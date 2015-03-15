@@ -108,7 +108,6 @@ void BatchElement::upgrade_ports() {
 	int io = 1;
 	bool is_inline =
 			(_ports[io] >= _inline_ports && _ports[io] <= _inline_ports + INLINE_PORTS);
-    click_chatter("Upgrading %s (%p)",name().c_str(),this);
 	BatchPort* newports = new BatchPort[_nports[io]];
 	for (int i = 0; i < _nports[io]; i++) {
 		newports[i].assign(io,_ports[io][i].element(),_ports[io][i].port());
@@ -125,7 +124,7 @@ void BatchElement::upgrade_ports() {
 void BatchElement::check_unbatch() {
 	for (int i = 0; i < noutputs(); i++) {
 		if (!output(i).output_supports_batch) {
-			click_chatter("Warning ! %s (%p) is not compatible with batch. Performance will be slightly worst.",output(i).element()->name().c_str(), output(i).element());
+			click_chatter("Warning ! %s is not compatible with batch. Performance will be slightly reduced.",output(i).element()->name().c_str());
 			PushToPushBatchVisitor v(static_cast<BatchElement::BatchPort>(output(i)).getDownstreamBatches());
 			router()->visit(this,1,i,&v);
 		}

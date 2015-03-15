@@ -14,7 +14,6 @@ class per_thread
 	} __attribute__((aligned(64))) AT;
 
 	void initialize(unsigned int n, T v) {
-        click_chatter("Size %u",n);
 	    _size = n;
         storage = new AT[_size];
         for (int i = 0; i < n; i++) {
