@@ -1177,6 +1177,7 @@ dnl note: no longer need pcap under Linux
 
 if test "$enable_userlevel" = yes; then
     CLICK_CHECK_LIBPCAP
+    CLICK_CHECK_NUMA
     CLICK_CHECK_NETMAP
     if test "$HAVE_PCAP" != yes -a "$HAVE_NETMAP" != yes -a "$ac_cv_under_linux" != yes; then
         AC_MSG_WARN([
@@ -1990,6 +1991,11 @@ fi
 dnl add 'netmap' if netmap support is available
 if test "x$HAVE_NETMAP" = xyes; then
     provisions="$provisions netmap"
+fi
+
+dnl add 'numa' if numa support is available
+if test "x$HAVE_NUMA" = xyes; then
+    provisions="$provisions numa"
 fi
 
 dnl add 'pcap' if libpcap is available

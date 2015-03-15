@@ -662,6 +662,7 @@ XML2CLICK
 PROPER_LIBS
 PROPER_INCLUDES
 NETMAP_INCLUDES
+NUMA_INCLUDES
 PCAP_LIBS
 PCAP_INCLUDES
 TOOL_TARGETS
@@ -844,6 +845,7 @@ enable_dmalloc
 enable_valgrind
 enable_schedule_debugging
 enable_intel_cpu
+with_numa
 with_netmap
 with_proper
 with_expat
@@ -1544,6 +1546,7 @@ Optional Packages:
   --with-linux-map[=FILE] filename for Linux System.map [LINUXDIR/System.map]
   --with-freebsd[=SRC,INC] FreeBSD source code is in SRC [/usr/src/sys],
                           include directory is INC [/usr/include]
+  --with-numa             enable numa [no]
   --with-netmap           enable netmap [no]
   --with-proper[=PREFIX]  use PlanetLab Proper library (optional)
   --with-expat[=PREFIX]   locate expat XML library (optional)
@@ -10580,6 +10583,71 @@ done
 
 
 
+# Check whether --with-numa was given.
+if test "${with_numa+set}" = set; then :
+  withval=$with_numa; use_numa=$withval
+else
+  use_numa=no
+fi
+
+
+    if test "$use_numa" != "yes" -a "$use_numa" != "no"; then
+        if test "${NUMA_INCLUDES-NO}" != NO; then
+            :
+        elif test -f "$use_numa/numa.h"; then
+            NUMA_INCLUDES="-I$use_numa"
+        fi
+    fi
+    saveflags="$CPPFLAGS"
+    CPPFLAGS="$saveflags $NUMA_INCLUDES"
+
+    HAVE_NUMA=no
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for numa.h" >&5
+$as_echo_n "checking for numa.h... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <numa.h>
+_ACEOF
+if ac_fn_c_try_cpp "$LINENO"; then :
+  ac_cv_numa_header_path="found"
+else
+  ac_cv_numa_header_path="not found"
+fi
+rm -f conftest.err conftest.i conftest.$ac_ext
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_numa_header_path" >&5
+$as_echo "$ac_cv_numa_header_path" >&6; }
+
+    if test "$ac_cv_net_numa_header_path" = "found"; then
+        HAVE_NUMA=yes
+    fi
+
+    if test "$HAVE_NUMA" = yes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether numa.h works" >&5
+$as_echo_n "checking whether numa.h works... " >&6; }
+if ${ac_cv_working_numa_h+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+            cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <numa.h>
+_ACEOF
+if ac_fn_c_try_cpp "$LINENO"; then :
+  ac_cv_working_numa_h=yes
+else
+  ac_cv_working_numa_h=no
+fi
+rm -f conftest.err conftest.i conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_working_numa_h" >&5
+$as_echo "$ac_cv_working_numa_h" >&6; }
+        test "$ac_cv_working_numa_h" != yes && HAVE_NUMA=
+    fi
+
+
+
+
+
 # Check whether --with-netmap was given.
 if test "${with_netmap+set}" = set; then :
   withval=$with_netmap; use_netmap=$withval
@@ -13339,6 +13407,10 @@ fi
 
 if test "x$HAVE_NETMAP" = xyes; then
     provisions="$provisions netmap"
+fi
+
+if test "x$HAVE_NUMA" = xyes; then
+    provisions="$provisions numa"
 fi
 
 if test "x$HAVE_PCAP" = xyes; then
