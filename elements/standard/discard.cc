@@ -52,12 +52,21 @@ Discard::initialize(ErrorHandler *errh)
     return 0;
 }
 
+#if HAVE_BATCH
+void
+Discard::push_batch(int, PacketBatch *head)
+{
+    _count+=head->count();
+    head->kill();
+}
+#else
 void
 Discard::push(int, Packet *p)
 {
     _count++;
     p->kill();
 }
+#endif
 
 bool
 Discard::run_task(Task *)

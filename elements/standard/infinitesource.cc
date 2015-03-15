@@ -121,12 +121,30 @@ InfiniteSource::run_task(Task *)
     int n = _burstsize;
     if (_limit >= 0 && _count + n >= (ucounter_t) _limit)
 	n = (_count > (ucounter_t) _limit ? 0 : _limit - _count);
+#if HAVE_BATCH
+    PacketBatch* head = NULL;
+    Packet* last = NULL;
+	for (int i = 0; i < n; i++) {
+		if (head == NULL) {
+			head = PacketBatch::start_head(_packet->clone());
+			last = head;
+		} else {
+			last->set_next(_packet->clone());
+			last = last->next();
+		}
+	    if (_timestamp)
+	    	last->timestamp_anno().assign_now();
+	}
+	if (n > 0)
+		output(0).push_batch(head->make_tail(last,n));
+#else
     for (int i = 0; i < n; i++) {
 	Packet *p = _packet->clone();
 	if (_timestamp)
 	    p->timestamp_anno().assign_now();
 	output(0).push(p);
     }
+#endif
     _count += n;
     if (n > 0)
 	_task.fast_reschedule();

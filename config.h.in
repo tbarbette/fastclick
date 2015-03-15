@@ -95,6 +95,9 @@
 /* Define if 64-bit integer types are enabled. */
 #undef HAVE_INT64_TYPES
 
+/* Define if Batching support is enabled. */
+#undef HAVE_BATCH
+
 /* Define if IPv6 support is enabled. */
 #undef HAVE_IP6
 

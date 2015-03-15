@@ -28,6 +28,7 @@
 #include <click/straccum.hh>
 #include <click/elemfilter.hh>
 #include <click/routervisitor.hh>
+#include <click/batchelement.hh>
 #include <click/confparse.hh>
 #include <click/timer.hh>
 #include <click/master.hh>
@@ -1164,6 +1165,27 @@ Router::initialize(ErrorHandler *errh)
 		element_stage[i] = Element::CLEANUP_CONFIGURED;
 	}
     }
+
+#if HAVE_BATCH
+    if (all_ok) {
+        for (int ord = 0; ord < _elements.size(); ord++) {
+            int i = _element_configure_order[ord], r;
+            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
+            if (e != NULL) {
+                e->upgrade_ports();
+            }
+        }
+
+        for (int ord = 0; ord < _elements.size(); ord++) {
+            int i = _element_configure_order[ord], r;
+            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
+            if (e != NULL) {
+                e->check_unbatch();
+            }
+        }
+    }
+
+#endif
 
 #if CLICK_DMALLOC
     CLICK_DMALLOC_REG("iHoo");

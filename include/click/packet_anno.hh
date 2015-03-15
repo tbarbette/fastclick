@@ -57,6 +57,11 @@
 #define SET_MISC_IP_ANNO(p, v)		((p)->set_anno_u32(MISC_IP_ANNO_OFFSET, (v).addr()))
 
 // bytes 24-27
+#define BATCH_COUNT_ANNO_OFFSET		24
+#define BATCH_COUNT_ANNO_SIZE		2
+#define BATCH_COUNT_ANNO(p)		((p)->anno_u16(BATCH_COUNT_ANNO_OFFSET))
+#define SET_BATCH_COUNT_ANNO(p, v)	((p)->set_anno_u16(BATCH_COUNT_ANNO_OFFSET, (v)))
+
 #define EXTRA_PACKETS_ANNO_OFFSET	24
 #define EXTRA_PACKETS_ANNO_SIZE		4
 #define EXTRA_PACKETS_ANNO(p)		((p)->anno_u32(EXTRA_PACKETS_ANNO_OFFSET))

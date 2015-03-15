@@ -816,6 +816,7 @@ enable_ethernet
 enable_etherswitch
 enable_grid
 enable_icmp
+enable_batch
 enable_ip
 enable_ip6
 enable_ipsec
@@ -1504,6 +1505,7 @@ Optional Features:
   --enable-etherswitch    include Ethernet switch elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
+  --disable-batch         do not enable batching
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
   --enable-ipsec          include IP security elements
@@ -6918,6 +6920,18 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_icmp" = xNO -o "x$enable_icmp" = x \) && enable_icmp=yes
 if test "x$enable_icmp" = xyes; then
     :
+
+fi
+# Check whether --enable-batch was given.
+if test "${enable_batch+set}" = set; then :
+  enableval=$enable_batch;
+else
+  enable_batch=yes
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_batch" = xNO -o "x$enable_batch" = x \) && enable_batch=yes
+if test "x$enable_batch" = xyes; then
+    :
+    $as_echo "#define HAVE_BATCH 1" >>confdefs.h
 
 fi
 # Check whether --enable-ip was given.

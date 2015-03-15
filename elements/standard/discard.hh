@@ -1,6 +1,6 @@
 #ifndef CLICK_DISCARD_HH
 #define CLICK_DISCARD_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/task.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
@@ -51,7 +51,7 @@ Resets "count" to 0.
 
 =a Queue */
 
-class Discard : public Element { public:
+class Discard : public BatchElement { public:
 
     Discard() CLICK_COLD;
 
@@ -62,7 +62,12 @@ class Discard : public Element { public:
     int initialize(ErrorHandler *errh) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch*);
+#else
     void push(int, Packet *);
+#endif
+
     bool run_task(Task *);
 
   protected:

@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKIPHEADER_HH
 #define CLICK_CHECKIPHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 class Args;
@@ -104,7 +104,7 @@ subdivided by error. Only available if the DETAILS keyword argument was true.
 =a CheckIPHeader2, MarkIPHeader, SetIPChecksum, StripIPHeader,
 CheckTCPHeader, CheckUDPHeader, CheckICMPHeader */
 
-class CheckIPHeader : public Element { public:
+class CheckIPHeader : public BatchElement { public:
 
   CheckIPHeader() CLICK_COLD;
   ~CheckIPHeader() CLICK_COLD;
@@ -117,7 +117,11 @@ class CheckIPHeader : public Element { public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;
 
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#else
   Packet *simple_action(Packet *);
+#endif
 
   struct OldBadSrcArg {
       static bool parse(const String &str, Vector<IPAddress> &result,
@@ -158,6 +162,7 @@ class CheckIPHeader : public Element { public:
   };
   static const char * const reason_texts[NREASONS];
 
+  inline Reason valid(Packet* p);
   Packet *drop(Reason, Packet *);
   static String read_handler(Element *, void *) CLICK_COLD;
 

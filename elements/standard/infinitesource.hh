@@ -1,6 +1,6 @@
 #ifndef CLICK_INFINITESOURCE_HH
 #define CLICK_INFINITESOURCE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/task.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
@@ -99,7 +99,7 @@ Makes the element active or inactive.
 
 RatedSource, Script */
 
-class InfiniteSource : public Element, public ActiveNotifier { public:
+class InfiniteSource : public BatchElement, public ActiveNotifier { public:
 
   InfiniteSource() CLICK_COLD;
 

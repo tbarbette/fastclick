@@ -150,35 +150,40 @@ CheckIPHeader::drop(Reason reason, Packet *p)
     if (_reason_drops)
 	_reason_drops[reason]++;
 
+#if HAVE_BATCH
+    if (noutputs() == 2)
+        output(1).push_batch(PacketBatch::make_from_packet(p));
+    else
+    	p->kill();
+#else
     if (noutputs() == 2)
 	output(1).push(p);
     else
 	p->kill();
+#endif
 
     return 0;
 }
 
-Packet *
-CheckIPHeader::simple_action(Packet *p)
-{
+inline CheckIPHeader::Reason CheckIPHeader::valid(Packet* p) {
   const click_ip *ip = reinterpret_cast<const click_ip *>(p->data() + _offset);
   unsigned plen = p->length() - _offset;
   unsigned hlen, len;
 
   // cast to int so very large plen is interpreted as negative
   if ((int)plen < (int)sizeof(click_ip))
-    return drop(MINISCULE_PACKET, p);
+    return MINISCULE_PACKET;
 
   if (ip->ip_v != 4)
-    return drop(BAD_VERSION, p);
-
+    return BAD_VERSION;
+    
   hlen = ip->ip_hl << 2;
   if (hlen < sizeof(click_ip))
-    return drop(BAD_HLEN, p);
+    return BAD_HLEN;
 
   len = ntohs(ip->ip_len);
   if (len > plen || len < hlen)
-    return drop(BAD_IP_LEN, p);
+    return BAD_IP_LEN;
 
   if (_checksum) {
     int val;
@@ -193,7 +198,7 @@ CheckIPHeader::simple_action(Packet *p)
     val = click_in_cksum((const unsigned char *)ip, hlen);
 #endif
     if (val != 0)
-      return drop(BAD_CHECKSUM, p);
+      return BAD_CHECKSUM;
   }
 
   /*
@@ -203,7 +208,7 @@ CheckIPHeader::simple_action(Packet *p)
    */
   if (find(_bad_src.begin(), _bad_src.end(), IPAddress(ip->ip_src)) < _bad_src.end()
       && find(_good_dst.begin(), _good_dst.end(), IPAddress(ip->ip_dst)) == _good_dst.end())
-    return drop(BAD_SADDR, p);
+    return BAD_SADDR;
 
   /*
    * RFC1812 4.2.3.1: discard illegal destinations.
@@ -222,8 +227,57 @@ CheckIPHeader::simple_action(Packet *p)
   // reported by Parveen Kumar Patel at Utah -- 4/3/2002
   p->set_dst_ip_anno(ip->ip_dst);
 
-  return(p);
+  return NREASONS;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+CheckIPHeader::simple_action_batch(PacketBatch* head) {
+	Packet* current = head;
+	Packet* last = head;
+	int c = head->count();
+	Reason r;
+	int dropped = 0;
+	while (current != NULL) {
+		if ((r = valid(current)) == NREASONS) {
+			last = current;
+			current = current->next();
+		} else {
+			dropped++;
+			if (current == head) {
+				head = PacketBatch::make_from_packet(current->next());
+				current->set_next(NULL);
+				drop(r,current);
+				current = head;
+				last = head;
+			} else {
+				Packet* todrop = current;
+				current = current->next();
+				todrop->set_next(NULL);
+				drop(r,todrop);
+				last->set_next(current);
+			}
+		}
+	}
+	if (dropped && head) {
+		head->set_count(c - dropped);
+		head->set_tail(last);
+	}
+	return head;
+}
+#else
+Packet *
+CheckIPHeader::simple_action(Packet *p)
+{
+  Reason r;
+  if ((r = valid(p)) == NREASONS)
+	  return p;
+  else {
+	  drop(r, p);
+	  return NULL;
+  }
+}
+#endif
 
 String
 CheckIPHeader::read_handler(Element *e, void *)

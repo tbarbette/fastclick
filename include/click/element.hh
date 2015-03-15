@@ -25,6 +25,9 @@ class EtherAddress;
 #ifndef CLICK_ELEMENT_DEPRECATED
 # define CLICK_ELEMENT_DEPRECATED CLICK_DEPRECATED
 #endif
+#if HAVE_BATCH
+class BatchElement;
+#endif
 
 class Element { public:
 
@@ -234,6 +237,9 @@ class Element { public:
 	union {
 	    void (*push)(Element *e, int port, Packet *p);
 	    Packet *(*pull)(Element *e, int port);
+#if HAVE_BATCH
+        void (*push_batch)(BatchElement *e, int port, PacketBatch *p);
+#endif
 	} _bound;
 #endif
 
@@ -248,7 +254,7 @@ class Element { public:
 	inline void assign(bool isoutput, Element *owner, Element *e, int port);
 
 	friend class Element;
-
+    friend class BatchElement;
     };
 
     // DEPRECATED
@@ -257,7 +263,7 @@ class Element { public:
     String landmark() const CLICK_DEPRECATED;
     /** @endcond never */
 
-  private:
+  protected:
 
     enum { INLINE_PORTS = 4 };
 
@@ -265,7 +271,7 @@ class Element { public:
     Port _inline_ports[INLINE_PORTS];
 
     int _nports[2];
-
+  private:
     Router* _router;
     int _eindex;
 
@@ -314,6 +320,7 @@ class Element { public:
 # if CLICK_USERLEVEL
     friend class SelectSet;
 # endif
+    friend class BatchPort;
 #endif
 
 };

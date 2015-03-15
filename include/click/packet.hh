@@ -4,6 +4,7 @@
 #include <click/ipaddress.hh>
 #include <click/glue.hh>
 #include <click/timestamp.hh>
+#include <click/packet_anno.hh>
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
 #else
@@ -807,6 +808,199 @@ class WritablePacket : public Packet { public:
 
 };
 
+/**
+ * Batch of packet
+ *
+ * Internally, the head contains all the information usefull for the batch. The
+ *  prev annotation points to the tail, the next to the next packet. It is
+ *  implemented by a *simply* linked list. The BATCH_COUNT annotation is set
+ *  on the first packet of the batch to remember the number of packets in the
+ *  batch.
+ *
+ * Batches must not mix cloned and unique packets. Use cut to split batches and have part of them cloned.
+ */
+class PacketBatch : public WritablePacket {
+
+//Consider a batch size bigger as bogus (prevent infinite loop on bad pointer manipulation)
+#define MAX_BATCH_SIZE 8192
+
+public :
+
+    inline void set_tail(Packet* p) {
+        set_prev(p);
+    }
+
+	inline Packet* tail() {
+		return prev();
+	}
+
+	inline void append_batch(PacketBatch* head) {
+		tail()->set_next(head);
+		set_tail(head->tail());
+		set_count(count() + head->count());
+	}
+
+	inline void append_packet(Packet* p) {
+		tail()->set_next(p);
+		set_tail(p);
+		set_count(count() + 1);
+	}
+
+	/**
+	 * Return the number of packets in this batch
+	 */
+	inline unsigned count() {
+		unsigned int r = BATCH_COUNT_ANNO(this);
+		if (r) {
+			return r;
+		} else {
+			click_chatter("BUG No batch count annotation...?");
+			Packet* p = this;
+			while (p != NULL && r) {
+				if (r == MAX_BATCH_SIZE) {
+					click_chatter("BUG Batch of maximum batch size !");
+					return r;
+				}
+				p = p->next();
+				r++;
+			}
+			return r;
+		}
+	}
+
+	/**
+	 * @brief Start a new batch
+	 *
+	 * @param p A packet
+	 *
+	 * Creates a new batch, with @a p as the first packet. Batch is *NOT* valid
+	 * 	until you call make_tail().
+	 */
+	inline static PacketBatch* start_head(Packet* p) {
+		return static_cast<PacketBatch*>(p);
+	}
+
+	/**
+	 * @brief Finish a batch started with start_head()
+	 *
+	 * @param last The last packet of the batch
+	 * @param count The number of packets in the batch
+	 *
+     * @return The whole packet batch
+     *
+	 * This will set up the batch with the last packet. set_next() have to be called for each packet from the head to the @a last packet !
+	 */
+	inline PacketBatch* make_tail(Packet* last, unsigned int count) {
+		set_count(count);
+		if (last == NULL) {
+			if (count != 1)
+				click_chatter("BUG in make_tail : last packet is the head, but count is %u",count);
+			set_tail(this);
+			set_next(NULL);
+		} else {
+			set_tail(last);
+			last->set_next(NULL);
+		}
+        return this;
+	}
+
+	/**
+	 * Set the number of packets in this batch
+	 */
+	inline void set_count(unsigned int c) {
+		SET_BATCH_COUNT_ANNO(this,c);
+	}
+
+	/**
+	 * @brief Cut a batch in two batches
+	 *
+	 * @param middle The last packet of the first batch
+	 * @param first_batch_count The number of packets in the first batch
+	 * @param second Reference to set the head of the second batch
+	 */
+	inline void cut(Packet* middle, int first_batch_count, PacketBatch* &second) {
+		if (middle == NULL) {
+			second = NULL;
+			click_chatter("BUG Warning : cutting a batch without a location to cut !");
+			return;
+		}
+
+		if (middle == tail()) {
+			second = NULL;
+			return;
+		}
+
+		int total_count = count();
+
+		second = static_cast<PacketBatch*>(middle->next());
+		middle->set_next(NULL);
+
+		Packet* second_tail = tail();
+		set_tail(middle);
+
+		second->set_tail(second_tail);
+		second->set_count(total_count - first_batch_count);
+
+		set_count(first_batch_count);
+	}
+
+	/**
+	 * Build a batch from a linked list of packet
+	 *
+	 * @param head The first packet of the batch
+	 * @param size Number of packets in the linkedlist
+	 *
+	 * The "prev" annotation of the first packet must point to the last packet of the linked list
+	 */
+	inline static PacketBatch* make_from_list(Packet* head, unsigned int size) {
+		PacketBatch* b = static_cast<PacketBatch*>(head);
+		b->set_count(size);
+		return b;
+	}
+
+	/**
+	 * Build a batch from a linked list of packet
+	 *
+	 * @param head The first packet of the batch
+	 * @param tail The last packet of the batch
+	 * @param size Number of packets in the linkedlist
+	 */
+	inline static PacketBatch* make_from_simple_list(Packet* head, Packet* tail, unsigned int size) {
+		PacketBatch* b = make_from_list(head,size);
+		b->set_tail(tail);
+		return b;
+	}
+
+	/**
+	 * Make a batch composed of a single packet
+	 */
+	inline static PacketBatch* make_from_packet(Packet* p) {
+		PacketBatch* b =  static_cast<PacketBatch*>(p);
+		b->set_count(1);
+		b->set_tail(b);
+		return b;
+	}
+
+	/**
+	 * Return the first packet of this batch
+	 */
+	inline Packet* begin() {
+		return this;
+	}
+
+	/**
+	 * Return the last packet of this batch
+	 */
+	inline Packet* end() {
+		return tail();
+	}
+
+	/**
+	 * Kill all packets in the batch
+	 */
+	inline unsigned int kill();
+
+};
 
 /** @brief Clear all packet annotations.
  * @param  all  If true, clear all annotations.  If false, clear only Click's
@@ -2411,6 +2605,18 @@ WritablePacket::buffer_data() const
     return const_cast<unsigned char *>(Packet::buffer());
 }
 /** @endcond never */
+
+inline unsigned int PacketBatch::kill() {
+    unsigned int i = 0;
+    Packet* head = this;
+    while (head != NULL) {
+        i++;
+        Packet* next = head->next();
+        head->kill();
+        head = next;
+    }
+    return i;
+}
 
 CLICK_ENDDECLS
 #endif
