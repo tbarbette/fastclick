@@ -153,6 +153,9 @@ class Timer { public:
     /** @brief Return the Timer's associated home thread ID. */
     int home_thread_id() const;
 
+    /** @brief Change the home thread. Will only apply at next schedule
+     * @param tid the new thread id */
+    void move_thread(int tid);
 
     /** @brief Initialize the timer.
      * @param owner the owner element

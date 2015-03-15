@@ -404,6 +404,21 @@ click_invalid_processor()
 extern __thread int click_current_thread_id;
 #endif
 
+inline click_processor_t
+click_cpu_id()
+{
+#if CLICK_LINUXMODULE
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)
+    return smp_processor_id();
+# else
+    return current->processor;
+# endif
+#elif CLICK_USERLEVEL && HAVE_MULTITHREAD && HAVE___THREAD_STORAGE_CLASS
+    return click_current_thread_id;
+#else
+    return 0;
+#endif
+}
 
 // TIMEVALS AND JIFFIES
 // click_jiffies_t is the type of click_jiffies() and must be unsigned.

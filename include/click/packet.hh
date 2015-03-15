@@ -94,8 +94,14 @@ class Packet { public:
     struct mbuf *steal_m();
     struct mbuf *dup_jumbo_m(struct mbuf *mbuf);
 #elif CLICK_USERLEVEL || CLICK_MINIOS
+    void set_buffer_destructor(buffer_destructor_type destructor) {
+    	_destructor = destructor;
+    }
     buffer_destructor_type buffer_destructor() const {
 	return _destructor;
+    }
+    void* destructor_argument() const {
+    	return _destructor_argument;
     }
     void reset_buffer() {
 	assert(!shared());

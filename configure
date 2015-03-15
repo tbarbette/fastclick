@@ -702,6 +702,7 @@ minios_dir
 xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
+USE_DPDK
 PTHREAD_LIBS
 AR_CREATEFLAGS
 STRIP
@@ -791,6 +792,7 @@ enable_user_multithread
 enable_select
 enable_poll
 enable_kqueue
+enable_dpdk
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -816,6 +818,7 @@ enable_ethernet
 enable_etherswitch
 enable_grid
 enable_icmp
+enable_zerocopy
 enable_ip
 enable_ip6
 enable_ipsec
@@ -1483,6 +1486,7 @@ Optional Features:
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
+    --enable-dpdk         use Intel DPDK
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -1504,6 +1508,7 @@ Optional Features:
   --enable-etherswitch    include Ethernet switch elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
+  --disable-zerocopy      do not use zero copy
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
   --enable-ipsec          include IP security elements
@@ -6478,6 +6483,46 @@ $as_echo "#define HAVE_ALLOW_KQUEUE 1" >>confdefs.h
 
 fi
 
+# Check whether --enable-dpdk was given.
+if test "${enable_dpdk+set}" = set; then :
+  enableval=$enable_dpdk; :
+else
+  enable_dpdk=no
+fi
+
+
+if test "x$enable_dpdk" = "xyes"; then
+    if test "x$enable_user_multithread" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk requires --enable-user-multithread which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    if test ! -f "$RTE_SDK/$RTE_TARGET/include/rte_eal.h"; then
+        as_fn_error $? "
+=========================================
+
+Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for Intel DPDK.
+Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
+
+=========================================" "$LINENO" 5
+    fi
+    if test ! -f "$RTE_SDK/$RTE_TARGET/lib/librte_eal.a"; then
+        as_fn_error $? "
+=========================================
+
+Cannot find \$RTE_SDK/\$RTE_TARGET/lib/librte_eal.a for Intel DPDK.
+Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define HAVE_DPDK 1" >>confdefs.h
+
+    USE_DPDK=yes
+
+fi
 
 
 # Check whether --enable-linuxmodule was given.
@@ -6918,6 +6963,18 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_icmp" = xNO -o "x$enable_icmp" = x \) && enable_icmp=yes
 if test "x$enable_icmp" = xyes; then
     :
+
+fi
+# Check whether --enable-zerocopy was given.
+if test "${enable_zerocopy+set}" = set; then :
+  enableval=$enable_zerocopy;
+else
+  enable_zerocopy=yes
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_zerocopy" = xNO -o "x$enable_zerocopy" = x \) && enable_zerocopy=yes
+if test "x$enable_zerocopy" = xyes; then
+    :
+    $as_echo "#define HAVE_ZEROCOPY 1" >>confdefs.h
 
 fi
 # Check whether --enable-ip was given.
@@ -13309,6 +13366,10 @@ esac
 
 if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
+fi
+
+if test "x$enable_dpdk" = xyes; then
+    provisions="$provisions dpdk"
 fi
 
 if test "x$enable_experimental" = xyes; then

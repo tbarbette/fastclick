@@ -57,6 +57,27 @@ inline void assign_consume(T &x, const V &y)
     x = y;
 }
 
+/** @brief return the minimum of two values
+ */
+template<typename _Tp>
+  inline const _Tp&
+  min(const _Tp& __a, const _Tp& __b)
+  {
+    if (__b < __a)
+	return __b;
+    return __a;
+  }
+
+/** @brief return the minimum of two values
+ */
+template<typename _Tp>
+  inline const _Tp&
+  max(const _Tp& __a, const _Tp& __b)
+  {
+    if (__b > __a)
+	return __b;
+    return __a;
+  }
 
 template <typename T, typename U = void> struct do_nothing;
 
