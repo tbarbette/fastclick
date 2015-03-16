@@ -31,6 +31,7 @@
 #include <click/master.hh>
 #include <click/straccum.hh>
 #include <click/etheraddress.hh>
+#include <click/routervisitor.hh>
 #if CLICK_DEBUG_SCHEDULING
 # include <click/notifier.hh>
 #endif
@@ -1663,6 +1664,35 @@ Element::home_thread() const
     return master()->thread(router()->home_thread_id(this));
 }
 
+class InputThreadVisitor: public RouterVisitor {
+public:
+     Bitvector& bitmask;
+     bool fullpush;
+
+     InputThreadVisitor(Bitvector& b): bitmask(b), fullpush(true) {}
+
+     virtual bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance) {
+         bool ret = e->get_runnable_threads(bitmask);
+         if (ret == false)
+             fullpush = false;
+         return ret;
+     }
+};
+
+bool Element::get_runnable_threads(Bitvector& bmp) {
+    return true;
+}
+
+Bitvector Element::get_threads() {
+    Bitvector b(master()->nthreads());
+    InputThreadVisitor visitor(b);
+    router()->visit(this,false,-1,&visitor);
+    _is_fullpush = visitor.fullpush;
+    if (!_is_fullpush)
+        router()->non_fullpush();
+    return b;
+}
 
 // SELECT
 
