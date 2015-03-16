@@ -265,7 +265,7 @@ CheckIPHeader::simple_action_batch(PacketBatch* head) {
 	}
 	return head;
 }
-#else
+#endif
 Packet *
 CheckIPHeader::simple_action(Packet *p)
 {
@@ -277,7 +277,6 @@ CheckIPHeader::simple_action(Packet *p)
 	  return NULL;
   }
 }
-#endif
 
 String
 CheckIPHeader::read_handler(Element *e, void *)

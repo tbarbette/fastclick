@@ -13,6 +13,10 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
+const bool BatchElement::need_batch() const {
+    return false;
+}
+
 BatchElement::BatchElement() : current_batch(NULL),inflow(0)
 {
 
@@ -65,6 +69,33 @@ inline void BatchElement::BatchPort::assign(bool isoutput, Element *e, int port)
 	#endif
 }
 
+/**
+ * Assign an element to this port
+ */
+inline void BatchElement::PullBatchPort::bound() {
+    #if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
+    if (dynamic_cast<BatchElement*>(element()) != NULL) {
+            PacketBatch *(BatchElement::*flow_pull)(int) = &BatchElement::pull_batch;
+            _bound.pull_batch = (PacketBatch * (*)(BatchElement *, int)) (static_cast<BatchElement*>(element())->*flow_pull);
+    }
+    #endif
+}
+
+PacketBatch* BatchElement::PullBatchPort::pull_batch() const {
+    PacketBatch* batch = NULL;
+    if (likely(dynamic_cast<BatchElement*>(_e) != NULL)) {
+#if HAVE_BOUND_PORT_TRANSFER
+        batch = _bound.pull_batch(static_cast<BatchElement*>(_e),_port);
+#else
+        batch = static_cast<BatchElement*>(_e)->pull_batch(_port);
+#endif
+        return batch;
+    } else {
+        click_chatter("unsupported pull batch");
+        MAKE_BATCH(Element::Port::pull(),batch);
+        return batch;
+    }
+}
 
 /**
  * RouterVisitor finding all reachable BatchElement from another given BatchElement
@@ -79,20 +110,28 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
 			Element *from_e, int from_port, int distance) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
 		if (batch_e != NULL) {
-			//We add this only if it's not reconstruction for just one element...
-			bool makesense = true;
+			/*We add this only if it's not reconstruction for just one element
+		        or if the elements only supports batches*/
 
-			//Check if all elements downstream support batch
-			for (int i = 0; i < batch_e->nports(isoutput); i++) {
-				if (dynamic_cast<BatchElement*>(batch_e->port(isoutput, i).element()) == NULL) {
-					makesense = false;
-					break;
-				}
+			bool reconstruct_batch = true;
+
+			if (!batch_e->need_batch()) {
+                //Check if all elements downstream support batch
+                for (int i = 0; i < batch_e->nports(isoutput); i++) {
+                    if (dynamic_cast<BatchElement*>(batch_e->port(isoutput, i).element()) == NULL) {
+                        reconstruct_batch = false;
+                        break;
+                    }
+                }
 			}
-			if (makesense) {
+
+			if (reconstruct_batch) {
 				_list.push_back(batch_e);
+				return false;
+			} else {
+			    return true;
 			}
-			return false;
+
 		};
 		return true;
 	}
@@ -105,6 +144,9 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
  * Upgrade the ports of this element to support communication between batch-compatible elements
  */
 void BatchElement::upgrade_ports() {
+    for (int i = 0; i < _nports[0]; i++) {
+        ((PullBatchPort&)_ports[0][i]).bound();
+    }
 	int io = 1;
 	bool is_inline =
 			(_ports[io] >= _inline_ports && _ports[io] <= _inline_ports + INLINE_PORTS);
@@ -118,12 +160,12 @@ void BatchElement::upgrade_ports() {
 }
 
 /**
- * Check if input and unput elements support batching. If they don't, ports
+ * Check if input and output elements support batching. If they don't, ports
  * 	will be set in support mode to unbatch/rebatch on batch request
  */
 void BatchElement::check_unbatch() {
 	for (int i = 0; i < noutputs(); i++) {
-		if (!output(i).output_supports_batch) {
+		if (output_is_push(i) && !output(i).output_supports_batch) {
 			click_chatter("Warning ! %s is not compatible with batch. Performance will be slightly reduced.",output(i).element()->name().c_str());
 			PushToPushBatchVisitor v(static_cast<BatchElement::BatchPort>(output(i)).getDownstreamBatches());
 			router()->visit(this,1,i,&v);

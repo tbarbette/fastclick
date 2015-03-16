@@ -16,21 +16,58 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
+#define BATCH_MAX_PULL 1024
+
 class BatchElement : public Element { public:
 	BatchElement();
 
 	~BatchElement();
 
-	virtual PacketBatch* simple_action_batch(PacketBatch* p) {
-		click_chatter("Warning in %s : simple_action_batch should be implemented",name().c_str());
-		return PacketBatch::make_from_packet(simple_action(p));
+	virtual const bool need_batch() const;
+
+	virtual PacketBatch* simple_action_batch(PacketBatch* batch) {
+        click_chatter("Warning in %s : simple_action_batch should be implemented."
+         " This element is useless, batch will be returned untouched.",name().c_str());
+        return batch;
 	}
+
+#define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != NULL;p=p->next())
+
+#define FOR_EACH_PACKET_SAFE(batch,p) \
+                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                for(Packet* p = batch;next != NULL;p=next,next = next->next())
+
+#define MAKE_BATCH(fnt,head) {\
+        head = PacketBatch::start_head(fnt);\
+        Packet* last = head;\
+        if (head != NULL) {\
+            unsigned int count = 1;\
+            do {\
+                Packet* current = fnt;\
+                if (current == NULL)\
+                    break;\
+                last->set_next(current);\
+                last = current;\
+                count++;\
+            }\
+            while (count < BATCH_MAX_PULL);\
+            head->make_tail(last,count);\
+        } else head = NULL;\
+}
 
 	virtual void push_batch(int port, PacketBatch* head) {
 		head = simple_action_batch(head);
 		if (head)
 			output(port).push_batch(head);
 	}
+
+	virtual PacketBatch* pull_batch(int port) {
+	    PacketBatch* head = input(port).pull_batch();
+	    if (head) {
+	        head = simple_action_batch(head);
+	    }
+	    return head;
+    }
 
 	per_thread<PacketBatch*> current_batch;
 
@@ -55,8 +92,12 @@ class BatchElement : public Element { public:
 					current_batch.get()->append_packet(p);
 				}
 		}
-		else
+		else if (need_batch()) {
+		    click_chatter("BUG : lonely packet sent to an element which needs batch !");
 			push_batch(port,PacketBatch::make_from_packet(p));
+		} else {
+		    push(port,p);
+		}
 	};
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
@@ -87,11 +128,23 @@ class BatchElement : public Element { public:
 
 	};
 
+	class PullBatchPort : public Port {
+	    public :
+	    PacketBatch* pull_batch() const;
+	    void bound();
+	};
+
 	inline const BatchPort&
 	output(int port)
 	{
 	    return static_cast<const BatchPort&>(static_cast<BatchElement::BatchPort*>(_ports[1])[port]);
 	}
+
+	inline const PullBatchPort&
+	input(int port)
+    {
+        return static_cast<const PullBatchPort&>(_ports[0][port]);
+    }
 
 	void upgrade_ports();
 	void check_unbatch();

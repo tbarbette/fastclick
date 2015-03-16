@@ -112,16 +112,15 @@ class CheckIPHeader : public BatchElement { public:
   const char *class_name() const		{ return "CheckIPHeader"; }
   const char *port_count() const		{ return PORTS_1_1X2; }
   const char *processing() const		{ return PROCESSING_A_AH; }
-  const char *flags() const			{ return "A"; }
+  const char *flags() const			{ return Element::AGNOSTIC; }
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;
 
 #if HAVE_BATCH
   PacketBatch *simple_action_batch(PacketBatch *);
-#else
-  Packet *simple_action(Packet *);
 #endif
+  Packet *simple_action(Packet *);
 
   struct OldBadSrcArg {
       static bool parse(const String &str, Vector<IPAddress> &result,

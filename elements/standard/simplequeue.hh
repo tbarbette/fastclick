@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_SIMPLEQUEUE_HH
 #define CLICK_SIMPLEQUEUE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/standard/storage.hh>
 CLICK_DECLS
 
@@ -62,7 +62,7 @@ When written, drops all packets in the queue.
 
 =a Queue, NotifierQueue, MixedQueue, RED, FrontDropQueue, ThreadSafeQueue */
 
-class SimpleQueue : public Element, public Storage { public:
+class SimpleQueue : public BatchElement, public Storage { public:
 
     SimpleQueue() CLICK_COLD;
 
@@ -96,6 +96,11 @@ class SimpleQueue : public Element, public Storage { public:
 
     void push(int port, Packet*);
     Packet* pull(int port);
+
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *);
+    PacketBatch* pull_batch(int port);
+#endif
 
   protected:
 

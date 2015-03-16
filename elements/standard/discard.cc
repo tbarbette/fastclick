@@ -59,24 +59,31 @@ Discard::push_batch(int, PacketBatch *head)
     _count+=head->count();
     head->kill();
 }
-#else
+#endif
 void
 Discard::push(int, Packet *p)
 {
     _count++;
     p->kill();
 }
-#endif
 
 bool
 Discard::run_task(Task *)
 {
-    unsigned x = _burst;
+    int x = _burst;
+#if HAVE_BATCH
+    PacketBatch* batch;
+    while (x && (batch = input(0).pull_batch())) {
+        x -= batch->count();
+        batch->kill();
+    }
+#else
     Packet *p;
     while (x && (p = input(0).pull())) {
 	p->kill();
 	--x;
     }
+#endif
     unsigned sent = _burst - x;
 
     _count += sent;
