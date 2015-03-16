@@ -117,6 +117,12 @@ class InfiniteSource : public BatchElement, public ActiveNotifier { public:
   bool run_task(Task *);
   Packet *pull(int);
 
+#if HAVE_BATCH
+  PacketBatch* pull_batch(int port) {
+      return pull_myself_batch(port);
+  }
+#endif
+
   protected:
 
 #if HAVE_INT64_TYPES

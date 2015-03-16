@@ -64,9 +64,9 @@ class Discard : public BatchElement { public:
 
 #if HAVE_BATCH
     void push_batch(int, PacketBatch*);
-#else
-    void push(int, Packet *);
 #endif
+    void push(int, Packet *);
+
 
     bool run_task(Task *);
 

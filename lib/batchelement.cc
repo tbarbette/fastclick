@@ -13,6 +13,10 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
+const bool BatchElement::need_batch() const {
+    return false;
+}
+
 BatchElement::BatchElement() : current_batch(NULL),inflow(0)
 {
 
@@ -65,6 +69,37 @@ inline void BatchElement::BatchPort::assign(bool isoutput, Element *e, int port)
 	#endif
 }
 
+PacketBatch* BatchElement::PullBatchPort::pull_batch() const {
+    PacketBatch* batch = NULL;
+    if (likely(dynamic_cast<BatchElement*>(_e) != NULL)) {
+#if HAVE_BOUND_PORT_TRANSFER
+        batch = _bound.pull_batch(static_cast<BatchElement*>(_e),_port);
+#else
+        batch = static_cast<BatchElement*>(_e)->pull_batch(_port);
+#endif
+        return batch;
+    } else {
+        Packet* last;
+        unsigned int count = 0;
+        do {
+            Packet* current =  Element::Port::pull();
+            if (current == NULL)
+                break;
+
+            if (batch == NULL) {
+                batch = PacketBatch::start_head(current);
+            } else
+                last->set_next(current);
+            last = current;
+            count++;
+        } while (count < BATCH_MAX_PULL);
+
+        if (batch != NULL)
+            return batch->make_tail(last, count);
+        else
+            return NULL;
+    }
+}
 
 /**
  * RouterVisitor finding all reachable BatchElement from another given BatchElement
@@ -79,20 +114,28 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
 			Element *from_e, int from_port, int distance) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
 		if (batch_e != NULL) {
-			//We add this only if it's not reconstruction for just one element...
-			bool makesense = true;
+			/*We add this only if it's not reconstruction for just one element
+		        or if the elements only supports batches*/
 
-			//Check if all elements downstream support batch
-			for (int i = 0; i < batch_e->nports(isoutput); i++) {
-				if (dynamic_cast<BatchElement*>(batch_e->port(isoutput, i).element()) == NULL) {
-					makesense = false;
-					break;
-				}
+			bool reconstruct_batch = true;
+
+			if (!batch_e->need_batch()) {
+                //Check if all elements downstream support batch
+                for (int i = 0; i < batch_e->nports(isoutput); i++) {
+                    if (dynamic_cast<BatchElement*>(batch_e->port(isoutput, i).element()) == NULL) {
+                        reconstruct_batch = false;
+                        break;
+                    }
+                }
 			}
-			if (makesense) {
+
+			if (reconstruct_batch) {
 				_list.push_back(batch_e);
+				return false;
+			} else {
+			    return true;
 			}
-			return false;
+
 		};
 		return true;
 	}

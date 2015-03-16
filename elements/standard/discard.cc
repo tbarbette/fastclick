@@ -59,14 +59,13 @@ Discard::push_batch(int, PacketBatch *head)
     _count+=head->count();
     head->kill();
 }
-#else
+#endif
 void
 Discard::push(int, Packet *p)
 {
     _count++;
     p->kill();
 }
-#endif
 
 bool
 Discard::run_task(Task *)

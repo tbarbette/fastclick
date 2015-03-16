@@ -16,14 +16,40 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
+#define BATCH_MAX_PULL 1024
+
 class BatchElement : public Element { public:
 	BatchElement();
 
 	~BatchElement();
 
-	virtual PacketBatch* simple_action_batch(PacketBatch* p) {
-		click_chatter("Warning in %s : simple_action_batch should be implemented",name().c_str());
-		return PacketBatch::make_from_packet(simple_action(p));
+	virtual const bool need_batch() const;
+
+	virtual PacketBatch* simple_action_batch(PacketBatch* batch) {
+        click_chatter("Warning in %s : simple_action_batch should be implemented."
+         " This element is useless, batch will be returned untouched.",name().c_str());
+        return batch;
+	}
+
+
+	PacketBatch* pull_myself_batch(int port) {
+	    PacketBatch* head = PacketBatch::start_head(pull(port));
+	    Packet* last = head;
+	    if (head != NULL) {
+	        unsigned int count = 1;
+	        do {
+	            Packet* current = pull(port);
+	            if (current == NULL)
+	                break;
+	            last->set_next(current);
+	            last = current;
+	            count++;
+	        }
+	        while (count < BATCH_MAX_PULL);
+
+	        return head->make_tail(last,count);
+	    }
+	    return NULL;
 	}
 
 	virtual void push_batch(int port, PacketBatch* head) {
@@ -31,6 +57,14 @@ class BatchElement : public Element { public:
 		if (head)
 			output(port).push_batch(head);
 	}
+
+	virtual PacketBatch* pull_batch(int port) {
+	    PacketBatch* head = input(port).pull_batch();
+	    if (head) {
+	        head = simple_action_batch(head);
+	    }
+	    return head;
+    }
 
 	per_thread<PacketBatch*> current_batch;
 
@@ -87,11 +121,22 @@ class BatchElement : public Element { public:
 
 	};
 
+	class PullBatchPort : public Port {
+	    public :
+	    PacketBatch* pull_batch() const;
+	};
+
 	inline const BatchPort&
 	output(int port)
 	{
 	    return static_cast<const BatchPort&>(static_cast<BatchElement::BatchPort*>(_ports[1])[port]);
 	}
+
+	inline const PullBatchPort&
+	input(int port)
+    {
+        return static_cast<const PullBatchPort&>(_ports[0][port]);
+    }
 
 	void upgrade_ports();
 	void check_unbatch();
