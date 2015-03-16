@@ -31,26 +31,29 @@ class BatchElement : public Element { public:
         return batch;
 	}
 
+#define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != NULL;p=p->next())
 
-	PacketBatch* pull_myself_batch(int port) {
-	    PacketBatch* head = PacketBatch::start_head(pull(port));
-	    Packet* last = head;
-	    if (head != NULL) {
-	        unsigned int count = 1;
-	        do {
-	            Packet* current = pull(port);
-	            if (current == NULL)
-	                break;
-	            last->set_next(current);
-	            last = current;
-	            count++;
-	        }
-	        while (count < BATCH_MAX_PULL);
+#define FOR_EACH_PACKET_SAFE(batch,p) \
+                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                for(Packet* p = batch;next != NULL;p=next,next = next->next())
 
-	        return head->make_tail(last,count);
-	    }
-	    return NULL;
-	}
+#define MAKE_BATCH(fnt,head) {\
+        head = PacketBatch::start_head(fnt);\
+        Packet* last = head;\
+        if (head != NULL) {\
+            unsigned int count = 1;\
+            do {\
+                Packet* current = fnt;\
+                if (current == NULL)\
+                    break;\
+                last->set_next(current);\
+                last = current;\
+                count++;\
+            }\
+            while (count < BATCH_MAX_PULL);\
+            head->make_tail(last,count);\
+        } else head = NULL;\
+}
 
 	virtual void push_batch(int port, PacketBatch* head) {
 		head = simple_action_batch(head);
@@ -89,8 +92,12 @@ class BatchElement : public Element { public:
 					current_batch.get()->append_packet(p);
 				}
 		}
-		else
+		else if (need_batch()) {
+		    click_chatter("BUG : lonely packet sent to an element which needs batch !");
 			push_batch(port,PacketBatch::make_from_packet(p));
+		} else {
+		    push(port,p);
+		}
 	};
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
@@ -124,6 +131,7 @@ class BatchElement : public Element { public:
 	class PullBatchPort : public Port {
 	    public :
 	    PacketBatch* pull_batch() const;
+	    void bound();
 	};
 
 	inline const BatchPort&

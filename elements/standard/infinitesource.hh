@@ -119,7 +119,9 @@ class InfiniteSource : public BatchElement, public ActiveNotifier { public:
 
 #if HAVE_BATCH
   PacketBatch* pull_batch(int port) {
-      return pull_myself_batch(port);
+      PacketBatch* batch;
+      MAKE_BATCH(pull(port),batch);
+      return batch;
   }
 #endif
 

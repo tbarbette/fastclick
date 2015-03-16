@@ -134,6 +134,20 @@ SimpleQueue::cleanup(CleanupStage)
     _q = 0;
 }
 
+#if HAVE_BATCH
+    void SimpleQueue::push_batch(int port, PacketBatch* batch) {
+        FOR_EACH_PACKET(batch,p) {
+            push(port, p);
+        }
+    }
+
+    PacketBatch* SimpleQueue::pull_batch(int port) {
+        PacketBatch* batch;
+        MAKE_BATCH(deq(),batch);
+        return batch;
+    }
+#endif
+
 void
 SimpleQueue::push(int, Packet *p)
 {
