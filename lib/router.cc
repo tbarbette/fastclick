@@ -83,7 +83,7 @@ Router::Router(const String &configuration, Master *master)
       _configuration(configuration),
       _notifier_signals(0),
       _arena_factory(new HashMap_ArenaFactory),
-      _hotswap_router(0), _thread_sched(0), _name_info(0), _next_router(0)
+      _hotswap_router(0), _thread_sched(0), _is_fullpush(true), _name_info(0), _next_router(0)
 {
     _refcount = 0;
     _runcount = 0;
