@@ -136,7 +136,7 @@ SimpleQueue::cleanup(CleanupStage)
 
 #if HAVE_BATCH
     void SimpleQueue::push_batch(int port, PacketBatch* batch) {
-        FOR_EACH_PACKET(batch,p) {
+        FOR_EACH_PACKET_SAFE(batch,p) {
             push(port, p);
         }
     }
