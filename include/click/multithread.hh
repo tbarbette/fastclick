@@ -2,9 +2,17 @@
 #ifndef CLICK_MULTITHREAD_HH
 #define CLICK_MULTITHREAD_HH
 
+#include <click/config.h>
+
 CLICK_DECLS
 
 extern int nthreads;
+
+#if CLICK_USERLEVEL && HAVE_MULTITHREAD
+#  define GET_CPU_ID() click_current_thread_id
+#else
+#  define GET_CPU_ID() click_current_processor()
+#endif
 
 template <typename T>
 class per_thread
@@ -52,49 +60,49 @@ public:
 
 
 	inline T* operator->() const {
-    	return &(storage[click_current_thread_id].v);
+        return &(storage[GET_CPU_ID()].v);
     }
     inline T& operator*() const {
-    	return storage[click_current_thread_id].v;
+        return storage[GET_CPU_ID()].v;
     }
 
     inline T& operator+=(const T& add) const {
-    	storage[click_current_thread_id].v += add;
-        return storage[click_current_thread_id].v;
+        storage[GET_CPU_ID()].v += add;
+        return storage[GET_CPU_ID()].v;
     }
 
     inline T& operator++() const { // prefix ++
-        return ++(storage[click_current_thread_id].v);
+        return ++(storage[GET_CPU_ID()].v);
     }
 
     inline T operator++(int) const { // postfix ++
-        return storage[click_current_thread_id].v++;
+        return storage[GET_CPU_ID()].v++;
     }
 
     inline T& operator--() const {
-        return --(storage[click_current_thread_id].v);
+        return --(storage[GET_CPU_ID()].v);
     }
 
     inline T operator--(int) const {
-    	return storage[click_current_thread_id].v--;
+        return storage[GET_CPU_ID()].v--;
     }
 
     inline T& operator=(T value) const {
-        storage[click_current_thread_id].v = value;
-        return storage[click_current_thread_id].v;
+        storage[GET_CPU_ID()].v = value;
+        return storage[GET_CPU_ID()].v;
     }
 
     inline void set(T v) {
-    	storage[click_current_thread_id].v = v;
+        storage[GET_CPU_ID()].v = v;
     }
 
     inline void setAll(T v) {
-    	for (int i = 0; i < nthreads; i++)
-    		storage[i].v = v;
+        for (int i = 0; i < nthreads; i++)
+            storage[i].v = v;
     }
 
     inline T& get() const{
-    	return storage[click_current_thread_id].v;
+        return storage[GET_CPU_ID()].v;
     }
 
     inline T& get_value_for_thread(int i) const{
@@ -106,11 +114,11 @@ public:
     }
 
     inline size_t size() {
-    	return _size;
+        return _size;
     }
 
     inline T& get_value(int i) const{
-    	return storage[i].v;
+        return storage[i].v;
     }
 
     inline void set_value(int i, T v) {
