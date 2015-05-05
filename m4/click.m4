@@ -460,6 +460,48 @@ AC_DEFUN([CLICK_CHECK_NETMAP], [
     AC_SUBST(NETMAP_INCLUDES)
 ])
 
+dnl
+dnl CLICK_CHECK_NUMA
+dnl Finds header files for numa.
+dnl
+
+AC_DEFUN([CLICK_CHECK_NUMA], [
+    AC_ARG_WITH([numa],
+        [AS_HELP_STRING([--with-numa], [enable numa [no]])],
+        [use_numa=$withval], [use_numa=no])
+
+    if test "$use_numa" != "yes" -a "$use_numa" != "no"; then
+        if test "${NUMA_INCLUDES-NO}" != NO; then
+            :
+        elif test -f "$use_numa/numa.h"; then
+            NUMA_INCLUDES="-I$use_numa"
+        fi
+    fi
+    saveflags="$CPPFLAGS"
+    CPPFLAGS="$saveflags $NUMA_INCLUDES"
+
+    HAVE_NUMA=no
+    AC_MSG_CHECKING([for numa.h])
+    AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <numa.h>]])],
+        [ac_cv_numa_header_path="found"],
+        [ac_cv_numa_header_path="not found"])
+    AC_MSG_RESULT($ac_cv_numa_header_path)
+
+    if test "$ac_cv_net_numa_header_path" = "found"; then
+        HAVE_NUMA=yes
+    fi
+
+    if test "$HAVE_NUMA" = yes; then
+        AC_CACHE_CHECK([whether numa.h works],
+            [ac_cv_working_numa_h], [
+            AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <numa.h>]])],
+                [ac_cv_working_numa_h=yes],
+                [ac_cv_working_numa_h=no])])
+        test "$ac_cv_working_numa_h" != yes && HAVE_NUMA=
+    fi
+
+    AC_SUBST(NUMA_INCLUDES)
+])
 
 dnl
 dnl CLICK_PROG_INSTALL

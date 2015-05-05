@@ -9,6 +9,7 @@
 #include <click/master.hh>
 #include <click/multithread.hh>
 #include <click/standard/scheduleinfo.hh>
+#include <click/numa.hh>
 
 class QueueDevice : public Element {
 
