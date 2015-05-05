@@ -139,6 +139,20 @@ protected:
         thread_state->_dropped += n;
     }
 
+    bool get_runnable_threads(Bitvector& bmk)
+    {
+    	if (noutputs()) { //RX
+    		for (int i = 0; i < nqueues; i++) {
+    			for (int j = 0; j < queue_share; j++) {
+    				bmk[thread_for_queue(i) - j] = 1;
+    			}
+    		}
+    		return true;
+    	} else { //TX
+    		return true;
+    	}
+    }
+
     /*
      * Configure a RX side of a queuedevice. Take cares of setting user max
      *  threads, queues and offset and registering this rx device for later

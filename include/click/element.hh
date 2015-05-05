@@ -45,6 +45,10 @@ class Element { public:
     virtual void selected(int fd);
 #endif
 
+    virtual bool get_runnable_threads(Bitvector& b);
+    inline bool is_fullpush() const;
+    Bitvector get_threads();
+
     inline void checked_output_push(int port, Packet *p) const;
     inline Packet* checked_input_pull(int port) const;
 
@@ -268,6 +272,7 @@ class Element { public:
 
     Router* _router;
     int _eindex;
+    bool _is_fullpush;
 
 #if CLICK_STATS >= 2
     // STATISTICS
@@ -683,6 +688,19 @@ Element::Port::pull() const
 #endif
     return p;
 }
+
+/**
+ * @brief Tell if the path up to this element is a full push path
+ *
+ * @pre get_threads() have to be called on this element or any downstream element
+ *
+ * If this element is part of a full push path, it means that packets passing
+ *  through will always be handled by the same thread and are not shared.
+ */
+inline bool Element::is_fullpush() const {
+    return _is_fullpush;
+}
+
 
 /** @brief Push packet @a p to output @a port, or kill it if @a port is out of
  * range.

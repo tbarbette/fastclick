@@ -59,7 +59,6 @@ int QueueDevice::configure_rx(int numa_node,unsigned int maxthreads, unsigned in
 }
 
 int QueueDevice::configure_tx(unsigned int maxthreads,unsigned int minqueues, unsigned int maxqueues, ErrorHandler *) {
-	usable_threads.assign(master()->nthreads(),true);
     _maxthreads = maxthreads;
     _minqueues = minqueues;
     _maxqueues = maxqueues;
@@ -67,13 +66,19 @@ int QueueDevice::configure_tx(unsigned int maxthreads,unsigned int minqueues, un
     return 0;
 }
 
-int QueueDevice::initialize_tx(ErrorHandler *) {
+int QueueDevice::initialize_tx(ErrorHandler * errh) {
+    usable_threads.assign(master()->nthreads(),false);
+    usable_threads = get_threads();
 
     int n_threads;
     if (_maxthreads == -1)
         n_threads = usable_threads.weight();
     else
         n_threads = min(_maxthreads,usable_threads.weight());
+
+    if (n_threads == 0) {
+        return errh->error("No threads end up in this queuedevice...? Aborting.");
+    }
 
     nqueues = min(_maxqueues,n_threads);
     nqueues = max(_minqueues,nqueues);

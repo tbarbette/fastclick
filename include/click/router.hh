@@ -90,6 +90,8 @@ class Router { public:
     inline ThreadSched* thread_sched() const;
     inline void set_thread_sched(ThreadSched* scheduler);
     inline int home_thread_id(const Element *e) const;
+    inline bool is_fullpush() const;
+    inline void non_fullpush();
 
     /** @cond never */
     // Needs to be public for NameInfo, but not useful outside
@@ -290,6 +292,7 @@ class Router { public:
     HashMap_ArenaFactory* _arena_factory;
     Router* _hotswap_router;
     ThreadSched* _thread_sched;
+    bool _is_fullpush;
     mutable NameInfo* _name_info;
     Vector<int> _flow_code_override_eindex;
     Vector<String> _flow_code_override;
@@ -450,6 +453,25 @@ Router::home_thread_id(const Element *e) const
 	return _element_home_thread_ids[e->eindex() + 1];
     else
 	return hard_home_thread_id(e);
+}
+
+/**
+ * @brief Tell if the whole router is in full push mode
+ *
+ * @pre getThreads() has been called on all final elements
+ *
+ * If true, all packets of this router are always handled by the same thread
+ *  (but mutltiple threads can handle different packets). This means that
+ *  sharing can be disabled.
+ */
+inline bool
+Router::is_fullpush() const {
+    return _is_fullpush;
+}
+
+inline void
+Router::non_fullpush() {
+    _is_fullpush = false;
 }
 
 /** @cond never */

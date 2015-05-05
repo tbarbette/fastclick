@@ -60,8 +60,6 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
     configure_tx(maxthreads,1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
 
-
-
     if (_burst > _device->some_nmd->some_ring->num_slots / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
@@ -72,18 +70,6 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 int ToNetmapDevice::initialize(ErrorHandler *errh)
 {
     int ret;
-
-    //If full push, and a thread is assign, we set it as the only thread which can push packets to this element
-    if (!input_is_pull(0) && router()->thread_sched() != NULL && router()->thread_sched()->initial_home_thread_id(this) != ThreadSched::THREAD_UNKNOWN) {
-    	int thread_id = router()->thread_sched()->initial_home_thread_id(this);
-    	click_chatter("Element %s is assigned to thread %d : double check that only this thread will push packets to this element !\n", name().c_str(),thread_id); // Will be auto-detected by bitvector
-        usable_threads.assign(master()->nthreads(),false);
-        usable_threads[thread_id] = true;
-    } else {
-    	int thread_id = this->home_thread()->thread_id();
-    	usable_threads.assign(master()->nthreads(),false);
-    	usable_threads[thread_id] = true;
-    }
 
     ret = initialize_tx(errh);
     if (ret != 0)
