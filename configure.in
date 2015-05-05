@@ -1220,6 +1220,7 @@ if test "$enable_userlevel" = yes; then
     CLICK_CHECK_LIBPCAP
     CLICK_CHECK_NUMA
     CLICK_CHECK_NETMAP
+
     if test "$HAVE_PCAP" != yes -a "$HAVE_NETMAP" != yes -a "$ac_cv_under_linux" != yes; then
         AC_MSG_WARN([
 =========================================
@@ -1233,7 +1234,6 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     AC_DEFINE(HAVE_USERLEVEL_DRIVER)
     HAVE_USERLEVEL_DRIVER=1
 fi
-
 
 dnl other user-level specifics
 

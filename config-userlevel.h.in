@@ -47,6 +47,9 @@
 /* Define if a Click user-level driver uses Netmap. */
 #undef HAVE_NETMAP
 
+/* Define if you have the <nuda.h> header file. */
+#undef HAVE_NUMA
+
 /* Define if dynamic linking is possible. */
 #undef HAVE_DYNAMIC_LINKING
 
