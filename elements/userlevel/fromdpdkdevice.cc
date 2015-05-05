@@ -109,9 +109,16 @@ bool FromDpdkDevice::run_task(Task * t)
     for (int iqueue = queue_for_thread_begin(); iqueue<=queue_for_thread_end();iqueue++) {
         unsigned n = rte_eth_rx_burst(_port_no, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
+#if HAVE_ZEROCOPY
+    rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
+    WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
+                     rte_pktmbuf_data_len(pkts[i]), DpdkDevice::free_pkt,
+                     pkts[i]);
+#else
             WritablePacket *p = Packet::make((void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
+#endif
             p->set_packet_type_anno(HOST);
             output(0).push(p);
         }

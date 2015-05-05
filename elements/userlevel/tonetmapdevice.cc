@@ -281,9 +281,19 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 			slot = &txring->slot[cur];
 			slot->len = p->length();
 
-			unsigned char* dstdata = (unsigned char*)NETMAP_BUF(txring, slot->buf_idx);
-			void* srcdata = (void*)(p->data());
-			memcpy(dstdata,srcdata,p->length());
+#if HAVE_ZEROCOPY
+			if (likely(NetmapBufQ::is_netmap_packet(p))) {
+				((NetmapBufQ*)(p->destructor_argument()))->insert(slot->buf_idx);
+				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				slot->flags |= NS_BUF_CHANGED;
+				p->set_buffer_destructor(NetmapBufQ::buffer_destructor_fake);
+			} else
+#endif
+			{
+				unsigned char* dstdata = (unsigned char*)NETMAP_BUF(txring, slot->buf_idx);
+				void* srcdata = (void*)(p->data());
+				memcpy(dstdata,srcdata,p->length());
+			}
 
 			p->kill();
 			sent++;

@@ -121,6 +121,9 @@
 #undef HAVE_TASK_HEAP
 #endif
 
+/* Use zerocopy */
+#undef HAVE_ZEROCOPY
+
 /* The size of a `int', as computed by sizeof. */
 #undef SIZEOF_INT
 
