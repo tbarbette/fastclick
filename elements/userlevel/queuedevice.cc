@@ -51,11 +51,6 @@ int QueueDevice::configure_rx(int numa_node,unsigned int maxthreads, unsigned in
         _this_node = numa_node;
     #endif
 
-    if (numa_node >= 0)
-    	_this_node = numa_node;
-    else
-    	_this_node = 0;
-
     if (_maxthreads == -1 || _threadoffset == -1) {
         inputs_count[_this_node] ++;
         if (inputs_count[_this_node] == 1)
@@ -102,13 +97,16 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
     NumaCpuBitmask b =  NumaCpuBitmask::allocate();
-    if (numa && (numa_available()==0)) {
+#if HAVE_NUMA
+    if (numa_available()==0)) {
         if (_this_node >= 0) {
             b = Numa::node_to_cpus(_this_node);
         } else
             b = Numa::all_cpu();
         b.toBitvector( usable_threads);
-    } else {
+    } else
+#endif
+    {
         usable_threads.negate();
     }
        for (int i = nthreads; i < usable_threads.size(); i++)
