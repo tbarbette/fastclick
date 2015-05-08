@@ -815,7 +815,10 @@ class WritablePacket : public Packet { public:
 };
 
 /**
- * Batch of packet
+ * Batch of Packet.
+ * This class has no field member and can be cast to or from Packet. It is
+ *  only there as a way to remember what we are handling and provide useful
+ *  functions for managing packets as a batch.
  *
  * Internally, the head contains all the information usefull for the batch. The
  *  prev annotation points to the tail, the next to the next packet. It is
