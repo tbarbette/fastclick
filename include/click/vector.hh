@@ -189,6 +189,7 @@ class Vector {
     inline iterator insert(iterator it, value_argument_type v);
     inline iterator erase(iterator it);
     inline iterator erase(iterator a, iterator b);
+    inline void fill(T value);
 
     inline void clear();
 
@@ -454,6 +455,15 @@ inline typename Vector<T>::iterator
 Vector<T>::erase(iterator a, iterator b) {
     return (iterator) vm_.erase(array_memory_type::cast(a),
 				array_memory_type::cast(b));
+}
+
+template <typename T>
+inline void
+Vector<T>::fill(T value) {
+	Vector<T>::iterator __first = begin();
+	Vector<T>::iterator __last = end();
+	for (; __first != __last; ++__first)
+		*__first = value;
 }
 
 /** @brief Remove all elements.

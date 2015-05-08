@@ -256,6 +256,12 @@ Timer::home_thread_id() const
 }
 
 void
+Timer::move_thread(int tid)
+{
+    _thread = _owner->master()->thread(tid);
+}
+
+void
 Timer::schedule_at_steady(const Timestamp &when)
 {
     // acquire lock, unschedule

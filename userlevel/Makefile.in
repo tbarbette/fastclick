@@ -100,6 +100,14 @@ COMPILE = $(CC) $(DEFS) $(INCLUDES) $(CPPFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 
+USE_DPDK = @USE_DPDK@
+ifeq ($(USE_DPDK),yes)
+include dpdk.mk
+EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+endif
+
+EXTRA_DRIVER_OBJS := netmapdevice.o
+
 ifndef MINDRIVER
 DRIVER = click
 ELEMENTSCONF = elements

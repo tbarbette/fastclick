@@ -487,10 +487,17 @@ AC_DEFUN([CLICK_CHECK_NUMA], [
         [ac_cv_numa_header_path="not found"])
     AC_MSG_RESULT($ac_cv_numa_header_path)
 
-    if test "$ac_cv_net_numa_header_path" = "found"; then
+    if test "$ac_cv_numa_header_path" = "found"; then
         HAVE_NUMA=yes
     fi
 
+    if test "$HAVE_NUMA" = yes; then
+        AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <nuda.h> header file.])
+        LDFLAGS="$LDFLAGS -lnuma"
+    fi
+    
+    
+    
     if test "$HAVE_NUMA" = yes; then
         AC_CACHE_CHECK([whether numa.h works],
             [ac_cv_working_numa_h], [

@@ -1,0 +1,194 @@
+// -*- c-basic-offset: 4; related-file-name: "queuedevice.hh" -*-
+/*
+ * queuedevice.{cc,hh} -- Base element for multiqueue/multichannel device
+ *
+ * Copyright (c) 2014 Tom Barbette, University of Liège
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
+ */
+#include <click/config.h>
+
+#include "queuedevice.hh"
+
+CLICK_DECLS
+
+int QueueDevice::n_initialized = 0;
+int QueueDevice::n_elements = 0;
+int QueueDevice::n_inputs = 0;
+int QueueDevice::use_nodes = 0;
+Vector<int> QueueDevice::inputs_count = Vector<int>();
+Vector<int> QueueDevice::shared_offset = Vector<int>();
+
+
+void QueueDevice::static_initialize() {
+    int num_nodes = Numa::get_max_numas();
+    shared_offset.resize(num_nodes);
+    inputs_count.resize(num_nodes);
+    inputs_count.fill(0);
+    shared_offset.fill(0);
+}
+
+int QueueDevice::configure_rx(int numa_node,unsigned int maxthreads, unsigned int minqueues, unsigned int maxqueues, unsigned int threadoffset, ErrorHandler *) {
+    _maxthreads = maxthreads;
+    _minqueues = minqueues;
+    _maxqueues = maxqueues;
+    _threadoffset = threadoffset;
+
+    usable_threads.assign(min(Numa::get_max_cpus(), master()->nthreads()),false);
+
+    #if !HAVE_NUMA
+        _this_node = 0;
+    #else
+        if (numa_node < 0) numa_node = 0;
+        _this_node = numa_node;
+    #endif
+
+    if (_maxthreads == -1 || _threadoffset == -1) {
+        inputs_count[_this_node] ++;
+        if (inputs_count[_this_node] == 1)
+            use_nodes++;
+    }
+    n_elements ++;
+    return 0;
+}
+
+int QueueDevice::configure_tx(unsigned int maxthreads,unsigned int minqueues, unsigned int maxqueues, ErrorHandler *) {
+    _maxthreads = maxthreads;
+    _minqueues = minqueues;
+    _maxqueues = maxqueues;
+    n_elements ++;
+    return 0;
+}
+
+int QueueDevice::initialize_tx(ErrorHandler * errh) {
+    usable_threads.assign(master()->nthreads(),false);
+    usable_threads = get_threads();
+
+    int n_threads;
+    if (_maxthreads == -1)
+        n_threads = usable_threads.weight();
+    else
+        n_threads = min(_maxthreads,usable_threads.weight());
+
+    if (n_threads == 0) {
+        return errh->error("No threads end up in this queuedevice...? Aborting.");
+    }
+
+    nqueues = min(_maxqueues,n_threads);
+    nqueues = max(_minqueues,nqueues);
+
+    queue_per_threads = nqueues / n_threads;
+    if (queue_per_threads == 0) {
+        queue_per_threads = 1;
+        thread_share = n_threads / nqueues;
+    }
+
+    n_initialized++;
+    click_chatter("%s : OUTPUT Using %d threads. %d queues so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+    return 0;
+}
+int QueueDevice::initialize_rx(ErrorHandler *errh) {
+    NumaCpuBitmask b =  NumaCpuBitmask::allocate();
+#if HAVE_NUMA
+    if (numa_available()==0) {
+        if (_this_node >= 0) {
+            b = Numa::node_to_cpus(_this_node);
+        } else
+            b = Numa::all_cpu();
+        b.toBitvector( usable_threads);
+    } else
+#endif
+    {
+        usable_threads.negate();
+    }
+       for (int i = nthreads; i < usable_threads.size(); i++)
+           usable_threads[i] = 0;
+
+       if (router()->thread_sched()) {
+           Bitvector v = router()->thread_sched()->assigned_thread();
+           if (v.size() < usable_threads.size())
+               v.resize(usable_threads.size());
+           if (v.weight() == usable_threads.weight())
+               click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
+           else
+               usable_threads &= (~v);
+       }
+
+       int cores_in_node = usable_threads.weight();
+
+       int n_threads;
+
+       if (_maxthreads == -1) {
+           n_threads = min(cores_in_node,master()->nthreads() / use_nodes) / inputs_count[_this_node];
+       } else {
+           n_threads = min(cores_in_node,_maxthreads);
+       }
+
+       if (n_threads == 0) {
+           n_threads = 1;
+           thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
+       }
+
+       if (n_threads > _maxqueues) {
+           queue_share = n_threads / _maxqueues;
+
+       }
+
+       if (_threadoffset == -1) {
+           _threadoffset = shared_offset[_this_node];
+           shared_offset[_this_node] += n_threads;
+       }
+
+       if (thread_share > 1)
+           _threadoffset = _threadoffset % (inputs_count[_this_node] / thread_share);
+       else
+           if (n_threads + _threadoffset > master()->nthreads())
+               _threadoffset = master()->nthreads() - n_threads;
+
+
+       nqueues = min(_maxqueues,n_threads);
+       nqueues = max(_minqueues,nqueues);
+
+       queue_per_threads = nqueues / n_threads;
+
+       if (queue_per_threads * n_threads < nqueues) queue_per_threads ++;
+
+       click_chatter("%s : INPUT Using thread %d to %d. %d queues per thread",name().c_str(),_threadoffset,_threadoffset + n_threads - 1,queue_per_threads);
+
+       int count = 0;
+       int offset = 0;
+       for (int b = 0; b < usable_threads.size(); b++) {
+           if (count >= n_threads) {
+               usable_threads[b] = false;
+           } else {
+               if (usable_threads[b]) {
+                   if (offset < _threadoffset) {
+                       usable_threads[b] = false;
+                       offset++;
+                   } else {
+                       count++;
+                   }
+               }
+           }
+       }
+
+
+       if (count < n_threads) {
+           return errh->error("Node has not enough threads for device !");
+       }
+
+       n_initialized++;
+
+       return 0;
+}
+
+CLICK_ENDDECLS
+ELEMENT_PROVIDES(QueueDevice)

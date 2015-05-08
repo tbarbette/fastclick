@@ -1,10 +1,13 @@
 #ifndef CLICK_NETMAPINFO_HH
 #define CLICK_NETMAPINFO_HH 1
 
+#include <click/netmapdevice.hh>
+
 #if HAVE_NET_NETMAP_H
 #include <net/if.h>
 #include <net/netmap.h>
 #include <net/netmap_user.h>
+
 
 // XXX bug in netmap_user.h , the prototype should be available
 
@@ -15,74 +18,6 @@ typedef void (*nm_cb_t)(u_char *, const struct nm_pkthdr *, const u_char *d);
 #include <click/packet.hh>
 #include <click/error.hh>
 CLICK_DECLS
-
-/* a queue of netmap buffers, by index */
-class NetmapBufQ {
-    unsigned char *buf_start;	/* base address */
-    unsigned int buf_size;
-    unsigned int max_index;	/* error checking */
-    unsigned char *buf_end; /* error checking */
-
-    unsigned int head;	/* index of first buffer */
-    unsigned int tail;	/* index of last buffer */
-    unsigned int count;	/* how many ? */
-
-  public:
-    inline unsigned int insert(unsigned int idx) {
-	if (idx >= max_index) {
-	    return 1; // error
-	}
-	unsigned int *p = reinterpret_cast<unsigned int *>(buf_start +
-		idx * buf_size);
-	// prepend
-	*p = head;
-	if (head == 0) {
-	    tail = idx;
-	}
-	head = idx;
-	count++;
-	return 0;
-    }
-    inline unsigned int insert_p(unsigned char *p) {
-	if (p < buf_start || p >= buf_end)
-	    return 1;
-	return insert((p - buf_start) / buf_size);
-    }
-    inline unsigned int extract() {
-	if (count == 0)
-	    return 0;
-	unsigned int idx = head;
-	unsigned int *p = reinterpret_cast<unsigned int *>(buf_start +
-		idx * buf_size);
-	head = *p;
-	count--;
-	return idx;
-    }
-    inline unsigned char * extract_p() {
-	unsigned int idx = extract();
-	return (idx == 0) ? 0 : buf_start + idx * buf_size;
-    }
-    inline int init (void *beg, void *end, uint32_t _size) {
-	click_chatter("Initializing NetmapBufQ %p size %d mem %p %p\n",
-		this, _size, beg, end);
-	head = tail = max_index = 0;
-	count = 0;
-	buf_size = 0;
-	buf_start = buf_end = 0;
-	if (_size == 0 || _size > 0x10000 ||
-		beg == 0 || end == 0 || end < beg) {
-	    click_chatter("NetmapBufQ %p bad args: size %d mem %p %p\n",
-		this, _size, beg, end);
-	    return 1;
-	}
-	buf_size = _size;
-	buf_start = reinterpret_cast<unsigned char *>(beg);
-	buf_end = reinterpret_cast<unsigned char *>(end);
-	max_index = (buf_end - buf_start) / buf_size;
-	// check max_index overflow ?
-	return 0;
-    }
-};
 
 /* a netmap port as returned by nm_open */
 class NetmapInfo { public:

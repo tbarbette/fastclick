@@ -72,6 +72,21 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+Bitvector StaticThreadSched::assigned_thread() {
+    Bitvector v(nthreads,0);
+    if (_next_thread_sched) {
+        v = _next_thread_sched->assigned_thread();
+    }
+    for (int i = 0; i < _thread_preferences.size(); i++) {
+        if (_thread_preferences[i] != THREAD_UNKNOWN) {
+            if (v.size() <= _thread_preferences[i])
+                v.resize(_thread_preferences[i]+1);
+            v[_thread_preferences[i]] = i;
+        }
+    }
+    return v;
+}
+
 int
 StaticThreadSched::initial_home_thread_id(const Element *e)
 {

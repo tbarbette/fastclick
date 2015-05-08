@@ -1,6 +1,11 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_THREADSCHED_HH
 #define CLICK_THREADSCHED_HH
+
+#include <click/bitvector.hh>
+
+extern int nthreads;
+
 CLICK_DECLS
 
 class ThreadSched { public:
@@ -11,6 +16,10 @@ class ThreadSched { public:
     virtual ~ThreadSched()		{ }
 
     virtual int initial_home_thread_id(const Element *e);
+
+    virtual Bitvector assigned_thread() {
+        return Bitvector(nthreads,0);
+    };
 
 };
 

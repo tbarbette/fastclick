@@ -41,6 +41,15 @@
 /* Define if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define if a Click user-level driver uses Intel DPDK. */
+#undef HAVE_DPDK
+
+/* Define if a Click user-level driver uses Netmap. */
+#undef HAVE_NETMAP
+
+/* Define if you have the <nuda.h> header file. */
+#undef HAVE_NUMA
+
 /* Define if dynamic linking is possible. */
 #undef HAVE_DYNAMIC_LINKING
 
@@ -219,6 +228,9 @@
 
 /* Define if you have the vsnprintf function. */
 #undef HAVE_VSNPRINTF
+
+/* Define if Zero-copy is enabled. */
+#undef HAVE_ZEROCOPY
 
 /* The size of a `click_jiffies_t', as computed by sizeof. */
 #define SIZEOF_CLICK_JIFFIES_T SIZEOF_INT
