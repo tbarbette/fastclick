@@ -22,6 +22,34 @@ CLICK_DECLS
  *
  * String Device name
  *
+ * =item IQUEUE (push mode only)
+ *
+ * Unsigned integer Number of packets that we can bufferize if all output rings are full while in push mode
+ *
+ * =item BLOCKANT (push mode only)
+ *
+ * Boolean. If true and packets are pushed and the IQUEUE is full, we'll block until there is space in the output ring, or we'll drop. Default true.
+ *
+ * =item MAXTHREADS
+ *
+ * Maximum number of threads to use.
+ *
+ * =item BURST
+ *
+ * Number of packets to batch before sending them out.
+ *
+ * =h n_sent read-only
+ *
+ * Returns the number of packets sent by the device.
+ *
+ * =h n_dropped read-only
+ *
+ * Returns the number of packets dropped by the device.
+ *
+ * =h reset_counts write-only
+ *
+ * Resets n_send and n_dropped counts to zero.
+ *
  */
 
 

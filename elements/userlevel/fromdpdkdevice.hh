@@ -29,10 +29,6 @@ CLICK_DECLS
  * received by devices put in DPDK mode will NOT be received by the kernel, and
  * will thus be processed only once.
  * 
- * Keyword arguments are:
- * 
- * =over 8
- * 
  * =item DEVNAME
  * 
  * String.  Device number

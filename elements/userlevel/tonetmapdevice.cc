@@ -29,7 +29,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _block(0), _internal_queue(512), _burst(32)
+ToNetmapDevice::ToNetmapDevice() : _block(1), _internal_queue(512), _burst(32)
 {
 
 }
@@ -39,16 +39,18 @@ int
 ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String ifname;
+    int maxthreads = -1;
 
     if (Args(conf, this, errh)
     .read_mp("DEVNAME", ifname)
   	.read_p("IQUEUE",_internal_queue)
 	.read_p("BLOCKANT",_block)
   	.read("BURST", _burst)
+	.read("MAXTHREADS",maxthreads)
   	.complete() < 0)
     	return -1;
 
-    int maxthreads = -1;
+
 
     if (_internal_queue < _burst * 2) {
         return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_queue, _burst);
@@ -171,32 +173,31 @@ ToNetmapDevice::push(int, Packet* p) {
 			s.q->set_prev(p);
 			s.q_size++;
 		} else {
-			//Todo : blockant
 			add_dropped(1);
 			p->kill();
 		}
 	}
 
-	if (s.q_size >= _burst) { //TODO : or timeout
-
+	if (s.q_size >= _burst) { //TODO "or if timeout", not implemented yet because batching solves this problem
+do_send:
 		Packet* last = s.q->prev();
 
 		/*As we arrive here once every packet, we just try to take the lock,
-			if we can't grab it, we'll simply re-try at the next packet*/
+			if we can't grab it, we'll simply re-try at the next packet
+			this should also set a timer to cope with very low throughput,
+			but again batching solves this problem*/
 		if (lock_attempt()) {
 			s.q->prev()->set_next(NULL);
-			//If it failed too much... We'll spinlock
-		} else if (unlikely(s.q_size > 2*_burst)) {
+		} else if (unlikely(s.q_size > 2*_burst || (_block && s.q_size >= _internal_queue))) {
+			//If it failed too much... We'll spinlock, or if we are in blockant mode and we need to block
 			s.q->prev()->set_next(NULL);
 			lock();
-		} else {
-			//"Failed lock but not too much packets are waiting
+		} else { //"Failed lock but not too much packets are waiting
 			return;
 		}
 
 		//Lock is acquired
 		unsigned int sent = send_packets(s.q,true);
-
 
 		if (sent > 0 && s.q)
 			s.q->set_prev(last);
@@ -217,6 +218,10 @@ ToNetmapDevice::push(int, Packet* p) {
 		}
 		unlock();
 
+		if (s.q && s.q_size >= _internal_queue && _block) {
+			allow_txsync();
+			goto do_send;
+		}
 	}
 }
 
@@ -320,7 +325,8 @@ ToNetmapDevice::run_task(Task* task)
 	s.q_size = 0;
 	do {
 		/* Difference from vanilla is that we build a batch up to _burst size
-		 * and then process it. */
+		 * and then process it. This allows to synchronize less often, which is
+		 * costly with netmap. */
 		if (!batch || batch_size < _burst) { //Create a batch up to _burst size, or less if no packets are available
 			Packet* last;
 			if (!batch) {
@@ -380,7 +386,6 @@ ToNetmapDevice::run_task(Task* task)
 }
 
 extern int nthreads;
-
 
 void
 ToNetmapDevice::cleanup(CleanupStage)
