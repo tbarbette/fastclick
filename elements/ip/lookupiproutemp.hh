@@ -19,12 +19,6 @@ CLICK_DECLS
  */
 
 class LookupIPRouteMP : public Element {
-#ifdef CLICK_LINUXMODULE
-  static const int _cache_buckets = NR_CPUS;
-#else
-  static const int _cache_buckets = 1;
-#endif
-
   struct cache_entry {
     IPAddress _last_addr_1;
     IPAddress _last_gw_1;
@@ -37,7 +31,11 @@ class LookupIPRouteMP : public Element {
 
   // XXX a bit annoying that we don't get better alignment =(
   int _pad[2];
-  struct cache_entry _cache[_cache_buckets];
+#if HAVE_USER_MULTITHREAD
+  struct cache_entry *_cache;
+#else
+  struct cache_entry _cache[NR_CPUS];
+#endif
 
   IPTable _t;
 
