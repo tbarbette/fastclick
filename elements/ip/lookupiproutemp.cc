@@ -35,14 +35,13 @@ CLICK_DECLS
 
 LookupIPRouteMP::LookupIPRouteMP()
 {
-
+#if HAVE_USER_MULTITHREAD
+    _cache = 0;
+#endif
 }
 
 LookupIPRouteMP::~LookupIPRouteMP()
 {
-#if HAVE_USER_MULTITHREAD
-    free(_cache);
-#endif
 }
 
 int
@@ -89,16 +88,24 @@ int
 LookupIPRouteMP::initialize(ErrorHandler *)
 {
 #if HAVE_USER_MULTITHREAD
-  _cache = (struct cache_entry*)malloc(sizeof(*_cache) * click_nr_cpu());
+  _cache = (struct cache_entry*)malloc(sizeof(*_cache) * click_max_cpu_ids());
 #endif
 
   click_chatter("LookupIPRouteMP alignment: %p, %p",
                 &(_cache[0]._last_addr_1), &(_cache[1]._last_addr_1));
-  for (int i=0; i<click_nr_cpu(); i++) {
+  for (unsigned i=0; i<click_max_cpu_ids(); i++) {
     _cache[i]._last_addr_1 = IPAddress();
     _cache[i]._last_addr_2 = IPAddress();
   }
   return 0;
+}
+
+void
+LookupIPRouteMP::cleanup(CleanupStage)
+{
+#if HAVE_USER_MULTITHREAD
+    free(_cache);
+#endif
 }
 
 void
