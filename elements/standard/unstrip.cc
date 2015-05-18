@@ -32,7 +32,30 @@ Unstrip::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     return Args(conf, this, errh).read_mp("LENGTH", _nbytes).complete();
 }
+#if HAVE_BATCH
+PacketBatch *
+Unstrip::simple_action_batch(PacketBatch *head)
+{
+	Packet* current = head;
+	Packet* last = NULL;
+	while (current != NULL) {
+	    Packet* pkt = current->push(_nbytes);
+	    if (pkt != current) {
+	        click_chatter("Warning : had not enough bytes to unstrip. Allocate more headroom !");
+            if (last) {
+                last->set_next(pkt);
+            } else {
+                head= static_cast<PacketBatch*>(pkt);
+            }
+            current = pkt;
+        }
+        last = current;
 
+		current = current->next();
+	}
+	return head;
+}
+#endif
 Packet *
 Unstrip::simple_action(Packet *p)
 {

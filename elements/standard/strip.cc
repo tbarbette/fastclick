@@ -33,6 +33,18 @@ Strip::configure(Vector<String> &conf, ErrorHandler *errh)
     return Args(conf, this, errh).read_mp("LENGTH", _nbytes).complete();
 }
 
+#if HAVE_BATCH
+PacketBatch *
+Strip::simple_action_batch(PacketBatch *head)
+{
+	Packet* current = head;
+	while (current != NULL) {
+		current->pull(_nbytes);
+		current = current->next();
+	}
+	return head;
+}
+#endif
 Packet *
 Strip::simple_action(Packet *p)
 {
