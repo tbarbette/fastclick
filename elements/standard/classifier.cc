@@ -248,6 +248,76 @@ Classifier::add_handlers()
     add_read_handler("program", Classifier::program_string, 0, Handler::CALM);
 }
 
+#if HAVE_BATCH
+void
+Classifier::push_batch(int, PacketBatch * p)
+{
+	PacketBatch* head = p;
+
+	PacketBatch* cur_head = p;
+	PacketBatch* last = NULL;
+
+	PacketBatch* out[noutputs() + 1];
+
+	memset(out,0,sizeof(PacketBatch*)*(noutputs()+1));
+
+	int last_o = -1;
+	int passed = 0;
+
+
+	while (p != NULL) {
+		int o = _prog.match(p); //Output of the current packet
+
+		if (o == last_o) {
+			//If same output than last packet, count
+			passed ++;
+			//Do nothing else, they are already linked
+		} else {
+			if (last == NULL) { //If it's the first packet
+				out[o] = p;
+				p->set_count(1);
+			} else {  //Cut the list
+				last->set_next(NULL);
+				out[last_o]->set_tail(last);
+				out[last_o]->set_count(out[last_o]->count() + passed);
+
+				if (!out[o]) {//If there wasn't any packet for this output
+					out[o] = PacketBatch::make_from_packet(p);
+				} else {
+					out[o]->append_packet(p);
+				}
+
+				//Reset the number of packets of the same output to 0
+				passed = 0;
+			}
+		}
+
+		last = p;
+		p = static_cast<PacketBatch*>(p->next());
+		last_o = o;
+	}
+
+	if (passed) { //If there was packet passed when we finished
+		out[last_o]->set_tail(last);
+		out[last_o]->set_count(out[last_o]->count() + passed);
+	}
+
+	//Effectively send the batches
+	int i = 0;
+	for (; i < noutputs(); i++) {
+		//click_chatter("%d %s",i,output(i).element()->name().c_str());
+		if (out[i]) {
+			//out[i]->tail()->set_next(NULL);
+			output(i).push_batch(out[i]);
+		}
+	}
+	if (out[noutputs()]) {
+		//out[i]->tail()->set_next(NULL);
+		out[i]->kill();
+	}
+}
+
+#endif
 void
 Classifier::push(int, Packet *p)
 {
