@@ -84,7 +84,7 @@ class BatchElement : public Element { public:
 		inflow.set(false);
 	}
 
-	void push(int port,Packet* p) {
+	virtual void push(int port,Packet* p) { //May still be extended
 		if (inflow.get()) {
 				if (current_batch.get() == NULL) {
 					current_batch.set(PacketBatch::make_from_packet(p));
@@ -96,13 +96,13 @@ class BatchElement : public Element { public:
 		    click_chatter("BUG : lonely packet sent to an element which needs batch !");
 			push_batch(port,PacketBatch::make_from_packet(p));
 		} else {
-		    push(port,p);
+		    Element::push(port,p);
 		}
 	};
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		 if ((unsigned) port < (unsigned) noutputs())
-			output(port).push_batch(batch);
+			 output(port).push_batch(batch);
 		 else
 			 batch->kill();
 	}

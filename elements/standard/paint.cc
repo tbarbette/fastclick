@@ -40,6 +40,18 @@ Paint::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+Paint::simple_action_batch(PacketBatch *p)
+{
+	Packet* cur = p;
+	while (cur != NULL) {
+		cur->set_anno_u8(_anno, _color);
+		cur = cur->next();
+	}
+    return p;
+}
+#endif
 Packet *
 Paint::simple_action(Packet *p)
 {

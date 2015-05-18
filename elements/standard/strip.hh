@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_STRIP_HH
 #define CLICK_STRIP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -18,7 +18,7 @@ CLICK_DECLS
  * =a StripToNetworkHeader, StripIPHeader, EtherEncap, IPEncap, Truncate
  */
 
-class Strip : public Element { public:
+class Strip : public BatchElement { public:
 
     Strip() CLICK_COLD;
 
@@ -27,7 +27,10 @@ class Strip : public Element { public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
+  Packet *simple_action(Packet *);
 
   private:
 

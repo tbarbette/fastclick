@@ -1,6 +1,6 @@
 #ifndef CLICK_UNSTRIP_HH
 #define CLICK_UNSTRIP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -18,7 +18,7 @@ CLICK_DECLS
  * =a EtherEncap, IPEncap
  */
 
-class Unstrip : public Element {
+class Unstrip : public BatchElement {
 
   unsigned _nbytes;
 
@@ -31,6 +31,9 @@ class Unstrip : public Element {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#endif
   Packet *simple_action(Packet *);
 
 };

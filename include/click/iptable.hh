@@ -20,6 +20,7 @@ class IPTable { public:
   void add(IPAddress dst, IPAddress mask, IPAddress gw, int index);
   void del(IPAddress dst, IPAddress mask);
   void clear()				{ _v.clear(); }
+  inline int size() { return _v.size(); }
 
  private:
 

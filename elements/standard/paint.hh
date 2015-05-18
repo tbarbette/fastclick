@@ -1,6 +1,6 @@
 #ifndef CLICK_PAINT_HH
 #define CLICK_PAINT_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -25,7 +25,7 @@ Get/set the color to paint.
 
 =a PaintTee */
 
-class Paint : public Element { public:
+class Paint : public BatchElement { public:
 
     Paint() CLICK_COLD;
 
@@ -36,6 +36,9 @@ class Paint : public Element { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
     Packet *simple_action(Packet *);
 
   private:

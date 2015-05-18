@@ -102,7 +102,7 @@ PacketBatch* BatchElement::PullBatchPort::pull_batch() const {
  */
 class PushToPushBatchVisitor : public RouterVisitor { public:
 
-	PushToPushBatchVisitor(std::list<BatchElement*> &list) : _list(list) {
+	PushToPushBatchVisitor(std::list<BatchElement*> *list) : _list(list) {
 
 	}
 
@@ -126,7 +126,7 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
 			}
 
 			if (reconstruct_batch) {
-				_list.push_back(batch_e);
+				_list->push_back(batch_e);
 				return false;
 			} else {
 			    return true;
@@ -136,7 +136,7 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
 		return true;
 	}
 
-	std::list<BatchElement*> &_list;
+	std::list<BatchElement*> *_list;
 
 };
 
@@ -167,7 +167,8 @@ void BatchElement::check_unbatch() {
 	for (int i = 0; i < noutputs(); i++) {
 		if (output_is_push(i) && !output(i).output_supports_batch) {
 			click_chatter("Warning ! %s is not compatible with batch. Performance will be slightly reduced.",output(i).element()->name().c_str());
-			PushToPushBatchVisitor v(static_cast<BatchElement::BatchPort>(output(i)).getDownstreamBatches());
+			BatchPort* port = &(static_cast<BatchElement::BatchPort*>(_ports[1])[i]);
+			PushToPushBatchVisitor v(&port[i].downstream_batches);
 			router()->visit(this,1,i,&v);
 		}
 	}

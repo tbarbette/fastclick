@@ -1,6 +1,6 @@
 #ifndef CLICK_IPOUTPUTCOMBO_HH
 #define CLICK_IPOUTPUTCOMBO_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <clicknet/ip.h>
 CLICK_DECLS
@@ -40,7 +40,7 @@ CLICK_DECLS
  * =a DropBroadcasts, PaintTee, CheckLength, IPGWOptions, FixIPSrc, DecIPTTL,
  * IPFragmenter, IPInputCombo */
 
-class IPOutputCombo : public Element {
+class IPOutputCombo : public BatchElement {
 
  public:
 
@@ -53,6 +53,11 @@ class IPOutputCombo : public Element {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+
+
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+#endif
   void push(int, Packet *);
 
  private:
@@ -61,6 +66,7 @@ class IPOutputCombo : public Element {
   struct in_addr _my_ip;	// IPGWOptions, FixIPSrc
   unsigned _mtu;		// Fragmenter
 
+  inline int action(Packet* &p_in, bool color);
 };
 
 CLICK_ENDDECLS

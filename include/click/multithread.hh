@@ -6,7 +6,7 @@
 
 CLICK_DECLS
 
-extern int nthreads;
+extern int click_nthreads;
 
 #if CLICK_USERLEVEL && HAVE_MULTITHREAD
 #  define GET_CPU_ID() click_current_thread_id
@@ -32,12 +32,12 @@ class per_thread
 	}
 public:
 	per_thread() {
-	    _size = nthreads;
+	    _size = click_nthreads;
 		storage = new AT[_size];
 	}
 
 	per_thread(T v) {
-	    initialize(nthreads,v);
+	    initialize(click_nthreads,v);
 	}
 
 	per_thread(T v, int n) {
@@ -97,7 +97,7 @@ public:
     }
 
     inline void setAll(T v) {
-        for (int i = 0; i < nthreads; i++)
+        for (int i = 0; i < click_nthreads; i++)
             storage[i].v = v;
     }
 

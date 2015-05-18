@@ -1,6 +1,7 @@
 #ifndef CLICK_CLASSIFIER_HH
 #define CLICK_CLASSIFIER_HH
 #include <click/element.hh>
+#include <click/batchelement.hh>
 #include "classification.hh"
 CLICK_DECLS
 
@@ -72,7 +73,7 @@ CLICK_DECLS
  *
  * =a IPClassifier, IPFilter */
 
-class Classifier : public Element { public:
+class Classifier : public BatchElement { public:
 
     Classifier() CLICK_COLD;
 
@@ -86,7 +87,10 @@ class Classifier : public Element { public:
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    void push(int port, Packet *);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
+    void push(int, Packet *);
 
     Classification::Wordwise::Program empty_program(ErrorHandler *errh) const;
     static void parse_program(Classification::Wordwise::Program &prog,
