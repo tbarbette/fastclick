@@ -5,39 +5,38 @@
 #include <click/notifier.hh>
 #include <click/task.hh>
 #include <click/dpdkdevice.hh>
-#include "kernelfilter.hh"
 #include "queuedevice.hh"
 
 CLICK_DECLS
 
 /*
  * =title FromDpdkDevice
- * 
+ *
  * =c
- * 
+ *
  * FromDpdkDevice(DEVNAME [, PROMISC])
- * 
+ *
  * =s netdevices
- * 
+ *
  * reads packets from network device using Intel's DPDK (user-level)
- * 
+ *
  * =d
- * 
+ *
  * Reads packets from the network controller named DEVNAME, using Intel's DPDK.
- * 
+ *
  * On the contrary to FromDevice.u which acts as a sniffer by default, packets
  * received by devices put in DPDK mode will NOT be received by the kernel, and
  * will thus be processed only once.
- * 
+ *
  * =item DEVNAME
- * 
+ *
  * String.  Device number
- *  *
+ *
  * =item PROMISC
- * 
+ *
  * Boolean.  FromDpdkDevice puts the device in promiscuous mode if PROMISC is
  * true. The default is false.
- * 
+ *
  * =item BURST
  *
  * Maximal number of packets that will be processed before rescheduling Click
@@ -72,26 +71,26 @@ CLICK_DECLS
  *  used.
  *
  * =back
- * 
+ *
  * This element is only available at user level, when compiled with DPDK
  * support.
  *
  * =e
- * 
+ *
  *   FromDpdkDevice() ->
- * 
+ *
  * =n
- * 
+ *
  * FromDpdkDevice sets packets' extra length annotations as appropriate.
- * 
+ *
  * =h count read-only
- * 
+ *
  * Returns the number of packets read by the device.
- * 
+ *
  * =h reset_counts write-only
- * 
+ *
  * Resets "count" to zero.
- * 
+ *
  * =a ToDpdkDevice
  */
 
@@ -105,7 +104,7 @@ public:
     const char *port_count() const    { return PORTS_0_1; }
     const char *processing() const    { return PUSH; }
     int configure_phase() const {
-        return KernelFilter::CONFIGURE_PHASE_FROMDEVICE;
+        return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
     bool can_live_reconfigure() const { return false; }
 

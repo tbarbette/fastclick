@@ -1,6 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_FROMNETMAPDEVICE_HH
 #define CLICK_FROMNETMAPDEVICE_HH
+#include <click/config.h>
 #include <click/task.hh>
 #include <click/etheraddress.hh>
 #include <click/netmapdevice.hh>

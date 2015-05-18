@@ -64,14 +64,17 @@ class atomic_uint32_t { public:
     inline atomic_uint32_t &operator|=(uint32_t mask);
     inline atomic_uint32_t &operator&=(uint32_t mask);
 
+    inline void unatomic_inc();
     inline void operator++();
     inline void operator++(int);
+    inline void unatomic_dec();
     inline void operator--();
     inline void operator--(int);
 
     inline uint32_t swap(uint32_t desired);
     inline uint32_t fetch_and_add(uint32_t delta);
     inline bool dec_and_test();
+    inline bool unatomic_dec_and_test();
     inline uint32_t compare_swap(uint32_t expected, uint32_t desired);
     inline bool compare_and_swap(uint32_t expected, uint32_t desired) CLICK_DEPRECATED;
 
@@ -220,6 +223,13 @@ atomic_uint32_t::inc(volatile uint32_t &x)
 #endif
 }
 
+/** @brief  Increment the value. */
+inline void
+atomic_uint32_t::unatomic_inc()
+{
+    _val++;
+}
+
 /** @brief  Atomically increment the value. */
 inline void
 atomic_uint32_t::operator++()
@@ -266,6 +276,13 @@ atomic_uint32_t::operator--()
 #else
     CLICK_ATOMIC_VAL--;
 #endif
+}
+
+/** @brief  Decrement the value. */
+inline void
+atomic_uint32_t::unatomic_dec()
+{
+    _val--;
 }
 
 /** @brief  Atomically decrement the value. */
@@ -509,6 +526,21 @@ atomic_uint32_t::dec_and_test()
 #else
     return (--CLICK_ATOMIC_VAL == 0);
 #endif
+}
+
+/** @brief  Decrement the value, returning true if the new value
+ *      is 0.
+ *
+ * Behaves like this, but in one atomic step:
+ * @code
+ * --*this;
+ * return value() == 0;
+ * @endcode */
+inline bool
+atomic_uint32_t::unatomic_dec_and_test()
+{
+    --_val;
+    return _val == 0;
 }
 
 /** @brief  Perform a compare-and-swap operation.

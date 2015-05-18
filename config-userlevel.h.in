@@ -125,8 +125,14 @@
 /* Define if you have the <net/netmap.h> header file. */
 #undef HAVE_NET_NETMAP_H
 
+/* Define if you have the <net/netmap.h> header file. */
+#undef HAVE_NETMAP_PACKET_POOL
+
 /* Define if you have the <netpacket/packet.h> header file. */
 #undef HAVE_NETPACKET_PACKET_H
+
+/* Define if Zero-copy is enabled. */
+#undef HAVE_ZEROCOPY
 
 /* Define if <new.h> exists and works. */
 #undef HAVE_NEW_H
@@ -220,6 +226,12 @@
 /* Define if a Click user-level driver might run multiple threads. */
 #undef HAVE_USER_MULTITHREAD
 
+/* Define if a Click user-level driver uses Intel DPDK. */
+#undef HAVE_DPDK
+
+/* Define if a Click user-level driver manages Intel DPDK packet pools. */
+#undef CLICK_DPDK_POOLS
+
 /* Define if Click should use Valgrind client requests. */
 #undef HAVE_VALGRIND
 
@@ -228,9 +240,6 @@
 
 /* Define if you have the vsnprintf function. */
 #undef HAVE_VSNPRINTF
-
-/* Define if Zero-copy is enabled. */
-#undef HAVE_ZEROCOPY
 
 /* The size of a `click_jiffies_t', as computed by sizeof. */
 #define SIZEOF_CLICK_JIFFIES_T SIZEOF_INT

@@ -5,6 +5,11 @@
 
 #if HAVE_NET_NETMAP_H
 #include <net/if.h>
+
+#ifndef NETMAP_WITH_LIBS
+#define NETMAP_WITH_LIBS 1
+#endif
+
 #include <net/netmap.h>
 #include <net/netmap_user.h>
 

@@ -1,6 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_TONETMAPDEVICE_HH
 #define CLICK_TONETMAPDEVICE_HH
+#include <click/config.h>
 #include <click/element.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
@@ -79,8 +80,10 @@ public:
 
     void add_handlers() CLICK_COLD;
 
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch*);
+#endif
     void push(int, Packet*);
-
     void run_timer(Timer *timer);
 
     bool run_task(Task *);

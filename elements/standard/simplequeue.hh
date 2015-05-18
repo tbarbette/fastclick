@@ -69,6 +69,9 @@ class SimpleQueue : public BatchElement, public Storage { public:
     int drops() const				{ return _drops; }
     int highwater_length() const		{ return _highwater_length; }
 
+
+    bool get_runnable_threads(Bitvector& b);
+
     inline bool enq(Packet*);
     inline void lifo_enq(Packet*);
     inline Packet* deq();

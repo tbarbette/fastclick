@@ -1,6 +1,21 @@
-// -*- c-basic-offset: 4; related-file-name: "pollqueue.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "fromnetmapdevice.hh" -*-
 /*
- * pollqueue.{cc,hh} --
+ * fromnetmapdevice.{cc,hh} -- element reads packets live from network via
+ * Intel's DPDK
+ *
+ * Copyright (c) 2014-2015 University of Liège
+ * Copyright (c) 2014 Cyril Soldani
+ * Copyright (c) 2015 Tom Barbette
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
  */
 
 #include <click/config.h>
@@ -9,6 +24,7 @@
 #include <click/master.hh>
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
+#include <click/packet.hh>
 #include <click/packet_anno.hh>
 #include <vector>
 
@@ -86,8 +102,6 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 	sprintf(netinfo, "/sys/class/net/%s/device/msi_irqs", _device->parent_nmd->nifp->ni_name);
 	DIR *dir;
 	struct dirent *ent;
-	int max=INT_MIN,min=INT_MAX;
-	int n_irqs = 0;
 
 	int i =0;
 	if ((dir = opendir (netinfo)) != NULL) {
@@ -137,7 +151,7 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 
 inline bool
 FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask) {
-		int nresched = 0;
+		unsigned nr_pending = 0;
 
 		int sent = 0;
 
@@ -154,7 +168,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 
 			n = nm_ring_space(rxring);
 			if (_burst && n > _burst) {
-			    nresched += n - _burst;
+			    nr_pending += n - _burst;
 				n = _burst;
 			}
 
@@ -189,11 +203,11 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 					if (unlikely(p == NULL)) goto error;
 			#else
                 #if HAVE_ZEROCOPY
-                    if (slot->len > 64)
+                    if (slot->len > 64) {
                         __builtin_prefetch(data);
-                        p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,*netmap_buf_pools);
+                        p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
                         if (!p) goto error;
-                        slot->buf_idx = (*netmap_buf_pools)->extract();
+                        slot->buf_idx = NetmapBufQ::get_local_pool()->extract();
 
                     } else
                 #endif
@@ -203,7 +217,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
                             if (!p) goto error;
                     }
             #endif
-				p->set_packet_type_anno(PacketType::HOST);
+				p->set_packet_type_anno(Packet::HOST);
 
 	#if HAVE_BATCH
 					if (batch_head == NULL) {
@@ -213,6 +227,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 					}
 					last = p;
 	#else
+					p->set_timestamp_anno(ts);
 					output(0).push(p);
     #endif
 					slot->flags |= NS_BUF_CHANGED;
@@ -236,7 +251,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 
 		}
 
-	if (nresched > _burst) { //TODO size/4
+	if (nr_pending > _burst) { //TODO size/4
 	    if (fromtask) {
 
 	            task->fast_reschedule();

@@ -73,7 +73,7 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 Bitvector StaticThreadSched::assigned_thread() {
-    Bitvector v(nthreads,0);
+    Bitvector v(master()->nthreads(),0);
     if (_next_thread_sched) {
         v = _next_thread_sched->assigned_thread();
     }

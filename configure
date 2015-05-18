@@ -661,6 +661,7 @@ EXPAT_INCLUDES
 XML2CLICK
 PROPER_LIBS
 PROPER_INCLUDES
+HAVE_NETMAP_PACKET_POOL
 NETMAP_INCLUDES
 NUMA_INCLUDES
 PCAP_LIBS
@@ -705,6 +706,7 @@ INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
 USE_DPDK
 PTHREAD_LIBS
+HAVE_BATCH
 AR_CREATEFLAGS
 STRIP
 RANLIB
@@ -790,10 +792,13 @@ ac_user_opts='
 enable_option_checking
 enable_userlevel
 enable_user_multithread
+enable_batch
+enable_netmap_pool
 enable_select
 enable_poll
 enable_kqueue
 enable_dpdk
+enable_dpdk_pools
 enable_zerocopy
 enable_linuxmodule
 enable_fixincludes
@@ -820,7 +825,6 @@ enable_ethernet
 enable_etherswitch
 enable_grid
 enable_icmp
-enable_batch
 enable_ip
 enable_ip6
 enable_ipsec
@@ -1484,12 +1488,15 @@ Optional Features:
   --disable-userlevel     disable user-level driver
     --enable-user-multithread
                           support userlevel multithreading
+    --disable-batch       disable batching support
+    --enable-netmap-pool  have only netmap packets in the pool
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use Intel DPDK
+    --enable-dpdk-pools   Click manages DPDK packet pools
     --enable-zerocopy     use Zero Copy
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
@@ -1512,7 +1519,6 @@ Optional Features:
   --enable-etherswitch    include Ethernet switch elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
-  --disable-batch         do not enable batching
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
   --enable-ipsec          include IP security elements
@@ -6336,6 +6342,37 @@ else
 fi
 
 
+# Check whether --enable-batch was given.
+if test "${enable_batch+set}" = set; then :
+  enableval=$enable_batch; :
+else
+  enable_batch=yes
+fi
+
+
+if test "x$enable_batch" = "xyes"; then
+    if test "x$enable_userlevel" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-batch requires --enable-userlevel which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define HAVE_BATCH 1" >>confdefs.h
+
+    HAVE_BATCH=yes
+
+fi
+
+# Check whether --enable-netmap-pool was given.
+if test "${enable_netmap_pool+set}" = set; then :
+  enableval=$enable_netmap_pool; :
+else
+  enable_netmap_pool=no
+fi
+
+
 PTHREAD_LIBS=""
 
 
@@ -6496,6 +6533,14 @@ else
 fi
 
 
+# Check whether --enable-dpdk-pools was given.
+if test "${enable_dpdk_pools+set}" = set; then :
+  enableval=$enable_dpdk_pools; :
+else
+  enable_dpdk_pools=no
+fi
+
+
 if test "x$enable_dpdk" = "xyes"; then
     if test "x$enable_user_multithread" != "xyes"; then
         as_fn_error $? "
@@ -6526,6 +6571,19 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
     USE_DPDK=yes
+
+fi
+
+if test "x$enable_dpdk_pools" = "xyes"; then
+    if test "x$enable_dpdk" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk-pools requires --enable-dpdk which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define CLICK_DPDK_POOLS 1" >>confdefs.h
 
 fi
 
@@ -6980,18 +7038,6 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_icmp" = xNO -o "x$enable_icmp" = x \) && enable_icmp=yes
 if test "x$enable_icmp" = xyes; then
     :
-
-fi
-# Check whether --enable-batch was given.
-if test "${enable_batch+set}" = set; then :
-  enableval=$enable_batch;
-else
-  enable_batch=yes
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_batch" = xNO -o "x$enable_batch" = x \) && enable_batch=yes
-if test "x$enable_batch" = xyes; then
-    :
-    $as_echo "#define HAVE_BATCH 1" >>confdefs.h
 
 fi
 # Check whether --enable-ip was given.
@@ -10669,30 +10715,69 @@ fi
             NUMA_INCLUDES="-I$use_numa"
         fi
     fi
-    saveflags="$CPPFLAGS"
-    CPPFLAGS="$saveflags $NUMA_INCLUDES"
 
     HAVE_NUMA=no
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for numa.h" >&5
-$as_echo_n "checking for numa.h... " >&6; }
-    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <numa.h>
-_ACEOF
-if ac_fn_c_try_cpp "$LINENO"; then :
-  ac_cv_numa_header_path="found"
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing numa_available" >&5
+$as_echo_n "checking for library containing numa_available... " >&6; }
+if ${ac_cv_search_numa_available+:} false; then :
+  $as_echo_n "(cached) " >&6
 else
-  ac_cv_numa_header_path="not found"
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char numa_available ();
+int
+main ()
+{
+return numa_available ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' numa; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_numa_available=$ac_res
 fi
-rm -f conftest.err conftest.i conftest.$ac_ext
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_numa_header_path" >&5
-$as_echo "$ac_cv_numa_header_path" >&6; }
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_numa_available+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_numa_available+:} false; then :
 
-    if test "$ac_cv_net_numa_header_path" = "found"; then
-        HAVE_NUMA=yes
-    fi
+else
+  ac_cv_search_numa_available=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_numa_available" >&5
+$as_echo "$ac_cv_search_numa_available" >&6; }
+ac_res=$ac_cv_search_numa_available
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  ac_have_libnuma=yes
+else
+  ac_have_libnuma=no
+fi
 
-    if test "$HAVE_NUMA" = yes; then
+
+    if test "$ac_have_libnuma" = yes; then
 
 $as_echo "#define HAVE_NUMA 1" >>confdefs.h
 
@@ -10816,6 +10901,21 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     $as_echo "#define HAVE_USERLEVEL_DRIVER 1" >>confdefs.h
 
     HAVE_USERLEVEL_DRIVER=1
+fi
+
+if test "x$enable_netmap_pool" = "xyes"; then
+    if test "x$HAVE_NETMAP" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-netmap-pool requires --with-netmap which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define HAVE_NETMAP_PACKET_POOL 1" >>confdefs.h
+
+    HAVE_NETMAP_PACKET_POOL=yes
+
 fi
 
 
@@ -13487,7 +13587,7 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
-if test "x$HAVE_NETMAP" = xyes; then
+if test "x$use_netmap" = xyes; then
     provisions="$provisions netmap"
 fi
 

@@ -2,7 +2,7 @@
 #define CLICK_QUEUEDEVICE_HH
 
 #include <click/error.hh>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/vector.hh>
 #include <click/bitvector.hh>
 #include <click/sync.hh>
@@ -11,7 +11,7 @@
 #include <click/standard/scheduleinfo.hh>
 #include <click/numa.hh>
 
-class QueueDevice : public Element {
+class QueueDevice : public BatchElement {
 
 public:
 
@@ -218,16 +218,16 @@ protected:
     }
 
     inline int queue_for_thread_begin() {
-        return _thread_to_queue[click_cpu_id()];
+        return _thread_to_queue[click_current_cpu_id()];
     }
 
     inline int queue_for_thread_end() {
-        return _thread_to_queue[click_cpu_id()] + queue_per_threads - 1;
+        return _thread_to_queue[click_current_cpu_id()] + queue_per_threads - 1;
     }
 
 
     inline int id_for_thread() {
-        return _thread_to_queue[click_cpu_id()] / queue_per_threads;
+        return _thread_to_queue[click_current_cpu_id()] / queue_per_threads;
     }
 
     inline Task* task_for_thread() {

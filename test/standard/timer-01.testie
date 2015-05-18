@@ -9,5 +9,4 @@ click -qe tt::TimerTest
 
 %expect stderr
 Initializing default_constructor_timer
-initializing Timer tt :: TimerTest{{.*}}
 Initializing explicit_do_nothing_timer

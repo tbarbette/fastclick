@@ -519,11 +519,12 @@ NotifierRouterVisitor::visit(Element* e, bool isoutput, int port,
  * @param port the input port of @a e at which to start the upstream search
  * @param f callback function
  * @param user_data user data for callback function
+ * @param signal signal to upstream
  * @sa add_activate_callback */
 NotifierSignal
-Notifier::upstream_empty_signal(Element* e, int port, callback_type f, void *user_data)
+Notifier::upstream_signal(Element* e, int port, callback_type f, void *user_data, const char * sgn)
 {
-    NotifierRouterVisitor filter(EMPTY_NOTIFIER);
+    NotifierRouterVisitor filter(sgn);
     int ok = e->router()->visit_upstream(e, port, &filter);
 
     NotifierSignal signal = filter._signal;
@@ -533,7 +534,7 @@ Notifier::upstream_empty_signal(Element* e, int port, callback_type f, void *use
 	filter._pass2 = true;
 	ok = e->router()->visit_upstream(e, port, &filter);
     }
-
+    //click_chatter("Found %d signals : %s",filter._notifiers.size(),(*filter._notifiers.begin()));
     // All bets are off if filter ran into a push output. That means there was
     // a regular Queue in the way (for example).
     if (ok < 0 || signal == NotifierSignal())
@@ -545,6 +546,7 @@ Notifier::upstream_empty_signal(Element* e, int port, callback_type f, void *use
 
     return signal;
 }
+
 
 /** @brief Calculate and return the NotifierSignal derived from all full
  * notifiers downstream of element @a e's output @a port.

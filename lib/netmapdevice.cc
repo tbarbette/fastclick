@@ -1,4 +1,4 @@
-// -*- c-basic-offset: 4; related-file-name: "nicqueue.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "netmapdevice.hh" -*-
 /*
  * netmapdevice.{cc,hh} -- library for interfacing with Netmap
  *
@@ -20,6 +20,9 @@
 #include <click/standard/scheduleinfo.hh>
 #include <click/error.hh>
 #include <click/netmapdevice.hh>
+
+#if HAVE_NET_NETMAP_H
+
 #include <stdio.h>
 #include <stdint.h>
 #include <dirent.h>
@@ -28,6 +31,8 @@
 #include <fstream>
 
 CLICK_DECLS
+
+
 
 NetmapDevice::NetmapDevice(String ifname) : _minfd(INT_MAX),_maxfd(INT_MIN),ifname(ifname),_use_count(0) {
 	n_refs = 0;
@@ -132,6 +137,5 @@ HashMap<String,NetmapDevice*> NetmapDevice::nics;
 struct nm_desc* NetmapDevice::some_nmd = 0;
 per_thread<NetmapBufQ*> NetmapBufQ::netmap_buf_pools = per_thread<NetmapBufQ*>(0,0);
 unsigned int NetmapBufQ::buf_size = 0;
-
 CLICK_ENDDECLS
-ELEMENT_PROVIDES(NicQueue)
+#endif

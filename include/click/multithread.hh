@@ -3,10 +3,10 @@
 #define CLICK_MULTITHREAD_HH
 
 #include <click/config.h>
+#include <click/glue.hh>
+#include <click/vector.hh>
 
 CLICK_DECLS
-
-extern int click_nthreads;
 
 #if CLICK_USERLEVEL && HAVE_MULTITHREAD
 #  define GET_CPU_ID() click_current_thread_id
@@ -24,20 +24,18 @@ class per_thread
 	void initialize(unsigned int n, T v) {
 	    _size = n;
         storage = new AT[_size];
-        for (int i = 0; i < n; i++) {
-
+        for (unsigned i = 0; i < n; i++) {
             storage[i].v = v;
-
         }
 	}
 public:
 	per_thread() {
-	    _size = click_nthreads;
+	    _size = click_max_cpu_ids();
 		storage = new AT[_size];
 	}
 
 	per_thread(T v) {
-	    initialize(click_nthreads,v);
+	    initialize(click_max_cpu_ids(),v);
 	}
 
 	per_thread(T v, int n) {
@@ -45,7 +43,7 @@ public:
 	}
 
 	/**
-	 * Resize must be called if per_thread was initialized before nthreads is set (such as in static functions)
+	 * Resize must be called if per_thread was initialized before click_max_cpu_ids() is set (such as in static functions)
 	 * This will destroy all data
 	 */
 	void resize(unsigned int n,T v) {
@@ -97,7 +95,7 @@ public:
     }
 
     inline void setAll(T v) {
-        for (int i = 0; i < click_nthreads; i++)
+        for (int i = 0; i < click_max_cpu_ids(); i++)
             storage[i].v = v;
     }
 
@@ -131,6 +129,48 @@ public:
 protected:
     AT* storage;
     size_t _size;
+};
+
+/*
+ * Not compressed for now, just avoid parcouring unused threads
+ */
+template <typename T>
+class per_thread_compressed : public per_thread<T> {
+
+public:
+    void compress(Bitvector v) {
+        usable = v;
+        mapping.resize(v.weight(),0);
+        int id = 0;
+        for (int i = 0; i < usable.size(); i++) {
+            if (usable[i]) {
+                mapping[id] = i;
+                id++;
+            }
+        }
+        _size = id;
+    }
+
+    inline size_t size() {
+        return _size;
+    }
+
+    inline T& get_value(int i) const{
+        return per_thread<T>::storage[mapping[i]].v;
+    }
+
+    inline void set_value(int i,T v) {
+        per_thread<T>::storage[mapping[i]].v = v;
+    }
+
+    inline unsigned int get_mapping(int i) {
+        return mapping[i];
+    }
+
+    Bitvector usable;
+    Vector<unsigned int> mapping;
+    size_t _size;
+
 };
 
 CLICK_ENDDECLS

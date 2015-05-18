@@ -24,6 +24,7 @@ class NotifierSignal {
     static inline NotifierSignal uninitialized_signal();
 
     inline bool active() const;
+    inline bool safe_active() const;
     inline operator unspecified_bool_type() const;
 
     inline bool set_active(bool active);
@@ -90,6 +91,7 @@ class Notifier { public:
     inline SearchOp search_op() const;
 
     inline bool active() const;
+    inline bool safe_active() const;
 
     inline bool set_active(bool active);
     inline void wake();
@@ -108,7 +110,9 @@ class Notifier { public:
     static inline NotifierSignal upstream_empty_signal(Element *e, int port);
     static inline NotifierSignal upstream_empty_signal(Element *e, int port, Task *task);
     static inline NotifierSignal upstream_empty_signal(Element *e, int port, Notifier *dependent_notifier);
-    static NotifierSignal upstream_empty_signal(Element *e, int port, callback_type f, void *user_data);
+    static inline NotifierSignal upstream_signal(Element *e, int port, Task *task, const char* signal);
+    static inline NotifierSignal upstream_empty_signal(Element *e, int port, callback_type f, void *user_data);
+    static NotifierSignal upstream_signal(Element *e, int port, callback_type f, void *user_data, const char* signal);
 
     static inline NotifierSignal downstream_full_signal(Element *e, int port);
     static inline NotifierSignal downstream_full_signal(Element *e, int port, Task *task);
@@ -235,6 +239,11 @@ inline bool NotifierSignal::active() const {
     // 2012.May.16 This fence is necessary; consider, for example,
     // InfiniteSource's checking of nonfull notifiers.
     click_fence();
+    return safe_active();
+}
+
+/** @brief Test if the signal is active. */
+inline bool NotifierSignal::safe_active() const {
     if (likely(_mask))
 	return (*_v.v1 & _mask) != 0;
     else {
@@ -457,6 +466,14 @@ inline bool Notifier::active() const {
     return _signal.active();
 }
 
+/** @brief Returns whether the associated signal is active.
+ *
+ * Same as signal().safe_active().
+ */
+inline bool Notifier::safe_active() const {
+    return _signal.safe_active();
+}
+
 /** @brief Set the associated signal's activity.
  * @param active true iff the signal should be active
  * @return previous active state
@@ -563,7 +580,7 @@ inline void Notifier::remove_dependent_signal(NotifierSignal* signal) {
  * @sa downstream_full_signal
  */
 inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port) {
-    return upstream_empty_signal(e, port, (callback_type) 0, 0);
+    return upstream_signal(e, port, (callback_type) 0, 0, Notifier::EMPTY_NOTIFIER);
 }
 
 /** @brief Calculate and return the NotifierSignal derived from all empty
@@ -574,7 +591,19 @@ inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port) {
  * @sa add_listener */
 inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port,
                                                       Task* task) {
-    return upstream_empty_signal(e, port, (callback_type) 0, task);
+    return upstream_signal(e, port, (callback_type) 0, task, Notifier::EMPTY_NOTIFIER);
+}
+
+/** @brief Calculate and return the NotifierSignal derived from all empty
+ * notifiers upstream of element @a e's input @a port.
+ * @param e an element
+ * @param port the input port of @a e at which to start the upstream search
+ * @param task task to schedule when packets become available
+ * @param signal signal to upstream
+ * @sa add_listener */
+inline NotifierSignal Notifier::upstream_signal(Element* e, int port,
+                                                      Task* task, const char * signal) {
+    return upstream_signal(e, port, (callback_type) 0, task, signal);
 }
 
 /** @brief Calculate and return the NotifierSignal derived from all empty
@@ -585,7 +614,20 @@ inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port,
  * @sa add_dependent_signal */
 inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port,
                                                       Notifier* dependent_notifier) {
-    return upstream_empty_signal(e, port, dependent_signal_callback, &dependent_notifier->_signal);
+    return upstream_signal(e, port, dependent_signal_callback, &dependent_notifier->_signal, Notifier::EMPTY_NOTIFIER);
+}
+
+
+/** @brief Calculate and return the NotifierSignal derived from all empty
+ * notifiers upstream of element @a e's input @a port.
+ * @param e an element
+ * @param port the input port of @a e at which to start the upstream search
+ * @param f callback function
+ * @param user_data user data for callback function
+ * @sa add_activate_callback */
+inline NotifierSignal Notifier::upstream_empty_signal(Element* e, int port, callback_type f, void *user_data)
+{
+	return upstream_signal(e,port,f,user_data,Notifier::EMPTY_NOTIFIER);
 }
 
 /** @brief Calculate and return the NotifierSignal derived from all full

@@ -63,8 +63,7 @@ d1 :: Discard;
 ust :: Unstrip(14);
 th :: ToHost;
 d2 :: Discard;
-AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(cl  4 2,
-  chip  4 0);
+AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(cl  4 2);
 fd -> cl
     -> st
     -> chip
@@ -79,8 +78,7 @@ chip :: CheckIPHeader(14);
 d1 :: Discard;
 th :: ToHost;
 d2 :: Discard;
-AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(cl  4 2,
-  chip  4 2);
+AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(cl  4 2);
 fd -> cl
     -> chip
     -> th;
@@ -93,8 +91,7 @@ chip :: CheckIPHeader2(OFFSET 14);
 d1 :: Discard;
 th :: ToHost;
 d2 :: Discard;
-AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(cl  4 2,
-  chip  4 2);
+AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(cl  4 2);
 fd -> cl
     -> chip
     -> th;
@@ -110,7 +107,6 @@ ipcl_0 :: IPClassifier(dst 10.0.0.0/8, -);
 d1 :: Discard;
 th :: ToHost;
 d2 :: Discard;
-AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(chip  4 0);
 fd -> st
     -> chip
     -> ust
@@ -131,7 +127,6 @@ ipcl_0 :: IPClassifier(dst 10.0.0.0/8, -);
 d1 :: Discard;
 th :: ToHost;
 d2 :: Discard;
-AlignmentInfo@click_align@{{\d+}} :: AlignmentInfo(chip  4 0);
 fd -> fst
     -> a1
     -> st

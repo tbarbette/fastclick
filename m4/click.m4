@@ -477,26 +477,15 @@ AC_DEFUN([CLICK_CHECK_NUMA], [
             NUMA_INCLUDES="-I$use_numa"
         fi
     fi
-    saveflags="$CPPFLAGS"
-    CPPFLAGS="$saveflags $NUMA_INCLUDES"
 
     HAVE_NUMA=no
-    AC_MSG_CHECKING([for numa.h])
-    AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <numa.h>]])],
-        [ac_cv_numa_header_path="found"],
-        [ac_cv_numa_header_path="not found"])
-    AC_MSG_RESULT($ac_cv_numa_header_path)
+        
+    AC_SEARCH_LIBS([numa_available], [numa], [ac_have_libnuma=yes], [ac_have_libnuma=no])
 
-    if test "$ac_cv_numa_header_path" = "found"; then
-        HAVE_NUMA=yes
-    fi
-
-    if test "$HAVE_NUMA" = yes; then
+    if test "$ac_have_libnuma" = yes; then
         AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <nuda.h> header file.])
-        LDFLAGS="$LDFLAGS -lnuma"
+        LDFLAGS="$LDFLAGS -Lnuma"
     fi
-    
-    
     
     if test "$HAVE_NUMA" = yes; then
         AC_CACHE_CHECK([whether numa.h works],

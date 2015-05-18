@@ -88,7 +88,6 @@ class NetmapBufQ {
                 ioctl(_some_nmd->fd,NIOCFREEBUF,&nbr);
             }
             _count = 0;
-
     };
 
     inline unsigned int count() const {return _count;};
@@ -210,16 +209,14 @@ class NetmapBufQ {
     return 0;
     }
 
-#if !HAVE_NETMAP_PACKET_POOL&&!CLICK_DPDK_POOLS
+    static bool is_netmap_packet(Packet* p) {
 
-    static bool is_netmap_packet(Packet* p) {
+#if !HAVE_NETMAP_PACKET_POOL&&!CLICK_DPDK_POOLS
         return (p->buffer_destructor() == buffer_destructor);
-    }
 #else
-    static bool is_netmap_packet(Packet* p) {
         return false;
-    }
 #endif
+    }
 
     static void buffer_destructor(unsigned char *buf, size_t, void *arg) {
         ((NetmapBufQ*)arg)->insert_p(buf);
@@ -233,9 +230,9 @@ class NetmapBufQ {
     }
 
     static int initialize(struct nm_desc* some_nmd) {
-    	if (netmap_buf_pools.size() < (unsigned)nthreads)
-			netmap_buf_pools.resize(nthreads,NULL);
-		for (int i = 0; i < nthreads; i++) {
+    	if (netmap_buf_pools.size() < (unsigned)click_nthreads)
+			netmap_buf_pools.resize(click_nthreads,NULL);
+		for (int i = 0; i < click_nthreads; i++) {
 			if (netmap_buf_pools.get_value(i) == NULL) {
 				NetmapBufQ* q = new NetmapBufQ(some_nmd);
 				if (q->expand(1024) <= 0)
@@ -256,6 +253,14 @@ class NetmapBufQ {
 				click_chatter("No free because no packet pool %d %d",netmap_buf_pools.get_value(i),netmap_buf_pools.get_value(i)->count());
 			}
 		}
+    }
+
+    inline static NetmapBufQ*& get_local_pool() {
+    	return (netmap_buf_pools.get());
+    }
+
+    inline static NetmapBufQ*& get_local_pool(int tid) {
+        return (netmap_buf_pools.get_value_for_thread(tid));
     }
 
 private :

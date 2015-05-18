@@ -59,6 +59,8 @@ int ToDpdkDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	.complete() < 0)
 	return -1;
 
+
+#if !HAVE_BATCH
     if (burst > ndesc / 2 ) {
         errh->warning("BURST should not be upper than half the number of descriptor");
     } else if (burst > 32) {
@@ -66,6 +68,12 @@ int ToDpdkDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
     if (burst > -1)
         _burst = burst;
+
+#else
+    if (burst != -1) {
+        errh->warning("BURST is unused with batching !");
+    }
+#endif
 
     QueueDevice::configure_tx(maxthreads,1,maxqueues,errh);
 }
@@ -110,7 +118,9 @@ void ToDpdkDevice::add_handlers()
 
 inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
     struct rte_mbuf* mbuf;
-
+    #if CLICK_DPDK_POOLS
+    mbuf = p->mb();
+    #else
     if (likely(DpdkDevice::is_dpdk_packet(p))) {
         mbuf = (struct rte_mbuf *) p->destructor_argument();
         p->set_buffer_destructor(DpdkDevice::fake_free_pkt);
@@ -123,6 +133,7 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
         } else
             return NULL;
     }
+    #endif
     return mbuf;
 }
 
@@ -174,8 +185,108 @@ void ToDpdkDevice::push(int, Packet *p)
 
 		}
 	}
+#if !CLICK_DPDK_POOLS
+	if (likely(is_fullpush()))
+	    p->safe_kill();
+	else
+	    p->kill();
+#endif
+}
 
-	p->kill();
+
+/**
+ * push_batch seems more complex than in tonetmapdevice, but it's only because
+ *  we have to place pointers in an array, and we don't want to keep a linked
+ *  list plus an array (we could end up with packets which were not sent in the
+ *  array, and packets in the list, it would be a mess). So we use an array as
+ *  a ring and it produce multiple "bad cases".
+ */
+#if HAVE_BATCH
+void ToDpdkDevice::push_batch(int, PacketBatch *head)
+{
+	Packet* p = head;
+
+	struct rte_mbuf **pkts = state->glob_pkts;
+
+	if (state->_int_left) {
+		//TODO : why never more than 32?
+		unsigned ret = 0;
+		unsigned r;
+		unsigned left = state->_int_left;
+		do {
+			lock();
+			r = rte_eth_tx_burst(_port_no, queue_for_thread_begin(), &state->glob_pkts[state->_int_index + ret] , left);
+			unlock();
+			ret += r;
+			left -= r;
+		} while (r == 32 && left > 0);
+
+		if (ret == state->_int_left) {//all was sent
+		    state->_int_left = 0;
+			state->_int_index = 0;
+			//Reset, there is nothing in the internal queue
+		} else if (state->_int_index + state->_int_left + head->count() <  _internal_queue) {
+			//Place the new packets after the old
+		    state->_int_index += ret;
+		    state->_int_left -= ret;
+			pkts = &state->glob_pkts[state->_int_index + state->_int_left];
+		} else if ((int)state->_int_index + (int)ret - (int)head->count() >= (int)0) {
+			//Place the new packets before the older
+		   // click_chatter("Before !");
+			state->_int_index = (unsigned int)((int)state->_int_index - (int)head->count() + (int)ret);
+			state->_int_left -= ret;
+			pkts = &state->glob_pkts[state->_int_index];
+		} else {
+		    //Drop packets
+
+			unsigned int lost = state->_int_left - ret;
+			add_dropped(lost);
+			//click_chatter("Dropped %d");
+			for (int i = state->_int_index + ret; i < state->_int_index + state->_int_left; i++) {
+				rte_pktmbuf_free(state->glob_pkts[i]);
+			}
+
+			state->_int_index = 0;
+			state->_int_left = 0;
+			//Reset, we will erase the old
+		}
+
+	}
+
+	struct rte_mbuf **pkt = pkts;
+
+	while (p != NULL) {
+        *pkt = get_mbuf(p);
+		pkt++;
+		p = p->next();
+	}
+
+	unsigned ret = 0;
+	unsigned r;
+	unsigned left = head->count() + state->_int_left;
+	do {
+	    lock();
+		r = rte_eth_tx_burst(_port_no, queue_for_thread_begin(), &state->glob_pkts[state->_int_index + ret] , left);
+		unlock();
+		ret += r;
+		left -= r;
+	} while (r == 32 && left > 0);
+	add_count(ret);
+	if (ret == head->count() + state->_int_left) { //All was sent
+	    state->_int_index = 0;
+	    state->_int_left = 0;
+	} else {
+	    state->_int_index = state->_int_index + ret;
+	    state->_int_left = head->count() + state->_int_left - ret;
+	}
+
+#if !CLICK_DPDK_POOLS
+    if (likely(is_fullpush()))
+        head->safe_kill();
+    else
+        head->kill();
+#endif
+
 }
 #endif
 

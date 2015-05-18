@@ -4,7 +4,6 @@
 
 #include <click/bitvector.hh>
 
-extern int nthreads;
 
 CLICK_DECLS
 
@@ -18,7 +17,7 @@ class ThreadSched { public:
     virtual int initial_home_thread_id(const Element *e);
 
     virtual Bitvector assigned_thread() {
-        return Bitvector(nthreads,0);
+        return Bitvector(click_max_cpu_ids(),0);
     };
 
 };

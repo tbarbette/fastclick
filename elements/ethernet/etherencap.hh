@@ -1,6 +1,7 @@
 #ifndef CLICK_ETHERENCAP_HH
 #define CLICK_ETHERENCAP_HH
 #include <click/element.hh>
+#include <click/batchelement.hh>
 #include <clicknet/ether.h>
 CLICK_DECLS
 
@@ -46,7 +47,8 @@ Return or set the ETHERTYPE parameter.
 
 EtherVLANEncap, ARPQuerier, EnsureEther, StoreEtherAddress */
 
-class EtherEncap : public Element { public:
+
+class EtherEncap : public BatchElement { public:
 
     EtherEncap() CLICK_COLD;
     ~EtherEncap() CLICK_COLD;
@@ -58,9 +60,14 @@ class EtherEncap : public Element { public:
     bool can_live_reconfigure() const	{ return true; }
     void add_handlers() CLICK_COLD;
 
-    Packet *smaction(Packet *);
-    void push(int, Packet *);
+    inline Packet *smaction(Packet *);
+
     Packet *pull(int);
+
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
+    void push(int, Packet *);
 
   private:
 

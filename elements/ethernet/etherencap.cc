@@ -46,7 +46,7 @@ EtherEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet *
+inline Packet *
 EtherEncap::smaction(Packet *p)
 {
     if (WritablePacket *q = p->push_mac_header(14)) {
@@ -56,12 +56,50 @@ EtherEncap::smaction(Packet *p)
 	return 0;
 }
 
-void
-EtherEncap::push(int, Packet *p)
-{
-    if (Packet *q = smaction(p))
-	output(0).push(q);
-}
+
+#if HAVE_BATCH
+    void EtherEncap::push_batch(int, PacketBatch * batch) {
+    	Packet* head = NULL;
+    	Packet* previous = NULL;
+    	Packet* current = batch;
+    	int count = 0;
+
+    	while (current != NULL) {
+    		Packet* next = current->next();
+
+    		current = smaction(current);
+    		if (current == NULL) {
+    			click_chatter("%s : could not set ethernet header !",name().c_str());
+    			current = next;
+    			continue;
+    		}
+
+    		if (previous == NULL)
+    		    head = current;
+    		else
+    			previous->set_next(current);
+
+    		current->set_next(next);
+    		previous = current;
+    		current = next;
+    		count++;
+
+    	}
+    	if (head != NULL) {
+    		if (batch == head)
+    			output(0).push_batch(PacketBatch::make_from_list(batch,count));
+    		else {
+           	output(0).push_batch(PacketBatch::make_from_list(head,count));
+    		}
+    	}
+    }
+#endif
+    void
+    EtherEncap::push(int, Packet *p)
+    {
+        if (Packet *q = smaction(p))
+    	output(0).push(q);
+    }
 
 Packet *
 EtherEncap::pull(int)

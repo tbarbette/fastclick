@@ -1169,7 +1169,7 @@ Router::initialize(ErrorHandler *errh)
 #if HAVE_BATCH
     if (all_ok) {
         for (int ord = 0; ord < _elements.size(); ord++) {
-            int i = _element_configure_order[ord], r;
+            int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
             if (e != NULL) {
                 e->upgrade_ports();
@@ -1177,7 +1177,7 @@ Router::initialize(ErrorHandler *errh)
         }
 
         for (int ord = 0; ord < _elements.size(); ord++) {
-            int i = _element_configure_order[ord], r;
+            int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
             if (e != NULL) {
                 e->check_unbatch();

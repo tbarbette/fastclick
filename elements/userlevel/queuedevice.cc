@@ -30,6 +30,8 @@ Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 void QueueDevice::static_initialize() {
     int num_nodes = Numa::get_max_numas();
+    if (num_nodes < 1)
+        num_nodes = 1;
     shared_offset.resize(num_nodes);
     inputs_count.resize(num_nodes);
     inputs_count.fill(0);
@@ -92,7 +94,7 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     n_initialized++;
-    click_chatter("%s : OUTPUT Using %d threads. %d queues so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+    click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
     return 0;
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
@@ -109,7 +111,7 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
     {
         usable_threads.negate();
     }
-       for (int i = nthreads; i < usable_threads.size(); i++)
+       for (int i = click_nthreads; i < usable_threads.size(); i++)
            usable_threads[i] = 0;
 
        if (router()->thread_sched()) {

@@ -1,3 +1,4 @@
+// -*- c-basic-offset: 4; related-file-name: "tonetmapdevice.hh" -*-
 /*
  * tonetmapdevice.{cc,hh} -- element reads packets live from network via
  * Netamap
@@ -29,7 +30,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _block(1), _internal_queue(512), _burst(32)
+ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(1),_internal_queue(512)
 {
 
 }
@@ -49,8 +50,6 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("MAXTHREADS",maxthreads)
   	.complete() < 0)
     	return -1;
-
-
 
     if (_internal_queue < _burst * 2) {
         return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_queue, _burst);
@@ -85,13 +84,13 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 		transient traffic, the iqueue if it's not enough, and block or drop if
 		even the iqueue is full*/
 	if (input_is_pull(0)) {
-		_queues.resize(nthreads);
+		_queues.resize(router()->master()->nthreads());
 		for (int i = 0; i < nqueues; i++) {
 			master()->thread(thread_for_queue(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
 		}
 
 		int nt = 0;
-		for (int i = 0; i < nthreads; i++) {
+		for (int i = 0; i < click_nthreads; i++) {
 			if (!usable_threads[i]) continue;
 			_queues[i] = 0;
 			state.get_value_for_thread(i).signal = (Notifier::upstream_empty_signal(this, 0, _tasks[nt]));
@@ -126,7 +125,7 @@ ToNetmapDevice::selected(int fd, int)
 
 inline void ToNetmapDevice::allow_txsync() {
     for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++)
-    	_iodone[i] = false;
+        _iodone[i] = false;
 }
 
 /**
@@ -153,12 +152,74 @@ inline void ToNetmapDevice::do_txreclaim(int fd) {
  * Will do a full ring synchronization if the IODONE flag is down
  */
 inline void ToNetmapDevice::try_txsync(int queue, int fd) {
+#if !HAVE_BATCH
     if (!_iodone[queue]) {
+#endif
         do_txsync(fd);
+#if !HAVE_BATCH
         _iodone[queue] = true;
     }
+#endif
 }
 
+#if HAVE_BATCH
+void
+ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
+{
+	State &s = state.get();
+   	bool should_be_dropped = false;
+
+	if (s.q != NULL) {
+		if (s.q_size < _internal_queue) {
+			s.q->prev()->set_next(b_head);
+			s.q_size += b_head->count();
+			s.q->set_prev(b_head->prev());
+		} else {
+		    //We don't have space to store these packets, but we'll try to send the awaiting packets before dropping them
+		    should_be_dropped = true;
+		}
+
+	} else {
+		s.q = b_head;
+		s.q_size = b_head->count();
+	}
+
+do_send_batch:
+	Packet* last = s.q->prev();
+
+    lock(); //Lock only if multiple threads can go here
+    unsigned sent = send_packets(s.q,true);
+    unlock();
+
+    if (sent > 0 && s.q)
+    	s.q->set_prev(last);
+
+    s.q_size -= sent;
+
+    if (s.q == NULL) { //All was placed in the ring
+        if (should_be_dropped) {
+            //we can give a second try to the awaiting packets
+            push_batch(port, b_head);
+        }
+    } else {
+        if (should_be_dropped) {
+            if (s.q_size < _internal_queue) {
+                s.q->prev()->set_next(b_head);
+                s.q_size += b_head->count();
+                s.q->set_prev(b_head->prev());
+            } else { //Still not enough place, drop !
+            	if (_block) {
+            		allow_txsync();
+            		goto do_send_batch;
+            	} else {
+                    add_dropped(b_head->count());
+                    b_head->kill();
+            	}
+            }
+        }
+    }
+}
+#endif
 void
 ToNetmapDevice::push(int, Packet* p) {
 	State &s = state.get();
@@ -232,8 +293,11 @@ ToNetmapDevice::run_timer(Timer *) {
     allow_txsync();
 }
 
+int complaint = 0;
+
 /**
- * Send a linked list of packet
+ * Send a linked list of packet, return the number of packet sent and the head
+ * 	points toward the packets following the last sent packet (could be null)
  *
  * @return The number of packets sent
  */
@@ -243,7 +307,8 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 	struct netmap_ring *txring;
 	struct netmap_slot *slot;
 
-	WritablePacket* next = head->uniqueify();
+	WritablePacket* s_head = head->uniqueify();
+	WritablePacket* next = s_head;
 	WritablePacket* p = next;
 
 	bool dosync = false;
@@ -263,7 +328,9 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 		}
 
 		u_int cur = txring->cur;
-
+#if HAVE_BATCH
+		WritablePacket* last = NULL; //Remember the last treated packet (p = last->next())
+#endif
 		while ((cur != txring->tail) && next) {
 			p = next;
 
@@ -271,26 +338,54 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 
 			slot = &txring->slot[cur];
 			slot->len = p->length();
+#if HAVE_NETMAP_PACKET_POOL
+			if (p->headroom() > 0) {
+				complaint++;
+				if (complaint < 5)
+					click_chatter("Shifting data in %s. You should avoid this case !");
+				p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
+			}
 
-#if HAVE_ZEROCOPY
+			unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
+			slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+			static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
+			slot->flags |= NS_BUF_CHANGED;
+
+			if (unlikely(push && cur % 32 == 0)) {
+				dosync = true;
+				slot->flags |= NS_REPORT;
+			}
+#else
+# if HAVE_ZEROCOPY
 			if (likely(NetmapBufQ::is_netmap_packet(p))) {
 				((NetmapBufQ*)(p->destructor_argument()))->insert(slot->buf_idx);
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				slot->flags |= NS_BUF_CHANGED;
 				p->set_buffer_destructor(NetmapBufQ::buffer_destructor_fake);
 			} else
-#endif
+# endif
 			{
 				unsigned char* dstdata = (unsigned char*)NETMAP_BUF(txring, slot->buf_idx);
 				void* srcdata = (void*)(p->data());
 				memcpy(dstdata,srcdata,p->length());
 			}
-
+#endif
+#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
+			//We cannot recycle a batch with shared packet in it
+			if (p->shared()) {
+				p->kill();
+				if (last)
+					last->set_next(next);
+			} else {
+				last = p;
+			}
+#else
+			//If no batch and no packet pool, don't bother recycling per-batch
 			p->kill();
+#endif
 			sent++;
 			cur = nm_ring_next(txring,cur);
 		}
-
 		txring->head = txring->cur = cur;
 
 		if (unlikely(dosync))
@@ -298,6 +393,11 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 
 		if (next == NULL) { //All is sent
 			add_count(sent);
+#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
+			p->set_next(0);
+			static_cast<PacketBatch*>(s_head)->set_count(sent);
+			static_cast<PacketBatch*>(s_head)->safe_kill();
+#endif
 			head = NULL;
 			return sent;
 		}
@@ -306,6 +406,11 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 	if (next == head) { //Nothing could be sent...
 		return 0;
 	} else {
+#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
+		p->set_next(0);
+		static_cast<PacketBatch*>(s_head)->set_count(sent);
+		static_cast<PacketBatch*>(s_head)->kill();
+#endif
 		add_count(sent);
 		head = next;
 		return sent;
@@ -376,7 +481,7 @@ ToNetmapDevice::run_task(Task* task)
 		s.q_size = batch_size;
 		//Register fd to wait for space
 		for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
-			master()->thread(click_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+			master()->thread(click_current_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
 		}
 	} else if (s.signal.active()) { //TODO is this really needed?
 		//We sent everything we could, but check signal to see if packet arrived after last read
@@ -385,7 +490,6 @@ ToNetmapDevice::run_task(Task* task)
 	return total_sent;
 }
 
-extern int nthreads;
 
 void
 ToNetmapDevice::cleanup(CleanupStage)

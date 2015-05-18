@@ -88,7 +88,7 @@ CXXFLAGS = @CXXFLAGS@
 DEFS = @DEFS@
 INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
 	-I$(srcdir) -I$(top_srcdir) \
-	@PROPER_INCLUDES@ @PCAP_INCLUDES@ @NETMAP_INCLUDES@
+	@PROPER_INCLUDES@ @PCAP_INCLUDES@ @NETMAP_INCLUDES@ @NUMA_INCLUDES@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ `$(CLICK_BUILDTOOL) --otherlibs` $(ELEMENT_LIBS)
 DL_LDFLAGS = @DL_LDFLAGS@
@@ -106,7 +106,7 @@ include dpdk.mk
 EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 endif
 
-EXTRA_DRIVER_OBJS := netmapdevice.o
+EXTRA_DRIVER_OBJS := netmapdevice.o $(EXTRA_DRIVER_OBJS)
 
 ifndef MINDRIVER
 DRIVER = click

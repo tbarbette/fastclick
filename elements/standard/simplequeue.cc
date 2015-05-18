@@ -20,6 +20,8 @@
 #include "simplequeue.hh"
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/router.hh>
+#include <click/packet.hh>
 CLICK_DECLS
 
 SimpleQueue::SimpleQueue()
@@ -58,7 +60,27 @@ SimpleQueue::initialize(ErrorHandler *errh)
 	return errh->error("out of memory");
     _drops = 0;
     _highwater_length = 0;
+
+    Bitvector b = get_threads();
+    unsigned int thisthread = router()->home_thread_id(this);
+
+    for (unsigned i = 0; i < (unsigned)b.size(); i++) {
+       if (b[i] && i != thisthread) {
+           WritablePacket::pool_transfer(thisthread,i);
+       }
+    }
+
     return 0;
+}
+
+
+
+bool
+SimpleQueue::get_runnable_threads(Bitvector& b) {
+    unsigned int thisthread = router()->home_thread_id(this);
+    b.clear();
+    b[thisthread] = 1;
+    return false;
 }
 
 int
@@ -142,6 +164,7 @@ SimpleQueue::cleanup(CleanupStage)
     }
 
     PacketBatch* SimpleQueue::pull_batch(int port) {
+        (void) port;
         PacketBatch* batch;
         MAKE_BATCH(deq(),batch);
         return batch;

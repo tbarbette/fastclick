@@ -1,5 +1,11 @@
 #ifndef CLICK_PACKET_ANNO_HH
 #define CLICK_PACKET_ANNO_HH
+#include <click/config.h>
+#include <click/vector.hh>
+#include <click/string.hh>
+#include <click/timestamp.hh>
+
+#define ANNO_SIZE 48
 
 #define MAKE_ANNOTATIONINFO(offset, size)	((size) << 16 | (offset))
 #define ANNOTATIONINFO_SIZE(ai)			((ai) >> 16)
@@ -93,6 +99,7 @@
 #define EXTRA_LENGTH_ANNO(p)		((p)->anno_u32(EXTRA_LENGTH_ANNO_OFFSET))
 #define SET_EXTRA_LENGTH_ANNO(p, v)	((p)->set_anno_u32(EXTRA_LENGTH_ANNO_OFFSET, (v)))
 
+
 // bytes 32-39
 #define FIRST_TIMESTAMP_ANNO_OFFSET	32
 #define FIRST_TIMESTAMP_ANNO_SIZE	8
@@ -105,6 +112,11 @@
 #define PACKET_NUMBER_ANNO_SIZE		4
 #define PACKET_NUMBER_ANNO(p)		((p)->anno_u32(PACKET_NUMBER_ANNO_OFFSET))
 #define SET_PACKET_NUMBER_ANNO(p, v)	((p)->set_anno_u32(PACKET_NUMBER_ANNO_OFFSET, (v)))
+
+#define FLOW_ID_ANNO_OFFSET	32
+#define FLOW_ID_ANNO_SIZE		4
+#define FLOW_ID_ANNO(p)		((p)->anno_u32(FLOW_ID_ANNO_OFFSET))
+#define SET_FLOW_ID_ANNO(p, v)	((p)->set_anno_u32(FLOW_ID_ANNO_OFFSET, (v)))
 
 #define IPSEC_SPI_ANNO_OFFSET		32
 #define IPSEC_SPI_ANNO_SIZE		4
@@ -139,4 +151,5 @@
 # endif
 #endif
 
+CLICK_ENDDECLS
 #endif

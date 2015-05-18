@@ -1,4 +1,4 @@
-// -*- c-basic-offset: 4; related-file-name: "../include/click/flowelement.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "../include/click/batchelement.hh" -*-
 /*
  * batchelement.{cc,hh}
  *
@@ -13,7 +13,7 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
-const bool BatchElement::need_batch() const {
+bool BatchElement::need_batch() const {
     return false;
 }
 
@@ -39,7 +39,7 @@ void BatchElement::BatchPort::push_batch(PacketBatch* batch) const {
 		static_cast<BatchElement*>(_e)->push_batch(_port,batch);
 #endif
 	} else {
-		for (auto it = downstream_batches.begin(); it!= downstream_batches.end(); it++)
+		for (std::list<BatchElement*>::const_iterator it = downstream_batches.begin(); it!= downstream_batches.end(); it++)
 			(*it)->start_batch();
 
 		while (head != NULL) {
@@ -49,9 +49,8 @@ void BatchElement::BatchPort::push_batch(PacketBatch* batch) const {
 			head = next;
 		}
 
-		for (auto it = downstream_batches.begin(); it!= downstream_batches.end(); it++)
+		for (std::list<BatchElement*>::const_iterator it = downstream_batches.begin(); it!= downstream_batches.end(); it++)
 			(*it)->end_batch();
-
 	}
 }
 
@@ -106,8 +105,8 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
 
 	}
 
-	bool visit(Element *e, bool isoutput, int port,
-			Element *from_e, int from_port, int distance) {
+	bool visit(Element *e, bool isoutput, int,
+			Element *, int, int) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
 		if (batch_e != NULL) {
 			/*We add this only if it's not reconstruction for just one element
@@ -126,10 +125,11 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
 			}
 
 			if (reconstruct_batch) {
+				click_chatter("Add %s",batch_e->name().c_str());
 				_list->push_back(batch_e);
 				return false;
 			} else {
-			    return true;
+			    return false;
 			}
 
 		};
@@ -166,7 +166,7 @@ void BatchElement::upgrade_ports() {
 void BatchElement::check_unbatch() {
 	for (int i = 0; i < noutputs(); i++) {
 		if (output_is_push(i) && !output(i).output_supports_batch) {
-			click_chatter("Warning ! %s is not compatible with batch. Performance will be slightly reduced.",output(i).element()->name().c_str());
+			click_chatter("Warning ! %s->%s is not compatible with batch. Packets will be unbatched and that will reduce performances.",output(i).element()->name().c_str(),name().c_str());
 			BatchPort* port = &(static_cast<BatchElement::BatchPort*>(_ports[1])[i]);
 			PushToPushBatchVisitor v(&port[i].downstream_batches);
 			router()->visit(this,1,i,&v);

@@ -239,8 +239,16 @@ Timer::initialize(Element *owner, bool quiet)
 {
     assert(!initialized() || _owner->router() == owner->router());
     _owner = owner;
-    if (unlikely(_hook.callback == do_nothing_hook && !_thunk) && !quiet)
-	click_chatter("initializing Timer %p{element} [%p], which does nothing", _owner, this);
+    if (unlikely(_hook.callback == do_nothing_hook && !_thunk)) {
+        if (_owner) {
+            _hook.callback = element_hook;
+            _thunk = _owner;
+        } else {
+            if (!quiet)
+                click_chatter("initializing Timer %p{element} [%p], which does nothing", _owner, this);
+        }
+    }
+
 
     int tid = owner->router()->home_thread_id(owner);
     _thread = owner->master()->thread(tid);

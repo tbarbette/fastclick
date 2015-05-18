@@ -1,3 +1,4 @@
+// -*- c-basic-offset: 4; related-file-name: "fromdpdkdevice.hh" -*-
 /*
  * fromdpdkdevice.{cc,hh} -- element reads packets live from network via
  * Intel's DPDK
@@ -106,10 +107,18 @@ bool FromDpdkDevice::run_task(Task * t)
     struct rte_mbuf *pkts[_burst];
     int ret = 0;
 
+#if HAVE_BATCH
+    PacketBatch* head = NULL;
+	WritablePacket *last = NULL;
+#endif
+
     for (int iqueue = queue_for_thread_begin(); iqueue<=queue_for_thread_end();iqueue++) {
         unsigned n = rte_eth_rx_burst(_port_no, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
-#if HAVE_ZEROCOPY
+#if CLICK_DPDK_POOLS
+            rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
+            WritablePacket *p = Packet::make(pkts[i]);
+#elif HAVE_ZEROCOPY
     rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
     WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
                      rte_pktmbuf_data_len(pkts[i]), DpdkDevice::free_pkt,
@@ -119,9 +128,23 @@ bool FromDpdkDevice::run_task(Task * t)
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
 #endif
-            p->set_packet_type_anno(HOST);
-            output(0).push(p);
+            p->set_packet_type_anno(Packet::HOST);
+#if HAVE_BATCH
+            if (head == NULL)
+                head = PacketBatch::start_head(p);
+            else
+                last->set_next(p);
+            last = p;
+#else
+             output(0).push(p);
+#endif
         }
+#if HAVE_BATCH
+        if (head) {
+            head->make_tail(last,n);
+            output(0).push_batch(head);
+        }
+#endif
         if (n) {
             add_count(n);
             ret = 1;
