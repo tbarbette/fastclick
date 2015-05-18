@@ -1,6 +1,6 @@
 #ifndef LOOKUPIPROUTEMP_HH
 #define LOOKUPIPROUTEMP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/iptable.hh>
 CLICK_DECLS
 
@@ -18,7 +18,7 @@ CLICK_DECLS
  * =a LookupIPRoute
  */
 
-class LookupIPRouteMP : public Element {
+class LookupIPRouteMP : public BatchElement {
   struct cache_entry {
     IPAddress _last_addr_1;
     IPAddress _last_gw_1;
@@ -47,6 +47,9 @@ public:
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage stage) CLICK_COLD;
 
+#if HAVE_BATCH
+  void push_batch(int port, PacketBatch *p);
+#endif
   void push(int port, Packet *p);
 };
 
