@@ -821,7 +821,7 @@ particular purpose.\n");
       click_master->thread(i + 1)->wake();
   for (int i = 0; i < other_threads.size(); ++i)
       (void) pthread_join(other_threads[i], 0);
-#else
+#elif HAVE_DPDK
     rte_eal_mp_wait_lcore();
 #endif
   click_router->unuse();
