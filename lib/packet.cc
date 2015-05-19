@@ -399,7 +399,18 @@ void WritablePacket::pool_transfer(int from, int to) {
 #endif
 }
 
-#  if HAVE_NET_NETMAP_H
+#  if HAVE_NETMAP_PACKET_POOL
+WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
+    WritablePacket* p = pool_data_allocate();
+    if (!p) return NULL;
+    p->initialize();
+    slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
+    p->set_buffer(data,rxring->nr_buf_size,slot->len);
+    return p;
+}
+
+
+#   if HAVE_BATCH
 /**
  * Creates a batch of packet directly from a netmap ring.
  */
@@ -450,10 +461,6 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
             _head = 0;
 
             next = pool_data_allocate();
-
-#if DYNAMIC_CHECKS
-            assert(next && next->buffer());
-#endif
             _count++; // We use the packet already out of the pool
         }
         last->set_next(next);
@@ -467,7 +474,8 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
     last->set_next(NULL);
     return p_batch;
 }
-#  endif //HAVE_NET_NETMAP_H
+#   endif //HAVE_BATCH
+#  endif //HAVE_NETMAP_PACKET_POOL
 
 inline void
 WritablePacket::check_pool_size(PacketPool &packet_pool, bool data) {

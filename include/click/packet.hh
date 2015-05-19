@@ -880,7 +880,10 @@ class WritablePacket : public Packet { public:
     inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
 
 #if HAVE_NETMAP_PACKET_POOL
+    static WritablePacket* make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot);
+# if HAVE_BATCH
     static PacketBatch* make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur);
+# endif
 #endif
 
     static void pool_transfer(int from, int to);

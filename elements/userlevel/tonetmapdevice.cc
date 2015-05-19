@@ -380,7 +380,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 				last = p;
 			}
 #else
-			//If no batch and no packet pool, don't bother recycling per-batch
+			//If no batch or no packet pool, don't bother recycling per-batch
 			p->kill();
 #endif
 			sent++;
