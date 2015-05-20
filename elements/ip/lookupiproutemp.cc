@@ -103,16 +103,15 @@ LookupIPRouteMP::initialize(ErrorHandler *)
 
 #if HAVE_BATCH
     void
-    LookupIPRouteMP::push_batch(int port, PacketBatch *p)
+    LookupIPRouteMP::push_batch(int, PacketBatch *p)
     {
-    	PacketBatch* head = p;
-
-    	PacketBatch* cur_head = p;
     	PacketBatch* last = NULL;
 
     	int max = _t.size();
-    	PacketBatch* out[max + 1] = {0}; //Array for each entry, last is for unrouted packets
-        IPAddress  out_gw[max + 1] = {0}; //Gw for each entry, last is used as a temp
+        PacketBatch* out[max + 1]; //Array for each entry, last is for unrouted packets
+        bzero(out,sizeof(PacketBatch*) * max+1);
+        IPAddress  out_gw[max + 1]; //Gw for each entry, last is used as a temp
+        bzero(out_gw,sizeof(IPAddress) * max+1);
 
     	int last_o = -1;
     	int passed = 0;
