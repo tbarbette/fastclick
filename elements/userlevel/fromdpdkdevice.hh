@@ -111,6 +111,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
+    void cleanup(CleanupStage stage) CLICK_COLD;
     bool run_task(Task *);
     
 private:

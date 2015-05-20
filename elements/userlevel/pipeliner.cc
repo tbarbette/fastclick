@@ -92,7 +92,6 @@ Pipeliner::initialize(ErrorHandler *errh)
 #define SLEEPINESS_THRESHOLD 4
 void Pipeliner::push_batch(int,PacketBatch* head) {
     if (storage->insert(head)) {
-        //click_chatter("Write %d[%d]",click_current_thread_id,storage->head % PIPELINE_RING_SIZE);
         if (sleepiness >= SLEEPINESS_THRESHOLD)
                     _task->reschedule();
     } else {
@@ -104,10 +103,8 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
 #define SLEEPINESS_THRESHOLD 128
 void Pipeliner::push(int,Packet* p) {
     if (storage->insert(p)) {
-       // click_chatter("Write %d[%d]",click_current_thread_id,storage->head % PIPELINE_RING_SIZE);
 
     } else {
-        //click_chatter("Queue drop!");
         p->kill();
         stats->dropped++;
         click_chatter("Have %d packets" + storage->count());
@@ -121,8 +118,6 @@ void Pipeliner::push(int,Packet* p) {
 bool
 Pipeliner::run_task(Task* t)
 {
-   /* if (click_current_thread_id == 0)
-            click_chatter("P");*/
     bool r = false;
     last_start++; //Used to RR the balancing of revert storage
     for (unsigned j = 0; j < storage.size(); j++) {

@@ -98,7 +98,7 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     return 0;
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
-    NumaCpuBitmask b =  NumaCpuBitmask::allocate();
+    NumaCpuBitmask b = NumaCpuBitmask::allocate();
 #if HAVE_NUMA
     if (numa_available()==0) {
         if (_this_node >= 0) {

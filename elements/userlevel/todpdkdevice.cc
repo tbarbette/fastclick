@@ -109,6 +109,14 @@ int ToDpdkDevice::initialize(ErrorHandler *errh)
     return 0;
 }
 
+void ToDpdkDevice::cleanup(CleanupStage stage)
+{
+	cleanup_tasks();
+	for (int i = 0; i < state.size();i++) {
+		delete[] state.get_value(i).glob_pkts;
+	}
+}
+
 void ToDpdkDevice::add_handlers()
 {
     add_read_handler("n_sent", count_handler, 0);

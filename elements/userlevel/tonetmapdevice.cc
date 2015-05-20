@@ -94,6 +94,9 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 			if (!usable_threads[i]) continue;
 			_queues[i] = 0;
 			state.get_value_for_thread(i).signal = (Notifier::upstream_empty_signal(this, 0, _tasks[nt]));
+			state.get_value_for_thread(i).timer = new Timer(task_for_thread(i));
+			state.get_value_for_thread(i).timer->initialize(this);
+			state.get_value_for_thread(i).backoff = 1;
 			nt++;
 		}
 	} else {
@@ -120,7 +123,7 @@ void
 ToNetmapDevice::selected(int fd, int)
 {
 	task_for_thread()->reschedule();
-	master()->thread(click_current_processor())->select_set().remove_select(fd,this,SELECT_WRITE);
+	master()->thread(click_current_cpu_id())->select_set().remove_select(fd,this,SELECT_WRITE);
 }
 
 inline void ToNetmapDevice::allow_txsync() {
@@ -435,6 +438,7 @@ ToNetmapDevice::run_task(Task* task)
 		if (!batch || batch_size < _burst) { //Create a batch up to _burst size, or less if no packets are available
 			Packet* last;
 			if (!batch) {
+				//TODO use pull_batch
 				if ((batch = input(0).pull()) == NULL) {
 					//TODO : if no signal, we should set a timer
 					break;
@@ -477,6 +481,7 @@ ToNetmapDevice::run_task(Task* task)
 
 	if (batch != NULL) {/*Output ring is full, we rely on the select mechanism
 		to know when we'll have space to send packets*/
+		s.backoff = 1;
 		s.q = batch;
 		s.q_size = batch_size;
 		//Register fd to wait for space
@@ -486,6 +491,11 @@ ToNetmapDevice::run_task(Task* task)
 	} else if (s.signal.active()) { //TODO is this really needed?
 		//We sent everything we could, but check signal to see if packet arrived after last read
 		task->fast_reschedule();
+	} else { //Empty and no signal
+		if (s.backoff < 256)
+			s.backoff*=2;
+		s.timer->schedule_after(Timestamp::make_usec(s.backoff));
+
 	}
 	return total_sent;
 }
@@ -494,13 +504,20 @@ ToNetmapDevice::run_task(Task* task)
 void
 ToNetmapDevice::cleanup(CleanupStage)
 {
+    cleanup_tasks();
     for (unsigned int i = 0; i < state.size(); i++) {
         if (state.get_value(i).q) {
         	Packet* next = state.get_value(i).q->next();
         	state.get_value(i).q->kill();
         	state.get_value(i).q = next;
         }
+        if (state.get_value(i).timer)
+            delete state.get_value(i).timer;
     }
+    if (!input_is_pull(0))
+        for (int i = 0; i < nqueues; i++)
+            delete _zctimers[i];
+
     if (_device) _device->destroy();
 }
 

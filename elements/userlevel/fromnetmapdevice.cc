@@ -272,18 +272,16 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 
 }
 
-
 void
 FromNetmapDevice::selected(int fd, int)
 {
 	receive_packets(task_for_thread(),queue_for_fd(fd),queue_for_fd(fd),false);
 }
 
-
-
 void
 FromNetmapDevice::cleanup(CleanupStage)
 {
+    cleanup_tasks();
     if (_device) _device->destroy();
 }
 

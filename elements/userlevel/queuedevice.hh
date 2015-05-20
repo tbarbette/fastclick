@@ -190,7 +190,6 @@ protected:
                     _locks[th_num] = 0;
                 }
             } else {
-
                 _tasks[th_num] = (new Task(this));
                 ScheduleInfo::initialize_task(this, _tasks[th_num], schedule, errh);
                 _tasks[th_num]->move_thread(th_id);
@@ -217,6 +216,13 @@ protected:
 
     }
 
+    void cleanup_tasks() {
+        for (int i = 0; i < usable_threads.weight(); i++) {
+            if (_tasks[i])
+                delete _tasks[i];
+        }
+    }
+
     inline int queue_for_thread_begin() {
         return _thread_to_queue[click_current_cpu_id()];
     }
@@ -225,14 +231,21 @@ protected:
         return _thread_to_queue[click_current_cpu_id()] + queue_per_threads - 1;
     }
 
+    inline int id_for_thread(int tid) {
+        return _thread_to_queue[tid] / queue_per_threads;
+    }
 
     inline int id_for_thread() {
-        return _thread_to_queue[click_current_cpu_id()] / queue_per_threads;
+        return id_for_thread(click_current_cpu_id());
     }
 
     inline Task* task_for_thread() {
         return _tasks[id_for_thread()];
     }
+
+    inline Task* task_for_thread(int tid) {
+            return _tasks[id_for_thread(tid)];
+        }
 
     inline int thread_for_queue(int queue) {
         return _queue_to_thread[queue];

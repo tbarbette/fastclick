@@ -23,7 +23,7 @@ public:
 		return numa_bitmask_isbitset(b,n);
 	}
 	~NumaCpuBitmask() {
-		//	numa_free_cpumask(b);
+		numa_free_cpumask(b);
 	}
 
 	struct bitmask* bitmask() {
@@ -33,7 +33,6 @@ public:
 	static NumaCpuBitmask allocate() {
 		numa_available();
 		NumaCpuBitmask bcp;
-		bcp.b = numa_allocate_cpumask();
 		return bcp;
 	}
 

@@ -96,6 +96,11 @@ int FromDpdkDevice::initialize(ErrorHandler *errh)
     return ret;
 }
 
+void FromDpdkDevice::cleanup(CleanupStage stage)
+{
+	cleanup_tasks();
+}
+
 void FromDpdkDevice::add_handlers()
 {
     add_read_handler("count", count_handler, 0);

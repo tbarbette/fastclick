@@ -96,11 +96,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
 
-    void cleanup(CleanupStage stage) CLICK_COLD {
-    	for (int i = 0; i < state.size();i++) {
-    		delete[] state.get_value(i).glob_pkts;
-    	}
-    }
+    void cleanup(CleanupStage stage) CLICK_COLD;
 
     void add_handlers() CLICK_COLD;
 
