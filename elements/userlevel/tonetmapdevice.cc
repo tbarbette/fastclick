@@ -41,12 +41,13 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String ifname;
     int maxthreads = -1;
+    int burst = -1;
 
     if (Args(conf, this, errh)
     .read_mp("DEVNAME", ifname)
   	.read_p("IQUEUE",_internal_queue)
 	.read_p("BLOCKANT",_block)
-  	.read("BURST", _burst)
+   .read("BURST", burst)
 	.read("MAXTHREADS",maxthreads)
   	.complete() < 0)
     	return -1;
@@ -55,6 +56,16 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_queue, _burst);
     }
 
+#if HAVE_BATCH
+    if (burst > 0) {
+        if (input_is_pull(0))
+            errh->warning("%s: burst does not make sense in full push with batching, it is unused.",name().c_str());
+        _burst = burst;
+    }
+#else
+    if (burst > 0)
+        _burst = burst;
+#endif
     _device = NetmapDevice::open(ifname);
     if (!_device) {
         return errh->error("Could not initialize %s",ifname.c_str());
@@ -398,21 +409,20 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 			add_count(sent);
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 			p->set_next(0);
-			static_cast<PacketBatch*>(s_head)->set_count(sent);
-			static_cast<PacketBatch*>(s_head)->safe_kill();
+			PacketBatch::make_from_list(s_head,sent)->safe_kill();
 #endif
 			head = NULL;
 			return sent;
 		}
 	}
 
-	if (next == head) { //Nothing could be sent...
+	if (next == s_head) { //Nothing could be sent...
+		head = s_head;
 		return 0;
 	} else {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 		p->set_next(0);
-		static_cast<PacketBatch*>(s_head)->set_count(sent);
-		static_cast<PacketBatch*>(s_head)->kill();
+		PacketBatch::make_from_simple_list(s_head,p,sent)->safe_kill();
 #endif
 		add_count(sent);
 		head = next;
@@ -432,15 +442,30 @@ ToNetmapDevice::run_task(Task* task)
 	s.q = NULL;
 	s.q_size = 0;
 	do {
+#if HAVE_BATCH
+		if (!batch || batch_size < _burst) {
+			PacketBatch* new_batch = input(0).pull_batch(_burst - batch_size);
+			if (new_batch) {
+				if (batch) {
+					batch->prev()->set_next(new_batch);
+					batch_size += new_batch->count();
+					batch->set_prev(new_batch->tail());
+				} else {
+					batch = new_batch;
+					batch_size = new_batch->count();
+				}
+			}
+		}
+#else
 		/* Difference from vanilla is that we build a batch up to _burst size
 		 * and then process it. This allows to synchronize less often, which is
 		 * costly with netmap. */
 		if (!batch || batch_size < _burst) { //Create a batch up to _burst size, or less if no packets are available
 			Packet* last;
 			if (!batch) {
-				//TODO use pull_batch
+				//Nothing in the internal queue
 				if ((batch = input(0).pull()) == NULL) {
-					//TODO : if no signal, we should set a timer
+					//Nothing to pull
 					break;
 				}
 				last = batch;
@@ -458,6 +483,7 @@ ToNetmapDevice::run_task(Task* task)
 			}
 			batch->set_prev(last); //Prev of the head is the tail of the batch
 		}
+#endif
 
 		if (batch) {
 			Packet* last = batch->prev();

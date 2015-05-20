@@ -16,7 +16,7 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
-#define BATCH_MAX_PULL 1024
+#define BATCH_MAX_PULL 256
 
 class BatchElement : public Element { public:
 	BatchElement();
@@ -37,13 +37,13 @@ class BatchElement : public Element { public:
 			output(port).push_batch(head);
 	}
 
-	virtual PacketBatch* pull_batch(int port) {
-	    PacketBatch* head = input(port).pull_batch();
+	virtual PacketBatch* pull_batch(int port, unsigned max) {
+	    PacketBatch* head = input(port).pull_batch(max);
 	    if (head) {
 	        head = simple_action_batch(head);
 	    }
 	    return head;
-    }
+	}
 
 	per_thread<PacketBatch*> current_batch;
 
@@ -105,7 +105,11 @@ class BatchElement : public Element { public:
 
 	class PullBatchPort : public Port {
 	    public :
-	    PacketBatch* pull_batch() const;
+	    PacketBatch* pull_batch(unsigned max) const;
+		inline Packet* pull() const {
+			click_chatter("WARNING : Using pull function inside a batch-compatible element. This will likely create errors, please change the element to use pull_batch instead !");
+			return _e->pull(_port);
+		}
 	    void bound();
 	};
 

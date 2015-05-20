@@ -163,10 +163,10 @@ SimpleQueue::cleanup(CleanupStage)
         }
     }
 
-    PacketBatch* SimpleQueue::pull_batch(int port) {
+    PacketBatch* SimpleQueue::pull_batch(int port,unsigned max) {
         (void) port;
         PacketBatch* batch;
-        MAKE_BATCH(deq(),batch);
+        MAKE_BATCH(deq(),batch,max);
         return batch;
     }
 #endif

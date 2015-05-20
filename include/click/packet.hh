@@ -951,9 +951,10 @@ class WritablePacket : public Packet { public:
 
 #define FOR_EACH_PACKET_SAFE(batch,p) \
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\
-                for(Packet* p = batch;next != NULL;p=next,next = next->next())
+                Packet* p = batch;\
+                for (;p != NULL;p=next,next=(p==0?0:p->next()))
 
-#define MAKE_BATCH(fnt,head) {\
+#define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
         Packet* last = head;\
         if (head != NULL) {\
@@ -966,7 +967,7 @@ class WritablePacket : public Packet { public:
                 last = current;\
                 count++;\
             }\
-            while (count < BATCH_MAX_PULL);\
+            while (count < (max>0?max:BATCH_MAX_PULL));\
             head->make_tail(last,count);\
         } else head = NULL;\
 }

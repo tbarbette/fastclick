@@ -56,17 +56,17 @@ FullNoteQueue::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
     void FullNoteQueue::push_batch(int port, PacketBatch* batch) {
         FOR_EACH_PACKET_SAFE(batch,p) {
             Storage::index_type h = head(), t = tail(), nt = next_i(t);
-
             if (nt != h)
            push_success(h, t, nt, p);
-            else
+            else{
            push_failure(p);
+            }
         }
     }
 
-    PacketBatch* FullNoteQueue::pull_batch(int port) {
+    PacketBatch* FullNoteQueue::pull_batch(int port,unsigned max) {
         PacketBatch* batch;
-        MAKE_BATCH(pull(port),batch);
+        MAKE_BATCH(pull(port),batch,max);
         return batch;
     }
 #endif

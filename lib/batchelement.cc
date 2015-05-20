@@ -74,24 +74,23 @@ inline void BatchElement::BatchPort::assign(bool isoutput, Element *e, int port)
 inline void BatchElement::PullBatchPort::bound() {
     #if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
     if (dynamic_cast<BatchElement*>(element()) != NULL) {
-            PacketBatch *(BatchElement::*flow_pull)(int) = &BatchElement::pull_batch;
-            _bound.pull_batch = (PacketBatch * (*)(BatchElement *, int)) (static_cast<BatchElement*>(element())->*flow_pull);
+            PacketBatch *(BatchElement::*flow_pull)(int,unsigned) = &BatchElement::pull_batch;
+            _bound.pull_batch = (PacketBatch * (*)(BatchElement *, int, unsigned)) (static_cast<BatchElement*>(element())->*flow_pull);
     }
     #endif
 }
 
-PacketBatch* BatchElement::PullBatchPort::pull_batch() const {
+PacketBatch* BatchElement::PullBatchPort::pull_batch(unsigned max) const {
     PacketBatch* batch = NULL;
     if (likely(dynamic_cast<BatchElement*>(_e) != NULL)) {
 #if HAVE_BOUND_PORT_TRANSFER
-        batch = _bound.pull_batch(static_cast<BatchElement*>(_e),_port);
+        batch = _bound.pull_batch(static_cast<BatchElement*>(_e),_port, max);
 #else
-        batch = static_cast<BatchElement*>(_e)->pull_batch(_port);
+        batch = static_cast<BatchElement*>(_e)->pull_batch(_port, max);
 #endif
         return batch;
     } else {
-        click_chatter("unsupported pull batch");
-        MAKE_BATCH(Element::Port::pull(),batch);
+        MAKE_BATCH(Element::Port::pull(),batch,max);
         return batch;
     }
 }

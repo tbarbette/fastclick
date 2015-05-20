@@ -250,7 +250,7 @@ class NetmapBufQ {
 				delete netmap_buf_pools.get_value(i);
 				netmap_buf_pools.set_value(i, NULL);
 			} else {
-				click_chatter("No free because no packet pool %d %d",netmap_buf_pools.get_value(i),netmap_buf_pools.get_value(i)->count());
+				click_chatter("No free because no packet pool %d(%p) has %d packets",i,netmap_buf_pools.get_value(i),netmap_buf_pools.get_value(i)->count());
 			}
 		}
     }

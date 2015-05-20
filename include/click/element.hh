@@ -242,7 +242,7 @@ class Element { public:
 	    Packet *(*pull)(Element *e, int port);
 #if HAVE_BATCH
 	    void (*push_batch)(BatchElement *e, int port, PacketBatch *p);
-	    PacketBatch* (*pull_batch)(BatchElement *e, int port);
+	    PacketBatch* (*pull_batch)(BatchElement *e, int port, unsigned max);
 #endif
 	} _bound;
 #endif
