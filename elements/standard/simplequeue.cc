@@ -70,6 +70,9 @@ SimpleQueue::initialize(ErrorHandler *errh)
        }
     }
 
+    if (get_threads().weight() > 1 && !String(class_name()).equals("ThreadSafeQueue"))
+        return errh->error("%s: %s queue is not multithread-safe ! Use ThreadSafeQueue instead.",name().c_str(),class_name());
+
     return 0;
 }
 
