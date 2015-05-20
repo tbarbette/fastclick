@@ -9,7 +9,9 @@
 #include <click/master.hh>
 #include <click/multithread.hh>
 #include <click/standard/scheduleinfo.hh>
+#if HAVE_NUMA
 #include <click/numa.hh>
+#endif
 
 class QueueDevice : public BatchElement {
 

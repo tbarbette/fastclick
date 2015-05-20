@@ -29,9 +29,13 @@ Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 
 void QueueDevice::static_initialize() {
+#if HAVE_NUMA
     int num_nodes = Numa::get_max_numas();
     if (num_nodes < 1)
         num_nodes = 1;
+#else
+    int num_nodes = 1;
+#endif
     shared_offset.resize(num_nodes);
     inputs_count.resize(num_nodes);
     inputs_count.fill(0);
@@ -44,11 +48,12 @@ int QueueDevice::configure_rx(int numa_node,unsigned int maxthreads, unsigned in
     _maxqueues = maxqueues;
     _threadoffset = threadoffset;
 
-    usable_threads.assign(min(Numa::get_max_cpus(), master()->nthreads()),false);
-
     #if !HAVE_NUMA
+        (void)numa_node;
         _this_node = 0;
+        usable_threads.assign(master()->nthreads(),false);
     #else
+        usable_threads.assign(min(Numa::get_max_cpus(), master()->nthreads()),false);
         if (numa_node < 0) numa_node = 0;
         _this_node = numa_node;
     #endif
@@ -98,8 +103,8 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     return 0;
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
-    NumaCpuBitmask b = NumaCpuBitmask::allocate();
 #if HAVE_NUMA
+	NumaCpuBitmask b = NumaCpuBitmask::allocate();
     if (numa_available()==0) {
         if (_this_node >= 0) {
             b = Numa::node_to_cpus(_this_node);
