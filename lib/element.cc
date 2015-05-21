@@ -3027,6 +3027,13 @@ Element::run_task(Task *)
     return false;
 }
 
+bool
+Element::run_idle_task(IdleTask *)
+{
+    assert(0 /* run_task implementation missing */);
+    return false;
+}
+
 /** @brief Run the element's timer.
  *
  * @param timer the timer object that fired

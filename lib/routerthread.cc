@@ -25,6 +25,7 @@
 #include <click/router.hh>
 #include <click/routerthread.hh>
 #include <click/master.hh>
+#include <click/idletask.hh>
 #if CLICK_LINUXMODULE
 # include <click/cxxprotect.h>
 CLICK_CXX_PROTECT
@@ -67,7 +68,7 @@ static unsigned long greedy_schedule_jiffies;
  */
 
 RouterThread::RouterThread(Master *master, int id)
-    : _stop_flag(0), _master(master), _id(id)
+    : _stop_flag(0),  _idletask(0), _master(master), _id(id)
 {
     _pending_head.x = 0;
     _pending_tail = &_pending_head;
@@ -363,7 +364,7 @@ RouterThread::task_reheapify_from(int pos, Task* t)
 #endif
 
 /* Run at most 'ntasks' tasks. */
-inline void
+inline bool
 RouterThread::run_tasks(int ntasks)
 {
     set_thread_state(S_RUNTASK);
@@ -383,6 +384,8 @@ RouterThread::run_tasks(int ntasks)
     // never run more than 32768 tasks
     if (ntasks > 32768)
 	ntasks = 32768;
+
+    bool any_work_done = false;
 
 #if HAVE_MULTITHREAD
     // cycle counter for adaptive scheduling among processors
@@ -420,6 +423,8 @@ RouterThread::run_tasks(int ntasks)
 
 	t->_status.is_scheduled = false;
 	work_done = t->fire();
+	if (work_done)
+		any_work_done = true;
 
 #if HAVE_MULTITHREAD
 	if (runs > PROFILE_ELEMENT) {
@@ -488,11 +493,14 @@ RouterThread::run_tasks(int ntasks)
 #if HAVE_ADAPTIVE_SCHEDULER
     client_update_pass(C_CLICK, t_before);
 #endif
+
+    return any_work_done;
 }
 
-inline void
+inline bool
 RouterThread::run_os()
 {
+	bool work_done = false;
 #if CLICK_LINUXMODULE
     // set state to interruptible early to avoid race conditions
     set_current_state(TASK_INTERRUPTIBLE);
@@ -503,7 +511,7 @@ RouterThread::run_os()
 #endif
 
 #if CLICK_USERLEVEL
-    select_set().run_selects(this);
+    work_done = select_set().run_selects(this);
 #elif CLICK_MINIOS
     /*
      * MiniOS uses a cooperative scheduler. By schedule() we'll give a chance
@@ -556,6 +564,8 @@ RouterThread::run_os()
     client_update_pass(C_KERNEL, t_before);
 #endif
     driver_lock_tasks();
+
+    return work_done;
 }
 
 void
@@ -640,13 +650,16 @@ RouterThread::driver()
 	if (_pending_head.x)
 	    process_pending();
 
+	bool any_work_done = false;
 	// run tasks
 	do {
 #if HAVE_ADAPTIVE_SCHEDULER
 	    if (PASS_GT(_clients[C_CLICK].pass, _clients[C_KERNEL].pass))
 		break;
 #endif
-	    run_tasks(_tasks_per_iter);
+		if (run_tasks(_tasks_per_iter)) {
+			any_work_done = true;
+		}
 	} while (0);
 
 #if CLICK_USERLEVEL
@@ -678,8 +691,21 @@ RouterThread::driver()
 #elif BSD_NETISRSCHED
 	    break;
 #endif
-	    run_os();
+	    if (run_os())
+	        any_work_done = true;
 	} while (0);
+
+	if (any_work_done) {
+		_idle_dorun = true;
+	} else if (_idle_dorun) {
+		_idle_dorun = false;
+		IdleTask* t = _idletask;
+		while (t != 0) {
+			if (t->fire())
+				_idle_dorun = true;
+			t = t->_next;
+		}
+	}
 
 #if CLICK_NS || BSD_NETISRSCHED
 	// Everyone except the NS driver stays in driver() until the driver is
