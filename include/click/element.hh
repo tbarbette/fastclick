@@ -11,6 +11,7 @@ class Router;
 class Master;
 class RouterThread;
 class Task;
+class IdleTask;
 class Timer;
 class NotifierSignal;
 class Element;
@@ -41,6 +42,7 @@ class Element { public:
 
     virtual bool run_task(Task *task);	// return true iff did useful work
     virtual void run_timer(Timer *timer);
+    virtual bool run_idle_task(IdleTask *task);
 #if CLICK_USERLEVEL
     enum { SELECT_READ = 1, SELECT_WRITE = 2 };
     virtual void selected(int fd, int mask);

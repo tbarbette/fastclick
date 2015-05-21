@@ -148,6 +148,8 @@ class RouterThread { public:
     atomic_uint32_t _task_blocker;
     atomic_uint32_t _task_blocker_waiting;
 
+    bool _idle_dorun;
+    IdleTask* _idletask;
     Task::Pending _pending_head;
     Task::Pending *_pending_tail;
     SpinlockIRQ _pending_lock;
@@ -218,9 +220,9 @@ class RouterThread { public:
     // task running functions
     inline void driver_lock_tasks();
     inline void driver_unlock_tasks();
-    inline void run_tasks(int ntasks);
+    inline bool run_tasks(int ntasks);
     inline void process_pending();
-    inline void run_os();
+    inline bool run_os();
 #if HAVE_ADAPTIVE_SCHEDULER
     void client_set_tickets(int client, int tickets);
     inline void client_update_pass(int client, const Timestamp &before);
@@ -234,6 +236,7 @@ class RouterThread { public:
     inline void request_go();
 
     friend class Task;
+    friend class IdleTask;
     friend class Master;
 #if CLICK_USERLEVEL
     friend class SelectSet;
