@@ -92,6 +92,7 @@ public:
 
     //Do not quit the task until we have sended all possible packets (until all queues are empty)
     bool _keephand;
+    bool _set_rss_aggregate;
 
     std::vector<int> _queue_for_fd;
 

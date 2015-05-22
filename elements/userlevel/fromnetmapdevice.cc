@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(false),_burst(32),_keephand(false)
+FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(false),_burst(32),_keephand(false), _set_rss_aggregate(0)
 {
 }
 
@@ -61,6 +61,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
   	.read("THREADOFFSET", threadoffset)
   	.read("KEEPHAND",_keephand)
   	.read("MAXQUEUES",maxqueues)
+	.read("RSS_AGGREGATE", _set_rss_aggregate)
   	.read("NUMA",numa)
 
   	.complete() < 0)
@@ -75,6 +76,10 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     thisnode = Numa::get_device_node(&device[7]);
 #endif
 
+#if !NETMAP_WITH_HASH
+    if (_set_rss_aggregate)
+        return errh->error("You have to use the modified netmap version to use RSS_AGGREGATE !");
+#endif
     _device = NetmapDevice::open(ifname);
     if (!_device) {
         return errh->error("Could not initialize %s",ifname.c_str());
@@ -182,7 +187,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 			sent+=n;
 
 #if HAVE_NETMAP_PACKET_POOL && HAVE_BATCH
-			PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur);
+			PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur,_set_rss_aggregate);
 			if (!batch_head) goto error;
 #else
 
@@ -217,6 +222,10 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
                             if (!p) goto error;
                     }
             #endif
+#if NETMAP_WITH_HASH
+               if (_set_rss_aggregate)
+                   SET_AGGREGATE_ANNO(p,slot->hash)
+#endif
 				p->set_packet_type_anno(Packet::HOST);
 
 	#if HAVE_BATCH
