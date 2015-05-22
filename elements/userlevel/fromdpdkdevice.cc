@@ -31,7 +31,7 @@
 CLICK_DECLS
 
 FromDpdkDevice::FromDpdkDevice()
-    : _port_no(0), _promisc(true), _burst(32)
+    : _port_no(0), _promisc(true), _burst(32), _set_rss_aggregate(0)
 {
 }
 
@@ -55,6 +55,7 @@ int FromDpdkDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_p("THREADOFFSET", threadoffset)
 	.read("MINQUEUES",minqueues)
 	.read("MAXQUEUES",maxqueues)
+	.read("RSS_AGGREGATE", _set_rss_aggregate)
 	.read("NDESC",ndesc)
 	.complete() < 0)
 	return -1;
@@ -134,6 +135,8 @@ bool FromDpdkDevice::run_task(Task * t)
             rte_pktmbuf_free(pkts[i]);
 #endif
             p->set_packet_type_anno(Packet::HOST);
+            if (_set_rss_aggregate)
+               SET_AGGREGATE_ANNO(p,pkts[i]->hash);
 #if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);

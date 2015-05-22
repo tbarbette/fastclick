@@ -124,6 +124,7 @@ private:
     unsigned _port_no;
     bool _promisc;
     unsigned int _burst;
+    bool _set_rss_aggregate;
 };
 
 CLICK_ENDDECLS
