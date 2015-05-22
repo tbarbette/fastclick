@@ -445,7 +445,7 @@ WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_r
 /**
  * Creates a batch of packet directly from a netmap ring.
  */
-PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur) {
+PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur, bool set_rss_aggregate) {
     if (n <= 0) return NULL;
     struct netmap_slot* slot;
     WritablePacket* last;
@@ -483,6 +483,11 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
         last->initialize();
 
         last->set_buffer(data,NetmapBufQ::buffer_size(),slot->len);
+#if NETMAP_WITH_HASH
+        if (set_rss_aggregate)
+            SET_AGGREGATE_ANNO(last,slot->hash);
+        click_chatter("Agg : %x",AGGREGATE_ANNO(last));
+#endif
         cur = nm_ring_next(rxring, cur);
         toreceive--;
         _count --;
