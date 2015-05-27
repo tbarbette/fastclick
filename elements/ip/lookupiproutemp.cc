@@ -110,7 +110,7 @@ LookupIPRouteMP::initialize(ErrorHandler *)
     	int max = _t.size();
         PacketBatch* out[max + 1]; //Array for each entry, last is for unrouted packets
         bzero(out,sizeof(PacketBatch*) * max+1);
-        IPAddress  out_gw[max + 1]; //Gw for each entry, last is used as a temp
+        IPAddress*  out_gw = new IPAddress[max + 1]; //Gw for each entry, last is used as a temp
         bzero(out_gw,sizeof(IPAddress) * max+1);
 
     	int last_o = -1;
@@ -197,6 +197,7 @@ LookupIPRouteMP::initialize(ErrorHandler *)
     	if (out[_t.size()]) {
     		out[i]->kill();
     	}
+        delete[] out_gw;
     }
 #endif
 void
