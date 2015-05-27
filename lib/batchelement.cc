@@ -17,7 +17,7 @@ bool BatchElement::need_batch() const {
     return false;
 }
 
-BatchElement::BatchElement() : current_batch(NULL),inflow(0)
+BatchElement::BatchElement() : current_batch(NULL),inflow(0),receives_batch(false)
 {
 
 }
@@ -60,22 +60,27 @@ void BatchElement::BatchPort::push_batch(PacketBatch* batch) const {
 inline void BatchElement::BatchPort::assign(bool isoutput, Element *e, int port) {
 	output_supports_batch = dynamic_cast<BatchElement*>(e) != NULL;
 	Element::Port::assign(isoutput,e,port);
-	#if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
-		if (output_supports_batch) {
-			void (BatchElement::*flow_pusher)(int, PacketBatch *) = &BatchElement::push_batch;
-			_bound.push_batch = (void (*)(BatchElement *, int, PacketBatch *)) (static_cast<BatchElement*>(e)->*flow_pusher);
-		}
-	#endif
+	bind_batchelement();
+}
+
+void BatchElement::BatchPort::bind_batchelement() {
+	if (dynamic_cast<BatchElement*>(element()) != NULL) {
+		dynamic_cast<BatchElement*>(element())->receives_batch = true;
+#if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
+		void (BatchElement::*flow_pusher)(int, PacketBatch *) = &BatchElement::push_batch;
+		_bound.push_batch = (void (*)(BatchElement *, int, PacketBatch *)) (dynamic_cast<BatchElement*>(element())->*flow_pusher);
+#endif
+	}
 }
 
 /**
  * Assign an element to this port
  */
-inline void BatchElement::PullBatchPort::bound() {
+void BatchElement::PullBatchPort::bind_batchelement() {
     #if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
     if (dynamic_cast<BatchElement*>(element()) != NULL) {
-            PacketBatch *(BatchElement::*flow_pull)(int,unsigned) = &BatchElement::pull_batch;
-            _bound.pull_batch = (PacketBatch * (*)(BatchElement *, int, unsigned)) (static_cast<BatchElement*>(element())->*flow_pull);
+        PacketBatch *(BatchElement::*flow_pull)(int,unsigned) = &BatchElement::pull_batch;
+        _bound.pull_batch = (PacketBatch * (*)(BatchElement *, int, unsigned)) (dynamic_cast<BatchElement*>(element())->*flow_pull);
     }
     #endif
 }
@@ -113,8 +118,8 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
 
 			bool reconstruct_batch = true;
 
-			if (!batch_e->need_batch()) {
-                //Check if all elements downstream support batch
+			if (!batch_e->need_batch() && !batch_e->receives_batch) {
+                //Check if all elements downstream support batch; if not we do not reconstruct. Force reconstruct if this element can receive batch
                 for (int i = 0; i < batch_e->nports(isoutput); i++) {
                     if (dynamic_cast<BatchElement*>(batch_e->port(isoutput, i).element()) == NULL) {
                         reconstruct_batch = false;
@@ -144,7 +149,7 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
  */
 void BatchElement::upgrade_ports() {
     for (int i = 0; i < _nports[0]; i++) {
-        ((PullBatchPort&)_ports[0][i]).bound();
+        ((PullBatchPort&)_ports[0][i]).bind_batchelement();
     }
 	int io = 1;
 	bool is_inline =

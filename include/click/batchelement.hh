@@ -17,7 +17,7 @@ CLICK_DECLS
 #ifdef HAVE_BATCH
 
 #define BATCH_MAX_PULL 256
-
+class PushToPushBatchVisitor;
 class BatchElement : public Element { public:
 	BatchElement();
 
@@ -46,8 +46,8 @@ class BatchElement : public Element { public:
 	}
 
 	per_thread<PacketBatch*> current_batch;
-
 	per_thread<bool> inflow; //Remember if we are currently rebuilding a batch
+
 	inline void start_batch() {
 		inflow.set(true);
 	}
@@ -99,7 +99,7 @@ class BatchElement : public Element { public:
 
 		void push_batch(PacketBatch* head) const;
 		inline void assign(bool isoutput, Element *e, int port);
-
+		void bind_batchelement();
 		friend class BatchElement;
 	};
 
@@ -110,7 +110,7 @@ class BatchElement : public Element { public:
 			click_chatter("WARNING : Using pull function inside a batch-compatible element. This will likely create errors, please change the element to use pull_batch instead !");
 			return _e->pull(_port);
 		}
-	    void bound();
+	    void bind_batchelement();
 	};
 
 	inline const BatchPort&
@@ -129,6 +129,8 @@ class BatchElement : public Element { public:
 	void check_unbatch();
 
 	protected :
+	bool receives_batch;
+	friend class PushToPushBatchVisitor;
 };
 
 #else
