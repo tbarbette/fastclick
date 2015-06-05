@@ -77,13 +77,21 @@ int QueueDevice::configure_tx(unsigned int maxthreads,unsigned int minqueues, un
 
 int QueueDevice::initialize_tx(ErrorHandler * errh) {
     usable_threads.assign(master()->nthreads(),false);
-    usable_threads = get_threads();
+    int n_threads = 0;
 
-    int n_threads;
-    if (_maxthreads == -1)
-        n_threads = usable_threads.weight();
-    else
-        n_threads = min(_maxthreads,usable_threads.weight());
+    if (input_is_pull(0)) {
+        usable_threads[router()->home_thread_id(this)] = 1;
+        if (_maxthreads == -1)
+            n_threads = 1;
+        else
+            n_threads = min(_maxthreads,master()->nthreads() - router()->home_thread_id(this));
+    } else {
+        usable_threads = get_threads();
+        if (_maxthreads == -1)
+            n_threads = usable_threads.weight();
+        else
+            n_threads = min(_maxthreads,usable_threads.weight());
+    }
 
     if (n_threads == 0) {
         return errh->error("No threads end up in this queuedevice...? Aborting.");
@@ -99,7 +107,11 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     n_initialized++;
-    click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+    if (input_is_push(0))
+        click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+    else
+        click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+
     return 0;
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
