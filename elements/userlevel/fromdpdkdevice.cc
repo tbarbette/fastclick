@@ -136,7 +136,11 @@ bool FromDpdkDevice::run_task(Task * t)
 #endif
             p->set_packet_type_anno(Packet::HOST);
             if (_set_rss_aggregate)
-               SET_AGGREGATE_ANNO(p,pkts[i]->hash);
+#if RTE_VER_MAJOR > 1 ||  RTE_VER_MINOR > 6
+                SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
+#else
+                SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
+#endif
 #if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);
