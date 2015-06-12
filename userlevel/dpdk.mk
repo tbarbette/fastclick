@@ -182,7 +182,12 @@ LIBS += $(CPU_LDLIBS)
 
 # Merge and rename flags
 CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
+
+include $(RTE_SDK)/mk/internal/rte.build-pre.mk
+
 LDFLAGS += $(EXTRA_LDFLAGS)
+
+override LDFLAGS := $(call linkerprefix,$(LDFLAGS))
 
 # Restore previous C flags
 CFLAGS := $(DPDK_OLD_CFLAGS)
