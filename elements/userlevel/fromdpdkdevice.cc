@@ -25,7 +25,7 @@
 
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
-
+#include <rte_version.h>
 #include "fromdpdkdevice.hh"
 
 CLICK_DECLS
@@ -136,7 +136,7 @@ bool FromDpdkDevice::run_task(Task * t)
 #endif
             p->set_packet_type_anno(Packet::HOST);
             if (_set_rss_aggregate)
-#if RTE_VER_MAJOR > 1 ||  RTE_VER_MINOR > 6
+#if RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);

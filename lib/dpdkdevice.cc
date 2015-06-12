@@ -24,7 +24,7 @@
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
 #include <rte_pci.h>
-
+#include <rte_version.h>
 
 
 CLICK_DECLS
@@ -119,7 +119,11 @@ static int initialize_device(unsigned port_no, const DevInfo &info,
                              ErrorHandler *errh)
 {
     struct rte_eth_conf dev_conf;
+    struct rte_eth_dev_info dev_info;
     memset(&dev_conf, 0, sizeof dev_conf);
+
+    rte_eth_dev_info_get(port_no, &dev_info);
+
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
@@ -130,19 +134,25 @@ static int initialize_device(unsigned port_no, const DevInfo &info,
             "Cannot initialize DPDK port %u with %u RX and %u TX queues",
             port_no, info.n_rx_queues, info.n_tx_queues);
     struct rte_eth_rxconf rx_conf;
-    memset(&rx_conf, 0, sizeof rx_conf);
+#if RTE_VER_MAJOR >= 2
+    memcpy(&rx_conf, &dev_info.default_rxconf, sizeof rx_conf);
+#else
+    bzero(&rx_conf,sizeof rx_conf);
+#endif
     rx_conf.rx_thresh.pthresh = RX_PTHRESH;
     rx_conf.rx_thresh.hthresh = RX_HTHRESH;
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
 
     struct rte_eth_txconf tx_conf;
-    memset(&tx_conf, 0, sizeof tx_conf);
+#if RTE_VER_MAJOR >= 2
+    memcpy(&tx_conf, &dev_info.default_txconf, sizeof tx_conf);
+#else
+    bzero(&tx_conf,sizeof tx_conf);
+#endif
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
-    tx_conf.tx_free_thresh = 0; /* use default value */
-    tx_conf.tx_rs_thresh = 0; /* use default value */
-    tx_conf.txq_flags = ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 
     int numa_node = DpdkDevice::get_port_numa_node(port_no);
     for (unsigned i = 0; i < info.n_rx_queues; ++i) {
@@ -236,16 +246,19 @@ int DpdkDevice::initialize(ErrorHandler *errh)
         return 0;
 
     click_chatter("Initializing DPDK");
-
+#if RTE_VER_MAJOR < 2
     if (rte_eal_pci_probe())
         return errh->error("Cannot probe the PCI bus");
+#endif
 
     // We should maybe do PCI probing and get some stats when DpdkConfig loads
     // so that we can check the following at configure time rather than during
     // initialization
+
     const unsigned n_ports = rte_eth_dev_count();
     if (n_ports == 0)
         return errh->error("No DPDK-enabled ethernet port found");
+
     for (HashMap<unsigned, DevInfo>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
         if (it.key() >= n_ports)
