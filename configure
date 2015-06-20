@@ -705,6 +705,8 @@ xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
 USE_DPDK
+RTE_VER_MINOR
+RTE_VER_MAJOR
 PTHREAD_LIBS
 HAVE_BATCH
 AR_CREATEFLAGS
@@ -6375,7 +6377,6 @@ fi
 
 PTHREAD_LIBS=""
 
-
 if test "x$enable_user_multithread" = xyes; then
     SAVE_LIBS="$LIBS"
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_create" >&5
@@ -6568,6 +6569,11 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi
+    rte_ver_major=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MAJOR" | head -n 1 | awk '{print $3}'`
+    rte_ver_minor=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MINOR" | head -n 1 | awk '{print $3}'`
+    RTE_VER_MAJOR=$rte_ver_major
+    RTE_VER_MINOR=$rte_ver_minor
+
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
     USE_DPDK=yes

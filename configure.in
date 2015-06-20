@@ -193,6 +193,10 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
 
 =========================================])
     fi
+    rte_ver_major=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MAJOR" | head -n 1 | awk '{print $3}'`
+    rte_ver_minor=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MINOR" | head -n 1 | awk '{print $3}'`
+    AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
+    AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)
 fi
