@@ -17,13 +17,14 @@ bool BatchElement::need_batch() const {
     return false;
 }
 
-BatchElement::BatchElement() : current_batch(NULL),inflow(0),receives_batch(false)
+BatchElement::BatchElement() : current_batch(NULL),inflow(0),receives_batch(false),ports_upgraded(false)
 {
 
 }
 
 BatchElement::~BatchElement() {
-	delete[] static_cast<BatchPort*>(_ports[1]);
+	if (_ports[1] && ports_upgraded)
+		delete[] static_cast<BatchPort*>(_ports[1]);
 	_ports[1] = 0;
 }
 
@@ -161,6 +162,7 @@ void BatchElement::upgrade_ports() {
 	if (!is_inline)
 		delete[] _ports[io];
 	_ports[io] = newports;
+	ports_upgraded = true;
 }
 
 /**

@@ -26,6 +26,7 @@
 #include <clicknet/icmp.h>
 #include <click/llrpc.h>
 #include <click/integers.hh>	// for first_bit_set
+#include <click/bitvector.hh>
 #ifdef CLICK_USERLEVEL
 # include <unistd.h>
 # include <time.h>
@@ -135,6 +136,7 @@ AnonymizeIPAddr::initialize(ErrorHandler *errh)
     _special_nodes[0].input = _special_nodes[0].output = 0;
     _special_nodes[1].input = _special_nodes[1].output = 0xFFFFFFFF;
 
+    _mt = get_threads().weight() > 1;
     return 0;
 }
 
@@ -204,11 +206,17 @@ AnonymizeIPAddr::make_peer(uint32_t a, Node *n)
 AnonymizeIPAddr::Node *
 AnonymizeIPAddr::find_node(uint32_t a)
 {
+	if (_mt) {
+		_lock.acquire();
+	}
     // straight outta tcpdpriv
     Node *n = _root;
     while (n) {
-	if (n->input == a)
-	    return n;
+	if (n->input == a) {
+		if (_mt)
+			_lock.release();
+		return n;
+	}
 	if (!n->child[0])
 	    n = make_peer(a, n);
 	else {
@@ -222,7 +230,8 @@ AnonymizeIPAddr::find_node(uint32_t a)
 		n = n->child[0];
 	}
     }
-
+    if (_mt)
+        _lock.release();
     click_chatter("AnonymizeIPAddr: out of memory!");
     return 0;
 }
@@ -316,3 +325,4 @@ AnonymizeIPAddr::llrpc(unsigned command, void *data)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(AnonymizeIPAddr)
+ELEMENT_MT_SAFE(AnonymizeIPAddr)

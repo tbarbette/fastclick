@@ -130,6 +130,7 @@ class BatchElement : public Element { public:
 
 	protected :
 	bool receives_batch;
+	bool ports_upgraded;
 	friend class PushToPushBatchVisitor;
 };
 

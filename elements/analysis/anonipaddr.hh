@@ -2,6 +2,7 @@
 #ifndef CLICK_ANONIPADDR_HH
 #define CLICK_ANONIPADDR_HH
 #include <click/element.hh>
+#include <click/sync.hh>
 CLICK_DECLS
 
 /*
@@ -108,6 +109,8 @@ class AnonymizeIPAddr : public Element { public:
     int llrpc(unsigned, void *);
 
   private:
+    bool _mt;
+    Spinlock _lock;
 
     struct Node {
 	uint32_t input;
