@@ -15,7 +15,7 @@ CLICK_DECLS
 //#define PS_BATCH_SIZE 1024
 
 Pipeliner::Pipeliner()
-    :   out_id(0),_task(NULL),last_start(0) {
+    :   sleepiness(0),out_id(0),_task(NULL),last_start(0) {
 }
 
 Pipeliner::~Pipeliner()
@@ -107,7 +107,8 @@ void Pipeliner::push(int,Packet* p) {
     } else {
         p->kill();
         stats->dropped++;
-        click_chatter("Have %d packets" + storage->count());
+		if (stats->dropped % 100 == 1)
+			click_chatter("%s : Dropped %d packets : have %d packets", name().c_str(), stats->dropped, storage->count());
     }
     if (sleepiness >= SLEEPINESS_THRESHOLD)
         _task->reschedule();
