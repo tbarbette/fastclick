@@ -280,4 +280,14 @@ Bitvector::swap(Bitvector &x)
     x._data = (d == _f ? x._f : d);
 }
 
+void
+Bitvector::print() {
+        char buf[size()+1];
+        int i;
+        for (i = 0; i < size(); i++) {
+   	     buf[i] = ((*this)[i]?'1':'0');
+        }
+        buf[i] = '\0';
+        click_chatter("%s",buf);
+}
 CLICK_ENDDECLS

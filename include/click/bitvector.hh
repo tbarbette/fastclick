@@ -82,6 +82,8 @@ class Bitvector {
     inline const word_type *data_words() const CLICK_DEPRECATED;
     /** @endcond never */
 
+    void print();
+
   private:
 
     enum { ninline = 2, inlinebits = ninline * wbits };

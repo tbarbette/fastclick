@@ -64,6 +64,64 @@ CLICK_DECLS
 
     };
 
+template <typename T> class DynamicRing {
+
+protected:
+int _size;
+
+inline bool has_space() {
+    return head - tail < _size;
+}
+
+inline bool is_empty() {
+    return head == tail;
+}
+
+public:
+int id;
+    DynamicRing() : _size(0) {
+        head = 0;
+        tail = 0;
+    }
+
+    ~DynamicRing() {
+    	if (_size)
+    		delete[] ring;
+    }
+
+
+    inline T extract() {
+        if (!is_empty()) {
+            T &v = ring[tail % _size];
+            tail++;
+            return v;
+        } else
+            return 0;
+    }
+
+    inline bool insert(T batch) {
+        if (has_space()) {
+            ring[head % _size] = batch;
+            head++;
+            return true;
+        } else
+            return false;
+    }
+
+    inline unsigned int count() {
+        return head - tail;
+    }
+
+    T* ring;
+    uint32_t head;
+    uint32_t tail;
+
+    void initialize(int size) {
+        _size = size;
+        ring = new T[size];
+    }
+};
+
 template <typename T, size_t RING_SIZE> class Ring : public BaseRing<T,RING_SIZE> {};
 
 template <typename T> class CircleList {

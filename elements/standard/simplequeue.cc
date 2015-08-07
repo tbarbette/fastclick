@@ -81,7 +81,6 @@ SimpleQueue::initialize(ErrorHandler *errh)
 bool
 SimpleQueue::get_runnable_threads(Bitvector& b) {
     unsigned int thisthread = router()->home_thread_id(this);
-    b.clear();
     b[thisthread] = 1;
     return false;
 }
