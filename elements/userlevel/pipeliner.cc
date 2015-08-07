@@ -7,6 +7,7 @@
 #include "pipeliner.hh"
 #include <click/standard/scheduleinfo.hh>
 #include <click/ring.hh>
+#include <click/args.hh>
 
 CLICK_DECLS
 
@@ -15,7 +16,14 @@ CLICK_DECLS
 //#define PS_BATCH_SIZE 1024
 
 Pipeliner::Pipeliner()
-    :   out_id(0),_task(NULL),last_start(0) {
+    :   sleepiness(0),out_id(0),_task(NULL),last_start(0),_block(false) {
+#if PIPELINE_IS_DYNAMIC
+#  if HAVE_BATCH
+	_ring_size = 16;
+#  else
+	_ring_size = 1024;
+#  endif
+#endif
 }
 
 Pipeliner::~Pipeliner()
@@ -27,7 +35,6 @@ Pipeliner::~Pipeliner()
 bool
 Pipeliner::get_runnable_threads(Bitvector& b) {
     unsigned int thisthread = router()->home_thread_id(this);
-    b.clear();
     b[thisthread] = 1;
     return false;
 }
@@ -49,17 +56,14 @@ void Pipeliner::cleanup(CleanupStage) {
 
 
 int
-Pipeliner::configure(Vector<String> &, ErrorHandler *)
+Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
 {
 
-/*
     if (Args(conf, this, errh)
-    .read("MAXTHREADS", maxthreads)
-    .read("THREADOFFSET", threadoffset)
-
+    .read_p("QUEUE", _ring_size)
+	.read_p("BLOCK", _block)
     .complete() < 0)
         return -1;
-*/
     return 0;
 }
 
@@ -73,6 +77,9 @@ Pipeliner::initialize(ErrorHandler *errh)
     stats.compress(v);
     out_id = router()->home_thread_id(this);
 
+    for (int i = 0; i < storage.size(); i++) {
+        storage.get_value(i).initialize(_ring_size);
+    }
 
     for (int i = 0; i < v.size(); i++) {
         if (v[i]) {
@@ -91,23 +98,33 @@ Pipeliner::initialize(ErrorHandler *errh)
 #if HAVE_BATCH
 #define SLEEPINESS_THRESHOLD 4
 void Pipeliner::push_batch(int,PacketBatch* head) {
+	retry:
     if (storage->insert(head)) {
         if (sleepiness >= SLEEPINESS_THRESHOLD)
                     _task->reschedule();
     } else {
         //click_chatter("Drop!");
+    if (_block)
+        goto retry;
         head->kill();
     }
 }
 #else
 #define SLEEPINESS_THRESHOLD 128
 void Pipeliner::push(int,Packet* p) {
+	retry:
     if (storage->insert(p)) {
 
     } else {
+        if (_block) {
+            if (sleepiness >= SLEEPINESS_THRESHOLD)
+                _task->reschedule();
+            goto retry;
+        }
         p->kill();
         stats->dropped++;
-        click_chatter("Have %d packets" + storage->count());
+		if (stats->dropped % 100 == 1)
+			click_chatter("%s : Dropped %d packets : have %d packets", name().c_str(), stats->dropped, storage->count());
     }
     if (sleepiness >= SLEEPINESS_THRESHOLD)
         _task->reschedule();

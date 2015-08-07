@@ -1142,6 +1142,7 @@ public :
 	 * Make a batch composed of a single packet
 	 */
 	inline static PacketBatch* make_from_packet(Packet* p) {
+		if (!p) return 0;
 		PacketBatch* b =  static_cast<PacketBatch*>(p);
 		b->set_count(1);
 		b->set_tail(b);

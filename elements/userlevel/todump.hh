@@ -5,6 +5,7 @@
 #include <click/element.hh>
 #include <click/task.hh>
 #include <click/notifier.hh>
+#include <click/sync.hh>
 #include <stdio.h>
 CLICK_DECLS
 
@@ -118,6 +119,8 @@ class ToDump : public Element { public:
     bool run_task(Task *);
 
   private:
+    bool _mt;
+    Spinlock _lock;
 
     String _filename;
     FILE *_fp;

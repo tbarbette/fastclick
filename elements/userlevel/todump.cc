@@ -191,6 +191,8 @@ ToDump::initialize(ErrorHandler *errh)
 	_signal = Notifier::upstream_empty_signal(this, 0, &_task);
     }
     _active = true;
+
+    _mt = get_threads().weight() > 1;
     return 0;
 }
 
@@ -227,6 +229,8 @@ ToDump::write_packet(Packet *p)
 	to_write = _snaplen;
     ph.caplen = to_write;
 
+    if (_mt)
+        _lock.acquire();
     // XXX writing to pipe?
     if (fwrite(&ph, sizeof(ph), 1, _fp) == 0
 	|| (to_write > 0 && fwrite(p->data(), 1, to_write, _fp) == 0)) {
@@ -236,6 +240,8 @@ ToDump::write_packet(Packet *p)
 	}
     } else
 	_count++;
+    if (_mt)
+        _lock.release();
 }
 
 void
@@ -306,4 +312,5 @@ ToDump::add_handlers()
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel|ns FakePcap)
+ELEMENT_MT_SAFE(ToDump)
 EXPORT_ELEMENT(ToDump)

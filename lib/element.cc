@@ -1683,7 +1683,6 @@ public:
 bool Element::get_runnable_threads(Bitvector& bmp) {
     if (input_is_push(0) && output_is_pull(0)) { //Push to pull
         unsigned int thisthread = router()->home_thread_id(this);
-        bmp.clear();
         bmp[thisthread] = 1;
         return false;
     }
