@@ -959,6 +959,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     int headroom = this->headroom();
     int length = this->length();
     uint8_t* new_head = p->_head;
+     uint8_t* new_end = p->_end;
     if (_use_count > 1) {
         memcpy(p, this, sizeof(Packet));
 
@@ -977,7 +978,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     p->_head = new_head;
     p->_data = new_head + headroom + extra_headroom;
     p->_tail = p->_data + length;
-    p->_end = new_head + buffer_length;
+    p->_end = new_end;
 
 	# if CLICK_BSDMODULE
 		struct mbuf *old_m = _m;
