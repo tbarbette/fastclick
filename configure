@@ -10689,7 +10689,7 @@ $as_echo "#define HAVE_PCAP 1" >>confdefs.h
 
         savelibs="$LIBS"
         LIBS="$savelibs $PCAP_LIBS"
-        for ac_func in pcap_inject pcap_sendpacket pcap_setdirection pcap_setnonblock
+        for ac_func in pcap_inject pcap_sendpacket pcap_setdirection pcap_setnonblock pcap_set_immediate_mode
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -11247,6 +11247,7 @@ Can't find Linux compilation flags.
             -e s,-Wstrict-prototypes,,g \
             -e s,-Wdeclaration-after-statement,,g \
             -e s,-fno-common,,g \
+            -e 's,-std=-a-z0-9+*,,g' \
             -e s,-Werror-implicit-function-declaration,,g \
             -e 's,-W^ *,,g' <conftest.dat`"
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LINUX_CFLAGS" >&5
