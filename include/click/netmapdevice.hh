@@ -162,7 +162,6 @@ class NetmapBufQ {
         do {
             idx = head;
 
-
             p  = reinterpret_cast<uint32_t *>(buf_start +
                 idx * buf_size);
 

@@ -45,11 +45,11 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
     .read_mp("DEVNAME", ifname)
-  	.read_p("IQUEUE",_internal_queue)
-	.read_p("BLOCKANT",_block)
-   .read("BURST", burst)
-	.read("MAXTHREADS",maxthreads)
-  	.complete() < 0)
+    .read_p("IQUEUE",_internal_queue)
+    .read_p("BLOCKANT",_block)
+    .read("BURST", burst)
+    .read("MAXTHREADS",maxthreads)
+    .complete() < 0)
     	return -1;
 
     if (_internal_queue < _burst * 2) {
@@ -541,7 +541,7 @@ ToNetmapDevice::cleanup(CleanupStage)
             delete state.get_value(i).timer;
     }
     if (!input_is_pull(0))
-        for (int i = 0; i < nqueues; i++)
+        for (int i = 0; i < min((int)_zctimers.size(),(int)nqueues); i++)
             delete _zctimers[i];
 
     if (_device) _device->destroy();
