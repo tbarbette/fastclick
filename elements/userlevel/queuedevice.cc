@@ -128,6 +128,7 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
     {
         usable_threads.negate();
     }
+
        for (int i = click_nthreads; i < usable_threads.size(); i++)
            usable_threads[i] = 0;
 
@@ -145,6 +146,7 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
 
        int n_threads;
 
+       //click_chatter("_maxthreads %d, cores_in_node %d, nthreads() %d, use_nodes %d, _this_node %d, inputs_count %d",_maxthreads,cores_in_node,master()->nthreads(),use_nodes,_this_node,inputs_count[_this_node]);
        if (_maxthreads == -1) {
            n_threads = min(cores_in_node,master()->nthreads() / use_nodes) / inputs_count[_this_node];
        } else {
@@ -153,6 +155,13 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
 
        if (n_threads == 0) {
            n_threads = 1;
+           if (cores_in_node == 0) {
+        	   click_chatter("%s : No cores available on the same NUMA node, I'll use a core from another NUMA node, this will reduce performances.",name().c_str());
+        	   usable_threads[0] = 1;
+			   cores_in_node = 1;
+			   if (use_nodes > 1)
+				   use_nodes = 1;
+           }
            thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
        }
 
