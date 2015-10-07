@@ -182,6 +182,7 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 {
 	State &s = state.get();
    	bool should_be_dropped = false;
+		bool ask_sync = false;
 
 	if (s.q != NULL) {
 		if (s.q_size < _internal_queue) {
@@ -196,13 +197,16 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 	} else {
 		s.q = b_head;
 		s.q_size = b_head->count();
+
+		//If we are not struggling, ask a sync at the end of the batch
+		ask_sync = true;
 	}
 
 do_send_batch:
 	Packet* last = s.q->prev();
 
     lock(); //Lock only if multiple threads can go here
-    unsigned sent = send_packets(s.q,true);
+    unsigned sent = send_packets(s.q,true,ask_sync);
     unlock();
 
     if (sent > 0 && s.q)
@@ -315,7 +319,7 @@ int complaint = 0;
  *
  * @return The number of packets sent
  */
-inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
+inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool ask_sync) {
 	State &s = state.get();
 	struct nm_desc* nmd;
 	struct netmap_ring *txring;
@@ -325,7 +329,6 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 	WritablePacket* next = s_head;
 	WritablePacket* p = next;
 
-	bool dosync = false;
 	unsigned int sent = 0;
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
@@ -366,7 +369,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 			slot->flags |= NS_BUF_CHANGED;
 
 			if (unlikely(push && cur % 32 == 0)) {
-				dosync = true;
+				ask_sync = true;
 				slot->flags |= NS_REPORT;
 			}
 #else
@@ -402,7 +405,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 		}
 		txring->head = txring->cur = cur;
 
-		if (unlikely(dosync))
+		if (unlikely(ask_sync))
 			do_txsync(nmd->fd);
 
 		if (next == NULL) { //All is sent
