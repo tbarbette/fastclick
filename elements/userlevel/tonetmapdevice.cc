@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(1),_internal_queue(512)
+ToNetmapDevice::ToNetmapDevice() : _device(0),_burst(32),_block(1),_internal_queue(512)
 {
 
 }
@@ -45,11 +45,11 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
     .read_mp("DEVNAME", ifname)
-  	.read_p("IQUEUE",_internal_queue)
-	.read_p("BLOCKANT",_block)
-   .read("BURST", burst)
-	.read("MAXTHREADS",maxthreads)
-  	.complete() < 0)
+    .read_p("IQUEUE",_internal_queue)
+    .read_p("BLOCKANT",_block)
+    .read("BURST", burst)
+    .read("MAXTHREADS",maxthreads)
+    .complete() < 0)
     	return -1;
 
     if (_internal_queue < _burst * 2) {
@@ -182,7 +182,13 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 {
 	State &s = state.get();
    	bool should_be_dropped = false;
-
+   	bool ask_sync = false;
+#if HAVE_FLOW
+    FlowControlBlock* sfcb_save = fcb_stack;
+       if (fcb_stack)
+           fcb_stack->release(b_head->count());
+   	fcb_stack = 0;
+#endif
 	if (s.q != NULL) {
 		if (s.q_size < _internal_queue) {
 			s.q->prev()->set_next(b_head);
@@ -196,13 +202,16 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 	} else {
 		s.q = b_head;
 		s.q_size = b_head->count();
+
+		//If we are not struggling, ask a sync at the end of the batch
+		ask_sync = true;
 	}
 
 do_send_batch:
 	Packet* last = s.q->prev();
 
     lock(); //Lock only if multiple threads can go here
-    unsigned sent = send_packets(s.q,true);
+    unsigned sent = send_packets(s.q,true,ask_sync);
     unlock();
 
     if (sent > 0 && s.q)
@@ -232,6 +241,9 @@ do_send_batch:
             }
         }
     }
+#if HAVE_FLOW
+   	fcb_stack = sfcb_save;
+#endif
 }
 #endif
 void
@@ -244,6 +256,10 @@ ToNetmapDevice::push(int, Packet* p) {
 		s.q_size = 1;
 	} else {
 		if (s.q_size < _internal_queue) { //Append packet at the end
+			#if HAVE_FLOW
+			if (fcb_stack)
+				fcb_stack->release(1);
+			#endif
 			s.q->prev()->set_next(p);
 			s.q->set_prev(p);
 			s.q_size++;
@@ -272,7 +288,8 @@ do_send:
 		}
 
 		//Lock is acquired
-		unsigned int sent = send_packets(s.q,true);
+		unsigned int sent;
+		SFCB_STACK(sent = send_packets(s.q,true););
 
 		if (sent > 0 && s.q)
 			s.q->set_prev(last);
@@ -315,7 +332,7 @@ int complaint = 0;
  *
  * @return The number of packets sent
  */
-inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
+inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool ask_sync) {
 	State &s = state.get();
 	struct nm_desc* nmd;
 	struct netmap_ring *txring;
@@ -325,7 +342,6 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 	WritablePacket* next = s_head;
 	WritablePacket* p = next;
 
-	bool dosync = false;
 	unsigned int sent = 0;
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
@@ -366,7 +382,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 			slot->flags |= NS_BUF_CHANGED;
 
 			if (unlikely(push && cur % 32 == 0)) {
-				dosync = true;
+				ask_sync = true;
 				slot->flags |= NS_REPORT;
 			}
 #else
@@ -402,7 +418,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push) {
 		}
 		txring->head = txring->cur = cur;
 
-		if (unlikely(dosync))
+		if (unlikely(ask_sync))
 			do_txsync(nmd->fd);
 
 		if (next == NULL) { //All is sent
@@ -541,9 +557,8 @@ ToNetmapDevice::cleanup(CleanupStage)
             delete state.get_value(i).timer;
     }
     if (!input_is_pull(0))
-        for (int i = 0; i < nqueues; i++)
+        for (int i = 0; i < min((int)_zctimers.size(),(int)nqueues); i++)
             delete _zctimers[i];
-
     if (_device) _device->destroy();
 }
 

@@ -825,6 +825,7 @@ enable_app
 enable_aqm
 enable_ethernet
 enable_etherswitch
+enable_flow
 enable_grid
 enable_icmp
 enable_ip
@@ -1519,6 +1520,7 @@ Optional Features:
   --disable-aqm           do not include active queue management elements
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
+  --enable-flow           include Enable flow system and elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
@@ -6483,6 +6485,8 @@ Can't find -lpthread and/or <pthread.h>, so I can't compile with
     LIBS="$SAVE_LIBS"
 fi
 
+
+
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
   enableval=$enable_select; :
@@ -7022,6 +7026,18 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_etherswitch" = xNO -o "x$enable_etherswitch" = x \) && enable_etherswitch=yes
 if test "x$enable_etherswitch" = xyes; then
     :
+
+fi
+# Check whether --enable-flow was given.
+if test "${enable_flow+set}" = set; then :
+  enableval=$enable_flow;
+else
+  enable_flow=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flow" = x \) && enable_flow=yes
+if test "x$enable_flow" = xyes; then
+    :
+    $as_echo "#define HAVE_FLOW 1" >>confdefs.h
 
 fi
 # Check whether --enable-grid was given.
@@ -10689,7 +10705,7 @@ $as_echo "#define HAVE_PCAP 1" >>confdefs.h
 
         savelibs="$LIBS"
         LIBS="$savelibs $PCAP_LIBS"
-        for ac_func in pcap_inject pcap_sendpacket pcap_setdirection pcap_setnonblock
+        for ac_func in pcap_inject pcap_sendpacket pcap_setdirection pcap_setnonblock pcap_set_immediate_mode
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -11247,6 +11263,7 @@ Can't find Linux compilation flags.
             -e s,-Wstrict-prototypes,,g \
             -e s,-Wdeclaration-after-statement,,g \
             -e s,-fno-common,,g \
+            -e 's,-std=-a-z0-9+*,,g' \
             -e s,-Werror-implicit-function-declaration,,g \
             -e 's,-W^ *,,g' <conftest.dat`"
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LINUX_CFLAGS" >&5
@@ -13561,6 +13578,10 @@ esac
 
 if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
+fi
+
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
 fi
 
 if test "x$enable_dpdk" = xyes; then

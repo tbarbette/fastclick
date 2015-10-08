@@ -66,8 +66,9 @@ class NetmapBufQ {
     }
 
     inline int expand(int n) {
+    	click_chatter("Expanding buffer pool with %d new packets",n);
+#if NETMAP_HAVE_DYNAMIC_ALLOC
         if (!_some_nmd) return -1;
-       click_chatter("Expanding buffer pool with %d new packets",n);
        struct nmbufreq nbr;
        nbr.num = n;
        nbr.head = 0;
@@ -75,11 +76,40 @@ class NetmapBufQ {
             click_chatter("Error ! Could not alloc buffers !");
                 return -1;
        }
-
        return insert_all(nbr.head);
+#else
+    if (unlikely(this == netmap_global_buf_pool)) {
+    	click_chatter("No more packets in global buffer pool ! Allocate more !");
+    	return -1;
     }
 
-    inline void clear() {
+    //Transfer from global pool
+	uint32_t idx;
+	uint32_t *p;
+	while(n > 0) {
+		idx = netmap_global_buf_pool->head;
+
+		if (idx == 0) {
+			click_chatter("No more global packets !");
+			break;
+		}
+
+		p  = reinterpret_cast<uint32_t *>(buf_start +
+			idx * buf_size);
+
+		if (__sync_bool_compare_and_swap(&netmap_global_buf_pool->head,idx,*p)) {
+			netmap_global_buf_pool->_count--;
+			n--;
+			insert(idx);
+		}
+	};
+	click_chatter("Pool is now %d",_count);
+#endif
+	return _count;
+    }
+
+    void clear() {
+#if NETMAP_HAVE_DYNAMIC_BUFFER
             if (_count > 0 && _some_nmd) {
                 struct nmbufreq nbr;
                 nbr.num = _count;
@@ -87,6 +117,11 @@ class NetmapBufQ {
 
                 ioctl(_some_nmd->fd,NIOCFREEBUF,&nbr);
             }
+#else
+            assert(this != netmap_global_buf_pool || _count == 0);
+            if (_count > 0)
+            	netmap_global_buf_pool->insert_all(head);
+#endif
             _count = 0;
     };
 
@@ -154,14 +189,13 @@ class NetmapBufQ {
     inline uint32_t extract() {
 
         if (_count <= 0) {
-            expand(1024);
+            if (expand(1024) < 0) return 0;
             if (_count == 0) return 0;
         }
         uint32_t idx;
         uint32_t *p;
         do {
             idx = head;
-
 
             p  = reinterpret_cast<uint32_t *>(buf_start +
                 idx * buf_size);
@@ -229,21 +263,31 @@ class NetmapBufQ {
     	return NetmapBufQ::netmap_buf_pools.get();
     }
 
+    static NetmapBufQ* get_global_pool() {
+    	return NetmapBufQ::netmap_global_buf_pool;
+    }
+
     static int initialize(struct nm_desc* some_nmd) {
     	if (netmap_buf_pools.size() < (unsigned)click_nthreads)
 			netmap_buf_pools.resize(click_nthreads,NULL);
+    	if (netmap_global_buf_pool == 0) {
+    		netmap_global_buf_pool = new NetmapBufQ(some_nmd);
+    		netmap_global_buf_pool->set_shared();
+    	}
 		for (int i = 0; i < click_nthreads; i++) {
 			if (netmap_buf_pools.get_value(i) == NULL) {
 				NetmapBufQ* q = new NetmapBufQ(some_nmd);
+#if NETMAP_HAVE_DYNAMIC_BUFFER
 				if (q->expand(1024) <= 0)
 					return -1;
+#endif
 				netmap_buf_pools.set_value(i,q);
 			}
 		}
 		return 0;
     }
 
-    static void cleanup() {
+    static uint32_t cleanup() {
 		for (unsigned int i = 0; i < netmap_buf_pools.size(); i++) {
 			if (netmap_buf_pools.get_value(i) && netmap_buf_pools.get_value(i)->count() > 0) {
 				click_chatter("Free pool %d (have %d packets)",i,netmap_buf_pools.get_value(i)->count());
@@ -253,6 +297,17 @@ class NetmapBufQ {
 				click_chatter("No free because no packet pool %d(%p) has %d packets",i,netmap_buf_pools.get_value(i),netmap_buf_pools.get_value(i)->count());
 			}
 		}
+
+    	if (netmap_global_buf_pool != 0) {
+    		uint32_t idx = netmap_global_buf_pool->head;
+    		click_chatter("Releasing %d",netmap_global_buf_pool->_count);
+    		netmap_global_buf_pool->head = 0;
+    		netmap_global_buf_pool->_count = 0;
+    		delete netmap_global_buf_pool;
+    		netmap_global_buf_pool = 0;
+    		return idx;
+    	}
+    	return 0;
     }
 
     inline static NetmapBufQ*& get_local_pool() {
@@ -265,6 +320,7 @@ class NetmapBufQ {
 
 private :
     static per_thread<NetmapBufQ*> netmap_buf_pools;
+    static NetmapBufQ* netmap_global_buf_pool;
 
 }  __attribute__((aligned(64)));
 
@@ -310,13 +366,14 @@ class NetmapDevice {
 	}
 
 	static struct nm_desc* some_nmd;
-
+	static int _global_alloc;
 protected :
 
 	static HashMap<String,NetmapDevice*> nics;
 
 private:
 	int _use_count;
+
 
 	int initialize();
 };

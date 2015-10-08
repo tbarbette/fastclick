@@ -72,8 +72,10 @@ class Bitvector {
     void or_with_difference(const Bitvector &x, Bitvector &difference);
 
     void swap(Bitvector &x);
+    void set_range(int start, int length, bool value);
 
     inline int weight();
+    inline int weight_range(int start, int length);
 
     /** @cond never */
     typedef word_type data_word_type CLICK_DEPRECATED;
@@ -383,6 +385,16 @@ inline Bitvector::Bit &Bitvector::Bit::operator-=(bool x) {
 inline int Bitvector::weight() {
 	int w = 0;
 	for (int i = 0; i < size(); i++)
+		if ((*this)[i])
+			w++;
+	return w;
+}
+
+/** @brief Return the number of true bits */
+inline int Bitvector::weight_range(int start, int length) {
+	assert(start+length < _max);
+	int w = 0;
+	for (int i = start; i < start + length; i++)
 		if ((*this)[i])
 			w++;
 	return w;

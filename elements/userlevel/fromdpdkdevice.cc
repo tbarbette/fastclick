@@ -88,7 +88,6 @@ int FromDpdkDevice::initialize(ErrorHandler *errh)
     ret = QueueDevice::initialize_tasks(true,errh);
     if (ret != 0) return ret;
 
-
     if (all_initialized()) {
         ret = DpdkDevice::initialize(errh);
         if (ret != 0) return ret;
@@ -113,10 +112,8 @@ bool FromDpdkDevice::run_task(Task * t)
     struct rte_mbuf *pkts[_burst];
     int ret = 0;
 
-#if HAVE_BATCH
     PacketBatch* head = NULL;
 	WritablePacket *last = NULL;
-#endif
 
     for (int iqueue = queue_for_thread_begin(); iqueue<=queue_for_thread_end();iqueue++) {
         unsigned n = rte_eth_rx_burst(_port_no, iqueue, pkts, _burst);
@@ -135,28 +132,24 @@ bool FromDpdkDevice::run_task(Task * t)
             rte_pktmbuf_free(pkts[i]);
 #endif
             p->set_packet_type_anno(Packet::HOST);
+
             if (_set_rss_aggregate)
 #if RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
 #endif
-#if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);
             else
                 last->set_next(p);
             last = p;
-#else
-             output(0).push(p);
-#endif
+
         }
-#if HAVE_BATCH
         if (head) {
             head->make_tail(last,n);
             output(0).push_batch(head);
         }
-#endif
         if (n) {
             add_count(n);
             ret = 1;

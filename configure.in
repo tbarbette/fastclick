@@ -521,6 +521,7 @@ ELEMENTS_ARG_ENABLE(app, [include application-level elements], yes)
 ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
+ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO, AC_DEFINE(HAVE_FLOW))
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
@@ -1449,6 +1450,7 @@ Can't find Linux compilation flags.
             -e s,-Wstrict-prototypes,,g \
             -e s,-Wdeclaration-after-statement,,g \
             -e s,-fno-common,,g \
+            -e 's,-std=[-a-z0-9+]*,,g' \
             -e s,-Werror-implicit-function-declaration,,g \
             -e 's,-W[^ ]*,,g' <conftest.dat`"
         AC_MSG_RESULT($LINUX_CFLAGS)
@@ -2052,6 +2054,11 @@ esac
 dnl add 'analysis' if analysis elements are available
 if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
+fi
+
+dnl add 'flow' if compiled with --enable-flow
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
 fi
 
 dnl add 'dpdk' if compiled with --enable-dpdk

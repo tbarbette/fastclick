@@ -434,13 +434,13 @@ Router::add_element(Element *e, const String &ename, const String &conf,
 }
 
 int
-Router::add_connection(int from_idx, int from_port, int to_idx, int to_port)
+Router::add_connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double)
 {
     assert(from_idx >= 0 && from_port >= 0 && to_idx >= 0 && to_port >= 0);
     if (_state != ROUTER_NEW)
 	return -1;
 
-    Connection c(from_idx, from_port, to_idx, to_port);
+    Connection c(from_idx, from_port, to_idx, to_port, allow_double);
 
     // check for continuing sorted order
     if (_conn_sorted && _conn.size() && c < _conn.back())
@@ -572,7 +572,7 @@ Router::check_hookup_completeness(ErrorHandler *errh)
 		ci = (p ? _conn_output_sorter[cix] : cix);
 		if (likely(last != _conn[ci][p]))
 		    last = _conn[ci][p];
-		else if (_elements[last.idx]->port_active(p, last.port))
+		else if (_elements[last.idx]->port_active(p, last.port) && !_conn[ci]._double)
 		    hookup_error(last, p, "illegal reuse of %<%p{element}%> %s %d", errh, true);
 	    }
 	}
@@ -709,7 +709,7 @@ Router::check_push_and_pull(ErrorHandler *errh)
     for (int ei = 0, *inputp = input_pers.begin(); ei < _elements.size(); ++ei) {
 	assert(inputp - input_pers.begin() == gport(false, Port(ei, 0)));
 	for (int port = 0; port < _elements[ei]->ninputs(); ++port, ++inputp)
-	    if (*inputp == Element::VAGNOSTIC) {
+	    if (*inputp == Element::VAGNOSTIC || *inputp == Element::VDOUBLE) {
 		_elements[ei]->port_flow(false, port, &bv);
 		int og = gport(true, Port(ei, 0));
 		for (int j = 0; j < bv.size(); ++j)
@@ -733,9 +733,36 @@ Router::check_push_and_pull(ErrorHandler *errh)
 	    int gt = gport(false, (*cp)[0]);
 	    int pf = output_pers[gf];
 	    int pt = input_pers[gt];
-
+/*if (cp->_double) {
+	click_chatter("%<%p{element}%> -> %<%p{element}%>  ALLOW double",_elements[(*cp)[1].idx],_elements[(*cp)[0].idx]);
+	return -1;
+}*/
 	    switch (pt) {
+	      case Element::VDOUBLE:
+	    if (!cp->_double) {
+	        if (pf == Element::VDOUBLE) {
+	            input_pers[gt] = Element::VPUSH;
+	            click_chatter("%s -> %s now push because double conn is not allowed",_elements[(*cp)[1].idx]->name().c_str(),_elements[(*cp)[0].idx]->name().c_str());
+	        } else {
+	        	if (pf == Element::VAGNOSTIC)
+	        		input_pers[gt] = Element::VPUSH;
+	        	else
+	        		input_pers[gt] = pf;
+	            click_chatter("%s -> %s now %d because double conn is not allowed",_elements[(*cp)[1].idx]->name().c_str(),_elements[(*cp)[0].idx]->name().c_str(),pf);
+	        }
+	        changed = true;
 
+	    	break;
+	    }
+	    if (pt != Element::VDOUBLE) {
+	        input_pers[gt] = pf;
+	        changed = true;
+	        click_chatter("%<%p{element}%> -> %<%p{element}%> now a %d, allowed : %d",_elements[(*cp)[1].idx],_elements[(*cp)[0].idx],pf,cp->_double);
+	    }
+	    break;
+	        /*if (!cp->_double) {
+	          1  return errh->error("%<%p{element}%> <-> %<%p{element}%> double connection without the <-> connector !",_elements[(*cp)[0].idx],_elements[(*cp)[1].idx]);
+	        }*/
 	      case Element::VAGNOSTIC:
 		if (pf != Element::VAGNOSTIC) {
 		    input_pers[gt] = pf;
@@ -745,7 +772,7 @@ Router::check_push_and_pull(ErrorHandler *errh)
 
 	      case Element::VPUSH:
 	      case Element::VPULL:
-		if (pf == Element::VAGNOSTIC) {
+		if (pf == Element::VAGNOSTIC || pf == Element::VDOUBLE) {
 		    output_pers[gf] = pt;
 		    changed = true;
 		} else if (pf != pt) {

@@ -20,7 +20,8 @@ enum Lexemes {
     lexElementclass,
     lexRequire,
     lexProvide,
-    lexDefine
+    lexDefine,
+	lexBiArrow
 };
 
 class Lexeme { public:

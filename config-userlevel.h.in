@@ -155,6 +155,9 @@
 /* Define if you have the pcap_setnonblock function. */
 #undef HAVE_PCAP_SETNONBLOCK
 
+/* Define if you have the pcap_set_immediate_mode function. */
+#undef HAVE_PCAP_SET_IMMEDIATE_MODE
+
 /* Define if you have -lproper and prop.h, and proper operations should be
    preferred to their non-proper counterparts. */
 #undef HAVE_PROPER

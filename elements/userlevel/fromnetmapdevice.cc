@@ -153,6 +153,51 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 
 	return 0;
 }
+PacketBatch*
+FromNetmapDevice::pull_batch(int port, unsigned max) {
+	for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
+		lock();
+		struct nm_desc* nmd = _device->nmds[i];
+		ioctl(nmd->fd,NIOCTXSYNC,SYNC_ON_IRQ);
+		struct netmap_ring *rxring = NETMAP_RXRING(nmd->nifp, i);
+
+		u_int cur, n;
+
+		cur = rxring->cur;
+
+		n = nm_ring_space(rxring);
+		if (max && n > max) {
+			n = max;
+		}
+
+		if (n == 0) {
+			unlock();
+			continue;
+		}
+
+		Timestamp ts = Timestamp::make_usec(nmd->hdr.ts.tv_sec, nmd->hdr.ts.tv_usec);
+
+#if HAVE_NETMAP_PACKET_POOL
+		PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur,_set_rss_aggregate);
+		if (!batch_head) goto error;
+#else
+		click_chatter("PULL BATCH only supports netmap batch!");
+#endif
+		rxring->head = rxring->cur = cur;
+		unlock();
+		batch_head->set_timestamp_anno(ts);
+		if (batch_head) {
+			add_count(batch_head->count());
+			return batch_head;
+		}
+	}
+	return 0;
+	error: //No more buffer
+	click_chatter("No more buffers !");
+	router()->master()->kill_router(router());
+	return 0;
+
+}
 
 inline bool
 FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask) {
@@ -208,12 +253,12 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 					if (unlikely(p == NULL)) goto error;
 			#else
                 #if HAVE_ZEROCOPY
-                    if (slot->len > 64) {
+					unsigned char* newbuffer;
+                    if (slot->len > 64 && (newbuffer = NetmapBufQ::get_local_pool()->extract()) != 0) {
                         __builtin_prefetch(data);
                         p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
                         if (!p) goto error;
-                        slot->buf_idx = NetmapBufQ::get_local_pool()->extract();
-
+                        slot->buf_idx = newbuffer;
                     } else
                 #endif
                     {
@@ -257,15 +302,12 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 			batch_head->set_timestamp_anno(ts);
 			output(0).push_batch(batch_head);
 #endif
-
 		}
 
 	if (nr_pending > _burst) { //TODO size/4
 	    if (fromtask) {
-
-	            task->fast_reschedule();
+	        task->fast_reschedule();
 	    } else {
-
 	        task->reschedule();
 	    }
 	}

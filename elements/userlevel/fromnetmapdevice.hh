@@ -68,7 +68,7 @@ public:
 
     const char *class_name() const		{ return "FromNetmapDevice"; }
     const char *port_count() const		{ return PORTS_0_1; }
-    const char *processing() const		{ return PUSH; }
+    const char *processing() const		{ return DOUBLE; }
 
     int configure_phase() const			{ return CONFIGURE_PHASE_PRIVILEGED - 5; }
     void* cast(const char*);
@@ -78,6 +78,7 @@ public:
     int initialize(ErrorHandler*) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
 
+    PacketBatch* pull_batch(int port, unsigned max);
 
     inline bool receive_packets(Task* task, int begin, int end, bool fromtask);
 

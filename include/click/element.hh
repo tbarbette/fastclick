@@ -67,6 +67,7 @@ class Element { public:
     static const char PORTS_1_1X2[];
 
     virtual const char *processing() const;
+    static const char DOUBLE[];
     static const char AGNOSTIC[];
     static const char PUSH[];
     static const char PULL[];
@@ -308,7 +309,7 @@ class Element { public:
     // METHODS USED BY ROUTER
     int set_nports(int, int);
     int notify_nports(int, int, ErrorHandler *);
-    enum Processing { VAGNOSTIC, VPUSH, VPULL };
+    enum Processing { VAGNOSTIC, VPUSH, VPULL, VDOUBLE };
     static int next_processing_code(const char*& p, ErrorHandler* errh);
     void processing_vector(int* input_codes, int* output_codes, ErrorHandler*) const;
 

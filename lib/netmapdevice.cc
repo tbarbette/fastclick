@@ -42,8 +42,14 @@ NetmapDevice::~NetmapDevice() {
     nics.remove(ifname);
 
 #if HAVE_ZEROCOPY
-    if (NetmapDevice::nics.empty())
-    	NetmapBufQ::cleanup();
+    if (NetmapDevice::nics.empty()) {
+
+    	uint32_t idx = NetmapBufQ::cleanup();
+        if (idx != 0 && parent_nmd) {
+        	click_chatter("Releasing packet idx %d",idx);
+        	parent_nmd->nifp->ni_bufs_head = idx;
+        }
+    }
 #endif
 
 	click_chatter("Deleting NIC %s",ifname.c_str());
@@ -66,7 +72,6 @@ int NetmapDevice::initialize() {
 		base_nmd->self = base_nmd;
 		strcpy(base_nmd->req.nr_name,&(ifname.c_str()[7]));
 		base_nmd->req.nr_flags = NR_REG_SW;
-
 	    if (NetmapDevice::some_nmd != NULL) { //Having same netmap space is a lot easier...
 	    	base_nmd->mem = NetmapDevice::some_nmd->mem;
 	    	base_nmd->memsize = NetmapDevice::some_nmd->memsize;
@@ -75,7 +80,8 @@ int NetmapDevice::initialize() {
 	    	NetmapDevice::some_nmd->req.nr_flags = NR_REG_SW;
 	    	nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_NO_MMAP | NM_OPEN_IFNAME, base_nmd);
 	    } else {
-	    	nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_IFNAME, base_nmd);
+			base_nmd->req.nr_arg3 = _global_alloc;
+	    	nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_IFNAME | NM_OPEN_ARG3, base_nmd);
 	    	NetmapDevice::some_nmd = nmd;
 	    }
 	    if (!nmd)
@@ -94,9 +100,16 @@ int NetmapDevice::initialize() {
 
 	    //Allocate packet pools
 	#if HAVE_ZEROCOPY
-		NetmapBufQ::initialize(NetmapDevice::some_nmd);
+		if (NetmapBufQ::initialize(NetmapDevice::some_nmd) != 0) {
+			nm_close(nmd);
+			return -1;
+		}
 	#endif
-
+		click_chatter("Allocated %d packets",nmd->req.nr_arg3);
+		if (nmd->req.nr_arg3) {
+			NetmapBufQ::get_global_pool()->insert_all(nmd->nifp->ni_bufs_head);
+			nmd->req.nr_arg3 = 0;
+		}
 		n_queues = nmd->nifp->ni_rx_rings;
 
 		nmds.resize(n_queues);
@@ -136,6 +149,14 @@ int NetmapDevice::initialize() {
 HashMap<String,NetmapDevice*> NetmapDevice::nics;
 struct nm_desc* NetmapDevice::some_nmd = 0;
 per_thread<NetmapBufQ*> NetmapBufQ::netmap_buf_pools = per_thread<NetmapBufQ*>(0,0);
+NetmapBufQ* NetmapBufQ::netmap_global_buf_pool = 0;
+
+#if NETMAP_HAVE_DYNAMIC_BUFFER
+int NetmapDevice::_global_alloc = 0;
+#else
+int NetmapDevice::_global_alloc = 2048;
+#endif
+
 unsigned int NetmapBufQ::buf_size = 0;
 CLICK_ENDDECLS
 #endif

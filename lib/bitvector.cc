@@ -290,4 +290,13 @@ Bitvector::print() {
         buf[i] = '\0';
         click_chatter("%s",buf);
 }
+
+void
+Bitvector::set_range(int start, int length, bool value) {
+	assert(start + length < _max);
+	for (int i = start; i < start + length; i++) {
+		((*this)[i]) = value;
+	}
+}
+
 CLICK_ENDDECLS

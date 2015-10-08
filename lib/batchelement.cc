@@ -60,11 +60,14 @@ void BatchElement::BatchPort::push_batch(PacketBatch* batch) const {
  */
 inline void BatchElement::BatchPort::assign(bool isoutput, Element *e, int port) {
 	output_supports_batch = dynamic_cast<BatchElement*>(e) != NULL;
+	assert(e);
 	Element::Port::assign(isoutput,e,port);
 	bind_batchelement();
 }
 
 void BatchElement::BatchPort::bind_batchelement() {
+	assert(element());
+
 	if (dynamic_cast<BatchElement*>(element()) != NULL) {
 		dynamic_cast<BatchElement*>(element())->receives_batch = true;
 #if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
@@ -78,9 +81,11 @@ void BatchElement::BatchPort::bind_batchelement() {
  * Assign an element to this port
  */
 void BatchElement::PullBatchPort::bind_batchelement() {
+	assert(!active() || element());
     #if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
     if (dynamic_cast<BatchElement*>(element()) != NULL) {
         PacketBatch *(BatchElement::*flow_pull)(int,unsigned) = &BatchElement::pull_batch;
+        click_chatter("Set pull batch function !");
         _bound.pull_batch = (PacketBatch * (*)(BatchElement *, int, unsigned)) (dynamic_cast<BatchElement*>(element())->*flow_pull);
     }
     #endif
@@ -149,6 +154,7 @@ class PushToPushBatchVisitor : public RouterVisitor { public:
  * Upgrade the ports of this element to support communication between batch-compatible elements
  */
 void BatchElement::upgrade_ports() {
+	//click_chatter("Upgrade %s",name().c_str());
     for (int i = 0; i < _nports[0]; i++) {
         ((PullBatchPort&)_ports[0][i]).bind_batchelement();
     }
@@ -174,7 +180,7 @@ void BatchElement::check_unbatch() {
 		if (output_is_push(i) && !output(i).output_supports_batch) {
 			click_chatter("Warning ! %s->%s is not compatible with batch. Packets will be unbatched and that will reduce performances.",output(i).element()->name().c_str(),name().c_str());
 			BatchPort* port = &(static_cast<BatchElement::BatchPort*>(_ports[1])[i]);
-			PushToPushBatchVisitor v(&port[i].downstream_batches);
+			PushToPushBatchVisitor v(&port->downstream_batches);
 			router()->visit(this,1,i,&v);
 		}
 	}

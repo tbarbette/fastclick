@@ -28,6 +28,7 @@ class Router { public:
     inline Master* master() const;
 
     // STATUS
+    inline bool configured() const;
     inline bool initialized() const;
     inline bool handlers_ready() const;
     inline bool running() const;
@@ -123,7 +124,7 @@ class Router { public:
 
     void add_requirement(const String &type, const String &value);
     int add_element(Element *e, const String &name, const String &conf, const String &filename, unsigned lineno);
-    int add_connection(int from_idx, int from_port, int to_idx, int to_port);
+    int add_connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double);
 #if CLICK_LINUXMODULE
     int add_module_ref(struct module* module);
 #endif
@@ -168,12 +169,19 @@ class Router { public:
 
     struct Connection {
 	Port p[2];
+	bool _double;
 
-	Connection() {
+	Connection() : _double(false) {
 	}
-	Connection(int from_idx, int from_port, int to_idx, int to_port) {
+
+	Connection(int from_idx, int from_port, int to_idx, int to_port) : _double(false) {
+		p[0] = Port(to_idx, to_port);
+		p[1] = Port(from_idx, from_port);
+	}
+	Connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double) {
 	    p[0] = Port(to_idx, to_port);
 	    p[1] = Port(from_idx, from_port);
+	    _double = allow_double;
 	}
 
 	const Port &operator[](int i) const {
@@ -373,6 +381,13 @@ inline bool
 Router::running() const
 {
     return _running > 0;
+}
+
+/** @brief  Return true iff the router has been successfully initialized. */
+inline bool
+Router::configured() const
+{
+    return _state >= ROUTER_PREINITIALIZE;
 }
 
 /** @brief  Return true iff the router has been successfully initialized. */

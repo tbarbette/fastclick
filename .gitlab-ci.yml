@@ -1,0 +1,2 @@
+jobs:
+    - script: "./configure --disable-linuxmodule --enable-batch --enable-flow"

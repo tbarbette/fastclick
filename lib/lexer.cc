@@ -149,7 +149,7 @@ class Lexer::Compound : public Element { public:
     inline int assign_arguments(const Vector<String> &args, Vector<String> *values) const;
     int resolve(Lexer *, int etype, int ninputs, int noutputs, Vector<String> &, ErrorHandler *, const String &landmark);
     void expand_into(Lexer *, int, VariableEnvironment &);
-    void connect(int from_idx, int from_port, int to_idx, int to_port);
+    void connect(int from_idx, int from_port, int to_idx, int to_port, bool allow_double);
 
     String deanonymize_element_name(int eidx);
 
@@ -240,13 +240,13 @@ Lexer::Compound::define(const String &name, const String &value, bool isformal, 
 }
 
 void
-Lexer::Compound::connect(int from_idx, int from_port, int to_idx, int to_port)
+Lexer::Compound::connect(int from_idx, int from_port, int to_idx, int to_port, bool allow_double)
 {
   if (from_port < 0)
     from_port = 0;
   if (to_port < 0)
     to_port = 0;
-  _conn.push_back(Router::Connection(from_idx, from_port, to_idx, to_port));
+  _conn.push_back(Router::Connection(from_idx, from_port, to_idx, to_port, allow_double));
   if (_element_nports[0][to_idx] <= to_port)
     _element_nports[0][to_idx] = to_port + 1;
   if (_element_nports[1][from_idx] <= from_port)
@@ -418,7 +418,7 @@ Lexer::Compound::expand_into(Lexer *lexer, int which, VariableEnvironment &ve)
     for (const Connection *cp = _conn.begin(); cp != _conn.end(); ++cp)
         if (eidx_map[(*cp)[0].idx] >= 0 && eidx_map[(*cp)[0].idx] >= 0)
             lexer->_c->connect(eidx_map[(*cp)[1].idx], (*cp)[1].port,
-                               eidx_map[(*cp)[0].idx], (*cp)[0].port);
+                               eidx_map[(*cp)[0].idx], (*cp)[0].port, cp->_double);
 
     // now expand those
     for (int i = 2; i < eidx_map.size(); i++)
@@ -797,6 +797,9 @@ Lexer::FileState::next_lexeme(Lexer *lexer)
     } else if (*s == '=' && s[1] == '>') {
       _pos = s + 2;
       return Lexeme(lex2Arrow, _big_string.substring(s, s + 2));
+    } else if (*s == '<' && s[1] == '-' && s[2] == '>') {
+       _pos = s + 3;
+       return Lexeme(lexBiArrow, _big_string.substring(s, s + 3));
     } else if (*s == ':' && s[1] == ':') {
       _pos = s + 2;
       return Lexeme(lex2Colon, _big_string.substring(s, s + 2));
@@ -859,11 +862,11 @@ Lexer::lexeme_string(int kind)
 {
     static const char names[] = "identifier\0variable\0'->'\0'=>'\0"
         "'::'\0'||'\0'...'\0'elementclass'\0'require'\0'provide'\0"
-        "'define'";
+        "'define'\0'<->'";
     static const uint8_t offsets[] = {
-        0, 11, 20, 25, 30, 35, 40, 46, 61, 71, 81, 90
+        0, 11, 20, 25, 30, 35, 40, 46, 61, 71, 81, 90, 96
     };
-    static_assert(sizeof(names) == 90, "names screwup.");
+    static_assert(sizeof(names) == 96, "names screwup.");
 
     char buf[14];
     if (kind >= lexIdent && kind < lexIdent + (int) sizeof(offsets) - 1) {
@@ -1313,7 +1316,7 @@ Lexer::yelement_name()
             return;
         } else {
             bool nested = _c->depth() || _ps->_parent;
-            if (nested && (t.is(lexArrow) || t.is(lex2Arrow))) {
+            if (nested && (t.is(lexArrow) || t.is(lex2Arrow) || t.is(lexBiArrow))) {
                 this_implicit = _ps->first_element_set()
                     && (_ps->nports(false) || !_ps->cur_epos);
                 if (this_implicit && !_ps->nports(false)
@@ -1420,13 +1423,13 @@ Lexer::yelement_next()
     unlex(t);
 
     // maybe complain about implicits
-    if (_ps->any_implicit && !_ps->first_element_set() && (t.is(lexArrow) || t.is(lex2Arrow)))
+    if (_ps->any_implicit && !_ps->first_element_set() && (t.is(lexArrow) || t.is(lex2Arrow) || t.is(lexBiArrow)))
         lerror("implicit ports used in the middle of a chain");
 
     // maybe spread class and configuration for standalone
     // multiple-element declaration
     if (_ps->_head->next && _ps->first_element_set()
-        && !(t.is(lexArrow) || t.is(lex2Arrow))
+        && !(t.is(lexArrow) || t.is(lex2Arrow) || t.is(lexBiArrow))
         && !_ps->any_ports && !_ps->any_implicit) {
         ElementState *last = _ps->_head;
         while (last->next && last->bare)
@@ -1542,7 +1545,7 @@ Lexer::yconnection_connect_all(Vector<int> &outputs, Vector<int> &inputs,
                 port[k] = np ? it[k][3 + (k ? it[k][1] : 0)] : 0;
             }
 
-        _c->connect(it[1][0], port[1], it[0][0], port[0]);
+        _c->connect(it[1][0], port[1], it[0][0], port[0], connector == lexBiArrow);
 
         for (int k = 0; k < 2; ++k)
             if (step[k]) {
@@ -1589,7 +1592,7 @@ Lexer::yconnection_connector()
     case lex2Colon:
         lerror_syntax(t);
         goto relex;
-
+    case lexBiArrow:
     case lexArrow:
     case lex2Arrow:
         // have 'x ->'
@@ -1977,6 +1980,7 @@ Lexer::ystatement()
     case '[':
     case '{':
     case '(':
+    case lexBiArrow:
     case lexArrow:
     case lex2Arrow:
         unlex(t);
@@ -2098,7 +2102,7 @@ Lexer::add_router_connections(int c, const Vector<int> &router_id)
       for (int t = 0; t < hto.size(); t++) {
         int tidx = router_id[hto[t].idx];
         if (tidx >= 0)
-          _c->connect(hfrom[f].idx, hfrom[f].port, hto[t].idx, hto[t].port);
+          _c->connect(hfrom[f].idx, hfrom[f].port, hto[t].idx, hto[t].port, _c->_conn[c]._double);
       }
   }
 }
@@ -2215,7 +2219,7 @@ Lexer::create_router(Master *master)
   click_qsort(_c->_conn.begin(), _c->_conn.size());
   for (Connection *cp = _c->_conn.begin(); cp != _c->_conn.end(); ++cp)
     if ((*cp)[0].idx >= 0 && (*cp)[1].idx >= 0)
-      router->add_connection((*cp)[1].idx, (*cp)[1].port, (*cp)[0].idx, (*cp)[0].port);
+      router->add_connection((*cp)[1].idx, (*cp)[1].port, (*cp)[0].idx, (*cp)[0].port, cp->_double);
 
   // add requirements to router
   for (int i = 0; i < _requirements.size(); i += 2)

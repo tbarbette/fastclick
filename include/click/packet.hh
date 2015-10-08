@@ -5,6 +5,7 @@
 #include <click/glue.hh>
 #include <click/timestamp.hh>
 #include <click/packet_anno.hh>
+#include <click/flow_common.hh>
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
 #elif CLICK_DPDK_POOLS
@@ -1880,6 +1881,11 @@ Packet::kill()
         rte_pktmbuf_free(mb());
 	#elif HAVE_CLICK_PACKET_POOL || HAVE_NETMAP_PACKET_POOL
 		if (_use_count.dec_and_test()) {
+			#if HAVE_FLOW
+				if (fcb_stack) {
+					fcb_stack->release(1);
+				}
+			#endif
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
 	#else
@@ -1910,6 +1916,11 @@ Packet::safe_kill()
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
         if (_use_count.unatomic_dec_and_test()) {
+			#if HAVE_FLOW
+				if (fcb_stack) {
+					fcb_stack->release(1);
+				}
+			#endif
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
     }
@@ -2995,6 +3006,11 @@ inline void PacketBatch::kill() {
  * @precond If have batching, no packets can be shared (hey must be plain packet with their own data, or all be packet without data)
  */
 inline void PacketBatch::safe_kill() {
+	#if HAVE_FLOW
+		if (fcb_stack) {
+			fcb_stack->release(count());
+		}
+	#endif
     WritablePacket::recycle_batch(this);
 }
 #endif

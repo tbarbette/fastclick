@@ -1,6 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_BATCHELEMENT_HH
 #define CLICK_BATCHELEMENT_HH
+#include <click/config.h>
 #include <click/glue.hh>
 #include <click/vector.hh>
 #include <click/string.hh>
@@ -38,6 +39,7 @@ class BatchElement : public Element { public:
 	}
 
 	virtual PacketBatch* pull_batch(int port, unsigned max) {
+		assert(port < ninputs() && input(port).active());
 	    PacketBatch* head = input(port).pull_batch(max);
 	    if (head) {
 	        head = simple_action_batch(head);

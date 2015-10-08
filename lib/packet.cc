@@ -426,7 +426,10 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
 
     if (_count == 0) {
         _head = pool_data_allocate();
-        _count = 1;
+        if (!_head) {
+        	click_chatter("Warning : could not receive packets because netmap buffers are short !");
+        	return 0;
+        }
     }
 
     //Next is the current packet in the batch
@@ -455,19 +458,22 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
 #if NETMAP_WITH_HASH
         if (set_rss_aggregate)
             SET_AGGREGATE_ANNO(last,slot->hash);
-        click_chatter("Agg : %x",AGGREGATE_ANNO(last));
 #endif
         cur = nm_ring_next(rxring, cur);
         toreceive--;
-        _count --;
+
 
         if (_count == 0) {
 
             _head = 0;
-
             next = pool_data_allocate();
-            _count++; // We use the packet already out of the pool
-        }
+            if (next == 0) {
+            	click_chatter("Warning : could not receive packets because netmap buffers are short !");
+            	n-=toreceive;
+            	toreceive = 0;
+            }
+        } else
+            _count --;
         last->set_next(next);
 
     }
@@ -835,6 +841,11 @@ Packet::clone()
     //click_chatter("CLone is %p->%p data is %p",p,this,p->buffer());
     p->_use_count = 1;
     p->_data_packet = origin;
+#if HAVE_FLOW
+	if (fcb_stack) {
+		fcb_stack->acquire(1);
+	}
+#endif
 # if CLICK_USERLEVEL || CLICK_MINIOS
     p->_destructor = 0;
 # else
@@ -964,6 +975,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     int headroom = this->headroom();
     int length = this->length();
     uint8_t* new_head = p->_head;
+     uint8_t* new_end = p->_end;
     if (_use_count > 1) {
         memcpy(p, this, sizeof(Packet));
 
@@ -982,7 +994,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     p->_head = new_head;
     p->_data = new_head + headroom + extra_headroom;
     p->_tail = p->_data + length;
-    p->_end = new_head + buffer_length;
+    p->_end = new_end;
 
 	# if CLICK_BSDMODULE
 		struct mbuf *old_m = _m;
