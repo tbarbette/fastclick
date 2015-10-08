@@ -18,7 +18,8 @@ class Middlebox : public Element { public:
   Packet *pull(int);
 
  protected:
-    void printInfo(Packet*);
+    void processPacket(WritablePacket*);
+    void processContent(unsigned char*);
 
 
 };
