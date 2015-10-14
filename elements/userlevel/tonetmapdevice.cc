@@ -325,8 +325,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 	struct netmap_ring *txring;
 	struct netmap_slot *slot;
 
-	WritablePacket* s_head = head->uniqueify();
-	WritablePacket* next = s_head;
+	WritablePacket* next = static_cast<WritablePacket*>(head);
 	WritablePacket* p = next;
 
 	unsigned int sent = 0;
@@ -394,11 +393,12 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 			if (p->shared()) {
 				n_shared++;
 				p->kill();
+				if (p == head) {
+					head = next;
+				}
 				if (last)
 					last->set_next(next);
 			} else {
-				if (last == NULL && p != s_head)
-					s_head = p;
 				last = p;
 			}
 #else
@@ -416,21 +416,24 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 		if (next == NULL) { //All is sent
 			add_count(sent);
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-			last->set_next(0);
-			PacketBatch::make_from_list(s_head,sent - n_shared)->safe_kill();
+			if (last) {
+				last->set_next(0);
+				PacketBatch::make_from_simple_list(head,last,sent - n_shared)->safe_kill();
+			}
 #endif
 			head = NULL;
 			return sent;
 		}
 	}
 
-	if (next == s_head) { //Nothing could be sent...
-		head = s_head;
+	if (sent == 0) { //Nothing could be sent...
 		return 0;
 	} else {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-		last->set_next(0);
-		PacketBatch::make_from_simple_list(s_head,last,sent- n_shared)->safe_kill();
+		if (last) {
+			last->set_next(0);
+			PacketBatch::make_from_simple_list(head,last,sent- n_shared)->safe_kill();
+		}
 #endif
 		add_count(sent);
 		head = next;
