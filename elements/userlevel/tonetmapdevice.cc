@@ -330,6 +330,10 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 	WritablePacket* p = next;
 
 	unsigned int sent = 0;
+	unsigned int n_shared = 0;
+#if HAVE_BATCH
+		WritablePacket* last = NULL; //Remember the last treated packet (p = last->next())
+#endif
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
 		int in = (s.last_queue + iloop) % queue_per_threads;
@@ -345,9 +349,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 		}
 
 		u_int cur = txring->cur;
-#if HAVE_BATCH
-		WritablePacket* last = NULL; //Remember the last treated packet (p = last->next())
-#endif
+
 		while ((cur != txring->tail) && next) {
 			p = next;
 
@@ -390,10 +392,13 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 			//We cannot recycle a batch with shared packet in it
 			if (p->shared()) {
+				n_shared++;
 				p->kill();
 				if (last)
 					last->set_next(next);
 			} else {
+				if (last == NULL && p != s_head)
+					s_head = p;
 				last = p;
 			}
 #else
@@ -411,8 +416,8 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 		if (next == NULL) { //All is sent
 			add_count(sent);
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-			p->set_next(0);
-			PacketBatch::make_from_list(s_head,sent)->safe_kill();
+			last->set_next(0);
+			PacketBatch::make_from_list(s_head,sent - n_shared)->safe_kill();
 #endif
 			head = NULL;
 			return sent;
@@ -424,8 +429,8 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 		return 0;
 	} else {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-		p->set_next(0);
-		PacketBatch::make_from_simple_list(s_head,p,sent)->safe_kill();
+		last->set_next(0);
+		PacketBatch::make_from_simple_list(s_head,last,sent- n_shared)->safe_kill();
 #endif
 		add_count(sent);
 		head = next;
