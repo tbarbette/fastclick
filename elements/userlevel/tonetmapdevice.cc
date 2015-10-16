@@ -326,12 +326,16 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 	struct netmap_slot *slot;
 
 	WritablePacket* next = static_cast<WritablePacket*>(head);
-	WritablePacket* p = next;
+	WritablePacket* p;
 
 	unsigned int sent = 0;
-	unsigned int n_shared = 0;
 #if HAVE_BATCH
-		WritablePacket* last = NULL; //Remember the last treated packet (p = last->next())
+	    WritablePacket* head_packet = NULL;
+	    WritablePacket* head_data = NULL;
+		WritablePacket* last_packet = NULL;
+		WritablePacket* last_data = NULL;
+		unsigned int n_packet = 0;
+		unsigned int n_data = 0;
 #endif
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
@@ -347,35 +351,36 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 			continue;
 		}
 
+#if HAVE_NETMAP_PACKET_POOL
+		unsigned int next_slots = 1;
+#else
+		unsigned int next_slots = ((next->length() - 1) / txring->nr_buf_size) + 1;
+#endif
+
 		u_int cur = txring->cur;
-
-		while ((cur != txring->tail) && next) {
+		while ((nm_ring_space(txring) >= next_slots) && next) {
 			p = next;
-
+			next_slots = ((next->length() - 1) / nmd->some_ring->nr_buf_size) + 1;
 			next = static_cast<WritablePacket*>(p->next());
 
 			slot = &txring->slot[cur];
-			slot->len = p->length();
+			bool is_data = false;
 #if HAVE_NETMAP_PACKET_POOL
+			slot->len = p->length();
 			if (p->headroom() > 0) {
 				complaint++;
 				if (complaint < 5)
 					click_chatter("Shifting data in %s. You should avoid this case !");
 				p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
 			}
-
 			unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
 			slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 			static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
 			slot->flags |= NS_BUF_CHANGED;
-
-			if (unlikely(push && cur % 32 == 0)) {
-				ask_sync = true;
-				slot->flags |= NS_REPORT;
-			}
 #else
 # if HAVE_ZEROCOPY
 			if (likely(NetmapBufQ::is_netmap_packet(p))) {
+				slot->len = p->length();
 				((NetmapBufQ*)(p->destructor_argument()))->insert(slot->buf_idx);
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				slot->flags |= NS_BUF_CHANGED;
@@ -383,23 +388,62 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 			} else
 # endif
 			{
-				unsigned char* dstdata = (unsigned char*)NETMAP_BUF(txring, slot->buf_idx);
-				void* srcdata = (void*)(p->data());
-				memcpy(dstdata,srcdata,p->length());
+				unsigned char* srcdata = p->data();
+				int length = p->length();
+				is_data = (p->data_packet() == 0 && p->buffer_destructor() == 0);
+				while (length > txring->nr_buf_size) {
+				    is_data = false;
+						memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,txring->nr_buf_size);
+						srcdata += txring->nr_buf_size;
+						length -= txring->nr_buf_size;
+						slot->len = txring->nr_buf_size;
+						slot->flags |= NS_MOREFRAG;
+						srcdata += txring->nr_buf_size;
+						if (unlikely(push && cur % 32 == 0)) {
+							ask_sync = true;
+							slot->flags |= NS_REPORT;
+						}
+						cur = nm_ring_next(txring,cur);
+						assert (cur != txring->tail);
+						slot = &txring->slot[cur];
+
+				}
+				memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,length);
+				slot->len = length;
+
 			}
 #endif
+		if (unlikely(push && cur % 32 == 0)) {
+			ask_sync = true;
+			slot->flags |= NS_REPORT;
+		}
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 			//We cannot recycle a batch with shared packet in it
 			if (p->shared()) {
-				n_shared++;
 				p->kill();
 				if (p == head) {
 					head = next;
 				}
-				if (last)
-					last->set_next(next);
 			} else {
-				last = p;
+			    if (!is_data) {
+			        if (head_packet == NULL) {
+			            head_packet = p;
+			            last_packet = p;
+			        } else {
+			            last_packet->set_next(p);
+			            last_packet = p;
+			        }
+			        n_packet++;
+			    } else {
+			        if (head_data == NULL) {
+                        head_data = p;
+                        last_data = p;
+                    } else {
+                        last_data->set_next(p);
+                        last_data = p;
+                    }
+			        n_data++;
+			    }
 			}
 #else
 			//If no batch or no packet pool, don't bother recycling per-batch
@@ -407,33 +451,29 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 #endif
 			sent++;
 			cur = nm_ring_next(txring,cur);
+#if !HAVE_NETMAP_PACKET_POOL
+			if (next)
+				next_slots = ((next->length() - 1) / nmd->some_ring->nr_buf_size) + 1;
+#endif
 		}
 		txring->head = txring->cur = cur;
 
 		if (unlikely(ask_sync))
 			do_txsync(nmd->fd);
-
-		if (next == NULL) { //All is sent
-			add_count(sent);
-#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-			if (last) {
-				last->set_next(0);
-				PacketBatch::make_from_simple_list(head,last,sent - n_shared)->safe_kill();
-			}
-#endif
-			head = NULL;
-			return sent;
-		}
 	}
 
 	if (sent == 0) { //Nothing could be sent...
 		return 0;
 	} else {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-		if (last) {
-			last->set_next(0);
-			PacketBatch::make_from_simple_list(head,last,sent- n_shared)->safe_kill();
-		}
+	    if (last_packet) {
+	        last_packet->set_next(0);
+	        PacketBatch::make_from_simple_list(head_packet,last_packet,n_packet)->safe_kill(false);
+	    }
+	    if (last_data) {
+	        last_data->set_next(0);
+	        PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);
+	    }
 #endif
 		add_count(sent);
 		head = next;

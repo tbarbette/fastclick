@@ -355,7 +355,7 @@ WritablePacket::pool_data_allocate()
         packet_pool.pd = static_cast<WritablePacket*>(pd->next());
         --packet_pool.pdcount;
     } else {
-        pd = new WritablePacket;
+        pd = pool_allocate();
         pd->alloc_data(0,CLICK_PACKET_POOL_BUFSIZ,0);
     }
     return pd;
@@ -478,9 +478,9 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
 #  endif //HAVE_NETMAP_PACKET_POOL
 
 inline void
-WritablePacket::check_pool_size(PacketPool &packet_pool, bool data) {
+WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
 #  if HAVE_MULTITHREAD
-    if (unlikely(!data && packet_pool.p && packet_pool.pcount >= CLICK_PACKET_POOL_SIZE)) {
+    if (unlikely(packet_pool.p && packet_pool.pcount >= CLICK_PACKET_POOL_SIZE)) {
         packet_pool.p->set_anno_u32(0, packet_pool.pcount);
         if (!global_packet_pool.pbatch.insert(packet_pool.p)) { //Si le nombre de batch est au max -> delete
             while (WritablePacket *p = packet_pool.p) { //On supprime le batch
@@ -491,7 +491,22 @@ WritablePacket::check_pool_size(PacketPool &packet_pool, bool data) {
         }
         packet_pool.p = 0;
         packet_pool.pcount = 0;
-    } else if (unlikely(packet_pool.pd && packet_pool.pdcount >= CLICK_PACKET_POOL_SIZE)) {
+    }
+#  else /* !HAVE_MULTITHREAD */
+    if (packet_pool.pcount == CLICK_PACKET_POOL_SIZE) {
+        WritablePacket* tmp = (WritablePacket*)packet_pool.p->next();
+        ::operator delete((void *) packet_pool.p);
+        packet_pool.p = tmp;
+        packet_pool.pcount--;
+    }
+#  endif /* HAVE_MULTITHREAD */
+}
+
+inline void
+WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
+#  if HAVE_MULTITHREAD
+    if (unlikely(packet_pool.pd && packet_pool.pdcount >= CLICK_PACKET_POOL_SIZE)) {
+        click_chatter("Too much pd, putting in global data pool");
         packet_pool.pd->set_anno_u32(0, packet_pool.pdcount);
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
@@ -505,13 +520,7 @@ WritablePacket::check_pool_size(PacketPool &packet_pool, bool data) {
     }
 
 #  else /* !HAVE_MULTITHREAD */
-    if (packet_pool.pcount == CLICK_PACKET_POOL_SIZE) {
-        WritablePacket* tmp = (WritablePacket*)packet_pool.p->next();
-        ::operator delete((void *) packet_pool.p);
-        packet_pool.p = tmp;
-        packet_pool.pcount--;
-    }
-    if (data && packet_pool.pdcount == CLICK_PACKET_POOL_SIZE) {
+    if (packet_pool.pdcount == CLICK_PACKET_POOL_SIZE) {
         WritablePacket* tmp = (WritablePacket*)packet_pool.pd->next();
         ::operator delete((void *) packet_pool.pd);
         packet_pool.pd = tmp;
@@ -544,15 +553,15 @@ WritablePacket::recycle(WritablePacket *p)
     PacketPool& packet_pool = *make_local_packet_pool();
     bool data = is_from_data_pool(p);
 
-    check_pool_size(packet_pool,data);
-
     if (likely(data)) {
+         check_data_pool_size(packet_pool);
         ++packet_pool.pdcount;
         p->set_next(packet_pool.pd);
         packet_pool.pd = p;
         assert(packet_pool.pdcount <= CLICK_PACKET_POOL_SIZE);
     } else {
         p->~WritablePacket();
+         check_packet_pool_size(packet_pool);
         ++packet_pool.pcount;
         p->set_next(packet_pool.p);
         packet_pool.p = p;
@@ -564,32 +573,32 @@ WritablePacket::recycle(WritablePacket *p)
 #  if HAVE_BATCH
 /**
  * @Precond : _use_count == 1 for all packets
- * @Precond : All packet are data packet from the pool, or not (have or have not _data_packet, _destructor, _head)
  */
 void
-WritablePacket::recycle_batch(PacketBatch *batch)
+WritablePacket::recycle_packet_batch(PacketBatch *p_batch)
 {
     PacketPool& packet_pool = *make_local_packet_pool();
 
-    bool data = is_from_data_pool(batch);
-
-    if (unlikely(!data)) {
-        FOR_EACH_PACKET_SAFE(batch,p) {
-        	((WritablePacket*)p)->~WritablePacket();
-        }
+    FOR_EACH_PACKET_SAFE(p_batch,p) {
+        ((WritablePacket*)p)->~WritablePacket();
     }
+    check_data_pool_size(packet_pool);
+    packet_pool.pcount += p_batch->count();
+    p_batch->tail()->set_next(packet_pool.p);
+    packet_pool.p = p_batch;
+}
 
-    check_pool_size(packet_pool,data);
-
-    if (likely(data)) {
-        packet_pool.pdcount += batch->count();
-        batch->tail()->set_next(packet_pool.pd);
-        packet_pool.pd = batch;
-    } else {
-        packet_pool.pcount += batch->count();
-        batch->tail()->set_next(packet_pool.p);
-        packet_pool.p = batch;
-    }
+/**
+ * @Precond : _use_count == 1 for all packets
+ */
+void
+WritablePacket::recycle_data_batch(PacketBatch *pd_batch)
+{
+    PacketPool& packet_pool = *make_local_packet_pool();
+    check_packet_pool_size(packet_pool);
+    packet_pool.pdcount += pd_batch->count();
+    pd_batch->tail()->set_next(packet_pool.pd);
+    packet_pool.pd = pd_batch;
 }
 #  endif /* HAVE_BATCH */
 

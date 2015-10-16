@@ -934,11 +934,13 @@ class WritablePacket : public Packet { public:
     static WritablePacket *pool_allocate(uint32_t headroom, uint32_t length,
 					 uint32_t tailroom);
 
-    static void check_pool_size(PacketPool &packet_pool, bool data);
+    static void check_data_pool_size(PacketPool &packet_pool);
+    static void check_packet_pool_size(PacketPool &packet_pool);
     static bool is_from_data_pool(WritablePacket *p);
     static void recycle(WritablePacket *p);
 # if HAVE_BATCH
-    static void recycle_batch(PacketBatch *batch);
+    static void recycle_packet_batch(PacketBatch *p_batch);
+    static void recycle_data_batch(PacketBatch *pd_batch);
 # endif
 #endif
 
@@ -1172,7 +1174,7 @@ public :
 	/**
 	 * Kill all packets of batch of unshared packets. Using this on unshared packets is very dangerous !
 	 */
-	inline void safe_kill();
+	inline void safe_kill(bool is_data);
 #endif
 };
 
@@ -2990,12 +2992,15 @@ inline void PacketBatch::kill() {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 /**
  * Recycle a whole batch of unshared packets
- * Warning ! If batching is enabled, must ensure the precond at all cost !
  *
- * @precond If have batching, no packets can be shared (hey must be plain packet with their own data, or all be packet without data)
+ * @precond No packet are shared
  */
-inline void PacketBatch::safe_kill() {
-    WritablePacket::recycle_batch(this);
+inline void PacketBatch::safe_kill(bool is_data) {
+    if (is_data) {
+        WritablePacket::recycle_data_batch(this);
+    } else {
+        WritablePacket::recycle_packet_batch(this);
+    }
 }
 #endif
 
