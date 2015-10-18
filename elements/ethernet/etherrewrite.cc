@@ -45,8 +45,11 @@ EtherRewrite::configure(Vector<String> &conf, ErrorHandler *errh)
 inline Packet *
 EtherRewrite::smaction(Packet *p)
 {
-	memcpy(p->mac_header(), &_ethh, 12);
-	return p;
+    WritablePacket* q = p->uniqueify();
+    if (q) {
+        memcpy(q->mac_header(), &_ethh, 12);
+    }
+    return q;
 }
 
 

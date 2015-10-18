@@ -12,7 +12,7 @@ CLICK_DECLS
  * =d
  * Releases the spinlock named LOCK. LOCK must be defined in a SpinlockInfo
  * element.
- * =a SpinlockInfo, SpinlockAcquire
+ * =a SpinlockInfo, SpinlockAcquire, SpinlockPush
  */
 
 class SpinlockRelease : public Element { public:
