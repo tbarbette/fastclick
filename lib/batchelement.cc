@@ -172,7 +172,7 @@ void BatchElement::upgrade_ports() {
 void BatchElement::check_unbatch() {
 	for (int i = 0; i < noutputs(); i++) {
 		if (output_is_push(i) && !output(i).output_supports_batch) {
-			click_chatter("Warning ! %s->%s is not compatible with batch. Packets will be unbatched and that will reduce performances.",output(i).element()->name().c_str(),name().c_str());
+			click_chatter("Warning ! %s->%s is not compatible with batch. Packets will be unbatched and that will reduce performances.",name().c_str(),output(i).element()->name().c_str());
 			BatchPort* port = &(static_cast<BatchElement::BatchPort*>(_ports[1])[i]);
 			PushToPushBatchVisitor v(&port[i].downstream_batches);
 			router()->visit(this,1,i,&v);

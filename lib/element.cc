@@ -1681,10 +1681,12 @@ public:
 };
 
 bool Element::get_runnable_threads(Bitvector& bmp) {
+    unsigned int thisthread = router()->home_thread_id(this);
     if (input_is_push(0) && output_is_pull(0)) { //Push to pull
-        unsigned int thisthread = router()->home_thread_id(this);
         bmp[thisthread] = 1;
         return false;
+    } else if (ninputs() == 0 && noutputs() > 0 && output_is_push(0)) { //Task which outputs something
+        bmp[thisthread] = 1;
     }
     return true;
 }

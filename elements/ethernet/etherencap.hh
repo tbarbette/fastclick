@@ -45,7 +45,7 @@ Return or set the ETHERTYPE parameter.
 
 =a
 
-EtherVLANEncap, ARPQuerier, EnsureEther, StoreEtherAddress */
+EtherVLANEncap, ARPQuerier, EnsureEther, StoreEtherAddress, EtherRewrite */
 
 
 class EtherEncap : public BatchElement { public:
