@@ -81,7 +81,7 @@ Bitvector StaticThreadSched::assigned_thread() {
         if (_thread_preferences[i] != THREAD_UNKNOWN) {
             if (v.size() <= _thread_preferences[i])
                 v.resize(_thread_preferences[i]+1);
-            v[_thread_preferences[i]] = i;
+            v[_thread_preferences[i]] = true;
         }
     }
     return v;
