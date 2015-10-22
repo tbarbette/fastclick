@@ -106,7 +106,7 @@ int NetmapDevice::initialize() {
 			struct nm_desc child_nmd = *nmd; //Copy mem, arg2, ...
 			child_nmd.self = &child_nmd;
 			child_nmd.req.nr_flags = NR_REG_ONE_NIC;
-			child_nmd.req.nr_ringid =  i| NETMAP_NO_TX_POLL;
+			child_nmd.req.nr_ringid =  i | NETMAP_NO_TX_POLL;
 
 			int flags =NM_OPEN_IFNAME | NM_OPEN_NO_MMAP;
 

@@ -406,6 +406,7 @@ WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_r
     p->initialize();
     slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
     p->set_buffer(data,rxring->nr_buf_size,slot->len);
+    slot->flags = NS_BUF_CHANGED;
     return p;
 }
 
@@ -446,7 +447,7 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
 
         slot->buf_idx = NETMAP_BUF_IDX(rxring,last->buffer());
 
-        slot->flags |= NS_BUF_CHANGED;
+        slot->flags = NS_BUF_CHANGED;
 
         next = last->next(); //Correct only if count != 0
         last->initialize();

@@ -43,8 +43,9 @@ CLICK_DECLS
  *
  * =item THREADOFFSET
  *
- * Specify which Click thread will handle this element. If multiple
- *  j threads are used, threads with id THREADOFFSET+j will be used. Default is
+ * Define a number of assignable threads to ignore and do not use. Assignable
+ * threads are the one on the same numa node than this device (if NUMA is true)
+ *  and not assigned to other elements using StaticThreadSched. Default is
  *  to share the threads available on the device's NUMA node equally.
  *
  * =item MAXQUEUES

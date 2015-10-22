@@ -799,8 +799,10 @@ class Packet { public:
 
 #if !(CLICK_LINUXMODULE || CLICK_DPDK_POOLS)
     // User-space and BSD kernel module implementations.
+protected:
     atomic_uint32_t _use_count;
     Packet *_data_packet;
+private:
     /* mimic Linux sk_buff */
     unsigned char *_head; /* start of allocated buffer */
     unsigned char *_data; /* where the packet starts */
@@ -844,6 +846,7 @@ class Packet { public:
     WritablePacket *expensive_put(uint32_t nbytes) CLICK_WARN_UNUSED_RESULT;
 
     friend class WritablePacket;
+    friend class PacketBatch;
 
 };
 
@@ -1175,6 +1178,8 @@ public :
 	 * Kill all packets of batch of unshared packets. Using this on unshared packets is very dangerous !
 	 */
 	inline void safe_kill(bool is_data);
+
+	inline void safe_kill();
 #endif
 };
 
@@ -3001,6 +3006,66 @@ inline void PacketBatch::safe_kill(bool is_data) {
     } else {
         WritablePacket::recycle_packet_batch(this);
     }
+}
+
+#define BATCH_RECYCLE_START() \
+			WritablePacket* head_packet = NULL;\
+			WritablePacket* head_data = NULL;\
+			WritablePacket* last_packet = NULL;\
+			WritablePacket* last_data = NULL;\
+			unsigned int n_packet = 0;\
+			unsigned int n_data = 0;
+
+#define BATCH_RECYCLE_END() \
+		if (last_packet) {\
+			last_packet->set_next(0);\
+			PacketBatch::make_from_simple_list(head_packet,last_packet,n_packet)->safe_kill(false);\
+		}\
+		if (last_data) {\
+			last_data->set_next(0);\
+			PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);\
+		}
+
+#define BATCH_RECYCLE_PACKET(p) {\
+        if (head_packet == NULL) {\
+            head_packet = p;\
+            last_packet = p;\
+        } else {\
+            last_packet->set_next(p);\
+            last_packet = p;\
+        }\
+        n_packet++;}
+
+#define BATCH_RECYCLE_DATA_PACKET(p) {\
+	if (head_data == NULL) {\
+		head_data = p;\
+		last_data = p;\
+	} else {\
+		last_data->set_next(p);\
+		last_data = p;\
+	}\
+	n_data++;}
+
+/**
+ * Recycle a whole batch of packets
+ */
+inline void PacketBatch::safe_kill() {
+	click_chatter("Need testing... Use batch->kill();");
+	assert(false);
+    BATCH_RECYCLE_START();
+    FOR_EACH_PACKET_SAFE(this,up) {
+        WritablePacket* p = static_cast<WritablePacket*>(up);
+		if (p->shared()) {
+			p->kill();
+		} else {
+			if (p->data_packet() == 0 && p->buffer_destructor() == 0) {
+				BATCH_RECYCLE_DATA_PACKET(p);
+			} else {
+				BATCH_RECYCLE_PACKET(p);
+			}
+		}
+    }
+    BATCH_RECYCLE_END();
 }
 #endif
 

@@ -115,9 +115,14 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     return 0;
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
+
+    if (router()->thread_sched() && router()->thread_sched()->initial_home_thread_id(this) != ThreadSched::THREAD_UNKNOWN) {
+        return errh->error("Configuration of %s has to be done using THREADOFFSET parameter instead of StaticThreadSched as this element can use multiple threads.",class_name());
+    };
+
 #if HAVE_NUMA
 	NumaCpuBitmask b = NumaCpuBitmask::allocate();
-    if (numa_available()==0) {
+    if (numa_available()==0 && _numa) {
         if (_this_node >= 0) {
             b = Numa::node_to_cpus(_this_node);
         } else
@@ -175,9 +180,12 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
            shared_offset[_this_node] += n_threads;
        }
 
-       if (thread_share > 1)
+       if (thread_share > 1) {
+           if (_threadoffset != -1) {
+               errh->warning("Thread offset %d will be ignored because the numa node has not enough cores.",_threadoffset);
+           }
            _threadoffset = _threadoffset % (inputs_count[_this_node] / thread_share);
-       else
+       } else
            if (n_threads + _threadoffset > master()->nthreads())
                _threadoffset = master()->nthreads() - n_threads;
 
@@ -188,8 +196,6 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
        queue_per_threads = nqueues / n_threads;
 
        if (queue_per_threads * n_threads < nqueues) queue_per_threads ++;
-
-       click_chatter("%s : INPUT Using thread %d to %d. %d queues per thread",name().c_str(),_threadoffset,_threadoffset + n_threads - 1,queue_per_threads);
 
        int count = 0;
        int offset = 0;
@@ -207,7 +213,6 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
                }
            }
        }
-
 
        if (count < n_threads) {
            return errh->error("Node has not enough threads for device !");

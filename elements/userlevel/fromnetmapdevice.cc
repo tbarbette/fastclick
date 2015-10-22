@@ -50,7 +50,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	int threadoffset = -1;
 	int maxthreads = -1;
 	int maxqueues = 128;
-	bool numa = true;
+	bool numa = _numa;
 	int thisnode = 0;
 
     if (Args(conf, this, errh)
@@ -70,9 +70,14 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
     	return -1;
     }
+    _numa = false;
 #else
+    _numa = numa;
+    if (numa) {
     const char* device = ifname.c_str();
     thisnode = Numa::get_device_node(&device[7]);
+    } else
+        thisnode = 0;
 #endif
 
     _device = NetmapDevice::open(ifname);
@@ -198,23 +203,30 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 					unsigned char* data = (unsigned char*)NETMAP_BUF(rxring, slot->buf_idx);
 					WritablePacket *p;
 			#if HAVE_NETMAP_PACKET_POOL
+					if (slot->flags & NS_MOREFRAG) {
+						click_chatter("Packets bigger than Netmap buffer size are not supported while compiled with Netmap Packet Pool. Please disable this feature.");
+						assert(false);
+					}
 					__builtin_prefetch(data);
 					p = WritablePacket::make_netmap(data, rxring, slot);
 					if (unlikely(p == NULL)) goto error;
 			#else
                 #if HAVE_ZEROCOPY
-                    if (slot->len > 64) {
+                    if (slot->len > 64 && !(slot->flags & NS_MOREFRAG)) {
                         __builtin_prefetch(data);
                         p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
                         if (!p) goto error;
                         slot->buf_idx = NetmapBufQ::get_local_pool()->extract();
-
+                        slot->flags = NS_BUF_CHANGED;
                     } else
                 #endif
                     {
-
-                            p = Packet::make(data, slot->len);
-                            if (!p) goto error;
+                            if (slot->flags & NS_MOREFRAG) {
+                                click_chatter("Packets bigger than Netmap buffer size are not supported for now. Please set MTU lower and disable features like LRO and GRO.");
+                                assert(false);
+                            }
+                        p = Packet::make(data, slot->len);
+                        if (!p) goto error;
                     }
             #endif
 				p->set_packet_type_anno(Packet::HOST);
@@ -230,8 +242,6 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 					p->set_timestamp_anno(ts);
 					output(0).push(p);
     #endif
-					slot->flags |= NS_BUF_CHANGED;
-
 					cur = nm_ring_next(rxring, cur);
 					n--;
 				}
@@ -253,7 +263,6 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 
 	if (nr_pending > _burst) { //TODO size/4
 	    if (fromtask) {
-
 	            task->fast_reschedule();
 	    } else {
 

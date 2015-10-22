@@ -330,12 +330,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 
 	unsigned int sent = 0;
 #if HAVE_BATCH
-	    WritablePacket* head_packet = NULL;
-	    WritablePacket* head_data = NULL;
-		WritablePacket* last_packet = NULL;
-		WritablePacket* last_data = NULL;
-		unsigned int n_packet = 0;
-		unsigned int n_data = 0;
+	    BATCH_RECYCLE_START();
 #endif
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
@@ -425,25 +420,11 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 					head = next;
 				}
 			} else {
-			    if (!is_data) {
-			        if (head_packet == NULL) {
-			            head_packet = p;
-			            last_packet = p;
-			        } else {
-			            last_packet->set_next(p);
-			            last_packet = p;
-			        }
-			        n_packet++;
-			    } else {
-			        if (head_data == NULL) {
-                        head_data = p;
-                        last_data = p;
-                    } else {
-                        last_data->set_next(p);
-                        last_data = p;
-                    }
-			        n_data++;
-			    }
+				if (is_data) {
+					BATCH_RECYCLE_DATA_PACKET(p);
+				} else {
+					BATCH_RECYCLE_PACKET(p);
+				}
 			}
 #else
 			//If no batch or no packet pool, don't bother recycling per-batch
@@ -466,14 +447,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 		return 0;
 	} else {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-	    if (last_packet) {
-	        last_packet->set_next(0);
-	        PacketBatch::make_from_simple_list(head_packet,last_packet,n_packet)->safe_kill(false);
-	    }
-	    if (last_data) {
-	        last_data->set_next(0);
-	        PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);
-	    }
+	    BATCH_RECYCLE_END();
 #endif
 		add_count(sent);
 		head = next;
