@@ -700,7 +700,7 @@ Packet::make(uint32_t headroom, const void *data,
 		} else
 		return 0;
 #elif CLICK_DPDK_POOLS
-    struct rte_mbuf *mb = rte_pktmbuf_alloc(DpdkDevice::get_mpool(rte_socket_id()));
+    struct rte_mbuf *mb = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));
     if (!mb) {
         click_chatter("could not alloc pktmbuf");
         return 0;
@@ -797,7 +797,7 @@ Packet::clone()
     
 #elif CLICK_DPDK_POOLS
     Packet* p = reinterpret_cast<Packet *>(
-        rte_pktmbuf_clone(mb(), DpdkDevice::get_mpool(rte_socket_id())));
+        rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
     p->copy_annotations(this,true);
     p->shift_header_annotations(buffer(), 0);
     click_chatter("Clone %p %p",this->mb(),p->mb());
@@ -927,7 +927,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 
 #elif CLICK_DPDK_POOLS /* !CLICK_LINUXMODULE */
     struct rte_mbuf *mb = this->mb();
-    struct rte_mbuf *nmb = rte_pktmbuf_alloc(DpdkDevice::get_mpool(rte_socket_id()));
+    struct rte_mbuf *nmb = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));
     click_chatter("Expensive uniqueify %p %p, exh = %d, ext = %d",mb,nmb,extra_headroom,extra_tailroom);
     if (!nmb) {
         click_chatter("cannot allocate new pktmbuf");

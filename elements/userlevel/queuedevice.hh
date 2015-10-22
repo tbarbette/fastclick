@@ -34,7 +34,7 @@ protected:
     int queue_per_threads;
     int queue_share;
     int ndesc;
-
+    bool _numa;
 private :
     int _maxthreads;
     int _minqueues;
