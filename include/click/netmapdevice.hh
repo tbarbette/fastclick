@@ -153,7 +153,7 @@ class NetmapBufQ {
 
     inline uint32_t extract() {
 
-        if (_count <= 0) {
+        if (_count == 0) {
             expand(1024);
             if (_count == 0) return 0;
         }
