@@ -80,6 +80,7 @@ Middlebox::processPacket(Packet* packet_in)
     click_tcp *tcph = packet->tcp_header();
 
     increasePacketsSeen();
+    click_chatter("Packet length: %u", packet_in->length());
 
     // Check if the packet is a TCP packet
     if(!packet->has_network_header() || iph->ip_p != IP_PROTO_TCP)
@@ -93,7 +94,8 @@ Middlebox::processPacket(Packet* packet_in)
     updateSeqNumbers(packet, !isLinked());
 
     // Process payload
-    processContent(packet, tcp_payload, payload_length);
+	if(payload_length > 0)
+    	processContent(packet, tcp_payload, payload_length);
 
     // Recompute checksum
     setChecksum(packet);
@@ -107,7 +109,7 @@ Middlebox::processContent(WritablePacket* packet, unsigned char* content, uint32
     char *source;
     if(strstr((char*)content, "200 OK") != NULL)
     {
-        click_chatter("Web response detected");
+        click_chatter("Web page detected");
         source = strstr((char*)content, "\r\n\r\n");
         header_processed = true;
     }
@@ -124,27 +126,16 @@ Middlebox::processContent(WritablePacket* packet, unsigned char* content, uint32
     {
         char *c = (char *)&(source[i]);
 
-        // Lower case
-        if ((*c >= 65) && (*c <= 90))
-            *c = *c + 32; 
-
-        // Change azerty input to qwerty
-        switch(*c)
-        {
-            case 'a':
-                *c = 'q';
-            break;
-            case 'z':
-                *c = 'w';
-            break;
-            case ',':
-                *c = 'm';
-            break;
-            case 'm':
-                *c = ';';
-            break;
-        }
+		if(*c == 'a' || *c == 'A')
+		{
+			memmove(&source[i], &source[i + 1], source_length - i);
+			source_length--;
+			updatePayloadSize(packet, -1);
+			packet->take(1);
+			getFlowMaintainer()->seq_offset_other = getFlowMaintainer()->seq_offset_other + 1;
+		}
     }
+
 }
 
 void Middlebox::setChecksum(WritablePacket* packet)
@@ -156,6 +147,9 @@ void Middlebox::setChecksum(WritablePacket* packet)
     tcph->th_sum = 0;
     unsigned csum = click_in_cksum((unsigned char *)tcph, plen);
     tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
+	unsigned hlen = iph->ip_hl << 2;
+	iph->ip_sum = 0;
+	iph->ip_sum = click_in_cksum((const unsigned char *)iph, hlen);
 }
 
 bool Middlebox::isLinked()
@@ -200,7 +194,7 @@ void Middlebox::updateSeqNumbers(WritablePacket *packet, bool from_initiator)
     }
 
     tcph->th_seq = htonl(ntohl(tcph->th_seq) - offsetSeq);
-    tcph->th_ack = htonl(ntohl(tcph->th_ack) + offsetAck);
+	tcph->th_ack = htonl(ntohl(tcph->th_ack) + offsetAck);
 }
 
 void Middlebox::updatePayloadSize(WritablePacket* packet, uint32_t offset)
