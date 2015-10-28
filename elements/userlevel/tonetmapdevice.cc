@@ -382,7 +382,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 				slot->len = p->length();
 				if (slot->ptr) {
 					//click_chatter("Free %lu",slot->ptr);
-					//reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
+					reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
 				}
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				slot->flags |= NS_BUF_CHANGED;
