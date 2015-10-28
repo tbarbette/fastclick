@@ -152,6 +152,9 @@ protected:
     		}
     		return true;
     	} else { //TX
+    		if (input_is_pull(0)) {
+    			bmk[router()->home_thread_id(this)] = 1;
+    		}
     		return true;
     	}
     }
