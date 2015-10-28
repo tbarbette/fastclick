@@ -233,6 +233,8 @@ class FromDump : public Element { public:
     unsigned _sampling_prob;
     int _minor_version;
     int _linktype;
+    long _preload;
+    Packet* _preload_head;
 
     Timestamp _first_time;
     Timestamp _last_time;
