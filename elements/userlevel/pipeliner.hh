@@ -45,9 +45,8 @@ public:
 
 #if HAVE_BATCH
     void push_batch(int,PacketBatch*);
-#else
-    void push(int,Packet*);
 #endif
+    void push(int,Packet*);
 
     bool run_task(Task *);
 
@@ -68,22 +67,8 @@ public:
     int _ring_size;
     bool _block;
 
-#if PIPELINE_IS_DYNAMIC
-#if HAVE_BATCH
-    #define PIPELINE_RING_SIZE 16
-    typedef Ring<PacketBatch*,PIPELINE_RING_SIZE> PacketRing;
-#else
-    #define PIPELINE_RING_SIZE 1024
-    typedef Ring<Packet*,PIPELINE_RING_SIZE> PacketRing;
-#endif
-#else
-#define PIPELINE_RING_SIZE _ring_size
-#if HAVE_BATCH
-    typedef DynamicRing<PacketBatch*> PacketRing;
-#else
     typedef DynamicRing<Packet*> PacketRing;
-#endif
-#endif
+
     per_thread_compressed<PacketRing> storage;
     struct stats {
         stats() : dropped(0) {
