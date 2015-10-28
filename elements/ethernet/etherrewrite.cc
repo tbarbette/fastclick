@@ -54,12 +54,12 @@ EtherRewrite::smaction(Packet *p)
 
 
 #if HAVE_BATCH
-    void EtherRewrite::push_batch(int, PacketBatch * batch) {
-        FOR_EACH_PACKET(batch,p) {
-            smaction(p);
-        }
+    PacketBatch* EtherRewrite::simple_action_batch(PacketBatch * batch) {
+        EXECUTE_FOR_EACH_PACKET(smaction,batch);
+        return batch;
     }
 #endif
+
 void
 EtherRewrite::push(int, Packet *p)
 {

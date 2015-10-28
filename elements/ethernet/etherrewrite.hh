@@ -62,8 +62,9 @@ class EtherRewrite : public BatchElement { public:
     Packet *pull(int);
 
 #if HAVE_BATCH
-    void push_batch(int, PacketBatch *);
+    PacketBatch* simple_action_batch(PacketBatch *);
 #endif
+
     void push(int, Packet *);
 
   private:
