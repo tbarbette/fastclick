@@ -83,8 +83,9 @@ class Packet { public:
     inline void safe_kill();
 
     inline bool shared() const;
-    Packet *clone() CLICK_WARN_UNUSED_RESULT;
+    Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
+    inline void get() {_use_count++;};
 
     inline const unsigned char *data() const;
     inline const unsigned char *end_data() const;
@@ -959,12 +960,64 @@ class WritablePacket : public Packet { public:
                 Packet* p = batch;\
                 for (;p != NULL;p=next,next=(p==0?0:p->next()))
 
+/**
+ * Cannot drop ! Use _DROPPABLE version if it could
+ */
+#define EXECUTE_FOR_EACH_PACKET(fnt,batch) \
+                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* p = batch;\
+                Packet* last = NULL;\
+                for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
+			Packet* q = fnt(p);\
+					if (q != p) {\
+						if (last) {\
+							last->set_next(q);\
+						} else {\
+							batch = static_cast<PacketBatch*>(q);\
+						}\
+						q->set_next(next);\
+					}\
+					last = q;\
+				}
+
+#define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
+                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* p = batch;\
+                Packet* last = NULL;\
+                int count = batch->count();\
+                for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
+			Packet* q = fnt(p);\
+			if (q == 0) {\
+				on_drop(p);\
+				if (last) {\
+					last->set_next(next);\
+				} else {\
+					batch = PacketBatch::start_head(next);\
+				}\
+						count--;\
+						continue;\
+			} else if (q != p) {\
+						if (last) {\
+							last->set_next(q);\
+						} else {\
+							batch = static_cast<PacketBatch*>(q);\
+						}\
+						q->set_next(next);\
+					}\
+					last = q;\
+				}\
+				if (batch) {\
+					batch->set_count(count);\
+					batch->set_tail(last);\
+				}\
+			}\
+
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
         Packet* last = head;\
         if (head != NULL) {\
             unsigned int count = 1;\
-            do {\
+            while (count < (max>0?max:BATCH_MAX_PULL)) {\
                 Packet* current = fnt;\
                 if (current == NULL)\
                     break;\
@@ -972,7 +1025,6 @@ class WritablePacket : public Packet { public:
                 last = current;\
                 count++;\
             }\
-            while (count < (max>0?max:BATCH_MAX_PULL));\
             head->make_tail(last,count);\
         } else head = NULL;\
 }
@@ -1023,21 +1075,8 @@ public :
 	 */
 	inline unsigned count() {
 		unsigned int r = BATCH_COUNT_ANNO(this);
-		if (r) {
-			return r;
-		} else {
-			click_chatter("BUG No batch count annotation...?");
-			Packet* p = this;
-			while (p != NULL && r) {
-				if (r == MAX_BATCH_SIZE) {
-					click_chatter("BUG Batch of maximum batch size !");
-					return r;
-				}
-				p = p->next();
-				r++;
-			}
-			return r;
-		}
+		assert(r); //If this is a batch, this anno has to be set
+		return r;
 	}
 
 	/**
@@ -2995,6 +3034,7 @@ inline void PacketBatch::kill() {
 }
 
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
+#define HAVE_BATCH_RECYCLE 1
 /**
  * Recycle a whole batch of unshared packets
  *
@@ -3009,32 +3049,22 @@ inline void PacketBatch::safe_kill(bool is_data) {
 }
 
 #define BATCH_RECYCLE_START() \
-			WritablePacket* head_packet = NULL;\
-			WritablePacket* head_data = NULL;\
-			WritablePacket* last_packet = NULL;\
-			WritablePacket* last_data = NULL;\
-			unsigned int n_packet = 0;\
-			unsigned int n_data = 0;
-
-#define BATCH_RECYCLE_END() \
-		if (last_packet) {\
-			last_packet->set_next(0);\
-			PacketBatch::make_from_simple_list(head_packet,last_packet,n_packet)->safe_kill(false);\
-		}\
-		if (last_data) {\
-			last_data->set_next(0);\
-			PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);\
-		}
+	WritablePacket* head_packet = NULL;\
+	WritablePacket* head_data = NULL;\
+	WritablePacket* last_packet = NULL;\
+	WritablePacket* last_data = NULL;\
+	unsigned int n_packet = 0;\
+	unsigned int n_data = 0;
 
 #define BATCH_RECYCLE_PACKET(p) {\
-        if (head_packet == NULL) {\
-            head_packet = p;\
-            last_packet = p;\
-        } else {\
-            last_packet->set_next(p);\
-            last_packet = p;\
-        }\
-        n_packet++;}
+	if (head_packet == NULL) {\
+		head_packet = p;\
+		last_packet = p;\
+	} else {\
+		last_packet->set_next(p);\
+		last_packet = p;\
+	}\
+	n_packet++;}
 
 #define BATCH_RECYCLE_DATA_PACKET(p) {\
 	if (head_data == NULL) {\
@@ -3045,6 +3075,16 @@ inline void PacketBatch::safe_kill(bool is_data) {
 		last_data = p;\
 	}\
 	n_data++;}
+
+#define BATCH_RECYCLE_END() \
+	if (last_packet) {\
+		last_packet->set_next(0);\
+		PacketBatch::make_from_simple_list(head_packet,last_packet,n_packet)->safe_kill(false);\
+	}\
+	if (last_data) {\
+		last_data->set_next(0);\
+		PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);\
+	}
 
 /**
  * Recycle a whole batch of packets

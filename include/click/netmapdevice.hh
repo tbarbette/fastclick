@@ -24,10 +24,10 @@ CLICK_DECLS
 
 /* a queue of netmap buffers, by index */
 class NetmapBufQ {
-    unsigned char *buf_start;   /* base address */
+    static unsigned char *buf_start;   /* base address */
     static unsigned int buf_size;
-    uint32_t max_index; /* error checking */
-    unsigned char *buf_end; /* error checking */
+    static uint32_t max_index; /* error checking */
+    static unsigned char *buf_end; /* error checking */
 
     uint32_t head;  /* index of first buffer */
     uint32_t tail;  /* index of last buffer */
@@ -211,7 +211,7 @@ class NetmapBufQ {
     static bool is_netmap_packet(Packet* p) {
 
 #if !HAVE_NETMAP_PACKET_POOL&&!CLICK_DPDK_POOLS
-        return (p->buffer_destructor() == buffer_destructor);
+        return (p->buffer() > buf_start && p->buffer() < buf_end);
 #else
         return false;
 #endif
