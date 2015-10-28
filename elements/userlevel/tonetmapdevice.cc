@@ -32,7 +32,6 @@ CLICK_DECLS
 
 ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(1),_internal_queue(512)
 {
-	in_batch_mode = BATCH_MODE_YES;
 }
 
 
@@ -75,6 +74,9 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (_burst > _device->some_nmd->some_ring->num_slots / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
+
+    if (ninputs() && input_is_pull(1))
+        in_batch_mode = BATCH_MODE_YES;
 
     return 0;
 }
