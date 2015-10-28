@@ -1,6 +1,6 @@
 #ifndef CLICK_AVERAGECOUNTER_HH
 #define CLICK_AVERAGECOUNTER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ewma.hh>
 #include <click/atomic.hh>
 #include <click/timer.hh>
@@ -40,7 +40,7 @@ CLICK_DECLS
  * Resets the count and rate to zero.
  */
 
-class AverageCounter : public Element { public:
+class AverageCounter : public BatchElement { public:
 
     AverageCounter() CLICK_COLD;
 
@@ -58,14 +58,17 @@ class AverageCounter : public Element { public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
     Packet *simple_action(Packet *);
 
   private:
 
-    atomic_uint32_t _count;
-    atomic_uint32_t _byte_count;
-    atomic_uint32_t _first;
-    atomic_uint32_t _last;
+    volatile uint32_t _count;
+    volatile uint32_t _byte_count;
+    volatile uint32_t _first;
+    volatile uint32_t _last;
     uint32_t _ignore;
 
 };

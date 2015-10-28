@@ -54,11 +54,30 @@ AverageCounter::initialize(ErrorHandler *)
   return 0;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+AverageCounter::simple_action_batch(PacketBatch *batch)
+{
+    uint32_t jpart = click_jiffies();
+    if (_first == 0)
+		_first = jpart;
+    FOR_EACH_PACKET(batch,p) {
+		if (jpart - _first >= _ignore) {
+		_count++;
+		_byte_count += p->length();
+		}
+    }
+    _last = jpart;
+    return batch;
+}
+#endif
+
 Packet *
 AverageCounter::simple_action(Packet *p)
 {
     uint32_t jpart = click_jiffies();
-    _first.compare_swap(0, jpart);
+    if (_first == 0)
+    	_first = jpart;
     if (jpart - _first >= _ignore) {
 	_count++;
 	_byte_count += p->length();
