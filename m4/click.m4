@@ -467,8 +467,8 @@ dnl
 
 AC_DEFUN([CLICK_CHECK_NUMA], [
     AC_ARG_WITH([numa],
-        [AS_HELP_STRING([--with-numa], [enable numa [no]])],
-        [use_numa=$withval], [use_numa=no])
+        [AS_HELP_STRING([--with-numa], [enable numa [yes]])],
+        [use_numa=$withval], [use_numa=yes])
 
     if test "$use_numa" != "yes" -a "$use_numa" != "no"; then
         if test "${NUMA_INCLUDES-NO}" != NO; then
@@ -479,21 +479,23 @@ AC_DEFUN([CLICK_CHECK_NUMA], [
     fi
 
     HAVE_NUMA=no
-        
-    AC_SEARCH_LIBS([numa_available], [numa], [ac_have_libnuma=yes], [ac_have_libnuma=no])
 
-    if test "$ac_have_libnuma" = yes; then
-        AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <nuda.h> header file.])
-        LDFLAGS="$LDFLAGS -Lnuma"
-    fi
-    
-    if test "$HAVE_NUMA" = yes; then
-        AC_CACHE_CHECK([whether numa.h works],
-            [ac_cv_working_numa_h], [
-            AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <numa.h>]])],
-                [ac_cv_working_numa_h=yes],
-                [ac_cv_working_numa_h=no])])
-        test "$ac_cv_working_numa_h" != yes && HAVE_NUMA=
+    if test "$use_numa" != "no"; then        
+        AC_SEARCH_LIBS([numa_available], [numa], [ac_have_libnuma=yes], [ac_have_libnuma=no])
+
+        if test "$ac_have_libnuma" = yes; then
+            AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <nuda.h> header file.])
+            LDFLAGS="$LDFLAGS -Lnuma"
+        fi
+        
+        if test "$HAVE_NUMA" = yes; then
+            AC_CACHE_CHECK([whether numa.h works],
+                [ac_cv_working_numa_h], [
+                AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <numa.h>]])],
+                    [ac_cv_working_numa_h=yes],
+                    [ac_cv_working_numa_h=no])])
+            test "$ac_cv_working_numa_h" != yes && HAVE_NUMA=
+        fi
     fi
 
     AC_SUBST(NUMA_INCLUDES)

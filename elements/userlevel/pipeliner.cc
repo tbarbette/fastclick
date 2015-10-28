@@ -16,14 +16,8 @@ CLICK_DECLS
 //#define PS_BATCH_SIZE 1024
 
 Pipeliner::Pipeliner()
-    :   sleepiness(0),out_id(0),_task(NULL),last_start(0),_block(false) {
-#if PIPELINE_IS_DYNAMIC
-#  if HAVE_BATCH
-	_ring_size = 16;
-#  else
-	_ring_size = 1024;
-#  endif
-#endif
+    :   sleepiness(0),_ring_size(-1),out_id(0),_task(NULL),last_start(0),_block(false) {
+	in_batch_mode = BATCH_MODE_YES;
 }
 
 Pipeliner::~Pipeliner()
@@ -42,13 +36,12 @@ Pipeliner::get_runnable_threads(Bitvector& b) {
 
 void Pipeliner::cleanup(CleanupStage) {
     for (unsigned i = 0; i < storage.size(); i++) {
-#if HAVE_BATCH
-        PacketBatch* p;
-#else
-        Packet* p;
-#endif
+    	Packet* p;
         while ((p = storage.get_value(i).extract()) != 0) {
-            p->kill();
+        	if (receives_batch == 1)
+        		static_cast<PacketBatch*>(p)->kill();
+        	else
+        		p->kill();
         }
     }
 }
@@ -60,7 +53,7 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
 {
 
     if (Args(conf, this, errh)
-    .read_p("QUEUE", _ring_size)
+    .read_p("SIZE", _ring_size)
 	.read_p("BLOCK", _block)
     .complete() < 0)
         return -1;
@@ -76,6 +69,17 @@ Pipeliner::initialize(ErrorHandler *errh)
     storage.compress(v);
     stats.compress(v);
     out_id = router()->home_thread_id(this);
+
+    if (_ring_size == -1) {
+	#  if HAVE_BATCH
+		if (receives_batch) {
+		_ring_size = 16;
+		} else
+	#  endif
+		{
+			_ring_size = 1024;
+		}
+    }
 
     for (int i = 0; i < storage.size(); i++) {
         storage.get_value(i).initialize(_ring_size);
@@ -96,11 +100,10 @@ Pipeliner::initialize(ErrorHandler *errh)
 }
 
 #if HAVE_BATCH
-#define SLEEPINESS_THRESHOLD 4
 void Pipeliner::push_batch(int,PacketBatch* head) {
 	retry:
     if (storage->insert(head)) {
-        if (sleepiness >= SLEEPINESS_THRESHOLD)
+        if (sleepiness >= 4)
                     _task->reschedule();
     } else {
         //click_chatter("Drop!");
@@ -109,28 +112,27 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
         head->kill();
     }
 }
-#else
-#define SLEEPINESS_THRESHOLD 128
+#endif
+
 void Pipeliner::push(int,Packet* p) {
 	retry:
     if (storage->insert(p)) {
 
     } else {
         if (_block) {
-            if (sleepiness >= SLEEPINESS_THRESHOLD)
+            if (sleepiness >= 128)
                 _task->reschedule();
             goto retry;
         }
         p->kill();
         stats->dropped++;
 		if (stats->dropped % 100 == 1)
-			click_chatter("%s : Dropped %d packets : have %d packets", name().c_str(), stats->dropped, storage->count());
+			click_chatter("%s : Dropped %d packets : have %d packets in ring", name().c_str(), stats->dropped, storage->count());
     }
-    if (sleepiness >= SLEEPINESS_THRESHOLD)
+    if (sleepiness >= 128)
         _task->reschedule();
 }
 
-#endif
 #define HINT_THRESHOLD 32
 bool
 Pipeliner::run_task(Task* t)
@@ -144,18 +146,29 @@ Pipeliner::run_task(Task* t)
         uint32_t tail = storage.get_value(i).tail;
         while (head != tail) {
 #if HAVE_BATCH
-            PacketBatch* b = storage.get_value(i).ring[tail % PIPELINE_RING_SIZE];
-            //pool_hint(b->count(),storage.get_mapping(i));
-            if (out == NULL) {
-                out = b;
+            PacketBatch* b = static_cast<PacketBatch*>(storage.get_value(i).ring[tail % _ring_size]);
+            if (unlikely(!receives_batch)) {
+            	if (out == NULL) {
+            		b->set_tail(b);
+            		b->set_count(1);
+            		out = b;
+            	} else {
+            		out->append_packet(b);
+            	}
             } else {
-                out->append_batch(b);
+            	if (out == NULL) {
+					out = b;
+				} else {
+					out->append_batch(b);
+				}
             }
+            //pool_hint(b->count(),storage.get_mapping(i));
+
             //click_chatter("Read %d[%d]",storage.get_mapping(i),tail % PIPELINE_RING_SIZE);
 #else
             (void)out;
             //click_chatter("Read %d[%d]",storage.get_mapping(i),tail % PIPELINE_RING_SIZE);
-            Packet* p = storage.get_value(i).ring[tail % PIPELINE_RING_SIZE];
+            Packet* p = storage.get_value(i).ring[tail % _ring_size];
             output(0).push(p);
 
             if (unlikely(tail % HINT_THRESHOLD == 0)) {
@@ -181,7 +194,7 @@ Pipeliner::run_task(Task* t)
     }
     if (!r) {
         sleepiness++;
-        if (sleepiness < SLEEPINESS_THRESHOLD) {
+        if (sleepiness < (receives_batch?4:128)) {
             t->fast_reschedule();
         }
     } else {

@@ -45,18 +45,21 @@ EtherRewrite::configure(Vector<String> &conf, ErrorHandler *errh)
 inline Packet *
 EtherRewrite::smaction(Packet *p)
 {
-	memcpy(p->mac_header(), &_ethh, 12);
-	return p;
+    WritablePacket* q = p->uniqueify();
+    if (q) {
+        memcpy(q->mac_header(), &_ethh, 12);
+    }
+    return q;
 }
 
 
 #if HAVE_BATCH
-    void EtherRewrite::push_batch(int, PacketBatch * batch) {
-        FOR_EACH_PACKET(batch,p) {
-            smaction(p);
-        }
+    PacketBatch* EtherRewrite::simple_action_batch(PacketBatch * batch) {
+        EXECUTE_FOR_EACH_PACKET(smaction,batch);
+        return batch;
     }
 #endif
+
 void
 EtherRewrite::push(int, Packet *p)
 {

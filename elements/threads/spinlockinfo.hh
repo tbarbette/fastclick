@@ -16,7 +16,7 @@ CLICK_DECLS
  * Lets you use mnemonic names for spinlocks. Each name names a spinlock that
  * the SpinlockAcquire and SpinlockRelease elements can use to reference a
  * spinlock.
- * =a SpinlockAcquire, SpinlockRelease
+ * =a SpinlockAcquire, SpinlockRelease, SpinlockPush
  */
 
 class SpinlockInfo : public Element { public:

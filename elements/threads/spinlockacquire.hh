@@ -12,7 +12,7 @@ CLICK_DECLS
  * =d
  * Acquires the spinlock named LOCK. LOCK must be defined in a SpinlockInfo
  * element.
- * =a SpinlockInfo, SpinlockRelease
+ * =a SpinlockInfo, SpinlockRelease, SpinlockPush
  */
 
 class SpinlockAcquire : public Element { public:

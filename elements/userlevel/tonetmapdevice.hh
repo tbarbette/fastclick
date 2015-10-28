@@ -103,7 +103,7 @@ public:
 
     unsigned int _internal_queue;
 
-    unsigned int send_packets(Packet* &packet, bool push, bool ask_sync=false);
+    unsigned int send_packets(Packet* &packet, bool ask_sync=false);
 
     NetmapDevice* _device;
 

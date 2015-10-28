@@ -406,6 +406,7 @@ WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_r
     p->initialize();
     slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
     p->set_buffer(data,rxring->nr_buf_size,slot->len);
+    slot->flags = NS_BUF_CHANGED;
     return p;
 }
 
@@ -446,7 +447,7 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
 
         slot->buf_idx = NETMAP_BUF_IDX(rxring,last->buffer());
 
-        slot->flags |= NS_BUF_CHANGED;
+        slot->flags = NS_BUF_CHANGED;
 
         next = last->next(); //Correct only if count != 0
         last->initialize();
@@ -485,7 +486,6 @@ WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
         if (!global_packet_pool.pbatch.insert(packet_pool.p)) { //Si le nombre de batch est au max -> delete
             while (WritablePacket *p = packet_pool.p) { //On supprime le batch
                 packet_pool.p = static_cast<WritablePacket *>(p->next());
-                click_chatter("Deleting packets... Configure better!");
                 ::operator delete((void *) p);
             }
         }
@@ -506,12 +506,10 @@ inline void
 WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
 #  if HAVE_MULTITHREAD
     if (unlikely(packet_pool.pd && packet_pool.pdcount >= CLICK_PACKET_POOL_SIZE)) {
-        click_chatter("Too much pd, putting in global data pool");
         packet_pool.pd->set_anno_u32(0, packet_pool.pdcount);
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
                 packet_pool.pd = static_cast<WritablePacket *>(pd->next());
-                click_chatter("Deleting packets data... Configure better!");
                 ::operator delete((void *) pd);
             }
         }
@@ -582,7 +580,7 @@ WritablePacket::recycle_packet_batch(PacketBatch *p_batch)
     FOR_EACH_PACKET_SAFE(p_batch,p) {
         ((WritablePacket*)p)->~WritablePacket();
     }
-    check_data_pool_size(packet_pool);
+    check_packet_pool_size(packet_pool);
     packet_pool.pcount += p_batch->count();
     p_batch->tail()->set_next(packet_pool.p);
     packet_pool.p = p_batch;
@@ -595,7 +593,7 @@ void
 WritablePacket::recycle_data_batch(PacketBatch *pd_batch)
 {
     PacketPool& packet_pool = *make_local_packet_pool();
-    check_packet_pool_size(packet_pool);
+    check_data_pool_size(packet_pool);
     packet_pool.pdcount += pd_batch->count();
     pd_batch->tail()->set_next(packet_pool.pd);
     packet_pool.pd = pd_batch;
@@ -700,7 +698,7 @@ Packet::make(uint32_t headroom, const void *data,
 		} else
 		return 0;
 #elif CLICK_DPDK_POOLS
-    struct rte_mbuf *mb = rte_pktmbuf_alloc(DpdkDevice::get_mpool(rte_socket_id()));
+    struct rte_mbuf *mb = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));
     if (!mb) {
         click_chatter("could not alloc pktmbuf");
         return 0;
@@ -778,18 +776,27 @@ assert(false); //TODO
 #endif
 }
 
+void emtpy_destructor(unsigned char *, size_t, void *) {
+
+}
+
 //
 // UNIQUEIFICATION
 //
 
 /** @brief Create a clone of this packet.
+ * @arg fast The new clone won't be a shared packet and we won't update the
+ * reference count of this packet. The buffer won't be freed in any way and an
+ * empty destructor will be set. It is usefull if you won't release this packet
+ * before you're sure that the clone will be killed.
+ *
  * @return the cloned packet
  *
  * The returned clone has independent annotations, initially copied from this
  * packet, but shares this packet's data.  shared() returns true for both the
- * packet and its clone.  Returns null if there's no memory for the clone. */
+ * packet and its clone.  Returns null if there's no memory for the clone.*/
 Packet *
-Packet::clone()
+Packet::clone(bool fast)
 {
 #if CLICK_LINUXMODULE
     struct sk_buff *nskb = skb_clone(skb(), GFP_ATOMIC);
@@ -797,7 +804,7 @@ Packet::clone()
     
 #elif CLICK_DPDK_POOLS
     Packet* p = reinterpret_cast<Packet *>(
-        rte_pktmbuf_clone(mb(), DpdkDevice::get_mpool(rte_socket_id())));
+        rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
     p->copy_annotations(this,true);
     p->shift_header_annotations(buffer(), 0);
     click_chatter("Clone %p %p",this->mb(),p->mb());
@@ -832,20 +839,29 @@ Packet::clone()
 # endif
     if (!p)
 	return 0;
-    Packet* origin = this;
-    if (origin->_data_packet)
-        origin = origin->_data_packet;
-    memcpy(p, this, sizeof(Packet));
-    //click_chatter("CLone is %p->%p data is %p",p,this,p->buffer());
-    p->_use_count = 1;
-    p->_data_packet = origin;
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    p->_destructor = 0;
-# else
-    p->_m = m;
-# endif
-    // increment our reference count because of _data_packet reference
-    origin->_use_count++;
+    if (unlikely(fast)) {
+        p->_use_count = 1;
+        p->_data_packet = 0;
+        p->_head = _head;
+        p->_data = _data;
+        p->_tail = _tail;
+        p->_end = _end;
+        p->_destructor = emtpy_destructor;
+    } else {
+        Packet* origin = this;
+        if (origin->_data_packet)
+            origin = origin->_data_packet;
+        memcpy(p, this, sizeof(Packet));
+        p->_use_count = 1;
+        p->_data_packet = origin;
+	# if CLICK_USERLEVEL || CLICK_MINIOS
+		p->_destructor = 0;
+	# else
+		p->_m = m;
+	# endif
+		// increment our reference count because of _data_packet reference
+		origin->_use_count++;
+    }
     return p;
 
 #endif /* CLICK_LINUXMODULE */
@@ -927,7 +943,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 
 #elif CLICK_DPDK_POOLS /* !CLICK_LINUXMODULE */
     struct rte_mbuf *mb = this->mb();
-    struct rte_mbuf *nmb = rte_pktmbuf_alloc(DpdkDevice::get_mpool(rte_socket_id()));
+    struct rte_mbuf *nmb = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));
     click_chatter("Expensive uniqueify %p %p, exh = %d, ext = %d",mb,nmb,extra_headroom,extra_tailroom);
     if (!nmb) {
         click_chatter("cannot allocate new pktmbuf");

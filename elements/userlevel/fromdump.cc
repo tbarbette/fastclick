@@ -47,7 +47,7 @@ CLICK_DECLS
 	( (((y)&0xff)<<8) | ((u_short)((y)&0xff00)>>8) )
 
 FromDump::FromDump()
-    : _packet(0), _end_h(0), _count(0), _timer(this), _task(this)
+    : _packet(0), _end_h(0), _count(0), _timer(this), _task(this), _preload_head(0)
 {
 }
 
@@ -86,6 +86,7 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
     bool per_node = false;
 #endif
     _packet_filepos = 0;
+    _preload = 0;
 
     if (_ff.configure_keywords(conf, this, errh) < 0)
 	return -1;
@@ -106,6 +107,7 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("PER_NODE", per_node)
 #endif
 	.read("FILEPOS", _packet_filepos)
+	.read("PRELOAD", _preload)
 	.complete() < 0)
 	return -1;
 
@@ -257,12 +259,41 @@ FromDump::initialize(ErrorHandler *errh)
 	_force_ip = true;
 
     // maybe skip ahead in the file
+    int result;
     if (_packet_filepos != 0) {
-	int result = _ff.seek(_packet_filepos, errh);
+	result = _ff.seek(_packet_filepos, errh);
 	_packet_filepos = 0;
-	return result;
     } else
-	return 0;
+	result = 0;
+
+    if (_preload) {
+        Packet* _preload_tail = 0;
+    	if (_preload < 0)
+    		_preload = LONG_MAX;
+    	int p_count = 0;
+    	int b_count = 0;
+    	while (_preload > 0) {
+    		read_packet(errh);
+    		if (_packet == 0) {
+    			errh->warning("Cannot read more than %d packets because no more Packet objects could be allocated or trace is finished.");
+    			break;
+    		}
+
+    		if (_preload_tail)  {
+    			_preload_tail->set_next(_packet);
+    			_preload_tail = _packet;
+    		} else {
+    			_preload_head = _packet;
+    			_preload_tail = _packet;
+    		}
+    		_preload-=_packet->length();
+    		b_count += _packet->length();
+    		_packet = 0;
+    		p_count++;
+    	}
+    	click_chatter("%s : Preloaded %d packets (%d bytes)",name().c_str(),p_count,b_count);
+    }
+    return result;
 }
 
 void
@@ -333,6 +364,12 @@ FromDump::read_packet(ErrorHandler *errh)
     int len, caplen, skiplen = 0;
     Packet *p;
     assert(!_packet);
+
+	if (!errh && _preload_head) {
+		_packet = _preload_head;
+		_preload_head = _preload_head->next();
+		return true;
+	}
 
     // record file position
     _packet_filepos = _ff.file_pos();
@@ -502,8 +539,9 @@ FromDump::pull(int)
 	_count++;
 	_packet = 0;
 	return p;
-    } else
+    } else {
 	return 0;
+    }
 }
 
 enum {

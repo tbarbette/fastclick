@@ -1682,7 +1682,10 @@ public:
 
 bool Element::get_runnable_threads(Bitvector& bmp) {
     unsigned int thisthread = router()->home_thread_id(this);
-    if (input_is_push(0) && output_is_pull(0)) { //Push to pull
+    if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) { //Push to pull
+        bmp[thisthread] = 1;
+        return false;
+    } else if (ninputs() > 0 && noutputs() > 0 && input_is_pull(0) && output_is_push(0)) { //Pull to push
         bmp[thisthread] = 1;
         return false;
     } else if (ninputs() == 0 && noutputs() > 0 && output_is_push(0)) { //Task which outputs something
@@ -1691,10 +1694,10 @@ bool Element::get_runnable_threads(Bitvector& bmp) {
     return true;
 }
 
-Bitvector Element::get_threads() {
+Bitvector Element::get_threads(bool is_pull) {
     Bitvector b(master()->nthreads());
     InputThreadVisitor visitor(b);
-    router()->visit(this,false,-1,&visitor);
+    router()->visit(this,is_pull,-1,&visitor);
     _is_fullpush = visitor.fullpush;
     if (!_is_fullpush)
         router()->non_fullpush();
