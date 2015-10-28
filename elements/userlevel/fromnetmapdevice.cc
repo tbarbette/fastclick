@@ -32,6 +32,7 @@ CLICK_DECLS
 
 FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(false),_burst(32),_keephand(false)
 {
+	in_batch_mode = BATCH_MODE_YES;
 }
 
 void *
