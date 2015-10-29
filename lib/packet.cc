@@ -223,7 +223,7 @@ Packet::~Packet()
 # if CLICK_USERLEVEL || CLICK_MINIOS
     else if (_head && _destructor) {
         if (_destructor != empty_destructor)
-            destructor(_head, _end - _head, _destructor_argument);
+            _destructor(_head, _end - _head, _destructor_argument);
     } else
 #  if HAVE_NETMAP_PACKET_POOL
     if (NetmapBufQ::is_netmap_packet(this)) {
