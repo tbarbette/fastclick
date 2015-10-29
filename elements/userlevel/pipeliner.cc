@@ -54,7 +54,7 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
 
     if (Args(conf, this, errh)
     .read_p("SIZE", _ring_size)
-	.read_p("BLOCK", _block)
+	.read_p("BLOCKING", _block)
     .complete() < 0)
         return -1;
     return 0;
@@ -73,7 +73,7 @@ Pipeliner::initialize(ErrorHandler *errh)
     if (_ring_size == -1) {
 	#  if HAVE_BATCH
 		if (receives_batch) {
-		_ring_size = 16;
+			_ring_size = 16;
 		} else
 	#  endif
 		{
@@ -120,7 +120,7 @@ void Pipeliner::push(int,Packet* p) {
 
     } else {
         if (_block) {
-            if (sleepiness >= 128)
+            if (sleepiness >= _ring_size / 4)
                 _task->reschedule();
             goto retry;
         }
@@ -129,7 +129,7 @@ void Pipeliner::push(int,Packet* p) {
 		if (stats->dropped % 100 == 1)
 			click_chatter("%s : Dropped %d packets : have %d packets in ring", name().c_str(), stats->dropped, storage->count());
     }
-    if (sleepiness >= 128)
+    if (sleepiness >= _ring_size / 4)
         _task->reschedule();
 }
 
@@ -141,12 +141,11 @@ Pipeliner::run_task(Task* t)
     last_start++; //Used to RR the balancing of revert storage
     for (unsigned j = 0; j < storage.size(); j++) {
         int i = (last_start + j) % storage.size();
+        PacketRing& s = storage.get_value(i);
         PacketBatch* out = NULL;
-        uint32_t head = storage.get_value(i).head;
-        uint32_t tail = storage.get_value(i).tail;
-        while (head != tail) {
+        while (!s.is_empty()) {
 #if HAVE_BATCH
-            PacketBatch* b = static_cast<PacketBatch*>(storage.get_value(i).ring[tail % _ring_size]);
+            PacketBatch* b = static_cast<PacketBatch*>(s.extract());
             if (unlikely(!receives_batch)) {
             	if (out == NULL) {
             		b->set_tail(b);
@@ -168,7 +167,7 @@ Pipeliner::run_task(Task* t)
 #else
             (void)out;
             //click_chatter("Read %d[%d]",storage.get_mapping(i),tail % PIPELINE_RING_SIZE);
-            Packet* p = storage.get_value(i).ring[tail % _ring_size];
+            Packet* p = s.extract();
             output(0).push(p);
 
             if (unlikely(tail % HINT_THRESHOLD == 0)) {
@@ -177,24 +176,19 @@ Pipeliner::run_task(Task* t)
 
             r = true;
 #endif
-
-            tail++;
         }
 
 #if HAVE_BATCH
         if (out) {
-            storage.get_value(i).tail = tail;
             output(0).push_batch(out);
             r = true;
         }
-#else
-        storage.get_value(i).tail = tail;
 #endif
 
     }
     if (!r) {
         sleepiness++;
-        if (sleepiness < (receives_batch?4:128)) {
+        if (sleepiness < (_ring_size / 4)) {
             t->fast_reschedule();
         }
     } else {

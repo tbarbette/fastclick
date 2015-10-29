@@ -27,8 +27,6 @@ public:
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 
-    static void fake_free_pkt(unsigned char *, size_t, void *pktmbuf);
-
     static unsigned int get_nb_txdesc(unsigned port_id);
 
     static int NB_MBUF;

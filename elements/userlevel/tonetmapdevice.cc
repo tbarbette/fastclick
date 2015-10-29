@@ -75,7 +75,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
-    if (ninputs() && input_is_pull(1))
+    if (ninputs() && input_is_pull(0))
         in_batch_mode = BATCH_MODE_YES;
 
     return 0;
@@ -364,40 +364,40 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 
 			slot = &txring->slot[cur];
 			bool is_data = false;
-#if HAVE_NETMAP_PACKET_POOL
-			slot->len = p->length();
-			if (p->headroom() > 0) {
-				complaint++;
-				if (complaint < 5)
-					click_chatter("Shifting data in %s. You should avoid this case !");
-				p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
-			}
-			unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
-			slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
-			static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
-			slot->flags |= NS_BUF_CHANGED;
-#else
-# if HAVE_ZEROCOPY
+#if HAVE_ZEROCOPY
 			if (likely(NetmapBufQ::is_netmap_packet(p))) {
 				slot->len = p->length();
-				if (slot->ptr) {
-					//click_chatter("Free %lu",slot->ptr);
+				if (p->headroom() > 0) {
+					complaint++;
+					if (complaint < 5)
+						click_chatter("Shifting data in %s. You should avoid this case !");
+					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
+				}
+#  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
+				unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
+				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
+				is_data = true;
+#  else //We must return the netmap buffer to the netmap netmap buffer queue
+				if (slot->ptr) { //But only if we previously asked to
 					reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
 				}
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
-				slot->flags |= NS_BUF_CHANGED;
 				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {
 					slot->ptr = reinterpret_cast<uint64_t>(p->destructor_argument());
-					p->set_buffer_destructor(NetmapBufQ::buffer_destructor_fake);
-				} else {
+					p->set_buffer_destructor(Packet::empty_destructor);
+				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not release ourselves
 					slot->ptr = 0;
 				}
+#  endif
+				slot->flags |= NS_BUF_CHANGED;
 			} else
-# endif
+#endif
 			{
 				unsigned char* srcdata = p->data();
 				int length = p->length();
 				is_data = (p->data_packet() == 0 && p->buffer_destructor() == 0);
+
 				while (length > txring->nr_buf_size) {
 					click_chatter("Warning ! Buffer splitting is highly experimental ! Prefer to send < 2k packets !");
 					is_data = false;
@@ -418,7 +418,6 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 				memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,length);
 				slot->len = length;
 			}
-#endif
 		if (unlikely(cur % 32 == 0)) {
 			ask_sync = true;
 			slot->flags |= NS_REPORT;

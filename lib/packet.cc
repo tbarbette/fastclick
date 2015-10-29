@@ -221,14 +221,18 @@ Packet::~Packet()
     if (_data_packet)
 	_data_packet->kill();
 # if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_head && _destructor)
-	_destructor(_head, _end - _head, _destructor_argument);
-    else
+    else if (_head && _destructor) {
+        if (_destructor != empty_destructor)
+            destructor(_head, _end - _head, _destructor_argument);
+    } else
 #  if HAVE_NETMAP_PACKET_POOL
-    NetmapBufQ::get_local_pool()->insert(_head);
-#  else
-	delete[] _head;
+    if (NetmapBufQ::is_netmap_packet(this)) {
+        NetmapBufQ::get_local_pool()->insert(_head);
+    } else
 #  endif
+    {
+            delete[] _head;
+    }
 # elif CLICK_BSDMODULE
     if (_m)
 	m_freem(_m);
@@ -776,8 +780,25 @@ assert(false); //TODO
 #endif
 }
 
-void emtpy_destructor(unsigned char *, size_t, void *) {
+void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
+}
+
+/** @brief Copying the content and annotations of another packet (userlevel).
+ * @param source packet
+ * @return new packet, or null if no packet could be created
+ */
+void
+Packet::copy(Packet* p, int headroom)
+{
+	_data = _head + headroom;
+	memcpy(_data,p->data(),p->length());
+	_tail = _data + p->length();
+	copy_annotations(p);
+    ptrdiff_t shift = _data - p->_data;
+    set_mac_header(p->mac_header() ? p->mac_header() + shift : 0);
+    set_network_header(p->network_header() ? p->network_header() + shift : 0);
+    set_transport_header(p->transport_header() ? p->transport_header() + shift : 0);
 }
 
 //
@@ -808,7 +829,7 @@ Packet::clone(bool fast)
     p->copy_annotations(this,true);
     p->shift_header_annotations(buffer(), 0);
     click_chatter("Clone %p %p",this->mb(),p->mb());
-    click_chatter("HEadroom %d %d",headroom(),p->headroom());
+    click_chatter("Headroom %d %d",headroom(),p->headroom());
     click_chatter("Tailroom %d %d",tailroom(),p->tailroom());
     click_chatter("Length %d %d",length(),p->length());
     click_chatter("Shared %d %d",shared(),p->shared());
@@ -846,7 +867,7 @@ Packet::clone(bool fast)
         p->_data = _data;
         p->_tail = _tail;
         p->_end = _end;
-        p->_destructor = emtpy_destructor;
+        p->_destructor = empty_destructor;
     } else {
         Packet* origin = this;
         if (origin->_data_packet)
@@ -1226,8 +1247,10 @@ cleanup_pool(PacketPool *pp, int global)
     pp->pd = static_cast<WritablePacket *>(pd->next());
     ::operator delete((void *) pd);
     }
+#if !HAVE_BATCH_RECYCLE
     assert(pcount <= CLICK_PACKET_POOL_SIZE);
     assert(pdcount <= CLICK_PACKET_POOL_SIZE);
+#endif
     assert(global || (pcount == pp->pcount && pdcount == pp->pdcount));
 }
 #endif

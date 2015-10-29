@@ -130,7 +130,7 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p))) {
         mbuf = (struct rte_mbuf *) p->destructor_argument();
-        p->set_buffer_destructor(DPDKDevice::fake_free_pkt);
+        p->set_buffer_destructor(Packet::empty_destructor);
     } else {
         if (create) {
             mbuf = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));

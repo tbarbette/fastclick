@@ -210,7 +210,7 @@ class NetmapBufQ {
 
     static bool is_netmap_packet(Packet* p) {
 
-#if !HAVE_NETMAP_PACKET_POOL&&!CLICK_DPDK_POOLS
+#if !CLICK_DPDK_POOLS
         return (p->buffer() > buf_start && p->buffer() < buf_end);
 #else
         return false;
@@ -219,9 +219,6 @@ class NetmapBufQ {
 
     static void buffer_destructor(unsigned char *buf, size_t, void *arg) {
         ((NetmapBufQ*)arg)->insert_p(buf);
-    }
-
-    static void buffer_destructor_fake(unsigned char *, size_t, void *) {
     }
 
     static NetmapBufQ* local_pool() {

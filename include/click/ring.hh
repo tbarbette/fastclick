@@ -86,6 +86,8 @@ int _size;
 		else
 			i++;
 	}
+
+    T* ring;
 public:
 int id;
     DynamicRing() : _size(0) {
@@ -132,7 +134,7 @@ int id;
         return next_i(head) == tail;
     }
 
-    T* ring;
+
     uint32_t head;
     uint32_t tail;
 
