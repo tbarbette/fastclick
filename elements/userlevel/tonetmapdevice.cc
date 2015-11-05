@@ -288,7 +288,7 @@ do_send:
 
 		//Lock is acquired
 		unsigned int sent;
-        SFCB_STACK(sent = send_packets(s.q,false,false););
+        SFCB_STACK(sent = send_packets(s.q,false,false));
 
 		if (sent > 0 && s.q)
 			s.q->set_prev(last);

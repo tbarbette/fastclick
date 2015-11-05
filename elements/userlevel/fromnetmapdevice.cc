@@ -155,8 +155,17 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 
 	return 0;
 }
+
+#if !HAVE_NETMAP_PACKET_POOL
 PacketBatch*
 FromNetmapDevice::pull_batch(int port, unsigned max) {
+		click_chatter("PULL BATCH only supports netmap batch!");
+		return 0;
+}
+#else
+PacketBatch*
+FromNetmapDevice::pull_batch(int port, unsigned max) {
+
 	for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
 		lock();
 		struct nm_desc* nmd = _device->nmds[i];
@@ -183,15 +192,11 @@ FromNetmapDevice::pull_batch(int port, unsigned max) {
 
 		Timestamp ts = Timestamp::make_usec(nmd->hdr.ts.tv_sec, nmd->hdr.ts.tv_usec);
 
-#if HAVE_NETMAP_PACKET_POOL
 		PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur,_set_rss_aggregate);
 		if (!batch_head) goto error;
-#else
-		click_chatter("PULL BATCH only supports netmap batch!");
-#endif
+		batch_head->set_timestamp_anno(ts);
 		rxring->head = rxring->cur = cur;
 		unlock();
-		batch_head->set_timestamp_anno(ts);
 		if (batch_head) {
 			add_count(batch_head->count());
 			return batch_head;
@@ -202,8 +207,8 @@ FromNetmapDevice::pull_batch(int port, unsigned max) {
 	click_chatter("No more buffers !");
 	router()->master()->kill_router(router());
 	return 0;
-
 }
+#endif
 
 inline bool
 FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask) {
