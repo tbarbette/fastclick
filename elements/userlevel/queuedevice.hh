@@ -17,9 +17,7 @@ class QueueDevice : public BatchElement {
 
 public:
 
-    QueueDevice() :  nqueues(1), usable_threads(), queue_per_threads(1), queue_share(1), ndesc(-1), _maxthreads(-1),_minqueues(1),_maxqueues(128),_threadoffset(-1),thread_share(1),_this_node(0),_numa(true){
-
-    }
+    QueueDevice() CLICK_COLD;
 
     static void static_initialize();
 

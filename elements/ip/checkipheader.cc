@@ -152,19 +152,18 @@ CheckIPHeader::drop(Reason reason, Packet *p, bool batch)
 
 #if HAVE_BATCH
     if (batch) {
-    if (noutputs() == 2)
-        output(1).push_batch(PacketBatch::make_from_packet(p));
-    else
-    	p->kill();
+		if (noutputs() == 2)
+			output(1).push_batch(PacketBatch::make_from_packet(p));
+		else
+			p->kill();
     } else
-#else
-    {
+#endif
+	{
 		if (noutputs() == 2)
 		output(1).push(p);
 		else
 		p->kill();
-    }
-#endif
+	}
 
     return 0;
 }

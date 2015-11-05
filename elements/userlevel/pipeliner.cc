@@ -16,7 +16,7 @@ CLICK_DECLS
 //#define PS_BATCH_SIZE 1024
 
 Pipeliner::Pipeliner()
-    :   sleepiness(0),_ring_size(-1),out_id(0),_task(NULL),last_start(0),_block(false) {
+    :   _ring_size(-1),_block(false),out_id(0),sleepiness(0),_task(NULL),last_start(0) {
 	in_batch_mode = BATCH_MODE_YES;
 }
 

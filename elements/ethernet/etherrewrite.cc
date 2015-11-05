@@ -33,7 +33,6 @@ EtherRewrite::~EtherRewrite()
 int
 EtherRewrite::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    uint16_t ether_type;
     if (Args(conf, this, errh)
 	.read_mp("SRC", EtherAddressArg(), _ethh.ether_shost)
 	.read_mp("DST", EtherAddressArg(), _ethh.ether_dhost)

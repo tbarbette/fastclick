@@ -79,6 +79,7 @@ public:
     per_thread_compressed<struct stats> stats;
     int out_id;
     volatile int sleepiness;
+
   protected:
     Task* _task;
     unsigned int last_start;

@@ -68,7 +68,7 @@ class Replay : public BatchElement { public:
     const char *flow_code() const	{ return "#/#"; }
     const char *processing() const	{ return PULL; }
 
-    bool get_runnable_thread(Bitvector& bmp) {
+    bool get_runnable_thread(Bitvector&) {
     	return false;
     }
 
@@ -85,8 +85,15 @@ class Replay : public BatchElement { public:
 
   private:
 
+    bool _active;
+    bool _loaded;
+
     unsigned int _burst;
+    int _stop;
+
     Task _task;
+    ActiveNotifier _notifier;
+
     struct s_input {
     	NotifierSignal signal;
     };
@@ -95,13 +102,12 @@ class Replay : public BatchElement { public:
     	DynamicRing<Packet*> ring;
     };
     Vector<struct s_output> _output;
-    ActiveNotifier _notifier;
-    bool _loaded;
+
+
     Packet* _queue_head;
     Packet* _queue_current;
     Timestamp _current;
-    bool _active;
-    int _stop;
+
 };
 
 CLICK_ENDDECLS

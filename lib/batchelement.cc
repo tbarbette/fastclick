@@ -144,6 +144,7 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int,
 		PushToPushBatchVisitor v(&port->downstream_batches);
 		e->router()->visit(e,1,-1,&v);
 	}
+	return false;
 }
 
 /**
@@ -154,7 +155,7 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int,
 
 	}
 
-	bool BatchElement::PushToPushBatchVisitor::visit(Element *e, bool isoutput, int,
+	bool BatchElement::PushToPushBatchVisitor::visit(Element *e, bool, int,
 			Element *, int, int) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
 		if (e->batch_mode() == BATCH_MODE_IFPOSSIBLE) {

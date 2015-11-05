@@ -234,7 +234,6 @@ class FromDump : public Element { public:
     int _minor_version;
     int _linktype;
     long _preload;
-    Packet* _preload_head;
 
     Timestamp _first_time;
     Timestamp _last_time;
@@ -250,6 +249,7 @@ class FromDump : public Element { public:
     Timer _timer;
     Task _task;
     ActiveNotifier _notifier;
+    Packet* _preload_head;
 
     Timestamp _timing_offset;
     off_t _packet_filepos;

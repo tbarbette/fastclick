@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() : _loaded(false),_task(this), _burst(64), _active(true), _stop(-1)
+Replay::Replay() :  _active(true), _loaded(false),_burst(64), _stop(-1), _task(this)
 {
 	in_batch_mode = BATCH_MODE_YES;
 }
@@ -79,6 +79,7 @@ Replay::initialize(ErrorHandler *errh) {
 	for (int i = 0; i < _output.size(); i++) {
 		_output[i].ring.initialize(1024);
 	}
+	return 0;
 }
 
 bool

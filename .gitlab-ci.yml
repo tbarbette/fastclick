@@ -1,0 +1,11 @@
+batch:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule && make
+ip6:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json --disable-linuxmodule && make
+mt:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule && make
+
+#before_script:

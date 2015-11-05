@@ -53,7 +53,7 @@ FullNoteQueue::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 #if HAVE_BATCH
-    void FullNoteQueue::push_batch(int port, PacketBatch* batch) {
+    void FullNoteQueue::push_batch(int, PacketBatch* batch) {
         FOR_EACH_PACKET_SAFE(batch,p) {
             Storage::index_type h = head(), t = tail(), nt = next_i(t);
             if (nt != h)
