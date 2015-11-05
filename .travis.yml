@@ -9,6 +9,18 @@ compiler:
   - clang
 script:
   - ./configure CXXFLAGS="-std=gnu++11" --disable-linuxmodule $CONFIG && make
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -y tcpdump libpcap-dev time libnuma-dev
+addons:
+  apt:
+    sources:
+        - ubuntu-toolchain-r-test
+    packages:
+        - tcpdump
+        - libpcap-dev
+        - time
+        - libnuma-dev
+        - gcc-4.8
+        - g++-4.8
+install:
+    - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8"; fi
+sudo: false
+cache: apt
