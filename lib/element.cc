@@ -433,9 +433,9 @@ Element::Element()
 Element::~Element()
 {
     nelements_allocated--;
-    if (_ports[0] < _inline_ports || _ports[0] > _inline_ports + INLINE_PORTS && _ports[0])
+    if (_ports[0] < _inline_ports || _ports[0] > _inline_ports + INLINE_PORTS)
 	delete[] _ports[0];
-    if (_ports[1] < _inline_ports || _ports[1] > _inline_ports + INLINE_PORTS && _ports[1])
+    if (_ports[1] < _inline_ports || _ports[1] > _inline_ports + INLINE_PORTS)
 	delete[] _ports[1];
 }
 
@@ -777,13 +777,13 @@ Element::initialize_ports(const int *in_v, const int *out_v)
 {
     for (int i = 0; i < ninputs(); i++) {
 	// allowed iff in_v[i] == VPULL
-	int port = (in_v[i] == VPULL || in_v[i] == VDOUBLE ? 0 : -1);
+	int port = (in_v[i] == VPULL ? 0 : -1);
 	_ports[0][i].assign(false, this, 0, port);
     }
 
     for (int o = 0; o < noutputs(); o++) {
 	// allowed iff out_v[o] != VPULL
-	int port = (out_v[o] == VPULL && out_v[o] != VDOUBLE ? -1 : 0);
+	int port = (out_v[o] == VPULL ? -1 : 0);
 	_ports[1][o].assign(true, this, 0, port);
     }
 }
@@ -1141,10 +1141,6 @@ Element::next_processing_code(const char*& p, ErrorHandler* errh)
       case 'l': case 'L':
 	p++;
 	return Element::VPULL;
-
-      case 'd': case 'D':
-	p++;
-	return Element::VDOUBLE;
 
       case 'a': case 'A':
 	p++;
@@ -1676,8 +1672,8 @@ public:
 
      InputThreadVisitor(Bitvector& b): bitmask(b), fullpush(true) {}
 
-     virtual bool visit(Element *e, bool isoutput, int port,
-                   Element *from_e, int from_port, int distance) {
+     virtual bool visit(Element *e, bool, int,
+                   Element *, int, int) {
          bool ret = e->get_runnable_threads(bitmask);
          if (ret == false)
              fullpush = false;
@@ -1686,22 +1682,27 @@ public:
 };
 
 bool Element::get_runnable_threads(Bitvector& bmp) {
-    if (input_is_push(0) && output_is_pull(0)) { //Push to pull
-        unsigned int thisthread = router()->home_thread_id(this);
+    unsigned int thisthread = router()->home_thread_id(this);
+    if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) { //Push to pull
         bmp[thisthread] = 1;
         return false;
+    } else if (ninputs() > 0 && noutputs() > 0 && input_is_pull(0) && output_is_push(0)) { //Pull to push
+        bmp[thisthread] = 1;
+        return false;
+    } else if (ninputs() == 0 && noutputs() > 0 && output_is_push(0)) { //Task which outputs something
+        bmp[thisthread] = 1;
     }
     return true;
 }
 
-Bitvector Element::get_threads() {
+Bitvector Element::get_threads(bool is_pull) {
 	if (!router()->configured()) {
 		click_chatter("Invalid call to get_thread() before initialization !");
 		abort();
 	}
     Bitvector b(master()->nthreads());
     InputThreadVisitor visitor(b);
-    router()->visit(this,false,-1,&visitor);
+    router()->visit(this,is_pull,-1,&visitor);
     _is_fullpush = visitor.fullpush;
     if (!_is_fullpush)
         router()->non_fullpush();

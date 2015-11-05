@@ -32,6 +32,7 @@ CLICK_DECLS
 
 FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(false),_burst(32),_keephand(false), _set_rss_aggregate(0)
 {
+	in_batch_mode = BATCH_MODE_YES;
 }
 
 void *
@@ -50,7 +51,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	int threadoffset = -1;
 	int maxthreads = -1;
 	int maxqueues = 128;
-	bool numa = true;
+	bool numa = _numa;
 	int thisnode = 0;
 
     if (Args(conf, this, errh)
@@ -71,15 +72,16 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
     	return -1;
     }
+    _numa = false;
 #else
+    _numa = numa;
+    if (numa) {
     const char* device = ifname.c_str();
     thisnode = Numa::get_device_node(&device[7]);
+    } else
+        thisnode = 0;
 #endif
 
-#if !NETMAP_WITH_HASH
-    if (_set_rss_aggregate)
-        return errh->error("You have to use the modified netmap version to use RSS_AGGREGATE !");
-#endif
     _device = NetmapDevice::open(ifname);
     if (!_device) {
         return errh->error("Could not initialize %s",ifname.c_str());
@@ -158,7 +160,11 @@ FromNetmapDevice::pull_batch(int port, unsigned max) {
 	for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
 		lock();
 		struct nm_desc* nmd = _device->nmds[i];
-		ioctl(nmd->fd,NIOCTXSYNC,SYNC_ON_IRQ);
+#ifdef SYNC_ON_IRQ
+		ioctl(nmd->fd,NIOCRXSYNC,SYNC_ON_IRQ);
+#else
+		ioctl(nmd->fd,NIOCRXSYNC,0);
+#endif
 		struct netmap_ring *rxring = NETMAP_RXRING(nmd->nifp, i);
 
 		u_int cur, n;
@@ -201,126 +207,131 @@ FromNetmapDevice::pull_batch(int port, unsigned max) {
 
 inline bool
 FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask) {
-		unsigned nr_pending = 0;
+	unsigned nr_pending = 0;
 
-		int sent = 0;
+	int sent = 0;
 
-		for (int i = begin; i <= end; i++) {
-		    lock();
+	for (int i = begin; i <= end; i++) {
+		lock();
 
-			struct nm_desc* nmd = _device->nmds[i];
+		struct nm_desc* nmd = _device->nmds[i];
 
-			struct netmap_ring *rxring = NETMAP_RXRING(nmd->nifp, i);
+		struct netmap_ring *rxring = NETMAP_RXRING(nmd->nifp, i);
 
-			u_int cur, n;
+		u_int cur, n;
 
-			cur = rxring->cur;
+		cur = rxring->cur;
 
-			n = nm_ring_space(rxring);
-			if (_burst && n > _burst) {
-			    nr_pending += n - _burst;
-				n = _burst;
-			}
-
-			if (n == 0) {
-			    unlock();
-				continue;
-			}
-
-			Timestamp ts = Timestamp::make_usec(nmd->hdr.ts.tv_sec, nmd->hdr.ts.tv_usec);
-
-			sent+=n;
-
-#if HAVE_NETMAP_PACKET_POOL && HAVE_BATCH
-			PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur,_set_rss_aggregate);
-			if (!batch_head) goto error;
-#else
-
-	#if HAVE_BATCH
-			PacketBatch *batch_head = NULL;
-			Packet* last = NULL;
-			unsigned int count = n;
-	#endif
-				while (n > 0) {
-
-					struct netmap_slot* slot = &rxring->slot[cur];
-
-					unsigned char* data = (unsigned char*)NETMAP_BUF(rxring, slot->buf_idx);
-					WritablePacket *p;
-			#if HAVE_NETMAP_PACKET_POOL
-					__builtin_prefetch(data);
-					p = WritablePacket::make_netmap(data, rxring, slot);
-					if (unlikely(p == NULL)) goto error;
-			#else
-                #if HAVE_ZEROCOPY
-					unsigned char* newbuffer;
-                    if (slot->len > 64 && (newbuffer = NetmapBufQ::get_local_pool()->extract()) != 0) {
-                        __builtin_prefetch(data);
-                        p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
-                        if (!p) goto error;
-                        slot->buf_idx = newbuffer;
-                    } else
-                #endif
-                    {
-
-                            p = Packet::make(data, slot->len);
-                            if (!p) goto error;
-                    }
-            #endif
-#if NETMAP_WITH_HASH
-               if (_set_rss_aggregate)
-                   SET_AGGREGATE_ANNO(p,slot->hash)
-#endif
-				p->set_packet_type_anno(Packet::HOST);
-
-	#if HAVE_BATCH
-					if (batch_head == NULL) {
-						batch_head = PacketBatch::start_head(p);
-					} else {
-						last->set_next(p);
-					}
-					last = p;
-	#else
-					p->set_timestamp_anno(ts);
-					output(0).push(p);
-    #endif
-					slot->flags |= NS_BUF_CHANGED;
-
-					cur = nm_ring_next(rxring, cur);
-					n--;
-				}
-#if HAVE_BATCH
-				if (batch_head) {
-					batch_head->make_tail(last,count);
-				}
-#endif
-
-#endif
-			rxring->head = rxring->cur = cur;
-			unlock();
-#if HAVE_BATCH
-			batch_head->set_timestamp_anno(ts);
-			output(0).push_batch(batch_head);
-#endif
+		n = nm_ring_space(rxring);
+		if (_burst && n > _burst) {
+			nr_pending += n - _burst;
+			n = _burst;
 		}
 
+		if (n == 0) {
+			unlock();
+			continue;
+		}
+
+		Timestamp ts = Timestamp::make_usec(nmd->hdr.ts.tv_sec, nmd->hdr.ts.tv_usec);
+
+		sent+=n;
+
+#if HAVE_NETMAP_PACKET_POOL && HAVE_BATCH
+		PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur,_set_rss_aggregate);
+		if (!batch_head) goto error;
+#else
+
+# if HAVE_BATCH
+		PacketBatch *batch_head = NULL;
+		Packet* last = NULL;
+		unsigned int count = n;
+# endif
+		while (n > 0) {
+
+			struct netmap_slot* slot = &rxring->slot[cur];
+
+			unsigned char* data = (unsigned char*)NETMAP_BUF(rxring, slot->buf_idx);
+			WritablePacket *p;
+# if HAVE_NETMAP_PACKET_POOL
+			if (slot->flags & NS_MOREFRAG) {
+				click_chatter("Packets bigger than Netmap buffer size are not supported while compiled with Netmap Packet Pool. Please disable this feature.");
+				assert(false);
+			}
+			__builtin_prefetch(data);
+			p = WritablePacket::make_netmap(data, rxring, slot,_set_rss_aggregate);
+			if (unlikely(p == NULL)) goto error;
+# else
+#  if HAVE_ZEROCOPY
+			uint32_t newbuffer;
+			if (slot->len > 64 && (newbuffer = NetmapBufQ::get_local_pool()->extract()) != 0) {
+				__builtin_prefetch(data);
+				p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
+				if (!p) goto error;
+				slot->buf_idx = newbuffer;
+				slot->flags |= NS_BUF_CHANGED;
+			} else
+#  endif
+			{
+				if (slot->flags & NS_MOREFRAG) {
+					click_chatter("Packets bigger than Netmap buffer size are not supported for now. Please set MTU lower and disable features like LRO and GRO.");
+					assert(false);
+				}
+				p = Packet::make(data, slot->len);
+				if (!p) goto error;
+			}
+# endif
+			#if NETMAP_WITH_HASH
+			if (_set_rss_aggregate)
+				SET_AGGREGATE_ANNO(p,slot->hash)
+			#endif
+
+			p->set_packet_type_anno(Packet::HOST);
+
+# if HAVE_BATCH
+			if (batch_head == NULL) {
+				batch_head = PacketBatch::start_head(p);
+			} else {
+				last->set_next(p);
+			}
+			last = p;
+# else
+			p->set_timestamp_anno(ts);
+			output(0).push(p);
+# endif
+			cur = nm_ring_next(rxring, cur);
+			n--;
+		}
+# if HAVE_BATCH
+	if (batch_head) {
+		batch_head->make_tail(last,count);
+	}
+# endif
+
+#endif
+	rxring->head = rxring->cur = cur;
+	unlock();
+# if HAVE_BATCH
+	batch_head->set_timestamp_anno(ts);
+	output(0).push_batch(batch_head);
+# endif
+	}
+
 	if (nr_pending > _burst) { //TODO size/4
-	    if (fromtask) {
-	        task->fast_reschedule();
-	    } else {
-	        task->reschedule();
-	    }
+		if (fromtask) {
+			task->fast_reschedule();
+		} else {
+			task->reschedule();
+		}
 	}
 
 	add_count(sent);
-  return sent;
-  error: //No more buffer
+	return sent;
+	error: //No more buffer
 
-  click_chatter("No more buffers !");
-  router()->master()->kill_router(router());
-  return 0;
-
-
+	click_chatter("No more buffers !");
+	router()->master()->kill_router(router());
+	return 0;
 }
 
 void

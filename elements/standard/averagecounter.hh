@@ -1,6 +1,6 @@
 #ifndef CLICK_AVERAGECOUNTER_HH
 #define CLICK_AVERAGECOUNTER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ewma.hh>
 #include <click/atomic.hh>
 #include <click/timer.hh>
@@ -40,7 +40,7 @@ CLICK_DECLS
  * Resets the count and rate to zero.
  */
 
-class AverageCounter : public Element { public:
+class AverageCounter : public BatchElement { public:
 
     AverageCounter() CLICK_COLD;
 
@@ -48,25 +48,28 @@ class AverageCounter : public Element { public:
     const char *port_count() const		{ return PORTS_1_1; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    uint32_t count() const			{ return _count; }
-    uint32_t byte_count() const			{ return _byte_count; }
-    uint32_t first() const			{ return _first; }
-    uint32_t last() const			{ return _last; }
-    uint32_t ignore() const			{ return _ignore; }
+    uint64_t count() const			{ return _count; }
+    uint64_t byte_count() const			{ return _byte_count; }
+    uint64_t first() const			{ return _first; }
+    uint64_t last() const			{ return _last; }
+    uint64_t ignore() const			{ return _ignore; }
     void reset();
 
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
     Packet *simple_action(Packet *);
 
   private:
 
-    atomic_uint32_t _count;
-    atomic_uint32_t _byte_count;
-    atomic_uint32_t _first;
-    atomic_uint32_t _last;
-    uint32_t _ignore;
+    volatile uint64_t _count;
+    volatile uint64_t _byte_count;
+    volatile uint64_t _first;
+    volatile uint64_t _last;
+    uint64_t _ignore;
 
 };
 

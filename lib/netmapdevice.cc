@@ -119,7 +119,7 @@ int NetmapDevice::initialize() {
 			struct nm_desc child_nmd = *nmd; //Copy mem, arg2, ...
 			child_nmd.self = &child_nmd;
 			child_nmd.req.nr_flags = NR_REG_ONE_NIC;
-			child_nmd.req.nr_ringid =  i| NETMAP_NO_TX_POLL;
+			child_nmd.req.nr_ringid =  i | NETMAP_NO_TX_POLL;
 
 			int flags =NM_OPEN_IFNAME | NM_OPEN_NO_MMAP;
 
@@ -134,6 +134,11 @@ int NetmapDevice::initialize() {
 				_maxfd = thread_nm->fd;
 
 			nmds[i] = thread_nm;
+
+			struct netmap_ring* txring = NETMAP_TXRING(thread_nm->nifp, i);
+			for (int j = 0; j <  txring->num_slots; j++) {
+				txring->slot[j].ptr = -1;
+			}
 		}
 
 		if (base_nmd != NULL) {
@@ -158,5 +163,9 @@ int NetmapDevice::_global_alloc = 2048;
 #endif
 
 unsigned int NetmapBufQ::buf_size = 0;
+unsigned char* NetmapBufQ::buf_end = 0;
+unsigned char* NetmapBufQ::buf_start = 0;
+uint32_t NetmapBufQ::max_index = 0;
+
 CLICK_ENDDECLS
 #endif

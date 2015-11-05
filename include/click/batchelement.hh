@@ -11,6 +11,7 @@
 #include <click/element.hh>
 #include <click/packet_anno.hh>
 #include <click/multithread.hh>
+#include <click/routervisitor.hh>
 #include <list>
 
 CLICK_DECLS
@@ -19,12 +20,13 @@ CLICK_DECLS
 
 #define BATCH_MAX_PULL 256
 class PushToPushBatchVisitor;
+class BatchModePropagate;
+
+
 class BatchElement : public Element { public:
 	BatchElement();
 
 	~BatchElement();
-
-	virtual bool need_batch() const;
 
 	virtual PacketBatch* simple_action_batch(PacketBatch* batch) {
         click_chatter("Warning in %s : simple_action_batch should be implemented."
@@ -62,21 +64,7 @@ class BatchElement : public Element { public:
 		inflow.set(false);
 	}
 
-	virtual void push(int port,Packet* p) { //May still be extended
-		if (inflow.get()) {
-				if (current_batch.get() == NULL) {
-					current_batch.set(PacketBatch::make_from_packet(p));
-				} else {
-					current_batch.get()->append_packet(p);
-				}
-		}
-		else if (need_batch()) {
-		    click_chatter("BUG : lonely packet sent to an element which needs batch !");
-			push_batch(port,PacketBatch::make_from_packet(p));
-		} else {
-		    Element::push(port,p);
-		}
-	};
+	virtual void push(int port,Packet* p);
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		 if ((unsigned) port < (unsigned) noutputs())
@@ -85,14 +73,11 @@ class BatchElement : public Element { public:
 			 batch->kill();
 	}
 
-	class BatchPort : public Port {
+	class PushBatchPort : public Port {
 	public :
-
-		~BatchPort() {
-
+		~PushBatchPort() {
 		}
 
-		bool output_supports_batch;
 		std::list<BatchElement*> downstream_batches;
 
 		std::list<BatchElement*>& getDownstreamBatches() {
@@ -100,7 +85,6 @@ class BatchElement : public Element { public:
 		}
 
 		void push_batch(PacketBatch* head) const;
-		inline void assign(bool isoutput, Element *e, int port);
 		void bind_batchelement();
 		friend class BatchElement;
 	};
@@ -109,16 +93,24 @@ class BatchElement : public Element { public:
 	    public :
 	    PacketBatch* pull_batch(unsigned max) const;
 		inline Packet* pull() const {
-			click_chatter("WARNING : Using pull function inside a batch-compatible element. This will likely create errors, please change the element to use pull_batch instead !");
-			return _e->pull(_port);
+			BatchElement* be = dynamic_cast<BatchElement*>(_e);
+			if (be) {
+				PacketBatch* batch = be->pull_batch(_port,1);
+				if (batch == 0)
+					return 0;
+				assert(batch->count() == 1);
+				return batch;
+			} else {
+				return _e->pull(_port);
+			}
 		}
 	    void bind_batchelement();
 	};
 
-	inline const BatchPort&
+	inline const PushBatchPort&
 	output(int port)
 	{
-		return static_cast<const BatchPort&>(static_cast<BatchElement::BatchPort*>(_ports[1])[port]);
+		return static_cast<const PushBatchPort&>(static_cast<BatchElement::PushBatchPort*>(_ports[1])[port]);
 	}
 
 	inline const PullBatchPort&
@@ -127,14 +119,46 @@ class BatchElement : public Element { public:
         return static_cast<const PullBatchPort&>(_ports[0][port]);
     }
 
+	enum batch_mode batch_mode() {
+		return in_batch_mode;
+	}
+
 	void upgrade_ports();
-	void check_unbatch();
+	void check_batch_mode();
+	void check_batch_rebuild();
 
 	protected :
+
+	enum batch_mode in_batch_mode;
 	bool receives_batch;
 	bool ports_upgraded;
-	friend class PushToPushBatchVisitor;
+
+	/**
+	 * Propagate a BATCH_MODE_YES upstream
+	 */
+	class BatchModePropagate : public RouterVisitor { public:
+
+		bool visit(Element *e, bool isoutput, int,
+				Element *, int, int);
+	};
+
+	/**
+	 * RouterVisitor finding all reachable batch-enabled element
+	 */
+	class PushToPushBatchVisitor : public RouterVisitor { public:
+
+		PushToPushBatchVisitor(std::list<BatchElement*> *list);
+
+		bool visit(Element *, bool, int,
+				Element *, int, int);
+		std::list<BatchElement*> *_list;
+	};
+
+	friend class Router;
 };
+
+
+
 
 #else
 class BatchElement : public Element { public:

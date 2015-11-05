@@ -85,11 +85,10 @@ Print::configure(Vector<String> &conf, ErrorHandler* errh)
   return 0;
 }
 
-Packet *
-Print::simple_action(Packet *p)
-{
+inline void
+Print::smaction(Packet* p) {
     if (!_active)
-	return p;
+	return;
 
     int bytes = (_contents ? _bytes : 0);
     if (bytes < 0 || (int) p->length() < bytes)
@@ -103,7 +102,7 @@ Print::simple_action(Packet *p)
 		   + 3 * bytes);
     if (sa.out_of_memory()) {
 	click_chatter("no memory for Print");
-	return p;
+	return;
     }
 
     const char *sep = "";
@@ -170,7 +169,24 @@ Print::simple_action(Packet *p)
 
   click_chatter("%s", sa.c_str());
 
-  return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+Print::simple_action_batch(PacketBatch* batch)
+{
+	FOR_EACH_PACKET(batch,p) {
+		smaction(p);
+	}
+	return batch;
+}
+#endif
+
+Packet *
+Print::simple_action(Packet *p)
+{
+	smaction(p);
+	return p;
 }
 
 void

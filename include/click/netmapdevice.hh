@@ -24,10 +24,10 @@ CLICK_DECLS
 
 /* a queue of netmap buffers, by index */
 class NetmapBufQ {
-    unsigned char *buf_start;   /* base address */
+    static unsigned char *buf_start;   /* base address */
     static unsigned int buf_size;
-    uint32_t max_index; /* error checking */
-    unsigned char *buf_end; /* error checking */
+    static uint32_t max_index; /* error checking */
+    static unsigned char *buf_end; /* error checking */
 
     uint32_t head;  /* index of first buffer */
     uint32_t tail;  /* index of last buffer */
@@ -67,7 +67,7 @@ class NetmapBufQ {
 
     inline int expand(int n) {
     	click_chatter("Expanding buffer pool with %d new packets",n);
-#if NETMAP_HAVE_DYNAMIC_ALLOC
+#ifdef NIOCALLOCBUF
         if (!_some_nmd) return -1;
        struct nmbufreq nbr;
        nbr.num = n;
@@ -109,7 +109,7 @@ class NetmapBufQ {
     }
 
     void clear() {
-#if NETMAP_HAVE_DYNAMIC_BUFFER
+#if NIOCFREEBUF
             if (_count > 0 && _some_nmd) {
                 struct nmbufreq nbr;
                 nbr.num = _count;
@@ -187,7 +187,6 @@ class NetmapBufQ {
     }
 
     inline uint32_t extract() {
-
         if (_count <= 0) {
             if (expand(1024) < 0) return 0;
             if (_count == 0) return 0;
@@ -244,9 +243,8 @@ class NetmapBufQ {
     }
 
     static bool is_netmap_packet(Packet* p) {
-
-#if !HAVE_NETMAP_PACKET_POOL&&!CLICK_DPDK_POOLS
-        return (p->buffer_destructor() == buffer_destructor);
+#if !CLICK_DPDK_POOLS
+    return (p->buffer() > buf_start && p->buffer() < buf_end);
 #else
         return false;
 #endif
@@ -254,9 +252,6 @@ class NetmapBufQ {
 
     static void buffer_destructor(unsigned char *buf, size_t, void *arg) {
         ((NetmapBufQ*)arg)->insert_p(buf);
-    }
-
-    static void buffer_destructor_fake(unsigned char *, size_t, void *) {
     }
 
     static NetmapBufQ* local_pool() {

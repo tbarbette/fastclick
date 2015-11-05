@@ -30,9 +30,8 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _device(0),_burst(32),_block(1),_internal_queue(512)
+ToNetmapDevice::ToNetmapDevice() : _device(0),_burst(32),_block(1),_internal_queue(512),_pull_use_select(true)
 {
-
 }
 
 
@@ -46,7 +45,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
     .read_mp("DEVNAME", ifname)
     .read_p("IQUEUE",_internal_queue)
-    .read_p("BLOCKANT",_block)
+    .read_p("BLOCKING",_block)
     .read("BURST", burst)
     .read("MAXTHREADS",maxthreads)
     .complete() < 0)
@@ -58,7 +57,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (burst > 0) {
-        if (input_is_pull(0))
+        if (input_is_push(0))
             errh->warning("%s: burst does not make sense in full push with batching, it is unused.",name().c_str());
         _burst = burst;
     }
@@ -76,6 +75,9 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
+    if (ninputs() && input_is_pull(0))
+        in_batch_mode = BATCH_MODE_YES;
+
     return 0;
 }
 
@@ -87,7 +89,7 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    ret = initialize_tasks(false,errh);
+    ret = initialize_tasks(input_is_pull(0) && !_pull_use_select,errh);
     if (ret != 0)
         return ret;
 
@@ -96,8 +98,10 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 		even the iqueue is full*/
 	if (input_is_pull(0)) {
 		_queues.resize(router()->master()->nthreads());
-		for (int i = 0; i < nqueues; i++) {
-			master()->thread(thread_for_queue(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+		if (_pull_use_select) {
+			for (int i = 0; i < nqueues; i++) {
+				master()->thread(thread_for_queue(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+			}
 		}
 
 		int nt = 0;
@@ -130,13 +134,6 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 	return 0;
 }
 
-void
-ToNetmapDevice::selected(int fd, int)
-{
-	task_for_thread()->reschedule();
-	master()->thread(click_current_cpu_id())->select_set().remove_select(fd,this,SELECT_WRITE);
-}
-
 inline void ToNetmapDevice::allow_txsync() {
     for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++)
         _iodone[i] = false;
@@ -157,6 +154,8 @@ inline void ToNetmapDevice::do_txsync(int fd) {
  *  sent packets if an interrupt has been sent to the TX ring.
  * This require our modified netmap version, but will still work with vanilla
  *  Netmap.
+ *
+ *  Only supported with modified netmap !
  */
 inline void ToNetmapDevice::do_txreclaim(int fd) {
     ioctl(fd,NIOCTXSYNC,1);
@@ -211,7 +210,7 @@ do_send_batch:
 	Packet* last = s.q->prev();
 
     lock(); //Lock only if multiple threads can go here
-    unsigned sent = send_packets(s.q,true,ask_sync);
+    unsigned sent = send_packets(s.q,ask_sync,true);
     unlock();
 
     if (sent > 0 && s.q)
@@ -289,7 +288,7 @@ do_send:
 
 		//Lock is acquired
 		unsigned int sent;
-		SFCB_STACK(sent = send_packets(s.q,true););
+        SFCB_STACK(sent = send_packets(s.q,false,false););
 
 		if (sent > 0 && s.q)
 			s.q->set_prev(last);
@@ -330,19 +329,23 @@ int complaint = 0;
  * Send a linked list of packet, return the number of packet sent and the head
  * 	points toward the packets following the last sent packet (could be null)
  *
+ * @arg ask_sync, if true, will force to flush packets (call netmap NIOCTXSYNC)
+ *
  * @return The number of packets sent
  */
-inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool ask_sync) {
+inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, bool txsync_on_empty) {
 	State &s = state.get();
 	struct nm_desc* nmd;
 	struct netmap_ring *txring;
 	struct netmap_slot *slot;
 
-	WritablePacket* s_head = head->uniqueify();
-	WritablePacket* next = s_head;
-	WritablePacket* p = next;
+	WritablePacket* next = static_cast<WritablePacket*>(head);
+	WritablePacket* p;
 
 	unsigned int sent = 0;
+#if HAVE_BATCH_RECYCLE
+	    BATCH_RECYCLE_START();
+#endif
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
 		int in = (s.last_queue + iloop) % queue_per_threads;
@@ -352,93 +355,126 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 		txring = NETMAP_TXRING(nmd->nifp, i);
 
 		if (nm_ring_empty(txring)) {
-			if (push)
+			if (txsync_on_empty)
 				try_txsync(i,nmd->fd);
 			continue;
 		}
 
-		u_int cur = txring->cur;
-#if HAVE_BATCH
-		WritablePacket* last = NULL; //Remember the last treated packet (p = last->next())
+#if HAVE_NETMAP_PACKET_POOL
+		unsigned int next_slots = 1;
+#else
+		unsigned int next_slots = ((next->length() - 1) / txring->nr_buf_size) + 1;
 #endif
-		while ((cur != txring->tail) && next) {
-			p = next;
 
+		u_int cur = txring->cur;
+		u_int space = nm_ring_space(txring);
+		while ((space >= next_slots) && next) {
+			p = next;
+			next_slots = ((next->length() - 1) / nmd->some_ring->nr_buf_size) + 1;
 			next = static_cast<WritablePacket*>(p->next());
 
 			slot = &txring->slot[cur];
-			slot->len = p->length();
-#if HAVE_NETMAP_PACKET_POOL
-			if (p->headroom() > 0) {
-				complaint++;
-				if (complaint < 5)
-					click_chatter("Shifting data in %s. You should avoid this case !");
-				p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
-			}
-
-			unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
-			slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
-			static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
-			slot->flags |= NS_BUF_CHANGED;
-
-			if (unlikely(push && cur % 32 == 0)) {
-				ask_sync = true;
-				slot->flags |= NS_REPORT;
-			}
-#else
-# if HAVE_ZEROCOPY
+			bool is_data = false;
+#if HAVE_ZEROCOPY
 			if (likely(NetmapBufQ::is_netmap_packet(p))) {
-				((NetmapBufQ*)(p->destructor_argument()))->insert(slot->buf_idx);
+				slot->len = p->length();
+				if (p->headroom() > 0) {
+					complaint++;
+					if (complaint < 5)
+						click_chatter("Shifting data in %s. You should avoid this case !");
+					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
+				}
+#  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
+				unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
+				is_data = true;
+#  else //We must return the netmap buffer to the netmap buffer queue
+				if (slot->ptr) { //But only if we previously asked to
+					if (slot->ptr == -1)
+						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
+					else
+						reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
+				} else { //We free the current slot to the current pool
+
+				}
+				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {
+					slot->ptr = reinterpret_cast<uint64_t>(p->destructor_argument());
+					p->set_buffer_destructor(Packet::empty_destructor);
+				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not release ourselves
+					slot->ptr = 0;
+				}
+#  endif
 				slot->flags |= NS_BUF_CHANGED;
-				p->set_buffer_destructor(NetmapBufQ::buffer_destructor_fake);
 			} else
-# endif
-			{
-				unsigned char* dstdata = (unsigned char*)NETMAP_BUF(txring, slot->buf_idx);
-				void* srcdata = (void*)(p->data());
-				memcpy(dstdata,srcdata,p->length());
-			}
 #endif
-#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
+			{
+				unsigned char* srcdata = p->data();
+				int length = p->length();
+				is_data = (p->data_packet() == 0 && p->buffer_destructor() == 0);
+
+				while (length > txring->nr_buf_size) {
+					click_chatter("Warning ! Buffer splitting is highly experimental ! Prefer to send < 2k packets !");
+					is_data = false;
+					memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,txring->nr_buf_size);
+					srcdata += txring->nr_buf_size;
+					length -= txring->nr_buf_size;
+					slot->len = txring->nr_buf_size;
+					slot->flags |= NS_MOREFRAG;
+					srcdata += txring->nr_buf_size;
+					if (unlikely(cur % 32 == 0)) {
+						ask_sync = true;
+						slot->flags |= NS_REPORT;
+					}
+					space--;
+					cur = nm_ring_next(txring,cur);
+					slot = &txring->slot[cur];
+				}
+				memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,length);
+				slot->len = length;
+			}
+		if (unlikely(cur % 32 == 0)) {
+			ask_sync = true;
+			slot->flags |= NS_REPORT;
+		}
+#if HAVE_BATCH_RECYCLE
 			//We cannot recycle a batch with shared packet in it
 			if (p->shared()) {
 				p->kill();
-				if (last)
-					last->set_next(next);
+				if (p == head) {
+					head = next;
+				}
 			} else {
-				last = p;
+				if (is_data) {
+					BATCH_RECYCLE_DATA_PACKET(p);
+				} else {
+					BATCH_RECYCLE_PACKET(p);
+				}
 			}
 #else
 			//If no batch or no packet pool, don't bother recycling per-batch
 			p->kill();
 #endif
 			sent++;
+			space--;
 			cur = nm_ring_next(txring,cur);
+#if !HAVE_NETMAP_PACKET_POOL
+			if (next)
+				next_slots = ((next->length() - 1) / nmd->some_ring->nr_buf_size) + 1;
+#endif
 		}
 		txring->head = txring->cur = cur;
 
 		if (unlikely(ask_sync))
 			do_txsync(nmd->fd);
-
-		if (next == NULL) { //All is sent
-			add_count(sent);
-#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-			p->set_next(0);
-			PacketBatch::make_from_list(s_head,sent)->safe_kill();
-#endif
-			head = NULL;
-			return sent;
-		}
 	}
 
-	if (next == s_head) { //Nothing could be sent...
-		head = s_head;
+	if (sent == 0) { //Nothing could be sent...
 		return 0;
 	} else {
-#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-		p->set_next(0);
-		PacketBatch::make_from_simple_list(s_head,p,sent)->safe_kill();
+#if HAVE_BATCH_RECYCLE
+	    BATCH_RECYCLE_END();
 #endif
 		add_count(sent);
 		head = next;
@@ -446,11 +482,17 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool push, bool 
 	}
 }
 
+void
+ToNetmapDevice::selected(int fd, int)
+{
+	task_for_thread()->reschedule();
+	master()->thread(click_current_cpu_id())->select_set().remove_select(fd,this,SELECT_WRITE);
+}
+
 bool
 ToNetmapDevice::run_task(Task* task)
 {
 	State &s = state.get();
-
 	unsigned int total_sent = 0;
 
 	Packet* batch = s.q;
@@ -502,20 +544,21 @@ ToNetmapDevice::run_task(Task* task)
 #endif
 
 		if (batch) {
+			s.backoff = 1;
 			Packet* last = batch->prev();
 			last->set_next(NULL); //Just to be sure
 
 			lock();
-			unsigned int sent = send_packets(batch,false);
+			unsigned int sent = send_packets(batch,false,false);
 			unlock();
 
 			total_sent += sent;
 			batch_size -= sent;
 
-			if (sent > 0) { //At least one packet sent
-				if (batch) //Reestablish the tail if we could not send everything
-					batch->set_prev(last);
-			} else
+			if (batch) //Reestablish the tail if we could not send everything
+				batch->set_prev(last);
+
+			if (sent == 0 || batch) //Not all packets could be sent
 				break;
 		} else //No packet to send
 			break;
@@ -523,21 +566,25 @@ ToNetmapDevice::run_task(Task* task)
 
 	if (batch != NULL) {/*Output ring is full, we rely on the select mechanism
 		to know when we'll have space to send packets*/
-		s.backoff = 1;
 		s.q = batch;
 		s.q_size = batch_size;
 		//Register fd to wait for space
 		for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
-			master()->thread(click_current_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+			if (_pull_use_select)
+				master()->thread(click_current_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+			else
+				do_txsync(_device->nmds[i]->fd);
 		}
-	} else if (s.signal.active()) { //TODO is this really needed?
+		if (!_pull_use_select)
+			task->fast_reschedule();
+
+	} else if (s.signal.active()) {
 		//We sent everything we could, but check signal to see if packet arrived after last read
 		task->fast_reschedule();
 	} else { //Empty and no signal
 		if (s.backoff < 256)
 			s.backoff*=2;
 		s.timer->schedule_after(Timestamp::make_usec(s.backoff));
-
 	}
 	return total_sent;
 }
@@ -559,6 +606,7 @@ ToNetmapDevice::cleanup(CleanupStage)
     if (!input_is_pull(0))
         for (int i = 0; i < min((int)_zctimers.size(),(int)nqueues); i++)
             delete _zctimers[i];
+
     if (_device) _device->destroy();
 }
 

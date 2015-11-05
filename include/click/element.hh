@@ -51,7 +51,12 @@ class Element { public:
 
     virtual bool get_runnable_threads(Bitvector& b);
     inline bool is_fullpush() const;
-    Bitvector get_threads();
+    Bitvector get_threads(bool is_pull=false);
+
+    enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_NEEDED, BATCH_MODE_YES};
+    virtual enum batch_mode batch_mode() {
+        return BATCH_MODE_NO;
+    }
 
     inline void checked_output_push(int port, Packet *p) const;
     inline Packet* checked_input_pull(int port) const;
@@ -239,6 +244,7 @@ class Element { public:
 
 	Element* _e;
 	int _port;
+	bool e_in_batch_mode;
 #if HAVE_BOUND_PORT_TRANSFER
 	union {
 	    void (*push)(Element *e, int port, Packet *p);
@@ -540,7 +546,7 @@ Element::input_is_push(int port) const
 
 inline
 Element::Port::Port()
-    : _e(0), _port(-2)
+    : _e(0), _port(-2), e_in_batch_mode(false)
 {
     PORT_ASSIGN(0);
 }

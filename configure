@@ -1563,7 +1563,7 @@ Optional Packages:
   --with-linux-map[=FILE] filename for Linux System.map [LINUXDIR/System.map]
   --with-freebsd[=SRC,INC] FreeBSD source code is in SRC [/usr/src/sys],
                           include directory is INC [/usr/include]
-  --with-numa             enable numa [no]
+  --with-numa             enable numa [yes]
   --with-netmap           enable netmap [no]
   --with-proper[=PREFIX]  use PlanetLab Proper library (optional)
   --with-expat[=PREFIX]   locate expat XML library (optional)
@@ -6576,6 +6576,7 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
     rte_ver_major=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MAJOR" | head -n 1 | awk '{print $3}'`
     rte_ver_minor=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MINOR" | head -n 1 | awk '{print $3}'`
     RTE_VER_MAJOR=$rte_ver_major
+
     RTE_VER_MINOR=$rte_ver_minor
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
@@ -10726,7 +10727,7 @@ done
 if test "${with_numa+set}" = set; then :
   withval=$with_numa; use_numa=$withval
 else
-  use_numa=no
+  use_numa=yes
 fi
 
 
@@ -10740,7 +10741,8 @@ fi
 
     HAVE_NUMA=no
 
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing numa_available" >&5
+    if test "$use_numa" != "no"; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing numa_available" >&5
 $as_echo_n "checking for library containing numa_available... " >&6; }
 if ${ac_cv_search_numa_available+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -10799,21 +10801,21 @@ else
 fi
 
 
-    if test "$ac_have_libnuma" = yes; then
+        if test "$ac_have_libnuma" = yes; then
 
 $as_echo "#define HAVE_NUMA 1" >>confdefs.h
 
-        LDFLAGS="$LDFLAGS -Lnuma"
-    fi
+            LDFLAGS="$LDFLAGS -Lnuma"
+        fi
 
-    if test "$HAVE_NUMA" = yes; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether numa.h works" >&5
+        if test "$HAVE_NUMA" = yes; then
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether numa.h works" >&5
 $as_echo_n "checking whether numa.h works... " >&6; }
 if ${ac_cv_working_numa_h+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-            cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+                cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <numa.h>
 _ACEOF
@@ -10826,7 +10828,8 @@ rm -f conftest.err conftest.i conftest.$ac_ext
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_working_numa_h" >&5
 $as_echo "$ac_cv_working_numa_h" >&6; }
-        test "$ac_cv_working_numa_h" != yes && HAVE_NUMA=
+            test "$ac_cv_working_numa_h" != yes && HAVE_NUMA=
+        fi
     fi
 
 

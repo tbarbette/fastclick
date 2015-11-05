@@ -1198,8 +1198,19 @@ Router::initialize(ErrorHandler *errh)
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
-            if (e != NULL) {
-                e->upgrade_ports();
+            if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES) {
+                BatchElement::BatchModePropagate p;
+                for (int i = 0; i < e->noutputs(); i++) {
+                    //click_chatter("%s output is push %d",e->name().c_str(),e->output_is_push(i));
+			if (e->output_is_push(i))
+				visit(e,true,i,&p);
+                }
+
+                for (int i = 0; i < e->ninputs(); i++) {
+                    //click_chatter("%s input is pull %d",e->name().c_str(),e->input_is_pull(i));
+                    if (e->input_is_pull(i))
+                        visit(e,false,i,&p);
+                }
             }
         }
 
@@ -1207,7 +1218,19 @@ Router::initialize(ErrorHandler *errh)
             int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
             if (e != NULL) {
-                e->check_unbatch();
+                if (e->batch_mode() == Element::BATCH_MODE_NO) {
+                    e->receives_batch = false;
+                } else  if (e->batch_mode() == Element::BATCH_MODE_IFPOSSIBLE) {
+                    e->in_batch_mode = Element::BATCH_MODE_NO;
+                    e->receives_batch = false;
+                    click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
+                } else if (e->in_batch_mode == Element::BATCH_MODE_NEEDED) {
+                    click_chatter("%s needs to receive batch ! Please check your configuration.",e->name().c_str());
+                    all_ok = false;
+                    break;
+                }
+                else
+                    e->upgrade_ports();
             }
         }
     }

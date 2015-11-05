@@ -19,7 +19,10 @@ class FlowClassifier;
 
 class FlowElement : public BatchElement {
 public:
-	FlowElement() {};
+	FlowElement() {
+		if (in_batch_mode < BATCH_MODE_NEEDED)
+			in_batch_mode = BATCH_MODE_NEEDED;
+	};
 	~FlowElement() {};
 	virtual FlowNode* get_table();
 };
@@ -38,8 +41,6 @@ public:
 	inline int flow_data_offset() {return _flow_data_offset; }
 
 	int configure_phase() const		{ return CONFIGURE_PHASE_DEFAULT + 5; }
-
-	bool need_batch() const final { return true; };
 
 protected:
 	int _flow_data_offset;

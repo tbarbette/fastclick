@@ -65,19 +65,30 @@ CLICK_DECLS
 
     };
 
+/**
+ * Ring with size set at initialization time
+ */
 template <typename T> class DynamicRing {
 
 protected:
-int _size;
+uint32_t _size;
 
-inline bool has_space() {
-    return head - tail < _size;
-}
+	inline uint32_t next_i(uint32_t i) {
+		if (i == _size -1)
+			return 0;
+		else
+			return i + 1;
+	}
 
-inline bool is_empty() {
-    return head == tail;
-}
+	inline void inc_i(uint32_t &i) {
 
+		if (i == _size -1 )
+			i = 0;
+		else
+			i++;
+	}
+
+    T* ring;
 public:
 int id;
     DynamicRing() : _size(0) {
@@ -93,27 +104,38 @@ int id;
 
     inline T extract() {
         if (!is_empty()) {
-            T &v = ring[tail % _size];
-            tail++;
+            T &v = ring[tail];
+            inc_i(tail);
             return v;
         } else
             return 0;
     }
 
     inline bool insert(T batch) {
-        if (has_space()) {
-            ring[head % _size] = batch;
-            head++;
+        if (!is_full()) {
+            ring[head] = batch;
+            inc_i(head);
             return true;
         } else
             return false;
     }
 
     inline unsigned int count() {
-        return head - tail;
+        int count = (int)head - (int)tail;
+        if (count < 0)
+            count += _size;
+        return count;
     }
 
-    T* ring;
+    inline bool is_empty() {
+        return head == tail;
+    }
+
+    inline bool is_full() {
+        return next_i(head) == tail;
+    }
+
+
     uint32_t head;
     uint32_t tail;
 

@@ -3,9 +3,8 @@
  * fromdpdkdevice.{cc,hh} -- element reads packets live from network via
  * Intel's DPDK
  *
- * Copyright (c) 2014-2015 University of Liège
- * Copyright (c) 2014 Cyril Soldani
- * Copyright (c) 2015 Tom Barbette
+ * Copyright (c) 2014-2015 Cyril Soldani, University of Liège
+ * Copyright (c) 2015 Tom Barbette, University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,6 +21,7 @@
 
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/standard/scheduleinfo.hh>
 
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
@@ -30,38 +30,41 @@
 
 CLICK_DECLS
 
-FromDpdkDevice::FromDpdkDevice()
-    : _port_no(0), _promisc(true), _burst(32), _set_rss_aggregate(0)
+FromDPDKDevice::FromDPDKDevice() :
+    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0)
 {
 }
 
-FromDpdkDevice::~FromDpdkDevice()
+FromDPDKDevice::~FromDPDKDevice()
 {
 }
 
-int FromDpdkDevice::configure(Vector<String> &conf, ErrorHandler *errh)
+int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	//Default parameters
     int maxthreads = -1;
     int threadoffset = -1;
     int minqueues = 1;
     int maxqueues = 128; //TODO Should be device dependent
+    int numa_node = 0;
 
     if (Args(conf, this, errh)
-	.read_mp("DEVNAME", _port_no)
-	.read_p("PROMISC", _promisc)
-	.read_p("BURST", _burst)
-	.read_p("MAXTHREADS", maxthreads)
-	.read_p("THREADOFFSET", threadoffset)
-	.read("MINQUEUES",minqueues)
-	.read("MAXQUEUES",maxqueues)
-	.read("RSS_AGGREGATE", _set_rss_aggregate)
-	.read("NDESC",ndesc)
-	.complete() < 0)
-	return -1;
+        .read_mp("PORT", _port_id)
+        .read("PROMISC", _promisc)
+        .read("MAXTHREADS", maxthreads)
+        .read("THREADOFFSET", threadoffset)
+        .read("MINQUEUES",minqueues)
+        .read("MAXQUEUES",maxqueues)
+        .read("RSS_AGGREGATE", _set_rss_aggregate)
+        .read("BURST", _burst_size)
+        .read("NDESC", _n_desc)
+		.read("NUMA", _numa)
+        .complete() < 0)
+        return -1;
 
-    int numa_node = DpdkDevice::get_port_numa_node(_port_no);
-
+    if (_numa) {
+        numa_node = DPDKDevice::get_port_numa_node(_port_id);
+    }
 
     int r;
     r = QueueDevice::configure_rx(numa_node,maxthreads,minqueues,maxqueues,threadoffset,errh);
@@ -70,7 +73,7 @@ int FromDpdkDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int FromDpdkDevice::initialize(ErrorHandler *errh)
+int FromDPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;
 
@@ -78,45 +81,42 @@ int FromDpdkDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     for (int i = 0; i < nqueues; i++) {
-        ret = DpdkDevice::add_rx_device(_port_no, i , _promisc, errh);
+        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, _n_desc, errh);
         if (ret != 0) return ret;
     }
-
-    if (ndesc > 0)
-        DpdkDevice::set_rx_descs(_port_no, ndesc, errh);
 
     ret = QueueDevice::initialize_tasks(true,errh);
     if (ret != 0) return ret;
 
     if (all_initialized()) {
-        ret = DpdkDevice::initialize(errh);
+        ret = DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
     }
 
     return ret;
 }
 
-void FromDpdkDevice::cleanup(CleanupStage stage)
+void FromDPDKDevice::cleanup(CleanupStage)
 {
 	cleanup_tasks();
 }
 
-void FromDpdkDevice::add_handlers()
+void FromDPDKDevice::add_handlers()
 {
     add_read_handler("count", count_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 
-bool FromDpdkDevice::run_task(Task * t)
+bool FromDPDKDevice::run_task(Task * t)
 {
-    struct rte_mbuf *pkts[_burst];
+    struct rte_mbuf *pkts[_burst_size];
     int ret = 0;
 
     PacketBatch* head = NULL;
 	WritablePacket *last = NULL;
 
     for (int iqueue = queue_for_thread_begin(); iqueue<=queue_for_thread_end();iqueue++) {
-        unsigned n = rte_eth_rx_burst(_port_no, iqueue, pkts, _burst);
+        unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst_size);
         for (unsigned i = 0; i < n; ++i) {
 #if CLICK_DPDK_POOLS
             rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
@@ -124,7 +124,7 @@ bool FromDpdkDevice::run_task(Task * t)
 #elif HAVE_ZEROCOPY
     rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
     WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
-                     rte_pktmbuf_data_len(pkts[i]), DpdkDevice::free_pkt,
+                     rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt,
                      pkts[i]);
 #else
             WritablePacket *p = Packet::make((void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),
@@ -164,5 +164,5 @@ bool FromDpdkDevice::run_task(Task * t)
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk)
-EXPORT_ELEMENT(FromDpdkDevice)
-ELEMENT_MT_SAFE(FromDpdkDevice)
+EXPORT_ELEMENT(FromDPDKDevice)
+ELEMENT_MT_SAFE(FromDPDKDevice)

@@ -1,2 +1,30 @@
-jobs:
-    - script: "./configure --disable-linuxmodule --enable-batch --enable-flow"
+batch:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule && make
+ip6:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json --disable-linuxmodule && make
+mt:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule && make
+netmap_single:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --with-netmap --disable-linuxmodule && make
+netmap:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --enable-netmap-pool --enable-zerocopy --disable-linuxmodule && make
+netmap_nopool:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --enable-zerocopy --disable-linuxmodule && make
+netmap_nopool_nozc:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule && make
+fbatch:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch --disable-linuxmodule && make
+fnetmap:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch --with-netmap --enable-netmap-pool --enable-zerocopy --disable-linuxmodule && make
+
+
+#before_script:
