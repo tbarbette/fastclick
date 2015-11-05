@@ -57,7 +57,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (burst > 0) {
-        if (input_is_pull(0))
+        if (input_is_push(0))
             errh->warning("%s: burst does not make sense in full push with batching, it is unused.",name().c_str());
         _burst = burst;
     }
@@ -377,9 +377,14 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
 				is_data = true;
-#  else //We must return the netmap buffer to the netmap netmap buffer queue
+#  else //We must return the netmap buffer to the netmap buffer queue
 				if (slot->ptr) { //But only if we previously asked to
-					reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
+					if (slot->ptr == -1)
+						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
+					else
+						reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
+				} else { //We free the current slot to the current pool
+
 				}
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {

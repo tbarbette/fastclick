@@ -122,10 +122,10 @@ int NetmapDevice::initialize() {
 
 			nmds[i] = thread_nm;
 
-				struct netmap_ring* txring = NETMAP_TXRING(thread_nm->nifp, i);
-				for (int j = 0; j <  txring->num_slots; j++) {
-					txring->slot[j].ptr = 0;
-				}
+			struct netmap_ring* txring = NETMAP_TXRING(thread_nm->nifp, i);
+			for (int j = 0; j <  txring->num_slots; j++) {
+				txring->slot[j].ptr = -1;
+			}
 		}
 
 		if (base_nmd != NULL) {

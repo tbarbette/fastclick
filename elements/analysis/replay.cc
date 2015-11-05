@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() : _loaded(false),_task(this), _burst(64)
+Replay::Replay() : _loaded(false),_task(this), _burst(64), _active(true), _stop(-1)
 {
 	in_batch_mode = BATCH_MODE_YES;
 }
@@ -36,7 +36,7 @@ int
 Replay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	//.read("TIME", _simple)
+	.read("STOP", _stop)
 	.complete() < 0)
     return -1;
 
@@ -63,7 +63,6 @@ PacketBatch* Replay::pull_batch(int port, unsigned max) {
 	_task.reschedule();
 	//click_chatter("Pull batch %d",port);
     MAKE_BATCH(_output[port].ring.extract(),head,max);
-
     /*if (head)
     	click_chatter("%d : Pull batch %p of %d packets",port,head,head->count());*/
     return head;
@@ -85,6 +84,9 @@ Replay::initialize(ErrorHandler *errh) {
 bool
 Replay::run_task(Task* task)
 {
+	if (!_active)
+		return false;
+
 	if (unlikely(!_loaded)) {
 		Packet* p_input[ninputs()] = {0};
 		int first_i = -1;
@@ -167,8 +169,15 @@ Replay::run_task(Task* task)
 		n++;
 	}
 	if (unlikely(!_queue_current)) {
-		_queue_current = _queue_head,
-		click_chatter("Replay finished");
+		_queue_current = _queue_head;
+		if (_stop > 0)
+			_stop--;
+		if (_stop == 0) {
+			router()->please_stop_driver();
+			_active = false;
+			return true;
+		}
+		click_chatter("Replay loop");
 	}
 	task->fast_reschedule();
 

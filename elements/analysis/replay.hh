@@ -100,6 +100,8 @@ class Replay : public BatchElement { public:
     Packet* _queue_head;
     Packet* _queue_current;
     Timestamp _current;
+    bool _active;
+    int _stop;
 };
 
 CLICK_ENDDECLS

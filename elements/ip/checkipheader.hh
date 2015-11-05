@@ -162,7 +162,7 @@ class CheckIPHeader : public BatchElement { public:
   static const char * const reason_texts[NREASONS];
 
   inline Reason valid(Packet* p);
-  Packet *drop(Reason, Packet *);
+  Packet *drop(Reason, Packet *, bool batch);
   static String read_handler(Element *, void *) CLICK_COLD;
 
   friend class CheckIPHeader2;

@@ -1291,6 +1291,14 @@ if test "x$enable_netmap_pool" = "xyes"; then
 
 =========================================])
     fi
+    if test "x$enable_zerocopy" != "xyes"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-netmap-pool requires --enable-zerocopy which was not provided.
+
+=========================================])
+    fi
     AC_DEFINE([HAVE_NETMAP_PACKET_POOL])
     AC_SUBST(HAVE_NETMAP_PACKET_POOL, yes)
 fi

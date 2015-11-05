@@ -970,7 +970,9 @@ class WritablePacket : public Packet { public:
                 for (;p != NULL;p=next,next=(p==0?0:p->next()))
 
 /**
- * Cannot drop ! Use _DROPPABLE version if it could
+ * Execute a function on each packets of a batch. The function may return
+ * another packet to replace the current one. This version cannot drop !
+ * Use _DROPPABLE version if the function could return null.
  */
 #define EXECUTE_FOR_EACH_PACKET(fnt,batch) \
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\
@@ -989,6 +991,10 @@ class WritablePacket : public Packet { public:
 					last = q;\
 				}
 
+/**
+ * Execute a function on each packet of a batch. The function may return
+ * another packet, or null if the packet could be dropped.
+ */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
@@ -1020,6 +1026,58 @@ class WritablePacket : public Packet { public:
 					batch->set_tail(last);\
 				}\
 			}\
+
+/**
+ * Split a batch into multiple batch according to a given function which will
+ * give the index of an output to choose.
+ * @fnt Function to call which will return a value between 0 and nbatches
+ * #on_finish function which take an output index and a number to call when classification is finished
+ */
+#define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
+	{\
+		PacketBatch* out[nbatches] = {0};\
+		PacketBatch* next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
+		PacketBatch* p = batch;\
+		PacketBatch* last = NULL;\
+		int last_o = -1;\
+		int passed = 0;\
+		for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
+			int o = fnt(p);\
+			if (o == last_o) {\
+				passed ++;\
+			} else {\
+				if (last == NULL) {\
+					out[o] = p;\
+					p->set_count(1);\
+				} else {\
+					last->set_next(NULL);\
+					out[last_o]->set_tail(last);\
+					out[last_o]->set_count(out[last_o]->count() + passed);\
+					if (!out[o]) {\
+						out[o] = PacketBatch::make_from_packet(p);\
+					} else {\
+						out[o]->append_packet(p);\
+					}\
+					passed = 0;\
+				}\
+			}\
+			last = p;\
+			last_o = o;\
+		}\
+\
+		if (passed) {\
+			out[last_o]->set_tail(last);\
+			out[last_o]->set_count(out[last_o]->count() + passed);\
+		}\
+\
+		int i = 0;\
+		for (; i < nbatches; i++) {\
+			if (out[i]) {\
+				out[i]->tail()->set_next(NULL);\
+				on_finish(i,out[i]);\
+			}\
+		}\
+	}
 
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
