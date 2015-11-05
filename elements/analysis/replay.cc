@@ -88,7 +88,8 @@ Replay::run_task(Task* task)
 		return false;
 
 	if (unlikely(!_loaded)) {
-		Packet* p_input[ninputs()] = {0};
+		Packet* p_input[ninputs()];
+		bzero(p_input,sizeof(Packet*) * ninputs());
 		int first_i = -1;
 		Timestamp first_t;
 		Packet* queue_tail = 0;

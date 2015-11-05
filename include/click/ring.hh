@@ -70,7 +70,7 @@ CLICK_DECLS
 template <typename T> class DynamicRing {
 
 protected:
-int _size;
+uint32_t _size;
 
 	inline uint32_t next_i(uint32_t i) {
 		if (i == _size -1)

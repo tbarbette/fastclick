@@ -1035,7 +1035,8 @@ class WritablePacket : public Packet { public:
  */
 #define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
 	{\
-		PacketBatch* out[nbatches] = {0};\
+		PacketBatch* out[nbatches];\
+		bzero(out,sizeof(PacketBatch*)*nbatches);\
 		PacketBatch* next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
 		PacketBatch* p = batch;\
 		PacketBatch* last = NULL;\
