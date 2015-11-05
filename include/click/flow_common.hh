@@ -221,6 +221,9 @@ inline void FlowControlBlock::release(int packets_nr) {
 		release_pool->release(this);
 	}
 }
-#endif
+#else
+#define SFCB_STACK(fnt) \
+		{fnt;}
+#endif //HAVE_FLOW
 CLICK_ENDDECLS
 #endif
