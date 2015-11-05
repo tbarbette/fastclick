@@ -59,12 +59,8 @@ Packet* Replay::pull(int port) {
 
 PacketBatch* Replay::pull_batch(int port, unsigned max) {
 	PacketBatch* head;
-
 	_task.reschedule();
-	//click_chatter("Pull batch %d",port);
     MAKE_BATCH(_output[port].ring.extract(),head,max);
-    /*if (head)
-    	click_chatter("%d : Pull batch %p of %d packets",port,head,head->count());*/
     return head;
 }
 
