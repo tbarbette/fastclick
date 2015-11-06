@@ -32,7 +32,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 		return errh->error("%s : Please place a FlowClassifier element before any FlowDispatcher",name().c_str());
 	}
 
-	std::regex reg("((agg )?((?:(?:ip)?[+]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+? ?)+)|-)( keep| [0-9]+)?",
+	std::regex reg("((agg )?((?:(?:ip)?[+]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+? ?)+)|-)( keep| [0-9]+| drop)?",
 			 std::regex_constants::icase);
 	std::regex classreg("(ip)?[+]?([0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?",
 				 std::regex_constants::icase);
@@ -60,6 +60,8 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 
 			if (deletable == " keep")
 				deletable_value = true;
+			else if (deletable == " drop")
+				output = -1;
 			else if (deletable != "") {
 				output = std::stoi(deletable);
 			} else {
@@ -197,7 +199,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 			return errh->error("argument %d is not a valid defined subflow (%s)", i+1,s.c_str());
 		}
 		if (_verbose)
-			click_chatter("Rule %d to output %d",rules.size(),rules[rules.size() - 1]);
+			click_chatter("Rule %d to output %d",rules.size(),rules[rules.size() - 1].output);
 		//rules[rules.size() - 1].root->print();
 		/*using namespace std;
 					istringstream iss(conf[i]);

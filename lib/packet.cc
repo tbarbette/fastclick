@@ -467,7 +467,7 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
 #endif
         cur = nm_ring_next(rxring, cur);
         toreceive--;
-
+        _count --;
 
         if (_count == 0) {
 
