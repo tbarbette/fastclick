@@ -77,8 +77,9 @@ class Replay : public BatchElement { public:
     int initialize(ErrorHandler *errh);
 
     Packet* pull(int port);
+#if HAVE_BATCH
     PacketBatch* pull_batch(int port, unsigned max);
-
+#endif
     void cleanup(CleanupStage);
 
     bool run_task(Task*);

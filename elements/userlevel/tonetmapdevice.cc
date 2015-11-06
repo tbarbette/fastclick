@@ -75,8 +75,11 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
+#if HAVE_BATCH
     if (ninputs() && input_is_pull(0))
         in_batch_mode = BATCH_MODE_YES;
+#endif
+
 
     return 0;
 }
