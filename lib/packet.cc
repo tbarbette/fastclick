@@ -412,7 +412,7 @@ WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_r
     p->set_buffer(data,rxring->nr_buf_size,slot->len);
 #if NETMAP_WITH_HASH
 	if (set_rss_aggregate)
-		SET_AGGREGATE_ANNO(last,slot->hash);
+		SET_AGGREGATE_ANNO(p,slot->hash);
 #endif
     slot->flags = NS_BUF_CHANGED;
     return p;
