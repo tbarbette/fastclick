@@ -15,6 +15,7 @@
 
 #ifndef NETMAP_WITH_LIBS
 #define NETMAP_WITH_LIBS 1
+#define NS_NOFREE 0x80 //We use this to set that a buffer is shared and should not be freed
 #endif
 
 #include <net/netmap.h>

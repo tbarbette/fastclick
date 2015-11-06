@@ -41,6 +41,18 @@ NetmapDevice::NetmapDevice(String ifname) : _minfd(INT_MAX),_maxfd(INT_MIN),ifna
 NetmapDevice::~NetmapDevice() {
     nics.remove(ifname);
 
+    //Replace buffer with NS_NOFREE inside rings as they will be freed by the NetmapBufQ cleaner
+    for (int i = 0; i < n_queues; i++) {
+        struct nm_desc* nmd = nmds[i];
+        struct netmap_ring* txring = NETMAP_TXRING(nmd->nifp,i);
+        for (int j = 0; j < txring->num_slots; j++) {
+            struct netmap_slot* slot = &txring->slot[j];
+            if (slot->flags & NS_NOFREE) {
+                slot->buf_idx = NetmapBufQ::get_local_pool()->extract();
+                slot->flags &= ~NS_NOFREE;
+            }
+        }
+    }
 #if HAVE_ZEROCOPY
     if (NetmapDevice::nics.empty())
     	NetmapBufQ::cleanup();
@@ -121,11 +133,6 @@ int NetmapDevice::initialize() {
 				_maxfd = thread_nm->fd;
 
 			nmds[i] = thread_nm;
-
-			struct netmap_ring* txring = NETMAP_TXRING(thread_nm->nifp, i);
-			for (int j = 0; j <  txring->num_slots; j++) {
-				txring->slot[j].ptr = -1;
-			}
 		}
 
 		if (base_nmd != NULL) {
