@@ -103,7 +103,7 @@ fi
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [have only netmap packets in the pool])],
     [:], [enable_netmap_pool=no])
-    
+
 PTHREAD_LIBS=""
 AC_SUBST(PTHREAD_LIBS)
 
