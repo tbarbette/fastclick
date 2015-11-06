@@ -17,7 +17,9 @@ CLICK_DECLS
 
 Pipeliner::Pipeliner()
     :   _ring_size(-1),_block(false),out_id(0),sleepiness(0),_task(NULL),last_start(0) {
+#if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 Pipeliner::~Pipeliner()
@@ -38,9 +40,11 @@ void Pipeliner::cleanup(CleanupStage) {
     for (unsigned i = 0; i < storage.size(); i++) {
     	Packet* p;
         while ((p = storage.get_value(i).extract()) != 0) {
+#if HAVE_BATCH
         	if (receives_batch == 1)
         		static_cast<PacketBatch*>(p)->kill();
         	else
+#endif
         		p->kill();
         }
     }
@@ -170,9 +174,7 @@ Pipeliner::run_task(Task* t)
             Packet* p = s.extract();
             output(0).push(p);
 
-            if (unlikely(tail % HINT_THRESHOLD == 0)) {
                 //WritablePacket::pool_hint(HINT_THRESHOLD,storage.get_mapping(i));
-            }
 
             r = true;
 #endif

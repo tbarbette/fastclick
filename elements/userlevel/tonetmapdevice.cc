@@ -75,8 +75,11 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
+#if HAVE_BATCH
     if (ninputs() && input_is_pull(0))
         in_batch_mode = BATCH_MODE_YES;
+#endif
+
 
     return 0;
 }
@@ -389,24 +392,22 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
 				is_data = true;
+				slot->flags = NS_BUF_CHANGED;
 #  else //We must return the netmap buffer to the netmap buffer queue
-				if (slot->ptr) { //But only if we previously asked to
-					if (slot->ptr == -1)
-						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
+				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
+					if (p->buffer_destructor() == NetmapBufQ::buffer_destructor)
+						reinterpret_cast<NetmapBufQ*>(p->destructor_argument())->insert(slot->buf_idx);
 					else
-						reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
-				} else { //We free the current slot to the current pool
-
+						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
 				}
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {
-					slot->ptr = reinterpret_cast<uint64_t>(p->destructor_argument());
 					p->set_buffer_destructor(Packet::empty_destructor);
+					slot->flags = NS_BUF_CHANGED;
 				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not release ourselves
-					slot->ptr = 0;
+					slot->flags = NS_BUF_CHANGED | NS_NOFREE;
 				}
 #  endif
-				slot->flags |= NS_BUF_CHANGED;
 			} else
 #endif
 			{

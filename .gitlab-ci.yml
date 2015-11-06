@@ -19,6 +19,9 @@ netmap_nopool:
 netmap_nopool_nozc:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule && make
+dpdk:
+    script:
+        - ./configure RTE_SDK=/opt/dpdk/ RTE_TARGET=x86_64-native-linuxapp-gcc CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule && make
 fbatch:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch --disable-linuxmodule && make
