@@ -7,6 +7,11 @@ ip6:
 mt:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule && make
+dpdk:
+    script:
+        - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule RTE_SDK=$RTE_SDK && RTE_TARGET=$RTE_TARGET && make
+
 netmap_single:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --with-netmap --disable-linuxmodule && make
@@ -19,5 +24,4 @@ netmap_nopool:
 netmap_nopool_nozc:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule && make
-
 #before_script:

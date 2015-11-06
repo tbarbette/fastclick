@@ -1,12 +1,12 @@
 FastClick
 =========
-This is an extended version of the Click Modular Router featuring an 
+This is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It is the result of
 our ANCS paper available at http://hdl.handle.net/2268/181954
 You'll find more details on http://fastclick.run.montefiore.ulg.ac.be
 
 The last version is available on github, while the gitlab repo available
-in the last link have multiple branches to look at each features 
+in the last link have multiple branches to look at each features
 independently as we do in our paper.
 
 Netmap

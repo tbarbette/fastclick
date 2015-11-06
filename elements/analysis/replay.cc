@@ -25,7 +25,9 @@ CLICK_DECLS
 
 Replay::Replay() :  _active(true), _loaded(false),_burst(64), _stop(-1), _task(this)
 {
+#if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 Replay::~Replay()
@@ -57,12 +59,14 @@ Packet* Replay::pull(int port) {
     return _output[port].ring.extract();
 }
 
+#if HAVE_BATCH
 PacketBatch* Replay::pull_batch(int port, unsigned max) {
 	PacketBatch* head;
 	_task.reschedule();
     MAKE_BATCH(_output[port].ring.extract(),head,max);
     return head;
 }
+#endif
 
 int
 Replay::initialize(ErrorHandler *errh) {
@@ -99,7 +103,11 @@ Replay::run_task(Task* task)
 			for (int i = 0; i < ninputs(); i++) {
 				if (p_input[i] == 0) {
 					do_pull:
+#if HAVE_BATCH
 					p_input[i] = input(i).pull_batch(1);
+#else
+					p_input[i] = input(i).pull();
+#endif
 					if (p_input[i] == 0) {
 						if (_input[i].signal.active()) goto do_pull;
 						dry = i;
