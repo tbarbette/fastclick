@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() :  _active(true), _loaded(false),_burst(64), _stop(-1), _task(this)
+Replay::Replay() :  _active(true), _loaded(false),_burst(64), _stop(-1), _task(this), _quick_clone(true)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
@@ -39,6 +39,7 @@ Replay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
 	.read("STOP", _stop)
+	.read("QUICK_CLONE", _quick_clone)
 	.complete() < 0)
     return -1;
 
@@ -154,22 +155,23 @@ Replay::run_task(Task* task)
 		_queue_current = _queue_head;
 	}
 
-
 	unsigned int n = 0;
 	while (_queue_current != 0 && n < _burst) {
 		Packet* p = _queue_current;
 		_queue_current = p->next();
-		//p->get();
-		//click_chatter("Insert in %d",PAINT_ANNO(p));
-		Packet* q = p->clone(true);
+		Packet* q = p->clone(_quick_clone);
 
-		if (!_output[PAINT_ANNO(p)].ring.insert(q)) {
-			q->kill();
-			_queue_current = p;
-			_notifier.sleep();
-			return n > 0;
+		if (output_is_push(PAINT_ANNO(p))) {
+			output(PAINT_ANNO(p)).push_batch(PacketBatch::make_from_packet(q));
 		} else {
-			_notifier.wake();
+			if (!_output[PAINT_ANNO(p)].ring.insert(q)) {
+				q->kill();
+				_queue_current = p;
+				_notifier.sleep();
+				return n > 0;
+			} else {
+				_notifier.wake();
+			}
 		}
 
 		n++;

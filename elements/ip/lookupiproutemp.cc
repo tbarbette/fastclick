@@ -103,7 +103,7 @@ LookupIPRouteMP::initialize(ErrorHandler *)
 
 #if HAVE_BATCH
     void
-    LookupIPRouteMP::push_batch(int, PacketBatch *p)
+    LookupIPRouteMP::push_batch(int, PacketBatch *batch)
     {
     	PacketBatch* last = NULL;
 
@@ -113,90 +113,42 @@ LookupIPRouteMP::initialize(ErrorHandler *)
         IPAddress*  out_gw = new IPAddress[max + 1]; //Gw for each entry, last is used as a temp
         bzero(out_gw,sizeof(IPAddress) * (max+1));
 
-    	int last_o = -1;
-    	int passed = 0;
        
     	IPAddress last_addr = 0;
     	int last_entry = 0;
     	IPAddress last_addr2 = 0;
     	int last_entry2 = 0;
 
-    		if (p == NULL) {
-    			click_chatter("ERROR");
-    		}
-    	while (p != NULL) {
+	auto fnt = [this,&out_gw,&max,&last_addr,&last_entry,&last_addr2,&last_entry2](Packet* p){
+		IPAddress a = p->dst_ip_anno();
+			int o = max;
 
-    	    IPAddress a = p->dst_ip_anno();
-    	    int o = max;
-
-
-    	    if (a && a == last_addr) {
-    	    	o = last_entry;
-    	    } else if (a && a == last_addr2) {
-    	    	o = last_entry2;
-    	    } else if (_t.lookup(a, out_gw[max], o)) {
+			if (a && a == last_addr) {
+				o = last_entry;
+			} else if (a && a == last_addr2) {
+				o = last_entry2;
+			} else if (_t.lookup(a, out_gw[max], o)) {
 				last_addr2 = last_addr;
 				last_entry2 = last_entry;
 				last_addr = a;
 				last_entry = o;
 				out_gw[o] = out_gw[max];
-    	    } else {
-    	    	static int complained = 0;
-    	    	if (++complained <= 5)
-    	    		click_chatter("LookupIPRouteMP: no route for %s", a.unparse().c_str());
-    	    	goto no_route;
-    	    }
+			} else {
+				static int complained = 0;
+				if (++complained <= 5)
+					click_chatter("LookupIPRouteMP: no route for %s", a.unparse().c_str());
+				goto no_route;
+			}
 
 
-    	    if (out_gw[o])
-    		p->set_dst_ip_anno(out_gw[o]);
+			if (out_gw[o])
+			p->set_dst_ip_anno(out_gw[o]);
 
-    	    no_route:
-    	    if (o == -1) o = max;
-    		if (o == last_o) {
-    			//If same output than last packet, count
-    			passed ++;
-    			//Do nothing else, they are already linked
-    		} else {
-
-    				if (last != NULL) { //If it's not the first packet, we cut the last list
-    					last->set_next(NULL);
-
-						out[last_o]->set_tail(last);
-						out[last_o]->set_count(out[last_o]->count() + passed);
-    				}
-
-    				if (!out[o]) {//If there wasn't any packet for this output
-    					out[o] = PacketBatch::make_from_packet(p);
-    				} else {
-    					out[o]->append_packet(p);
-    				}
-
-    				//Reset the number of packets of the same output to 0
-    				passed = 0;
-       		}
-    		last = p;
-    		p = static_cast<PacketBatch*>(p->next());
-    		last_o = o;
-    	}
-
-    	if (passed) { //If there was packet passed when we finished
-    		out[last_o]->set_tail(last);
-    		out[last_o]->set_count(out[last_o]->count() + passed);
-    	}
-
-    	//Effectively send the batches
-    	int i = 0;
-    	for (; i < max; i++) {
-    		//click_chatter("%d %s",i,output(i).element()->name().c_str());
-    		if (out[i]) {
-    			//out[i]->tail()->set_next(NULL);
-    			output(i).push_batch(out[i]);
-    		}
-    	}
-       if (out[max]) {
-           out[max]->kill();
-    	}
+			no_route:
+			if (o == -1) o = max;
+			return o;
+        };
+        CLASSIFY_EACH_PACKET((max + 1),fnt,batch,[this](int port,PacketBatch* batch){checked_output_push_batch(port,batch);});
         delete[] out_gw;
     }
 #endif
