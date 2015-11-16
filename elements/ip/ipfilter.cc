@@ -1377,7 +1377,17 @@ IPFilter::length_checked_match(const IPFilterProgram &zprog, const Packet *p,
 	goto gotit;
     }
 }
+#if HAVE_BATCH
+void
+IPFilter::push_batch(int, PacketBatch *batch)
+{
+	CLASSIFY_EACH_PACKET(	(noutputs() + 1),
+							[this](Packet* p){int n = match(_zprog, p);if (n < 0||n>noutputs()) return noutputs();return n;},
+							batch,
+							[this](int output,PacketBatch* batch){if (batch) {checked_output_push_batch(output,batch);};});
 
+}
+#endif
 void
 IPFilter::push(int, Packet *p)
 {

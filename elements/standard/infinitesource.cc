@@ -32,7 +32,9 @@ CLICK_DECLS
 InfiniteSource::InfiniteSource()
     : _packet(0), _task(this), _end_h(0)
 {
+#if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 void *

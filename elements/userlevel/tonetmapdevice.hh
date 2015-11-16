@@ -102,8 +102,9 @@ public:
     enum { h_signal };
 
     unsigned int _internal_queue;
+    bool _pull_use_select;
 
-    unsigned int send_packets(Packet* &packet, bool ask_sync=false);
+    unsigned int send_packets(Packet* &packet, bool ask_sync=false, bool txsync_on_empty = true);
 
     NetmapDevice* _device;
 

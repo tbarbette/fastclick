@@ -71,6 +71,12 @@ class Packet { public:
 #endif
 #if CLICK_USERLEVEL || CLICK_MINIOS
     typedef void (*buffer_destructor_type)(unsigned char* buf, size_t sz, void* argument);
+
+    /*Empty destructor does nothing (buffer management is done totally
+     * externally. Prefer to use this one instead of an empty one as this
+     * special case will be optimized.*/
+    static void empty_destructor(unsigned char *, size_t, void *);
+
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
                                 void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
@@ -301,6 +307,7 @@ class Packet { public:
     inline void change_headroom_and_length(uint32_t headroom, uint32_t length);
     inline void change_buffer_length(uint32_t length);
 #endif
+    void copy(Packet* p, int headroom=0);
     //@}
 
     /** @name Header Pointers */
@@ -319,10 +326,12 @@ class Packet { public:
     inline int network_header_offset() const;
     inline uint32_t network_header_length() const;
     inline int network_length() const;
+    inline void set_network_header(const unsigned char *p);
     inline void set_network_header(const unsigned char *p, uint32_t len);
     inline void set_network_header_length(uint32_t len);
     inline void clear_network_header();
 
+    inline void set_transport_header(const unsigned char *p);
     inline bool has_transport_header() const;
     inline const unsigned char *transport_header() const;
     inline int transport_header_offset() const;
@@ -961,7 +970,9 @@ class WritablePacket : public Packet { public:
                 for (;p != NULL;p=next,next=(p==0?0:p->next()))
 
 /**
- * Cannot drop ! Use _DROPPABLE version if it could
+ * Execute a function on each packets of a batch. The function may return
+ * another packet to replace the current one. This version cannot drop !
+ * Use _DROPPABLE version if the function could return null.
  */
 #define EXECUTE_FOR_EACH_PACKET(fnt,batch) \
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\
@@ -980,6 +991,10 @@ class WritablePacket : public Packet { public:
 					last = q;\
 				}
 
+/**
+ * Execute a function on each packet of a batch. The function may return
+ * another packet, or null if the packet could be dropped.
+ */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
@@ -1011,6 +1026,59 @@ class WritablePacket : public Packet { public:
 					batch->set_tail(last);\
 				}\
 			}\
+
+/**
+ * Split a batch into multiple batch according to a given function which will
+ * give the index of an output to choose.
+ * @fnt Function to call which will return a value between 0 and nbatches
+ * #on_finish function which take an output index and a number to call when classification is finished
+ */
+#define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
+	{\
+		PacketBatch* out[nbatches];\
+		bzero(out,sizeof(PacketBatch*)*nbatches);\
+		PacketBatch* next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
+		PacketBatch* p = batch;\
+		PacketBatch* last = NULL;\
+		int last_o = -1;\
+		int passed = 0;\
+		for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
+			int o = fnt(p);\
+			if (o == last_o) {\
+				passed ++;\
+			} else {\
+				if (last == NULL) {\
+					out[o] = p;\
+					p->set_count(1);\
+				} else {\
+					last->set_next(NULL);\
+					out[last_o]->set_tail(last);\
+					out[last_o]->set_count(out[last_o]->count() + passed);\
+					if (!out[o]) {\
+						out[o] = PacketBatch::make_from_packet(p);\
+					} else {\
+						out[o]->append_packet(p);\
+					}\
+					passed = 0;\
+				}\
+			}\
+			last = p;\
+			last_o = o;\
+		}\
+\
+		if (passed) {\
+			out[last_o]->set_tail(last);\
+			out[last_o]->set_count(out[last_o]->count() + passed);\
+		}\
+\
+		int i = 0;\
+		for (; i < nbatches; i++) {\
+			if (out[i]) {\
+				out[i]->tail()->set_next(NULL);\
+				on_finish(i,out[i]);\
+			}\
+		}\
+	}
 
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
@@ -2425,6 +2493,44 @@ Packet::push_mac_header(uint32_t len)
     return q;
 }
 
+/** @brief Set the network header
+ * @param p new network header pointer
+ */
+inline void
+Packet::set_network_header(const unsigned char *p)
+{
+#if CLICK_LINUXMODULE	/* Linux kernel module */
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
+    skb_set_network_header(skb(), p - data());
+# else
+    skb()->nh.raw = const_cast<unsigned char *>(p);
+# endif
+#elif CLICK_DPDK_POOLS
+    all_anno()->nh = const_cast<unsigned char *>(p);
+#else				/* User-space and BSD kernel module */
+    _aa.nh = const_cast<unsigned char *>(p);
+#endif
+}
+
+/** @brief Set the transport header
+ * @param p new transport header pointer
+ */
+inline void
+Packet::set_transport_header(const unsigned char *p)
+{
+#if CLICK_LINUXMODULE	/* Linux kernel module */
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
+    skb_set_transport_header(skb(), p - data());
+# else
+    skb()->h.raw = const_cast<unsigned char *>(p);
+# endif
+#elif CLICK_DPDK_POOLS
+    all_anno()->h = const_cast<unsigned char *>(p);
+#else				/* User-space and BSD kernel module */
+    _aa.h = const_cast<unsigned char *>(p);
+#endif
+}
+
 /** @brief Set the network and transport header pointers.
  * @param p new network header pointer
  * @param len new network header length
@@ -3090,7 +3196,7 @@ inline void PacketBatch::safe_kill(bool is_data) {
  * Recycle a whole batch of packets
  */
 inline void PacketBatch::safe_kill() {
-	click_chatter("Need testing... Use batch->kill();");
+	click_chatter("Need testing... Use batch->kill() for now;");
 	assert(false);
     BATCH_RECYCLE_START();
     FOR_EACH_PACKET_SAFE(this,up) {

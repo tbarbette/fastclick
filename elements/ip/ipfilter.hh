@@ -1,7 +1,7 @@
 #ifndef CLICK_IPFILTER_HH
 #define CLICK_IPFILTER_HH
 #include "elements/standard/classification.hh"
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -112,7 +112,7 @@ classifier pattern.
 IPClassifier, Classifier, CheckIPHeader, MarkIPHeader, CheckIPHeader2,
 AddressInfo, tcpdump(1) */
 
-class IPFilter : public Element { public:
+class IPFilter : public BatchElement { public:
 
     IPFilter() CLICK_COLD;
     ~IPFilter() CLICK_COLD;
@@ -130,6 +130,9 @@ class IPFilter : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *);
+#endif
     void push(int port, Packet *);
 
     typedef Classification::Wordwise::CompressedProgram IPFilterProgram;

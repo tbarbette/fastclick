@@ -103,7 +103,7 @@ fi
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [have only netmap packets in the pool])],
     [:], [enable_netmap_pool=no])
-    
+
 PTHREAD_LIBS=""
 AC_SUBST(PTHREAD_LIBS)
 
@@ -1288,6 +1288,14 @@ if test "x$enable_netmap_pool" = "xyes"; then
 =========================================
 
 --enable-netmap-pool requires --with-netmap which was not provided.
+
+=========================================])
+    fi
+    if test "x$enable_zerocopy" != "xyes"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-netmap-pool requires --enable-zerocopy which was not provided.
 
 =========================================])
     fi

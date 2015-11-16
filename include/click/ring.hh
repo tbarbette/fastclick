@@ -70,7 +70,7 @@ CLICK_DECLS
 template <typename T> class DynamicRing {
 
 protected:
-int _size;
+uint32_t _size;
 
 	inline uint32_t next_i(uint32_t i) {
 		if (i == _size -1)
@@ -86,6 +86,8 @@ int _size;
 		else
 			i++;
 	}
+
+    T* ring;
 public:
 int id;
     DynamicRing() : _size(0) {
@@ -132,7 +134,7 @@ int id;
         return next_i(head) == tail;
     }
 
-    T* ring;
+
     uint32_t head;
     uint32_t tail;
 

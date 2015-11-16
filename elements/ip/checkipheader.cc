@@ -141,7 +141,7 @@ CheckIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 Packet *
-CheckIPHeader::drop(Reason reason, Packet *p)
+CheckIPHeader::drop(Reason reason, Packet *p, bool batch)
 {
     if (_drops == 0 || _verbose)
 	click_chatter("%s: IP header check failed: %s", name().c_str(), reason_texts[reason]);
@@ -151,16 +151,19 @@ CheckIPHeader::drop(Reason reason, Packet *p)
 	_reason_drops[reason]++;
 
 #if HAVE_BATCH
-    if (noutputs() == 2)
-        output(1).push_batch(PacketBatch::make_from_packet(p));
-    else
-    	p->kill();
-#else
-    if (noutputs() == 2)
-	output(1).push(p);
-    else
-	p->kill();
+    if (batch) {
+		if (noutputs() == 2)
+			output(1).push_batch(PacketBatch::make_from_packet(p));
+		else
+			p->kill();
+    } else
 #endif
+	{
+		if (noutputs() == 2)
+		output(1).push(p);
+		else
+		p->kill();
+	}
 
     return 0;
 }
@@ -247,14 +250,14 @@ CheckIPHeader::simple_action_batch(PacketBatch* head) {
 			if (current == head) {
 				head = PacketBatch::make_from_packet(current->next());
 				current->set_next(NULL);
-				drop(r,current);
+				drop(r,current,true);
 				current = head;
 				last = head;
 			} else {
 				Packet* todrop = current;
 				current = current->next();
 				todrop->set_next(NULL);
-				drop(r,todrop);
+				drop(r,todrop,true);
 				last->set_next(current);
 			}
 		}
@@ -273,7 +276,7 @@ CheckIPHeader::simple_action(Packet *p)
   if ((r = valid(p)) == NREASONS)
 	  return p;
   else {
-	  drop(r, p);
+	  drop(r, p,false);
 	  return NULL;
   }
 }

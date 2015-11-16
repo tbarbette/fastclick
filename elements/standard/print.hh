@@ -1,6 +1,6 @@
 #ifndef CLICK_PRINT_HH
 #define CLICK_PRINT_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/string.hh>
 CLICK_DECLS
 
@@ -67,7 +67,7 @@ Returns or sets the ACTIVE parameter.
 
 IPPrint */
 
-class Print : public Element { public:
+class Print : public BatchElement { public:
 
     Print() CLICK_COLD;
 
@@ -78,8 +78,11 @@ class Print : public Element { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
+    void smaction(Packet *);
+#if HAVE_BATCH
+    PacketBatch* simple_action_batch(PacketBatch *);
+#endif
     Packet *simple_action(Packet *);
-
  private:
 
     String _label;

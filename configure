@@ -707,6 +707,8 @@ LINUXMODULE_FIXINCLUDES
 USE_DPDK
 RTE_VER_MINOR
 RTE_VER_MAJOR
+RTE_TARGET
+RTE_SDK
 PTHREAD_LIBS
 HAVE_BATCH
 AR_CREATEFLAGS
@@ -1534,13 +1536,16 @@ Optional Features:
   --disable-threads       do not include thread management elements
   --enable-wifi           include wifi elements and support
   --enable-experimental   enable experimental elements in normal groups
-  --enable-skip-elements=ELTS disable comma-separated elements
+  --enable-skip-elements=ELTS
+                          disable comma-separated elements
   --enable-smaller-code   generate smaller code (sometimes slower)
   --disable-int64         disable 64-bit integer support
   --enable-nanotimestamp  enable nanosecond timestamps
-  --enable-bound-port-transfer  enable port transfer function ptr optimization
-  --enable-tools=WHERE    enable tools (host/build/mixed/no) [mixed]
-  --disable-dynamic-linking disable dynamic linking
+  --enable-bound-port-transfer
+                          enable port transfer function ptr optimization
+  --enable-tools=WHERE    enable tools (host/build/mixed/no) [[mixed]]
+  --disable-dynamic-linking
+                          disable dynamic linking
   --enable-stats[=LEVEL]  enable statistics collection
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
@@ -6377,6 +6382,7 @@ fi
 
 PTHREAD_LIBS=""
 
+
 if test "x$enable_user_multithread" = xyes; then
     SAVE_LIBS="$LIBS"
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_create" >&5
@@ -6483,8 +6489,6 @@ Can't find -lpthread and/or <pthread.h>, so I can't compile with
     LIBS="$SAVE_LIBS"
 fi
 
-
-
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
   enableval=$enable_select; :
@@ -6571,8 +6575,10 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi
-    rte_ver_major=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MAJOR" | head -n 1 | awk '{print $3}'`
-    rte_ver_minor=`cat $RTE_SDK/$RTE_TARGET/include/rte_version.h | grep "#define RTE_VER_MINOR" | head -n 1 | awk '{print $3}'`
+    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+
+
     RTE_VER_MAJOR=$rte_ver_major
 
     RTE_VER_MINOR=$rte_ver_minor
@@ -9846,7 +9852,7 @@ if test "$LINUXMODULE_2_6" = 0; then
 =========================================
 
 Click no longer supports in-kernel compilation on Linux 2.4 kernels.
-Try an older version of Click.
+Update your Linux or try an older version of Click.
 
 =========================================" "$LINENO" 5
 fi
@@ -10923,6 +10929,14 @@ if test "x$enable_netmap_pool" = "xyes"; then
 
 =========================================" "$LINENO" 5
     fi
+    if test "x$enable_zerocopy" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-netmap-pool requires --enable-zerocopy which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
     $as_echo "#define HAVE_NETMAP_PACKET_POOL 1" >>confdefs.h
 
     HAVE_NETMAP_PACKET_POOL=yes
@@ -11242,12 +11256,7 @@ Can't find Linux compilation flags.
 ==============================================" "$LINENO" 5
                     fi
         echo "$lCPPFLAGS $lCFLAGS $lLINUXINCLUDE $lKBUILD_CPPFLAGS $lKBUILD_CFLAGS" >conftest.dat
-        LINUX_CFLAGS="`sed -e 's,-Iinclude ',-I$linux_builddir/include' ,g' \
-            -e 's,-Iinclude2 ',-I$linux_builddir/include2' ,g' \
-            -e 's,-Iarch/',-I$linux_builddir/arch/',g' \
-            -e 's, include/, '$linux_builddir/include/,g \
-            -e s,-Iinclude/,-I${linux_srcdir}include/,g \
-            -e s,-Wno-pointer-sign,,g \
+        LINUX_CFLAGS="`sed -e s,-Wno-pointer-sign,,g \
             -e s,-fno-unit-at-a-time,,g \
             -e s,-Wstrict-prototypes,,g \
             -e s,-Wdeclaration-after-statement,,g \
@@ -11265,19 +11274,21 @@ $as_echo "$LINUX_CFLAGS" >&6; }
     if test "$LINUXMODULE_FIXINCLUDES" = 1; then
         { $as_echo "$as_me:${as_lineno-$LINENO}: making C++-safe versions of Linux kernel headers (may take a while)" >&5
 $as_echo "$as_me: making C++-safe versions of Linux kernel headers (may take a while)" >&6;}
-        mydir="`pwd`/include/click-linuxmodule"
-        $srcdir/linuxmodule/fixincludes.pl -o "$mydir" $LINUX_CFLAGS >conftest.dat
+        mydir="`pwd`"
+        mysrcdir="$srcdir"
+        if expr $mysrcdir : / >/dev/null; then :; else mysrcdir="$mydir/$srcdir"; fi
+        (cd $linux_builddir; $mysrcdir/linuxmodule/click-linuxtool.pl -o "$mydir/include/click-linuxmodule" $LINUX_CFLAGS) >conftest.dat
         if test $? != 0; then
             as_fn_error $? "
 ==============================================
 
-fixincludes.pl execution failed.
+click-linuxtool.pl execution failed.
 
 ==============================================" "$LINENO" 5
         fi
         LINUX_CFLAGS="`head -n 1 conftest.dat`"
         LINUX_FIXINCLUDES_PROGRAM="| sed `tail -n 1 conftest.dat`"
-        CLICKLINUX_FIXINCLUDES_PROGRAM="| sed `tail -n 1 conftest.dat | sed -e "s$tabchar$mydir$tabchar$clickbuild_includedir/click-linuxmodule${tabchar}g"`"
+        CLICKLINUX_FIXINCLUDES_PROGRAM="| sed `tail -n 1 conftest.dat | sed -e "s$tabchar$mydir/include/click-linuxmodule$tabchar$clickbuild_includedir/click-linuxmodule${tabchar}g"`"
     fi
 
 
@@ -11370,11 +11381,11 @@ Your Linux kernel header files cause errors when included by a C++ program,
 so I won't try to compile the linuxmodule driver.
 
 Click modifies the Linux kernel's header files to make them work with
-C++, using the program 'linuxmodule/fixincludes.pl'. It looks like
-your kernel header files have features that 'linuxmodule/fixincludes.pl'
-doesn't know how to fix. You can report this error to us on the Click
-mailing list, or, even better, try to fix the error. See the config.log
-file for more information on the error.
+C++, using the program 'linuxmodule/click-linuxtool.pl'. It looks like
+your kernel header files have features that tool doesn't know how to fix.
+You can report this error to us on the Click mailing list, or, even better,
+try to fix the error. See the config.log file for more information on the
+error.
 
 =========================================" >&5
 $as_echo "$as_me: WARNING:
@@ -11384,11 +11395,11 @@ Your Linux kernel header files cause errors when included by a C++ program,
 so I won't try to compile the linuxmodule driver.
 
 Click modifies the Linux kernel's header files to make them work with
-C++, using the program 'linuxmodule/fixincludes.pl'. It looks like
-your kernel header files have features that 'linuxmodule/fixincludes.pl'
-doesn't know how to fix. You can report this error to us on the Click
-mailing list, or, even better, try to fix the error. See the config.log
-file for more information on the error.
+C++, using the program 'linuxmodule/click-linuxtool.pl'. It looks like
+your kernel header files have features that tool doesn't know how to fix.
+You can report this error to us on the Click mailing list, or, even better,
+try to fix the error. See the config.log file for more information on the
+error.
 
 =========================================" >&2;}
             else
@@ -11398,11 +11409,11 @@ file for more information on the error.
 Your Linux kernel header files cause errors when included by a C++ program.
 
 Click modifies the Linux kernel's header files to make them work with
-C++, using the program 'linuxmodule/fixincludes.pl'. It looks like
-your kernel header files have features that 'linuxmodule/fixincludes.pl'
-doesn't know how to fix. You can report this error to us on the Click
-mailing list, or, even better, try to fix the error. See the config.log
-file for more information on the error.
+C++, using the program 'linuxmodule/click-linuxtool.pl'. It looks like
+your kernel header files have features that tool doesn't know how to fix.
+You can report this error to us on the Click mailing list, or, even better,
+try to fix the error. See the config.log file for more information on the
+error.
 
 =========================================" "$LINENO" 5
     fi
@@ -12746,7 +12757,7 @@ $as_echo_n "checking for get_monotonic_coarse kernel symbol... " >&6; }
 if ${ac_cv_linux_get_monotonic_coarse+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  if grep "__ksymtab_get_monotonic_coarse" $linux_system_map >/dev/null 2>&1; then
+  if grep '__ksymtab_get_monotonic_coarse$' $linux_system_map >/dev/null 2>&1; then
         ac_cv_linux_get_monotonic_coarse=yes
     else ac_cv_linux_get_monotonic_coarse=no; fi
 fi
@@ -12754,6 +12765,22 @@ fi
 $as_echo "$ac_cv_linux_get_monotonic_coarse" >&6; }
     if test $ac_cv_linux_get_monotonic_coarse = yes; then
         $as_echo "#define HAVE_LINUX_GET_MONOTONIC_COARSE 1" >>confdefs.h
+
+    fi
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ktime_mono_to_any kernel symbol" >&5
+$as_echo_n "checking for ktime_mono_to_any kernel symbol... " >&6; }
+if ${ac_cv_linux_ktime_mono_to_any+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if grep '__ksymtab_ktime_mono_to_any$' $linux_system_map >/dev/null 2>&1; then
+        ac_cv_linux_ktime_mono_to_any=yes
+    else ac_cv_linux_ktime_mono_to_any=no; fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_linux_ktime_mono_to_any" >&5
+$as_echo "$ac_cv_linux_ktime_mono_to_any" >&6; }
+    if test $ac_cv_linux_ktime_mono_to_any = yes; then
+        $as_echo "#define HAVE_LINUX_KTIME_MONO_TO_ANY 1" >>confdefs.h
 
     fi
 
@@ -12859,6 +12886,62 @@ fi
     if test $ac_cv_linux_d_make_root = yes; then
 
 $as_echo "#define HAVE_LINUX_D_MAKE_ROOT 1" >>confdefs.h
+
+    fi
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether struct dentry has a d_child member" >&5
+$as_echo_n "checking whether struct dentry has a d_child member... " >&6; }
+if ${ac_cv_linuxmodule_dentry_d_child+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#define KBUILD_STR(s) #s
+#define KBUILD_BASENAME KBUILD_STR(click)
+#define KBUILD_MODNAME KBUILD_STR(click)
+#define new linux_new
+#define this linux_this
+#define delete linux_delete
+#define class linux_class
+#define virtual linux_virtual
+#define typename linux_typename
+#define private linux_private
+#define protected linux_protected
+#define public linux_public
+#define namespace linux_namespace
+#define false linux_false
+#define true linux_true
+#define CLICK_CXX_PROTECTED 1
+$linux_autoconf_include
+#include <asm/types.h>
+#include <linux/fs.h>
+#include <linux/dcache.h>
+int
+main ()
+{
+extern struct dentry* de; de->d_child.next = 0;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_cv_linuxmodule_dentry_d_child=yes
+else
+  ac_cv_linuxmodule_dentry_d_child=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_linuxmodule_dentry_d_child" >&5
+$as_echo "$ac_cv_linuxmodule_dentry_d_child" >&6; }
+    if test $ac_cv_linuxmodule_dentry_d_child = yes; then
+
+$as_echo "#define HAVE_LINUX_DENTRY_D_CHILD 1" >>confdefs.h
 
     fi
 

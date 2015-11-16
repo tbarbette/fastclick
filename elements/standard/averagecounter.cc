@@ -89,18 +89,20 @@ AverageCounter::simple_action(Packet *p)
 static String
 averagecounter_read_count_handler(Element *e, void *thunk)
 {
+  int user_data = (long)thunk;
   AverageCounter *c = (AverageCounter *)e;
-  return String(thunk ? c->byte_count() : c->count());
+  return String(user_data ? (user_data == 2 ? c->byte_count() * 8 : c->byte_count()) : c->count());
 }
 
 static String
 averagecounter_read_rate_handler(Element *e, void *thunk)
 {
   AverageCounter *c = (AverageCounter *)e;
-  uint32_t d = c->last() - c->first();
+  uint64_t d = c->last() - c->first();
+  int user_data = (long)thunk;
   d -= c->ignore();
   if (d < 1) d = 1;
-  uint32_t count = (thunk ? c->byte_count() : c->count());
+  uint64_t count = (user_data ? (user_data == 2 ? c->byte_count() * 8 : c->byte_count()) : c->count());
 #if CLICK_USERLEVEL
   return String(((double) count * CLICK_HZ) / d);
 #else
@@ -127,8 +129,10 @@ AverageCounter::add_handlers()
 {
   add_read_handler("count", averagecounter_read_count_handler, 0);
   add_read_handler("byte_count", averagecounter_read_count_handler, 1);
+  add_read_handler("bits_count", averagecounter_read_count_handler, 2);
   add_read_handler("rate", averagecounter_read_rate_handler, 0);
   add_read_handler("byte_rate", averagecounter_read_rate_handler, 1);
+  add_read_handler("bits_rate", averagecounter_read_rate_handler, 2);
   add_write_handler("reset", averagecounter_reset_write_handler, 0, Handler::BUTTON);
 }
 

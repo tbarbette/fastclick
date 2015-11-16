@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(1),_internal_queue(512)
+ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(1),_internal_queue(512),_pull_use_select(true)
 {
 }
 
@@ -57,7 +57,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (burst > 0) {
-        if (input_is_pull(0))
+        if (input_is_push(0))
             errh->warning("%s: burst does not make sense in full push with batching, it is unused.",name().c_str());
         _burst = burst;
     }
@@ -75,8 +75,11 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
-    if (ninputs() && input_is_pull(1))
+#if HAVE_BATCH
+    if (ninputs() && input_is_pull(0))
         in_batch_mode = BATCH_MODE_YES;
+#endif
+
 
     return 0;
 }
@@ -89,7 +92,7 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    ret = initialize_tasks(false,errh);
+    ret = initialize_tasks(input_is_pull(0) && !_pull_use_select,errh);
     if (ret != 0)
         return ret;
 
@@ -98,8 +101,10 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 		even the iqueue is full*/
 	if (input_is_pull(0)) {
 		_queues.resize(router()->master()->nthreads());
-		for (int i = 0; i < nqueues; i++) {
-			master()->thread(thread_for_queue(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+		if (_pull_use_select) {
+			for (int i = 0; i < nqueues; i++) {
+				master()->thread(thread_for_queue(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+			}
 		}
 
 		int nt = 0;
@@ -132,13 +137,6 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 	return 0;
 }
 
-void
-ToNetmapDevice::selected(int fd, int)
-{
-	task_for_thread()->reschedule();
-	master()->thread(click_current_cpu_id())->select_set().remove_select(fd,this,SELECT_WRITE);
-}
-
 inline void ToNetmapDevice::allow_txsync() {
     for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++)
         _iodone[i] = false;
@@ -159,6 +157,8 @@ inline void ToNetmapDevice::do_txsync(int fd) {
  *  sent packets if an interrupt has been sent to the TX ring.
  * This require our modified netmap version, but will still work with vanilla
  *  Netmap.
+ *
+ *  Only supported with modified netmap !
  */
 inline void ToNetmapDevice::do_txreclaim(int fd) {
     ioctl(fd,NIOCTXSYNC,1);
@@ -208,7 +208,7 @@ do_send_batch:
 	Packet* last = s.q->prev();
 
     lock(); //Lock only if multiple threads can go here
-    unsigned sent = send_packets(s.q,ask_sync);
+    unsigned sent = send_packets(s.q,ask_sync,true);
     unlock();
 
     if (sent > 0 && s.q)
@@ -278,7 +278,7 @@ do_send:
 		}
 
 		//Lock is acquired
-		unsigned int sent = send_packets(s.q);
+		unsigned int sent = send_packets(s.q,false,false);
 
 		if (sent > 0 && s.q)
 			s.q->set_prev(last);
@@ -323,7 +323,7 @@ int complaint = 0;
  *
  * @return The number of packets sent
  */
-inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
+inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, bool txsync_on_empty) {
 	State &s = state.get();
 	struct nm_desc* nmd;
 	struct netmap_ring *txring;
@@ -346,7 +346,8 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 		txring = NETMAP_TXRING(nmd->nifp, i);
 
 		if (nm_ring_empty(txring)) {
-			try_txsync(i,nmd->fd);
+			if (txsync_on_empty)
+				try_txsync(i,nmd->fd);
 			continue;
 		}
 
@@ -357,47 +358,51 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 #endif
 
 		u_int cur = txring->cur;
-		while ((nm_ring_space(txring) >= next_slots) && next) {
+		u_int space = nm_ring_space(txring);
+		while ((space >= next_slots) && next) {
 			p = next;
 			next_slots = ((next->length() - 1) / nmd->some_ring->nr_buf_size) + 1;
 			next = static_cast<WritablePacket*>(p->next());
 
 			slot = &txring->slot[cur];
 			bool is_data = false;
-#if HAVE_NETMAP_PACKET_POOL
-			slot->len = p->length();
-			if (p->headroom() > 0) {
-				complaint++;
-				if (complaint < 5)
-					click_chatter("Shifting data in %s. You should avoid this case !");
-				p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
-			}
-			unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
-			slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
-			static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
-			slot->flags |= NS_BUF_CHANGED;
-#else
-# if HAVE_ZEROCOPY
+#if HAVE_ZEROCOPY
 			if (likely(NetmapBufQ::is_netmap_packet(p))) {
 				slot->len = p->length();
-				if (slot->ptr) {
-					//click_chatter("Free %lu",slot->ptr);
-					//reinterpret_cast<NetmapBufQ*>(slot->ptr)->insert(slot->buf_idx);
+				if (p->headroom() > 0) {
+					complaint++;
+					if (complaint < 5)
+						click_chatter("Shifting data in %s. You should avoid this case !");
+					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
+				}
+#  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
+				unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
+				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
+				is_data = true;
+				slot->flags = NS_BUF_CHANGED;
+#  else //We must return the netmap buffer to the netmap buffer queue
+				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
+					if (p->buffer_destructor() == NetmapBufQ::buffer_destructor)
+						reinterpret_cast<NetmapBufQ*>(p->destructor_argument())->insert(slot->buf_idx);
+					else
+						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
 				}
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
-				slot->flags |= NS_BUF_CHANGED;
 				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {
-					slot->ptr = reinterpret_cast<uint64_t>(p->destructor_argument());
-					p->set_buffer_destructor(NetmapBufQ::buffer_destructor_fake);
-				} else {
-					slot->ptr = 0;
+					p->set_buffer_destructor(Packet::empty_destructor);
+					slot->flags = NS_BUF_CHANGED;
+				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not release ourselves
+					slot->flags = NS_BUF_CHANGED | NS_NOFREE;
 				}
+#  endif
 			} else
-# endif
+#endif
 			{
 				unsigned char* srcdata = p->data();
 				int length = p->length();
 				is_data = (p->data_packet() == 0 && p->buffer_destructor() == 0);
+
 				while (length > txring->nr_buf_size) {
 					click_chatter("Warning ! Buffer splitting is highly experimental ! Prefer to send < 2k packets !");
 					is_data = false;
@@ -411,14 +416,13 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 						ask_sync = true;
 						slot->flags |= NS_REPORT;
 					}
+					space--;
 					cur = nm_ring_next(txring,cur);
-					assert (cur != txring->tail);
 					slot = &txring->slot[cur];
 				}
 				memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,length);
 				slot->len = length;
 			}
-#endif
 		if (unlikely(cur % 32 == 0)) {
 			ask_sync = true;
 			slot->flags |= NS_REPORT;
@@ -442,6 +446,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 			p->kill();
 #endif
 			sent++;
+			space--;
 			cur = nm_ring_next(txring,cur);
 #if !HAVE_NETMAP_PACKET_POOL
 			if (next)
@@ -466,6 +471,13 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync) {
 	}
 }
 
+void
+ToNetmapDevice::selected(int fd, int)
+{
+	task_for_thread()->reschedule();
+	master()->thread(click_current_cpu_id())->select_set().remove_select(fd,this,SELECT_WRITE);
+}
+
 bool
 ToNetmapDevice::run_task(Task* task)
 {
@@ -476,7 +488,6 @@ ToNetmapDevice::run_task(Task* task)
 	unsigned batch_size = s.q_size;
 	s.q = NULL;
 	s.q_size = 0;
-	bool ask_sync = false;
 	do {
 #if HAVE_BATCH
 		if (!batch || batch_size < _burst) {
@@ -527,16 +538,16 @@ ToNetmapDevice::run_task(Task* task)
 			last->set_next(NULL); //Just to be sure
 
 			lock();
-			unsigned int sent = send_packets(batch);
+			unsigned int sent = send_packets(batch,false,false);
 			unlock();
 
 			total_sent += sent;
 			batch_size -= sent;
 
-			if (sent > 0) { //At least one packet sent
-				if (batch) //Reestablish the tail if we could not send everything
-					batch->set_prev(last);
-			} else
+			if (batch) //Reestablish the tail if we could not send everything
+				batch->set_prev(last);
+
+			if (sent == 0 || batch) //Not all packets could be sent
 				break;
 		} else //No packet to send
 			break;
@@ -548,10 +559,14 @@ ToNetmapDevice::run_task(Task* task)
 		s.q_size = batch_size;
 		//Register fd to wait for space
 		for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
-			master()->thread(click_current_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+			if (_pull_use_select)
+				master()->thread(click_current_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
+			else
+				do_txsync(_device->nmds[i]->fd);
 		}
-	} else if (total_sent) {
-		task->fast_reschedule();
+		if (!_pull_use_select)
+			task->fast_reschedule();
+
 	} else if (s.signal.active()) {
 		//We sent everything we could, but check signal to see if packet arrived after last read
 		task->fast_reschedule();
@@ -559,7 +574,6 @@ ToNetmapDevice::run_task(Task* task)
 		if (s.backoff < 256)
 			s.backoff*=2;
 		s.timer->schedule_after(Timestamp::make_usec(s.backoff));
-
 	}
 	return total_sent;
 }

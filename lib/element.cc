@@ -1671,8 +1671,8 @@ public:
 
      InputThreadVisitor(Bitvector& b): bitmask(b), fullpush(true) {}
 
-     virtual bool visit(Element *e, bool isoutput, int port,
-                   Element *from_e, int from_port, int distance) {
+     virtual bool visit(Element *e, bool, int,
+                   Element *, int, int) {
          bool ret = e->get_runnable_threads(bitmask);
          if (ret == false)
              fullpush = false;
