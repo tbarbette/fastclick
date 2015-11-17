@@ -228,7 +228,6 @@ inline int IPOutputCombo::action(Packet* &p_in, bool color) {
 
 			if (o == 1) {
 				PacketBatch* clone = PacketBatch::make_from_packet(cur->clone());
-				clone->set_next(NULL);
 				output(1).push_batch(clone);
 				o = action(cur, false);
 			}
@@ -238,7 +237,6 @@ inline int IPOutputCombo::action(Packet* &p_in, bool color) {
 				} else {
 					last->set_next(next);
 				}
-				cur->set_next(NULL);
 				output(o).push_batch(PacketBatch::make_from_packet(cur));
 
 			} else {

@@ -31,7 +31,7 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0)
+    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0),_n_desc(0)
 {
 }
 

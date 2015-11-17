@@ -1258,6 +1258,7 @@ public :
 		PacketBatch* b =  static_cast<PacketBatch*>(p);
 		b->set_count(1);
 		b->set_tail(b);
+		b->set_next(0);
 		return b;
 	}
 

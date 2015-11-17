@@ -134,18 +134,18 @@ int DPDKDevice::initialize_device(unsigned port_id, const DevInfo &info,
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
-    for (unsigned i = 0; i < info.n_rx_queues; ++i) {
-        if (rte_eth_rx_queue_setup(
-                port_id, i, info.n_rx_descs, numa_node, &rx_conf,
+    for (unsigned i = 0; i < info.n_rx_queues; ++i)
+        if (rte_eth_rx_queue_setup(port_id, i,
+                (info.n_rx_descs>0?info.n_rx_descs:256), numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
             return errh->error(
                 "Cannot initialize RX queue %u of port %u on node %u",
                 i, port_id, numa_node);
-    }
 
     for (unsigned i = 0; i < info.n_tx_queues; ++i)
-        if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
-                                   &tx_conf) != 0)
+        if (rte_eth_tx_queue_setup(port_id, i,
+                (info.n_tx_descs>0?info.n_tx_descs:1024), numa_node, &tx_conf)
+            != 0)
             return errh->error(
                 "Cannot initialize TX queue %u of port %u on node %u",
                 i, port_id, numa_node);
@@ -180,17 +180,25 @@ int DPDKDevice::add_device(unsigned port_id, DPDKDevice::Dir dir,
                     "Some elements disagree on whether or not device %u should"
                     " be in promiscuous mode", port_id);
             info->promisc |= promisc;
-            if (n_desc != info->n_rx_descs)
-                return errh->error(
-                    "Some elements disagree on the number of RX descriptors "
-                    "for device %u", port_id);
+            if (n_desc != 0) {
+                if (n_desc != info->n_rx_descs && info->n_rx_descs != 0)
+                    return errh->error(
+                        "Some elements disagree on the number of RX descriptors "
+                        "for device %u (want %d, actual is %d)", port_id, n_desc,
+                        info->n_rx_descs);
+                info->n_rx_descs = n_desc;
+            }
             info->n_rx_queues =
                 1 + ((queue_id <= 0) ? info->n_rx_queues : queue_id);
         } else {
-            if (n_desc != info->n_tx_descs)
-                return errh->error(
-                    "Some elements disagree on the number of TX descriptors "
-                    "for device %u", port_id);
+            if (n_desc != 0) {
+                if (n_desc != info->n_tx_descs && info->n_tx_descs != 0)
+                    return errh->error(
+                        "Some elements disagree on the number of TX descriptors "
+                        "for device %u (want %d, actual is %d)", port_id, n_desc,
+                        info->n_tx_descs);
+                info->n_tx_descs = n_desc;
+            }
             info->n_tx_queues =
                 1 + ((queue_id <= 0) ? info->n_tx_queues : queue_id);
         }
