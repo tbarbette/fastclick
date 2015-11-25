@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() :  _active(true), _loaded(false),_burst(64), _stop(-1), _task(this), _quick_clone(true)
+Replay::Replay() :  _queue_head(0),_active(true), _loaded(false),_burst(64), _stop(-1), _task(this), _quick_clone(true)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
@@ -134,7 +134,6 @@ Replay::run_task(Task* task)
 				_queue_head = p_input[first_i];
 			} else {
 				queue_tail->set_next(p_input[first_i]);
-				queue_tail = p_input[first_i];
 			}
 			queue_tail = p_input[first_i];
 			SET_PAINT_ANNO(p_input[first_i],first_i);
@@ -161,17 +160,13 @@ Replay::run_task(Task* task)
 		_queue_current = p->next();
 		Packet* q = p->clone(_quick_clone);
 
-		if (output_is_push(PAINT_ANNO(p))) {
-			output(PAINT_ANNO(p)).push_batch(PacketBatch::make_from_packet(q));
+		if (!_output[PAINT_ANNO(p)].ring.insert(q)) {
+			q->kill();
+			_queue_current = p;
+			_notifier.sleep();
+			return n > 0;
 		} else {
-			if (!_output[PAINT_ANNO(p)].ring.insert(q)) {
-				q->kill();
-				_queue_current = p;
-				_notifier.sleep();
-				return n > 0;
-			} else {
-				_notifier.wake();
-			}
+			_notifier.wake();
 		}
 
 		n++;

@@ -28,6 +28,9 @@ CLICK_DECLS
 Unqueue::Unqueue()
     : _task(this)
 {
+#if HAVE_BATCH
+	in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 int
@@ -68,6 +71,10 @@ Unqueue::run_task(Task *)
 	    return false;
     }
 
+#if HAVE_BATCH
+    PacketBatch* head;
+    output(0).push_batch(input(0).pull_batch(limit));
+#else
     while (worked < limit && _active) {
 	if (Packet *p = input(0).pull()) {
 	    ++worked;
@@ -78,7 +85,7 @@ Unqueue::run_task(Task *)
 	else
 	    break;
     }
-
+#endif
     _task.fast_reschedule();
   out:
     return worked > 0;

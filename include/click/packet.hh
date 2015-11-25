@@ -3165,23 +3165,29 @@ inline void PacketBatch::safe_kill(bool is_data) {
 
 #define BATCH_RECYCLE_PACKET(p) {\
 	if (head_packet == NULL) {\
-		head_packet = p;\
-		last_packet = p;\
+		head_packet = static_cast<WritablePacket*>(p);\
+		last_packet = static_cast<WritablePacket*>(p);\
 	} else {\
 		last_packet->set_next(p);\
-		last_packet = p;\
+		last_packet = static_cast<WritablePacket*>(p);\
 	}\
 	n_packet++;}
 
 #define BATCH_RECYCLE_DATA_PACKET(p) {\
 	if (head_data == NULL) {\
-		head_data = p;\
-		last_data = p;\
+		head_data = static_cast<WritablePacket*>(p);\
+		last_data = static_cast<WritablePacket*>(p);\
 	} else {\
 		last_data->set_next(p);\
-		last_data = p;\
+		last_data = static_cast<WritablePacket*>(p);\
 	}\
 	n_data++;}
+
+#define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
+	if (p->data_packet() == 0 && p->buffer_destructor() == 0) {\
+		BATCH_RECYCLE_DATA_PACKET(p);\
+	} else {\
+		BATCH_RECYCLE_PACKET(p);}}
 
 #define BATCH_RECYCLE_END() \
 	if (last_packet) {\
