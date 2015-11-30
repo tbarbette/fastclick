@@ -57,7 +57,7 @@ void
 Discard::push_batch(int, PacketBatch *head)
 {
     _count+=head->count();
-    head->kill();
+    head->safe_kill();
 }
 #endif
 void
@@ -75,7 +75,7 @@ Discard::run_task(Task *)
     PacketBatch* batch;
     while (x && (batch = input(0).pull_batch(0))) {
         x -= batch->count();
-        batch->kill();
+        batch->safe_kill();
     }
 #else
     Packet *p;

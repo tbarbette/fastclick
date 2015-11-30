@@ -310,6 +310,65 @@ static inline PacketPool* make_local_packet_pool() {
  * Allocate a packet without a buffer
  */
 inline WritablePacket *
+WritablePacket::pool_allocate(uint16_t size)
+{
+    PacketPool& packet_pool = *make_local_packet_pool();
+    //click_chatter("In pool_allocate() requested size: %d", size);
+#  if HAVE_MULTITHREAD
+    if (!packet_pool.p) {
+        WritablePacket *pp = global_packet_pool.pbatch.extract();
+        if (pp) {
+            packet_pool.p = pp;
+            packet_pool.pcount = pp->anno_u32(0);
+        }
+
+    }
+#  endif /* HAVE_MULTITHREAD */
+        WritablePacket *p = packet_pool.p;
+        WritablePacket *head = p, *prev;
+        uint32_t taken = 0;
+#ifdef STATS
+        uint32_t created = 0;
+#endif
+        while (p && taken < size) {
+        	prev = p;
+        	p = packet_pool.p;
+        	packet_pool.p = static_cast<WritablePacket*>(p->next());
+        	++taken;
+        }
+        packet_pool.pcount -= taken;
+        //click_chatter("Taken from pool: %d", taken);
+        if (!head) {
+        	p = new WritablePacket;
+        	prev = p;
+        	++taken;
+#ifdef STATS
+        	++created;
+#endif
+        	head = p;
+        }
+
+        if (!p)	//If partially fulfilled from the pool (taken < size) p will be null here
+        	p = prev;
+        while (taken < size) {
+        	prev = p;
+        	p = new WritablePacket;
+        	prev->set_next(p);
+        	//p = next;
+        	++taken;
+#ifdef STATS
+        	++created;
+#endif
+        	} //p points to last here
+#ifdef STATS
+        click_chatter("Created new: %d", created);
+#endif
+        p->set_next(0);
+
+        return head;
+}
+
+inline WritablePacket *
 WritablePacket::pool_allocate()
 {
     PacketPool& packet_pool = *make_local_packet_pool();
@@ -402,6 +461,17 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)to;
 #endif
 }
+#if 0
+#if !CLICK_LINUXMODULE && !CLICK_DPDK_POOLS && HAVE_CLICK_PACKET_POOL
+PacketBatch* WritablePacket::make_batch_from_page(const int n, uint16_t *lims, void *page){
+	if (n <= 0) return 0;
+	WritablePacket* p = pool_data_allocate();
+	if (!p) return 0;
+	PacketBatch* p_batch = static_cast<PacketBatch*>(p);
+	return p_batch;
+}
+#endif
+#endif
 
 #  if HAVE_NETMAP_PACKET_POOL
 WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
@@ -777,9 +847,46 @@ assert(false); //TODO
     }
     return p;
 # endif
-#endif
 }
 
+WritablePacket *
+Packet::make(unsigned char *data, uint16_t packets, uint16_t *length, WritablePacket **prev,
+	     buffer_destructor_type destructor, void* argument )
+{
+#if CLICK_DPDK_POOLS
+assert(false); //TODO
+#else
+# if HAVE_CLICK_PACKET_POOL
+    WritablePacket *p = WritablePacket::pool_allocate(packets);
+    WritablePacket *head = p;
+    //WritablePacket *prev = p;
+# else
+    WritablePacket *p = new WritablePacket;
+# endif
+    uint16_t i = 0;
+    while(p) {
+    //if (p) {
+	  p->initialize();
+	  p->_head = p->_data = data;
+	  //uint32_t len = length[i++];
+	  p->_tail = p->_end = data + length[i];
+	  //assert(114 == length[i]);
+	  data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
+	  ++i;
+	  p->_destructor = destructor;
+	  p->_destructor_argument = argument;
+	  *prev = p;
+	  p = static_cast<WritablePacket *>(p->next());
+    }
+    if (i != packets) {
+    	fprintf(stderr, "Size of list %d, expected %d\n", i, packets);
+    }
+    return head;
+    //PacketBatch::make_from_simple_list(head, prev, packets);
+# endif
+}
+
+#endif
 void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }
