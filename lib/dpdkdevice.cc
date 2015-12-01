@@ -39,6 +39,13 @@ unsigned int DPDKDevice::get_nb_txdesc(unsigned port_id)
     return info->n_tx_descs;
 }
 
+void DPDKDevice::add_pool(const struct rte_mempool * rte, void *arg){
+	int* i = (int*)arg;
+	if (*i < _nr_pktmbuf_pools)
+		_pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
+	i++;
+}
+
 bool DPDKDevice::alloc_pktmbufs()
 {
     // Count NUMA sockets
@@ -49,6 +56,7 @@ bool DPDKDevice::alloc_pktmbufs()
         if (numa_node > max_socket)
             max_socket = numa_node;
     }
+
     if (max_socket == -1)
         return false;
 
@@ -61,20 +69,25 @@ bool DPDKDevice::alloc_pktmbufs()
         return false;
     memset(_pktmbuf_pools, 0, _nr_pktmbuf_pools * sizeof(rte_mempool_p));
 
-    // Create a pktmbuf pool for each active socket
-    for (int i = 0; i < _nr_pktmbuf_pools; i++) {
-        if (!_pktmbuf_pools[i]) {
-            char name[64];
-            snprintf(name, 64, "mbuf_pool_%u", i);
-            _pktmbuf_pools[i] =
-                rte_mempool_create(
-                    name, NB_MBUF, MBUF_SIZE, MBUF_CACHE_SIZE,
-                    sizeof (struct rte_pktmbuf_pool_private),
-                    rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
-                    i, 0);
-            if (!_pktmbuf_pools[i])
-                return false;
-        }
+    if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		// Create a pktmbuf pool for each active socket
+		for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+			if (!_pktmbuf_pools[i]) {
+				char name[64];
+				snprintf(name, 64, "mbuf_pool_%u", i);
+				_pktmbuf_pools[i] =
+					rte_mempool_create(
+						name, NB_MBUF, MBUF_SIZE, MBUF_CACHE_SIZE,
+						sizeof (struct rte_pktmbuf_pool_private),
+						rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
+						i, 0);
+				if (!_pktmbuf_pools[i])
+					return false;
+			}
+		}
+    } else {
+		int i = 0;
+		rte_mempool_walk(add_pool,(void*)&i);
     }
 
     return true;

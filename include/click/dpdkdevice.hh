@@ -98,6 +98,7 @@ private:
     static int initialize_device(unsigned port_id, const DevInfo &info,
                                  ErrorHandler *errh) CLICK_COLD;
 
+    static void add_pool(const struct rte_mempool *, void *) CLICK_COLD;
     static bool alloc_pktmbufs() CLICK_COLD;
 
     static int add_device(unsigned port_id, Dir dir, int &queue_id,
