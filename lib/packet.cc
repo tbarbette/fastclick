@@ -307,8 +307,37 @@ static inline PacketPool* make_local_packet_pool() {
 }
 
 /**
- * Allocate a packet without a buffer
+ * Allocate a batch of packets without buffer
  */
+inline WritablePacket *
+WritablePacket::pool_batch_allocate(uint16_t count)
+{
+        PacketPool& packet_pool = *make_local_packet_pool();
+
+        WritablePacket *p = 0;
+        WritablePacket *head = 0;
+        int taken_from_pool = 0;
+
+        while (count > 0) {
+			p = packet_pool.p;
+			if (!p) {
+				p = pool_allocate();
+			} else {
+				packet_pool.p = static_cast<WritablePacket*>(p->next());
+				taken_from_pool++;
+			}
+			if (head == 0) {
+				head = p;
+			}
+			count --;
+        }
+        packet_pool.pcount -= taken_from_pool;
+
+        p->set_next(0);
+
+        return head;
+}
+
 inline WritablePacket *
 WritablePacket::pool_allocate()
 {
@@ -402,6 +431,7 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)to;
 #endif
 }
+
 
 #  if HAVE_NETMAP_PACKET_POOL
 WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
@@ -777,9 +807,59 @@ assert(false); //TODO
     }
     return p;
 # endif
-#endif
 }
 
+
+#if HAVE_BATCH
+/** @brief Create and return a batch of packets made from a contiguous buffer
+ * @param count number of packets
+ *
+ * @param data data used in the new packet
+ * @param length array of packets length
+ * @param destructor destructor function
+ * @param argument argument to destructor function
+ * @return new packet batch, or null if no packet could be created
+ *
+ **/
+PacketBatch *
+Packet::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
+		buffer_destructor_type destructor, void* argument )
+{
+#if CLICK_DPDK_POOLS
+assert(false); //TODO
+#endif
+
+# if HAVE_CLICK_PACKET_POOL
+    WritablePacket *p = WritablePacket::pool_batch_allocate(count);
+# else
+    WritablePacket *p = new WritablePacket;
+# endif
+    WritablePacket *head = p;
+    WritablePacket *last = p;
+    uint16_t i = 0;
+    while(p) {
+		p->initialize();
+		p->_head = p->_data = data;
+		p->_tail = p->_end = data + length[i];
+		data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
+		++i;
+		p->_destructor = destructor;
+		p->_destructor_argument = argument;
+		last = p;
+#if HAVE_CLICK_PACKET_POOL
+        p = static_cast<WritablePacket *>(p->next());
+#else
+        WritablePacket *p = new WritablePacket;
+#endif
+    }
+    if (i != count) {
+        click_chatter("Size of list %d, expected %d\n", i, count);
+    }
+    return PacketBatch::make_from_simple_list(head, last, i);
+}
+#endif
+
+#endif
 void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }

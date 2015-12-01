@@ -35,7 +35,7 @@ CLICK_DECLS
 
 class IP6Address;
 class WritablePacket;
-
+class PacketBatch;
 class Packet { public:
 
     /** @name Data */
@@ -80,7 +80,12 @@ class Packet { public:
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
                                 void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
-#endif
+# if HAVE_BATCH
+    static PacketBatch *make_batch(unsigned char *data, uint16_t count, uint16_t *length,
+                buffer_destructor_type destructor,
+								void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+# endif //HAVE_BATCH
+#endif //CLICK_USERLEVEL || CLICK_MINIOS
 
     static void static_cleanup();
 
@@ -872,8 +877,6 @@ private:
     };
 #endif
 
-class PacketBatch;
-
 class WritablePacket : public Packet { public:
 
     inline unsigned char *data() const;
@@ -952,6 +955,7 @@ class WritablePacket : public Packet { public:
     static bool is_from_data_pool(WritablePacket *p);
     static void recycle(WritablePacket *p);
 # if HAVE_BATCH
+    static WritablePacket *pool_batch_allocate(uint16_t count);
     static void recycle_packet_batch(PacketBatch *p_batch);
     static void recycle_data_batch(PacketBatch *pd_batch);
 # endif
@@ -1247,6 +1251,7 @@ public :
 	inline static PacketBatch* make_from_simple_list(Packet* head, Packet* tail, unsigned int size) {
 		PacketBatch* b = make_from_list(head,size);
 		b->set_tail(tail);
+		tail->set_next(0);
 		return b;
 	}
 
@@ -3203,8 +3208,6 @@ inline void PacketBatch::safe_kill(bool is_data) {
  * Recycle a whole batch of packets
  */
 inline void PacketBatch::safe_kill() {
-	click_chatter("Need testing... Use batch->kill() for now;");
-	assert(false);
     BATCH_RECYCLE_START();
     FOR_EACH_PACKET_SAFE(this,up) {
         WritablePacket* p = static_cast<WritablePacket*>(up);
