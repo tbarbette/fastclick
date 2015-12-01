@@ -3188,6 +3188,18 @@ inline void PacketBatch::safe_kill(bool is_data) {
 	}\
 	n_data++;}
 
+#define BATCH_RECYCLE_UNSAFE_PACKET(p) {\
+			if (p->shared()) {\
+				p->kill();\
+			} else {\
+				if (!p->buffer()) {\
+					BATCH_RECYCLE_PACKET(p);\
+				} else {\
+					BATCH_RECYCLE_UNKNOWN_PACKET(p);\
+				}\
+			}\
+		}
+
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
 	if (p->data_packet() == 0 && p->buffer_destructor() == 0) {\
 		BATCH_RECYCLE_DATA_PACKET(p);\
@@ -3223,6 +3235,8 @@ inline void PacketBatch::safe_kill() {
     }
     BATCH_RECYCLE_END();
 }
+#else
+#define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
 #endif
 
 

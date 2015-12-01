@@ -315,11 +315,76 @@ ToNetmapDevice::run_timer(Timer *) {
 
 int complaint = 0;
 
+static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, struct netmap_slot* slot, u_int &cur) {
+	int n = 1;
+#if HAVE_ZEROCOPY
+			if (likely(NetmapBufQ::is_netmap_packet(p))) {
+				slot->len = p->length();
+				if (p->headroom() > 0) {
+					complaint++;
+					if (complaint < 5)
+						click_chatter("Shifting data in %s. You should avoid this case !");
+					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
+				}
+#  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
+				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
+					unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
+					static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
+				}
+
+				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+
+				if (!p->data_packet() && p->buffer_destructor() != Packet::empty_destructor) {
+					slot->flags = NS_BUF_CHANGED;
+				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not use to make a new packet
+					slot->flags = NS_BUF_CHANGED | NS_NOFREE;
+				}
+#  else //We must return the netmap buffer to the netmap buffer queue
+				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
+					if (p->buffer_destructor() == NetmapBufQ::buffer_destructor)
+						reinterpret_cast<NetmapBufQ*>(p->destructor_argument())->insert(slot->buf_idx);
+					else
+						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
+				}
+				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {
+					p->set_buffer_destructor(Packet::empty_destructor);
+					slot->flags = NS_BUF_CHANGED;
+				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not release ourselves
+					slot->flags = NS_BUF_CHANGED | NS_NOFREE;
+				}
+#  endif //HAVE_NETMAP_PACKET_POOL
+			} else
+#endif //HAVE_ZEROCOPY
+			{
+				unsigned char* srcdata = p->data();
+				int length = p->length();
+
+				while (length > txring->nr_buf_size) {
+					click_chatter("Warning ! Buffer splitting is highly experimental ! Prefer to send < 2k packets !");
+					memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,txring->nr_buf_size);
+					srcdata += txring->nr_buf_size;
+					length -= txring->nr_buf_size;
+					slot->len = txring->nr_buf_size;
+					slot->flags |= NS_MOREFRAG;
+					srcdata += txring->nr_buf_size;
+
+					n++;
+					cur = nm_ring_next(txring,cur);
+					slot = &txring->slot[cur];
+				}
+				memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,length);
+				slot->len = length;
+			}
+		return n;
+}
+
 /**
  * Send a linked list of packet, return the number of packet sent and the head
  * 	points toward the packets following the last sent packet (could be null)
- *
- * @arg ask_sync, if true, will force to flush packets (call netmap NIOCTXSYNC)
+ * @arg head First packet of the list
+ * @arg ask_sync If true, will force to flush packets (call netmap NIOCTXSYNC) after adding them in the ring
+ * @arg txsync_on_empty If true, will do a txsync on all empty queue to force reclaim sent buffers
  *
  * @return The number of packets sent
  */
@@ -365,88 +430,17 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 			next = static_cast<WritablePacket*>(p->next());
 
 			slot = &txring->slot[cur];
-			bool is_data = false;
-#if HAVE_ZEROCOPY
-			if (likely(NetmapBufQ::is_netmap_packet(p))) {
-				slot->len = p->length();
-				if (p->headroom() > 0) {
-					complaint++;
-					if (complaint < 5)
-						click_chatter("Shifting data in %s. You should avoid this case !");
-					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
-				}
-#  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
-				unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
-				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
-				static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
-				is_data = true;
-				slot->flags = NS_BUF_CHANGED;
-#  else //We must return the netmap buffer to the netmap buffer queue
-				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
-					if (p->buffer_destructor() == NetmapBufQ::buffer_destructor)
-						reinterpret_cast<NetmapBufQ*>(p->destructor_argument())->insert(slot->buf_idx);
-					else
-						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
-				}
-				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
-				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {
-					p->set_buffer_destructor(Packet::empty_destructor);
-					slot->flags = NS_BUF_CHANGED;
-				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not release ourselves
-					slot->flags = NS_BUF_CHANGED | NS_NOFREE;
-				}
-#  endif
-			} else
-#endif
-			{
-				unsigned char* srcdata = p->data();
-				int length = p->length();
-				is_data = (p->data_packet() == 0 && p->buffer_destructor() == 0);
 
-				while (length > txring->nr_buf_size) {
-					click_chatter("Warning ! Buffer splitting is highly experimental ! Prefer to send < 2k packets !");
-					is_data = false;
-					memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,txring->nr_buf_size);
-					srcdata += txring->nr_buf_size;
-					length -= txring->nr_buf_size;
-					slot->len = txring->nr_buf_size;
-					slot->flags |= NS_MOREFRAG;
-					srcdata += txring->nr_buf_size;
-					if (unlikely(cur % 32 == 0)) {
-						ask_sync = true;
-						slot->flags |= NS_REPORT;
-					}
-					space--;
-					cur = nm_ring_next(txring,cur);
-					slot = &txring->slot[cur];
-				}
-				memcpy((unsigned char*)NETMAP_BUF(txring, slot->buf_idx),srcdata,length);
-				slot->len = length;
+			space -= _send_packet(p,txring,slot,cur);
+
+			if (unlikely(cur % 32 == 0)) {
+				ask_sync = true;
+				slot->flags |= NS_REPORT;
 			}
-		if (unlikely(cur % 32 == 0)) {
-			ask_sync = true;
-			slot->flags |= NS_REPORT;
-		}
-#if HAVE_BATCH_RECYCLE
-			//We cannot recycle a batch with shared packet in it
-			if (p->shared()) {
-				p->kill();
-				if (p == head) {
-					head = next;
-				}
-			} else {
-				if (is_data) {
-					BATCH_RECYCLE_DATA_PACKET(p);
-				} else {
-					BATCH_RECYCLE_PACKET(p);
-				}
-			}
-#else
-			//If no batch or no packet pool, don't bother recycling per-batch
-			p->kill();
-#endif
+
+			BATCH_RECYCLE_UNSAFE_PACKET(p);
+
 			sent++;
-			space--;
 			cur = nm_ring_next(txring,cur);
 #if !HAVE_NETMAP_PACKET_POOL
 			if (next)

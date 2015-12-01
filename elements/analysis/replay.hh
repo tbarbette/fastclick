@@ -42,6 +42,7 @@ class Replay : public BatchElement { public:
     bool _active;
     bool _loaded;
 
+    unsigned int _queue;
     unsigned int _burst;
     int _stop;
 

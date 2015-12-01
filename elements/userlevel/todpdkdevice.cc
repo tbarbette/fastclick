@@ -314,18 +314,8 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 
 	while (p != NULL) {
         *pkt = get_mbuf(p);
-#if HAVE_BATCH_RECYCLE
-			//We cannot recycle a batch with shared packet in it
-			if (p->shared()) {
-				p->kill();
-			} else {
-				if (!p->buffer()) {
-					BATCH_RECYCLE_PACKET(p);
-				} else {
-					BATCH_RECYCLE_UNKNOWN_PACKET(p);
-				}
-			}
-#else
+#if !CLICK_DPDK_POOLS
+        BATCH_RECYCLE_UNSAFE_PACKET(p);
 #endif
 		pkt++;
 		p = p->next();
@@ -353,10 +343,9 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 #if !CLICK_DPDK_POOLS
 	#if HAVE_BATCH_RECYCLE
 		BATCH_RECYCLE_END();
-#else
-	 head->kill();
-#endif
-
+	#else
+		 head->kill();
+	#endif
 #endif
 
 }

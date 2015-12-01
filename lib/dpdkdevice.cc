@@ -43,7 +43,7 @@ void DPDKDevice::add_pool(const struct rte_mempool * rte, void *arg){
 	int* i = (int*)arg;
 	if (*i < _nr_pktmbuf_pools)
 		_pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
-	i++;
+	(*i)++;
 }
 
 bool DPDKDevice::alloc_pktmbufs()

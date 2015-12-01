@@ -38,6 +38,7 @@ int
 Replay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
+	.read_p("QUEUE", _queue)
 	.read("STOP", _stop)
 	.read("QUICK_CLONE", _quick_clone)
 	.complete() < 0)
@@ -78,7 +79,7 @@ Replay::initialize(ErrorHandler *errh) {
 		_input[i].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
 	_output.resize(noutputs());
 	for (int i = 0; i < _output.size(); i++) {
-		_output[i].ring.initialize(1024);
+		_output[i].ring.initialize(_queue);
 	}
 	return 0;
 }
