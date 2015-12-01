@@ -35,7 +35,7 @@ CLICK_DECLS
 
 class IP6Address;
 class WritablePacket;
-
+class PacketBatch;
 class Packet { public:
 
     /** @name Data */
@@ -80,9 +80,12 @@ class Packet { public:
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
                                 void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
-    static WritablePacket *make(unsigned char *data, uint16_t packets, uint16_t *length, WritablePacket **,
-    	     buffer_destructor_type destructor, void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
-#endif
+# if HAVE_BATCH
+    static PacketBatch *make_batch(unsigned char *data, uint16_t count, uint16_t *length,
+                buffer_destructor_type destructor,
+								void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+# endif //HAVE_BATCH
+#endif //CLICK_USERLEVEL || CLICK_MINIOS
 
     static void static_cleanup();
 
@@ -874,8 +877,6 @@ private:
     };
 #endif
 
-class PacketBatch;
-
 class WritablePacket : public Packet { public:
 
     inline unsigned char *data() const;
@@ -897,7 +898,7 @@ class WritablePacket : public Packet { public:
 #if HAVE_NETMAP_PACKET_POOL
     static WritablePacket* make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot);
 # if HAVE_BATCH
-    static PacketBatch* make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur, bool set_rss_aggregate);
+    static PacketBatch* make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur);
 # endif
 #endif
 
@@ -954,7 +955,7 @@ class WritablePacket : public Packet { public:
     static bool is_from_data_pool(WritablePacket *p);
     static void recycle(WritablePacket *p);
 # if HAVE_BATCH
-    static WritablePacket *pool_allocate(uint16_t);
+    static WritablePacket *pool_batch_allocate(uint16_t count);
     static void recycle_packet_batch(PacketBatch *p_batch);
     static void recycle_data_batch(PacketBatch *pd_batch);
 # endif
@@ -1250,7 +1251,7 @@ public :
 	inline static PacketBatch* make_from_simple_list(Packet* head, Packet* tail, unsigned int size) {
 		PacketBatch* b = make_from_list(head,size);
 		b->set_tail(tail);
-       tail->set_next(0);
+		tail->set_next(0);
 		return b;
 	}
 
@@ -3169,23 +3170,29 @@ inline void PacketBatch::safe_kill(bool is_data) {
 
 #define BATCH_RECYCLE_PACKET(p) {\
 	if (head_packet == NULL) {\
-		head_packet = p;\
-		last_packet = p;\
+		head_packet = static_cast<WritablePacket*>(p);\
+		last_packet = static_cast<WritablePacket*>(p);\
 	} else {\
 		last_packet->set_next(p);\
-		last_packet = p;\
+		last_packet = static_cast<WritablePacket*>(p);\
 	}\
 	n_packet++;}
 
 #define BATCH_RECYCLE_DATA_PACKET(p) {\
 	if (head_data == NULL) {\
-		head_data = p;\
-		last_data = p;\
+		head_data = static_cast<WritablePacket*>(p);\
+		last_data = static_cast<WritablePacket*>(p);\
 	} else {\
 		last_data->set_next(p);\
-		last_data = p;\
+		last_data = static_cast<WritablePacket*>(p);\
 	}\
 	n_data++;}
+
+#define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
+	if (p->data_packet() == 0 && p->buffer_destructor() == 0) {\
+		BATCH_RECYCLE_DATA_PACKET(p);\
+	} else {\
+		BATCH_RECYCLE_PACKET(p);}}
 
 #define BATCH_RECYCLE_END() \
 	if (last_packet) {\

@@ -307,62 +307,32 @@ static inline PacketPool* make_local_packet_pool() {
 }
 
 /**
- * Allocate a packet without a buffer
+ * Allocate a batch of packets without buffer
  */
 inline WritablePacket *
-WritablePacket::pool_allocate(uint16_t size)
+WritablePacket::pool_batch_allocate(uint16_t count)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-    //click_chatter("In pool_allocate() requested size: %d", size);
-#  if HAVE_MULTITHREAD
-    if (!packet_pool.p) {
-        WritablePacket *pp = global_packet_pool.pbatch.extract();
-        if (pp) {
-            packet_pool.p = pp;
-            packet_pool.pcount = pp->anno_u32(0);
-        }
+        PacketPool& packet_pool = *make_local_packet_pool();
 
-    }
-#  endif /* HAVE_MULTITHREAD */
-        WritablePacket *p = packet_pool.p;
-        WritablePacket *head = p, *prev;
-        uint32_t taken = 0;
-#ifdef STATS
-        uint32_t created = 0;
-#endif
-        while (p && taken < size) {
-        	prev = p;
-        	p = packet_pool.p;
-        	packet_pool.p = static_cast<WritablePacket*>(p->next());
-        	++taken;
-        }
-        packet_pool.pcount -= taken;
-        //click_chatter("Taken from pool: %d", taken);
-        if (!head) {
-        	p = new WritablePacket;
-        	prev = p;
-        	++taken;
-#ifdef STATS
-        	++created;
-#endif
-        	head = p;
-        }
+        WritablePacket *p = 0;
+        WritablePacket *head = 0;
+        int taken_from_pool = 0;
 
-        if (!p)	//If partially fulfilled from the pool (taken < size) p will be null here
-        	p = prev;
-        while (taken < size) {
-        	prev = p;
-        	p = new WritablePacket;
-        	prev->set_next(p);
-        	//p = next;
-        	++taken;
-#ifdef STATS
-        	++created;
-#endif
-        	} //p points to last here
-#ifdef STATS
-        click_chatter("Created new: %d", created);
-#endif
+        while (count > 0) {
+			p = packet_pool.p;
+			if (!p) {
+				p = pool_allocate();
+			} else {
+				packet_pool.p = static_cast<WritablePacket*>(p->next());
+				taken_from_pool++;
+			}
+			if (head == 0) {
+				head = p;
+			}
+			count --;
+        }
+        packet_pool.pcount -= taken_from_pool;
+
         p->set_next(0);
 
         return head;
@@ -461,17 +431,7 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)to;
 #endif
 }
-#if 0
-#if !CLICK_LINUXMODULE && !CLICK_DPDK_POOLS && HAVE_CLICK_PACKET_POOL
-PacketBatch* WritablePacket::make_batch_from_page(const int n, uint16_t *lims, void *page){
-	if (n <= 0) return 0;
-	WritablePacket* p = pool_data_allocate();
-	if (!p) return 0;
-	PacketBatch* p_batch = static_cast<PacketBatch*>(p);
-	return p_batch;
-}
-#endif
-#endif
+
 
 #  if HAVE_NETMAP_PACKET_POOL
 WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
@@ -849,42 +809,55 @@ assert(false); //TODO
 # endif
 }
 
-WritablePacket *
-Packet::make(unsigned char *data, uint16_t packets, uint16_t *length, WritablePacket **prev,
-	     buffer_destructor_type destructor, void* argument )
+
+#if HAVE_BATCH
+/** @brief Create and return a batch of packets made from a contiguous buffer
+ * @param count number of packets
+ *
+ * @param data data used in the new packet
+ * @param length array of packets length
+ * @param destructor destructor function
+ * @param argument argument to destructor function
+ * @return new packet batch, or null if no packet could be created
+ *
+ **/
+PacketBatch *
+Packet::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
+		buffer_destructor_type destructor, void* argument )
 {
 #if CLICK_DPDK_POOLS
 assert(false); //TODO
-#else
+#endif
+
 # if HAVE_CLICK_PACKET_POOL
-    WritablePacket *p = WritablePacket::pool_allocate(packets);
-    WritablePacket *head = p;
-    //WritablePacket *prev = p;
+    WritablePacket *p = WritablePacket::pool_batch_allocate(count);
 # else
     WritablePacket *p = new WritablePacket;
 # endif
+    WritablePacket *head = p;
+    WritablePacket *last = p;
     uint16_t i = 0;
     while(p) {
-    //if (p) {
-	  p->initialize();
-	  p->_head = p->_data = data;
-	  //uint32_t len = length[i++];
-	  p->_tail = p->_end = data + length[i];
-	  //assert(114 == length[i]);
-	  data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
-	  ++i;
-	  p->_destructor = destructor;
-	  p->_destructor_argument = argument;
-	  *prev = p;
-	  p = static_cast<WritablePacket *>(p->next());
+		p->initialize();
+		p->_head = p->_data = data;
+		p->_tail = p->_end = data + length[i];
+		data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
+		++i;
+		p->_destructor = destructor;
+		p->_destructor_argument = argument;
+		last = p;
+#if HAVE_CLICK_PACKET_POOL
+        p = static_cast<WritablePacket *>(p->next());
+#else
+        WritablePacket *p = new WritablePacket;
+#endif
     }
-    if (i != packets) {
-    	fprintf(stderr, "Size of list %d, expected %d\n", i, packets);
+    if (i != count) {
+        click_chatter("Size of list %d, expected %d\n", i, count);
     }
-    return head;
-    //PacketBatch::make_from_simple_list(head, prev, packets);
-# endif
+    return PacketBatch::make_from_simple_list(head, last, i);
 }
+#endif
 
 #endif
 void Packet::empty_destructor(unsigned char *, size_t, void *) {
