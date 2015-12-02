@@ -95,7 +95,7 @@ struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
 
-int DPDKDevice::initialize_device(unsigned port_id, const DevInfo &info,
+int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
                                   ErrorHandler *errh)
 {
     struct rte_eth_conf dev_conf;
@@ -271,7 +271,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (!alloc_pktmbufs())
         return errh->error("Could not allocate packet MBuf pools");
 
-    for (HashMap<unsigned, DevInfo>::const_iterator it = _devs.begin();
+    for (HashMap<unsigned, DevInfo>::iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int ret = initialize_device(it.key(), it.value(), errh);
         if (ret < 0)

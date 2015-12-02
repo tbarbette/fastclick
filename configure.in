@@ -157,15 +157,6 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
 
 =========================================])
     fi
-    if test ! -f "$RTE_SDK/$RTE_TARGET/lib/librte_eal.a" -a test ! -f "$RTE_SDK/$RTE_TARGET/lib/librte_eal.so" ; then
-        AC_MSG_ERROR([
-=========================================
-
-Cannot find \$RTE_SDK/\$RTE_TARGET/lib/librte_eal.a for Intel DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
-
-=========================================])
-    fi
     rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
     rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
     AC_SUBST(RTE_SDK)
