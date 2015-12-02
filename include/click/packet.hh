@@ -3192,11 +3192,7 @@ inline void PacketBatch::safe_kill(bool is_data) {
 			if (p->shared()) {\
 				p->kill();\
 			} else {\
-				if (!p->buffer()) {\
-					BATCH_RECYCLE_PACKET(p);\
-				} else {\
-					BATCH_RECYCLE_UNKNOWN_PACKET(p);\
-				}\
+				BATCH_RECYCLE_UNKNOWN_PACKET(p);\
 			}\
 		}
 

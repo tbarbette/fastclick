@@ -97,7 +97,7 @@ struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
 
-int DPDKDevice::initialize_device(unsigned port_id, const DevInfo &info,
+int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
                                   ErrorHandler *errh)
 {
     struct rte_eth_conf dev_conf;
@@ -110,8 +110,11 @@ int DPDKDevice::initialize_device(unsigned port_id, const DevInfo &info,
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 
-    if (rte_eth_dev_configure(port_id, (info.n_rx_queues>0?info.n_rx_queues:1),
-                              (info.n_tx_queues>0?info.n_tx_queues:1),
+    info.n_rx_queues = (info.n_rx_queues>0?info.n_rx_queues:1);
+    info.n_tx_queues = (info.n_tx_queues>0?info.n_tx_queues:1);
+
+    if (rte_eth_dev_configure(port_id, info.n_rx_queues,
+                              info.n_tx_queues,
                               &dev_conf) < 0)
         return errh->error(
             "Cannot initialize DPDK port %u with %u RX and %u TX queues",
@@ -247,7 +250,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (!alloc_pktmbufs())
         return errh->error("Could not allocate packet MBuf pools");
 
-    for (HashMap<unsigned, DevInfo>::const_iterator it = _devs.begin();
+    for (HashMap<unsigned, DevInfo>::iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int ret = initialize_device(it.key(), it.value(), errh);
         if (ret < 0)

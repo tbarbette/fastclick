@@ -95,7 +95,7 @@ private:
     static struct rte_mempool** _pktmbuf_pools;
     static int _nr_pktmbuf_pools;
 
-    static int initialize_device(unsigned port_id, const DevInfo &info,
+    static int initialize_device(unsigned port_id, DevInfo &info,
                                  ErrorHandler *errh) CLICK_COLD;
 
     static void add_pool(const struct rte_mempool *, void *) CLICK_COLD;

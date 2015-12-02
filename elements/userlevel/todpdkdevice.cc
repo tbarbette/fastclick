@@ -313,12 +313,13 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	struct rte_mbuf **pkt = pkts;
 
 	while (p != NULL) {
+		Packet* next = p->next();
         *pkt = get_mbuf(p);
 #if !CLICK_DPDK_POOLS
         BATCH_RECYCLE_UNSAFE_PACKET(p);
 #endif
 		pkt++;
-		p = p->next();
+		p = next;
 	}
 
 	unsigned ret = 0;
