@@ -17,13 +17,14 @@
  */
 
 #include <click/config.h>
+#include <click/args.hh>
 #include <click/dpdkdevice.hh>
 #include "ensuredpdkbuffer.hh"
 
 CLICK_DECLS
 
 
-EnsureDPDKBuffer::EnsureDPDKBuffer()
+EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false)
 {
 }
 
@@ -31,9 +32,21 @@ EnsureDPDKBuffer::~EnsureDPDKBuffer()
 {
 }
 
+
+int
+EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (Args(conf, this, errh)
+	.read_p("FORCE_COPY", _force)
+	.complete() < 0)
+    return -1;
+
+    return 0;
+}
+
 inline Packet*
 EnsureDPDKBuffer::smaction(Packet* p) {
-	if (DPDKDevice::is_dpdk_packet(p)) {
+	if (!_force && DPDKDevice::is_dpdk_packet(p)) {
 		return p;
 	} else {
 		struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
@@ -53,7 +66,7 @@ PacketBatch*
 EnsureDPDKBuffer::simple_action_batch(PacketBatch *head)
 {
 #if HAVE_ZEROCOPY
-	EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction,head,[](Packet* p) {click_chatter("No more netmap buffer ! Dropping packet %p !",p);});
+	EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction,head,[](Packet* p) {click_chatter("No more DPDK buffer ! Dropping packet %p !",p);});
 #endif
 	return head;
 }
