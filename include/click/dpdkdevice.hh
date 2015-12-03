@@ -50,7 +50,7 @@ public:
     static unsigned int get_nb_txdesc(unsigned port_id);
 
     static int NB_MBUF;
-    static int MBUF_SIZE;
+    static int MBUF_DATA_SIZE;
     static int MBUF_CACHE_SIZE;
     static int RX_PTHRESH;
     static int RX_HTHRESH;

@@ -74,11 +74,17 @@ bool DPDKDevice::alloc_pktmbufs()
 				char name[64];
 				snprintf(name, 64, "mbuf_pool_%u", i);
 				_pktmbuf_pools[i] =
+#if RTE_VER_MAJOR >= 2 && RTE_VER_MINOR >= 1
+					rte_pktmbuf_pool_create(name, NB_MBUF,
+							MBUF_CACHE_SIZE, 0, MBUF_DATA_SIZE, i);
+#else
 					rte_mempool_create(
-						name, NB_MBUF, MBUF_SIZE, MBUF_CACHE_SIZE,
+						name, NB_MBUF, MBUF_DATA_SIZE + sizeof (struct rte_mbuf), MBUF_CACHE_SIZE,
 						sizeof (struct rte_pktmbuf_pool_private),
 						rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
 						i, 0);
+#endif
+
 				if (!_pktmbuf_pools[i])
 					return false;
 			}
@@ -87,6 +93,7 @@ bool DPDKDevice::alloc_pktmbufs()
 		int i = 0;
 		rte_mempool_walk(add_pool,(void*)&i);
 		if (i == 0) {
+			click_chatter("Could not get pools from the primary DPDK process");
 			return false;
 		}
     }
@@ -149,7 +156,7 @@ int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
                 port_id, i, info.n_rx_descs, numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
             return errh->error(
-                "Cannot initialize RX queue %u of port %u on node %u",
+                "Cannot setup RX queue %u of port %u on node %u",
                 i, port_id, numa_node);
     }
 
@@ -157,7 +164,7 @@ int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
         if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
                                    &tx_conf) != 0)
             return errh->error(
-                "Cannot initialize TX queue %u of port %u on node %u",
+                "Cannot setup TX queue %u of port %u on node %u",
                 i, port_id, numa_node);
 
     int err = rte_eth_dev_start(port_id);
@@ -303,8 +310,8 @@ void DPDKDevice::fake_free_pkt(unsigned char *, size_t, void *)
 }
 
 int DPDKDevice::NB_MBUF = 65536;
-int DPDKDevice::MBUF_SIZE =
-    2048 + sizeof (struct rte_mbuf) + RTE_PKTMBUF_HEADROOM;
+int DPDKDevice::MBUF_DATA_SIZE =
+    2048 + RTE_PKTMBUF_HEADROOM;
 int DPDKDevice::MBUF_CACHE_SIZE = 256;
 int DPDKDevice::RX_PTHRESH = 8;
 int DPDKDevice::RX_HTHRESH = 8;
