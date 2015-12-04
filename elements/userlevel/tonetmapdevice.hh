@@ -15,9 +15,20 @@
 CLICK_DECLS
 
 /*
+ * =title ToDPDKDevice
+ *
  * =c
  *
- * ToNetmapDevice(DEVNAME)
+ * ToNetmapDevice(DEVNAME [, QUEUE, [, I<keywords> PROMISC, BURST])
+ *
+ * =s comm
+ *
+ * Send packets through a Netmap device, optionnaly specifying a queue number.
+ * This element is NOT thread safe. This element supports both push and pull.
+ * In push mode, it will batch packets up to BURST then sends them. If the
+ * output rings are full, it will either block until there is some space (if
+ *  BLOCKANT is set) or it will internally queue the packets and finally drops
+ *  them if there is still not enough space.
  *
  * =item DEVNAME
  *
@@ -27,9 +38,9 @@ CLICK_DECLS
  *
  * Unsigned integer Number of packets that we can bufferize if all output rings are full while in push mode
  *
- * =item BLOCKANT (push mode only)
+ * =item BLOCKING (push mode only)
  *
- * Boolean. If true and packets are pushed and the IQUEUE is full, we'll block until there is space in the output ring, or we'll drop. Default true.
+ * Boolean. If true and packets are pushed and the IQUEUE is full, the element will loop until there is space in the output ring, or we'll drop. Default true.
  *
  * =item MAXTHREADS
  *

@@ -35,6 +35,7 @@ FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(fals
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
 #endif
+	NetmapDevice::global_alloc += 2048;
 }
 
 void *
@@ -210,9 +211,9 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
                 #if HAVE_ZEROCOPY
                     if (slot->len > 64 && !(slot->flags & NS_MOREFRAG)) {
                         __builtin_prefetch(data);
-                        p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
+                        p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::local_pool());
                         if (!p) goto error;
-                        slot->buf_idx = NetmapBufQ::get_local_pool()->extract();
+                        slot->buf_idx = NetmapBufQ::local_pool()->extract();
                         slot->flags = NS_BUF_CHANGED;
                     } else
                 #endif

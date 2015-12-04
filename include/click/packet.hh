@@ -72,10 +72,12 @@ class Packet { public:
 #if CLICK_USERLEVEL || CLICK_MINIOS
     typedef void (*buffer_destructor_type)(unsigned char* buf, size_t sz, void* argument);
 
-    /*Empty destructor does nothing (buffer management is done totally
-     * externally. Prefer to use this one instead of an empty one as this
-     * special case will be optimized.*/
-    static void empty_destructor(unsigned char *, size_t, void *);
+    /**
+     * Empty destructor which does nothing. Use this whenever possible instead
+     * of your own empty destructor as this special case will be detected and it
+     * won't be called.
+     */
+    static void empty_destructor(unsigned char*, size_t, void*);
 
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,

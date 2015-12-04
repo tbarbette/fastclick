@@ -355,3 +355,4 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk)
 EXPORT_ELEMENT(ToDPDKDevice)
+ELEMENT_MT_SAFE(ToDPDKDevice)

@@ -227,7 +227,7 @@ Packet::~Packet()
     } else
 #  if HAVE_NETMAP_PACKET_POOL
     if (NetmapBufQ::is_netmap_packet(this)) {
-        NetmapBufQ::get_local_pool()->insert(_head);
+        NetmapBufQ::local_pool()->insert_p(_head);
     } else
 #  endif
     {
@@ -424,12 +424,8 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
  * Give a hint that some packets from one thread will switch to another thread
  */
 void WritablePacket::pool_transfer(int from, int to) {
-#if HAVE_ZEROCOPY && HAVE_NET_NETMAP_H
-    NetmapBufQ::get_local_pool(to)->set_shared();
-#else
     (void)from;
     (void)to;
-#endif
 }
 
 
@@ -544,6 +540,12 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
                 packet_pool.pd = static_cast<WritablePacket *>(pd->next());
+#if HAVE_NETMAP_PACKET_POOL
+                if (NetmapBufQ::is_netmap_packet(pd))
+                    NetmapBufQ::local_pool()->insert_p(pd->buffer());
+                else
+#endif
+                ::operator delete[]((unsigned char *) pd->buffer());
                 ::operator delete((void *) pd);
             }
         }
@@ -586,7 +588,7 @@ WritablePacket::recycle(WritablePacket *p)
     bool data = is_from_data_pool(p);
 
     if (likely(data)) {
-         check_data_pool_size(packet_pool);
+        check_data_pool_size(packet_pool);
         ++packet_pool.pdcount;
         p->set_next(packet_pool.pd);
         packet_pool.pd = p;
@@ -648,10 +650,10 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
 # if CLICK_USERLEVEL || CLICK_MINIOS
 #  if HAVE_NETMAP_PACKET_POOL
     assert(n <= NetmapBufQ::buffer_size());
-    unsigned char *d = NetmapBufQ::get_local_pool()->extract_p();
-#  else
-    unsigned char *d = new unsigned char[n];
+    unsigned char *d = NetmapBufQ::local_pool()->extract_p();
+    if (d == 0)
 #  endif
+    unsigned char *d = new unsigned char[n];
     if (!d)
 	return false;
     _head = d;
@@ -1311,7 +1313,6 @@ Packet::shift_data(int offset, bool free_on_failure)
     }
 }
 
-
 #if HAVE_CLICK_PACKET_POOL
 static void
 cleanup_pool(PacketPool *pp, int global)
@@ -1326,9 +1327,9 @@ cleanup_pool(PacketPool *pp, int global)
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
 #if HAVE_NETMAP_PACKET_POOL
-    NetmapBufQ::local_pool()->insert(pd->buffer());
+    NetmapBufQ::local_pool()->insert_p(pd->buffer());
 #else
-    ::operator delete((void *) pd->buffer());
+	delete[] reinterpret_cast<unsigned char *>(pd->buffer());
 #endif
     ::operator delete((void *) pd);
     }
@@ -1354,7 +1355,7 @@ Packet::static_cleanup()
 		PacketPool fake_pool;
 		do {
 			fake_pool.p = global_packet_pool.pbatch.extract();
-			fake_pool.pd = global_packet_pool.pbatch.extract();
+			fake_pool.pd = global_packet_pool.pdbatch.extract();
 			if (!fake_pool.p && !fake_pool.pd) break;
 			cleanup_pool(&fake_pool, 1);
 		} while(true);

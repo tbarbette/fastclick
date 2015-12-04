@@ -335,10 +335,7 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 				}
 #  else //We must return the netmap buffer to the netmap buffer queue
 				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
-					if (p->buffer_destructor() == NetmapBufQ::buffer_destructor)
-						reinterpret_cast<NetmapBufQ*>(p->destructor_argument())->insert(slot->buf_idx);
-					else
-						NetmapBufQ::get_local_pool()->insert(slot->buf_idx);
+					NetmapBufQ::local_pool()->insert(slot->buf_idx);
 				}
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {

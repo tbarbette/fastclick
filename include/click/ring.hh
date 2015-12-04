@@ -3,6 +3,7 @@
 #define CLICK_RING_HH
 
 #include <click/atomic.hh>
+#include <click/sync.hh>
 
 CLICK_DECLS
 
@@ -63,6 +64,7 @@ CLICK_DECLS
 
 
     };
+
 
 /**
  * Ring with size set at initialization time
