@@ -206,8 +206,8 @@ if test "x$enable_dpdk_pools" = "xyes"; then
 fi
 
 AC_ARG_ENABLE([zerocopy],
-    [AS_HELP_STRING([  --enable-zerocopy], [use Zero Copy])],
-    [:], [enable_zerocopy=no])
+    [AS_HELP_STRING([  --disable-zerocopy], [disable Zero Copy])],
+    [:], [enable_zerocopy=yes])
 if test "x$enable_zerocopy" = xyes; then
     AC_DEFINE(HAVE_ZEROCOPY)
 fi
