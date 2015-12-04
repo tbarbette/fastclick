@@ -128,12 +128,6 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 	     }
 	}
 
-	//Wait for Netmap init if we're the last interface
-    if (all_initialized()) {
-        click_chatter("Waiting 3 sec for full hardware initialization of netmap devices...\n");
-        sleep(3);
-    }
-
 	return 0;
 }
 
