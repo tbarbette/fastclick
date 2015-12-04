@@ -125,7 +125,7 @@
 /* Define if you have the <net/netmap.h> header file. */
 #undef HAVE_NET_NETMAP_H
 
-/* Define if you have the <net/netmap.h> header file. */
+/* Define if you use only netmap buffer as data buffer. */
 #undef HAVE_NETMAP_PACKET_POOL
 
 /* Define if you have the <netpacket/packet.h> header file. */

@@ -1325,6 +1325,11 @@ cleanup_pool(PacketPool *pp, int global)
     while (WritablePacket *pd = pp->pd) {
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
+#if HAVE_NETMAP_PACKET_POOL
+    NetmapBufQ::local_pool()->insert(pd->buffer());
+#else
+    ::operator delete((void *) pd->buffer());
+#endif
     ::operator delete((void *) pd);
     }
 #if !HAVE_BATCH_RECYCLE
