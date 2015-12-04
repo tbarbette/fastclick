@@ -89,8 +89,7 @@ uint32_t _size;
 
     T* ring;
 public:
-int id;
-    DynamicRing() : _size(0) {
+    DynamicRing() : _size(0),ring(0) {
         head = 0;
         tail = 0;
     }

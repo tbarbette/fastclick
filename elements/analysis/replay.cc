@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() :  _queue_head(0),_active(true), _loaded(false),_burst(64), _stop(-1), _task(this), _quick_clone(true)
+Replay::Replay() :  _queue(1024), _queue_head(0),_active(true), _loaded(false),_burst(64), _stop(-1), _task(this), _quick_clone(true)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;

@@ -71,7 +71,6 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #if !HAVE_NUMA
     if (numa) {
     	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
-    	return -1;
     }
     _numa = false;
 #else
@@ -147,12 +146,6 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 	        master()->thread(thread_for_queue(i) - j)->select_set().add_select(fd,this,SELECT_READ);
 	    }
 	}
-
-    //Wait for Netmap init if we're the last interface
-    if (all_initialized()) {
-        click_chatter("Waiting 3 sec for full hardware initialization of %s...\n",_device->parent_nmd->nifp->ni_name);
-        sleep(3);
-    }
 
 	return 0;
 }
