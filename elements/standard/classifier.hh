@@ -90,7 +90,7 @@ class Classifier : public BatchElement { public:
 #if HAVE_BATCH
     void push_batch(int, PacketBatch *);
 #endif
-    void push(int, Packet *);
+    void push_packet(int, Packet *);
 
     Classification::Wordwise::Program empty_program(ErrorHandler *errh) const;
     static void parse_program(Classification::Wordwise::Program &prog,

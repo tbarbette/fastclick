@@ -26,23 +26,22 @@ BatchElement::~BatchElement() {
 
 /**
  * Default push action for a batch element, will batch packets if inflow and
- *
  */
 void BatchElement::push(int port,Packet* p) { //May still be extended
 	if (inflow.get()) {
+		if (port != 0) {
+			push_batch(port,PacketBatch::make_from_packet(p));
+		} else {
 			if (current_batch.get() == NULL) {
 				current_batch.set(PacketBatch::make_from_packet(p));
 			} else {
 				current_batch.get()->append_packet(p);
 			}
-	}
-	else if (in_batch_mode >= BATCH_MODE_NEEDED) {
-	    click_chatter("BUG : lonely packet sent to %s which needs batch !",name().c_str());
+		}
+	} else if (in_batch_mode == BATCH_MODE_YES) {
 		push_batch(port,PacketBatch::make_from_packet(p));
 	} else {
-	    p = simple_action(p);
-	    if (p)
-	        output(port).push(p);
+		push_packet(port,p);
 	}
 };
 
@@ -92,7 +91,7 @@ BatchElement::PullBatchPort::pull_batch(unsigned max) const {
 void BatchElement::PushBatchPort::bind_batchelement() {
 	BatchElement* be;
 	if ((be = dynamic_cast<BatchElement*>(element())) != NULL) {
-		e_in_batch_mode = (be->in_batch_mode >= BATCH_MODE_NEEDED);
+		e_in_batch_mode = (be->in_batch_mode == BATCH_MODE_YES);
 #if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
 		void (BatchElement::*flow_pusher)(int, PacketBatch *) = &BatchElement::push_batch;
 		_bound.push_batch = (void (*)(BatchElement *, int, PacketBatch *)) (dynamic_cast<BatchElement*>(element())->*flow_pusher);
@@ -106,7 +105,7 @@ void BatchElement::PushBatchPort::bind_batchelement() {
 void BatchElement::PullBatchPort::bind_batchelement() {
 	BatchElement* be;
     if ((be = dynamic_cast<BatchElement*>(element())) != NULL) {
-        e_in_batch_mode = (be->in_batch_mode >= BATCH_MODE_NEEDED);
+        e_in_batch_mode = (be->in_batch_mode == BATCH_MODE_YES);
 #if HAVE_BOUND_PORT_TRANSFER && HAVE_BATCH
         PacketBatch *(BatchElement::*flow_pull)(int,unsigned) = &BatchElement::pull_batch;
         _bound.pull_batch = (PacketBatch * (*)(BatchElement *, int, unsigned)) (dynamic_cast<BatchElement*>(element())->*flow_pull);
@@ -114,32 +113,40 @@ void BatchElement::PullBatchPort::bind_batchelement() {
     }
 }
 
-bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int,
+bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int port,
 		Element *from, int from_port, int) {
 
 	if (e->batch_mode() > Element::BATCH_MODE_NO) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
 		batch_e->in_batch_mode = Element::BATCH_MODE_YES;
-		click_chatter("%s is in batch mode",e->name().c_str());
-		return true;
+		batch_e->upgrade_ports();
+		bool cont = (isoutput && e->output_is_push(port)) || (!isoutput && e->input_is_pull(port));
+		if (_verbose)
+			if (cont)
+				click_chatter("%s is now in batch mode, continue propagation",e->name().c_str());
+			else
+				click_chatter("%s is now in batch mode",e->name().c_str());
+		return cont;
 	}
-
-	if (!isoutput)
-		click_chatter("Warning ! Push %s->%s is not compatible with batch. "
-					"Packets will be unbatched and that will reduce performances.",
-					from->name().c_str(),e->name().c_str());
-	else
-		click_chatter("Warning ! Pull %s<-%s is not compatible with batch. "
-					"Batching will be disabled and that will reduce performances.",
-							e->name().c_str(),from->name().c_str());
-
 	BatchElement* from_batch_e = dynamic_cast<BatchElement*>(from);
 	assert(from_batch_e);
 	if (!from_batch_e->ports_upgraded)
 		from_batch_e->upgrade_ports();
 
+	bool ispush = (isoutput && e->output_is_push(port)) || (!isoutput && e->input_is_push(port));
+	if (_verbose) {
+		if (ispush)
+			click_chatter("Warning ! Push %s->%s is not compatible with batch. "
+					"Packets will be unbatched and that will reduce performances.",
+					from->name().c_str(),e->name().c_str());
+		else
+			click_chatter("Warning ! Pull %s<-%s is not compatible with batch. "
+					"Batching will be disabled and that will reduce performances.",
+							e->name().c_str(),from->name().c_str());
+	}
+
 	//If this is push, we try to create a re-batching bridge
-	if (!isoutput) {
+	if (ispush) {
 		PushBatchPort* port = &(static_cast<BatchElement::PushBatchPort*>(from_batch_e->_ports[1])[from_port]);
 		PushToPushBatchVisitor v(&port->downstream_batches);
 		e->router()->visit(e,1,-1,&v);
@@ -158,7 +165,7 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int,
 	bool BatchElement::PushToPushBatchVisitor::visit(Element *e, bool, int,
 			Element *, int, int) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
-		if (e->batch_mode() == BATCH_MODE_IFPOSSIBLE || e->batch_mode() == BATCH_MODE_NEEDED) {
+		if (e->batch_mode() == BATCH_MODE_IFPOSSIBLE) {
 			batch_e->in_batch_mode = BATCH_MODE_YES;
 			_list->push_back(batch_e);
 			batch_e->receives_batch = true;
@@ -175,21 +182,15 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int,
 void BatchElement::upgrade_ports() {
 	if (in_batch_mode != BATCH_MODE_YES || ports_upgraded)
 		return;
+#if HAVE_VERBOSE_BATCH && BATCH_DEBUG
 	click_chatter("Upgrading ports of %s",name().c_str());
-    for (int i = 0; i < _nports[0]; i++) {
-	Port* p =  &_ports[0][i];
-	if (input_is_pull(i)) {
-		static_cast<PullBatchPort*>(p)->bind_batchelement();
-	}
-    }
-
+#endif
 
 	PushBatchPort* newports = new PushBatchPort[_nports[1]];
 	for (int i = 0; i < _nports[1]; i++) {
 		Port* p =  &_ports[1][i];
 		if (output_is_push(i)) {
 			newports[i].assign(1,p->element(),p->port());
-			newports[i].bind_batchelement();
 		}
 	}
 	bool is_inline =
@@ -199,7 +200,28 @@ void BatchElement::upgrade_ports() {
 	_ports[1] = newports;
 	ports_upgraded = true;
 }
+
+void BatchElement::bind_ports() {
+	for (int i = 0; i < _nports[0]; i++) {
+		Port* p =  &_ports[0][i];
+		if (input_is_pull(i)) {
+			static_cast<PullBatchPort*>(p)->bind_batchelement();
+		}
+	}
+
+	for (int i = 0; i < _nports[1]; i++) {
+		PushBatchPort* p =  static_cast<BatchElement::PushBatchPort*>(_ports[1]);
+		if (output_is_push(i)) {
+			p[i].bind_batchelement();
+		}
+	}
+}
 #endif
 
+void BatchElement::push_packet(int port, Packet* p) {
+	p = simple_action(p);
+	if (p)
+		output(port).push(p);
+}
 
 CLICK_ENDDECLS

@@ -603,7 +603,7 @@ RouterThread::driver()
 # if CLICK_USERLEVEL && HAVE_MULTITHREAD
     _running_processor = click_current_processor();
 #  if HAVE___THREAD_STORAGE_CLASS
-    click_current_thread_id = _id;
+    click_current_thread_id = _id | 0x40000000;
 #  endif
 # endif
 #endif
@@ -657,9 +657,9 @@ RouterThread::driver()
 	    if (PASS_GT(_clients[C_CLICK].pass, _clients[C_KERNEL].pass))
 		break;
 #endif
-		if (run_tasks(_tasks_per_iter)) {
-			any_work_done = true;
-		}
+	    if (run_tasks(_tasks_per_iter)) {
+	        any_work_done = true;
+	    }
 	} while (0);
 
 #if CLICK_USERLEVEL

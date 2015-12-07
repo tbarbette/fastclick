@@ -49,15 +49,31 @@ Bypass::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 Bypass::initialize(ErrorHandler *)
 {
+#if HAVE_BATCH
+	click_chatter("Bypass is not very compatible with batching");
+#endif
     fix();
     return 0;
 }
 
 void
-Bypass::push(int port, Packet *p)
+Bypass::push_packet(int port, Packet *p)
 {
     output(_active && !port && noutputs() > 1).push(p);
 }
+
+#if HAVE_BATCH
+void
+Bypass::push_batch(int port, PacketBatch *p)
+{
+    output(_active && !port && noutputs() > 1).push_batch(p);
+}
+PacketBatch *
+Bypass::pull_batch(int port,int max)
+{
+    return input(_active && !port && ninputs() > 1).pull_batch(max);
+}
+#endif
 
 Packet *
 Bypass::pull(int port)
@@ -113,6 +129,7 @@ Bypass::Assigner::visit(Element* e, bool isoutput, int port,
         }
     // Just cheat.
     //click_chatter("Bypass: Assigning %p{element}:%d to %p{element}:%d\n", _e, _port, e, port);
+    //TODO : Support batching
     const_cast<Element::Port&>(e->port(isoutput, port)).assign(isoutput, _e, _port);
     return false;
 }

@@ -1199,6 +1199,9 @@ Router::initialize(ErrorHandler *errh)
             int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
             if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES) {
+# if BATCH_DEBUG
+                click_chatter("%s is in batch mode",e->name().c_str());
+# endif
                 BatchElement::BatchModePropagate p;
                 for (int i = 0; i < e->noutputs(); i++) {
                     //click_chatter("%s output is push %d",e->name().c_str(),e->output_is_push(i));

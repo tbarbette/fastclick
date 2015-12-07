@@ -36,7 +36,7 @@ CLICK_DECLS
 
 class IP6Address;
 class WritablePacket;
-
+class PacketBatch;
 class Packet { public:
 
     /** @name Data */
@@ -73,15 +73,22 @@ class Packet { public:
 #if CLICK_USERLEVEL || CLICK_MINIOS
     typedef void (*buffer_destructor_type)(unsigned char* buf, size_t sz, void* argument);
 
-    /*Empty destructor does nothing (buffer management is done totally
-     * externally. Prefer to use this one instead of an empty one as this
-     * special case will be optimized.*/
-    static void empty_destructor(unsigned char *, size_t, void *);
+    /**
+     * Empty destructor which does nothing. Use this whenever possible instead
+     * of your own empty destructor as this special case will be detected and it
+     * won't be called.
+     */
+    static void empty_destructor(unsigned char*, size_t, void*);
 
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
                                 void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
-#endif
+# if HAVE_BATCH
+    static PacketBatch *make_batch(unsigned char *data, uint16_t count, uint16_t *length,
+                buffer_destructor_type destructor,
+								void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+# endif //HAVE_BATCH
+#endif //CLICK_USERLEVEL || CLICK_MINIOS
 
     static void static_cleanup();
 
@@ -873,8 +880,6 @@ private:
     };
 #endif
 
-class PacketBatch;
-
 class WritablePacket : public Packet { public:
 
     inline unsigned char *data() const;
@@ -953,6 +958,7 @@ class WritablePacket : public Packet { public:
     static bool is_from_data_pool(WritablePacket *p);
     static void recycle(WritablePacket *p);
 # if HAVE_BATCH
+    static WritablePacket *pool_batch_allocate(uint16_t count);
     static void recycle_packet_batch(PacketBatch *p_batch);
     static void recycle_data_batch(PacketBatch *pd_batch);
 # endif
@@ -1044,19 +1050,22 @@ class WritablePacket : public Packet { public:
 		int last_o = -1;\
 		int passed = 0;\
 		for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
-			int o = fnt(p);\
+			int o = (fnt(p));\
+			if (o < 0 || o>(nbatches)) o = (nbatches);\
 			if (o == last_o) {\
 				passed ++;\
 			} else {\
 				if (last == NULL) {\
 					out[o] = p;\
 					p->set_count(1);\
+					p->set_tail(p);\
 				} else {\
-					last->set_next(NULL);\
 					out[last_o]->set_tail(last);\
 					out[last_o]->set_count(out[last_o]->count() + passed);\
 					if (!out[o]) {\
-						out[o] = PacketBatch::make_from_packet(p);\
+						out[o] = p;\
+						out[o]->set_count(1);\
+						out[o]->set_tail(p);\
 					} else {\
 						out[o]->append_packet(p);\
 					}\
@@ -1076,7 +1085,7 @@ class WritablePacket : public Packet { public:
 		for (; i < nbatches; i++) {\
 			if (out[i]) {\
 				out[i]->tail()->set_next(NULL);\
-				on_finish(i,out[i]);\
+				(on_finish(i,out[i]));\
 			}\
 		}\
 	}
@@ -1248,6 +1257,7 @@ public :
 	inline static PacketBatch* make_from_simple_list(Packet* head, Packet* tail, unsigned int size) {
 		PacketBatch* b = make_from_list(head,size);
 		b->set_tail(tail);
+		tail->set_next(0);
 		return b;
 	}
 
@@ -1259,6 +1269,7 @@ public :
 		PacketBatch* b =  static_cast<PacketBatch*>(p);
 		b->set_count(1);
 		b->set_tail(b);
+		b->set_next(0);
 		return b;
 	}
 
@@ -3153,7 +3164,7 @@ inline void PacketBatch::kill() {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 #define HAVE_BATCH_RECYCLE 1
 /**
- * Recycle a whole batch of unshared packets
+ * Recycle a whole batch of unshared packets of the same type
  *
  * @precond No packet are shared
  */
@@ -3180,23 +3191,37 @@ inline void PacketBatch::safe_kill(bool is_data) {
 
 #define BATCH_RECYCLE_PACKET(p) {\
 	if (head_packet == NULL) {\
-		head_packet = p;\
-		last_packet = p;\
+		head_packet = static_cast<WritablePacket*>(p);\
+		last_packet = static_cast<WritablePacket*>(p);\
 	} else {\
 		last_packet->set_next(p);\
-		last_packet = p;\
+		last_packet = static_cast<WritablePacket*>(p);\
 	}\
 	n_packet++;}
 
 #define BATCH_RECYCLE_DATA_PACKET(p) {\
 	if (head_data == NULL) {\
-		head_data = p;\
-		last_data = p;\
+		head_data = static_cast<WritablePacket*>(p);\
+		last_data = static_cast<WritablePacket*>(p);\
 	} else {\
 		last_data->set_next(p);\
-		last_data = p;\
+		last_data = static_cast<WritablePacket*>(p);\
 	}\
 	n_data++;}
+
+#define BATCH_RECYCLE_UNSAFE_PACKET(p) {\
+			if (p->shared()) {\
+				p->kill();\
+			} else {\
+				BATCH_RECYCLE_UNKNOWN_PACKET(p);\
+			}\
+		}
+
+#define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
+	if (p->data_packet() == 0 && p->buffer_destructor() == 0) {\
+		BATCH_RECYCLE_DATA_PACKET(p);\
+	} else {\
+		BATCH_RECYCLE_PACKET(p);}}
 
 #define BATCH_RECYCLE_END() \
 	if (last_packet) {\
@@ -3209,26 +3234,18 @@ inline void PacketBatch::safe_kill(bool is_data) {
 	}
 
 /**
- * Recycle a whole batch of packets
+ * Recycle a whole batch, faster in most cases
  */
 inline void PacketBatch::safe_kill() {
-	click_chatter("Need testing... Use batch->kill() for now;");
-	assert(false);
     BATCH_RECYCLE_START();
     FOR_EACH_PACKET_SAFE(this,up) {
         WritablePacket* p = static_cast<WritablePacket*>(up);
-		if (p->shared()) {
-			p->kill();
-		} else {
-			if (p->data_packet() == 0 && p->buffer_destructor() == 0) {
-				BATCH_RECYCLE_DATA_PACKET(p);
-			} else {
-				BATCH_RECYCLE_PACKET(p);
-			}
-		}
+        BATCH_RECYCLE_UNSAFE_PACKET(p);
     }
     BATCH_RECYCLE_END();
 }
+#else
+#define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
 #endif
 
 

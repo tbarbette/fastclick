@@ -23,15 +23,12 @@
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
 
-#include <rte_ethdev.h>
-#include <rte_mbuf.h>
-#include <rte_version.h>
 #include "fromdpdkdevice.hh"
 
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0)
+    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0),_n_desc(0)
 {
 }
 

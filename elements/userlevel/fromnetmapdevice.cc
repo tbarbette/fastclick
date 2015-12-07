@@ -35,6 +35,9 @@ FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(fals
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
 #endif
+#if HAVE_ZEROCOPY
+	NetmapDevice::global_alloc += 2048;
+#endif
 }
 
 void *
@@ -72,7 +75,6 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #if !HAVE_NUMA
     if (numa) {
     	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
-    	return -1;
     }
     _numa = false;
 #else
@@ -84,6 +86,10 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         thisnode = 0;
 #endif
 
+#if !NETMAP_WITH_HASH
+    if (_set_rss_aggregate)
+        return errh->error("You have to use the modified netmap version to use RSS_AGGREGATE !");
+#endif
     _device = NetmapDevice::open(ifname);
     if (!_device) {
         return errh->error("Could not initialize %s",ifname.c_str());
@@ -148,12 +154,6 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 	        master()->thread(thread_for_queue(i) - j)->select_set().add_select(fd,this,SELECT_READ);
 	    }
 	}
-
-    //Wait for Netmap init if we're the last interface
-    if (all_initialized()) {
-        click_chatter("Waiting 3 sec for full hardware initialization of %s...\n",_device->parent_nmd->nifp->ni_name);
-        sleep(3);
-    }
 
 	return 0;
 }
@@ -260,38 +260,34 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 
 			unsigned char* data = (unsigned char*)NETMAP_BUF(rxring, slot->buf_idx);
 			WritablePacket *p;
-# if HAVE_NETMAP_PACKET_POOL
 			if (slot->flags & NS_MOREFRAG) {
-				click_chatter("Packets bigger than Netmap buffer size are not supported while compiled with Netmap Packet Pool. Please disable this feature.");
-				assert(false);
+				click_chatter("Packets bigger than Netmap buffer size are not supported for now. Please set MTU lower and disable features like LRO and GRO.");
+			    assert(false);
 			}
+# if HAVE_NETMAP_PACKET_POOL
 			__builtin_prefetch(data);
 			p = WritablePacket::make_netmap(data, rxring, slot,_set_rss_aggregate);
 			if (unlikely(p == NULL)) goto error;
 # else
 #  if HAVE_ZEROCOPY
 			uint32_t newbuffer;
-			if (slot->len > 64 && (newbuffer = NetmapBufQ::get_local_pool()->extract()) != 0) {
+			if (slot->len > 64 && (newbuffer = NetmapBufQ::local_pool()->extract()) != 0) {
 				__builtin_prefetch(data);
-				p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
+				p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,0);
 				if (!p) goto error;
 				slot->buf_idx = newbuffer;
-				slot->flags |= NS_BUF_CHANGED;
+				slot->flags = NS_BUF_CHANGED;
 			} else
 #  endif
 			{
-				if (slot->flags & NS_MOREFRAG) {
-					click_chatter("Packets bigger than Netmap buffer size are not supported for now. Please set MTU lower and disable features like LRO and GRO.");
-					assert(false);
-				}
 				p = Packet::make(data, slot->len);
 				if (!p) goto error;
 			}
-# endif
-			#if NETMAP_WITH_HASH
+# endif //HAVE_NETMAP_PACKET_POOL
+#if NETMAP_WITH_HASH
 			if (_set_rss_aggregate)
 				SET_AGGREGATE_ANNO(p,slot->hash)
-			#endif
+#endif
 
 			p->set_packet_type_anno(Packet::HOST);
 
@@ -315,7 +311,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 	}
 # endif
 
-#endif
+#endif //HAVE_NETMAP_PACKET_POOL && HAVE_BATCH
 	rxring->head = rxring->cur = cur;
 	unlock();
 # if HAVE_BATCH
@@ -323,22 +319,21 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 	output(0).push_batch(batch_head);
 # endif
 	}
-
-	if (nr_pending > _burst) { //TODO size/4
+	if (nr_pending > _burst) { //TODO size/4?
 		if (fromtask) {
 			task->fast_reschedule();
 		} else {
-			task->reschedule();
-		}
+	        task->reschedule();
+	    }
 	}
 
 	add_count(sent);
-	return sent;
-	error: //No more buffer
+  return sent;
+  error: //No more buffer
 
-	click_chatter("No more buffers !");
-	router()->master()->kill_router(router());
-	return 0;
+  click_chatter("No more buffers !");
+  router()->master()->kill_router(router());
+  return 0;
 }
 
 void

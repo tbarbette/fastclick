@@ -144,6 +144,7 @@ class InfiniteSource : public BatchElement, public ActiveNotifier { public:
     int _datasize;
     bool _active;
     bool _timestamp;
+    int _headroom;
     Task _task;
     String _data;
     NotifierSignal _nonfull_signal;

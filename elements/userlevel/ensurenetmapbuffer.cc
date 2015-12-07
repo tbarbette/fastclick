@@ -39,12 +39,12 @@ EnsureNetmapBuffer::smaction(Packet* p) {
 #if HAVE_NETMAP_PACKET_POOL
 		WritablePacket* q = WritablePacket::make(p->length());
 #else
-		unsigned char* buffer = NetmapBufQ::get_local_pool()->extract_p();
+		unsigned char* buffer = NetmapBufQ::local_pool()->extract_p();
 		if (!buffer) {
 			p->kill();
 			return 0;
 		}
-		WritablePacket* q = WritablePacket::make(buffer,NetmapBufQ::buffer_size(),NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
+		WritablePacket* q = WritablePacket::make(buffer,NetmapBufQ::buffer_size(),NetmapBufQ::buffer_destructor,NetmapBufQ::local_pool());
 #endif
 		q->copy(p);
 		p->kill();

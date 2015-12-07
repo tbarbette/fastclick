@@ -18,12 +18,14 @@ CLICK_DECLS
 /*
  * =c
  *
- * FromNetmapDevice
+ * FromNetmapDevice(DEVNAME [, QUEUE, NR_QUEUE, [, I<keywords> PROMISC, BURST])
  *
- *  * =item DEVNAME
+ * =s netdevices
+ *
+ * =item DEVNAME
  *
  * String.  Device number
- *  *
+ *
  * =item PROMISC
  *
  * Boolean.  FromNetmapDevice puts the device in promiscuous mode if PROMISC is

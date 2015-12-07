@@ -111,8 +111,6 @@ include dpdk.mk
 EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 endif
 
-EXTRA_DRIVER_OBJS := netmapdevice.o $(EXTRA_DRIVER_OBJS)
-
 ifndef MINDRIVER
 DRIVER = click
 ELEMENTSCONF = elements

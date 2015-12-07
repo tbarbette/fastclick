@@ -173,7 +173,6 @@ protected:
     }
 
     int initialize_tasks(bool schedule, ErrorHandler *errh) {
-        this->queue_per_threads = queue_per_threads;
         _tasks.resize(usable_threads.weight());
         _locks.resize(usable_threads.weight());
         _thread_to_queue.resize(master()->nthreads());

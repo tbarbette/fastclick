@@ -36,7 +36,7 @@ CLICK_DECLS
  * device. Linux targets generally support PCAP and LINUX; other targets
  * support PCAP or, occasionally, other methods. Defaults to the method
  * specified for a matching L<FromDevice(n)>, or the first supported
- * method among NETMAP, PCAP, DEVBPF, LINUX and PCAPFD otherwise.
+ * method among PCAP, DEVBPF, LINUX and PCAPFD otherwise.
  *
  * =item DEBUG
  *
@@ -79,9 +79,6 @@ extern "C" {
 #elif defined(__sun)
 # define TODEVICE_ALLOW_PCAPFD 1
 #endif
-#if FROMDEVICE_ALLOW_NETMAP
-# define TODEVICE_ALLOW_NETMAP 1
-#endif
 
 class ToDevice : public Element { public:
 
@@ -114,13 +111,10 @@ class ToDevice : public Element { public:
 #if TODEVICE_ALLOW_PCAP
     pcap_t *_pcap;
 #endif
-#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD || TODEVICE_ALLOW_NETMAP
+#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD
     int _fd;
 #endif
-#if TODEVICE_ALLOW_NETMAP
-    NetmapInfo _netmap;
-#endif
-    enum { method_default, method_netmap, method_linux, method_pcap, method_devbpf, method_pcapfd };
+    enum { method_default, method_linux, method_pcap, method_devbpf, method_pcapfd };
     int _method;
     NotifierSignal _signal;
 
@@ -131,7 +125,7 @@ class ToDevice : public Element { public:
 #if TODEVICE_ALLOW_PCAP
     bool _my_pcap;
 #endif
-#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD || TODEVICE_ALLOW_NETMAP
+#if TODEVICE_ALLOW_LINUX || TODEVICE_ALLOW_DEVBPF || TODEVICE_ALLOW_PCAPFD
     bool _my_fd;
 #endif
     int _backoff;

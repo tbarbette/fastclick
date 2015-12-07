@@ -260,8 +260,8 @@ Classifier::push_batch(int, PacketBatch * batch)
 }
 
 #endif
-void
-Classifier::push(int, Packet *p)
+inline void
+Classifier::push_packet(int, Packet *p)
 {
     checked_output_push(_prog.match(p), p);
 }

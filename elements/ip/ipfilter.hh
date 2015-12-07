@@ -133,13 +133,14 @@ class IPFilter : public BatchElement { public:
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *);
 #endif
-    void push(int port, Packet *);
+    void push_packet(int port, Packet *);
 
     typedef Classification::Wordwise::CompressedProgram IPFilterProgram;
     static void parse_program(IPFilterProgram &zprog,
 			      const Vector<String> &conf, int noutputs,
 			      const Element *context, ErrorHandler *errh);
     static inline int match(const IPFilterProgram &zprog, const Packet *p);
+    inline int match(Packet *p);
 
     enum {
 	TYPE_NONE	= 0,		// data types
@@ -384,6 +385,12 @@ IPFilter::match(const IPFilterProgram &zprog, const Packet *p)
 	    return -off;
 	pr += off;
     }
+}
+
+inline int
+IPFilter::match(Packet *p)
+{
+	return match(_zprog,p);
 }
 
 CLICK_ENDDECLS

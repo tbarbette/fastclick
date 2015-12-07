@@ -18,16 +18,6 @@
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
 
-#include <rte_common.h>
-#include <rte_eal.h>
-#include <rte_ethdev.h>
-#include <rte_lcore.h>
-#include <rte_mbuf.h>
-#include <rte_mempool.h>
-#include <rte_pci.h>
-#include <rte_version.h>
-
-
 CLICK_DECLS
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
@@ -49,6 +39,13 @@ unsigned int DPDKDevice::get_nb_txdesc(unsigned port_id)
     return info->n_tx_descs;
 }
 
+void DPDKDevice::add_pool(const struct rte_mempool * rte, void *arg){
+	int* i = (int*)arg;
+	if (*i < _nr_pktmbuf_pools)
+		_pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
+	(*i)++;
+}
+
 bool DPDKDevice::alloc_pktmbufs()
 {
     // Count NUMA sockets
@@ -59,32 +56,38 @@ bool DPDKDevice::alloc_pktmbufs()
         if (numa_node > max_socket)
             max_socket = numa_node;
     }
+
     if (max_socket == -1)
         return false;
 
+    _nr_pktmbuf_pools = max_socket + 1;
+
     // Allocate pktmbuf_pool array
     typedef struct rte_mempool *rte_mempool_p;
-    _pktmbuf_pools = new rte_mempool_p[max_socket + 1];
+    _pktmbuf_pools = new rte_mempool_p[_nr_pktmbuf_pools];
     if (!_pktmbuf_pools)
         return false;
-    memset(_pktmbuf_pools, 0, (max_socket + 1) * sizeof(rte_mempool_p));
+    memset(_pktmbuf_pools, 0, _nr_pktmbuf_pools * sizeof(rte_mempool_p));
 
-    // Create a pktmbuf pool for each active socket
-    for (HashMap<unsigned, DevInfo>::const_iterator it = _devs.begin();
-         it != _devs.end(); ++it) {
-        int numa_node = DPDKDevice::get_port_numa_node(it.key());
-        if (!_pktmbuf_pools[numa_node]) {
-            char name[64];
-            snprintf(name, 64, "mbuf_pool_%u", numa_node);
-            _pktmbuf_pools[numa_node] =
-                rte_mempool_create(
-                    name, NB_MBUF, MBUF_SIZE, MBUF_CACHE_SIZE,
-                    sizeof (struct rte_pktmbuf_pool_private),
-                    rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
-                    numa_node, 0);
-            if (!_pktmbuf_pools[numa_node])
-                return false;
-        }
+    if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
+		// Create a pktmbuf pool for each active socket
+		for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+			if (!_pktmbuf_pools[i]) {
+				char name[64];
+				snprintf(name, 64, "mbuf_pool_%u", i);
+				_pktmbuf_pools[i] =
+					rte_mempool_create(
+						name, NB_MBUF, MBUF_SIZE, MBUF_CACHE_SIZE,
+						sizeof (struct rte_pktmbuf_pool_private),
+						rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
+						i, 0);
+				if (!_pktmbuf_pools[i])
+					return false;
+			}
+		}
+    } else {
+		int i = 0;
+		rte_mempool_walk(add_pool,(void*)&i);
     }
 
     return true;
@@ -94,7 +97,7 @@ struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
 
-int DPDKDevice::initialize_device(unsigned port_id, const DevInfo &info,
+int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
                                   ErrorHandler *errh)
 {
     struct rte_eth_conf dev_conf;
@@ -107,7 +110,11 @@ int DPDKDevice::initialize_device(unsigned port_id, const DevInfo &info,
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 
-    if (rte_eth_dev_configure(port_id, info.n_rx_queues, info.n_tx_queues,
+    info.n_rx_queues = (info.n_rx_queues>0?info.n_rx_queues:1);
+    info.n_tx_queues = (info.n_tx_queues>0?info.n_tx_queues:1);
+
+    if (rte_eth_dev_configure(port_id, info.n_rx_queues,
+                              info.n_tx_queues,
                               &dev_conf) < 0)
         return errh->error(
             "Cannot initialize DPDK port %u with %u RX and %u TX queues",
@@ -134,18 +141,18 @@ int DPDKDevice::initialize_device(unsigned port_id, const DevInfo &info,
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
-    for (unsigned i = 0; i < info.n_rx_queues; ++i) {
-        if (rte_eth_rx_queue_setup(
-                port_id, i, info.n_rx_descs, numa_node, &rx_conf,
+    for (unsigned i = 0; i < info.n_rx_queues; ++i)
+        if (rte_eth_rx_queue_setup(port_id, i,
+                (info.n_rx_descs>0?info.n_rx_descs:256), numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
             return errh->error(
                 "Cannot initialize RX queue %u of port %u on node %u",
                 i, port_id, numa_node);
-    }
 
     for (unsigned i = 0; i < info.n_tx_queues; ++i)
-        if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
-                                   &tx_conf) != 0)
+        if (rte_eth_tx_queue_setup(port_id, i,
+                (info.n_tx_descs>0?info.n_tx_descs:1024), numa_node, &tx_conf)
+            != 0)
             return errh->error(
                 "Cannot initialize TX queue %u of port %u on node %u",
                 i, port_id, numa_node);
@@ -180,17 +187,25 @@ int DPDKDevice::add_device(unsigned port_id, DPDKDevice::Dir dir,
                     "Some elements disagree on whether or not device %u should"
                     " be in promiscuous mode", port_id);
             info->promisc |= promisc;
-            if (n_desc != info->n_rx_descs)
-                return errh->error(
-                    "Some elements disagree on the number of RX descriptors "
-                    "for device %u", port_id);
+            if (n_desc != 0) {
+                if (n_desc != info->n_rx_descs && info->n_rx_descs != 0)
+                    return errh->error(
+                        "Some elements disagree on the number of RX descriptors "
+                        "for device %u (want %d, actual is %d)", port_id, n_desc,
+                        info->n_rx_descs);
+                info->n_rx_descs = n_desc;
+            }
             info->n_rx_queues =
                 1 + ((queue_id <= 0) ? info->n_rx_queues : queue_id);
         } else {
-            if (n_desc != info->n_tx_descs)
-                return errh->error(
-                    "Some elements disagree on the number of TX descriptors "
-                    "for device %u", port_id);
+            if (n_desc != 0) {
+                if (n_desc != info->n_tx_descs && info->n_tx_descs != 0)
+                    return errh->error(
+                        "Some elements disagree on the number of TX descriptors "
+                        "for device %u (want %d, actual is %d)", port_id, n_desc,
+                        info->n_tx_descs);
+                info->n_tx_descs = n_desc;
+            }
             info->n_tx_queues =
                 1 + ((queue_id <= 0) ? info->n_tx_queues : queue_id);
         }
@@ -235,7 +250,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (!alloc_pktmbufs())
         return errh->error("Could not allocate packet MBuf pools");
 
-    for (HashMap<unsigned, DevInfo>::const_iterator it = _devs.begin();
+    for (HashMap<unsigned, DevInfo>::iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int ret = initialize_device(it.key(), it.value(), errh);
         if (ret < 0)
@@ -252,8 +267,9 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 }
 
 int DPDKDevice::NB_MBUF = 65536*8;
+int DPDKDevice::DATA_SIZE = 2048;
 int DPDKDevice::MBUF_SIZE =
-    2048 + sizeof (struct rte_mbuf) + RTE_PKTMBUF_HEADROOM;
+	DPDKDevice::DATA_SIZE + sizeof (struct rte_mbuf) + RTE_PKTMBUF_HEADROOM;
 int DPDKDevice::MBUF_CACHE_SIZE = 256;
 int DPDKDevice::RX_PTHRESH = 8;
 int DPDKDevice::RX_HTHRESH = 8;
@@ -265,5 +281,6 @@ int DPDKDevice::TX_WTHRESH = 0;
 bool DPDKDevice::_is_initialized = false;
 HashMap<unsigned, DPDKDevice::DevInfo> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;
+int DPDKDevice::_nr_pktmbuf_pools;
 
 CLICK_ENDDECLS

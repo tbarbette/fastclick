@@ -777,13 +777,13 @@ Element::initialize_ports(const int *in_v, const int *out_v)
 {
     for (int i = 0; i < ninputs(); i++) {
 	// allowed iff in_v[i] == VPULL
-	int port = (in_v[i] == VPULL ? 0 : -1);
+	int port = (in_v[i] == VPULL || in_v[i] == VDOUBLE ? 0 : -1);
 	_ports[0][i].assign(false, this, 0, port);
     }
 
     for (int o = 0; o < noutputs(); o++) {
 	// allowed iff out_v[o] != VPULL
-	int port = (out_v[o] == VPULL ? -1 : 0);
+	int port = (out_v[o] == VPULL && out_v[o] != VDOUBLE ? -1 : 0);
 	_ports[1][o].assign(true, this, 0, port);
     }
 }
@@ -1145,6 +1145,10 @@ Element::next_processing_code(const char*& p, ErrorHandler* errh)
       case 'a': case 'A':
 	p++;
 	return Element::VAGNOSTIC;
+
+      case 'd': case 'D':
+	p++;
+	return Element::VDOUBLE;
 
       case '/': case 0:
 	return -2;

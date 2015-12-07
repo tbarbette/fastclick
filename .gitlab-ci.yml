@@ -1,34 +1,35 @@
 batch:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule --disable-verbose-batch && make && make check
 ip6:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json --disable-linuxmodule --disable-batch && make && make check
 mt:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule --disable-batch && make && make check
 dpdk:
     script:
         - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule RTE_SDK=$RTE_SDK && RTE_TARGET=$RTE_TARGET && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+
 netmap_single:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --with-netmap --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --with-netmap --disable-linuxmodule --disable-verbose-batch && make
 netmap:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --enable-netmap-pool --enable-zerocopy --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --enable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make
 netmap_nopool:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --enable-zerocopy --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
 netmap_nopool_nozc:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
 fbatch:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch --disable-linuxmodule --disable-verbose-batch && make && make check
 fnetmap:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch --with-netmap --enable-netmap-pool --enable-zerocopy --disable-linuxmodule && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --enable-flow --enable-batch  --enable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make-check
 
-
-#before_script:
+before_script:
+    - gcc -v

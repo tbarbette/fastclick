@@ -227,7 +227,7 @@ Packet::~Packet()
     } else
 #  if HAVE_NETMAP_PACKET_POOL
     if (NetmapBufQ::is_netmap_packet(this)) {
-        NetmapBufQ::get_local_pool()->insert(_head);
+        NetmapBufQ::local_pool()->insert_p(_head);
     } else
 #  endif
     {
@@ -306,9 +306,40 @@ static inline PacketPool* make_local_packet_pool() {
 #  endif
 }
 
+#if HAVE_BATCH
 /**
- * Allocate a packet without a buffer
+ * Allocate a batch of packets without buffer
  */
+inline WritablePacket *
+WritablePacket::pool_batch_allocate(uint16_t count)
+{
+        PacketPool& packet_pool = *make_local_packet_pool();
+
+        WritablePacket *p = 0;
+        WritablePacket *head = 0;
+        int taken_from_pool = 0;
+
+        while (count > 0) {
+			p = packet_pool.p;
+			if (!p) {
+				p = pool_allocate();
+			} else {
+				packet_pool.p = static_cast<WritablePacket*>(p->next());
+				taken_from_pool++;
+			}
+			if (head == 0) {
+				head = p;
+			}
+			count --;
+        }
+        packet_pool.pcount -= taken_from_pool;
+
+        p->set_next(0);
+
+        return head;
+}
+#endif
+
 inline WritablePacket *
 WritablePacket::pool_allocate()
 {
@@ -330,8 +361,9 @@ WritablePacket::pool_allocate()
         if (p) {
         packet_pool.p = static_cast<WritablePacket*>(p->next());
         --packet_pool.pcount;
-        } else
+        } else {
         p = new WritablePacket;
+        }
         return p;
 
 }
@@ -395,13 +427,10 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
  * Give a hint that some packets from one thread will switch to another thread
  */
 void WritablePacket::pool_transfer(int from, int to) {
-#if HAVE_ZEROCOPY && HAVE_NET_NETMAP_H
-    NetmapBufQ::get_local_pool(to)->set_shared();
-#else
     (void)from;
     (void)to;
-#endif
 }
+
 
 #  if HAVE_NETMAP_PACKET_POOL
 WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot, bool set_rss_aggregate) {
@@ -410,10 +439,11 @@ WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_r
     p->initialize();
     slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
     p->set_buffer(data,rxring->nr_buf_size,slot->len);
-#if NETMAP_WITH_HASH
-	if (set_rss_aggregate)
-		SET_AGGREGATE_ANNO(p,slot->hash);
-#endif
+    #if NETMAP_WITH_HASH
+           if (set_rss_aggregate)
+                   SET_AGGREGATE_ANNO(p,slot->hash);
+    #endif
+
     slot->flags = NS_BUF_CHANGED;
     return p;
 }
@@ -464,6 +494,7 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
 #if NETMAP_WITH_HASH
         if (set_rss_aggregate)
             SET_AGGREGATE_ANNO(last,slot->hash);
+        click_chatter("Agg : %x",AGGREGATE_ANNO(last));
 #endif
         cur = nm_ring_next(rxring, cur);
         toreceive--;
@@ -472,6 +503,7 @@ PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_rin
         if (_count == 0) {
 
             _head = 0;
+
             next = pool_data_allocate();
             _count++; // We use the packet already out of the pool
         }
@@ -521,6 +553,12 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
                 packet_pool.pd = static_cast<WritablePacket *>(pd->next());
+#if HAVE_NETMAP_PACKET_POOL
+                if (NetmapBufQ::is_netmap_packet(pd))
+                    NetmapBufQ::local_pool()->insert_p(pd->buffer());
+                else
+#endif
+                ::operator delete[]((unsigned char *) pd->buffer());
                 ::operator delete((void *) pd);
             }
         }
@@ -563,18 +601,22 @@ WritablePacket::recycle(WritablePacket *p)
     bool data = is_from_data_pool(p);
 
     if (likely(data)) {
-         check_data_pool_size(packet_pool);
+        check_data_pool_size(packet_pool);
         ++packet_pool.pdcount;
         p->set_next(packet_pool.pd);
         packet_pool.pd = p;
+#if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pdcount <= CLICK_PACKET_POOL_SIZE);
+#endif
     } else {
         p->~WritablePacket();
-         check_packet_pool_size(packet_pool);
+        check_packet_pool_size(packet_pool);
         ++packet_pool.pcount;
         p->set_next(packet_pool.p);
         packet_pool.p = p;
+#if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pcount <= CLICK_PACKET_POOL_SIZE);
+#endif
     }
 
 }
@@ -625,10 +667,10 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
 # if CLICK_USERLEVEL || CLICK_MINIOS
 #  if HAVE_NETMAP_PACKET_POOL
     assert(n <= NetmapBufQ::buffer_size());
-    unsigned char *d = NetmapBufQ::get_local_pool()->extract_p();
-#  else
-    unsigned char *d = new unsigned char[n];
+    unsigned char *d = NetmapBufQ::local_pool()->extract_p();
+    if (d == 0)
 #  endif
+    unsigned char *d = new unsigned char[n];
     if (!d)
 	return false;
     _head = d;
@@ -780,13 +822,63 @@ assert(false); //TODO
 	p->_head = p->_data = data;
 	p->_tail = p->_end = data + length;
 	p->_destructor = destructor;
-        p->_destructor_argument = argument;
+	p->_destructor_argument = argument;
     }
     return p;
 # endif
-#endif
 }
 
+
+#if HAVE_BATCH
+/** @brief Create and return a batch of packets made from a contiguous buffer
+ * @param count number of packets
+ *
+ * @param data data used in the new packet
+ * @param length array of packets length
+ * @param destructor destructor function
+ * @param argument argument to destructor function
+ * @return new packet batch, or null if no packet could be created
+ *
+ **/
+PacketBatch *
+Packet::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
+		buffer_destructor_type destructor, void* argument )
+{
+#if CLICK_DPDK_POOLS
+assert(false); //TODO
+#endif
+
+# if HAVE_CLICK_PACKET_POOL
+    WritablePacket *p = WritablePacket::pool_batch_allocate(count);
+# else
+    WritablePacket *p = new WritablePacket;
+# endif
+    WritablePacket *head = p;
+    WritablePacket *last = p;
+    uint16_t i = 0;
+    while(p) {
+		p->initialize();
+		p->_head = p->_data = data;
+		p->_tail = p->_end = data + length[i];
+		data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
+		++i;
+		p->_destructor = destructor;
+		p->_destructor_argument = argument;
+		last = p;
+#if HAVE_CLICK_PACKET_POOL
+        p = static_cast<WritablePacket *>(p->next());
+#else
+        WritablePacket *p = new WritablePacket;
+#endif
+    }
+    if (i != count) {
+        click_chatter("Size of list %d, expected %d\n", i, count);
+    }
+    return PacketBatch::make_from_simple_list(head, last, i);
+}
+#endif
+
+#endif
 void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }
@@ -1238,7 +1330,6 @@ Packet::shift_data(int offset, bool free_on_failure)
     }
 }
 
-
 #if HAVE_CLICK_PACKET_POOL
 static void
 cleanup_pool(PacketPool *pp, int global)
@@ -1252,6 +1343,11 @@ cleanup_pool(PacketPool *pp, int global)
     while (WritablePacket *pd = pp->pd) {
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
+#if HAVE_NETMAP_PACKET_POOL
+    NetmapBufQ::local_pool()->insert_p(pd->buffer());
+#else
+	delete[] reinterpret_cast<unsigned char *>(pd->buffer());
+#endif
     ::operator delete((void *) pd);
     }
 #if !HAVE_BATCH_RECYCLE
@@ -1276,7 +1372,7 @@ Packet::static_cleanup()
 		PacketPool fake_pool;
 		do {
 			fake_pool.p = global_packet_pool.pbatch.extract();
-			fake_pool.pd = global_packet_pool.pbatch.extract();
+			fake_pool.pd = global_packet_pool.pdbatch.extract();
 			if (!fake_pool.p && !fake_pool.pd) break;
 			cleanup_pool(&fake_pool, 1);
 		} while(true);

@@ -8,56 +8,6 @@
 #include <click/notifier.hh>
 CLICK_DECLS
 
-/*
-=c
-
-TimeRange(I<keyword SIMPLE>)
-
-=s timestamps
-
-monitor range of packet timestamps
-
-=d
-
-TimeRange passes packets along unchanged, monitoring the smallest range that
-contains all of their timestamps. You can access that range with handlers.
-
-Keyword arguments are:
-
-=over 8
-
-=item SIMPLE
-
-Boolean. If true, then packets arrive at TimeRange with monotonically
-increasing timestamps. Default is false.
-
-=back
-
-=h first read-only
-
-Returns the earliest timestamp observed, or "0.0" if no packets have passed.
-
-=h last read-only
-
-Returns the latest timestamp observed, or "0.0" if no packets have passed.
-
-=h range read-only
-
-Returns the earliest and latest timestamps observed, separated by a space.
-
-=h interval read-only
-
-Returns the difference between the earliest and latest timestamps observed,
-in seconds.
-
-=h reset write-only
-
-Clears the stored range. Future packets will accumulate a new range.
-
-=a
-
-TimeFilter */
-
 class Replay : public BatchElement { public:
 
 	Replay() CLICK_COLD;
@@ -68,8 +18,11 @@ class Replay : public BatchElement { public:
     const char *flow_code() const	{ return "#/#"; }
     const char *processing() const	{ return PULL; }
 
-    bool get_runnable_thread(Bitvector&) {
-    	return false;
+    bool get_runnable_thread(Bitvector& bmp) {
+        for (int i = 0; i < noutputs(); i++)
+            if (output_is_push(i))
+                bmp[router()->home_thread_id(this)] = true;
+        return false;
     }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -89,8 +42,10 @@ class Replay : public BatchElement { public:
     bool _active;
     bool _loaded;
 
+    unsigned int _queue;
     unsigned int _burst;
     int _stop;
+    bool _quick_clone;
 
     Task _task;
     ActiveNotifier _notifier;
@@ -108,7 +63,6 @@ class Replay : public BatchElement { public:
     Packet* _queue_head;
     Packet* _queue_current;
     Timestamp _current;
-
 };
 
 CLICK_ENDDECLS

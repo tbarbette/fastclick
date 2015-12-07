@@ -57,7 +57,7 @@ CLICK_DECLS
 
 FromDevice::FromDevice()
     :
-#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP
+#if FROMDEVICE_ALLOW_PCAP
       _task(this),
 #endif
 #if FROMDEVICE_ALLOW_PCAP
@@ -65,7 +65,7 @@ FromDevice::FromDevice()
 #endif
       _datalink(-1), _count(0), _promisc(0), _snaplen(0)
 {
-#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP
     _fd = -1;
 #endif
 }
@@ -122,7 +122,7 @@ FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     // set _method
     if (capture == "") {
-#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
+#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
 # if FROMDEVICE_ALLOW_PCAP
 	_method = _bpf_filter ? method_pcap : method_default;
 # else
@@ -139,10 +139,6 @@ FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #if FROMDEVICE_ALLOW_PCAP
     else if (capture == "PCAP")
 	_method = method_pcap;
-#endif
-#if FROMDEVICE_ALLOW_NETMAP
-    else if (capture == "NETMAP")
-	_method = method_netmap;
 #endif
     else
 	return errh->error("bad METHOD");
@@ -308,17 +304,6 @@ FromDevice::initialize(ErrorHandler *errh)
     if (!_ifname)
 	return errh->error("interface not set");
 
-#if FROMDEVICE_ALLOW_NETMAP
-    if (_method == method_default || _method == method_netmap) {
-	_fd = _netmap.open(_ifname, _method == method_netmap, errh);
-	if (_fd >= 0) {
-	    _datalink = FAKE_DLT_EN10MB;
-	    _method = method_netmap;
-	    _netmap.initialize_rings_rx(_timestamp);
-	}
-    }
-#endif
-
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_default || _method == method_pcap) {
 	assert(!_pcap);
@@ -408,11 +393,11 @@ FromDevice::initialize(ErrorHandler *errh)
     }
 #endif
 
-#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
-    if (_method == method_pcap || _method == method_netmap)
+#if FROMDEVICE_ALLOW_PCAP
+    if (_method == method_pcap)
 	ScheduleInfo::initialize_task(this, &_task, false, errh);
 #endif
-#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
     if (_fd >= 0)
 	add_select(_fd, SELECT_READ);
 #endif
@@ -429,10 +414,6 @@ FromDevice::cleanup(CleanupStage stage)
 {
     if (stage >= CLEANUP_INITIALIZED && !_sniffer)
 	KernelFilter::device_filter(_ifname, false, ErrorHandler::default_handler());
-#if FROMDEVICE_ALLOW_NETMAP
-    if (_fd >= 0 && _method == method_netmap)
-	_netmap.close(_fd);
-#endif
 #if FROMDEVICE_ALLOW_LINUX
     if (_fd >= 0 && _method == method_linux) {
 	if (_was_promisc >= 0)
@@ -445,12 +426,12 @@ FromDevice::cleanup(CleanupStage stage)
 	pcap_close(_pcap);
     _pcap = 0;
 #endif
-#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
+#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
     _fd = -1;
 #endif
 }
 
-#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_PCAP
 void
 FromDevice::emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts)
 {
@@ -474,7 +455,7 @@ FromDevice::emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts)
 }
 #endif
 
-#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_PCAP
 CLICK_ENDDECLS
 extern "C" {
 void
@@ -501,22 +482,6 @@ CLICK_DECLS
 void
 FromDevice::selected(int, int)
 {
-    // netmap and pcap are essentially the same code, different
-    // dispatch function. This code is also in run_task()
-    // with fast_reschedule()
-#if FROMDEVICE_ALLOW_NETMAP
-    if (_method == method_netmap) {
-	// Read and push() at most one burst of packets.
-	int r = _netmap.dispatch(_burst,
-		reinterpret_cast<nm_cb_t>(FromDevice_get_packet), (u_char *) this);
-	if (r > 0) {
-	    _count += r;
-	    _task.reschedule();
-	} else if (r < 0 && ++_pcap_complaints < 5)
-	    ErrorHandler::default_handler()->error("%p{element}: %s",
-			this, "nm_dispatch failed");
-    }
-#endif
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_pcap) {
 	// Read and push() at most one burst of packets.
@@ -561,29 +526,17 @@ FromDevice::selected(int, int)
 #endif
 }
 
-#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_PCAP
 bool
 FromDevice::run_task(Task *)
 {
     // Read and push() at most one burst of packets.
     int r = 0;
-# if FROMDEVICE_ALLOW_NETMAP
-    if (_method == method_netmap) {
-	// Read and push() at most one burst of packets.
-	r = _netmap.dispatch(_burst,
-		reinterpret_cast<nm_cb_t>(FromDevice_get_packet), (u_char *) this);
-	if (r < 0 && ++_pcap_complaints < 5)
-	    ErrorHandler::default_handler()->error("%p{element}: %s",
-			this, "nm_dispatch failed");
-    }
-# endif
-# if FROMDEVICE_ALLOW_PCAP
     if (_method == method_pcap) {
 	r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) this);
 	if (r < 0 && ++_pcap_complaints < 5)
 	    ErrorHandler::default_handler()->error("%p{element}: %s", this, pcap_geterr(_pcap));
     }
-# endif
     if (r > 0) {
 	_count += r;
 	_task.fast_reschedule();
@@ -652,5 +605,5 @@ FromDevice::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel FakePcap KernelFilter NetmapInfo)
+ELEMENT_REQUIRES(userlevel FakePcap KernelFilter)
 EXPORT_ELEMENT(FromDevice)

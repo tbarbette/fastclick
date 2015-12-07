@@ -98,6 +98,9 @@
 /* Define if Batching support is enabled. */
 #undef HAVE_BATCH
 
+/* Define if warnings and information about batching are enabled. */
+#undef HAVE_VERBOSE_BATCH
+
 /* Define if Flow support is enabled. */
 #undef HAVE_FLOW
 

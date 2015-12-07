@@ -248,7 +248,7 @@ CheckIPHeader::simple_action_batch(PacketBatch* head) {
 		} else {
 			dropped++;
 			if (current == head) {
-				head = PacketBatch::make_from_packet(current->next());
+				head = PacketBatch::start_head(current->next());
 				current->set_next(NULL);
 				drop(r,current,true);
 				current = head;
