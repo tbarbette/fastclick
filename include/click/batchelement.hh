@@ -68,7 +68,7 @@ class BatchElement : public Element { public:
 		 if ((unsigned) port < (unsigned) noutputs())
 			 output(port).push_batch(batch);
 		 else
-			 batch->kill();
+			 batch->safe_kill();
 	}
 
 	class PushBatchPort : public Port {

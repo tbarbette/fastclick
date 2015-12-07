@@ -306,6 +306,7 @@ static inline PacketPool* make_local_packet_pool() {
 #  endif
 }
 
+#if HAVE_BATCH
 /**
  * Allocate a batch of packets without buffer
  */
@@ -337,6 +338,7 @@ WritablePacket::pool_batch_allocate(uint16_t count)
 
         return head;
 }
+#endif
 
 inline WritablePacket *
 WritablePacket::pool_allocate()
@@ -359,8 +361,9 @@ WritablePacket::pool_allocate()
         if (p) {
         packet_pool.p = static_cast<WritablePacket*>(p->next());
         --packet_pool.pcount;
-        } else
+        } else {
         p = new WritablePacket;
+        }
         return p;
 
 }

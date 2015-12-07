@@ -177,8 +177,8 @@ void
 ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 {
 	State &s = state.get();
-   	bool should_be_dropped = false;
-		bool ask_sync = false;
+	bool should_be_dropped = false;
+	bool ask_sync = false;
 
 	if (s.q != NULL) {
 		if (s.q_size < _internal_queue) {
@@ -339,7 +339,7 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 				}
 				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
 				if (p->buffer_destructor() == NetmapBufQ::buffer_destructor) {
-					p->set_buffer_destructor(Packet::empty_destructor);
+					p->reset_buffer();
 					slot->flags = NS_BUF_CHANGED;
 				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not release ourselves
 					slot->flags = NS_BUF_CHANGED | NS_NOFREE;

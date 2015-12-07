@@ -130,7 +130,7 @@ void NetmapBufQ::global_insert_all(uint32_t idx, int count) {
  * NetmapDevice
  ***************************/
 
-NetmapDevice::NetmapDevice(String ifname) : ifname(ifname),_use_count(0),n_queues(0) {
+NetmapDevice::NetmapDevice(String ifname) : ifname(ifname),_minfd(INT_MAX),_maxfd(INT_MIN),_use_count(0),n_queues(0)  {
 	n_refs = 0;
 }
 
@@ -195,9 +195,11 @@ int NetmapDevice::initialize() {
 		base_nmd->req.nr_arg3 = NetmapDevice::global_alloc;
 		if (base_nmd->req.nr_arg3 % NETMAP_PACKET_POOL_SIZE != 0)
 			base_nmd->req.nr_arg3 = ((base_nmd->req.nr_arg3 / NETMAP_PACKET_POOL_SIZE) + 1) * NETMAP_PACKET_POOL_SIZE;
+#if HAVE_ZEROCOPY
 		//Ensure we have at least a batch per thread + 1
 		if (NETMAP_PACKET_POOL_SIZE * (click_nthreads + 1) > base_nmd->req.nr_arg3)
 			base_nmd->req.nr_arg3 = NETMAP_PACKET_POOL_SIZE * (click_nthreads + 1);
+#endif
 		nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_IFNAME | NM_OPEN_ARG3, base_nmd);
 		NetmapDevice::some_nmd = nmd;
 	}
@@ -242,6 +244,11 @@ int NetmapDevice::initialize() {
 		if (thread_nm == NULL) {
 			return -1;
 		}
+
+		if (thread_nm->fd < _minfd)
+			_minfd = thread_nm->fd;
+		if (thread_nm->fd > _maxfd)
+			_maxfd = thread_nm->fd;
 
 		nmds[i] = thread_nm;
 	}

@@ -1049,19 +1049,21 @@ class WritablePacket : public Packet { public:
 		int last_o = -1;\
 		int passed = 0;\
 		for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
-			int o = fnt(p);\
+			int o = (fnt(p));\
 			if (o == last_o) {\
 				passed ++;\
 			} else {\
 				if (last == NULL) {\
 					out[o] = p;\
 					p->set_count(1);\
+					p->set_tail(p);\
 				} else {\
-					last->set_next(NULL);\
 					out[last_o]->set_tail(last);\
 					out[last_o]->set_count(out[last_o]->count() + passed);\
 					if (!out[o]) {\
-						out[o] = PacketBatch::make_from_packet(p);\
+						out[o] = p;\
+						out[o]->set_count(1);\
+						out[o]->set_tail(p);\
 					} else {\
 						out[o]->append_packet(p);\
 					}\
@@ -1081,7 +1083,7 @@ class WritablePacket : public Packet { public:
 		for (; i < nbatches; i++) {\
 			if (out[i]) {\
 				out[i]->tail()->set_next(NULL);\
-				on_finish(i,out[i]);\
+				(on_finish(i,out[i]));\
 			}\
 		}\
 	}
@@ -3221,15 +3223,7 @@ inline void PacketBatch::safe_kill() {
     BATCH_RECYCLE_START();
     FOR_EACH_PACKET_SAFE(this,up) {
         WritablePacket* p = static_cast<WritablePacket*>(up);
-		if (p->shared()) {
-			p->kill();
-		} else {
-			if (p->data_packet() == 0 && p->buffer_destructor() == 0) {
-				BATCH_RECYCLE_DATA_PACKET(p);
-			} else {
-				BATCH_RECYCLE_PACKET(p);
-			}
-		}
+        BATCH_RECYCLE_UNSAFE_PACKET(p);
     }
     BATCH_RECYCLE_END();
 }
