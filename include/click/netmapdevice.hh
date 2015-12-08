@@ -79,7 +79,7 @@ public:
 		return buf_size;
 	}
 
-	static void buffer_destructor(unsigned char *buf, size_t, void *arg) {
+	static void buffer_destructor(unsigned char *buf, size_t, void *) {
 		NetmapBufQ::local_pool()->insert_p(buf);
 	}
 
@@ -155,7 +155,6 @@ private :
  */
 
 inline void NetmapBufQ::expand() {
-	uint32_t idx;
 	global_buffer_lock.acquire();
 	if (global_buffer_list != 0) {
 		//Transfer from global pool

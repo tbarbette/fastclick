@@ -1,6 +1,6 @@
 #ifndef CLICK_BYPASS_HH
 #define CLICK_BYPASS_HH 1
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/routervisitor.hh>
 CLICK_DECLS
 
@@ -77,7 +77,7 @@ is set to true.
 
 Switch, PullSwitch, Null, click-devirtualize
 */
-class Bypass : public Element { public:
+class Bypass : public BatchElement { public:
 
     Bypass() CLICK_COLD;
 
@@ -92,6 +92,10 @@ class Bypass : public Element { public:
 
     void push(int port, Packet *p);
     Packet *pull(int port);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *p);
+    PacketBatch * pull_batch(int port,int max);
+#endif
 
   private:
     struct Locator : public RouterVisitor {

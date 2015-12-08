@@ -349,7 +349,7 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 #endif //HAVE_ZEROCOPY
 			{
 				unsigned char* srcdata = p->data();
-				int length = p->length();
+				unsigned length = p->length();
 
 				while (length > txring->nr_buf_size) {
 					click_chatter("Warning ! Buffer splitting is highly experimental ! Prefer to send < 2k packets !");

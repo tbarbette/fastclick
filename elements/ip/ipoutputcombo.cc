@@ -205,72 +205,54 @@ inline int IPOutputCombo::action(Packet* &p_in, bool color) {
 }
 
 #if HAVE_BATCH
-  void IPOutputCombo::push_batch(int, PacketBatch * head) {
-	  Packet* cur = NULL;
-	  Packet* next = head;
-	  Packet* last = NULL;
-	  int o;
-	  int count = 0;
-	  while (next != NULL) {
-		  	cur = next;
-		  	next = cur->next();
+void IPOutputCombo::push_batch(int, PacketBatch * head) {
+	Packet* cur = NULL;
+	Packet* next = head;
+	Packet* last = NULL;
+	int o;
+	int count = 0;
+	while (next != NULL) {
+		cur = next;
+		next = cur->next();
 
-		  	Packet* old_cur = cur;
+		Packet* old_cur = cur;
 
-		  	o = action(cur, 1);
+		o = action(cur, 1);
 
-		  	if (old_cur != cur) { //If packet has changed (due to expensive uniqueify)
-		  	    click_chatter("Packet has changed");
-		  	    if (last) {
-		  	        last->set_next(cur);
-                }
-		  	}
-
-			if (o == 1) {
-				PacketBatch* clone = PacketBatch::make_from_packet(cur->clone());
-				output(1).push_batch(clone);
-				o = action(cur, false);
+		if (old_cur != cur) { //If packet has changed (due to expensive uniqueify)
+			click_chatter("Packet has changed");
+			if (last) {
+				last->set_next(cur);
 			}
-			if (o != 0) {//An error occured
-				if (last == NULL) { //We are head
+		}
 
-				} else {
-					last->set_next(next);
-				}
-				output(o).push_batch(PacketBatch::make_from_packet(cur));
+		if (o == 1) {
+			PacketBatch* clone = PacketBatch::make_from_packet(cur->clone());
+			output(1).push_batch(clone);
+			o = action(cur, false);
+		}
+		if (o != 0) {//An error occured
+			if (last == NULL) { //We are head
 
 			} else {
-			    if (last == NULL) {
-			        head = PacketBatch::start_head(head);
-			    }
-				last = cur;
-				count++;
+				last->set_next(next);
 			}
-	  } //end while
+			output(o).push_batch(PacketBatch::make_from_packet(cur));
 
-	  if (last != NULL) {
-	      head->make_tail(last,count);
-		  output(0).push_batch(head);
-	  }
+		} else {
+			if (last == NULL) {
+				head = PacketBatch::start_head(head);
+			}
+			last = cur;
+			count++;
+		}
+	} //end while
 
-	  /* Packet* next = head;
-	 +      while (next != NULL) {
-	 +          Packet* nnext = next->next();
-	 +          next->set_next(NULL);
-	 +          int o = action(next, 1);
-	 +
-	 +              if (o == 1) {
-	 +                  PacketBatch* n = PacketBatch::make_from_packet(next->clone());
-	 +                  n->set_next(NULL);
-	 +                  output(1).push_batch(n);
-	 +                  o = action(next, 0);
-	 +              }
-	 +
-	 +              output(o).push_batch(PacketBatch::make_from_packet(next));
-	 +              next = nnext;
-	 +      }*/
-
-  }
+	if (last != NULL) {
+		head->make_tail(last,count);
+		output(0).push_batch(head);
+	}
+}
 #endif
 void
 IPOutputCombo::push(int, Packet *p_in)

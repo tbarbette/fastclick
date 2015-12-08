@@ -85,7 +85,7 @@ Pipeliner::initialize(ErrorHandler *errh)
 		}
     }
 
-    for (int i = 0; i < storage.size(); i++) {
+    for (unsigned i = 0; i < storage.size(); i++) {
         storage.get_value(i).initialize(_ring_size);
     }
 

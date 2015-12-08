@@ -1,6 +1,9 @@
 %info
 Tests Bypass.
 
+%require
+! click-buildtool provides batch
+
 %script
 click --simtime CONFIG 2>OUT 1>&2
 click --simtime CONFIG2 2>>OUT 1>&2

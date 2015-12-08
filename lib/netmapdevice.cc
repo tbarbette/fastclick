@@ -52,7 +52,7 @@ int NetmapBufQ::static_initialize(struct nm_desc* nmd) {
 	if (!netmap_buf_pools) {
 		netmap_buf_pools = new NetmapBufQ*[click_max_cpu_ids()];
 
-		for (int i = 0; i < click_max_cpu_ids(); i++) {
+		for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
 			netmap_buf_pools[i] = new NetmapBufQ();
 		}
 	}
@@ -130,7 +130,7 @@ void NetmapBufQ::global_insert_all(uint32_t idx, int count) {
  * NetmapDevice
  ***************************/
 
-NetmapDevice::NetmapDevice(String ifname) : ifname(ifname),_minfd(INT_MAX),_maxfd(INT_MIN),_use_count(0),n_queues(0)  {
+NetmapDevice::NetmapDevice(String ifname) : ifname(ifname),n_queues(0),_minfd(INT_MAX),_maxfd(INT_MIN),_use_count(0)  {
 	n_refs = 0;
 }
 
@@ -141,7 +141,7 @@ NetmapDevice::~NetmapDevice() {
     for (int i = 0; i < n_queues; i++) {
         struct nm_desc* nmd = nmds[i];
         struct netmap_ring* txring = NETMAP_TXRING(nmd->nifp,i);
-        for (int j = 0; j < txring->num_slots; j++) {
+        for (unsigned j = 0; j < txring->num_slots; j++) {
             struct netmap_slot* slot = &txring->slot[j];
             if (slot->flags & NS_NOFREE) {
                 slot->buf_idx = NetmapBufQ::local_pool()->extract();
@@ -197,7 +197,7 @@ int NetmapDevice::initialize() {
 			base_nmd->req.nr_arg3 = ((base_nmd->req.nr_arg3 / NETMAP_PACKET_POOL_SIZE) + 1) * NETMAP_PACKET_POOL_SIZE;
 #if HAVE_ZEROCOPY
 		//Ensure we have at least a batch per thread + 1
-		if (NETMAP_PACKET_POOL_SIZE * (click_nthreads + 1) > base_nmd->req.nr_arg3)
+		if (NETMAP_PACKET_POOL_SIZE * ((unsigned)click_nthreads + 1) > base_nmd->req.nr_arg3)
 			base_nmd->req.nr_arg3 = NETMAP_PACKET_POOL_SIZE * (click_nthreads + 1);
 #endif
 		nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_IFNAME | NM_OPEN_ARG3, base_nmd);

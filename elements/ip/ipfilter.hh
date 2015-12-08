@@ -140,6 +140,7 @@ class IPFilter : public BatchElement { public:
 			      const Vector<String> &conf, int noutputs,
 			      const Element *context, ErrorHandler *errh);
     static inline int match(const IPFilterProgram &zprog, const Packet *p);
+    inline int match(Packet *p);
 
     enum {
 	TYPE_NONE	= 0,		// data types
@@ -384,6 +385,12 @@ IPFilter::match(const IPFilterProgram &zprog, const Packet *p)
 	    return -off;
 	pr += off;
     }
+}
+
+inline int
+IPFilter::match(Packet *p)
+{
+	return match(_zprog,p);
 }
 
 CLICK_ENDDECLS

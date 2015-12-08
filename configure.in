@@ -100,6 +100,15 @@ if test "x$enable_batch" = "xyes"; then
     AC_SUBST(HAVE_BATCH, yes)
 fi
 
+AC_ARG_ENABLE([verbose-batch],
+    [AS_HELP_STRING([  --disable-verbose-batch], [disable warnings and information about batching])],
+    [:], [enable_verbose_batch=yes])
+
+if test "x$enable_verbose_batch" = "xyes"; then
+    AC_DEFINE([HAVE_VERBOSE_BATCH])
+    AC_SUBST(HAVE_VERBOSE_BATCH, yes)
+fi
+
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [have only netmap packets in the pool])],
     [:], [enable_netmap_pool=no])
@@ -2077,6 +2086,11 @@ fi
 dnl add 'dpdk' if compiled with --enable-dpdk
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
+fi
+
+dnl add 'batch' if compiled with --enable-batch
+if test "x$enable_batch" = xyes; then
+    provisions="$provisions batch"
 fi
 
 dnl add 'experimental' if --enable-experimental was supplied
