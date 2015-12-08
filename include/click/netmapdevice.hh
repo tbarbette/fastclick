@@ -88,6 +88,10 @@ public:
 				(p->buffer() > NetmapBufQ::buf_start && p->buffer() < NetmapBufQ::buf_end));
 	}
 
+	inline static bool is_valid_netmap_packet(Packet* p) {
+		return (p->buffer() > NetmapBufQ::buf_start && p->buffer() < NetmapBufQ::buf_end);
+	}
+
 	inline static NetmapBufQ* local_pool() {
 		return NetmapBufQ::netmap_buf_pools[click_current_cpu_id()];
 	}

@@ -3152,7 +3152,7 @@ inline void PacketBatch::kill() {
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 #define HAVE_BATCH_RECYCLE 1
 /**
- * Recycle a whole batch of unshared packets
+ * Recycle a whole batch of unshared packets of the same type
  *
  * @precond No packet are shared
  */
@@ -3217,7 +3217,7 @@ inline void PacketBatch::safe_kill(bool is_data) {
 	}
 
 /**
- * Recycle a whole batch of packets
+ * Recycle a whole batch, faster in most cases
  */
 inline void PacketBatch::safe_kill() {
     BATCH_RECYCLE_START();
