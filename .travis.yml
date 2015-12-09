@@ -8,7 +8,7 @@ compiler:
   - gcc
   - clang
 script:
-  - ./configure CXXFLAGS="-std=gnu++11" --disable-linuxmodule $CONFIG && make
+  - ./configure CXXFLAGS="-std=gnu++11" --disable-linuxmodule $CONFIG && make && make check
 addons:
   apt:
     sources:
