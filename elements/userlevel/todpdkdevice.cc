@@ -63,7 +63,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
     }
     if (burst > -1)
-        _burst = burst;
+        _burst_size = burst;
 
 #else
     if (burst != -1) {
