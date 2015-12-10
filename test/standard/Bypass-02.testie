@@ -2,7 +2,7 @@
 Tests consecutive Bypasses.
 
 %require
-! click-buildtool provides batch
+click-buildtool provides -i batch
 
 %script
 $VALGRIND click --simtime CONFIG 2>OUT 1>&2

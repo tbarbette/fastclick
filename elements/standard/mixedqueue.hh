@@ -81,6 +81,9 @@ class MixedQueue : public NotifierQueue { public:
     void *cast(const char *);
 
     void push(int port, Packet *);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *);
+#endif
 
 };
 

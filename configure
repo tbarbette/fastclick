@@ -710,6 +710,7 @@ RTE_VER_MAJOR
 RTE_TARGET
 RTE_SDK
 PTHREAD_LIBS
+HAVE_VERBOSE_BATCH
 HAVE_BATCH
 AR_CREATEFLAGS
 STRIP
@@ -797,6 +798,7 @@ enable_option_checking
 enable_userlevel
 enable_user_multithread
 enable_batch
+enable_verbose_batch
 enable_netmap_pool
 enable_select
 enable_poll
@@ -1493,6 +1495,8 @@ Optional Features:
     --enable-user-multithread
                           support userlevel multithreading
     --disable-batch       disable batching support
+    --disable-verbose-batch
+                          disable warnings and information about batching
     --enable-netmap-pool  have only netmap packets in the pool
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
@@ -6369,6 +6373,21 @@ if test "x$enable_batch" = "xyes"; then
     $as_echo "#define HAVE_BATCH 1" >>confdefs.h
 
     HAVE_BATCH=yes
+
+fi
+
+# Check whether --enable-verbose-batch was given.
+if test "${enable_verbose_batch+set}" = set; then :
+  enableval=$enable_verbose_batch; :
+else
+  enable_verbose_batch=yes
+fi
+
+
+if test "x$enable_verbose_batch" = "xyes"; then
+    $as_echo "#define HAVE_VERBOSE_BATCH 1" >>confdefs.h
+
+    HAVE_VERBOSE_BATCH=yes
 
 fi
 
@@ -13649,6 +13668,10 @@ fi
 
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
+fi
+
+if test "x$enable_batch" = xyes; then
+    provisions="$provisions batch"
 fi
 
 if test "x$enable_experimental" = xyes; then

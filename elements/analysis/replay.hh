@@ -45,6 +45,7 @@ class Replay : public BatchElement { public:
     unsigned int _queue;
     unsigned int _burst;
     int _stop;
+    bool _quick_clone;
 
     Task _task;
     ActiveNotifier _notifier;
@@ -62,9 +63,6 @@ class Replay : public BatchElement { public:
     Packet* _queue_head;
     Packet* _queue_current;
     Timestamp _current;
-
-    bool _quick_clone;
-
 };
 
 CLICK_ENDDECLS
