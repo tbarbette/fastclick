@@ -26,27 +26,22 @@ BatchElement::~BatchElement() {
 
 /**
  * Default push action for a batch element, will batch packets if inflow and
- *
  */
 void BatchElement::push(int port,Packet* p) { //May still be extended
 	if (inflow.get()) {
-		if (port == 0)
+		if (port != 0) {
 			push_batch(port,PacketBatch::make_from_packet(p));
-		else {
+		} else {
 			if (current_batch.get() == NULL) {
 				current_batch.set(PacketBatch::make_from_packet(p));
 			} else {
 				current_batch.get()->append_packet(p);
 			}
 		}
-	}
-	else if (in_batch_mode == BATCH_MODE_YES) {
-	    click_chatter("BUG : lonely packet sent to %s which needs batch !",name().c_str());
+	} else if (in_batch_mode == BATCH_MODE_YES) {
 		push_batch(port,PacketBatch::make_from_packet(p));
 	} else {
-	    p = simple_action(p);
-	    if (p)
-	        output(port).push(p);
+		push_packet(port,p);
 	}
 };
 
@@ -223,5 +218,10 @@ void BatchElement::bind_ports() {
 }
 #endif
 
+void BatchElement::push_packet(int port, Packet* p) {
+	p = simple_action(p);
+	if (p)
+		output(port).push(p);
+}
 
 CLICK_ENDDECLS

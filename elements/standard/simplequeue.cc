@@ -159,45 +159,23 @@ SimpleQueue::cleanup(CleanupStage)
 }
 
 #if HAVE_BATCH
-void
-SimpleQueue::push_batch(int, PacketBatch *batch)
-{
+void SimpleQueue::push_batch(int port, PacketBatch* batch) {
 	FOR_EACH_PACKET_SAFE(batch,p) {
-		// If you change this code, also change NotifierQueue::push()
-		// and FullNoteQueue::push().
-	    Storage::index_type h = head(), t = tail(), nt = next_i(t);
-
-	    // should this stuff be in SimpleQueue::enq?
-	    if (nt != h) {
-		_q[t] = p;
-		set_tail(nt);
-
-		int s = size(h, nt);
-		if (s > _highwater_length)
-		    _highwater_length = s;
-
-	    } else {
-		// if (!(_drops % 100))
-		if (_drops == 0 && _capacity > 0)
-		    click_chatter("%p{element}: overflow", this);
-		_drops++;
-		checked_output_push_batch(1, PacketBatch::make_from_packet(p));
-		}
+		push_packet(port,p);
 	}
 }
 
 PacketBatch* SimpleQueue::pull_batch(int port,unsigned max) {
-	(void) port;
 	PacketBatch* batch;
-	MAKE_BATCH(deq(),batch,max);
+	MAKE_BATCH(pull(port),batch,max);
 	return batch;
 }
 #endif
 
-void
-SimpleQueue::push(int, Packet *p)
+inline void
+SimpleQueue::push_packet(int, Packet *p)
 {
-    // If you change this code, also change NotifierQueue::push()
+    // If you change this code, also change NotifierQueue::push_packet()
     // and FullNoteQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);
 

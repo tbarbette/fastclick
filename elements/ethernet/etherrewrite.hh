@@ -65,7 +65,7 @@ class EtherRewrite : public BatchElement { public:
     PacketBatch* simple_action_batch(PacketBatch *);
 #endif
 
-    void push(int, Packet *);
+    void push_packet(int, Packet *);
 
   private:
 

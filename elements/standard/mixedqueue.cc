@@ -34,7 +34,7 @@ MixedQueue::cast(const char *n)
 }
 
 void
-MixedQueue::push(int port, Packet *p)
+MixedQueue::push_packet(int port, Packet *p)
 {
     Packet *oldp = 0;
 

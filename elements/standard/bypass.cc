@@ -57,7 +57,7 @@ Bypass::initialize(ErrorHandler *)
 }
 
 void
-Bypass::push(int port, Packet *p)
+Bypass::push_packet(int port, Packet *p)
 {
     output(_active && !port && noutputs() > 1).push(p);
 }

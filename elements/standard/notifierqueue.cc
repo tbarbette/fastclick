@@ -45,9 +45,9 @@ NotifierQueue::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-NotifierQueue::push(int, Packet *p)
+NotifierQueue::push_packet(int, Packet *p)
 {
-    // Code taken from SimpleQueue::push().
+    // Code taken from SimpleQueue::push_packet().
     int h = head(), t = tail(), nt = next_i(t);
 
     if (nt != h) {
@@ -89,38 +89,7 @@ NotifierQueue::pull(int)
 
     return p;
 }
-#if HAVE_BATCH
-void
-NotifierQueue::push_batch(int, PacketBatch *batch)
-{
-	FOR_EACH_PACKET_SAFE(batch,p) {
-	    int h = head(), t = tail(), nt = next_i(t);
 
-	    if (nt != h) {
-		_q[t] = p;
-		set_tail(nt);
-
-		int s = size(h, nt);
-		if (s > _highwater_length)
-		    _highwater_length = s;
-
-		_empty_note.wake();
-
-	    } else {
-		if (_drops == 0 && _capacity > 0)
-		    click_chatter("%p{element}: overflow", this);
-		_drops++;
-		checked_output_push_batch(1, PacketBatch::make_from_packet(p));
-		}
-	}
-}
-
-PacketBatch* NotifierQueue::pull_batch(int port,unsigned max) {
-	PacketBatch* batch;
-	MAKE_BATCH(pull(port),batch,max);
-	return batch;
-}
-#endif
 #if CLICK_DEBUG_SCHEDULING
 String
 NotifierQueue::read_handler(Element *e, void *)

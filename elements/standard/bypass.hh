@@ -90,7 +90,7 @@ class Bypass : public BatchElement { public:
     int initialize(ErrorHandler *errh) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    void push(int port, Packet *p);
+    void push_packet(int port, Packet *p);
     Packet *pull(int port);
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *p);

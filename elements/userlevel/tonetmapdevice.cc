@@ -235,7 +235,7 @@ do_send_batch:
 }
 #endif
 void
-ToNetmapDevice::push(int, Packet* p) {
+ToNetmapDevice::push_packet(int, Packet* p) {
 	State &s = state.get();
 	if (s.q == NULL) {
 		s.q = p;

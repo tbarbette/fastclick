@@ -62,7 +62,9 @@ class BatchElement : public Element { public:
 		inflow.set(false);
 	}
 
-	virtual void push(int port,Packet* p);
+	void push(int port,Packet* p) final;
+
+	virtual void push_packet(int port,Packet* p);
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		 if ((unsigned) port < (unsigned) noutputs())
@@ -77,7 +79,6 @@ class BatchElement : public Element { public:
 		~PushBatchPort() {
 
 		}
-
 
 		std::list<BatchElement*> downstream_batches;
 
@@ -174,6 +175,15 @@ class BatchElement : public Element { public:
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		output(port).push(batch);
 	}
+
+	virtual void push_packet(int port,Packet* p);
+
+
+	void push(int port,Packet* p) final {
+		push_packet(port, p);
+	};
+
+
 };
 #endif
 

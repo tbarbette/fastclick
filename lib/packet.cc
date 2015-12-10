@@ -595,14 +595,18 @@ WritablePacket::recycle(WritablePacket *p)
         ++packet_pool.pdcount;
         p->set_next(packet_pool.pd);
         packet_pool.pd = p;
+#if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pdcount <= CLICK_PACKET_POOL_SIZE);
+#endif
     } else {
         p->~WritablePacket();
-         check_packet_pool_size(packet_pool);
+        check_packet_pool_size(packet_pool);
         ++packet_pool.pcount;
         p->set_next(packet_pool.p);
         packet_pool.p = p;
+#if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pcount <= CLICK_PACKET_POOL_SIZE);
+#endif
     }
 
 }

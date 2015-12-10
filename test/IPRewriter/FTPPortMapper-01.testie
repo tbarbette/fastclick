@@ -8,6 +8,7 @@ FTPPortMapper and TCPRewriter.
 
 %require
 click-buildtool provides linuxmodule
+which nc >/dev/null 2>&1
 [ `whoami` = root ] || sudo -n true
 
 %script
