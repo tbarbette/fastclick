@@ -12,6 +12,7 @@ CLICK_DECLS
 
 FlowIPOutputCombo::FlowIPOutputCombo()
 {
+	in_batch_mode = BATCH_MODE_NEEDED;
 }
 
 FlowIPOutputCombo::~FlowIPOutputCombo()

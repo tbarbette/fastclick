@@ -116,9 +116,9 @@ void BatchElement::PullBatchPort::bind_batchelement() {
 bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int port,
 		Element *from, int from_port, int) {
 
-	//Only care about the "outputing" port
-	click_chatter("visit %s %d %d %s",e->name().c_str(),isoutput,ispush,from->name().c_str());
+	//Do not continue if we change from pull to push
 	if ((ispush && !from->output_is_push(from_port)) || (!ispush && !from->input_is_pull(from_port))) return false;
+
 
 	if (e->batch_mode() > Element::BATCH_MODE_NO) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);

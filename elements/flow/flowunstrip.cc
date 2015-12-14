@@ -26,6 +26,7 @@ CLICK_DECLS
 FlowUnstrip::FlowUnstrip(unsigned nbytes)
   : _nbytes(nbytes)
 {
+	in_batch_mode = BATCH_MODE_NEEDED;
 }
 
 int

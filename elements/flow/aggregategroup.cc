@@ -15,7 +15,7 @@
 CLICK_DECLS
 
 AggregateGroup::AggregateGroup() : timeout(0) {
-
+	in_batch_mode = BATCH_MODE_NEEDED;
 }
 
 

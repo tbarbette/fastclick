@@ -27,7 +27,6 @@ public:
     const char *class_name() const		{ return "AggregateGroup"; }
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
-    bool need_batch() const		{ return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return false; }

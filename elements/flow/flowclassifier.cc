@@ -66,7 +66,7 @@ public:
 };
 
 FlowClassifier::FlowClassifier(): _aggcache(false), _cache(), _pull_burst(0), _verbose(false) {
-
+	in_batch_mode = BATCH_MODE_NEEDED;
 }
 
 FlowClassifier::~FlowClassifier() {

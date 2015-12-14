@@ -26,7 +26,6 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return DOUBLE; }
     const char *flow_code() const		{ return "x/x"; }
-    bool need_batch() const		{ return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

@@ -26,6 +26,7 @@ CLICK_DECLS
 
 FlowStrip::FlowStrip()
 {
+	in_batch_mode = BATCH_MODE_NEEDED;
 }
 
 int
