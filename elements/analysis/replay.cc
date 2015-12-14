@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() :  _queue(1024), _queue_head(0),_active(true), _loaded(false),_burst(64), _stop(-1), _task(this), _quick_clone(true)
+Replay::Replay() : _active(true), _loaded(false), _queue(1024), _burst(64), _stop(-1), _quick_clone(true), _task(this), _queue_head(0), _queue_current(0)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
@@ -71,7 +71,7 @@ PacketBatch* Replay::pull_batch(int port, unsigned max) {
 #endif
 
 int
-Replay::initialize(ErrorHandler *errh) {
+Replay::initialize(ErrorHandler *) {
 	_notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
 	_notifier.set_active(false,false);
 	_input.resize(ninputs());

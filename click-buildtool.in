@@ -1118,13 +1118,15 @@ provides () {
 $driver_provisions
 "`default_elementmap_provisions`
     requirements=""
-    stdin=n; query=n; print=n
+    stdin=n; query=n; print=n; invert=n
     while [ x"$1" != x ]; do
     case $1 in
     -q|--q|--qu|--que|--quer|--query)
 	query=y; shift 1;;
     -l|--pri|--prin|--print)
 	print=y; shift 1;;
+	-i|--invert)
+	invert=y; shift 1;;
     -r|--pro|--prov|--provi|--provid|--provide)
 	if test $# -lt 2; then provides_usage; fi
 	shift 1; provisions="$1
@@ -1184,6 +1186,13 @@ $requirements"; shift 1;;
 }
 /./ { if (!dep[$1]) exit 1; }' >/dev/null 2>&1
     status=$?
+	if [ $invert = y ] ; then
+        if [ $status -eq 0 ] ; then
+            status=1
+        else
+            status=0
+        fi
+    fi
     [ $print = y ] && expr 1 - $status
     exit $status
 }

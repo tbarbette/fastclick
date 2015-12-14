@@ -77,7 +77,7 @@ class NotifierQueue : public SimpleQueue { public:
 
     int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
 
-    void push(int port, Packet *);
+    void push_packet(int port, Packet *);
     Packet *pull(int port);
 
 #if CLICK_DEBUG_SCHEDULING

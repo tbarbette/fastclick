@@ -61,7 +61,7 @@ Discard::push_batch(int, PacketBatch *head)
 }
 #endif
 void
-Discard::push(int, Packet *p)
+Discard::push_packet(int, Packet *p)
 {
     _count++;
     p->kill();

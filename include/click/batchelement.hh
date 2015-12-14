@@ -62,13 +62,15 @@ class BatchElement : public Element { public:
 		inflow.set(false);
 	}
 
-	virtual void push(int port,Packet* p);
+	void push(int port,Packet* p) final;
+
+	virtual void push_packet(int port,Packet* p);
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		 if ((unsigned) port < (unsigned) noutputs())
 			 output(port).push_batch(batch);
 		 else
-			 batch->kill();
+			 batch->safe_kill();
 	}
 
 	class PushBatchPort : public Port {
@@ -77,7 +79,6 @@ class BatchElement : public Element { public:
 		~PushBatchPort() {
 
 		}
-
 
 		std::list<BatchElement*> downstream_batches;
 
@@ -125,8 +126,7 @@ class BatchElement : public Element { public:
 	}
 
 	void upgrade_ports();
-	void check_batch_mode();
-	void check_batch_rebuild();
+	void bind_ports();
 
 	protected :
 
@@ -135,9 +135,18 @@ class BatchElement : public Element { public:
 	bool ports_upgraded;
 
 	/**
-	 * Propagate a BATCH_MODE_YES upstream
+	 * Propagate a BATCH_MODE_YES upstream or downstream
 	 */
 	class BatchModePropagate : public RouterVisitor { public:
+		bool _verbose;
+
+		BatchModePropagate() {
+#if HAVE_VERBOSE_BATCH
+			_verbose = true;
+#else
+			_verbose = false;
+#endif
+		}
 
 		bool visit(Element *e, bool isoutput, int,
 				Element *, int, int);
@@ -166,6 +175,15 @@ class BatchElement : public Element { public:
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		output(port).push(batch);
 	}
+
+	virtual void push_packet(int port,Packet* p);
+
+
+	void push(int port,Packet* p) final {
+		push_packet(port, p);
+	};
+
+
 };
 #endif
 
