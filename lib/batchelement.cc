@@ -115,25 +115,24 @@ void BatchElement::PullBatchPort::bind_batchelement() {
 
 bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int port,
 		Element *from, int from_port, int) {
+	//Do not continue if we change from pull to push
+	if ((ispush && !from->output_is_push(from_port)) || (!ispush && !from->input_is_pull(from_port))) return false;
 
 	if (e->batch_mode() > Element::BATCH_MODE_NO) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
 		batch_e->in_batch_mode = Element::BATCH_MODE_YES;
 		batch_e->upgrade_ports();
+#if BATCH_DEBUG
 		if (_verbose)
-			click_chatter("%s is in batch mode",e->name().c_str());
-		if (isoutput) {
-			return e->output_is_push(port);
-		} else {
-			return e->input_is_pull(port);
-		}
+			click_chatter("%s is now in batch mode",e->name().c_str());
+#endif
+		return true;
 	}
 	BatchElement* from_batch_e = dynamic_cast<BatchElement*>(from);
 	assert(from_batch_e);
 	if (!from_batch_e->ports_upgraded)
 		from_batch_e->upgrade_ports();
 
-	bool ispush = (isoutput && e->output_is_push(port)) || (!isoutput && e->input_is_push(port));
 	if (_verbose) {
 		if (ispush)
 			click_chatter("Warning ! Push %s->%s is not compatible with batch. "
@@ -182,7 +181,7 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int port
 void BatchElement::upgrade_ports() {
 	if (in_batch_mode != BATCH_MODE_YES || ports_upgraded)
 		return;
-#if HAVE_VERBOSE_BATCH
+#if HAVE_VERBOSE_BATCH && BATCH_DEBUG
 	click_chatter("Upgrading ports of %s",name().c_str());
 #endif
 

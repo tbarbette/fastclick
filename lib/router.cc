@@ -1173,10 +1173,13 @@ Router::initialize(ErrorHandler *errh)
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
             if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES && !e->ports_upgraded) {
                 BatchElement::BatchModePropagate p;
+                p.ispush = true;
                 for (int i = 0; i < e->noutputs(); i++) {
                     if (e->output_is_push(i))
                         visit(e,true,i,&p);
                 }
+
+                p.ispush = false;
 
                 for (int i = 0; i < e->ninputs(); i++) {
                     if (e->input_is_pull(i))

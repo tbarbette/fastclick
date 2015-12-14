@@ -17,6 +17,8 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
+//#define BATCH_DEBUG 1
+
 #define BATCH_MAX_PULL 256
 class PushToPushBatchVisitor;
 class BatchModePropagate;
@@ -139,8 +141,9 @@ class BatchElement : public Element { public:
 	 */
 	class BatchModePropagate : public RouterVisitor { public:
 		bool _verbose;
+		bool ispush;
 
-		BatchModePropagate() {
+		BatchModePropagate() : ispush(true) {
 #if HAVE_VERBOSE_BATCH
 			_verbose = true;
 #else
