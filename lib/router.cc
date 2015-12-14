@@ -1203,11 +1203,14 @@ Router::initialize(ErrorHandler *errh)
                 click_chatter("%s is in batch mode",e->name().c_str());
 # endif
                 BatchElement::BatchModePropagate p;
+                p.ispush = true;
                 for (int i = 0; i < e->noutputs(); i++) {
                     //click_chatter("%s output is push %d",e->name().c_str(),e->output_is_push(i));
 			if (e->output_is_push(i))
 				visit(e,true,i,&p);
                 }
+
+                p.ispush = false;
 
                 for (int i = 0; i < e->ninputs(); i++) {
                     //click_chatter("%s input is pull %d",e->name().c_str(),e->input_is_pull(i));

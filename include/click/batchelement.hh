@@ -141,8 +141,9 @@ class BatchElement : public Element { public:
 	 */
 	class BatchModePropagate : public RouterVisitor { public:
 		bool _verbose;
+		bool ispush;
 
-		BatchModePropagate() {
+		BatchModePropagate() : ispush(true) {
 #if HAVE_VERBOSE_BATCH
 			_verbose = true;
 #else
