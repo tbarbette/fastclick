@@ -59,8 +59,8 @@ EtherRewrite::smaction(Packet *p)
     }
 #endif
 
-void
-EtherRewrite::push(int, Packet *p)
+inline void
+EtherRewrite::push_packet(int, Packet *p)
 {
     if (Packet *q = smaction(p))
     output(0).push(q);

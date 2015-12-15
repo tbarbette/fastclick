@@ -52,27 +52,8 @@ FullNoteQueue::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
     return r;
 }
 
-#if HAVE_BATCH
-    void FullNoteQueue::push_batch(int, PacketBatch* batch) {
-        FOR_EACH_PACKET_SAFE(batch,p) {
-            Storage::index_type h = head(), t = tail(), nt = next_i(t);
-            if (nt != h)
-           push_success(h, t, nt, p);
-            else{
-           push_failure(p);
-            }
-        }
-    }
-
-    PacketBatch* FullNoteQueue::pull_batch(int port,unsigned max) {
-        PacketBatch* batch;
-        MAKE_BATCH(pull(port),batch,max);
-        return batch;
-    }
-#endif
-
 void
-FullNoteQueue::push(int, Packet *p)
+FullNoteQueue::push_packet(int, Packet *p)
 {
     // Code taken from SimpleQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);

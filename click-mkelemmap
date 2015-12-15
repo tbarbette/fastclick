@@ -267,7 +267,7 @@ sub parents_port_count ($) {
     if (!$port_count[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element') {
+	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
 		$port_count[$classid] = '0/0';
 		last;
 	    } elsif ($parent ne '') {
@@ -285,7 +285,7 @@ sub parents_processing ($) {
     if (!$processing[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element') {
+	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
 		$processing[$classid] = 'a/a';
 		last;
 	    } elsif ($parent ne '') {
@@ -303,7 +303,7 @@ sub parents_flow_code ($) {
     if (!$flow_code[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element') {
+	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
 		$flow_code[$classid] = 'x/x';
 		last;
 	    } elsif ($parent ne '') {
@@ -321,7 +321,7 @@ sub parents_flags ($) {
     if (!defined $flags[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element') {
+	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
 		last;
 	    } elsif ($parent ne '') {
 		$flags[$classid] = &parents_flags($cxx_name_to_id{$parent});

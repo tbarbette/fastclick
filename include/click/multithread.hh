@@ -5,6 +5,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/vector.hh>
+#include <click/bitvector.hh>
 
 CLICK_DECLS
 

@@ -1,3 +1,6 @@
+%require
+which nc >/dev/null 2>&1
+
 %script
 msleep () { click -e "DriverManager(wait ${1}ms)"; }
 

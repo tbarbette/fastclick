@@ -1,6 +1,6 @@
 #ifndef CLICK_NULLELEMENT_HH
 #define CLICK_NULLELEMENT_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -42,7 +42,7 @@ Null itself is most useful for benchmarking.
 PushNull, PullNull
 */
 
-class NullElement : public Element { public:
+class NullElement : public BatchElement { public:
 
   NullElement() CLICK_COLD;
 
@@ -50,6 +50,7 @@ class NullElement : public Element { public:
   const char *port_count() const	{ return PORTS_1_1; }
 
   Packet *simple_action(Packet *);
+  PacketBatch *simple_action_batch(PacketBatch *);
 
 };
 
@@ -75,7 +76,7 @@ class PushNullElement : public Element { public:
   const char *port_count() const	{ return PORTS_1_1; }
   const char *processing() const	{ return PUSH; }
 
-  void push(int, Packet *);
+  void push_packet(int, Packet *);
 
 };
 

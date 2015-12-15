@@ -94,12 +94,12 @@ EtherEncap::smaction(Packet *p)
     	}
     }
 #endif
-    void
-    EtherEncap::push(int, Packet *p)
-    {
-        if (Packet *q = smaction(p))
-    	output(0).push(q);
-    }
+inline void
+EtherEncap::push_packet(int, Packet *p)
+{
+	if (Packet *q = smaction(p))
+	output(0).push(q);
+}
 
 Packet *
 EtherEncap::pull(int)

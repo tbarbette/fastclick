@@ -18,12 +18,7 @@ int pcap_setnonblock(pcap_t *p, int nonblock, char *errbuf);
 }
 #endif
 
-#if HAVE_NET_NETMAP_H
-# define FROMDEVICE_ALLOW_NETMAP 1
-# include "elements/userlevel/netmapinfo.hh"
-#endif
-
-#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP
+#if FROMDEVICE_ALLOW_PCAP
 # include <click/task.hh>
 extern "C" {
 void FromDevice_get_packet(u_char*, const struct pcap_pkthdr*, const u_char*);
@@ -182,7 +177,7 @@ class FromDevice : public Element { public:
     void add_handlers() CLICK_COLD;
 
     inline String ifname() const	{ return _ifname; }
-#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP
     inline int fd() const		{ return _fd; }
 #else
     inline int fd() const		{ return -1; }
@@ -202,11 +197,7 @@ class FromDevice : public Element { public:
     static int set_promiscuous(int, String, bool);
 #endif
 
-#if FROMDEVICE_ALLOW_NETMAP
-    const NetmapInfo *netmap() const { return _method == method_netmap ? &_netmap : 0; }
-#endif
-
-#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP
+#if FROMDEVICE_ALLOW_PCAP
     bool run_task(Task *task);
 #endif
 
@@ -214,24 +205,16 @@ class FromDevice : public Element { public:
 
   private:
 
-#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP
     int _fd;
 #endif
-#if FROMDEVICE_ALLOW_NETMAP || FROMDEVICE_ALLOW_PCAP
-    Task _task;
-#endif
-#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
-    void emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts);
-#endif
 #if FROMDEVICE_ALLOW_PCAP
+    Task _task;
+    void emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts);
     pcap_t *_pcap;
     int _pcap_complaints;
 #endif
-#if FROMDEVICE_ALLOW_NETMAP
-    NetmapInfo _netmap;
-    int netmap_dispatch();
-#endif
-#if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_NETMAP
+#if FROMDEVICE_ALLOW_PCAP
     friend void FromDevice_get_packet(u_char*, const struct pcap_pkthdr*,
                                       const u_char*);
 #endif
@@ -259,7 +242,7 @@ class FromDevice : public Element { public:
     int _snaplen;
     uint16_t _protocol;
     unsigned _headroom;
-    enum { method_default, method_netmap, method_pcap, method_linux };
+    enum { method_default, method_pcap, method_linux };
     int _method;
 #if FROMDEVICE_ALLOW_PCAP
     String _bpf_filter;

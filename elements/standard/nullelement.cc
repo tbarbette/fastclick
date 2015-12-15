@@ -29,12 +29,18 @@ NullElement::simple_action(Packet *p)
   return p;
 }
 
+PacketBatch *
+NullElement::simple_action_batch(PacketBatch *p)
+{
+  return p;
+}
+
 PushNullElement::PushNullElement()
 {
 }
 
 void
-PushNullElement::push(int, Packet *p)
+PushNullElement::push_packet(int, Packet *p)
 {
   output(0).push(p);
 }

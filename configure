@@ -710,6 +710,7 @@ RTE_VER_MAJOR
 RTE_TARGET
 RTE_SDK
 PTHREAD_LIBS
+HAVE_VERBOSE_BATCH
 HAVE_BATCH
 AR_CREATEFLAGS
 STRIP
@@ -797,6 +798,7 @@ enable_option_checking
 enable_userlevel
 enable_user_multithread
 enable_batch
+enable_verbose_batch
 enable_netmap_pool
 enable_select
 enable_poll
@@ -1493,6 +1495,8 @@ Optional Features:
     --enable-user-multithread
                           support userlevel multithreading
     --disable-batch       disable batching support
+    --disable-verbose-batch
+                          disable warnings and information about batching
     --enable-netmap-pool  have only netmap packets in the pool
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
@@ -1501,7 +1505,7 @@ Optional Features:
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use Intel DPDK
     --enable-dpdk-pools   Click manages DPDK packet pools
-    --enable-zerocopy     use Zero Copy
+    --disable-zerocopy    disable Zero Copy
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -6372,6 +6376,21 @@ if test "x$enable_batch" = "xyes"; then
 
 fi
 
+# Check whether --enable-verbose-batch was given.
+if test "${enable_verbose_batch+set}" = set; then :
+  enableval=$enable_verbose_batch; :
+else
+  enable_verbose_batch=yes
+fi
+
+
+if test "x$enable_verbose_batch" = "xyes"; then
+    $as_echo "#define HAVE_VERBOSE_BATCH 1" >>confdefs.h
+
+    HAVE_VERBOSE_BATCH=yes
+
+fi
+
 # Check whether --enable-netmap-pool was given.
 if test "${enable_netmap_pool+set}" = set; then :
   enableval=$enable_netmap_pool; :
@@ -6566,15 +6585,6 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi
-    if test ! -f "$RTE_SDK/$RTE_TARGET/lib/librte_eal.a"; then
-        as_fn_error $? "
-=========================================
-
-Cannot find \$RTE_SDK/\$RTE_TARGET/lib/librte_eal.a for Intel DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
-
-=========================================" "$LINENO" 5
-    fi
     rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
     rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
 
@@ -6606,7 +6616,7 @@ fi
 if test "${enable_zerocopy+set}" = set; then :
   enableval=$enable_zerocopy; :
 else
-  enable_zerocopy=no
+  enable_zerocopy=yes
 fi
 
 if test "x$enable_zerocopy" = xyes; then
@@ -10894,9 +10904,13 @@ $as_echo "$ac_cv_working_net_netmap_h" >&6; }
     CPPFLAGS="$saveflags"
     if test "$HAVE_NETMAP" = yes -a "$use_netmap" != no; then
 
-$as_echo "#define HAVE_NET_NETMAP_H 1" >>confdefs.h
+$as_echo "#define HAVE_NETMAP 1" >>confdefs.h
 
+        EXTRA_DRIVER_OBJS="netmapdevice.o $EXTRA_DRIVER_OBJS"
+    else
+        HAVE_NETMAP=no
     fi
+
 
 
 
@@ -13654,6 +13668,10 @@ fi
 
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
+fi
+
+if test "x$enable_batch" = xyes; then
+    provisions="$provisions batch"
 fi
 
 if test "x$enable_experimental" = xyes; then

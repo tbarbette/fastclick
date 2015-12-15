@@ -1,271 +1,120 @@
+// -*- c-basic-offset: 4; related-file-name: "../../lib/netmapdevice.cc" -*-
+/*
+ * netmapdevice.{cc,hh} -- Library to use netmap
+ * Eddie Kohler, Luigi Rizzo, Tom Barbette
+ *
+ * Copyright (c) 2012 Eddie Kohler
+ * Copyright (c) 2014-2015 University of Liege
+ *
+ * NetmapBufQ implementation was started by Luigi Rizzo and moved from
+ * netmapinfo.hh.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
+ */
 #ifndef CLICK_NETMAPDEVICE_HH
-#define CLICK_NETMAPDEVICE_HH 1
+#define CLICK_NETMAPDEVICE_HH
 
-#if HAVE_NET_NETMAP_H
+#if HAVE_NETMAP && CLICK_USERLEVEL
 
-#include <vector>
-#include <list>
-#include <map>
-#include <click/bitvector.hh>
-#include <click/sync.hh>
-#include <click/hashmap.hh>
-#include <click/multithread.hh>
-#include <click/packet.hh>
 #include <net/if.h>
-
-#ifndef NETMAP_WITH_LIBS
-#define NETMAP_WITH_LIBS 1
-#define NS_NOFREE 0x80 //We use this to set that a buffer is shared and should not be freed
-#endif
-
 #include <net/netmap.h>
+#define NETMAP_WITH_LIBS 1
 #include <net/netmap_user.h>
+
+#define NS_NOFREE 0x80 //We use this to set that a buffer is shared and should not be freed
+
+
+#include <click/error.hh>
+#include <click/ring.hh>
+#include <click/vector.hh>
+#include <click/hashmap.hh>
+#include <click/element.hh>
+#include <click/args.hh>
+#include <click/packet.hh>
+#include <click/sync.hh>
 
 CLICK_DECLS
 
-/* a queue of netmap buffers, by index */
+#define NETMAP_PACKET_POOL_SIZE			2048
+#define BUFFER_PTR(idx) reinterpret_cast<uint32_t *>(buf_start + idx * buf_size)
+#define BUFFER_NEXT_LIST(idx) *(((uint32_t*)BUFFER_PTR(idx)) + 1)
+
+/* a queue of netmap buffers, by index*/
 class NetmapBufQ {
-    static unsigned char *buf_start;   /* base address */
-    static unsigned int buf_size;
-    static uint32_t max_index; /* error checking */
-    static unsigned char *buf_end; /* error checking */
+public:
 
-    uint32_t head;  /* index of first buffer */
-    uint32_t tail;  /* index of last buffer */
+	NetmapBufQ();
+	~NetmapBufQ();
 
-    atomic_uint32_t _count; /* how many ? */
+	inline void expand();
 
-    struct nm_desc* _some_nmd;
+	inline void insert(uint32_t idx);
+	inline void insert_p(unsigned char *p);
+	inline void insert_all(uint32_t idx, bool check_size);
 
-    bool shared;
+	inline uint32_t extract();
+	inline unsigned char * extract_p();
 
-  public:
-    NetmapBufQ() : _some_nmd(NULL), shared(false) {
-        _count = 0;
-    }
+	inline int count_buffers(uint32_t idx);
 
-    static inline unsigned int buffer_size() {
-        return buf_size;
-    }
+	inline int count() const {
+		return _count;
+	};
 
-    NetmapBufQ(struct nm_desc* some_nmd) : shared(false) {
-        _count = 0;
-        init(some_nmd->buf_start,some_nmd->buf_end,some_nmd->some_ring->nr_buf_size);
-        _some_nmd = some_nmd;
+	//Static functions
+	static int static_initialize(struct nm_desc* nmd);
+	static uint32_t static_cleanup();
 
-    }
+	static void global_insert_all(uint32_t idx, int count);
 
-    ~NetmapBufQ() {
-        clear();
-    }
+	inline static unsigned int buffer_size() {
+		return buf_size;
+	}
 
-    /*
-     * Tell the pool to go in single consumer / multiple producer mode
-     */
-    inline void set_shared() {
-       shared = true;
-    }
+	static void buffer_destructor(unsigned char *buf, size_t, void *) {
+		NetmapBufQ::local_pool()->insert_p(buf);
+	}
 
-    inline int expand(int n) {
-        if (!_some_nmd) return -1;
-       click_chatter("Expanding buffer pool with %d new packets",n);
-       struct nmbufreq nbr;
-       nbr.num = n;
-       nbr.head = 0;
-       if (ioctl(_some_nmd->fd,NIOCALLOCBUF,&nbr) != 0) {
-            click_chatter("Error ! Could not alloc buffers !");
-                return -1;
-       }
+	inline static bool is_netmap_packet(Packet* p) {
+		return (p->buffer_destructor() == buffer_destructor ||
+				(p->buffer() > NetmapBufQ::buf_start && p->buffer() < NetmapBufQ::buf_end));
+	}
 
-       return insert_all(nbr.head);
-    }
+	inline static bool is_valid_netmap_packet(Packet* p) {
+		return (p->buffer() > NetmapBufQ::buf_start && p->buffer() < NetmapBufQ::buf_end);
+	}
 
-    inline void clear() {
-            if (_count > 0 && _some_nmd) {
-                struct nmbufreq nbr;
-                nbr.num = _count;
-                nbr.head = head;
-
-                ioctl(_some_nmd->fd,NIOCFREEBUF,&nbr);
-            }
-            _count = 0;
-    };
-
-    inline unsigned int count() const {return _count;};
-
-    inline int insert_all(uint32_t idx) {
-        if (unlikely(idx >= max_index || idx == 0)) {
-            click_chatter("Error : cannot insert index %d",idx);
-             return 0;
-        }
-
-        uint32_t firstidx = idx;
-        uint32_t *p;
-        while (idx > 0) {
-            p = reinterpret_cast<uint32_t*>(buf_start +
-                                idx * buf_size);
-            idx = *p;
-            _count++;
-        }
-
-        do {
-            *p = head;
-            if (!shared)
-                head = firstidx;
-        } while (shared && !__sync_bool_compare_and_swap(&head, *p, firstidx));
-
-        return _count;
-    }
-
-    inline unsigned int insert(unsigned char* buf) {
-        return insert((buf - buf_start) / buf_size);
-    }
-
-    inline unsigned int insert(uint32_t idx) {
-    assert(idx > 0 && idx < max_index);
-
-    uint32_t *p = reinterpret_cast<uint32_t *>(buf_start +
-        idx * buf_size);
-    // prepend
-    do {
-        *p = head;
-        /*if (head == 0) {
-            tail = idx;
-        }*/
-        if (unlikely(shared)) {
-            if (__sync_bool_compare_and_swap(&head, *p, idx)) {
-                _count++;
-                return 0;
-            }
-
-        } else {
-            head = idx;
-            (*((uint32_t*)&_count))++;
-            return 0;
-        }
-    } while (1);
-    return 0;
-    }
-
-    inline unsigned int insert_p(unsigned char *p) {
-//        assert (p >= buf_start && p < buf_end);
-        return insert((p - buf_start) / buf_size);
-    }
-
-    inline uint32_t extract() {
-
-        if (_count == 0) {
-            expand(1024);
-            if (_count == 0) return 0;
-        }
-        uint32_t idx;
-        uint32_t *p;
-        do {
-            idx = head;
-
-            p  = reinterpret_cast<uint32_t *>(buf_start +
-                idx * buf_size);
-
-            if (unlikely(shared)) {
-                if (__sync_bool_compare_and_swap(&head,idx,*p)) {
-                    _count--;
-                    break;
-                }
-
-            } else {
-                head = *p;
-                (*((uint32_t*)&_count))--;
-                break;
-            }
-
-        } while(1);
-        return idx;
-    }
-
-    inline unsigned char * extract_p() {
-        uint32_t idx = extract();
-    return (idx == 0) ? 0 : buf_start + idx * buf_size;
-    }
-
-    inline int init (void *beg, void *end, uint32_t _size) {
-    click_chatter("Initializing NetmapBufQ %p size %d mem %p %p\n",
-        this, _size, beg, end);
-    head = tail = max_index = 0;
-    _count = 0;
-    buf_size = 0;
-    buf_start = buf_end = 0;
-    if (_size == 0 || _size > 0x10000 ||
-        beg == 0 || end == 0 || end < beg) {
-        click_chatter("NetmapBufQ %p bad args: size %d mem %p %p\n",
-        this, _size, beg, end);
-        return 1;
-    }
-
-    buf_size = _size;
-    buf_start = reinterpret_cast<unsigned char *>(beg);
-    buf_end = reinterpret_cast<unsigned char *>(end);
-    max_index = (buf_end - buf_start) / buf_size;
-    // check max_index overflow ?
-    return 0;
-    }
-
-    static bool is_netmap_packet(Packet* p) {
-
-#if !CLICK_DPDK_POOLS
-        return (p->buffer() > buf_start && p->buffer() < buf_end);
-#else
-        return false;
-#endif
-    }
-
-    static void buffer_destructor(unsigned char *buf, size_t, void *arg) {
-        ((NetmapBufQ*)arg)->insert_p(buf);
-    }
-
-    static NetmapBufQ* local_pool() {
-    	return NetmapBufQ::netmap_buf_pools.get();
-    }
-
-    static int initialize(struct nm_desc* some_nmd) {
-    	if (netmap_buf_pools.size() < (unsigned)click_nthreads)
-			netmap_buf_pools.resize(click_nthreads,NULL);
-		for (int i = 0; i < click_nthreads; i++) {
-			if (netmap_buf_pools.get_value(i) == NULL) {
-				NetmapBufQ* q = new NetmapBufQ(some_nmd);
-				if (q->expand(1024) <= 0)
-					return -1;
-				netmap_buf_pools.set_value(i,q);
-			}
-		}
-		return 0;
-    }
-
-    static void cleanup() {
-		for (unsigned int i = 0; i < netmap_buf_pools.size(); i++) {
-			if (netmap_buf_pools.get_value(i) && netmap_buf_pools.get_value(i)->count() > 0) {
-				click_chatter("Free pool %d (have %d packets)",i,netmap_buf_pools.get_value(i)->count());
-				delete netmap_buf_pools.get_value(i);
-				netmap_buf_pools.set_value(i, NULL);
-			} else {
-				click_chatter("No free because no packet pool %d(%p) has %d packets",i,netmap_buf_pools.get_value(i),netmap_buf_pools.get_value(i)->count());
-			}
-		}
-    }
-
-    inline static NetmapBufQ*& get_local_pool() {
-    	return (netmap_buf_pools.get());
-    }
-
-    inline static NetmapBufQ*& get_local_pool(int tid) {
-        return (netmap_buf_pools.get_value_for_thread(tid));
-    }
+	inline static NetmapBufQ* local_pool() {
+		return NetmapBufQ::netmap_buf_pools[click_current_cpu_id()];
+	}
 
 private :
-    static per_thread<NetmapBufQ*> netmap_buf_pools;
+	uint32_t _head;  /* index of first buffer */
+	int _count; /* how many ? */
+
+	//Static attributes (shared between all queues)
+	static unsigned char *buf_start;   /* base address */
+	static unsigned char *buf_end; /* error checking */
+	static unsigned int buf_size;
+	static uint32_t max_index; /* error checking */
+
+	static Spinlock global_buffer_lock;
+	//The global netmap buffer list is used to exchange batch of buffers between threads
+	//The second uint32_t in the buffer is used to point to the next batch
+	static uint32_t global_buffer_list;
+
+	static int messagelimit;
+	static NetmapBufQ** netmap_buf_pools;
 
 }  __attribute__((aligned(64)));
-
-class NetmapDevice;
 
 /**
  * A Netmap interface, its global descriptor and one descriptor per queue
@@ -273,51 +122,146 @@ class NetmapDevice;
 class NetmapDevice {
 	public:
 
-	int _minfd;
-	int _maxfd;
-
 	NetmapDevice(String ifname) CLICK_COLD;
 	~NetmapDevice() CLICK_COLD;
+
+	int initialize() CLICK_COLD;
+	void destroy() CLICK_COLD;
 
 	atomic_uint32_t n_refs;
 
 	struct nm_desc* parent_nmd;
-	std::vector<struct nm_desc*> nmds;
+	Vector<struct nm_desc*> nmds;
 
 	String ifname;
 	int n_queues;
 
-	void destroy() {
-	    --_use_count;
-	    if (_use_count == 0)
-	        delete this;
-	}
-
-	static NetmapDevice* open(String ifname) {
-	    NetmapDevice* d = nics.find(ifname);
-	    if (d == NULL) {
-	        d = new NetmapDevice(ifname);
-	        if (d->initialize() != 0) {
-	            return NULL;
-	        }
-	        nics.insert(ifname,d);
-	    }
-	    d->_use_count++;
-	    return d;
-	}
-
+	static NetmapDevice* open(String ifname);
+	static void static_cleanup();
 	static struct nm_desc* some_nmd;
+	static int global_alloc;
 
-protected :
+	int _minfd;
+	int _maxfd;
 
+private :
 	static HashMap<String,NetmapDevice*> nics;
 
-private:
 	int _use_count;
-
-	int initialize();
 };
 
-CLICK_ENDDECLS
+/*
+ * Inline functions
+ */
+
+inline void NetmapBufQ::expand() {
+	global_buffer_lock.acquire();
+	if (global_buffer_list != 0) {
+		//Transfer from global pool
+		_head = global_buffer_list;
+		global_buffer_list = BUFFER_NEXT_LIST(global_buffer_list);
+		_count = NETMAP_PACKET_POOL_SIZE;
+	} else {
+#ifdef NIOCALLOCBUF
+		click_chatter("Expanding buffer pool with %d new packets",NETMAP_PACKET_POOL_SIZE);
+		struct nmbufreq nbr;
+		nbr.num = NETMAP_PACKET_POOL_SIZE;
+		nbr.head = 0;
+		if (ioctl(NetmapDevice::some_nmd->fd,NIOCALLOCBUF,&nbr) == 0) {
+			insert_all(nbr.head,false);
+		} else
 #endif
+		{
+		if (messagelimit < 5)
+			click_chatter("No more netmap buffers !");
+		messagelimit++;
+}
+	}
+	global_buffer_lock.release();
+}
+
+/**
+ * Insert a list of netmap buffers in the queue
+ */
+inline void NetmapBufQ::insert_all(uint32_t idx,bool check_size = false) {
+	if (unlikely(idx >= max_index || idx == 0)) {
+		click_chatter("Error : cannot insert index %d",idx);
+		return;
+	}
+
+	uint32_t firstidx = idx;
+	uint32_t *p;
+	while (idx > 0) { //Go to the end of the passed list
+		if (check_size) {
+			insert(idx);
+		} else {
+			p = reinterpret_cast<uint32_t*>(buf_start +
+					idx * buf_size);
+			idx = *p;
+			_count++;
+		}
+	}
+
+	//Add the current list at the end of this one
+	*p = _head;
+	_head = firstidx;
+}
+
+/**
+ * Return the number of buffer inside a netmap buffer list
+ */
+int NetmapBufQ::count_buffers(uint32_t idx) {
+	int count=0;
+	while (idx != 0) {
+		count++;
+		idx = *BUFFER_PTR(idx);
+	}
+	return count;
+}
+
+inline void NetmapBufQ::insert(uint32_t idx) {
+	assert(idx > 0 && idx < max_index);
+
+	if (_count < NETMAP_PACKET_POOL_SIZE) {
+		*BUFFER_PTR(idx) = _head;
+		_head = idx;
+		_count++;
+	} else {
+		assert(_count == NETMAP_PACKET_POOL_SIZE);
+		global_buffer_lock.acquire();
+		BUFFER_NEXT_LIST(_head) = global_buffer_list;
+		global_buffer_list = _head;
+		global_buffer_lock.release();
+		_head = idx;
+		*BUFFER_PTR(idx) = 0;
+		_count = 1;
+	}
+}
+
+inline void NetmapBufQ::insert_p(unsigned char* buf) {
+	insert((buf - buf_start) / buf_size);
+}
+
+inline uint32_t NetmapBufQ::extract() {
+	if (_count <= 0) {
+		expand();
+		if (_count == 0) return 0;
+	}
+	uint32_t idx;
+	uint32_t *p;
+	idx = _head;
+	p  = reinterpret_cast<uint32_t *>(buf_start + idx * buf_size);
+
+	_head = *p;
+	_count--;
+	return idx;
+}
+
+inline unsigned char* NetmapBufQ::extract_p() {
+	uint32_t idx = extract();
+	return (idx == 0) ? 0 : buf_start + idx * buf_size;
+}
+
+#endif
+
 #endif

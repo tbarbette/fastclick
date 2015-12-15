@@ -85,7 +85,7 @@ Pipeliner::initialize(ErrorHandler *errh)
 		}
     }
 
-    for (int i = 0; i < storage.size(); i++) {
+    for (unsigned i = 0; i < storage.size(); i++) {
         storage.get_value(i).initialize(_ring_size);
     }
 
@@ -118,7 +118,7 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
 }
 #endif
 
-void Pipeliner::push(int,Packet* p) {
+void Pipeliner::push_packet(int,Packet* p) {
 	retry:
     if (storage->insert(p)) {
 

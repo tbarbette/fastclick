@@ -159,24 +159,23 @@ SimpleQueue::cleanup(CleanupStage)
 }
 
 #if HAVE_BATCH
-    void SimpleQueue::push_batch(int port, PacketBatch* batch) {
-        FOR_EACH_PACKET_SAFE(batch,p) {
-            push(port, p);
-        }
-    }
+void SimpleQueue::push_batch(int port, PacketBatch* batch) {
+	FOR_EACH_PACKET_SAFE(batch,p) {
+		push_packet(port,p);
+	}
+}
 
-    PacketBatch* SimpleQueue::pull_batch(int port,unsigned max) {
-        (void) port;
-        PacketBatch* batch;
-        MAKE_BATCH(deq(),batch,max);
-        return batch;
-    }
+PacketBatch* SimpleQueue::pull_batch(int port,unsigned max) {
+	PacketBatch* batch;
+	MAKE_BATCH(pull(port),batch,max);
+	return batch;
+}
 #endif
 
-void
-SimpleQueue::push(int, Packet *p)
+inline void
+SimpleQueue::push_packet(int, Packet *p)
 {
-    // If you change this code, also change NotifierQueue::push()
+    // If you change this code, also change NotifierQueue::push_packet()
     // and FullNoteQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);
 

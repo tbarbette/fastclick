@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() :  _active(true), _loaded(false),_burst(64), _stop(-1), _task(this), _quick_clone(true)
+Replay::Replay() : _active(true), _loaded(false), _queue(1024), _burst(64), _stop(-1), _quick_clone(true), _task(this), _queue_head(0), _queue_current(0)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
@@ -38,6 +38,7 @@ int
 Replay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
+	.read_p("QUEUE", _queue)
 	.read("STOP", _stop)
 	.read("QUICK_CLONE", _quick_clone)
 	.complete() < 0)
@@ -70,7 +71,7 @@ PacketBatch* Replay::pull_batch(int port, unsigned max) {
 #endif
 
 int
-Replay::initialize(ErrorHandler *errh) {
+Replay::initialize(ErrorHandler *) {
 	_notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
 	_notifier.set_active(false,false);
 	_input.resize(ninputs());
@@ -78,7 +79,7 @@ Replay::initialize(ErrorHandler *errh) {
 		_input[i].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
 	_output.resize(noutputs());
 	for (int i = 0; i < _output.size(); i++) {
-		_output[i].ring.initialize(1024);
+		_output[i].ring.initialize(_queue);
 	}
 	return 0;
 }
@@ -134,7 +135,6 @@ Replay::run_task(Task* task)
 				_queue_head = p_input[first_i];
 			} else {
 				queue_tail->set_next(p_input[first_i]);
-				queue_tail = p_input[first_i];
 			}
 			queue_tail = p_input[first_i];
 			SET_PAINT_ANNO(p_input[first_i],first_i);
@@ -161,17 +161,13 @@ Replay::run_task(Task* task)
 		_queue_current = p->next();
 		Packet* q = p->clone(_quick_clone);
 
-		if (output_is_push(PAINT_ANNO(p))) {
-			output(PAINT_ANNO(p)).push_batch(PacketBatch::make_from_packet(q));
+		if (!_output[PAINT_ANNO(p)].ring.insert(q)) {
+			q->kill();
+			_queue_current = p;
+			_notifier.sleep();
+			return n > 0;
 		} else {
-			if (!_output[PAINT_ANNO(p)].ring.insert(q)) {
-				q->kill();
-				_queue_current = p;
-				_notifier.sleep();
-				return n > 0;
-			} else {
-				_notifier.wake();
-			}
+			_notifier.wake();
 		}
 
 		n++;

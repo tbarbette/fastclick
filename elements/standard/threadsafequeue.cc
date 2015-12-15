@@ -46,7 +46,7 @@ ThreadSafeQueue::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-ThreadSafeQueue::push(int, Packet *p)
+ThreadSafeQueue::push_packet(int, Packet *p)
 {
     // Code taken from SimpleQueue::push().
 

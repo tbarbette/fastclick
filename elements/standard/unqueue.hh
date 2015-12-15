@@ -1,6 +1,6 @@
 #ifndef CLICK_UNQUEUE_HH
 #define CLICK_UNQUEUE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/task.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
@@ -63,7 +63,7 @@ Same as the BURST keyword.
 =a RatedUnqueue, BandwidthRatedUnqueue
 */
 
-class Unqueue : public Element { public:
+class Unqueue : public BatchElement { public:
 
     Unqueue() CLICK_COLD;
 

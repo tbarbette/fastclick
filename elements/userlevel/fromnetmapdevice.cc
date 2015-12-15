@@ -35,6 +35,9 @@ FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(fals
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
 #endif
+#if HAVE_ZEROCOPY
+	NetmapDevice::global_alloc += 2048;
+#endif
 }
 
 void *
@@ -71,7 +74,6 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #if !HAVE_NUMA
     if (numa) {
     	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
-    	return -1;
     }
     _numa = false;
 #else
@@ -148,12 +150,6 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 	    }
 	}
 
-    //Wait for Netmap init if we're the last interface
-    if (all_initialized()) {
-        click_chatter("Waiting 3 sec for full hardware initialization of %s...\n",_device->parent_nmd->nifp->ni_name);
-        sleep(3);
-    }
-
 	return 0;
 }
 
@@ -217,9 +213,9 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
                 #if HAVE_ZEROCOPY
                     if (slot->len > 64 && !(slot->flags & NS_MOREFRAG)) {
                         __builtin_prefetch(data);
-                        p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,NetmapBufQ::get_local_pool());
+                        p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,0);
                         if (!p) goto error;
-                        slot->buf_idx = NetmapBufQ::get_local_pool()->extract();
+                        slot->buf_idx = NetmapBufQ::local_pool()->extract();
                         slot->flags = NS_BUF_CHANGED;
                     } else
                 #endif

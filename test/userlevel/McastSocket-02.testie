@@ -1,6 +1,10 @@
 %info
 Test MulticastSocket without loop filtering.
 
+%require
+# Cannot be assumed on multiple of my computers...
+exit 1
+
 %script
 # Assumes that a multicast route exists to any network device but 'lo'.
 # Most hosts have a default route to this effect.

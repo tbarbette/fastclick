@@ -1171,16 +1171,17 @@ Router::initialize(ErrorHandler *errh)
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
-            if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES) {
+            if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES && !e->ports_upgraded) {
                 BatchElement::BatchModePropagate p;
+                p.ispush = true;
                 for (int i = 0; i < e->noutputs(); i++) {
-                    //click_chatter("%s output is push %d",e->name().c_str(),e->output_is_push(i));
-			if (e->output_is_push(i))
-				visit(e,true,i,&p);
+                    if (e->output_is_push(i))
+                        visit(e,true,i,&p);
                 }
 
+                p.ispush = false;
+
                 for (int i = 0; i < e->ninputs(); i++) {
-                    //click_chatter("%s input is pull %d",e->name().c_str(),e->input_is_pull(i));
                     if (e->input_is_pull(i))
                         visit(e,false,i,&p);
                 }
@@ -1192,17 +1193,20 @@ Router::initialize(ErrorHandler *errh)
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
             if (e != NULL) {
                 if (e->batch_mode() == Element::BATCH_MODE_NO) {
-			e->receives_batch = false;
-				continue; //This element is traversed by packets... nothing to do.
+                    e->receives_batch = false;
+                    continue; //This element is traversed by packets... nothing to do.
                 }
 
                 if (e->batch_mode() == Element::BATCH_MODE_IFPOSSIBLE) {
-			e->in_batch_mode = Element::BATCH_MODE_NO;
-			e->receives_batch = false;
+                    e->in_batch_mode = Element::BATCH_MODE_NO;
+                    e->receives_batch = false;
+#if HAVE_VERBOSE_BATCH
 			click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
-			continue;
+#endif
+                    continue;
                 }
-		e->upgrade_ports();
+                e->upgrade_ports();
+                e->bind_ports();
             }
         }
     }

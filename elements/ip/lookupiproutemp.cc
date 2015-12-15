@@ -102,56 +102,56 @@ LookupIPRouteMP::initialize(ErrorHandler *)
 
 
 #if HAVE_BATCH
-    void
-    LookupIPRouteMP::push_batch(int, PacketBatch *batch)
-    {
-    	PacketBatch* last = NULL;
+void
+LookupIPRouteMP::push_batch(int, PacketBatch *batch)
+{
+	PacketBatch* last = NULL;
 
-        int max = _t.size();
-        PacketBatch* out[max + 1]; //Array for each entry, last is for unrouted packets
-        bzero(out,sizeof(PacketBatch*) * (max+1));
-        IPAddress*  out_gw = new IPAddress[max + 1]; //Gw for each entry, last is used as a temp
-        bzero(out_gw,sizeof(IPAddress) * (max+1));
+	int max = _t.size();
+	PacketBatch* out[max + 1]; //Array for each entry, last is for unrouted packets
+	bzero(out,sizeof(PacketBatch*) * (max+1));
+	IPAddress*  out_gw = new IPAddress[max + 1]; //Gw for each entry, last is used as a temp
+	bzero(out_gw,sizeof(IPAddress) * (max+1));
 
-       
-    	IPAddress last_addr = 0;
-    	int last_entry = 0;
-    	IPAddress last_addr2 = 0;
-    	int last_entry2 = 0;
+
+	IPAddress last_addr = 0;
+	int last_entry = 0;
+	IPAddress last_addr2 = 0;
+	int last_entry2 = 0;
 
 	auto fnt = [this,&out_gw,&max,&last_addr,&last_entry,&last_addr2,&last_entry2](Packet* p){
 		IPAddress a = p->dst_ip_anno();
-			int o = max;
+		int o = max;
 
-			if (a && a == last_addr) {
-				o = last_entry;
-			} else if (a && a == last_addr2) {
-				o = last_entry2;
-			} else if (_t.lookup(a, out_gw[max], o)) {
-				last_addr2 = last_addr;
-				last_entry2 = last_entry;
-				last_addr = a;
-				last_entry = o;
-				out_gw[o] = out_gw[max];
-			} else {
-				static int complained = 0;
-				if (++complained <= 5)
-					click_chatter("LookupIPRouteMP: no route for %s", a.unparse().c_str());
-				goto no_route;
-			}
+		if (a && a == last_addr) {
+			o = last_entry;
+		} else if (a && a == last_addr2) {
+			o = last_entry2;
+		} else if (_t.lookup(a, out_gw[max], o)) {
+			last_addr2 = last_addr;
+			last_entry2 = last_entry;
+			last_addr = a;
+			last_entry = o;
+			out_gw[o] = out_gw[max];
+		} else {
+			static int complained = 0;
+			if (++complained <= 5)
+				click_chatter("LookupIPRouteMP: no route for %s", a.unparse().c_str());
+			goto no_route;
+		}
 
 
-			if (out_gw[o])
+		if (out_gw[o])
 			p->set_dst_ip_anno(out_gw[o]);
 
-			no_route:
-			if (o == -1) o = max;
-			return o;
-        };
-        CLASSIFY_EACH_PACKET((max + 1),fnt,batch,[this](int port,PacketBatch* batch){checked_output_push_batch(port,batch);});
-        delete[] out_gw;
-    }
-#endif
+		no_route:
+		if (o == -1) o = max;
+		return o;
+	};
+	CLASSIFY_EACH_PACKET((max + 1),fnt,batch,checked_output_push_batch);
+	delete[] out_gw;
+}
+#endif //HAVE_BATCH
 void
 LookupIPRouteMP::cleanup(CleanupStage)
 {
@@ -161,7 +161,7 @@ LookupIPRouteMP::cleanup(CleanupStage)
 }
 
 void
-LookupIPRouteMP::push(int, Packet *p)
+LookupIPRouteMP::push_packet(int, Packet *p)
 {
   IPAddress a = p->dst_ip_anno();
   IPAddress gw;

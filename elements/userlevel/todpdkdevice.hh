@@ -122,7 +122,7 @@ public:
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *head);
 #endif
-    void push(int port, Packet *p);
+    void push_packet(int port, Packet *p);
 
 private:
 

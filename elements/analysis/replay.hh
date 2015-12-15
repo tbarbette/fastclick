@@ -16,7 +16,7 @@ class Replay : public BatchElement { public:
     const char *class_name() const	{ return "Replay"; }
     const char *port_count() const	{ return "1-/="; }
     const char *flow_code() const	{ return "#/#"; }
-    const char *processing() const	{ return "l/a"; }
+    const char *processing() const	{ return PULL; }
 
     bool get_runnable_thread(Bitvector& bmp) {
         for (int i = 0; i < noutputs(); i++)
@@ -42,8 +42,10 @@ class Replay : public BatchElement { public:
     bool _active;
     bool _loaded;
 
+    unsigned int _queue;
     unsigned int _burst;
     int _stop;
+    bool _quick_clone;
 
     Task _task;
     ActiveNotifier _notifier;
@@ -61,9 +63,6 @@ class Replay : public BatchElement { public:
     Packet* _queue_head;
     Packet* _queue_current;
     Timestamp _current;
-
-    bool _quick_clone;
-
 };
 
 CLICK_ENDDECLS

@@ -20,9 +20,6 @@
 #include <click/args.hh>
 #include <click/error.hh>
 
-#include <rte_ethdev.h>
-#include <rte_mbuf.h>
-
 #include "todpdkdevice.hh"
 
 CLICK_DECLS
@@ -66,7 +63,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
     }
     if (burst > -1)
-        _burst = burst;
+        _burst_size = burst;
 
 #else
     if (burst != -1) {
@@ -128,12 +125,14 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
     #if CLICK_DPDK_POOLS
     mbuf = p->mb();
     #else
-    if (likely(DPDKDevice::is_dpdk_packet(p))) {
-        mbuf = (struct rte_mbuf *) p->destructor_argument();
-        p->set_buffer_destructor(Packet::empty_destructor);
+    if (likely(DPDKDevice::is_dpdk_packet(p) && !p->shared())) {
+        mbuf = (struct rte_mbuf *) (p->buffer() - sizeof(struct rte_mbuf));
+        rte_pktmbuf_pkt_len(mbuf) = p->length();
+        rte_pktmbuf_data_len(mbuf) = p->length();
+        static_cast<WritablePacket*>(p)->set_buffer(0);
     } else {
         if (create) {
-            mbuf = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));
+            mbuf = DPDKDevice::get_pkt();
             memcpy((void*)rte_pktmbuf_mtod(mbuf, unsigned char *),p->data(),p->length());
             rte_pktmbuf_pkt_len(mbuf) = p->length();
             rte_pktmbuf_data_len(mbuf) = p->length();
@@ -191,7 +190,7 @@ void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
         iqueue.index = 0;
 }
 
-void ToDPDKDevice::push(int, Packet *p)
+void ToDPDKDevice::push_packet(int, Packet *p)
 {
     // Get the thread-local internal queue
     InternalQueue &iqueue = _iqueues.get();
@@ -213,7 +212,7 @@ void ToDPDKDevice::push(int, Packet *p)
                     click_chatter("%s: congestion warning", name().c_str());
                 _congestion_warning_printed = true;
             }
-        } else { // If there is space in the iqueue just after index + left
+        } else { // If there is space in the iqueue
             iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _iqueue_size] =
                 get_mbuf(p);
             iqueue.nr_pending++;
@@ -256,6 +255,10 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	InternalQueue &iqueue = _iqueues.get();
 
 	Packet* p = head;
+
+#if HAVE_BATCH_RECYCLE
+	    BATCH_RECYCLE_START();
+#endif
 
 	struct rte_mbuf **pkts = iqueue.pkts;
 
@@ -307,9 +310,13 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	struct rte_mbuf **pkt = pkts;
 
 	while (p != NULL) {
+		Packet* next = p->next();
         *pkt = get_mbuf(p);
+#if !CLICK_DPDK_POOLS
+        BATCH_RECYCLE_UNSAFE_PACKET(p);
+#endif
 		pkt++;
-		p = p->next();
+		p = next;
 	}
 
 	unsigned ret = 0;
@@ -332,11 +339,11 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	}
 
 #if !CLICK_DPDK_POOLS
-/* Need to check that packet are not shared before doing that
-      if (likely(is_fullpush()))
-        head->safe_kill();
-    else*/
-        head->kill();
+	#if HAVE_BATCH_RECYCLE
+		BATCH_RECYCLE_END();
+	#else
+		 head->kill();
+	#endif
 #endif
 
 }
@@ -345,3 +352,4 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk)
 EXPORT_ELEMENT(ToDPDKDevice)
+ELEMENT_MT_SAFE(ToDPDKDevice)

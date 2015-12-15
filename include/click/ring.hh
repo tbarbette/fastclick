@@ -3,6 +3,7 @@
 #define CLICK_RING_HH
 
 #include <click/atomic.hh>
+#include <click/sync.hh>
 
 CLICK_DECLS
 
@@ -64,6 +65,7 @@ CLICK_DECLS
 
     };
 
+
 /**
  * Ring with size set at initialization time
  */
@@ -89,8 +91,7 @@ uint32_t _size;
 
     T* ring;
 public:
-int id;
-    DynamicRing() : _size(0) {
+    DynamicRing() : _size(0),ring(0) {
         head = 0;
         tail = 0;
     }
