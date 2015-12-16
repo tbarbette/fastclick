@@ -42,7 +42,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 		FlowNodePtr* parent_ptr = 0;
 		bool deletable_value = false;
 		int output = 0;
-		FlowNodeData lastvalue = (FlowNodeData){.data_64 = 0};
+
 
 
 		std::smatch result;
@@ -54,6 +54,8 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 			/*		} else if (conf[i] == "subflow") {
 						subflow = true;*/
 		} else if (std::regex_match(s, result, reg)){
+			FlowNodeData lastvalue = (FlowNodeData){.data_64 = 0};
+
 			std::string other = result.str(1);
 			std::string aggregate = result.str(2);
 			std::string deletable = result.str(4);
@@ -193,6 +195,8 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 			parent_ptr->set_data(lastvalue);
 			parent_ptr->leaf->release_ptr = parent;
 			parent_ptr->leaf->acquire(1);
+			parent_ptr->leaf->data[_flow_data_offset] = output;
+
 
 			rules.push_back((Rule){.root = root, .output = output});
 		} else {
@@ -296,36 +300,31 @@ FlowNode* FlowDispatcher::get_table() {
 			click_chatter("%s : Computing table with %d rules",name().c_str(),rules.size());
 		FlowNode* merged = 0;
 
-		for (int i = 0; i < rules.size(); i++) {
+		for (int i = rules.size() - 1; i >= 0 ; --i) {
 			//First merge the table after the output to the final node of this rule
 			if (_verbose)
-				click_chatter("Merging this table :");
+				click_chatter("Merging this rule of %s :",name().c_str());
 			rules[i].root->print();
 			if (rules[i].output > -1 && rules[i].output < noutputs()) {
+
 				FlowNode* child_table = FlowElementVisitor::get_downward_table(this, i);
 				if (child_table) {
-					FlowNode* parent = rules[i].root;
-					FlowNodePtr* current_ptr = 0;
-
-					do {
-						if (parent->getNum() > 0)
-							current_ptr = parent->iterator()->next();
-						else
-							current_ptr = parent->default_ptr();
-					} while(!current_ptr->is_leaf() && (parent = current_ptr->node));
-
-					FlowControlBlock* leaf = current_ptr->leaf;
+					FlowNodePtr* leaf_ptr = rules[i].root->get_first_leaf_ptr();
+					FlowControlBlock* leaf = leaf_ptr->leaf;
+					FlowNode* parent = leaf_ptr->parent();
+					assert(parent);
 				//	click_chatter("Leaf data %lu is now replaced with child table :",current_ptr->data().data_64);
-					current_ptr->set_node(child_table);
-					current_ptr->set_parent(parent);
-					current_ptr->set_data(leaf->node_data[0]);
+					leaf_ptr->set_node(child_table);
+					leaf_ptr->set_parent(parent);
+					leaf_ptr->set_data(leaf->node_data[0]);
 					leaf->release(1);
 				}
+				if (_verbose) {
+					click_chatter("Print rule merged with child of %p :",rules[i].root);
+					rules[i].root->print();
+				}
 			}
-			if (_verbose) {
-				click_chatter("Print rule merged with child of %p :",rules[i].root);
-				rules[i].root->print();
-			}
+
 
 			//For all leaf of the rule (now appended with all leafs of the child)
 			FlowNode::LeafIterator* it = rules[i].root->leaf_iterator();

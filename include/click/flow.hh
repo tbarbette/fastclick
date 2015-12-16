@@ -226,6 +226,12 @@ public:
 		return &_default;
 	}
 
+	inline void set_default(FlowNode* node) {
+		assert(_default.ptr == 0);
+		_default.ptr = node;
+		node->set_parent(this);
+	}
+
 	virtual void release_child(FlowNodePtr fl) = 0;
 
 	virtual void renew() {
@@ -249,6 +255,7 @@ public:
 
 	virtual FlowNode* optimize();
 
+	FlowNodePtr* get_first_leaf_ptr();
 
 	class LeafIterator {
 	private:
@@ -405,6 +412,10 @@ public:
 
 	int offset() const {
 		return _offset;
+	}
+
+	bool equals(FlowLevel* level) {
+		return ((FlowLevel::equals(level))&& (_offset == dynamic_cast<FlowLevelOffset*>(level)->_offset));
 	}
 };
 /**

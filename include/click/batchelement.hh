@@ -18,7 +18,7 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
-#define BATCH_DEBUG 1
+#define BATCH_DEBUG 0
 
 #define BATCH_MAX_PULL 256
 class PushToPushBatchVisitor;

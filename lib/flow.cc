@@ -37,7 +37,27 @@ void FlowClassificationTable::set_release_fnt(SubFlowRealeaseFnt pool_release_fn
 
 
 FlowNode* FlowNode::combine(FlowNode* other) {
-	if (level()->equals(other->level())) {
+	if (other == 0) return this;
+
+	if (other->level()->get_max_value() > level()->get_max_value()) {
+#if DEBUG_CLASSIFIER
+		click_chatter("COMBINE : swapping nodes");
+#endif
+		return other->combine(this);
+	}
+
+	if (other->parent()) {
+#if DEBUG_CLASSIFIER
+		click_chatter("COMBINE : swapping parent");
+#endif
+		assert(parent() == 0);
+		set_parent(other->parent());
+		other->set_parent(0);
+	}
+
+	assert(other->parent() == 0);
+
+	if (level()->equals(other->level())) { //Same level
 #if DEBUG_CLASSIFIER
 		click_chatter("COMBINE : same level");
 #endif
@@ -71,15 +91,23 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 		}
 		delete other;
 		return this;
-	} else if (dynamic_cast<FlowLevelDummy*>(other->level()) != 0) {
+	} else if (dynamic_cast<FlowLevelDummy*>(other->level()) != 0) { //Other level is dummy
 #if DEBUG_CLASSIFIER
 		click_chatter("COMBINE : with a default route");
 #endif
 		//Merging with a default route
 		if (_default.ptr != 0) {
-			click_chatter("Cannot merge default route !");
+			if (_default.is_leaf() || (other->default_ptr() && other->default_ptr()->is_leaf())) {
+				click_chatter("COMBINE : Cannot combine leaf (a is %d, b is %d)!",_default.is_leaf(),other->default_ptr() && other->default_ptr()->is_leaf());
+			this->print();
+			other->print();
+			click_chatter("So, what do i do?");
+				assert(false);
+			}
+			set_default(_default.node->combine(other->_default.node));
 			return this;
 		}
+
 		if (!other->_default.ptr) {
 #if DEBUG_CLASSIFIER
 			click_chatter("There is no default value ...?");
@@ -92,13 +120,28 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 		other->_default.ptr = 0; //Remove default from other node so it's not freed
 		delete other;
 		return this;
-	} else {
-		click_chatter("Combining different tables is not supported for now !");
-		return this;
+	} else if (dynamic_cast<FlowLevelOffset*>(level()) && dynamic_cast<FlowLevelOffset*>(other->level())) {
+#if DEBUG_CLASSIFIER
+		click_chatter("COMBINE : two level offset");
+#endif
+		FlowLevelOffset* o1 = dynamic_cast<FlowLevelOffset*>(level());
+		FlowLevelOffset* o2 = dynamic_cast<FlowLevelOffset*>(other->level());
+		/*if (o1->get_max_value() == o2->get_max_value() && abs(o1->offset() - o2->offset())) { //Offset is different
+
+		}*/
 	}
 
-}
+	click_chatter("Combining different tables (%s and %s) is not supported for now, the second one will be added as default !",level()->print().c_str(),other->level()->print().c_str());
+	if (this->default_ptr()->ptr == 0) {
+		this->set_default(other);
+	} else {
+		assert(this->default_ptr()->is_node());
+		this->set_default(this->default_ptr()->node->combine(other));
+	}
+	return this;
 
+
+}
 FlowNode* FlowNode::optimize() {
 	NodeIterator* it = iterator();
 	FlowNodePtr* ptr;
@@ -219,23 +262,47 @@ FlowNode* FlowNode::optimize() {
 	return this;
 }
 
+
+FlowNodePtr* FlowNode::get_first_leaf_ptr() {
+	FlowNode* parent = this;
+	FlowNodePtr* current_ptr = 0;
+
+	do {
+		if (parent->getNum() > 0)
+			current_ptr = parent->iterator()->next();
+		else
+			current_ptr = parent->default_ptr();
+	} while(!current_ptr->is_leaf() && (parent = current_ptr->node));
+
+	return current_ptr;
+
+}
+
 void FlowNode::print(FlowNode* node,String prefix) {
-	click_chatter("%s%s (%s, %d childs) %p P:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+	click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
 
 	NodeIterator* it = node->iterator();
 	FlowNodePtr* cur = 0;
 	while ((cur = it->next()) != 0) {
-		click_chatter("%s|-> %lu P:%p",prefix.c_str(),cur->data().data_64,cur->parent());
+
 		if (!cur->is_leaf()) {
+			click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().data_64,cur->parent());
 			assert(cur->node->parent() == node);
 			print(cur->node,prefix + "|  ");
 		} else {
+			char data_str[64];
+			int j = 0;
+			for (int i = 0; i < cur->leaf->release_pool->data_size() && j < 60;i++) {
+				sprintf(&data_str[j],"%02x",cur->leaf->data[i]);
+				j+=2;
+			}
+			click_chatter("%s|-> %lu Parent:%p (data %s)",prefix.c_str(),cur->data().data_64,cur->parent(),data_str);
 			//click_chatter("%s|    Data %d %d",prefix.c_str(),cur->leaf->data_32[2],cur->leaf->data_32[3]);
 		}
 	}
 
 	if (node->_default.ptr != 0) {
-		click_chatter("%s|-> DEFAULT P:%p",prefix.c_str(),node->_default.parent());
+		click_chatter("%s|-> DEFAULT Parent:%p",prefix.c_str(),node->_default.parent());
 		if (node->_default.is_node()) {
 			assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
 			print(node->_default.node,prefix + "|  ");
