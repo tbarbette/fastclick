@@ -321,17 +321,20 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
 				}
 #  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
+				uint32_t buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+
 				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
 					unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
 					static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
 				}
 
-				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				slot->buf_idx = buf_idx;
 
-				if (!p->data_packet() && p->buffer_destructor() != Packet::empty_destructor) {
-					slot->flags = NS_BUF_CHANGED;
-				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not use to make a new packet
+				if (p->data_packet() || p->buffer_destructor() == Packet::empty_destructor) {
+					//If it's a shared packet, do not free the buffer
 					slot->flags = NS_BUF_CHANGED | NS_NOFREE;
+				} else {
+					slot->flags = NS_BUF_CHANGED;
 				}
 #  else //We must return the netmap buffer to the netmap buffer queue
 				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
