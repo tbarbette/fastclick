@@ -37,7 +37,6 @@ public:
 	}
 
 	NumaCpuBitmask& operator=(const NumaCpuBitmask& other) {
-		click_chatter("%p %p, %d %d",other.b,b,(unsigned long)other.b,(unsigned long)b);
 		copy_bitmask_to_bitmask(other.b,b);
 		return *this;
 	}
