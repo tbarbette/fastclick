@@ -144,6 +144,10 @@ class NetmapDevice {
 	int _minfd;
 	int _maxfd;
 
+	int get_num_slots() {
+		return some_nmd->some_ring->num_slots;
+	}
+
 private :
 	static HashMap<String,NetmapDevice*> nics;
 
@@ -195,8 +199,7 @@ inline void NetmapBufQ::insert_all(uint32_t idx,bool check_size = false) {
 		if (check_size) {
 			insert(idx);
 		} else {
-			p = reinterpret_cast<uint32_t*>(buf_start +
-					idx * buf_size);
+			p = BUFFER_PTR(idx);
 			idx = *p;
 			_count++;
 		}
@@ -250,8 +253,7 @@ inline uint32_t NetmapBufQ::extract() {
 	uint32_t idx;
 	uint32_t *p;
 	idx = _head;
-	p  = reinterpret_cast<uint32_t *>(buf_start + idx * buf_size);
-
+	p  = BUFFER_PTR(idx);
 	_head = *p;
 	_count--;
 	return idx;
@@ -259,7 +261,7 @@ inline uint32_t NetmapBufQ::extract() {
 
 inline unsigned char* NetmapBufQ::extract_p() {
 	uint32_t idx = extract();
-	return (idx == 0) ? 0 : buf_start + idx * buf_size;
+	return (idx == 0) ? 0 : reinterpret_cast<unsigned char*>(BUFFER_PTR(idx));
 }
 
 #endif

@@ -1,0 +1,59 @@
+%info
+Tests a more complex netmap configuration
+
+%require
+click-buildtool provides netmap
+test -r /dev/netmap
+
+%script
+{ click NETMAPIN ; } | { click NETMAPOUT ; }
+
+%file NETMAPIN
+is :: InfiniteSource(DATA \<
+  // Ethernet header
+  ff ff ff ff ff ff  00 00 c0 ae 67 ef  08 00
+  // IP header
+  45 00 00 28  00 00 00 00  40 11 77 c3  01 00 00 01  02 00 00 02
+  // UDP header
+  13 69 13 69  00 14 d6 41
+  // UDP payload
+  55 44 50 20  70 61 63 6b  65 74 21 0a  04 00 00 00  01 00 00 00
+  01 00 00 00  00 00 00 00  00 80 04 08  00 80 04 08  53 53 00 00
+  53 53 00 00  05 00 00 00  00 10 00 00  01 00 00 00  54 53 00 00
+  54 e3 04 08  54 e3 04 08  d8 01 00 00
+>, LIMIT 1, BURST 1, ACTIVE false) ->
+    Print(send) ->
+    ToNetmapDevice(vale0:0, BURST 1);
+
+FromNetmapDevice(vale0:0) ->
+    Print(back) ->
+    EtherRewrite(00:00:c0:ae:67:ef,00:00:c0:ae:67:ee) ->
+    ToNetmapDevice(vale0:0, BURST 1)
+
+DriverManager(wait 1s, write is.active true, wait 2s)
+
+%file NETMAPOUT
+FromNetmapDevice(vale0:1) -> c :: Classifier(0/ff,-) [0] ->
+    Print(recv) ->
+    MarkMACHeader() ->
+    EtherRewrite(00:00:c0:ae:67:ee,00:00:c0:ae:67:ef) ->
+    Print(resend) ->
+    ToNetmapDevice(vale0:1,BURST 1)
+c[1] -> Print("arpswitched") -> Discard
+
+DriverManager(wait 3s, stop);
+
+
+%expect stderr
+send:  114 | ffffffff ffff0000 c0ae67ef 08004500 00280000 00004011
+recv:  114 | ffffffff ffff0000 c0ae67ef 08004500 00280000 00004011
+resend:  114 | 0000c0ae 67ef0000 c0ae67ee 08004500 00280000 00004011
+back:  114 | 0000c0ae 67ef0000 c0ae67ee 08004500 00280000 00004011
+arpswitched:  114 | 0000c0ae 67ee0000 c0ae67ef 08004500 00280000 00004011
+
+%ignorex stderr
+.*nm_open.*
+Detaching netmap device vale.*
+Allocated [0-9]+ buffers from Netmap buffer pool
+Freeing [0-9]+ Netmap buffers
+.*do not mmap.*
