@@ -26,3 +26,4 @@ netmap_nopool_nozc:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
 before_script:
     - gcc -v
+    - if [ `sudo -n whoami` = "root" ] ; then sudo modprobe netmap && sudo chmod 666 /dev/netmap ; fi

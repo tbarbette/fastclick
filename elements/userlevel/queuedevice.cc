@@ -28,10 +28,15 @@ Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 QueueDevice::QueueDevice() :  nqueues(1), usable_threads(),
-	queue_per_threads(1), queue_share(1), ndesc(-1), _numa(true), _maxthreads(-1),
+	queue_per_threads(1), queue_share(1), ndesc(-1), _maxthreads(-1),
 	_minqueues(1),_maxqueues(128),_threadoffset(-1),thread_share(1),
 	_this_node(0){
-
+#if HAVE_NUMA
+	_numa = true;
+#else
+	_numa = false;
+#endif
+	_verbose = false;
 }
 void QueueDevice::static_initialize() {
 #if HAVE_NUMA
@@ -112,10 +117,11 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     n_initialized++;
-    if (input_is_push(0))
-        click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
-    else
-        click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+    if (_verbose)
+		if (input_is_push(0))
+			click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+		else
+			click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
 
     return 0;
 }
@@ -146,9 +152,10 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
            Bitvector v = router()->thread_sched()->assigned_thread();
            if (v.size() < usable_threads.size())
                v.resize(usable_threads.size());
-           if (v.weight() == usable_threads.weight())
-               click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
-           else
+           if (v.weight() == usable_threads.weight()) {
+               if (_verbose)
+                   click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
+           } else
                usable_threads &= (~v);
        }
 
@@ -166,11 +173,11 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
        if (n_threads == 0) {
            n_threads = 1;
            if (cores_in_node == 0) {
-        	   click_chatter("%s : No cores available on the same NUMA node, I'll use a core from another NUMA node, this will reduce performances.",name().c_str());
-        	   usable_threads[0] = 1;
-			   cores_in_node = 1;
-			   if (use_nodes > 1)
-				   use_nodes = 1;
+               click_chatter("%s : No cores available on the same NUMA node, I'll use a core from another NUMA node, this will reduce performances.",name().c_str());
+               usable_threads[0] = 1;
+               cores_in_node = 1;
+               if (use_nodes > 1)
+                   use_nodes = 1;
            }
            thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
        }

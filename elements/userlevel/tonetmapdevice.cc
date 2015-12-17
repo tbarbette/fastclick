@@ -71,7 +71,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
     configure_tx(maxthreads,1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
 
-    if (_burst > _device->some_nmd->some_ring->num_slots / 2) {
+    if (_burst > _device->get_num_slots() / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 

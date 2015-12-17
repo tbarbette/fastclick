@@ -1297,7 +1297,7 @@ public :
 	 */
 	inline void safe_kill(bool is_data);
 
-	inline void safe_kill();
+	inline void fast_kill();
 #endif
 };
 
@@ -3220,7 +3220,7 @@ inline void PacketBatch::safe_kill(bool is_data) {
 /**
  * Recycle a whole batch, faster in most cases
  */
-inline void PacketBatch::safe_kill() {
+inline void PacketBatch::fast_kill() {
     BATCH_RECYCLE_START();
     FOR_EACH_PACKET_SAFE(this,up) {
         WritablePacket* p = static_cast<WritablePacket*>(up);
