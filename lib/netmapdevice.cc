@@ -57,6 +57,16 @@ int NetmapBufQ::static_initialize(struct nm_desc* nmd) {
 		}
 	}
 
+
+	if (nmd->req.nr_arg3 > 0) {
+		NetmapDevice::global_alloc -= nmd->req.nr_arg3;
+		click_chatter("Allocated %d buffers from Netmap buffer pool",nmd->req.nr_arg3);
+		NetmapBufQ::global_insert_all(nmd->nifp->ni_bufs_head,nmd->req.nr_arg3);
+		nmd->nifp->ni_bufs_head = 0;
+		nmd->req.nr_arg3 = 0;
+	}
+
+
 	return 0;
 }
 
@@ -111,8 +121,7 @@ void NetmapBufQ::global_insert_all(uint32_t idx, int count) {
 		global_buffer_list = idx;
 		uint32_t *p = 0;
 		while (c < NETMAP_PACKET_POOL_SIZE) {
-			p = reinterpret_cast<uint32_t*>((unsigned char *)buf_start +
-					idx * buf_size);
+			p = BUFFER_PTR(idx);
 			idx = *p;
 			c++;
 		}
@@ -153,12 +162,12 @@ NetmapDevice::~NetmapDevice() {
 	click_chatter("Detaching netmap device %s",ifname.c_str());
 	if (parent_nmd) {
 		for (int i = 0; i < n_queues; i++) {
-			nm_close(nmds[i]);
+			if (NetmapDevice::some_nmd != nmds[i]) {
+				nm_close(nmds[i]);
+			}
 			nmds[i] = NULL;
 		}
 
-		if (some_nmd != parent_nmd)
-			nm_close(parent_nmd);
 		parent_nmd = NULL;
 	};
 }
@@ -181,16 +190,13 @@ int NetmapDevice::initialize() {
 	struct nm_desc* base_nmd = (struct nm_desc*)calloc(1,sizeof(struct nm_desc));
 
 	base_nmd->self = base_nmd;
-	strcpy(base_nmd->req.nr_name,&(ifname.c_str()[7]));
-	base_nmd->req.nr_flags = NR_REG_SW;
+
 	if (NetmapDevice::some_nmd != NULL) { //Having same netmap space is a lot easier...
 		base_nmd->mem = NetmapDevice::some_nmd->mem;
 		base_nmd->memsize = NetmapDevice::some_nmd->memsize;
 		base_nmd->req.nr_arg2 = NetmapDevice::some_nmd->req.nr_arg2;
 		base_nmd->req.nr_arg3 = 0;
-		base_nmd->done_mmap = NetmapDevice::some_nmd->done_mmap;
-		NetmapDevice::some_nmd->req.nr_flags = NR_REG_SW;
-		nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_NO_MMAP | NM_OPEN_IFNAME, base_nmd);
+		nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_NO_MMAP, base_nmd);
 	} else {
 		base_nmd->req.nr_arg3 = NetmapDevice::global_alloc;
 		if (base_nmd->req.nr_arg3 % NETMAP_PACKET_POOL_SIZE != 0)
@@ -200,8 +206,7 @@ int NetmapDevice::initialize() {
 		if (NETMAP_PACKET_POOL_SIZE * ((unsigned)click_nthreads + 1) > base_nmd->req.nr_arg3)
 			base_nmd->req.nr_arg3 = NETMAP_PACKET_POOL_SIZE * (click_nthreads + 1);
 #endif
-		nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_IFNAME | NM_OPEN_ARG3, base_nmd);
-		NetmapDevice::some_nmd = nmd;
+		nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_ARG3, base_nmd);
 	}
 	if (!nmd)
 		return -1;
@@ -221,18 +226,11 @@ int NetmapDevice::initialize() {
 		return -1;
 	}
 
-	if (nmd->req.nr_arg3 > 0) {
-		click_chatter("Allocated %d buffers from Netmap buffer pool",nmd->req.nr_arg3);
-		NetmapBufQ::global_insert_all(nmd->nifp->ni_bufs_head,nmd->req.nr_arg3);
-		nmd->nifp->ni_bufs_head = 0;
-		nmd->req.nr_arg3 = 0;
-	}
-
 	n_queues = nmd->nifp->ni_rx_rings;
 	nmds.resize(n_queues);
 
 	for (int i = 0; i < n_queues; i++) {
-		struct nm_desc child_nmd = *nmd; //Copy mem, arg2, ...
+		struct nm_desc child_nmd = *parent_nmd; //Copy mem, arg2, ...
 		child_nmd.self = &child_nmd;
 		child_nmd.req.nr_flags = NR_REG_ONE_NIC;
 		child_nmd.req.nr_ringid =  i | NETMAP_NO_TX_POLL;
@@ -251,6 +249,19 @@ int NetmapDevice::initialize() {
 			_maxfd = thread_nm->fd;
 
 		nmds[i] = thread_nm;
+		if (i == 0) {
+			parent_nmd = thread_nm;
+			//Prevent from releasing the memory zone
+			nmd->done_mmap = 0;
+			nm_close(nmd);
+			NetmapDevice::some_nmd = thread_nm;
+		}
+
+		struct netmap_ring* txring = NETMAP_TXRING(thread_nm->nifp,i);
+		for (unsigned j = 0; j < txring->num_slots; j++) {
+			struct netmap_slot* slot = &txring->slot[j];
+			slot->flags &= ~NS_NOFREE;
+		}
 	}
 
 	if (base_nmd != NULL) {
@@ -272,6 +283,7 @@ void NetmapDevice::static_cleanup() {
 	if (idx != 0) {
 		if (some_nmd) {
 			some_nmd->nifp->ni_bufs_head = idx;
+			some_nmd->done_mmap = 1;
 			nm_close(some_nmd);
 			some_nmd = 0;
 		} else {

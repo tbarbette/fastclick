@@ -69,6 +69,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
   	.read("MAXQUEUES",maxqueues)
 	.read("RSS_AGGREGATE", _set_rss_aggregate)
   	.read("NUMA",numa)
+	.read("VERBOSE",_verbose)
 
   	.complete() < 0)
     	return -1;
@@ -94,6 +95,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (!_device) {
         return errh->error("Could not initialize %s",ifname.c_str());
     }
+
     int r = configure_rx(thisnode,maxthreads,_device->n_queues,std::min(maxqueues,_device->n_queues),threadoffset,errh);
     if (r != 0) return r;
 
@@ -290,6 +292,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 #endif
 
 			p->set_packet_type_anno(Packet::HOST);
+            p->set_mac_header(p->data());
 
 # if HAVE_BATCH
 			if (batch_head == NULL) {

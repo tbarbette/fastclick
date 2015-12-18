@@ -1298,7 +1298,7 @@ public :
 	 */
 	inline void safe_kill(bool is_data);
 
-	inline void safe_kill();
+	inline void fast_kill();
 #endif
 };
 
@@ -3163,24 +3163,9 @@ inline void PacketBatch::kill() {
 
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 #define HAVE_BATCH_RECYCLE 1
-/**
- * Recycle a whole batch of unshared packets of the same type
- *
- * @precond No packet are shared
- */
-inline void PacketBatch::safe_kill(bool is_data) {
-	#if HAVE_FLOW
-		if (fcb_stack) {
-			fcb_stack->release(count());
-		}
-	#endif
-    if (is_data) {
-        WritablePacket::recycle_data_batch(this);
-    } else {
-        WritablePacket::recycle_packet_batch(this);
-    }
-}
+#endif
 
+#if HAVE_BATCH_RECYCLE
 #define BATCH_RECYCLE_START() \
 	WritablePacket* head_packet = NULL;\
 	WritablePacket* head_data = NULL;\
@@ -3218,7 +3203,7 @@ inline void PacketBatch::safe_kill(bool is_data) {
 		}
 
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
-	if (p->data_packet() == 0 && p->buffer_destructor() == 0) {\
+	if (p->data_packet() == 0 && p->buffer_destructor() == 0 && p->buffer() != 0) {\
 		BATCH_RECYCLE_DATA_PACKET(p);\
 	} else {\
 		BATCH_RECYCLE_PACKET(p);}}
@@ -3232,11 +3217,32 @@ inline void PacketBatch::safe_kill(bool is_data) {
 		last_data->set_next(0);\
 		PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);\
 	}
+#else
+#define BATCH_RECYCLE_START() {}
+#define BATCH_RECYCLE_END() {}
+#define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
+#endif
+
+
+#if HAVE_BATCH
+
+/**
+ * Recycle a whole batch of unshared packets of the same type
+ *
+ * @precond No packet are shared
+ */
+inline void PacketBatch::safe_kill(bool is_data) {
+    if (is_data) {
+        WritablePacket::recycle_data_batch(this);
+    } else {
+        WritablePacket::recycle_packet_batch(this);
+    }
+}
 
 /**
  * Recycle a whole batch, faster in most cases
  */
-inline void PacketBatch::safe_kill() {
+inline void PacketBatch::fast_kill() {
     BATCH_RECYCLE_START();
     FOR_EACH_PACKET_SAFE(this,up) {
         WritablePacket* p = static_cast<WritablePacket*>(up);
@@ -3244,10 +3250,7 @@ inline void PacketBatch::safe_kill() {
     }
     BATCH_RECYCLE_END();
 }
-#else
-#define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
 #endif
-
 
 typedef Packet::PacketType PacketType;
 

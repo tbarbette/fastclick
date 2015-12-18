@@ -33,3 +33,4 @@ fnetmap:
 
 before_script:
     - gcc -v
+    - if [ `sudo -n whoami` = "root" ] ; then sudo modprobe netmap && sudo chmod 666 /dev/netmap ; fi

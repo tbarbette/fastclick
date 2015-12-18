@@ -18,7 +18,7 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
-#define BATCH_DEBUG 0
+//#define BATCH_DEBUG 1
 
 #define BATCH_MAX_PULL 256
 class PushToPushBatchVisitor;
@@ -74,11 +74,12 @@ class BatchElement : public Element { public:
 		 if ((unsigned) port < (unsigned) noutputs())
 			 output(port).push_batch(batch);
 		 else
-			 batch->safe_kill();
+			 batch->fast_kill();
 	}
 
 	class PushBatchPort : public Port {
 	public :
+
 		~PushBatchPort() {
 		}
 

@@ -33,6 +33,7 @@ protected:
     int queue_share;
     int ndesc;
     bool _numa;
+    bool _verbose;
 private :
     int _maxthreads;
     int _minqueues;
@@ -202,7 +203,8 @@ protected:
             _thread_to_queue[th_id] = (th_num * queue_per_threads) / queue_share;
 
             for (int j = 0; j < queue_per_threads; j++) {
-                click_chatter("Queue %d handled by th %d",((th_num * queue_per_threads) + j) / queue_share,th_id);
+                if (_verbose)
+                    click_chatter("Queue %d handled by th %d",((th_num * queue_per_threads) + j) / queue_share,th_id);
                 _queue_to_thread[((th_num * queue_per_threads) + j) / queue_share] = th_id;
             }
 
