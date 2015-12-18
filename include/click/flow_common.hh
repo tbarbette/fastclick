@@ -113,6 +113,7 @@ private:
 		fcb->release_fnt = 0;
 		fcb->release_pool = this;
 		fcb->clear();
+		bzero(&fcb->data,_data_size);
 		return fcb;
 	}
 

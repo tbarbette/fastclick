@@ -742,13 +742,13 @@ Router::check_push_and_pull(ErrorHandler *errh)
 	    if (!cp->_double) {
 	        if (pf == Element::VDOUBLE) {
 	            input_pers[gt] = Element::VPUSH;
-	            click_chatter("%s -> %s now push because double conn is not allowed",_elements[(*cp)[1].idx]->name().c_str(),_elements[(*cp)[0].idx]->name().c_str());
+	            //click_chatter("%s -> %s now push because double conn is not allowed",_elements[(*cp)[1].idx]->name().c_str(),_elements[(*cp)[0].idx]->name().c_str());
 	        } else {
 	        	if (pf == Element::VAGNOSTIC)
 	        		input_pers[gt] = Element::VPUSH;
 	        	else
 	        		input_pers[gt] = pf;
-	            click_chatter("%s -> %s now %d because double conn is not allowed",_elements[(*cp)[1].idx]->name().c_str(),_elements[(*cp)[0].idx]->name().c_str(),pf);
+	            //click_chatter("%s -> %s now %d because double conn is not allowed",_elements[(*cp)[1].idx]->name().c_str(),_elements[(*cp)[0].idx]->name().c_str(),pf);
 	        }
 	        changed = true;
 

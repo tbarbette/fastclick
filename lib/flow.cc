@@ -297,15 +297,22 @@ void FlowNode::print(FlowNode* node,String prefix) {
 				j+=2;
 			}
 			click_chatter("%s|-> %lu Parent:%p (data %s)",prefix.c_str(),cur->data().data_64,cur->parent(),data_str);
-			//click_chatter("%s|    Data %d %d",prefix.c_str(),cur->leaf->data_32[2],cur->leaf->data_32[3]);
 		}
 	}
 
 	if (node->_default.ptr != 0) {
-		click_chatter("%s|-> DEFAULT Parent:%p",prefix.c_str(),node->_default.parent());
 		if (node->_default.is_node()) {
+			click_chatter("%s|-> DEFAULT Parent:%p",prefix.c_str(),node->_default.parent());
 			assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
 			print(node->_default.node,prefix + "|  ");
+		} else {
+			char data_str[64];
+			int j = 0;
+			for (int i = 0; i < node->_default.leaf->release_pool->data_size() && j < 60;i++) {
+				sprintf(&data_str[j],"%02x",node->_default.leaf->data[i]);
+				j+=2;
+			}
+			click_chatter("%s|-> DEFAULT Parent:%p (data %s)",prefix.c_str(),node->_default.parent(),data_str);
 		}
 	}
 }

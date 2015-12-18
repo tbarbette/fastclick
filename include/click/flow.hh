@@ -18,7 +18,7 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-#define DEBUG_CLASSIFIER 0
+#define DEBUG_CLASSIFIER 1
 
 typedef void (*sfcb_combiner)(FlowControlBlock* old_sfcb, FlowControlBlock* new_sfcb);
 

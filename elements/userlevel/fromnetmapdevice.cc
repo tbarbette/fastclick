@@ -288,11 +288,11 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 # endif //HAVE_NETMAP_PACKET_POOL
 #if NETMAP_WITH_HASH
 			if (_set_rss_aggregate)
-				SET_AGGREGATE_ANNO(p,slot->hash)
+				SET_AGGREGATE_ANNO(p,slot->hash);
 #endif
 
 			p->set_packet_type_anno(Packet::HOST);
-            p->set_mac_header(p->data());
+			p->set_mac_header(p->data());
 
 # if HAVE_BATCH
 			if (batch_head == NULL) {

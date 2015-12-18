@@ -17,7 +17,12 @@
 
 CLICK_DECLS
 
-FlowDispatcher::FlowDispatcher() : _table(0),_verbose(false)  {
+FlowDispatcher::FlowDispatcher() : _table(0)  {
+#if DEBUG_CLASSIFIER
+	_verbose = true;
+#else
+	_verbose = false;
+#endif
 
 };
 

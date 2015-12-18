@@ -57,7 +57,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (burst > 0) {
-        if (input_is_push(0))
+        if (input_is_push(0) && in_batch_mode == BATCH_MODE_YES && _verbose)
             errh->warning("%s: burst does not make sense in full push with batching, it is unused.",name().c_str());
         _burst = burst;
     }
