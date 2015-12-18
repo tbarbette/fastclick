@@ -69,11 +69,12 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
   	.read("MAXQUEUES",maxqueues)
 	.read("RSS_AGGREGATE", _set_rss_aggregate)
   	.read("NUMA",numa)
+	.read("VERBOSE",_verbose)
 
   	.complete() < 0)
     	return -1;
 #if !HAVE_NUMA
-    if (numa) {
+    if (numa == true) {
     	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
     }
     _numa = false;
@@ -94,6 +95,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (!_device) {
         return errh->error("Could not initialize %s",ifname.c_str());
     }
+
     int r = configure_rx(thisnode,maxthreads,_device->n_queues,std::min(maxqueues,_device->n_queues),threadoffset,errh);
     if (r != 0) return r;
 
@@ -216,11 +218,12 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 					if (unlikely(p == NULL)) goto error;
 			#else
                 #if HAVE_ZEROCOPY
-                    if (slot->len > 64 && !(slot->flags & NS_MOREFRAG)) {
+					uint32_t new_buf = 0;
+                    if (slot->len > 64 && !(slot->flags & NS_MOREFRAG) && (new_buf = NetmapBufQ::local_pool()->extract())) {
                         __builtin_prefetch(data);
                         p = Packet::make( data, slot->len, NetmapBufQ::buffer_destructor,0);
                         if (!p) goto error;
-                        slot->buf_idx = NetmapBufQ::local_pool()->extract();
+                        slot->buf_idx = new_buf;
                         slot->flags = NS_BUF_CHANGED;
                     } else
                 #endif
@@ -238,6 +241,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
                    SET_AGGREGATE_ANNO(p,slot->hash)
 #endif
 				p->set_packet_type_anno(Packet::HOST);
+				p->set_mac_header(p->data());
 
 	#if HAVE_BATCH
 					if (batch_head == NULL) {

@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(1),_internal_queue(512),_pull_use_select(true)
+ToNetmapDevice::ToNetmapDevice() : _device(0),_burst(32),_block(1),_internal_queue(512),_pull_use_select(true)
 {
 }
 
@@ -57,7 +57,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (burst > 0) {
-        if (input_is_push(0))
+        if (input_is_push(0) && in_batch_mode == BATCH_MODE_YES && _verbose)
             errh->warning("%s: burst does not make sense in full push with batching, it is unused.",name().c_str());
         _burst = burst;
     }
@@ -71,7 +71,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
     configure_tx(maxthreads,1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
 
-    if (_burst > _device->some_nmd->some_ring->num_slots / 2) {
+    if (_burst > _device->get_num_slots() / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
@@ -321,17 +321,20 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
 				}
 #  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
+				uint32_t buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+
 				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
 					unsigned char * tx_buffer_data = (unsigned char*)NETMAP_BUF(txring,slot->buf_idx);
 					static_cast<WritablePacket*>(p)->set_buffer(tx_buffer_data,txring->nr_buf_size);
 				}
 
-				slot->buf_idx = NETMAP_BUF_IDX(txring,p->buffer());
+				slot->buf_idx = buf_idx;
 
-				if (!p->data_packet() && p->buffer_destructor() != Packet::empty_destructor) {
-					slot->flags = NS_BUF_CHANGED;
-				} else { //If the buffer destructor is something else, this is a shared netmap packet that we must not use to make a new packet
+				if (p->data_packet() || p->buffer_destructor() == Packet::empty_destructor) {
+					//If it's a shared packet, do not free the buffer
 					slot->flags = NS_BUF_CHANGED | NS_NOFREE;
+				} else {
+					slot->flags = NS_BUF_CHANGED;
 				}
 #  else //We must return the netmap buffer to the netmap buffer queue
 				if (!(slot->flags & NS_NOFREE)) { //But only if it's not shared
@@ -388,10 +391,9 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 	WritablePacket* next = static_cast<WritablePacket*>(head);
 	WritablePacket* p;
 
-	//click_chatter("%s",name().c_str());
 	unsigned int sent = 0;
 #if HAVE_BATCH_RECYCLE
-	    BATCH_RECYCLE_START();
+        BATCH_RECYCLE_START();
 #endif
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
