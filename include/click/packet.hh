@@ -1051,7 +1051,7 @@ class WritablePacket : public Packet { public:
 		int passed = 0;\
 		for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
 			int o = (fnt(p));\
-			if (o < 0 || o>(nbatches)) o = (nbatches);\
+			if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
 			if (o == last_o) {\
 				passed ++;\
 			} else {\
