@@ -33,7 +33,8 @@ public:
 	virtual FlowNodeData get_data(Packet* packet) = 0;
 	virtual void add_offset(int offset) {};
 
-	bool equals(FlowLevel* level) {
+	virtual bool equals(FlowLevel* level) {
+		click_chatter("level equals");
 		return typeid(*this) == typeid(*level);
 	}
 
@@ -111,6 +112,8 @@ public :
 		return v;
 	}
 
+	void print();
+
 };
 
 class FlowNode {
@@ -125,11 +128,11 @@ protected:
 	bool _child_deletable;
 	bool _released;
 
-	void duplicate_internal(FlowNode* node, bool recursive) {
+	void duplicate_internal(FlowNode* node, bool recursive, int use_count) {
 		assign(node);
 		if (unlikely(recursive)) {
 			if (_default.ptr && _default.is_node()) {
-				_default.set_node(node->_default.node->duplicate(recursive));
+				_default.set_node(node->_default.node->duplicate(recursive, use_count));
 				_default.set_parent(this);
 			}
 
@@ -137,11 +140,11 @@ protected:
 			FlowNodePtr* child;
 			while ((child = it->next()) != 0) {
 				if (child->is_leaf()) {
-					FlowControlBlock* new_leaf = child->leaf->duplicate();
-					new_leaf->release_ptr = this;
+					FlowControlBlock* new_leaf = child->leaf->duplicate(use_count);
+					new_leaf->parent = this;
 					add_leaf(child->data(),new_leaf);
 				} else {
-					FlowNode* new_node = child->node->duplicate(recursive);
+					FlowNode* new_node = child->node->duplicate(recursive, use_count);
 					new_node->set_parent(this);
 					add_node(child->data(),new_node);
 				}
@@ -177,7 +180,7 @@ public:
 
 	FlowNode* combine(FlowNode* other) CLICK_WARN_UNUSED_RESULT;
 
-	virtual FlowNode* duplicate(bool recursive) = 0;
+	virtual FlowNode* duplicate(bool recursive,int use_count) = 0;
 
 	void assign(FlowNode* node) {
 		_level = node->_level;
@@ -226,8 +229,23 @@ public:
 		return &_default;
 	}
 
+
+	inline void set_default(FlowNodePtr ptr) {
+		if (ptr.ptr) {
+			assert(ptr.ptr != this);
+			_default = ptr;
+			_default.set_parent(this);
+			click_chatter("Changing default of %p",_default.ptr);
+		} else {
+			click_chatter("No default");
+		}
+		assert(_default.ptr == ptr.ptr);
+	}
+
+
 	inline void set_default(FlowNode* node) {
 		assert(_default.ptr == 0);
+		assert(node != this);
 		_default.ptr = node;
 		node->set_parent(this);
 	}
@@ -253,7 +271,7 @@ public:
 
 	static inline FlowNode* create(FlowNode* parent, FlowLevel* level);
 
-	virtual FlowNode* optimize();
+	virtual FlowNode* optimize() CLICK_WARN_UNUSED_RESULT;
 
 	FlowNodePtr* get_first_leaf_ptr();
 
@@ -415,6 +433,7 @@ public:
 	}
 
 	bool equals(FlowLevel* level) {
+		click_chatter("Offset equals");
 		return ((FlowLevel::equals(level))&& (_offset == dynamic_cast<FlowLevelOffset*>(level)->_offset));
 	}
 };
@@ -608,9 +627,9 @@ public:
 		childs.resize(max_size);
 	}
 
-	FlowNode* duplicate(bool recursive) {
+	FlowNode* duplicate(bool recursive,int use_count) {
 		FlowNodeArray* fa = new FlowNodeArray(childs.size());
-		fa->duplicate_internal(this,recursive);
+		fa->duplicate_internal(this,recursive,use_count);
 		return fa;
 	}
 
@@ -809,9 +828,9 @@ class FlowNodeHash : public FlowNode  {
 
 	public:
 
-	FlowNode* duplicate(bool recursive) {
+	FlowNode* duplicate(bool recursive,int use_count) {
 		FlowNodeHash* fh = new FlowNodeHash();
-		fh->duplicate_internal(this,recursive);
+		fh->duplicate_internal(this,recursive,use_count);
 		return fh;
 	}
 
@@ -914,9 +933,9 @@ class FlowNodeDummy : public FlowNode {
 			return "DUMMY";
 		}
 
-	FlowNode* duplicate(bool recursive) {
+	FlowNode* duplicate(bool recursive,int use_count) {
 		FlowNodeDummy* fh = new FlowNodeDummy();
-		fh->duplicate_internal(this,recursive);
+		fh->duplicate_internal(this,recursive,use_count);
 		return fh;
 	}
 
@@ -964,10 +983,11 @@ class FlowNodeTwoCase : public FlowNode  {
 	public:
 	String name() {
 			return "TWOCASE";
-		}
-	FlowNode* duplicate(bool recursive) {
+	}
+
+	FlowNode* duplicate(bool recursive,int use_count) {
 		FlowNodeTwoCase* fh = new FlowNodeTwoCase(child);
-		fh->duplicate_internal(this,recursive);
+		fh->duplicate_internal(this,recursive,use_count);
 		return fh;
 	}
 
@@ -1052,9 +1072,9 @@ class FlowNodeThreeCase : public FlowNode  {
 		return "THREECASE";
 	}
 
-	FlowNode* duplicate(bool recursive) {
+	FlowNode* duplicate(bool recursive,int use_count) {
 		FlowNodeThreeCase* fh = new FlowNodeThreeCase(childA,childB);
-		fh->duplicate_internal(this,recursive);
+		fh->duplicate_internal(this,recursive,use_count);
 		return fh;
 	}
 
@@ -1159,7 +1179,7 @@ private:
  * Check that a SFCB match correspond to a packet
  */
 bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
-	FlowNode* parent = (FlowNode*)sfcb->release_ptr;
+	FlowNode* parent = (FlowNode*)sfcb->parent;
 	if (parent->level()->get_data(p).data_64 != sfcb->node_data[0].data_64) return false;
 
 	do {
@@ -1176,12 +1196,11 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 	FlowControlBlock* FlowClassificationTable::match(Packet* p) {
 		FlowNode* parent = _root;
 		FlowNodePtr* child_ptr = 0;
-
 		do {
 			FlowNodeData data = parent->level()->get_data(p);
-			click_chatter("Data is %016llX",data.data_64);
+			//click_chatter("Data is %016llX",data.data_64);
 			child_ptr = parent->find(data);
-			click_chatter("->Ptr is %p",child_ptr->ptr);
+			//click_chatter("->Ptr is %p",child_ptr->ptr);
 
 			if (child_ptr->ptr == NULL) {
 				if (parent->get_default().ptr) {
@@ -1192,7 +1211,8 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 							//click_chatter("New leaf with data '%x'",data.data_64);
 							//click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
 							child_ptr->set_leaf(_pool.allocate());
-							child_ptr->leaf->release_ptr = parent;
+							child_ptr->leaf->initialize();
+							child_ptr->leaf->parent = parent;
 							child_ptr->leaf->release_fnt = _pool_release_fnt;
 							child_ptr->set_data(data);
 							memcpy(&child_ptr->leaf->node_data[1], &parent->default_ptr()->leaf->node_data[1] ,_pool.data_size() - sizeof(FlowNodeData));
@@ -1200,7 +1220,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 							return child_ptr->leaf;
 						} else {
 							click_chatter("DUPLICATE child");
-							child_ptr->set_node(parent->default_ptr()->node->duplicate(false));
+							child_ptr->set_node(parent->default_ptr()->node->duplicate(false, 0));
 							child_ptr->set_data(data);
 							child_ptr->set_parent(parent);
 						}
@@ -1260,7 +1280,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 
 	inline FlowNode* FlowNodePtr::parent() {
 		if (is_leaf())
-			return (FlowNode*)leaf->release_ptr;
+			return (FlowNode*)leaf->parent;
 		else
 			return node->parent();
 	}
@@ -1274,7 +1294,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 
 	inline void FlowNodePtr::set_parent(FlowNode* parent) {
 		if (is_leaf())
-			leaf->release_ptr = parent;
+			leaf->parent = parent;
 		else
 			node->set_parent(parent);
 	}

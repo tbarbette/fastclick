@@ -78,6 +78,10 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 				if (child_ptr->is_leaf() || other_child_ptr->is_leaf()) {
 #if DEBUG_CLASSIFIER
 					click_chatter("Combining leaf???");
+					child_ptr->print();
+					other_child_ptr->print();
+					assert(false);
+
 #endif
 				} else {
 					child_ptr->node = child_ptr->node->combine(other_child_ptr->node);
@@ -126,6 +130,7 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 #endif
 		FlowLevelOffset* o1 = dynamic_cast<FlowLevelOffset*>(level());
 		FlowLevelOffset* o2 = dynamic_cast<FlowLevelOffset*>(other->level());
+
 		/*if (o1->get_max_value() == o2->get_max_value() && abs(o1->offset() - o2->offset())) { //Offset is different
 
 		}*/
@@ -148,7 +153,7 @@ FlowNode* FlowNode::optimize() {
 
 	//Optimize default
 	if (_default.ptr && _default.is_node())
-		_default.node->optimize();
+		_default.node = _default.node->optimize();
 
 	//Optimize all childs
 	while ((ptr = it->next()) != 0) {
@@ -189,7 +194,8 @@ FlowNode* FlowNode::optimize() {
 #endif
 					FlowNodeDummy* fl = new FlowNodeDummy();
 					fl->assign(this);
-					fl->_default = *child;
+					fl->set_default(*child);
+
 					newnode = fl;
 				} else {
 #if DEBUG_CLASSIFIER
@@ -204,9 +210,11 @@ FlowNode* FlowNode::optimize() {
 				FlowNodeTwoCase* fl = new FlowNodeTwoCase(*child);
 				fl->assign(this);
 				fl->inc_num();
-				fl->_default = _default;
+				click_chatter("New fl = %p, _default = %p, _default.ptr = %p",fl,_default,_default.ptr);
+				fl->set_default(_default);
 				newnode = fl;
 				_default.ptr = 0;
+				click_chatter("Parent is %p %p",fl,fl->_default.parent());
 			}
 			child->set_parent(newnode);
 			child->ptr = 0;
@@ -225,18 +233,20 @@ FlowNode* FlowNode::optimize() {
 				FlowNodeTwoCase* fl = new FlowNodeTwoCase(*childA);
 				fl->inc_num();
 				fl->assign(this);
-				fl->_default = *childB;
+				fl->set_default(*childB);
 				newnode = fl;
 			} else {
 #if DEBUG_CLASSIFIER
-				click_chatter("Optimize : only 3 possible case (value %lu, value %lu or default %lu)",childA->data().data_64,childB->data().data_64,_default.data().data_64);
+				click_chatter("Optimize : only 3 possible cases (value %lu, value %lu or default %lu)",childA->data().data_64,childB->data().data_64,_default.data().data_64);
 #endif
 				FlowNodeThreeCase* fl = new FlowNodeThreeCase(*childA,*childB);
 				fl->inc_num();
 				fl->inc_num();
 				fl->assign(this);
+				fl->set_default(_default);
 				newnode = fl;
 				_default.ptr = 0;
+				click_chatter("Parent is %p %p",fl,fl->_default.parent());
 			}
 			childA->set_parent(newnode);
 			childB->set_parent(newnode);
@@ -290,31 +300,36 @@ void FlowNode::print(FlowNode* node,String prefix) {
 			assert(cur->node->parent() == node);
 			print(cur->node,prefix + "|  ");
 		} else {
-			char data_str[64];
-			int j = 0;
-			for (int i = 0; i < cur->leaf->release_pool->data_size() && j < 60;i++) {
-				sprintf(&data_str[j],"%02x",cur->leaf->data[i]);
-				j+=2;
-			}
-			click_chatter("%s|-> %lu Parent:%p (data %s)",prefix.c_str(),cur->data().data_64,cur->parent(),data_str);
+			cur->leaf->print(prefix + "|->");
 		}
 	}
 
 	if (node->_default.ptr != 0) {
 		if (node->_default.is_node()) {
-			click_chatter("%s|-> DEFAULT Parent:%p",prefix.c_str(),node->_default.parent());
+			click_chatter("%s|-> DEFAULT %p Parent:%p",prefix.c_str(),node->_default.ptr,node->_default.parent());
 			assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
 			print(node->_default.node,prefix + "|  ");
 		} else {
-			char data_str[64];
-			int j = 0;
-			for (int i = 0; i < node->_default.leaf->release_pool->data_size() && j < 60;i++) {
-				sprintf(&data_str[j],"%02x",node->_default.leaf->data[i]);
-				j+=2;
-			}
-			click_chatter("%s|-> DEFAULT Parent:%p (data %s)",prefix.c_str(),node->_default.parent(),data_str);
+			node->_default.leaf->print(prefix + "|-> DEFAULT");
 		}
 	}
+}
+
+void FlowControlBlock::print(String prefix) {
+	char data_str[64];
+	int j = 0;
+	for (int i = 0; i < release_pool->data_size() && j < 60;i++) {
+		sprintf(&data_str[j],"%02x",data[i]);
+		j+=2;
+	}
+	click_chatter("%s %lu Parent:%p UC:%d (data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),data_str);
+}
+
+void FlowNodePtr::print() {
+	if (is_leaf())
+		leaf->print("");
+	else
+		node->print();
 }
 
 int NR_SHARED_FLOW = 0;

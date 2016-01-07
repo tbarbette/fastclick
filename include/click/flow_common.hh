@@ -9,6 +9,7 @@ CLICK_DECLS
 
 class FlowControlBlock;
 class FCBPool;
+class FlowNode;
 
 typedef union {
 	uint8_t data_8;
@@ -39,7 +40,11 @@ private:
 		SubFlowRealeaseFnt release_fnt ;
 		FCBPool* release_pool;
 
-		void* release_ptr;
+		FlowNode* parent;
+
+		inline void initialize() {
+			use_count = 0;
+		}
 
 		inline void acquire(int packets_nr) {
 			use_count+=packets_nr;
@@ -59,7 +64,7 @@ private:
 			return use_count;
 		}
 
-		inline FlowControlBlock* duplicate();
+		inline FlowControlBlock* duplicate(int use_count);
 
 		union {
 			uint8_t data[0];
@@ -68,6 +73,8 @@ private:
 			uint64_t data_64[0];
 			FlowNodeData node_data[0];
 		};
+
+		void print(String prefix);
 		//Nothing after this line !
 };
 
@@ -196,12 +203,12 @@ public:
 	}
 };
 
-inline FlowControlBlock* FlowControlBlock::duplicate() {
+inline FlowControlBlock* FlowControlBlock::duplicate(int use_count) {
 	FlowControlBlock* fcb = release_pool->allocate();
 	//fcb->release_ptr = release_ptr;
 	//fcb->release_fnt = release_fnt;
 	memcpy(fcb, this ,sizeof(FlowControlBlock) + release_pool->data_size());
-	fcb->use_count = 0;
+	fcb->use_count = use_count;
 	return fcb;
 }
 

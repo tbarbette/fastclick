@@ -198,7 +198,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 
 			parent_ptr->set_leaf(upstream_classifier()->table().get_pool().allocate());
 			parent_ptr->set_data(lastvalue);
-			parent_ptr->leaf->release_ptr = parent;
+			parent_ptr->leaf->parent = parent;
 			parent_ptr->leaf->acquire(1);
 			parent_ptr->leaf->data[_flow_data_offset] = output;
 
@@ -301,8 +301,12 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 
 FlowNode* FlowDispatcher::get_table() {
 	if (!_table) {
-		if (_verbose)
-			click_chatter("%s : Computing table with %d rules",name().c_str(),rules.size());
+		if (_verbose) {
+			click_chatter("%s : Computing table with %d rules :",name().c_str(),rules.size());
+			for (int i = 0; i < rules.size(); ++i) {
+				rules[i].root->print();
+			}
+		}
 		FlowNode* merged = 0;
 
 		for (int i = rules.size() - 1; i >= 0 ; --i) {
@@ -311,7 +315,6 @@ FlowNode* FlowDispatcher::get_table() {
 				click_chatter("Merging this rule of %s :",name().c_str());
 			rules[i].root->print();
 			if (rules[i].output > -1 && rules[i].output < noutputs()) {
-
 				FlowNode* child_table = FlowElementVisitor::get_downward_table(this, i);
 				if (child_table) {
 					FlowNodePtr* leaf_ptr = rules[i].root->get_first_leaf_ptr();
@@ -323,15 +326,15 @@ FlowNode* FlowDispatcher::get_table() {
 					leaf_ptr->set_parent(parent);
 					leaf_ptr->set_data(leaf->node_data[0]);
 					leaf->release(1);
-				}
-				if (_verbose) {
-					click_chatter("Print rule merged with child of %p :",rules[i].root);
-					rules[i].root->print();
+					if (_verbose) {
+						click_chatter("Print rule merged with child of %p :",rules[i].root);
+						rules[i].root->print();
+					}
 				}
 			}
 
 
-			//For all leaf of the rule (now appended with all leafs of the child)
+			//Now set data for all leaf of the rule (now appended with all leafs of the child)
 			FlowNode::LeafIterator* it = rules[i].root->leaf_iterator();
 			FlowControlBlock* leaf;
 			while ((leaf = it->next()) != 0) {
@@ -353,7 +356,7 @@ FlowNode* FlowDispatcher::get_table() {
 	}
 	//click_chatter("Table before duplicate : ");
 	//_table->print();
-	FlowNode* tmp = _table->duplicate(true);
+	FlowNode* tmp = _table->duplicate(true,1);
 	//click_chatter("Table after duplicate :");
 	//tmp->print();
 	return tmp;

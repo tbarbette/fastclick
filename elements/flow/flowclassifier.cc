@@ -94,11 +94,11 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 void release_subflow(FlowControlBlock* fcb) {
-	//click_chatter("Release fcb %p idx %d",fcb,fcb->data_64[0]);
-	if (fcb->release_ptr == NULL) return;
+	click_chatter("Release fcb %p idx %d",fcb,fcb->data_64[0]);
+	if (fcb->parent == NULL) return;
 
 	//Parent of the fcb is release_ptr
-	FlowNode* child = static_cast<FlowNode*>(fcb->release_ptr);
+	FlowNode* child = static_cast<FlowNode*>(fcb->parent);
 	child->release_child(FlowNodePtr(fcb));
 
 	FlowNode* parent = child->parent();
@@ -127,6 +127,8 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
 
     _table.set_root(table->optimize());
+    click_chatter("Table after optimization :");
+    _table.get_root()->print();
     _table.set_release_fnt(release_subflow);
 
     if (_verbose)

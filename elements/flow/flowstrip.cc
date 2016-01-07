@@ -46,6 +46,26 @@ FlowStrip::simple_action_batch(PacketBatch *head)
 	return head;
 }
 
+void FlowStrip::apply_offset(FlowNode* node) {
+	node->level()->add_offset(_nbytes);
+
+	FlowNode::NodeIterator* it = node->iterator();
+	FlowNodePtr* child;
+	while ((child = it->next()) != 0) {
+		if (child->ptr && child->is_node())
+			apply_offset(child->node);
+	}
+	if (node->default_ptr()->ptr && node->default_ptr()->is_node())
+		apply_offset(node->default_ptr()->node);
+}
+
+FlowNode* FlowStrip::get_table() {
+	FlowNode* root = FlowElementVisitor::get_downward_table(this, 0);
+	if (root)
+		apply_offset(root);
+	return root;
+}
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)
 EXPORT_ELEMENT(FlowStrip)
