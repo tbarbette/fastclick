@@ -73,7 +73,7 @@ Discard::run_task(Task *)
     int x = _burst;
 #if HAVE_BATCH
     PacketBatch* batch;
-    while (x && (batch = input(0).pull_batch(0))) {
+    while (x && (batch = input_pull_batch(0,0))) {
         x -= batch->count();
         batch->fast_kill();
     }

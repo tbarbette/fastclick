@@ -66,12 +66,12 @@ Bypass::push_packet(int port, Packet *p)
 void
 Bypass::push_batch(int port, PacketBatch *p)
 {
-    output(_active && !port && noutputs() > 1).push_batch(p);
+    output_push_batch(_active && !port && noutputs() > 1,p);
 }
 PacketBatch *
 Bypass::pull_batch(int port,int max)
 {
-    return input(_active && !port && ninputs() > 1).pull_batch(max);
+    return input_pull_batch(_active && !port && ninputs() > 1,max);
 }
 #endif
 

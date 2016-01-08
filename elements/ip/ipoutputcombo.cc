@@ -228,7 +228,7 @@ void IPOutputCombo::push_batch(int, PacketBatch * head) {
 
 		if (o == 1) {
 			PacketBatch* clone = PacketBatch::make_from_packet(cur->clone());
-			output(1).push_batch(clone);
+			output_push_batch(1,clone);
 			o = action(cur, false);
 		}
 		if (o != 0) {//An error occured
@@ -237,7 +237,7 @@ void IPOutputCombo::push_batch(int, PacketBatch * head) {
 			} else {
 				last->set_next(next);
 			}
-			output(o).push_batch(PacketBatch::make_from_packet(cur));
+			output_push_batch(o,PacketBatch::make_from_packet(cur));
 
 		} else {
 			if (last == NULL) {
@@ -250,7 +250,7 @@ void IPOutputCombo::push_batch(int, PacketBatch * head) {
 
 	if (last != NULL) {
 		head->make_tail(last,count);
-		output(0).push_batch(head);
+		output_push_batch(0,head);
 	}
 }
 #endif

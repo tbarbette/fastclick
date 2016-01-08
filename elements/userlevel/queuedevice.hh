@@ -137,6 +137,10 @@ protected:
         thread_state->_count += n;
     }
 
+    inline void set_dropped(long long unsigned n) {
+        thread_state->_dropped = n;
+    }
+
     inline void add_dropped(unsigned int n) {
         thread_state->_dropped += n;
     }

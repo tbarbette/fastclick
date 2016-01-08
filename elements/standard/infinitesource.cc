@@ -141,7 +141,7 @@ InfiniteSource::run_task(Task *)
 	    	last->timestamp_anno().assign_now();
 	}
 	if (n > 0)
-		output(0).push_batch(head->make_tail(last,n));
+		output_push_batch(0,head->make_tail(last,n));
 #else
     for (int i = 0; i < n; i++) {
 	Packet *p = _packet->clone();

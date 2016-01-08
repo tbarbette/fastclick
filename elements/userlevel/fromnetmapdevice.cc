@@ -259,7 +259,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 			unlock();
 #if HAVE_BATCH
 			batch_head->set_timestamp_anno(ts);
-			output(0).push_batch(batch_head);
+			output_push_batch(0,batch_head);
 #endif
 
 		}
@@ -307,6 +307,7 @@ FromNetmapDevice::run_task(Task* t)
 void FromNetmapDevice::add_handlers()
 {
     add_read_handler("count", count_handler, 0);
+    add_read_handler("dropped", dropped_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 

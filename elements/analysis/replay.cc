@@ -106,7 +106,7 @@ Replay::run_task(Task* task)
 				if (p_input[i] == 0) {
 					do_pull:
 #if HAVE_BATCH
-					p_input[i] = input(i).pull_batch(1);
+					p_input[i] = input_pull_batch(i,1);
 #else
 					p_input[i] = input(i).pull();
 #endif

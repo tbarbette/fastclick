@@ -151,7 +151,7 @@ bool FromDPDKDevice::run_task(Task * t)
 #if HAVE_BATCH
         if (head) {
             head->make_tail(last,n);
-            output(0).push_batch(head);
+            output_push_batch(0,head);
         }
 #endif
         if (n) {
