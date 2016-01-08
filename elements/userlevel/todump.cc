@@ -257,7 +257,7 @@ ToDump::push_batch(int, PacketBatch *b)
 }
 #endif
 void
-ToDump::push_simple(int, Packet *p)
+ToDump::push_packet(int, Packet *p)
 {
     if (_active)
 	write_packet(p);

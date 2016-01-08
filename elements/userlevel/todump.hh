@@ -116,7 +116,7 @@ class ToDump : public BatchElement { public:
 #if HAVE_BATCH
     void push_batch(int, PacketBatch *);
 #endif
-    void push_simple(int, Packet *);
+    void push_packet(int, Packet *);
     Packet *pull(int);
     bool run_task(Task *);
 
