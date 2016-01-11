@@ -223,7 +223,7 @@ void BatchElement::bind_ports() {
 void BatchElement::push_packet(int port, Packet* p) {
 	p = simple_action(p);
 	if (p)
-		output(port).push(p);
+		checked_output_push(port,p);
 }
 
 CLICK_ENDDECLS

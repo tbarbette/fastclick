@@ -72,7 +72,7 @@ class BatchElement : public Element { public:
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		 if ((unsigned) port < (unsigned) noutputs())
-			 output(port).push_batch(batch);
+			 output_push_batch(port,batch);
 		 else
 			 batch->fast_kill();
 	}
@@ -113,16 +113,26 @@ class BatchElement : public Element { public:
 	};
 
 	inline const PushBatchPort&
-	output(int port)
+	output_batch(int port)
 	{
 		return static_cast<const PushBatchPort&>(static_cast<BatchElement::PushBatchPort*>(_ports[1])[port]);
 	}
 
 	inline const PullBatchPort&
-	input(int port)
+	input_batch(int port)
     {
         return static_cast<const PullBatchPort&>(_ports[0][port]);
     }
+
+	inline void
+	output_push_batch(int port, PacketBatch* batch) {
+		output_batch(port).push_batch(batch);
+	}
+
+	inline PacketBatch*
+	input_pull_batch(int port, int max) {
+		return input_batch(port).pull_batch(max);
+	}
 
 	enum batch_mode batch_mode() {
 		return in_batch_mode;

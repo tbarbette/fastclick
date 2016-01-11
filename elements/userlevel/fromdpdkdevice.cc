@@ -145,7 +145,7 @@ bool FromDPDKDevice::run_task(Task * t)
         }
         if (head) {
             head->make_tail(last,n);
-            output(0).push_batch(head);
+            output_push_batch(0,head);
         }
         if (n) {
             add_count(n);

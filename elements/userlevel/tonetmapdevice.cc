@@ -491,7 +491,7 @@ ToNetmapDevice::run_task(Task* task)
 	do {
 #if HAVE_BATCH
 		if (!batch || batch_size < _burst) {
-			PacketBatch* new_batch = input(0).pull_batch(_burst - batch_size);
+			PacketBatch* new_batch = input_pull_batch(0,_burst - batch_size);
 			if (new_batch) {
 				if (batch) {
 					batch->prev()->set_next(new_batch);

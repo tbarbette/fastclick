@@ -182,7 +182,7 @@ Pipeliner::run_task(Task* t)
 
 #if HAVE_BATCH
         if (out) {
-            output(0).push_batch(out);
+            output_push_batch(0,out);
             r = true;
         }
 #endif

@@ -244,8 +244,20 @@ ToDump::write_packet(Packet *p)
         _lock.release();
 }
 
+#if HAVE_BATCH
 void
-ToDump::push(int, Packet *p)
+ToDump::push_batch(int, PacketBatch *b)
+{
+    if (_active) {
+        FOR_EACH_PACKET(b,p) {
+            write_packet(p);
+        }
+        checked_output_push_batch(0, b);
+    }
+}
+#endif
+void
+ToDump::push_packet(int, Packet *p)
 {
     if (_active)
 	write_packet(p);

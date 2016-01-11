@@ -73,11 +73,11 @@ Unqueue::run_task(Task *)
 
 #if HAVE_BATCH
     if (in_batch_mode) {
-    PacketBatch* head = input(0).pull_batch(limit);
+    PacketBatch* head = input_pull_batch(0,limit);
     if (head) {
         _count += head->count();
         worked = head->count();
-        output(0).push_batch(head);
+        output_push_batch(0,head);
     } else if (!_signal)
 	    goto out;
     } else
