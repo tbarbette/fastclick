@@ -54,7 +54,7 @@ bool AggregateGroup::run_task(Task *task) {
 	}
 
 	PacketBatch* p = s.last_packet;
-	output(0).push_batch(p);
+	output_push_batch(0,p);
 	s.last_packet = NULL;
 	return true;
 }
@@ -84,9 +84,9 @@ void AggregateGroup::push_batch(int port, PacketBatch *p) {
 		if (timeout > 0)
 			s.timers->unschedule();
 
-		output(0).push_batch(s.last_packet);
+		output_push_batch(0,s.last_packet);
 		s.last_packet = 0;
-		output(0).push_batch(p);
+		output_push_batch(0,p);
 	}
 }
 

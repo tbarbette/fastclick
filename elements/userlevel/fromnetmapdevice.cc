@@ -319,7 +319,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 	unlock();
 # if HAVE_BATCH
 	batch_head->set_timestamp_anno(ts);
-	output(0).push_batch(batch_head);
+	output_push_batch(0,batch_head);
 # endif
 	}
 	if (nr_pending > _burst) { //TODO size/4?

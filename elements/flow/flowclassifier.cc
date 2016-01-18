@@ -214,7 +214,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 				PacketBatch* new_batch = NULL;
 				awaiting_batch->cut(last,count,new_batch);
 				fcb->lastseen = p->timestamp_anno();
-				output(port).push_batch(awaiting_batch);
+				output_push_batch(port,awaiting_batch);
 				awaiting_batch = new_batch;
 				fcb_stack = fcb;
 				count = 0;
@@ -229,7 +229,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 
 	if (awaiting_batch) {
 		fcb_stack->acquire(count);
-		output(port).push_batch(awaiting_batch);
+		output_push_batch(port,awaiting_batch);
 		fcb_stack = 0;
 	}
 }
@@ -310,7 +310,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 					fcb_stack->acquire(batches[tail % RING_SIZE].batch->count());
 					fcb_stack->lastseen = batches[tail % RING_SIZE].batch->tail()->timestamp_anno();
 					//click_chatter("FPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-					output(port).push_batch(batches[tail % RING_SIZE].batch);
+					output_push_batch(port,batches[tail % RING_SIZE].batch);
 					tail++;
 				}
 				//click_chatter("batches[%d].batch = %p",curbatch,batch);
@@ -338,7 +338,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 		fcb_stack->acquire(batches[tail % RING_SIZE].batch->count());
 		fcb_stack->lastseen = batches[tail % RING_SIZE].batch->tail()->timestamp_anno();
 		//click_chatter("EPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-		output(port).push_batch(batches[tail % RING_SIZE].batch);
+		output_push_batch(port,batches[tail % RING_SIZE].batch);
 
 		curbatch = -1;
 		lastfcb = 0;
@@ -348,7 +348,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 		tail++;
 		if (tail == head) break;
 
-		if (input_is_pull(0) && ((batch = input(0).pull_batch(_pull_burst)) != 0)) { //If we can pull and it's not the last pull
+		if (input_is_pull(0) && ((batch = input_pull_batch(0,_pull_burst)) != 0)) { //If we can pull and it's not the last pull
 			//click_chatter("Pull continue because received %d ! tail %d, head %d",batch->count(),tail,head);
 			p = batch;
 			goto process;

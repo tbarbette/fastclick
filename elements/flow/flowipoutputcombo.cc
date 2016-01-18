@@ -216,7 +216,7 @@ void FlowIPOutputCombo::push_batch(int, int* flow_data, PacketBatch * head) {
 		if (o == 1) {
 			PacketBatch* clone = PacketBatch::make_from_packet(cur->clone());
 			clone->set_next(NULL);
-			output(1).push_batch(clone);
+			output_push_batch(1,clone);
 			o = action(cur, false, *flow_data);
 		}
 		if (o != 0) {//An error occured
@@ -226,7 +226,7 @@ void FlowIPOutputCombo::push_batch(int, int* flow_data, PacketBatch * head) {
 				last->set_next(next);
 			}
 			cur->set_next(NULL);
-			output(o).push_batch(PacketBatch::make_from_packet(cur));
+			output_push_batch(o,PacketBatch::make_from_packet(cur));
 
 		} else {
 			if (last == NULL) {
@@ -239,7 +239,7 @@ void FlowIPOutputCombo::push_batch(int, int* flow_data, PacketBatch * head) {
 
   if (last != NULL) {
 	  head->make_tail(last,count);
-	  output(0).push_batch(head);
+	  output_push_batch(0,head);
   }
 
   /* Packet* next = head;
@@ -251,11 +251,11 @@ void FlowIPOutputCombo::push_batch(int, int* flow_data, PacketBatch * head) {
  +              if (o == 1) {
  +                  PacketBatch* n = PacketBatch::make_from_packet(next->clone());
  +                  n->set_next(NULL);
- +                  output(1).push_batch(n);
+ +                  output_push_batch(1,n);
  +                  o = action(next, 0);
  +              }
  +
- +              output(o).push_batch(PacketBatch::make_from_packet(next));
+ +              output_push_batch(o,PacketBatch::make_from_packet(next));
  +              next = nnext;
  +      }*/
 

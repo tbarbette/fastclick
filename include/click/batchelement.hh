@@ -39,12 +39,12 @@ class BatchElement : public Element { public:
 	virtual void push_batch(int port, PacketBatch* head) {
 		head = simple_action_batch(head);
 		if (head)
-			output(port).push_batch(head);
+			output_push_batch(port,head);
 	}
 
 	virtual PacketBatch* pull_batch(int port, unsigned max) {
 		assert(port < ninputs() && input(port).active());
-	    PacketBatch* head = input(port).pull_batch(max);
+		PacketBatch* head = input_pull_batch(port,max);
 	    if (head) {
 	        head = simple_action_batch(head);
 	    }

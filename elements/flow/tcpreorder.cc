@@ -141,7 +141,7 @@ void TCPReorder::push_batch(int port, TCPReorderFlowData* flowdata, PacketBatch*
 
 	end:
 
-	output(port).push_batch(p_saved);
+	output_push_batch(port, p_saved);
 }
 
 CLICK_ENDDECLS

@@ -49,7 +49,7 @@ void TCPStatus::push_batch(int port, TCPStatusFlowData* flowdata, PacketBatch* h
 		p->kill();
 		continue;
 	}
-	output(0).push_batch(head);
+	output_push_batch(0,head);
 	return;
 	drop_flow:
 	flowdata->status = TCP_DROP;

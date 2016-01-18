@@ -31,7 +31,7 @@ FlowPaint::push_batch(int port, int* flowdata, PacketBatch* head)
 {
 	*flowdata = _color;
 	//click_chatter("%s : %d packets colored with %d",name().c_str(),head->count(),_color);
-	output(0).push_batch(head);
+	output_push_batch(0,head);
 }
 
 void
