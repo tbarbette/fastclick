@@ -126,13 +126,22 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
     mbuf = p->mb();
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p) && !p->shared())) {
+        /* If the packet is an unshared DPDK packet, we can send
+         *  the mbuf as it to DPDK*/
         mbuf = (struct rte_mbuf *) (p->buffer() - sizeof(struct rte_mbuf));
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
         static_cast<WritablePacket*>(p)->set_buffer(0);
     } else {
         if (create) {
+            /*The packet is not a DPDK packet, or it is shared : we need to allocate a mbuf and
+             * copy the packet content to it.*/
             mbuf = DPDKDevice::get_pkt();
+            if (mbuf == 0) {
+                click_chatter("Out of DPDK buffer ! Check your configuration for "
+                        "packet leaks or increase the number of buffer with DPDKInfo().");
+                return NULL;
+            }
             memcpy((void*)rte_pktmbuf_mtod(mbuf, unsigned char *),p->data(),p->length());
             rte_pktmbuf_pkt_len(mbuf) = p->length();
             rte_pktmbuf_data_len(mbuf) = p->length();
@@ -213,9 +222,11 @@ void ToDPDKDevice::push_packet(int, Packet *p)
                 _congestion_warning_printed = true;
             }
         } else { // If there is space in the iqueue
-            iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _iqueue_size] =
-                get_mbuf(p);
-            iqueue.nr_pending++;
+            struct rte_mbuf* mbuf = get_mbuf(p);
+            if (mbuf != NULL) {
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _iqueue_size] = mbuf;
+                iqueue.nr_pending++;
+            }
         }
 
         if (iqueue.nr_pending >= _burst_size || congestioned) {
@@ -312,6 +323,8 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	while (p != NULL) {
 		Packet* next = p->next();
         *pkt = get_mbuf(p);
+        if (*pkt == 0)
+            break;
 #if !CLICK_DPDK_POOLS
         BATCH_RECYCLE_UNSAFE_PACKET(p);
 #endif
