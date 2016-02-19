@@ -127,7 +127,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
 
     _table.set_root(table->optimize());
-    click_chatter("Table after optimization :");
+    click_chatter("Table of %s after optimization :",name().c_str());
     _table.get_root()->print();
     _table.set_release_fnt(release_subflow);
 
@@ -188,8 +188,9 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 	int count =0;
 	FlowControlBlock* fcb = 0;
 	while (p != NULL) {
-		//click_chatter("Packet %p",p);
-
+#if DEBUG_CLASSIFIER
+		click_chatter("Packet %p in %s",p,name().c_str());
+#endif
 		Packet* next = p->next();
 
 
@@ -263,6 +264,9 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 	//click_chatter("Have %d packets.",batch->count());
 
 	while (p != NULL) {
+#if DEBUG_CLASSIFIER
+		click_chatter("Packet %p in %s",p,name().c_str());
+#endif
 		Packet* next = p->next();
 
 		if (_aggcache) {

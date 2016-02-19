@@ -315,7 +315,7 @@ FlowNode* FlowDispatcher::get_table() {
 				click_chatter("Merging this rule of %s :",name().c_str());
 			rules[i].root->print();
 			if (rules[i].output > -1 && rules[i].output < noutputs()) {
-				FlowNode* child_table = FlowElementVisitor::get_downward_table(this, i);
+				FlowNode* child_table = FlowElementVisitor::get_downward_table(this, rules[i].output);
 				if (child_table) {
 					FlowNodePtr* leaf_ptr = rules[i].root->get_first_leaf_ptr();
 					FlowControlBlock* leaf = leaf_ptr->leaf;

@@ -18,7 +18,7 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-#define DEBUG_CLASSIFIER 1
+#define DEBUG_CLASSIFIER 0
 
 typedef void (*sfcb_combiner)(FlowControlBlock* old_sfcb, FlowControlBlock* new_sfcb);
 
@@ -755,9 +755,11 @@ class FlowNodeHash : public FlowNode  {
 		else
 			idx = hash32(data.data_32);
 
-		//click_chatter("Idx is %d, table v = %p",idx,childs[idx]);
+#if DEBUG_CLASSIFIER
+		click_chatter("Idx is %d, table v = %p",idx,childs[idx]);
+#endif
 		while (childs[idx].ptr && childs[idx].data().data_64 != data.data_64) {
-			click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].data().data_64, data.data_64);
+			//click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].data().data_64, data.data_64);
 			idx = next_idx(idx);
 			i++;
 		}
@@ -1196,12 +1198,18 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 	FlowControlBlock* FlowClassificationTable::match(Packet* p) {
 		FlowNode* parent = _root;
 		FlowNodePtr* child_ptr = 0;
+#if DEBUG_CLASSIFIER
+		int level_nr = 0;
+#endif
 		do {
 			FlowNodeData data = parent->level()->get_data(p);
-			//click_chatter("Data is %016llX",data.data_64);
+#if DEBUG_CLASSIFIER
+			click_chatter("[%d] Data level %d is %016llX",click_current_cpu_id(), level_nr++,data.data_64);
+#endif
 			child_ptr = parent->find(data);
-			//click_chatter("->Ptr is %p",child_ptr->ptr);
-
+#if DEBUG_CLASSIFIER
+			click_chatter("->Ptr is %p, is_leaf : %d",child_ptr->ptr, child_ptr->is_leaf());
+#endif
 			if (child_ptr->ptr == NULL) {
 				if (parent->get_default().ptr) {
 					if (parent->level()->is_dynamic()) {

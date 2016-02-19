@@ -37,6 +37,8 @@ FlowUnstrip::configure(Vector<String> &conf, ErrorHandler *errh)
 PacketBatch *
 FlowUnstrip::simple_action_batch(PacketBatch *head)
 {
+	EXECUTE_FOR_EACH_PACKET([this](Packet* p){return p->push(_nbytes);},head)
+			/*
 	Packet* current = head;
 	Packet* last = NULL;
 	while (current != NULL) {
@@ -53,7 +55,7 @@ FlowUnstrip::simple_action_batch(PacketBatch *head)
         last = current;
 
 		current = current->next();
-	}
+	}*/
 	return head;
 }
 

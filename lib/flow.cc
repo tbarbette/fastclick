@@ -36,15 +36,20 @@ void FlowClassificationTable::set_release_fnt(SubFlowRealeaseFnt pool_release_fn
 }
 
 
+/**
+ * Combine this rule with rule of higher priority if its level is not equal
+ * If you want to combine with a rule of lower priority, call other->combine(this)
+ */
 FlowNode* FlowNode::combine(FlowNode* other) {
 	if (other == 0) return this;
 
-	if (other->level()->get_max_value() > level()->get_max_value()) {
+
+	/*if (other->level()->get_max_value() > level()->get_max_value()) {
 #if DEBUG_CLASSIFIER
 		click_chatter("COMBINE : swapping nodes");
 #endif
 		return other->combine(this);
-	}
+	}*/
 
 	if (other->parent()) {
 #if DEBUG_CLASSIFIER
@@ -136,14 +141,45 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 		}*/
 	}
 
-	click_chatter("Combining different tables (%s and %s) is not supported for now, the second one will be added as default !",level()->print().c_str(),other->level()->print().c_str());
-	if (this->default_ptr()->ptr == 0) {
-		this->set_default(other);
+	click_chatter("Combining different tables (%s and %s) is not supported for now, the first one will be added as default !",level()->print().c_str(),other->level()->print().c_str());
+	if (dynamic_cast<FlowLevelDummy*>(this->level()) != 0) {
+		//If this is a dummy, we can directly set our leaf as the child
+		assert(this->default_ptr()->is_leaf());
+		if (other->default_ptr()->ptr == 0) {
+			other->set_default(this->default_ptr()->leaf);
+		} else {
+			if (other->default_ptr()->is_node())
+				other->set_default(other->default_ptr()->node->combine(this));
+			else {
+				click_chatter("BUG : Combining a leaf with dummy?");
+				click_chatter("merging leaf :");
+				this->default_ptr()->print();
+				click_chatter("from :");
+				this->print();
+				click_chatter("with :");
+				other->print();
+				assert(false);
+			}
+		}
 	} else {
-		assert(this->default_ptr()->is_node());
-		this->set_default(this->default_ptr()->node->combine(other));
+		if (other->default_ptr()->ptr == 0) {
+			other->set_default(this);
+		} else {
+			if (other->default_ptr()->is_node())
+				other->set_default(other->default_ptr()->node->combine(this));
+			else {
+				click_chatter("BUG : Combining a leaf?");
+				click_chatter("merging leaf :");
+				this->default_ptr()->print();
+				click_chatter("from :");
+				this->print();
+				click_chatter("with :");
+				other->print();
+				assert(false);
+			}
+		}
 	}
-	return this;
+	return other;
 
 
 }
