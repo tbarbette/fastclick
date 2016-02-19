@@ -1,6 +1,6 @@
 #ifndef CLICK_MARKMACHEADER_HH
 #define CLICK_MARKMACHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -18,7 +18,7 @@ CLICK_DECLS
  *
  * =a MarkIPHeader */
 
-class MarkMACHeader : public Element { public:
+class MarkMACHeader : public BatchElement { public:
 
     MarkMACHeader() CLICK_COLD;
 
@@ -27,6 +27,9 @@ class MarkMACHeader : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }
 
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *head);
+#endif
     Packet *simple_action(Packet *);
 
   private:
