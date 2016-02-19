@@ -116,7 +116,7 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 
 	//IRQ
 	char netinfo[100];
-	sprintf(netinfo, "/sys/class/net/%s/device/msi_irqs", _device->parent_nmd->nifp->ni_name);
+	sprintf(netinfo, "/sys/class/net/%s/device/msi_irqs", _device->ifname.c_str() + 7);
 	DIR *dir;
 	struct dirent *ent;
 
