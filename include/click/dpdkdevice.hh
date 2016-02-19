@@ -58,6 +58,7 @@ public:
     static int TX_PTHRESH;
     static int TX_HTHRESH;
     static int TX_WTHRESH;
+    static String MEMPOOL_PREFIX;
 
 private:
 

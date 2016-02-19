@@ -39,9 +39,16 @@ unsigned int DPDKDevice::get_nb_txdesc(unsigned port_id)
     return info->n_tx_descs;
 }
 
+/**
+ * This function is called by DPDK when Click run as a secondary process. It
+ * 	checks that the prefix match with the given config prefix and add it if it does so.
+ */
 void DPDKDevice::add_pool(const struct rte_mempool * rte, void *arg){
 	int* i = (int*)arg;
+	if (strncmp(DPDKDevice::MEMPOOL_PREFIX.c_str(), const_cast<struct rte_mempool *>(rte)->name, DPDKDevice::MEMPOOL_PREFIX.length()) != 0)
+		return;
 	_pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
+	click_chatter("Found DPDK pool %s",*i,rte,_pktmbuf_pools[*i]->name);
 	(*i)++;
 }
 
@@ -71,8 +78,7 @@ bool DPDKDevice::alloc_pktmbufs()
 		// Create a pktmbuf pool for each active socket
 		for (int i = 0; i < nr_pktmbuf_pools; i++) {
 			if (!_pktmbuf_pools[i]) {
-				char name[64];
-				snprintf(name, 64, "mbuf_pool_%u", i);
+				const char* name = (DPDKDevice::MEMPOOL_PREFIX + String(i)).c_str();
 				_pktmbuf_pools[i] =
 #if RTE_VER_MAJOR >= 2 && RTE_VER_MINOR >= 1
 					rte_pktmbuf_pool_create(name, NB_MBUF,
@@ -319,6 +325,7 @@ int DPDKDevice::RX_WTHRESH = 4;
 int DPDKDevice::TX_PTHRESH = 36;
 int DPDKDevice::TX_HTHRESH = 0;
 int DPDKDevice::TX_WTHRESH = 0;
+String DPDKDevice::MEMPOOL_PREFIX = "click_mempool_";
 
 bool DPDKDevice::_is_initialized = false;
 HashMap<unsigned, DPDKDevice::DevInfo> DPDKDevice::_devs;
