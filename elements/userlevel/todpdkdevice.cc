@@ -125,20 +125,19 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
     #if CLICK_DPDK_POOLS
     mbuf = p->mb();
     #else
-    if (likely(DPDKDevice::is_dpdk_packet(p) && !p->shared())) {
-        /* If the packet is an unshared DPDK packet, we can send
-         *  the mbuf as it to DPDK*/
+    if (likely(DPDKDevice::is_dpdk_packet(p))) {
+        /* If the packet is shared, we ask DPDK not to release it*/
         mbuf = (struct rte_mbuf *) (p->buffer() - sizeof(struct rte_mbuf));
+        rte_mbuf_refcnt_update(mbuf, 1);
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
         static_cast<WritablePacket*>(p)->set_buffer(0);
     } else {
         if (create) {
-            /*The packet is not a DPDK packet, or it is shared : we need to allocate a mbuf and
-             * copy the packet content to it.*/
+            /*The packet is not a DPDK packet*/
             mbuf = DPDKDevice::get_pkt();
             if (mbuf == 0) {
-                click_chatter("Out of DPDK buffer ! Check your configuration for "
+                 click_chatter("Out of DPDK buffer ! Check your configuration for "
                         "packet leaks or increase the number of buffer with DPDKInfo().");
                 return NULL;
             }

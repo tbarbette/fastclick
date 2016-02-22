@@ -39,12 +39,7 @@ public:
     static int initialize(ErrorHandler *errh);
 
     inline static bool is_dpdk_packet(Packet* p) {
-        if (p->buffer_destructor() == DPDKDevice::free_pkt)
-            return true;
-        for (int i = 0; i < _nr_pktmbuf_pools; i++)
-            if (p->buffer() >= (void*)get_mpool(i)->elt_va_start && p->buffer() < (void*)get_mpool(i)->elt_va_end)
-                return true;
-        return false;
+        return (p->buffer_destructor() == DPDKDevice::free_pkt || (p->data_packet() && is_dpdk_packet(p->data_packet())));
     }
 
     inline static rte_mbuf* get_pkt() {

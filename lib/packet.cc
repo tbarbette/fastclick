@@ -908,7 +908,8 @@ Packet::copy(Packet* p, int headroom)
  * @arg fast The new clone won't be a shared packet and we won't update the
  * reference count of this packet. The buffer won't be freed in any way and an
  * empty destructor will be set. It is usefull if you won't release this packet
- * before you're sure that the clone will be killed.
+ * before you're sure that the clone will be killed and plan on managing the
+ * freeing yourself.
  *
  * @return the cloned packet
  *
