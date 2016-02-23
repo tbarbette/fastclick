@@ -126,14 +126,20 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
     #if CLICK_DPDK_POOLS
     mbuf = p->mb();
     #else
-    if (likely(DPDKDevice::is_dpdk_packet(p) && !p->shared())) {
+    if (likely(DPDKDevice::is_dpdk_packet(p))) {
         /* If the packet is an unshared DPDK packet, we can send
          *  the mbuf as it to DPDK*/
         mbuf = (struct rte_mbuf *) p->destructor_argument();
-        assert(mbuf);  // all DPDK packets should have destructor_argument set
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
-        static_cast<WritablePacket*>(p)->set_buffer(0);
+        if (p->shared()) {
+            /*Prevent DPDK from freeing the buffer. When all shared packet
+             * are freed, DPDKDevice::free_pkt will effectively destroy it.*/
+            rte_mbuf_refcnt_update(mbuf, 1);
+        } else {
+            //Reset buffer, let DPDK free the buffer when it wants
+            p->reset_buffer();
+        }
     } else {
         if (create) {
             /*The packet is not a DPDK packet, or it is shared : we need to allocate a mbuf and

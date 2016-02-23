@@ -149,7 +149,6 @@ class Packet { public:
     	return _destructor_argument;
     }
     void reset_buffer() {
-	assert(!shared());
 	_head = _data = _tail = _end = 0;
 	_destructor = 0;
     }
