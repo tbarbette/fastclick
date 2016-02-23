@@ -128,7 +128,8 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
     if (likely(DPDKDevice::is_dpdk_packet(p) && !p->shared())) {
         /* If the packet is an unshared DPDK packet, we can send
          *  the mbuf as it to DPDK*/
-        mbuf = (struct rte_mbuf *) (p->buffer() - sizeof(struct rte_mbuf));
+        mbuf = (struct rte_mbuf *) p->destructor_argument();
+        assert(mbuf);  // all DPDK packets should have destructor_argument set
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
         static_cast<WritablePacket*>(p)->set_buffer(0);
@@ -180,7 +181,7 @@ void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
             // The sub_burst wraps around the ring
             sub_burst = _iqueue_size - iqueue.index;
         r = rte_eth_tx_burst(_port_id, queue_for_thread_begin(), &iqueue.pkts[iqueue.index],
-                             iqueue.nr_pending);
+                             sub_burst);
 
         iqueue.nr_pending -= r;
         iqueue.index += r;
