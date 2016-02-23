@@ -153,9 +153,8 @@ private:
     unsigned _port_id;
     unsigned int _iqueue_size;
     bool _blocking;
-    unsigned int _burst_size;
+    int _burst_size;
     int _timeout;
-    int _n_desc;
     bool _congestion_warning_printed;
 };
 

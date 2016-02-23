@@ -202,7 +202,7 @@ int DPDKDevice::add_device(unsigned port_id, DPDKDevice::Dir dir,
                     " be in promiscuous mode", port_id);
             info->promisc |= promisc;
             if (n_desc != 0) {
-                if (n_desc != info->n_rx_descs && info->n_rx_descs != 0)
+                if (n_desc != info->n_rx_descs && info->n_rx_descs != 0 && queue_id > 0)
                     return errh->error(
                         "Some elements disagree on the number of RX descriptors "
                         "for device %u (want %d, actual is %d)", port_id, n_desc,
@@ -213,7 +213,7 @@ int DPDKDevice::add_device(unsigned port_id, DPDKDevice::Dir dir,
                 1 + ((queue_id <= 0) ? info->n_rx_queues : queue_id);
         } else {
             if (n_desc != 0) {
-                if (n_desc != info->n_tx_descs && info->n_tx_descs != 0)
+                if (n_desc != info->n_tx_descs && info->n_tx_descs != 0 && queue_id > 0)
                     return errh->error(
                         "Some elements disagree on the number of TX descriptors "
                         "for device %u (want %d, actual is %d)", port_id, n_desc,

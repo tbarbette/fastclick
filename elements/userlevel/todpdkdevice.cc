@@ -26,7 +26,7 @@ CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
     _iqueues(), _port_id(0), _blocking(false),
-    _iqueue_size(1024), _burst_size(32), _timeout(0), _congestion_warning_printed(false)
+    _iqueue_size(1024), _burst_size(-1), _timeout(0), _congestion_warning_printed(false)
 {
 }
 
@@ -40,7 +40,6 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int maxthreads = -1;
     int minqueues = 1;
     int maxqueues = 128;
-    int burst = -1;
 
     if (Args(conf, this, errh)
         .read_mp("PORT", _port_id)
@@ -48,28 +47,12 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES",maxqueues)
         .read("MAXTHREADS",maxthreads)
         .read("BLOCKING", _blocking)
-        .read("BURST", burst)
+        .read("BURST", _burst_size)
         .read("MAXQUEUES",maxqueues)
         .read("TIMEOUT", _timeout)
-        .read("NDESC",_n_desc)
+        .read("NDESC",ndesc)
         .complete() < 0)
             return -1;
-
-
-#if !HAVE_BATCH
-    if (burst > ndesc / 2 ) {
-        errh->warning("BURST should not be upper than half the number of descriptor");
-    } else if (burst > 32) {
-        errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
-    }
-    if (burst > -1)
-        _burst_size = burst;
-
-#else
-    if (burst != -1) {
-        errh->warning("BURST is unused with batching !");
-    }
-#endif
 
     QueueDevice::configure_tx(maxthreads,1,maxqueues,errh);
 }
@@ -78,12 +61,28 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;
 
+#if HAVE_BATCH
+    if (batch_mode() == BATCH_MODE_YES) {
+        if (_burst_size > 0)
+            errh->warning("BURST is unused with batching !");
+    } else
+#endif
+    {
+		if (_burst_size < 0)
+			_burst_size = 32;
+		if (ndesc > 0 && _burst_size > ndesc / 2 ) {
+			errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
+		} else if (_burst_size > 32) {
+			errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
+		}
+    }
+
     ret = initialize_tx(errh);
     if (ret != 0)
         return ret;
 
     for (int i = 0; i < nqueues; i++) {
-        ret = DPDKDevice::add_tx_device(_port_id, i, _n_desc , errh);
+        ret = DPDKDevice::add_tx_device(_port_id, i, ndesc , errh);
         if (ret != 0) return ret;    }
 
     ret = initialize_tasks(false,errh);
