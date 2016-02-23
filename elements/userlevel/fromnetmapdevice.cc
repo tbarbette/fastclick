@@ -73,7 +73,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
   	.complete() < 0)
     	return -1;
 #if !HAVE_NUMA
-    if (numa == true) {
+    if (numa) {
     	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
     }
     _numa = false;
