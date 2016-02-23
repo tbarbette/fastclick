@@ -122,7 +122,7 @@ void ToDPDKDevice::add_handlers()
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 
-inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
+inline struct rte_mbuf* ToDPDKDevice::get_mbuf(Packet* p, bool create=true) {
     struct rte_mbuf* mbuf;
     #if CLICK_DPDK_POOLS
     mbuf = p->mb();
