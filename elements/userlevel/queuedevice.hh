@@ -49,7 +49,7 @@ private :
     static int n_elements; //Number of total elements heriting from QueueDevice
     static int n_inputs; //Number of total input
     static int use_nodes; //Number of numa nodes used
-    int _this_node; //Numa node index
+
     static Vector<int> inputs_count; //Number of inputs per numa node
 
     static Vector<int> shared_offset; //Thread offset for each node
@@ -63,6 +63,8 @@ private :
     per_thread<ThreadState> thread_state;
 
 protected:
+
+    int _this_node; //Numa node index
 
     inline bool lock_attempt() {
         if (_locks[id_for_thread()] != NO_LOCK) {

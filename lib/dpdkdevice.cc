@@ -46,9 +46,16 @@ void DPDKDevice::add_pool(const struct rte_mempool * rte, void *arg){
 	(*i)++;
 }
 
+int core_to_numa_node(unsigned lcore_id) {
+       int numa_node = rte_lcore_to_socket_id(lcore_id);
+       return (numa_node < 0) ? 0 : numa_node;
+}
+
 bool DPDKDevice::alloc_pktmbufs()
 {
-    // Count NUMA sockets
+    /* Count NUMA sockets for each device and each node, we do not want to
+     * allocate a unused pool
+     */
     int max_socket = -1;
     for (HashMap<unsigned, DevInfo>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it) {
@@ -56,6 +63,13 @@ bool DPDKDevice::alloc_pktmbufs()
         if (numa_node > max_socket)
             max_socket = numa_node;
     }
+    int i;
+    RTE_LCORE_FOREACH(i) {
+        int numa_node = core_to_numa_node(i);
+        if (numa_node > max_socket)
+            max_socket = numa_node;
+    }
+
 
     if (max_socket == -1)
         return false;

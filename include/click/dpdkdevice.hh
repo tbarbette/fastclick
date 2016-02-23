@@ -42,8 +42,12 @@ public:
         return (p->buffer_destructor() == DPDKDevice::free_pkt || p->data_packet() && is_dpdk_packet(p->data_packet()));
     }
 
+    inline static rte_mbuf* get_pkt(unsigned numa_node) {
+        return rte_pktmbuf_alloc(get_mpool(numa_node));
+    }
+
     inline static rte_mbuf* get_pkt() {
-        return rte_pktmbuf_alloc(get_mpool(rte_socket_id()));
+        return get_pkt(rte_socket_id());
     }
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);

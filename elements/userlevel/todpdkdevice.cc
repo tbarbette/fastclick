@@ -99,6 +99,8 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         }
     }
 
+    _this_node = DPDKDevice::get_port_numa_node(_port_id);
+
     if (all_initialized()) {
         int ret =DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
@@ -144,7 +146,7 @@ inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
         if (create) {
             /*The packet is not a DPDK packet, or it is shared : we need to allocate a mbuf and
              * copy the packet content to it.*/
-            mbuf = DPDKDevice::get_pkt();
+            mbuf = DPDKDevice::get_pkt(_this_node);
             if (mbuf == 0) {
                 click_chatter("Out of DPDK buffer ! Check your configuration for "
                         "packet leaks or increase the number of buffer with DPDKInfo().");
