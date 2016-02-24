@@ -94,7 +94,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         if (_timeout >= 0) {
             _iqueues.get_value(i).timeout.assign(this);
             _iqueues.get_value(i).timeout.initialize(this);
-            _iqueues.get_value(i).timeout.move_thread(thread_for_queue(i));
+            _iqueues.get_value(i).timeout.move_thread(i);
         }
     }
 
