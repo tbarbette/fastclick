@@ -174,7 +174,7 @@ int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
     for (unsigned i = 0; i < info.rx_queues.size(); ++i) {
         if (rte_eth_rx_queue_setup(
-                port_id, i, info.n_rx_descs, numa_node, &rx_conf,
+                port_id, i, info.n_rx_descs > 0 ? info.n_rx_descs : 256 , numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
             return errh->error(
                 "Cannot setup RX queue %u of port %u on node %u",
@@ -182,7 +182,7 @@ int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
     }
 
     for (unsigned i = 0; i < info.tx_queues.size(); ++i)
-        if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
+        if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs > 0 ? info.n_tx_descs : 1024, numa_node,
                                    &tx_conf) != 0)
             return errh->error(
                 "Cannot setup TX queue %u of port %u on node %u",
@@ -245,7 +245,7 @@ int DPDKDevice::add_device(unsigned port_id, DPDKDevice::Dir dir,
 				" be in promiscuous mode", port_id);
 		info->promisc |= promisc;
 		if (n_desc > 0) {
-			if (n_desc != info->n_rx_descs && info->rx_queues.size() > 0)
+			if (info->n_rx_descs != 0 && n_desc != info->n_rx_descs)
 				return errh->error(
 						"Some elements disagree on the number of RX descriptors "
 						"for device %u", port_id);
@@ -257,7 +257,7 @@ int DPDKDevice::add_device(unsigned port_id, DPDKDevice::Dir dir,
 						"for device %u", port_id);
 	} else {
 		if (n_desc > 0) {
-			if (n_desc != info->n_tx_descs && info->tx_queues.size() > 0)
+			if (info->n_tx_descs != 0 && n_desc != info->n_tx_descs)
 				return errh->error(
 						"Some elements disagree on the number of TX descriptors "
 						"for device %u", port_id);
