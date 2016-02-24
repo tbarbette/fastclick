@@ -21,6 +21,7 @@
 #include <click/packet.hh>
 #include <click/error.hh>
 #include <click/hashmap.hh>
+#include <click/vector.hh>
 
 CLICK_DECLS
 
@@ -55,7 +56,7 @@ public:
     static unsigned int get_nb_txdesc(unsigned port_id);
 
     static int NB_MBUF;
-    static int DATA_SIZE;
+    static int MBUF_DATA_SIZE;
     static int MBUF_SIZE;
     static int MBUF_CACHE_SIZE;
     static int RX_PTHRESH;
@@ -64,6 +65,7 @@ public:
     static int TX_PTHRESH;
     static int TX_HTHRESH;
     static int TX_WTHRESH;
+    static String MEMPOOL_PREFIX;
 
 private:
 
@@ -71,19 +73,14 @@ private:
 
     struct DevInfo {
         inline DevInfo() :
-            n_rx_queues(0), n_tx_queues(0), promisc(false), n_rx_descs(0),
-            n_tx_descs(0) {}
-        inline DevInfo(DPDKDevice::Dir dir, unsigned queue_id, bool promisc,
-                       unsigned n_desc) :
-            n_rx_queues((dir == DPDKDevice::RX) ? queue_id + 1 : 0),
-            n_tx_queues((dir == DPDKDevice::TX) ? queue_id + 1 : 0),
-            promisc(promisc),
-            n_rx_descs((dir == DPDKDevice::RX) ? n_desc : 256),
-            n_tx_descs((dir == DPDKDevice::TX) ? n_desc : 1024)
-            {}
+            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
+            n_tx_descs(0) {
+            rx_queues.reserve(128);
+            tx_queues.reserve(128);
+        }
 
-        unsigned n_rx_queues;
-        unsigned n_tx_queues;
+        Vector<bool> rx_queues;
+        Vector<bool> tx_queues;
         bool promisc;
         unsigned n_rx_descs;
         unsigned n_tx_descs;
