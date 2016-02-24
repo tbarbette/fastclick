@@ -54,7 +54,7 @@ EnsureDPDKBuffer::smaction(Packet* p) {
 			p->kill();
 			return 0;
 		}
-		WritablePacket* q = WritablePacket::make((unsigned char*)mbuf->buf_addr,DPDKDevice::DATA_SIZE,DPDKDevice::free_pkt,(void*)mbuf);
+		WritablePacket* q = WritablePacket::make((unsigned char*)mbuf->buf_addr,DPDKDevice::MBUF_DATA_SIZE,DPDKDevice::free_pkt,(void*)mbuf);
 		q->copy(p,rte_pktmbuf_headroom(mbuf));
 		p->kill();
 		return q;
