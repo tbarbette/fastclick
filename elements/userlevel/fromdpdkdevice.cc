@@ -28,7 +28,7 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0),_n_desc(0)
+    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0)
 {
 	#if HAVE_BATCH
 		in_batch_mode = BATCH_MODE_YES;
@@ -57,7 +57,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES",maxqueues)
         .read("RSS_AGGREGATE", _set_rss_aggregate)
         .read("BURST", _burst_size)
-        .read("NDESC", _n_desc)
+        .read("NDESC", ndesc)
 		.read("NUMA", _numa)
         .complete() < 0)
         return -1;
@@ -81,7 +81,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     for (int i = 0; i < nqueues; i++) {
-        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, _n_desc, errh);
+        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }
 

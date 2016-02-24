@@ -28,7 +28,7 @@ Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 QueueDevice::QueueDevice() :  nqueues(1), usable_threads(),
-	queue_per_threads(1), queue_share(1), ndesc(-1), _maxthreads(-1),
+	queue_per_threads(1), queue_share(1), ndesc(0), _maxthreads(-1),
 	_minqueues(1),_maxqueues(128),_threadoffset(-1),thread_share(1),
 	_this_node(0){
 #if HAVE_NUMA

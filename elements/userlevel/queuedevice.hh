@@ -31,7 +31,7 @@ protected:
     Bitvector usable_threads;
     int queue_per_threads;
     int queue_share;
-    int ndesc;
+    unsigned ndesc;
     bool _numa;
     bool _verbose;
 private :

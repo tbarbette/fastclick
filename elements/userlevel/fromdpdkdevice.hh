@@ -121,7 +121,6 @@ private:
     bool _promisc;
     unsigned int _burst_size;
     bool _set_rss_aggregate;
-    int _n_desc;
 };
 
 CLICK_ENDDECLS
