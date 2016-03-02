@@ -40,7 +40,7 @@ public:
     static int initialize(ErrorHandler *errh);
 
     inline static bool is_dpdk_packet(Packet* p) {
-        return (p->buffer_destructor() == DPDKDevice::free_pkt || p->data_packet() && is_dpdk_packet(p->data_packet()));
+        return (p->buffer_destructor() == DPDKDevice::free_pkt || (p->data_packet() && is_dpdk_packet(p->data_packet())));
     }
 
     inline static rte_mbuf* get_pkt(unsigned numa_node) {
