@@ -109,6 +109,23 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
     ret = QueueDevice::initialize_tasks(false,errh);
     if (ret != 0) return ret;
 
+	if (_verbose > 0 && thread_per_queues() > 2) {
+	errh->warning("Using 3 or more threads per NIC's hardware queue is "
+				"discouraged : use more hardware-queue or less threads, or they "
+				"will spin to lock the same hardware queue and do nothing usefull.");
+	}
+
+	if (_verbose > 0 && queue_per_threads > 3) {
+		errh->warning(((usable_threads.weight()==1?String("The thread handling"):
+				String("Each thread of")) + String(
+						" %s will loop through %d hardware queues. Having "
+						"more than 3 queues per thread is useless. Consider limiting the "
+						"number of hardware queue of %s (via ethtool -L %s combined X "
+						"on Linux), or use MAXQUEUES N argument to only use the first N queues and "
+						"prevent traffic from going to the last queues by limiting RSS "
+						"on %s (via ethtool -X %s equal N).")).c_str(),name().c_str(), queue_per_threads,_device->nmds[0]->nifp->ni_name,_device->nmds[0]->nifp->ni_name,_device->nmds[0]->nifp->ni_name,_device->nmds[0]->nifp->ni_name);
+	}
+
 	//IRQ
 	char netinfo[100];
 	sprintf(netinfo, "/sys/class/net/%s/device/msi_irqs", _device->ifname.c_str() + 7);
@@ -142,14 +159,18 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 	  closedir (dir);
 	}
 
-	//Register select for all concerned threads
+	//Map fd to queues to allow select handler to quickly check the right ring
 	_queue_for_fd.resize(_device->_maxfd + 1);
 	for (int i = 0; i < nqueues; i++) {
 	    int fd = _device->nmds[i]->fd;
 	    _queue_for_fd[fd] = i;
-	    for (int j = 0; j < queue_share;j++) {
-	        master()->thread(thread_for_queue(i) - j)->select_set().add_select(fd,this,SELECT_READ);
-	    }
+	}
+	//Register selects for threads
+	for (int i = 0; i < usable_threads.size();i++) {
+		if (!usable_threads[i])
+			continue;
+		for (int j = queue_for_thread_begin(i); j <= queue_for_thread_end(i); j++)
+			master()->thread(i)->select_set().add_select(_device->nmds[j]->fd,this,SELECT_READ);
 	}
 
 	return 0;
@@ -162,7 +183,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 		int sent = 0;
 
 		for (int i = begin; i <= end; i++) {
-		    lock();
+			lock();
 
 			struct nm_desc* nmd = _device->nmds[i];
 
@@ -300,7 +321,7 @@ FromNetmapDevice::cleanup(CleanupStage)
 bool
 FromNetmapDevice::run_task(Task* t)
 {
-    return receive_packets(t,queue_for_thread_begin(),queue_for_thread_end(),true);
+    return receive_packets(t,queue_for_thisthread_begin(),queue_for_thisthread_end(),true);
 
 }
 

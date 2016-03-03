@@ -36,7 +36,7 @@ QueueDevice::QueueDevice() :  nqueues(1), usable_threads(),
 #else
 	_numa = false;
 #endif
-	_verbose = false;
+	_verbose = 1;
 }
 void QueueDevice::static_initialize() {
 #if HAVE_NUMA
@@ -117,7 +117,7 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     n_initialized++;
-    if (_verbose)
+    if (_verbose > 1)
 		if (input_is_push(0))
 			click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
 		else
@@ -153,7 +153,7 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
            if (v.size() < usable_threads.size())
                v.resize(usable_threads.size());
            if (v.weight() == usable_threads.weight()) {
-               if (_verbose)
+               if (_verbose > 0)
                    click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
            } else
                usable_threads &= (~v);
@@ -233,6 +233,52 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
        n_initialized++;
 
        return 0;
+}
+
+int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
+	_tasks.resize(usable_threads.weight());
+	_locks.resize(usable_threads.weight());
+	_thread_to_queue.resize(master()->nthreads());
+	_queue_to_thread.resize(nqueues);
+
+	int th_num = 0;
+
+	int share_idx = 0;
+	for (int th_id = 0; th_id < master()->nthreads(); th_id++) {
+		if (!usable_threads[th_id])
+			continue;
+
+		if (share_idx % thread_share != 0) {
+			--th_num;
+			if (_locks[th_num] == NO_LOCK) {
+				_locks[th_num] = 0;
+			}
+		} else {
+			_tasks[th_num] = (new Task(this));
+			ScheduleInfo::initialize_task(this, _tasks[th_num], schedule, errh);
+			_tasks[th_num]->move_thread(th_id);
+			_locks[th_num] = NO_LOCK;
+		}
+		share_idx++;
+
+		_thread_to_queue[th_id] = (th_num * queue_per_threads) / queue_share;
+
+		for (int j = 0; j < queue_per_threads; j++) {
+			if (_verbose > 2)
+				click_chatter("Queue %d handled by th %d",((th_num * queue_per_threads) + j) / queue_share,th_id);
+			_queue_to_thread[((th_num * queue_per_threads) + j) / queue_share] = th_id;
+		}
+
+		if (queue_share > 1) {
+			_locks[th_num] = 0;
+		}
+
+		++th_num;
+
+	}
+
+	return 0;
+
 }
 
 CLICK_ENDDECLS

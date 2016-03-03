@@ -188,7 +188,7 @@ void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
         if (iqueue.index + sub_burst >= _iqueue_size)
             // The sub_burst wraps around the ring
             sub_burst = _iqueue_size - iqueue.index;
-        r = rte_eth_tx_burst(_port_id, queue_for_thread_begin(), &iqueue.pkts[iqueue.index],
+        r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
                              sub_burst);
 
         iqueue.nr_pending -= r;
@@ -289,7 +289,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 		unsigned left = iqueue.nr_pending;
 		do {
 			lock();
-			r = rte_eth_tx_burst(_port_id, queue_for_thread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
+			r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
 			unlock();
 			ret += r;
 			left -= r;
@@ -346,7 +346,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	unsigned left = head->count() + iqueue.nr_pending;
 	do {
 	    lock();
-		r = rte_eth_tx_burst(_port_id, queue_for_thread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
+		r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
 		unlock();
 		ret += r;
 		left -= r;

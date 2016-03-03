@@ -118,7 +118,7 @@ bool FromDPDKDevice::run_task(Task * t)
 	WritablePacket *last = NULL;
 #endif
 
-    for (int iqueue = queue_for_thread_begin(); iqueue<=queue_for_thread_end();iqueue++) {
+    for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
         unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst_size);
         for (unsigned i = 0; i < n; ++i) {
 #if CLICK_DPDK_POOLS
