@@ -118,6 +118,8 @@ public:
 
     void add_handlers() CLICK_COLD;
 
+    struct rte_mbuf* get_mbuf(Packet* p, bool create);
+
     void run_timer(Timer *);
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *head);
@@ -153,9 +155,8 @@ private:
     unsigned _port_id;
     unsigned int _iqueue_size;
     bool _blocking;
-    unsigned int _burst_size;
+    int _burst_size;
     int _timeout;
-    int _n_desc;
     bool _congestion_warning_printed;
 };
 

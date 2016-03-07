@@ -909,7 +909,7 @@ Packet::copy(Packet* p, int headroom)
  * reference count of this packet. The buffer won't be freed in any way and an
  * empty destructor will be set. It is usefull if you won't release this packet
  * before you're sure that the clone will be killed and plan on managing the
- * freeing yourself.
+ * buffer yourself.
  *
  * @return the cloned packet
  *

@@ -28,8 +28,11 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0),_n_desc(0)
+    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0)
 {
+	#if HAVE_BATCH
+		in_batch_mode = BATCH_MODE_YES;
+	#endif
 }
 
 FromDPDKDevice::~FromDPDKDevice()
@@ -54,7 +57,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES",maxqueues)
         .read("RSS_AGGREGATE", _set_rss_aggregate)
         .read("BURST", _burst_size)
-        .read("NDESC", _n_desc)
+        .read("NDESC", ndesc)
 		.read("NUMA", _numa)
         .complete() < 0)
         return -1;
@@ -78,7 +81,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     for (int i = 0; i < nqueues; i++) {
-        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, _n_desc, errh);
+        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }
 
@@ -112,7 +115,7 @@ bool FromDPDKDevice::run_task(Task * t)
     PacketBatch* head = NULL;
 	WritablePacket *last = NULL;
 
-    for (int iqueue = queue_for_thread_begin(); iqueue<=queue_for_thread_end();iqueue++) {
+    for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
         unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst_size);
         for (unsigned i = 0; i < n; ++i) {
 #if CLICK_DPDK_POOLS

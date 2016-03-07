@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _device(0),_burst(32),_block(1),_internal_queue(512),_pull_use_select(true)
+ToNetmapDevice::ToNetmapDevice() : _device(0),_burst(32),_block(true),_internal_queue(512),_pull_use_select(true)
 {
 }
 
@@ -132,7 +132,7 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 }
 
 inline void ToNetmapDevice::allow_txsync() {
-    for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++)
+    for (int i = queue_for_thisthread_begin(); i <= queue_for_thisthread_end(); i++)
         _iodone[i] = false;
 }
 
@@ -295,8 +295,8 @@ do_send:
 		if (s.q && s.backoff < 128) {
 			s.backoff++;
 
-			if (!_zctimers[queue_for_thread_begin()]->scheduled()) {
-				_zctimers[queue_for_thread_begin()]->schedule_after(Timestamp::make_usec(1));
+			if (!_zctimers[queue_for_thisthread_begin()]->scheduled()) {
+				_zctimers[queue_for_thisthread_begin()]->schedule_after(Timestamp::make_usec(1));
 			}
 		} else {
 			//If we backed off a lot, we may try to do a sync before waiting for the timer to trigger
@@ -411,7 +411,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
 		int in = (s.last_queue + iloop) % queue_per_threads;
-		int i =  queue_for_thread_begin() + in;
+		int i =  queue_for_thisthread_begin() + in;
 
 		nmd = _device->nmds[i];
 		txring = NETMAP_TXRING(nmd->nifp, i);
@@ -558,7 +558,7 @@ ToNetmapDevice::run_task(Task* task)
 		s.q = batch;
 		s.q_size = batch_size;
 		//Register fd to wait for space
-		for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
+		for (int i = queue_for_thisthread_begin(); i <= queue_for_thisthread_end(); i++) {
 			if (_pull_use_select)
 				master()->thread(click_current_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
 			else

@@ -31,9 +31,9 @@ protected:
     Bitvector usable_threads;
     int queue_per_threads;
     int queue_share;
-    int ndesc;
+    unsigned ndesc;
     bool _numa;
-    bool _verbose;
+    int _verbose;
 private :
     int _maxthreads;
     int _minqueues;
@@ -49,7 +49,7 @@ private :
     static int n_elements; //Number of total elements heriting from QueueDevice
     static int n_inputs; //Number of total input
     static int use_nodes; //Number of numa nodes used
-    int _this_node; //Numa node index
+
     static Vector<int> inputs_count; //Number of inputs per numa node
 
     static Vector<int> shared_offset; //Thread offset for each node
@@ -63,6 +63,8 @@ private :
     per_thread<ThreadState> thread_state;
 
 protected:
+
+    int _this_node; //Numa node index
 
     inline bool lock_attempt() {
         if (_locks[id_for_thread()] != NO_LOCK) {
@@ -177,52 +179,7 @@ protected:
         return n_elements == n_initialized;
     }
 
-    int initialize_tasks(bool schedule, ErrorHandler *errh) {
-        _tasks.resize(usable_threads.weight());
-        _locks.resize(usable_threads.weight());
-        _thread_to_queue.resize(master()->nthreads());
-        _queue_to_thread.resize(nqueues);
-
-        int th_num = 0;
-
-        int share_idx = 0;
-        for (int th_id = 0; th_id < master()->nthreads(); th_id++) {
-
-            if (!usable_threads[th_id]) {
-                continue;
-            }
-            if (share_idx % thread_share != 0) {
-                --th_num;
-                if (_locks[th_num] == NO_LOCK) {
-                    _locks[th_num] = 0;
-                }
-            } else {
-                _tasks[th_num] = (new Task(this));
-                ScheduleInfo::initialize_task(this, _tasks[th_num], schedule, errh);
-                _tasks[th_num]->move_thread(th_id);
-                _locks[th_num] = NO_LOCK;
-            }
-            share_idx++;
-
-            _thread_to_queue[th_id] = (th_num * queue_per_threads) / queue_share;
-
-            for (int j = 0; j < queue_per_threads; j++) {
-                if (_verbose)
-                    click_chatter("Queue %d handled by th %d",((th_num * queue_per_threads) + j) / queue_share,th_id);
-                _queue_to_thread[((th_num * queue_per_threads) + j) / queue_share] = th_id;
-            }
-
-            if (queue_share > 1) {
-                _locks[th_num] = 0;
-            }
-
-            ++th_num;
-
-        }
-
-        return 0;
-
-    }
+    int initialize_tasks(bool schedule, ErrorHandler *errh);
 
     void cleanup_tasks() {
         for (int i = 0; i < usable_threads.weight(); i++) {
@@ -231,12 +188,20 @@ protected:
         }
     }
 
-    inline int queue_for_thread_begin() {
-        return _thread_to_queue[click_current_cpu_id()];
+    inline int queue_for_thread_begin(int tid) {
+        return _thread_to_queue[tid];
     }
 
-    inline int queue_for_thread_end() {
-        return _thread_to_queue[click_current_cpu_id()] + queue_per_threads - 1;
+    inline int queue_for_thread_end(int tid) {
+        return _thread_to_queue[tid] + queue_per_threads - 1;
+    }
+
+    inline int queue_for_thisthread_begin() {
+        return queue_for_thread_begin(click_current_cpu_id());
+    }
+
+    inline int queue_for_thisthread_end() {
+        return queue_for_thread_end(click_current_cpu_id());
     }
 
     inline int id_for_thread(int tid) {
@@ -257,6 +222,10 @@ protected:
 
     inline int thread_for_queue(int queue) {
         return _queue_to_thread[queue];
+    }
+
+    int thread_per_queues() {
+        return queue_share;
     }
 };
 
