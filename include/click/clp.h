@@ -88,6 +88,8 @@ struct Clp_Option {
 #define Clp_ValDouble		8	/**< @brief Option value is a
 					     double.
 		Accepts a real number as defined by strtod(). */
+#define Clp_ValStringDashTerimnated	9	/**< @brief Option value is a string
+						terminated by a double dash.*/
 #define Clp_ValFirstUser	10	/**< @brief Value types >=
 					     Clp_ValFirstUser are available
 					     for user types. */
@@ -200,6 +202,7 @@ struct Clp_Parser {
 	unsigned char ucs[Clp_ValSize];
 	int is[Clp_ValIntSize];
 	unsigned us[Clp_ValIntSize];
+	char** ps;
     } val;			/**< The parsed value provided with the last
 				     option. */
 
@@ -259,6 +262,7 @@ int Clp_SetOptionProcessing(Clp_Parser *clp, int on);
 					     can't be an option string.
 
 		See Clp_AddType(). */
+#define Clp_DashTerminated (1<<1)
 
 /** @brief Define a new value type for @a clp. */
 int Clp_AddType(Clp_Parser *clp, int val_type, int flags,
