@@ -202,6 +202,8 @@ void StackElement::removeBytes(WritablePacket* packet, uint32_t position, uint32
     unsigned char *source = packet->data();
     uint32_t bytesAfter = packet->length() - position;
 
+    click_chatter("Pos: %u, length: %u", position, length);
+
     memmove(&source[position], &source[position + length], bytesAfter);
     packet->take(length);
 }

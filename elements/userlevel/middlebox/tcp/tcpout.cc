@@ -45,7 +45,7 @@ Packet* TCPOut::processPacket(Packet* p)
         if(offsetModification != 0)
         {
             // We know that the packet has been modified and its size has changed
-            click_chatter("Packet modified, offset: %d", offsetModification);
+            click_chatter("Packet %u modified, offset: %d", prevSeq, offsetModification);
 
             // Check if the full packet content has been removed
             if(getPacketLength(packet) + offsetModification == 0)

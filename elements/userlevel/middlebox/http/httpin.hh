@@ -17,6 +17,8 @@ public:
 
 protected:
     Packet* processPacket(Packet*);
+    void removeHeader(WritablePacket*, const char*);
+    bool headerFound;
 };
 
 CLICK_ENDDECLS

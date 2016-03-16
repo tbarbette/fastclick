@@ -349,13 +349,6 @@ void InorderTreePrint(rb_red_blk_tree* tree, rb_red_blk_node* x)
         tree->manager->printInfo(x->info);
         click_chatter("  key=");
         tree->manager->printKey(x->key);
-        click_chatter("  l->key=");
-        if( x->left == nil) click_chatter("NULL"); else tree->manager->printKey(x->left->key);
-        click_chatter("  r->key=");
-        if( x->right == nil) click_chatter("NULL"); else tree->manager->printKey(x->right->key);
-        click_chatter("  p->key=");
-        if( x->parent == root) click_chatter("NULL"); else tree->manager->printKey(x->parent->key);
-        click_chatter("  red=%i\n",x->red);
         InorderTreePrint(tree,x->right);
     }
 }
@@ -624,10 +617,12 @@ void* RBFindElementGreatestAbove(rb_red_blk_tree* tree, void* q)
     while(x != nil)
     {
         if(tree->manager->compareKeys(x->key, q) == 1) /* x->key > q */
+        {
             x = x->left;
+        }
         else
         {
-            if(result == NULL || tree->manager->compareKeys(x->key, result->key) != 1) /* x->key <= result */
+            if(result == NULL || tree->manager->compareKeys(x->key, result->key) == 1) /* x->key > result */
                 result = x;
 
             x = x->right;

@@ -19,9 +19,9 @@ public:
 
     int compareKeys(const void* first, const void* second)
     {
-        if(*(int*)first > *(int*)second)
+        if(*(unsigned int*)first > *(unsigned int*)second)
             return 1;
-        if(*(int*)first < *(int*)second)
+        if(*(unsigned int*)first < *(unsigned int*)second)
             return -1;
 
         return 0;
@@ -34,7 +34,7 @@ public:
 
     void printInfo(void* first)
     {
-        click_chatter("%i", *(int*)first);
+        click_chatter("%d", *(int*)first);
     }
 
     rb_red_blk_node* allocateNode(void)

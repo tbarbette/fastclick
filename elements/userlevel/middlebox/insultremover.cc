@@ -34,7 +34,7 @@ Packet* InsultRemover::processPacket(Packet* p)
             uint32_t position = firstOccur - packet->data();
 
             removeBytes(packet, position, 3);
-            modifyPacket(p);
+            modifyPacket(packet);
         }
 
         source = firstOccur;
