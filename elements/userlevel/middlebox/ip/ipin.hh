@@ -1,10 +1,10 @@
 #ifndef MIDDLEBOX_IPIN_HH
 #define MIDDLEBOX_IPIN_HH
-#include "../stackelement.hh"
+#include "ipelement.hh"
 #include <click/element.hh>
 CLICK_DECLS
 
-class IPIn : public StackElement
+class IPIn : public IPElement
 {
 public:
     IPIn() CLICK_COLD;
@@ -17,7 +17,7 @@ public:
 
 protected:
     Packet* processPacket(Packet*);
-    void packetModified(Packet*, int offset);
+    void packetModified(Packet*);
 };
 
 CLICK_ENDDECLS

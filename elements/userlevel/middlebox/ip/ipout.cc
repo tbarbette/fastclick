@@ -23,16 +23,7 @@ Packet* IPOut::processPacket(Packet* p)
 
     // Recompute the IP checksum if the packet has been modified
     if(getAnnotationModification(packet))
-    {
-        click_ip *iph = packet->ip_header();
-
-        unsigned plen = ntohs(iph->ip_len) - (iph->ip_hl << 2);
-        unsigned hlen = iph->ip_hl << 2;
-
-        iph->ip_sum = 0;
-        iph->ip_sum = click_in_cksum((const unsigned char *)iph, hlen);
-        click_chatter("IPOut recomputed the checksum");
-    }
+        computeChecksum(packet);
 
     return p;
 }

@@ -4,6 +4,7 @@
 #include <click/element.hh>
 #include <click/router.hh>
 #include <click/routervisitor.hh>
+#include <click/stackvisitor.hh>
 
 CLICK_DECLS
 
@@ -11,6 +12,7 @@ class StackElement : public Element
 {
 public:
     StackElement() CLICK_COLD;
+    ~StackElement();
 
     // Click related methods
     const char *class_name() const        { return "StackElement"; }
@@ -24,7 +26,7 @@ public:
 
     // Custom methods
     virtual bool isOutElement()          { return false; }
-    virtual void packetModified(Packet*, int);
+    virtual void packetModified(Packet*);
     void addStackElementInList(StackElement*);
     static bool isStackElement(Element*);
 
@@ -32,20 +34,29 @@ protected:
     virtual Packet* processPacket(Packet*);
     void setAnnotationModification(Packet*, bool);
     bool getAnnotationModification(Packet*);
-    uint32_t getContentOffset(Packet*);
-    void setContentOffset(Packet*, uint32_t);
-    void modifyPacket(Packet* packet, int);
+    void setAnnotationAcked(Packet* p, bool value);
+    bool getAnnotationAcked(Packet* p);
+    uint16_t getContentOffset(Packet*);
+    void setContentOffset(Packet*, uint16_t);
+    void modifyPacket(Packet* packet);
     void buildFunctionStack();
     const unsigned char* getPacketContentConst(Packet*);
     unsigned char* getPacketContent(WritablePacket*);
     bool isPacketContentEmpty(Packet*);
+    void removeBytes(WritablePacket*, uint32_t, uint32_t);
 
 private:
     struct stackElementListNode *stackElementList;
+    void setAnnotationBit(Packet*, int, bool);
+    bool getAnnotationBit(Packet*, int);
 
     // Constants
-    const int offsetAnnotation = 12;
-    const int offsetContentOffset = 13;
+    const int offsetAnnotationBools = 12;
+    const int offsetContentOffset = 13; // Currently set to 2 bytes (-> to check)
+
+    // Up to 8 booleans can be stored in the corresponding annotation
+    const int offsetAnnotationModified = 0;
+    const int offsetAnnotationAcked = 1;
 
 };
 
@@ -53,41 +64,6 @@ struct stackElementListNode
 {
     StackElement *node;
     struct stackElementListNode *next;
-};
-
-class StackVisitor : public RouterVisitor
-{
-public:
-    StackVisitor(StackElement* startElement)
-    {
-        this->startElement = startElement;
-
-    }
-    ~StackVisitor() {}
-
-    bool visit(Element *e, bool isoutput, int port, Element *from_e, int from_port, int distance)
-    {
-        if(!StackElement::isStackElement(e))
-            return true;
-
-        StackElement *element = (StackElement*)e;
-        // Only add stack functions to input elements
-        if(element->isOutElement())
-            return true;
-
-        click_chatter("Adding element %s to the list of %s", startElement->class_name(), element->class_name());
-
-        element->addStackElementInList(startElement);
-
-        // Stop search when finding the IPOut Element
-        if(strcmp(element->class_name(), "IPOut") == 0)
-            return false;
-
-        return true;
-    }
-
-private:
-    StackElement* startElement;
 };
 
 CLICK_ENDDECLS

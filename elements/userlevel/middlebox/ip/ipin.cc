@@ -24,13 +24,13 @@ Packet* IPIn::processPacket(Packet* p)
     // Compute the offset of the IP payload
     const click_ip *iph = p->ip_header();
     unsigned iph_len = iph->ip_hl << 2;
-    uint32_t offset = (int)(p->network_header() + iph_len - p->data());
+    uint16_t offset = (uint16_t)(p->network_header() + iph_len - p->data());
     setContentOffset(p, offset);
 
     return p;
 }
 
-void IPIn::packetModified(Packet* p, int)
+void IPIn::packetModified(Packet* p)
 {
     // Annotate the packet to indicate it has been modified
     // While going through "out elements", the checksum will be recomputed

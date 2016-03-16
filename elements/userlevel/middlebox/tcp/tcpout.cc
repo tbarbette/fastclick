@@ -1,5 +1,6 @@
 #include <click/config.h>
 #include "tcpout.hh"
+#include "../ip/ipelement.hh"
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
@@ -22,20 +23,54 @@ Packet* TCPOut::processPacket(Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 
-    // Recompute the TCP checksum if the packet has been modified
-    if(getAnnotationModification(packet))
-    {
-        click_ip *iph = packet->ip_header();
-        click_tcp *tcph = packet->tcp_header();
+    // Update the sequence number (according to modifications made on previous packets)
+    tcp_seq_t prevSeq = getSequenceNumber(packet);
+    tcp_seq_t newSeq =  prevSeq + byteStreamMaintainer.getSeqOffset();
+    bool seqModified = false;
 
-        unsigned plen = ntohs(iph->ip_len) - (iph->ip_hl << 2);
-        tcph->th_sum = 0;
-        unsigned csum = click_in_cksum((unsigned char *)tcph, plen);
-        tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
-        click_chatter("TCPOut recomputed the checksum");
+    if(prevSeq != newSeq)
+    {
+        setSequenceNumber(packet, newSeq);
+        seqModified = true;
+    }
+
+    // Check if the packet has been modified
+    if(getAnnotationModification(packet) || seqModified)
+    {
+        // Check the length to see if bytes were added or removed
+        uint16_t initialLength = IPElement::packetTotalLength(packet);
+        uint16_t currentLength = (uint16_t)packet->length();
+        int offsetModification = -(initialLength - currentLength);
+
+        if(offsetModification != 0)
+        {
+            // We know that the packet has been modified and its size has changed
+            click_chatter("Packet modified, offset: %d", offsetModification);
+
+            // Check if the full packet content has been removed
+            if(getPacketLength(packet) + offsetModification == 0)
+            {
+                // The packet is now empty, we discard it and send an ACK directly to the source
+                click_chatter("Empty packet. I am supposed to discard it and send a ACK to the source, but it is still TODO");
+            }
+
+            // Notify about the new modifications
+            byteStreamMaintainer.newInsertion(newSeq + getPacketLength(packet), offsetModification);
+
+            // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo hdr)
+            IPElement::setPacketTotalLength(packet, initialLength + offsetModification);
+        }
+
+        // Recompute the checksum
+        computeChecksum(packet);
     }
 
     return p;
+}
+
+ByteStreamMaintainer* TCPOut::getByteStreamMaintainer()
+{
+    return &byteStreamMaintainer;
 }
 
 CLICK_ENDDECLS

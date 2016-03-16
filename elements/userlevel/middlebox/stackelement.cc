@@ -11,6 +11,19 @@ StackElement::StackElement()
     stackElementList = NULL;
 }
 
+StackElement::~StackElement()
+{
+    struct stackElementListNode *node = stackElementList;
+    struct stackElementListNode *toFree = NULL;
+
+    while(node != NULL)
+    {
+        toFree = node;
+        node = node->next;
+        free(toFree);
+    }
+}
+
 void StackElement::push(int, Packet *packet)
 {
     Packet *p = processPacket(packet);
@@ -32,27 +45,75 @@ Packet* StackElement::processPacket(Packet* p)
     return p;
 }
 
-void StackElement::setContentOffset(Packet* p, uint32_t offset)
+void StackElement::setContentOffset(Packet* p, uint16_t offset)
 {
-    p->set_anno_u32(offsetContentOffset, offset);
+    p->set_anno_u16(offsetContentOffset, offset);
 }
 
-uint32_t StackElement::getContentOffset(Packet* p)
+uint16_t StackElement::getContentOffset(Packet* p)
 {
-    return (int)(p->anno_u32(offsetContentOffset));
+    return p->anno_u16(offsetContentOffset);
+}
+
+void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
+{
+    // Build masks
+    unsigned char clearMask = 1;
+    clearMask = clearMask << bit;
+    clearMask = ~clearMask;
+
+    unsigned char mask = (unsigned char)value;
+    mask = mask << bit;
+
+    // Get previous value
+    unsigned char previousValue = (unsigned char)(p->anno_u8(offsetAnnotationBools));
+
+    // Apply masks
+    // Clear the bit to modify
+    previousValue &= clearMask;
+    // Set the new value
+    previousValue |= mask;
+
+    // Set the new value
+    p->set_anno_u8(offsetAnnotationBools, previousValue);
+}
+
+bool StackElement::getAnnotationBit(Packet* p, int bit)
+{
+    // Build mask
+    unsigned char mask = 1;
+    mask = mask << bit;
+
+    // Get full value
+    unsigned char value = (unsigned char)(p->anno_u8(offsetAnnotationBools));
+
+    // Apply mask
+    value &= mask;
+
+    return (bool)value;
 }
 
 void StackElement::setAnnotationModification(Packet* p, bool value)
 {
-    p->set_anno_u8(offsetAnnotation, (uint8_t)value);
+    setAnnotationBit(p, offsetAnnotationModified, value);
 }
 
 bool StackElement::getAnnotationModification(Packet* p)
 {
-    return (bool)(p->anno_u8(offsetAnnotation));
+    return getAnnotationBit(p, offsetAnnotationModified);
 }
 
-void StackElement::packetModified(Packet* p, int offset)
+void StackElement::setAnnotationAcked(Packet* p, bool value)
+{
+    setAnnotationBit(p, offsetAnnotationAcked, value);
+}
+
+bool StackElement::getAnnotationAcked(Packet* p)
+{
+    return getAnnotationBit(p, offsetAnnotationAcked);
+}
+
+void StackElement::packetModified(Packet* p)
 {
     // This function is called when an downstream element modifies a packet
     // By default, it does nothing. Elements can implement their own behavior
@@ -68,13 +129,13 @@ void StackElement::addStackElementInList(StackElement *element)
     stackElementList = newElement;
 }
 
-void StackElement::modifyPacket(Packet* packet, int offset)
+void StackElement::modifyPacket(Packet* packet)
 {
     // Call the "packetModified" method on every element in the stack
     struct stackElementListNode* current = stackElementList;
     while(current != NULL)
     {
-        current->node->packetModified(packet, offset);
+        current->node->packetModified(packet);
         current = current->next;
     }
 }
@@ -114,26 +175,35 @@ int StackElement::initialize(ErrorHandler*  errh)
 
 const unsigned char* StackElement::getPacketContentConst(Packet* p)
 {
-    uint32_t offset = getContentOffset(p);
+    uint16_t offset = getContentOffset(p);
 
     return (p->data() + offset);
 }
 
 unsigned char* StackElement::getPacketContent(WritablePacket* p)
 {
-    uint32_t offset = getContentOffset(p);
+    uint16_t offset = getContentOffset(p);
 
     return (p->data() + offset);
 }
 
 bool StackElement::isPacketContentEmpty(Packet* packet)
 {
-    uint32_t offset = getContentOffset(packet);
+    uint16_t offset = getContentOffset(packet);
 
     if(offset >= packet->length())
         return true;
     else
         return false;
+}
+
+void StackElement::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
+{
+    unsigned char *source = packet->data();
+    uint32_t bytesAfter = packet->length() - position;
+
+    memmove(&source[position], &source[position + length], bytesAfter);
+    packet->take(length);
 }
 
 CLICK_ENDDECLS

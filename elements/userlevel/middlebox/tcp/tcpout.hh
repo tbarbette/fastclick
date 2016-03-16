@@ -1,10 +1,12 @@
 #ifndef MIDDLEBOX_TCPOUT_HH
 #define MIDDLEBOX_TCPOUT_HH
-#include "../stackelement.hh"
+#include "tcpelement.hh"
 #include <click/element.hh>
+#include <click/bytestreammaintainer.hh>
+
 CLICK_DECLS
 
-class TCPOut : public StackElement
+class TCPOut : public TCPElement
 {
 public:
     TCPOut() CLICK_COLD;
@@ -17,8 +19,11 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+    ByteStreamMaintainer* getByteStreamMaintainer();
+
 protected:
     Packet* processPacket(Packet*);
+    ByteStreamMaintainer byteStreamMaintainer;
 };
 
 CLICK_ENDDECLS

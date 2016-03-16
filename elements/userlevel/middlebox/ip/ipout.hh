@@ -1,10 +1,10 @@
 #ifndef MIDDLEBOX_IPOUT_HH
 #define MIDDLEBOX_IPOUT_HH
-#include "../stackelement.hh"
+#include "ipelement.hh"
 #include <click/element.hh>
 CLICK_DECLS
 
-class IPOut : public StackElement
+class IPOut : public IPElement
 {
 public:
     IPOut() CLICK_COLD;

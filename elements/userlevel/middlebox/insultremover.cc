@@ -22,19 +22,19 @@ Packet* InsultRemover::processPacket(Packet* p)
     if(isPacketContentEmpty(packet))
         return packet;
 
-    char *source = (char*)getPacketContent(packet);
-    char* firstOccur = NULL;
+    unsigned char *source = getPacketContent(packet);
+    uint32_t contentOffset = getContentOffset(packet);
+    unsigned char* firstOccur = NULL;
 
     while(source != NULL)
     {
-        firstOccur = strstr(source, "and");
+        firstOccur = (unsigned char*)strstr((char*)source, "and");
         if(firstOccur != NULL)
         {
-            firstOccur[0] = '*';
-            firstOccur[1] = '*';
-            firstOccur[2] = '*';
+            uint32_t position = firstOccur - packet->data();
 
-            modifyPacket(p, 0);
+            removeBytes(packet, position, 3);
+            modifyPacket(p);
         }
 
         source = firstOccur;
