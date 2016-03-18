@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() : _active(true), _loaded(false), _queue(1024), _burst(64), _stop(-1), _quick_clone(true), _task(this), _queue_head(0), _queue_current(0)
+Replay::Replay() : _active(true), _loaded(false), _queue(1024), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
@@ -76,7 +76,7 @@ Replay::initialize(ErrorHandler *) {
 	_notifier.set_active(false,false);
 	_input.resize(ninputs());
 	for (int i = 0 ; i < ninputs(); i++)
-		_input[i].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
+		_input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
 	_output.resize(noutputs());
 	for (int i = 0; i < _output.size(); i++) {
 		_output[i].ring.initialize(_queue);
@@ -158,20 +158,25 @@ Replay::run_task(Task* task)
 	unsigned int n = 0;
 	while (_queue_current != 0 && n < _burst) {
 		Packet* p = _queue_current;
-		_queue_current = p->next();
-		Packet* q = p->clone(_quick_clone);
 
-		if (!_output[PAINT_ANNO(p)].ring.insert(q)) {
-			q->kill();
-			_queue_current = p;
+		if (_output[PAINT_ANNO(p)].ring.is_full()) {
 			_notifier.sleep();
 			return n > 0;
 		} else {
+			_queue_current = p->next();
+			Packet* q;
+			if (_stop > 1) {
+				q = p->clone(_quick_clone);
+			} else {
+				q = p;
+				_queue_head = _queue_current;
+			}
+			assert(_output[PAINT_ANNO(p)].ring.insert(q));
 			_notifier.wake();
 		}
-
 		n++;
 	}
+
 	if (unlikely(!_queue_current)) {
 		_queue_current = _queue_head;
 		if (_stop > 0)

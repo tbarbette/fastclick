@@ -23,7 +23,7 @@
 CLICK_DECLS
 
 
-EnsureNetmapBuffer::EnsureNetmapBuffer() : _headroom(Packet::default_headroom)
+EnsureNetmapBuffer::EnsureNetmapBuffer() : _headroom(0)
 {
 }
 
