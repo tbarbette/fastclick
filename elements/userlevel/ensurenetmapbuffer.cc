@@ -23,12 +23,23 @@
 CLICK_DECLS
 
 
-EnsureNetmapBuffer::EnsureNetmapBuffer()
+EnsureNetmapBuffer::EnsureNetmapBuffer() : _headroom(Packet::default_headroom)
 {
 }
 
 EnsureNetmapBuffer::~EnsureNetmapBuffer()
 {
+}
+
+int
+EnsureNetmapBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (Args(conf, this, errh)
+	.read_p("HEADROOM", _headroom)
+	.complete() < 0)
+    return -1;
+
+    return 0;
 }
 
 inline Packet*
@@ -46,7 +57,7 @@ EnsureNetmapBuffer::smaction(Packet* p) {
 		}
 		WritablePacket* q = WritablePacket::make(buffer,NetmapBufQ::buffer_size(),NetmapBufQ::buffer_destructor,NetmapBufQ::local_pool());
 #endif
-		q->copy(p);
+		q->copy(p, _headroom);
 		p->kill();
 		assert(NetmapBufQ::is_netmap_packet(q));
 		return q;
