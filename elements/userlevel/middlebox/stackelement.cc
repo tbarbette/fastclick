@@ -27,7 +27,9 @@ StackElement::~StackElement()
 void StackElement::push(int, Packet *packet)
 {
     Packet *p = processPacket(packet);
-    output(0).push(p);
+
+    if(p != NULL)
+        output(0).push(p);
 }
 
 Packet* StackElement::pull(int)
@@ -201,8 +203,6 @@ void StackElement::removeBytes(WritablePacket* packet, uint32_t position, uint32
 {
     unsigned char *source = packet->data();
     uint32_t bytesAfter = packet->length() - position;
-
-    click_chatter("Pos: %u, length: %u", position, length);
 
     memmove(&source[position], &source[position + length], bytesAfter);
     packet->take(length);

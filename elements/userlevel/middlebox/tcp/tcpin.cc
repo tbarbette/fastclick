@@ -60,6 +60,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     {
         this->returnElement = (TCPIn*)returnElement;
         this->outElement = (TCPOut*)outElement;
+        this->outElement->setInElement(this);
     }
 
     return 0;

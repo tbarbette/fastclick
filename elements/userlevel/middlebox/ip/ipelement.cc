@@ -42,6 +42,20 @@ void IPElement::computeChecksum(WritablePacket *packet)
     iph->ip_sum = click_in_cksum((const unsigned char *)iph, hlen);
 }
 
+const uint32_t IPElement::getSourceAddress(Packet* packet)
+{
+    const click_ip *iph = packet->ip_header();
+
+    return *(const uint32_t*)&iph->ip_src;
+}
+
+const uint32_t IPElement::getDestinationAddress(Packet* packet)
+{
+    const click_ip *iph = packet->ip_header();
+
+    return *(const uint32_t*)&iph->ip_dst;
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPElement)
 //ELEMENT_MT_SAFE(IPElement)

@@ -4,6 +4,9 @@
 #include <click/element.hh>
 #include <click/bytestreammaintainer.hh>
 
+// Forward declaration
+class TCPIn;
+
 CLICK_DECLS
 
 class TCPOut : public TCPElement
@@ -20,10 +23,12 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     ByteStreamMaintainer* getByteStreamMaintainer();
+    void setInElement(TCPIn*);
 
 protected:
     Packet* processPacket(Packet*);
     ByteStreamMaintainer byteStreamMaintainer;
+    TCPIn* inElement;
 };
 
 CLICK_ENDDECLS
