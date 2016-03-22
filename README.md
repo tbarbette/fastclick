@@ -39,7 +39,7 @@ An example configuration is :
 FromDpdkDevice(0) -> CheckIPHeader() -> ToDpdkDevice(0)
 
 To run click with DPDK, you can add the usual EAL parameters :
-sudo bin/click -c 0xf -n 4 /path/to/config/file.click
+sudo bin/click -c 0xf -n 4 -- /path/to/config/file.click
 where 4 is the number of memory channel and 0xf the core mask.
 
 DPDK only supports full push mode.
