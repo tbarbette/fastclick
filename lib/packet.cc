@@ -30,10 +30,12 @@
 #if CLICK_USERLEVEL || CLICK_MINIOS
 # include <unistd.h>
 #endif
-#if CLICK_DPDK_POOLS
+#if HAVE_DPDK_PACKET_POOL
+# include <click/dpdkdevice.hh>
+#endif
+#if CLICK_PACKET_USE_DPDK
 # include <rte_lcore.h>
 # include <rte_mempool.h>
-# include <click/dpdkdevice.hh>
 #endif
 CLICK_DECLS
 
@@ -215,7 +217,7 @@ Packet::~Packet()
 
 #if CLICK_LINUXMODULE
     panic("Packet destructor");
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     rte_panic("Packet destructor");
 #else
     if (_data_packet)
@@ -225,8 +227,12 @@ Packet::~Packet()
         if (_destructor != empty_destructor)
             _destructor(_head, _end - _head, _destructor_argument);
     } else
-#  if HAVE_NETMAP_PACKET_POOL
-    if (NetmapBufQ::is_netmap_packet(this)) {
+#  if HAVE_DPDK_PACKET_POOL
+    if (DPDKDevice::is_valid_dpdk_packet(this)) {
+        rte_pktmbuf_free((struct rte_mbuf*)_destructor_argument);
+    } else
+#  elif HAVE_NETMAP_PACKET_POOL
+    if (NetmapBufQ::is_valid_netmap_packet(this)) {
         NetmapBufQ::local_pool()->insert_p(_head);
     } else
 #  endif
@@ -241,7 +247,7 @@ Packet::~Packet()
 #endif
 }
 
-#if !CLICK_LINUXMODULE && !CLICK_DPDK_POOLS
+#if !CLICK_LINUXMODULE && !CLICK_PACKET_USE_DPDK
 
 # if HAVE_CLICK_PACKET_POOL
 // ** Packet pools **
@@ -543,8 +549,12 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
                 packet_pool.pd = static_cast<WritablePacket *>(pd->next());
-#if HAVE_NETMAP_PACKET_POOL
-                if (NetmapBufQ::is_netmap_packet(pd))
+#if HAVE_DPDK_PACKET_POOL
+                if (DPDKDevice::is_valid_dpdk_packet(pd))
+                    rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
+                else
+#elif HAVE_NETMAP_PACKET_POOL
+                if (NetmapBufQ::is_valid_netmap_packet(pd))
                     NetmapBufQ::local_pool()->insert_p(pd->buffer());
                 else
 #endif
@@ -568,7 +578,7 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
 
 inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
     if (likely(!p->_data_packet && p->_head && !p->_destructor)) {
-# if HAVE_NETMAP_PACKET_POOL
+# if HAVE_NETMAP_PACKET_POOL || HAVE_DPDK_PACKET_POOL
         return true;
 # else
         if (likely(p->_end - p->_head == CLICK_PACKET_POOL_BUFSIZ)) //Is standard buffer size?
@@ -655,12 +665,21 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
 	n = min_buffer_length;
     }
 # if CLICK_USERLEVEL || CLICK_MINIOS
-#  if HAVE_NETMAP_PACKET_POOL
-    assert(n <= NetmapBufQ::buffer_size());
-    unsigned char *d = NetmapBufQ::local_pool()->extract_p();
+    unsigned char *d = 0;
+#  if HAVE_DPDK_PACKET_POOL
+    assert(n <= DPDKDevice::MBUF_DATA_SIZE);
+    struct rte_mbuf *mb = DPDKDevice::get_pkt();
+    if (mb) {
+      d = (unsigned char*)mb->buf_addr;
+      _destructor_argument = mb;
+    }
     if (d == 0)
+#  elif HAVE_NETMAP_PACKET_POOL
+    assert(n <= NetmapBufQ::buffer_size());
+    d = NetmapBufQ::local_pool()->extract_p();
+    if (!d)
 #  endif
-    unsigned char *d = new unsigned char[n];
+    d = new unsigned char[n];
     if (!d)
 	return false;
     _head = d;
@@ -698,7 +717,7 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
     return true;
 }
 
-#endif /* !CLICK_LINUXMODULE && !CLICK_DPDK_POOLS */
+#endif /* !CLICK_LINUXMODULE && !CLICK_PACKET_USE_DPDK */
 
 
 /** @brief Create and return a new packet.
@@ -740,8 +759,8 @@ Packet::make(uint32_t headroom, const void *data,
 		return q;
 		} else
 		return 0;
-#elif CLICK_DPDK_POOLS
-    struct rte_mbuf *mb = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));
+#elif CLICK_PACKET_USE_DPDK
+    struct rte_mbuf *mb = DPDKDevice::get_pkt();
     if (!mb) {
         click_chatter("could not alloc pktmbuf");
         return 0;
@@ -799,7 +818,7 @@ WritablePacket *
 Packet::make(unsigned char *data, uint32_t length,
 	     buffer_destructor_type destructor, void* argument)
 {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
 assert(false); //TODO
 #else
 # if HAVE_CLICK_PACKET_POOL
@@ -834,7 +853,7 @@ PacketBatch *
 Packet::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
 		buffer_destructor_type destructor, void* argument )
 {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
 assert(false); //TODO
 #endif
 
@@ -913,7 +932,7 @@ Packet::clone(bool fast)
     struct sk_buff *nskb = skb_clone(skb(), GFP_ATOMIC);
     return reinterpret_cast<Packet *>(nskb);
     
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     Packet* p = reinterpret_cast<Packet *>(
         rte_pktmbuf_clone(mb(), DPDKDevice::get_mpool(rte_socket_id())));
     p->copy_annotations(this,true);
@@ -1052,9 +1071,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     shift_header_annotations(old_head, extra_headroom);
     return static_cast<WritablePacket *>(this);
 
-#elif CLICK_DPDK_POOLS /* !CLICK_LINUXMODULE */
+#elif CLICK_PACKET_USE_DPDK /* !CLICK_LINUXMODULE */
     struct rte_mbuf *mb = this->mb();
-    struct rte_mbuf *nmb = rte_pktmbuf_alloc(DPDKDevice::get_mpool(rte_socket_id()));
+    struct rte_mbuf *nmb = DPDKDevice::get_pkt();
     click_chatter("Expensive uniqueify %p %p, exh = %d, ext = %d",mb,nmb,extra_headroom,extra_tailroom);
     if (!nmb) {
         click_chatter("cannot allocate new pktmbuf");
@@ -1095,7 +1114,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     int headroom = this->headroom();
     int length = this->length();
     uint8_t* new_head = p->_head;
-     uint8_t* new_end = p->_end;
+    uint8_t* new_end = p->_end;
     if (_use_count > 1) {
         memcpy(p, this, sizeof(Packet));
 
@@ -1107,6 +1126,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     } else {
         p->_head = NULL;
         p->_data_packet = NULL; //packet from pool_data_allocate can be dirty
+#if HAVE_DPDK_PACKET_POOL
+        _destructor_argument = p->_destructor_argument;
+#endif
         WritablePacket::recycle(p);
         p = (WritablePacket*)this;
     }
@@ -1219,10 +1241,10 @@ Packet::expensive_push(uint32_t nbytes)
                   headroom(), nbytes);
     chatter++;
   }
-  if (WritablePacket *q = expensive_uniqueify((nbytes + 128) & ~3, 0, true)) {
+  if (WritablePacket *q = expensive_uniqueify((nbytes + 128) & ~3, -((nbytes + 128) & ~3), true)) {
 #ifdef CLICK_LINUXMODULE	/* Linux kernel module */
     __skb_push(q->skb(), nbytes);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     rte_pktmbuf_prepend(q->mb(), nbytes);
     click_chatter("New head : %d",q->headroom());
 #else				/* User-space and BSD kernel module */
@@ -1241,7 +1263,7 @@ Packet::expensive_push(uint32_t nbytes)
 WritablePacket *
 Packet::expensive_put(uint32_t nbytes)
 {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
     assert(false);
 #endif
   static int chatter = 0;
@@ -1253,7 +1275,7 @@ Packet::expensive_put(uint32_t nbytes)
   if (WritablePacket *q = expensive_uniqueify(0, nbytes + 128, true)) {
 #ifdef CLICK_LINUXMODULE	/* Linux kernel module */
     __skb_put(q->skb(), nbytes);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     rte_pktmbuf_append(q->mb(), nbytes);
 #else				/* User-space and BSD kernel module */
     q->_tail += nbytes;
@@ -1270,7 +1292,7 @@ Packet::expensive_put(uint32_t nbytes)
 Packet *
 Packet::shift_data(int offset, bool free_on_failure)
 {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
     assert(false);
 #endif
 
@@ -1299,7 +1321,7 @@ Packet::shift_data(int offset, bool free_on_failure)
 	struct sk_buff *mskb = q->skb();
 	mskb->data += offset;
 	mskb->tail += offset;
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_adj(q->mb(), offset);
         rte_pktmbuf_append(q->mb(), offset);
 #else				/* User-space and BSD kernel module */
@@ -1334,7 +1356,9 @@ cleanup_pool(PacketPool *pp, int global)
     while (WritablePacket *pd = pp->pd) {
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
-#if HAVE_NETMAP_PACKET_POOL
+#if HAVE_DPDK_PACKET_POOL
+    rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
+#elif HAVE_NETMAP_PACKET_POOL
     NetmapBufQ::local_pool()->insert_p(pd->buffer());
 #else
 	delete[] reinterpret_cast<unsigned char *>(pd->buffer());

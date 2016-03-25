@@ -296,7 +296,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return 0;
 
     click_chatter("Initializing DPDK");
-#if defined(RTE_VER_YEAR) || (RTE_VER_MAJOR < 2)
+#if !defined(RTE_VER_YEAR) && (RTE_VER_MAJOR < 2)
     if (rte_eal_pci_probe())
         return errh->error("Cannot probe the PCI bus");
 #endif
@@ -326,10 +326,12 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     return 0;
 }
 
+#if !HAVE_DPDK_PACKET_POOL
 void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 {
     rte_pktmbuf_free((struct rte_mbuf *) pktmbuf);
 }
+#endif
 
 int DPDKDevice::NB_MBUF = 65536;
 int DPDKDevice::MBUF_DATA_SIZE =

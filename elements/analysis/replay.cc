@@ -43,8 +43,6 @@ Replay::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("QUICK_CLONE", _quick_clone)
 	.complete() < 0)
     return -1;
-
-    ScheduleInfo::initialize_task(this,&_task,true,errh);
     return 0;
 }
 
@@ -71,7 +69,7 @@ PacketBatch* Replay::pull_batch(int port, unsigned max) {
 #endif
 
 int
-Replay::initialize(ErrorHandler *) {
+Replay::initialize(ErrorHandler * errh) {
 	_notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
 	_notifier.set_active(false,false);
 	_input.resize(ninputs());
@@ -81,6 +79,7 @@ Replay::initialize(ErrorHandler *) {
 	for (int i = 0; i < _output.size(); i++) {
 		_output[i].ring.initialize(_queue);
 	}
+	ScheduleInfo::initialize_task(this,&_task,true,errh);
 	return 0;
 }
 

@@ -121,13 +121,18 @@ bool FromDPDKDevice::run_task(Task * t)
     for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
         unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst_size);
         for (unsigned i = 0; i < n; ++i) {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
             rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
             WritablePacket *p = Packet::make(pkts[i]);
 #elif HAVE_ZEROCOPY
     rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
     WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
-                     rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt,
+                     rte_pktmbuf_data_len(pkts[i]),
+#if HAVE_DPDK_PACKET_POOL
+					 0,
+#else
+					 DPDKDevice::free_pkt,
+#endif
                      pkts[i]);
 #else
             WritablePacket *p = Packet::make((void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),

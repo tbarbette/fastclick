@@ -125,7 +125,7 @@ void ToDPDKDevice::add_handlers()
 
 inline struct rte_mbuf* ToDPDKDevice::get_mbuf(Packet* p, bool create=true) {
     struct rte_mbuf* mbuf;
-    #if CLICK_DPDK_POOLS
+    #if CLICK_PACKET_USE_DPDK
     mbuf = p->mb();
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p))) {
@@ -253,7 +253,7 @@ void ToDPDKDevice::push_packet(int, Packet *p)
         // If we're in blocking mode, we loop until we can put p in the iqueue
     } while (unlikely(_blocking && congestioned));
 
-#if !CLICK_DPDK_POOLS
+#if !CLICK_PACKET_USE_DPDK
 	if (likely(is_fullpush()))
 	    p->safe_kill();
 	else
@@ -335,7 +335,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         *pkt = get_mbuf(p);
         if (*pkt == 0)
             break;
-#if !CLICK_DPDK_POOLS
+#if !CLICK_PACKET_USE_DPDK
         BATCH_RECYCLE_UNSAFE_PACKET(p);
 #endif
 		pkt++;
@@ -361,7 +361,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	    iqueue.nr_pending = head->count() + iqueue.nr_pending - ret;
 	}
 
-#if !CLICK_DPDK_POOLS
+#if !CLICK_PACKET_USE_DPDK
 	#if HAVE_BATCH_RECYCLE
 		BATCH_RECYCLE_END();
 	#else
