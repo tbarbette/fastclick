@@ -38,6 +38,7 @@ public:
     static int add_tx_device(unsigned port_id, int &queue_id, unsigned n_desc,
                              ErrorHandler *errh);
     static int initialize(ErrorHandler *errh);
+	static int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {
         return (p->buffer_destructor() == DPDKDevice::free_pkt || (p->data_packet() && is_dpdk_packet(p->data_packet())));
