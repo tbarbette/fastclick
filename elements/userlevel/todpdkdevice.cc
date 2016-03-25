@@ -61,6 +61,14 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;
 
+    ret = initialize_tx(errh);
+    if (ret != 0)
+        return ret;
+
+    for (int i = 0; i < nqueues; i++) {
+        ret = DPDKDevice::add_tx_device(_port_id, i, ndesc , errh);
+        if (ret != 0) return ret;    }
+
 #if HAVE_BATCH
     if (batch_mode() == BATCH_MODE_YES) {
         if (_burst_size > 0)
@@ -77,14 +85,6 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 			errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
 		}
     }
-
-    ret = initialize_tx(errh);
-    if (ret != 0)
-        return ret;
-
-    for (int i = 0; i < nqueues; i++) {
-        ret = DPDKDevice::add_tx_device(_port_id, i, ndesc , errh);
-        if (ret != 0) return ret;    }
 
     ret = initialize_tasks(false,errh);
     if (ret != 0)

@@ -1294,6 +1294,25 @@ public :
 	 */
 	inline void kill();
 
+	/**
+	 * Clone the batch
+	 */
+	inline PacketBatch* clone_batch() {
+		PacketBatch* head = 0;
+		Packet* last = 0;
+		FOR_EACH_PACKET(this,p) {
+			Packet* q = p->clone();
+			if (last == 0) {
+				head = start_head(q);
+				last = q;
+			} else {
+				last->set_next(q);
+				last = q;
+			}
+		}
+		return head->make_tail(last,count());
+	}
+
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 	/**
 	 * Kill all packets of batch of unshared packets. Using this on unshared packets is very dangerous !
