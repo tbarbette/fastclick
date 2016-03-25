@@ -1089,6 +1089,9 @@ class WritablePacket : public Packet { public:
 		}\
 	}
 
+/**
+ * Create a batch by calling multiple times (up to max) a given function
+ */
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
         Packet* last = head;\

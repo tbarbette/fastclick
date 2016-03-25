@@ -194,7 +194,7 @@ inline void NetmapBufQ::insert_all(uint32_t idx,bool check_size = false) {
 	}
 
 	uint32_t firstidx = idx;
-	uint32_t *p;
+	uint32_t *p = 0;
 	while (idx > 0) { //Go to the end of the passed list
 		if (check_size) {
 			insert(idx);
@@ -206,8 +206,10 @@ inline void NetmapBufQ::insert_all(uint32_t idx,bool check_size = false) {
 	}
 
 	//Add the current list at the end of this one
-	*p = _head;
-	_head = firstidx;
+	if (!check_size) {
+		*p = _head;
+		_head = firstidx;
+	}
 }
 
 /**

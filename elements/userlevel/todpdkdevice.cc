@@ -25,8 +25,8 @@
 CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
-    _iqueues(), _port_id(0), _blocking(false),
-    _iqueue_size(1024), _burst_size(-1), _timeout(0), _congestion_warning_printed(false)
+    _iqueues(), _port_id(0), _iqueue_size(1024), _blocking(false),
+    _burst_size(-1), _timeout(0), _congestion_warning_printed(false)
 {
 }
 
@@ -38,7 +38,6 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String devname;
     int maxthreads = -1;
-    int minqueues = 1;
     int maxqueues = 128;
 
     if (Args(conf, this, errh)
@@ -55,6 +54,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
             return -1;
 
     QueueDevice::configure_tx(maxthreads,1,maxqueues,errh);
+    return 0;
 }
 
 int ToDPDKDevice::initialize(ErrorHandler *errh)
@@ -70,7 +70,8 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     {
 		if (_burst_size < 0)
 			_burst_size = 32;
-		if (ndesc > 0 && _burst_size > ndesc / 2 ) {
+
+		if (ndesc > 0 && (unsigned)_burst_size > ndesc / 2 ) {
 			errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
 		} else if (_burst_size > 32) {
 			errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
@@ -89,8 +90,8 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (int i = 0; i < _iqueues.size();i++) {
-    	_iqueues.get_value(i).pkts = new struct rte_mbuf *[_iqueue_size];
+    for (unsigned i = 0; i < _iqueues.size();i++) {
+        _iqueues.get_value(i).pkts = new struct rte_mbuf *[_iqueue_size];
         if (_timeout >= 0) {
             _iqueues.get_value(i).timeout.assign(this);
             _iqueues.get_value(i).timeout.initialize(this);
@@ -110,7 +111,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 void ToDPDKDevice::cleanup(CleanupStage stage)
 {
 	cleanup_tasks();
-	for (int i = 0; i < _iqueues.size();i++) {
+	for (unsigned i = 0; i < _iqueues.size();i++) {
 			delete[] _iqueues.get_value(i).pkts;
 	}
 }
@@ -238,7 +239,7 @@ void ToDPDKDevice::push_packet(int, Packet *p)
             }
         }
 
-        if (iqueue.nr_pending >= _burst_size || congestioned) {
+        if ((int)iqueue.nr_pending >= _burst_size || congestioned) {
             flush_internal_queue(iqueue);
             if (_timeout && iqueue.nr_pending == 0)
                 iqueue.timeout.unschedule();
@@ -316,7 +317,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 			unsigned int lost = iqueue.nr_pending - ret;
 			add_dropped(lost);
 			//click_chatter("Dropped %d");
-			for (int i = iqueue.index + ret; i < iqueue.index + iqueue.nr_pending; i++) {
+			for (unsigned i = iqueue.index + ret; i < iqueue.index + iqueue.nr_pending; i++) {
 				rte_pktmbuf_free(iqueue.pkts[i]);
 			}
 

@@ -117,12 +117,12 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     n_initialized++;
-    if (_verbose > 1)
+    if (_verbose > 1) {
 		if (input_is_push(0))
 			click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
 		else
 			click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
-
+    }
     return 0;
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
