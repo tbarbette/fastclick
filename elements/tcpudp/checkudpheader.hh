@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKUDPHEADER_HH
 #define CLICK_CHECKUDPHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -51,7 +51,7 @@ true.
 
 =a CheckIPHeader, CheckTCPHeader, CheckICMPHeader, MarkIPHeader */
 
-class CheckUDPHeader : public Element { public:
+class CheckUDPHeader : public BatchElement { public:
 
   CheckUDPHeader() CLICK_COLD;
   ~CheckUDPHeader() CLICK_COLD;
@@ -64,6 +64,9 @@ class CheckUDPHeader : public Element { public:
   void add_handlers() CLICK_COLD;
 
   Packet *simple_action(Packet *);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#endif
   /* inline Packet *smaction(Packet *);
      void push(int, Packet *p);
      Packet *pull(int); */

@@ -1,6 +1,6 @@
 #ifndef CLICK_TEE_HH
 #define CLICK_TEE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -22,7 +22,7 @@ CLICK_DECLS
  * N.
  */
 
-class Tee : public Element {
+class Tee : public BatchElement {
 
  public:
 
@@ -34,7 +34,10 @@ class Tee : public Element {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  void push(int, Packet *);
+  void push_packet(int, Packet *);
+  #if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+  #endif
 
 };
 

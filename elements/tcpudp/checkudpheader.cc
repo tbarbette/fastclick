@@ -106,6 +106,14 @@ CheckUDPHeader::simple_action(Packet *p)
   return p;
 }
 
+#if HAVE_BATCH
+PacketBatch*
+CheckUDPHeader::simple_action_batch(PacketBatch * batch) {
+	EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action,batch,[](Packet* p){});
+	return batch;
+}
+#endif
+
 String
 CheckUDPHeader::read_handler(Element *e, void *thunk)
 {
