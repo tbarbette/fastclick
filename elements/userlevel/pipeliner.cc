@@ -106,7 +106,9 @@ Pipeliner::initialize(ErrorHandler *errh)
 #if HAVE_BATCH
 void Pipeliner::push_batch(int,PacketBatch* head) {
 	retry:
+    int count = head->count();
     if (storage->insert(head)) {
+        stats->sent += count;
         if (sleepiness >= 4)
                     _task->reschedule();
     } else {
@@ -121,7 +123,7 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
 void Pipeliner::push_packet(int,Packet* p) {
 	retry:
     if (storage->insert(p)) {
-
+        stats->sent++;
     } else {
         if (_block) {
             if (sleepiness >= _ring_size / 4)
@@ -130,7 +132,7 @@ void Pipeliner::push_packet(int,Packet* p) {
         }
         p->kill();
         stats->dropped++;
-		if (stats->dropped % 100 == 1)
+		if (stats->dropped < 10 || stats->dropped % 100 == 1)
 			click_chatter("%s : Dropped %d packets : have %d packets in ring", name().c_str(), stats->dropped, storage->count());
     }
     if (sleepiness >= _ring_size / 4)
@@ -204,6 +206,7 @@ Pipeliner::run_task(Task* t)
 void Pipeliner::add_handlers()
 {
     add_read_handler("n_dropped", dropped_handler, 0);
+    add_read_handler("n_sent", sent_handler, 0);
 }
 
 CLICK_ENDDECLS
