@@ -128,11 +128,7 @@ bool FromDPDKDevice::run_task(Task * t)
     rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
     WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
                      rte_pktmbuf_data_len(pkts[i]),
-#if HAVE_DPDK_PACKET_POOL
-					 0,
-#else
 					 DPDKDevice::free_pkt,
-#endif
                      pkts[i]);
 #else
             WritablePacket *p = Packet::make((void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),

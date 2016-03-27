@@ -1168,6 +1168,7 @@ Router::initialize(ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (all_ok) {
+		//In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instanciating batches
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);

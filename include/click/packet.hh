@@ -45,7 +45,7 @@ class Packet { public:
     enum {
 #ifdef CLICK_MINIOS
 	default_headroom = 48,		///< Increase headroom for improved performance.
-#elif CLICK_PACKET_USE_DPDK
+#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL
 	default_headroom = RTE_PKTMBUF_HEADROOM,
 #else
 	default_headroom = 28,		///< Default packet headroom() for
@@ -2200,8 +2200,14 @@ Packet::uniqueify()
 inline WritablePacket *
 Packet::push(uint32_t len)
 {
-    if (headroom() >= len && !shared()) {
-	WritablePacket *q = (WritablePacket *)this;
+    if (headroom() >= len) {
+        WritablePacket *q;
+        if (shared()) {
+            q = expensive_uniqueify(0,0,true);
+            if (!q)
+                return 0;
+        } else
+           q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(q->skb(), len);
 #elif CLICK_PACKET_USE_DPDK
@@ -3217,11 +3223,19 @@ inline void PacketBatch::kill() {
 			}\
 		}
 
+#if HAVE_DPDK_PACKET_POOL
+#define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
+	if (p->data_packet() == 0 && p->buffer_destructor() == DPDKDevice::free_pkt && p->buffer() != 0) {\
+		BATCH_RECYCLE_DATA_PACKET(p);\
+	} else {\
+		BATCH_RECYCLE_PACKET(p);}}
+#else
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
 	if (p->data_packet() == 0 && p->buffer_destructor() == 0 && p->buffer() != 0) {\
 		BATCH_RECYCLE_DATA_PACKET(p);\
 	} else {\
 		BATCH_RECYCLE_PACKET(p);}}
+#endif
 
 #define BATCH_RECYCLE_END() \
 	if (last_packet) {\

@@ -326,12 +326,11 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     return 0;
 }
 
-#if !HAVE_DPDK_PACKET_POOL
-void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
+void DPDKDevice::free_pkt(unsigned char * h, size_t, void *pktmbuf)
 {
-    rte_pktmbuf_free((struct rte_mbuf *) pktmbuf);
+	struct rte_mbuf* mb = (struct rte_mbuf *) pktmbuf;
+	rte_pktmbuf_free(mb);
 }
-#endif
 
 int DPDKDevice::NB_MBUF = 65536;
 int DPDKDevice::MBUF_DATA_SIZE =

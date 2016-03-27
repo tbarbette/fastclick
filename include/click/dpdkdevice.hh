@@ -41,11 +41,11 @@ public:
 	static int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {
-#if HAVE_DPDK_PACKET_POOL
-        return is_valid_dpdk_packet(p);
-#else
-        return (p->buffer_destructor() == DPDKDevice::free_pkt || (p->data_packet() && is_dpdk_packet(p->data_packet())));
-#endif
+        return p->buffer_destructor() == DPDKDevice::free_pkt;
+    }
+
+    inline static bool is_dpdk_buffer(Packet* p) {
+        return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
     }
 
     inline static bool is_valid_dpdk_packet(Packet* p) {
@@ -54,8 +54,8 @@ public:
         /*for (int i = 0; i < _nr_pktmbuf_pools; i++) {
             if (p->buffer() > _pktmbuf_pools[i]->elt_va_start && p->buffer() < _pktmbuf_pools[i]->elt_va_start)
                 return true;
-        }*/
-        return false;
+        }
+        return false;*/
     }
 
     inline static rte_mbuf* get_pkt(unsigned numa_node) {
@@ -66,9 +66,8 @@ public:
         return get_pkt(rte_socket_id());
     }
 
-#if !HAVE_DPDK_PACKET_POOL
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
-#endif
+
     static unsigned int get_nb_txdesc(unsigned port_id);
 
     static int NB_MBUF;

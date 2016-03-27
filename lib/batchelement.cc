@@ -121,6 +121,7 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int port
 	if (e->batch_mode() > Element::BATCH_MODE_NO) {
 		BatchElement* batch_e = dynamic_cast<BatchElement*>(e);
 		batch_e->in_batch_mode = Element::BATCH_MODE_YES;
+		batch_e->receives_batch = true;
 		batch_e->upgrade_ports();
 #if BATCH_DEBUG
 		if (_verbose)
@@ -154,7 +155,7 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int port
 }
 
 /**
- * RouterVisitor finding all reachable batch-enabled element
+ * RouterVisitor finding all reachable batch-enabled element. Used to re-batch before those
  */
 
 	BatchElement::PushToPushBatchVisitor::PushToPushBatchVisitor(std::list<BatchElement*> *list) : _list(list) {

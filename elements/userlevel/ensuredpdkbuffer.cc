@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 
-EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false)
+EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false), _extra_headroom(0)
 {
 }
 
@@ -39,6 +39,7 @@ EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
 	.read_p("FORCE_COPY", _force)
+	.read_p("EXTRA_HEADROOM", _extra_headroom)
 	.complete() < 0)
     return -1;
 
@@ -47,7 +48,7 @@ EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
 
 inline Packet*
 EnsureDPDKBuffer::smaction(Packet* p) {
-	if (!_force && DPDKDevice::is_dpdk_packet(p)) {
+	if (!_force && (DPDKDevice::is_dpdk_buffer(p))) {
 		return p;
 	} else {
 		struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
@@ -58,13 +59,9 @@ EnsureDPDKBuffer::smaction(Packet* p) {
 		WritablePacket* q = WritablePacket::make(
 				(unsigned char*)mbuf->buf_addr,
 				DPDKDevice::MBUF_DATA_SIZE,
-#if HAVE_DPDK_PACKET_POOL
-				0,
-#else
 				DPDKDevice::free_pkt,
-#endif
 				(void*)mbuf);
-		q->copy(p,rte_pktmbuf_headroom(mbuf));
+		q->copy(p,rte_pktmbuf_headroom(mbuf) + _extra_headroom);
 		p->kill();
 		return q;
 	}
