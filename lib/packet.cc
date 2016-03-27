@@ -1425,6 +1425,34 @@ Packet::static_cleanup()
 #endif
 }
 
+#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
+/**
+ * Recycle a whole batch of unshared packets of the same type
+ *
+ * @precond No packet are shared
+ */
+void PacketBatch::safe_kill(bool is_data) {
+    if (is_data) {
+        WritablePacket::recycle_data_batch(this);
+    } else {
+        WritablePacket::recycle_packet_batch(this);
+    }
+}
+
+/**
+ * Recycle a whole batch, faster in most cases
+ */
+void PacketBatch::fast_kill() {
+    BATCH_RECYCLE_START();
+    FOR_EACH_PACKET_SAFE(this,up) {
+        WritablePacket* p = static_cast<WritablePacket*>(up);
+        BATCH_RECYCLE_UNSAFE_PACKET(p);
+    }
+    BATCH_RECYCLE_END();
+}
+#endif
+
+
 #if HAVE_STATIC_ANNO
 unsigned int Packet::clean_offset = 0;
 unsigned int Packet::clean_size = 0;

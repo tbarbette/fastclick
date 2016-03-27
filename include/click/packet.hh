@@ -1317,9 +1317,9 @@ public :
 	/**
 	 * Kill all packets of batch of unshared packets. Using this on unshared packets is very dangerous !
 	 */
-	inline void safe_kill(bool is_data);
+	void safe_kill(bool is_data);
 
-	inline void fast_kill();
+	void fast_kill();
 #endif
 };
 
@@ -3250,35 +3250,6 @@ inline void PacketBatch::kill() {
 #define BATCH_RECYCLE_START() {}
 #define BATCH_RECYCLE_END() {}
 #define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
-#endif
-
-
-#if HAVE_BATCH
-
-/**
- * Recycle a whole batch of unshared packets of the same type
- *
- * @precond No packet are shared
- */
-inline void PacketBatch::safe_kill(bool is_data) {
-    if (is_data) {
-        WritablePacket::recycle_data_batch(this);
-    } else {
-        WritablePacket::recycle_packet_batch(this);
-    }
-}
-
-/**
- * Recycle a whole batch, faster in most cases
- */
-inline void PacketBatch::fast_kill() {
-    BATCH_RECYCLE_START();
-    FOR_EACH_PACKET_SAFE(this,up) {
-        WritablePacket* p = static_cast<WritablePacket*>(up);
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
-    }
-    BATCH_RECYCLE_END();
-}
 #endif
 
 typedef Packet::PacketType PacketType;
