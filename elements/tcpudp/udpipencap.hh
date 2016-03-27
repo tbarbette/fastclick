@@ -1,6 +1,6 @@
 #ifndef CLICK_UDPIPENCAP_HH
 #define CLICK_UDPIPENCAP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 #include <clicknet/udp.h>
@@ -52,7 +52,7 @@ Returns or sets the DPORT destination port argument.
 =a Strip, IPEncap
 */
 
-class UDPIPEncap : public Element { public:
+class UDPIPEncap : public BatchElement { public:
 
     UDPIPEncap() CLICK_COLD;
     ~UDPIPEncap() CLICK_COLD;
@@ -66,7 +66,9 @@ class UDPIPEncap : public Element { public:
     void add_handlers() CLICK_COLD;
 
     Packet *simple_action(Packet *);
-
+#if HAVE_BATCH
+	PacketBatch* simple_action_batch(PacketBatch *);
+#endif
   private:
 
     struct in_addr _saddr;
