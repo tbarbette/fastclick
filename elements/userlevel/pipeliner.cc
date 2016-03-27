@@ -113,9 +113,12 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
                     _task->reschedule();
     } else {
         //click_chatter("Drop!");
-    if (_block)
-        goto retry;
-        head->kill();
+	    if (_block) {
+			if (sleepiness >= _ring_size / 4)
+            	_task->reschedule();
+	        goto retry;
+		}
+     	head->kill();
     }
 }
 #endif
