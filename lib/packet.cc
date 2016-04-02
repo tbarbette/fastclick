@@ -818,6 +818,8 @@ Packet::make(uint32_t headroom, const void *data,
  * @param length length of packet
  * @param destructor destructor function
  * @param argument argument to destructor function
+ * @param headroom headroom available before the data pointer
+ * @param tailroom tailroom available after data + length
  * @return new packet, or null if no packet could be created
  *
  * The packet's data pointer becomes the @a data: the data is not copied
@@ -832,7 +834,7 @@ Packet::make(uint32_t headroom, const void *data,
  * null. */
 WritablePacket *
 Packet::make(unsigned char *data, uint32_t length,
-	     buffer_destructor_type destructor, void* argument)
+	     buffer_destructor_type destructor, void* argument, int headroom, int tailroom)
 {
 #if CLICK_PACKET_USE_DPDK
 assert(false); //TODO
@@ -844,8 +846,10 @@ assert(false); //TODO
 # endif
     if (p) {
 	p->initialize();
-	p->_head = p->_data = data;
-	p->_tail = p->_end = data + length;
+	p->_head = data - headroom;
+	p->_data = data;
+	p->_tail = data + length;
+	p->_end = p->_tail + tailroom;
 	p->_destructor = destructor;
 	p->_destructor_argument = argument;
     }
