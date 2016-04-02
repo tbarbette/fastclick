@@ -96,6 +96,9 @@ public:
 		return NetmapBufQ::netmap_buf_pools[click_current_cpu_id()];
 	}
 
+	static inline bool initialized() {
+		return netmap_buf_pools != 0;
+	}
 private :
 	uint32_t _head;  /* index of first buffer */
 	int _count; /* how many ? */
