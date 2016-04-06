@@ -81,7 +81,7 @@ class Packet { public:
 
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
-                                void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
 # if HAVE_BATCH
     static PacketBatch *make_batch(unsigned char *data, uint16_t count, uint16_t *length,
                 buffer_destructor_type destructor,
@@ -710,7 +710,7 @@ class Packet { public:
     }
 
 #if !CLICK_PACKET_USE_DPDK
-    Packet* data_packet() {
+    inline Packet* data_packet() {
     	return _data_packet;
     }
 #endif
