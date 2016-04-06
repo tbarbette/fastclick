@@ -460,7 +460,7 @@ WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_r
 PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur) {
     if (n <= 0) return NULL;
     struct netmap_slot* slot;
-    WritablePacket* last;
+    WritablePacket* last = 0;
 
     PacketPool& packet_pool = *make_local_packet_pool();
 

@@ -35,6 +35,9 @@
 #include <click/notifier.hh>
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
+#if HAVE_NETMAP_PACKET_POOL
+#include <click/netmapdevice.hh>
+#endif
 #if CLICK_STATS >= 2
 # include <click/hashtable.hh>
 #endif
