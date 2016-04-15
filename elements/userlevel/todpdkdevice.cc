@@ -128,10 +128,10 @@ inline struct rte_mbuf* ToDPDKDevice::get_mbuf(Packet* p, bool create=true) {
     #if CLICK_PACKET_USE_DPDK
     mbuf = p->mb();
     #else
-    if (likely(DPDKDevice::is_dpdk_buffer(p))) {
+    if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *) p->destructor_argument()))
+		|| unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
         /* If the packet is an unshared DPDK packet, we can send
          *  the mbuf as it to DPDK*/
-        mbuf = (struct rte_mbuf *) p->destructor_argument();
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
         mbuf->data_off = p->headroom();

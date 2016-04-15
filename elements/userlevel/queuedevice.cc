@@ -127,9 +127,15 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
 
-    if (router()->thread_sched() && router()->thread_sched()->initial_home_thread_id(this) != ThreadSched::THREAD_UNKNOWN) {
-        return errh->error("Configuration of %s has to be done using THREADOFFSET parameter instead of StaticThreadSched as this element can use multiple threads.",class_name());
-    };
+	if (router()->thread_sched() && router()->thread_sched()->initial_home_thread_id(this) != ThreadSched::THREAD_UNKNOWN) {
+		usable_threads[router()->thread_sched()
+					   ->initial_home_thread_id(this)] = 1;
+		n_initialized++;
+		click_chatter(
+				"%s : remove StaticThreadSched to use FastClick's "
+				"auto-thread assignment", class_name());
+		return 0;
+	};
 
 #if HAVE_NUMA
 	NumaCpuBitmask b = NumaCpuBitmask::allocate();

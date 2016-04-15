@@ -30,7 +30,7 @@
 #if CLICK_USERLEVEL || CLICK_MINIOS
 # include <unistd.h>
 #endif
-#if HAVE_DPDK_PACKET_POOL
+#if HAVE_DPDK
 # include <click/dpdkdevice.hh>
 #endif
 #if CLICK_PACKET_USE_DPDK
@@ -996,7 +996,16 @@ Packet::clone(bool fast)
         p->_data = _data;
         p->_tail = _tail;
         p->_end = _end;
+#if HAVE_DPDK
+        if (DPDKDevice::is_dpdk_packet(this)) {
+          p->_destructor = DPDKDevice::free_pkt;
+          p->_destructor_argument = destructor_argument();
+          rte_mbuf_refcnt_update((struct rte_mbuf*)p->destructor_argument(), 1);
+        } else
+#endif
+        {
         p->_destructor = empty_destructor;
+        }
     } else {
         Packet* origin = this;
         if (origin->_data_packet)
