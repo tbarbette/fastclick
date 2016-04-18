@@ -93,14 +93,14 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
     else
 	_end_h = 0;
 
-    setup_packet();
-
     return 0;
 }
 
 int
 InfiniteSource::initialize(ErrorHandler *errh)
 {
+	setup_packet();
+
     if (output_is_push(0)) {
 	ScheduleInfo::initialize_task(this, &_task, errh);
 	_nonfull_signal = Notifier::downstream_full_signal(this, 0, &_task);

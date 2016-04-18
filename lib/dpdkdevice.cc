@@ -95,7 +95,7 @@ bool DPDKDevice::alloc_pktmbufs()
 			if (!_pktmbuf_pools[i]) {
 				const char* name = (DPDKDevice::MEMPOOL_PREFIX + String(i)).c_str();
 				_pktmbuf_pools[i] =
-#if RTE_VER_MAJOR >= 2 && RTE_VER_MINOR >= 1
+#if defined(RTE_VER_YEAR) || (RTE_VER_MAJOR >= 2 && RTE_VER_MINOR >= 1)
 					rte_pktmbuf_pool_create(name, NB_MBUF,
 							MBUF_CACHE_SIZE, 0, MBUF_DATA_SIZE, i);
 #else
@@ -151,7 +151,7 @@ int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
             "Cannot initialize DPDK port %u with %u RX and %u TX queues",
             port_id, info.rx_queues.size(), info.tx_queues.size());
     struct rte_eth_rxconf rx_conf;
-#if RTE_VER_MAJOR >= 2
+#if defined(RTE_VER_YEAR) || RTE_VER_MAJOR >= 2
     memcpy(&rx_conf, &dev_info.default_rxconf, sizeof rx_conf);
 #else
     bzero(&rx_conf,sizeof rx_conf);
@@ -161,7 +161,7 @@ int DPDKDevice::initialize_device(unsigned port_id, DevInfo &info,
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
 
     struct rte_eth_txconf tx_conf;
-#if RTE_VER_MAJOR >= 2
+#if defined(RTE_VER_YEAR) || RTE_VER_MAJOR >= 2
     memcpy(&tx_conf, &dev_info.default_txconf, sizeof tx_conf);
 #else
     bzero(&tx_conf,sizeof tx_conf);
@@ -285,13 +285,18 @@ int DPDKDevice::add_tx_device(unsigned port_id, int &queue_id, unsigned n_desc,
     return add_device(port_id, DPDKDevice::TX, queue_id, false, n_desc, errh);
 }
 
+int DPDKDevice::static_cleanup() {
+	if (!_is_initialized)
+		return 0;
+}
+
 int DPDKDevice::initialize(ErrorHandler *errh)
 {
     if (_is_initialized)
         return 0;
 
     click_chatter("Initializing DPDK");
-#if RTE_VER_MAJOR < 2
+#if !defined(RTE_VER_YEAR) && (RTE_VER_MAJOR < 2)
     if (rte_eal_pci_probe())
         return errh->error("Cannot probe the PCI bus");
 #endif
@@ -321,9 +326,10 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     return 0;
 }
 
-void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
+void DPDKDevice::free_pkt(unsigned char * h, size_t, void *pktmbuf)
 {
-    rte_pktmbuf_free((struct rte_mbuf *) pktmbuf);
+	struct rte_mbuf* mb = (struct rte_mbuf *) pktmbuf;
+	rte_pktmbuf_free(mb);
 }
 
 int DPDKDevice::NB_MBUF = 65536;

@@ -226,8 +226,11 @@
 /* Define if a Click user-level driver uses Intel DPDK. */
 #undef HAVE_DPDK
 
+/* Define if you use only DPDK buffer as data buffer. */
+#undef HAVE_DPDK_PACKET_POOL
+
 /* Define if a Click user-level driver manages Intel DPDK packet pools. */
-#undef CLICK_DPDK_POOLS
+#undef CLICK_PACKET_USE_DPDK
 
 /* Define if Click should use Valgrind client requests. */
 #undef HAVE_VALGRIND

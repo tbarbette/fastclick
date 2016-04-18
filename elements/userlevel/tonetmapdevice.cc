@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _device(0),_burst(32),_block(true),_internal_queue(512),_pull_use_select(true)
+ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(true),_internal_queue(512),_pull_use_select(true),_device(0)
 {
 }
 
@@ -71,7 +71,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
     configure_tx(maxthreads,1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
 
-    if (_burst > _device->get_num_slots() / 2) {
+    if (_burst > (unsigned)_device->get_num_slots() / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
@@ -330,7 +330,7 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 				if (p->headroom() > 0) {
 					complaint++;
 					if (complaint < 5)
-						click_chatter("Shifting data in %s. You should avoid this case !");
+						click_chatter("Shifting data in ToNetmapDevice. You should avoid this case !");
 					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
 				}
 #  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool

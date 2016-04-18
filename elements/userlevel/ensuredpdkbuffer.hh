@@ -33,6 +33,7 @@ public:
 
 private:
     bool _force;
+    int _extra_headroom;
 };
 
 CLICK_ENDDECLS

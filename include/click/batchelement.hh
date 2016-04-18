@@ -51,8 +51,7 @@ class BatchElement : public Element { public:
 	    return head;
 	}
 
-	per_thread<PacketBatch*> current_batch;
-	per_thread<bool> inflow; //Remember if we are currently rebuilding a batch
+
 
 	inline void start_batch() {
 		inflow.set(true);
@@ -179,6 +178,10 @@ class BatchElement : public Element { public:
 	};
 
 	friend class Router;
+
+	private:
+	per_thread<PacketBatch*> current_batch;
+	per_thread<bool> inflow; //Remember if we are currently rebuilding a batch
 };
 
 

@@ -52,7 +52,7 @@ LookupIPRouteMP::configure(Vector<String> &conf, ErrorHandler *errh)
 
   for (int i = 0; i < conf.size(); i++) {
     IPAddress dst, mask, gw;
-    int32_t output_num;
+    int32_t output_num = 0;
     bool ok = false;
 
     Vector<String> words;

@@ -38,9 +38,24 @@ public:
     static int add_tx_device(unsigned port_id, int &queue_id, unsigned n_desc,
                              ErrorHandler *errh);
     static int initialize(ErrorHandler *errh);
+	static int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {
-        return (p->buffer_destructor() == DPDKDevice::free_pkt || (p->data_packet() && is_dpdk_packet(p->data_packet())));
+        return p->buffer_destructor() == DPDKDevice::free_pkt;
+    }
+
+    inline static bool is_dpdk_buffer(Packet* p) {
+        return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
+    }
+
+    inline static bool is_valid_dpdk_packet(Packet* p) {
+        struct rte_mbuf* mb = (struct rte_mbuf*)p->destructor_argument();
+        return mb && (mb->buf_addr == p->buffer());
+        /*for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+            if (p->buffer() > _pktmbuf_pools[i]->elt_va_start && p->buffer() < _pktmbuf_pools[i]->elt_va_start)
+                return true;
+        }
+        return false;*/
     }
 
     inline static rte_mbuf* get_pkt(unsigned numa_node) {

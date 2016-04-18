@@ -804,7 +804,8 @@ enable_select
 enable_poll
 enable_kqueue
 enable_dpdk
-enable_dpdk_pools
+enable_dpdk_pool
+enable_dpdk_packet
 enable_zerocopy
 enable_linuxmodule
 enable_fixincludes
@@ -1498,14 +1499,17 @@ Optional Features:
     --disable-batch       disable batching support
     --disable-verbose-batch
                           disable warnings and information about batching
-    --enable-netmap-pool  have only netmap packets in the pool
+    --enable-netmap-pool  use netmap buffers instead of standard Click
+                          malloc'ed buffers
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use Intel DPDK
-    --enable-dpdk-pools   Click manages DPDK packet pools
+    --enable-dpdk-pool    use DPDK buffer instead of standard click malloc'ed
+                          buffer
+    --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
@@ -6561,11 +6565,19 @@ else
 fi
 
 
-# Check whether --enable-dpdk-pools was given.
-if test "${enable_dpdk_pools+set}" = set; then :
-  enableval=$enable_dpdk_pools; :
+# Check whether --enable-dpdk-pool was given.
+if test "${enable_dpdk_pool+set}" = set; then :
+  enableval=$enable_dpdk_pool; :
 else
-  enable_dpdk_pools=no
+  enable_dpdk_pool=no
+fi
+
+
+# Check whether --enable-dpdk-packet was given.
+if test "${enable_dpdk_packet+set}" = set; then :
+  enableval=$enable_dpdk_packet; :
+else
+  enable_dpdk_packet=no
 fi
 
 
@@ -6601,16 +6613,29 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
 
 fi
 
-if test "x$enable_dpdk_pools" = "xyes"; then
+if test "x$enable_dpdk_pool" = "xyes"; then
     if test "x$enable_dpdk" != "xyes"; then
         as_fn_error $? "
 =========================================
 
---enable-dpdk-pools requires --enable-dpdk which was not provided.
+--enable-dpdk-pool requires --enable-dpdk which was not provided.
 
 =========================================" "$LINENO" 5
     fi
-    $as_echo "#define CLICK_DPDK_POOLS 1" >>confdefs.h
+    $as_echo "#define HAVE_DPDK_PACKET_POOL 1" >>confdefs.h
+
+fi
+
+if test "x$enable_dpdk_packet" = "xyes"; then
+    if test "x$enable_dpdk" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk-packet requires --enable-dpdk which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define CLICK_PACKET_USE_DPDK 1" >>confdefs.h
 
 fi
 
