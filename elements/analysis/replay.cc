@@ -1,6 +1,6 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 /*
- * replay.{cc,hh} -- replay some packets
+ * MultiReplay.{cc,hh} -- MultiReplay some packets
  * Tom Barbette
  *
  * Copyright (c) 2015 University of Liege
@@ -23,74 +23,19 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-Replay::Replay() : _active(true), _loaded(false), _queue(1024), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0)
+MultiReplayBase::MultiReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
 #endif
 }
 
-Replay::~Replay()
+MultiReplayBase::~MultiReplayBase()
 {
 }
 
-int
-Replay::configure(Vector<String> &conf, ErrorHandler *errh)
-{
-    if (Args(conf, this, errh)
-	.read_p("QUEUE", _queue)
-	.read("STOP", _stop)
-	.read("QUICK_CLONE", _quick_clone)
-	.complete() < 0)
-    return -1;
 
-    ScheduleInfo::initialize_task(this,&_task,true,errh);
-    return 0;
-}
-
-void *
-Replay::cast(const char *n)
-{
-    if (strcmp(n, Notifier::EMPTY_NOTIFIER) == 0)
-	return static_cast<Notifier *>(&_notifier);
-    else
-	return Element::cast(n);
-}
-Packet* Replay::pull(int port) {
-	_task.reschedule();
-    return _output[port].ring.extract();
-}
-
-#if HAVE_BATCH
-PacketBatch* Replay::pull_batch(int port, unsigned max) {
-	PacketBatch* head;
-	_task.reschedule();
-    MAKE_BATCH(_output[port].ring.extract(),head,max);
-    return head;
-}
-#endif
-
-int
-Replay::initialize(ErrorHandler *) {
-	_notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
-	_notifier.set_active(false,false);
-	_input.resize(ninputs());
-	for (int i = 0 ; i < ninputs(); i++)
-		_input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
-	_output.resize(noutputs());
-	for (int i = 0; i < _output.size(); i++) {
-		_output[i].ring.initialize(_queue);
-	}
-	return 0;
-}
-
-bool
-Replay::run_task(Task* task)
-{
-	if (!_active)
-		return false;
-
-	if (unlikely(!_loaded)) {
+inline bool MultiReplayBase::load_packets() {
 		Packet* p_input[ninputs()];
 		bzero(p_input,sizeof(Packet*) * ninputs());
 		int first_i = -1;
@@ -111,7 +56,9 @@ Replay::run_task(Task* task)
 					p_input[i] = input(i).pull();
 #endif
 					if (p_input[i] == 0) {
-						if (_input[i].signal.active()) goto do_pull;
+						if (_use_signal && _input[i].signal.active()) {
+							goto do_pull;
+						}
 						dry = i;
 						break;
 					}
@@ -141,19 +88,117 @@ Replay::run_task(Task* task)
 			p_input[first_i] = 0;
 			count++;
 			if (!router()->running())
-				return 0;
+				return false;
 		} while(dry < 0);
 
-		click_chatter("Successfully loaded %d packets. Input %d dried out.",count,dry);
+		click_chatter("%s : Successfully loaded %d packets. Input %d dried out.",name().c_str(),count,dry);
 
-		//Clean left over
+		//Clean left overs
 		for (int i = 0; i < ninputs(); i++) {
 			if (p_input[i])
 				p_input[i]->kill();
 		}
 		_loaded = true;
 		_queue_current = _queue_head;
+		return true;
+}
+
+inline void MultiReplayBase::check_end_loop(Task* t) {
+	if (unlikely(!_queue_current)) {
+		_queue_current = _queue_head;
+		if (_stop > 0)
+			_stop--;
+		if (_stop == 0) {
+			router()->please_stop_driver();
+			_active = false;
+			return;
+		}
+		if (_verbose)
+			click_chatter("MultiReplay loop");
 	}
+	t->fast_reschedule();
+}
+
+void MultiReplayBase::cleanup(CleanupStage) {
+	while (_queue_head) {
+		Packet* next = _queue_head->next();
+		_queue_head->kill();
+		_queue_head = next;
+	}
+}
+
+MultiReplay::MultiReplay() : _queue(1024)
+{
+}
+
+MultiReplay::~MultiReplay()
+{
+}
+
+
+void *
+MultiReplay::cast(const char *n)
+{
+    if (strcmp(n, Notifier::EMPTY_NOTIFIER) == 0)
+	return static_cast<Notifier *>(&_notifier);
+    else
+	return Element::cast(n);
+}
+
+
+int
+MultiReplay::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (Args(conf, this, errh)
+	.read_p("QUEUE", _queue)
+	.read("STOP", _stop)
+	.read("QUICK_CLONE", _quick_clone)
+	.read("USE_SIGNAL",_use_signal)
+	.complete() < 0)
+    return -1;
+    return 0;
+}
+
+Packet* MultiReplay::pull(int port) {
+	_task.reschedule();
+    return _output[port].ring.extract();
+}
+
+#if HAVE_BATCH
+PacketBatch* MultiReplay::pull_batch(int port, unsigned max) {
+	PacketBatch* head;
+	_task.reschedule();
+    MAKE_BATCH(_output[port].ring.extract(),head,max);
+    return head;
+}
+#endif
+
+int
+MultiReplay::initialize(ErrorHandler * errh) {
+	_notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
+	_notifier.set_active(false,false);
+	_input.resize(ninputs());
+	for (int i = 0 ; i < ninputs(); i++) {
+		_input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
+	}
+	_output.resize(noutputs());
+	for (int i = 0; i < _output.size(); i++) {
+		_output[i].ring.initialize(_queue);
+	}
+	ScheduleInfo::initialize_task(this,&_task,true,errh);
+	return 0;
+}
+
+
+
+bool
+MultiReplay::run_task(Task* task)
+{
+	if (!_active)
+		return false;
+
+	if (unlikely(!_loaded && !load_packets()))
+		return false;
 
 	unsigned int n = 0;
 	while (_queue_current != 0 && n < _burst) {
@@ -177,39 +222,111 @@ Replay::run_task(Task* task)
 		n++;
 	}
 
-	if (unlikely(!_queue_current)) {
-		_queue_current = _queue_head;
-		if (_stop > 0)
-			_stop--;
-		if (_stop == 0) {
-			router()->please_stop_driver();
-			_active = false;
-			return true;
-		}
-		click_chatter("Replay loop");
-	}
-	task->fast_reschedule();
+	check_end_loop(task);
 
 	return n > 0;
 }
 
-void Replay::cleanup(CleanupStage) {
-	while (_queue_head) {
-		Packet* next = _queue_head->next();
-		_queue_head->kill();
-		_queue_head = next;
-	}
-}
 
-/*
-Packet*
-Replay::pull(int port)
+MultiReplayUnqueue::MultiReplayUnqueue()
 {
 
-    return p;
-}*/
+}
+
+MultiReplayUnqueue::~MultiReplayUnqueue()
+{
+}
+
+
+int
+MultiReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (Args(conf, this, errh)
+	.read("STOP", _stop)
+	.read("QUICK_CLONE", _quick_clone)
+	.read("USE_SIGNAL",_use_signal)
+	.complete() < 0)
+    return -1;
+    return 0;
+}
+
+int
+MultiReplayUnqueue::initialize(ErrorHandler * errh) {
+	_input.resize(ninputs());
+	for (int i = 0 ; i < ninputs(); i++) {
+		_input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
+	}
+	ScheduleInfo::initialize_task(this,&_task,true,errh);
+	return 0;
+}
+
+bool
+MultiReplayUnqueue::run_task(Task* task)
+{
+	if (!_active)
+		return false;
+
+	if (unlikely(!_loaded && !load_packets()))
+		return false;
+	unsigned int n = 0;
+#if HAVE_BATCH
+	unsigned int c = 0;
+	PacketBatch* head = 0;
+	Packet* last = 0;
+#endif
+	while (_queue_current != 0 && n < _burst) {
+		Packet* p = _queue_current;
+
+			_queue_current = p->next();
+			Packet* q;
+			if (_stop > 1) {
+				q = p->clone(_quick_clone);
+				if (_quick_clone)
+					SET_PAINT_ANNO(q,PAINT_ANNO(p));
+			} else {
+				q = p;
+				_queue_head = _queue_current;
+			}
+#if HAVE_BATCH
+			if (head == 0) {
+				head = PacketBatch::start_head(q);
+				last = head;
+				c = 1;
+			} else {
+				//If next packet is for another output, send the pending batch and start a new one
+				if (PAINT_ANNO(q) != PAINT_ANNO(head)) {
+					output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
+					head = PacketBatch::start_head(q);
+					last = head;
+					c = 1;
+				} else {
+					//Just add the packet to the end of the batch
+					last->set_next(q);
+					last = q;
+					c++;
+				}
+			}
+#else
+			output(PAINT_ANNO(q)).push(q);
+#endif
+		n++;
+	}
+
+#if HAVE_BATCH
+	//Flush pending batch
+	if (head)
+		output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
+#endif
+
+
+	check_end_loop(task);
+
+	return n > 0;
+}
 
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(Replay)
-ELEMENT_MT_SAFE(Replay)
+EXPORT_ELEMENT(MultiReplay)
+ELEMENT_MT_SAFE(MultiReplay)
+EXPORT_ELEMENT(MultiReplayUnqueue)
+ELEMENT_MT_SAFE(MultiReplayUnqueue)

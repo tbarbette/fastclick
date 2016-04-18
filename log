@@ -1,0 +1,88 @@
+EAL: Detected lcore 0 as core 0 on socket 0
+EAL: Detected lcore 1 as core 1 on socket 0
+EAL: Detected lcore 2 as core 2 on socket 0
+EAL: Detected lcore 3 as core 3 on socket 0
+EAL: Detected lcore 4 as core 4 on socket 0
+EAL: Detected lcore 5 as core 5 on socket 0
+EAL: Detected lcore 6 as core 6 on socket 0
+EAL: Detected lcore 7 as core 7 on socket 0
+EAL: Detected lcore 8 as core 0 on socket 0
+EAL: Detected lcore 9 as core 1 on socket 0
+EAL: Detected lcore 10 as core 2 on socket 0
+EAL: Detected lcore 11 as core 3 on socket 0
+EAL: Detected lcore 12 as core 4 on socket 0
+EAL: Detected lcore 13 as core 5 on socket 0
+EAL: Detected lcore 14 as core 6 on socket 0
+EAL: Detected lcore 15 as core 7 on socket 0
+EAL: Support maximum 128 logical core(s) by configuration.
+EAL: Detected 16 lcore(s)
+EAL: VFIO modules not all loaded, skip VFIO support...
+EAL: Setting up physically contiguous memory...
+EAL: Ask a virtual area of 0x55400000 bytes
+EAL: Virtual area found at 0x7fff9fa00000 (size = 0x55400000)
+EAL: Ask a virtual area of 0x200000 bytes
+EAL: Virtual area found at 0x7fff9f600000 (size = 0x200000)
+EAL: Ask a virtual area of 0x200000 bytes
+EAL: Virtual area found at 0x7fff9f200000 (size = 0x200000)
+EAL: Ask a virtual area of 0xaa800000 bytes
+EAL: Virtual area found at 0x7ffef4800000 (size = 0xaa800000)
+EAL: Requesting 2048 pages of size 2MB from socket 0
+EAL: TSC frequency is ~2404171 KHz
+EAL: Master lcore 0 is ready (tid=f7fe3940;cpuset=[0])
+EAL: lcore 6 is ready (tid=f1ffa700;cpuset=[6])
+EAL: lcore 4 is ready (tid=f2ffc700;cpuset=[4])
+EAL: lcore 5 is ready (tid=f27fb700;cpuset=[5])
+EAL: lcore 3 is ready (tid=f37fd700;cpuset=[3])
+EAL: lcore 1 is ready (tid=f47ff700;cpuset=[1])
+EAL: lcore 2 is ready (tid=f3ffe700;cpuset=[2])
+EAL: PCI device 0000:02:00.0 on NUMA socket 0
+EAL:   probe driver: 8086:154d rte_ixgbe_pmd
+EAL:   PCI memory mapped at 0x7ffff4e00000
+EAL:   PCI memory mapped at 0x7ffff4e80000
+PMD: eth_ixgbe_dev_init(): MAC: 2, PHY: 12, SFP+: 3
+PMD: eth_ixgbe_dev_init(): port 0 vendorID=0x8086 deviceID=0x154d
+EAL: PCI device 0000:02:00.1 on NUMA socket 0
+EAL:   probe driver: 8086:154d rte_ixgbe_pmd
+EAL:   PCI memory mapped at 0x7ffff4e84000
+EAL:   PCI memory mapped at 0x7ffff4f04000
+PMD: eth_ixgbe_dev_init(): MAC: 2, PHY: 12, SFP+: 4
+PMD: eth_ixgbe_dev_init(): port 1 vendorID=0x8086 deviceID=0x154d
+EAL: PCI device 0000:03:00.0 on NUMA socket 0
+EAL:   probe driver: 8086:10fb rte_ixgbe_pmd
+EAL:   PCI memory mapped at 0x7ffff4f08000
+EAL:   PCI memory mapped at 0x7ffff4f88000
+PMD: eth_ixgbe_dev_init(): MAC: 2, PHY: 12, SFP+: 3
+PMD: eth_ixgbe_dev_init(): port 2 vendorID=0x8086 deviceID=0x10fb
+EAL: PCI device 0000:03:00.1 on NUMA socket 0
+EAL:   probe driver: 8086:10fb rte_ixgbe_pmd
+EAL:   PCI memory mapped at 0x7ffff4f8c000
+EAL:   PCI memory mapped at 0x7ffff500c000
+PMD: eth_ixgbe_dev_init(): MAC: 2, PHY: 12, SFP+: 4
+PMD: eth_ixgbe_dev_init(): port 3 vendorID=0x8086 deviceID=0x10fb
+Initializing DPDK
+PMD: ixgbe_dev_rx_queue_setup(): sw_ring=0x7fff9f298040 sw_sc_ring=0x7fff9f297700 hw_ring=0x7fff9f298980 dma_addr=0x358898980
+PMD: ixgbe_dev_tx_queue_setup(): sw_ring=0x7fff9f283540 hw_ring=0x7fff9f287580 dma_addr=0x358887580
+PMD: ixgbe_set_tx_function(): Using simple tx code path
+PMD: ixgbe_set_tx_function(): Vector tx enabled.
+PMD: ixgbe_set_rx_function(): Vector rx enabled, please make sure RX burst size no less than 4 (port=0).
+PMD: ixgbe_dev_rx_queue_setup(): sw_ring=0x7fff9f272740 sw_sc_ring=0x7fff9f271e00 hw_ring=0x7fff9f273080 dma_addr=0x358873080
+PMD: ixgbe_dev_tx_queue_setup(): sw_ring=0x7fff9f25dc40 hw_ring=0x7fff9f261c80 dma_addr=0x358861c80
+PMD: ixgbe_set_tx_function(): Using simple tx code path
+PMD: ixgbe_set_tx_function(): Vector tx enabled.
+PMD: ixgbe_set_rx_function(): Vector rx enabled, please make sure RX burst size no less than 4 (port=1).
+PMD: ixgbe_dev_rx_queue_setup(): sw_ring=0x7fff9f24ce40 sw_sc_ring=0x7fff9f24c500 hw_ring=0x7fff9f24d780 dma_addr=0x35884d780
+PMD: ixgbe_dev_tx_queue_setup(): sw_ring=0x7fff9f238340 hw_ring=0x7fff9f23c380 dma_addr=0x35883c380
+PMD: ixgbe_set_tx_function(): Using simple tx code path
+PMD: ixgbe_set_tx_function(): Vector tx enabled.
+PMD: ixgbe_set_rx_function(): Vector rx enabled, please make sure RX burst size no less than 4 (port=2).
+PMD: ixgbe_dev_rx_queue_setup(): sw_ring=0x7fff9f227540 sw_sc_ring=0x7fff9f226c00 hw_ring=0x7fff9f227e80 dma_addr=0x358827e80
+PMD: ixgbe_dev_tx_queue_setup(): sw_ring=0x7fff9f212a40 hw_ring=0x7fff9f216a80 dma_addr=0x358816a80
+PMD: ixgbe_set_tx_function(): Using simple tx code path
+PMD: ixgbe_set_tx_function(): Vector tx enabled.
+PMD: ixgbe_set_rx_function(): Vector rx enabled, please make sure RX burst size no less than 4 (port=3).
+Pipeline from 1 to 2
+Pipeline from 1 to 3
+Pipeline from 1 to 4
+Loading source/replay with 1 inputs.
+Successfully loaded 571588 packets. Input 0 dried out.
+expensive Packet::push; have 2 wanted 14

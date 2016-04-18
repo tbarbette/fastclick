@@ -35,9 +35,19 @@ Tee::configure(Vector<String> &conf, ErrorHandler *errh)
 	return errh->error("%d outputs implies %d arms", noutputs(), noutputs());
     return 0;
 }
-
+#if HAVE_BATCH
 void
-Tee::push(int, Packet *p)
+Tee::push_batch(int, PacketBatch *p)
+{
+  int n = noutputs();
+  for (int i = 0; i < n - 1; i++)
+    if (PacketBatch *q = p->clone_batch())
+      output_push_batch(i,q);
+  output_push_batch(n-1,p);
+}
+#endif
+void
+Tee::push_packet(int, Packet *p)
 {
   int n = noutputs();
   for (int i = 0; i < n - 1; i++)

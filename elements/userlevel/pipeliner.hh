@@ -57,11 +57,25 @@ public:
         return total;
     }
 
+    unsigned long int n_sent() {
+        unsigned long int total = 0;
+        for (unsigned i = 0; i < stats.size(); i++)
+            total += stats.get_value(i).sent;
+        return total;
+    }
+
     static String dropped_handler(Element *e, void *)
     {
         Pipeliner *p = static_cast<Pipeliner *>(e);
         return String(p->n_dropped());
     }
+
+    static String sent_handler(Element *e, void *)
+    {
+        Pipeliner *p = static_cast<Pipeliner *>(e);
+        return String(p->n_sent());
+    }
+
     void add_handlers() CLICK_COLD;
 
     int _ring_size;
@@ -71,10 +85,11 @@ public:
 
     per_thread_compressed<PacketRing> storage;
     struct stats {
-        stats() : dropped(0) {
+        stats() : dropped(0), sent(0) {
 
         }
         unsigned long int dropped;
+        unsigned long int sent;
     };
     per_thread_compressed<struct stats> stats;
     int out_id;

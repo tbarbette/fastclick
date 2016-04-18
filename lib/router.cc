@@ -35,6 +35,9 @@
 #include <click/notifier.hh>
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
+#if HAVE_NETMAP_PACKET_POOL
+#include <click/netmapdevice.hh>
+#endif
 #if CLICK_STATS >= 2
 # include <click/hashtable.hh>
 #endif
@@ -1168,6 +1171,7 @@ Router::initialize(ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (all_ok) {
+		//In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instanciating batches
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
             BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
@@ -1228,6 +1232,15 @@ Router::initialize(ErrorHandler *errh)
 	    sprintf(dmalloc_buf, "i%d  ", i);
 	    CLICK_DMALLOC_REG(dmalloc_buf);
 #endif
+#if HAVE_NETMAP_PACKET_POOL
+	if (element_stage[i] < Element::CONFIGURE_PHASE_PRIVILEGED && !NetmapBufQ::initialized()) {
+		click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-packet-pool to configure script to disable this feature.");
+		all_ok = false;
+		break;
+	}
+
+#endif
+
 	    RouterContextErrh cerrh(errh, "While initializing", element(i));
 	    assert(!cerrh.nerrors());
 	    if (_elements[i]->initialize(&cerrh) >= 0)

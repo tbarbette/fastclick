@@ -473,6 +473,9 @@ click_static_cleanup()
 #if HAVE_NETMAP
     NetmapDevice::static_cleanup();
 #endif
+#if HAVE_DPDK
+//	DPDKDevice::static_cleanup();
+#endif
     ErrorHandler::static_cleanup();
     cp_va_static_cleanup();
     NameInfo::static_cleanup();
