@@ -2200,14 +2200,8 @@ Packet::uniqueify()
 inline WritablePacket *
 Packet::push(uint32_t len)
 {
-    if (headroom() >= len) {
-        WritablePacket *q;
-        if (shared()) {
-            q = expensive_uniqueify(0,0,true);
-            if (!q)
-                return 0;
-        } else
-           q = (WritablePacket *)this;
+    if (headroom() >= len && !shared()) {
+        WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(q->skb(), len);
 #elif CLICK_PACKET_USE_DPDK
