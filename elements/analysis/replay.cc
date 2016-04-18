@@ -307,7 +307,7 @@ MultiReplayUnqueue::run_task(Task* task)
 				}
 			}
 #else
-			output(PAINT_ANNO(q),q);
+			output(PAINT_ANNO(q)).push(q);
 #endif
 		n++;
 	}
