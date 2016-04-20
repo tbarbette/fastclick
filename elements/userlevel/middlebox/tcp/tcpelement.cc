@@ -70,8 +70,8 @@ unsigned TCPElement::getPayloadLength(Packet* packet)
     return ip_len - iph_len - tcp_offset;
 }
 
-Packet* TCPElement::forgeAck(uint32_t saddr, uint32_t daddr, uint16_t sport,
-                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack)
+Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
+                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint8_t flags)
 {
     struct click_ether *ether;
     struct click_ip *ip;
@@ -80,7 +80,7 @@ Packet* TCPElement::forgeAck(uint32_t saddr, uint32_t daddr, uint16_t sport,
 
     if(packet == NULL)
         return NULL;
-        
+
     memset(packet->data(), '\0', packet->length());
 
     ether = (struct click_ether*)packet->data();
@@ -109,7 +109,7 @@ Packet* TCPElement::forgeAck(uint32_t saddr, uint32_t daddr, uint16_t sport,
     tcp->th_seq = htonl(seq);
     tcp->th_ack = htonl(ack);
     tcp->th_off = 5;
-    tcp->th_flags = TH_ACK;
+    tcp->th_flags = flags;
     tcp->th_win = htons(32120);
     tcp->th_sum = htons(0);
     tcp->th_urp = htons(0);

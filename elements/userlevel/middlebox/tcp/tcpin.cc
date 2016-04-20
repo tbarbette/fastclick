@@ -7,9 +7,8 @@
 
 CLICK_DECLS
 
-TCPIn::TCPIn() : outElement(NULL), returnElement(NULL)
+TCPIn::TCPIn() : outElement(NULL), returnElement(NULL), closingState(ClosingState::OPEN)
 {
-
 }
 
 int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -110,6 +109,25 @@ TCPOut* TCPIn::getOutElement()
 TCPIn* TCPIn::getReturnElement()
 {
     return returnElement;
+}
+
+void TCPIn::closeConnection(uint32_t saddr, uint32_t daddr, uint16_t sport,
+                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
+{
+    closeConnection(saddr, daddr, sport, dport, seq, ack, graceful, true);
+}
+
+void TCPIn::closeConnection(uint32_t saddr, uint32_t daddr, uint16_t sport,
+                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful, bool initiator)
+{
+    // TODO: ungraceful part (RST)
+
+    Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, TH_FIN);
+    push(0, packet);
+    closingState = ClosingState::FIN_WAIT;
+
+    if(initiator)
+        returnElement->closeConnection(daddr, saddr, dport, sport, ack, seq, graceful, false);
 }
 
 CLICK_ENDDECLS

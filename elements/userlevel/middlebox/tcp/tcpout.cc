@@ -43,10 +43,6 @@ Packet* TCPOut::processPacket(Packet* p)
         uint16_t currentLength = (uint16_t)packet->length();
         int offsetModification = -(initialLength - currentLength);
 
-        // Test to remove whole packet
-        if(offsetModification != 0)
-            offsetModification = -getPayloadLength(packet);
-
         if(offsetModification != 0)
         {
             // We know that the packet has been modified and its size has changed
@@ -67,7 +63,7 @@ Packet* TCPOut::processPacket(Packet* p)
                 // The packet is now empty, we discard it and send an ACK directly to the source
                 click_chatter("Empty packet. I send an ACK! (%u - %u - %d)", saddr, daddr, offsetModification);
 
-                Packet* forged = forgeAck(saddr, daddr, sport, dport, seq, ack);
+                Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, TH_ACK);
                 packet->kill();
 
                 if(forged == NULL)
