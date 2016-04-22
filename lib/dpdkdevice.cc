@@ -18,6 +18,8 @@
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
 
+#include <rte_errno.h>
+
 CLICK_DECLS
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
@@ -311,7 +313,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
             return errh->error("Cannot find DPDK port %u", it.key());
 
     if (!alloc_pktmbufs())
-        return errh->error("Could not allocate packet MBuf pools");
+        return errh->error("Could not allocate packet MBuf pools. Errno %d : %s", rte_errno, rte_strerror(rte_errno));
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         for (HashMap<unsigned, DevInfo>::iterator it = _devs.begin();
