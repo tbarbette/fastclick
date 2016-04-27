@@ -59,6 +59,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("BURST", _burst_size)
         .read("NDESC", ndesc)
 		.read("NUMA", _numa)
+		.read("VERBOSE", _verbose)
         .complete() < 0)
         return -1;
 
