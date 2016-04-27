@@ -50,6 +50,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES",maxqueues)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
+		.read("VERBOSE",_verbose)
         .complete() < 0)
             return -1;
 

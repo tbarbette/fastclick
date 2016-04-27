@@ -59,6 +59,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("BURST", _burst_size)
         .read("NDESC", ndesc)
 		.read("NUMA", _numa)
+		.read("VERBOSE", _verbose)
         .complete() < 0)
         return -1;
 
@@ -140,7 +141,7 @@ bool FromDPDKDevice::run_task(Task * t)
 #endif
             p->set_packet_type_anno(Packet::HOST);
             if (_set_rss_aggregate)
-#if RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
+#if RTE_VER_YEAR ||  RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
