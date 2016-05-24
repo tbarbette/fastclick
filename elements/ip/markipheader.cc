@@ -2,7 +2,11 @@
  * markipheader.{cc,hh} -- element sets IP Header annotation
  * Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -39,10 +43,19 @@ MarkIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet *
 MarkIPHeader::simple_action(Packet *p)
 {
-  const click_ip *ip = reinterpret_cast<const click_ip *>(p->data() + _offset);
-  p->set_ip_header(ip, ip->ip_hl << 2);
-  return p;
+    const click_ip *ip = reinterpret_cast<const click_ip *>(p->data() + _offset);
+    p->set_ip_header(ip, ip->ip_hl << 2);
+    return p;
 }
+
+#if HAVE_BATCH
+PacketBatch*
+MarkIPHeader::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(MarkIPHeader)

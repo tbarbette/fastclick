@@ -1,6 +1,6 @@
 #ifndef CLICK_IPPRINT_HH
 #define CLICK_IPPRINT_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -96,7 +96,7 @@ Boolean.  If false, then don't print messages.  Default is true.
 
 =a Print, CheckIPHeader */
 
-class IPPrint : public Element { public:
+class IPPrint : public BatchElement { public:
 
   IPPrint() CLICK_COLD;
   ~IPPrint() CLICK_COLD;
@@ -109,7 +109,10 @@ class IPPrint : public Element { public:
   void cleanup(CleanupStage) CLICK_COLD;
   void add_handlers() CLICK_COLD;
 
-  Packet *simple_action(Packet *);
+  Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
  private:
 
