@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKICMPHEADER_HH
 #define CLICK_CHECKICMPHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -49,7 +49,7 @@ subdivided by error. Only available if the DETAILS keyword argument was true.
 
 =a CheckIPHeader, CheckTCPHeader, CheckUDPHeader, MarkIPHeader */
 
-class CheckICMPHeader : public Element { public:
+class CheckICMPHeader : public BatchElement { public:
 
   CheckICMPHeader() CLICK_COLD;
   ~CheckICMPHeader() CLICK_COLD;
@@ -61,7 +61,10 @@ class CheckICMPHeader : public Element { public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;
 
-  Packet *simple_action(Packet *);
+  Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
  private:
 

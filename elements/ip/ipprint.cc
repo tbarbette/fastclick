@@ -2,8 +2,12 @@
  * ipprint.{cc,hh} -- element prints packet contents to system log
  * Max Poletto, Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2000 Mazu Networks, Inc.
  * Copyright (c) 2005-2008 Regents of the University of California
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -442,6 +446,14 @@ IPPrint::simple_action(Packet *p)
 
     return p;
 }
+
+#if HAVE_BATCH
+PacketBatch*
+IPPrint::simple_action_batch(PacketBatch *batch) {
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
+}
+#endif
 
 void
 IPPrint::add_handlers()

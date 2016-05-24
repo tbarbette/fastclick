@@ -1,6 +1,6 @@
 #ifndef CLICK_ICMPERROR_HH
 #define CLICK_ICMPERROR_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -102,7 +102,7 @@ CLICK_DECLS
  *
  * =a DecIPTTL, FixIPSrc, IPGWOptions */
 
-class ICMPError : public Element { public:
+class ICMPError : public BatchElement { public:
 
     ICMPError() CLICK_COLD;
     ~ICMPError() CLICK_COLD;
@@ -114,7 +114,10 @@ class ICMPError : public Element { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
   private:
 
