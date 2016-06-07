@@ -3,10 +3,11 @@
  * Dimitris Syrivelis  <jsyr@inf.uth.gr>
  * contains code from other sources; see below
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2006 University of Thessaly, Hellas
- *
- *
- *
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -69,14 +70,13 @@ Aes::initialize(ErrorHandler *)
 Packet *
 Aes::simple_action(Packet *p_in)
 {
-
   WritablePacket *p = p_in->uniqueify();
   unsigned char hold[8];
   struct esp_new *esp = (struct esp_new *)p->data();
-  SADataTuple * sa_data;
+  SADataTuple *sa_data;
   unsigned char iv[8];
-  unsigned char *ivp = esp->esp_iv;
-  unsigned char * idat = p->data() + sizeof(esp_new);
+  unsigned char *ivp  = esp->esp_iv;
+  unsigned char *idat = p->data() + sizeof(esp_new);
   int plen = p->length() - sizeof(esp_new) - _ignore;
   int i;
   /*
@@ -87,7 +87,7 @@ Aes::simple_action(Packet *p_in)
   if ((plen % 16) != 0) { plen += 8; }
   i = plen;
 
-  sa_data =(SADataTuple *)IPSEC_SA_DATA_REFERENCE_ANNO(p);
+  sa_data =reinterpret_cast<SADataTuple *>( IPSEC_SA_DATA_REFERENCE_ANNO(p) );
 
   if (_op == AES_DECRYPT) {
     memcpy(iv, ivp, 8);
@@ -136,6 +136,15 @@ Aes::simple_action(Packet *p_in)
 
   return(p);
 }
+
+#if HAVE_BATCH
+PacketBatch*
+Aes::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 /***************************AES BELOW********************************/
 
@@ -814,7 +823,6 @@ static const unsigned long rcon[] = {
 int Aes::AES_set_encrypt_key(const unsigned char *userKey, const int bits,
 			AES_KEY *key)
  {
-
 	unsigned long *rk;
 	int i = 0;
 	unsigned long temp;
@@ -915,8 +923,7 @@ int Aes::AES_set_encrypt_key(const unsigned char *userKey, const int bits,
  */
 int Aes::AES_set_decrypt_key(const unsigned char *userKey, const int bits,
 			 AES_KEY *key) {
-
-        unsigned long *rk;
+    unsigned long *rk;
 	int i, j, status;
 	unsigned long temp;
 
@@ -1208,34 +1215,6 @@ void Aes::AES_decrypt(const unsigned char *in, unsigned char *out,
 		rk[3];
 	PUTU32(out + 12, s3);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(Aes)

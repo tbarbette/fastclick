@@ -1,6 +1,6 @@
 #ifndef CLICK_DECIPTTL_HH
 #define CLICK_DECIPTTL_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
@@ -42,7 +42,7 @@ CLICK_DECLS
  * =a ICMPError, CheckIPHeader
  */
 
-class DecIPTTL : public Element { public:
+class DecIPTTL : public BatchElement { public:
 
     DecIPTTL() CLICK_COLD;
     ~DecIPTTL() CLICK_COLD;
@@ -54,14 +54,16 @@ class DecIPTTL : public Element { public:
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    Packet      *simple_action      (Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 
     atomic_uint32_t _drops;
     bool _active;
     bool _multicast;
-
 };
 
 CLICK_ENDDECLS

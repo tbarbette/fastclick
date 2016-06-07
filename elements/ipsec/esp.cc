@@ -2,12 +2,14 @@
  * esp.{cc,hh} -- element implements IPsec encapsulation (RFC 2406)
  * Alex Snoeren, Benjie Chen
  *
+ * Computational batching support
+ * by Georgios Katsikas
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
- * Added Security Association Database support. Dimitris Syrivelis <jsyr@inf.uth.gr>, University of Thessaly, *
- * Hellas
- *
+ * Added Security Association Database support. Dimitris Syrivelis <jsyr@inf.uth.gr>,
+ * University of Thessaly, Hellas
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -59,7 +61,7 @@ IPsecESPEncap::simple_action(Packet *p)
   // extract protocol header
   if (p->has_network_header())
       ip_p = p->ip_header()->ip_p;
-  sa_data=(SADataTuple *)IPSEC_SA_DATA_REFERENCE_ANNO(p);
+  sa_data = reinterpret_cast<SADataTuple *>( IPSEC_SA_DATA_REFERENCE_ANNO(p) );
 
   // make room for ESP header and padding
   int plen = p->length();
@@ -97,7 +99,14 @@ IPsecESPEncap::simple_action(Packet *p)
   return(q);
 }
 
-
+#if HAVE_BATCH
+PacketBatch*
+IPsecESPEncap::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPsecESPEncap)

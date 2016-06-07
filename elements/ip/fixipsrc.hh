@@ -1,6 +1,6 @@
 #ifndef CLICK_FIXIPSRC_HH
 #define CLICK_FIXIPSRC_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -26,7 +26,7 @@ CLICK_DECLS
  *
  * =a ICMPError */
 
-class FixIPSrc : public Element {
+class FixIPSrc : public BatchElement {
   struct in_addr _my_ip;
 
 public:
@@ -38,8 +38,11 @@ public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
   WritablePacket *fix_it(Packet *);
-  Packet *simple_action(Packet *);
 
+  Packet      *simple_action      (Packet *);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 };
 
 CLICK_ENDDECLS

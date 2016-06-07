@@ -2,7 +2,7 @@
 #ifndef CLICK_IPROUTETABLE_HH
 #define CLICK_IPROUTETABLE_HH
 #include <click/glue.hh>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -185,7 +185,7 @@ struct IPRoute {
     String unparse_addr() const	{ return addr.unparse_with_mask(mask); }
 };
 
-class IPRouteTable : public Element { public:
+class IPRouteTable : public BatchElement { public:
 
     void* cast(const char*);
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
@@ -196,7 +196,10 @@ class IPRouteTable : public Element { public:
     virtual int lookup_route(IPAddress addr, IPAddress& gw) const = 0;
     virtual String dump_routes();
 
-    void push(int port, Packet* p);
+    void push      (int, Packet      *p);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *batch);
+#endif
 
     static int add_route_handler(const String&, Element*, void*, ErrorHandler*);
     static int remove_route_handler(const String&, Element*, void*, ErrorHandler*);
@@ -209,6 +212,9 @@ class IPRouteTable : public Element { public:
     enum { CMD_ADD, CMD_SET, CMD_REMOVE };
     int run_command(int command, const String &, Vector<IPRoute>* old_routes, ErrorHandler*);
 
+    // The actual processing of this element is abstracted from the push operation.
+    // This allows both push and push_batch to exploit the same processing.
+    int process(int port, Packet *p);
 };
 
 inline StringAccum&

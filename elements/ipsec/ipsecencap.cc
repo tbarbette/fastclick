@@ -1,14 +1,17 @@
 /*
  * ipsecenncap.{cc,hh} -- element encapsulates packet in IP header and implements additional logic for IPSEC
  * (implemented in simple_action)
- *
  * Dimitris Syrivelis
- * Copyright (c) 2006 University of Thessaly, Hellas
  *
  * based on ipencap.{cc,hh}
  * Robert Morris, Eddie Kohler, Alex Snoeren
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2006 University of Thessaly, Hellas
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -154,6 +157,15 @@ IPsecEncap::simple_action(Packet *p_in)
   p->set_ip_header(ip, sizeof(click_ip));
   return p;
 }
+
+#if HAVE_BATCH
+PacketBatch*
+IPsecEncap::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 String
 IPsecEncap::read_handler(Element *e, void *thunk)

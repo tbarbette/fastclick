@@ -1,8 +1,13 @@
 // -*- c-basic-offset: 4 -*-
 /*
-Programmer: Roman Chertov
+ * Programmer: Roman Chertov
+ *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2010 The Aerospace Corporation
-
+ * Copyright (c) 2016 KTH Royal Institute of Technology
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, subject to the conditions
@@ -15,7 +20,7 @@ Programmer: Roman Chertov
 */
 #ifndef CLICK_STOREUDPTIMESEQRECORD_HH
 #define CLICK_STOREUDPTIMESEQRECORD_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 
 CLICK_DECLS
 
@@ -75,8 +80,8 @@ the difference between the current time and the packet's initial time.
         -> StoreUDPTimeSeqRecord(OFFSET 14, DELTA true)
         -> ToDump("dump.dmp");
 */
-class StoreUDPTimeSeqRecord : public Element
-{
+class StoreUDPTimeSeqRecord : public BatchElement {
+
 public:
     StoreUDPTimeSeqRecord() CLICK_COLD;
 
@@ -86,7 +91,10 @@ public:
     void add_handlers() CLICK_COLD;
     int  configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
     // packet data payload access struct
     // Header | PDATA | rest of data

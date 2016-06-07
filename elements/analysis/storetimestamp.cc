@@ -3,7 +3,11 @@
  * storetimestamp.{cc,hh} -- element stores timestamp in packet data
  * Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2003 International Computer Science Institute
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -57,6 +61,15 @@ StoreTimestamp::simple_action(Packet *p)
     } else
 	return 0;
 }
+
+#if HAVE_BATCH
+PacketBatch*
+StoreTimestamp::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StoreTimestamp)

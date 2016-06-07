@@ -1,7 +1,12 @@
 /*
-Programmer: Roman Chertov
+ * Programmer: Roman Chertov
+ *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2010 The Aerospace Corporation
-
+ * Copyright (c) 2016 KTH Royal Institute of Technology
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, subject to the conditions
@@ -38,9 +43,8 @@ StoreUDPTimeSeqRecord::StoreUDPTimeSeqRecord()
     _offset = 0;
 }
 
-
-
-int StoreUDPTimeSeqRecord::configure(Vector<String> &conf, ErrorHandler *errh)
+int
+StoreUDPTimeSeqRecord::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
 	.read_mp("OFFSET", _offset)
@@ -53,8 +57,8 @@ int StoreUDPTimeSeqRecord::configure(Vector<String> &conf, ErrorHandler *errh)
 // This is the tricky bit.  We can't rely on any headers being
 // filled out if elements like CheckIPHeader have not been called
 // so we should just access the raw data and cast wisely
-Packet* StoreUDPTimeSeqRecord::simple_action(Packet *packet)
-{
+Packet*
+StoreUDPTimeSeqRecord::simple_action(Packet *packet) {
     WritablePacket *p = packet->uniqueify();
     Timestamp       tnow;
     click_udp      *udph = 0;
@@ -150,8 +154,17 @@ Packet* StoreUDPTimeSeqRecord::simple_action(Packet *packet)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch*
+StoreUDPTimeSeqRecord::simple_action_batch(PacketBatch *batch)
+{
+	EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+	return batch;
+}
+#endif
 
-int StoreUDPTimeSeqRecord::reset_handler(const String &, Element *e, void *, ErrorHandler *)
+int
+StoreUDPTimeSeqRecord::reset_handler(const String &, Element *e, void *, ErrorHandler *)
 {
     StoreUDPTimeSeqRecord *t = (StoreUDPTimeSeqRecord *) e;
 
@@ -159,7 +172,8 @@ int StoreUDPTimeSeqRecord::reset_handler(const String &, Element *e, void *, Err
     return 0;
 }
 
-void StoreUDPTimeSeqRecord::add_handlers()
+void
+StoreUDPTimeSeqRecord::add_handlers()
 {
     add_data_handlers("count", Handler::f_read, &_count);
     add_write_handler("reset", reset_handler);

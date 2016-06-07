@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_STORETIMESTAMP_HH
 #define CLICK_STORETIMESTAMP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -38,7 +38,7 @@ Boolean.  If true, the timestamp will be tacked on to the end of the packet.
 
 SetTimestamp */
 
-class StoreTimestamp : public Element { public:
+class StoreTimestamp : public BatchElement { public:
 
     StoreTimestamp() CLICK_COLD;
     ~StoreTimestamp() CLICK_COLD;
@@ -47,7 +47,10 @@ class StoreTimestamp : public Element { public:
     const char *port_count() const	{ return PORTS_1_1; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    Packet      *simple_action      (Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
   private:
 

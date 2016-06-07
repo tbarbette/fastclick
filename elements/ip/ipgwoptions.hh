@@ -1,6 +1,6 @@
 #ifndef CLICK_IPGWOPTIONS_HH
 #define CLICK_IPGWOPTIONS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
@@ -33,7 +33,7 @@ CLICK_DECLS
  *
  * =a ICMPError */
 
-class IPGWOptions : public Element { public:
+class IPGWOptions : public BatchElement { public:
 
   IPGWOptions() CLICK_COLD;
   ~IPGWOptions() CLICK_COLD;
@@ -47,7 +47,11 @@ class IPGWOptions : public Element { public:
   uint32_t drops() const			{ return _drops; }
 
   Packet *handle_options(Packet *);
+
   Packet *simple_action(Packet *);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
  private:
 

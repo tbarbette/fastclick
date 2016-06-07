@@ -1,6 +1,6 @@
 #ifndef CLICK_IPSEC_DESP_HH
 #define CLICK_IPSEC_DESP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include "satable.hh"
 #include "sadatatuple.hh"
@@ -19,7 +19,7 @@ CLICK_DECLS
  * =a IPsecESPUnencap, IPsecDES, IPsecAuthSHA1
  */
 
-class IPsecESPUnencap : public Element {
+class IPsecESPUnencap : public BatchElement {
 public:
   IPsecESPUnencap() CLICK_COLD;
   ~IPsecESPUnencap() CLICK_COLD;
@@ -29,7 +29,10 @@ public:
 
   int checkreplaywindow(SADataTuple * sa_data,unsigned long seq);
 
-  Packet *simple_action(Packet *);
+  Packet      *simple_action      (Packet *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 };
 
 CLICK_ENDDECLS

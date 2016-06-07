@@ -2,7 +2,11 @@
  * desp.{cc,hh} -- element implements IPsec unencapsulation (RFC 2406)
  * Alex Snoeren, Benjie Chen
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Added Security Association Table support. Dimitris Syrivelis <jsyr@inf.uth.gr>, University of Thessaly, Hellas
  * Added Replay Check support originally written for linux ipsec-0.5 from John Ioannidis <ji@hol.gr>
@@ -119,6 +123,15 @@ IPsecESPUnencap::simple_action(Packet *p)
   p->take(blks+2);
   return p;
 }
+
+#if HAVE_BATCH
+PacketBatch*
+IPsecESPUnencap::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPsecESPUnencap)

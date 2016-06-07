@@ -3,8 +3,12 @@
  * iproutetable.{cc,hh} -- looks up next-hop address in route table
  * Benjie Chen, Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2001 Massachusetts Institute of Technology
  * Copyright (c) 2002 International Computer Science Institute
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -145,25 +149,99 @@ IPRouteTable::dump_routes()
     return String();
 }
 
-
-void
-IPRouteTable::push(int, Packet *p)
+int
+IPRouteTable::process(int, Packet *p)
 {
-    IPAddress gw;
+	IPAddress gw;
     int port = lookup_route(p->dst_ip_anno(), gw);
     if (port >= 0) {
-	assert(port < noutputs());
-	if (gw)
-	    p->set_dst_ip_anno(gw);
-	output(port).push(p);
-    } else {
-	static int complained = 0;
-	if (++complained <= 5)
-	    click_chatter("IPRouteTable: no route for %s", p->dst_ip_anno().unparse().c_str());
-	p->kill();
+		assert(port < noutputs());
+		if (gw)
+		    p->set_dst_ip_anno(gw);
+		return port;
+    }
+    else {
+		static int complained = 0;
+		if (++complained <= 5)
+		    click_chatter("IPRouteTable: no route for %s", p->dst_ip_anno().unparse().c_str());
+		return -1;
     }
 }
 
+void
+IPRouteTable::push(int port, Packet *p)
+{
+    int output_port = process(port, p);
+	if ( output_port < 0 ) {
+		p->kill();
+		return;
+	}
+
+	output(output_port).push(p);
+}
+
+#if HAVE_BATCH
+void
+IPRouteTable::push_batch(int port, PacketBatch *batch)
+{
+	unsigned short outports = noutputs();
+	PacketBatch* out[outports];
+	bzero(out,sizeof(PacketBatch*)*outports);
+	PacketBatch* next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );
+	PacketBatch* p = batch;
+	PacketBatch* last = NULL;
+	int last_o = -1;
+	int passed = 0;
+	int count  = 0;
+
+	for ( ;p != NULL; p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next())) ) {
+		// The actual job of this element
+		int o = process(port, p);
+
+		if (o < 0 || o>=(outports)) o = (outports - 1);
+
+		if (o == last_o) {
+			passed ++;
+		}
+		else {
+			if ( !last ) {
+				out[o] = p;
+				p->set_count(1);
+				p->set_tail(p);
+			}
+			else {
+				out[last_o]->set_tail(last);
+				out[last_o]->set_count(out[last_o]->count() + passed);
+				if (!out[o]) {
+					out[o] = p;
+					out[o]->set_count(1);
+					out[o]->set_tail(p);
+				}
+				else {
+					out[o]->append_packet(p);
+				}
+				passed = 0;
+			}
+		}
+		last = p;
+		last_o = o;
+		count++;
+	}
+
+	if (passed) {
+		out[last_o]->set_tail(last);
+		out[last_o]->set_count(out[last_o]->count() + passed);
+	}
+
+	int i = 0;
+	for (; i < outports; i++) {
+		if (out[i]) {
+			out[i]->tail()->set_next(NULL);
+			checked_output_push_batch(i, out[i]);
+		}
+	}
+}
+#endif
 
 int
 IPRouteTable::run_command(int command, const String &str, Vector<IPRoute>* old_routes, ErrorHandler *errh)
