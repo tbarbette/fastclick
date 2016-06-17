@@ -1,5 +1,5 @@
-#ifndef CLICK_IPREWRITER_HH
-#define CLICK_IPREWRITER_HH
+#ifndef CLICK_IPSYNTHESIZER_HH
+#define CLICK_IPSYNTHESIZER_HH
 #include "tcprewriter.hh"
 #include "udprewriter.hh"
 CLICK_DECLS
@@ -8,22 +8,23 @@ class UDPRewriter;
 /*
 =c
 
-IPRewriter(INPUTSPEC1, ..., INPUTSPECn [, I<keywords>])
+IPSynthesizer(INPUTSPEC1, ..., INPUTSPECn [, I<keywords>])
 
 =s nat
 
-rewrites TCP/UDP packets' addresses and ports
+rewrites TCP/UDP packets' addresses and ports while (optionally) combining post-routing operations
+such as DecIPTTL, DropBroadcasts, FixIPSrc, IPGWOptions, and IPFragmentation.
 
 =d
 
 Rewrites the source address, source port, destination address, and/or
 destination port on TCP and UDP packets, along with their checksums.
-IPRewriter implements the functionality of a network address/port translator
+IPSynthesizer implements the functionality of a network address/port translator
 E<lparen>NAPT).  See also IPAddrRewriter and IPAddrPairRewriter, which
 implement Basic NAT, and TCPRewriter, which implements NAPT plus sequence
 number changes for TCP packets.
 
-IPRewriter maintains a I<mapping table> that records how packets are
+IPSynthesizer maintains a I<mapping table> that records how packets are
 rewritten.  The mapping table is indexed by I<flow identifier>, the quintuple
 of source address, source port, destination address, destination port, and IP
 protocol (TCP or UDP).  Each mapping contains a new flow identifier and an
@@ -33,7 +34,7 @@ written as follows:
 
 	(SA, SP, DA, DP, PROTO) => (SA', SP', DA', DP') [*OUTPUT]
 
-When IPRewriter receives a packet, it first looks up that packet in the
+When IPSynthesizer receives a packet, it first looks up that packet in the
 mapping table by flow identifier.  If the table contains a mapping for the
 input packet, then the packet is rewritten according to the mapping and
 emitted on the specified output port.  If there was no mapping, the packet is
@@ -71,7 +72,7 @@ Creates a mapping according to the given pattern, 'SADDR SPORT DADDR DPORT'.
 Any pattern field may be a dash '-', in which case the packet's corresponding
 field is left unchanged.  For instance, the pattern '1.0.0.1 20 - -' will
 rewrite input packets' source address and port, but leave its destination
-address and port unchanged.  SPORT may be a port range 'L-H'; IPRewriter will
+address and port unchanged.  SPORT may be a port range 'L-H'; IPSynthesizer will
 choose a source port in that range so that the resulting mappings don't
 conflict with any existing mappings.  The input packet's source port is
 preferred, if it is available; otherwise a random port is chosen.  If no
@@ -104,11 +105,11 @@ RoundRobinIPMapper.
 
 =back
 
-IPRewriter has no mappings when first initialized.
+IPSynthesizer has no mappings when first initialized.
 
 Input packets must have their IP header annotations set.  Non-TCP and UDP
 packets, and second and subsequent fragments, are dropped unless they arrive
-on a 'pass' input port.  IPRewriter changes IP packet data and, optionally,
+on a 'pass' input port.  IPSynthesizer changes IP packet data and, optionally,
 destination IP address annotations; see the DST_ANNO keyword argument below.
 
 Keyword arguments determine how often stale mappings should be removed.
@@ -137,7 +138,7 @@ than TCP_DONE_TIMEOUT.
 
 Preserve each TCP connection mapping for at least I<time> seconds after each
 successfully processed packet. Defaults to 5 seconds. Incoming flows are
-dropped if an IPRewriter's mapping table is full of guaranteed flows.
+dropped if an IPSynthesizer's mapping table is full of guaranteed flows.
 
 =item UDP_TIMEOUT I<time>
 
@@ -173,13 +174,13 @@ packets to the rewritten destination address. Default is true.
 
 =h table_size r
 
-Returns the number of mappings in this IPRewriter's tables.
+Returns the number of mappings in this IPSynthesizer's tables.
 
 =h mapping_failures r
 
 Returns the number of mapping failures, which can occur, for example, when the
-IPRewriter runs out of source ports, or when a new flow is dropped because the
-IPRewriter is full.
+IPSynthesizer runs out of source ports, or when a new flow is dropped because the
+IPSynthesizer is full.
 
 =h size r
 
@@ -195,13 +196,13 @@ omitted; it is then set to the minimum of 50 and one-eighth the capacity.
 
 =h tcp_table read-only
 
-Returns a human-readable description of the IPRewriter's current TCP mapping
+Returns a human-readable description of the IPSynthesizer's current TCP mapping
 table. An unparsed mapping includes both directions' output ports; the
 relevant output port is starred.
 
 =h udp_table read-only
 
-Returns a human-readable description of the IPRewriter's current UDP mapping
+Returns a human-readable description of the IPSynthesizer's current UDP mapping
 table.
 
 =h tcp_lookup read
@@ -216,38 +217,39 @@ flow and returns in the same format.  Otherwise, returns nothing.
 =a TCPRewriter, IPAddrRewriter, IPAddrPairRewriter, IPRewriterPatterns,
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter */
 
-class IPRewriter : public TCPRewriter {
+class IPSynthesizer : public TCPRewriter {
 
 	public:
 		typedef UDPRewriter::UDPFlow UDPFlow;
 
-		IPRewriter () CLICK_COLD;
-		~IPRewriter() CLICK_COLD;
+		IPSynthesizer () CLICK_COLD;
+		~IPSynthesizer() CLICK_COLD;
 
-		const char *class_name() const { return "IPRewriter"; }
+		const char *class_name() const { return "IPSynthesizer"; }
 		void *cast(const char *);
 
 		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
 		IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
 		HashContainer<IPRewriterEntry> *get_map(int mapid) {
-		if (mapid == IPRewriterInput::mapid_default)
-			return &_map[click_current_cpu_id()];
-		else if (mapid == IPRewriterInput::mapid_iprewriter_udp)
-			return &_udp_map[click_current_cpu_id()];
-		else
-			return 0;
+			if (mapid == IPRewriterInput::mapid_default)
+				return &_map[click_current_cpu_id()];
+			else if (mapid == IPRewriterInput::mapid_iprewriter_udp)
+				return &_udp_map[click_current_cpu_id()];
+			else
+				return 0;
 		}
+
 		IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
 					  const IPFlowID &rewritten_flowid, int input);
+
 		void destroy_flow(IPRewriterFlow *flow);
-			click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
+		click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
 			if (flow->ip_p() == IP_PROTO_TCP)
 				return TCPRewriter::best_effort_expiry(flow);
 			else
-				return flow->expiry() +
-					udp_flow_timeout(static_cast<const UDPFlow *>(flow)) -
-					_udp_timeouts[click_current_cpu_id()][1];
+				return flow->expiry() 	+ udp_flow_timeout(static_cast<const UDPFlow *>(flow))
+										- _udp_timeouts[click_current_cpu_id()][1];
 		}
 
 		void push_packet(int, Packet      *p);
@@ -263,8 +265,8 @@ class IPRewriter : public TCPRewriter {
 		// might cause state inconsistencies (e.g., bi-directional flows that
 		// need to pass through the same table).
 		// To solve this conundrum and apply minimal modifications to the memory
-		// management of IPRewriter, we assume that you will instantiate a
-		// symmetric RSS scheme in your NIC.
+		// management of IPRewriter (upon which IPSynthesizer is built), we assume
+		// that you will instantiate a symmetric RSS scheme in your NIC.
 		// This guarantees that bidirectional flows get handled by  the same
 		// CPU core, thus the same cache.
 		unsigned _mem_units_no;
@@ -273,9 +275,8 @@ class IPRewriter : public TCPRewriter {
 		uint32_t                            **_udp_timeouts;
 		uint32_t                            *_udp_streaming_timeout;
 
-		// The actual processing of this element is abstracted from the push operation.
-		// This allows both push and push_batch to exploit the same processing
-		int process(int port, Packet *p_in);
+		atomic_uint32_t _drops;
+		atomic_uint32_t _fragments;
 
 		int udp_flow_timeout(const UDPFlow *mf) const {
 			if (mf->streaming())
@@ -284,16 +285,25 @@ class IPRewriter : public TCPRewriter {
 				return _udp_timeouts[click_current_cpu_id()][0];
 		}
 
+		// The actual processing of this element is abstracted from the push operation.
+		// This allows both push and push_batch to exploit the same processing
+		int process(int port, Packet *p_in);
+
+		// Hyper-NF extension: Combines several post-routing elements
+		// to avoid further processing overhead
+		bool combine_ip_elements(Packet *p_in);
+		void fragment(Packet *p_in, const int& output_port);
+		int  optcopy(const click_ip *ip1, click_ip *ip2);
+
 		static inline Map &reply_udp_map(IPRewriterInput *rwinput) {
-		IPRewriter *x = static_cast<IPRewriter *>(rwinput->reply_element);
+			IPSynthesizer *x = static_cast<IPSynthesizer *>(rwinput->reply_element);
 			return x->_udp_map[click_current_cpu_id()];
 		}
 		static String udp_mappings_handler(Element *e, void *user_data);
 };
 
-
 inline void
-IPRewriter::destroy_flow(IPRewriterFlow *flow)
+IPSynthesizer::destroy_flow(IPRewriterFlow *flow)
 {
 	if (flow->ip_p() == IP_PROTO_TCP)
 		TCPRewriter::destroy_flow(flow);

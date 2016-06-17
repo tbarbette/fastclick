@@ -165,7 +165,7 @@ void SimpleQueue::push_batch(int port, PacketBatch* batch) {
 	}
 }
 
-PacketBatch* SimpleQueue::pull_batch(int port,unsigned max) {
+PacketBatch* SimpleQueue::pull_batch(int port, unsigned max) {
 	PacketBatch* batch;
 	MAKE_BATCH(pull(port),batch,max);
 	return batch;

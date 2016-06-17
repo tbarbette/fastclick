@@ -49,8 +49,10 @@ class NullElement : public BatchElement { public:
   const char *class_name() const	{ return "Null"; }
   const char *port_count() const	{ return PORTS_1_1; }
 
-  Packet *simple_action(Packet *);
-  PacketBatch *simple_action_batch(PacketBatch *);
+  Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
 };
 
@@ -68,7 +70,7 @@ Responds to each pushed packet by pushing it unchanged out its first output.
 Null, PullNull
 */
 
-class PushNullElement : public Element { public:
+class PushNullElement : public BatchElement { public:
 
   PushNullElement() CLICK_COLD;
 
@@ -76,8 +78,10 @@ class PushNullElement : public Element { public:
   const char *port_count() const	{ return PORTS_1_1; }
   const char *processing() const	{ return PUSH; }
 
-  void push_packet(int, Packet *);
-
+  void push_packet(int port, Packet      *p);
+#if HAVE_BATCH
+  void push_batch (int port, PacketBatch *batch);
+#endif
 };
 
 /*
@@ -94,7 +98,7 @@ that packet unchanged.
 =a
 Null, PushNull */
 
-class PullNullElement : public Element { public:
+class PullNullElement : public BatchElement { public:
 
   PullNullElement() CLICK_COLD;
 
@@ -102,8 +106,10 @@ class PullNullElement : public Element { public:
   const char *port_count() const	{ return PORTS_1_1; }
   const char *processing() const	{ return PULL; }
 
-  Packet *pull(int);
-
+  Packet      *pull      (int);
+#if HAVE_BATCH
+  PacketBatch *pull_batch(int);
+#endif
 };
 
 CLICK_ENDDECLS

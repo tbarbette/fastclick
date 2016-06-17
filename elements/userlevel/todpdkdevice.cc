@@ -36,7 +36,6 @@ ToDPDKDevice::~ToDPDKDevice()
 
 int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    String devname;
     int maxthreads = -1;
     int maxqueues = 128;
 

@@ -1,6 +1,6 @@
 #ifndef CLICK_FROMDEVICE_USERLEVEL_HH
 #define CLICK_FROMDEVICE_USERLEVEL_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include "elements/userlevel/kernelfilter.hh"
 
 #ifdef __linux__

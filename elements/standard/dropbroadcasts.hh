@@ -1,6 +1,6 @@
 #ifndef CLICK_DROPBROADCASTS_HH
 #define CLICK_DROPBROADCASTS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -17,7 +17,7 @@ CLICK_DECLS
  * =a FromDevice
  */
 
-class DropBroadcasts : public Element {
+class DropBroadcasts : public BatchElement {
  public:
 
   DropBroadcasts() CLICK_COLD;
@@ -30,7 +30,11 @@ class DropBroadcasts : public Element {
   uint32_t drops() const		{ return _drops; }
 
   void drop_it(Packet *);
-  Packet *simple_action(Packet *);
+
+  Packet        *simple_action      (Packet *p);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
 private:
   atomic_uint32_t _drops;

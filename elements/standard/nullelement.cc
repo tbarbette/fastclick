@@ -2,7 +2,11 @@
  * nullelement.{cc,hh} -- do-nothing element
  * Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,11 +33,14 @@ NullElement::simple_action(Packet *p)
   return p;
 }
 
-PacketBatch *
-NullElement::simple_action_batch(PacketBatch *p)
+#if HAVE_BATCH
+PacketBatch*
+NullElement::simple_action_batch(PacketBatch *batch)
 {
-  return p;
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
 }
+#endif
 
 PushNullElement::PushNullElement()
 {
@@ -44,6 +51,17 @@ PushNullElement::push_packet(int, Packet *p)
 {
   output(0).push(p);
 }
+#if HAVE_BATCH
+void
+PushNullElement::push_batch(int, PacketBatch *batch)
+{
+    output_push_batch(0, batch);
+}
+#endif
+
+#if HAVE_BATCH
+static const short PULL_LIMIT = 32;
+#endif
 
 PullNullElement::PullNullElement()
 {
@@ -54,6 +72,14 @@ PullNullElement::pull(int)
 {
   return input(0).pull();
 }
+
+#if HAVE_BATCH
+PacketBatch *
+PullNullElement::pull_batch(int)
+{
+    return input_pull_batch(0, PULL_LIMIT);
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(NullElement)

@@ -97,10 +97,10 @@ class ICMPPingRewriter : public IPRewriterBase { public:
 
     };
 
-    ICMPPingRewriter() CLICK_COLD;
+    ICMPPingRewriter()  CLICK_COLD;
     ~ICMPPingRewriter() CLICK_COLD;
 
-    const char *class_name() const	{ return "ICMPPingRewriter"; }
+    const char *class_name() const { return "ICMPPingRewriter"; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -110,26 +110,30 @@ class ICMPPingRewriter : public IPRewriterBase { public:
 			      const IPFlowID &rewritten_flowid, int input);
     void destroy_flow(IPRewriterFlow *flow);
 
-    void push(int, Packet *);
+    void push_packet(int, Packet *);
 
     void add_handlers() CLICK_COLD;
 
   private:
+#if HAVE_USER_MULTITHREAD
+    unsigned _maps_no;
+    SizedHashAllocator<sizeof(ICMPPingFlow)> *_allocator;
+#else
+    SizedHashAllocator<sizeof(ICMPPingFlow)> _allocator[CLICK_CPU_MAX];
+#endif
 
-    SizedHashAllocator<sizeof(ICMPPingFlow)> _allocator;
     unsigned _annos;
 
     static String dump_mappings_handler(Element *, void *);
-
 };
 
 
 inline void
 ICMPPingRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map);
+    unmap_flow(flow, _map[click_current_cpu_id()]);
     static_cast<ICMPPingFlow *>(flow)->~ICMPPingFlow();
-    _allocator.deallocate(flow);
+    _allocator[click_current_cpu_id()].deallocate(flow);
 }
 
 CLICK_ENDDECLS

@@ -113,57 +113,68 @@ IPAddrRewriter.
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter,
 StoreIPAddress (for simple uses) */
 
-class IPAddrRewriter : public IPRewriterBase { public:
+class IPAddrRewriter : public IPRewriterBase {
 
-    class IPAddrFlow : public IPRewriterFlow { public:
+	public:
+		class IPAddrFlow : public IPRewriterFlow {
 
-	IPAddrFlow(IPRewriterInput *owner, const IPFlowID &flowid,
-		   const IPFlowID &rewritten_flowid,
-		   bool guaranteed, click_jiffies_t expiry_j)
-	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
-			     0, guaranteed, expiry_j) {
-	}
+			public:
+				IPAddrFlow(IPRewriterInput *owner, const IPFlowID &flowid,
+					   const IPFlowID &rewritten_flowid,
+					   bool guaranteed, click_jiffies_t expiry_j)
+					: IPRewriterFlow(owner, flowid, rewritten_flowid,
+							 0, guaranteed, expiry_j) {
+				}
 
-	void apply(WritablePacket *p, bool direction, unsigned annos);
+				void apply(WritablePacket *p, bool direction, unsigned annos);
+				void unparse(StringAccum &sa, bool direction, click_jiffies_t now) const;
+		};
 
-	void unparse(StringAccum &sa, bool direction, click_jiffies_t now) const;
+		IPAddrRewriter () CLICK_COLD;
+		~IPAddrRewriter() CLICK_COLD;
 
-    };
+		const char *class_name() const { return "IPAddrRewriter"; }
+		void *cast(const char *);
 
-    IPAddrRewriter() CLICK_COLD;
-    ~IPAddrRewriter() CLICK_COLD;
+		int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
+		//void take_state(Element *, ErrorHandler *);
 
-    const char *class_name() const		{ return "IPAddrRewriter"; }
-    void *cast(const char *);
+		inline IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
+		IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
+					  const IPFlowID &rewritten_flowid, int input);
+		void destroy_flow(IPRewriterFlow *flow);
 
-    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
-    //void take_state(Element *, ErrorHandler *);
+		void push_packet(int port, Packet *p_in);
+	#if HAVE_BATCH
+		void push_batch (int port, PacketBatch *batch);
+	#endif
 
-    inline IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
-    IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-			      const IPFlowID &rewritten_flowid, int input);
-    void destroy_flow(IPRewriterFlow *flow);
+		void add_handlers() CLICK_COLD;
 
-    void push(int, Packet *);
+	protected:
+	#if HAVE_USER_MULTITHREAD
+		unsigned _maps_no;
+		SizedHashAllocator<sizeof(IPAddrFlow)> *_allocator;
+	#else
+		SizedHashAllocator<sizeof(IPAddrFlow)> _allocator[CLICK_CPU_MAX];
+	#endif
 
-    void add_handlers() CLICK_COLD;
+		unsigned _annos;
 
-  protected:
+		// The actual processing of this element is abstracted from the push operation.
+		// This allows both push and push_batch to exploit the same processing
+		int process(int port, Packet *p_in);
 
-    SizedHashAllocator<sizeof(IPAddrFlow)> _allocator;
-    unsigned _annos;
-
-    static String dump_mappings_handler(Element *, void *);
-
+		static String dump_mappings_handler(Element *, void *);
 };
 
 
 inline void
 IPAddrRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map);
-    static_cast<IPAddrFlow *>(flow)->~IPAddrFlow();
-    _allocator.deallocate(flow);
+	unmap_flow(flow, _map[click_current_cpu_id()]);
+	static_cast<IPAddrFlow *>(flow)->~IPAddrFlow();
+	_allocator[click_current_cpu_id()].deallocate(flow);
 }
 
 CLICK_ENDDECLS

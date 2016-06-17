@@ -53,8 +53,8 @@ the range, as in '1.0.0.1-1.255.255.254#'.
 Say a packet with address pair (SA, DA) is received, and the corresponding new
 addresses are (SA', DA').  Then two mappings are installed:
 
-    (SA, DA) => (SA', DA') [FOUTPUT]
-    (DA', SA') => (DA, SA) [ROUTPUT]
+	(SA, DA) => (SA', DA') [FOUTPUT]
+	(DA', SA') => (DA, SA) [ROUTPUT]
 
 Thus, the input packet is rewritten and sent to FOUTPUT, and packets from the
 reply flow are rewritten to look like part of the original flow and sent to
@@ -114,57 +114,68 @@ IPAddrRewriter.
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter,
 StoreIPAddress (for simple uses) */
 
-class IPAddrPairRewriter : public IPRewriterBase { public:
+class IPAddrPairRewriter : public IPRewriterBase {
 
-    class IPAddrPairFlow : public IPRewriterFlow { public:
+	public:
+		class IPAddrPairFlow : public IPRewriterFlow {
 
-	IPAddrPairFlow(IPRewriterInput *owner, const IPFlowID &flowid,
-		       const IPFlowID &rewritten_flowid,
-		       bool guaranteed, click_jiffies_t expiry_j)
-	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
-			     0, guaranteed, expiry_j) {
-	}
+			public:
+				IPAddrPairFlow(IPRewriterInput *owner, const IPFlowID &flowid,
+						   const IPFlowID &rewritten_flowid,
+						   bool guaranteed, click_jiffies_t expiry_j)
+					: IPRewriterFlow(owner, flowid, rewritten_flowid,
+							 0, guaranteed, expiry_j) {
+				}
 
-	void apply(WritablePacket *p, bool direction, unsigned annos);
+				void apply(WritablePacket *p, bool direction, unsigned annos);
+				void unparse(StringAccum &sa, bool direction, click_jiffies_t now) const;
+		};
 
-	void unparse(StringAccum &sa, bool direction, click_jiffies_t now) const;
+		IPAddrPairRewriter () CLICK_COLD;
+		~IPAddrPairRewriter() CLICK_COLD;
 
-    };
+		const char *class_name() const { return "IPAddrPairRewriter"; }
+		void *cast(const char *);
 
-    IPAddrPairRewriter() CLICK_COLD;
-    ~IPAddrPairRewriter() CLICK_COLD;
+		int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
+		//void take_state(Element *, ErrorHandler *);
 
-    const char *class_name() const		{ return "IPAddrPairRewriter"; }
-    void *cast(const char *);
+		IPRewriterEntry *get_entry(int ip_p, const IPFlowID &xflowid, int input);
+		IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
+									const IPFlowID &rewritten_flowid, int input);
+		void destroy_flow(IPRewriterFlow *flow);
 
-    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
-    //void take_state(Element *, ErrorHandler *);
+		void push_packet(int port, Packet *p_in);
+	#if HAVE_BATCH
+		void push_batch (int port, PacketBatch *batch);
+	#endif
 
-    IPRewriterEntry *get_entry(int ip_p, const IPFlowID &xflowid, int input);
-    IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-			      const IPFlowID &rewritten_flowid, int input);
-    void destroy_flow(IPRewriterFlow *flow);
+		void add_handlers() CLICK_COLD;
 
-    void push(int, Packet *);
+	private:
+	#if HAVE_USER_MULTITHREAD
+		unsigned _maps_no;
+		SizedHashAllocator<sizeof(IPAddrPairFlow)> *_allocator;
+	#else
+		SizedHashAllocator<sizeof(IPAddrPairFlow)> _allocator[CLICK_CPU_MAX];
+	#endif
 
-    void add_handlers() CLICK_COLD;
+		unsigned _annos;
 
-  private:
+		// The actual processing of this element is abstracted from the push operation.
+		// This allows both push and push_batch to exploit the same processing
+		int process(int port, Packet *p_in);
 
-    SizedHashAllocator<sizeof(IPAddrPairFlow)> _allocator;
-    unsigned _annos;
-
-    static String dump_mappings_handler(Element *, void *);
+		static String dump_mappings_handler(Element *, void *);
 
 };
-
 
 inline void
 IPAddrPairRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map);
-    static_cast<IPAddrPairFlow *>(flow)->~IPAddrPairFlow();
-    _allocator.deallocate(flow);
+	unmap_flow(flow, _map[click_current_cpu_id()]);
+	static_cast<IPAddrPairFlow *>(flow)->~IPAddrPairFlow();
+	_allocator[click_current_cpu_id()].deallocate(flow);
 }
 
 CLICK_ENDDECLS
