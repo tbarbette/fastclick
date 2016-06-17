@@ -1,6 +1,6 @@
 #ifndef CLICK_IPSEC_ESP_HH
 #define CLICK_IPSEC_ESP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 #include <click/glue.hh>
 CLICK_DECLS
@@ -29,7 +29,7 @@ struct esp_new {
   uint8_t esp_iv[8];
 };
 
-class IPsecESPEncap : public Element {
+class IPsecESPEncap : public BatchElement {
 
 public:
   IPsecESPEncap() CLICK_COLD;
@@ -41,7 +41,10 @@ public:
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  Packet *simple_action(Packet *);
+  Packet      *simple_action      (Packet *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
 private:
 

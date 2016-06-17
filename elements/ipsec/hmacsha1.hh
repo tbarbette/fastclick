@@ -1,6 +1,6 @@
 #ifndef CLICK_IPSECAUTHHMACSHA1_HH
 #define CLICK_IPSECAUTHHMACSHA1_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 #include <click/glue.hh>
 CLICK_DECLS
@@ -19,7 +19,7 @@ CLICK_DECLS
  * =a IPsecESPEncap, IPsecDES
  */
 
-class IPsecAuthHMACSHA1 : public Element {
+class IPsecAuthHMACSHA1 : public BatchElement {
 
 public:
   IPsecAuthHMACSHA1();
@@ -31,7 +31,11 @@ public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
 
-  Packet *simple_action(Packet *);
+  Packet      *simple_action      (Packet *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
+
   void add_handlers() CLICK_COLD;
 
   static String drop_handler(Element *e, void *thunk);

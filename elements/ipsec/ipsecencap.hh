@@ -1,6 +1,6 @@
 #ifndef CLICK_IPSECENCAP_HH
 #define CLICK_IPSECENCAP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 #include <clicknet/ip.h>
@@ -79,7 +79,7 @@ Returns or sets the DST parameter.
 
 =a UDPIPsecEncap, StripIPHeader */
 
-class IPsecEncap : public Element { public:
+class IPsecEncap : public BatchElement { public:
 
   IPsecEncap() CLICK_COLD;
   ~IPsecEncap() CLICK_COLD;
@@ -93,7 +93,10 @@ class IPsecEncap : public Element { public:
   int initialize(ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;
 
-  Packet *simple_action(Packet *);
+  Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
  private:
 

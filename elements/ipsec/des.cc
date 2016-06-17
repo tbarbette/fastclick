@@ -3,12 +3,14 @@
  * Alex Snoeren, Benjie Chen
  * contains code from other sources; see below
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
- * Changed to use the Security Association Table. Dimitris Syrivelis <jsyr@inf.uth.gr>, University of Thessaly ,
- * Hellas
- *
- *
+ * Changed to use the Security Association Table. Dimitris Syrivelis <jsyr@inf.uth.gr>, 
+ * University of Thessaly, Hellas
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -116,6 +118,15 @@ Des::simple_action(Packet *p_in)
     memcpy(ivp, iv, 8);
   return(p);
 }
+
+#if HAVE_BATCH
+PacketBatch*
+Des::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 /* Copyright (C) 1992 Eric Young - see COPYING for more details */
 /* Collected and modified by Werner Almesberger */

@@ -1,6 +1,6 @@
 #ifndef CLICK_IPSECDES_HH
 #define CLICK_IPSECDES_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -31,7 +31,7 @@ typedef struct des_ks_struct {
 
 class Address;
 
-class Des : public Element {
+class Des : public BatchElement {
 public:
   Des() CLICK_COLD;
   Des(int);
@@ -43,7 +43,10 @@ public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
 
-  Packet *simple_action(Packet *);
+  Packet      *simple_action      (Packet *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
   enum { DES_DECRYPT = 0, DES_ENCRYPT = 1 };
 

@@ -2,7 +2,11 @@
  * hmacsha1.{cc,hh} -- element implements IPsec hmac authentication using SHA1
  * Dimitris Syrivelis
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2006 University of Thessaly, Hellas
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -61,7 +65,7 @@ IPsecAuthHMACSHA1::initialize(ErrorHandler *)
 Packet *
 IPsecAuthHMACSHA1::simple_action(Packet *p)
 {
-  SADataTuple * sa_data=(SADataTuple *)IPSEC_SA_DATA_REFERENCE_ANNO(p);
+  SADataTuple *sa_data = reinterpret_cast<SADataTuple *>( IPSEC_SA_DATA_REFERENCE_ANNO(p) );
   unsigned int len;
   // compute HMAC
   len = SHA_DIGEST_LEN;
@@ -95,10 +99,19 @@ IPsecAuthHMACSHA1::simple_action(Packet *p)
   }
 }
 
+#if HAVE_BATCH
+PacketBatch*
+IPsecAuthHMACSHA1::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
+
 String
 IPsecAuthHMACSHA1::drop_handler(Element *e, void *)
 {
-  IPsecAuthHMACSHA1 *a = (IPsecAuthHMACSHA1 *)e;
+  IPsecAuthHMACSHA1 *a = static_cast<IPsecAuthHMACSHA1 *>(e);
   return String(a->_drops);
 }
 

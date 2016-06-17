@@ -3,7 +3,11 @@
  * settimestampdelta.{cc,hh} -- element observes range of timestamps
  * Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2003 International Computer Science Institute
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -71,6 +75,15 @@ SetTimestampDelta::simple_action(Packet *p)
 	}
     return p;
 }
+
+#if HAVE_BATCH
+PacketBatch*
+SetTimestampDelta::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
+}
+#endif
 
 String
 SetTimestampDelta::read_handler(Element *e, void *thunk)

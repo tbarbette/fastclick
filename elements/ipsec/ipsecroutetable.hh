@@ -2,7 +2,7 @@
 #ifndef CLICK_IPSECROUTETABLE_HH
 #define CLICK_IPSECROUTETABLE_HH
 #include <click/glue.hh>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include "satable.hh"
 #include "sadatatuple.hh"
 CLICK_DECLS
@@ -199,7 +199,7 @@ struct IPsecRoute {
 };
 
 
-class IPsecRouteTable : public Element { public:
+class IPsecRouteTable : public BatchElement { public:
 
     void* cast(const char*);
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
@@ -210,7 +210,10 @@ class IPsecRouteTable : public Element { public:
     virtual int lookup_route(IPAddress dest, IPAddress &gw, unsigned int &spi, SADataTuple * &sa_data) const = 0;
     virtual String dump_routes();
 
-    void push(int port, Packet* p);
+    void push      (int, Packet* p);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *batch);
+#endif
 
     static int add_route_handler(const String&, Element*, void*, ErrorHandler*);
     static int remove_route_handler(const String&, Element*, void*, ErrorHandler*);
@@ -224,6 +227,9 @@ class IPsecRouteTable : public Element { public:
     enum { CMD_ADD, CMD_SET, CMD_REMOVE };
     int run_command(int command, const String &, Vector<IPsecRoute>* old_routes, ErrorHandler*);
 
+    // The actual processing of this element is abstracted from the push operation.
+    // This allows both push and push_batch to exploit the same processing.
+    int process(int port, Packet *p);
 };
 
 inline StringAccum&

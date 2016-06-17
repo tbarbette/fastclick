@@ -1,6 +1,6 @@
 #ifndef CLICK_IPSECAES_HH
 #define CLICK_IPSECAES_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -37,7 +37,7 @@ typedef struct aes_key_st AES_KEY;
 class Address;
 
 
-class Aes : public Element {
+class Aes : public BatchElement {
  public:
    Aes() CLICK_COLD;
    Aes(int);
@@ -49,7 +49,10 @@ class Aes : public Element {
    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
    int initialize(ErrorHandler *) CLICK_COLD;
 
-   Packet *simple_action(Packet *);
+   Packet     *simple_action      (Packet *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
    enum { AES_DECRYPT = 0, AES_ENCRYPT = 1 };
 

@@ -2,7 +2,11 @@
  * sha1.{cc,hh} -- element implements IPsec SHA1 authentication (RFC 2404)
  * Benjie Chen
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -90,6 +94,15 @@ IPsecAuthSHA1::simple_action(Packet *p)
     return p;
   }
 }
+
+#if HAVE_BATCH
+PacketBatch*
+IPsecAuthSHA1::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 String
 IPsecAuthSHA1::drop_handler(Element *e, void *)
