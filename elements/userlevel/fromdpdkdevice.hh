@@ -109,12 +109,13 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
-
+    
 private:
 
     static String read_handler(Element*, void*) CLICK_COLD;
     static int write_handler(const String&, Element*, void*, ErrorHandler*)
         CLICK_COLD;
+
 
     unsigned _port_id;
     bool _promisc;

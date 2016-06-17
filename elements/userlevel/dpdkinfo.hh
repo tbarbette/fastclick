@@ -28,12 +28,12 @@ Keyword arguments:
 
 =item NB_MBUF
 
-Integer.  Number of message buffers to allocate. Defaults to 65536.
+Integer.  Number of message buffers to allocate. Defaults to 524288.
 
 =item MBUF_SIZE
 
 Integer.  Size of a message buffer in bytes. Defaults to 2048 +
-RTE_PKTMBUF_HEADROOM.
+RTE_PKTMBUF_HEADROOM + sizeof (struct rte_mbuf).
 
 =item MBUF_CACHE_SIZE
 
@@ -64,40 +64,6 @@ Integer.  TX host threshold. Defaults to 0.
 
 Integer.  TX write-back threshold. Defaults to 0.
 
-=item MEMPOOL_PREFIX
-
-Integer.  TX write-back threshold. Defaults to 0.
-
-=item DEF_RING_NDESC
-
-Integer.  Number of frame descriptors in the ring buffer. 
-Used for interprocess communication. Defaults to 1024.
-
-=item DEF_BURST_SIZE
-
-Integer.  Number of frames to read/write from/to a DPDK device. 
-Defaults to 32.
-
-=item RING_FLAGS
-
-Integer.  Parameters to pass to a ring-based DPDK process communication.
-Defaults to 0.
-
-=item RING_SIZE
-
-Integer.  The size of the ring used for DPDK inter-process communication.
-Defaults to 64.
-
-=item RING_POOL_CACHE_SIZE
-
-Integer.  The size of the message buffer for DPDK inter-process communication.
-Defaults to 32.
-
-=item RING_PRIV_DATA_SIZE
-
-Integer.  The size of the private memory area for a pair of interconnected DPDK process.
-Defaults to 0 as there is no need to share something privately.
-
 =back
 
 This element is only available at user level, when compiled with DPDK
@@ -107,7 +73,7 @@ support.
 
   DPDKInfo(NB_MBUF 1048576, MBUF_SIZE 4096, MBUF_CACHE_SIZE 512)
 
-=a FromDPDKDevice, ToDPDKDevice, FromDPDKRing, ToDPDKRing */
+=a FromDPDKDevice, ToDPDKDevice */
 
 class DPDKInfo : public Element {
 public:

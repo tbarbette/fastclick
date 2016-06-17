@@ -84,7 +84,7 @@ table.
 
 Takes a flow as a space-separated
 
-	saddr sport daddr dport
+    saddr sport daddr dport
 
 and attempts to find a forward mapping for that flow. If found, rewrites the
 flow and returns in the same format.  Otherwise, returns nothing.
@@ -92,145 +92,134 @@ flow and returns in the same format.  Otherwise, returns nothing.
 =a IPRewriter, IPAddrRewriter, IPAddrPairRewriter, IPRewriterPatterns,
 FTPPortMapper */
 
-class TCPRewriter : public IPRewriterBase {
+class TCPRewriter : public IPRewriterBase { public:
 
-	public:
-		class TCPFlow : public IPRewriterFlow {
-			public:
-				TCPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
-					const IPFlowID &rewritten_flowid,
-					bool guaranteed, click_jiffies_t expiry_j)
-					: IPRewriterFlow(owner, flowid, rewritten_flowid,
-							 IP_PROTO_TCP, guaranteed, expiry_j), _dt(0) {
-				}
+    class TCPFlow : public IPRewriterFlow { public:
 
-				~TCPFlow() {
-					while (delta_transition *x = _dt) {
-						_dt = x->next();
-						delete x;
-					}
-				}
+	TCPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
+		const IPFlowID &rewritten_flowid,
+		bool guaranteed, click_jiffies_t expiry_j)
+	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
+			     IP_PROTO_TCP, guaranteed, expiry_j), _dt(0) {
+	}
 
-				enum {
-					s_forward_done = 1, s_reply_done = 2,
-					s_both_done = (s_forward_done | s_reply_done),
-					s_forward_data = 4, s_reply_data = 8,
-					s_both_data = (s_forward_data | s_reply_data)
-				};
+	~TCPFlow() {
+	    while (delta_transition *x = _dt) {
+		_dt = x->next();
+		delete x;
+	    }
+	}
 
-				bool both_done() const {
-					return (_tflags & s_both_done) == s_both_done;
-				}
-				bool both_data() const {
-					return (_tflags & s_both_data) == s_both_data;
-				}
+	enum {
+	    s_forward_done = 1, s_reply_done = 2,
+	    s_both_done = (s_forward_done | s_reply_done),
+	    s_forward_data = 4, s_reply_data = 8,
+	    s_both_data = (s_forward_data | s_reply_data)
+	};
+	bool both_done() const {
+	    return (_tflags & s_both_done) == s_both_done;
+	}
+	bool both_data() const {
+	    return (_tflags & s_both_data) == s_both_data;
+	}
 
-				int update_seqno_delta(bool direction, tcp_seq_t old_seqno, int32_t delta);
-				tcp_seq_t new_seq(bool direction, tcp_seq_t seqno) const;
-				tcp_seq_t new_ack(bool direction, tcp_seq_t seqno) const;
+	int update_seqno_delta(bool direction, tcp_seq_t old_seqno, int32_t delta);
+	tcp_seq_t new_seq(bool direction, tcp_seq_t seqno) const;
+	tcp_seq_t new_ack(bool direction, tcp_seq_t seqno) const;
 
-				void apply(WritablePacket *p, bool direction, unsigned annos, bool calc_checksum);
-				void unparse(StringAccum &sa, bool direction, click_jiffies_t now) const;
+	void apply(WritablePacket *p, bool direction, unsigned annos);
 
-			private:
-				struct delta_transition {
-					int32_t delta[2];
-					tcp_seq_t trigger[2];
-					uintptr_t nextptr;
-					delta_transition() {
-						memset(this, 0, sizeof(delta_transition));
-					}
-					delta_transition *next() const {
-						return reinterpret_cast<delta_transition *>(nextptr - (nextptr & 3));
-					}
-					bool has_trigger(bool direction) const {
-						return nextptr & (1 << direction);
-					}
-				};
+	void unparse(StringAccum &sa, bool direction, click_jiffies_t now) const;
 
-				delta_transition *_dt;
-				void apply_sack(bool direction, click_tcp *tcp, int transport_len, bool calc_checksum);
-		};
+      private:
 
-		TCPRewriter () CLICK_COLD;
-		~TCPRewriter() CLICK_COLD;
+	struct delta_transition {
+	    int32_t delta[2];
+	    tcp_seq_t trigger[2];
+	    uintptr_t nextptr;
+	    delta_transition() {
+		memset(this, 0, sizeof(delta_transition));
+	    }
+	    delta_transition *next() const {
+		return reinterpret_cast<delta_transition *>(nextptr - (nextptr & 3));
+	    }
+	    bool has_trigger(bool direction) const {
+		return nextptr & (1 << direction);
+	    }
+	};
 
-		const char *class_name() const { return "TCPRewriter"; }
-		void *cast(const char *);
+	delta_transition *_dt;
 
-		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+	void apply_sack(bool direction, click_tcp *tcp, int transport_len);
 
-		IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-					 				const IPFlowID &rewritten_flowid, int input);
-		void destroy_flow(IPRewriterFlow *flow);
-		click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-			return flow->expiry() + tcp_flow_timeout(
-				static_cast<const TCPFlow *>(flow)) -
-				_timeouts[click_current_cpu_id()][1];
-		}
+    };
 
-		void push_packet(int port, Packet      *p);
-	#if HAVE_BATCH
-		void push_batch(int port, PacketBatch *batch);
-	#endif
+    TCPRewriter() CLICK_COLD;
+    ~TCPRewriter() CLICK_COLD;
 
-		void add_handlers() CLICK_COLD;
+    const char *class_name() const		{ return "TCPRewriter"; }
+    void *cast(const char *);
 
-	protected:
-	#if HAVE_USER_MULTITHREAD
-		unsigned _maps_no;
-		SizedHashAllocator<sizeof(TCPFlow)> *_allocator;
-	#else
-		SizedHashAllocator<sizeof(TCPFlow)> _allocator[CLICK_CPU_MAX];
-	#endif
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-		unsigned _annos;
-		uint32_t _tcp_data_timeout;
-		uint32_t _tcp_done_timeout;
+    IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
+			      const IPFlowID &rewritten_flowid, int input);
+    void destroy_flow(IPRewriterFlow *flow);
+    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
+	return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) - _timeouts[1];
+    }
 
-		// The actual processing of this element is abstracted from the push operation.
-		// This allows both push and push_batch to exploit the same processing
-		int process(int port, Packet *p_in);
+    void push(int, Packet *);
 
-		int tcp_flow_timeout(const TCPFlow *mf) const {
-			if (mf->both_done())
-				return _tcp_done_timeout;
-			else if (mf->both_data())
-				return _tcp_data_timeout;
-			else
-				return _timeouts[click_current_cpu_id()][0];
-		}
+    void add_handlers() CLICK_COLD;
 
-		static String tcp_mappings_handler(Element *, void *);
-		static int tcp_lookup_handler(int, String &str, Element *e, const Handler *h, ErrorHandler *errh);
+ protected:
+
+    SizedHashAllocator<sizeof(TCPFlow)> _allocator;
+    unsigned _annos;
+    uint32_t _tcp_data_timeout;
+    uint32_t _tcp_done_timeout;
+
+    int tcp_flow_timeout(const TCPFlow *mf) const {
+	if (mf->both_done())
+	    return _tcp_done_timeout;
+	else if (mf->both_data())
+	    return _tcp_data_timeout;
+	else
+	    return _timeouts[0];
+    }
+
+    static String tcp_mappings_handler(Element *, void *);
+    static int tcp_lookup_handler(int, String &str, Element *e, const Handler *h, ErrorHandler *errh);
+
 };
 
 inline void
 TCPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-	unmap_flow(flow, _map[click_current_cpu_id()]);
-	static_cast<TCPFlow *>(flow)->~TCPFlow();
-	_allocator[click_current_cpu_id()].deallocate(flow);
+    unmap_flow(flow, _map);
+    static_cast<TCPFlow *>(flow)->~TCPFlow();
+    _allocator.deallocate(flow);
 }
 
 inline tcp_seq_t
 TCPRewriter::TCPFlow::new_seq(bool direction, tcp_seq_t seqno) const
 {
-	delta_transition *dt = _dt;
-	while (dt && dt->has_trigger(direction)
+    delta_transition *dt = _dt;
+    while (dt && dt->has_trigger(direction)
 	   && !SEQ_GEQ(seqno, dt->trigger[direction]))
 	dt = dt->next();
-	return dt ? seqno + dt->delta[direction] : seqno;
+    return dt ? seqno + dt->delta[direction] : seqno;
 }
 
 inline tcp_seq_t
 TCPRewriter::TCPFlow::new_ack(bool direction, tcp_seq_t ackno) const
 {
-	delta_transition *dt = _dt;
-	while (dt && dt->has_trigger(!direction)
+    delta_transition *dt = _dt;
+    while (dt && dt->has_trigger(!direction)
 	   && !SEQ_GEQ(ackno - dt->delta[!direction], dt->trigger[!direction]))
 	dt = dt->next();
-	return dt ? ackno - dt->delta[!direction] : ackno;
+    return dt ? ackno - dt->delta[!direction] : ackno;
 }
 
 CLICK_ENDDECLS

@@ -211,7 +211,7 @@ LinearIPLookup::dump_routes()
 }
 
 void
-LinearIPLookup::push_packet(int, Packet *p)
+LinearIPLookup::push(int, Packet *p)
 {
 #define EXCHANGE(a,b,t) { t = a; a = b; b = t; }
     IPAddress a = p->dst_ip_anno();

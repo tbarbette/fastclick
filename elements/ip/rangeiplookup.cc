@@ -66,7 +66,7 @@ RangeIPLookup::cleanup(CleanupStage)
 }
 
 void
-RangeIPLookup::push_packet(int, Packet *p)
+RangeIPLookup::push(int, Packet *p)
 {
     IPAddress gw;
     int port = lookup_route(p->dst_ip_anno(), gw);

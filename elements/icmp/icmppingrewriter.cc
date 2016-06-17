@@ -71,19 +71,10 @@ ICMPPingRewriter::ICMPPingFlow::unparse(StringAccum &sa, bool direction,
 
 ICMPPingRewriter::ICMPPingRewriter()
 {
-#if HAVE_USER_MULTITHREAD
-    _maps_no = ( click_max_cpu_ids() == 0 )? 1 : click_max_cpu_ids();
-    _allocator = new SizedHashAllocator<sizeof(ICMPPingFlow)>[_maps_no];
-    //click_chatter("[%s]: Allocated %d ICMP flow maps", class_name(), _maps_no);
-#endif
 }
 
 ICMPPingRewriter::~ICMPPingRewriter()
 {
-#if HAVE_USER_MULTITHREAD
-    if ( _allocator )
-        delete [] _allocator;
-#endif
 }
 
 void *
@@ -100,10 +91,8 @@ ICMPPingRewriter::cast(const char *n)
 int
 ICMPPingRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    for (unsigned i=0; i<_mem_units_no; i++) {
-        // numbers in seconds
-        _timeouts[i][0] = 5 * 60;	// best effort: 5 minutes
-    }
+    // numbers in seconds
+    _timeouts[0] = 5 * 60;	// best effort: 5 minutes
     bool dst_anno = true, has_reply_anno = false;
     int reply_anno;
 
@@ -125,7 +114,7 @@ ICMPPingRewriter::get_entry(int ip_p, const IPFlowID &xflowid, int input)
     bool echo = (input != get_entry_reply);
     IPFlowID flowid(xflowid.saddr(), xflowid.sport() + !echo,
 		    xflowid.daddr(), xflowid.sport() + echo);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = _map.get(flowid);
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
 	IPRewriterInput &is = _input_specs[input];
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
@@ -144,19 +133,18 @@ ICMPPingRewriter::add_flow(int, const IPFlowID &flowid,
     void *data;
     if ((uint16_t) (flowid.sport() + 1) != flowid.dport()
 	|| (uint16_t) (rewritten_flowid.sport() + 1) != rewritten_flowid.dport()
-	|| !(data = _allocator[click_current_cpu_id()].allocate()))
+	|| !(data = _allocator.allocate()))
 	return 0;
 
     ICMPPingFlow *flow = new(data) ICMPPingFlow
 	(&_input_specs[input], flowid, rewritten_flowid,
-	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-     relevant_timeout(_timeouts[click_current_cpu_id()]));
+	 !!_timeouts[1], click_jiffies() + relevant_timeout(_timeouts));
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, _map);
 }
 
 void
-ICMPPingRewriter::push_packet(int port, Packet *p_in)
+ICMPPingRewriter::push(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     click_ip *iph = p->ip_header();
@@ -180,7 +168,7 @@ ICMPPingRewriter::push_packet(int port, Packet *p_in)
     IPFlowID flowid(iph->ip_src, icmph->icmp_identifier + !echo,
 		    iph->ip_dst, icmph->icmp_identifier + echo);
 
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = _map.get(flowid);
 
     if (!m && !echo)
 	goto mapping_fail;
@@ -201,10 +189,7 @@ ICMPPingRewriter::push_packet(int port, Packet *p_in)
 
     ICMPPingFlow *mf = static_cast<ICMPPingFlow *>(m->flow());
     mf->apply(p, m->direction(), _annos);
-    mf->change_expiry_by_timeout(
-        _heap[click_current_cpu_id()], click_jiffies(),
-        _timeouts[click_current_cpu_id()]
-    );
+    mf->change_expiry_by_timeout(_heap, click_jiffies(), _timeouts);
 
     output(m->output()).push(p);
 }
@@ -213,10 +198,10 @@ ICMPPingRewriter::push_packet(int port, Packet *p_in)
 String
 ICMPPingRewriter::dump_mappings_handler(Element *e, void *)
 {
-    ICMPPingRewriter *rw = static_cast<ICMPPingRewriter *> (e);
+    ICMPPingRewriter *rw = (ICMPPingRewriter *)e;
     StringAccum sa;
     click_jiffies_t now = click_jiffies();
-    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); ++iter) {
+    for (Map::iterator iter = rw->_map.begin(); iter.live(); ++iter) {
 	ICMPPingFlow *f = static_cast<ICMPPingFlow *>(iter->flow());
 	f->unparse(sa, iter->direction(), now);
 	sa << '\n';

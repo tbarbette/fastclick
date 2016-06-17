@@ -63,7 +63,7 @@ class BatchElement : public Element { public:
 		inflow.set(false);
 	}
 
-	void push(int port,Packet* p); //final;
+	void push(int port,Packet* p) final;
 
 	virtual void push_packet(int port,Packet* p);
 
@@ -195,7 +195,7 @@ class BatchElement : public Element { public:
 	virtual void push_packet(int port,Packet* p);
 
 
-	void push(int port,Packet* p) { //final {
+	void push(int port,Packet* p) final {
 		push_packet(port, p);
 	};
 

@@ -4,7 +4,6 @@
  *
  * Copyright (c) 2014-2015 Cyril Soldani, University of Liège
  * Copyright (c) 2015 Tom Barbette, University of Liège
- * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -40,12 +39,6 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
         .read("TX_HTHRESH", DPDKDevice::TX_HTHRESH)
         .read("TX_WTHRESH", DPDKDevice::TX_WTHRESH)
         .read("MEMPOOL_PREFIX", DPDKDevice::MEMPOOL_PREFIX)
-        .read("DEF_RING_NDESC", DPDKDevice::DEF_RING_NDESC)
-        .read("DEF_BURST_SIZE", DPDKDevice::DEF_BURST_SIZE)
-        .read("RING_FLAGS",     DPDKDevice::RING_FLAGS)
-        .read("RING_SIZE",      DPDKDevice::RING_SIZE)
-        .read("RING_POOL_CACHE_SIZE", DPDKDevice::RING_POOL_CACHE_SIZE)
-        .read("RING_PRIV_DATA_SIZE",  DPDKDevice::RING_PRIV_DATA_SIZE)
         .complete() < 0)
         return -1;
 

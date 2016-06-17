@@ -346,14 +346,6 @@ int DPDKDevice::TX_HTHRESH = 0;
 int DPDKDevice::TX_WTHRESH = 0;
 String DPDKDevice::MEMPOOL_PREFIX = "click_mempool_";
 
-unsigned DPDKDevice::DEF_RING_NDESC = 1024;
-unsigned DPDKDevice::DEF_BURST_SIZE = 32;
-
-unsigned DPDKDevice::RING_FLAGS = 0;
-unsigned DPDKDevice::RING_SIZE  = 64;
-unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
-unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
-
 bool DPDKDevice::_is_initialized = false;
 HashMap<unsigned, DPDKDevice::DevInfo> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;

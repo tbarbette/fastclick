@@ -512,7 +512,7 @@ DirectIPLookup::cleanup(CleanupStage)
 }
 
 void
-DirectIPLookup::push_packet(int, Packet *p)
+DirectIPLookup::push(int, Packet *p)
 {
     IPAddress gw;
     int port = lookup_route(p->dst_ip_anno(), gw);

@@ -253,7 +253,7 @@ IPsecRouteTable::process(int, Packet *p)
 }
 
 void
-IPsecRouteTable::push_packet(int port, Packet *p)
+IPsecRouteTable::push(int port, Packet *p)
 {
 	int output_port = process(port, p);
 	if ( output_port < 0 ) {

@@ -25,12 +25,6 @@
 
 CLICK_DECLS
 
-#if HAVE_INT64_TYPES
-typedef uint64_t counter_t;
-#else
-typedef uint32_t counter_t;
-#endif
-
 class DPDKDevice {
 public:
 
@@ -87,14 +81,6 @@ public:
     static int TX_HTHRESH;
     static int TX_WTHRESH;
     static String MEMPOOL_PREFIX;
-
-    static unsigned DEF_RING_NDESC;
-    static unsigned DEF_BURST_SIZE;
-
-    static unsigned RING_FLAGS;
-    static unsigned RING_SIZE;
-    static unsigned RING_POOL_CACHE_SIZE;
-    static unsigned RING_PRIV_DATA_SIZE;
 
 private:
 

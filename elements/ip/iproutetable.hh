@@ -196,9 +196,9 @@ class IPRouteTable : public BatchElement { public:
     virtual int lookup_route(IPAddress addr, IPAddress& gw) const = 0;
     virtual String dump_routes();
 
-    void push_packet(int, Packet      *p);
+    void push      (int, Packet      *p);
 #if HAVE_BATCH
-    void push_batch (int, PacketBatch *batch);
+    void push_batch(int, PacketBatch *batch);
 #endif
 
     static int add_route_handler(const String&, Element*, void*, ErrorHandler*);

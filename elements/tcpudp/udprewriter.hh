@@ -33,7 +33,7 @@ Each mapping contains a new flow identifier and an output port.  Input packets
 with the indexed flow identifier are rewritten to use the new flow identifier,
 then emitted on the output port.  A mapping is written as follows:
 
-	(SA, SP, DA, DP) => (SA', SP', DA', DP') [OUTPUT]
+    (SA, SP, DA, DP) => (SA', SP', DA', DP') [OUTPUT]
 
 When UDPRewriter receives a packet, it first looks up that packet in the
 mapping table by flow identifier.  If the table contains a mapping for the
@@ -62,8 +62,8 @@ Installs mappings that preserve the input packet's flow ID.  Specifically,
 given an input packet with flow ID (SA, SP, DA, DP, PROTO), two mappings are
 installed:
 
-	(SA, SP, DA, DP, PROTO) => (SA, SP, DA, DP) [FOUTPUT]
-	(DA, DP, SA, SP, PROTO) => (DA, DP, SA, SP) [ROUTPUT]
+    (SA, SP, DA, DP, PROTO) => (SA, SP, DA, DP) [FOUTPUT]
+    (DA, DP, SA, SP, PROTO) => (DA, DP, SA, SP) [ROUTPUT]
 
 Thus, the input packet is emitted on output port FOUTPUT unchanged, and
 packets from the reply flow are emitted on output port ROUTPUT unchanged.
@@ -87,8 +87,8 @@ Say a packet with flow ID (SA, SP, DA, DP, PROTO) is received, and the
 corresponding new flow ID is (SA', SP', DA', DP').  Then two mappings are
 installed:
 
-	(SA, SP, DA, DP, PROTO) => (SA', SP', DA', DP') [FOUTPUT]
-	(DA', DP', SA', SP', PROTO) => (DA, DP, SA, SP) [ROUTPUT]
+    (SA, SP, DA, DP, PROTO) => (SA', SP', DA', DP') [FOUTPUT]
+    (DA', DP', SA', SP', PROTO) => (DA, DP, SA, SP) [ROUTPUT]
 
 Thus, the input packet is rewritten and sent to FOUTPUT, and packets from the
 reply flow are rewritten to look like part of the original flow and sent to
@@ -160,85 +160,70 @@ table.
 =a TCPRewriter, IPAddrRewriter, IPAddrPairRewriter, IPRewriterPatterns,
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter */
 
-class UDPRewriter : public IPRewriterBase {
+class UDPRewriter : public IPRewriterBase { public:
 
-	public:
-		class UDPFlow : public IPRewriterFlow {
+    class UDPFlow : public IPRewriterFlow { public:
 
-			public:
-				UDPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
-					const IPFlowID &rewritten_flowid, int ip_p,
-					bool guaranteed, click_jiffies_t expiry_j)
-					: IPRewriterFlow(owner, flowid, rewritten_flowid,
-							 ip_p, guaranteed, expiry_j) {
-				}
+	UDPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
+		const IPFlowID &rewritten_flowid, int ip_p,
+		bool guaranteed, click_jiffies_t expiry_j)
+	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
+			     ip_p, guaranteed, expiry_j) {
+	}
 
-				bool streaming() const {
-					return _tflags > 6;
-				}
+	bool streaming() const {
+	    return _tflags > 6;
+	}
 
-				void apply(WritablePacket *p, bool direction, unsigned annos, bool calc_checksum);
-		};
+	void apply(WritablePacket *p, bool direction, unsigned annos);
 
-		UDPRewriter () CLICK_COLD;
-		~UDPRewriter() CLICK_COLD;
+    };
 
-		const char *class_name() const	{ return "UDPRewriter"; }
-		void *cast(const char *);
+    UDPRewriter() CLICK_COLD;
+    ~UDPRewriter() CLICK_COLD;
 
-		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    const char *class_name() const		{ return "UDPRewriter"; }
+    void *cast(const char *);
 
-		IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-									const IPFlowID &rewritten_flowid, int input);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-		void destroy_flow(IPRewriterFlow *flow);
-		click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-			return flow->expiry() +
-				udp_flow_timeout(static_cast<const UDPFlow *>(flow)) -
-				_timeouts[click_current_cpu_id()][1];
-		}
+    IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
+			      const IPFlowID &rewritten_flowid, int input);
+    void destroy_flow(IPRewriterFlow *flow);
+    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
+	return flow->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>(flow)) - _timeouts[1];
+    }
 
-		void push_packet(int port, Packet      *p);
-	#if HAVE_BATCH
-		void push_batch (int port, PacketBatch *batch);
-	#endif
+    void push(int, Packet *);
 
-		void add_handlers() CLICK_COLD;
+    void add_handlers() CLICK_COLD;
 
-	private:
-	#if HAVE_USER_MULTITHREAD
-		unsigned _maps_no;
-		SizedHashAllocator<sizeof(UDPFlow)> *_allocator;
-	#else
-		SizedHashAllocator<sizeof(UDPFlow)> _allocator[CLICK_CPU_MAX];
-	#endif
+  private:
 
-		unsigned _annos;
-		uint32_t _udp_streaming_timeout;
+    SizedHashAllocator<sizeof(UDPFlow)> _allocator;
+    unsigned _annos;
+    uint32_t _udp_streaming_timeout;
 
-		// The actual processing of this element is abstracted from the push operation.
-		// This allows both push and push_batch to exploit the same processing
-		int process(int port, Packet *p_in);
+    int udp_flow_timeout(const UDPFlow *mf) const {
+	if (mf->streaming())
+	    return _udp_streaming_timeout;
+	else
+	    return _timeouts[0];
+    }
 
-		int udp_flow_timeout(const UDPFlow *mf) const {
-			if (mf->streaming())
-				return _udp_streaming_timeout;
-			else
-				return _timeouts[click_current_cpu_id()][0];
-		}
+    static String dump_mappings_handler(Element *, void *);
 
-		static String dump_mappings_handler(Element *, void *);
+    friend class IPRewriter;
 
-		friend class IPRewriter;
 };
 
 
 inline void
 UDPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-	unmap_flow(flow, _map[click_current_cpu_id()]);
-	flow->~IPRewriterFlow();
-	_allocator[click_current_cpu_id()].deallocate(flow);
+    unmap_flow(flow, _map);
+    flow->~IPRewriterFlow();
+    _allocator.deallocate(flow);
 }
 
 CLICK_ENDDECLS
