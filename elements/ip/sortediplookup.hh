@@ -31,7 +31,7 @@ class SortedIPLookup : public LinearIPLookup { public:
     const char *class_name() const	{ return "SortedIPLookup"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push(int port, Packet *p);
+    void push_packet(int port, Packet *p);
 
     int add_route(const IPRoute&, bool, IPRoute*, ErrorHandler *);
     int remove_route(const IPRoute&, IPRoute*, ErrorHandler *);

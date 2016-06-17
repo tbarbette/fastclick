@@ -2,8 +2,12 @@
  * decipttl.{cc,hh} -- element decrements IP packet's time-to-live
  * Eddie Kohler, Robert Morris
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2008 Meraki, Inc.
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -75,6 +79,15 @@ DecIPTTL::simple_action(Packet *p)
 	return q;
     }
 }
+
+#if HAVE_BATCH
+PacketBatch *
+DecIPTTL::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 void
 DecIPTTL::add_handlers()

@@ -149,7 +149,7 @@ SortedIPLookup::lookup_entry(IPAddress a) const
 }
 
 void
-SortedIPLookup::push(int, Packet *p)
+SortedIPLookup::push_packet(int, Packet *p)
 {
 #define EXCHANGE(a,b,t) { t = a; a = b; b = t; }
     IPAddress a = p->dst_ip_anno();
