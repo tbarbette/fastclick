@@ -76,7 +76,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     configure_tx(1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
 
-    if (_burst > (unsigned)_device->get_num_slots() / 2) {
+    if (_burst > _device->get_num_slots() / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
@@ -250,12 +250,13 @@ ToNetmapDevice::push_packet(int, Packet* p) {
 			s.q->set_prev(p);
 			s.q_size++;
 		} else {
+			//TODO : blocking mode
 			add_dropped(1);
 			p->kill();
 		}
 	}
 
-	if (s.q_size >= _burst) { //TODO "or if timeout", not implemented yet because batching solves this problem
+	if (s.q_size >= _burst) { //TODO "or if timeout", not implemented yet because batching +- solves this problem
 do_send:
 		Packet* last = s.q->prev();
 
@@ -473,7 +474,7 @@ ToNetmapDevice::run_task(Task* task)
 	unsigned int total_sent = 0;
 
 	Packet* batch = s.q;
-	unsigned batch_size = s.q_size;
+	int batch_size = s.q_size;
 	s.q = NULL;
 	s.q_size = 0;
 	do {

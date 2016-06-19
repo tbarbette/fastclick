@@ -194,8 +194,8 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 			cur = rxring->cur;
 
 			n = nm_ring_space(rxring);
-			if (_burst && n > _burst) {
-			    nr_pending += n - _burst;
+			if (_burst > 0 && n > (int)_burst) {
+			    nr_pending += n - (int)_burst;
 				n = _burst;
 			}
 
@@ -285,7 +285,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 
 		}
 
-	if (nr_pending > _burst) { //TODO size/4
+	if ((int)nr_pending > _burst) { //TODO size/4 or something
 	    if (fromtask) {
 	            task->fast_reschedule();
 	    } else {

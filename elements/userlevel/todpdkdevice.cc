@@ -80,8 +80,6 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
 		if (ndesc > 0 && (unsigned)_burst > ndesc / 2 ) {
 			errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
-		} else if (_burst > 32) {
-			errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
 		}
     }
 

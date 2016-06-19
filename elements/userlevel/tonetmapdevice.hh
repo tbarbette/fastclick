@@ -119,7 +119,7 @@ public:
         State() : backoff(0), q(NULL), q_size(0), last_queue(0), timer() {};
         unsigned int backoff;
     	Packet* q; //Pending packets to send
-    	unsigned int q_size;
+	int q_size;
     	unsigned int last_queue; //Last queue used to send packets
     	NotifierSignal signal;
        Timer* timer; //Timer for repeateadly empty pull()
