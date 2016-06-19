@@ -90,9 +90,9 @@ class FromDPDKRing : public BatchElement {
 		bool can_live_reconfigure() const { return false; }
 
 		int  configure   (Vector<String> &, ErrorHandler *)	CLICK_COLD;
-		int  initialize  (ErrorHandler *) 					CLICK_COLD;
-		void add_handlers()									CLICK_COLD;
-		void cleanup     (CleanupStage) 					CLICK_COLD;
+		int  initialize  (ErrorHandler *) 			CLICK_COLD;
+		void add_handlers()					CLICK_COLD;
+		void cleanup     (CleanupStage) 			CLICK_COLD;
 
 		// Calls either push_packet or push_batch
 		bool run_task    (Task *);

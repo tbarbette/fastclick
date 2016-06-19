@@ -120,10 +120,10 @@ class ToDPDKRing : public BatchElement {
 		int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED; }
 		bool can_live_reconfigure() const { return false; }
 
-		int  configure   (Vector<String> &, ErrorHandler *) CLICK_COLD;
-		int  initialize  (ErrorHandler *) 					CLICK_COLD;
-		void cleanup     (CleanupStage stage) 				CLICK_COLD;
-		void add_handlers() 								CLICK_COLD;
+		int  configure   (Vector<String> &, ErrorHandler *) 	CLICK_COLD;
+		int  initialize  (ErrorHandler *) 			CLICK_COLD;
+		void cleanup     (CleanupStage stage) 			CLICK_COLD;
+		void add_handlers() 					CLICK_COLD;
 
 		void run_timer(Timer *);
 
@@ -176,7 +176,7 @@ class ToDPDKRing : public BatchElement {
 		unsigned     _def_burst_size;
 		unsigned int _iqueue_size;
 		short        _numa_zone;
-		
+
 		short        _timeout;
 		bool         _blocking;
 		bool         _congestion_warning_printed;
@@ -184,7 +184,7 @@ class ToDPDKRing : public BatchElement {
 		counter_t    _n_sent;
 		counter_t    _n_dropped;
 
-	static String read_handler(Element*, void*) CLICK_COLD;
+		static String read_handler(Element*, void*) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

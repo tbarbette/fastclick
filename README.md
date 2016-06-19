@@ -36,7 +36,7 @@ Setup your DPDK 1.6 to 2.2 environment, then configure with :
 to get the better performances.
 
 An example configuration is :
-FromDpdkDevice(0) -> CheckIPHeader() -> ToDpdkDevice(1)
+FromDPDKDevice(0) -> CheckIPHeader(OFFSET 14) -> ToDPDKDevice(1)
 
 To run click with DPDK, you can add the usual EAL parameters :
 sudo bin/click -c 0xf -n 4 -- /path/to/config/file.click

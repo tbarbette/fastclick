@@ -196,9 +196,9 @@ FromDPDKRing::run_task(Task * t)
 			rte_pktmbuf_free(pkts[i]
 		);
 	#endif
-		
+
 		p->set_packet_type_anno(Packet::HOST);
-		
+
 	#if HAVE_BATCH
 		if (head == NULL)
 			head = PacketBatch::start_head(p);
