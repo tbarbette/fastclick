@@ -65,10 +65,9 @@ CLICK_DECLS
  */
 
 
-class ToNetmapDevice: public QueueDevice  {
+class ToNetmapDevice: public TXQueueDevice  {
 
 public:
-	std::vector <Packet*> _queues;
 	ToNetmapDevice() CLICK_COLD;
 
     void selected(int, int);
@@ -102,9 +101,6 @@ public:
 
   protected:
 
-
-    unsigned int _burst;
-    bool _block;
     unsigned long last_count;
     unsigned long last_rate;
     std::vector<Timer*> _zctimers;
@@ -112,7 +108,6 @@ public:
     bool _debug;
     enum { h_signal };
 
-    unsigned int _internal_queue;
     bool _pull_use_select;
 
     unsigned int send_packets(Packet* &packet, bool ask_sync=false, bool txsync_on_empty = true);

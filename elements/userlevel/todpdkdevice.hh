@@ -97,7 +97,7 @@ Resets n_send and n_dropped counts to zero.
 
 =a DPDKInfo, FromDPDKDevice */
 
-class ToDPDKDevice : public QueueDevice {
+class ToDPDKDevice : public TXQueueDevice {
 public:
 
     ToDPDKDevice() CLICK_COLD;
@@ -132,7 +132,7 @@ private:
      * to be sent.
      * index is the index of the first valid packets awaiting to be sent, while
      * nr_pending is the number of packets. index + nr_pending may be greater
-     * than _iqueue_size but index should be wrapped-around. */
+     * than _internal_queue_size but index should be wrapped-around. */
     class InternalQueue {
     public:
         InternalQueue() : pkts(0), index(0), nr_pending(0) { }
@@ -148,14 +148,12 @@ private:
         Timer timeout;
     } __attribute__((aligned(64)));
 
+    inline void set_flush_timer(InternalQueue &iqueue);
     void flush_internal_queue(InternalQueue &);
 
     per_thread<InternalQueue> _iqueues;
 
     unsigned _port_id;
-    unsigned int _iqueue_size;
-    bool _blocking;
-    int _burst_size;
     int _timeout;
     bool _congestion_warning_printed;
 };

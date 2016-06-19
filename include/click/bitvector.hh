@@ -84,6 +84,8 @@ class Bitvector {
 
     void print();
 
+    static Bitvector from_mask(unsigned long mask);
+
   private:
 
     enum { ninline = 2, inlinebits = ninline * wbits };

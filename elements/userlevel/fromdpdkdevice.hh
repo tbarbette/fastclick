@@ -90,7 +90,7 @@ Resets "count" to zero.
 
 =a DPDKInfo, ToDPDKDevice */
 
-class FromDPDKDevice : public QueueDevice {
+class FromDPDKDevice : public RXQueueDevice {
 public:
 
     FromDPDKDevice() CLICK_COLD;
@@ -118,9 +118,6 @@ private:
 
 
     unsigned _port_id;
-    bool _promisc;
-    unsigned int _burst_size;
-    bool _set_rss_aggregate;
 };
 
 CLICK_ENDDECLS

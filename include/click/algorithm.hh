@@ -68,7 +68,7 @@ template<typename _Tp>
     return __a;
   }
 
-/** @brief return the minimum of two values
+/** @brief return the maximum of two values
  */
 template<typename _Tp>
   inline const _Tp&

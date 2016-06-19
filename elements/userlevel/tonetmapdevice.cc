@@ -30,8 +30,11 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(true),_internal_queue(512),_pull_use_select(true),_device(0)
+ToNetmapDevice::ToNetmapDevice() : _pull_use_select(true),_device(0)
 {
+	_burst = 32;
+	_blocking = true;
+	_internal_queue_size = 512;
 }
 
 
@@ -39,20 +42,15 @@ int
 ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String ifname;
-    int maxthreads = -1;
     int burst = -1;
 
-    if (Args(conf, this, errh)
-    .read_mp("DEVNAME", ifname)
-    .read_p("IQUEUE",_internal_queue)
-    .read_p("BLOCKING",_block)
-    .read("BURST", burst)
-    .read("MAXTHREADS",maxthreads)
+    if (parse(Args(conf, this, errh)
+    .read_mp("DEVNAME", ifname))
     .complete() < 0)
     	return -1;
 
-    if (_internal_queue < _burst * 2) {
-        return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_queue, _burst);
+    if (_internal_queue_size < _burst * 2) {
+        return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_queue_size, _burst);
     }
 
 #if HAVE_BATCH
@@ -69,7 +67,14 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (!_device) {
         return errh->error("Could not initialize %s",ifname.c_str());
     }
-    configure_tx(maxthreads,1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
+
+    //TODO : If user put multiple ToNetmapDevice with the same port and without the QUEUE parameter, try to share the available queues among them
+    if (firstqueue == -1)
+        firstqueue = 0;
+    if (firstqueue >= _device->n_queues)
+        return errh->error("You asked for queue %d but device only have %d queues.",firstqueue,_device->n_queues);
+
+    configure_tx(1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
 
     if (_burst > (unsigned)_device->get_num_slots() / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
@@ -79,7 +84,6 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (ninputs() && input_is_pull(0))
         in_batch_mode = BATCH_MODE_YES;
 #endif
-
 
     return 0;
 }
@@ -100,9 +104,8 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 		transient traffic, the iqueue if it's not enough, and block or drop if
 		even the iqueue is full*/
 	if (input_is_pull(0)) {
-		_queues.resize(router()->master()->nthreads());
 		if (_pull_use_select) {
-			for (int i = 0; i < nqueues; i++) {
+			for (int i = 0; i < n_queues; i++) {
 				master()->thread(thread_for_queue(i))->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
 			}
 		}
@@ -110,7 +113,6 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 		int nt = 0;
 		for (int i = 0; i < click_nthreads; i++) {
 			if (!usable_threads[i]) continue;
-			_queues[i] = 0;
 			state.get_value_for_thread(i).signal = (Notifier::upstream_empty_signal(this, 0, _tasks[nt]));
 			state.get_value_for_thread(i).timer = new Timer(task_for_thread(i));
 			state.get_value_for_thread(i).timer->initialize(this);
@@ -118,9 +120,9 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 			nt++;
 		}
 	} else {
-		_iodone.resize(nqueues);
-		_zctimers.resize(nqueues);
-		for (int i = 0; i < nqueues; i++) {
+		_iodone.resize(firstqueue + n_queues);
+		_zctimers.resize(firstqueue + n_queues);
+		for (int i = firstqueue; i < firstqueue + n_queues; i++) {
 		    _iodone[i] = false;
 		    _zctimers[i] = new Timer(this);
 		    _zctimers[i]->initialize(this,false);
@@ -181,7 +183,7 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 	bool ask_sync = false;
 
 	if (s.q != NULL) {
-		if (s.q_size < _internal_queue) {
+		if (s.q_size < _internal_queue_size) {
 			s.q->prev()->set_next(b_head);
 			s.q_size += b_head->count();
 			s.q->set_prev(b_head->prev());
@@ -217,12 +219,12 @@ do_send_batch:
         }
     } else {
         if (should_be_dropped) {
-            if (s.q_size < _internal_queue) {
+            if (s.q_size < _internal_queue_size) {
                 s.q->prev()->set_next(b_head);
                 s.q_size += b_head->count();
                 s.q->set_prev(b_head->prev());
             } else { //Still not enough place, drop !
-            	if (_block) {
+		if (_blocking) {
             		allow_txsync();
             		goto do_send_batch;
             	} else {
@@ -243,7 +245,7 @@ ToNetmapDevice::push_packet(int, Packet* p) {
 		p->set_next(NULL); //Just to be sure, even if it should already be
 		s.q_size = 1;
 	} else {
-		if (s.q_size < _internal_queue) { //Append packet at the end
+		if (s.q_size < _internal_queue_size) { //Append packet at the end
 			s.q->prev()->set_next(p);
 			s.q->set_prev(p);
 			s.q_size++;
@@ -263,7 +265,7 @@ do_send:
 			but again batching solves this problem*/
 		if (lock_attempt()) {
 			s.q->prev()->set_next(NULL);
-		} else if (unlikely(s.q_size > 2*_burst || (_block && s.q_size >= _internal_queue))) {
+		} else if (unlikely(s.q_size > 2*_burst || (_blocking && s.q_size >= _internal_queue_size))) {
 			//If it failed too much... We'll spinlock, or if we are in blockant mode and we need to block
 			s.q->prev()->set_next(NULL);
 			lock();
@@ -293,7 +295,7 @@ do_send:
 		}
 		unlock();
 
-		if (s.q && s.q_size >= _internal_queue && _block) {
+		if (s.q && s.q_size >= _internal_queue_size && _blocking) {
 			allow_txsync();
 			goto do_send;
 		}
@@ -399,7 +401,6 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
 		int in = (s.last_queue + iloop) % queue_per_threads;
 		int i =  queue_for_thisthread_begin() + in;
-
 		nmd = _device->nmds[i];
 		txring = NETMAP_TXRING(nmd->nifp, i);
 
@@ -580,7 +581,7 @@ ToNetmapDevice::cleanup(CleanupStage)
             delete state.get_value(i).timer;
     }
     if (!input_is_pull(0))
-        for (int i = 0; i < min((int)_zctimers.size(),(int)nqueues); i++)
+        for (int i = firstqueue; i < min((int)_zctimers.size(),firstqueue + n_queues); i++)
             delete _zctimers[i];
 
     if (_device) _device->destroy();

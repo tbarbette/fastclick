@@ -65,7 +65,7 @@ CLICK_DECLS
 
 
 
-class FromNetmapDevice: public QueueDevice {
+class FromNetmapDevice: public RXQueueDevice {
 
 public:
 
@@ -92,9 +92,6 @@ public:
   protected:
 
     NetmapDevice* _device;
-    bool _promisc;
-    bool _blockant;
-    unsigned int _burst;
 
     //Do not quit the task until we have sended all possible packets (until all queues are empty)
     bool _keephand;
