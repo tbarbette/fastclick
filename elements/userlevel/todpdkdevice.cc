@@ -120,46 +120,6 @@ void ToDPDKDevice::add_handlers()
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 
-inline struct rte_mbuf* ToDPDKDevice::get_mbuf(Packet* p, bool create=true) {
-    struct rte_mbuf* mbuf;
-    #if CLICK_PACKET_USE_DPDK
-    mbuf = p->mb();
-    #else
-    if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *) p->destructor_argument()))
-		|| unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
-        /* If the packet is an unshared DPDK packet, we can send
-         *  the mbuf as it to DPDK*/
-        rte_pktmbuf_pkt_len(mbuf) = p->length();
-        rte_pktmbuf_data_len(mbuf) = p->length();
-        mbuf->data_off = p->headroom();
-        if (p->shared()) {
-            /*Prevent DPDK from freeing the buffer. When all shared packet
-             * are freed, DPDKDevice::free_pkt will effectively destroy it.*/
-            rte_mbuf_refcnt_update(mbuf, 1);
-        } else {
-            //Reset buffer, let DPDK free the buffer when it wants
-            p->reset_buffer();
-        }
-    } else {
-        if (create) {
-            /*The packet is not a DPDK packet, or it is shared : we need to allocate a mbuf and
-             * copy the packet content to it.*/
-            mbuf = DPDKDevice::get_pkt(_this_node);
-            if (mbuf == 0) {
-                click_chatter("Out of DPDK buffer ! Check your configuration for "
-                        "packet leaks or increase the number of buffer with DPDKInfo().");
-                return NULL;
-            }
-            memcpy((void*)rte_pktmbuf_mtod(mbuf, unsigned char *),p->data(),p->length());
-            rte_pktmbuf_pkt_len(mbuf) = p->length();
-            rte_pktmbuf_data_len(mbuf) = p->length();
-        } else
-            return NULL;
-    }
-    #endif
-    return mbuf;
-}
-
 inline void ToDPDKDevice::set_flush_timer(InternalQueue &iqueue) {
     if (_timeout >= 0) {
 	if (iqueue.timeout.scheduled()) {
@@ -181,7 +141,6 @@ void ToDPDKDevice::run_timer(Timer *)
 {
     flush_internal_queue(_iqueues.get());
 }
-
 
 /* Flush as much as possible packets from a given internal queue to the DPDK
  * device. */
@@ -248,7 +207,7 @@ void ToDPDKDevice::push_packet(int, Packet *p)
                 _congestion_warning_printed = true;
             }
         } else { // If there is space in the iqueue
-            struct rte_mbuf* mbuf = get_mbuf(p);
+            struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
             if (mbuf != NULL) {
                 iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_queue_size] = mbuf;
                 iqueue.nr_pending++;
@@ -298,7 +257,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 		//First, place the packets in the queue
         while (iqueue.nr_pending < _internal_queue_size && p) { // Internal queue is full
             // While there is still place in the iqueue
-            struct rte_mbuf* mbuf = get_mbuf(p);
+            struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
             if (mbuf != NULL) {
                 iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_queue_size] = mbuf;
                 iqueue.nr_pending++;

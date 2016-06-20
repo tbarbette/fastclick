@@ -127,8 +127,6 @@ public:
 
     void add_handlers() CLICK_COLD;
 
-    struct rte_mbuf* get_mbuf(Packet* p, bool create);
-
     void run_timer(Timer *);
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *head);

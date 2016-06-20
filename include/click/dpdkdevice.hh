@@ -29,6 +29,7 @@ class DPDKDevice {
 public:
 
     static struct rte_mempool *get_mpool(unsigned int);
+    inline static struct rte_mbuf* get_mbuf(Packet* p, bool create = true, int node = 0);
 
     static int get_port_numa_node(unsigned port_id);
 
@@ -116,6 +117,54 @@ private:
                           bool promisc, unsigned n_desc, ErrorHandler *errh)
         CLICK_COLD;
 };
+
+/**
+ * Get a DPDK mbuf from a packet. If the packet buffer is a DPDK buffer, it will
+ * 	give that one. If it isn't, it will allocate a new mbuf from a DPDK pool
+ * 	and copy its content.
+ * 	If compiled with CLICK_PACKET_USE_DPDK, it will simply return the packet
+ * 	casted as it's already a DPDK buffer.
+ */
+inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node) {
+    struct rte_mbuf* mbuf;
+    #if CLICK_PACKET_USE_DPDK
+    mbuf = p->mb();
+    #else
+    if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *) p->destructor_argument()))
+		|| unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
+        /* If the packet is an unshared DPDK packet, we can send
+         *  the mbuf as it to DPDK*/
+        rte_pktmbuf_pkt_len(mbuf) = p->length();
+        rte_pktmbuf_data_len(mbuf) = p->length();
+        mbuf->data_off = p->headroom();
+        if (p->shared()) {
+            /*Prevent DPDK from freeing the buffer. When all shared packet
+             * are freed, DPDKDevice::free_pkt will effectively destroy it.*/
+            rte_mbuf_refcnt_update(mbuf, 1);
+        } else {
+            //Reset buffer, let DPDK free the buffer when it wants
+            p->reset_buffer();
+        }
+    } else {
+        if (create) {
+            /*The packet is not a DPDK packet, or it is shared : we need to allocate a mbuf and
+             * copy the packet content to it.*/
+            mbuf = DPDKDevice::get_pkt(node);
+            if (mbuf == 0) {
+                click_chatter("Out of DPDK buffer ! Check your configuration for "
+                        "packet leaks or increase the number of buffer with DPDKInfo().");
+                return NULL;
+            }
+            memcpy((void*)rte_pktmbuf_mtod(mbuf, unsigned char *),p->data(),p->length());
+            rte_pktmbuf_pkt_len(mbuf) = p->length();
+            rte_pktmbuf_data_len(mbuf) = p->length();
+        } else
+            return NULL;
+    }
+    #endif
+    return mbuf;
+}
+
 
 CLICK_ENDDECLS
 
