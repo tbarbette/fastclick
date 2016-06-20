@@ -204,9 +204,9 @@ void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
         if (iqueue.index + sub_burst >= _internal_queue_size)
             // The sub_burst wraps around the ring
             sub_burst = _internal_queue_size - iqueue.index;
+        //Todo : if there is multiple queue assigned to this thread, send on all of them
         r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
                              sub_burst);
-
         iqueue.nr_pending -= r;
         iqueue.index += r;
 

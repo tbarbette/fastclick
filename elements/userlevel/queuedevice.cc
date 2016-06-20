@@ -232,7 +232,6 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 
        if (n_threads > _maxqueues) {
            queue_share = n_threads / _maxqueues;
-
        }
 
        if (_threadoffset == -1) {
@@ -277,6 +276,13 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
            return errh->error("Node has not enough threads for device !");
        }
 
+       if (_verbose > 1) {
+           if (n_threads >= n_queues)
+               click_chatter("%s : %d threads will be used to push packets downstream. %d queues will be used meaning that each queue will be shared by %d threads.",name().c_str(),n_threads,n_queues,queue_share);
+           else
+               click_chatter("%s : %d threads will be used to push packets downstream. %d queues will be used meaning that each thread will handle up to %d queues",name().c_str(),n_threads,n_queues,queue_per_threads);
+       }
+
     end:
        n_initialized++;
        return 0;
@@ -294,24 +300,24 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 		click_chatter("%s : using queues from %d to %d",name().c_str(),firstqueue,firstqueue+n_queues-1);
 
 	//If there is multiple threads per queue, share_idx will be in [0,thread_share[, thread_share being the amount of queues that needs to be shared between threads
-	int share_idx = 0;
+	int th_share_idx = 0;
+	int qu_share_idx = 0;
 	for (int th_id = 0; th_id < master()->nthreads(); th_id++) {
 		if (!usable_threads[th_id])
 			continue;
 
-		if (share_idx % thread_share != 0) {
+		if (th_share_idx % thread_share != 0) {
 			--th_num;
 			if (_locks[th_num] == NO_LOCK) {
 				_locks[th_num] = 0;
 			}
-			qu_num --;
 		} else {
 			_tasks[th_num] = (new Task(this));
 			ScheduleInfo::initialize_task(this, _tasks[th_num], schedule, errh);
 			_tasks[th_num]->move_thread(th_id);
 			_locks[th_num] = NO_LOCK;
 		}
-		share_idx++;
+		th_share_idx++;
 
 		_thread_to_firstqueue[th_id] = qu_num;
 
@@ -320,7 +326,9 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 				click_chatter("%s : Queue %d handled by th %d",name().c_str(),qu_num,th_id);
 			_queue_to_thread[qu_num] = th_id;
 			//If queue are shared, this mapping is loosy : _queue_to_thread will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
-			qu_num++;
+			qu_share_idx++;
+			if (qu_share_idx % queue_share == 0)
+				qu_num++;
 			if (qu_num == firstqueue + n_queues) break;
 		}
 

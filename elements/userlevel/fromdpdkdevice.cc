@@ -90,6 +90,8 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     ret = initialize_tasks(true,errh);
     if (ret != 0) return ret;
 
+    if (queue_share > 1)
+        return errh->error("Sharing queue between multiple threads is not yet supported by FromDPDKDevice. Raise the number using N_QUEUES of queues or limit the number of threads using MAXTHREADS");
 
     if (all_initialized()) {
         ret = DPDKDevice::initialize(errh);
@@ -116,11 +118,12 @@ bool FromDPDKDevice::run_task(Task * t)
     int ret = 0;
 
 #if HAVE_BATCH
-    PacketBatch* head = NULL;
-	WritablePacket *last = NULL;
+    PacketBatch* head;
+	WritablePacket *last;
 #endif
 
     for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
+        head = NULL;
         unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
 #if CLICK_PACKET_USE_DPDK
