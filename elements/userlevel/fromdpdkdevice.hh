@@ -14,7 +14,7 @@ CLICK_DECLS
 
 =c
 
-FromDPDKDevice(PORT [, I<keywords> PROMISC, BURST, NDESC])
+FromDPDKDevice(PORT [, QUEUE, N_QUEUES, I<keywords> PROMISC, BURST, NDESC])
 
 =s netdevices
 
@@ -35,6 +35,14 @@ Arguments:
 =item PORT
 
 Integer.  Port identifier of the device.
+
+=item QUEUE
+
+Integer.  A specific hardware queue to use. Default is 0.
+
+=item N_QUEUES
+
+Integer.  Number of hardware queues to use. -1 or default is to use as many queues as threads assigned to this element.
 
 =item PROMISC
 
@@ -58,14 +66,6 @@ other input elements supporting multiqueue (extending QueueDevice)
 Specify which Click thread will handle this element. If multiple
 j threads are used, threads with id THREADOFFSET+j will be used. Default is
 to share the threads available on the device's NUMA node equally.
-
-=item MINQUEUE
-Minimum number of hardware queue of the devices to use. Multiple queues
-allows to load balance the traffic on multiple thread using RSS.
-Default is 1.
-
-=item MAXQUEUES
-Maximum number of hardware queue to use. Default is 128.
 
 =item NDESC
 

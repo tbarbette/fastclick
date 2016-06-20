@@ -19,7 +19,7 @@ CLICK_DECLS
  *
  * =c
  *
- * ToNetmapDevice(DEVNAME [, QUEUE, [, I<keywords> PROMISC, BURST])
+ * ToNetmapDevice(DEVNAME [, QUEUE, N_QUEUES, [, I<keywords> PROMISC, BURST])
  *
  * =s comm
  *
@@ -33,6 +33,15 @@ CLICK_DECLS
  * =item DEVNAME
  *
  * String Device name
+ *
+ *=item QUEUE
+ *
+ * Integer.  A specific hardware queue to use. Default is 0.
+ *
+ *=item N_QUEUES
+ *
+ * Integer.  Number of hardware queues to use. -1 or default is to use as many
+ * queues as threads which can end up in this element.
  *
  * =item IQUEUE (push mode only)
  *

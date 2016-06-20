@@ -26,6 +26,17 @@ CLICK_DECLS
  *
  * String.  Device number
  *
+ *=item QUEUE
+ * Integer.  A specific hardware queue to use. Default is 0.
+ *
+ *=item N_QUEUES
+ *
+ * Integer.  Number of hardware queues to use. -1 or default is to use all
+ * available queues, as RSS is probably enabled and packet will come to all RX
+ * queues. Be noticed that using more than 1 queue per RX thread is useless
+ * in 99% of cases and you should use ethtool -L [interface] combined N or
+ * equivalent to ensure that.
+ *
  * =item PROMISC
  *
  * Boolean.  FromNetmapDevice puts the device in promiscuous mode if PROMISC is

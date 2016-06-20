@@ -13,7 +13,7 @@ CLICK_DECLS
 
 =c
 
-ToDPDKDevice(PORT [, I<keywords> IQUEUE, BLOCKING, etc.])
+ToDPDKDevice(PORT [, QUEUE, N_QUEUES, I<keywords> IQUEUE, BLOCKING, etc.])
 
 =s netdevices
 
@@ -35,6 +35,15 @@ Arguments:
 =item PORT
 
 Integer.  Port identifier of the device.
+
+=item QUEUE
+
+Integer.  A specific hardware queue to use. Default is 0.
+
+=item N_QUEUES
+
+Integer.  Number of hardware queues to use. -1 or default is to use as many
+queues as threads which can end up in this element.
 
 =item IQUEUE
 
