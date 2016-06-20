@@ -317,8 +317,8 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
                     click_chatter("%s: packet dropped", name().c_str());
                 else
                     click_chatter("%s: congestion warning", name().c_str());
-            } else
                 _congestion_warning_printed = true;
+            }
         }
 
         //Flush the queue if we have pending packets
@@ -336,6 +336,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 		next = p->next();
         BATCH_RECYCLE_UNSAFE_PACKET(p);
         p = next;
+        add_dropped(1);
 	}
 #endif
 
