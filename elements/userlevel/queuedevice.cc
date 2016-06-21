@@ -87,7 +87,7 @@ Args& RXQueueDevice::parse(Args &args) {
 
 Args& TXQueueDevice::parse(Args &args) {
 	QueueDevice::parse(args);
-	args.read("IQUEUE", _internal_queue_size)
+	args.read("IQUEUE", _tx_internal_queue_size)
 		.read("BLOCKING", _blocking);
 	return args;
 }

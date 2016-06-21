@@ -260,7 +260,7 @@ protected:
 class TXQueueDevice : public QueueDevice {
 protected:
 	bool _blocking;
-	int _internal_queue_size;
+	int _tx_internal_queue_size;
 
     /**
      * Common parsing for all RXQueueDevice

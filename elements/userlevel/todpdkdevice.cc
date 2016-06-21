@@ -30,7 +30,7 @@ ToDPDKDevice::ToDPDKDevice() :
 {
 	 _blocking = false;
 	 _burst = -1;
-	 _internal_queue_size = 1024;
+	 _tx_internal_queue_size = 1024;
 }
 
 ToDPDKDevice::~ToDPDKDevice()
@@ -88,7 +88,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         return ret;
 
     for (unsigned i = 0; i < _iqueues.size();i++) {
-        _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_queue_size];
+        _iqueues.get_value(i).pkts = new struct rte_mbuf *[_tx_internal_queue_size];
         if (_timeout >= 0) {
             _iqueues.get_value(i).timeout.assign(this);
             _iqueues.get_value(i).timeout.initialize(this);
@@ -120,7 +120,7 @@ void ToDPDKDevice::add_handlers()
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 
-inline void ToDPDKDevice::set_flush_timer(InternalQueue &iqueue) {
+inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
     if (_timeout >= 0) {
 	if (iqueue.timeout.scheduled()) {
 		//No more pending packets, remove timer
@@ -139,12 +139,12 @@ inline void ToDPDKDevice::set_flush_timer(InternalQueue &iqueue) {
 
 void ToDPDKDevice::run_timer(Timer *)
 {
-    flush_internal_queue(_iqueues.get());
+    flush_tx_internal_queue(_iqueues.get());
 }
 
 /* Flush as much as possible packets from a given internal queue to the DPDK
  * device. */
-void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
+void ToDPDKDevice::flush_tx_internal_queue(TXInternalQueue &iqueue) {
     unsigned sent = 0;
     unsigned r;
     /* sub_burst is the number of packets DPDK should send in one call if
@@ -160,16 +160,16 @@ void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
 
     do {
         sub_burst = iqueue.nr_pending > 32 ? 32 : iqueue.nr_pending;
-        if (iqueue.index + sub_burst >= _internal_queue_size)
+        if (iqueue.index + sub_burst >= _tx_internal_queue_size)
             // The sub_burst wraps around the ring
-            sub_burst = _internal_queue_size - iqueue.index;
+            sub_burst = _tx_internal_queue_size - iqueue.index;
         //Todo : if there is multiple queue assigned to this thread, send on all of them
         r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
                              sub_burst);
         iqueue.nr_pending -= r;
         iqueue.index += r;
 
-        if (iqueue.index >= _internal_queue_size) // Wrapping around the ring
+        if (iqueue.index >= _tx_internal_queue_size) // Wrapping around the ring
             iqueue.index = 0;
 
         sent += r;
@@ -186,13 +186,13 @@ void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
 void ToDPDKDevice::push_packet(int, Packet *p)
 {
     // Get the thread-local internal queue
-    InternalQueue &iqueue = _iqueues.get();
+    TXInternalQueue &iqueue = _iqueues.get();
 
     bool congestioned;
     do {
         congestioned = false;
 
-        if (iqueue.nr_pending == _internal_queue_size) { // Internal queue is full
+        if (iqueue.nr_pending == _tx_internal_queue_size) { // Internal queue is full
             /* We just set the congestion flag. If we're in blocking mode,
              * we'll loop, else we'll drop this packet.*/
             congestioned = true;
@@ -209,13 +209,13 @@ void ToDPDKDevice::push_packet(int, Packet *p)
         } else { // If there is space in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
             if (mbuf != NULL) {
-                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_queue_size] = mbuf;
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _tx_internal_queue_size] = mbuf;
                 iqueue.nr_pending++;
             }
         }
 
         if ((int)iqueue.nr_pending >= _burst || congestioned) {
-            flush_internal_queue(iqueue);
+            flush_tx_internal_queue(iqueue);
         }
         set_flush_timer(iqueue); //We wait until burst for sending packets, so flushing timer is especially important here
 
@@ -242,7 +242,7 @@ void ToDPDKDevice::push_packet(int, Packet *p)
 void ToDPDKDevice::push_batch(int, PacketBatch *head)
 {
 	// Get the thread-local internal queue
-	InternalQueue &iqueue = _iqueues.get();
+	TXInternalQueue &iqueue = _iqueues.get();
 
 	Packet* p = head;
 	Packet* next;
@@ -255,11 +255,11 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	do {
 		congestioned = false;
 		//First, place the packets in the queue
-        while (iqueue.nr_pending < _internal_queue_size && p) { // Internal queue is full
+        while (iqueue.nr_pending < _tx_internal_queue_size && p) { // Internal queue is full
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
             if (mbuf != NULL) {
-                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_queue_size] = mbuf;
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _tx_internal_queue_size] = mbuf;
                 iqueue.nr_pending++;
             }
             next = p->next();
@@ -282,7 +282,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 
         //Flush the queue if we have pending packets
         if ((int)iqueue.nr_pending > 0) {
-            flush_internal_queue(iqueue);
+            flush_tx_internal_queue(iqueue);
         }
         set_flush_timer(iqueue);
 

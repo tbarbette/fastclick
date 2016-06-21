@@ -135,14 +135,15 @@ public:
 
 private:
 
-    /* InternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
-     * to be sent.
+    /* TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
+     * to be sent. It is used as an internal buffer to be passed to DPDK device
+	 * queue.
      * index is the index of the first valid packets awaiting to be sent, while
      * nr_pending is the number of packets. index + nr_pending may be greater
-     * than _internal_queue_size but index should be wrapped-around. */
-    class InternalQueue {
+     * than _tx_internal_queue_size but index should be wrapped-around. */
+    class TXInternalQueue {
     public:
-        InternalQueue() : pkts(0), index(0), nr_pending(0) { }
+        TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
 
         // Array of DPDK Buffers
         struct rte_mbuf ** pkts;
@@ -155,10 +156,10 @@ private:
         Timer timeout;
     } __attribute__((aligned(64)));
 
-    inline void set_flush_timer(InternalQueue &iqueue);
-    void flush_internal_queue(InternalQueue &);
+    inline void set_flush_timer(TXInternalQueue &iqueue);
+    void flush_tx_internal_queue(TXInternalQueue &);
 
-    per_thread<InternalQueue> _iqueues;
+    per_thread<TXInternalQueue> _iqueues;
 
     unsigned _port_id;
     int _timeout;
