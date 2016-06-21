@@ -117,13 +117,11 @@ bool FromDPDKDevice::run_task(Task * t)
     struct rte_mbuf *pkts[_burst];
     int ret = 0;
 
-#if HAVE_BATCH
-    PacketBatch* head;
-	WritablePacket *last;
-#endif
-
     for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
-        head = NULL;
+#if HAVE_BATCH
+	 PacketBatch* head = 0;
+     WritablePacket *last;
+#endif
         unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
 #if CLICK_PACKET_USE_DPDK
