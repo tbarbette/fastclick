@@ -161,7 +161,7 @@ FromDPDKRing::cleanup(CleanupStage)
 }
 
 bool
-FromDPDKRing::run_task(Task * t)
+FromDPDKRing::run_task(Task *t)
 {
 #if HAVE_BATCH
 	PacketBatch    *head = NULL;
@@ -178,9 +178,11 @@ FromDPDKRing::run_task(Task * t)
 
 	// Turn the received frames into Click frames
 	for (unsigned i = 0; i < n; ++i) {
+
 	#if CLICK_PACKET_USE_DPDK
 		rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
 		WritablePacket *p = Packet::make(pkts[i]);
+
 	#elif HAVE_ZEROCOPY
 		rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
 		WritablePacket *p = Packet::make(
@@ -191,6 +193,7 @@ FromDPDKRing::run_task(Task * t)
 			rte_pktmbuf_headroom(pkts[i]),
 			rte_pktmbuf_tailroom(pkts[i])
 		);
+
 	#else
 		WritablePacket *p = Packet::make(
 			(void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),
@@ -229,9 +232,9 @@ FromDPDKRing::run_task(Task * t)
 }
 
 String
-FromDPDKRing::read_handler(Element* e, void *thunk)
+FromDPDKRing::read_handler(Element *e, void *thunk)
 {
-	FromDPDKRing* fr = static_cast<FromDPDKRing*>(e);
+	FromDPDKRing *fr = static_cast<FromDPDKRing*>(e);
 
 	if ( thunk == (void *) 0 )
 		return String(fr->_pkts_recv);
