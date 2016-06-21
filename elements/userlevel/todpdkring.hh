@@ -12,7 +12,7 @@ CLICK_DECLS
 
 =c
 
-ToDPDKRing(MEMPOOL [, I<keywords> BURST, etc.])
+ToDPDKRing(MEMPOOL m, FROM_PROC p1, TO_PROC p2, [, I<keywords> BURST, etc.])
 
 =s netdevices
 

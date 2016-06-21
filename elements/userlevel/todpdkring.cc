@@ -99,16 +99,16 @@ ToDPDKRing::initialize(ErrorHandler *errh)
 		if ( _burst_size == 0 ) {
 			_burst_size = _def_burst_size;
 			click_chatter("[%s] Non-positive BURST number. Setting default (%d) \n",
-							name().c_str(), _burst_size);
+					name().c_str(), _burst_size);
 		}
 
 		if ( (_ndesc > 0) && ((unsigned)_burst_size > _ndesc / 2) ) {
 			errh->warning("[%s] BURST should not be greater than half the number of descriptors (%d)",
-							name().c_str(), _ndesc);
+					name().c_str(), _ndesc);
 		}
 		else if ( _burst_size > _def_burst_size ) {
 			errh->warning("[%s] BURST should not be greater than 32 as DPDK won't send more packets at once",
-							name().c_str());
+					name().c_str());
 		}
 	}
 
@@ -120,7 +120,7 @@ ToDPDKRing::initialize(ErrorHandler *errh)
 			_PROC_1.c_str(), DPDKDevice::RING_SIZE,
 			rte_socket_id(), DPDKDevice::RING_FLAGS
 		);
-		
+
 		_message_pool = rte_mempool_create(
 			_MEM_POOL.c_str(), _ndesc,
 			DPDKDevice::MBUF_DATA_SIZE,
@@ -138,12 +138,12 @@ ToDPDKRing::initialize(ErrorHandler *errh)
 
 	if ( !_send_ring )
 		return errh->error("[%s] Problem getting Tx ring. "
-							"Make sure that the process attached to this element has the right ring configuration\n",
-							name().c_str());
+					"Make sure that the process attached to this element has the right ring configuration\n",
+					name().c_str());
 	if ( !_message_pool )
 		return errh->error("[%s] Problem getting message pool. "
-							"Make sure that the process attached to this element has the right ring configuration\n",
-							name().c_str());
+					"Make sure that the process attached to this element has the right ring configuration\n",
+					name().c_str());
 
 	// Initialize the internal queue
 	_iqueue.pkts = new struct rte_mbuf *[_internal_tx_queue_size];
@@ -186,13 +186,14 @@ ToDPDKRing::set_flush_timer(TXInternalQueue &iqueue)
 {
 	if (_timeout >= 0) {
 		if (iqueue.timeout.scheduled()) {
-			//No more pending packets, remove timer
+			// No more pending packets, remove timer
 			if (iqueue.nr_pending == 0)
 				iqueue.timeout.unschedule();
 		}
 		else {
 			if (iqueue.nr_pending > 0)
-				//Pending packets, set timeout to flush packets after a while even without burst
+				// Pending packets, set timeout to flush packets
+				// after a while even without burst
 				if (_timeout == 0)
 					iqueue.timeout.schedule_now();
 				else
@@ -250,7 +251,7 @@ ToDPDKRing::flush_internal_tx_ring(TXInternalQueue &iqueue)
 void
 ToDPDKRing::push_packet(int, Packet *p)
 {
-	// Get the thread-local internal queue
+	// Get the internal queue
 	TXInternalQueue &iqueue = _iqueue;
 
 	bool congestioned;
@@ -288,7 +289,7 @@ ToDPDKRing::push_packet(int, Packet *p)
 		}
 		// We wait until burst for sending packets, so flushing timer is especially important here
 		set_flush_timer(iqueue);
-		
+
 		// If we're in blocking mode, we loop until we can put p in the iqueue
 	} while (unlikely(_blocking && congestioned));
 
