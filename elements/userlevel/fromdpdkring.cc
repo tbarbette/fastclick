@@ -130,11 +130,11 @@ FromDPDKRing::initialize(ErrorHandler *errh)
 
 	if ( !_recv_ring )
 		return errh->error("[%s] Problem getting Rx ring. "
-							"Make sure that the process attached to this element has the right ring configuration\n",
+							"Make sure that the involved processes have a correct ring configuration\n",
 							name().c_str());
 	if ( !_message_pool )
 		return errh->error("[%s] Problem getting message pool. "
-							"Make sure that the process attached to this element has the right ring configuration\n",
+							"Make sure that the involved processes have a correct ring configuration\n",
 							name().c_str());
 
 	// The other end of this element might be in a different process (hence Click configuration),

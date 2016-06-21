@@ -25,7 +25,7 @@ CLICK_DECLS
 
 ToDPDKRing::ToDPDKRing() :
 	_message_pool(0), _send_ring(0), _iqueue(),
-	_numa_zone(0), _iqueue_size(1024),
+	_numa_zone(0), _internal_tx_queue_size(1024),
 	_burst_size(0), _timeout(0),
 	_blocking(false), _congestion_warning_printed(false),
 	_n_sent(0), _n_dropped(0)
@@ -45,7 +45,7 @@ ToDPDKRing::configure(Vector<String> &conf, ErrorHandler *errh)
 		.read_mp("MEM_POOL",  _MEM_POOL)
 		.read_mp("FROM_PROC", _origin)
 		.read_mp("TO_PROC",   _destination)
-		.read("IQUEUE",       _iqueue_size)
+		.read("IQUEUE",       _internal_tx_queue_size)
 		.read("BLOCKING",     _blocking)
 		.read("BURST",        _burst_size)
 		.read("NDESC",        _ndesc)
@@ -73,6 +73,8 @@ ToDPDKRing::configure(Vector<String> &conf, ErrorHandler *errh)
 	// If user does not specify the port number
 	// we assume that the process belongs to the
 	// memory zone of device 0.
+	// TODO: Search the Click DAG to find a FromDPDKDevice, take its' port_id
+	//       and use _numa_zone = DPDKDevice::get_port_numa_node(_port_id);
 	if ( _numa_zone < 0 ) {
 		click_chatter("[%s] Assuming NUMA zone 0\n");
 		_numa_zone = 0;
@@ -144,7 +146,7 @@ ToDPDKRing::initialize(ErrorHandler *errh)
 							name().c_str());
 
 	// Initialize the internal queue
-	_iqueue.pkts = new struct rte_mbuf *[_iqueue_size];
+	_iqueue.pkts = new struct rte_mbuf *[_internal_tx_queue_size];
 	if (_timeout >= 0) {
 		_iqueue.timeout.assign     (this);
 		_iqueue.timeout.initialize (this);
@@ -157,7 +159,7 @@ ToDPDKRing::initialize(ErrorHandler *errh)
 	click_chatter("|-> FROM_PROC: %s \n", _origin.c_str());
 	click_chatter("|->   TO_PROC: %s \n", _destination.c_str());
 	click_chatter("|-> NUMA ZONE: %d \n", _numa_zone);
-	click_chatter("|->    IQUEUE: %d \n", _iqueue_size);
+	click_chatter("|->    IQUEUE: %d \n", _internal_tx_queue_size);
 	click_chatter("|->     BURST: %d \n", _burst_size);
 	click_chatter("|->     NDESC: %d \n", _ndesc);
 	click_chatter("|->   TIMEOUT: %d \n", _timeout);
@@ -173,77 +175,46 @@ ToDPDKRing::cleanup(CleanupStage stage)
 		delete[] _iqueue.pkts;
 }
 
-inline struct rte_mbuf*
-ToDPDKRing::get_mbuf(Packet* p, bool create=true)
-{
-	struct rte_mbuf* mbuf;
-#if CLICK_PACKET_USE_DPDK
-	mbuf = p->mb();
-#else
-
-	if ( likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *) p->destructor_argument())) ||
-		 unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && 
-		 (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument())))
-	{
-		// If the packet is an unshared DPDK packet, we can send the mbuf as it to DPDK
-		rte_pktmbuf_pkt_len(mbuf) = p->length();
-		rte_pktmbuf_data_len(mbuf) = p->length();
-		mbuf->data_off = p->headroom();
-		if (p->shared()) {
-			// Prevent DPDK from freeing the buffer. When all shared packet are freed,
-			// DPDKDevice::free_pkt will effectively destroy it.
-			rte_mbuf_refcnt_update(mbuf, 1);
-		}
-		else {
-			//Reset buffer, let DPDK free the buffer when it wants
-			p->reset_buffer();
-		}
-	}
-	else {
-		if (create) {
-			// The packet is not a DPDK packet, or it is shared : we need to
-			// allocate an mbuf and copy the packet content to it.
-			mbuf = DPDKDevice::get_pkt(_numa_zone);
-			if (mbuf == 0) {
-				click_chatter(
-					"[%s] Out of DPDK buffer! Check your configuration for "
-					"packet leaks or increase the buffer size with DPDKInfo().", name().c_str()
-				);
-				return NULL;
-			}
-			memcpy((void*)rte_pktmbuf_mtod(mbuf, unsigned char *),p->data(),p->length());
-			rte_pktmbuf_pkt_len(mbuf) = p->length();
-			rte_pktmbuf_data_len(mbuf) = p->length();
-		}
-		else
-			return NULL;
-	}
-#endif
-
-	return mbuf;
-}
-
 void
 ToDPDKRing::run_timer(Timer *)
 {
-	flush_internal_queue(_iqueue);
+	flush_internal_tx_ring(_iqueue);
 }
 
+inline void
+ToDPDKRing::set_flush_timer(TXInternalQueue &iqueue)
+{
+	if (_timeout >= 0) {
+		if (iqueue.timeout.scheduled()) {
+			//No more pending packets, remove timer
+			if (iqueue.nr_pending == 0)
+				iqueue.timeout.unschedule();
+		}
+		else {
+			if (iqueue.nr_pending > 0)
+				//Pending packets, set timeout to flush packets after a while even without burst
+				if (_timeout == 0)
+					iqueue.timeout.schedule_now();
+				else
+					iqueue.timeout.schedule_after_msec(_timeout);
+		}
+	}
+}
 
 /* Flush as many packets as possible from the internal queue of the DPDK ring. */
 void
-ToDPDKRing::flush_internal_queue(InternalQueue &iqueue)
+ToDPDKRing::flush_internal_tx_ring(TXInternalQueue &iqueue)
 {
 	unsigned n;
 	unsigned sent = 0;
 	/*
-	 * sub_burst is the number of packets DPDK should send in one call if
-	 * there is no congestion, normally 32. If it sends less, it means
-	 * there is no more room in the output ring and we'll need to come
-	 * back later. Also, if we're wrapping around the ring, sub_burst
-	 * will be used to split the burst in two, as rte_eth_tx_burst needs a
-	 * contiguous buffer space.
-	 */
+	* sub_burst is the number of packets DPDK should send in one call
+	* if there is no congestion, normally 32. If it sends less, it means
+	* there is no more room in the output ring and we'll need to come
+	* back later. Also, if we're wrapping around the ring, sub_burst
+	* will be used to split the burst in two, as rte_ring_enqueue_burst
+	* needs a contiguous buffer space.
+	*/
 	unsigned sub_burst;
 
 	do {
@@ -251,9 +222,9 @@ ToDPDKRing::flush_internal_queue(InternalQueue &iqueue)
 			_def_burst_size : iqueue.nr_pending;
 
 		// The sub_burst wraps around the ring
-		if (iqueue.index + sub_burst >= _iqueue_size)
-			sub_burst = _iqueue_size - iqueue.index;
-		
+		if (iqueue.index + sub_burst >= _internal_tx_queue_size)
+			sub_burst = _internal_tx_queue_size - iqueue.index;
+
 		n = rte_ring_enqueue_burst(
 			_send_ring, (void* const*)(&iqueue.pkts[iqueue.index]),
 			sub_burst
@@ -263,7 +234,7 @@ ToDPDKRing::flush_internal_queue(InternalQueue &iqueue)
 		iqueue.index      += n;
 
 		// Wrapping around the ring
-		if (iqueue.index >= _iqueue_size)
+		if (iqueue.index >= _internal_tx_queue_size)
 			iqueue.index = 0;
 
 		sent += n;
@@ -280,14 +251,14 @@ void
 ToDPDKRing::push_packet(int, Packet *p)
 {
 	// Get the thread-local internal queue
-	InternalQueue &iqueue = _iqueue;
+	TXInternalQueue &iqueue = _iqueue;
 
 	bool congestioned;
 	do {
 		congestioned = false;
 
 		// Internal queue is full
-		if (iqueue.nr_pending == _iqueue_size) {
+		if (iqueue.nr_pending == _internal_tx_queue_size) {
 			// We just set the congestion flag. If we're in blocking mode,
 			// we'll loop, else we'll drop this packet.
 			congestioned = true;
@@ -305,24 +276,19 @@ ToDPDKRing::push_packet(int, Packet *p)
 		}
 		// There is space in the iqueue
 		else {
-			struct rte_mbuf* mbuf = get_mbuf(p);
+			struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _numa_zone);
 			if ( mbuf ) {
-				iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _iqueue_size] = mbuf;
+				iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size] = mbuf;
 				iqueue.nr_pending++;
 			}
 		}
 
 		if ( (int)iqueue.nr_pending >= _burst_size || congestioned ) {
-			flush_internal_queue(iqueue);
-			if (_timeout && iqueue.nr_pending == 0)
-				iqueue.timeout.unschedule();
+			flush_internal_tx_ring(iqueue);
 		}
-		else if (_timeout >= 0 && !iqueue.timeout.scheduled()) {
-			if (_timeout == 0)
-				iqueue.timeout.schedule_now();
-			else
-				iqueue.timeout.schedule_after_msec(_timeout);
-		}
+		// We wait until burst for sending packets, so flushing timer is especially important here
+		set_flush_timer(iqueue);
+		
 		// If we're in blocking mode, we loop until we can put p in the iqueue
 	} while (unlikely(_blocking && congestioned));
 
@@ -334,119 +300,75 @@ ToDPDKRing::push_packet(int, Packet *p)
 #endif
 }
 
-
 #if HAVE_BATCH
 void ToDPDKRing::push_batch(int, PacketBatch *head)
 {
 	// Get the internal queue
-	InternalQueue &iqueue = _iqueue;
-	// .. and a pointer to the first packet of the batch
-	Packet* p = head;
+	TXInternalQueue &iqueue = _iqueue;
 
-#if HAVE_BATCH_RECYCLE
-		BATCH_RECYCLE_START();
+	Packet* p = head;
+	Packet* next;
+
+	// No recycling through Click if we have DPDK packets
+	bool congestioned;
+#if !CLICK_PACKET_USE_DPDK
+	BATCH_RECYCLE_START();
 #endif
 
-	struct rte_mbuf **pkts = iqueue.pkts;
-
-	/////////////////////////////////////////////////////
-	// There are packets in the queue
-	/////////////////////////////////////////////////////
-	if ( iqueue.nr_pending ) {
-		unsigned ret  = 0;
-		unsigned n    = 0;
-		unsigned left = iqueue.nr_pending;
-		do {
-			n = rte_ring_enqueue_burst(_send_ring, (void* const*)(&iqueue.pkts[iqueue.index + ret]), left);
-			ret  += n;
-			left -= n;
-		} while ( (n == _def_burst_size) && (left > 0) );
-
-		// All sent
-		if ( ret == iqueue.nr_pending ) {
-			//Reset, there is nothing in the internal queue
-			iqueue.index      = 0;
-			iqueue.nr_pending = 0;
-		}
-		// Place the new packets after the old
-		else if ( iqueue.index + iqueue.nr_pending + head->count() <  _iqueue_size ) {
-			iqueue.index      += ret;
-			iqueue.nr_pending -= ret;
-			pkts = &iqueue.pkts[iqueue.index + iqueue.nr_pending];
-		}
-		//Place the new packets before the older
-		else if ( (int)iqueue.index + (int)ret - (int)head->count() >= (int)0 ) {
-			iqueue.index       = (unsigned int)((int)iqueue.index - (int)head->count() + (int)ret);
-			iqueue.nr_pending -= ret;
-			pkts = &iqueue.pkts[iqueue.index];
-		}
-		// Drop packets
-		else {
-			unsigned int lost = iqueue.nr_pending - ret;
-			_n_dropped += lost;
-
-			for (unsigned i = iqueue.index + ret; i < iqueue.index + iqueue.nr_pending; i++) {
-				rte_pktmbuf_free(iqueue.pkts[i]);
-			}
-
-			//Reset, we will erase the old
-			iqueue.index      = 0;
-			iqueue.nr_pending = 0;
-		}
-		_n_sent += ret;
-	}
-
-	/////////////////////////////////////////////////////
-	// After dealing with the remaining packets above (if any),
-	// let's now construct a new batch that incorporates
-	// the newly arrived ones.
-	/////////////////////////////////////////////////////
-	struct rte_mbuf **new_pkts = pkts;
-	while ( p ) {
-		Packet* next = p->next();
-		*new_pkts = get_mbuf(p);
-		if (*new_pkts == 0)
-			break;
-	#if !CLICK_PACKET_USE_DPDK
-		BATCH_RECYCLE_UNSAFE_PACKET(p);
-	#endif
-		new_pkts++;
-		p = next;
-	}
-
-	/////////////////////////////////////////////////////
-	// Time to transmit this new batch
-	/////////////////////////////////////////////////////
-	unsigned ret  = 0;
-	unsigned n    = 0;
-	unsigned left = head->count() + iqueue.nr_pending;
 	do {
-		n = rte_ring_enqueue_burst(_send_ring, (void* const*)&iqueue.pkts[iqueue.index + ret], left);
-		ret  += n;
-		left -= n;
-	} while ( (n == _def_burst_size) && (left > 0) );
+		congestioned = false;
 
-	// All sent
-	if ( ret == head->count() + iqueue.nr_pending ) {
-		iqueue.index      = 0;
-		iqueue.nr_pending = 0;
-	}
-	// Still leftovers
-	else {
-		iqueue.index      = iqueue.index + ret;
-		iqueue.nr_pending = head->count() + iqueue.nr_pending - ret;
-	}
+		// First, place the packets in the queue
+		// Internal queue is full
+		while (iqueue.nr_pending < _internal_tx_queue_size && p) {
+			// While there is still place in the iqueue
+			struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _numa_zone);
+			if ( mbuf ) {
+				iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size] = mbuf;
+				iqueue.nr_pending++;
+			}
+			next = p->next();
 
-	_n_sent += ret;
+		#if !CLICK_PACKET_USE_DPDK
+			BATCH_RECYCLE_UNSAFE_PACKET(p);
+		#endif
+
+			p = next;
+		}
+
+		if ( p ) {
+			congestioned = true;
+			if ( !_congestion_warning_printed ) {
+				if ( !_blocking )
+					click_chatter("[%s] Packet dropped", name().c_str());
+				else
+					click_chatter("[%s] Congestion warning", name().c_str());
+				_congestion_warning_printed = true;
+			}
+		}
+
+		//Flush the queue if we have pending packets
+		if ( (int)iqueue.nr_pending > 0 ) {
+			flush_internal_tx_ring(iqueue);
+		}
+		set_flush_timer(iqueue);
+
+		// If we're in blocking mode, we loop until we can put p in the iqueue
+	} while (unlikely(_blocking && congestioned));
 
 #if !CLICK_PACKET_USE_DPDK
-	#if HAVE_BATCH_RECYCLE
-		BATCH_RECYCLE_END();
-	#else
-		 head->kill();
-	#endif
+	// If non-blocking, drop all packets that could not be sent
+	while (p) {
+		next = p->next();
+		BATCH_RECYCLE_UNSAFE_PACKET(p);
+		p = next;
+		++_n_dropped;
+	}
 #endif
 
+#if !CLICK_PACKET_USE_DPDK
+	BATCH_RECYCLE_END();
+#endif
 }
 #endif
 

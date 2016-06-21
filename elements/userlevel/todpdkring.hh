@@ -132,25 +132,23 @@ class ToDPDKRing : public BatchElement {
 	#endif
 		void push_packet(int port, Packet      *p);
 
-		// Turn a Click packet into a DPDK packet
-		struct rte_mbuf* get_mbuf(Packet* p, bool create);
-
 	private:
 		/*
-		 * @ ToDPDKDevice
-		 * InternalQueue is a ring of DPDK buffer pointers (rte_mbuf *) awaiting
-		 * to be sent.
-		 * index is the index of the first valid packet awaiting to be sent, while
-		 * nr_pending is the number of packets. index + nr_pending may be greater
-		 * than _iqueue_size but index should be wrapped-around.
-		 */
-		class InternalQueue {
+		* TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
+		* to be sent. It is used as an internal buffer to be passed to DPDK ring
+		* queue.
+		* |-> index is the index of the first valid packet awaiting to be sent, while
+		*     nr_pending is the number of packets.
+		* |-> index + nr_pending may be greater than
+		*     _internal_tx_queue_size but index should be wrapped-around.
+		*/
+		class TXInternalQueue {
 			public:
-				InternalQueue() : pkts(0), index(0), nr_pending(0) { }
+				TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
 
 				// Array of DPDK Buffers
-				struct rte_mbuf ** pkts;
-				// Index of the first valid packet in the pkts array
+				struct rte_mbuf **pkts;
+				// Index of the first valid packet in the packets array
 				unsigned int index;
 				// Number of valid packets awaiting to be sent after index
 				unsigned int nr_pending;
@@ -159,11 +157,12 @@ class ToDPDKRing : public BatchElement {
 				Timer timeout;
 		} __attribute__((aligned(64)));
 
-		void flush_internal_queue(InternalQueue &);
+		inline void set_flush_timer(TXInternalQueue &iqueue);
+		void flush_internal_tx_ring(TXInternalQueue &iqueue);
 
 		struct rte_mempool *_message_pool;
 		struct rte_ring    *_send_ring;
-		InternalQueue       _iqueue;
+		TXInternalQueue     _iqueue;
 
 		String _MEM_POOL;
 		String _PROC_1;
@@ -174,7 +173,7 @@ class ToDPDKRing : public BatchElement {
 		unsigned     _ndesc;
 		unsigned     _burst_size;
 		unsigned     _def_burst_size;
-		unsigned int _iqueue_size;
+		unsigned int _internal_tx_queue_size;
 		short        _numa_zone;
 
 		short        _timeout;
