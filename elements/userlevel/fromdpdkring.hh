@@ -104,8 +104,8 @@ class FromDPDKRing : public BatchElement {
 		struct rte_ring    *_recv_ring;
 
 		String _MEM_POOL;
-		String _FROM_PRI;
-		String _FROM_SEC;
+		String _PROC_1;
+		String _PROC_2;
 		String _origin;
 		String _destination;
 

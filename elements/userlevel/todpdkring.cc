@@ -78,8 +78,8 @@ ToDPDKRing::configure(Vector<String> &conf, ErrorHandler *errh)
 		_numa_zone = 0;
 	}
 
-	_FROM_PRI = _origin+"_2_"+_destination;
-	_FROM_SEC = _destination+"_2_"+_origin;
+	_PROC_1 = _origin+"_2_"+_destination;
+	_PROC_2 = _destination+"_2_"+_origin;
 
 	return 0;
 }
@@ -110,10 +110,12 @@ ToDPDKRing::initialize(ErrorHandler *errh)
 		}
 	}
 
-	// If primary process, create the ring buffer and memory pool
-	if ( rte_eal_process_type() == RTE_PROC_PRIMARY ) {
+	// If primary process, create the ring buffer and memory pool.
+	// The primary process is responsible for managing the memory
+	// and acting as a bridge to interconnect various secondary processes
+	if ( rte_eal_process_type() == RTE_PROC_PRIMARY ){
 		_send_ring = rte_ring_create(
-			_FROM_PRI.c_str(), DPDKDevice::RING_SIZE,
+			_PROC_1.c_str(), DPDKDevice::RING_SIZE,
 			rte_socket_id(), DPDKDevice::RING_FLAGS
 		);
 		
@@ -128,7 +130,7 @@ ToDPDKRing::initialize(ErrorHandler *errh)
 	}
 	// If secondary process, search for the appropriate memory and attach to it.
 	else {
-		_send_ring    = rte_ring_lookup   (_FROM_SEC.c_str());
+		_send_ring    = rte_ring_lookup   (_PROC_2.c_str());
 		_message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
 	}
 

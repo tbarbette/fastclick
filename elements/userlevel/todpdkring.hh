@@ -166,8 +166,8 @@ class ToDPDKRing : public BatchElement {
 		InternalQueue       _iqueue;
 
 		String _MEM_POOL;
-		String _FROM_PRI;
-		String _FROM_SEC;
+		String _PROC_1;
+		String _PROC_2;
 		String _origin;
 		String _destination;
 
