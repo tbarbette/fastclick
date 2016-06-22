@@ -34,7 +34,7 @@ ToNetmapDevice::ToNetmapDevice() : _pull_use_select(true),_device(0)
 {
 	_burst = 32;
 	_blocking = true;
-	_tx_internal_queue_size = 512;
+	_internal_tx_queue_size = 512;
 }
 
 

@@ -140,7 +140,7 @@ private:
 	 * queue.
      * index is the index of the first valid packets awaiting to be sent, while
      * nr_pending is the number of packets. index + nr_pending may be greater
-     * than _tx_internal_queue_size but index should be wrapped-around. */
+     * than _internal_tx_queue_size but index should be wrapped-around. */
     class TXInternalQueue {
     public:
         TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
@@ -157,7 +157,7 @@ private:
     } __attribute__((aligned(64)));
 
     inline void set_flush_timer(TXInternalQueue &iqueue);
-    void flush_tx_internal_queue(TXInternalQueue &);
+    void flush_internal_tx_queue(TXInternalQueue &);
 
     per_thread<TXInternalQueue> _iqueues;
 
