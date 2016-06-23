@@ -27,6 +27,8 @@ CLICK_DECLS
 
 SortedIPLookup::SortedIPLookup()
 {
+    // TODO: Remove this when push_batch() will actually be implemented
+    in_batch_mode = BATCH_MODE_NO;
 }
 
 SortedIPLookup::~SortedIPLookup()

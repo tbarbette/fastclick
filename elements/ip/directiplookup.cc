@@ -489,6 +489,8 @@ DirectIPLookup::Table::remove_route(const IPRoute& route, IPRoute* old_route, Er
 
 DirectIPLookup::DirectIPLookup()
 {
+	// TODO: Remove this when push_batch() will actually be implemented
+	in_batch_mode = BATCH_MODE_NO;
 }
 
 DirectIPLookup::~DirectIPLookup()
