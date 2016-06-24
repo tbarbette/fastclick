@@ -3,8 +3,12 @@
  * options
  * Robert Morris, Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2003 International Computer Science Institute
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -180,6 +184,15 @@ IPGWOptions::simple_action(Packet *p)
     return(p);
   return(0);
 }
+
+#if HAVE_BATCH
+PacketBatch *
+IPGWOptions::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    return batch;
+}
+#endif
 
 void
 IPGWOptions::add_handlers()
