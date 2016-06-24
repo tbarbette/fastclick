@@ -28,8 +28,10 @@ CLICK_DECLS
 LinearIPLookup::LinearIPLookup()
     : _zero_route(-1)
 {
+#if HAVE_BATCH
 	// TODO: Remove this when push_batch() will actually be implemented
 	in_batch_mode = BATCH_MODE_NO;
+#endif
 }
 
 LinearIPLookup::~LinearIPLookup()

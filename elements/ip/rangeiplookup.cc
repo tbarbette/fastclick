@@ -32,8 +32,10 @@ RangeIPLookup::RangeIPLookup()
       _range_t((uint32_t *) CLICK_LALLOC(RANGES_MAX * sizeof(uint32_t))),
       _active(false)
 {
+#if HAVE_BATCH
     // TODO: Remove this when push_batch() will actually be implemented
     in_batch_mode = BATCH_MODE_NO;
+#endif
 }
 
 RangeIPLookup::~RangeIPLookup()
