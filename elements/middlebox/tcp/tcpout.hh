@@ -22,12 +22,10 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    ByteStreamMaintainer* getByteStreamMaintainer();
     void setInElement(TCPIn*);
 
 protected:
-    Packet* processPacket(Packet*);
-    ByteStreamMaintainer byteStreamMaintainer;
+    Packet* processPacket(struct fcb*, Packet*);
     TCPIn* inElement;
 };
 

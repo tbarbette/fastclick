@@ -17,7 +17,7 @@ int IPOut::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* IPOut::processPacket(Packet* p)
+Packet* IPOut::processPacket(struct fcb*, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 

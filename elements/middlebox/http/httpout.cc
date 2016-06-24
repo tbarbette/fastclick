@@ -16,7 +16,7 @@ int HTTPOut::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* HTTPOut::processPacket(Packet* p)
+Packet* HTTPOut::processPacket(struct fcb*, Packet* p)
 {
     return p;
 }

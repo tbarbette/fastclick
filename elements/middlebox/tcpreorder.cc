@@ -10,18 +10,36 @@ CLICK_DECLS
 
 TCPReorder::TCPReorder() : pool(TCPREORDER_POOL_SIZE)
 {
-    expectedPacketSeq = 0;
-    packetList = NULL;
+
 }
 
 TCPReorder::~TCPReorder()
 {
-    flushList();
 }
 
-void TCPReorder::flushList()
+int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    struct TCPPacketListNode* node = packetList;
+    int flowDirectionParam = -1;
+
+    if(Args(conf, this, errh)
+    .read_p("FLOWDIRECTION", flowDirectionParam)
+    .complete() < 0)
+        return -1;
+
+    if(flowDirectionParam == -1)
+    {
+        click_chatter("Missing parameter(s): TCPReorder requires FLOWDIRECTION");
+        return -1;
+    }
+
+    flowDirection = (unsigned int)flowDirectionParam;
+
+    return 0;
+}
+
+void TCPReorder::flushList(struct fcb *fcb)
+{
+    struct TCPPacketListNode* node = fcb->tcpreorder.packetList;
     struct TCPPacketListNode* toDelete = NULL;
 
     while(node != NULL)
@@ -29,33 +47,35 @@ void TCPReorder::flushList()
         toDelete = node;
         node = node->next;
 
-        pool.releaseMemory(toDelete);
+        // Kill packet
+        //toDelete->packet->kill();
+
+        fcb->tcpreorder.pool->releaseMemory(toDelete);
     }
 
-    packetList = NULL;
-}
-
-int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
-{
-    return 0;
+    fcb->tcpreorder.packetList = NULL;
 }
 
 void TCPReorder::push(int, Packet *packet)
 {
-    processPacket(packet);
+    processPacket(&fcbArray[flowDirection], packet);
 }
 
-void TCPReorder::processPacket(Packet* packet)
+void TCPReorder::processPacket(struct fcb *fcb, Packet* packet)
 {
-    checkRetransmission(packet);
-    checkFirstPacket(packet);
-    putPacketInList(packet);
-    sendEligiblePackets();
+    // Ensure that the pointer in the FCB is set
+    if(fcb->tcpreorder.pool == NULL)
+        fcb->tcpreorder.pool = &pool;
+
+    checkRetransmission(fcb, packet);
+    checkFirstPacket(fcb, packet);
+    putPacketInList(fcb, packet);
+    sendEligiblePackets(fcb);
 }
 
-void TCPReorder::checkRetransmission(Packet* packet)
+void TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
 {
-    if(getSequenceNumber(packet) < expectedPacketSeq)
+    if(getSequenceNumber(packet) < fcb->tcpreorder.expectedPacketSeq)
     {
         if(noutputs() == 2)
             output(1).push(packet);
@@ -64,22 +84,22 @@ void TCPReorder::checkRetransmission(Packet* packet)
     }
 }
 
-void TCPReorder::sendEligiblePackets()
+void TCPReorder::sendEligiblePackets(struct fcb *fcb)
 {
-    struct TCPPacketListNode* packetNode = packetList;
+    struct TCPPacketListNode* packetNode = fcb->tcpreorder.packetList;
 
     while(packetNode != NULL)
     {
         tcp_seq_t currentSeq = getSequenceNumber(packetNode->packet);
 
         // We check if the current packet is the expected one (if not, there is a gap)
-        if(currentSeq != expectedPacketSeq)
+        if(currentSeq != fcb->tcpreorder.expectedPacketSeq)
             return;
 
         // Compute sequence number of the next packet
-        expectedPacketSeq = currentSeq + getPacketLength(packetNode->packet);
+        fcb->tcpreorder.expectedPacketSeq = currentSeq + getPacketLength(packetNode->packet);
         if(isFinOrSyn(packetNode->packet))
-            expectedPacketSeq++;
+            (fcb->tcpreorder.expectedPacketSeq)++;
 
         // Send packet
         output(0).push(packetNode->packet);
@@ -87,8 +107,8 @@ void TCPReorder::sendEligiblePackets()
         // Free memory and remove node from the list
         struct TCPPacketListNode* toFree = packetNode;
         packetNode = packetNode->next;
-        packetList = packetNode;
-        pool.releaseMemory(toFree);
+        fcb->tcpreorder.packetList = packetNode;
+        fcb->tcpreorder.pool->releaseMemory(toFree);
     }
 }
 
@@ -111,11 +131,11 @@ tcp_seq_t TCPReorder::getSequenceNumber(Packet* packet)
     return ntohl(tcph->th_seq);
 }
 
-void TCPReorder::putPacketInList(Packet* packet)
+void TCPReorder::putPacketInList(struct fcb* fcb, Packet* packet)
 {
     struct TCPPacketListNode* prevNode = NULL;
-    struct TCPPacketListNode* packetNode = packetList;
-    struct TCPPacketListNode* toAdd = pool.getMemory();
+    struct TCPPacketListNode* packetNode = fcb->tcpreorder.packetList;
+    struct TCPPacketListNode* toAdd = fcb->tcpreorder.pool->getMemory();
     toAdd->packet = packet;
     toAdd->next = NULL;
 
@@ -128,14 +148,14 @@ void TCPReorder::putPacketInList(Packet* packet)
 
     // Check if we need to add the node at the head of the list
     if(prevNode == NULL)
-        packetList = toAdd; // If so, the list points to the node to add
+        fcb->tcpreorder.packetList = toAdd; // If so, the list points to the node to add
     else
         prevNode->next = toAdd; // If not, the previous node in the list now points to the node to add
 
     toAdd->next = packetNode; // The node to add points to the first node with a greater sequence number
 }
 
-void TCPReorder::checkFirstPacket(Packet* packet)
+void TCPReorder::checkFirstPacket(struct fcb* fcb, Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
@@ -144,12 +164,12 @@ void TCPReorder::checkFirstPacket(Packet* packet)
     if(flags & TH_SYN)
     {
         // Update the expected sequence number
-        expectedPacketSeq = getSequenceNumber(packet);
-        click_chatter("First packet received (%u)", expectedPacketSeq);
+        fcb->tcpreorder.expectedPacketSeq = getSequenceNumber(packet);
+        click_chatter("First packet received (%u) for flow %u", fcb->tcpreorder.expectedPacketSeq, flowDirection);
 
-        // Delete all packets that could be in list as they are probably artifacts
+        // Ensure that the list of waiting packets is free
         // (SYN should always be the first packet)
-        flushList();
+        flushList(fcb);
     }
 }
 

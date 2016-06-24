@@ -8,7 +8,6 @@ CLICK_DECLS
 
 HTTPIn::HTTPIn()
 {
-    headerFound = false;
 }
 
 int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -16,11 +15,11 @@ int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* HTTPIn::processPacket(Packet* p)
+Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 
-    if(!headerFound)
+    if(!fcb->httpin.headerFound)
     {
         //removeHeader(packet, "Content-Length");
         //removeHeader(packet, "Transfer-Encoding");
@@ -32,13 +31,13 @@ Packet* HTTPIn::processPacket(Packet* p)
     {
         uint32_t offset = (int)(source - (char*)packet->data() + 4);
         setContentOffset(packet, offset);
-        headerFound = true;
+        fcb->httpin.headerFound = true;
     }
 
     return packet;
 }
 
-void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
+void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* header)
 {
     unsigned char* source = getPacketContent(packet);
     unsigned char* beginning = (unsigned char*)strstr((char*)source, header);
@@ -57,8 +56,8 @@ void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
 
     uint32_t position = beginning - packet->data();
 
-    removeBytes(packet, position, nbBytesToRemove);
-    modifyPacket(packet);
+    removeBytes(fcb, packet, position, nbBytesToRemove);
+    setPacketModified(fcb, packet);
 }
 
 CLICK_ENDDECLS

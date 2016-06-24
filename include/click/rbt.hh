@@ -1,5 +1,5 @@
-#ifndef HH_MIDDLEBOX_RBT
-#define HH_MIDDLEBOX_RBT
+#ifndef MIDDLEBOX_RBT_HH
+#define MIDDLEBOX_RBT_HH
 
 #include <stdlib.h>
 
@@ -69,7 +69,9 @@ void RBTreeDestroy(rb_red_blk_tree*);
 rb_red_blk_node* TreePredecessor(rb_red_blk_tree*, rb_red_blk_node*);
 rb_red_blk_node* TreeSuccessor(rb_red_blk_tree*, rb_red_blk_node*);
 rb_red_blk_node* RBExactQuery(rb_red_blk_tree*, void*);
-void* RBFindElementGreatestAbove(rb_red_blk_tree*, void*);
-int RBPrune(rb_red_blk_tree*, rb_red_blk_node*, void*);
+rb_red_blk_node* RBFindElementGreatestBelow(rb_red_blk_tree*, void*);
+rb_red_blk_node* RBMin(rb_red_blk_tree* tree);
+rb_red_blk_node* RBMax(rb_red_blk_tree* tree);
+void RBPrune(rb_red_blk_tree*, void*);
 
 #endif

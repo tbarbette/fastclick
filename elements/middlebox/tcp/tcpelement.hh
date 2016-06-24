@@ -28,7 +28,14 @@ public:
     static const uint16_t getSourcePort(Packet*);
 
 protected:
+    unsigned int flowDirection;
+
     void computeChecksum(WritablePacket*);
+    void setFlowDirection(unsigned int flowDirection);
+    unsigned int getFlowDirection();
+    unsigned int getOppositeFlowDirection();
+
+    friend class TCPIn;
 };
 
 CLICK_ENDDECLS

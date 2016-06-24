@@ -1,24 +1,23 @@
-#ifndef MIDDLEBOX_IPOUT_HH
-#define MIDDLEBOX_IPOUT_HH
+#ifndef MIDDLEBOX_IPIN_HH
+#define MIDDLEBOX_IPIN_HH
 #include "ipelement.hh"
 #include <click/element.hh>
 CLICK_DECLS
 
-class IPOut : public IPElement
+class IPIn : public IPElement
 {
 public:
-    IPOut() CLICK_COLD;
+    IPIn() CLICK_COLD;
 
-    const char *class_name() const        { return "IPOut"; }
+    const char *class_name() const        { return "IPIn"; }
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PROCESSING_A_AH; }
-
-    bool isOutElement()             { return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
 protected:
-    Packet* processPacket(Packet*);
+    Packet* processPacket(struct fcb*, Packet*);
+    void setPacketModified(struct fcb*, WritablePacket*);
 };
 
 CLICK_ENDDECLS

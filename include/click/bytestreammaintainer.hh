@@ -6,13 +6,13 @@
 #include <click/rbt.hh>
 #include <click/memorypool.hh>
 
-#define BS_POOL_SIZE 20
+#define BS_POOL_SIZE 40
 #define BS_PRUNE_THRESHOLD BS_POOL_SIZE / 2
 
 class RBTMemoryPoolManager : public RBTManager
 {
 public:
-    RBTMemoryPoolManager() : poolNodes(BS_POOL_SIZE), poolKeys(BS_POOL_SIZE * 2), poolInfos(BS_POOL_SIZE * 2)
+    RBTMemoryPoolManager() : poolNodes(BS_POOL_SIZE), poolKeys(BS_POOL_SIZE), poolInfos(BS_POOL_SIZE)
     {
 
     }
@@ -75,21 +75,26 @@ private:
 
 class ByteStreamMaintainer
 {
+    // ModificationList is the only one allowed to add nodes in the tress
+    friend class ModificationList;
+
     public:
         ByteStreamMaintainer();
         ~ByteStreamMaintainer();
-        void newInsertion(unsigned int, int);
-        void newDeletion(unsigned int, int);
-        int getAckOffset(unsigned int);
-        int getSeqOffset();
-        void ackReceived(unsigned int);
-        void printTree();
+        unsigned int mapAck(unsigned int position);
+        unsigned int mapSeq(unsigned int position);
+        int lastOffsetInAckTree();
+        void printTrees();
 
     private:
-        void prune(unsigned int);
+        void prune(unsigned int position);
+        void ackReceived(unsigned int position);
+        void insertInAckTree(unsigned int position, int offset);
+        void insertInSeqTree(unsigned int position, int offset);
+        void insertInTree(rb_red_blk_tree* tree, unsigned int position, int offset);
 
-        int seqOffset;
-        rb_red_blk_tree* tree;
+        rb_red_blk_tree* treeAck;
+        rb_red_blk_tree* treeSeq;
         RBTManager* rbtManager;
         unsigned int lastAck;
         unsigned int pruneCounter;

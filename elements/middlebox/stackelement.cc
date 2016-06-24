@@ -4,29 +4,28 @@
 #include <click/args.hh>
 #include <click/error.hh>
 
+// Simulation of the Middleclick FCBs
+struct fcb fcbArray[2];
+
 CLICK_DECLS
 
 StackElement::StackElement()
 {
-    stackElementList = NULL;
+    previousStackElement = NULL;
 }
 
 StackElement::~StackElement()
 {
-    struct stackElementListNode *node = stackElementList;
-    struct stackElementListNode *toFree = NULL;
 
-    while(node != NULL)
-    {
-        toFree = node;
-        node = node->next;
-        free(toFree);
-    }
 }
 
 void StackElement::push(int, Packet *packet)
 {
-    Packet *p = processPacket(packet);
+    // Similate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction. 
+    unsigned int flowDirection = determineFlowDirection();
+    Packet *p = processPacket(&fcbArray[flowDirection], packet);
 
     if(p != NULL)
         output(0).push(p);
@@ -35,12 +34,17 @@ void StackElement::push(int, Packet *packet)
 Packet* StackElement::pull(int)
 {
     Packet *packet = input(0).pull();
-    Packet* p = processPacket(packet);
+
+    // Similate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
+    Packet* p = processPacket(&fcbArray[flowDirection], packet);
 
     return p;
 }
 
-Packet* StackElement::processPacket(Packet* p)
+Packet* StackElement::processPacket(struct fcb *fcb, Packet* p)
 {
     click_chatter("Warning: A stack element has processed a packet in a generic way");
 
@@ -115,31 +119,48 @@ bool StackElement::getAnnotationAcked(Packet* p)
     return getAnnotationBit(p, offsetAnnotationAcked);
 }
 
-void StackElement::packetModified(Packet* p)
-{
-    // This function is called when an downstream element modifies a packet
-    // By default, it does nothing. Elements can implement their own behavior
-}
-
 void StackElement::addStackElementInList(StackElement *element)
 {
-    struct stackElementListNode *newElement = (struct stackElementListNode *)malloc(sizeof(struct stackElementListNode));
+    // Check that this element was not already added in the list via an
+    // alternative path
 
-    newElement->node = element;
-    newElement->next = stackElementList;
-
-    stackElementList = newElement;
+    previousStackElement = element;
 }
 
-void StackElement::modifyPacket(Packet* packet)
+void StackElement::setPacketModified(struct fcb *fcb, WritablePacket* packet)
 {
-    // Call the "packetModified" method on every element in the stack
-    struct stackElementListNode* current = stackElementList;
-    while(current != NULL)
-    {
-        current->node->packetModified(packet);
-        current = current->next;
-    }
+    // Call the "setPacketModified" method on every element in the stack
+    if(previousStackElement == NULL)
+        return;
+
+    previousStackElement->setPacketModified(fcb, packet);
+}
+
+void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+{
+    // Call the "removeBytes" method on every element in the stack
+    if(previousStackElement == NULL)
+        return;
+
+    previousStackElement->removeBytes(fcb, packet, position, length);
+}
+
+void StackElement::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+{
+    // Call the "insertBytes" method on every element in the stack
+    if(previousStackElement == NULL)
+        return;
+
+    previousStackElement->insertBytes(fcb, packet, position, length);
+}
+
+void StackElement::requestMoreBytes(struct fcb *fcb)
+{
+    // Call the "requestMoreBytes" method on every element in the stack
+    if(previousStackElement == NULL)
+        return;
+
+    previousStackElement->requestMoreBytes(fcb);
 }
 
 bool StackElement::isStackElement(Element* element)
@@ -160,11 +181,8 @@ void* StackElement::cast(const char *name)
 
  void StackElement::buildFunctionStack()
  {
-     if(!isOutElement())
-     {
-         StackVisitor visitor(this);
-         this->router()->visit_downstream(this, -1, &visitor);
-     }
+     StackVisitor visitor(this);
+     this->router()->visit_downstream(this, -1, &visitor);
  }
 
 
@@ -199,13 +217,13 @@ bool StackElement::isPacketContentEmpty(Packet* packet)
         return false;
 }
 
-void StackElement::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
+unsigned int StackElement::determineFlowDirection()
 {
-    unsigned char *source = packet->data();
-    uint32_t bytesAfter = packet->length() - position;
+    // Call the "determineFlowDirection" method on every element in the stack
+    if(previousStackElement == NULL)
+        return -1; // We've reached the end of the path and nobody answered
 
-    memmove(&source[position], &source[position + length], bytesAfter);
-    packet->take(length);
+    return previousStackElement->determineFlowDirection();
 }
 
 CLICK_ENDDECLS

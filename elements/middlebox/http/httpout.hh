@@ -18,7 +18,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
 protected:
-    Packet* processPacket(Packet*);
+    Packet* processPacket(struct fcb*, Packet*);
 };
 
 CLICK_ENDDECLS

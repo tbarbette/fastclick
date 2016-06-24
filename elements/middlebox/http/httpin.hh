@@ -16,9 +16,8 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
 protected:
-    Packet* processPacket(Packet*);
-    void removeHeader(WritablePacket*, const char*);
-    bool headerFound;
+    Packet* processPacket(struct fcb*, Packet*);
+    void removeHeader(struct fcb *fcb, WritablePacket*, const char*);
 };
 
 CLICK_ENDDECLS

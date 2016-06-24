@@ -136,6 +136,21 @@ const uint16_t TCPElement::getDestinationPort(Packet* packet)
     return (uint16_t)tcph->th_dport;
 }
 
+void TCPElement::setFlowDirection(unsigned int flowDirection)
+{
+    this->flowDirection = flowDirection;
+}
+
+unsigned int TCPElement::getFlowDirection()
+{
+    return flowDirection;
+}
+
+unsigned int TCPElement::getOppositeFlowDirection()
+{
+    return (1 - flowDirection);
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(TCPElement)
 //ELEMENT_MT_SAFE(TCPElement)

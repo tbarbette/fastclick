@@ -20,17 +20,21 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* TCPOut::processPacket(Packet* p)
+Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 
+    ByteStreamMaintainer &byteStreamMaintainer = fcb->tcp_common.maintainers[getFlowDirection()];
+    ModificationList *modList = inElement->getModificationList(fcb, packet);
+
     // Update the sequence number (according to modifications made on previous packets)
     tcp_seq_t prevSeq = getSequenceNumber(packet);
-    tcp_seq_t newSeq =  prevSeq + byteStreamMaintainer.getSeqOffset();
+    tcp_seq_t newSeq =  byteStreamMaintainer.mapSeq(prevSeq);
     bool seqModified = false;
 
     if(prevSeq != newSeq)
     {
+        click_chatter("Sequence number %u modified to %u in flow %u", prevSeq, newSeq, flowDirection);
         setSequenceNumber(packet, newSeq);
         seqModified = true;
     }
@@ -43,15 +47,14 @@ Packet* TCPOut::processPacket(Packet* p)
         uint16_t currentLength = (uint16_t)packet->length();
         int offsetModification = -(initialLength - currentLength);
 
+        // TODO: Check modifications
         if(offsetModification != 0)
         {
             // We know that the packet has been modified and its size has changed
-
-            // Notify about the new modifications
-            byteStreamMaintainer.newInsertion(newSeq + getPayloadLength(packet), offsetModification);
+            modList->commit(fcb->tcp_common.maintainers[getFlowDirection()]);
 
             // Check if the full packet content has been removed
-            if(getPayloadLength(packet) + offsetModification == 0)
+            if(getPayloadLength(packet) == 0)
             {
                 uint32_t saddr = IPElement::getDestinationAddress(packet);
                 uint32_t daddr = IPElement::getSourceAddress(packet);
@@ -89,11 +92,6 @@ Packet* TCPOut::processPacket(Packet* p)
 void TCPOut::setInElement(TCPIn* inElement)
 {
     this->inElement = inElement;
-}
-
-ByteStreamMaintainer* TCPOut::getByteStreamMaintainer()
-{
-    return &byteStreamMaintainer;
 }
 
 CLICK_ENDDECLS

@@ -2,7 +2,12 @@
 #include <click/memorypool.hh>
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/element.hh>
+
+/**
+ * Adapted from the Red Black Tree implementation of Emin Martinian:
+ * (http://web.mit.edu/~emin/www.old/source_code/red_black_tree/index.html)
+ * (http://web.mit.edu/~emin/www.old/source_code/red_black_tree/LICENSE)
+ */
 
 /***********************************************************************/
 /*  FUNCTION:  RBTreeCreate */
@@ -444,7 +449,7 @@ rb_red_blk_node* RBExactQuery(rb_red_blk_tree* tree, void* q)
     rb_red_blk_node* nil=tree->nil;
     int compVal;
     if (x == nil) return(0);
-    compVal=tree->manager->compareKeys(x->key,(int*) q);
+    compVal=tree->manager->compareKeys(x->key, q);
     while(0 != compVal) {/*assignemnt*/
         if (1 == compVal) { /* x->key > q */
             x=x->left;
@@ -452,7 +457,7 @@ rb_red_blk_node* RBExactQuery(rb_red_blk_tree* tree, void* q)
             x=x->right;
         }
         if ( x == nil) return(0);
-        compVal=tree->manager->compareKeys(x->key,(int*) q);
+        compVal=tree->manager->compareKeys(x->key, q);
     }
     return(x);
 }
@@ -597,21 +602,14 @@ void RBDelete(rb_red_blk_tree* tree, rb_red_blk_node* z)
 
 
 
-/* Homemade */
-/***********************************************************************/
-/*  FUNCTION:  RBFindElementGreatestAbove */
-/**/
-/*    INPUTS:  tree is the tree to explore and q is the value of the key */
-/**/
-/*    OUTPUT:  The info corresponding to the greatest key that is less or equal to key */
-/**/
-/**/
-/*    Modifies Input: None */
-/***********************************************************************/
-void* RBFindElementGreatestAbove(rb_red_blk_tree* tree, void* q)
+/********* Added functions *********/
+/**
+ * Complexity: O(log(n)) where n is the number of elements in the tree
+ */
+rb_red_blk_node* RBFindElementGreatestBelow(rb_red_blk_tree* tree, void* q)
 {
-    rb_red_blk_node* x=tree->root->left;
-    rb_red_blk_node* nil=tree->nil;
+    rb_red_blk_node* x = tree->root->left;
+    rb_red_blk_node* nil = tree->nil;
     rb_red_blk_node* result = NULL;
 
     while(x != nil)
@@ -622,7 +620,12 @@ void* RBFindElementGreatestAbove(rb_red_blk_tree* tree, void* q)
         }
         else
         {
-            if(result == NULL || tree->manager->compareKeys(x->key, result->key) == 1) /* x->key > result */
+            /* x->key == q */
+            if(tree->manager->compareKeys(x->key, q) == 0)
+                return x;
+
+            /* (x->key < q) && (x->key > result) */
+            if(result == NULL || tree->manager->compareKeys(x->key, result->key) == 1)
                 result = x;
 
             x = x->right;
@@ -630,35 +633,75 @@ void* RBFindElementGreatestAbove(rb_red_blk_tree* tree, void* q)
     }
 
     if(result == NULL)
-        return NULL;
+        return tree->nil;
 
-    return result->info;
+    return result;
 }
 
-
-int RBPrune(rb_red_blk_tree* tree, rb_red_blk_node* x, void* q)
+/**
+ * Complexity: O(log(n)) where n is the number of elements in the tree
+ */
+rb_red_blk_node* RBMin(rb_red_blk_tree* tree)
 {
-    int total = 0;
+    rb_red_blk_node* nil = tree->nil;
+    rb_red_blk_node* x = tree->root->left;
+    rb_red_blk_node* min = tree->nil;
+
+    while(x != tree->nil)
+    {
+        min = x;
+
+        x = x->left;
+    }
+
+    return min;
+}
+
+/**
+ * Complexity: O(log(n)) where n is the number of elements in the tree
+ */
+rb_red_blk_node* RBMax(rb_red_blk_tree* tree)
+{
+    rb_red_blk_node* nil = tree->nil;
+    rb_red_blk_node* x = tree->root->left;
+    rb_red_blk_node* max = tree->nil;
+
+    while(x != tree->nil)
+    {
+        max = x;
+
+        x = x->right;
+    }
+
+    return max;
+}
+
+/**
+ * Complexity: O(k * log(n)) where k is the number of elements with a key < q
+ * and n is the total number of elements in the tree
+ */
+void RBPrune(rb_red_blk_tree* tree, void* q)
+{
     rb_red_blk_node* nil = tree->nil;
     rb_red_blk_node* root = tree->root;
 
-    if(x != tree->nil)
+    // Find the min element (beginning of the pruning interval)
+    rb_red_blk_node* current = RBMin(tree);
+    // Find the greatest node below the key q (end of the pruning interval)
+    rb_red_blk_node* end = RBFindElementGreatestBelow(tree, q);
+
+    // Browse the tree starting at the min element and going each time to the successor
+    // of the current node until it reaches the greatest element below the given key (q).
+    // This element will not be removed and will thus become the smallest element in the tree
+    while(current != nil && tree->manager->compareKeys(current->key, end->key) == -1)
     {
-        // Process left
-        total += RBPrune(tree, x->left, q);
+        // Find the next element (the successor of the current one)
+        rb_red_blk_node* next = TreeSuccessor(tree, current);
 
-        if(tree->manager->compareKeys(x->key, q) != 1) /* x->key <= q */
-        {
-            // Process current
-            total += *(int*)x->info;
+        // Delete the current node (the key is lower than q)
+        RBDelete(tree, current);
 
-            // Process right
-            total += RBPrune(tree, x->right, q);
-
-            // Remove current node
-            RBDelete(tree, x);
-        }
+        // Continue with the successor
+        current = next;
     }
-
-    return total;
 }

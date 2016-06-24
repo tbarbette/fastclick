@@ -16,7 +16,7 @@ int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* InsultRemover::processPacket(Packet* p)
+Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
     if(isPacketContentEmpty(packet))
@@ -33,8 +33,8 @@ Packet* InsultRemover::processPacket(Packet* p)
         {
             uint32_t position = firstOccur - packet->data();
 
-            removeBytes(packet, position, 3);
-            modifyPacket(packet);
+            removeBytes(fcb, packet, position, 3);
+            setPacketModified(fcb, packet);
         }
 
         source = firstOccur;
