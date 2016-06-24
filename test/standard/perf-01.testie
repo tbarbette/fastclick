@@ -1,6 +1,9 @@
 %info
 Performance test with many many different click elements
 
+%require
+time
+
 %script
 
 # you can see a pretty picture with

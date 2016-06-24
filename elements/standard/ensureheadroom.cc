@@ -1,12 +1,8 @@
 /*
- * markipheader.{cc,hh} -- element sets IP Header annotation
- * Eddie Kohler
- *
- * Computational batching support
- * by Georgios Katsikas
+ * ensureheadroom.{cc,hh} --
+ * Tom Barbett
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
- * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -20,43 +16,53 @@
  */
 
 #include <click/config.h>
-#include "markipheader.hh"
+#include "ensureheadroom.hh"
 #include <click/args.hh>
-#include <clicknet/ip.h>
+
 CLICK_DECLS
 
-MarkIPHeader::MarkIPHeader()
+EnsureHeadroom::EnsureHeadroom()
+    :  _headroom(Packet::default_headroom)
 {
-}
 
-MarkIPHeader::~MarkIPHeader()
-{
 }
 
 int
-MarkIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
+EnsureHeadroom::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    _offset = 0;
-    return Args(conf, this, errh).read_p("OFFSET", _offset).complete();
+    if (Args(conf, this, errh)
+	.read_p("HEADROOM", _headroom)
+	.complete() < 0)
+	return -1;
+    return 0;
 }
 
-Packet *
-MarkIPHeader::simple_action(Packet *p)
-{
-    const click_ip *ip = reinterpret_cast<const click_ip *>(p->data() + _offset);
-    p->set_ip_header(ip, ip->ip_hl << 2);
-    return p;
+inline Packet* EnsureHeadroom::smaction(Packet* p) {
+	int length = p->length();
+	Packet* q;
+	if (p->headroom() < _headroom) {
+		q = p->shift_data(_headroom - p->headroom());
+	}	else
+		q = p;
+	assert(length = q->length());
+	return q;
 }
 
 #if HAVE_BATCH
 PacketBatch*
-MarkIPHeader::simple_action_batch(PacketBatch *batch)
+EnsureHeadroom::simple_action_batch(PacketBatch *head)
 {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
-    return batch;
+    EXECUTE_FOR_EACH_PACKET(smaction,head);
+	return head;
 }
 #endif
+Packet*
+EnsureHeadroom::simple_action(Packet *p)
+{
+    return smaction(p);
+}
+
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(MarkIPHeader)
-ELEMENT_MT_SAFE(MarkIPHeader)
+EXPORT_ELEMENT(EnsureHeadroom)
+ELEMENT_MT_SAFE(EnsureHeadroom)

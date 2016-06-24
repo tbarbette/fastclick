@@ -38,19 +38,18 @@ class BatchElement : public Element { public:
 	virtual void push_batch(int port, PacketBatch* head) {
 		head = simple_action_batch(head);
 		if (head)
-			output(port).push_batch(head);
+			output_push_batch(port,head);
 	}
 
 	virtual PacketBatch* pull_batch(int port, unsigned max) {
-	    PacketBatch* head = input(port).pull_batch(max);
+	    PacketBatch* head = input_pull_batch(port,max);
 	    if (head) {
 	        head = simple_action_batch(head);
 	    }
 	    return head;
 	}
 
-	per_thread<PacketBatch*> current_batch;
-	per_thread<bool> inflow; //Remember if we are currently rebuilding a batch
+
 
 	inline void start_batch() {
 		inflow.set(true);
@@ -70,7 +69,7 @@ class BatchElement : public Element { public:
 
 	inline void checked_output_push_batch(int port, PacketBatch* batch) {
 		 if ((unsigned) port < (unsigned) noutputs())
-			 output(port).push_batch(batch);
+			 output_push_batch(port,batch);
 		 else
 			 batch->fast_kill();
 	}
@@ -112,16 +111,26 @@ class BatchElement : public Element { public:
 	};
 
 	inline const PushBatchPort&
-	output(int port)
+	output_batch(int port)
 	{
 		return static_cast<const PushBatchPort&>(static_cast<BatchElement::PushBatchPort*>(_ports[1])[port]);
 	}
 
 	inline const PullBatchPort&
-	input(int port)
+	input_batch(int port)
     {
         return static_cast<const PullBatchPort&>(_ports[0][port]);
     }
+
+	inline void
+	output_push_batch(int port, PacketBatch* batch) {
+		output_batch(port).push_batch(batch);
+	}
+
+	inline PacketBatch*
+	input_pull_batch(int port, int max) {
+		return input_batch(port).pull_batch(max);
+	}
 
 	enum batch_mode batch_mode() {
 		return in_batch_mode;
@@ -168,6 +177,10 @@ class BatchElement : public Element { public:
 	};
 
 	friend class Router;
+
+	private:
+	per_thread<PacketBatch*> current_batch;
+	per_thread<bool> inflow; //Remember if we are currently rebuilding a batch
 };
 
 

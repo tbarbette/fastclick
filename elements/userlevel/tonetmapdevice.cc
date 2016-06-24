@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(1),_internal_queue(512),_pull_use_select(true)
+ToNetmapDevice::ToNetmapDevice() : _burst(32),_block(true),_internal_queue(512),_pull_use_select(true),_device(0)
 {
 }
 
@@ -57,7 +57,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (burst > 0) {
-        if (input_is_push(0))
+        if (input_is_push(0) && in_batch_mode == BATCH_MODE_YES && _verbose)
             errh->warning("%s: burst does not make sense in full push with batching, it is unused.",name().c_str());
         _burst = burst;
     }
@@ -71,7 +71,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     }
     configure_tx(maxthreads,1,_device->n_queues,errh); //Using the fewer possible number of queues is the better
 
-    if (_burst > _device->get_num_slots() / 2) {
+    if (_burst > (unsigned)_device->get_num_slots() / 2) {
         errh->warning("BURST value larger than half the ring size (%d) is not recommended. Please set BURST to %d or less",_burst, _device->some_nmd->some_ring->num_slots,_device->some_nmd->some_ring->num_slots/2);
     }
 
@@ -132,7 +132,7 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 }
 
 inline void ToNetmapDevice::allow_txsync() {
-    for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++)
+    for (int i = queue_for_thisthread_begin(); i <= queue_for_thisthread_end(); i++)
         _iodone[i] = false;
 }
 
@@ -282,8 +282,8 @@ do_send:
 		if (s.q && s.backoff < 128) {
 			s.backoff++;
 
-			if (!_zctimers[queue_for_thread_begin()]->scheduled()) {
-				_zctimers[queue_for_thread_begin()]->schedule_after(Timestamp::make_usec(1));
+			if (!_zctimers[queue_for_thisthread_begin()]->scheduled()) {
+				_zctimers[queue_for_thisthread_begin()]->schedule_after(Timestamp::make_usec(1));
 			}
 		} else {
 			//If we backed off a lot, we may try to do a sync before waiting for the timer to trigger
@@ -317,7 +317,7 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 				if (p->headroom() > 0) {
 					complaint++;
 					if (complaint < 5)
-						click_chatter("Shifting data in %s. You should avoid this case !");
+						click_chatter("Shifting data in ToNetmapDevice. You should avoid this case !");
 					p = static_cast<PacketBatch*>(p->shift_data(-p->headroom())); //Is it better to shift or to copy like if it was not a netmap buffer?
 				}
 #  if HAVE_NETMAP_PACKET_POOL //We must return the netmap buffer to the packet pool
@@ -391,15 +391,14 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 	WritablePacket* next = static_cast<WritablePacket*>(head);
 	WritablePacket* p;
 
-	//click_chatter("%s",name().c_str());
 	unsigned int sent = 0;
 #if HAVE_BATCH_RECYCLE
-	    BATCH_RECYCLE_START();
+        BATCH_RECYCLE_START();
 #endif
 
 	for (int iloop = 0; iloop < queue_per_threads; iloop++) {
 		int in = (s.last_queue + iloop) % queue_per_threads;
-		int i =  queue_for_thread_begin() + in;
+		int i =  queue_for_thisthread_begin() + in;
 
 		nmd = _device->nmds[i];
 		txring = NETMAP_TXRING(nmd->nifp, i);
@@ -479,7 +478,7 @@ ToNetmapDevice::run_task(Task* task)
 	do {
 #if HAVE_BATCH
 		if (!batch || batch_size < _burst) {
-			PacketBatch* new_batch = input(0).pull_batch(_burst - batch_size);
+			PacketBatch* new_batch = input_pull_batch(0,_burst - batch_size);
 			if (new_batch) {
 				if (batch) {
 					batch->prev()->set_next(new_batch);
@@ -546,7 +545,7 @@ ToNetmapDevice::run_task(Task* task)
 		s.q = batch;
 		s.q_size = batch_size;
 		//Register fd to wait for space
-		for (int i = queue_for_thread_begin(); i <= queue_for_thread_end(); i++) {
+		for (int i = queue_for_thisthread_begin(); i <= queue_for_thisthread_end(); i++) {
 			if (_pull_use_select)
 				master()->thread(click_current_cpu_id())->select_set().add_select(_device->nmds[i]->fd,this,SELECT_WRITE);
 			else

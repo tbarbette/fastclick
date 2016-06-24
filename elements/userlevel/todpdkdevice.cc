@@ -25,8 +25,8 @@
 CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
-    _iqueues(), _port_id(0), _blocking(false),
-    _iqueue_size(1024), _burst_size(32), _timeout(0), _congestion_warning_printed(false)
+    _iqueues(), _port_id(0), _iqueue_size(1024), _blocking(false),
+    _burst_size(-1), _timeout(0), _congestion_warning_printed(false)
 {
 }
 
@@ -38,9 +38,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String devname;
     int maxthreads = -1;
-    int minqueues = 1;
     int maxqueues = 128;
-    int burst = -1;
 
     if (Args(conf, this, errh)
         .read_mp("PORT", _port_id)
@@ -48,30 +46,16 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES",maxqueues)
         .read("MAXTHREADS",maxthreads)
         .read("BLOCKING", _blocking)
-        .read("BURST", burst)
+        .read("BURST", _burst_size)
         .read("MAXQUEUES",maxqueues)
         .read("TIMEOUT", _timeout)
-        .read("NDESC",_n_desc)
+        .read("NDESC",ndesc)
+		.read("VERBOSE",_verbose)
         .complete() < 0)
             return -1;
 
-
-#if !HAVE_BATCH
-    if (burst > ndesc / 2 ) {
-        errh->warning("BURST should not be upper than half the number of descriptor");
-    } else if (burst > 32) {
-        errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
-    }
-    if (burst > -1)
-        _burst_size = burst;
-
-#else
-    if (burst != -1) {
-        errh->warning("BURST is unused with batching !");
-    }
-#endif
-
     QueueDevice::configure_tx(maxthreads,1,maxqueues,errh);
+    return 0;
 }
 
 int ToDPDKDevice::initialize(ErrorHandler *errh)
@@ -83,20 +67,40 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         return ret;
 
     for (int i = 0; i < nqueues; i++) {
-        ret = DPDKDevice::add_tx_device(_port_id, i, _n_desc , errh);
+        ret = DPDKDevice::add_tx_device(_port_id, i, ndesc , errh);
         if (ret != 0) return ret;    }
+
+#if HAVE_BATCH
+    if (batch_mode() == BATCH_MODE_YES) {
+        if (_burst_size > 0)
+            errh->warning("BURST is unused with batching !");
+    } else
+#endif
+    {
+		if (_burst_size < 0)
+			_burst_size = 32;
+
+		if (ndesc > 0 && (unsigned)_burst_size > ndesc / 2 ) {
+			errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
+		} else if (_burst_size > 32) {
+			errh->warning("BURST should not be upper than 32 as DPDK won't send more packets at once");
+		}
+    }
 
     ret = initialize_tasks(false,errh);
     if (ret != 0)
         return ret;
 
-    for (int i = 0; i < _iqueues.size();i++) {
-    	_iqueues.get_value(i).pkts = new struct rte_mbuf *[_iqueue_size];
+    for (unsigned i = 0; i < _iqueues.size();i++) {
+        _iqueues.get_value(i).pkts = new struct rte_mbuf *[_iqueue_size];
         if (_timeout >= 0) {
             _iqueues.get_value(i).timeout.assign(this);
             _iqueues.get_value(i).timeout.initialize(this);
+            _iqueues.get_value(i).timeout.move_thread(i);
         }
     }
+
+    _this_node = DPDKDevice::get_port_numa_node(_port_id);
 
     if (all_initialized()) {
         int ret =DPDKDevice::initialize(errh);
@@ -108,7 +112,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 void ToDPDKDevice::cleanup(CleanupStage stage)
 {
 	cleanup_tasks();
-	for (int i = 0; i < _iqueues.size();i++) {
+	for (unsigned i = 0; i < _iqueues.size();i++) {
 			delete[] _iqueues.get_value(i).pkts;
 	}
 }
@@ -120,19 +124,36 @@ void ToDPDKDevice::add_handlers()
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 
-inline struct rte_mbuf* get_mbuf(Packet* p, bool create=true) {
+inline struct rte_mbuf* ToDPDKDevice::get_mbuf(Packet* p, bool create=true) {
     struct rte_mbuf* mbuf;
-    #if CLICK_DPDK_POOLS
+    #if CLICK_PACKET_USE_DPDK
     mbuf = p->mb();
     #else
-    if (likely(DPDKDevice::is_dpdk_packet(p) && !p->shared())) {
-        mbuf = (struct rte_mbuf *) (p->buffer() - sizeof(struct rte_mbuf));
+    if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *) p->destructor_argument()))
+		|| unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
+        /* If the packet is an unshared DPDK packet, we can send
+         *  the mbuf as it to DPDK*/
         rte_pktmbuf_pkt_len(mbuf) = p->length();
         rte_pktmbuf_data_len(mbuf) = p->length();
-        static_cast<WritablePacket*>(p)->set_buffer(0);
+        mbuf->data_off = p->headroom();
+        if (p->shared()) {
+            /*Prevent DPDK from freeing the buffer. When all shared packet
+             * are freed, DPDKDevice::free_pkt will effectively destroy it.*/
+            rte_mbuf_refcnt_update(mbuf, 1);
+        } else {
+            //Reset buffer, let DPDK free the buffer when it wants
+            p->reset_buffer();
+        }
     } else {
         if (create) {
-            mbuf = DPDKDevice::get_pkt();
+            /*The packet is not a DPDK packet, or it is shared : we need to allocate a mbuf and
+             * copy the packet content to it.*/
+            mbuf = DPDKDevice::get_pkt(_this_node);
+            if (mbuf == 0) {
+                click_chatter("Out of DPDK buffer ! Check your configuration for "
+                        "packet leaks or increase the number of buffer with DPDKInfo().");
+                return NULL;
+            }
             memcpy((void*)rte_pktmbuf_mtod(mbuf, unsigned char *),p->data(),p->length());
             rte_pktmbuf_pkt_len(mbuf) = p->length();
             rte_pktmbuf_data_len(mbuf) = p->length();
@@ -170,8 +191,8 @@ void ToDPDKDevice::flush_internal_queue(InternalQueue &iqueue) {
         if (iqueue.index + sub_burst >= _iqueue_size)
             // The sub_burst wraps around the ring
             sub_burst = _iqueue_size - iqueue.index;
-        r = rte_eth_tx_burst(_port_id, queue_for_thread_begin(), &iqueue.pkts[iqueue.index],
-                             iqueue.nr_pending);
+        r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
+                             sub_burst);
 
         iqueue.nr_pending -= r;
         iqueue.index += r;
@@ -213,12 +234,14 @@ void ToDPDKDevice::push_packet(int, Packet *p)
                 _congestion_warning_printed = true;
             }
         } else { // If there is space in the iqueue
-            iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _iqueue_size] =
-                get_mbuf(p);
-            iqueue.nr_pending++;
+            struct rte_mbuf* mbuf = get_mbuf(p);
+            if (mbuf != NULL) {
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _iqueue_size] = mbuf;
+                iqueue.nr_pending++;
+            }
         }
 
-        if (iqueue.nr_pending >= _burst_size || congestioned) {
+        if ((int)iqueue.nr_pending >= _burst_size || congestioned) {
             flush_internal_queue(iqueue);
             if (_timeout && iqueue.nr_pending == 0)
                 iqueue.timeout.unschedule();
@@ -232,7 +255,7 @@ void ToDPDKDevice::push_packet(int, Packet *p)
         // If we're in blocking mode, we loop until we can put p in the iqueue
     } while (unlikely(_blocking && congestioned));
 
-#if !CLICK_DPDK_POOLS
+#if !CLICK_PACKET_USE_DPDK
 	if (likely(is_fullpush()))
 	    p->safe_kill();
 	else
@@ -269,7 +292,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 		unsigned left = iqueue.nr_pending;
 		do {
 			lock();
-			r = rte_eth_tx_burst(_port_id, queue_for_thread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
+			r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
 			unlock();
 			ret += r;
 			left -= r;
@@ -296,7 +319,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 			unsigned int lost = iqueue.nr_pending - ret;
 			add_dropped(lost);
 			//click_chatter("Dropped %d");
-			for (int i = iqueue.index + ret; i < iqueue.index + iqueue.nr_pending; i++) {
+			for (unsigned i = iqueue.index + ret; i < iqueue.index + iqueue.nr_pending; i++) {
 				rte_pktmbuf_free(iqueue.pkts[i]);
 			}
 
@@ -312,7 +335,9 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	while (p != NULL) {
 		Packet* next = p->next();
         *pkt = get_mbuf(p);
-#if !CLICK_DPDK_POOLS
+        if (*pkt == 0)
+            break;
+#if !CLICK_PACKET_USE_DPDK
         BATCH_RECYCLE_UNSAFE_PACKET(p);
 #endif
 		pkt++;
@@ -324,7 +349,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	unsigned left = head->count() + iqueue.nr_pending;
 	do {
 	    lock();
-		r = rte_eth_tx_burst(_port_id, queue_for_thread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
+		r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index + ret] , left);
 		unlock();
 		ret += r;
 		left -= r;
@@ -338,7 +363,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 	    iqueue.nr_pending = head->count() + iqueue.nr_pending - ret;
 	}
 
-#if !CLICK_DPDK_POOLS
+#if !CLICK_PACKET_USE_DPDK
 	#if HAVE_BATCH_RECYCLE
 		BATCH_RECYCLE_END();
 	#else

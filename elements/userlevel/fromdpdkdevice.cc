@@ -28,8 +28,11 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0),_n_desc(0)
+    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0)
 {
+	#if HAVE_BATCH
+		in_batch_mode = BATCH_MODE_YES;
+	#endif
 }
 
 FromDPDKDevice::~FromDPDKDevice()
@@ -54,8 +57,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES",maxqueues)
         .read("RSS_AGGREGATE", _set_rss_aggregate)
         .read("BURST", _burst_size)
-        .read("NDESC", _n_desc)
+        .read("NDESC", ndesc)
 		.read("NUMA", _numa)
+		.read("VERBOSE", _verbose)
         .complete() < 0)
         return -1;
 
@@ -78,7 +82,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     for (int i = 0; i < nqueues; i++) {
-        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, _n_desc, errh);
+        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }
 
@@ -115,17 +119,21 @@ bool FromDPDKDevice::run_task(Task * t)
 	WritablePacket *last = NULL;
 #endif
 
-    for (int iqueue = queue_for_thread_begin(); iqueue<=queue_for_thread_end();iqueue++) {
+    for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
         unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst_size);
         for (unsigned i = 0; i < n; ++i) {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
             rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
             WritablePacket *p = Packet::make(pkts[i]);
 #elif HAVE_ZEROCOPY
     rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
     WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
-                     rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt,
-                     pkts[i]);
+                     rte_pktmbuf_data_len(pkts[i]),
+					 DPDKDevice::free_pkt,
+                     pkts[i],
+                     rte_pktmbuf_headroom(pkts[i]),
+                     rte_pktmbuf_tailroom(pkts[i])
+                     );
 #else
             WritablePacket *p = Packet::make((void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
@@ -133,7 +141,7 @@ bool FromDPDKDevice::run_task(Task * t)
 #endif
             p->set_packet_type_anno(Packet::HOST);
             if (_set_rss_aggregate)
-#if RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
+#if RTE_VER_YEAR ||  RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
@@ -151,7 +159,7 @@ bool FromDPDKDevice::run_task(Task * t)
 #if HAVE_BATCH
         if (head) {
             head->make_tail(last,n);
-            output(0).push_batch(head);
+            output_push_batch(0,head);
         }
 #endif
         if (n) {

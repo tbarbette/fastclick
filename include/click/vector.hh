@@ -195,6 +195,8 @@ class Vector {
 
     inline void swap(Vector<T> &x);
 
+    inline void shuffle(int n);
+
 };
 
 /** @brief Construct an empty vector. */
@@ -521,6 +523,25 @@ inline void click_swap(Vector<T> &a, Vector<T> &b) {
 template <typename T>
 inline void assign_consume(Vector<T> &a, Vector<T> &b) {
     a.swap(b);
+}
+
+template <typename T>
+inline void Vector<T>::shuffle(int n) {
+	if (size() > 1)
+	{
+		size_t i;
+		for (i = 0; i < n; i++)
+		{
+			int n_i = i % size();
+			size_t j = click_random(0, size() -1);
+			if (n_i == j)
+				continue;
+			assert(j >= 0 && j < size());
+			T t = *(T*)&vm_.l_[n_i];
+			*(T*)&vm_.l_[j] = *(T*)&vm_.l_[n_i];
+			*(T*)&vm_.l_[n_i] = t;
+		}
+	}
 }
 
 CLICK_ENDDECLS

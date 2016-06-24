@@ -21,6 +21,7 @@
 #include <click/packet.hh>
 #include <click/error.hh>
 #include <click/hashmap.hh>
+#include <click/vector.hh>
 
 CLICK_DECLS
 
@@ -37,18 +38,32 @@ public:
     static int add_tx_device(unsigned port_id, int &queue_id, unsigned n_desc,
                              ErrorHandler *errh);
     static int initialize(ErrorHandler *errh);
+	static int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {
-        if (p->buffer_destructor() == DPDKDevice::free_pkt)
-            return true;
-        for (int i = 0; i < _nr_pktmbuf_pools; i++)
-            if (p->buffer() >= (void*)get_mpool(i)->elt_va_start && p->buffer() < (void*)get_mpool(i)->elt_va_end)
+        return p->buffer_destructor() == DPDKDevice::free_pkt;
+    }
+
+    inline static bool is_dpdk_buffer(Packet* p) {
+        return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
+    }
+
+    inline static bool is_valid_dpdk_packet(Packet* p) {
+        struct rte_mbuf* mb = (struct rte_mbuf*)p->destructor_argument();
+        return mb && (mb->buf_addr == p->buffer());
+        /*for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+            if (p->buffer() > _pktmbuf_pools[i]->elt_va_start && p->buffer() < _pktmbuf_pools[i]->elt_va_start)
                 return true;
-        return false;
+        }
+        return false;*/
+    }
+
+    inline static rte_mbuf* get_pkt(unsigned numa_node) {
+        return rte_pktmbuf_alloc(get_mpool(numa_node));
     }
 
     inline static rte_mbuf* get_pkt() {
-        return rte_pktmbuf_alloc(get_mpool(rte_socket_id()));
+        return get_pkt(rte_socket_id());
     }
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
@@ -56,7 +71,7 @@ public:
     static unsigned int get_nb_txdesc(unsigned port_id);
 
     static int NB_MBUF;
-    static int DATA_SIZE;
+    static int MBUF_DATA_SIZE;
     static int MBUF_SIZE;
     static int MBUF_CACHE_SIZE;
     static int RX_PTHRESH;
@@ -65,6 +80,7 @@ public:
     static int TX_PTHRESH;
     static int TX_HTHRESH;
     static int TX_WTHRESH;
+    static String MEMPOOL_PREFIX;
 
 private:
 
@@ -72,19 +88,14 @@ private:
 
     struct DevInfo {
         inline DevInfo() :
-            n_rx_queues(0), n_tx_queues(0), promisc(false), n_rx_descs(0),
-            n_tx_descs(0) {}
-        inline DevInfo(DPDKDevice::Dir dir, unsigned queue_id, bool promisc,
-                       unsigned n_desc) :
-            n_rx_queues((dir == DPDKDevice::RX) ? queue_id + 1 : 0),
-            n_tx_queues((dir == DPDKDevice::TX) ? queue_id + 1 : 0),
-            promisc(promisc),
-            n_rx_descs((dir == DPDKDevice::RX) ? n_desc : 256),
-            n_tx_descs((dir == DPDKDevice::TX) ? n_desc : 1024)
-            {}
+            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
+            n_tx_descs(0) {
+            rx_queues.reserve(128);
+            tx_queues.reserve(128);
+        }
 
-        unsigned n_rx_queues;
-        unsigned n_tx_queues;
+        Vector<bool> rx_queues;
+        Vector<bool> tx_queues;
         bool promisc;
         unsigned n_rx_descs;
         unsigned n_tx_descs;

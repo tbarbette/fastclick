@@ -56,6 +56,10 @@ CLICK_DECLS
  * 	queue. If you use RSS, do not set this below the number of queues receiving
  * 	packets hashed by RSS or you won't serve packets.
  *
+ * =item VERBOSE
+ *
+ * Amount of verbosity. If 1, display warnings about potential misconfigurations. If 2, display some informations. Default to 1.
+ *
  *
  */
 

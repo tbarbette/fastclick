@@ -100,3 +100,4 @@ DriverManager(wait 2s, stop);
 Detaching netmap device vale.*
 Allocated [0-9]+ buffers from Netmap buffer pool
 Freeing [0-9]+ Netmap buffers
+.*do not mmap.*

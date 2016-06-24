@@ -138,6 +138,14 @@ UDPIPEncap::simple_action(Packet *p_in)
   return p;
 }
 
+#if HAVE_BATCH
+PacketBatch*
+UDPIPEncap::simple_action_batch(PacketBatch* batch) {
+	EXECUTE_FOR_EACH_PACKET(simple_action,batch);
+	return batch;
+}
+#endif
+
 String UDPIPEncap::read_handler(Element *e, void *thunk)
 {
     UDPIPEncap *u = static_cast<UDPIPEncap *>(e);

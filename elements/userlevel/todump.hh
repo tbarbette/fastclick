@@ -2,7 +2,7 @@
 #ifndef CLICK_TODUMP_HH
 #define CLICK_TODUMP_HH
 #include <click/timer.hh>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/task.hh>
 #include <click/notifier.hh>
 #include <click/sync.hh>
@@ -96,7 +96,7 @@ Returns the filename.
 
 FromDump, FromDevice.u, ToDevice.u, tcpdump(1) */
 
-class ToDump : public Element { public:
+class ToDump : public BatchElement { public:
 
     ToDump() CLICK_COLD;
     ~ToDump() CLICK_COLD;
@@ -113,8 +113,10 @@ class ToDump : public Element { public:
     void add_handlers() CLICK_COLD;
     ToDump *hotswap_element() const;
     void take_state(Element *, ErrorHandler *);
-
-    void push(int, Packet *);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
+    void push_packet(int, Packet *);
     Packet *pull(int);
     bool run_task(Task *);
 

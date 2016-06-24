@@ -7,7 +7,7 @@
 #include <click/packet_anno.hh>
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
 # include <rte_debug.h>
 # include <rte_mbuf.h>
 #else
@@ -19,7 +19,7 @@
 #if CLICK_NS
 # include <click/simclick.h>
 #endif
-#if !CLICK_DPDK_POOLS && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL)
+#if !CLICK_PACKET_USE_DPDK && (CLICK_USERLEVEL || CLICK_NS || CLICK_MINIOS) && (!HAVE_MULTITHREAD || HAVE___THREAD_STORAGE_CLASS) && !(NETMAP_PACKET_POOL)
 # define HAVE_CLICK_PACKET_POOL 1
 #endif
 #ifndef CLICK_PACKET_DEPRECATED_ENUM
@@ -45,7 +45,7 @@ class Packet { public:
     enum {
 #ifdef CLICK_MINIOS
 	default_headroom = 48,		///< Increase headroom for improved performance.
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL
 	default_headroom = RTE_PKTMBUF_HEADROOM,
 #else
 	default_headroom = 28,		///< Default packet headroom() for
@@ -61,7 +61,7 @@ class Packet { public:
     static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_LINUXMODULE
     static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     static Packet *make(struct rte_mbuf *mb) CLICK_WARN_UNUSED_RESULT;
 #endif
 #if CLICK_BSDMODULE
@@ -81,7 +81,7 @@ class Packet { public:
 
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
-                                void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
 # if HAVE_BATCH
     static PacketBatch *make_batch(unsigned char *data, uint16_t count, uint16_t *length,
                 buffer_destructor_type destructor,
@@ -112,7 +112,7 @@ class Packet { public:
 #if CLICK_LINUXMODULE
     struct sk_buff *skb()		{ return (struct sk_buff *)this; }
     const struct sk_buff *skb() const	{ return (const struct sk_buff*)this; }
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     inline void prefetch_anno() {
         rte_prefetch0(xanno());
     }
@@ -149,7 +149,6 @@ class Packet { public:
     	return _destructor_argument;
     }
     void reset_buffer() {
-	assert(!shared());
 	_head = _data = _tail = _end = 0;
 	_destructor = 0;
     }
@@ -366,7 +365,8 @@ class Packet { public:
     //@}
 
 #if CLICK_LINUXMODULE
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET
+# if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET) || \
+     (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
   protected:
     typedef typeof(((struct sk_buff*)0)->mac_header) mac_header_type;
     typedef typeof(((struct sk_buff*)0)->network_header) network_header_type;
@@ -380,7 +380,7 @@ class Packet { public:
 #if CLICK_LINUXMODULE
     const Anno *xanno() const		{ return (const Anno *)skb()->cb; }
     Anno *xanno()			{ return (Anno *)skb()->cb; }
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
 # define ANNO_OFFSET sizeof(struct rte_mbuf)
     const Anno *xanno() const           { return (const Anno *) ((unsigned char*)this) + ANNO_OFFSET; }
     Anno *xanno()			{ return (Anno *) ((unsigned char*)this) + ANNO_OFFSET; }
@@ -709,8 +709,8 @@ class Packet { public:
 	*reinterpret_cast<click_aliasable_void_pointer_t *>(xanno()->c + i) = const_cast<void *>(x);
     }
 
-#if !CLICK_DPDK_POOLS
-    Packet* data_packet() {
+#if !CLICK_PACKET_USE_DPDK
+    inline Packet* data_packet() {
     	return _data_packet;
     }
 #endif
@@ -802,7 +802,7 @@ class Packet { public:
 	}
     };
 
-# if CLICK_DPDK_POOLS
+# if CLICK_PACKET_USE_DPDK
     inline struct AllAnno *all_anno() {
         return reinterpret_cast<AllAnno *>(xanno());
     }
@@ -814,7 +814,7 @@ class Packet { public:
 #endif
     /** @endcond never */
 
-#if !(CLICK_LINUXMODULE || CLICK_DPDK_POOLS)
+#if !(CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK)
     // User-space and BSD kernel module implementations.
 protected:
     atomic_uint32_t _use_count;
@@ -841,7 +841,7 @@ private:
     inline Packet() {
 #if CLICK_LINUXMODULE
 	panic("Packet constructor");
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     rte_panic("Packet constructor");
 #endif
     }
@@ -849,7 +849,7 @@ private:
     ~Packet();
     Packet &operator=(const Packet &x);
 
-#if !(CLICK_LINUXMODULE || CLICK_DPDK_POOLS)
+#if !(CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK)
     bool alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom);
 #endif
 #if CLICK_BSDMODULE
@@ -932,7 +932,7 @@ class WritablePacket : public Packet { public:
         else return static_cast<WritablePacket*>(prev());
     }
 
-    #if !CLICK_LINUXMODULE || CLICK_DPDK_POOLS
+    #if !CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK
         inline void initialize();
         inline void initialize_data();
     #endif
@@ -1050,7 +1050,7 @@ class WritablePacket : public Packet { public:
 		int passed = 0;\
 		for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
 			int o = (fnt(p));\
-			if (o < 0 || o>(nbatches)) o = (nbatches);\
+			if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
 			if (o == last_o) {\
 				passed ++;\
 			} else {\
@@ -1089,6 +1089,9 @@ class WritablePacket : public Packet { public:
 		}\
 	}
 
+/**
+ * Create a batch by calling multiple times (up to max) a given function
+ */
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
         Packet* last = head;\
@@ -1291,13 +1294,32 @@ public :
 	 */
 	inline void kill();
 
+	/**
+	 * Clone the batch
+	 */
+	inline PacketBatch* clone_batch() {
+		PacketBatch* head = 0;
+		Packet* last = 0;
+		FOR_EACH_PACKET(this,p) {
+			Packet* q = p->clone();
+			if (last == 0) {
+				head = start_head(q);
+				last = q;
+			} else {
+				last->set_next(q);
+				last = q;
+			}
+		}
+		return head->make_tail(last,count());
+	}
+
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 	/**
 	 * Kill all packets of batch of unshared packets. Using this on unshared packets is very dangerous !
 	 */
-	inline void safe_kill(bool is_data);
+	void safe_kill(bool is_data);
 
-	inline void fast_kill();
+	void fast_kill();
 #endif
 };
 
@@ -1383,7 +1405,7 @@ Packet::data() const
 {
 #if CLICK_LINUXMODULE
     return skb()->data;
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return rte_pktmbuf_mtod(mb(), const unsigned char *);
 #else
     return _data;
@@ -1403,7 +1425,7 @@ Packet::end_data() const
 # else
     return skb()->tail;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return data() + length();
 #else
     return _tail;
@@ -1419,7 +1441,7 @@ Packet::buffer() const
 {
 #if CLICK_LINUXMODULE
     return skb()->head;
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return data() - rte_pktmbuf_headroom(mb());
 #else
     return _head;
@@ -1439,7 +1461,7 @@ Packet::end_buffer() const
 # else
     return skb()->end;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return end_data() + rte_pktmbuf_tailroom(mb());
 #else
     return _end;
@@ -1452,7 +1474,7 @@ Packet::length() const
 {
 #if CLICK_LINUXMODULE
     return skb()->len;
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return rte_pktmbuf_data_len(mb());
 #else
     return _tail - _data;
@@ -1467,7 +1489,7 @@ Packet::length() const
 inline uint32_t
 Packet::headroom() const
 {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
     return rte_pktmbuf_headroom(mb());
 #else
     return data() - buffer();
@@ -1482,7 +1504,7 @@ Packet::headroom() const
 inline uint32_t
 Packet::tailroom() const
 {
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
     return rte_pktmbuf_tailroom(mb());
 #else
     return end_buffer() - end_data();
@@ -1503,7 +1525,7 @@ Packet::next() const
 {
 #if CLICK_LINUXMODULE
     return (Packet *)(skb()->next);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->next;
 #else
     return _aa.next;
@@ -1515,7 +1537,7 @@ Packet::next()
 {
 #if CLICK_LINUXMODULE
     return (Packet *&)(skb()->next);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->next;
 #else
     return _aa.next;
@@ -1527,7 +1549,7 @@ Packet::set_next(Packet *p)
 {
 #if CLICK_LINUXMODULE
     skb()->next = p->skb();
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->next = p;
 #else
     _aa.next = p;
@@ -1539,7 +1561,7 @@ Packet::prev() const
 {
 #if CLICK_LINUXMODULE
     return (Packet *)(skb()->prev);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->prev;
 #else
     return _aa.prev;
@@ -1551,7 +1573,7 @@ Packet::prev()
 {
 #if CLICK_LINUXMODULE
     return (Packet *&)(skb()->prev);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->prev;
 #else
     return _aa.prev;
@@ -1563,7 +1585,7 @@ Packet::set_prev(Packet *p)
 {
 #if CLICK_LINUXMODULE
     skb()->prev = p->skb();
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->prev = p;
 #else
     _aa.prev = p;
@@ -1581,7 +1603,7 @@ Packet::has_mac_header() const
 # else
     return skb()->mac.raw != 0;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->mac != 0;
 #else
     return _aa.mac != 0;
@@ -1601,7 +1623,7 @@ Packet::mac_header() const
 # else
     return skb()->mac.raw;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->mac;
 #else
     return _aa.mac;
@@ -1623,7 +1645,7 @@ Packet::has_network_header() const
 # else
     return skb()->nh.raw != 0;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->nh != 0;
 #else
     return _aa.nh != 0;
@@ -1643,7 +1665,7 @@ Packet::network_header() const
 # else
     return skb()->nh.raw;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->nh;
 #else
     return _aa.nh;
@@ -1665,7 +1687,7 @@ Packet::has_transport_header() const
 # else
     return skb()->h.raw != 0;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->h != 0;
 #else
     return _aa.h != 0;
@@ -1685,7 +1707,7 @@ Packet::transport_header() const
 # else
     return skb()->h.raw;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->h;
 #else
     return _aa.h;
@@ -1788,7 +1810,7 @@ Packet::timestamp_anno() const
 # else
     return *reinterpret_cast<const Timestamp *>(&skb()->tstamp);
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->timestamp;
 #else
     return _aa.timestamp;
@@ -1804,7 +1826,7 @@ Packet::timestamp_anno()
 # else
     return *reinterpret_cast<Timestamp *>(&skb()->tstamp);
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->timestamp;
 #else
     return _aa.timestamp;
@@ -1852,7 +1874,7 @@ Packet::packet_type_anno() const
     return (PacketType)(skb()->pkt_type & PACKET_TYPE_MASK);
 #elif CLICK_LINUXMODULE
     return (PacketType)(skb()->pkt_type);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return all_anno()->pkt_type;
 #else
     return _aa.pkt_type;
@@ -1866,7 +1888,7 @@ Packet::set_packet_type_anno(PacketType p)
     skb()->pkt_type = (skb()->pkt_type & PACKET_CLEAN) | p;
 #elif CLICK_LINUXMODULE
     skb()->pkt_type = p;
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->pkt_type = p;
 #else
     _aa.pkt_type = p;
@@ -1950,7 +1972,7 @@ Packet::make(struct sk_buff *skb)
 }
 #endif
 
-#if CLICK_DPDK_POOLS
+#if CLICK_PACKET_USE_DPDK
 /** @brief Change an pktmbuf into a Packet (DPDK).
  * @param mb input pktmbuf
  * @return the packet
@@ -2000,10 +2022,10 @@ Packet::kill()
 			b->list = 0;
 		# endif
 		skbmgr_recycle_skbs(b);
-    #elif CLICK_DPDK_POOLS
+    #elif CLICK_PACKET_USE_DPDK
 		//Dpdk takes care of indirect and related things
         rte_pktmbuf_free(mb());
-	#elif HAVE_CLICK_PACKET_POOL || HAVE_NETMAP_PACKET_POOL
+	#elif HAVE_CLICK_PACKET_POOL
 		if (_use_count.dec_and_test()) {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
@@ -2031,7 +2053,7 @@ Packet::safe_kill()
         b->list = 0;
     # endif
         skbmgr_recycle_skbs(b);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
         if (_use_count.unatomic_dec_and_test()) {
@@ -2136,7 +2158,7 @@ Packet::shared() const
 {
 #if CLICK_LINUXMODULE
     return skb_cloned(const_cast<struct sk_buff *>(skb()));
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
 #else
     return (_data_packet || _use_count > 1);
@@ -2179,10 +2201,10 @@ inline WritablePacket *
 Packet::push(uint32_t len)
 {
     if (headroom() >= len && !shared()) {
-	WritablePacket *q = (WritablePacket *)this;
+        WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(q->skb(), len);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     rte_pktmbuf_prepend(q->mb(), len);
 #else				/* User-space and BSD kernel module */
 	q->_data -= len;
@@ -2204,7 +2226,7 @@ Packet::nonunique_push(uint32_t len)
     if (headroom() >= len) {
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(skb(), len);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
 	rte_pktmbuf_prepend(mb(), len);
 #else				/* User-space and BSD kernel module */
 	_data -= len;
@@ -2229,7 +2251,7 @@ Packet::pull(uint32_t len)
     }
 #if CLICK_LINUXMODULE	/* Linux kernel module */
     __skb_pull(skb(), len);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     rte_pktmbuf_adj(mb(), len);
 #else				/* User-space and BSD kernel module */
     _data += len;
@@ -2248,7 +2270,7 @@ Packet::put(uint32_t len)
 	WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_put(q->skb(), len);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_append(q->mb(), len);
 #else				/* User-space and BSD kernel module */
 	q->_tail += len;
@@ -2268,7 +2290,7 @@ Packet::nonunique_put(uint32_t len)
     if (tailroom() >= len) {
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_put(skb(), len);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_append(mb(), len);
 #else				/* User-space and BSD kernel module */
 	_tail += len;
@@ -2292,7 +2314,7 @@ Packet::take(uint32_t len)
 #if CLICK_LINUXMODULE	/* Linux kernel module */
     skb()->tail -= len;
     skb()->len -= len;
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     rte_pktmbuf_trim(mb(), len);
 #else				/* User-space and BSD kernel module */
     _tail -= len;
@@ -2332,7 +2354,7 @@ Packet::take(uint32_t len)
 inline void
 Packet::shrink_data(const unsigned char *data, uint32_t length)
 {
-# if CLICK_DPDK_POOLS
+# if CLICK_PACKET_USE_DPDK
     // TODO find a way to support both mbuf and real packets, a way to avoid
     // building files depending on this function, or at least update the doc
     (void) data;
@@ -2367,7 +2389,7 @@ Packet::shrink_data(const unsigned char *data, uint32_t length)
 inline void
 Packet::change_headroom_and_length(uint32_t headroom, uint32_t length)
 {
-# if CLICK_DPDK_POOLS
+# if CLICK_PACKET_USE_DPDK
     rte_pktmbuf_prepend(mb(), this->headroom());
     rte_pktmbuf_adj(mb(), headroom);
     rte_pktmbuf_data_len(mb()) = length;
@@ -2382,7 +2404,7 @@ Packet::change_headroom_and_length(uint32_t headroom, uint32_t length)
 inline void
 Packet::change_buffer_length(uint32_t length)
 {
-# if CLICK_DPDK_POOLS
+# if CLICK_PACKET_USE_DPDK
     rte_panic("Not allowed with DPDK");
 # else
 	_end = _head + length;
@@ -2414,7 +2436,7 @@ Packet::set_mac_header(const unsigned char *p)
 # else
     skb()->mac.raw = const_cast<unsigned char *>(p);
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->mac = const_cast<unsigned char *>(p);
 #else				/* User-space and BSD kernel module */
     _aa.mac = const_cast<unsigned char *>(p);
@@ -2437,7 +2459,7 @@ Packet::set_mac_header(const unsigned char *p, uint32_t len)
     skb()->mac.raw = const_cast<unsigned char *>(p);
     skb()->nh.raw = const_cast<unsigned char *>(p) + len;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->mac = const_cast<unsigned char *>(p);
     all_anno()->nh = const_cast<unsigned char *>(p) + len;
 #else				/* User-space and BSD kernel module */
@@ -2471,7 +2493,7 @@ Packet::clear_mac_header()
 # else
     skb()->mac.raw = 0;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->mac = 0;
 #else				/* User-space and BSD kernel module */
     _aa.mac = 0;
@@ -2486,7 +2508,7 @@ Packet::push_mac_header(uint32_t len)
 	q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 	__skb_push(q->skb(), len);
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_prepend(q->mb(), len);
 #else				/* User-space and BSD kernel module */
 	q->_data -= len;
@@ -2516,7 +2538,7 @@ Packet::set_network_header(const unsigned char *p)
 # else
     skb()->nh.raw = const_cast<unsigned char *>(p);
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->nh = const_cast<unsigned char *>(p);
 #else				/* User-space and BSD kernel module */
     _aa.nh = const_cast<unsigned char *>(p);
@@ -2535,7 +2557,7 @@ Packet::set_transport_header(const unsigned char *p)
 # else
     skb()->h.raw = const_cast<unsigned char *>(p);
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->h = const_cast<unsigned char *>(p);
 #else				/* User-space and BSD kernel module */
     _aa.h = const_cast<unsigned char *>(p);
@@ -2558,7 +2580,7 @@ Packet::set_network_header(const unsigned char *p, uint32_t len)
     skb()->nh.raw = const_cast<unsigned char *>(p);
     skb()->h.raw = const_cast<unsigned char *>(p) + len;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->nh = const_cast<unsigned char *>(p);
     all_anno()->h = const_cast<unsigned char *>(p) + len;
 #else				/* User-space and BSD kernel module */
@@ -2583,7 +2605,7 @@ Packet::set_network_header_length(uint32_t len)
 # else
     skb()->h.raw = skb()->nh.raw + len;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->h = all_anno()->nh + len;
 #else				/* User-space and BSD kernel module */
     _aa.h = _aa.nh + len;
@@ -2639,7 +2661,7 @@ Packet::clear_network_header()
 # else
     skb()->nh.raw = 0;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->nh = 0;
 #else				/* User-space and BSD kernel module */
     _aa.nh = 0;
@@ -2757,7 +2779,7 @@ Packet::clear_transport_header()
 # else
     skb()->h.raw = 0;
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     all_anno()->h = 0;
 #else				/* User-space and BSD kernel module */
     _aa.h = 0;
@@ -2770,7 +2792,11 @@ Packet::shift_header_annotations(const unsigned char *old_head,
 {
 #if CLICK_LINUXMODULE
     struct sk_buff *mskb = skb();
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET
+    /* From Linux 2.6.24 - 3.10, the header offsets are integers if
+     * NET_SKBUFF_DATA_USES_OFFSET is 1.  From 3.11 onward, they're
+     * always integers. */
+# if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET) || \
+     (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
     (void) old_head;
     mskb->mac_header += (mskb->mac_header == (mac_header_type) ~0U ? 0 : extra_headroom);
     mskb->network_header += (mskb->network_header == (network_header_type) ~0U ? 0 : extra_headroom);
@@ -2786,7 +2812,7 @@ Packet::shift_header_annotations(const unsigned char *old_head,
     mskb->nh.raw += (mskb->nh.raw ? shift : 0);
     mskb->h.raw += (mskb->h.raw ? shift : 0);
 # endif
-#elif CLICK_DPDK_POOLS
+#elif CLICK_PACKET_USE_DPDK
     ptrdiff_t shift = (buffer() - old_head) + extra_headroom;
     all_anno()->mac += (all_anno()->mac ? shift : 0);
     all_anno()->nh += (all_anno()->nh ? shift : 0);
@@ -3132,7 +3158,7 @@ WritablePacket::buffer_data() const
 
 inline void
 WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length) {
-# if CLICK_DPDK_POOLS
+# if CLICK_PACKET_USE_DPDK
     rte_panic("Not allowed with DPDK");
 # else
 	_head = _data = data;
@@ -3152,19 +3178,9 @@ inline void PacketBatch::kill() {
 
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 #define HAVE_BATCH_RECYCLE 1
-/**
- * Recycle a whole batch of unshared packets of the same type
- *
- * @precond No packet are shared
- */
-inline void PacketBatch::safe_kill(bool is_data) {
-    if (is_data) {
-        WritablePacket::recycle_data_batch(this);
-    } else {
-        WritablePacket::recycle_packet_batch(this);
-    }
-}
+#endif
 
+#if HAVE_BATCH_RECYCLE
 #define BATCH_RECYCLE_START() \
 	WritablePacket* head_packet = NULL;\
 	WritablePacket* head_data = NULL;\
@@ -3201,11 +3217,19 @@ inline void PacketBatch::safe_kill(bool is_data) {
 			}\
 		}
 
+#if HAVE_DPDK_PACKET_POOL
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
-	if (p->data_packet() == 0 && p->buffer_destructor() == 0) {\
+	if (p->data_packet() == 0 && p->buffer_destructor() == DPDKDevice::free_pkt && p->buffer() != 0) {\
 		BATCH_RECYCLE_DATA_PACKET(p);\
 	} else {\
 		BATCH_RECYCLE_PACKET(p);}}
+#else
+#define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
+	if (p->data_packet() == 0 && p->buffer_destructor() == 0 && p->buffer() != 0) {\
+		BATCH_RECYCLE_DATA_PACKET(p);\
+	} else {\
+		BATCH_RECYCLE_PACKET(p);}}
+#endif
 
 #define BATCH_RECYCLE_END() \
 	if (last_packet) {\
@@ -3216,22 +3240,11 @@ inline void PacketBatch::safe_kill(bool is_data) {
 		last_data->set_next(0);\
 		PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);\
 	}
-
-/**
- * Recycle a whole batch, faster in most cases
- */
-inline void PacketBatch::fast_kill() {
-    BATCH_RECYCLE_START();
-    FOR_EACH_PACKET_SAFE(this,up) {
-        WritablePacket* p = static_cast<WritablePacket*>(up);
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
-    }
-    BATCH_RECYCLE_END();
-}
 #else
+#define BATCH_RECYCLE_START() {}
+#define BATCH_RECYCLE_END() {}
 #define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
 #endif
-
 
 typedef Packet::PacketType PacketType;
 

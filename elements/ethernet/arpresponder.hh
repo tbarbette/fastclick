@@ -1,6 +1,7 @@
+// -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_ARPRESPONDER_HH
 #define CLICK_ARPRESPONDER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/vector.hh>
@@ -74,7 +75,7 @@ CLICK_DECLS
  *
  * ARPQuerier, ARPFaker, AddressInfo */
 
-class ARPResponder : public Element { public:
+class ARPResponder : public BatchElement { public:
 
     ARPResponder() CLICK_COLD;
     ~ARPResponder() CLICK_COLD;
@@ -87,7 +88,10 @@ class ARPResponder : public Element { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 
     static Packet *make_response(const uint8_t target_eth[6],
 				 const uint8_t target_ip[4],

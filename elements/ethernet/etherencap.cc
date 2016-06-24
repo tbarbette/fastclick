@@ -87,9 +87,9 @@ EtherEncap::smaction(Packet *p)
     	}
     	if (head != NULL) {
     		if (batch == head)
-    			output(0).push_batch(PacketBatch::make_from_list(batch,count));
+               output_push_batch(0,PacketBatch::make_from_list(batch,count));
     		else {
-           	output(0).push_batch(PacketBatch::make_from_list(head,count));
+               output_push_batch(0,PacketBatch::make_from_list(head,count));
     		}
     	}
     }

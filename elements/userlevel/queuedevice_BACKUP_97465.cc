@@ -28,7 +28,11 @@ Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 QueueDevice::QueueDevice() :  nqueues(1), usable_threads(),
+<<<<<<< HEAD
+	queue_per_threads(1), queue_share(1), ndesc(-1), _maxthreads(-1),
+=======
 	queue_per_threads(1), queue_share(1), ndesc(0), _maxthreads(-1),
+>>>>>>> 2e7c9f0f15fd35708c02cffbaf231804aa592cc3
 	_minqueues(1),_maxqueues(128),_threadoffset(-1),thread_share(1),
 	_this_node(0){
 #if HAVE_NUMA
@@ -36,7 +40,11 @@ QueueDevice::QueueDevice() :  nqueues(1), usable_threads(),
 #else
 	_numa = false;
 #endif
+<<<<<<< HEAD
+	_verbose = false;
+=======
 	_verbose = 1;
+>>>>>>> 2e7c9f0f15fd35708c02cffbaf231804aa592cc3
 }
 void QueueDevice::static_initialize() {
 #if HAVE_NUMA
@@ -117,12 +125,20 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     n_initialized++;
+<<<<<<< HEAD
+    if (_verbose)
+=======
     if (_verbose > 1) {
+>>>>>>> 2e7c9f0f15fd35708c02cffbaf231804aa592cc3
 		if (input_is_push(0))
 			click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
 		else
 			click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+<<<<<<< HEAD
+
+=======
     }
+>>>>>>> 2e7c9f0f15fd35708c02cffbaf231804aa592cc3
     return 0;
 }
 int QueueDevice::initialize_rx(ErrorHandler *errh) {
@@ -159,7 +175,11 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
            if (v.size() < usable_threads.size())
                v.resize(usable_threads.size());
            if (v.weight() == usable_threads.weight()) {
+<<<<<<< HEAD
+               if (_verbose)
+=======
                if (_verbose > 0)
+>>>>>>> 2e7c9f0f15fd35708c02cffbaf231804aa592cc3
                    click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
            } else
                usable_threads &= (~v);

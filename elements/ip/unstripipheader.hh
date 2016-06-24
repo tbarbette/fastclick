@@ -1,6 +1,6 @@
 #ifndef CLICK_UNSTRIPIPHEADER_HH
 #define CLICK_UNSTRIPIPHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -16,16 +16,19 @@ CLICK_DECLS
  *
  * =a CheckIPHeader, MarkIPHeader, StripIPHeader */
 
-class UnstripIPHeader : public Element { public:
+class UnstripIPHeader : public BatchElement {
 
+public:
   UnstripIPHeader() CLICK_COLD;
   ~UnstripIPHeader() CLICK_COLD;
 
   const char *class_name() const		{ return "UnstripIPHeader"; }
   const char *port_count() const		{ return PORTS_1_1; }
 
-  Packet *simple_action(Packet *);
-
+  Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 };
 
 CLICK_ENDDECLS

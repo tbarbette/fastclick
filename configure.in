@@ -110,7 +110,7 @@ if test "x$enable_verbose_batch" = "xyes"; then
 fi
 
 AC_ARG_ENABLE([netmap-pool],
-    [AS_HELP_STRING([  --enable-netmap-pool], [have only netmap packets in the pool])],
+    [AS_HELP_STRING([  --enable-netmap-pool], [use netmap buffers instead of standard Click malloc'ed buffers])],
     [:], [enable_netmap_pool=no])
 
 PTHREAD_LIBS=""
@@ -169,10 +169,14 @@ AC_ARG_ENABLE([dpdk],
     [AS_HELP_STRING([  --enable-dpdk], [use Intel DPDK])],
     [:], [enable_dpdk=no])
 
-AC_ARG_ENABLE([dpdk-pools],
-    [AS_HELP_STRING([  --enable-dpdk-pools],
-                    [Click manages DPDK packet pools])],
-    [:], [enable_dpdk_pools=no])
+AC_ARG_ENABLE([dpdk-pool],
+    [AS_HELP_STRING([  --enable-dpdk-pool], [use DPDK buffer instead of standard click malloc'ed buffer])],
+    [:], [enable_dpdk_pool=no])
+
+AC_ARG_ENABLE([dpdk-packet],
+    [AS_HELP_STRING([  --enable-dpdk-packet],
+                    [Click packets are DPDK packet])],
+    [:], [enable_dpdk_packet=no])
 
 if test "x$enable_dpdk" = "xyes"; then
     if test "x$enable_user_multithread" != "xyes"; then
@@ -202,16 +206,28 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
     AC_SUBST(USE_DPDK, yes)
 fi
 
-if test "x$enable_dpdk_pools" = "xyes"; then
+if test "x$enable_dpdk_pool" = "xyes"; then
     if test "x$enable_dpdk" != "xyes"; then
         AC_MSG_ERROR([
 =========================================
 
---enable-dpdk-pools requires --enable-dpdk which was not provided.
+--enable-dpdk-pool requires --enable-dpdk which was not provided.
 
 =========================================])
     fi
-    AC_DEFINE([CLICK_DPDK_POOLS])
+    AC_DEFINE([HAVE_DPDK_PACKET_POOL])
+fi
+
+if test "x$enable_dpdk_packet" = "xyes"; then
+    if test "x$enable_dpdk" != "xyes"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-dpdk-packet requires --enable-dpdk which was not provided.
+
+=========================================])
+    fi
+    AC_DEFINE([CLICK_PACKET_USE_DPDK])
 fi
 
 AC_ARG_ENABLE([zerocopy],

@@ -93,14 +93,14 @@ InfiniteSource::configure(Vector<String> &conf, ErrorHandler *errh)
     else
 	_end_h = 0;
 
-    setup_packet();
-
     return 0;
 }
 
 int
 InfiniteSource::initialize(ErrorHandler *errh)
 {
+	setup_packet();
+
     if (output_is_push(0)) {
 	ScheduleInfo::initialize_task(this, &_task, errh);
 	_nonfull_signal = Notifier::downstream_full_signal(this, 0, &_task);
@@ -141,7 +141,7 @@ InfiniteSource::run_task(Task *)
 	    	last->timestamp_anno().assign_now();
 	}
 	if (n > 0)
-		output(0).push_batch(head->make_tail(last,n));
+		output_push_batch(0,head->make_tail(last,n));
 #else
     for (int i = 0; i < n; i++) {
 	Packet *p = _packet->clone();
