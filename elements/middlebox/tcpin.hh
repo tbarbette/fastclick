@@ -1,12 +1,12 @@
 #ifndef MIDDLEBOX_TCPIN_HH
 #define MIDDLEBOX_TCPIN_HH
-#include "tcpelement.hh"
-#include "tcpout.hh"
 #include <click/element.hh>
 #include <click/hashtable.hh>
 #include <click/memorypool.hh>
 #include <click/modificationlist.hh>
 #include "tcpclosingstate.hh"
+#include "tcpelement.hh"
+#include "tcpout.hh"
 
 #define MODIFICATIONLISTS_POOL_SIZE 100
 #define MODIFICATIONNODES_POOL_SIZE 200
@@ -29,6 +29,7 @@ public:
     TCPIn* getReturnElement();
 
     ModificationList* getModificationList(struct fcb*, WritablePacket* packet);
+    bool hasModificationList(struct fcb* fcb, Packet* packet);
 
 protected:
     virtual Packet* processPacket(struct fcb*, Packet*);

@@ -2,11 +2,11 @@
 #define MIDDLEBOX_FCB_HH
 
 #include <clicknet/tcp.h>
-#include <click/bytestreammaintainer.hh>
 #include <click/hashtable.hh>
+#include <click/bytestreammaintainer.hh>
 #include <click/modificationlist.hh>
 #include <click/memorypool.hh>
-#include "tcp/tcpclosingstate.hh"
+#include "tcpclosingstate.hh"
 #include "tcpreordernode.hh"
 
 /**
@@ -92,6 +92,15 @@ struct fcb_httpin
     }
 };
 
+struct fcb_pathmerger
+{
+    HashTable<tcp_seq_t, int> portMap;
+
+    fcb_pathmerger() : portMap(-1)
+    {
+    }
+};
+
 struct fcb
 {
     struct fcb_tcp_common tcp_common;
@@ -99,6 +108,7 @@ struct fcb
     struct fcb_tcpreorder tcpreorder;
     struct fcb_tcpin tcpin;
     struct fcb_httpin httpin;
+    struct fcb_pathmerger pathmerger;
 };
 
 // Global array of the two FCBs corresponding to each direction of the

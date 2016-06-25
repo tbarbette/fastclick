@@ -1,9 +1,9 @@
 #include <click/config.h>
-#include "ipelement.hh"
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <clicknet/ip.h>
+#include "ipelement.hh"
 
 CLICK_DECLS
 
@@ -22,6 +22,11 @@ uint16_t IPElement::packetTotalLength(Packet *packet)
     const click_ip *iph = packet->ip_header();
 
     return ntohs(iph->ip_len);
+}
+
+uint16_t IPElement::getIPHeaderOffset(Packet *packet)
+{
+    return (((const unsigned char *)packet->ip_header()) - packet->data());
 }
 
 void IPElement::setPacketTotalLength(WritablePacket* packet, unsigned length)

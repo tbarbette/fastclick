@@ -1,8 +1,8 @@
 #include <click/config.h>
-#include "stackelement.hh"
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
+#include "stackelement.hh"
 
 // Simulation of the Middleclick FCBs
 struct fcb fcbArray[2];
@@ -23,7 +23,7 @@ void StackElement::push(int, Packet *packet)
 {
     // Similate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
-    // direction. 
+    // direction.
     unsigned int flowDirection = determineFlowDirection();
     Packet *p = processPacket(&fcbArray[flowDirection], packet);
 
@@ -34,6 +34,9 @@ void StackElement::push(int, Packet *packet)
 Packet* StackElement::pull(int)
 {
     Packet *packet = input(0).pull();
+
+    if(packet == NULL)
+        return NULL;
 
     // Similate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
@@ -119,7 +122,7 @@ bool StackElement::getAnnotationAcked(Packet* p)
     return getAnnotationBit(p, offsetAnnotationAcked);
 }
 
-void StackElement::addStackElementInList(StackElement *element)
+void StackElement::addStackElementInList(StackElement *element, int port)
 {
     // Check that this element was not already added in the list via an
     // alternative path
@@ -134,6 +137,15 @@ void StackElement::setPacketModified(struct fcb *fcb, WritablePacket* packet)
         return;
 
     previousStackElement->setPacketModified(fcb, packet);
+}
+
+void StackElement::packetSent(struct fcb *fcb, Packet* packet)
+{
+    // Call the "packetSent" method on every element in the stack
+    if(previousStackElement == NULL)
+        return;
+
+    previousStackElement->packetSent(fcb, packet);
 }
 
 void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)

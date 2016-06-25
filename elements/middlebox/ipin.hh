@@ -1,15 +1,16 @@
-#ifndef MIDDLEBOX_HTTPIN_HH
-#define MIDDLEBOX_HTTPIN_HH
-#include "../stackelement.hh"
+#ifndef MIDDLEBOX_IPIN_HH
+#define MIDDLEBOX_IPIN_HH
+#include "ipelement.hh"
 #include <click/element.hh>
+
 CLICK_DECLS
 
-class HTTPIn : public StackElement
+class IPIn : public IPElement
 {
 public:
-    HTTPIn() CLICK_COLD;
+    IPIn() CLICK_COLD;
 
-    const char *class_name() const        { return "HTTPIn"; }
+    const char *class_name() const        { return "IPIn"; }
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
@@ -17,7 +18,7 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
-    void removeHeader(struct fcb *fcb, WritablePacket*, const char*);
+    void setPacketModified(struct fcb*, WritablePacket*);
 };
 
 CLICK_ENDDECLS

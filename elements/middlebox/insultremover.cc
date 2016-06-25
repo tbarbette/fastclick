@@ -1,8 +1,8 @@
 #include <click/config.h>
-#include "insultremover.hh"
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
+#include "insultremover.hh"
 
 CLICK_DECLS
 

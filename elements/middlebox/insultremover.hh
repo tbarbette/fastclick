@@ -1,7 +1,8 @@
 #ifndef MIDDLEBOX_INSULTREM_HH
 #define MIDDLEBOX_INSULTREM_HH
-#include "stackelement.hh"
 #include <click/element.hh>
+#include "stackelement.hh"
+
 CLICK_DECLS
 
 class InsultRemover : public StackElement

@@ -1,7 +1,8 @@
 #ifndef MIDDLEBOX_IPELEMENT_HH
 #define MIDDLEBOX_IPELEMENT_HH
-#include "../stackelement.hh"
 #include <click/element.hh>
+#include "stackelement.hh"
+
 CLICK_DECLS
 
 class IPElement : public StackElement
@@ -16,6 +17,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     static uint16_t packetTotalLength(Packet*);
+    static uint16_t getIPHeaderOffset(Packet* packet);
     static void setPacketTotalLength(WritablePacket*, unsigned);
     static const uint32_t getDestinationAddress(Packet*);
     static const uint32_t getSourceAddress(Packet*);

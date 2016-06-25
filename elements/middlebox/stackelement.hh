@@ -26,10 +26,12 @@ public:
 
     // Custom methods
     virtual bool isOutElement()          { return false; }
-    void addStackElementInList(StackElement*);
+    virtual void addStackElementInList(StackElement* element, int port);
     static bool isStackElement(Element*);
 
 protected:
+    friend class PathMerger;
+    
     void setAnnotationModification(Packet*, bool);
     bool getAnnotationModification(Packet*);
     void setAnnotationAcked(Packet* p, bool value);
@@ -47,6 +49,7 @@ protected:
     virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual void insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual void requestMoreBytes(struct fcb *fcb);
+    virtual void packetSent(struct fcb *fcb, Packet* packet);
 
     // Method used for the simulation of Middleclick's fcb management system
     // Should be removed when integrated to Middleclick
@@ -93,7 +96,7 @@ public:
 
         // Add the starting element in the list of the current element
         click_chatter("Adding element %s as predecessor of %s", startElement->class_name(), element->class_name());
-        element->addStackElementInList(startElement);
+        element->addStackElementInList(startElement, port);
 
         // Stop search when we encounter the IPOut Element
         if(strcmp(element->class_name(), "IPOut") == 0)

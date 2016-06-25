@@ -1,12 +1,12 @@
 #include <click/config.h>
-#include "tcpout.hh"
-#include "../ip/ipelement.hh"
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include "tcpin.hh"
+#include "tcpout.hh"
+#include "ipelement.hh"
 
 CLICK_DECLS
 
@@ -25,7 +25,11 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     WritablePacket *packet = p->uniqueify();
 
     ByteStreamMaintainer &byteStreamMaintainer = fcb->tcp_common.maintainers[getFlowDirection()];
-    ModificationList *modList = inElement->getModificationList(fcb, packet);
+    bool hasModificationList = inElement->hasModificationList(fcb, packet);
+    ModificationList *modList = NULL;
+
+    if(hasModificationList)
+        modList = inElement->getModificationList(fcb, packet);
 
     // Update the sequence number (according to modifications made on previous packets)
     tcp_seq_t prevSeq = getSequenceNumber(packet);
@@ -44,15 +48,19 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     {
         // Check the length to see if bytes were added or removed
         uint16_t initialLength = IPElement::packetTotalLength(packet);
-        uint16_t currentLength = (uint16_t)packet->length();
+        uint16_t currentLength = (uint16_t)packet->length() - IPElement::getIPHeaderOffset(packet);
         int offsetModification = -(initialLength - currentLength);
 
-        // TODO: Check modifications
-        if(offsetModification != 0)
+        // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo hdr)
+        IPElement::setPacketTotalLength(packet, initialLength + offsetModification);
+
+        // Check if the modificationlist has to be committed
+        if(hasModificationList)
         {
             // We know that the packet has been modified and its size has changed
             modList->commit(fcb->tcp_common.maintainers[getFlowDirection()]);
 
+            // TODO: Rework that part
             // Check if the full packet content has been removed
             if(getPayloadLength(packet) == 0)
             {
@@ -77,9 +85,6 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
 
                 return NULL;
             }
-
-            // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo hdr)
-            IPElement::setPacketTotalLength(packet, initialLength + offsetModification);
         }
 
         // Recompute the checksum

@@ -1,9 +1,9 @@
 #include <click/config.h>
-#include "tcpin.hh"
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <clicknet/tcp.h>
+#include "tcpin.hh"
 
 CLICK_DECLS
 
@@ -161,6 +161,15 @@ ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* pa
     return list;
 }
 
+bool TCPIn::hasModificationList(struct fcb *fcb, Packet* packet)
+{
+    HashTable<tcp_seq_t, ModificationList*> modificationLists = fcb->tcpin.modificationLists;
+
+    ModificationList* list = fcb->tcpin.modificationLists.get(getSequenceNumber(packet));
+
+    return (list != NULL);
+}
+
 void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
     click_chatter("Removing %u bytes", length);
@@ -187,6 +196,14 @@ void TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
     getModificationList(fcb, packet)->addModification(seqNumber + position, (int)length);
+
+    unsigned char *source = packet->data();
+    uint32_t bytesAfter = packet->length() + position;
+
+    packet = packet->put(length);
+    assert(packet != NULL);
+    
+    memmove(&source[position + length], &source[position], bytesAfter);
 
     // Continue in the stack function
     StackElement::insertBytes(fcb, packet, position, length);

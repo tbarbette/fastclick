@@ -1,10 +1,10 @@
 #include <click/config.h>
-#include "tcpreorder.hh"
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
+#include "tcpreorder.hh"
 
 CLICK_DECLS
 

@@ -844,6 +844,7 @@ enable_tcpudp
 enable_test
 enable_threads
 enable_wifi
+enable_middlebox
 enable_experimental
 enable_skip_elements
 with_freebsd
@@ -1543,6 +1544,7 @@ Optional Features:
   --disable-test          do not include regression test elements
   --disable-threads       do not include thread management elements
   --enable-wifi           include wifi elements and support
+  --disable-middlebox     do not include middlebox elements
   --enable-experimental   enable experimental elements in normal groups
   --enable-skip-elements=ELTS
                           disable comma-separated elements
@@ -7221,6 +7223,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_wifi" = xNO -o "x$enable_wifi" = x \) && enable_wifi=yes
 if test "x$enable_wifi" = xyes; then
+    :
+
+fi
+# Check whether --enable-middlebox was given.
+if test "${enable_middlebox+set}" = set; then :
+  enableval=$enable_middlebox;
+else
+  enable_middlebox=yes
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_middlebox" = xNO -o "x$enable_middlebox" = x \) && enable_middlebox=yes
+if test "x$enable_middlebox" = xyes; then
     :
 
 fi
