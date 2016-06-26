@@ -49,8 +49,8 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     .complete() < 0)
     	return -1;
 
-    if (tx_internal_queue_size < _burst * 2) {
-        return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",tx_internal_queue_size, _burst);
+    if (_internal_tx_queue_size < _burst * 2) {
+        return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_tx_queue_size, _burst);
     }
 
 #if HAVE_BATCH
@@ -183,7 +183,7 @@ ToNetmapDevice::push_batch(int port, PacketBatch *b_head)
 	bool ask_sync = false;
 
 	if (s.q != NULL) {
-		if (s.q_size < tx_internal_queue_size) {
+		if (s.q_size < _internal_tx_queue_size) {
 			s.q->prev()->set_next(b_head);
 			s.q_size += b_head->count();
 			s.q->set_prev(b_head->prev());
@@ -219,7 +219,7 @@ do_send_batch:
         }
     } else {
         if (should_be_dropped) {
-            if (s.q_size < tx_internal_queue_size) {
+            if (s.q_size < _internal_tx_queue_size) {
                 s.q->prev()->set_next(b_head);
                 s.q_size += b_head->count();
                 s.q->set_prev(b_head->prev());
@@ -245,7 +245,7 @@ ToNetmapDevice::push_packet(int, Packet* p) {
 		p->set_next(NULL); //Just to be sure, even if it should already be
 		s.q_size = 1;
 	} else {
-		if (s.q_size < tx_internal_queue_size) { //Append packet at the end
+		if (s.q_size < _internal_tx_queue_size) { //Append packet at the end
 			s.q->prev()->set_next(p);
 			s.q->set_prev(p);
 			s.q_size++;
@@ -266,7 +266,7 @@ do_send:
 			but again batching solves this problem*/
 		if (lock_attempt()) {
 			s.q->prev()->set_next(NULL);
-		} else if (unlikely(s.q_size > 2*_burst || (_blocking && s.q_size >= tx_internal_queue_size))) {
+		} else if (unlikely(s.q_size > 2*_burst || (_blocking && s.q_size >= _internal_tx_queue_size))) {
 			//If it failed too much... We'll spinlock, or if we are in blockant mode and we need to block
 			s.q->prev()->set_next(NULL);
 			lock();
@@ -296,7 +296,7 @@ do_send:
 		}
 		unlock();
 
-		if (s.q && s.q_size >= tx_internal_queue_size && _blocking) {
+		if (s.q && s.q_size >= _internal_tx_queue_size && _blocking) {
 			allow_txsync();
 			goto do_send;
 		}
