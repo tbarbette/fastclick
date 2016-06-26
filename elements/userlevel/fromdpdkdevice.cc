@@ -177,6 +177,6 @@ bool FromDPDKDevice::run_task(Task * t)
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel dpdk)
+ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
 EXPORT_ELEMENT(FromDPDKDevice)
 ELEMENT_MT_SAFE(FromDPDKDevice)
