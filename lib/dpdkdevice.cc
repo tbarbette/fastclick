@@ -256,7 +256,7 @@ int DPDKDevice::add_device(unsigned port_id, DPDKDevice::Dir dir,
 		if (!set_slot(info->rx_queues,queue_id))
 			return errh->error(
 						"Some elements are assigned to the same RX queue "
-						"for device %u", port_id);
+        "for device %u", port_id);
 	} else {
 		if (n_desc > 0) {
 			if (info->n_tx_descs != 0 && n_desc != info->n_tx_descs)
@@ -358,5 +358,6 @@ bool DPDKDevice::_is_initialized = false;
 HashMap<unsigned, DPDKDevice::DevInfo> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;
 int DPDKDevice::_nr_pktmbuf_pools;
+bool DPDKDevice::no_more_buffer_msg_printed = false;
 
 CLICK_ENDDECLS
