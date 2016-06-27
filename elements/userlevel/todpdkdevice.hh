@@ -13,7 +13,7 @@ CLICK_DECLS
 
 =c
 
-ToDPDKDevice(PORT [, I<keywords> IQUEUE, BLOCKING, etc.])
+ToDPDKDevice(PORT [, QUEUE, N_QUEUES, I<keywords> IQUEUE, BLOCKING, etc.])
 
 =s netdevices
 
@@ -35,6 +35,15 @@ Arguments:
 =item PORT
 
 Integer.  Port identifier of the device.
+
+=item QUEUE
+
+Integer.  A specific hardware queue to use. Default is 0.
+
+=item N_QUEUES
+
+Integer.  Number of hardware queues to use. -1 or default is to use as many
+queues as threads which can end up in this element.
 
 =item IQUEUE
 
@@ -97,7 +106,7 @@ Resets n_send and n_dropped counts to zero.
 
 =a DPDKInfo, FromDPDKDevice */
 
-class ToDPDKDevice : public QueueDevice {
+class ToDPDKDevice : public TXQueueDevice {
 public:
 
     ToDPDKDevice() CLICK_COLD;
@@ -118,8 +127,6 @@ public:
 
     void add_handlers() CLICK_COLD;
 
-    struct rte_mbuf* get_mbuf(Packet* p, bool create);
-
     void run_timer(Timer *);
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *head);
@@ -128,14 +135,15 @@ public:
 
 private:
 
-    /* InternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
-     * to be sent.
+    /* TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
+     * to be sent. It is used as an internal buffer to be passed to DPDK device
+	 * queue.
      * index is the index of the first valid packets awaiting to be sent, while
      * nr_pending is the number of packets. index + nr_pending may be greater
-     * than _iqueue_size but index should be wrapped-around. */
-    class InternalQueue {
+     * than _internal_tx_queue_size but index should be wrapped-around. */
+    class TXInternalQueue {
     public:
-        InternalQueue() : pkts(0), index(0), nr_pending(0) { }
+        TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
 
         // Array of DPDK Buffers
         struct rte_mbuf ** pkts;
@@ -148,14 +156,12 @@ private:
         Timer timeout;
     } __attribute__((aligned(64)));
 
-    void flush_internal_queue(InternalQueue &);
+    inline void set_flush_timer(TXInternalQueue &iqueue);
+    void flush_internal_tx_queue(TXInternalQueue &);
 
-    per_thread<InternalQueue> _iqueues;
+    per_thread<TXInternalQueue> _iqueues;
 
     unsigned _port_id;
-    unsigned int _iqueue_size;
-    bool _blocking;
-    int _burst_size;
     int _timeout;
     bool _congestion_warning_printed;
 };

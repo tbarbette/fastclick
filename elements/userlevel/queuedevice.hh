@@ -9,10 +9,13 @@
 #include <click/master.hh>
 #include <click/multithread.hh>
 #include <click/standard/scheduleinfo.hh>
+#include <click/args.hh>
 #if HAVE_NUMA
 #include <click/numa.hh>
 #endif
 
+class RXQueueDevice;
+class TXQueueDevice;
 class QueueDevice : public BatchElement {
 
 public:
@@ -21,28 +24,35 @@ public:
 
     static void static_initialize();
 
+private :
+    /* Those two are only used during configurations. On runtime, the final
+     * n_queues choice is used.*/
+    int _minqueues;
+    int _maxqueues;
+    friend RXQueueDevice;
+    friend TXQueueDevice;
 protected:
-    int nqueues;//Number of queues in the device
 
+	int _burst; //Max size of burst
     Vector<Task*> _tasks;
     Vector<atomic_uint32_t> _locks;
-
 #define NO_LOCK 2
+
     Bitvector usable_threads;
     int queue_per_threads;
     int queue_share;
     unsigned ndesc;
-    bool _numa;
     int _verbose;
-private :
+
     int _maxthreads;
-    int _minqueues;
-    int _maxqueues;
-    int _threadoffset;
+    int firstqueue;
+
+    // n_queues will be the final choice in [_minqueues, _maxqueues].
+    int n_queues;
 
     int thread_share;
 
-    Vector<int> _thread_to_queue;
+    Vector<int> _thread_to_firstqueue;
     Vector<int> _queue_to_thread;
 
     static int n_initialized; //Number of total elements configured
@@ -62,7 +72,6 @@ private :
     };
     per_thread<ThreadState> thread_state;
 
-protected:
 
     int _this_node; //Numa node index
 
@@ -150,7 +159,7 @@ protected:
     bool get_runnable_threads(Bitvector& bmk)
     {
     	if (noutputs()) { //RX
-    		for (int i = 0; i < nqueues; i++) {
+		for (int i = 0; i < n_queues; i++) {
     			for (int j = 0; j < queue_share; j++) {
     				bmk[thread_for_queue(i) - j] = 1;
     			}
@@ -164,16 +173,11 @@ protected:
     	}
     }
 
-    /*
-     * Configure a RX side of a queuedevice. Take cares of setting user max
-     *  threads, queues and offset and registering this rx device for later
-     *  sharing.
-     * numa should be set.
+    /**
+     * Common parsing for all kind of QueueDevice
      */
-    int configure_rx(int numa_node,unsigned int maxthreads, unsigned int minqueues, unsigned int maxqueues, unsigned int threadoffset, ErrorHandler *errh);
-    int configure_tx(unsigned int maxthreads,unsigned int minqueues, unsigned int maxqueues, ErrorHandler *errh);
-    int initialize_tx(ErrorHandler *errh);
-    int initialize_rx(ErrorHandler *errh);
+    Args& parse(Args &args);
+
 
     bool all_initialized() {
         return n_elements == n_initialized;
@@ -189,11 +193,11 @@ protected:
     }
 
     inline int queue_for_thread_begin(int tid) {
-        return _thread_to_queue[tid];
+        return _thread_to_firstqueue[tid];
     }
 
     inline int queue_for_thread_end(int tid) {
-        return _thread_to_queue[tid] + queue_per_threads - 1;
+        return _thread_to_firstqueue[tid] + queue_per_threads - 1;
     }
 
     inline int queue_for_thisthread_begin() {
@@ -205,7 +209,7 @@ protected:
     }
 
     inline int id_for_thread(int tid) {
-        return _thread_to_queue[tid] / queue_per_threads;
+        return (_thread_to_firstqueue[tid] - firstqueue) / queue_per_threads;
     }
 
     inline int id_for_thread() {
@@ -217,8 +221,8 @@ protected:
     }
 
     inline Task* task_for_thread(int tid) {
-            return _tasks[id_for_thread(tid)];
-        }
+        return _tasks[id_for_thread(tid)];
+    }
 
     inline int thread_for_queue(int queue) {
         return _queue_to_thread[queue];
@@ -227,6 +231,44 @@ protected:
     int thread_per_queues() {
         return queue_share;
     }
+};
+
+
+class RXQueueDevice : public QueueDevice {
+protected:
+	bool _promisc;
+	bool _set_rss_aggregate;
+	int _threadoffset;
+	bool _use_numa;
+
+    /**
+     * Common parsing for all RXQueueDevice
+     */
+    Args& parse(Args &args);
+
+    /*
+     * Configure a RX side of a queuedevice. Take cares of setting user max
+     *  threads, queues and offset and registering this rx device for later
+     *  sharing.
+     * numa should be set.
+     */
+    int configure_rx(int numa_node, int minqueues, int maxqueues, ErrorHandler *errh);
+    int initialize_rx(ErrorHandler *errh);
+
+};
+
+class TXQueueDevice : public QueueDevice {
+protected:
+	bool _blocking;
+	int _internal_tx_queue_size;
+
+    /**
+     * Common parsing for all RXQueueDevice
+     */
+    Args& parse(Args &args);
+
+    int configure_tx(int hardminqueues, int hardmaxqueues, ErrorHandler *errh);
+    int initialize_tx(ErrorHandler *errh);
 };
 
 CLICK_ENDDECLS

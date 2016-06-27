@@ -93,7 +93,7 @@ class RangeIPLookup : public IPRouteTable { public:
     int initialize(ErrorHandler *errh) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     void add_handlers() CLICK_COLD;
-    void push(int port, Packet* p);
+    void push_packet(int port, Packet* p);
 
     int add_route(const IPRoute&, bool, IPRoute*, ErrorHandler *);
     int remove_route(const IPRoute&, IPRoute*, ErrorHandler *);

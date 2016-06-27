@@ -2147,7 +2147,7 @@ if test $ac_have_linux_kernel = y; then
 fi
 
 dnl add 'netmap' if netmap support is available
-if test "x$use_netmap" = xyes; then
+if test "x$use_netmap" != xno; then
     provisions="$provisions netmap"
 fi
 

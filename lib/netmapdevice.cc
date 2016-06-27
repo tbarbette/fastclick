@@ -78,6 +78,14 @@ uint32_t NetmapBufQ::static_cleanup()
 	if (!netmap_buf_pools)
 		return 0;
 
+	#if CLICK_NETMAP_POOL_DEBUG
+	for (unsigned int i = 0; i < click_max_cpu_ids(); i++) {
+		if (!netmap_buf_pools[i]->check_list()) {
+			click_chatter("BUG : Netmap pool %d is invalid !",i);
+			return 0;
+		}
+	}
+	#endif
 	for (unsigned int i = 1; i < click_max_cpu_ids(); i++) {
 		if (netmap_buf_pools[i]) {
 			if (netmap_buf_pools[i]->_head)
@@ -87,8 +95,18 @@ uint32_t NetmapBufQ::static_cleanup()
 		}
 	}
 
+#if CLICK_NETMAP_POOL_DEBUG
+	if (!netmap_buf_pools[0]->check_list()) {
+		click_chatter("BUG : Netmap pool %d is invalid !",0);
+		return 0;
+	}
+#endif
+
 	while (global_buffer_list > 0) {
 		uint32_t idx=global_buffer_list;
+#if CLICK_NETMAP_POOL_DEBUG
+		assert(NetmapBufQ::find_count(idx) == NETMAP_PACKET_POOL_SIZE);
+#endif
 		global_buffer_list = BUFFER_NEXT_LIST(global_buffer_list);
 		netmap_buf_pools[0]->insert_all(idx, false);
 	}
@@ -117,6 +135,10 @@ void NetmapBufQ::global_insert_all(uint32_t idx, int count) {
 	//Cut packets in global pools
 	while (count >= NETMAP_PACKET_POOL_SIZE) {
 		int c = 0;
+#if CLICK_NETMAP_POOL_DEBUG
+		if (global_buffer_list != 0)
+			assert(NetmapBufQ::find_count(global_buffer_list) == NETMAP_PACKET_POOL_SIZE);
+#endif
 		BUFFER_NEXT_LIST(idx) = global_buffer_list;
 		global_buffer_list = idx;
 		uint32_t *p = 0;
@@ -127,6 +149,9 @@ void NetmapBufQ::global_insert_all(uint32_t idx, int count) {
 		}
 		*p = 0;
 		count -= NETMAP_PACKET_POOL_SIZE;
+#if CLICK_NETMAP_POOL_DEBUG
+		assert(find_count(global_buffer_list) == NETMAP_PACKET_POOL_SIZE);
+#endif
 	}
 
 	//Add remaining buffer to the local pool

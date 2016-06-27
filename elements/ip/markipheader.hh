@@ -1,6 +1,6 @@
 #ifndef CLICK_MARKIPHEADER_HH
 #define CLICK_MARKIPHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -19,21 +19,23 @@ CLICK_DECLS
  *
  * =a CheckIPHeader, CheckIPHeader2, StripIPHeader */
 
-class MarkIPHeader : public Element {
+class MarkIPHeader : public BatchElement {
 
   int _offset;
 
  public:
 
-  MarkIPHeader() CLICK_COLD;
+  MarkIPHeader () CLICK_COLD;
   ~MarkIPHeader() CLICK_COLD;
 
-  const char *class_name() const		{ return "MarkIPHeader"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+  const char *class_name() const { return "MarkIPHeader"; }
+  const char *port_count() const { return PORTS_1_1; }
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  Packet *simple_action(Packet *);
-
+  Packet      *simple_action      (Packet      *p);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *batch);
+#endif
 };
 
 CLICK_ENDDECLS

@@ -291,12 +291,25 @@ Bitvector::print() {
         click_chatter("%s",buf);
 }
 
+
 void
 Bitvector::set_range(int start, int length, bool value) {
 	assert(start + length < _max);
 	for (int i = start; i < start + length; i++) {
 		((*this)[i]) = value;
 	}
+}
+
+Bitvector Bitvector::from_mask(unsigned long mask) {
+	int vsize = sizeof(unsigned long) * 8;
+	Bitvector v(vsize);
+	int pow = 0;
+	while (pow < vsize) {
+		v[pow] = mask & 1;
+		mask >>= 1;
+		++pow;
+	}
+	return v;
 }
 
 CLICK_ENDDECLS

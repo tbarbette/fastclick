@@ -28,11 +28,12 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _port_id(0), _promisc(true), _burst_size(32), _set_rss_aggregate(0)
+    _port_id(0)
 {
 	#if HAVE_BATCH
 		in_batch_mode = BATCH_MODE_YES;
 	#endif
+	_burst = 32;
 }
 
 FromDPDKDevice::~FromDPDKDevice()
@@ -42,32 +43,33 @@ FromDPDKDevice::~FromDPDKDevice()
 int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	//Default parameters
-    int maxthreads = -1;
-    int threadoffset = -1;
-    int minqueues = 1;
-    int maxqueues = 128; //TODO Should be device dependent
     int numa_node = 0;
 
-    if (Args(conf, this, errh)
-        .read_mp("PORT", _port_id)
-        .read("PROMISC", _promisc)
-        .read("MAXTHREADS", maxthreads)
-        .read("THREADOFFSET", threadoffset)
-        .read("MINQUEUES",minqueues)
-        .read("MAXQUEUES",maxqueues)
-        .read("RSS_AGGREGATE", _set_rss_aggregate)
-        .read("BURST", _burst_size)
+    if (parse(Args(conf, this, errh)
+        .read_mp("PORT", _port_id))
         .read("NDESC", ndesc)
-		.read("NUMA", _numa)
         .complete() < 0)
         return -1;
 
-    if (_numa) {
+    if (_use_numa) {
         numa_node = DPDKDevice::get_port_numa_node(_port_id);
     }
 
     int r;
-    r = QueueDevice::configure_rx(numa_node,maxthreads,minqueues,maxqueues,threadoffset,errh);
+    if (n_queues == -1) {
+	if (firstqueue == -1) {
+		firstqueue = 0;
+		//With DPDK we'll take as many queues as available threads
+		 r = configure_rx(numa_node,1,128,errh);
+	} else {
+		//If a queue number is setted, user probably want only one queue
+		r = configure_rx(numa_node,1,1,errh);
+	}
+    } else {
+        if (firstqueue == -1)
+            firstqueue = 0;
+        r = configure_rx(numa_node,n_queues,n_queues,errh);
+    }
     if (r != 0) return r;
 
     return 0;
@@ -77,16 +79,19 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;
 
-    ret = QueueDevice::initialize_rx(errh);
+    ret = initialize_rx(errh);
     if (ret != 0) return ret;
 
-    for (int i = 0; i < nqueues; i++) {
+    for (int i = firstqueue; i < firstqueue + n_queues; i++) {
         ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }
 
-    ret = QueueDevice::initialize_tasks(true,errh);
+    ret = initialize_tasks(true,errh);
     if (ret != 0) return ret;
+
+    if (queue_share > 1)
+        return errh->error("Sharing queue between multiple threads is not yet supported by FromDPDKDevice. Raise the number using N_QUEUES of queues or limit the number of threads using MAXTHREADS");
 
     if (all_initialized()) {
         ret = DPDKDevice::initialize(errh);
@@ -109,14 +114,15 @@ void FromDPDKDevice::add_handlers()
 
 bool FromDPDKDevice::run_task(Task * t)
 {
-    struct rte_mbuf *pkts[_burst_size];
+    struct rte_mbuf *pkts[_burst];
     int ret = 0;
 
-    PacketBatch* head = NULL;
-	WritablePacket *last = NULL;
-
     for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
-        unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst_size);
+#if HAVE_BATCH
+	 PacketBatch* head = 0;
+     WritablePacket *last;
+#endif
+        unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
 #if CLICK_PACKET_USE_DPDK
             rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
@@ -136,24 +142,28 @@ bool FromDPDKDevice::run_task(Task * t)
             rte_pktmbuf_free(pkts[i]);
 #endif
             p->set_packet_type_anno(Packet::HOST);
-
             if (_set_rss_aggregate)
-#if RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
+#if RTE_VER_YEAR ||  RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
 #endif
+#if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);
             else
                 last->set_next(p);
             last = p;
-
+#else
+             output(0).push(p);
+#endif
         }
+#if HAVE_BATCH
         if (head) {
             head->make_tail(last,n);
             output_push_batch(0,head);
         }
+#endif
         if (n) {
             add_count(n);
             ret = 1;
@@ -167,6 +177,6 @@ bool FromDPDKDevice::run_task(Task * t)
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel dpdk)
+ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
 EXPORT_ELEMENT(FromDPDKDevice)
 ELEMENT_MT_SAFE(FromDPDKDevice)

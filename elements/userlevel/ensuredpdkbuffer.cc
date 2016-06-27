@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 
-EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false), _extra_headroom(0)
+EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false), _extra_headroom(0), _warn_count(0)
 {
 }
 
@@ -54,6 +54,8 @@ EnsureDPDKBuffer::smaction(Packet* p) {
 		struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
 		if (!mbuf) {
 			p->kill();
+			if (_warn_count++ < 5)
+				click_chatter("%s : No more DPDK Buffer ! Dropping packet.",name().c_str());
 			return 0;
 		}
 		WritablePacket* q = WritablePacket::make(

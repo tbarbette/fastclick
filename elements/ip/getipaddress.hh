@@ -1,6 +1,6 @@
 #ifndef CLICK_GETIPADDRESS_HH
 #define CLICK_GETIPADDRESS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ipaddress.hh>
 CLICK_DECLS
 
@@ -31,7 +31,7 @@ CLICK_DECLS
  */
 
 
-class GetIPAddress : public Element {
+class GetIPAddress : public BatchElement {
 
     enum {
 	offset_ip_src = -1,
@@ -51,8 +51,10 @@ class GetIPAddress : public Element {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  Packet *simple_action(Packet *);
-
+  Packet      *simple_action      (Packet *);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 };
 
 CLICK_ENDDECLS
