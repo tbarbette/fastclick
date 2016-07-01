@@ -19,9 +19,9 @@ public:
 
     int compareKeys(const void* first, const void* second)
     {
-        if(*(unsigned int*)first > *(unsigned int*)second)
+        if(*(uint32_t*)first > *(uint32_t*)second)
             return 1;
-        if(*(unsigned int*)first < *(unsigned int*)second)
+        if(*(uint32_t*)first < *(uint32_t*)second)
             return -1;
 
         return 0;
@@ -29,7 +29,7 @@ public:
 
     void printKey(const void* first)
     {
-        click_chatter("%u",*(unsigned int*)first);
+        click_chatter("%u", *(uint32_t*)first);
     }
 
     void printInfo(void* first)
@@ -49,7 +49,7 @@ public:
 
     void freeKey(void* key)
     {
-        poolKeys.releaseMemory((unsigned int*)key);
+        poolKeys.releaseMemory((uint32_t*)key);
     }
 
     void freeInfo(void* info)
@@ -57,7 +57,7 @@ public:
         poolInfos.releaseMemory((int*)info);
     }
 
-    unsigned int* allocateKey(void)
+    uint32_t* allocateKey(void)
     {
         return poolKeys.getMemory();
     }
@@ -69,7 +69,7 @@ public:
 
 private:
     MemoryPool<rb_red_blk_node> poolNodes;
-    MemoryPool<unsigned int> poolKeys;
+    MemoryPool<uint32_t> poolKeys;
     MemoryPool<int> poolInfos;
 };
 
@@ -81,23 +81,23 @@ class ByteStreamMaintainer
     public:
         ByteStreamMaintainer();
         ~ByteStreamMaintainer();
-        unsigned int mapAck(unsigned int position);
-        unsigned int mapSeq(unsigned int position);
+        uint32_t mapAck(uint32_t position);
+        uint32_t mapSeq(uint32_t position);
         int lastOffsetInAckTree();
         void printTrees();
 
     private:
-        void prune(unsigned int position);
-        void ackReceived(unsigned int position);
-        void insertInAckTree(unsigned int position, int offset);
-        void insertInSeqTree(unsigned int position, int offset);
-        void insertInTree(rb_red_blk_tree* tree, unsigned int position, int offset);
+        void prune(uint32_t position);
+        void ackReceived(uint32_t ackNumber);
+        void insertInAckTree(uint32_t position, int offset);
+        void insertInSeqTree(uint32_t position, int offset);
+        void insertInTree(rb_red_blk_tree* tree, uint32_t position, int offset);
 
         rb_red_blk_tree* treeAck;
         rb_red_blk_tree* treeSeq;
         RBTManager* rbtManager;
-        unsigned int lastAck;
-        unsigned int pruneCounter;
+        uint32_t lastAck;
+        uint32_t pruneCounter;
 };
 
 #endif

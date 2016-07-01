@@ -59,6 +59,20 @@ void TCPElement::setAckNumber(WritablePacket* packet, tcp_seq_t ack)
     tcph->th_ack = htonl(ack);
 }
 
+uint16_t TCPElement::getWindowSize(Packet *packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    return ntohs(tcph->th_win);
+}
+
+void TCPElement::setWindowSize(WritablePacket *packet, uint16_t winSize)
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    tcph->th_win = htons(winSize);
+}
+
 unsigned TCPElement::getPayloadLength(Packet* packet)
 {
     const click_ip *iph = packet->ip_header();
@@ -72,16 +86,19 @@ unsigned TCPElement::getPayloadLength(Packet* packet)
 }
 
 Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
-                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint8_t flags)
+                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags)
 {
-    struct click_ether *ether;
-    struct click_ip *ip;
-    struct click_tcp *tcp;
-    WritablePacket *packet = Packet::make(sizeof(struct click_ether) + sizeof(struct click_ip) + sizeof(struct click_tcp));
+    struct click_ether *ether; // Ethernet header
+    struct click_ip *ip;       // IP header
+    struct click_tcp *tcp;     // TCP header
 
-    if(packet == NULL)
-        return NULL;
+    // Build a new packet
+    WritablePacket *packet = Packet::make(sizeof(struct click_ether)
+        + sizeof(struct click_ip) + sizeof(struct click_tcp));
 
+    assert(packet != NULL);
+
+    // Clean the data of the packet
     memset(packet->data(), '\0', packet->length());
 
     ether = (struct click_ether*)packet->data();
@@ -89,35 +106,43 @@ Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
     tcp = (struct click_tcp*)(ip + 1);
     packet->set_ip_header(ip, sizeof(struct click_ip));
 
-    ether->ether_type = htons(ETHERTYPE_IP);
-    uint8_t etherDest[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    memcpy((void*)&(ether->ether_dhost), (void*)&etherDest, sizeof(etherDest));
+    // Set a blank ethernet header
+    ether->ether_type = htons(ETHERTYPE_IP); // Indicate it is an IP packet
+    uint8_t etherBlank[6] = {0x0};
+    memcpy((void*)&(ether->ether_dhost), (void*)&etherBlank, sizeof(etherBlank));
+    memcpy((void*)&(ether->ether_shost), (void*)&etherBlank, sizeof(etherBlank));
 
-    ip->ip_v = 4;
-    ip->ip_hl = 5;
-    ip->ip_tos = 0;
+    // Set the IP header
+    ip->ip_v = 4; // IPv4
+    ip->ip_hl = 5; // Set IP header length (no options and 5 is the minimum value)
+    ip->ip_tos = 0; // Set type of service to 0
+    // Set the current length of the packet (with empty TCP payload)
     ip->ip_len = htons(packet->length() - sizeof(struct click_ether));
-    ip->ip_id = htons(0);
-    ip->ip_off = htons(IP_DF);
-    ip->ip_ttl = 255;
-    ip->ip_p = IP_PROTO_TCP;
-    ip->ip_sum = 0;
+    ip->ip_id = htons(0);      // Set fragment id to 0
+    ip->ip_off = htons(IP_DF); // Indicate not to fragment
+    ip->ip_ttl = 255;          // Set the TTL to 255
+    ip->ip_p = IP_PROTO_TCP; // Indicate that it is a TCP packet
+    ip->ip_sum = 0; // Set the IP checksum to 0 (it will be computed afterwards)
+    // Set the IP addresses
     memcpy((void*)&(ip->ip_src), (void*)&saddr, sizeof(saddr));
     memcpy((void*)&(ip->ip_dst), (void*)&daddr, sizeof(daddr));
 
+    // Set the TCP ports
     memcpy((void*)&(tcp->th_sport), (void*)&sport, sizeof(sport));
     memcpy((void*)&(tcp->th_dport), (void*)&dport, sizeof(dport));
-    tcp->th_seq = htonl(seq);
-    tcp->th_ack = htonl(ack);
-    tcp->th_off = 5;
-    tcp->th_flags = flags;
-    tcp->th_win = htons(32120);
-    tcp->th_sum = htons(0);
-    tcp->th_urp = htons(0);
+    tcp->th_seq = htonl(seq); // Set the sequence number
+    tcp->th_ack = htonl(ack); // Set the ack number
+    tcp->th_off = 5; // Set the data offset
+    tcp->th_flags = flags; // Set the flags
+    tcp->th_win = htons(winSize); // Set the window size
+    tcp->th_sum = htons(0); // Set temporarily the checksum to 0
+    tcp->th_urp = htons(0); // Set urgent pointer to 0
 
+    // Pull the ethernet header
     packet->pull(14);
 
-    computeChecksum(packet);
+    computeChecksum(packet); // Finally compute the checksum
+    // Indicate that the packet has been modified
     setAnnotationModification(packet, true);
 
     return packet;

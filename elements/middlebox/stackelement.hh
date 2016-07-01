@@ -31,7 +31,7 @@ public:
 
 protected:
     friend class PathMerger;
-    
+
     void setAnnotationModification(Packet*, bool);
     bool getAnnotationModification(Packet*);
     void setAnnotationAcked(Packet* p, bool value);
@@ -48,7 +48,7 @@ protected:
     virtual void setPacketModified(struct fcb *fcb, WritablePacket* packet);
     virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual void insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
-    virtual void requestMoreBytes(struct fcb *fcb);
+    virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
     virtual void packetSent(struct fcb *fcb, Packet* packet);
 
     // Method used for the simulation of Middleclick's fcb management system

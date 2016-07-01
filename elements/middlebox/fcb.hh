@@ -3,6 +3,7 @@
 
 #include <clicknet/tcp.h>
 #include <click/hashtable.hh>
+#include <click/ipflowid.hh>
 #include <click/bytestreammaintainer.hh>
 #include <click/modificationlist.hh>
 #include <click/memorypool.hh>
@@ -17,6 +18,31 @@ struct fcb_tcp_common
 {
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
+
+    // Members used to be able to free memory for this structure when
+    // destroyed
+    IPFlowID flowID;
+    HashTable<IPFlowID, struct fcb_tcp_common*> *table;
+    MemoryPool<struct fcb_tcp_common>  *pool;
+
+    fcb_tcp_common(IPFlowID flowID, HashTable<IPFlowID,
+         struct fcb_tcp_common*> *table,
+         MemoryPool<struct fcb_tcp_common> *pool)
+    {
+        // Those variables will be used to free memory when the connection
+        // is closed
+        this->flowID = flowID;
+        this->table = table;
+        this->pool = pool;
+    }
+
+    ~fcb_tcp_common()
+    {
+        // Remove the corresponding entry in the hashtable
+        table->erase(flowID);
+        // Release memory for this structure
+        pool->releaseMemory(this);
+    }
 };
 
 struct fcb_tcpreorder
@@ -59,6 +85,7 @@ struct fcb_tcpin
     TCPClosingState::Value closingState;
     MemoryPool<struct ModificationList>* poolModificationLists;
     MemoryPool<struct ModificationNode>* poolModificationNodes;
+    uint32_t tcpOffset;
 
     fcb_tcpin() : modificationLists(NULL)
     {
@@ -103,12 +130,28 @@ struct fcb_pathmerger
 
 struct fcb
 {
-    struct fcb_tcp_common tcp_common;
+    struct fcb_tcp_common* tcp_common;
 
     struct fcb_tcpreorder tcpreorder;
     struct fcb_tcpin tcpin;
     struct fcb_httpin httpin;
     struct fcb_pathmerger pathmerger;
+
+    fcb()
+    {
+        tcp_common = NULL;
+    }
+
+    ~fcb()
+    {
+        // Because tcp_commin has been allocated manually by TCPIn
+        // we need, to free its memory manually
+        // To do so, we call the constructor that will
+        // put back its memory chunk in the right memory pool and remove
+        // the corresponding entry in the hashtable
+        if(tcp_common != NULL)
+            tcp_common->~fcb_tcp_common();
+    }
 };
 
 // Global array of the two FCBs corresponding to each direction of the

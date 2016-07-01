@@ -90,16 +90,12 @@ void PathMerger::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t p
         previousElem->insertBytes(fcb, packet, position, length);
 }
 
-void PathMerger::requestMoreBytes(struct fcb *fcb)
+void PathMerger::requestMorePackets(struct fcb *fcb, Packet *packet)
 {
-    // Only send this message on one of the path
-    // The message is intented to be received by TCPIn which is at the
-    // beginning of the stack of elements. Thus, it will receive the message
-    // no matter on which port we send it. However, if we send it on both
-    // ports, it will receive the message twice.
-    StackElement *previousElem = previousStackElements[0];
+    StackElement *previousElem = getElementForPacket(fcb, packet);
 
-    previousElem->requestMoreBytes(fcb);
+    if(previousElem != NULL)
+        previousElem->requestMorePackets(fcb, packet);
 }
 
 void PathMerger::packetSent(struct fcb *fcb, Packet* packet)

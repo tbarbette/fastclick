@@ -21,11 +21,13 @@ public:
     unsigned getPayloadLength(Packet*);
     void setSequenceNumber(WritablePacket*, tcp_seq_t);
     void setAckNumber(WritablePacket*, tcp_seq_t);
-    Packet* forgePacket(uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, uint8_t);
+    Packet* forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags);
     static const uint16_t getDestinationPort(Packet*);
     static const uint16_t getSourcePort(Packet*);
     static tcp_seq_t getSequenceNumber(Packet*);
     static tcp_seq_t getAckNumber(Packet*);
+    static uint16_t getWindowSize(Packet *packet);
+    static void setWindowSize(WritablePacket *packet, uint16_t winSize);
 
 protected:
     unsigned int flowDirection;

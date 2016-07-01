@@ -24,7 +24,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 
-    ByteStreamMaintainer &byteStreamMaintainer = fcb->tcp_common.maintainers[getFlowDirection()];
+    ByteStreamMaintainer &byteStreamMaintainer = fcb->tcp_common->maintainers[getFlowDirection()];
     bool hasModificationList = inElement->hasModificationList(fcb, packet);
     ModificationList *modList = NULL;
 
@@ -58,7 +58,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         if(hasModificationList)
         {
             // We know that the packet has been modified and its size has changed
-            modList->commit(fcb->tcp_common.maintainers[getFlowDirection()]);
+            modList->commit(fcb->tcp_common->maintainers[getFlowDirection()]);
 
             // TODO: Rework that part
             // Check if the full packet content has been removed
@@ -69,16 +69,14 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                 uint16_t sport = getDestinationPort(packet);
                 uint16_t dport = getSourcePort(packet);
                 tcp_seq_t seq = getAckNumber(packet);
+                uint8_t winSize = getWindowSize(packet);
                 tcp_seq_t ack = prevSeq + getPayloadLength(packet);
 
                 // The packet is now empty, we discard it and send an ACK directly to the source
-                click_chatter("Empty packet. I send an ACK! (%u - %u - %d)", saddr, daddr, offsetModification);
+                click_chatter("Empty packet. Sending an ACK! (%u - %u - %d)", saddr, daddr, offsetModification);
 
-                Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, TH_ACK);
+                Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, TH_ACK);
                 packet->kill();
-
-                if(forged == NULL)
-                    click_chatter("Unable to forge packet!");
 
                 // Send it
                 inElement->getReturnElement()->getOutElement()->push(0, forged);

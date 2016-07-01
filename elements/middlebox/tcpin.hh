@@ -1,6 +1,7 @@
 #ifndef MIDDLEBOX_TCPIN_HH
 #define MIDDLEBOX_TCPIN_HH
 #include <click/element.hh>
+#include <click/ipflowid.hh>
 #include <click/hashtable.hh>
 #include <click/memorypool.hh>
 #include <click/modificationlist.hh>
@@ -10,6 +11,7 @@
 
 #define MODIFICATIONLISTS_POOL_SIZE 100
 #define MODIFICATIONNODES_POOL_SIZE 200
+#define TCPCOMMON_POOL_SIZE 50
 
 CLICK_DECLS
 
@@ -31,13 +33,15 @@ public:
     ModificationList* getModificationList(struct fcb*, WritablePacket* packet);
     bool hasModificationList(struct fcb* fcb, Packet* packet);
 
+    struct fcb_tcp_common* getTCPCommon(IPFlowID flowID);
+
 protected:
     virtual Packet* processPacket(struct fcb*, Packet*);
 
     virtual void setPacketModified(struct fcb*, WritablePacket*);
     virtual void removeBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual void insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
-    virtual void requestMoreBytes(struct fcb*);
+    virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
 
     // Method used for the simulation of Middleclick's fcb management system
     // Should be removed when integrated to Middleclick
@@ -48,10 +52,17 @@ protected:
 private:
     void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool);
     void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool, bool);
+    bool assignTCPCommon(struct fcb *fcb, Packet *packet);
 
     // TODO Will be thread local as each TCPIn is managed by a different thread
     MemoryPool<struct ModificationNode> poolModificationNodes;
     MemoryPool<struct ModificationList> poolModificationLists;
+
+
+    // Lock when access these
+    HashTable<IPFlowID, struct fcb_tcp_common*> tableFcbTcpCommon;
+    MemoryPool<struct fcb_tcp_common> poolFcbTcpCommon;
+
     TCPOut* outElement;
     TCPIn* returnElement;
 };

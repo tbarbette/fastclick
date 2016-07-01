@@ -166,13 +166,13 @@ void StackElement::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t
     previousStackElement->insertBytes(fcb, packet, position, length);
 }
 
-void StackElement::requestMoreBytes(struct fcb *fcb)
+void StackElement::requestMorePackets(struct fcb *fcb, Packet *packet)
 {
-    // Call the "requestMoreBytes" method on every element in the stack
+    // Call the "requestMorePackets" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->requestMoreBytes(fcb);
+    previousStackElement->requestMorePackets(fcb, packet);
 }
 
 bool StackElement::isStackElement(Element* element)

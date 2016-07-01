@@ -9,7 +9,9 @@ CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
     poolModificationNodes(MODIFICATIONNODES_POOL_SIZE),
-    poolModificationLists(MODIFICATIONLISTS_POOL_SIZE)
+    poolModificationLists(MODIFICATIONLISTS_POOL_SIZE),
+    poolFcbTcpCommon(TCPCOMMON_POOL_SIZE),
+    tableFcbTcpCommon(NULL)
 {
 }
 
@@ -85,6 +87,26 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     if(fcb->tcpin.poolModificationLists == NULL)
         fcb->tcpin.poolModificationLists = &poolModificationLists;
 
+    // Assign the tcp_common structure if not already done
+    if(fcb->tcp_common == NULL)
+    {
+        if(!assignTCPCommon(fcb, p))
+        {
+            // The allocation failed, meaning that the packet is not a SYN
+            // packet. This is not supposed to happen and it means that
+            // the first two packets of the connection are not SYN packets
+            click_chatter("Warning: Trying to assign a common tcp memory area"
+                " for a non-SYN packet");
+            p->kill();
+
+            return NULL;
+        }
+    }
+    else
+    {
+        // TODO we could check here that the packet is not a SYN packet
+    }
+
     WritablePacket *packet = p->uniqueify();
 
     const click_tcp *tcph = packet->tcp_header();
@@ -93,10 +115,12 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     unsigned tcph_len = tcph->th_off << 2;
     uint16_t offset = (uint16_t)(packet->transport_header() + tcph_len - packet->data());
     setContentOffset(packet, offset);
+    fcb->tcpin.tcpOffset = offset;
 
     // Update the ack number according to the bytestreammaintainer of the other direction
     tcp_seq_t ackNumber = getAckNumber(packet);
-    tcp_seq_t newAckNumber = fcb->tcp_common.maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
+    tcp_seq_t newAckNumber = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
+    // TODO fcb->tcp_common.maintainers[getOppositeFlowDirection()].ackReceived();
 
     if(ackNumber != newAckNumber)
     {
@@ -133,9 +157,9 @@ void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uin
 {
     // TODO: ungraceful part (RST)
 
-    // Initiator indicates which side of the connection closes it (us or the other side)
+    // "initiator" indicates which side of the connection closes it (us (true) or the other side (false))
 
-    Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, TH_FIN);
+    Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, 32120, TH_FIN);
     push(0, packet);
     fcb->tcpin.closingState = TCPClosingState::FIN_WAIT;
 
@@ -177,7 +201,8 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
-    list->addModification(seqNumber + position, -((int)length));
+    uint32_t tcpOffset = fcb->tcpin.tcpOffset; // TO REPLACE
+    list->addModification(seqNumber + position - tcpOffset, -((int)length));
 
     unsigned char *source = packet->data();
     uint32_t bytesAfter = packet->length() - position;
@@ -195,26 +220,27 @@ void TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
-    getModificationList(fcb, packet)->addModification(seqNumber + position, (int)length);
+    uint32_t tcpOffset = fcb->tcpin.tcpOffset;
+    getModificationList(fcb, packet)->addModification(seqNumber + position - tcpOffset, (int)length);
 
     unsigned char *source = packet->data();
     uint32_t bytesAfter = packet->length() + position;
 
     packet = packet->put(length);
     assert(packet != NULL);
-    
+
     memmove(&source[position + length], &source[position], bytesAfter);
 
     // Continue in the stack function
     StackElement::insertBytes(fcb, packet, position, length);
 }
 
-void TCPIn::requestMoreBytes(struct fcb *fcb)
+void TCPIn::requestMorePackets(struct fcb *fcb, Packet *packet)
 {
     //TODO
 
     // Continue in the stack function
-    StackElement::requestMoreBytes(fcb);
+    StackElement::requestMorePackets(fcb, packet);
 }
 
 void TCPIn::setPacketModified(struct fcb *fcb, WritablePacket* packet)
@@ -231,6 +257,54 @@ unsigned int TCPIn::determineFlowDirection()
 {
     return getFlowDirection();
 }
+
+bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+    uint8_t flags = tcph->th_flags;
+    const click_ip *iph = packet->ip_header();
+
+    // Check if we are in the first two steps of the three-way handshake
+    // (SYN packet)
+    if(!(flags & TH_SYN))
+        return false;
+
+    // Check if we are the side initiating the connection or not
+    // (if ACK flag, we are not the initiator)
+    if(flags & TH_ACK)
+    {
+        // Getting the flow ID for the opposite side of the connection
+        IPFlowID flowID(iph->ip_dst, tcph->th_dport, iph->ip_src, tcph->th_sport);
+
+        // Get the struct allocated by the initiator
+        fcb->tcp_common = returnElement->getTCPCommon(flowID);
+    }
+    else
+    {
+        IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
+        // We are the initiator, we need to allocate memory
+        struct fcb_tcp_common *allocated = poolFcbTcpCommon.getMemory();
+        // Call the constructor with some parameters that will be used
+        // to free the memory of the structure when not needed anymore
+        allocated = new(allocated) struct fcb_tcp_common(flowID, &tableFcbTcpCommon, &poolFcbTcpCommon);
+
+        // Add an entry if the hashtable
+        tableFcbTcpCommon.set(flowID, allocated);
+
+        // Set the pointer in the structure
+        fcb->tcp_common = allocated;
+    }
+
+    return true;
+}
+
+
+struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
+{
+    return tableFcbTcpCommon.get(flowID);
+}
+
+
 
 TCPIn::~TCPIn()
 {

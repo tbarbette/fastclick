@@ -14,11 +14,11 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     pruneCounter = 0;
 }
 
-unsigned int ByteStreamMaintainer::mapAck(unsigned int position)
+uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 {
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &position);
     rb_red_blk_node* succ = treeAck->nil;
-    unsigned int newPosition = position;
+    uint32_t newPosition = position;
 
     if(node != treeAck->nil)
     {
@@ -37,10 +37,10 @@ unsigned int ByteStreamMaintainer::mapAck(unsigned int position)
     // obtained via the successor
     if(succ != treeAck->nil)
     {
-        unsigned int succPosition = *((unsigned int*)succ->key);
+        uint32_t succPosition = *((uint32_t*)succ->key);
         int succOffset = *((int*)succ->info);
 
-        unsigned int succBound = 0;
+        uint32_t succBound = 0;
 
         if(succOffset < 0 && -(succOffset) > succPosition)
             succBound = 0;
@@ -57,11 +57,11 @@ unsigned int ByteStreamMaintainer::mapAck(unsigned int position)
     return newPosition;
 }
 
-unsigned int ByteStreamMaintainer::mapSeq(unsigned int position)
+uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
 {
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeSeq, &position);
     rb_red_blk_node* pred = treeSeq->nil;
-    unsigned int newPosition = position;
+    uint32_t newPosition = position;
 
     if(node != treeSeq->nil)
     {
@@ -81,24 +81,21 @@ unsigned int ByteStreamMaintainer::mapSeq(unsigned int position)
 
     // Check that the computed value is at least equal to the lowest value
     // obtained via the predecessor
-    unsigned int predPosition = 0;
+    uint32_t predPosition = 0;
     int predOffset = 0;
 
     if(pred != treeSeq->nil)
     {
-        predPosition = *((unsigned int*)pred->key);
+        predPosition = *((uint32_t*)pred->key);
         predOffset = *((int*)pred->info);
     }
 
-    unsigned int predBound = 0;
+    uint32_t predBound = 0;
 
     if(predOffset < 0 && -(predOffset) > predPosition)
         predBound = predPosition;
     else
         predBound = predPosition + predOffset;
-
-    if(predBound < predPosition)
-        predBound = predPosition;
 
     if(newPosition < predBound)
         newPosition = predBound;
@@ -115,17 +112,17 @@ void ByteStreamMaintainer::printTrees()
     RBTreePrint(treeSeq);
 }
 
-void ByteStreamMaintainer::prune(unsigned int position)
+void ByteStreamMaintainer::prune(uint32_t position)
 {
     // Remove every element in the tree with a key < position
     RBPrune(treeAck, &position);
 
     // Map the given position to the seq tree and prune it
-    unsigned int positionSeq = mapAck(position);
+    uint32_t positionSeq = mapAck(position);
     RBPrune(treeSeq, &positionSeq);
 }
 
-void ByteStreamMaintainer::ackReceived(unsigned int ackNumber)
+void ByteStreamMaintainer::ackReceived(uint32_t ackNumber)
 {
     pruneCounter++;
 
@@ -140,23 +137,23 @@ void ByteStreamMaintainer::ackReceived(unsigned int ackNumber)
     }
 }
 
-void ByteStreamMaintainer::insertInAckTree(unsigned int position, int offset)
+void ByteStreamMaintainer::insertInAckTree(uint32_t position, int offset)
 {
     insertInTree(treeAck, position, offset);
 }
 
-void ByteStreamMaintainer::insertInSeqTree(unsigned int position, int offset)
+void ByteStreamMaintainer::insertInSeqTree(uint32_t position, int offset)
 {
     insertInTree(treeSeq, position, offset);
 }
 
-void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, unsigned int position, int offset)
+void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position, int offset)
 {
     rb_red_blk_node* currentNode = RBExactQuery(tree, &position);
     if(currentNode == tree->nil || currentNode == NULL)
     {
         // Node did not already exist, insert
-        unsigned int *newKey = ((RBTMemoryPoolManager*)tree->manager)->allocateKey();
+        uint32_t *newKey = ((RBTMemoryPoolManager*)tree->manager)->allocateKey();
         *newKey = position;
         int *newInfo = ((RBTMemoryPoolManager*)tree->manager)->allocateInfo();
         *newInfo = offset;
