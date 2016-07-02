@@ -40,7 +40,7 @@ protected:
 
     virtual void setPacketModified(struct fcb*, WritablePacket*);
     virtual void removeBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
-    virtual void insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
+    virtual WritablePacket* insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
 
     // Method used for the simulation of Middleclick's fcb management system
@@ -53,6 +53,8 @@ private:
     void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool);
     void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool, bool);
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
+    void ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped);
+    Packet* checkClosingConnection(struct fcb *fcb, Packet* packet);
 
     // TODO Will be thread local as each TCPIn is managed by a different thread
     MemoryPool<struct ModificationNode> poolModificationNodes;

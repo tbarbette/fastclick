@@ -18,9 +18,6 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    unsigned getPayloadLength(Packet*);
-    void setSequenceNumber(WritablePacket*, tcp_seq_t);
-    void setAckNumber(WritablePacket*, tcp_seq_t);
     Packet* forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags);
     static const uint16_t getDestinationPort(Packet*);
     static const uint16_t getSourcePort(Packet*);
@@ -28,6 +25,12 @@ public:
     static tcp_seq_t getAckNumber(Packet*);
     static uint16_t getWindowSize(Packet *packet);
     static void setWindowSize(WritablePacket *packet, uint16_t winSize);
+    static bool isFinOrSyn(Packet* packet);
+    static bool isFin(Packet* packet);
+    static unsigned getPayloadLength(Packet*);
+    static void setSequenceNumber(WritablePacket*, tcp_seq_t);
+    static void setAckNumber(WritablePacket*, tcp_seq_t);
+    static bool isJustAnAck(Packet* packet);
 
 protected:
     unsigned int flowDirection;

@@ -84,11 +84,14 @@ class ByteStreamMaintainer
         uint32_t mapAck(uint32_t position);
         uint32_t mapSeq(uint32_t position);
         int lastOffsetInAckTree();
+        void setLastAck(uint32_t ackNumber);
+        uint32_t getLastAck();
+        void ackReceived(uint32_t ackNumber);
+
         void printTrees();
 
     private:
         void prune(uint32_t position);
-        void ackReceived(uint32_t ackNumber);
         void insertInAckTree(uint32_t position, int offset);
         void insertInSeqTree(uint32_t position, int offset);
         void insertInTree(rb_red_blk_tree* tree, uint32_t position, int offset);

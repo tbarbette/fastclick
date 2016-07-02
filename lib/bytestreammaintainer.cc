@@ -10,7 +10,7 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     rbtManager = new RBTMemoryPoolManager();
     treeAck = RBTreeCreate(rbtManager); // Create the RBT for ACK
     treeSeq = RBTreeCreate(rbtManager); // Create the RBT for Seq
-    lastAck = 0;
+    lastAck= 0;
     pruneCounter = 0;
 }
 
@@ -122,19 +122,28 @@ void ByteStreamMaintainer::prune(uint32_t position)
     RBPrune(treeSeq, &positionSeq);
 }
 
+void ByteStreamMaintainer::setLastAck(uint32_t ackNumber)
+{
+    if(ackNumber > lastAck)
+        lastAck = ackNumber;
+}
+
 void ByteStreamMaintainer::ackReceived(uint32_t ackNumber)
 {
     pruneCounter++;
 
-    if(ackNumber > lastAck)
-        lastAck = ackNumber;
-
     // Avoid pruning at every ack
     if(pruneCounter >= BS_PRUNE_THRESHOLD)
     {
+        click_chatter("Tree pruned");
         pruneCounter = 0;
-        prune(lastAck);
+        prune(ackNumber);
     }
+}
+
+uint32_t ByteStreamMaintainer::getLastAck()
+{
+    return lastAck;
 }
 
 void ByteStreamMaintainer::insertInAckTree(uint32_t position, int offset)

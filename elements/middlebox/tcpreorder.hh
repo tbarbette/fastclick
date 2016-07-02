@@ -39,7 +39,6 @@ private:
     tcp_seq_t getSequenceNumber(Packet* packet);
     unsigned getPacketLength(Packet* packet);
     void checkFirstPacket(struct fcb *fcb, Packet* packet);
-    bool isFinOrSyn(Packet* packet);
     void flushList(struct fcb *fcb);
     void checkRetransmission(struct fcb *fcb, Packet* packet);
 

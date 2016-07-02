@@ -177,6 +177,46 @@ unsigned int TCPElement::getOppositeFlowDirection()
     return (1 - flowDirection);
 }
 
+bool TCPElement::isFinOrSyn(Packet* packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+    uint8_t flags = tcph->th_flags;
+
+    // Check if the packet is a SYN or FIN packet
+    if((flags & TH_SYN) || (flags & TH_FIN))
+        return true;
+    else
+        return false;
+}
+
+bool TCPElement::isFin(Packet* packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+    uint8_t flags = tcph->th_flags;
+
+    // Check if the packet is a FIN packet
+    if(flags & TH_FIN)
+        return true;
+    else
+        return false;
+}
+
+bool TCPElement::isJustAnAck(Packet* packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+    uint8_t flags = tcph->th_flags;
+
+    // If we have a payload, we are more than just a ACK
+    if(getPayloadLength(packet) > 0)
+        return false;
+
+    //  If we have other flags, we are more than just an ACK
+    if(flags == TH_ACK)
+        return true;
+    else
+        return false;
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(TCPElement)
 //ELEMENT_MT_SAFE(TCPElement)

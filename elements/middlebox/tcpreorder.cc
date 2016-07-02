@@ -5,6 +5,7 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include "tcpreorder.hh"
+#include "tcpelement.hh"
 
 CLICK_DECLS
 
@@ -98,7 +99,7 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
 
         // Compute sequence number of the next packet
         fcb->tcpreorder.expectedPacketSeq = currentSeq + getPacketLength(packetNode->packet);
-        if(isFinOrSyn(packetNode->packet))
+        if(TCPElement::isFinOrSyn(packetNode->packet))
             (fcb->tcpreorder.expectedPacketSeq)++;
 
         // Send packet
@@ -171,18 +172,6 @@ void TCPReorder::checkFirstPacket(struct fcb* fcb, Packet* packet)
         // (SYN should always be the first packet)
         flushList(fcb);
     }
-}
-
-bool TCPReorder::isFinOrSyn(Packet* packet)
-{
-    const click_tcp *tcph = packet->tcp_header();
-    uint8_t flags = tcph->th_flags;
-
-    // Check if the packet is a SYN packet
-    if((flags & TH_SYN) || (flags & TH_FIN))
-        return true;
-    else
-        return false;
 }
 
 CLICK_ENDDECLS

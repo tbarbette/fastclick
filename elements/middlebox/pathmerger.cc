@@ -82,12 +82,14 @@ void PathMerger::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t p
         previousElem->removeBytes(fcb, packet, position, length);
 }
 
-void PathMerger::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+WritablePacket* PathMerger::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);
 
     if(previousElem != NULL)
-        previousElem->insertBytes(fcb, packet, position, length);
+        return previousElem->insertBytes(fcb, packet, position, length);
+    else
+        return NULL;
 }
 
 void PathMerger::requestMorePackets(struct fcb *fcb, Packet *packet)

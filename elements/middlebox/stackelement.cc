@@ -157,13 +157,13 @@ void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t
     previousStackElement->removeBytes(fcb, packet, position, length);
 }
 
-void StackElement::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+WritablePacket* StackElement::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
     // Call the "insertBytes" method on every element in the stack
     if(previousStackElement == NULL)
-        return;
+        return NULL;
 
-    previousStackElement->insertBytes(fcb, packet, position, length);
+    return previousStackElement->insertBytes(fcb, packet, position, length);
 }
 
 void StackElement::requestMorePackets(struct fcb *fcb, Packet *packet)

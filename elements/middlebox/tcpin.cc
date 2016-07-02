@@ -4,6 +4,7 @@
 #include <click/error.hh>
 #include <clicknet/tcp.h>
 #include "tcpin.hh"
+#include "ipelement.hh"
 
 CLICK_DECLS
 
@@ -117,10 +118,31 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     setContentOffset(packet, offset);
     fcb->tcpin.tcpOffset = offset;
 
-    // Update the ack number according to the bytestreammaintainer of the other direction
     tcp_seq_t ackNumber = getAckNumber(packet);
+
+    // Update the ack number according to the bytestreammaintainer of the other direction
     tcp_seq_t newAckNumber = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
-    // TODO fcb->tcp_common.maintainers[getOppositeFlowDirection()].ackReceived();
+
+    // Check if the current packet is just an ACK without more information
+    if(isJustAnAck(packet))
+    {
+        // If it is the case, check that the ACK value is greater than what
+        // we have already sent earlier
+        if(newAckNumber < fcb->tcp_common->maintainers[getFlowDirection()].getLastAck())
+        {
+            // If this is not the case, the packet does not give any information
+            // We can drop it
+            click_chatter("Received an ACK for a sequence number already ACKed. Dropping it.");
+            packet->kill();
+            return NULL;
+        }
+    }
+
+    // Prune the ByteSreamMaintainer
+    // The value to send must be the ACK value BEFORE mapping
+    fcb->tcp_common->maintainers[getOppositeFlowDirection()].ackReceived(ackNumber);
+    // Prune the RetransmissionManager
+    // TODO indicate to RetransmissionManager (opposite) that we received an ACK so it can prune its tree
 
     if(ackNumber != newAckNumber)
     {
@@ -155,14 +177,24 @@ void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uin
 void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uint16_t sport,
                              uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful, bool initiator)
 {
-    // TODO: ungraceful part (RST)
+    if(graceful)
+    {
+        Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, 32120, TH_FIN);
+        outElement->push(0, packet);
+        fcb->tcpin.closingState = TCPClosingState::FIN_WAIT;
 
+        click_chatter("Sending FIN on flow %u", getFlowDirection());
+    }
+    else
+    {
+        Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, 32120, TH_RST);
+        outElement->push(0, packet);
+        fcb->tcpin.closingState = TCPClosingState::CLOSED;
+
+        click_chatter("Sending RST on flow %u", getFlowDirection());
+    }
     // "initiator" indicates which side of the connection closes it (us (true) or the other side (false))
-
-    Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, 32120, TH_FIN);
-    push(0, packet);
-    fcb->tcpin.closingState = TCPClosingState::FIN_WAIT;
-
+    // If we are the initiator, tell the other side of the connection to do so as well
     if(initiator)
         returnElement->closeConnection(fcb, daddr, saddr, dport, sport, ack, seq, graceful, false);
 }
@@ -196,12 +228,12 @@ bool TCPIn::hasModificationList(struct fcb *fcb, Packet* packet)
 
 void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
-    click_chatter("Removing %u bytes", length);
+    //click_chatter("Removing %u bytes", length);
     ModificationList* list = getModificationList(fcb, packet);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
-    uint32_t tcpOffset = fcb->tcpin.tcpOffset; // TO REPLACE
+    uint32_t tcpOffset = fcb->tcpin.tcpOffset;
     list->addModification(seqNumber + position - tcpOffset, -((int)length));
 
     unsigned char *source = packet->data();
@@ -214,7 +246,7 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     StackElement::removeBytes(fcb, packet, position, length);
 }
 
-void TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
     click_chatter("Adding %u bytes", length);
 
@@ -223,24 +255,51 @@ void TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     uint32_t tcpOffset = fcb->tcpin.tcpOffset;
     getModificationList(fcb, packet)->addModification(seqNumber + position - tcpOffset, (int)length);
 
-    unsigned char *source = packet->data();
-    uint32_t bytesAfter = packet->length() + position;
+    uint32_t bytesAfter = packet->length() - position;
 
-    packet = packet->put(length);
-    assert(packet != NULL);
+    WritablePacket *newPacket = packet->put(length);
+    assert(newPacket != NULL);
+    unsigned char *source = newPacket->data();
 
     memmove(&source[position + length], &source[position], bytesAfter);
 
-    // Continue in the stack function
-    StackElement::insertBytes(fcb, packet, position, length);
+    return newPacket;
 }
 
 void TCPIn::requestMorePackets(struct fcb *fcb, Packet *packet)
 {
-    //TODO
+    ackPacket(fcb, packet, true);
 
     // Continue in the stack function
     StackElement::requestMorePackets(fcb, packet);
+}
+
+void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped)
+{
+    // Get the information needed to ack the given packet
+    uint32_t saddr = IPElement::getDestinationAddress(packet);
+    uint32_t daddr = IPElement::getSourceAddress(packet);
+    uint16_t sport = getDestinationPort(packet);
+    uint16_t dport = getSourcePort(packet);
+    // The SEQ value is the initial ACK value in the packet sent
+    // by the source.
+    tcp_seq_t seq = getAckNumber(packet);
+    // If the ACK has been mapped, we map it back to get its initial value
+    if(ackMapped)
+        seq = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(seq);
+    uint16_t winSize = getWindowSize(packet);
+    // The ACK is the sequence number sent by the source
+    // to which we add the size of the payload to acknowledge it
+    tcp_seq_t ack = getSequenceNumber(packet) + getPayloadLength(packet);
+
+    if(isFinOrSyn(packet))
+        ack++;
+
+    // Craft and send the ack
+    outElement->sendAck(saddr, daddr, sport, dport, seq, ack, winSize);
+
+    // Update the number of the last ack sent for the other side
+    fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAck(ack);
 }
 
 void TCPIn::setPacketModified(struct fcb *fcb, WritablePacket* packet)
@@ -256,6 +315,32 @@ void TCPIn::setPacketModified(struct fcb *fcb, WritablePacket* packet)
 unsigned int TCPIn::determineFlowDirection()
 {
     return getFlowDirection();
+}
+
+Packet* TCPIn::checkClosingConnection(struct fcb *fcb, Packet* packet)
+{
+    // If the connection is not being closed, we simply return the packet
+    if(fcb->tcpin.closingState == TCPClosingState::OPEN)
+        return packet;
+
+    // If the connection is closed, discard any incoming packet
+    if(fcb->tcpin.closingState == TCPClosingState::CLOSED)
+    {
+        packet->kill();
+        return NULL;
+    }
+
+    // We have sent a FIN to the source
+    if(fcb->tcpin.closingState == TCPClosingState::FIN_WAIT)
+    {
+        packet->kill();
+    }
+
+    if(isFin(packet))
+    {
+        fcb->tcpin.closingState = TCPClosingState::CLOSED;
+        //sendAck(packet);
+    }
 }
 
 bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
