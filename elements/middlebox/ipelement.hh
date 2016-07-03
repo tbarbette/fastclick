@@ -21,9 +21,9 @@ public:
     static void setPacketTotalLength(WritablePacket*, unsigned);
     static const uint32_t getDestinationAddress(Packet*);
     static const uint32_t getSourceAddress(Packet*);
+    static void computeChecksum(WritablePacket*);
 
 protected:
-    void computeChecksum(WritablePacket*);
 };
 
 CLICK_ENDDECLS

@@ -25,17 +25,20 @@ public:
     static tcp_seq_t getAckNumber(Packet*);
     static uint16_t getWindowSize(Packet *packet);
     static void setWindowSize(WritablePacket *packet, uint16_t winSize);
-    static bool isFinOrSyn(Packet* packet);
+    static bool isSyn(Packet* packet);
     static bool isFin(Packet* packet);
+    static bool isRst(Packet* packet);
+    static bool isAck(Packet* packet);
+    static bool checkFlag(Packet *packet, uint8_t flag);
     static unsigned getPayloadLength(Packet*);
     static void setSequenceNumber(WritablePacket*, tcp_seq_t);
     static void setAckNumber(WritablePacket*, tcp_seq_t);
     static bool isJustAnAck(Packet* packet);
+    static void computeChecksum(WritablePacket*);
 
 protected:
     unsigned int flowDirection;
 
-    void computeChecksum(WritablePacket*);
     void setFlowDirection(unsigned int flowDirection);
     unsigned int getFlowDirection();
     unsigned int getOppositeFlowDirection();

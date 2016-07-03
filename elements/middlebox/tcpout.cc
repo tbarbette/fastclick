@@ -24,8 +24,8 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 
-    ByteStreamMaintainer &byteStreamMaintainer = fcb->tcp_common->maintainers[getFlowDirection()];
     bool hasModificationList = inElement->hasModificationList(fcb, packet);
+    ByteStreamMaintainer &byteStreamMaintainer = fcb->tcp_common->maintainers[getFlowDirection()];
     ModificationList *modList = NULL;
 
     if(hasModificationList)
@@ -43,6 +43,9 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     {
         click_chatter("Sequence number %u modified to %u in flow %u", prevSeq, newSeq, flowDirection);
         setSequenceNumber(packet, newSeq);
+        // Update the last sequence number seen
+        // This number is used when crafting ACKs
+        byteStreamMaintainer.setLastSeq(newSeq);
         seqModified = true;
     }
 
@@ -66,7 +69,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         uint16_t initialLength = IPElement::packetTotalLength(packet);
         uint16_t currentLength = (uint16_t)packet->length() - IPElement::getIPHeaderOffset(packet);
         int offsetModification = -(initialLength - currentLength);
-        uint32_t prevPayloadSize = getPayloadLength(packet) - offsetModification;
+        uint32_t prevPayloadSize = getPayloadLength(packet);
 
         // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo hdr)
         IPElement::setPacketTotalLength(packet, initialLength + offsetModification);
@@ -96,14 +99,11 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                 // to which we add the old size of the payload to acknowledge it
                 tcp_seq_t ack = prevSeq + prevPayloadSize;
 
-                if(isFinOrSyn(packet))
+                if(isFin(packet) || isSyn(packet))
                     ack++;
 
                 // Craft and send the ack
-                sendAck(saddr, daddr, sport, dport, seq, ack, winSize);
-
-                // Update the number of the last ack sent for the other side
-                fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAck(ack);
+                sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack, winSize);
 
                 // Even if the packet is empty it can still contain relevant
                 // information (significant ACK value or another flag)
@@ -127,10 +127,16 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         computeChecksum(packet);
     }
 
+    // Notify the stack function that this packet has been sent
+    packetSent(fcb, packet);
+
+    if(isFin(packet) || isRst(packet))
+        fcb->tcpout.closingState = TCPClosingState::CLOSED;
+
     return packet;
 }
 
-void TCPOut::sendAck(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize)
+void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize)
 {
     if(noutputs() < 2)
     {
@@ -138,14 +144,26 @@ void TCPOut::sendAck(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dp
         return;
     }
 
+    // Check if the ACK does not bring any additional information
+    if(ack <= maintainer.getLastAck())
+        return;
+
+    // Update the number of the last ack sent for the other side
+    maintainer.setLastAck(ack);
+
+    // Ensure that the sequence number of the packet is not below
+    // a sequence number sent before by the other side
+    if(seq < maintainer.getLastSeq())
+        seq = maintainer.getLastSeq();
+
     // The packet is now empty, we discard it and send an ACK directly to the source
-    click_chatter("Sending an ACK! (%u -> %u : %u)", saddr, daddr, ack);
+    click_chatter("Sending an ACK! (%u)", ack);
 
     // Craft the packet
     Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, TH_ACK);
 
     //Send it on the second output
-    push(1, forged);
+    output(1).push(forged);
 }
 
 void TCPOut::setInElement(TCPIn* inElement)
@@ -154,5 +172,7 @@ void TCPOut::setInElement(TCPIn* inElement)
 }
 
 CLICK_ENDDECLS
+ELEMENT_REQUIRES(ByteStreamMaintainer)
+ELEMENT_REQUIRES(ModificationList)
 EXPORT_ELEMENT(TCPOut)
 //ELEMENT_MT_SAFE(TCPOut)

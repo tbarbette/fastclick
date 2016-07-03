@@ -1,7 +1,9 @@
-#include <click/rbt.hh>
-#include <click/memorypool.hh>
 #include <click/config.h>
 #include <click/glue.hh>
+#include "rbt.hh"
+#include "memorypool.hh"
+
+CLICK_DECLS
 
 /**
  * Adapted from the Red Black Tree implementation of Emin Martinian:
@@ -705,3 +707,6 @@ void RBPrune(rb_red_blk_tree* tree, void* q)
         current = next;
     }
 }
+
+CLICK_ENDDECLS
+ELEMENT_PROVIDES(RBT)

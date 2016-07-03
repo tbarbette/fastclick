@@ -4,9 +4,10 @@
 #include <clicknet/tcp.h>
 #include <click/hashtable.hh>
 #include <click/ipflowid.hh>
-#include <click/bytestreammaintainer.hh>
-#include <click/modificationlist.hh>
-#include <click/memorypool.hh>
+#include "bytestreammaintainer.hh"
+#include "modificationlist.hh"
+#include "memorypool.hh"
+#include "retransmissionmanager.hh"
 #include "tcpclosingstate.hh"
 #include "tcpreordernode.hh"
 
@@ -18,6 +19,7 @@ struct fcb_tcp_common
 {
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
+    //RetransmissionManager retransmitters[2];
 
     // Members used to be able to free memory for this structure when
     // destroyed
@@ -128,6 +130,16 @@ struct fcb_pathmerger
     }
 };
 
+struct fcb_tcpout
+{
+    TCPClosingState::Value closingState;
+
+    fcb_tcpout()
+    {
+        closingState = TCPClosingState::OPEN;
+    }
+};
+
 struct fcb
 {
     struct fcb_tcp_common* tcp_common;
@@ -136,6 +148,7 @@ struct fcb
     struct fcb_tcpin tcpin;
     struct fcb_httpin httpin;
     struct fcb_pathmerger pathmerger;
+    struct fcb_tcpout tcpout;
 
     fcb()
     {

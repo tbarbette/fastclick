@@ -1,10 +1,12 @@
-#include <click/modificationlist.hh>
 #include <click/config.h>
 #include <click/glue.hh>
+#include "modificationlist.hh"
 #ifdef CLICK_USERLEVEL
 #include <math.h>
 #endif
-#include <click/memorypool.hh>
+#include "memorypool.hh"
+
+CLICK_DECLS
 
 /*
  * modificationlist.cc - Class used to store the modifications performed in a
@@ -287,3 +289,7 @@ inline bool ModificationList::sameSign(int x, int y)
 {
     return ((x <= 0) == (y <= 0));
 }
+
+CLICK_ENDDECLS
+ELEMENT_REQUIRES(ByteStreamMaintainer)
+ELEMENT_PROVIDES(ModificationList)

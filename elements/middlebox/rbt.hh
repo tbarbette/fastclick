@@ -1,7 +1,7 @@
 #ifndef MIDDLEBOX_RBT_HH
 #define MIDDLEBOX_RBT_HH
 
-#include <stdlib.h>
+CLICK_DECLS
 
 class RBTManager;
 
@@ -73,5 +73,7 @@ rb_red_blk_node* RBFindElementGreatestBelow(rb_red_blk_tree*, void*);
 rb_red_blk_node* RBMin(rb_red_blk_tree* tree);
 rb_red_blk_node* RBMax(rb_red_blk_tree* tree);
 void RBPrune(rb_red_blk_tree*, void*);
+
+CLICK_ENDDECLS
 
 #endif

@@ -18,7 +18,6 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
-    int packetNb = 0;
 };
 
 CLICK_ENDDECLS

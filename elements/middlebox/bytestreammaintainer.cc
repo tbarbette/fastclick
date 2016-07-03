@@ -1,16 +1,17 @@
-#include <click/bytestreammaintainer.hh>
-#include <stdlib.h>
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/rbt.hh>
-#include <click/memorypool.hh>
+#include "rbt.hh"
+#include "bytestreammaintainer.hh"
+#include "memorypool.hh"
+
+CLICK_DECLS
 
 ByteStreamMaintainer::ByteStreamMaintainer()
 {
-    rbtManager = new RBTMemoryPoolManager();
+    rbtManager = new RBTMemoryPoolStreamManager();
     treeAck = RBTreeCreate(rbtManager); // Create the RBT for ACK
     treeSeq = RBTreeCreate(rbtManager); // Create the RBT for Seq
-    lastAck= 0;
+    lastAck = 0;
     pruneCounter = 0;
 }
 
@@ -128,6 +129,23 @@ void ByteStreamMaintainer::setLastAck(uint32_t ackNumber)
         lastAck = ackNumber;
 }
 
+uint32_t ByteStreamMaintainer::getLastAck()
+{
+    return lastAck;
+}
+
+void ByteStreamMaintainer::setLastSeq(uint32_t seqNumber)
+{
+    if(seqNumber > lastSeq)
+        lastSeq = seqNumber;
+}
+
+uint32_t ByteStreamMaintainer::getLastSeq()
+{
+    return lastSeq;
+}
+
+
 void ByteStreamMaintainer::ackReceived(uint32_t ackNumber)
 {
     pruneCounter++;
@@ -139,11 +157,6 @@ void ByteStreamMaintainer::ackReceived(uint32_t ackNumber)
         pruneCounter = 0;
         prune(ackNumber);
     }
-}
-
-uint32_t ByteStreamMaintainer::getLastAck()
-{
-    return lastAck;
 }
 
 void ByteStreamMaintainer::insertInAckTree(uint32_t position, int offset)
@@ -162,9 +175,9 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
     if(currentNode == tree->nil || currentNode == NULL)
     {
         // Node did not already exist, insert
-        uint32_t *newKey = ((RBTMemoryPoolManager*)tree->manager)->allocateKey();
+        uint32_t *newKey = ((RBTMemoryPoolStreamManager*)tree->manager)->allocateKey();
         *newKey = position;
-        int *newInfo = ((RBTMemoryPoolManager*)tree->manager)->allocateInfo();
+        int *newInfo = ((RBTMemoryPoolStreamManager*)tree->manager)->allocateInfo();
         *newInfo = offset;
 
         RBTreeInsert(tree, newKey, newInfo);
@@ -194,3 +207,8 @@ ByteStreamMaintainer::~ByteStreamMaintainer()
     RBTreeDestroy(treeSeq);
     delete rbtManager;
 }
+
+CLICK_ENDDECLS
+ELEMENT_REQUIRES(RBT)
+ELEMENT_REQUIRES(ModificationList)
+ELEMENT_PROVIDES(ByteStreamMaintainer)

@@ -111,6 +111,14 @@ void PathMerger::packetSent(struct fcb *fcb, Packet* packet)
     removeEntry(fcb, packet);
 }
 
+void PathMerger::closeConnection(struct fcb *fcb, WritablePacket* packet, bool graceful)
+{
+    StackElement *previousElem = getElementForPacket(fcb, packet);
+
+    if(previousElem != NULL)
+        previousElem->closeConnection(fcb, packet, graceful);
+}
+
 void PathMerger::removeEntry(struct fcb *fcb, Packet *packet)
 {
     tcp_seq_t seqNumber = TCPElement::getSequenceNumber(packet);

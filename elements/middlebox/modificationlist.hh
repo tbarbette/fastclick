@@ -10,8 +10,10 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/memorypool.hh>
-#include <click/bytestreammaintainer.hh>
+#include "memorypool.hh"
+#include "bytestreammaintainer.hh"
+
+CLICK_DECLS
 
 class ByteStreamMaintainer;
 
@@ -90,5 +92,8 @@ private:
     struct ModificationNode *head;
     bool committed; /** Becomes true when a commit is made */
 };
+
+
+CLICK_ENDDECLS
 
 #endif

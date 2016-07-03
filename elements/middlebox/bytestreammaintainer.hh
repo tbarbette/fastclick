@@ -3,16 +3,18 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/rbt.hh>
-#include <click/memorypool.hh>
+#include "rbt.hh"
+#include "memorypool.hh"
+
+CLICK_DECLS
 
 #define BS_POOL_SIZE 40
 #define BS_PRUNE_THRESHOLD BS_POOL_SIZE / 2
 
-class RBTMemoryPoolManager : public RBTManager
+class RBTMemoryPoolStreamManager : public RBTManager
 {
 public:
-    RBTMemoryPoolManager() : poolNodes(BS_POOL_SIZE), poolKeys(BS_POOL_SIZE), poolInfos(BS_POOL_SIZE)
+    RBTMemoryPoolStreamManager() : poolNodes(BS_POOL_SIZE), poolKeys(BS_POOL_SIZE), poolInfos(BS_POOL_SIZE)
     {
 
     }
@@ -86,6 +88,8 @@ class ByteStreamMaintainer
         int lastOffsetInAckTree();
         void setLastAck(uint32_t ackNumber);
         uint32_t getLastAck();
+        void setLastSeq(uint32_t seqNumber);
+        uint32_t getLastSeq();
         void ackReceived(uint32_t ackNumber);
 
         void printTrees();
@@ -99,8 +103,10 @@ class ByteStreamMaintainer
         rb_red_blk_tree* treeAck;
         rb_red_blk_tree* treeSeq;
         RBTManager* rbtManager;
-        uint32_t lastAck;
+        uint32_t lastAck; // Last ACK value sent
+        uint32_t lastSeq; // Last SEQ value sent
         uint32_t pruneCounter;
 };
 
+CLICK_ENDDECLS
 #endif

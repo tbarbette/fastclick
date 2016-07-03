@@ -1,7 +1,7 @@
 #ifndef MIDDLEBOX_TCPOUT_HH
 #define MIDDLEBOX_TCPOUT_HH
 #include <click/element.hh>
-#include <click/bytestreammaintainer.hh>
+#include "bytestreammaintainer.hh"
 #include "tcpelement.hh"
 
 // Forward declaration
@@ -21,7 +21,7 @@ public:
     bool isOutElement()                   { return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    void sendAck(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize);
+    void sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize);
 
     void setInElement(TCPIn*);
 

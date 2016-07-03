@@ -27,6 +27,7 @@ protected:
     virtual WritablePacket* insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
     virtual void packetSent(struct fcb *fcb, Packet* packet);
+    virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful);
 
 private:
     StackElement* previousStackElements[2];

@@ -27,32 +27,23 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     uint32_t contentOffset = getContentOffset(packet);
     unsigned char* firstOccur = NULL;
 
-    packetNb++;
+    static int nbPackets = 0;
 
-    if(packetNb == 5)
+    nbPackets++;
+
+    /*if(nbPackets == 5)
+        closeConnection(fcb, packet, true);*/
+
+    while(source != NULL)
     {
-        uint32_t position = source - packet->data();
-        removeBytes(fcb, packet, position, TCPElement::getPayloadLength(packet));
-        setPacketModified(fcb, packet);
-    }
-    else
-    {
-        while(source != NULL)
+        firstOccur = (unsigned char*)strstr((char*)source, "and");
+        if(firstOccur != NULL)
         {
-            firstOccur = (unsigned char*)strstr((char*)source, "and");
-            if(firstOccur != NULL)
-            {
-                uint32_t position = firstOccur - packet->data();
-                removeBytes(fcb, packet, position, 3);
-                packet = insertBytes(fcb, packet, position, 3);
-                firstOccur[0] = 'l';
-                firstOccur[1] = 'o';
-                firstOccur[2] = 'l';
-                setPacketModified(fcb, packet);
-            }
-                source = firstOccur;
+            uint32_t position = firstOccur - packet->data();
+            removeBytes(fcb, packet, position, 3);
+            setPacketModified(fcb, packet);
         }
-
+            source = firstOccur;
     }
 
     return packet;

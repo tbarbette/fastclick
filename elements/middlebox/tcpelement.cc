@@ -141,7 +141,10 @@ Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
     // Pull the ethernet header
     packet->pull(14);
 
-    computeChecksum(packet); // Finally compute the checksum
+    // Finally compute the checksums
+    computeChecksum(packet);
+    IPElement::computeChecksum(packet);
+
     // Indicate that the packet has been modified
     setAnnotationModification(packet, true);
 
@@ -177,25 +180,33 @@ unsigned int TCPElement::getOppositeFlowDirection()
     return (1 - flowDirection);
 }
 
-bool TCPElement::isFinOrSyn(Packet* packet)
+bool TCPElement::isSyn(Packet* packet)
 {
-    const click_tcp *tcph = packet->tcp_header();
-    uint8_t flags = tcph->th_flags;
-
-    // Check if the packet is a SYN or FIN packet
-    if((flags & TH_SYN) || (flags & TH_FIN))
-        return true;
-    else
-        return false;
+    return checkFlag(packet, TH_SYN);
 }
 
 bool TCPElement::isFin(Packet* packet)
 {
+    return checkFlag(packet, TH_FIN);
+}
+
+bool TCPElement::isRst(Packet* packet)
+{
+    return checkFlag(packet, TH_RST);
+}
+
+bool TCPElement::isAck(Packet* packet)
+{
+    return checkFlag(packet, TH_ACK);
+}
+
+bool TCPElement::checkFlag(Packet *packet, uint8_t flag)
+{
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
 
-    // Check if the packet is a FIN packet
-    if(flags & TH_FIN)
+    // Check if the packet has the given flag
+    if(flags & flag)
         return true;
     else
         return false;

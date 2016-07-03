@@ -3,8 +3,8 @@
 #include <click/element.hh>
 #include <click/ipflowid.hh>
 #include <click/hashtable.hh>
-#include <click/memorypool.hh>
-#include <click/modificationlist.hh>
+#include "memorypool.hh"
+#include "modificationlist.hh"
 #include "tcpclosingstate.hh"
 #include "tcpelement.hh"
 #include "tcpout.hh"
@@ -42,6 +42,7 @@ protected:
     virtual void removeBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual WritablePacket* insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
+    virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful);
 
     // Method used for the simulation of Middleclick's fcb management system
     // Should be removed when integrated to Middleclick
@@ -50,11 +51,10 @@ protected:
     virtual unsigned int determineFlowDirection();
 
 private:
-    void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool);
-    void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool, bool);
+    //void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool);
+    //void closeConnection(struct fcb*, uint32_t, uint32_t, uint16_t, uint16_t, tcp_seq_t, tcp_seq_t, bool, bool);
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
     void ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped);
-    Packet* checkClosingConnection(struct fcb *fcb, Packet* packet);
 
     // TODO Will be thread local as each TCPIn is managed by a different thread
     MemoryPool<struct ModificationNode> poolModificationNodes;

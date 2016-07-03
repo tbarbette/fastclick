@@ -3,10 +3,10 @@
 
 #include <click/config.h>
 #include <click/element.hh>
-#include <click/memorypool.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include "tcpreordernode.hh"
+#include "memorypool.hh"
 #include "fcb.hh"
 
 #define TCPREORDER_POOL_SIZE 20

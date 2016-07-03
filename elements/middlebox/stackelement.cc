@@ -148,6 +148,15 @@ void StackElement::packetSent(struct fcb *fcb, Packet* packet)
     previousStackElement->packetSent(fcb, packet);
 }
 
+void StackElement::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful)
+{
+    // Call the "closeConnection" method on every element in the stack
+    if(previousStackElement == NULL)
+        return;
+
+    previousStackElement->closeConnection(fcb, packet, graceful);
+}
+
 void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
     // Call the "removeBytes" method on every element in the stack
