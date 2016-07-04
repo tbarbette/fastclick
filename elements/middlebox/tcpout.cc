@@ -37,7 +37,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     bool seqModified = false;
     bool ackModified = false;
     tcp_seq_t prevAck = getAckNumber(packet);
-    tcp_seq_t prevLastAck = byteStreamMaintainer.getLastAck();
+    tcp_seq_t prevLastAck = byteStreamMaintainer.getLastAckSent();
 
     if(prevSeq != newSeq)
     {
@@ -45,19 +45,19 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         setSequenceNumber(packet, newSeq);
         // Update the last sequence number seen
         // This number is used when crafting ACKs
-        byteStreamMaintainer.setLastSeq(newSeq);
+        byteStreamMaintainer.setLastSeqSent(newSeq);
         seqModified = true;
     }
 
     // Update the value of the last ACK sent
-    byteStreamMaintainer.setLastAck(prevAck);
+    byteStreamMaintainer.setLastAckSent(prevAck);
 
     // Ensure that the value of the ACK is not below the last ACKed position
     /* This solves the following problem:
      * - We ACK a packet manually for any reason
      * - The "manual" ACK is lost
      */
-    setAckNumber(packet, byteStreamMaintainer.getLastAck());
+    setAckNumber(packet, byteStreamMaintainer.getLastAckSent());
 
     if(getAckNumber(packet) != prevAck)
         ackModified = true;
@@ -145,16 +145,16 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     }
 
     // Check if the ACK does not bring any additional information
-    if(ack <= maintainer.getLastAck())
+    if(ack <= maintainer.getLastAckSent())
         return;
 
     // Update the number of the last ack sent for the other side
-    maintainer.setLastAck(ack);
+    maintainer.setLastAckSent(ack);
 
     // Ensure that the sequence number of the packet is not below
     // a sequence number sent before by the other side
-    if(seq < maintainer.getLastSeq())
-        seq = maintainer.getLastSeq();
+    if(seq < maintainer.getLastSeqSent())
+        seq = maintainer.getLastSeqSent();
 
     // The packet is now empty, we discard it and send an ACK directly to the source
     click_chatter("Sending an ACK! (%u)", ack);

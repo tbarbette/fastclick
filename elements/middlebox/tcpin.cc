@@ -128,7 +128,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     {
         // If it is the case, check that the ACK value is greater than what
         // we have already sent earlier
-        if(newAckNumber < fcb->tcp_common->maintainers[getFlowDirection()].getLastAck())
+        if(newAckNumber < fcb->tcp_common->maintainers[getFlowDirection()].getLastAckSent())
         {
             // If this is not the case, the packet does not give any information
             // We can drop it
@@ -138,15 +138,21 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         }
     }
 
-    // Prune the ByteSreamMaintainer
-    // The value to send must be the ACK value BEFORE mapping
-    fcb->tcp_common->maintainers[getOppositeFlowDirection()].ackReceived(ackNumber);
-    // Prune the RetransmissionManager
-    // TODO indicate to RetransmissionManager (opposite) that we received an ACK so it can prune its tree
+    // Update the value of the last ACK received
+    fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAckReceived(newAckNumber);
 
     if(ackNumber != newAckNumber)
     {
         click_chatter("Ack number %u becomes %u in flow %u", ackNumber, newAckNumber, flowDirection);
+
+        // Just a test to remove
+        uint32_t back =fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(newAckNumber);
+        if(back != ackNumber)
+        {
+            click_chatter("ERROR: %u / %u", back, ackNumber);
+            assert(back == ackNumber);
+        }
+
         setAckNumber(packet, newAckNumber);
         setPacketModified(fcb, packet);
     }
@@ -355,6 +361,8 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
 
         // Get the struct allocated by the initiator
         fcb->tcp_common = returnElement->getTCPCommon(flowID);
+        // Initialize the RBT with the RBTManager
+        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
     }
     else
     {
@@ -370,6 +378,8 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
 
         // Set the pointer in the structure
         fcb->tcp_common = allocated;
+        // Initialize the RBT with the RBTManager
+        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
     }
 
     return true;
@@ -380,8 +390,6 @@ struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
     return tableFcbTcpCommon.get(flowID);
 }
-
-
 
 TCPIn::~TCPIn()
 {

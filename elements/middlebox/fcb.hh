@@ -7,7 +7,7 @@
 #include "bytestreammaintainer.hh"
 #include "modificationlist.hh"
 #include "memorypool.hh"
-#include "retransmissionmanager.hh"
+#include "rbt.hh"
 #include "tcpclosingstate.hh"
 #include "tcpreordernode.hh"
 
@@ -19,7 +19,6 @@ struct fcb_tcp_common
 {
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
-    //RetransmissionManager retransmitters[2];
 
     // Members used to be able to free memory for this structure when
     // destroyed
@@ -140,6 +139,22 @@ struct fcb_tcpout
     }
 };
 
+struct fcb_tcpretransmitter
+{
+    rb_red_blk_tree* tree;
+    // TODO add a retransmit timer with a reference to the fcb
+
+    fcb_tcpretransmitter()
+    {
+        tree = NULL;
+    }
+
+    ~fcb_tcpretransmitter()
+    {
+        RBTreeDestroy(tree);
+    }
+};
+
 struct fcb
 {
     struct fcb_tcp_common* tcp_common;
@@ -149,6 +164,7 @@ struct fcb
     struct fcb_httpin httpin;
     struct fcb_pathmerger pathmerger;
     struct fcb_tcpout tcpout;
+    struct fcb_tcpretransmitter tcpretransmitter;
 
     fcb()
     {

@@ -1,37 +1,30 @@
-#ifndef MIDDLEBOX_RETRANSMISSIONMANAGER_HH
-#define MIDDLEBOX_RETRANSMISSIONMANAGER_HH
+#ifndef MIDDLEBOX_TCPRETRANSMITTER_HH
+#define MIDDLEBOX_TCPRETRANSMITTER_HH
 
 #include <click/config.h>
 #include <click/glue.hh>
+#include <click/element.hh>
 #include <click/timestamp.hh>
 #include <clicknet/tcp.h>
+#include "stackelement.hh"
 #include "rbt.hh"
 #include "memorypool.hh"
 #include "bytestreammaintainer.hh"
+#include "tcpretransmissionnode.hh"
 
+CLICK_DECLS
+
+#define RM_TREE_POOL_SIZE 10
 #define RM_POOL_SIZE 40
 #define RM_PRUNE_THRESHOLD RM_POOL_SIZE / 2
-/*
-struct RetransmissionNode
-{
-    Packet* packet;
-    Timestamp lastTransmission;
-
-    RetransmissionNode()
-    {
-
-    }
-
-    ~RetransmissionNode()
-    {
-
-    }
-};
 
 class RBTMemoryPoolRetransmissionManager : public RBTManager
 {
 public:
-    RBTMemoryPoolRetransmissionManager() : poolNodes(RM_POOL_SIZE), poolKeys(RM_POOL_SIZE), poolInfos(RM_POOL_SIZE)
+    RBTMemoryPoolRetransmissionManager() : poolNodes(RM_POOL_SIZE),
+        poolKeys(RM_POOL_SIZE),
+        poolInfos(RM_POOL_SIZE),
+        poolTrees(RM_TREE_POOL_SIZE)
     {
 
     }
@@ -53,7 +46,7 @@ public:
 
     void printInfo(void* first)
     {
-        struct RetransmissionNode* node = (struct RetransmissionNode*)first;
+        struct TCPRetransmissionNode* node = (struct TCPRetransmissionNode*)first;
         // Get the sequence number of the packet
         const click_tcp *tcph = node->packet->tcp_header();
         uint32_t seq = ntohl(tcph->th_seq);
@@ -80,9 +73,14 @@ public:
     void freeInfo(void* info)
     {
         // Call the destructor to allow the timestamp to release its memory
-        struct RetransmissionNode* node = (struct RetransmissionNode*)info;
-        node->~RetransmissionNode();
+        struct TCPRetransmissionNode* node = (struct TCPRetransmissionNode*)info;
+        node->~TCPRetransmissionNode();
         poolInfos.releaseMemory(node);
+    }
+
+    void freeTree(rb_red_blk_tree* tree)
+    {
+        poolTrees.releaseMemory(tree);
     }
 
     uint32_t* allocateKey(void)
@@ -90,37 +88,45 @@ public:
         return poolKeys.getMemory();
     }
 
-    struct RetransmissionNode* allocateInfo(void)
+    struct TCPRetransmissionNode* allocateInfo(void)
     {
-        struct RetransmissionNode* node = poolInfos.getMemory();
+        struct TCPRetransmissionNode* node = poolInfos.getMemory();
         // Call the constructor to ensure that the timestamp is clear
-        node = new(node) struct RetransmissionNode();
+        node = new(node) struct TCPRetransmissionNode();
         return node;
     }
 
 private:
+    MemoryPool<rb_red_blk_tree> poolTrees;
     MemoryPool<rb_red_blk_node> poolNodes;
     MemoryPool<uint32_t> poolKeys;
-    MemoryPool<struct RetransmissionNode> poolInfos;
+    MemoryPool<struct TCPRetransmissionNode> poolInfos;
 };
 
-class RetransmissionManager
+class TCPRetransmitter : public StackElement
 {
 public:
-    RetransmissionManager();
-    ~RetransmissionManager();
-    bool insertPacket(Packet* packet);
-    void ackReceived(uint32_t ackNumber);
-    void retransmit(Packet* packet);
-    void setByteStreamMaintainer(ByteStreamMaintainer *maintainer);
-    void setOutElement(TCPOut *outElement);
+    TCPRetransmitter() CLICK_COLD;
+    ~TCPRetransmitter();
+
+    // Click related methods
+    const char *class_name() const        { return "TCPRetransmitter"; }
+    const char *port_count() const        { return "2/1"; }
+    const char *processing() const        { return PUSH; }
+    void push(int port, Packet *packet);
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+
+    bool isOutElement()                   { return true; }
+
+protected:
 
 private:
-    rb_red_blk_tree* tree;
     RBTManager* rbtManager;
-    TCPOut *outElement;
-    ByteStreamMaintainer *maintainer;
+
+    void prune(struct fcb *fcb);
+    void retransmitSelfAcked(struct fcb *fcb);
 };
-*/
+
+CLICK_ENDDECLS
 
 #endif

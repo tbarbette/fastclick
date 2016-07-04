@@ -8,15 +8,32 @@ CLICK_DECLS
 
 ByteStreamMaintainer::ByteStreamMaintainer()
 {
-    rbtManager = new RBTMemoryPoolStreamManager();
+    rbtManager = NULL;
+    lastAckSent = 0;
+    lastAckReceived = 0;
+    lastSeqSent = 0;
+    pruneCounter = 0;
+    initialized = false;
+    treeAck = NULL;
+    treeSeq = NULL;
+}
+
+void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager)
+{
+    this->rbtManager = rbtManager;
     treeAck = RBTreeCreate(rbtManager); // Create the RBT for ACK
     treeSeq = RBTreeCreate(rbtManager); // Create the RBT for Seq
-    lastAck = 0;
-    pruneCounter = 0;
+    initialized = true;
 }
 
 uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 {
+    if(!initialized)
+    {
+        click_chatter("Error: ByteStreamMaintainer is not initialized");
+        return 0;
+    }
+
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &position);
     rb_red_blk_node* succ = treeAck->nil;
     uint32_t newPosition = position;
@@ -60,6 +77,12 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 
 uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
 {
+    if(!initialized)
+    {
+        click_chatter("Error: ByteStreamMaintainer is not initialized");
+        return 0;
+    }
+
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeSeq, &position);
     rb_red_blk_node* pred = treeSeq->nil;
     uint32_t newPosition = position;
@@ -115,48 +138,42 @@ void ByteStreamMaintainer::printTrees()
 
 void ByteStreamMaintainer::prune(uint32_t position)
 {
-    // Remove every element in the tree with a key < position
-    RBPrune(treeAck, &position);
-
-    // Map the given position to the seq tree and prune it
-    uint32_t positionSeq = mapAck(position);
-    RBPrune(treeSeq, &positionSeq);
-}
-
-void ByteStreamMaintainer::setLastAck(uint32_t ackNumber)
-{
-    if(ackNumber > lastAck)
-        lastAck = ackNumber;
-}
-
-uint32_t ByteStreamMaintainer::getLastAck()
-{
-    return lastAck;
-}
-
-void ByteStreamMaintainer::setLastSeq(uint32_t seqNumber)
-{
-    if(seqNumber > lastSeq)
-        lastSeq = seqNumber;
-}
-
-uint32_t ByteStreamMaintainer::getLastSeq()
-{
-    return lastSeq;
-}
-
-
-void ByteStreamMaintainer::ackReceived(uint32_t ackNumber)
-{
-    pruneCounter++;
-
-    // Avoid pruning at every ack
-    if(pruneCounter >= BS_PRUNE_THRESHOLD)
+    if(!initialized)
     {
-        click_chatter("Tree pruned");
-        pruneCounter = 0;
-        prune(ackNumber);
+        click_chatter("Error: ByteStreamMaintainerr is not initialized");
+        return;
     }
+
+    // Remove every element in the tree with a key < position
+    RBPrune(treeSeq, &position);
+
+    // We have received a position mapped for the ACK
+    // Thus, we map it back (using mapSeq) to have the ACK unmapped
+    uint32_t positionAck = mapSeq(position);
+    RBPrune(treeAck, &positionAck);
+
+}
+
+void ByteStreamMaintainer::setLastAckSent(uint32_t ackNumber)
+{
+    if(ackNumber > lastAckSent)
+        lastAckSent = ackNumber;
+}
+
+uint32_t ByteStreamMaintainer::getLastAckSent()
+{
+    return lastAckSent;
+}
+
+void ByteStreamMaintainer::setLastSeqSent(uint32_t seqNumber)
+{
+    if(seqNumber > lastSeqSent)
+        lastSeqSent = seqNumber;
+}
+
+uint32_t ByteStreamMaintainer::getLastSeqSent()
+{
+    return lastSeqSent;
 }
 
 void ByteStreamMaintainer::insertInAckTree(uint32_t position, int offset)
@@ -171,6 +188,12 @@ void ByteStreamMaintainer::insertInSeqTree(uint32_t position, int offset)
 
 void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position, int offset)
 {
+    if(!initialized)
+    {
+        click_chatter("Error: ByteStreamMaintainer is not initialized");
+        return;
+    }
+
     rb_red_blk_node* currentNode = RBExactQuery(tree, &position);
     if(currentNode == tree->nil || currentNode == NULL)
     {
@@ -189,6 +212,28 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
     }
 }
 
+void ByteStreamMaintainer::setLastAckReceived(uint32_t ackNumber)
+{
+    if(ackNumber > lastAckReceived)
+    {
+        pruneCounter++;
+        lastAckReceived = ackNumber;
+    }
+
+    // Avoid pruning at every ack
+    if(pruneCounter >= BS_PRUNE_THRESHOLD)
+    {
+        click_chatter("Tree pruned");
+        pruneCounter = 0;
+        prune(ackNumber);
+    }
+}
+
+uint32_t ByteStreamMaintainer::getLastAckReceived()
+{
+    return lastAckReceived;
+}
+
 int ByteStreamMaintainer::lastOffsetInAckTree()
 {
     // Return the offset with the greatest key in the ack tree
@@ -203,9 +248,11 @@ int ByteStreamMaintainer::lastOffsetInAckTree()
 
 ByteStreamMaintainer::~ByteStreamMaintainer()
 {
-    RBTreeDestroy(treeAck);
-    RBTreeDestroy(treeSeq);
-    delete rbtManager;
+    if(initialized)
+    {
+        RBTreeDestroy(treeAck);
+        RBTreeDestroy(treeSeq);
+    }
 }
 
 CLICK_ENDDECLS

@@ -45,6 +45,16 @@ public:
         return (rb_red_blk_node*)malloc(sizeof(rb_red_blk_node));
     }
 
+    virtual rb_red_blk_tree* allocateTree(void)
+    {
+        return (rb_red_blk_tree*) malloc(sizeof(rb_red_blk_tree));
+    }
+
+    virtual void freeTree(rb_red_blk_tree* tree)
+    {
+        free(tree);
+    }
+
     virtual void freeNode(rb_red_blk_node* node)
     {
         free(node);

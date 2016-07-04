@@ -8,13 +8,17 @@
 
 CLICK_DECLS
 
+#define BS_TREE_POOL_SIZE 10
 #define BS_POOL_SIZE 40
 #define BS_PRUNE_THRESHOLD BS_POOL_SIZE / 2
 
 class RBTMemoryPoolStreamManager : public RBTManager
 {
 public:
-    RBTMemoryPoolStreamManager() : poolNodes(BS_POOL_SIZE), poolKeys(BS_POOL_SIZE), poolInfos(BS_POOL_SIZE)
+    RBTMemoryPoolStreamManager() : poolNodes(BS_POOL_SIZE),
+        poolKeys(BS_POOL_SIZE),
+        poolInfos(BS_POOL_SIZE),
+        poolTrees(BS_TREE_POOL_SIZE)
     {
 
     }
@@ -44,6 +48,11 @@ public:
         return poolNodes.getMemory();
     }
 
+    rb_red_blk_tree* allocateTree(void)
+    {
+        return poolTrees.getMemory();
+    }
+
     void freeNode(rb_red_blk_node* node)
     {
         poolNodes.releaseMemory(node);
@@ -59,6 +68,11 @@ public:
         poolInfos.releaseMemory((int*)info);
     }
 
+    void freeTree(rb_red_blk_tree* tree)
+    {
+        poolTrees.releaseMemory(tree);
+    }
+
     uint32_t* allocateKey(void)
     {
         return poolKeys.getMemory();
@@ -70,6 +84,7 @@ public:
     }
 
 private:
+    MemoryPool<rb_red_blk_tree> poolTrees;
     MemoryPool<rb_red_blk_node> poolNodes;
     MemoryPool<uint32_t> poolKeys;
     MemoryPool<int> poolInfos;
@@ -86,13 +101,14 @@ class ByteStreamMaintainer
         uint32_t mapAck(uint32_t position);
         uint32_t mapSeq(uint32_t position);
         int lastOffsetInAckTree();
-        void setLastAck(uint32_t ackNumber);
-        uint32_t getLastAck();
-        void setLastSeq(uint32_t seqNumber);
-        uint32_t getLastSeq();
-        void ackReceived(uint32_t ackNumber);
-
+        void setLastAckSent(uint32_t ackNumber);
+        uint32_t getLastAckSent();
+        void setLastSeqSent(uint32_t seqNumber);
+        uint32_t getLastSeqSent();
+        void setLastAckReceived(uint32_t ackNumber);
+        uint32_t getLastAckReceived();
         void printTrees();
+        void initialize(RBTMemoryPoolStreamManager *rbtManager);
 
     private:
         void prune(uint32_t position);
@@ -103,9 +119,11 @@ class ByteStreamMaintainer
         rb_red_blk_tree* treeAck;
         rb_red_blk_tree* treeSeq;
         RBTManager* rbtManager;
-        uint32_t lastAck; // Last ACK value sent
-        uint32_t lastSeq; // Last SEQ value sent
+        uint32_t lastAckSent;
+        uint32_t lastSeqSent;
+        uint32_t lastAckReceived;
         uint32_t pruneCounter;
+        bool initialized;
 };
 
 CLICK_ENDDECLS

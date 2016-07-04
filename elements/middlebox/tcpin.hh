@@ -59,6 +59,7 @@ private:
     // TODO Will be thread local as each TCPIn is managed by a different thread
     MemoryPool<struct ModificationNode> poolModificationNodes;
     MemoryPool<struct ModificationList> poolModificationLists;
+    RBTMemoryPoolStreamManager rbtManager;
 
 
     // Lock when access these

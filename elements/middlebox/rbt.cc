@@ -27,7 +27,7 @@ rb_red_blk_tree* RBTreeCreate(RBTManager* manager)
     rb_red_blk_tree* newTree;
     rb_red_blk_node* temp;
 
-    newTree=(rb_red_blk_tree*) malloc(sizeof(rb_red_blk_tree));
+    newTree= manager->allocateTree();
     newTree->manager = manager;
 
     /*  see the comment in the rb_red_blk_tree structure in red_black_tree.h */
@@ -405,9 +405,9 @@ void TreeDestHelper(rb_red_blk_tree* tree, rb_red_blk_node* x)
 void RBTreeDestroy(rb_red_blk_tree* tree)
 {
     TreeDestHelper(tree,tree->root->left);
-    free(tree->root);
-    free(tree->nil);
-    free(tree);
+    tree->manager->freeNode(tree->root);
+    tree->manager->freeNode(tree->nil);
+    tree->manager->freeTree(tree);
 }
 
 
