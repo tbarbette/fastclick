@@ -121,7 +121,7 @@ public:
 protected:
 
 private:
-    RBTManager* rbtManager;
+    RBTMemoryPoolRetransmissionManager rbtManager;
 
     void prune(struct fcb *fcb);
     void retransmitSelfAcked(struct fcb *fcb);

@@ -11,12 +11,12 @@
 
 TCPRetransmitter::TCPRetransmitter()
 {
-    rbtManager = new RBTMemoryPoolRetransmissionManager();
+
 }
 
 TCPRetransmitter::~TCPRetransmitter()
 {
-    delete rbtManager;
+
 }
 
 
@@ -35,7 +35,7 @@ void TCPRetransmitter::push(int port, Packet *packet)
     if(fcb->tcpretransmitter.tree == NULL)
     {
         // Create the tree for this flow if not already done
-        fcb->tcpretransmitter.tree = RBTreeCreate(rbtManager);
+        fcb->tcpretransmitter.tree = RBTreeCreate(&rbtManager);
     }
 
     rb_red_blk_tree* tree = fcb->tcpretransmitter.tree;
@@ -63,6 +63,8 @@ void TCPRetransmitter::push(int port, Packet *packet)
             // Set the last transmission of the packet to now
             // (because packets are inserted after their first transmission)
             newInfo->lastTransmission.assign_now();
+
+            click_chatter("Packet %u added to retransmission tree", seq);
 
             // Insert the packet in the tree
             RBTreeInsert(tree, newKey, newInfo);
