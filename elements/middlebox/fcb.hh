@@ -138,7 +138,7 @@ struct fcb_tcpout
         closingState = TCPClosingState::OPEN;
     }
 };
-
+/*
 struct fcb_tcpretransmitter
 {
     rb_red_blk_tree* tree;
@@ -154,7 +154,7 @@ struct fcb_tcpretransmitter
         RBTreeDestroy(tree);
     }
 };
-
+*/
 struct fcb
 {
     struct fcb_tcp_common* tcp_common;
@@ -164,7 +164,7 @@ struct fcb
     struct fcb_httpin httpin;
     struct fcb_pathmerger pathmerger;
     struct fcb_tcpout tcpout;
-    struct fcb_tcpretransmitter tcpretransmitter;
+    //struct fcb_tcpretransmitter tcpretransmitter;
 
     fcb()
     {
