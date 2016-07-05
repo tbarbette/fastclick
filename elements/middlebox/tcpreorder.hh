@@ -8,12 +8,13 @@
 #include "tcpreordernode.hh"
 #include "memorypool.hh"
 #include "fcb.hh"
+#include "tcpelement.hh"
 
 #define TCPREORDER_POOL_SIZE 20
 
 CLICK_DECLS
 
-class TCPReorder : public Element
+class TCPReorder : public Element, public TCPElement
 {
 public:
     TCPReorder() CLICK_COLD;

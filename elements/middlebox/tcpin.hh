@@ -6,6 +6,7 @@
 #include "memorypool.hh"
 #include "modificationlist.hh"
 #include "tcpclosingstate.hh"
+#include "stackelement.hh"
 #include "tcpelement.hh"
 #include "tcpout.hh"
 
@@ -15,7 +16,7 @@
 
 CLICK_DECLS
 
-class TCPIn : public TCPElement
+class TCPIn : public StackElement, public TCPElement
 {
 public:
     TCPIn() CLICK_COLD;
@@ -38,7 +39,7 @@ public:
 protected:
     virtual Packet* processPacket(struct fcb*, Packet*);
 
-    virtual void setPacketModified(struct fcb*, WritablePacket*);
+    virtual void setPacketDirty(struct fcb*, WritablePacket*);
     virtual void removeBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual WritablePacket* insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);

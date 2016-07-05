@@ -93,7 +93,7 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
 
         // Compute sequence number of the next packet
         fcb->tcpreorder.expectedPacketSeq = currentSeq + getPacketLength(packetNode->packet);
-        if(TCPElement::isFin(packetNode->packet) || TCPElement::isSyn(packetNode->packet))
+        if(isFin(packetNode->packet) || isSyn(packetNode->packet))
             (fcb->tcpreorder.expectedPacketSeq)++;
 
         // Send packet
@@ -170,4 +170,5 @@ void TCPReorder::checkFirstPacket(struct fcb* fcb, Packet* packet)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(TCPReorder)
+ELEMENT_REQUIRES(TCPElement)
 //ELEMENT_MT_SAFE(TCPReorder)

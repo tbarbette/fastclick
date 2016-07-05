@@ -10,17 +10,7 @@
 
 CLICK_DECLS
 
-TCPElement::TCPElement()
-{
-
-}
-
-int TCPElement::configure(Vector<String> &conf, ErrorHandler *errh)
-{
-    return 0;
-}
-
-void TCPElement::computeChecksum(WritablePacket *packet)
+void TCPElement::computeTCPChecksum(WritablePacket *packet)
 {
     click_ip *iph = packet->ip_header();
     click_tcp *tcph = packet->tcp_header();
@@ -85,6 +75,15 @@ unsigned TCPElement::getPayloadLength(Packet* packet)
     return ip_len - iph_len - tcp_offset;
 }
 
+const unsigned char* TCPElement::getPayload(Packet* packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+    return (const unsigned char*)packet->transport_header() + tcph_len;
+}
+
 Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
                              uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags)
 {
@@ -142,11 +141,8 @@ Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
     packet->pull(14);
 
     // Finally compute the checksums
-    computeChecksum(packet);
-    IPElement::computeChecksum(packet);
-
-    // Indicate that the packet has been modified
-    setAnnotationModification(packet, true);
+    computeTCPChecksum(packet);
+    computeIPChecksum(packet);
 
     return packet;
 }
@@ -229,5 +225,5 @@ bool TCPElement::isJustAnAck(Packet* packet)
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(TCPElement)
-//ELEMENT_MT_SAFE(TCPElement)
+ELEMENT_PROVIDES(TCPElement)
+ELEMENT_REQUIRES(IPElement)

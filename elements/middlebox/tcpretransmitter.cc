@@ -56,54 +56,49 @@ void TCPRetransmitter::push(int port, Packet *packet)
         fcb->tcpretransmitter.bufferPool = &circularPool;
     }
 
-    // TODO this part must be reworked, this is old code that used trees and packets
-    // It must be adapted to the circular buffers
-    /*
-    rb_red_blk_tree* tree = fcb->tcpretransmitter.tree;
 
-    unsigned oppositeFlowDirection = 1 - flowDirection;
-    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
+    CircularBuffer *buffer = fcb->tcpretransmitter.buffer;
+
+    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[flowDirection];
 
     if(port == 0)
     {
         // The packet comes on the normal input
-        // We thus need to add it in the tree and let it continue
-        click_chatter("Packet cloned: %p", packet);
-        Packet* toInsert = packet->clone();
-        click_chatter("Insert before: %p", toInsert);
-        click_chatter("Begnning shared? %d / %d", packet->shared(), toInsert->shared());
-        toInsert = toInsert->uniqueify();
-        click_chatter("End shared? %d / %d", packet->shared(), toInsert->shared());
+        // We thus need to add its content in the buffer and let it continue
+        const unsigned char* content = getPayload(packet);
+        uint32_t contentSize = getPayloadLength(packet);
 
-        uint32_t seq = TCPElement::getSequenceNumber(toInsert);
-        // Check if the packet was not already in the tree
-        rb_red_blk_node* currentNode = RBExactQuery(tree, &seq);
-        if(currentNode == tree->nil || currentNode == NULL)
+        if(contentSize > 0)
         {
-            uint32_t *newKey = ((RBTMemoryPoolRetransmissionManager*)tree->manager)->allocateKey();
-            *newKey = seq;
-            struct TCPRetransmissionNode *newInfo = ((RBTMemoryPoolRetransmissionManager*)tree->manager)->allocateInfo();
+            uint32_t seq = getSequenceNumber(packet);
 
-            // Set the pointer to the packet
-            newInfo->packet = toInsert;
-            // Set the last transmission of the packet to now
-            // (because packets are inserted after their first transmission)
-            newInfo->lastTransmission.assign_now();
+            // If this is the first content added to the buffer, we indicate
+            // the buffer the sequence number as an offset
+            // so that we will be able to give sequence number as indexes in
+            // the future
+            if(buffer->isBlank())
+                buffer->setStartOffset(seq);
 
-            click_chatter("Packet %u added to retransmission tree", seq);
+            // Add packet content to the buffer
+            buffer->addDataAtEnd(content, contentSize);
 
-            // Insert the packet in the tree
-            RBTreeInsert(tree, newKey, newInfo);
+            click_chatter("Packet %u added to retransmission buffer (%u bytes)", seq, contentSize);
         }
+        // Prune the tree to remove received packets
+        prune(fcb);
 
         // Push the packet to the next element
         output(0).push(packet);
-
-        // Prune the tree to remove received packets
-        prune(fcb);
     }
     else
     {
+        // We must check the lastAckSent by the other side
+        // If we receive data already ACKed, we must drop them and make the other side
+        // resend the last ACK, because it means that the ACK was lost.
+        // (We send an ACK and we receive retransmission nevertheless)
+        // Idea: add "lostAck" function in the stack so that TCPIn will ack
+        // the packet for us
+
         // The packet comes on the second input
         // It means we have a retransmission.
         // We need to perform the mapping between the received packet and
@@ -113,12 +108,12 @@ void TCPRetransmitter::push(int port, Packet *packet)
         // are unmodified. Thus, we need to perform the right mappings to
         // have the connection with the packets in the tree
 
-        // Get the sequence number that will be the key of the packet in the tree
-        uint32_t seq = TCPElement::getSequenceNumber(packet);
+        // Get the sequence number that will be the key of the packet in the buffer
+        uint32_t seq = getSequenceNumber(packet);
 
         uint32_t mappedSeq = maintainer.mapSeq(seq);
 
-        uint32_t payloadSize = TCPElement::getPayloadLength(packet);
+        uint32_t payloadSize = getPayloadLength(packet);
         uint32_t mappedSeqEnd = maintainer.mapSeq(seq + payloadSize);
 
         // The lower bound of the interval to retransmit is "mappedSeq"
@@ -136,23 +131,31 @@ void TCPRetransmitter::push(int port, Packet *packet)
         }
         click_chatter("Retransmitting %u bytes", sizeOfRetransmission);
 
-        // TODO Get the data to retransmit from the tree
+        // Get the data from the buffer
+        fcb->tcpretransmitter.buffer->getData(mappedSeq, sizeOfRetransmission, getBuffer);
+        // The data to retransmit is now in "getBuffer"
+
+        // TODO: get the TCP info from the retransmitted packet so that we can
+        // put them in the new packet (ip, port, ...)
 
         // We drop the retransmitted packet
         packet->kill();
 
-        // TODO We push the corresponding data from the tree
+        // TODO create a packet with the data in "getBuffer" and push it
     }
-    */
+
 }
 
 void TCPRetransmitter::prune(struct fcb *fcb)
 {
     unsigned flowDirection = determineFlowDirection();
-    unsigned oppositeFlowDirection = 1 - flowDirection;
-    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
+    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[flowDirection];
 
-    // TODO prune the buffer
+    click_chatter("Pruning... (size: %u, ack: %u )", fcb->tcpretransmitter.buffer->getSize(), maintainer.getLastAckReceived());
+    // We remove ACKed data in the buffer
+    fcb->tcpretransmitter.buffer->removeDataAtBeginning(maintainer.getLastAckReceived());
+
+    click_chatter("Pruned! (size: %u)", fcb->tcpretransmitter.buffer->getSize());
 }
 
 void TCPRetransmitter::retransmitSelfAcked(struct fcb *fcb)
@@ -170,4 +173,5 @@ void TCPRetransmitter::retransmitSelfAcked(struct fcb *fcb)
 ELEMENT_REQUIRES(ByteStreamMaintainer)
 ELEMENT_REQUIRES(BufferPool)
 ELEMENT_REQUIRES(BufferPoolNode)
+ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(TCPRetransmitter)

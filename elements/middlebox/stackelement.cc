@@ -102,24 +102,14 @@ bool StackElement::getAnnotationBit(Packet* p, int bit)
     return (bool)value;
 }
 
-void StackElement::setAnnotationModification(Packet* p, bool value)
+void StackElement::setAnnotationDirty(Packet* p, bool value)
 {
-    setAnnotationBit(p, offsetAnnotationModified, value);
+    setAnnotationBit(p, offsetAnnotationDirty, value);
 }
 
-bool StackElement::getAnnotationModification(Packet* p)
+bool StackElement::getAnnotationDirty(Packet* p)
 {
-    return getAnnotationBit(p, offsetAnnotationModified);
-}
-
-void StackElement::setAnnotationAcked(Packet* p, bool value)
-{
-    setAnnotationBit(p, offsetAnnotationAcked, value);
-}
-
-bool StackElement::getAnnotationAcked(Packet* p)
-{
-    return getAnnotationBit(p, offsetAnnotationAcked);
+    return getAnnotationBit(p, offsetAnnotationDirty);
 }
 
 void StackElement::addStackElementInList(StackElement *element, int port)
@@ -130,13 +120,13 @@ void StackElement::addStackElementInList(StackElement *element, int port)
     previousStackElement = element;
 }
 
-void StackElement::setPacketModified(struct fcb *fcb, WritablePacket* packet)
+void StackElement::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
 {
-    // Call the "setPacketModified" method on every element in the stack
+    // Call the "setPacketDirty" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->setPacketModified(fcb, packet);
+    previousStackElement->setPacketDirty(fcb, packet);
 }
 
 void StackElement::packetSent(struct fcb *fcb, Packet* packet)

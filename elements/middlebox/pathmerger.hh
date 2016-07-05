@@ -2,10 +2,11 @@
 #define MIDDLEBOX_PATHMERGER_HH
 #include <click/element.hh>
 #include "stackelement.hh"
+#include "tcpelement.hh"
 
 CLICK_DECLS
 
-class PathMerger : public StackElement
+class PathMerger : public TCPElement, public StackElement
 {
 public:
     PathMerger() CLICK_COLD;
@@ -22,7 +23,7 @@ public:
     virtual void addStackElementInList(StackElement* element, int port);
 
 protected:
-    virtual void setPacketModified(struct fcb *fcb, WritablePacket* packet);
+    virtual void setPacketDirty(struct fcb *fcb, WritablePacket* packet);
     virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual WritablePacket* insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);

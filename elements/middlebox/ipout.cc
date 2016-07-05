@@ -22,12 +22,12 @@ Packet* IPOut::processPacket(struct fcb*, Packet* p)
     WritablePacket *packet = p->uniqueify();
 
     // Recompute the IP checksum if the packet has been modified
-    if(getAnnotationModification(packet))
-        computeChecksum(packet);
+    if(getAnnotationDirty(packet))
+        computeIPChecksum(packet);
 
     return p;
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPOut)
-//ELEMENT_MT_SAFE(IPOut)
+ELEMENT_REQUIRES(IPElement)

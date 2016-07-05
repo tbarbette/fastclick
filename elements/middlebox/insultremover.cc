@@ -41,7 +41,7 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
         {
             uint32_t position = firstOccur - packet->data();
             removeBytes(fcb, packet, position, 3);
-            setPacketModified(fcb, packet);
+            setPacketDirty(fcb, packet);
         }
             source = firstOccur;
     }

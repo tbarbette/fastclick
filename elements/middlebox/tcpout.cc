@@ -63,16 +63,16 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         ackModified = true;
 
     // Check if the packet has been modified
-    if(getAnnotationModification(packet) || seqModified || ackModified)
+    if(getAnnotationDirty(packet) || seqModified || ackModified)
     {
         // Check the length to see if bytes were added or removed
-        uint16_t initialLength = IPElement::packetTotalLength(packet);
-        uint16_t currentLength = (uint16_t)packet->length() - IPElement::getIPHeaderOffset(packet);
+        uint16_t initialLength = packetTotalLength(packet);
+        uint16_t currentLength = (uint16_t)packet->length() - getIPHeaderOffset(packet);
         int offsetModification = -(initialLength - currentLength);
         uint32_t prevPayloadSize = getPayloadLength(packet);
 
         // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo hdr)
-        IPElement::setPacketTotalLength(packet, initialLength + offsetModification);
+        setPacketTotalLength(packet, initialLength + offsetModification);
 
         // Check if the modificationlist has to be committed
         if(hasModificationList)
@@ -83,8 +83,8 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
             // Check if the full packet content has been removed
             if(getPayloadLength(packet) == 0)
             {
-                uint32_t saddr = IPElement::getDestinationAddress(packet);
-                uint32_t daddr = IPElement::getSourceAddress(packet);
+                uint32_t saddr = getDestinationAddress(packet);
+                uint32_t daddr = getSourceAddress(packet);
                 uint16_t sport = getDestinationPort(packet);
                 uint16_t dport = getSourcePort(packet);
                 // The SEQ value is the initial ACK value in the packet sent
@@ -124,7 +124,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         }
 
         // Recompute the checksum
-        computeChecksum(packet);
+        computeTCPChecksum(packet);
     }
 
     // Notify the stack function that this packet has been sent
@@ -174,5 +174,6 @@ void TCPOut::setInElement(TCPIn* inElement)
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(ByteStreamMaintainer)
 ELEMENT_REQUIRES(ModificationList)
+ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(TCPOut)
 //ELEMENT_MT_SAFE(TCPOut)

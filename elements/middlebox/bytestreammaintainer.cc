@@ -145,12 +145,11 @@ void ByteStreamMaintainer::prune(uint32_t position)
     }
 
     // Remove every element in the tree with a key < position
-    RBPrune(treeSeq, &position);
+    RBPrune(treeAck, &position);
 
-    // We have received a position mapped for the ACK
-    // Thus, we map it back (using mapSeq) to have the ACK unmapped
-    uint32_t positionAck = mapSeq(position);
-    RBPrune(treeAck, &positionAck);
+    // Map the value to have a valid seq number
+    uint32_t positionSeq = mapAck(position);
+    RBPrune(treeSeq, &positionSeq);
 
 }
 

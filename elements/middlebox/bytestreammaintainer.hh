@@ -119,9 +119,9 @@ class ByteStreamMaintainer
         rb_red_blk_tree* treeAck;
         rb_red_blk_tree* treeSeq;
         RBTManager* rbtManager;
-        uint32_t lastAckSent;
-        uint32_t lastSeqSent;
-        uint32_t lastAckReceived;
+        uint32_t lastAckSent;     // /!\ mapped value (as sent)
+        uint32_t lastSeqSent;     // /!\ mapped value (as sent)
+        uint32_t lastAckReceived; // /!\ Unamapped value (as received)
         uint32_t pruneCounter;
         bool initialized;
 };

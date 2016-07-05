@@ -32,10 +32,8 @@ public:
 protected:
     friend class PathMerger;
 
-    void setAnnotationModification(Packet*, bool);
-    bool getAnnotationModification(Packet*);
-    void setAnnotationAcked(Packet* p, bool value);
-    bool getAnnotationAcked(Packet* p);
+    void setAnnotationDirty(Packet*, bool);
+    bool getAnnotationDirty(Packet*);
     uint16_t getContentOffset(Packet*);
     void setContentOffset(Packet*, uint16_t);
     void buildFunctionStack();
@@ -45,7 +43,7 @@ protected:
 
     virtual Packet* processPacket(struct fcb *fcb, Packet*);
 
-    virtual void setPacketModified(struct fcb *fcb, WritablePacket* packet);
+    virtual void setPacketDirty(struct fcb *fcb, WritablePacket* packet);
     virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual WritablePacket* insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
@@ -66,11 +64,9 @@ private:
     // Constants
     const int offsetAnnotationBools = 12; // 1 byte
     const int offsetContentOffset = 13;   // 2 bytes
-    const int offsetModificationList = 15; // 4 bytes
 
     // Up to 8 booleans can be stored in the corresponding annotation
-    const int offsetAnnotationModified = 0;
-    const int offsetAnnotationAcked = 1;
+    const int offsetAnnotationDirty = 0;
 
 };
 

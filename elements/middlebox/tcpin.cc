@@ -133,22 +133,14 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     }
 
     // Update the value of the last ACK received
-    fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAckReceived(newAckNumber);
+    fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAckReceived(ackNumber);
 
     if(ackNumber != newAckNumber)
     {
         click_chatter("Ack number %u becomes %u in flow %u", ackNumber, newAckNumber, flowDirection);
 
-        // Just a test to remove
-        uint32_t back =fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(newAckNumber);
-        if(back != ackNumber)
-        {
-            click_chatter("ERROR: %u / %u", back, ackNumber);
-            assert(back == ackNumber);
-        }
-
         setAckNumber(packet, newAckNumber);
-        setPacketModified(fcb, packet);
+        setPacketDirty(fcb, packet);
     }
     else
     {
@@ -298,8 +290,8 @@ void TCPIn::requestMorePackets(struct fcb *fcb, Packet *packet)
 void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped)
 {
     // Get the information needed to ack the given packet
-    uint32_t saddr = IPElement::getDestinationAddress(packet);
-    uint32_t daddr = IPElement::getSourceAddress(packet);
+    uint32_t saddr = getDestinationAddress(packet);
+    uint32_t daddr = getSourceAddress(packet);
     uint16_t sport = getDestinationPort(packet);
     uint16_t dport = getSourcePort(packet);
     // The SEQ value is the initial ACK value in the packet sent
@@ -320,14 +312,14 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped)
     outElement->sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack, winSize);
 }
 
-void TCPIn::setPacketModified(struct fcb *fcb, WritablePacket* packet)
+void TCPIn::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
 {
     // Annotate the packet to indicate it has been modified
     // While going through "out elements", the checksum will be recomputed
-    setAnnotationModification(packet, true);
+    setAnnotationDirty(packet, true);
 
     // Continue in the stack function
-    StackElement::setPacketModified(fcb, packet);
+    StackElement::setPacketDirty(fcb, packet);
 }
 
 unsigned int TCPIn::determineFlowDirection()
@@ -393,5 +385,6 @@ TCPIn::~TCPIn()
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(ByteStreamMaintainer)
 ELEMENT_REQUIRES(ModificationList)
+ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(TCPIn)
 //ELEMENT_MT_SAFE(TCPIn)

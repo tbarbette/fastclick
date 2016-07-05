@@ -19,7 +19,7 @@ public:
     void setStartOffset(uint32_t startOffset);
     bool isBlank();
     void removeDataAtBeginning(uint32_t newStart);
-    void addDataAtEnd(unsigned char* data, uint32_t length);
+    void addDataAtEnd(const unsigned char* data, uint32_t length);
     void getData(uint32_t start, uint32_t length, Vector<unsigned char> &getBuffer);
 
 private:

@@ -10,6 +10,7 @@
 #include "stackelement.hh"
 #include "memorypool.hh"
 #include "bufferpool.hh"
+#include "tcpelement.hh"
 #include "bufferpoolnode.hh"
 #include "bytestreammaintainer.hh"
 
@@ -18,7 +19,7 @@ CLICK_DECLS
 #define TCPRETRANSMITTER_BUFFER_NUMBER 10
 #define TCPRETRANSMITTER_GET_BUFFER_SIZE 1500
 
-class TCPRetransmitter : public StackElement
+class TCPRetransmitter : public StackElement, public TCPElement
 {
 public:
     TCPRetransmitter() CLICK_COLD;

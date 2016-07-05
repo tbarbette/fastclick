@@ -1,21 +1,9 @@
 #include <click/config.h>
-#include <click/router.hh>
-#include <click/args.hh>
-#include <click/error.hh>
+#include <click/glue.hh>
 #include <clicknet/ip.h>
 #include "ipelement.hh"
 
 CLICK_DECLS
-
-IPElement::IPElement()
-{
-
-}
-
-int IPElement::configure(Vector<String> &conf, ErrorHandler *errh)
-{
-    return 0;
-}
 
 uint16_t IPElement::packetTotalLength(Packet *packet)
 {
@@ -36,7 +24,7 @@ void IPElement::setPacketTotalLength(WritablePacket* packet, unsigned length)
 }
 
 
-void IPElement::computeChecksum(WritablePacket *packet)
+void IPElement::computeIPChecksum(WritablePacket *packet)
 {
     click_ip *iph = packet->ip_header();
 
@@ -62,5 +50,4 @@ const uint32_t IPElement::getDestinationAddress(Packet* packet)
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(IPElement)
-//ELEMENT_MT_SAFE(IPElement)
+ELEMENT_PROVIDES(IPElement)

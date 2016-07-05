@@ -57,7 +57,7 @@ void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* h
     uint32_t position = beginning - packet->data();
 
     removeBytes(fcb, packet, position, nbBytesToRemove);
-    setPacketModified(fcb, packet);
+    setPacketDirty(fcb, packet);
 }
 
 CLICK_ENDDECLS

@@ -1,6 +1,7 @@
 #ifndef MIDDLEBOX_TCPOUT_HH
 #define MIDDLEBOX_TCPOUT_HH
 #include <click/element.hh>
+#include "stackelement.hh"
 #include "bytestreammaintainer.hh"
 #include "tcpelement.hh"
 
@@ -9,7 +10,7 @@ class TCPIn;
 
 CLICK_DECLS
 
-class TCPOut : public TCPElement
+class TCPOut : public StackElement, public TCPElement
 {
 public:
     TCPOut() CLICK_COLD;

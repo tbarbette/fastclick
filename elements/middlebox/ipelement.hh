@@ -1,27 +1,21 @@
 #ifndef MIDDLEBOX_IPELEMENT_HH
 #define MIDDLEBOX_IPELEMENT_HH
+
+#include <click/config.h>
+#include <click/glue.hh>
 #include <click/element.hh>
-#include "stackelement.hh"
 
 CLICK_DECLS
 
-class IPElement : public StackElement
+class IPElement
 {
 public:
-    IPElement() CLICK_COLD;
-
-    const char *class_name() const        { return "IPElement"; }
-    const char *port_count() const        { return PORTS_1_1; }
-    const char *processing() const        { return PROCESSING_A_AH; }
-
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-
-    static uint16_t packetTotalLength(Packet*);
-    static uint16_t getIPHeaderOffset(Packet* packet);
-    static void setPacketTotalLength(WritablePacket*, unsigned);
-    static const uint32_t getDestinationAddress(Packet*);
-    static const uint32_t getSourceAddress(Packet*);
-    static void computeChecksum(WritablePacket*);
+    uint16_t packetTotalLength(Packet*);
+    uint16_t getIPHeaderOffset(Packet* packet);
+    void setPacketTotalLength(WritablePacket*, unsigned);
+    const uint32_t getDestinationAddress(Packet*);
+    const uint32_t getSourceAddress(Packet*);
+    void computeIPChecksum(WritablePacket*);
 
 protected:
 };

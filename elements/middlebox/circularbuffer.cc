@@ -67,6 +67,9 @@ void CircularBuffer::removeDataAtBeginning(uint32_t newStart)
     // newStart is a sequence number so we need to map it to a position
     uint32_t nbRemoved = (newStart - getStartOffset());
 
+    if(nbRemoved == 0)
+        return;
+
     // Ensure that we do not remove too much data
     if(nbRemoved > getSize())
         nbRemoved = getSize();
@@ -84,7 +87,7 @@ void CircularBuffer::removeDataAtBeginning(uint32_t newStart)
     size -= nbRemoved;
 }
 
-void CircularBuffer::addDataAtEnd(unsigned char* data, uint32_t length)
+void CircularBuffer::addDataAtEnd(const unsigned char* data, uint32_t length)
 {
     blank = false;
 
