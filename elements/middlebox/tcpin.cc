@@ -23,17 +23,11 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     int flowDirectionParam = -1;
 
     if(Args(conf, this, errh)
-    .read_p("FLOWDIRECTION", flowDirectionParam)
-    .read_p("OUTNAME", outName)
-    .read_p("RETURNNAME", returnName)
+    .read_mp("FLOWDIRECTION", flowDirectionParam)
+    .read_mp("OUTNAME", outName)
+    .read_mp("RETURNNAME", returnName)
     .complete() < 0)
         return -1;
-
-    if(flowDirectionParam == -1 || outName == "" || returnName == "")
-    {
-        click_chatter("Missing parameter(s): TCPIn requires three parameters (FLOWDIRECTION, OUTNAME and RETURNNAME)");
-        return -1;
-    }
 
     Element* returnElement = this->router()->find(returnName, errh);
     Element* outElement = this->router()->find(outName, errh);

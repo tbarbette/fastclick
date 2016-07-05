@@ -23,15 +23,9 @@ int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
     int flowDirectionParam = -1;
 
     if(Args(conf, this, errh)
-    .read_p("FLOWDIRECTION", flowDirectionParam)
+    .read_mp("FLOWDIRECTION", flowDirectionParam)
     .complete() < 0)
         return -1;
-
-    if(flowDirectionParam == -1)
-    {
-        click_chatter("Missing parameter(s): TCPReorder requires FLOWDIRECTION");
-        return -1;
-    }
 
     flowDirection = (unsigned int)flowDirectionParam;
 

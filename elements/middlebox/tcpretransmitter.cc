@@ -1,43 +1,64 @@
 #include <click/config.h>
 #include <click/glue.hh>
+#include <click/args.hh>
+#include <click/error.hh>
 #include <click/timestamp.hh>
 #include <clicknet/tcp.h>
-#include "rbt.hh"
-#include "memorypool.hh"
+#include "bufferpool.hh"
+#include "bufferpoolnode.hh"
 #include "bytestreammaintainer.hh"
 #include "tcpretransmitter.hh"
-#include "tcpretransmissionnode.hh"
 #include "tcpelement.hh"
 
-TCPRetransmitter::TCPRetransmitter()
+TCPRetransmitter::TCPRetransmitter() : circularPool(TCPRETRANSMITTER_BUFFER_NUMBER), getBuffer(TCPRETRANSMITTER_GET_BUFFER_SIZE, '\0')
 {
-
+    rawBufferPool = NULL;
 }
 
 TCPRetransmitter::~TCPRetransmitter()
 {
-
+    if(rawBufferPool != NULL)
+        delete rawBufferPool;
 }
 
 
 int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    uint32_t initialBufferSize = 65535;
+
+    if(Args(conf, this, errh)
+    .read_p("INITIALBUFFERSIZE", initialBufferSize)
+    .complete() < 0)
+        return -1;
+
+    rawBufferPool = new BufferPool(TCPRETRANSMITTER_BUFFER_NUMBER, initialBufferSize);
+
     return 0;
 }
 
 void TCPRetransmitter::push(int port, Packet *packet)
 {
+
     // Similate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();
     struct fcb* fcb = &fcbArray[flowDirection];
-    if(fcb->tcpretransmitter.tree == NULL)
+
+    if(fcb->tcpretransmitter.buffer == NULL)
     {
-        // Create the tree for this flow if not already done
-        fcb->tcpretransmitter.tree = RBTreeCreate(&rbtManager);
+        // If this had not been done previously, assign a circular buffer
+        // for this flow
+        CircularBuffer *circularBuffer = circularPool.getMemory();
+        // Call the constructor of CircularBuffer with the pool of raw buffers
+        circularBuffer = new(circularBuffer) CircularBuffer(rawBufferPool);
+        fcb->tcpretransmitter.buffer = circularBuffer;
+        fcb->tcpretransmitter.bufferPool = &circularPool;
     }
 
+    // TODO this part must be reworked, this is old code that used trees and packets
+    // It must be adapted to the circular buffers
+    /*
     rb_red_blk_tree* tree = fcb->tcpretransmitter.tree;
 
     unsigned oppositeFlowDirection = 1 - flowDirection;
@@ -47,7 +68,12 @@ void TCPRetransmitter::push(int port, Packet *packet)
     {
         // The packet comes on the normal input
         // We thus need to add it in the tree and let it continue
+        click_chatter("Packet cloned: %p", packet);
         Packet* toInsert = packet->clone();
+        click_chatter("Insert before: %p", toInsert);
+        click_chatter("Begnning shared? %d / %d", packet->shared(), toInsert->shared());
+        toInsert = toInsert->uniqueify();
+        click_chatter("End shared? %d / %d", packet->shared(), toInsert->shared());
 
         uint32_t seq = TCPElement::getSequenceNumber(toInsert);
         // Check if the packet was not already in the tree
@@ -117,16 +143,16 @@ void TCPRetransmitter::push(int port, Packet *packet)
 
         // TODO We push the corresponding data from the tree
     }
+    */
 }
 
 void TCPRetransmitter::prune(struct fcb *fcb)
 {
-    rb_red_blk_tree* tree = fcb->tcpretransmitter.tree;
     unsigned flowDirection = determineFlowDirection();
     unsigned oppositeFlowDirection = 1 - flowDirection;
     ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
 
-    // TODO prune the tree
+    // TODO prune the buffer
 }
 
 void TCPRetransmitter::retransmitSelfAcked(struct fcb *fcb)
@@ -140,6 +166,8 @@ void TCPRetransmitter::retransmitSelfAcked(struct fcb *fcb)
     // The interval of the timer will depend on the estimated initial RTT
 }
 
+
 ELEMENT_REQUIRES(ByteStreamMaintainer)
-ELEMENT_REQUIRES(RBT)
+ELEMENT_REQUIRES(BufferPool)
+ELEMENT_REQUIRES(BufferPoolNode)
 EXPORT_ELEMENT(TCPRetransmitter)

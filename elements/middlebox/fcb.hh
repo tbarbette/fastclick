@@ -10,6 +10,7 @@
 #include "rbt.hh"
 #include "tcpclosingstate.hh"
 #include "tcpreordernode.hh"
+#include "circularbuffer.hh"
 
 /**
  * This file is used to simulate the FCB provided by Middleclick
@@ -65,18 +66,21 @@ struct fcb_tcpreorder
         struct TCPPacketListNode* node = packetList;
         struct TCPPacketListNode* toDelete = NULL;
 
-        while(node != NULL)
+        if(pool != NULL)
         {
-            toDelete = node;
-            node = node->next;
+            while(node != NULL)
+            {
+                toDelete = node;
+                node = node->next;
 
-            // Kill packet
-            toDelete->packet->kill();
+                // Kill packet
+                toDelete->packet->kill();
 
-            // Put back node in memory pool
-            pool->releaseMemory(toDelete);
+                // Put back node in memory pool
+                pool->releaseMemory(toDelete);
+            }
+            packetList = NULL;
         }
-        packetList = NULL;
     }
 };
 
@@ -141,18 +145,25 @@ struct fcb_tcpout
 
 struct fcb_tcpretransmitter
 {
-    rb_red_blk_tree* tree;
+    CircularBuffer *buffer;
+    MemoryPool<CircularBuffer> *bufferPool;
+
     // TODO add a retransmit timer with a reference to the fcb
 
     fcb_tcpretransmitter()
     {
-        tree = NULL;
+        buffer = NULL;
+        bufferPool = NULL;
     }
 
     ~fcb_tcpretransmitter()
     {
-        if(tree != NULL)
-            RBTreeDestroy(tree);
+        if(buffer != NULL && bufferPool != NULL)
+        {
+            // Release memory for the circular buffer
+            buffer->~CircularBuffer();
+            bufferPool->releaseMemory(buffer);
+        }
     }
 };
 
