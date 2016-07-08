@@ -4,10 +4,10 @@
 #include <click/error.hh>
 #include "stackelement.hh"
 
+CLICK_DECLS
+
 // Simulation of the Middleclick FCBs
 struct fcb fcbArray[2];
-
-CLICK_DECLS
 
 StackElement::StackElement()
 {

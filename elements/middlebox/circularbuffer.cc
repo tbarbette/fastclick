@@ -1,5 +1,6 @@
 #include <click/config.h>
 #include <click/glue.hh>
+#include <clicknet/tcp.h>
 #include "circularbuffer.hh"
 
 CLICK_DECLS
@@ -141,14 +142,14 @@ bool CircularBuffer::isBlank()
 
 void CircularBuffer::getData(uint32_t start, uint32_t length, Vector<unsigned char> &getBuffer)
 {
-    // start is a sequence number so we need to map it to a position
-    start = start - getStartOffset() + bufferStart;
-
-    if(start < 0)
+    if(SEQ_LT(start, getStartOffset()))
     {
         click_chatter("Error: TCPRetransmission: data not in the buffer.");
         return;
     }
+
+    // "Start" is a sequence number so we need to map it to a position
+    start = start - getStartOffset() + bufferStart;
 
     // Check that we do not request too much data
     if(length > getSize())

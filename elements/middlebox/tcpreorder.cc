@@ -34,21 +34,40 @@ int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void TCPReorder::flushList(struct fcb *fcb)
 {
-    struct TCPPacketListNode* node = fcb->tcpreorder.packetList;
-    struct TCPPacketListNode* toDelete = NULL;
+    struct TCPPacketListNode* head = fcb->tcpreorder.packetList;
 
-    while(node != NULL)
+    // Flush the entire list
+    flushListFrom(fcb, NULL, head);
+}
+
+void TCPReorder::flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep, struct TCPPacketListNode *toRemove)
+{
+    // toKeep will be the last packet in the list
+    if(toKeep != NULL)
+        toKeep->next = NULL;
+
+    if(toRemove == NULL)
+        return;
+
+    // Update the head if the list is going to be empty
+    if(fcb->tcpreorder.packetList == toRemove)
     {
-        toDelete = node;
-        node = node->next;
-
-        // Kill packet
-        //toDelete->packet->kill();
-
-        fcb->tcpreorder.pool->releaseMemory(toDelete);
+        fcb->tcpreorder.packetList = NULL;
     }
 
-    fcb->tcpreorder.packetList = NULL;
+    struct TCPPacketListNode* toFree = NULL;
+
+    while(toRemove != NULL)
+    {
+        toFree = toRemove;
+        toRemove = toRemove->next;
+
+        // Kill packet
+        if(toFree->packet != NULL)
+            toFree->packet->kill();
+
+        fcb->tcpreorder.pool->releaseMemory(toFree);
+    }
 }
 
 void TCPReorder::push(int, Packet *packet)
@@ -62,21 +81,25 @@ void TCPReorder::processPacket(struct fcb *fcb, Packet* packet)
     if(fcb->tcpreorder.pool == NULL)
         fcb->tcpreorder.pool = &pool;
 
-    checkRetransmission(fcb, packet);
     checkFirstPacket(fcb, packet);
+    if(!checkRetransmission(fcb, packet))
+        return;
     putPacketInList(fcb, packet);
     sendEligiblePackets(fcb);
 }
 
-void TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
+bool TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
 {
-    if(getSequenceNumber(packet) < fcb->tcpreorder.expectedPacketSeq)
+    if(SEQ_LT(getSequenceNumber(packet), fcb->tcpreorder.expectedPacketSeq))
     {
         if(noutputs() == 2)
             output(1).push(packet);
         else
             packet->kill();
+        return false;
     }
+
+    return true;
 }
 
 void TCPReorder::sendEligiblePackets(struct fcb *fcb)
@@ -87,14 +110,29 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
     {
         tcp_seq_t currentSeq = getSequenceNumber(packetNode->packet);
 
+        // Check if the previous packet overlaps with the current one
+        // (the expected sequence number is greater than the one of the packet
+        // meaning that the new packet shares the begin of its content with
+        // the end of the previous packet)
+        // This case occurs when there was a gap in the list because a packet
+        // had been lost, and the source retransmits the packets with the
+        // content split differently.
+        // Thus, the previous packets that were after the gap are not
+        // correctly align and must be dropped as the source will retransmit
+        // them with the new alignment.
+        if(SEQ_LT(currentSeq, fcb->tcpreorder.expectedPacketSeq))
+        {
+            click_chatter("Warning: received a retransmission with a different split");
+            flushListFrom(fcb, NULL, packetNode);
+            return;
+        }
+
         // We check if the current packet is the expected one (if not, there is a gap)
         if(currentSeq != fcb->tcpreorder.expectedPacketSeq)
             return;
 
         // Compute sequence number of the next packet
-        fcb->tcpreorder.expectedPacketSeq = currentSeq + getPacketLength(packetNode->packet);
-        if(isFin(packetNode->packet) || isSyn(packetNode->packet))
-            (fcb->tcpreorder.expectedPacketSeq)++;
+        fcb->tcpreorder.expectedPacketSeq = getNextSequenceNumber(packetNode->packet);
 
         // Send packet
         output(0).push(packetNode->packet);
@@ -107,23 +145,23 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
     }
 }
 
-unsigned TCPReorder::getPacketLength(Packet* packet)
-{
-    const click_ip *iph = packet->ip_header();
-    unsigned iph_len = iph->ip_hl << 2;
-    uint16_t ip_len = ntohs(iph->ip_len);
-
-    const click_tcp *tcph = packet->tcp_header();
-    unsigned tcp_offset = tcph->th_off << 2;
-
-    return ip_len - iph_len - tcp_offset;
-}
-
 tcp_seq_t TCPReorder::getSequenceNumber(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohl(tcph->th_seq);
+}
+
+tcp_seq_t TCPReorder::getNextSequenceNumber(Packet* packet)
+{
+    tcp_seq_t currentSeq = getSequenceNumber(packet);
+
+    tcp_seq_t nextSeq = currentSeq + getPayloadLength(packet);
+
+    if(isFin(packet) || isSyn(packet))
+        nextSeq++;
+
+    return nextSeq;
 }
 
 void TCPReorder::putPacketInList(struct fcb* fcb, Packet* packet)
@@ -135,7 +173,7 @@ void TCPReorder::putPacketInList(struct fcb* fcb, Packet* packet)
     toAdd->next = NULL;
 
     // Browse the list until we find a packet with a greater sequence number than the packet to add in the list
-    while(packetNode != NULL && (getSequenceNumber(packetNode->packet) < getSequenceNumber(packet)))
+    while(packetNode != NULL && (SEQ_LT(getSequenceNumber(packetNode->packet), getSequenceNumber(packet))))
     {
         prevNode = packetNode;
         packetNode = packetNode->next;

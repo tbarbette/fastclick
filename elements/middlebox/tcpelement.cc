@@ -84,6 +84,28 @@ const unsigned char* TCPElement::getPayload(Packet* packet)
     return (const unsigned char*)packet->transport_header() + tcph_len;
 }
 
+void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload, uint32_t length)
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+
+    unsigned char* payloadPtr = (unsigned char*)packet->transport_header() + tcph_len;
+    memcpy(payloadPtr, payload, length);
+}
+
+uint16_t TCPElement::getPayloadOffset(Packet* packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+    uint16_t offset = (uint16_t)(packet->transport_header() + tcph_len - packet->data());
+
+    return offset;
+}
+
 Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
                              uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags)
 {
@@ -206,6 +228,12 @@ bool TCPElement::checkFlag(Packet *packet, uint8_t flag)
         return true;
     else
         return false;
+}
+
+uint8_t getFlags(Packet *packet)
+{
+    const click_tcp *tcph = packet->tcp_header();
+    return tcph->th_flags;
 }
 
 bool TCPElement::isJustAnAck(Packet* packet)

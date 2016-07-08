@@ -63,7 +63,7 @@ void ModificationList::printList()
     }
 }
 
-bool ModificationList::addModification(unsigned int position, int offset)
+bool ModificationList::addModification(uint32_t position, int offset)
 {
     // The structure refuses new modifications if a commit has been made before
     if(committed)
@@ -85,7 +85,7 @@ bool ModificationList::addModification(unsigned int position, int offset)
              * A negative offset means that we removed data in the new content
              * Thus, we substract the offset
              */
-            unsigned int newPosition = 0;
+            uint32_t newPosition = 0;
 
             if(node->offset > 0 && node->offset > position)
                 newPosition = 0;
@@ -167,7 +167,7 @@ void ModificationList::mergeNodes()
             // of the current node can be merged with the previous one
 
             // Determine the range of the modification of the previous node
-            unsigned int range = prev->position + (int)abs(prev->offset);
+            uint32_t range = prev->position + (int)abs(prev->offset);
 
             // If the modification of this node is within the range of the
             // previous one and if they represent the same kind of modification
@@ -206,7 +206,7 @@ void ModificationList::commit(ByteStreamMaintainer &maintainer)
     while(node != NULL)
     {
         // Accumulate on the position the effects of the previous modifications
-        unsigned int newPositionAck = node->position + offsetTotal;
+        uint32_t newPositionAck = node->position + offsetTotal;
         offsetTotal += node->offset;
 
         if(node->offset > 0 && offsetTotal < 0)
@@ -258,7 +258,7 @@ void ModificationList::commit(ByteStreamMaintainer &maintainer)
         }
 
         // The position of the SEQ mapping remains unchanged
-        unsigned int newPositionSeq = node->position;
+        uint32_t newPositionSeq = node->position;
 
         // Accumulate on the offsets the effects of the previous modifications
         int newOffsetAck = offsetTotal;

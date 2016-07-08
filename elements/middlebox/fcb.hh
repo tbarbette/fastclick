@@ -4,6 +4,7 @@
 #include <clicknet/tcp.h>
 #include <click/hashtable.hh>
 #include <click/ipflowid.hh>
+#include <click/timer.hh>
 #include "bytestreammaintainer.hh"
 #include "modificationlist.hh"
 #include "memorypool.hh"
@@ -11,6 +12,7 @@
 #include "tcpclosingstate.hh"
 #include "tcpreordernode.hh"
 #include "circularbuffer.hh"
+#include "retransmissiontiming.hh"
 
 /**
  * This file is used to simulate the FCB provided by Middleclick
@@ -20,30 +22,15 @@ struct fcb_tcp_common
 {
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
+    // One retransmission manager for each direction of the connecytion
+    RetransmissionTiming retransmissionTimings[2];
 
-    // Members used to be able to free memory for this structure when
-    // destroyed
-    IPFlowID flowID;
-    HashTable<IPFlowID, struct fcb_tcp_common*> *table;
-    MemoryPool<struct fcb_tcp_common>  *pool;
-
-    fcb_tcp_common(IPFlowID flowID, HashTable<IPFlowID,
-         struct fcb_tcp_common*> *table,
-         MemoryPool<struct fcb_tcp_common> *pool)
+    fcb_tcp_common()
     {
-        // Those variables will be used to free memory when the connection
-        // is closed
-        this->flowID = flowID;
-        this->table = table;
-        this->pool = pool;
     }
 
     ~fcb_tcp_common()
     {
-        // Remove the corresponding entry in the hashtable
-        table->erase(flowID);
-        // Release memory for this structure
-        pool->releaseMemory(this);
     }
 };
 
@@ -87,16 +74,29 @@ struct fcb_tcpreorder
 struct fcb_tcpin
 {
     HashTable<tcp_seq_t, ModificationList*> modificationLists;
-    TCPClosingState::Value closingState;
     MemoryPool<struct ModificationList>* poolModificationLists;
     MemoryPool<struct ModificationNode>* poolModificationNodes;
-    uint32_t tcpOffset;
 
-    fcb_tcpin() : modificationLists(NULL)
+    TCPClosingState::Value closingState;
+
+    // Members used to be able to free memory for tcp_common
+    // destroyed
+    MemoryPool<struct fcb_tcp_common>* poolTcpCommon;
+    bool inChargeOfTcpCommon;
+    struct fcb_tcp_common *commonToDelete;
+    IPFlowID flowID;
+    HashTable<IPFlowID, struct fcb_tcp_common*> *tableTcpCommon;
+
+    fcb_tcpin()
     {
         closingState = TCPClosingState::OPEN;
         poolModificationLists = NULL;
         poolModificationNodes = NULL;
+
+        poolTcpCommon = NULL;
+        commonToDelete = NULL;
+        inChargeOfTcpCommon = false;
+        tableTcpCommon = NULL;
     }
 
     ~fcb_tcpin()
@@ -110,6 +110,16 @@ struct fcb_tcpin
             (it.value())->~ModificationList();
             // Put it back in the pool
             poolModificationLists->releaseMemory(it.value());
+        }
+
+        // Because tcp_common has been allocated manually by TCPIn
+        // we need, to free its memory manually if we are the creator
+        if(inChargeOfTcpCommon && commonToDelete != NULL)
+        {
+            commonToDelete->~fcb_tcp_common();
+            tableTcpCommon->erase(flowID);
+            poolTcpCommon->releaseMemory(commonToDelete);
+            commonToDelete = NULL;
         }
     }
 };
@@ -148,8 +158,6 @@ struct fcb_tcpretransmitter
     CircularBuffer *buffer;
     MemoryPool<CircularBuffer> *bufferPool;
 
-    // TODO add a retransmit timer with a reference to the fcb
-
     fcb_tcpretransmitter()
     {
         buffer = NULL;
@@ -185,13 +193,7 @@ struct fcb
 
     ~fcb()
     {
-        // Because tcp_commin has been allocated manually by TCPIn
-        // we need, to free its memory manually
-        // To do so, we call the constructor that will
-        // put back its memory chunk in the right memory pool and remove
-        // the corresponding entry in the hashtable
-        if(tcp_common != NULL)
-            tcp_common->~fcb_tcp_common();
+
     }
 };
 

@@ -3,6 +3,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <clicknet/tcp.h>
+#include <click/timestamp.hh>
 #include "tcpin.hh"
 #include "ipelement.hh"
 
@@ -99,52 +100,63 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     }
     else
     {
-        // TODO we could check here that the packet is not a SYN packet
-    }
-
-    WritablePacket *packet = p->uniqueify();
-
-    const click_tcp *tcph = packet->tcp_header();
-
-    // Compute the offset of the TCP payload
-    unsigned tcph_len = tcph->th_off << 2;
-    uint16_t offset = (uint16_t)(packet->transport_header() + tcph_len - packet->data());
-    setContentOffset(packet, offset);
-    fcb->tcpin.tcpOffset = offset;
-
-    tcp_seq_t ackNumber = getAckNumber(packet);
-
-    // Update the ack number according to the bytestreammaintainer of the other direction
-    tcp_seq_t newAckNumber = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
-
-    // Check if the current packet is just an ACK without more information
-    if(isJustAnAck(packet))
-    {
-        // If it is the case, check that the ACK value is greater than what
-        // we have already sent earlier
-        if(newAckNumber < fcb->tcp_common->maintainers[getFlowDirection()].getLastAckSent())
+        // The structure has been assigned so the three-way handshake is over
+        // Check that the packet is not a SYN packet
+        if(isSyn(p))
         {
-            // If this is not the case, the packet does not give any information
-            // We can drop it
-            click_chatter("Received an ACK for a sequence number already ACKed. Dropping it.");
-            packet->kill();
+            click_chatter("Unexpected SYN packet. Dropping it");
+            p->kill();
+
             return NULL;
         }
     }
 
-    // Update the value of the last ACK received
-    fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAckReceived(ackNumber);
+    WritablePacket *packet = p->uniqueify();
 
-    if(ackNumber != newAckNumber)
-    {
-        click_chatter("Ack number %u becomes %u in flow %u", ackNumber, newAckNumber, flowDirection);
+    // Compute the offset of the TCP payload
+    uint16_t offset = getPayloadOffset(packet);
+    setContentOffset(packet, offset);
 
-        setAckNumber(packet, newAckNumber);
-        setPacketDirty(fcb, packet);
-    }
-    else
+    // Take care of the ACK value in the packet
+    bool isAnAck = isAck(packet);
+    tcp_seq_t ackNumber = 0;
+    tcp_seq_t newAckNumber = 0;
+    if(isAnAck)
     {
-        click_chatter("Ack number %u stays the same in flow %u", ackNumber, flowDirection);
+        // Map the ack number according to the bytestreammaintainer of the other direction
+        ackNumber = getAckNumber(packet);
+        newAckNumber = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
+
+        // Check if the current packet is just an ACK without more information
+        if(isJustAnAck(packet))
+        {
+            // If it is the case, check that the ACK value is greater than what
+            // we have already sent earlier
+            if(SEQ_LT(newAckNumber, fcb->tcp_common->maintainers[getFlowDirection()].getLastAckSent()))
+            {
+                // If this is not the case, the packet does not give any information
+                // We can drop it
+                click_chatter("Received an ACK for a sequence number already ACKed. Dropping it.");
+                packet->kill();
+                return NULL;
+            }
+        }
+
+        // Update the value of the last ACK received
+        fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAckReceived(ackNumber);
+
+        // If needed, update the ACK value in the packet with the mapped one
+        if(ackNumber != newAckNumber)
+        {
+            click_chatter("Ack number %u becomes %u in flow %u", ackNumber, newAckNumber, flowDirection);
+
+            setAckNumber(packet, newAckNumber);
+            setPacketDirty(fcb, packet);
+        }
+        else
+        {
+            click_chatter("Ack number %u stays the same in flow %u", ackNumber, flowDirection);
+        }
     }
 
     return packet;
@@ -216,9 +228,16 @@ void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uin
 
 ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* packet)
 {
-    HashTable<tcp_seq_t, ModificationList*> modificationLists = fcb->tcpin.modificationLists;
+    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb->tcpin.modificationLists;
 
-    ModificationList* list = fcb->tcpin.modificationLists.get(getSequenceNumber(packet));
+    ModificationList* list = NULL;
+
+    // Search the modification list in the hashtable
+    HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.find(getSequenceNumber(packet));
+
+    // If we could find the element
+    if(it != modificationLists.end())
+        list = it.value();
 
     // If no list was assigned to this packet, create a new one
     if(list == NULL)
@@ -226,7 +245,7 @@ ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* pa
         ModificationList* listPtr = fcb->tcpin.poolModificationLists->getMemory();
         // Call the constructor manually to have a clean object
         list = new(listPtr) ModificationList(&poolModificationNodes);
-        fcb->tcpin.modificationLists.set(getSequenceNumber(packet), list);
+        modificationLists.set(getSequenceNumber(packet), list);
     }
 
     return list;
@@ -234,11 +253,10 @@ ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* pa
 
 bool TCPIn::hasModificationList(struct fcb *fcb, Packet* packet)
 {
-    HashTable<tcp_seq_t, ModificationList*> modificationLists = fcb->tcpin.modificationLists;
+    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb->tcpin.modificationLists;
+    HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.find(getSequenceNumber(packet));
 
-    ModificationList* list = fcb->tcpin.modificationLists.get(getSequenceNumber(packet));
-
-    return (list != NULL);
+    return (it != modificationLists.end());
 }
 
 void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
@@ -248,7 +266,7 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
-    uint32_t tcpOffset = fcb->tcpin.tcpOffset;
+    uint16_t tcpOffset = getPayloadOffset(packet);
     list->addModification(seqNumber + position - tcpOffset, -((int)length));
 
     unsigned char *source = packet->data();
@@ -265,7 +283,7 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
 {
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
-    uint32_t tcpOffset = fcb->tcpin.tcpOffset;
+    uint16_t tcpOffset = getPayloadOffset(packet);
     getModificationList(fcb, packet)->addModification(seqNumber + position - tcpOffset, (int)length);
 
     uint32_t bytesAfter = packet->length() - position;
@@ -349,6 +367,8 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         fcb->tcp_common = returnElement->getTCPCommon(flowID);
         // Initialize the RBT with the RBTManager
         fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
+        fcb->tcp_common->maintainers[getFlowDirection()].printTrees();
+        fcb->tcpin.inChargeOfTcpCommon = false;
     }
     else
     {
@@ -357,7 +377,7 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         struct fcb_tcp_common *allocated = poolFcbTcpCommon.getMemory();
         // Call the constructor with some parameters that will be used
         // to free the memory of the structure when not needed anymore
-        allocated = new(allocated) struct fcb_tcp_common(flowID, &tableFcbTcpCommon, &poolFcbTcpCommon);
+        allocated = new(allocated) struct fcb_tcp_common();
 
         // Add an entry if the hashtable
         tableFcbTcpCommon.set(flowID, allocated);
@@ -366,6 +386,14 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         fcb->tcp_common = allocated;
         // Initialize the RBT with the RBTManager
         fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
+        fcb->tcp_common->maintainers[getFlowDirection()].printTrees();
+
+        // Store in our structure information needed to free the memory
+        // of the common structure
+        fcb->tcpin.inChargeOfTcpCommon = true;
+        fcb->tcpin.flowID = flowID;
+        fcb->tcpin.tableTcpCommon = &tableFcbTcpCommon;
+        fcb->tcpin.poolTcpCommon = &poolFcbTcpCommon;
     }
 
     return true;
@@ -374,7 +402,12 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
 
 struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
-    return tableFcbTcpCommon.get(flowID);
+    HashTable<IPFlowID, struct fcb_tcp_common*>::iterator it = tableFcbTcpCommon.find(flowID);
+
+    if(it == tableFcbTcpCommon.end())
+        return NULL; // Not in the table
+    else
+        return it.value();
 }
 
 TCPIn::~TCPIn()
@@ -386,5 +419,6 @@ CLICK_ENDDECLS
 ELEMENT_REQUIRES(ByteStreamMaintainer)
 ELEMENT_REQUIRES(ModificationList)
 ELEMENT_REQUIRES(TCPElement)
+ELEMENT_REQUIRES(RetransmissionTiming)
 EXPORT_ELEMENT(TCPIn)
 //ELEMENT_MT_SAFE(TCPIn)

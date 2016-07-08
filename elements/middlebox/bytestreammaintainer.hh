@@ -3,6 +3,7 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
+#include <clicknet/tcp.h>
 #include "rbt.hh"
 #include "memorypool.hh"
 

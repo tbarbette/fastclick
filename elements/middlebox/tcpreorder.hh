@@ -38,10 +38,11 @@ private:
     void putPacketInList(struct fcb *fcb, Packet* packet);
     void sendEligiblePackets(struct fcb *fcb);
     tcp_seq_t getSequenceNumber(Packet* packet);
-    unsigned getPacketLength(Packet* packet);
     void checkFirstPacket(struct fcb *fcb, Packet* packet);
     void flushList(struct fcb *fcb);
-    void checkRetransmission(struct fcb *fcb, Packet* packet);
+    void flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep, struct TCPPacketListNode *toRemove);
+    bool checkRetransmission(struct fcb *fcb, Packet* packet);
+    tcp_seq_t getNextSequenceNumber(Packet* packet);
 
     MemoryPool<struct TCPPacketListNode> pool; // TODO: Ensure that is it per-thread
     unsigned int flowDirection;

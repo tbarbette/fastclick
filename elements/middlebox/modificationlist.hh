@@ -22,7 +22,7 @@ class ByteStreamMaintainer;
  */
 struct ModificationNode
 {
-        unsigned int position; /** Position of the modification */
+        uint32_t position; /** Position of the modification */
         int offset; /** Offset of the modification (positive if bytes are added
                         or negative if bytes are removed) */
         struct ModificationNode* next; /** Pointer to the next node */
@@ -61,7 +61,7 @@ public:
      * if the list does not accept any new modification because a commit
      * has been made.
      */
-    bool addModification(unsigned int position, int offset);
+    bool addModification(uint32_t position, int offset);
 
     bool isCommitted()
     {

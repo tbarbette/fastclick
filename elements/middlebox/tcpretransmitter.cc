@@ -2,13 +2,14 @@
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/error.hh>
-#include <click/timestamp.hh>
+#include <click/timer.hh>
 #include <clicknet/tcp.h>
 #include "bufferpool.hh"
 #include "bufferpoolnode.hh"
 #include "bytestreammaintainer.hh"
 #include "tcpretransmitter.hh"
 #include "tcpelement.hh"
+#include "retransmissiontiming.hh"
 
 TCPRetransmitter::TCPRetransmitter() : circularPool(TCPRETRANSMITTER_BUFFER_NUMBER), getBuffer(TCPRETRANSMITTER_GET_BUFFER_SIZE, '\0')
 {
@@ -20,7 +21,6 @@ TCPRetransmitter::~TCPRetransmitter()
     if(rawBufferPool != NULL)
         delete rawBufferPool;
 }
-
 
 int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -39,11 +39,19 @@ int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 void TCPRetransmitter::push(int port, Packet *packet)
 {
 
-    // Similate Middleclick's FCB management
+    // Simulate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();
+    unsigned int oppositeFlowDirection = 1 - flowDirection;
     struct fcb* fcb = &fcbArray[flowDirection];
+
+    bool dataSent = false;
+    RetransmissionTiming &manager = fcb->tcp_common->retransmissionTimings[flowDirection];
+
+    // If timer has not been initialized yet, do it
+    if(!manager.timerInitialized())
+        manager.initTimer(fcb, this, TCPRetransmitter::retransmissionTimerFired);
 
     if(fcb->tcpretransmitter.buffer == NULL)
     {
@@ -83,9 +91,20 @@ void TCPRetransmitter::push(int port, Packet *packet)
             buffer->addDataAtEnd(content, contentSize);
 
             click_chatter("Packet %u added to retransmission buffer (%u bytes)", seq, contentSize);
+
+            dataSent = true;
         }
         // Prune the tree to remove received packets
         prune(fcb);
+
+
+        // Check if we can start a new RTT measure
+        if(!manager.isMeasureInProgress())
+        {
+            // Check that the packet contains content
+
+            // TODO
+        }
 
         // Push the packet to the next element
         output(0).push(packet);
@@ -135,13 +154,39 @@ void TCPRetransmitter::push(int port, Packet *packet)
         fcb->tcpretransmitter.buffer->getData(mappedSeq, sizeOfRetransmission, getBuffer);
         // The data to retransmit is now in "getBuffer"
 
-        // TODO: get the TCP info from the retransmitted packet so that we can
-        // put them in the new packet (ip, port, ...)
+        // Map the previous ACL
+        uint32_t ack = getAckNumber(packet);
+        ack = fcb->tcp_common->maintainers[oppositeFlowDirection].mapAck(ack);
 
-        // We drop the retransmitted packet
-        packet->kill();
+        // Uniqueify the packet so we can modify it to replace its content
+        WritablePacket *newPacket = packet->uniqueify();
 
-        // TODO create a packet with the data in "getBuffer" and push it
+        // Ensure that the packet has the right size
+        uint32_t previousPayloadSize = getPayloadLength(newPacket);
+        if(sizeOfRetransmission > previousPayloadSize)
+            newPacket = newPacket->put(sizeOfRetransmission - previousPayloadSize);
+        else if(sizeOfRetransmission < previousPayloadSize)
+            newPacket->take(previousPayloadSize - sizeOfRetransmission);
+
+        // Set the new size of the packet in the IP header (total size minus ethernet header)
+        setPacketTotalLength(newPacket, newPacket->length() - getIPHeaderOffset(packet));
+
+        // Copy the content of the buffer to the payload area
+        setPayload(newPacket, &getBuffer[0], sizeOfRetransmission);
+
+        // Recompute the checksums
+        computeTCPChecksum(newPacket);
+        computeIPChecksum(newPacket);
+
+        // Push the packet with its new content
+        output(0).push(newPacket);
+
+        dataSent = true;
+    }
+
+    if(dataSent)
+    {
+        // Start timer here as we just sent data
     }
 
 }
@@ -151,27 +196,22 @@ void TCPRetransmitter::prune(struct fcb *fcb)
     unsigned flowDirection = determineFlowDirection();
     ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[flowDirection];
 
-    click_chatter("Pruning... (size: %u, ack: %u )", fcb->tcpretransmitter.buffer->getSize(), maintainer.getLastAckReceived());
     // We remove ACKed data in the buffer
     fcb->tcpretransmitter.buffer->removeDataAtBeginning(maintainer.getLastAckReceived());
 
-    click_chatter("Pruned! (size: %u)", fcb->tcpretransmitter.buffer->getSize());
+    click_chatter("Retransmission buffer pruned! (new size: %u, ack: %u)", fcb->tcpretransmitter.buffer->getSize(), maintainer.getLastAckReceived());
 }
 
-void TCPRetransmitter::retransmitSelfAcked(struct fcb *fcb)
+void TCPRetransmitter::retransmissionTimerFired(Timer *timer, void *data)
 {
     // This method is called regularly by a timer to retransmit packets
     // that have been acked by the middlebox but not yet by the receiver
-
-    // TODO
-    // The timer is linked to each flow (thus it is in the fcb) and must
-    // have a reference to the fcb so it can give it to this method
-    // The interval of the timer will depend on the estimated initial RTT
+    struct fcb *fcb = (struct fcb*)data;
 }
-
 
 ELEMENT_REQUIRES(ByteStreamMaintainer)
 ELEMENT_REQUIRES(BufferPool)
 ELEMENT_REQUIRES(BufferPoolNode)
 ELEMENT_REQUIRES(TCPElement)
+ELEMENT_REQUIRES(RetransmissionTiming)
 EXPORT_ELEMENT(TCPRetransmitter)

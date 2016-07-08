@@ -1,5 +1,6 @@
 #include <click/config.h>
 #include <click/glue.hh>
+#include <clicknet/tcp.h>
 #include "rbt.hh"
 #include "bytestreammaintainer.hh"
 #include "memorypool.hh"
@@ -140,7 +141,7 @@ void ByteStreamMaintainer::prune(uint32_t position)
 {
     if(!initialized)
     {
-        click_chatter("Error: ByteStreamMaintainerr is not initialized");
+        click_chatter("Error: ByteStreamMaintainer is not initialized");
         return;
     }
 

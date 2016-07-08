@@ -4,6 +4,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/element.hh>
+#include <click/timer.hh>
 #include <click/timestamp.hh>
 #include <click/vector.hh>
 #include <clicknet/tcp.h>
@@ -34,7 +35,7 @@ public:
 
     bool isOutElement()                   { return true; }
 
-protected:
+    static void retransmissionTimerFired(Timer *timer, void *data);
 
 private:
     BufferPool *rawBufferPool;
@@ -42,7 +43,6 @@ private:
     Vector<unsigned char> getBuffer;
 
     void prune(struct fcb *fcb);
-    void retransmitSelfAcked(struct fcb *fcb);
 };
 
 CLICK_ENDDECLS

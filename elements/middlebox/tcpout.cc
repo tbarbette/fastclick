@@ -110,7 +110,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                 if(isJustAnAck(packet))
                 {
                     // Check if the ACK of the packet was significant or not
-                    if(prevAck <= prevLastAck)
+                    if(SEQ_LEQ(prevAck, prevLastAck))
                     {
                         // If this is not the case, drop the packet as it
                         // does not contain any relevant information
@@ -145,7 +145,7 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     }
 
     // Check if the ACK does not bring any additional information
-    if(ack <= maintainer.getLastAckSent())
+    if(SEQ_LEQ(ack, maintainer.getLastAckSent()))
         return;
 
     // Update the number of the last ack sent for the other side
@@ -153,7 +153,7 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
 
     // Ensure that the sequence number of the packet is not below
     // a sequence number sent before by the other side
-    if(seq < maintainer.getLastSeqSent())
+    if(SEQ_LT(seq, maintainer.getLastSeqSent()))
         seq = maintainer.getLastSeqSent();
 
     // The packet is now empty, we discard it and send an ACK directly to the source
