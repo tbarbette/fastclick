@@ -50,7 +50,7 @@ void TCPRetransmitter::push(int port, Packet *packet)
     RetransmissionTiming &manager = fcb->tcp_common->retransmissionTimings[flowDirection];
 
     // If timer has not been initialized yet, do it
-    if(!manager.timerInitialized())
+    if(!manager.isTimerInitialized())
         manager.initTimer(fcb, this, TCPRetransmitter::retransmissionTimerFired);
 
     if(fcb->tcpretransmitter.buffer == NULL)
@@ -75,11 +75,10 @@ void TCPRetransmitter::push(int port, Packet *packet)
         // We thus need to add its content in the buffer and let it continue
         const unsigned char* content = getPayload(packet);
         uint32_t contentSize = getPayloadLength(packet);
+        uint32_t seq = getSequenceNumber(packet);
 
         if(contentSize > 0)
         {
-            uint32_t seq = getSequenceNumber(packet);
-
             // If this is the first content added to the buffer, we indicate
             // the buffer the sequence number as an offset
             // so that we will be able to give sequence number as indexes in
@@ -93,18 +92,12 @@ void TCPRetransmitter::push(int port, Packet *packet)
             click_chatter("Packet %u added to retransmission buffer (%u bytes)", seq, contentSize);
 
             dataSent = true;
+
+            // Start a new RTT measure if possible
+            fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
         }
         // Prune the tree to remove received packets
         prune(fcb);
-
-
-        // Check if we can start a new RTT measure
-        if(!manager.isMeasureInProgress())
-        {
-            // Check that the packet contains content
-
-            // TODO
-        }
 
         // Push the packet to the next element
         output(0).push(packet);
@@ -148,6 +141,7 @@ void TCPRetransmitter::push(int port, Packet *packet)
             click_chatter("Nothing to retransmit for packet with sequence %u", seq);
             return;
         }
+
         click_chatter("Retransmitting %u bytes", sizeOfRetransmission);
 
         // Get the data from the buffer
@@ -177,6 +171,8 @@ void TCPRetransmitter::push(int port, Packet *packet)
         // Recompute the checksums
         computeTCPChecksum(newPacket);
         computeIPChecksum(newPacket);
+
+        fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(mappedSeq + payloadSize);
 
         // Push the packet with its new content
         output(0).push(newPacket);

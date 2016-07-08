@@ -145,6 +145,9 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         // Update the value of the last ACK received
         fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAckReceived(ackNumber);
 
+        // Update the statistics regarding the RTT
+        fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
+
         // If needed, update the ACK value in the packet with the mapped one
         if(ackNumber != newAckNumber)
         {
@@ -367,7 +370,6 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         fcb->tcp_common = returnElement->getTCPCommon(flowID);
         // Initialize the RBT with the RBTManager
         fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
-        fcb->tcp_common->maintainers[getFlowDirection()].printTrees();
         fcb->tcpin.inChargeOfTcpCommon = false;
     }
     else
@@ -386,7 +388,6 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         fcb->tcp_common = allocated;
         // Initialize the RBT with the RBTManager
         fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
-        fcb->tcp_common->maintainers[getFlowDirection()].printTrees();
 
         // Store in our structure information needed to free the memory
         // of the common structure
