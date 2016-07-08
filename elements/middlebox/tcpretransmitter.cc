@@ -46,12 +46,11 @@ void TCPRetransmitter::push(int port, Packet *packet)
     unsigned int oppositeFlowDirection = 1 - flowDirection;
     struct fcb* fcb = &fcbArray[flowDirection];
 
-    bool dataSent = false;
     RetransmissionTiming &manager = fcb->tcp_common->retransmissionTimings[flowDirection];
 
     // If timer has not been initialized yet, do it
     if(!manager.isTimerInitialized())
-        manager.initTimer(fcb, this, TCPRetransmitter::retransmissionTimerFired);
+        manager.initTimer(fcb, this);
 
     if(fcb->tcpretransmitter.buffer == NULL)
     {
@@ -90,8 +89,6 @@ void TCPRetransmitter::push(int port, Packet *packet)
             buffer->addDataAtEnd(content, contentSize);
 
             click_chatter("Packet %u added to retransmission buffer (%u bytes)", seq, contentSize);
-
-            dataSent = true;
 
             // Start a new RTT measure if possible
             fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
@@ -148,7 +145,7 @@ void TCPRetransmitter::push(int port, Packet *packet)
         fcb->tcpretransmitter.buffer->getData(mappedSeq, sizeOfRetransmission, getBuffer);
         // The data to retransmit is now in "getBuffer"
 
-        // Map the previous ACL
+        // Map the previous ACK
         uint32_t ack = getAckNumber(packet);
         ack = fcb->tcp_common->maintainers[oppositeFlowDirection].mapAck(ack);
 
@@ -176,13 +173,6 @@ void TCPRetransmitter::push(int port, Packet *packet)
 
         // Push the packet with its new content
         output(0).push(newPacket);
-
-        dataSent = true;
-    }
-
-    if(dataSent)
-    {
-        // Start timer here as we just sent data
     }
 
 }
@@ -190,7 +180,8 @@ void TCPRetransmitter::push(int port, Packet *packet)
 void TCPRetransmitter::prune(struct fcb *fcb)
 {
     unsigned flowDirection = determineFlowDirection();
-    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[flowDirection];
+    unsigned int oppositeFlowDirection = 1 - flowDirection;
+    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
 
     // We remove ACKed data in the buffer
     fcb->tcpretransmitter.buffer->removeDataAtBeginning(maintainer.getLastAckReceived());
@@ -198,11 +189,60 @@ void TCPRetransmitter::prune(struct fcb *fcb)
     click_chatter("Retransmission buffer pruned! (new size: %u, ack: %u)", fcb->tcpretransmitter.buffer->getSize(), maintainer.getLastAckReceived());
 }
 
-void TCPRetransmitter::retransmissionTimerFired(Timer *timer, void *data)
+bool TCPRetransmitter::dataToRetransmit(struct fcb *fcb)
+{
+    unsigned int flowDirection = determineFlowDirection();;
+    unsigned int oppositeFlowDirection = 1 - flowDirection;
+
+    uint32_t lastAckReceived = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived();
+    uint32_t lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
+
+    // The last ack received is "raw": as received from the source whereas
+    // the last ack sent is mapped: as sent to the destination
+    // We thus map the last ack received to be able to compare them
+    lastAckReceived = fcb->tcp_common->maintainers[flowDirection].mapAck(lastAckReceived);
+
+    // If the value of the last ack sent is greater than the value of the
+    // ack received, it means we have sent ACK by ourselves and thus
+    // we have in the buffer waiting to be acked
+    if(SEQ_LT(lastAckReceived, lastAckSent))
+        return true;
+    else
+        return false;
+}
+
+void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
 {
     // This method is called regularly by a timer to retransmit packets
     // that have been acked by the middlebox but not yet by the receiver
-    struct fcb *fcb = (struct fcb*)data;
+    unsigned int flowDirection = determineFlowDirection();
+    unsigned int oppositeFlowDirection = 1 - flowDirection;
+
+    if(!dataToRetransmit(fcb))
+        return;
+
+    // TODO retransmit the data
+    // Beginning: lastAckReceived mapped
+    // End: lastAckSent
+    uint32_t start = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived();
+    uint32_t end = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
+    start = fcb->tcp_common->maintainers[flowDirection].mapAck(start);
+
+    uint32_t sizeOfRetransmission = end - start;
+    fcb->tcpretransmitter.buffer->getData(start, sizeOfRetransmission, getBuffer);
+
+    uint32_t ack = fcb->tcp_common->maintainers[flowDirection].getLastAckSent();
+
+    // TODO
+    uint32_t ipSrc = 0;
+    uint32_t ipDst = 0;
+    uint16_t portSrc = 0;
+    uint16_t portDst = 0;
+    uint16_t winSize = 0;
+
+    WritablePacket* packet = forgePacket(ipSrc, ipDst, portSrc, portDst, start, ack, winSize, TH_ACK, sizeOfRetransmission);
+
+    fcb->tcp_common->retransmissionTimings[flowDirection].startTimerDoubleRTO();
 }
 
 ELEMENT_REQUIRES(ByteStreamMaintainer)

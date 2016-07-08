@@ -35,7 +35,7 @@ public:
 
     bool isOutElement()                   { return true; }
 
-    static void retransmissionTimerFired(Timer *timer, void *data);
+    void retransmissionTimerFired(struct fcb* fcb);
 
 private:
     BufferPool *rawBufferPool;
@@ -43,6 +43,7 @@ private:
     Vector<unsigned char> getBuffer;
 
     void prune(struct fcb *fcb);
+    bool dataToRetransmit(struct fcb *fcb);
 };
 
 CLICK_ENDDECLS

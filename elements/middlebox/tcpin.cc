@@ -117,6 +117,21 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     uint16_t offset = getPayloadOffset(packet);
     setContentOffset(packet, offset);
 
+    tcp_seq_t seqNumber = getSequenceNumber(packet);
+    tcp_seq_t lastAckSentOtherSide = fcb->tcp_common->maintainers[getOppositeFlowDirection()].getLastAckSent();
+
+    if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
+    {
+        // We receive content that has already been ACKed.
+        // This case occurs when the ACK is lost between the middlebox and
+        // the destination.
+        // In this case, we ACK the content and we discard it
+        click_chatter("Lost ACK detected: %u, resending it");
+        ackPacket(fcb, packet, false);
+        packet->kill();
+        return NULL;
+    }
+
     // Take care of the ACK value in the packet
     bool isAnAck = isAck(packet);
     tcp_seq_t ackNumber = 0;
@@ -143,7 +158,10 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         }
 
         // Update the value of the last ACK received
-        fcb->tcp_common->maintainers[getOppositeFlowDirection()].setLastAckReceived(ackNumber);
+        fcb->tcp_common->maintainers[getFlowDirection()].setLastAckReceived(ackNumber);
+
+        // Prune the ByteStreamMaintainer of the other side
+        fcb->tcp_common->maintainers[getOppositeFlowDirection()].prune(ackNumber);
 
         // Update the statistics regarding the RTT
         fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);

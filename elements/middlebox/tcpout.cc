@@ -43,11 +43,12 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     {
         click_chatter("Sequence number %u modified to %u in flow %u", prevSeq, newSeq, flowDirection);
         setSequenceNumber(packet, newSeq);
-        // Update the last sequence number seen
-        // This number is used when crafting ACKs
-        byteStreamMaintainer.setLastSeqSent(newSeq);
         seqModified = true;
     }
+    
+    // Update the last sequence number seen
+    // This number is used when crafting ACKs
+    byteStreamMaintainer.setLastSeqSent(newSeq);
 
     // Update the value of the last ACK sent
     byteStreamMaintainer.setLastAckSent(prevAck);

@@ -34,6 +34,16 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     /*if(nbPackets == 5)
         closeConnection(fcb, packet, true);*/
 
+    insertBytes(fcb, packet, contentOffset, 6);
+
+    source[0] = 'H';
+    source[1] = 'E';
+    source[2] = 'L';
+    source[3] = 'L';
+    source[4] = 'O';
+    source[5] = ' ';
+
+
     while(source != NULL)
     {
         firstOccur = (unsigned char*)strstr((char*)source, "and");

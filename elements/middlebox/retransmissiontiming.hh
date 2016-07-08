@@ -9,7 +9,15 @@
 
 CLICK_DECLS
 
+
 class TCPRetransmitter;
+struct fcb;
+
+struct retransmissionTimerData
+{
+    TCPRetransmitter *retransmitter;
+    struct fcb *fcb;
+};
 
 class RetransmissionTiming
 {
@@ -17,7 +25,7 @@ public:
     RetransmissionTiming();
     ~RetransmissionTiming();
 
-    void initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter, TimerCallback f);
+    void initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter);
     bool isTimerInitialized();
 
     bool startRTTMeasure(uint32_t seq);
@@ -26,14 +34,17 @@ public:
     bool isMeasureInProgress();
 
     bool startTimer();
-    bool startTimeDoubleRTO();
+    bool startTimerDoubleRTO();
     bool stopTimer();
     bool restartTimer();
     bool isTimerRunning();
 
+    static void timerFired(Timer *timer, void *data);
+
 private:
     // Retransmission timer
     Timer timer;
+    struct retransmissionTimerData timerData;
 
     bool measureInProgress;
     Timestamp measureStartTime;

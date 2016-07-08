@@ -2,6 +2,7 @@
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
 #include "retransmissiontiming.hh"
+#include "tcpretransmitter.hh"
 
 CLICK_DECLS
 
@@ -16,7 +17,7 @@ RetransmissionTiming::RetransmissionTiming()
 
 RetransmissionTiming::~RetransmissionTiming()
 {
-
+    stopTimer();
 }
 
 void RetransmissionTiming::computeClockGranularity()
@@ -34,16 +35,17 @@ void RetransmissionTiming::computeClockGranularity()
         clockGranularity = timerAdjustment;
     else
         clockGranularity = epsilon;
-
 }
 
-void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter, TimerCallback f)
+void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter)
 {
     timer.initialize((Element*)retransmitter);
     // Assign the callback of the timer
     // Give it a pointer to the fcb so that when the timer fires, we
     // can access it
-    timer.assign(f, (void*)fcb);
+    timerData.retransmitter = retransmitter;
+    timerData.fcb = fcb;
+    timer.assign(RetransmissionTiming::timerFired, (void*)&timerData);
 }
 
 bool RetransmissionTiming::isTimerInitialized()
@@ -59,7 +61,7 @@ bool RetransmissionTiming::startRTTMeasure(uint32_t seq)
     measureInProgress = true;
     rttSeq = seq;
     measureStartTime.assign_now();
-    
+
     return true;
 }
 
@@ -165,7 +167,7 @@ bool RetransmissionTiming::startTimer()
     return true;
 }
 
-bool RetransmissionTiming::startTimeDoubleRTO()
+bool RetransmissionTiming::startTimerDoubleRTO()
 {
     if(!isTimerInitialized() || isTimerRunning())
         return false;
@@ -189,8 +191,7 @@ bool RetransmissionTiming::stopTimer()
 
 bool RetransmissionTiming::restartTimer()
 {
-    if(!stopTimer())
-        return false;
+    stopTimer();
 
     if(!startTimer())
         return false;
@@ -218,6 +219,13 @@ void RetransmissionTiming::checkRTOMinValue()
     // RTO should be at least one second (RFC 1122)
     if(rto < 1000)
         rto = 1000;
+}
+
+void RetransmissionTiming::timerFired(Timer *timer, void *data)
+{
+    struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
+    TCPRetransmitter *retransmitter = (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
+    retransmitter->retransmissionTimerFired(fcb);
 }
 
 CLICK_ENDDECLS

@@ -110,9 +110,9 @@ class ByteStreamMaintainer
         uint32_t getLastAckReceived();
         void printTrees();
         void initialize(RBTMemoryPoolStreamManager *rbtManager);
+        void prune(uint32_t position);
 
     private:
-        void prune(uint32_t position);
         void insertInAckTree(uint32_t position, int offset);
         void insertInSeqTree(uint32_t position, int offset);
         void insertInTree(rb_red_blk_tree* tree, uint32_t position, int offset);

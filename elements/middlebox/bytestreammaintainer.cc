@@ -145,6 +145,15 @@ void ByteStreamMaintainer::prune(uint32_t position)
         return;
     }
 
+    pruneCounter++;
+
+    // Avoid pruning at every ack
+    if(pruneCounter < BS_PRUNE_THRESHOLD)
+        return;
+
+    click_chatter("Tree pruned");
+    pruneCounter = 0;
+
     // Remove every element in the tree with a key < position
     RBPrune(treeAck, &position);
 
@@ -215,18 +224,7 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
 void ByteStreamMaintainer::setLastAckReceived(uint32_t ackNumber)
 {
     if(ackNumber > lastAckReceived)
-    {
-        pruneCounter++;
         lastAckReceived = ackNumber;
-    }
-
-    // Avoid pruning at every ack
-    if(pruneCounter >= BS_PRUNE_THRESHOLD)
-    {
-        click_chatter("Tree pruned");
-        pruneCounter = 0;
-        prune(ackNumber);
-    }
 }
 
 uint32_t ByteStreamMaintainer::getLastAckReceived()

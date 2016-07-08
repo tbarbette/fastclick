@@ -106,8 +106,8 @@ uint16_t TCPElement::getPayloadOffset(Packet* packet)
     return offset;
 }
 
-Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
-                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags)
+WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
+                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags, uint32_t contentSize)
 {
     struct click_ether *ether; // Ethernet header
     struct click_ip *ip;       // IP header
@@ -115,7 +115,7 @@ Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
 
     // Build a new packet
     WritablePacket *packet = Packet::make(sizeof(struct click_ether)
-        + sizeof(struct click_ip) + sizeof(struct click_tcp));
+        + sizeof(struct click_ip) + sizeof(struct click_tcp) + contentSize);
 
     assert(packet != NULL);
 
