@@ -62,9 +62,6 @@ private:
     bool getAnnotationBit(Packet*, int);
 
     // Constants
-    const int offsetAnnotationBools = 12; // 1 byte
-    const int offsetContentOffset = 13;   // 2 bytes
-
     // Up to 8 booleans can be stored in the corresponding annotation
     const int offsetAnnotationDirty = 0;
 

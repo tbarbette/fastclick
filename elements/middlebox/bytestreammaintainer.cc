@@ -17,6 +17,7 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     initialized = false;
     treeAck = NULL;
     treeSeq = NULL;
+    windowSize = 32120;
 }
 
 void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager)
@@ -230,6 +231,56 @@ void ByteStreamMaintainer::setLastAckReceived(uint32_t ackNumber)
 uint32_t ByteStreamMaintainer::getLastAckReceived()
 {
     return lastAckReceived;
+}
+
+void ByteStreamMaintainer::setWindowSize(uint16_t windowSize)
+{
+    this->windowSize = windowSize;
+}
+
+uint16_t ByteStreamMaintainer::getWindowSize()
+{
+    return windowSize;
+}
+
+void ByteStreamMaintainer::setIpSrc(uint32_t ipSrc)
+{
+    this->ipSrc = ipSrc;
+}
+
+uint32_t ByteStreamMaintainer::getIpSrc()
+{
+    return ipSrc;
+}
+
+void ByteStreamMaintainer::setIpDst(uint32_t ipDst)
+{
+    this->ipDst = ipDst;
+}
+
+uint32_t ByteStreamMaintainer::getIpDst()
+{
+    return ipDst;
+}
+
+void ByteStreamMaintainer::setPortSrc(uint16_t portSrc)
+{
+    this->portSrc = portSrc;
+}
+
+uint16_t ByteStreamMaintainer::getPortSrc()
+{
+    return portSrc;
+}
+
+void ByteStreamMaintainer::setPortDst(uint16_t portDst)
+{
+    this->portDst = portDst;
+}
+
+uint16_t ByteStreamMaintainer::getPortDst()
+{
+    return portDst;
 }
 
 int ByteStreamMaintainer::lastOffsetInAckTree()

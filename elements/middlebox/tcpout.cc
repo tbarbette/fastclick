@@ -45,19 +45,21 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         setSequenceNumber(packet, newSeq);
         seqModified = true;
     }
-    
+
     // Update the last sequence number seen
     // This number is used when crafting ACKs
     byteStreamMaintainer.setLastSeqSent(newSeq);
+
+    // Update the window size
+    byteStreamMaintainer.setWindowSize(getWindowSize(packet));
 
     // Update the value of the last ACK sent
     byteStreamMaintainer.setLastAckSent(prevAck);
 
     // Ensure that the value of the ACK is not below the last ACKed position
-    /* This solves the following problem:
-     * - We ACK a packet manually for any reason
-     * - The "manual" ACK is lost
-     */
+    // This solves the following problem:
+    // - We ACK a packet manually for any reason
+    // -> The "manual" ACK is lost
     setAckNumber(packet, byteStreamMaintainer.getLastAckSent());
 
     if(getAckNumber(packet) != prevAck)
@@ -95,7 +97,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                 // the initial value
                 tcp_seq_t seq = getAckNumber(packet);
                 seq = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(seq);
-                uint16_t winSize = getWindowSize(packet);
+
                 // The ACK is the sequence number sent by the source
                 // to which we add the old size of the payload to acknowledge it
                 tcp_seq_t ack = prevSeq + prevPayloadSize;
@@ -104,7 +106,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                     ack++;
 
                 // Craft and send the ack
-                sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack, winSize);
+                sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack);
 
                 // Even if the packet is empty it can still contain relevant
                 // information (significant ACK value or another flag)
@@ -137,7 +139,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     return packet;
 }
 
-void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize)
+void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack)
 {
     if(noutputs() < 2)
     {
@@ -156,6 +158,8 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     // a sequence number sent before by the other side
     if(SEQ_LT(seq, maintainer.getLastSeqSent()))
         seq = maintainer.getLastSeqSent();
+
+    uint16_t winSize = maintainer.getWindowSize();
 
     // The packet is now empty, we discard it and send an ACK directly to the source
     click_chatter("Sending an ACK! (%u)", ack);

@@ -4,6 +4,7 @@
 #include <click/error.hh>
 #include <clicknet/tcp.h>
 #include <click/timestamp.hh>
+#include <click/multithread.hh>
 #include "tcpin.hh"
 #include "ipelement.hh"
 
@@ -288,6 +289,8 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
     uint16_t tcpOffset = getPayloadOffset(packet);
+    uint16_t contentOffset = getContentOffset(packet);
+    position += contentOffset;
     list->addModification(seqNumber + position - tcpOffset, -((int)length));
 
     unsigned char *source = packet->data();
@@ -305,6 +308,8 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
     uint16_t tcpOffset = getPayloadOffset(packet);
+    uint16_t contentOffset = getContentOffset(packet);
+    position += contentOffset;
     getModificationList(fcb, packet)->addModification(seqNumber + position - tcpOffset, (int)length);
 
     uint32_t bytesAfter = packet->length() - position;
@@ -339,7 +344,7 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped)
     // If the ACK has been mapped, we map it back to get its initial value
     if(ackMapped)
         seq = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(seq);
-    uint16_t winSize = getWindowSize(packet);
+
     // The ACK is the sequence number sent by the source
     // to which we add the size of the payload to acknowledge it
     tcp_seq_t ack = getSequenceNumber(packet) + getPayloadLength(packet);
@@ -348,7 +353,7 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped)
         ack++;
 
     // Craft and send the ack
-    outElement->sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack, winSize);
+    outElement->sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack);
 }
 
 void TCPIn::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
@@ -414,6 +419,12 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         fcb->tcpin.tableTcpCommon = &tableFcbTcpCommon;
         fcb->tcpin.poolTcpCommon = &poolFcbTcpCommon;
     }
+
+    // Set information about the flow
+    fcb->tcp_common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));
+    fcb->tcp_common->maintainers[getFlowDirection()].setIpDst(getDestinationAddress(packet));
+    fcb->tcp_common->maintainers[getFlowDirection()].setPortSrc(getDestinationPort(packet));
+    fcb->tcp_common->maintainers[getFlowDirection()].setPortDst(getSourcePort(packet));
 
     return true;
 }

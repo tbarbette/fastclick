@@ -14,8 +14,8 @@ class TCPElement : public IPElement
 {
 public:
     WritablePacket* forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags, uint32_t contentSize = 0);
-    const uint16_t getDestinationPort(Packet*);
-    const uint16_t getSourcePort(Packet*);
+    uint16_t getDestinationPort(Packet*);
+    uint16_t getSourcePort(Packet*);
     tcp_seq_t getSequenceNumber(Packet*);
     tcp_seq_t getAckNumber(Packet*);
     uint16_t getWindowSize(Packet *packet);

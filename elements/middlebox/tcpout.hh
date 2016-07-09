@@ -22,7 +22,7 @@ public:
     bool isOutElement()                   { return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    void sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize);
+    void sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack);
 
     void setInElement(TCPIn*);
 

@@ -88,8 +88,6 @@ void TCPRetransmitter::push(int port, Packet *packet)
             // Add packet content to the buffer
             buffer->addDataAtEnd(content, contentSize);
 
-            click_chatter("Packet %u added to retransmission buffer (%u bytes)", seq, contentSize);
-
             // Start a new RTT measure if possible
             fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
         }
@@ -169,12 +167,13 @@ void TCPRetransmitter::push(int port, Packet *packet)
         computeTCPChecksum(newPacket);
         computeIPChecksum(newPacket);
 
+        // Signal the retransmission to avoind taking retransmitted packets
+        // into account to compute the RTT
         fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(mappedSeq + payloadSize);
 
         // Push the packet with its new content
         output(0).push(newPacket);
     }
-
 }
 
 void TCPRetransmitter::prune(struct fcb *fcb)
@@ -221,9 +220,6 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     if(!dataToRetransmit(fcb))
         return;
 
-    // TODO retransmit the data
-    // Beginning: lastAckReceived mapped
-    // End: lastAckSent
     uint32_t start = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived();
     uint32_t end = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
     start = fcb->tcp_common->maintainers[flowDirection].mapAck(start);
@@ -232,15 +228,29 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     fcb->tcpretransmitter.buffer->getData(start, sizeOfRetransmission, getBuffer);
 
     uint32_t ack = fcb->tcp_common->maintainers[flowDirection].getLastAckSent();
-
-    // TODO
-    uint32_t ipSrc = 0;
-    uint32_t ipDst = 0;
-    uint16_t portSrc = 0;
-    uint16_t portDst = 0;
-    uint16_t winSize = 0;
+    uint32_t ipSrc = fcb->tcp_common->maintainers[flowDirection].getIpSrc();
+    uint32_t ipDst = fcb->tcp_common->maintainers[flowDirection].getIpDst();
+    uint16_t portSrc = fcb->tcp_common->maintainers[flowDirection].getPortSrc();
+    uint16_t portDst = fcb->tcp_common->maintainers[flowDirection].getPortDst();
+    uint16_t winSize = fcb->tcp_common->maintainers[flowDirection].getWindowSize();
 
     WritablePacket* packet = forgePacket(ipSrc, ipDst, portSrc, portDst, start, ack, winSize, TH_ACK, sizeOfRetransmission);
+
+    setPacketTotalLength(packet, packet->length() - getIPHeaderOffset(packet));
+
+    // Copy the content of the buffer to the payload area
+    setPayload(packet, &getBuffer[0], sizeOfRetransmission);
+
+    // Compute the checksums
+    computeTCPChecksum(packet);
+    computeIPChecksum(packet);
+
+    // Signal the retransmission to avoind taking retransmitted packets
+    // into account to compute the RTT
+    fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(start + sizeOfRetransmission);
+
+    // Push the packet
+    output(0).push(packet);
 
     fcb->tcp_common->retransmissionTimings[flowDirection].startTimerDoubleRTO();
 }

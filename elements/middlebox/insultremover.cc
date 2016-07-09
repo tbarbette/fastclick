@@ -31,10 +31,10 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
 
     nbPackets++;
 
-    /*if(nbPackets == 5)
-        closeConnection(fcb, packet, true);*/
+    if(nbPackets == 5)
+        requestMorePackets(fcb, packet);
 
-    insertBytes(fcb, packet, contentOffset, 6);
+    insertBytes(fcb, packet, 0, 6);
 
     source[0] = 'H';
     source[1] = 'E';
@@ -43,18 +43,18 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     source[4] = 'O';
     source[5] = ' ';
 
-
-    while(source != NULL)
+    firstOccur = source;
+    while(firstOccur != NULL)
     {
-        firstOccur = (unsigned char*)strstr((char*)source, "and");
+        firstOccur = (unsigned char*)strstr((char*)firstOccur, "and");
         if(firstOccur != NULL)
         {
-            uint32_t position = firstOccur - packet->data();
+            uint32_t position = firstOccur - source;
             removeBytes(fcb, packet, position, 3);
             setPacketDirty(fcb, packet);
         }
-            source = firstOccur;
     }
+    
 
     return packet;
 }

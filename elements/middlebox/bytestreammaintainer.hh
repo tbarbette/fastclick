@@ -102,15 +102,26 @@ class ByteStreamMaintainer
         uint32_t mapAck(uint32_t position);
         uint32_t mapSeq(uint32_t position);
         int lastOffsetInAckTree();
+        void printTrees();
+        void initialize(RBTMemoryPoolStreamManager *rbtManager);
+        void prune(uint32_t position);
+
         void setLastAckSent(uint32_t ackNumber);
         uint32_t getLastAckSent();
         void setLastSeqSent(uint32_t seqNumber);
         uint32_t getLastSeqSent();
         void setLastAckReceived(uint32_t ackNumber);
         uint32_t getLastAckReceived();
-        void printTrees();
-        void initialize(RBTMemoryPoolStreamManager *rbtManager);
-        void prune(uint32_t position);
+        void setWindowSize(uint16_t windowSize);
+        uint16_t getWindowSize();
+        void setIpSrc(uint32_t ipSrc);
+        uint32_t getIpSrc();
+        void setIpDst(uint32_t ipDst);
+        uint32_t getIpDst();
+        void setPortSrc(uint16_t portSrc);
+        uint16_t getPortSrc();
+        void setPortDst(uint16_t portDst);
+        uint16_t getPortDst();
 
     private:
         void insertInAckTree(uint32_t position, int offset);
@@ -120,11 +131,18 @@ class ByteStreamMaintainer
         rb_red_blk_tree* treeAck;
         rb_red_blk_tree* treeSeq;
         RBTManager* rbtManager;
+        uint32_t pruneCounter;
+        bool initialized;
+
         uint32_t lastAckSent;     // /!\ mapped value (as sent)
         uint32_t lastSeqSent;     // /!\ mapped value (as sent)
         uint32_t lastAckReceived; // /!\ Unamapped value (as received)
-        uint32_t pruneCounter;
-        bool initialized;
+        uint16_t windowSize;
+        uint32_t ipSrc;
+        uint32_t ipDst;
+        uint16_t portSrc;
+        uint16_t portDst;
+
 };
 
 CLICK_ENDDECLS

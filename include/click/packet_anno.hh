@@ -22,6 +22,12 @@
 #define WIFI_EXTRA_ANNO_SIZE		24
 #define WIFI_EXTRA_ANNO(p)		((click_wifi_extra *) ((p)->anno_u8() + WIFI_EXTRA_ANNO_OFFSET))
 
+// bytes 16-18
+#define MIDDLEBOX_BOOLS_OFFSET  16
+#define MIDDLEBOX_BOOLS_SIZE    1
+#define MIDDLEBOX_CONTENTOFFSET_OFFSET  17
+#define MIDDLEBOX_CONTENTOFFSET_SIZE    2
+
 // byte 16
 #define PAINT_ANNO_OFFSET		16
 #define PAINT_ANNO_SIZE			1

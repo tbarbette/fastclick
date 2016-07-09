@@ -2,6 +2,7 @@
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/packet_anno.hh>
 #include "stackelement.hh"
 
 CLICK_DECLS
@@ -56,12 +57,12 @@ Packet* StackElement::processPacket(struct fcb *fcb, Packet* p)
 
 void StackElement::setContentOffset(Packet* p, uint16_t offset)
 {
-    p->set_anno_u16(offsetContentOffset, offset);
+    p->set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
 }
 
 uint16_t StackElement::getContentOffset(Packet* p)
 {
-    return p->anno_u16(offsetContentOffset);
+    return p->anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
 }
 
 void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
@@ -75,7 +76,7 @@ void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
     mask = mask << bit;
 
     // Get previous value
-    unsigned char previousValue = (unsigned char)(p->anno_u8(offsetAnnotationBools));
+    unsigned char previousValue = (unsigned char)(p->anno_u8(MIDDLEBOX_BOOLS_OFFSET));
 
     // Apply masks
     // Clear the bit to modify
@@ -84,7 +85,7 @@ void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
     previousValue |= mask;
 
     // Set the new value
-    p->set_anno_u8(offsetAnnotationBools, previousValue);
+    p->set_anno_u8(MIDDLEBOX_BOOLS_OFFSET, previousValue);
 }
 
 bool StackElement::getAnnotationBit(Packet* p, int bit)
@@ -94,7 +95,7 @@ bool StackElement::getAnnotationBit(Packet* p, int bit)
     mask = mask << bit;
 
     // Get full value
-    unsigned char value = (unsigned char)(p->anno_u8(offsetAnnotationBools));
+    unsigned char value = (unsigned char)(p->anno_u8(MIDDLEBOX_BOOLS_OFFSET));
 
     // Apply mask
     value &= mask;

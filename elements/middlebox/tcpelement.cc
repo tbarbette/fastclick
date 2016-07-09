@@ -149,8 +149,8 @@ WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t
     memcpy((void*)&(ip->ip_dst), (void*)&daddr, sizeof(daddr));
 
     // Set the TCP ports
-    memcpy((void*)&(tcp->th_sport), (void*)&sport, sizeof(sport));
-    memcpy((void*)&(tcp->th_dport), (void*)&dport, sizeof(dport));
+    tcp->th_sport = htons(sport);
+    tcp->th_dport = htons(dport);
     tcp->th_seq = htonl(seq); // Set the sequence number
     tcp->th_ack = htonl(ack); // Set the ack number
     tcp->th_off = 5; // Set the data offset
@@ -169,18 +169,18 @@ WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t
     return packet;
 }
 
-const uint16_t TCPElement::getSourcePort(Packet* packet)
+uint16_t TCPElement::getSourcePort(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 
-    return (uint16_t)tcph->th_sport;
+    return ntohs(tcph->th_sport);
 }
 
-const uint16_t TCPElement::getDestinationPort(Packet* packet)
+uint16_t TCPElement::getDestinationPort(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 
-    return (uint16_t)tcph->th_dport;
+    return ntohs(tcph->th_dport);
 }
 
 void TCPElement::setFlowDirection(unsigned int flowDirection)
@@ -251,6 +251,7 @@ bool TCPElement::isJustAnAck(Packet* packet)
     else
         return false;
 }
+
 
 CLICK_ENDDECLS
 ELEMENT_PROVIDES(TCPElement)
