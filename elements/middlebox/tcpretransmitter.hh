@@ -37,6 +37,8 @@ public:
 
     void retransmissionTimerFired(struct fcb* fcb);
 
+    void signalAck(struct fcb* fcb, uint32_t ack);
+
 private:
     BufferPool *rawBufferPool;
     MemoryPool<CircularBuffer> circularPool;

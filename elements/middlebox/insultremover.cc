@@ -54,7 +54,7 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
             setPacketDirty(fcb, packet);
         }
     }
-    
+
 
     return packet;
 }

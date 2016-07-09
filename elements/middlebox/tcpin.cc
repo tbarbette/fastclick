@@ -143,6 +143,17 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         ackNumber = getAckNumber(packet);
         newAckNumber = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
 
+        // Update the value of the last ACK received
+        fcb->tcp_common->maintainers[getFlowDirection()].setLastAckReceived(ackNumber);
+
+        // Prune the ByteStreamMaintainer of the other side
+        fcb->tcp_common->maintainers[getOppositeFlowDirection()].prune(ackNumber);
+
+        // Update the statistics regarding the RTT
+        // And potentially update the retransmission timer
+        fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(fcb, ackNumber);
+
+
         // Check if the current packet is just an ACK without more information
         if(isJustAnAck(packet))
         {
@@ -152,20 +163,11 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
             {
                 // If this is not the case, the packet does not give any information
                 // We can drop it
-                click_chatter("Received an ACK for a sequence number already ACKed. Dropping it.");
+                click_chatter("Received an ACK for a sequence number already ACKed. Dropping it (%u ; %u).", newAckNumber, fcb->tcp_common->maintainers[getFlowDirection()].getLastAckSent());
                 packet->kill();
                 return NULL;
             }
         }
-
-        // Update the value of the last ACK received
-        fcb->tcp_common->maintainers[getFlowDirection()].setLastAckReceived(ackNumber);
-
-        // Prune the ByteStreamMaintainer of the other side
-        fcb->tcp_common->maintainers[getOppositeFlowDirection()].prune(ackNumber);
-
-        // Update the statistics regarding the RTT
-        fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
 
         // If needed, update the ACK value in the packet with the mapped one
         if(ackNumber != newAckNumber)

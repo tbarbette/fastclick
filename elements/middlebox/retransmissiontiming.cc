@@ -13,6 +13,7 @@ RetransmissionTiming::RetransmissionTiming()
     rttvar = 0;
     rto = 3000; // RFC 1122
     measureInProgress = false;
+    owner = NULL;
 }
 
 RetransmissionTiming::~RetransmissionTiming()
@@ -39,6 +40,7 @@ void RetransmissionTiming::computeClockGranularity()
 
 void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter)
 {
+    owner = retransmitter;
     timer.initialize((Element*)retransmitter);
     // Assign the callback of the timer
     // Give it a pointer to the fcb so that when the timer fires, we
@@ -65,8 +67,11 @@ bool RetransmissionTiming::startRTTMeasure(uint32_t seq)
     return true;
 }
 
-bool RetransmissionTiming::signalAck(uint32_t ack)
+bool RetransmissionTiming::signalAck(struct fcb *fcb, uint32_t ack)
 {
+    if(owner != NULL)
+        owner->signalAck(fcb, ack);
+
     if(!measureInProgress)
         return false;
 
@@ -164,6 +169,8 @@ bool RetransmissionTiming::startTimer()
 
     timer.schedule_after_msec(rto);
 
+    click_chatter("Timer starting (%u)", rto);
+
     return true;
 }
 
@@ -176,6 +183,8 @@ bool RetransmissionTiming::startTimerDoubleRTO()
     checkRTOMaxValue();
     timer.schedule_after_msec(rto);
 
+    click_chatter("Timer starting with double RTO (%u)", rto);
+
     return true;
 }
 
@@ -185,6 +194,8 @@ bool RetransmissionTiming::stopTimer()
         return false;
 
     timer.unschedule();
+
+    click_chatter("Timer stopped");
 
     return true;
 }

@@ -90,6 +90,19 @@ void TCPRetransmitter::push(int port, Packet *packet)
 
             // Start a new RTT measure if possible
             fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
+
+            uint32_t lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
+            // ackToReceive is the ACK that will be received for the current
+            // packet. We map it to be able to compare it with lastAckSent
+            // which is mapped
+            uint32_t ackToReceive = fcb->tcp_common->maintainers[flowDirection].mapAck(seq + contentSize);
+
+            if(SEQ_LEQ(ackToReceive, lastAckSent))
+            {
+                // We know that we are transmitting ACKed data
+                // We thus start the retransmission timer
+                fcb->tcp_common->retransmissionTimings[flowDirection].startTimer();
+            }
         }
         // Prune the tree to remove received packets
         prune(fcb);
@@ -205,7 +218,10 @@ bool TCPRetransmitter::dataToRetransmit(struct fcb *fcb)
     // ack received, it means we have sent ACK by ourselves and thus
     // we have in the buffer waiting to be acked
     if(SEQ_LT(lastAckReceived, lastAckSent))
+    {
+        click_chatter("Data to retransmit! %u ; %u", lastAckReceived, lastAckSent);
         return true;
+    }
     else
         return false;
 }
@@ -252,7 +268,18 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     // Push the packet
     output(0).push(packet);
 
+    fcb->tcp_common->retransmissionTimings[flowDirection].stopTimer();
     fcb->tcp_common->retransmissionTimings[flowDirection].startTimerDoubleRTO();
+}
+
+void TCPRetransmitter::signalAck(struct fcb* fcb, uint32_t ack)
+{
+    // If all the data have been transmitted, stop the timer
+    // Otherwise, restart it
+    if(dataToRetransmit(fcb))
+        fcb->tcp_common->retransmissionTimings[flowDirection].restartTimer();
+    else
+        fcb->tcp_common->retransmissionTimings[flowDirection].stopTimer();
 }
 
 ELEMENT_REQUIRES(ByteStreamMaintainer)

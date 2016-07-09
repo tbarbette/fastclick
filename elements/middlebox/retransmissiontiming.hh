@@ -29,7 +29,7 @@ public:
     bool isTimerInitialized();
 
     bool startRTTMeasure(uint32_t seq);
-    bool signalAck(uint32_t ack);
+    bool signalAck(struct fcb* fcb, uint32_t ack);
     bool signalRetransmission(uint32_t expectedAck);
     bool isMeasureInProgress();
 
@@ -45,6 +45,7 @@ private:
     // Retransmission timer
     Timer timer;
     struct retransmissionTimerData timerData;
+    TCPRetransmitter *owner;
 
     bool measureInProgress;
     Timestamp measureStartTime;
