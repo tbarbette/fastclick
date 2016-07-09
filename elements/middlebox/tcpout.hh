@@ -23,12 +23,15 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     void sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack);
+    void sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful);
 
     void setInElement(TCPIn*);
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
     TCPIn* inElement;
+private:
+    bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
 };
 
 CLICK_ENDDECLS

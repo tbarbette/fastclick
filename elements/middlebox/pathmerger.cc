@@ -111,12 +111,12 @@ void PathMerger::packetSent(struct fcb *fcb, Packet* packet)
     removeEntry(fcb, packet);
 }
 
-void PathMerger::closeConnection(struct fcb *fcb, WritablePacket* packet, bool graceful)
+void PathMerger::closeConnection(struct fcb *fcb, WritablePacket* packet, bool graceful, bool bothSides)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);
 
     if(previousElem != NULL)
-        previousElem->closeConnection(fcb, packet, graceful);
+        previousElem->closeConnection(fcb, packet, graceful, bothSides);
 }
 
 void PathMerger::removeEntry(struct fcb *fcb, Packet *packet)

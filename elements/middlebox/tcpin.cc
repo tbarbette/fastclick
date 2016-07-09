@@ -112,6 +112,12 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         }
     }
 
+    if(!checkConnectionClosed(fcb, p))
+    {
+        p->kill();
+        return NULL;
+    }
+
     WritablePacket *packet = p->uniqueify();
 
     // Compute the offset of the TCP payload
@@ -196,7 +202,7 @@ TCPIn* TCPIn::getReturnElement()
     return returnElement;
 }
 
-void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful)
+void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides)
 {
     uint8_t newFlag = 0;
 
@@ -210,45 +216,46 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
     // Change the flags of the packet
     tcph->th_flags = tcph->th_flags | newFlag;
 
-    fcb->tcpin.closingState = TCPClosingState::CLOSED;
+    TCPClosingState::Value newStateSelf = TCPClosingState::BEING_CLOSED_GRACEFUL;
+    TCPClosingState::Value newStateOther = TCPClosingState::CLOSED_GRACEFUL;
 
-    click_chatter("Closing connection on flow %u", getFlowDirection());
-
-    StackElement::closeConnection(fcb, packet, graceful);
-}
-
-/*
-void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uint16_t sport,
-                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
-{
-    closeConnection(fcb, saddr, daddr, sport, dport, seq, ack, graceful, true);
-}
-
-void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uint16_t sport,
-                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful, bool initiator)
-{
-    if(graceful)
+    if(!graceful)
     {
-        Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, 32120, TH_FIN);
-        outElement->push(0, packet);
-        fcb->tcpin.closingState = TCPClosingState::FIN_WAIT;
-
-        click_chatter("Sending FIN on flow %u", getFlowDirection());
+        newStateSelf = TCPClosingState::BEING_CLOSED_UNGRACEFUL;
+        newStateOther = TCPClosingState::CLOSED_UNGRACEFUL;
     }
-    else
+    fcb->tcp_common->closingStates[getFlowDirection()] = newStateSelf;
+
+    if(bothSides)
     {
-        Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, 32120, TH_RST);
-        outElement->push(0, packet);
-        fcb->tcpin.closingState = TCPClosingState::CLOSED;
+        fcb->tcp_common->closingStates[getOppositeFlowDirection()] = newStateOther;
 
-        click_chatter("Sending RST on flow %u", getFlowDirection());
+        // Get the information needed to ack the given packet
+        uint32_t saddr = getDestinationAddress(packet);
+        uint32_t daddr = getSourceAddress(packet);
+        uint16_t sport = getDestinationPort(packet);
+        uint16_t dport = getSourcePort(packet);
+        // The SEQ value is the initial ACK value in the packet sent
+        // by the source.
+        tcp_seq_t seq = getAckNumber(packet);
+        // As the ACK has been mapped, we map it back to get its initial value
+        seq = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(seq);
+
+        // The ACK is the sequence number sent by the source
+        // to which we add the size of the payload to acknowledge it
+        tcp_seq_t ack = getSequenceNumber(packet) + getPayloadLength(packet);
+
+        if(isFin(packet) || isSyn(packet))
+            ack++;
+
+        // Craft and send the ack
+        outElement->sendClosingPacket(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack, graceful);
     }
-    // "initiator" indicates which side of the connection closes it (us (true) or the other side (false))
-    // If we are the initiator, tell the other side of the connection to do so as well
-    if(initiator)
-        returnElement->closeConnection(fcb, daddr, saddr, dport, sport, ack, seq, graceful, false);
+
+    click_chatter("Closing connection on flow %u (graceful: %u, both sides: %u)", getFlowDirection(), graceful, bothSides);
+
+    StackElement::closeConnection(fcb, packet, graceful, bothSides);
 }
-*/
 
 ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* packet)
 {
@@ -366,6 +373,24 @@ void TCPIn::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
 
     // Continue in the stack function
     StackElement::setPacketDirty(fcb, packet);
+}
+
+bool TCPIn::checkConnectionClosed(struct fcb* fcb, Packet *packet)
+{
+    TCPClosingState::Value closingState = fcb->tcp_common->closingStates[getFlowDirection()];
+    if(closingState != TCPClosingState::OPEN)
+    {
+        if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL || closingState == TCPClosingState::CLOSED_GRACEFUL)
+        {
+            // We ACK every packet and we discard it
+            if(isFin(packet) || isSyn(packet) || getPayloadLength(packet) > 0)
+                ackPacket(fcb, packet, false);
+        }
+
+        return false;
+    }
+
+    return true;
 }
 
 unsigned int TCPIn::determineFlowDirection()

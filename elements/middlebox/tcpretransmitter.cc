@@ -128,6 +128,12 @@ void TCPRetransmitter::push(int port, Packet *packet)
         // are unmodified. Thus, we need to perform the right mappings to
         // have the connection with the packets in the tree
 
+        if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
+        {
+            packet->kill();
+            return;
+        }
+
         // Get the sequence number that will be the key of the packet in the buffer
         uint32_t seq = getSequenceNumber(packet);
 
@@ -233,6 +239,9 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
+    if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
+        return;
+
     if(!dataToRetransmit(fcb))
         return;
 
@@ -274,6 +283,9 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
 
 void TCPRetransmitter::signalAck(struct fcb* fcb, uint32_t ack)
 {
+    if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
+        return;
+        
     // If all the data have been transmitted, stop the timer
     // Otherwise, restart it
     if(dataToRetransmit(fcb))

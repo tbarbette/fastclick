@@ -24,9 +24,13 @@ struct fcb_tcp_common
     ByteStreamMaintainer maintainers[2];
     // One retransmission manager for each direction of the connecytion
     RetransmissionTiming retransmissionTimings[2];
+    // State of the connection
+    TCPClosingState::Value closingStates[2];
 
     fcb_tcp_common()
     {
+        closingStates[0] = TCPClosingState::OPEN;
+        closingStates[1] = TCPClosingState::OPEN;
     }
 
     ~fcb_tcp_common()
@@ -77,8 +81,6 @@ struct fcb_tcpin
     MemoryPool<struct ModificationList>* poolModificationLists;
     MemoryPool<struct ModificationNode>* poolModificationNodes;
 
-    TCPClosingState::Value closingState;
-
     // Members used to be able to free memory for tcp_common
     // destroyed
     MemoryPool<struct fcb_tcp_common>* poolTcpCommon;
@@ -89,7 +91,6 @@ struct fcb_tcpin
 
     fcb_tcpin()
     {
-        closingState = TCPClosingState::OPEN;
         poolModificationLists = NULL;
         poolModificationNodes = NULL;
 
@@ -143,15 +144,6 @@ struct fcb_pathmerger
     }
 };
 
-struct fcb_tcpout
-{
-    TCPClosingState::Value closingState;
-
-    fcb_tcpout()
-    {
-        closingState = TCPClosingState::OPEN;
-    }
-};
 
 struct fcb_tcpretransmitter
 {
@@ -183,7 +175,6 @@ struct fcb
     struct fcb_tcpin tcpin;
     struct fcb_httpin httpin;
     struct fcb_pathmerger pathmerger;
-    struct fcb_tcpout tcpout;
     struct fcb_tcpretransmitter tcpretransmitter;
 
     fcb()

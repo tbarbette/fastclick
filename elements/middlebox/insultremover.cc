@@ -34,6 +34,9 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     if(nbPackets == 5)
         requestMorePackets(fcb, packet);
 
+    if(nbPackets == 10)
+        closeConnection(fcb, packet, false, true);
+
     insertBytes(fcb, packet, 0, 6);
 
     source[0] = 'H';

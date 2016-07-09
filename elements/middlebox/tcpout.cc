@@ -22,6 +22,12 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 
 Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
 {
+    if(!checkConnectionClosed(fcb, p))
+    {
+        p->kill();
+        return NULL;
+    }
+
     WritablePacket *packet = p->uniqueify();
 
     bool hasModificationList = inElement->hasModificationList(fcb, packet);
@@ -74,7 +80,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
         int offsetModification = -(initialLength - currentLength);
         uint32_t prevPayloadSize = getPayloadLength(packet);
 
-        // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo hdr)
+        // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo header)
         setPacketTotalLength(packet, initialLength + offsetModification);
 
         // Check if the modificationlist has to be committed
@@ -133,9 +139,6 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     // Notify the stack function that this packet has been sent
     packetSent(fcb, packet);
 
-    if(isFin(packet) || isRst(packet))
-        fcb->tcpout.closingState = TCPClosingState::CLOSED;
-
     return packet;
 }
 
@@ -171,9 +174,70 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     output(1).push(forged);
 }
 
+void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
+{
+    if(noutputs() < 2)
+    {
+        click_chatter("Warning: trying to send an FIN or RST packet on a TCPOut with only 1 output");
+        return;
+    }
+
+    // Update the number of the last ack sent for the other side
+    maintainer.setLastAckSent(ack);
+
+    if(SEQ_LT(seq, maintainer.getLastSeqSent()))
+        seq = maintainer.getLastSeqSent();
+
+    uint16_t winSize = maintainer.getWindowSize();
+
+    click_chatter("Sending a closing packet");
+
+    uint8_t flag = TH_ACK;
+
+    if(graceful)
+    {
+        flag = flag | TH_FIN;
+        // Ensure that further packet will have seq + 1 (for FIN flag) as a
+        // sequence number
+        maintainer.setLastSeqSent(seq + 1);
+    }
+    else
+        flag = flag | TH_RST;
+
+    // Craft the packet
+    Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, flag);
+
+    //Send it on the second output
+    output(1).push(forged);
+}
+
 void TCPOut::setInElement(TCPIn* inElement)
 {
     this->inElement = inElement;
+}
+
+bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
+{
+    if(fcb->tcp_common->closingStates[getFlowDirection()] == TCPClosingState::OPEN)
+        return true;
+
+    if(fcb->tcp_common->closingStates[getFlowDirection()] == TCPClosingState::BEING_CLOSED_GRACEFUL)
+    {
+        if(isFin(packet))
+            fcb->tcp_common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_GRACEFUL;
+
+        return true;
+    }
+    else if(fcb->tcp_common->closingStates[getFlowDirection()] == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
+    {
+        if(isRst(packet))
+            fcb->tcp_common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_UNGRACEFUL;
+
+        return true;
+    }
+
+    // Otherwise, the connection is closed
+    return false;
 }
 
 CLICK_ENDDECLS

@@ -139,13 +139,13 @@ void StackElement::packetSent(struct fcb *fcb, Packet* packet)
     previousStackElement->packetSent(fcb, packet);
 }
 
-void StackElement::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful)
+void StackElement::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides)
 {
     // Call the "closeConnection" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->closeConnection(fcb, packet, graceful);
+    previousStackElement->closeConnection(fcb, packet, graceful, bothSides);
 }
 
 void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
