@@ -20,12 +20,24 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     windowSize = 32120;
 }
 
-void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager)
+void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager, uint32_t flowStart)
 {
+    if(initialized)
+    {
+        click_chatter("Warning: ByteStreamMaintainer already initialized!");
+        return;
+    }
+
     this->rbtManager = rbtManager;
     treeAck = RBTreeCreate(rbtManager); // Create the RBT for ACK
     treeSeq = RBTreeCreate(rbtManager); // Create the RBT for Seq
+
     initialized = true;
+
+    // Insert a key indicating the beginning of the flow that will be used
+    // as a guard
+    insertInAckTree(flowStart, 0);
+    insertInSeqTree(flowStart, 0);
 }
 
 uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
@@ -37,21 +49,36 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
     }
 
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &position);
+    rb_red_blk_node* pred = treeAck->nil;
     rb_red_blk_node* succ = treeAck->nil;
+    uint32_t nodeKey = 0;
+    int nodeInfo = 0;
     uint32_t newPosition = position;
 
-    if(node != treeAck->nil)
+    if(node == treeAck->nil)
+        return position;
+
+    // Compute the new position
+    nodeKey = *((uint32_t*)node->key);
+    nodeInfo = *((int*)node->info);
+
+    newPosition += nodeInfo;
+
+    pred = TreePredecessor(treeAck, node);
+    succ = TreeSuccessor(treeAck, node);
+
+    int predOffset = 0;
+    // If the node has a predecessor
+    if(pred != treeAck->nil)
     {
-        // Compute the new position
-        int nodeInfo = *((int*)node->info);
-
-        if(nodeInfo < 0 && -(nodeInfo) > newPosition)
-            newPosition = 0;
-        else
-            newPosition += nodeInfo;
-
-        succ = TreeSuccessor(treeAck, node);
+        uint32_t predKey = *((uint32_t*)pred->key);
+        predOffset = *((int*)pred->info);
     }
+
+    uint32_t predBound = nodeKey + predOffset;
+
+    if(newPosition < predBound)
+        newPosition = predBound;
 
     // Check that the computed value is at most equal to the lowest value
     // obtained via the successor
@@ -60,18 +87,15 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
         uint32_t succPosition = *((uint32_t*)succ->key);
         int succOffset = *((int*)succ->info);
 
-        uint32_t succBound = 0;
+        if(succOffset > 0)
+        {
+            uint32_t succBound = 0;
 
-        if(succOffset < 0 && -(succOffset) > succPosition)
-            succBound = 0;
-        else
             succBound = succPosition + succOffset;
 
-        if(succBound < succPosition)
-            succBound = succPosition;
-
-        if(newPosition > succBound)
-            newPosition = succBound;
+            if(newPosition >= succBound)
+                newPosition = succBound;
+        }
     }
 
     return newPosition;
@@ -89,39 +113,26 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
     rb_red_blk_node* pred = treeSeq->nil;
     uint32_t newPosition = position;
 
-    if(node != treeSeq->nil)
-    {
-        // Compute the new position
-        int nodeInfo = *((int*)node->info);
+    if(node == treeSeq->nil)
+        return position;
 
-        if(nodeInfo < 0 && -(nodeInfo) > newPosition)
-            newPosition = 0;
-        else
-            newPosition += nodeInfo;
+    // Compute the new position
+    uint32_t nodeKey = *((uint32_t*)node->key);
+    int nodeInfo = *((int*)node->info);
 
-        pred = TreePredecessor(treeSeq, node);
-    }
+    newPosition += nodeInfo;
 
-    if(newPosition < 0)
-        newPosition = 0;
+    pred = TreePredecessor(treeSeq, node);
 
-    // Check that the computed value is at least equal to the lowest value
-    // obtained via the predecessor
-    uint32_t predPosition = 0;
     int predOffset = 0;
-
+    // If the node has a predecessor
     if(pred != treeSeq->nil)
     {
-        predPosition = *((uint32_t*)pred->key);
+        uint32_t predKey = *((uint32_t*)pred->key);
         predOffset = *((int*)pred->info);
     }
 
-    uint32_t predBound = 0;
-
-    if(predOffset < 0 && -(predOffset) > predPosition)
-        predBound = predPosition;
-    else
-        predBound = predPosition + predOffset;
+    uint32_t predBound = nodeKey + predOffset;
 
     if(newPosition < predBound)
         newPosition = predBound;

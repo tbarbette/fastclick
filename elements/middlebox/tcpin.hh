@@ -53,7 +53,7 @@ protected:
 
 private:
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
-    void ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped);
+    void ackPacket(struct fcb *fcb, Packet* packet);
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
 
     // TODO Will be thread local as each TCPIn is managed by a different thread

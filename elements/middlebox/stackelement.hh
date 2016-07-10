@@ -36,6 +36,8 @@ protected:
     bool getAnnotationDirty(Packet*);
     uint16_t getContentOffset(Packet*);
     void setContentOffset(Packet*, uint16_t);
+    void setInitialAck(Packet *p, uint32_t initialAck);
+    uint32_t getInitialAck(Packet *p);
     void buildFunctionStack();
     const unsigned char* getPacketContentConst(Packet*);
     unsigned char* getPacketContent(WritablePacket*);

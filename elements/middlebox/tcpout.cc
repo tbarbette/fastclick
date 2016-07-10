@@ -98,11 +98,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                 uint16_t dport = getSourcePort(packet);
                 // The SEQ value is the initial ACK value in the packet sent
                 // by the source.
-                // To get it, we take the current one (which has been corrected)
-                // and we map it as if it was a sequence number to get back
-                // the initial value
-                tcp_seq_t seq = getAckNumber(packet);
-                seq = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(seq);
+                tcp_seq_t seq = getInitialAck(packet);
 
                 // The ACK is the sequence number sent by the source
                 // to which we add the old size of the payload to acknowledge it

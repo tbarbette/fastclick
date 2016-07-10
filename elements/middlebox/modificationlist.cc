@@ -170,9 +170,8 @@ void ModificationList::mergeNodes()
             uint32_t range = prev->position + (int)abs(prev->offset);
 
             // If the modification of this node is within the range of the
-            // previous one and if they represent the same kind of modification
-            // (both a deletion or an insertion), merge them
-            if(node->position < range && sameSign(prev->offset, node->offset))
+            // previous one and if they represent both a deletion, merge them
+            if(node->position < range && prev->offset< 0 && sameSign(node->offset, prev->offset))
             {
                 // Remove current node and merge its value with the previous node
                 prev->offset += node->offset;
@@ -220,9 +219,9 @@ void ModificationList::commit(ByteStreamMaintainer &maintainer)
              * position of the node.
              * e.g: we insert 4 bytes at the positon 3, if we commit, it creates
              * an entry in the tree (3, -4). Thus, all the positions in the
-             * interval [3, 7] will be converted to 3 (to ensure that the
-             * value, to which the offset has been substracted, is at least equal
-             * to the position of the node).
+             * interval [3, 7] will be converted to 2 (to ensure the new
+             * value is at least equal to the max value obtain via
+             * the predecessor: 2)
              *
              * A problem occurs when modifications occuring earlier in the stream
              * result in a positive total offset. For instance, if we had the key

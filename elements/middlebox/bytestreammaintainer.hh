@@ -103,7 +103,7 @@ class ByteStreamMaintainer
         uint32_t mapSeq(uint32_t position);
         int lastOffsetInAckTree();
         void printTrees();
-        void initialize(RBTMemoryPoolStreamManager *rbtManager);
+        void initialize(RBTMemoryPoolStreamManager *rbtManager, uint32_t flowStart);
         void prune(uint32_t position);
 
         void setLastAckSent(uint32_t ackNumber);

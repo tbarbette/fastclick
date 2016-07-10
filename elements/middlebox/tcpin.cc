@@ -120,6 +120,9 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
 
     WritablePacket *packet = p->uniqueify();
 
+    // Set the annotation indicating the initial ACK value
+    setInitialAck(packet, getAckNumber(packet));
+
     // Compute the offset of the TCP payload
     uint16_t offset = getPayloadOffset(packet);
     setContentOffset(packet, offset);
@@ -134,7 +137,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         // the destination.
         // In this case, we ACK the content and we discard it
         click_chatter("Lost ACK detected: %u, resending it");
-        ackPacket(fcb, packet, false);
+        ackPacket(fcb, packet);
         packet->kill();
         return NULL;
     }
@@ -237,9 +240,7 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
         uint16_t dport = getSourcePort(packet);
         // The SEQ value is the initial ACK value in the packet sent
         // by the source.
-        tcp_seq_t seq = getAckNumber(packet);
-        // As the ACK has been mapped, we map it back to get its initial value
-        seq = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(seq);
+        tcp_seq_t seq = getInitialAck(packet);
 
         // The ACK is the sequence number sent by the source
         // to which we add the size of the payload to acknowledge it
@@ -334,13 +335,13 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
 
 void TCPIn::requestMorePackets(struct fcb *fcb, Packet *packet)
 {
-    ackPacket(fcb, packet, true);
+    ackPacket(fcb, packet);
 
     // Continue in the stack function
     StackElement::requestMorePackets(fcb, packet);
 }
 
-void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped)
+void TCPIn::ackPacket(struct fcb *fcb, Packet* packet)
 {
     // Get the information needed to ack the given packet
     uint32_t saddr = getDestinationAddress(packet);
@@ -349,10 +350,7 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool ackMapped)
     uint16_t dport = getSourcePort(packet);
     // The SEQ value is the initial ACK value in the packet sent
     // by the source.
-    tcp_seq_t seq = getAckNumber(packet);
-    // If the ACK has been mapped, we map it back to get its initial value
-    if(ackMapped)
-        seq = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapSeq(seq);
+    tcp_seq_t seq = getInitialAck(packet);
 
     // The ACK is the sequence number sent by the source
     // to which we add the size of the payload to acknowledge it
@@ -384,7 +382,7 @@ bool TCPIn::checkConnectionClosed(struct fcb* fcb, Packet *packet)
         {
             // We ACK every packet and we discard it
             if(isFin(packet) || isSyn(packet) || getPayloadLength(packet) > 0)
-                ackPacket(fcb, packet, false);
+                ackPacket(fcb, packet);
         }
 
         return false;
@@ -409,6 +407,10 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
     if(!(flags & TH_SYN))
         return false;
 
+    // The data in the flow will start at current sequence number + 1
+    // (because we have a SYN packet)
+    uint32_t flowStart = getSequenceNumber(packet) + 1;
+
     // Check if we are the side initiating the connection or not
     // (if ACK flag, we are not the initiator)
     if(flags & TH_ACK)
@@ -419,7 +421,7 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         // Get the struct allocated by the initiator
         fcb->tcp_common = returnElement->getTCPCommon(flowID);
         // Initialize the RBT with the RBTManager
-        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
+        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager, flowStart);
         fcb->tcpin.inChargeOfTcpCommon = false;
     }
     else
@@ -437,7 +439,7 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         // Set the pointer in the structure
         fcb->tcp_common = allocated;
         // Initialize the RBT with the RBTManager
-        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager);
+        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager, flowStart);
 
         // Store in our structure information needed to free the memory
         // of the common structure

@@ -130,6 +130,16 @@ void StackElement::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
     previousStackElement->setPacketDirty(fcb, packet);
 }
 
+void StackElement::setInitialAck(Packet *p, uint32_t initialAck)
+{
+    p->set_anno_u32(MIDDLEBOX_INIT_ACK_OFFSET, initialAck);
+}
+
+uint32_t StackElement::getInitialAck(Packet *p)
+{
+    return (uint32_t)p->anno_u32(MIDDLEBOX_INIT_ACK_OFFSET);
+}
+
 void StackElement::packetSent(struct fcb *fcb, Packet* packet)
 {
     // Call the "packetSent" method on every element in the stack

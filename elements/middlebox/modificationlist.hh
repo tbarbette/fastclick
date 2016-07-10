@@ -49,10 +49,12 @@ public:
      */
     ModificationList(MemoryPool<struct ModificationNode>* poolNodes);
     ~ModificationList();
+
     /** @brief Print the current state of the list in the console using
      * click_chatter
      */
     void printList();
+
     /** @brief Add a modification in the list
      * @param position The position at which the modification occurs
      * @param offset The offset representing the modification (a positive
@@ -68,6 +70,8 @@ public:
         return committed;
     }
 
+        void commit(ByteStreamMaintainer& maintainer);
+
 private:
     /** @brief Indicate if two integers have the same sign
      * @param first The first integer
@@ -75,15 +79,16 @@ private:
      * @return  True if both integers have the same sign
      */
     bool sameSign(int first, int second);
-    /** @brief Merge nodes that represent overlapping modifications of the
-     * same kind
+
+    /** @brief Merge nodes that represent overlapping deletions
      */
     void mergeNodes();
+    
     /** @brief Commit the modifications in the ByteStreamMaintainer.
      * @param maintainer The ByteStreamMaintainer in which the modifications
      * will be committed
      */
-    void commit(ByteStreamMaintainer& maintainer);
+
     /** @brief Clear the modification list
      */
     void clear();
