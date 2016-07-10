@@ -60,8 +60,6 @@ Packet* TCPMarkMSS::markMSS(struct fcb *fcb, Packet *packet)
     {
         packet->set_anno_u16(annotation, fcb->tcpmarkmss.mss);
 
-        click_chatter("Mss set on flow %u: %u (%u)", flowDirection, fcb->tcpmarkmss.mss, offset);
-
         return packet;
     }
 
@@ -98,8 +96,6 @@ Packet* TCPMarkMSS::markMSS(struct fcb *fcb, Packet *packet)
         fcb->tcpmarkmss.mss += offset;
 
     packet->set_anno_u16(annotation, fcb->tcpmarkmss.mss);
-
-    click_chatter("Mss discovered for flow %u: %u (%u)", flowDirection, fcb->tcpmarkmss.mss, offset);
 
     return packet;
 }
