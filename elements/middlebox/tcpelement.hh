@@ -34,15 +34,6 @@ public:
     bool isJustAnAck(Packet* packet);
     uint8_t getFlags(Packet *packet);
     void computeTCPChecksum(WritablePacket*);
-
-protected:
-    unsigned int flowDirection;
-
-    void setFlowDirection(unsigned int flowDirection);
-    unsigned int getFlowDirection();
-    unsigned int getOppositeFlowDirection();
-
-    friend class TCPIn;
 };
 
 CLICK_ENDDECLS

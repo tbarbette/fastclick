@@ -500,7 +500,7 @@ void TCPIn::removeSACKPermitted(struct fcb *fcb, WritablePacket *packet)
             optStart += 1; // Move to the next option
         else if(optStart[1] < 2 || optStart[1] + optStart > optEnd)
             break; // Avoid malformed options
-        else if(optStart[0] == TCPOPT_SACK_PERMITTED)
+        else if(optStart[0] == TCPOPT_SACK_PERMITTED && optStart[1] == TCPOLEN_SACK_PERMITTED)
         {
             // If we find the SACK permitted option, we remove it
             for(int i = 0; i < TCPOLEN_SACK_PERMITTED; ++i)
@@ -509,10 +509,27 @@ void TCPIn::removeSACKPermitted(struct fcb *fcb, WritablePacket *packet)
             click_chatter("SACK Permitted removed from options");
 
             setPacketDirty(fcb, packet);
+
+            break;
         }
         else
             optStart += optStart[1]; // Move to the next option
     }
+}
+
+void TCPIn::setFlowDirection(unsigned int flowDirection)
+{
+    this->flowDirection = flowDirection;
+}
+
+unsigned int TCPIn::getFlowDirection()
+{
+    return flowDirection;
+}
+
+unsigned int TCPIn::getOppositeFlowDirection()
+{
+    return (1 - flowDirection);
 }
 
 TCPIn::~TCPIn()

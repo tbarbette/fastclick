@@ -26,12 +26,17 @@ public:
     void sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful);
 
     void setInElement(TCPIn*);
+    
+    void setFlowDirection(unsigned int flowDirection);
+    unsigned int getFlowDirection();
+    unsigned int getOppositeFlowDirection();
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
     TCPIn* inElement;
 private:
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
+    unsigned int flowDirection;
 };
 
 CLICK_ENDDECLS

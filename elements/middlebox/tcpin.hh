@@ -51,6 +51,10 @@ protected:
     // answer the question
     virtual unsigned int determineFlowDirection();
 
+    void setFlowDirection(unsigned int flowDirection);
+    unsigned int getFlowDirection();
+    unsigned int getOppositeFlowDirection();
+
 private:
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
     void ackPacket(struct fcb *fcb, Packet* packet);
@@ -69,6 +73,7 @@ private:
 
     TCPOut* outElement;
     TCPIn* returnElement;
+    unsigned int flowDirection;
 };
 
 CLICK_ENDDECLS

@@ -167,6 +167,16 @@ struct fcb_tcpretransmitter
     }
 };
 
+struct fcb_tcpmarkmss
+{
+    uint16_t mss;
+
+    fcb_tcpmarkmss()
+    {
+        mss = 0;
+    }
+};
+
 struct fcb
 {
     struct fcb_tcp_common* tcp_common;
@@ -176,6 +186,7 @@ struct fcb
     struct fcb_httpin httpin;
     struct fcb_pathmerger pathmerger;
     struct fcb_tcpretransmitter tcpretransmitter;
+    struct fcb_tcpmarkmss tcpmarkmss;
 
     fcb()
     {

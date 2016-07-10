@@ -254,7 +254,7 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     if(!dataToRetransmit(fcb))
         return;
 
-    if(!fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet() || !fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckReceivedSet())
+    if(!fcb->tcp_common->maintainers[flowDirection].isLastAckSentSet() || !fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet() || !fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckReceivedSet())
         return;
 
     uint32_t start = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived();
@@ -295,6 +295,8 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
 
 void TCPRetransmitter::signalAck(struct fcb* fcb, uint32_t ack)
 {
+    unsigned int flowDirection = determineFlowDirection();
+    
     if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
         return;
 

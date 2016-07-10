@@ -246,6 +246,21 @@ bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
     return false;
 }
 
+void TCPOut::setFlowDirection(unsigned int flowDirection)
+{
+    this->flowDirection = flowDirection;
+}
+
+unsigned int TCPOut::getFlowDirection()
+{
+    return flowDirection;
+}
+
+unsigned int TCPOut::getOppositeFlowDirection()
+{
+    return (1 - flowDirection);
+}
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(ByteStreamMaintainer)
 ELEMENT_REQUIRES(ModificationList)

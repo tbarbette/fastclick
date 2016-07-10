@@ -172,21 +172,6 @@ uint16_t TCPElement::getDestinationPort(Packet* packet)
     return ntohs(tcph->th_dport);
 }
 
-void TCPElement::setFlowDirection(unsigned int flowDirection)
-{
-    this->flowDirection = flowDirection;
-}
-
-unsigned int TCPElement::getFlowDirection()
-{
-    return flowDirection;
-}
-
-unsigned int TCPElement::getOppositeFlowDirection()
-{
-    return (1 - flowDirection);
-}
-
 bool TCPElement::isSyn(Packet* packet)
 {
     return checkFlag(packet, TH_SYN);
