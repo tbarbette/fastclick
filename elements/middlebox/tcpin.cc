@@ -127,6 +127,9 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     uint16_t offset = getPayloadOffset(packet);
     setContentOffset(packet, offset);
 
+    // Remove the SACK permitted option if present
+    removeSACKPermitted(fcb, packet);
+
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
     if(fcb->tcp_common->maintainers[getOppositeFlowDirection()].isLastAckSentSet())
@@ -172,7 +175,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         {
             // If it is the case, check that the ACK value is greater than what
             // we have already sent earlier
-            if(SEQ_LT(newAckNumber, fcb->tcp_common->maintainers[getFlowDirection()].getLastAckSent()))
+            if(fcb->tcp_common->maintainers[getFlowDirection()].isLastAckSentSet() && SEQ_LT(newAckNumber, fcb->tcp_common->maintainers[getFlowDirection()].getLastAckSent()))
             {
                 // If this is not the case, the packet does not give any information
                 // We can drop it
@@ -473,6 +476,43 @@ struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
         return NULL; // Not in the table
     else
         return it.value();
+}
+
+void TCPIn::removeSACKPermitted(struct fcb *fcb, WritablePacket *packet)
+{
+    // The option can only be in SYN packets
+    if(!isSyn(packet))
+        return;
+
+    click_tcp *tcph = packet->tcp_header();
+
+    uint8_t *optStart = (uint8_t *) (tcph + 1);
+    uint8_t *optEnd = (uint8_t *) tcph + (tcph->th_off << 2);
+
+    if(optEnd > packet->end_data())
+        optEnd = packet->end_data();
+
+    while(optStart < optEnd)
+    {
+        if(optStart[0] == TCPOPT_EOL) // End of list
+            break; // Stop searching
+        else if(optStart[0] == TCPOPT_NOP)
+            optStart += 1; // Move to the next option
+        else if(optStart[1] < 2 || optStart[1] + optStart > optEnd)
+            break; // Avoid malformed options
+        else if(optStart[0] == TCPOPT_SACK_PERMITTED)
+        {
+            // If we find the SACK permitted option, we remove it
+            for(int i = 0; i < TCPOLEN_SACK_PERMITTED; ++i)
+                optStart[i] = TCPOPT_NOP; // Replace the option with NOP
+
+            click_chatter("SACK Permitted removed from options");
+
+            setPacketDirty(fcb, packet);
+        }
+        else
+            optStart += optStart[1]; // Move to the next option
+    }
 }
 
 TCPIn::~TCPIn()

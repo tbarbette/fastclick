@@ -109,36 +109,28 @@ uint16_t TCPElement::getPayloadOffset(Packet* packet)
 WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
                              uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags, uint32_t contentSize)
 {
-    struct click_ether *ether; // Ethernet header
     struct click_ip *ip;       // IP header
     struct click_tcp *tcp;     // TCP header
 
     // Build a new packet
-    WritablePacket *packet = Packet::make(sizeof(struct click_ether)
-        + sizeof(struct click_ip) + sizeof(struct click_tcp) + contentSize);
+    WritablePacket *packet = Packet::make(sizeof(struct click_ip)
+        + sizeof(struct click_tcp) + contentSize);
 
     assert(packet != NULL);
 
     // Clean the data of the packet
     memset(packet->data(), '\0', packet->length());
 
-    ether = (struct click_ether*)packet->data();
-    ip = (struct click_ip*)(ether + 1);
+    ip = (struct click_ip*)packet->data();
     tcp = (struct click_tcp*)(ip + 1);
     packet->set_ip_header(ip, sizeof(struct click_ip));
-
-    // Set a blank ethernet header
-    ether->ether_type = htons(ETHERTYPE_IP); // Indicate it is an IP packet
-    uint8_t etherBlank[6] = {0x0};
-    memcpy((void*)&(ether->ether_dhost), (void*)&etherBlank, sizeof(etherBlank));
-    memcpy((void*)&(ether->ether_shost), (void*)&etherBlank, sizeof(etherBlank));
 
     // Set the IP header
     ip->ip_v = 4; // IPv4
     ip->ip_hl = 5; // Set IP header length (no options and 5 is the minimum value)
     ip->ip_tos = 0; // Set type of service to 0
     // Set the current length of the packet (with empty TCP payload)
-    ip->ip_len = htons(packet->length() - sizeof(struct click_ether));
+    ip->ip_len = htons(packet->length());
     ip->ip_id = htons(0);      // Set fragment id to 0
     ip->ip_off = htons(IP_DF); // Indicate not to fragment
     ip->ip_ttl = 255;          // Set the TTL to 255
@@ -158,9 +150,6 @@ WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t
     tcp->th_win = htons(winSize); // Set the window size
     tcp->th_sum = htons(0); // Set temporarily the checksum to 0
     tcp->th_urp = htons(0); // Set urgent pointer to 0
-
-    // Pull the ethernet header
-    packet->pull(14);
 
     // Finally compute the checksums
     computeTCPChecksum(packet);

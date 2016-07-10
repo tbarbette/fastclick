@@ -55,6 +55,7 @@ private:
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
     void ackPacket(struct fcb *fcb, Packet* packet);
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
+    void removeSACKPermitted(struct fcb* fcb, WritablePacket *packet);
 
     // TODO Will be thread local as each TCPIn is managed by a different thread
     MemoryPool<struct ModificationNode> poolModificationNodes;
