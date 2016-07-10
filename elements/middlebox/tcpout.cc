@@ -43,7 +43,14 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     bool seqModified = false;
     bool ackModified = false;
     tcp_seq_t prevAck = getAckNumber(packet);
-    tcp_seq_t prevLastAck = byteStreamMaintainer.getLastAckSent();
+    tcp_seq_t prevLastAck = 0;
+    bool prevLastAckSet = false;
+
+    if(byteStreamMaintainer.isLastAckSentSet())
+    {
+        prevLastAck = byteStreamMaintainer.getLastAckSent();
+        prevLastAckSet = true;
+    }
 
     if(prevSeq != newSeq)
     {
@@ -60,16 +67,19 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     byteStreamMaintainer.setWindowSize(getWindowSize(packet));
 
     // Update the value of the last ACK sent
-    byteStreamMaintainer.setLastAckSent(prevAck);
+    if(isAck(packet))
+    {
+        byteStreamMaintainer.setLastAckSent(prevAck);
 
-    // Ensure that the value of the ACK is not below the last ACKed position
-    // This solves the following problem:
-    // - We ACK a packet manually for any reason
-    // -> The "manual" ACK is lost
-    setAckNumber(packet, byteStreamMaintainer.getLastAckSent());
+        // Ensure that the value of the ACK is not below the last ACKed position
+        // This solves the following problem:
+        // - We ACK a packet manually for any reason
+        // -> The "manual" ACK is lost
+        setAckNumber(packet, byteStreamMaintainer.getLastAckSent());
 
-    if(getAckNumber(packet) != prevAck)
-        ackModified = true;
+        if(getAckNumber(packet) != prevAck)
+            ackModified = true;
+    }
 
     // Check if the packet has been modified
     if(getAnnotationDirty(packet) || seqModified || ackModified)
@@ -115,7 +125,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                 if(isJustAnAck(packet))
                 {
                     // Check if the ACK of the packet was significant or not
-                    if(SEQ_LEQ(prevAck, prevLastAck))
+                    if(prevLastAckSet && SEQ_LEQ(prevAck, prevLastAck))
                     {
                         // If this is not the case, drop the packet as it
                         // does not contain any relevant information
@@ -147,7 +157,7 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     }
 
     // Check if the ACK does not bring any additional information
-    if(SEQ_LEQ(ack, maintainer.getLastAckSent()))
+    if(maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent()))
         return;
 
     // Update the number of the last ack sent for the other side
@@ -155,7 +165,7 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
 
     // Ensure that the sequence number of the packet is not below
     // a sequence number sent before by the other side
-    if(SEQ_LT(seq, maintainer.getLastSeqSent()))
+    if(maintainer.isLastSeqSentSet() && SEQ_LT(seq, maintainer.getLastSeqSent()))
         seq = maintainer.getLastSeqSent();
 
     uint16_t winSize = maintainer.getWindowSize();
@@ -181,7 +191,7 @@ void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr,
     // Update the number of the last ack sent for the other side
     maintainer.setLastAckSent(ack);
 
-    if(SEQ_LT(seq, maintainer.getLastSeqSent()))
+    if(maintainer.isLastSeqSentSet() && SEQ_LT(seq, maintainer.getLastSeqSent()))
         seq = maintainer.getLastSeqSent();
 
     uint16_t winSize = maintainer.getWindowSize();

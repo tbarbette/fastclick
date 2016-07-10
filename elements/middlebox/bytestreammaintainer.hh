@@ -26,9 +26,9 @@ public:
 
     int compareKeys(const void* first, const void* second)
     {
-        if(*(uint32_t*)first > *(uint32_t*)second)
+        if(SEQ_GT(*(uint32_t*)first, *(uint32_t*)second))
             return 1;
-        if(*(uint32_t*)first < *(uint32_t*)second)
+        if(SEQ_LT(*(uint32_t*)first, *(uint32_t*)second))
             return -1;
 
         return 0;
@@ -108,10 +108,15 @@ class ByteStreamMaintainer
 
         void setLastAckSent(uint32_t ackNumber);
         uint32_t getLastAckSent();
+        bool isLastAckSentSet();
         void setLastSeqSent(uint32_t seqNumber);
         uint32_t getLastSeqSent();
+        bool isLastSeqSentSet();
         void setLastAckReceived(uint32_t ackNumber);
         uint32_t getLastAckReceived();
+        bool isLastAckReceivedSet();
+
+
         void setWindowSize(uint16_t windowSize);
         uint16_t getWindowSize();
         void setIpSrc(uint32_t ipSrc);
@@ -133,6 +138,9 @@ class ByteStreamMaintainer
         RBTManager* rbtManager;
         uint32_t pruneCounter;
         bool initialized;
+        bool lastAckSentSet;
+        bool lastSeqSentSet;
+        bool lastAckReceivedSet;
 
         uint32_t lastAckSent;     // /!\ mapped value (as sent)
         uint32_t lastSeqSent;     // /!\ mapped value (as sent)

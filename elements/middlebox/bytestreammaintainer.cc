@@ -18,6 +18,9 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     treeAck = NULL;
     treeSeq = NULL;
     windowSize = 32120;
+    lastAckSentSet = false;
+    lastSeqSentSet = false;
+    lastAckReceivedSet = false;
 }
 
 void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager, uint32_t flowStart)
@@ -77,7 +80,7 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 
     uint32_t predBound = nodeKey + predOffset;
 
-    if(newPosition < predBound)
+    if(SEQ_LT(newPosition, predBound))
         newPosition = predBound;
 
     // Check that the computed value is at most equal to the lowest value
@@ -93,7 +96,7 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 
             succBound = succPosition + succOffset;
 
-            if(newPosition >= succBound)
+            if(SEQ_GT(newPosition, succBound))
                 newPosition = succBound;
         }
     }
@@ -134,7 +137,7 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
 
     uint32_t predBound = nodeKey + predOffset;
 
-    if(newPosition < predBound)
+    if(SEQ_LT(newPosition, predBound))
         newPosition = predBound;
 
     return newPosition;
@@ -177,23 +180,35 @@ void ByteStreamMaintainer::prune(uint32_t position)
 
 void ByteStreamMaintainer::setLastAckSent(uint32_t ackNumber)
 {
-    if(ackNumber > lastAckSent)
+    // TODO comment
+    if(!lastAckSentSet || SEQ_GT(ackNumber, lastAckSent))
         lastAckSent = ackNumber;
+
+    lastAckSentSet = true;
 }
 
 uint32_t ByteStreamMaintainer::getLastAckSent()
 {
+    if(!lastAckSentSet)
+        click_chatter("Error: Last ack sent not defined");
+
     return lastAckSent;
 }
 
 void ByteStreamMaintainer::setLastSeqSent(uint32_t seqNumber)
 {
-    if(seqNumber > lastSeqSent)
+    // TODO comment
+    if(!lastSeqSentSet || SEQ_GT(seqNumber, lastSeqSent))
         lastSeqSent = seqNumber;
+
+    lastSeqSentSet = true;
 }
 
 uint32_t ByteStreamMaintainer::getLastSeqSent()
 {
+    if(!lastSeqSentSet)
+        click_chatter("Error: Last sequence sent not defined");
+
     return lastSeqSent;
 }
 
@@ -235,13 +250,34 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
 
 void ByteStreamMaintainer::setLastAckReceived(uint32_t ackNumber)
 {
-    if(ackNumber > lastAckReceived)
+    // TODO comment
+    if(!lastAckReceivedSet || SEQ_GT(ackNumber, lastAckReceived))
         lastAckReceived = ackNumber;
+
+    lastAckReceivedSet = true;
 }
 
 uint32_t ByteStreamMaintainer::getLastAckReceived()
 {
+    if(!lastAckReceivedSet)
+        click_chatter("Error: Last ack received not defined");
+
     return lastAckReceived;
+}
+
+bool ByteStreamMaintainer::isLastAckSentSet()
+{
+    return lastAckSentSet;
+}
+
+bool ByteStreamMaintainer::isLastAckReceivedSet()
+{
+    return lastAckReceivedSet;
+}
+
+bool ByteStreamMaintainer::isLastSeqSentSet()
+{
+    return lastSeqSentSet;
 }
 
 void ByteStreamMaintainer::setWindowSize(uint16_t windowSize)

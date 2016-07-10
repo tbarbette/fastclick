@@ -91,13 +91,16 @@ void TCPRetransmitter::push(int port, Packet *packet)
             // Start a new RTT measure if possible
             fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
 
-            uint32_t lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
+            uint32_t lastAckSent = 0;
+            bool lastAckSentSet = fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet();
+            if(lastAckSentSet)
+                lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
             // ackToReceive is the ACK that will be received for the current
             // packet. We map it to be able to compare it with lastAckSent
             // which is mapped
             uint32_t ackToReceive = fcb->tcp_common->maintainers[flowDirection].mapAck(seq + contentSize);
 
-            if(SEQ_LEQ(ackToReceive, lastAckSent))
+            if(lastAckSentSet && SEQ_LEQ(ackToReceive, lastAckSent))
             {
                 // We know that we are transmitting ACKed data
                 // We thus start the retransmission timer
@@ -201,6 +204,9 @@ void TCPRetransmitter::prune(struct fcb *fcb)
     unsigned int oppositeFlowDirection = 1 - flowDirection;
     ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
 
+    if(!maintainer.isLastAckReceivedSet())
+        return;
+
     // We remove ACKed data in the buffer
     fcb->tcpretransmitter.buffer->removeDataAtBeginning(maintainer.getLastAckReceived());
 
@@ -211,6 +217,9 @@ bool TCPRetransmitter::dataToRetransmit(struct fcb *fcb)
 {
     unsigned int flowDirection = determineFlowDirection();;
     unsigned int oppositeFlowDirection = 1 - flowDirection;
+
+    if(!fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet() || fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckReceivedSet())
+        return false;
 
     uint32_t lastAckReceived = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived();
     uint32_t lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
@@ -243,6 +252,9 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
         return;
 
     if(!dataToRetransmit(fcb))
+        return;
+
+    if(!fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet() || !fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckReceivedSet())
         return;
 
     uint32_t start = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived();
@@ -285,7 +297,7 @@ void TCPRetransmitter::signalAck(struct fcb* fcb, uint32_t ack)
 {
     if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
         return;
-        
+
     // If all the data have been transmitted, stop the timer
     // Otherwise, restart it
     if(dataToRetransmit(fcb))

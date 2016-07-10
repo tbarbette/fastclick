@@ -128,18 +128,22 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     setContentOffset(packet, offset);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
-    tcp_seq_t lastAckSentOtherSide = fcb->tcp_common->maintainers[getOppositeFlowDirection()].getLastAckSent();
 
-    if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
+    if(fcb->tcp_common->maintainers[getOppositeFlowDirection()].isLastAckSentSet())
     {
-        // We receive content that has already been ACKed.
-        // This case occurs when the ACK is lost between the middlebox and
-        // the destination.
-        // In this case, we ACK the content and we discard it
-        click_chatter("Lost ACK detected: %u, resending it");
-        ackPacket(fcb, packet);
-        packet->kill();
-        return NULL;
+        tcp_seq_t lastAckSentOtherSide = fcb->tcp_common->maintainers[getOppositeFlowDirection()].getLastAckSent();
+
+        if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
+        {
+            // We receive content that has already been ACKed.
+            // This case occurs when the ACK is lost between the middlebox and
+            // the destination.
+            // In this case, we ACK the content and we discard it
+            click_chatter("Lost ACK detected: %u, resending it");
+            ackPacket(fcb, packet);
+            packet->kill();
+            return NULL;
+        }
     }
 
     // Take care of the ACK value in the packet
@@ -298,10 +302,12 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
+    // Used to have the position in the TCP flow and not in the packet
     uint16_t tcpOffset = getPayloadOffset(packet);
+
     uint16_t contentOffset = getContentOffset(packet);
     position += contentOffset;
-    list->addModification(seqNumber + position - tcpOffset, -((int)length));
+    list->addModification(seqNumber, seqNumber + position - tcpOffset, -((int)length));
 
     unsigned char *source = packet->data();
     uint32_t bytesAfter = packet->length() - position;
@@ -320,7 +326,7 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
     uint16_t tcpOffset = getPayloadOffset(packet);
     uint16_t contentOffset = getContentOffset(packet);
     position += contentOffset;
-    getModificationList(fcb, packet)->addModification(seqNumber + position - tcpOffset, (int)length);
+    getModificationList(fcb, packet)->addModification(seqNumber, seqNumber + position - tcpOffset, (int)length);
 
     uint32_t bytesAfter = packet->length() - position;
 

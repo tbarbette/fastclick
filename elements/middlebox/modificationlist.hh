@@ -56,6 +56,7 @@ public:
     void printList();
 
     /** @brief Add a modification in the list
+     * @param firstPosition The lowest position possible for this packet
      * @param position The position at which the modification occurs
      * @param offset The offset representing the modification (a positive
      * number if bytes are added and a negative number if bytes are removed)
@@ -63,7 +64,7 @@ public:
      * if the list does not accept any new modification because a commit
      * has been made.
      */
-    bool addModification(uint32_t position, int offset);
+    bool addModification(uint32_t firstPosition, uint32_t position, int offset);
 
     bool isCommitted()
     {
@@ -83,7 +84,7 @@ private:
     /** @brief Merge nodes that represent overlapping deletions
      */
     void mergeNodes();
-    
+
     /** @brief Commit the modifications in the ByteStreamMaintainer.
      * @param maintainer The ByteStreamMaintainer in which the modifications
      * will be committed

@@ -63,7 +63,7 @@ void ModificationList::printList()
     }
 }
 
-bool ModificationList::addModification(uint32_t position, int offset)
+bool ModificationList::addModification(uint32_t firstPosition, uint32_t position, int offset)
 {
     // The structure refuses new modifications if a commit has been made before
     if(committed)
@@ -73,12 +73,12 @@ bool ModificationList::addModification(uint32_t position, int offset)
     struct ModificationNode* node = head;
 
     // Determine where to add the modification in the list
-    while(node != NULL && node->position <= position)
+    while(node != NULL && SEQ_LEQ(node->position, position))
     {
         // We translate the requested position which is relative to the current
         // content of the packet to a position relative to the initial content
         // of the packet
-        if(node->position < position)
+        if(SEQ_LT(node->position, position))
         {
             /* Apply the offset of the current node on the requested position
              * A positive offset means that we added data in the new content
@@ -87,13 +87,13 @@ bool ModificationList::addModification(uint32_t position, int offset)
              */
             uint32_t newPosition = 0;
 
-            if(node->offset > 0 && node->offset > position)
-                newPosition = 0;
-            else
-                newPosition = position - node->offset;
+            newPosition = position - node->offset;
+
+            if(SEQ_LT(newPosition, firstPosition))
+                newPosition = firstPosition;
 
             // Ensure that we do not go beyond the position of the current node
-            if(newPosition < node->position)
+            if(SEQ_LT(newPosition, node->position))
                 newPosition = node->position;
 
             // Update the position
@@ -171,7 +171,7 @@ void ModificationList::mergeNodes()
 
             // If the modification of this node is within the range of the
             // previous one and if they represent both a deletion, merge them
-            if(node->position < range && prev->offset< 0 && sameSign(node->offset, prev->offset))
+            if(SEQ_LT(node->position, range) && prev->offset < 0 && sameSign(node->offset, prev->offset))
             {
                 // Remove current node and merge its value with the previous node
                 prev->offset += node->offset;
