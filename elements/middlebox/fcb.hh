@@ -128,10 +128,17 @@ struct fcb_tcpin
 struct fcb_httpin
 {
     bool headerFound;
+    char url[2048];
+    uint64_t contentLength;
+    uint64_t contentSeen;
+    uint32_t lastPacket;
 
     fcb_httpin()
     {
         headerFound = false;
+        lastPacket = 0;
+        contentSeen = 0;
+        contentLength = 0;
     }
 };
 

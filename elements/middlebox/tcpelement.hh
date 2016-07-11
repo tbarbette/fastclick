@@ -16,7 +16,7 @@ public:
     WritablePacket* forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags, uint32_t contentSize = 0);
     uint16_t getDestinationPort(Packet*);
     uint16_t getSourcePort(Packet*);
-    tcp_seq_t getSequenceNumber(Packet*);
+    tcp_seq_t getSequenceNumber(Packet*) const;
     tcp_seq_t getAckNumber(Packet*);
     uint16_t getWindowSize(Packet *packet);
     void setWindowSize(WritablePacket *packet, uint16_t winSize);
@@ -26,7 +26,8 @@ public:
     bool isAck(Packet* packet);
     bool checkFlag(Packet *packet, uint8_t flag);
     unsigned getPayloadLength(Packet*);
-    const unsigned char* getPayload(Packet* packet);
+    unsigned char* getPayload(WritablePacket* packet);
+    const unsigned char* getPayloadConst(Packet* packet);
     uint16_t getPayloadOffset(Packet* packet);
     void setPayload(WritablePacket* packet, const unsigned char* payload, uint32_t length);
     void setSequenceNumber(WritablePacket*, tcp_seq_t);

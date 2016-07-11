@@ -8,6 +8,7 @@ CLICK_DECLS
 
 HTTPIn::HTTPIn()
 {
+
 }
 
 int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -19,9 +20,18 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 
-    if(!fcb->httpin.headerFound)
+
+    if(!fcb->httpin.headerFound && !isPacketContentEmpty(packet))
     {
+        // Remove the "Accept-Encoding" header to avoid receiving
+        // compressed content
         removeHeader(fcb, packet, "Accept-Encoding");
+        char buffer[250];
+        getHeaderContent(fcb, packet, "Content-Length", buffer, 250);
+        fcb->httpin.contentLength = (uint64_t)atol(buffer);
+
+        if(fcb->httpin.contentLength > 0)
+            click_chatter("Content-Length: %lu", fcb->httpin.contentLength);
     }
 
     // Compute the offset of the HTML payload
@@ -47,6 +57,7 @@ void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* h
     unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
     if(end == NULL)
         return;
+
     unsigned nbBytesToRemove = (end - beginning) + strlen("\r\n");
 
     uint32_t position = beginning - source;
@@ -57,6 +68,90 @@ void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* h
     setPacketDirty(fcb, packet);
 }
 
+void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, char* buffer, uint32_t bufferSize)
+{
+    unsigned char* source = getPacketContent(packet);
+    unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
+
+    if(beginning == NULL)
+    {
+        buffer[0] = '\0';
+        return;
+    }
+
+    beginning += strlen(headerName) + 1;
+
+    unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
+    if(end == NULL)
+    {
+        buffer[0] = '\0';
+        return;
+    }
+
+    // Skip spaces at the beginning of the string
+    while(beginning < end && beginning[0] == ' ')
+        beginning++;
+
+    uint16_t contentSize = end - beginning;
+
+    if(contentSize >= bufferSize)
+    {
+        contentSize = bufferSize - 1;
+        click_chatter("Warning: buffer not big enough to contain the header %s", headerName);
+    }
+
+    memcpy(buffer, beginning, contentSize);
+    buffer[contentSize] = '\0';
+}
+
+void HTTPIn::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content)
+{
+    unsigned char* source = getPacketContent(packet);
+    unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
+
+    if(beginning == NULL)
+        return;
+
+    beginning += strlen(headerName) + 1;
+
+    unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
+    if(end == NULL)
+        return;
+
+    // Skip spaces at the beginning of the string
+    while(beginning < end && beginning[0] == ' ')
+        beginning++;
+
+    uint32_t startPos = beginning - source;
+    uint32_t newSize = strlen(content);
+    uint32_t endPos = startPos + newSize;
+    uint32_t prevSize = end - beginning;
+    uint32_t prevEndPos = startPos + prevSize;
+    int offset = newSize - prevSize;
+
+    // Ensure that the header has the right size
+    if(offset > 0)
+        insertBytes(fcb, packet, prevEndPos, offset);
+    else if(offset < 0)
+        removeBytes(fcb, packet, endPos, -offset);
+
+    memcpy(beginning, content, newSize);
+}
+
+void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
+{
+    /*
+    unsigned char* source = getPacketContent(packet);
+    unsigned char* requestEnd = (unsigned char*)strstr((char*)beginning, "\r\n");
+
+    if(requestEnd == NULL)
+        return;
+
+    unsigned char* urlStart = (unsigned char*)strstr((char*)beginning, "\r\n");
+    */
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(HTTPIn)
+ELEMENT_REQUIRES(FlowBuffer)
 //ELEMENT_MT_SAFE(HTTPIn)

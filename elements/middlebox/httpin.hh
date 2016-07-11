@@ -19,6 +19,9 @@ public:
 protected:
     Packet* processPacket(struct fcb*, Packet*);
     void removeHeader(struct fcb *fcb, WritablePacket*, const char*);
+    void getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, char* buffer, uint32_t bufferSize);
+    void setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content);
+    void setRequestParameters(struct fcb *fcb, WritablePacket *packet);
 };
 
 CLICK_ENDDECLS

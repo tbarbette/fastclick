@@ -72,7 +72,7 @@ void TCPRetransmitter::push(int port, Packet *packet)
     {
         // The packet comes on the normal input
         // We thus need to add its content in the buffer and let it continue
-        const unsigned char* content = getPayload(packet);
+        const unsigned char* content = getPayloadConst(packet);
         uint32_t contentSize = getPayloadLength(packet);
         uint32_t seq = getSequenceNumber(packet);
 
@@ -296,7 +296,7 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
 void TCPRetransmitter::signalAck(struct fcb* fcb, uint32_t ack)
 {
     unsigned int flowDirection = determineFlowDirection();
-    
+
     if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
         return;
 

@@ -11,6 +11,10 @@ CLICK_DECLS
 class StackElement : public Element
 {
 public:
+    friend class PathMerger;
+    friend class FlowBuffer;
+    friend class FlowBufferContentIter;
+
     StackElement() CLICK_COLD;
     ~StackElement();
 
@@ -30,17 +34,15 @@ public:
     static bool isStackElement(Element*);
 
 protected:
-    friend class PathMerger;
-
     void setAnnotationDirty(Packet*, bool);
     bool getAnnotationDirty(Packet*);
     uint16_t getContentOffset(Packet*);
+    const unsigned char* getPacketContentConst(Packet*);
+    unsigned char* getPacketContent(WritablePacket*);
     void setContentOffset(Packet*, uint16_t);
     void setInitialAck(Packet *p, uint32_t initialAck);
     uint32_t getInitialAck(Packet *p);
     void buildFunctionStack();
-    const unsigned char* getPacketContentConst(Packet*);
-    unsigned char* getPacketContent(WritablePacket*);
     bool isPacketContentEmpty(Packet*);
 
     virtual Packet* processPacket(struct fcb *fcb, Packet*);

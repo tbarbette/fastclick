@@ -28,7 +28,7 @@ void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq)
     tcph->th_seq = htonl(seq);
 }
 
-tcp_seq_t TCPElement::getSequenceNumber(Packet* packet)
+tcp_seq_t TCPElement::getSequenceNumber(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
@@ -75,7 +75,16 @@ unsigned TCPElement::getPayloadLength(Packet* packet)
     return ip_len - iph_len - tcp_offset;
 }
 
-const unsigned char* TCPElement::getPayload(Packet* packet)
+unsigned char* TCPElement::getPayload(WritablePacket* packet)
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+    return (unsigned char*)packet->transport_header() + tcph_len;
+}
+
+const unsigned char* TCPElement::getPayloadConst(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 
