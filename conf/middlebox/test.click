@@ -29,12 +29,12 @@ reorderLeft[1] -> [1]retransmitterLeft;
 reorderRight[1] -> [1]retransmitterRight;
 
 // Left path for generated packets that go back to the source
-tcpOUTLeft[1] -> etherLeft -> Print(SecondaryOutLeft) -> ToNetmapDevice(netmap:eth0);
 etherLeft :: EtherEncap(0x800, 08:00:27:27:b5:9a, 08:00:27:db:83:16);
+tcpOUTLeft[1] -> etherLeft -> Print(SecondaryOutLeft) -> ToNetmapDevice(netmap:eth0);
 
 // Right path for generated packets that go back to the source
-tcpOUTRight[1] -> etherRight -> Print(SecondaryOutRight) -> ToNetmapDevice(netmap:eth1);
 etherRight :: EtherEncap(0x800, 08:00:27:db:83:16, 08:00:27:27:b5:9a);
+tcpOUTRight[1] -> etherRight -> Print(SecondaryOutRight) -> ToNetmapDevice(netmap:eth1);
 
 // Non-ip packets bypass the middlebox
 chIN[1] -> outLeft;

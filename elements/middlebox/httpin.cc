@@ -21,8 +21,7 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
 
     if(!fcb->httpin.headerFound)
     {
-        //removeHeader(packet, "Content-Length");
-        //removeHeader(packet, "Transfer-Encoding");
+        removeHeader(fcb, packet, "Accept-Encoding");
     }
 
     // Compute the offset of the HTML payload
@@ -41,22 +40,20 @@ void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* h
 {
     unsigned char* source = getPacketContent(packet);
     unsigned char* beginning = (unsigned char*)strstr((char*)source, header);
+
     if(beginning == NULL)
         return;
-    else
-        click_chatter("Found!");
+
     unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
     if(end == NULL)
         return;
-    click_chatter("End: %d",(end - beginning));
     unsigned nbBytesToRemove = (end - beginning) + strlen("\r\n");
 
-    click_chatter("Bytes to remove: %u", nbBytesToRemove);
-
-
-    uint32_t position = beginning - packet->data();
+    uint32_t position = beginning - source;
 
     removeBytes(fcb, packet, position, nbBytesToRemove);
+
+    click_chatter("Removed header: %s", header);
     setPacketDirty(fcb, packet);
 }
 
