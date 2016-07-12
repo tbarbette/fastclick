@@ -19,6 +19,11 @@ int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
+
+    // By default, the packet is not considered to be the last one
+    // containing HTTP content
+    setAnnotationLastUseful(packet, false);
+
     if(!fcb->httpin.headerFound && !isPacketContentEmpty(packet))
     {
         // Remove the "Accept-Encoding" header to avoid receiving
@@ -42,8 +47,22 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
         fcb->httpin.headerFound = true;
     }
 
+    // Add the size of the HTTP content to the counter
+    if(!isPacketContentEmpty(packet))
+    {
+        uint16_t currentContent = getPacketContentSize(packet);
+        fcb->httpin.contentSeen += currentContent;
+        // Check if we have seen all the HTTP content
+        if(fcb->httpin.contentSeen >= fcb->httpin.contentLength)
+        {
+            setAnnotationLastUseful(packet, true);
+            click_chatter("Last HTTP packet!");
+        }
+    }
+
     return packet;
 }
+
 
 void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* header)
 {
@@ -103,40 +122,6 @@ void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const cha
     buffer[contentSize] = '\0';
 }
 
-void HTTPIn::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content)
-{
-    unsigned char* source = getPacketContent(packet);
-    unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
-
-    if(beginning == NULL)
-        return;
-
-    beginning += strlen(headerName) + 1;
-
-    unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
-    if(end == NULL)
-        return;
-
-    // Skip spaces at the beginning of the string
-    while(beginning < end && beginning[0] == ' ')
-        beginning++;
-
-    uint32_t startPos = beginning - source;
-    uint32_t newSize = strlen(content);
-    uint32_t endPos = startPos + newSize;
-    uint32_t prevSize = end - beginning;
-    uint32_t prevEndPos = startPos + prevSize;
-    int offset = newSize - prevSize;
-
-    // Ensure that the header has the right size
-    if(offset > 0)
-        insertBytes(fcb, packet, prevEndPos, offset);
-    else if(offset < 0)
-        removeBytes(fcb, packet, endPos, -offset);
-
-    memcpy(beginning, content, newSize);
-}
-
 void HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
 {
     unsigned char* source = getPacketContent(packet);
@@ -175,7 +160,12 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
     */
 }
 
+
+bool HTTPIn::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
+{
+    return getAnnotationLastUseful(packet);
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(HTTPIn)
-ELEMENT_REQUIRES(FlowBuffer)
 //ELEMENT_MT_SAFE(HTTPIn)

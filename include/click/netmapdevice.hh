@@ -43,9 +43,14 @@
 
 CLICK_DECLS
 
+#define CLICK_NETMAP_POOL_DEBUG 0
+
 #define NETMAP_PACKET_POOL_SIZE			2048
 #define BUFFER_PTR(idx) reinterpret_cast<uint32_t *>(buf_start + idx * buf_size)
 #define BUFFER_NEXT_LIST(idx) *(((uint32_t*)BUFFER_PTR(idx)) + 1)
+
+#define CLICK_NETMAP_POOL_DEBUG_MAGIC(idx) (*(BUFFER_PTR(idx)+3))
+#define CLICK_NETMAP_POOL_DEBUG_MAGIC_VALUE 0b01011100010111000101110001011100
 
 /* a queue of netmap buffers, by index*/
 class NetmapBufQ {
@@ -98,6 +103,22 @@ public:
 
 	static inline bool initialized() {
 		return netmap_buf_pools != 0;
+	}
+
+	bool check_list() {
+		return find_count(_head) == _count;
+	}
+
+	static int find_count(uint32_t cur,int limit = 65536) {
+		int c = 0;
+
+		while (cur > 0) {
+			uint32_t* p = BUFFER_PTR(cur);
+			cur = *p;
+			c++;
+			assert(c <= limit);
+		}
+		return c;
 	}
 private :
 	uint32_t _head;  /* index of first buffer */
@@ -228,14 +249,20 @@ int NetmapBufQ::count_buffers(uint32_t idx) {
 }
 
 inline void NetmapBufQ::insert(uint32_t idx) {
+#if CLICK_NETMAP_POOL_DEBUG
 	assert(idx > 0 && idx < max_index);
+	assert(CLICK_NETMAP_POOL_DEBUG_MAGIC(idx) != CLICK_NETMAP_POOL_DEBUG_MAGIC_VALUE);
+#endif
 
 	if (_count < NETMAP_PACKET_POOL_SIZE) {
 		*BUFFER_PTR(idx) = _head;
 		_head = idx;
 		_count++;
 	} else {
+#if CLICK_NETMAP_POOL_DEBUG
 		assert(_count == NETMAP_PACKET_POOL_SIZE);
+		assert(find_count(_head) == NETMAP_PACKET_POOL_SIZE);
+#endif
 		global_buffer_lock.acquire();
 		BUFFER_NEXT_LIST(_head) = global_buffer_list;
 		global_buffer_list = _head;
@@ -261,6 +288,9 @@ inline uint32_t NetmapBufQ::extract() {
 	p  = BUFFER_PTR(idx);
 	_head = *p;
 	_count--;
+	#if CLICK_NETMAP_POOL_DEBUG
+	CLICK_NETMAP_POOL_DEBUG_MAGIC(idx) = 0;
+	#endif
 	return idx;
 }
 

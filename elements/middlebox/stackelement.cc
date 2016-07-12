@@ -105,12 +105,22 @@ bool StackElement::getAnnotationBit(Packet* p, int bit)
 
 void StackElement::setAnnotationDirty(Packet* p, bool value)
 {
-    setAnnotationBit(p, offsetAnnotationDirty, value);
+    setAnnotationBit(p, OFFSET_ANNOTATION_DIRTY, value);
 }
 
 bool StackElement::getAnnotationDirty(Packet* p)
 {
-    return getAnnotationBit(p, offsetAnnotationDirty);
+    return getAnnotationBit(p, OFFSET_ANNOTATION_DIRTY);
+}uint32_t getPacketContentSize(Packet *packet);
+
+void StackElement::setAnnotationLastUseful(Packet *p, bool value)
+{
+    setAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL, value);
+}
+
+bool StackElement::getAnnotationLastUseful(Packet *p)
+{
+    return getAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL);
 }
 
 void StackElement::addStackElementInList(StackElement *element, int port)
@@ -185,6 +195,15 @@ void StackElement::requestMorePackets(struct fcb *fcb, Packet *packet)
     previousStackElement->requestMorePackets(fcb, packet);
 }
 
+bool StackElement::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
+{
+    // Call the "isLastUsefulPacket" method on every element in the stack
+    if(previousStackElement == NULL)
+        return false;
+
+    return previousStackElement->isLastUsefulPacket(fcb, packet);
+}
+
 bool StackElement::isStackElement(Element* element)
 {
     if(element->cast("StackElement") != NULL)
@@ -237,6 +256,13 @@ bool StackElement::isPacketContentEmpty(Packet* packet)
         return true;
     else
         return false;
+}
+
+uint16_t StackElement::getPacketContentSize(Packet *packet)
+{
+    uint16_t offset = getContentOffset(packet);
+
+    return packet->length() - offset;
 }
 
 unsigned int StackElement::determineFlowDirection()

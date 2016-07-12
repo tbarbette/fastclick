@@ -28,6 +28,10 @@ CLICK_DECLS
 LinearIPLookup::LinearIPLookup()
     : _zero_route(-1)
 {
+#if HAVE_BATCH
+	// TODO: Remove this when push_batch() will actually be implemented
+	in_batch_mode = BATCH_MODE_NO;
+#endif
 }
 
 LinearIPLookup::~LinearIPLookup()
@@ -211,7 +215,7 @@ LinearIPLookup::dump_routes()
 }
 
 void
-LinearIPLookup::push(int, Packet *p)
+LinearIPLookup::push_packet(int, Packet *p)
 {
 #define EXCHANGE(a,b,t) { t = a; a = b; b = t; }
     IPAddress a = p->dst_ip_anno();

@@ -466,6 +466,14 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
     return true;
 }
 
+bool TCPIn::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
+{
+    if(isFin(packet) || isRst(packet))
+        return true;
+    else
+        return false;
+}
+
 
 struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {

@@ -29,6 +29,7 @@ protected:
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
     virtual void packetSent(struct fcb *fcb, Packet* packet);
     virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
+    virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
 private:
     StackElement* previousStackElements[2];

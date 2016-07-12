@@ -1,5 +1,6 @@
 #include <click/config.h>
 #include <click/glue.hh>
+#include "fcb.hh"
 #include "flowbuffer.hh"
 #include "stackelement.hh"
 

@@ -44,6 +44,7 @@ protected:
     virtual WritablePacket* insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
     virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
+    virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
     // Method used for the simulation of Middleclick's fcb management system
     // Should be removed when integrated to Middleclick

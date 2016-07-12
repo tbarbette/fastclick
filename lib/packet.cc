@@ -362,7 +362,6 @@ WritablePacket::pool_allocate()
     }
 #  endif /* HAVE_MULTITHREAD */
 
-
         WritablePacket *p = packet_pool.p;
         if (p) {
         packet_pool.p = static_cast<WritablePacket*>(p->next());
@@ -419,9 +418,12 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
         p->_data = p->_head + headroom;
         p->_tail = p->_data + length;
         p->_end = p->_head + CLICK_PACKET_POOL_BUFSIZ;
+#if HAVE_DPDK_PACKET_POOL || HAVE_NETMAP_PACKET_POOL
+       buffer_destructor_type type = p->_destructor;
+#endif
         p->initialize();
-#if HAVE_DPDK_PACKET_POOL
-        p->_destructor = DPDKDevice::free_pkt;
+#if HAVE_DPDK_PACKET_POOL || HAVE_NETMAP_PACKET_POOL
+        p->_destructor = type;
 #endif
     } else {
         p = pool_allocate();

@@ -36,6 +36,8 @@ public:
 protected:
     void setAnnotationDirty(Packet*, bool);
     bool getAnnotationDirty(Packet*);
+    void setAnnotationLastUseful(Packet*, bool);
+    bool getAnnotationLastUseful(Packet*);
     uint16_t getContentOffset(Packet*);
     const unsigned char* getPacketContentConst(Packet*);
     unsigned char* getPacketContent(WritablePacket*);
@@ -44,6 +46,7 @@ protected:
     uint32_t getInitialAck(Packet *p);
     void buildFunctionStack();
     bool isPacketContentEmpty(Packet*);
+    uint16_t getPacketContentSize(Packet *packet);
 
     virtual Packet* processPacket(struct fcb *fcb, Packet*);
 
@@ -53,6 +56,7 @@ protected:
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
     virtual void packetSent(struct fcb *fcb, Packet* packet);
     virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
+    virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
     // Method used for the simulation of Middleclick's fcb management system
     // Should be removed when integrated to Middleclick
@@ -67,7 +71,8 @@ private:
 
     // Constants
     // Up to 8 booleans can be stored in the corresponding annotation
-    const int offsetAnnotationDirty = 0;
+    const int OFFSET_ANNOTATION_DIRTY = 0;
+    const int OFFSET_ANNOTATION_LASTUSEFUL = 1;
 
 };
 

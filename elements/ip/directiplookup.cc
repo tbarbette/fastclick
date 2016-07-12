@@ -489,6 +489,10 @@ DirectIPLookup::Table::remove_route(const IPRoute& route, IPRoute* old_route, Er
 
 DirectIPLookup::DirectIPLookup()
 {
+#if HAVE_BATCH
+	// TODO: Remove this when push_batch() will actually be implemented
+	in_batch_mode = BATCH_MODE_NO;
+#endif
 }
 
 DirectIPLookup::~DirectIPLookup()
@@ -512,7 +516,7 @@ DirectIPLookup::cleanup(CleanupStage)
 }
 
 void
-DirectIPLookup::push(int, Packet *p)
+DirectIPLookup::push_packet(int, Packet *p)
 {
     IPAddress gw;
     int port = lookup_route(p->dst_ip_anno(), gw);

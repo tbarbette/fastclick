@@ -290,4 +290,17 @@ Bitvector::print() {
         buf[i] = '\0';
         click_chatter("%s",buf);
 }
+
+Bitvector Bitvector::from_mask(unsigned long mask) {
+	int vsize = sizeof(unsigned long) * 8;
+	Bitvector v(vsize);
+	int pow = 0;
+	while (pow < vsize) {
+		v[pow] = mask & 1;
+		mask >>= 1;
+		++pow;
+	}
+	return v;
+}
+
 CLICK_ENDDECLS

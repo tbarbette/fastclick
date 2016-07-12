@@ -13,6 +13,7 @@
 #include "tcpreordernode.hh"
 #include "circularbuffer.hh"
 #include "retransmissiontiming.hh"
+#include "flowbuffer.hh"
 
 /**
  * This file is used to simulate the FCB provided by Middleclick
@@ -184,6 +185,11 @@ struct fcb_tcpmarkmss
     }
 };
 
+struct fcb_httpout
+{
+    FlowBuffer flowBuffer;
+};
+
 struct fcb
 {
     struct fcb_tcp_common* tcp_common;
@@ -191,6 +197,7 @@ struct fcb
     struct fcb_tcpreorder tcpreorder;
     struct fcb_tcpin tcpin;
     struct fcb_httpin httpin;
+    struct fcb_httpout httpout;
     struct fcb_pathmerger pathmerger;
     struct fcb_tcpretransmitter tcpretransmitter;
     struct fcb_tcpmarkmss tcpmarkmss;

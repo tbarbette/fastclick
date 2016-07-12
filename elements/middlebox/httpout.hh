@@ -2,8 +2,13 @@
 #define MIDDLEBOX_HTTPOUT_HH
 #include <click/element.hh>
 #include "stackelement.hh"
+#include "memorypool.hh"
+#include "flowbuffer.hh"
+#include "flowbufferentry.hh"
 
 CLICK_DECLS
+
+#define POOL_BUFFER_ENTRIES_SIZE 300
 
 class HTTPOut : public StackElement
 {
@@ -20,6 +25,9 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
+    void setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content);
+
+    MemoryPool<struct flowBufferEntry> poolBufferEntries;
 };
 
 CLICK_ENDDECLS

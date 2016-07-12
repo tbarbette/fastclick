@@ -5,12 +5,13 @@
 #include "memorypool.hh"
 #include "flowbufferentry.hh"
 #include "stackelement.hh"
-#include "fcb.hh"
 
 CLICK_DECLS
 
 class FlowBufferContentIter;
 class FlowBufferIter;
+class StackElement;
+struct fcb;
 
 class FlowBuffer
 {

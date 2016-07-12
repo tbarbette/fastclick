@@ -19,7 +19,7 @@ CLICK_DECLS
  *
  * =c
  *
- * ToNetmapDevice(DEVNAME [, QUEUE, [, I<keywords> PROMISC, BURST])
+ * ToNetmapDevice(DEVNAME [, QUEUE, N_QUEUES, [, I<keywords> PROMISC, BURST])
  *
  * =s comm
  *
@@ -33,6 +33,15 @@ CLICK_DECLS
  * =item DEVNAME
  *
  * String Device name
+ *
+ *=item QUEUE
+ *
+ * Integer.  A specific hardware queue to use. Default is 0.
+ *
+ *=item N_QUEUES
+ *
+ * Integer.  Number of hardware queues to use. -1 or default is to use as many
+ * queues as threads which can end up in this element.
  *
  * =item IQUEUE (push mode only)
  *
@@ -65,10 +74,9 @@ CLICK_DECLS
  */
 
 
-class ToNetmapDevice: public QueueDevice  {
+class ToNetmapDevice: public TXQueueDevice  {
 
 public:
-	std::vector <Packet*> _queues;
 	ToNetmapDevice() CLICK_COLD;
 
     void selected(int, int);
@@ -102,9 +110,6 @@ public:
 
   protected:
 
-
-    unsigned int _burst;
-    bool _block;
     unsigned long last_count;
     unsigned long last_rate;
     std::vector<Timer*> _zctimers;
@@ -112,7 +117,6 @@ public:
     bool _debug;
     enum { h_signal };
 
-    unsigned int _internal_queue;
     bool _pull_use_select;
 
     unsigned int send_packets(Packet* &packet, bool ask_sync=false, bool txsync_on_empty = true);
@@ -124,7 +128,7 @@ public:
         State() : backoff(0), q(NULL), q_size(0), last_queue(0), timer() {};
         unsigned int backoff;
     	Packet* q; //Pending packets to send
-    	unsigned int q_size;
+	int q_size;
     	unsigned int last_queue; //Last queue used to send packets
     	NotifierSignal signal;
        Timer* timer; //Timer for repeateadly empty pull()

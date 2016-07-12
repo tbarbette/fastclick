@@ -74,6 +74,16 @@ void PathMerger::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
         previousElem->setPacketDirty(fcb, packet);
 }
 
+bool PathMerger::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
+{
+    StackElement *previousElem = getElementForPacket(fcb, packet);
+
+    if(previousElem != NULL)
+        return previousElem->isLastUsefulPacket(fcb, packet);
+    else
+        return false;
+}
+
 void PathMerger::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);

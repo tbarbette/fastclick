@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(false),_burst(32),_keephand(false)
+FromNetmapDevice::FromNetmapDevice() : _device(NULL),_keephand(false)
 {
 #if HAVE_BATCH
 	in_batch_mode = BATCH_MODE_YES;
@@ -38,6 +38,7 @@ FromNetmapDevice::FromNetmapDevice() : _device(NULL), _promisc(1),_blockant(fals
 #if HAVE_ZEROCOPY
 	NetmapDevice::global_alloc += 2048;
 #endif
+	_burst = 32;
 }
 
 void *
@@ -53,33 +54,16 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 
 	String flow,ifname;
-	int threadoffset = -1;
-	int maxthreads = -1;
-	int maxqueues = 128;
-	bool numa = _numa;
+
 	int thisnode = 0;
 
-    if (Args(conf, this, errh)
-    .read_mp("DEVNAME", ifname)
-  	.read_p("PROMISC", _promisc)
-  	.read_p("BURST", _burst)
-  	.read("MAXTHREADS", maxthreads)
-  	.read("THREADOFFSET", threadoffset)
+    if (parse(Args(conf, this, errh)
+    .read_mp("DEVNAME", ifname))
   	.read("KEEPHAND",_keephand)
-  	.read("MAXQUEUES",maxqueues)
-  	.read("NUMA",numa)
-	.read("VERBOSE",_verbose)
-
   	.complete() < 0)
     	return -1;
-#if !HAVE_NUMA
-    if (numa == true) {
-    	click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
-    }
-    _numa = false;
-#else
-    _numa = numa;
-    if (numa) {
+#if HAVE_NUMA
+    if (_use_numa) {
     const char* device = ifname.c_str();
     thisnode = Numa::get_device_node(&device[7]);
     } else
@@ -91,7 +75,25 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("Could not initialize %s",ifname.c_str());
     }
 
-    int r = configure_rx(thisnode,maxthreads,_device->n_queues,std::min(maxqueues,_device->n_queues),threadoffset,errh);
+    int r;
+    if (n_queues == -1) {
+	if (firstqueue == -1) {
+		firstqueue = 0;
+		//By default with Netmap, use all available queues (RSS is enabled by default)
+		 r = configure_rx(thisnode,_device->n_queues,_device->n_queues,errh);
+	} else {
+		//If a queue number is setted, user probably want only one queue
+		r = configure_rx(thisnode,1,1,errh);
+	}
+    } else {
+        if (firstqueue == -1)
+            firstqueue = 0;
+        if (firstqueue + n_queues > _device->n_queues)
+            return errh->error("You asked for %d queues after queue %d but device only have %d.",n_queues,firstqueue,_device->n_queues);
+        r = configure_rx(thisnode,n_queues,n_queues,errh);
+    }
+
+
     if (r != 0) return r;
 
     return 0;
@@ -103,10 +105,10 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 {
     int ret;
 
-    ret = QueueDevice::initialize_rx(errh);
+    ret = initialize_rx(errh);
     if (ret != 0) return ret;
 
-    ret = QueueDevice::initialize_tasks(false,errh);
+    ret = initialize_tasks(false,errh);
     if (ret != 0) return ret;
 
 	if (_verbose > 0 && thread_per_queues() > 2) {
@@ -134,11 +136,10 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 
 	int i =0;
 	if ((dir = opendir (netinfo)) != NULL) {
-	  /* print all the files and directories within directory */
-	  while ((ent = readdir (dir)) != NULL) {
+	  while ((ent = readdir (dir)) != NULL && i < firstqueue + n_queues) {
 		int n = atoi(ent->d_name);
 		if (n == 0) continue;
-
+		if (i < firstqueue) continue;
 
 		char irqpath[100];
 		int irq_n = n;
@@ -149,23 +150,21 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 			continue;
 		sprintf(irqpath,"%d",thread_for_queue(i));
 		if (_verbose > 1)
-			click_chatter("Pinning IRQ %d (queue %d) to thread %d",irq_n,thread_for_queue(i),i,irq_n);
+			click_chatter("Pinning IRQ %d (queue %d) to thread %d",irq_n,i,thread_for_queue(i));
 		write(fd, irqpath, (size_t)strlen(irqpath));
 		close(fd);
 		i++;
-		if (i == nqueues)
-			break;
-
 	  }
 	  closedir (dir);
 	}
 
 	//Map fd to queues to allow select handler to quickly check the right ring
 	_queue_for_fd.resize(_device->_maxfd + 1);
-	for (int i = 0; i < nqueues; i++) {
+	for (int i = firstqueue; i < n_queues + firstqueue; i++) {
 	    int fd = _device->nmds[i]->fd;
 	    _queue_for_fd[fd] = i;
 	}
+
 	//Register selects for threads
 	for (int i = 0; i < usable_threads.size();i++) {
 		if (!usable_threads[i])
@@ -195,8 +194,8 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 			cur = rxring->cur;
 
 			n = nm_ring_space(rxring);
-			if (_burst && n > _burst) {
-			    nr_pending += n - _burst;
+			if (_burst > 0 && n > (int)_burst) {
+			    nr_pending += n - (int)_burst;
 				n = _burst;
 			}
 
@@ -286,7 +285,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 
 		}
 
-	if (nr_pending > _burst) { //TODO size/4
+	if ((int)nr_pending > _burst) { //TODO size/4 or something
 	    if (fromtask) {
 	            task->fast_reschedule();
 	    } else {

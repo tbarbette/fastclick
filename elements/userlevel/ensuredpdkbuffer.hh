@@ -7,10 +7,23 @@
 CLICK_DECLS
 
 /*
+ * =title EnsureDPDKBuffer
+ *
  * =c
  *
  * EnsureDPDKBuffer()
-
+ *
+ * =d
+ *
+ * Ensure that all packets passing through this element are using DPDK buffer and not Click or mmap'd buffers. Packet will be copied to a new DPDK buffer if it's not the case.
+ *
+ * =item FORCE_COPY
+ *
+ * Always copy packets to a new DPDK buffer
+ *
+ * =item EXTRA_HEADROOM
+ *
+ * When a copy is done, add an extra headroom space
  */
 
 
@@ -34,6 +47,7 @@ public:
 private:
     bool _force;
     int _extra_headroom;
+	int _warn_count;
 };
 
 CLICK_ENDDECLS

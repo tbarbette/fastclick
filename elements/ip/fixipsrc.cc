@@ -2,7 +2,11 @@
  * fixipsrc.{cc,hh} -- element sets IP source if Fix IP Source annotation on
  * Robert Morris
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -67,6 +71,15 @@ FixIPSrc::simple_action(Packet *p)
     p = fix_it(p);
   return p;
 }
+
+#if HAVE_BATCH
+PacketBatch*
+FixIPSrc::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(FixIPSrc)

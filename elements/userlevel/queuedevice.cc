@@ -27,15 +27,9 @@ int QueueDevice::use_nodes = 0;
 Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
-QueueDevice::QueueDevice() :  nqueues(1), usable_threads(),
-	queue_per_threads(1), queue_share(1), ndesc(0), _maxthreads(-1),
-	_minqueues(1),_maxqueues(128),_threadoffset(-1),thread_share(1),
+QueueDevice::QueueDevice() : _minqueues(0),_maxqueues(128), usable_threads(),
+	queue_per_threads(1), queue_share(1), ndesc(0), _maxthreads(-1),firstqueue(-1),n_queues(-1),thread_share(1),
 	_this_node(0){
-#if HAVE_NUMA
-	_numa = true;
-#else
-	_numa = false;
-#endif
 	_verbose = 1;
 }
 void QueueDevice::static_initialize() {
@@ -52,40 +46,81 @@ void QueueDevice::static_initialize() {
     shared_offset.fill(0);
 }
 
-int QueueDevice::configure_rx(int numa_node,unsigned int maxthreads, unsigned int minqueues, unsigned int maxqueues, unsigned int threadoffset, ErrorHandler *) {
-    _maxthreads = maxthreads;
-    _minqueues = minqueues;
-    _maxqueues = maxqueues;
-    _threadoffset = threadoffset;
+Args& QueueDevice::parse(Args &args) {
+	args.read_p("QUEUE", firstqueue)
+		.read("N_QUEUES",n_queues)
+		.read("MAXTHREADS", _maxthreads)
+		.read("BURST", _burst)
+		.read("VERBOSE", _verbose);
 
-    #if !HAVE_NUMA
-        (void)numa_node;
-        _this_node = 0;
-        usable_threads.assign(master()->nthreads(),false);
-    #else
-        usable_threads.assign(min(Numa::get_max_cpus(), master()->nthreads()),false);
-        if (numa_node < 0) numa_node = 0;
-        _this_node = numa_node;
-    #endif
+	n_elements ++;
 
-    if (_maxthreads == -1 || _threadoffset == -1) {
-        inputs_count[_this_node] ++;
-        if (inputs_count[_this_node] == 1)
-            use_nodes++;
-    }
-    n_elements ++;
-    return 0;
+	return args;
 }
 
-int QueueDevice::configure_tx(unsigned int maxthreads,unsigned int minqueues, unsigned int maxqueues, ErrorHandler *) {
-    _maxthreads = maxthreads;
-    _minqueues = minqueues;
-    _maxqueues = maxqueues;
-    n_elements ++;
-    return 0;
+Args& RXQueueDevice::parse(Args &args) {
+	args = QueueDevice::parse(args);
+
+	_promisc = true;
+	args.read_p("PROMISC", _promisc);
+
+#if HAVE_NUMA
+	_use_numa = true;
+#else
+	_use_numa = false;
+#endif
+	_threadoffset = -1;
+	_set_rss_aggregate = false;
+
+	args.read("RSS_AGGREGATE", _set_rss_aggregate)
+		.read("NUMA", _use_numa)
+		.read("THREADOFFSET", _threadoffset);
+
+#if !HAVE_NUMA
+	if (_use_numa) {
+		click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
+	}
+	_use_numa = false;
+#endif
+	return args;
 }
 
-int QueueDevice::initialize_tx(ErrorHandler * errh) {
+Args& TXQueueDevice::parse(Args &args) {
+	QueueDevice::parse(args);
+	args.read("IQUEUE", _internal_tx_queue_size)
+		.read("BLOCKING", _blocking);
+	return args;
+}
+
+int RXQueueDevice::configure_rx(int numa_node, int minqueues, int maxqueues, ErrorHandler *) {
+	_minqueues = minqueues;
+	_maxqueues = maxqueues;
+#if !HAVE_NUMA
+	(void)numa_node;
+	_this_node = 0;
+	usable_threads.assign(master()->nthreads(),false);
+#else
+	usable_threads.assign(min(Numa::get_max_cpus(), master()->nthreads()),false);
+	if (numa_node < 0) numa_node = 0;
+	_this_node = numa_node;
+#endif
+
+	if (_maxthreads == -1 || _threadoffset == -1) {
+		inputs_count[_this_node] ++;
+		if (inputs_count[_this_node] == 1)
+			use_nodes++;
+	}
+
+	return 0;
+}
+
+int TXQueueDevice::configure_tx(int minqueues, int maxqueues,ErrorHandler *) {
+	_minqueues = minqueues;
+	_maxqueues = maxqueues;
+	return 0;
+}
+
+int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
     usable_threads.assign(master()->nthreads(),false);
     int n_threads = 0;
 
@@ -107,39 +142,48 @@ int QueueDevice::initialize_tx(ErrorHandler * errh) {
         return errh->error("No threads end up in this queuedevice...? Aborting.");
     }
 
-    nqueues = min(_maxqueues,n_threads);
-    nqueues = max(_minqueues,nqueues);
+    if (n_threads >= _maxqueues)
+        n_queues = _maxqueues;
+    else
+        n_queues = max(_minqueues,n_threads);
 
-    queue_per_threads = nqueues / n_threads;
+    queue_per_threads = n_queues / n_threads;
     if (queue_per_threads == 0) {
         queue_per_threads = 1;
-        thread_share = n_threads / nqueues;
+        thread_share = n_threads / n_queues;
     }
 
     n_initialized++;
     if (_verbose > 1) {
 		if (input_is_push(0))
-			click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+			click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,n_queues,queue_per_threads,thread_share);
 		else
-			click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,nqueues,queue_per_threads,thread_share);
+			click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,n_queues,queue_per_threads,thread_share);
     }
     return 0;
 }
-int QueueDevice::initialize_rx(ErrorHandler *errh) {
 
-	if (router()->thread_sched() && router()->thread_sched()->initial_home_thread_id(this) != ThreadSched::THREAD_UNKNOWN) {
+int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
+	int n_threads;
+	int cores_in_node;
+    int count = 0;
+    int offset = 0;
+
+    if (router()->thread_sched() && router()->thread_sched()->initial_home_thread_id(this) != ThreadSched::THREAD_UNKNOWN) {
 		usable_threads[router()->thread_sched()
 					   ->initial_home_thread_id(this)] = 1;
-		n_initialized++;
+
 		click_chatter(
 				"%s : remove StaticThreadSched to use FastClick's "
 				"auto-thread assignment", class_name());
-		return 0;
+		goto end;
 	};
 
+    {
 #if HAVE_NUMA
 	NumaCpuBitmask b = NumaCpuBitmask::allocate();
-    if (numa_available()==0 && _numa) {
+
+    if (numa_available()==0 && _use_numa) {
         if (_this_node >= 0) {
             b = Numa::node_to_cpus(_this_node);
         } else
@@ -150,7 +194,7 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
     {
         usable_threads.negate();
     }
-
+    }
        for (int i = click_nthreads; i < usable_threads.size(); i++)
            usable_threads[i] = 0;
 
@@ -165,9 +209,7 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
                usable_threads &= (~v);
        }
 
-       int cores_in_node = usable_threads.weight();
-
-       int n_threads;
+       cores_in_node = usable_threads.weight();
 
        //click_chatter("_maxthreads %d, cores_in_node %d, nthreads() %d, use_nodes %d, _this_node %d, inputs_count %d",_maxthreads,cores_in_node,master()->nthreads(),use_nodes,_this_node,inputs_count[_this_node]);
        if (_maxthreads == -1) {
@@ -190,7 +232,6 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
 
        if (n_threads > _maxqueues) {
            queue_share = n_threads / _maxqueues;
-
        }
 
        if (_threadoffset == -1) {
@@ -207,16 +248,15 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
            if (n_threads + _threadoffset > master()->nthreads())
                _threadoffset = master()->nthreads() - n_threads;
 
+       if (n_threads >= _maxqueues)
+           n_queues = _maxqueues;
+       else
+           n_queues = max(_minqueues,n_threads);
 
-       nqueues = min(_maxqueues,n_threads);
-       nqueues = max(_minqueues,nqueues);
+       queue_per_threads = n_queues / n_threads;
 
-       queue_per_threads = nqueues / n_threads;
+       if (queue_per_threads * n_threads < n_queues) queue_per_threads ++;
 
-       if (queue_per_threads * n_threads < nqueues) queue_per_threads ++;
-
-       int count = 0;
-       int offset = 0;
        for (int b = 0; b < usable_threads.size(); b++) {
            if (count >= n_threads) {
                usable_threads[b] = false;
@@ -236,25 +276,37 @@ int QueueDevice::initialize_rx(ErrorHandler *errh) {
            return errh->error("Node has not enough threads for device !");
        }
 
-       n_initialized++;
+       if (_verbose > 1) {
+           if (n_threads >= n_queues)
+               click_chatter("%s : %d threads will be used to push packets downstream. %d queues will be used meaning that each queue will be shared by %d threads.",name().c_str(),n_threads,n_queues,queue_share);
+           else
+               click_chatter("%s : %d threads will be used to push packets downstream. %d queues will be used meaning that each thread will handle up to %d queues",name().c_str(),n_threads,n_queues,queue_per_threads);
+       }
 
+    end:
+       n_initialized++;
        return 0;
 }
 
 int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 	_tasks.resize(usable_threads.weight());
 	_locks.resize(usable_threads.weight());
-	_thread_to_queue.resize(master()->nthreads());
-	_queue_to_thread.resize(nqueues);
+	_thread_to_firstqueue.resize(master()->nthreads());
+	_queue_to_thread.resize(firstqueue + n_queues);
 
 	int th_num = 0;
+	int qu_num = firstqueue;
+	if (_verbose > 2)
+		click_chatter("%s : using queues from %d to %d",name().c_str(),firstqueue,firstqueue+n_queues-1);
 
-	int share_idx = 0;
+	//If there is multiple threads per queue, share_idx will be in [0,thread_share[, thread_share being the amount of queues that needs to be shared between threads
+	int th_share_idx = 0;
+	int qu_share_idx = 0;
 	for (int th_id = 0; th_id < master()->nthreads(); th_id++) {
 		if (!usable_threads[th_id])
 			continue;
 
-		if (share_idx % thread_share != 0) {
+		if (th_share_idx % thread_share != 0) {
 			--th_num;
 			if (_locks[th_num] == NO_LOCK) {
 				_locks[th_num] = 0;
@@ -265,14 +317,19 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 			_tasks[th_num]->move_thread(th_id);
 			_locks[th_num] = NO_LOCK;
 		}
-		share_idx++;
+		th_share_idx++;
 
-		_thread_to_queue[th_id] = (th_num * queue_per_threads) / queue_share;
+		_thread_to_firstqueue[th_id] = qu_num;
 
 		for (int j = 0; j < queue_per_threads; j++) {
 			if (_verbose > 2)
-				click_chatter("Queue %d handled by th %d",((th_num * queue_per_threads) + j) / queue_share,th_id);
-			_queue_to_thread[((th_num * queue_per_threads) + j) / queue_share] = th_id;
+				click_chatter("%s : Queue %d handled by th %d",name().c_str(),qu_num,th_id);
+			_queue_to_thread[qu_num] = th_id;
+			//If queue are shared, this mapping is loosy : _queue_to_thread will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
+			qu_share_idx++;
+			if (qu_share_idx % queue_share == 0)
+				qu_num++;
+			if (qu_num == firstqueue + n_queues) break;
 		}
 
 		if (queue_share > 1) {
@@ -280,7 +337,6 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 		}
 
 		++th_num;
-
 	}
 
 	return 0;
