@@ -51,7 +51,9 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
         return 0;
     }
 
-    rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &position);
+    uint32_t positionSeek = position;
+
+    rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &positionSeek);
     rb_red_blk_node* pred = treeAck->nil;
     rb_red_blk_node* succ = treeAck->nil;
     uint32_t nodeKey = 0;
@@ -112,7 +114,9 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
         return 0;
     }
 
-    rb_red_blk_node* node = RBFindElementGreatestBelow(treeSeq, &position);
+    uint32_t positionSeek = position - 1;
+
+    rb_red_blk_node* node = RBFindElementGreatestBelow(treeSeq, &positionSeek);
     rb_red_blk_node* pred = treeSeq->nil;
     uint32_t newPosition = position;
 

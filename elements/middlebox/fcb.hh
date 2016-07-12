@@ -146,7 +146,7 @@ struct fcb_pathmerger
 {
     HashTable<tcp_seq_t, int> portMap;
 
-    fcb_pathmerger() : portMap(-1)
+    fcb_pathmerger() : portMap(0)
     {
     }
 };

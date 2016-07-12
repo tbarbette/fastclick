@@ -416,9 +416,8 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
     if(!(flags & TH_SYN))
         return false;
 
-    // The data in the flow will start at current sequence number + 1
-    // (because we have a SYN packet)
-    uint32_t flowStart = getSequenceNumber(packet) + 1;
+    // The data in the flow will start at current sequence number
+    uint32_t flowStart = getSequenceNumber(packet);
 
     // Check if we are the side initiating the connection or not
     // (if ACK flag, we are not the initiator)
@@ -461,8 +460,8 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
     // Set information about the flow
     fcb->tcp_common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));
     fcb->tcp_common->maintainers[getFlowDirection()].setIpDst(getDestinationAddress(packet));
-    fcb->tcp_common->maintainers[getFlowDirection()].setPortSrc(getDestinationPort(packet));
-    fcb->tcp_common->maintainers[getFlowDirection()].setPortDst(getSourcePort(packet));
+    fcb->tcp_common->maintainers[getFlowDirection()].setPortSrc(getSourcePort(packet));
+    fcb->tcp_common->maintainers[getFlowDirection()].setPortDst(getDestinationPort(packet));
 
     return true;
 }

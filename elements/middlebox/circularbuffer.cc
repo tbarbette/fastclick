@@ -142,7 +142,7 @@ bool CircularBuffer::isBlank()
 
 void CircularBuffer::getData(uint32_t start, uint32_t length, Vector<unsigned char> &getBuffer)
 {
-    if(SEQ_LT(start, getStartOffset()))
+    if(SEQ_LT(start, getStartOffset()) || start - getStartOffset() > getSize())
     {
         click_chatter("Error: TCPRetransmission: data not in the buffer.");
         return;

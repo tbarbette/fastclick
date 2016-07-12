@@ -36,6 +36,11 @@ MemoryPool<struct flowBufferEntry>* FlowBuffer::getMemoryPool()
     return poolEntries;
 }
 
+bool FlowBuffer::isInitialized()
+{
+    return initialized;
+}
+
 void FlowBuffer::enqueue(WritablePacket *packet)
 {
     if(!initialized)
@@ -124,7 +129,7 @@ FlowBufferIter FlowBuffer::end()
     return FlowBufferIter(this, NULL);
 }
 
-void FlowBuffer::initialize(MemoryPool<struct flowBufferEntry> *poolEntries, StackElement *owner)
+void FlowBuffer::initialize(StackElement *owner, MemoryPool<struct flowBufferEntry> *poolEntries)
 {
     this->poolEntries = poolEntries;
     this->owner = owner;

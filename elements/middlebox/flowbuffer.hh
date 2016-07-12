@@ -20,7 +20,8 @@ public:
     FlowBuffer();
     ~FlowBuffer();
 
-    void initialize(MemoryPool<struct flowBufferEntry> *poolEntries, StackElement *owner);
+    void initialize(StackElement *owner, MemoryPool<struct flowBufferEntry> *poolEntries);
+    bool isInitialized();
     StackElement* getOwner();
     MemoryPool<struct flowBufferEntry>* getMemoryPool();
 

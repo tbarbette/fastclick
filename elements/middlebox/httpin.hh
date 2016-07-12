@@ -22,6 +22,9 @@ protected:
     void getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, char* buffer, uint32_t bufferSize);
     void setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content);
     void setRequestParameters(struct fcb *fcb, WritablePacket *packet);
+    void setHTTP10(struct fcb *fcb, WritablePacket *packet);
+
+private:
 };
 
 CLICK_ENDDECLS

@@ -31,13 +31,15 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
 
     nbPackets++;
 
-    if(nbPackets == 5)
+    if(nbPackets < 15)
         requestMorePackets(fcb, packet);
 
 /*
     if(nbPackets == 10)
         closeConnection(fcb, packet, false, true);
         */
+
+
 
     insertBytes(fcb, packet, 0, 6);
 

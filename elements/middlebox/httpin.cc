@@ -19,12 +19,11 @@ int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
-
-
     if(!fcb->httpin.headerFound && !isPacketContentEmpty(packet))
     {
         // Remove the "Accept-Encoding" header to avoid receiving
         // compressed content
+        setHTTP10(fcb, packet);
         removeHeader(fcb, packet, "Accept-Encoding");
         char buffer[250];
         getHeaderContent(fcb, packet, "Content-Length", buffer, 250);
@@ -136,6 +135,31 @@ void HTTPIn::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const cha
         removeBytes(fcb, packet, endPos, -offset);
 
     memcpy(beginning, content, newSize);
+}
+
+void HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
+{
+    unsigned char* source = getPacketContent(packet);
+    unsigned char* endFirstLine = (unsigned char*)strstr((char*)source, "\r\n");
+
+    if(endFirstLine == NULL)
+        return;
+
+    unsigned char* beginning = (unsigned char*)strstr((char*)source, "HTTP/");
+
+    if(beginning == NULL || beginning > endFirstLine)
+        return;
+
+    // Ensure the line has the right length
+    int offset = endFirstLine - beginning - 8; // 8 is the length of "HTTP/1.1"
+    if(offset > 0)
+        removeBytes(fcb, packet, beginning - source + 8, offset);
+    else
+        insertBytes(fcb, packet , beginning - source + 5, -offset);
+
+    beginning[5] = '1';
+    beginning[6] = '.';
+    beginning[7] = '0';
 }
 
 void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)

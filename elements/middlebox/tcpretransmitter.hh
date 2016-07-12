@@ -45,7 +45,7 @@ private:
     Vector<unsigned char> getBuffer;
 
     void prune(struct fcb *fcb);
-    bool dataToRetransmit(struct fcb *fcb);
+    bool dataToRetransmit(struct fcb *fcb, int direction);
 };
 
 CLICK_ENDDECLS

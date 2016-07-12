@@ -692,6 +692,25 @@ void RBPrune(rb_red_blk_tree* tree, void* q)
     // Find the greatest node below the key q (end of the pruning interval)
     rb_red_blk_node* end = RBFindElementGreatestBelow(tree, q);
 
+    // We will not prune until the node retrieved, but instead, until
+    // the predecessor of the predecessor of the node retrieved.
+    // The first predecessor is used because to map a sequence number,
+    // we need to map it using the position before it
+    // The predecessor of the predecessor is used because to perform
+    // a mapping, we look at the predecessor of the node obtained
+    if(end == nil)
+        return;
+
+    rb_red_blk_node* pred = TreePredecessor(tree, end);
+    end = pred;
+    if(end == nil)
+        return;
+
+    pred = TreePredecessor(tree, end);
+    end = pred;
+    if(end == nil)
+        return;
+
     // Browse the tree starting at the min element and going each time to the successor
     // of the current node until it reaches the greatest element below the given key (q).
     // This element will not be removed and will thus become the smallest element in the tree
