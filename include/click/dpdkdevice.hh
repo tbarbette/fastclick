@@ -66,7 +66,15 @@ public:
     }
 
     inline static rte_mbuf* get_pkt(unsigned numa_node) {
-        return rte_pktmbuf_alloc(get_mpool(numa_node));
+        struct rte_mbuf* mbuf = rte_pktmbuf_alloc(get_mpool(numa_node));
+        if (unlikely(!mbuf)) {
+            if (!DPDKDevice::no_more_buffer_msg_printed)
+                 click_chatter("No more DPDK buffer available ! Try using "
+                               "DPDKInfo to allocate more.");
+            else
+                DPDKDevice::no_more_buffer_msg_printed = true;
+        }
+        return mbuf;
     }
 
     inline static rte_mbuf* get_pkt() {
@@ -120,6 +128,7 @@ private:
     static HashMap<unsigned, DevInfo> _devs;
     static struct rte_mempool** _pktmbuf_pools;
     static int _nr_pktmbuf_pools;
+     static bool no_more_buffer_msg_printed;
 
     static int initialize_device(unsigned port_id, DevInfo &info,
                                  ErrorHandler *errh) CLICK_COLD;
@@ -165,8 +174,6 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node) {
              * copy the packet content to it.*/
             mbuf = DPDKDevice::get_pkt(node);
             if (mbuf == 0) {
-                click_chatter("Out of DPDK buffer ! Check your configuration for "
-                        "packet leaks or increase the number of buffer with DPDKInfo().");
                 return NULL;
             }
             memcpy((void*)rte_pktmbuf_mtod(mbuf, unsigned char *),p->data(),p->length());
