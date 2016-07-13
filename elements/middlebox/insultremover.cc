@@ -39,8 +39,6 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
         closeConnection(fcb, packet, false, true);
         */
 
-/*
-
     packet = insertBytes(fcb, packet, 0, 6);
 
     source[0] = 'H';
@@ -49,8 +47,8 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     source[3] = 'L';
     source[4] = 'O';
     source[5] = ' ';
-    */
 
+    source = getPacketContent(packet);
     firstOccur = source;
     while(firstOccur != NULL)
     {

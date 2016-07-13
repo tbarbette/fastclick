@@ -313,7 +313,14 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     list->addModification(seqNumber, seqNumber + position - tcpOffset, -((int)length));
 
     unsigned char *source = packet->data();
+    if(position > packet->length())
+    {
+        click_chatter("Error: Invalid removeBytes call (packet length: %u, position: %u)", length, position);
+        return;
+    }
     uint32_t bytesAfter = packet->length() - position;
+
+    click_chatter("Bytes after: %u, position %u, length: %u", bytesAfter, position, length);
 
     memmove(&source[position], &source[position + length], bytesAfter);
     packet->take(length);
@@ -332,10 +339,11 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
     getModificationList(fcb, packet)->addModification(seqNumber, seqNumber + position - tcpOffset, (int)length);
 
     uint32_t bytesAfter = packet->length() - position;
-
     WritablePacket *newPacket = packet->put(length);
     assert(newPacket != NULL);
     unsigned char *source = newPacket->data();
+
+    click_chatter("Bytes after: %u, position %u, length: %u", bytesAfter, position, length);
 
     memmove(&source[position + length], &source[position], bytesAfter);
 
