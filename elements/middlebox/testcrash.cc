@@ -24,8 +24,11 @@ void TestCrash::push(int, Packet *p)
 {
     WritablePacket *packet = p->uniqueify();
 
-    for(int i = 0; i < 10; ++i)
-        WritablePacket* newPacket = Packet::make(1500);
+    click_chatter("Packet!");
+
+
+    packet = packet->put(1500);
+    packet->take(1500);
 
     output(0).push(packet);
 }

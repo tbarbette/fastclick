@@ -35,20 +35,22 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
         // We have the whole content
         if(isLastUsefulPacket(fcb, packet))
         {
-            /*// Compute the new Content-Length
+            // Compute the new Content-Length
             FlowBufferIter it = flowBuffer.begin();
 
             uint64_t newContentLength = 0;
-
             while(it != flowBuffer.end())
+            {
                 newContentLength += getPacketContentSize(*it);
+                ++it;
+            }
 
             WritablePacket *packetHdr = *(flowBuffer.begin());
 
             char bufferHeader[25];
 
             sprintf(bufferHeader, "%lu", newContentLength);
-            setHeaderContent(fcb, packet, "Content-Length", bufferHeader);
+            packetHdr = setHeaderContent(fcb, packet, "Content-Length", bufferHeader);
 
             click_chatter("Content-Length modified to %lu", newContentLength);
 
@@ -57,7 +59,7 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
             {
                 output(0).push(toPush);
                 toPush = flowBuffer.dequeue();
-            }*/
+            }
         }
 
         return NULL;
@@ -66,19 +68,19 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
     return packet;
 }
 
-void HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content)
+WritablePacket* HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content)
 {
     unsigned char* source = getPacketContent(packet);
     unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
 
     if(beginning == NULL)
-        return;
+        return packet;
 
     beginning += strlen(headerName) + 1;
 
     unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
     if(end == NULL)
-        return;
+        return packet;
 
     // Skip spaces at the beginning of the string
     while(beginning < end && beginning[0] == ' ')
@@ -93,11 +95,13 @@ void HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const ch
 
     // Ensure that the header has the right size
     if(offset > 0)
-        insertBytes(fcb, packet, prevEndPos, offset);
+        packet = insertBytes(fcb, packet, prevEndPos, offset);
     else if(offset < 0)
         removeBytes(fcb, packet, endPos, -offset);
 
     memcpy(beginning, content, newSize);
+
+    return packet;
 }
 
 

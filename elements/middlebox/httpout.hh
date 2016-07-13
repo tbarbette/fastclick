@@ -25,7 +25,7 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
-    void setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content);
+    WritablePacket* setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content) CLICK_WARN_UNUSED_RESULT;
 
     MemoryPool<struct flowBufferEntry> poolBufferEntries;
 };
