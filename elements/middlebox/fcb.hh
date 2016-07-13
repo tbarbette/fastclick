@@ -156,28 +156,6 @@ struct fcb_pathmerger
 };
 
 
-struct fcb_tcpretransmitter
-{
-    CircularBuffer *buffer;
-    MemoryPool<CircularBuffer> *bufferPool;
-
-    fcb_tcpretransmitter()
-    {
-        buffer = NULL;
-        bufferPool = NULL;
-    }
-
-    ~fcb_tcpretransmitter()
-    {
-        if(buffer != NULL && bufferPool != NULL)
-        {
-            // Release memory for the circular buffer
-            buffer->~CircularBuffer();
-            bufferPool->releaseMemory(buffer);
-        }
-    }
-};
-
 struct fcb_tcpmarkmss
 {
     uint16_t mss;
@@ -193,6 +171,17 @@ struct fcb_httpout
     FlowBuffer flowBuffer;
 };
 
+struct fcb_insultremover
+{
+    FlowBuffer flowBuffer;
+    uint32_t counterRemoved;
+
+    fcb_insultremover()
+    {
+        counterRemoved = 0;
+    }
+};
+
 struct fcb
 {
     struct fcb_tcp_common* tcp_common;
@@ -202,7 +191,7 @@ struct fcb
     struct fcb_httpin httpin;
     struct fcb_httpout httpout;
     struct fcb_pathmerger pathmerger;
-    struct fcb_tcpretransmitter tcpretransmitter;
+    struct fcb_insultremover insultremover;
     struct fcb_tcpmarkmss tcpmarkmss;
 
     fcb()

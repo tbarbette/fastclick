@@ -24,7 +24,7 @@ class TCPRetransmitter : public StackElement, public TCPElement
 {
 public:
     TCPRetransmitter() CLICK_COLD;
-    ~TCPRetransmitter();
+    ~TCPRetransmitter() CLICK_COLD;
 
     // Click related methods
     const char *class_name() const        { return "TCPRetransmitter"; }
@@ -45,7 +45,7 @@ private:
     Vector<unsigned char> getBuffer;
 
     void prune(struct fcb *fcb);
-    bool dataToRetransmit(struct fcb *fcb, int direction);
+    bool dataToRetransmit(struct fcb *fcb);
 };
 
 CLICK_ENDDECLS

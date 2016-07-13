@@ -14,11 +14,20 @@ RetransmissionTiming::RetransmissionTiming()
     rto = 3000; // RFC 1122
     measureInProgress = false;
     owner = NULL;
+    buffer = NULL;
+    bufferPool = NULL;
 }
 
 RetransmissionTiming::~RetransmissionTiming()
 {
     stopTimer();
+
+    if(buffer != NULL && bufferPool != NULL)
+    {
+        // Release memory for the circular buffer
+        buffer->~CircularBuffer();
+        bufferPool->releaseMemory(buffer);
+    }
 }
 
 void RetransmissionTiming::computeClockGranularity()
@@ -48,6 +57,17 @@ void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransm
     timerData.retransmitter = retransmitter;
     timerData.fcb = fcb;
     timer.assign(RetransmissionTiming::timerFired, (void*)&timerData);
+}
+
+void RetransmissionTiming::setCircularBuffer(CircularBuffer *buffer, MemoryPool<CircularBuffer> *bufferPool)
+{
+    this->buffer = buffer;
+    this->bufferPool = bufferPool;
+}
+
+CircularBuffer* RetransmissionTiming::getCircularBuffer()
+{
+    return buffer;
 }
 
 bool RetransmissionTiming::isTimerInitialized()

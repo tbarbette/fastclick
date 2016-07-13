@@ -10,7 +10,7 @@ class PathMerger : public TCPElement, public StackElement
 {
 public:
     PathMerger() CLICK_COLD;
-    ~PathMerger();
+    ~PathMerger() CLICK_COLD;
 
     const char *class_name() const        { return "PathMerger"; }
     const char *port_count() const        { return "2/1"; }
@@ -30,6 +30,7 @@ protected:
     virtual void packetSent(struct fcb *fcb, Packet* packet);
     virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
     virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
+    virtual unsigned int determineFlowDirection();
 
 private:
     StackElement* previousStackElements[2];

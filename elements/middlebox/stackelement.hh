@@ -34,19 +34,20 @@ public:
     static bool isStackElement(Element*);
 
 protected:
-    void setAnnotationDirty(Packet*, bool);
-    bool getAnnotationDirty(Packet*);
-    void setAnnotationLastUseful(Packet*, bool);
-    bool getAnnotationLastUseful(Packet*);
-    uint16_t getContentOffset(Packet*);
-    const unsigned char* getPacketContentConst(Packet*);
-    unsigned char* getPacketContent(WritablePacket*);
-    void setContentOffset(Packet*, uint16_t);
-    void setInitialAck(Packet *p, uint32_t initialAck);
-    uint32_t getInitialAck(Packet *p);
+    void setAnnotationDirty(Packet*, bool) const;
+    bool getAnnotationDirty(Packet*) const;
+    void setAnnotationLastUseful(Packet*, bool) const;
+    bool getAnnotationLastUseful(Packet*) const;
+    uint16_t getContentOffset(Packet*) const;
+    const unsigned char* getPacketContentConst(Packet*) const;
+    unsigned char* getPacketContent(WritablePacket*) const;
+    void setContentOffset(Packet*, uint16_t) const;
+    void setInitialAck(Packet *p, uint32_t initialAck) const;
+    uint32_t getInitialAck(Packet *p) const;
+    bool isPacketContentEmpty(Packet*) const;
+    uint16_t getPacketContentSize(Packet *packet) const;
+
     void buildFunctionStack();
-    bool isPacketContentEmpty(Packet*);
-    uint16_t getPacketContentSize(Packet *packet);
 
     virtual Packet* processPacket(struct fcb *fcb, Packet*);
 
@@ -58,16 +59,14 @@ protected:
     virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
     virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
-    // Method used for the simulation of Middleclick's fcb management system
-    // Should be removed when integrated to Middleclick
     // This method process the stack function until an element is able to
     // answer the question
     virtual unsigned int determineFlowDirection();
 
 private:
     StackElement *previousStackElement;
-    void setAnnotationBit(Packet*, int, bool);
-    bool getAnnotationBit(Packet*, int);
+    void setAnnotationBit(Packet*, int, bool) const;
+    bool getAnnotationBit(Packet*, int) const;
 
     // Constants
     // Up to 8 booleans can be stored in the corresponding annotation

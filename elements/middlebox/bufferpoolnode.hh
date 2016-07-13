@@ -13,7 +13,7 @@ public:
     ~BufferPoolNode();
 
     unsigned char* getBuffer();
-    uint32_t getSize();
+    uint32_t getSize() const;
     void resize(uint32_t newSize);
 
 private:

@@ -148,6 +148,12 @@ void CircularBuffer::getData(uint32_t start, uint32_t length, Vector<unsigned ch
         return;
     }
 
+    if(length == 0)
+    {
+        getBuffer.resize(0);
+        return;
+    }
+
     // "Start" is a sequence number so we need to map it to a position
     start = start - getStartOffset() + bufferStart;
 

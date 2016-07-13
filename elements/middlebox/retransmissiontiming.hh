@@ -6,6 +6,8 @@
 #include <click/timer.hh>
 #include <clicknet/tcp.h>
 #include <click/timestamp.hh>
+#include "circularbuffer.hh"
+#include "memorypool.hh"
 
 CLICK_DECLS
 
@@ -28,6 +30,9 @@ public:
     void initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter);
     bool isTimerInitialized();
 
+    void setCircularBuffer(CircularBuffer *buffer, MemoryPool<CircularBuffer> *bufferPool);
+    CircularBuffer* getCircularBuffer();
+
     bool startRTTMeasure(uint32_t seq);
     bool signalAck(struct fcb* fcb, uint32_t ack);
     bool signalRetransmission(uint32_t expectedAck);
@@ -46,6 +51,8 @@ private:
     Timer timer;
     struct retransmissionTimerData timerData;
     TCPRetransmitter *owner;
+    CircularBuffer *buffer;
+    MemoryPool<CircularBuffer> *bufferPool;
 
     bool measureInProgress;
     Timestamp measureStartTime;

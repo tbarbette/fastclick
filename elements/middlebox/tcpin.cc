@@ -4,7 +4,6 @@
 #include <click/error.hh>
 #include <clicknet/tcp.h>
 #include <click/timestamp.hh>
-#include <click/multithread.hh>
 #include "tcpin.hh"
 #include "ipelement.hh"
 
@@ -320,8 +319,6 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     }
     uint32_t bytesAfter = packet->length() - position;
 
-    click_chatter("Bytes after: %u, position %u, length: %u", bytesAfter, position, length);
-
     memmove(&source[position], &source[position + length], bytesAfter);
     packet->take(length);
 
@@ -342,8 +339,6 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
     WritablePacket *newPacket = packet->put(length);
     assert(newPacket != NULL);
     unsigned char *source = newPacket->data();
-
-    click_chatter("Bytes after: %u, position %u, length: %u", bytesAfter, position, length);
 
     memmove(&source[position + length], &source[position], bytesAfter);
 

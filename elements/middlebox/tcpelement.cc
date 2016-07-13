@@ -10,7 +10,7 @@
 
 CLICK_DECLS
 
-void TCPElement::computeTCPChecksum(WritablePacket *packet)
+void TCPElement::computeTCPChecksum(WritablePacket *packet) const
 {
     click_ip *iph = packet->ip_header();
     click_tcp *tcph = packet->tcp_header();
@@ -21,7 +21,7 @@ void TCPElement::computeTCPChecksum(WritablePacket *packet)
     tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
 }
 
-void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq)
+void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq) const
 {
     click_tcp *tcph = packet->tcp_header();
 
@@ -35,35 +35,35 @@ tcp_seq_t TCPElement::getSequenceNumber(Packet* packet) const
     return ntohl(tcph->th_seq);
 }
 
-tcp_seq_t TCPElement::getAckNumber(Packet* packet)
+tcp_seq_t TCPElement::getAckNumber(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohl(tcph->th_ack);
 }
 
-void TCPElement::setAckNumber(WritablePacket* packet, tcp_seq_t ack)
+void TCPElement::setAckNumber(WritablePacket* packet, tcp_seq_t ack) const
 {
     click_tcp *tcph = packet->tcp_header();
 
     tcph->th_ack = htonl(ack);
 }
 
-uint16_t TCPElement::getWindowSize(Packet *packet)
+uint16_t TCPElement::getWindowSize(Packet *packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohs(tcph->th_win);
 }
 
-void TCPElement::setWindowSize(WritablePacket *packet, uint16_t winSize)
+void TCPElement::setWindowSize(WritablePacket *packet, uint16_t winSize) const
 {
     click_tcp *tcph = packet->tcp_header();
 
     tcph->th_win = htons(winSize);
 }
 
-unsigned TCPElement::getPayloadLength(Packet* packet)
+unsigned TCPElement::getPayloadLength(Packet* packet) const
 {
     const click_ip *iph = packet->ip_header();
     unsigned iph_len = iph->ip_hl << 2;
@@ -75,7 +75,7 @@ unsigned TCPElement::getPayloadLength(Packet* packet)
     return ip_len - iph_len - tcp_offset;
 }
 
-unsigned char* TCPElement::getPayload(WritablePacket* packet)
+unsigned char* TCPElement::getPayload(WritablePacket* packet) const
 {
     click_tcp *tcph = packet->tcp_header();
 
@@ -84,7 +84,7 @@ unsigned char* TCPElement::getPayload(WritablePacket* packet)
     return (unsigned char*)packet->transport_header() + tcph_len;
 }
 
-const unsigned char* TCPElement::getPayloadConst(Packet* packet)
+const unsigned char* TCPElement::getPayloadConst(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
@@ -93,7 +93,7 @@ const unsigned char* TCPElement::getPayloadConst(Packet* packet)
     return (const unsigned char*)packet->transport_header() + tcph_len;
 }
 
-void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload, uint32_t length)
+void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload, uint32_t length) const
 {
     click_tcp *tcph = packet->tcp_header();
 
@@ -104,7 +104,7 @@ void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload
     memcpy(payloadPtr, payload, length);
 }
 
-uint16_t TCPElement::getPayloadOffset(Packet* packet)
+uint16_t TCPElement::getPayloadOffset(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
@@ -116,7 +116,7 @@ uint16_t TCPElement::getPayloadOffset(Packet* packet)
 }
 
 WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
-                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags, uint32_t contentSize)
+                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags, uint32_t contentSize) const
 {
     struct click_ip *ip;       // IP header
     struct click_tcp *tcp;     // TCP header
@@ -167,41 +167,41 @@ WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t
     return packet;
 }
 
-uint16_t TCPElement::getSourcePort(Packet* packet)
+uint16_t TCPElement::getSourcePort(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohs(tcph->th_sport);
 }
 
-uint16_t TCPElement::getDestinationPort(Packet* packet)
+uint16_t TCPElement::getDestinationPort(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohs(tcph->th_dport);
 }
 
-bool TCPElement::isSyn(Packet* packet)
+bool TCPElement::isSyn(Packet* packet) const
 {
     return checkFlag(packet, TH_SYN);
 }
 
-bool TCPElement::isFin(Packet* packet)
+bool TCPElement::isFin(Packet* packet) const
 {
     return checkFlag(packet, TH_FIN);
 }
 
-bool TCPElement::isRst(Packet* packet)
+bool TCPElement::isRst(Packet* packet) const
 {
     return checkFlag(packet, TH_RST);
 }
 
-bool TCPElement::isAck(Packet* packet)
+bool TCPElement::isAck(Packet* packet) const
 {
     return checkFlag(packet, TH_ACK);
 }
 
-bool TCPElement::checkFlag(Packet *packet, uint8_t flag)
+bool TCPElement::checkFlag(Packet *packet, uint8_t flag) const
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
@@ -213,13 +213,13 @@ bool TCPElement::checkFlag(Packet *packet, uint8_t flag)
         return false;
 }
 
-uint8_t getFlags(Packet *packet)
+uint8_t TCPElement::getFlags(Packet *packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
     return tcph->th_flags;
 }
 
-bool TCPElement::isJustAnAck(Packet* packet)
+bool TCPElement::isJustAnAck(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;

@@ -18,7 +18,7 @@ class TCPReorder : public Element, public TCPElement
 {
 public:
     TCPReorder() CLICK_COLD;
-    ~TCPReorder();
+    ~TCPReorder() CLICK_COLD;
 
     // Click related methods
     const char *class_name() const        { return "TCPReorder"; }

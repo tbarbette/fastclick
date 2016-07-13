@@ -145,15 +145,19 @@ StackElement* FlowBuffer::getOwner()
 FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char* pattern, int *feedback)
 {
     const char *currentPattern = pattern;
+    int nbFound = 0;
+
     while(start != contentEnd())
     {
         currentPattern = pattern;
         FlowBufferContentIter currentContent = start;
+        nbFound = 0;
 
         while(currentContent != contentEnd() && (tolower(*currentContent) == tolower(*currentPattern)) && *currentPattern != '\0')
         {
             ++currentPattern;
             ++currentContent;
+            nbFound++;
         }
 
         if(*currentPattern == '\0')
@@ -162,30 +166,34 @@ FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char
             return start;
         }
 
+        // If we have found at least one matching character at the end, tell it
+        // as the rest may be in the next packet
+        if(currentContent == contentEnd() && nbFound > 0)
+        {
+            *feedback = 0;
+            return contentEnd();
+        }
+
         ++start;
     }
 
-    // If we have found at least one matching character at the end, tell it
-    // as the rest may be in the next packet
-    if(*currentPattern != *pattern)
-        *feedback = 0;
-    else
-        *feedback = -1;
+    // Nothing found
+    *feedback = -1;
 
     return contentEnd();
 }
 
-bool FlowBuffer::removeInFlow(struct fcb *fcb, const char* pattern)
+int FlowBuffer::removeInFlow(struct fcb *fcb, const char* pattern)
 {
     int feedback = -1;
     FlowBufferContentIter iter = search(contentBegin(), pattern, &feedback);
 
     if(iter == contentEnd())
-        return false;
+        return feedback;
 
     remove(fcb, iter, strlen(pattern));
 
-    return true;
+    return 1;
 }
 
 void FlowBuffer::remove(struct fcb *fcb, FlowBufferContentIter start, uint32_t length)
@@ -219,13 +227,13 @@ void FlowBuffer::remove(struct fcb *fcb, FlowBufferContentIter start, uint32_t l
     }
 }
 
-bool FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char *replacement)
+int FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char *replacement)
 {
     int feedback = -1;
     FlowBufferContentIter iter = search(contentBegin(), pattern, &feedback);
 
     if(iter == contentEnd())
-        return false;
+        return feedback;
 
     uint32_t lenPattern = strlen(pattern);
     uint32_t lenReplacement = strlen(replacement);
@@ -262,7 +270,7 @@ bool FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char 
         for(int i = 0; i < lenReplacement - toReplace; ++i)
             owner->getPacketContent(packet)[offsetInPacket + i] = replacement[toReplace + i];
 
-        return true;
+        return 1;
     }
     else
     {
@@ -270,7 +278,7 @@ bool FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char 
         remove(fcb, iter, -offset);
     }
 
-    return true;
+    return 1;
 }
 
 

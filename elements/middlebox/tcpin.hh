@@ -20,7 +20,7 @@ class TCPIn : public StackElement, public TCPElement
 {
 public:
     TCPIn() CLICK_COLD;
-    ~TCPIn();
+    ~TCPIn() CLICK_COLD;
 
     const char *class_name() const        { return "TCPIn"; }
     const char *port_count() const        { return PORTS_1_1; }
@@ -46,8 +46,6 @@ protected:
     virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
     virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
-    // Method used for the simulation of Middleclick's fcb management system
-    // Should be removed when integrated to Middleclick
     // This method process the stack function until an element is able to
     // answer the question
     virtual unsigned int determineFlowDirection();

@@ -33,8 +33,8 @@ public:
     FlowBufferIter end();
 
     int searchInFlow(const char *pattern);
-    bool removeInFlow(struct fcb* fcb, const char* pattern);
-    bool replaceInFlow(struct fcb *fcb, const char* pattern, const char *replacement);
+    int removeInFlow(struct fcb* fcb, const char* pattern);
+    int replaceInFlow(struct fcb *fcb, const char* pattern, const char *replacement);
 
 private:
     FlowBufferContentIter contentBegin();

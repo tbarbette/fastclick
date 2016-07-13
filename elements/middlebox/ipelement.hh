@@ -10,12 +10,12 @@ CLICK_DECLS
 class IPElement
 {
 public:
-    uint16_t packetTotalLength(Packet*);
-    uint16_t getIPHeaderOffset(Packet* packet);
-    void setPacketTotalLength(WritablePacket*, unsigned);
-    const uint32_t getDestinationAddress(Packet*);
-    const uint32_t getSourceAddress(Packet*);
-    void computeIPChecksum(WritablePacket*);
+    uint16_t packetTotalLength(Packet*) const;
+    uint16_t getIPHeaderOffset(Packet* packet) const;
+    void setPacketTotalLength(WritablePacket*, unsigned) const;
+    const uint32_t getDestinationAddress(Packet*) const;
+    const uint32_t getSourceAddress(Packet*) const;
+    void computeIPChecksum(WritablePacket*) const;
 
 protected:
 };

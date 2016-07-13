@@ -20,7 +20,7 @@ unsigned char* BufferPoolNode::getBuffer()
     return (unsigned char*)&buffer[0];
 }
 
-uint32_t BufferPoolNode::getSize()
+uint32_t BufferPoolNode::getSize() const
 {
     return buffer.size();
 }

@@ -121,6 +121,12 @@ void PathMerger::packetSent(struct fcb *fcb, Packet* packet)
     removeEntry(fcb, packet);
 }
 
+unsigned int PathMerger::determineFlowDirection()
+{
+    // We could chose either of the inputs as the answer would be the same
+    return previousStackElements[0]->determineFlowDirection();
+}
+
 void PathMerger::closeConnection(struct fcb *fcb, WritablePacket* packet, bool graceful, bool bothSides)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);

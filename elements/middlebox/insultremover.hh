@@ -2,8 +2,12 @@
 #define MIDDLEBOX_INSULTREM_HH
 #include <click/element.hh>
 #include "stackelement.hh"
+#include "flowbuffer.hh"
+#include "flowbufferentry.hh"
 
 CLICK_DECLS
+
+#define POOL_BUFFER_ENTRIES_SIZE 300
 
 class InsultRemover : public StackElement
 {
@@ -18,6 +22,9 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
+    int removeInsult(struct fcb* fcb, const char *insult);
+
+    MemoryPool<struct flowBufferEntry> poolBufferEntries;
 };
 
 CLICK_ENDDECLS

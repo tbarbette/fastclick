@@ -55,17 +55,17 @@ Packet* StackElement::processPacket(struct fcb *fcb, Packet* p)
     return p;
 }
 
-void StackElement::setContentOffset(Packet* p, uint16_t offset)
+void StackElement::setContentOffset(Packet* p, uint16_t offset) const
 {
     p->set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
 }
 
-uint16_t StackElement::getContentOffset(Packet* p)
+uint16_t StackElement::getContentOffset(Packet* p) const
 {
     return p->anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
 }
 
-void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
+void StackElement::setAnnotationBit(Packet* p, int bit, bool value) const
 {
     // Build masks
     unsigned char clearMask = 1;
@@ -88,7 +88,7 @@ void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
     p->set_anno_u8(MIDDLEBOX_BOOLS_OFFSET, previousValue);
 }
 
-bool StackElement::getAnnotationBit(Packet* p, int bit)
+bool StackElement::getAnnotationBit(Packet* p, int bit) const
 {
     // Build mask
     unsigned char mask = 1;
@@ -103,22 +103,22 @@ bool StackElement::getAnnotationBit(Packet* p, int bit)
     return (bool)value;
 }
 
-void StackElement::setAnnotationDirty(Packet* p, bool value)
+void StackElement::setAnnotationDirty(Packet* p, bool value) const
 {
     setAnnotationBit(p, OFFSET_ANNOTATION_DIRTY, value);
 }
 
-bool StackElement::getAnnotationDirty(Packet* p)
+bool StackElement::getAnnotationDirty(Packet* p) const
 {
     return getAnnotationBit(p, OFFSET_ANNOTATION_DIRTY);
-}uint32_t getPacketContentSize(Packet *packet);
+}
 
-void StackElement::setAnnotationLastUseful(Packet *p, bool value)
+void StackElement::setAnnotationLastUseful(Packet *p, bool value) const
 {
     setAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL, value);
 }
 
-bool StackElement::getAnnotationLastUseful(Packet *p)
+bool StackElement::getAnnotationLastUseful(Packet *p) const
 {
     return getAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL);
 }
@@ -140,12 +140,12 @@ void StackElement::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
     previousStackElement->setPacketDirty(fcb, packet);
 }
 
-void StackElement::setInitialAck(Packet *p, uint32_t initialAck)
+void StackElement::setInitialAck(Packet *p, uint32_t initialAck) const
 {
     p->set_anno_u32(MIDDLEBOX_INIT_ACK_OFFSET, initialAck);
 }
 
-uint32_t StackElement::getInitialAck(Packet *p)
+uint32_t StackElement::getInitialAck(Packet *p) const
 {
     return (uint32_t)p->anno_u32(MIDDLEBOX_INIT_ACK_OFFSET);
 }
@@ -234,21 +234,21 @@ int StackElement::initialize(ErrorHandler*  errh)
     return Element::initialize(errh);
 }
 
-const unsigned char* StackElement::getPacketContentConst(Packet* p)
+const unsigned char* StackElement::getPacketContentConst(Packet* p) const
 {
     uint16_t offset = getContentOffset(p);
 
     return (p->data() + offset);
 }
 
-unsigned char* StackElement::getPacketContent(WritablePacket* p)
+unsigned char* StackElement::getPacketContent(WritablePacket* p) const
 {
     uint16_t offset = getContentOffset(p);
 
     return (p->data() + offset);
 }
 
-bool StackElement::isPacketContentEmpty(Packet* packet)
+bool StackElement::isPacketContentEmpty(Packet* packet) const
 {
     uint16_t offset = getContentOffset(packet);
 
@@ -258,7 +258,7 @@ bool StackElement::isPacketContentEmpty(Packet* packet)
         return false;
 }
 
-uint16_t StackElement::getPacketContentSize(Packet *packet)
+uint16_t StackElement::getPacketContentSize(Packet *packet) const
 {
     uint16_t offset = getContentOffset(packet);
 
