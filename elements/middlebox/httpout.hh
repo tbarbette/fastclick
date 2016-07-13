@@ -5,12 +5,13 @@
 #include "memorypool.hh"
 #include "flowbuffer.hh"
 #include "flowbufferentry.hh"
+#include "tcpelement.hh"
 
 CLICK_DECLS
 
 #define POOL_BUFFER_ENTRIES_SIZE 300
 
-class HTTPOut : public StackElement
+class HTTPOut : public StackElement, public TCPElement
 {
 public:
     HTTPOut() CLICK_COLD;

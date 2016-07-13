@@ -255,7 +255,8 @@ bool FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char 
     {
         // Insert a number of bytes equal to the difference between
         // the replacement and the pattern
-        owner->insertBytes(fcb, packet, offsetInPacket, offset);
+        packet = owner->insertBytes(fcb, packet, offsetInPacket, offset);
+        entry->packet = packet;
 
         // Copy the rest of the replacement where we added bytes
         for(int i = 0; i < lenReplacement - toReplace; ++i)

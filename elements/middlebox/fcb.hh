@@ -130,16 +130,19 @@ struct fcb_httpin
 {
     bool headerFound;
     char url[2048];
+    char method[16];
     uint64_t contentLength;
     uint64_t contentSeen;
-    uint32_t lastPacket;
+    bool isRequest;
 
     fcb_httpin()
     {
         headerFound = false;
-        lastPacket = 0;
         contentSeen = 0;
         contentLength = 0;
+        url[0] = '\0';
+        method[0] = '\0';
+        isRequest = false;
     }
 };
 

@@ -45,16 +45,15 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
                 ++it;
             }
 
-            WritablePacket *packetHdr = *(flowBuffer.begin());
+            WritablePacket *toPush = flowBuffer.dequeue();;
 
             char bufferHeader[25];
 
             sprintf(bufferHeader, "%lu", newContentLength);
-            packetHdr = setHeaderContent(fcb, packet, "Content-Length", bufferHeader);
+            toPush = setHeaderContent(fcb, toPush, "Content-Length", bufferHeader);
 
             click_chatter("Content-Length modified to %lu", newContentLength);
 
-            WritablePacket *toPush = flowBuffer.dequeue();
             while(toPush != NULL)
             {
                 output(0).push(toPush);
@@ -70,7 +69,7 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
 
 WritablePacket* HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content)
 {
-    unsigned char* source = getPacketContent(packet);
+    unsigned char* source = getPayload(packet);
     unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
 
     if(beginning == NULL)
