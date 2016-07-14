@@ -59,6 +59,7 @@ private:
     void ackPacket(struct fcb *fcb, Packet* packet);
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
     void removeSACKPermitted(struct fcb* fcb, WritablePacket *packet);
+    void detectWindowScale(struct fcb *fcb, Packet* packet);
 
     // TODO ensure perthreadness
     MemoryPool<struct ModificationNode> poolModificationNodes;

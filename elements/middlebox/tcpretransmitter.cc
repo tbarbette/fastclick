@@ -348,6 +348,25 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     end = maintainer.mapSeq(end);
 
     uint32_t sizeOfRetransmission = end - start;
+
+    // Check that we do not exceed the receiver's window size
+    uint64_t windowSize = otherMaintainer.getWindowSize();
+    if(otherMaintainer.getUseWindowScale())
+        windowSize *= otherMaintainer.getWindowScale();
+    if(sizeOfRetransmission > windowSize)
+    {
+        sizeOfRetransmission = windowSize;
+        otherMaintainer.setWindowSize(0);
+        click_chatter("Manual retransmission limited to %lu bytes by receiver's window size", sizeOfRetransmission);
+    }
+    else
+    {
+        windowSize -= sizeOfRetransmission;
+        if(otherMaintainer.getUseWindowScale())
+            windowSize /= otherMaintainer.getWindowScale();
+        otherMaintainer.setWindowSize(windowSize);
+    }
+
     fcb->tcp_common->retransmissionTimings[flowDirection].getCircularBuffer()->getData(start, sizeOfRetransmission, getBuffer);
 
     uint32_t ack = maintainer.getLastAckSent();

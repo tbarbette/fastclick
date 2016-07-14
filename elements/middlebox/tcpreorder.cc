@@ -190,7 +190,10 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
     #if HAVE_BATCH
         // We now send the batch we built
         if(batch != NULL)
+        {
             click_chatter("Sending a batch of %u element(s) after reordering", batch->count());
+            output_push_batch(0, batch);
+        }
     #endif
 }
 

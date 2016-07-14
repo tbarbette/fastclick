@@ -119,6 +119,10 @@ class ByteStreamMaintainer
 
         void setWindowSize(uint16_t windowSize);
         uint16_t getWindowSize();
+        void setWindowScale(uint16_t windowScale);
+        uint16_t getWindowScale();
+        void setUseWindowScale(bool useWindowScale);
+        bool getUseWindowScale();
         void setIpSrc(uint32_t ipSrc);
         uint32_t getIpSrc();
         void setIpDst(uint32_t ipDst);
@@ -146,6 +150,8 @@ class ByteStreamMaintainer
         uint32_t lastSeqSent;     // /!\ mapped value (as sent)
         uint32_t lastAckReceived; // /!\ Unamapped value (as received)
         uint16_t windowSize;
+        uint16_t windowScale;
+        bool useWindowScale;
         uint32_t ipSrc;
         uint32_t ipDst;
         uint16_t portSrc;

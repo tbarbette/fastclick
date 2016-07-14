@@ -18,6 +18,8 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     treeAck = NULL;
     treeSeq = NULL;
     windowSize = 32120;
+    windowScale = 1;
+    useWindowScale = false;
     lastAckSentSet = false;
     lastSeqSentSet = false;
     lastAckReceivedSet = false;
@@ -332,6 +334,26 @@ void ByteStreamMaintainer::setPortDst(uint16_t portDst)
 uint16_t ByteStreamMaintainer::getPortDst()
 {
     return portDst;
+}
+
+void ByteStreamMaintainer::setWindowScale(uint16_t windowScale)
+{
+    this->windowScale = windowScale;
+}
+
+uint16_t ByteStreamMaintainer::getWindowScale()
+{
+    return windowScale;
+}
+
+void ByteStreamMaintainer::setUseWindowScale(bool useWindowScale)
+{
+    this->useWindowScale = useWindowScale;
+}
+
+bool ByteStreamMaintainer::getUseWindowScale()
+{
+    return useWindowScale;
 }
 
 int ByteStreamMaintainer::lastOffsetInAckTree()
