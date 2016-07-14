@@ -9,7 +9,7 @@ CLICK_DECLS
 
 IPOut::IPOut()
 {
-
+    counter = 0;
 }
 
 int IPOut::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -24,6 +24,14 @@ Packet* IPOut::processPacket(struct fcb*, Packet* p)
     click_chatter("Flow %d was managed by thread %u", flowDirection, click_current_cpu_id());
 
     WritablePacket *packet = p->uniqueify();
+
+    counter++;
+
+    if(counter == 10)
+    {
+        packet->kill();
+        return NULL;
+    }
 
     // Recompute the IP checksum if the packet has been modified
     if(getAnnotationDirty(packet))

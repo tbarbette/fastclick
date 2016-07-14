@@ -21,6 +21,7 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
+    int counter;
 };
 
 CLICK_ENDDECLS

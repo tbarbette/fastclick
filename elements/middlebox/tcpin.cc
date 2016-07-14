@@ -126,11 +126,11 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     uint16_t offset = getPayloadOffset(packet);
     setContentOffset(packet, offset);
 
-    // Remove the SACK permitted option if present
-    removeSACKPermitted(fcb, packet);
-
-    // Detect the window scale option if present
-    detectWindowScale(fcb, packet);
+    // Manage the TCP options
+    // Remove the SACK permitted option
+    // Detect the Window scale
+    // Detect MSS
+    manageOptions(fcb, packet);
 
     // Update the window size
     fcb->tcp_common->maintainers[getFlowDirection()].setWindowSize(getWindowSize(packet));
@@ -164,6 +164,21 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         ackNumber = getAckNumber(packet);
         newAckNumber = fcb->tcp_common->maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
 
+        // Check the value of the previous ack received if it exists
+        bool lastAckReceivedSet = fcb->tcp_common->maintainers[getFlowDirection()].isLastAckReceivedSet();
+        uint32_t prevLastAckReceived = 0;
+        if(lastAckReceivedSet)
+            prevLastAckReceived = fcb->tcp_common->maintainers[getFlowDirection()].getLastAckReceived();
+
+
+        // Check if we acknowledged new data
+        if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
+        {
+            // Increase congestion window
+            click_chatter("Congestion window increased");
+            fcb->tcp_common->maintainers[getFlowDirection()].setDupAcks(0);
+        }
+
         // Update the value of the last ACK received
         fcb->tcp_common->maintainers[getFlowDirection()].setLastAckReceived(ackNumber);
 
@@ -174,12 +189,20 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         // And potentially update the retransmission timer
         fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(fcb, ackNumber);
 
-
         // Check if the current packet is just an ACK without more information
         if(isJustAnAck(packet))
         {
-            // If it is the case, check that the ACK value is greater than what
-            // we have already sent earlier
+            // Check duplicate acks
+            if(prevLastAckReceived == ackNumber)
+            {
+                uint8_t dupAcks = fcb->tcp_common->maintainers[getFlowDirection()].getDupAcks();
+                dupAcks++;
+                fcb->tcp_common->maintainers[getFlowDirection()].setDupAcks(dupAcks);
+                click_chatter("Duplicate ACK!");
+            }
+
+            // Check that the ACK value is greater than what we have already
+            // sent to the destination
             if(fcb->tcp_common->maintainers[getFlowDirection()].isLastAckSentSet() && SEQ_LT(newAckNumber, fcb->tcp_common->maintainers[getFlowDirection()].getLastAckSent()))
             {
                 // If this is not the case, the packet does not give any information
@@ -494,59 +517,7 @@ struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
         return it.value();
 }
 
-void TCPIn::detectWindowScale(struct fcb *fcb, Packet* packet)
-{
-    // The option can only be present in SYN packets
-    if(!isSyn(packet))
-        return;
-
-    const click_tcp *tcph = packet->tcp_header();
-
-    const uint8_t *optStart = (const uint8_t *) (tcph + 1);
-    const uint8_t *optEnd = (const uint8_t *) tcph + (tcph->th_off << 2);
-
-    if(optEnd > packet->end_data())
-        optEnd = packet->end_data();
-
-    while(optStart < optEnd)
-    {
-        if(optStart[0] == TCPOPT_EOL) // End of list
-            break; // Stop searching
-        else if(optStart[0] == TCPOPT_NOP)
-            optStart += 1; // Move to the next option
-        else if(optStart[1] < 2 || optStart[1] + optStart > optEnd)
-            break; // Avoid malformed options
-        else if(optStart[0] == TCPOPT_WSCALE && optStart[1] == TCPOLEN_WSCALE)
-        {
-            uint16_t winScale = optStart[2];
-
-            if(winScale >= 1)
-                winScale = 2 << (winScale - 1);
-
-            fcb->tcp_common->maintainers[flowDirection].setWindowScale(winScale);
-            fcb->tcp_common->maintainers[flowDirection].setUseWindowScale(true);
-            click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
-
-            if(isAck(packet))
-            {
-                // Here, we have a SYNACK
-                // It means that we now if the other side of the flow
-                // has the option enabled
-                // if this is not the case, we disable it for use as well
-                if(!fcb->tcp_common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
-                {
-                    fcb->tcp_common->maintainers[flowDirection].setUseWindowScale(false);
-                    click_chatter("Window scaling disabled");
-                }
-            }
-            break;
-        }
-        else
-            optStart += optStart[1]; // Move to the next option
-    }
-}
-
-void TCPIn::removeSACKPermitted(struct fcb *fcb, WritablePacket *packet)
+void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
 {
     // The option can only be present in SYN packets
     if(!isSyn(packet))
@@ -578,7 +549,41 @@ void TCPIn::removeSACKPermitted(struct fcb *fcb, WritablePacket *packet)
 
             setPacketDirty(fcb, packet);
 
-            break;
+            optStart += optStart[1];
+        }
+        else if(optStart[0] == TCPOPT_WSCALE && optStart[1] == TCPOLEN_WSCALE)
+        {
+            uint16_t winScale = optStart[2];
+
+            if(winScale >= 1)
+                winScale = 2 << (winScale - 1);
+
+            fcb->tcp_common->maintainers[flowDirection].setWindowScale(winScale);
+            fcb->tcp_common->maintainers[flowDirection].setUseWindowScale(true);
+            click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
+
+            if(isAck(packet))
+            {
+                // Here, we have a SYNACK
+                // It means that we now if the other side of the flow
+                // has the option enabled
+                // if this is not the case, we disable it for use as well
+                if(!fcb->tcp_common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
+                {
+                    fcb->tcp_common->maintainers[flowDirection].setUseWindowScale(false);
+                    click_chatter("Window scaling disabled");
+                }
+            }
+            optStart += optStart[1];
+        }
+        else if(optStart[0] == TCPOPT_MAXSEG && optStart[1] == TCPOLEN_MAXSEG)
+        {
+
+            fcb->tcp_common->maintainers[flowDirection].setMSS((optStart[2] << 8) | optStart[3]);
+
+            click_chatter("MSS: %u", fcb->tcp_common->maintainers[flowDirection].getMSS());
+
+            optStart += optStart[1];
         }
         else
             optStart += optStart[1]; // Move to the next option

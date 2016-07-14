@@ -23,6 +23,8 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     lastAckSentSet = false;
     lastSeqSentSet = false;
     lastAckReceivedSet = false;
+    mss = 536;
+    dupAcks = 0;
 }
 
 void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager, uint32_t flowStart)
@@ -354,6 +356,26 @@ void ByteStreamMaintainer::setUseWindowScale(bool useWindowScale)
 bool ByteStreamMaintainer::getUseWindowScale()
 {
     return useWindowScale;
+}
+
+uint16_t ByteStreamMaintainer::getMSS()
+{
+    return mss;
+}
+
+void ByteStreamMaintainer::setMSS(uint16_t mss)
+{
+    this->mss = mss;
+}
+
+uint8_t ByteStreamMaintainer::getDupAcks()
+{
+    return dupAcks;
+}
+
+void ByteStreamMaintainer::setDupAcks(uint8_t dupAcks)
+{
+    this->dupAcks = dupAcks;
 }
 
 int ByteStreamMaintainer::lastOffsetInAckTree()

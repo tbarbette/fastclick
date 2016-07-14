@@ -58,8 +58,7 @@ private:
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
     void ackPacket(struct fcb *fcb, Packet* packet);
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
-    void removeSACKPermitted(struct fcb* fcb, WritablePacket *packet);
-    void detectWindowScale(struct fcb *fcb, Packet* packet);
+    void manageOptions(struct fcb* fcb, WritablePacket *packet);
 
     // TODO ensure perthreadness
     MemoryPool<struct ModificationNode> poolModificationNodes;

@@ -16,6 +16,8 @@ RetransmissionTiming::RetransmissionTiming()
     owner = NULL;
     buffer = NULL;
     bufferPool = NULL;
+    lastManualTransmission = 0;
+    manualTransmissionDone = false;
 }
 
 RetransmissionTiming::~RetransmissionTiming()
@@ -230,6 +232,19 @@ bool RetransmissionTiming::restartTimer()
     return true;
 }
 
+bool RetransmissionTiming::restartTimerNow()
+{
+    if(!isTimerInitialized())
+        return false;
+
+    stopTimer();
+
+    click_chatter("Restarting timer now!");
+    timer.schedule_now();
+
+    return true;
+}
+
 bool RetransmissionTiming::isTimerRunning()
 {
     if(!isTimerInitialized())
@@ -257,6 +272,22 @@ void RetransmissionTiming::timerFired(Timer *timer, void *data)
     struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
     TCPRetransmitter *retransmitter = (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
     retransmitter->retransmissionTimerFired(fcb);
+}
+
+bool RetransmissionTiming::isManualTransmissionDone()
+{
+    return manualTransmissionDone;
+}
+
+uint32_t RetransmissionTiming::getLastManualTransmission()
+{
+    return lastManualTransmission;
+}
+
+void RetransmissionTiming::setLastManualTransmission(uint32_t lastManualTransmission)
+{
+    this->lastManualTransmission = lastManualTransmission;
+    manualTransmissionDone = true;
 }
 
 CLICK_ENDDECLS

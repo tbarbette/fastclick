@@ -42,7 +42,12 @@ public:
     bool startTimerDoubleRTO();
     bool stopTimer();
     bool restartTimer();
+    bool restartTimerNow();
     bool isTimerRunning();
+
+    bool isManualTransmissionDone();
+    uint32_t getLastManualTransmission();
+    void setLastManualTransmission(uint32_t lastManualTransmission);
 
     static void timerFired(Timer *timer, void *data);
 
@@ -59,6 +64,9 @@ private:
     Timestamp measureEndTime;
 
     uint32_t rttSeq; // Sequence number that started the last measure of the RTT
+
+    uint32_t lastManualTransmission;
+    bool manualTransmissionDone;
 
     // Statistics about the retransmission timing
     // These variables are expressed in milliseconds

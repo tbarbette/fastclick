@@ -136,24 +136,58 @@ Packet* TCPRetransmitter::processPacketNormal(struct fcb *fcb, Packet *packet)
         // Add packet content to the buffer
         buffer->addDataAtEnd(content, contentSize);
 
-        // Start a new RTT measure if possible
-        fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
-
         uint32_t lastAckSent = 0;
         bool lastAckSentSet = fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet();
         if(lastAckSentSet)
             lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
+
         // ackToReceive is the ACK that will be received for the current
         // packet. We map it to be able to compare it with lastAckSent
         // which is mapped
-        uint32_t ackToReceive = fcb->tcp_common->maintainers[flowDirection].mapAck(seq + contentSize);
+        uint32_t ackToReceive = seq + contentSize;
+        if(isFin(packet) || isSyn(packet))
+            ackToReceive++;
+        uint32_t ackToReceiveMapped = fcb->tcp_common->maintainers[flowDirection].mapAck(seq + contentSize);
 
-        if(lastAckSentSet && SEQ_LEQ(ackToReceive, lastAckSent))
+        if(lastAckSentSet && SEQ_LEQ(ackToReceiveMapped, lastAckSent))
         {
             // We know that we are transmitting ACKed data
             // We thus start the retransmission timer
             fcb->tcp_common->retransmissionTimings[flowDirection].startTimer();
+
+            // We Check that the data we are transmitting are not
+            // going to exceed the receiver's window size.
+            // If this is the case, we stop transmitting and we will wait
+            // to receive ACKs
+            ByteStreamMaintainer &otherMaintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
+            uint64_t windowSize = otherMaintainer.getWindowSize();
+            if(otherMaintainer.getUseWindowScale())
+                windowSize *= otherMaintainer.getWindowScale();
+            uint16_t sizeOfTransmission = getPayloadLength(packet);
+            if(getPayloadLength(packet) > windowSize)
+            {
+                otherMaintainer.setWindowSize(0);
+                click_chatter("Transmission aborted due to receiver's window size");
+
+                // We don't transmit this packet for now, it is in the buffer
+                // and it will be retransmitted as soon as the network or
+                // the receiver will allow it
+                packet->kill();
+                return NULL;
+            }
+            else
+            {
+                windowSize -= sizeOfTransmission;
+                if(otherMaintainer.getUseWindowScale())
+                    windowSize /= otherMaintainer.getWindowScale();
+                otherMaintainer.setWindowSize(windowSize);
+            }
+
+            fcb->tcp_common->retransmissionTimings[flowDirection].setLastManualTransmission(ackToReceive);
         }
+
+        // Start a new RTT measure if possible
+        fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
     }
 
     return packet;
@@ -348,7 +382,6 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     end = maintainer.mapSeq(end);
 
     uint32_t sizeOfRetransmission = end - start;
-
     // Check that we do not exceed the receiver's window size
     uint64_t windowSize = otherMaintainer.getWindowSize();
     if(otherMaintainer.getUseWindowScale())
@@ -377,6 +410,9 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     uint16_t winSize = maintainer.getWindowSize();
 
     WritablePacket* packet = forgePacket(ipSrc, ipDst, portSrc, portDst, start, ack, winSize, TH_ACK, sizeOfRetransmission);
+
+    uint32_t ackToReceive = start + sizeOfRetransmission;
+    fcb->tcp_common->retransmissionTimings[flowDirection].setLastManualTransmission(ackToReceive);
 
     setPacketTotalLength(packet, packet->length() - getIPHeaderOffset(packet));
 
@@ -415,13 +451,24 @@ void TCPRetransmitter::signalAck(struct fcb* fcb, uint32_t ack)
     if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
         return;
 
-    // Prune the tree to remove received packets
+    // Prune the buffer to remove received packets
     prune(fcb);
 
     // If all the data have been transmitted, stop the timer
     // Otherwise, restart it
     if(dataToRetransmit(fcb))
-        fcb->tcp_common->retransmissionTimings[flowDirection].restartTimer();
+    {
+        RetransmissionTiming &retransmission = fcb->tcp_common->retransmissionTimings[flowDirection];
+        // In the first case, we received ACK for retransmitted data but
+        // they are still retransmitted data non acknowledged
+        // In the second case, all retransmitted data have been ACKed but
+        // we still have manual data waiting to be transmetted for the
+        // first time, so we will do it now.
+        if(!retransmission.isManualTransmissionDone() || SEQ_LT(ack, retransmission.getLastManualTransmission()))
+            retransmission.restartTimer();
+        else
+            retransmission.restartTimerNow();
+    }
     else
         fcb->tcp_common->retransmissionTimings[flowDirection].stopTimer();
 }
