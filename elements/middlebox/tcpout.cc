@@ -177,7 +177,12 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, TH_ACK);
 
     //Send it on the second output
-    output(1).push(forged);
+    #if HAVE_BATCH
+        PacketBatch *batch =  PacketBatch::make_from_packet(forged);
+        output_push_batch(1, batch);
+    #else
+        output(1).push(forged);
+    #endif
 }
 
 void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
@@ -214,7 +219,12 @@ void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr,
     Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, flag);
 
     //Send it on the second output
-    output(1).push(forged);
+    #if HAVE_BATCH
+        PacketBatch *batch =  PacketBatch::make_from_packet(forged);
+        output_push_batch(1, batch);
+    #else
+        output(1).push(forged);
+    #endif
 }
 
 void TCPOut::setInElement(TCPIn* inElement)

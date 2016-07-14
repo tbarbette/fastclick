@@ -20,7 +20,7 @@ StackElement::~StackElement()
 
 }
 
-void StackElement::push(int, Packet *packet)
+void StackElement::push_packet(int, Packet *packet)
 {
     // Similate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
@@ -47,6 +47,35 @@ Packet* StackElement::pull(int)
 
     return p;
 }
+
+#if HAVE_BATCH
+void StackElement::push_batch(int, PacketBatch *batch)
+{
+    // Similate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
+
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacket, &fcbArray[flowDirection], batch, [](Packet* p){})
+
+    if(batch != NULL)
+        output_push_batch(0, batch);
+}
+
+PacketBatch* StackElement::pull_batch(int port, int max)
+{
+    // Similate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
+
+    PacketBatch *batch = input_pull_batch(port, max);
+
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacket, &fcbArray[flowDirection], batch, [](Packet* p){})
+
+	return batch;
+}
+#endif
 
 Packet* StackElement::processPacket(struct fcb *fcb, Packet* p)
 {
@@ -276,4 +305,4 @@ unsigned int StackElement::determineFlowDirection()
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StackElement)
-//ELEMENT_MT_SAFE(StackElement)
+ELEMENT_MT_SAFE(StackElement)

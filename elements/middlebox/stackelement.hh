@@ -2,13 +2,15 @@
 #define MIDDLEBOX_STACKELEMENT_HH
 #include <click/config.h>
 #include <click/element.hh>
+#include <click/batchelement.hh>
+#include "batchfcb.hh"
 #include <click/router.hh>
 #include <click/routervisitor.hh>
 #include "fcb.hh"
 
 CLICK_DECLS
 
-class StackElement : public Element
+class StackElement : public BatchElement
 {
 public:
     friend class PathMerger;
@@ -25,8 +27,13 @@ public:
     void* cast(const char*);
     int initialize(ErrorHandler*)   CLICK_COLD;
 
-    void push(int, Packet *);
+    void push_packet(int, Packet *);
     Packet *pull(int);
+
+    #if HAVE_BATCH
+    void push_batch(int, PacketBatch *batch);
+    PacketBatch* pull_batch(int port, int max);
+    #endif
 
     // Custom methods
     virtual bool isOutElement()          { return false; }

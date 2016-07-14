@@ -34,7 +34,7 @@ int TCPMarkMSS::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void TCPMarkMSS::push(int, Packet *packet)
+void TCPMarkMSS::push_packet(int, Packet *packet)
 {
     Packet* p = markMSS(&fcbArray[flowDirection], packet);
 
@@ -53,6 +53,25 @@ Packet* TCPMarkMSS::pull(int)
 
     return p;
 }
+
+#if HAVE_BATCH
+void TCPMarkMSS::push_batch(int, PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_FCB(markMSS, &fcbArray[flowDirection], batch)
+
+    if(batch != NULL)
+        output_push_batch(0, batch);
+}
+
+PacketBatch* TCPMarkMSS::pull_batch(int port, int max)
+{
+    PacketBatch *batch = input_pull_batch(port, max);
+
+    EXECUTE_FOR_EACH_PACKET_FCB(markMSS, &fcbArray[flowDirection], batch)
+
+	return batch;
+}
+#endif
 
 Packet* TCPMarkMSS::markMSS(struct fcb *fcb, Packet *packet)
 {

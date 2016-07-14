@@ -5,6 +5,7 @@
 #include <click/hashtable.hh>
 #include <click/ipflowid.hh>
 #include <click/timer.hh>
+#include <click/sync.hh>
 #include "bytestreammaintainer.hh"
 #include "modificationlist.hh"
 #include "memorypool.hh"
@@ -23,10 +24,13 @@ struct fcb_tcp_common
 {
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
-    // One retransmission manager for each direction of the connecytion
+    // One retransmission manager for each direction of the connection
     RetransmissionTiming retransmissionTimings[2];
     // State of the connection
     TCPClosingState::Value closingStates[2];
+    // Lock to ensure that only one side of the flow (one thread) at a time
+    // accesses the common structure
+    Spinlock lock;
 
     fcb_tcp_common()
     {

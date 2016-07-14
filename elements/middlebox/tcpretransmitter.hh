@@ -30,8 +30,12 @@ public:
     const char *class_name() const        { return "TCPRetransmitter"; }
     const char *port_count() const        { return "2/1"; }
     const char *processing() const        { return PUSH; }
-    void push(int port, Packet *packet);
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+
+    void push_packet(int port, Packet *packet);
+    #if HAVE_BATCH
+    void push_batch(int port, PacketBatch *batch);
+    #endif
 
     bool isOutElement()                   { return true; }
 
@@ -40,12 +44,16 @@ public:
     void signalAck(struct fcb* fcb, uint32_t ack);
 
 private:
+    // TODO ensure perthreadness
     BufferPool *rawBufferPool;
     MemoryPool<CircularBuffer> circularPool;
     Vector<unsigned char> getBuffer;
 
     void prune(struct fcb *fcb);
     bool dataToRetransmit(struct fcb *fcb);
+    void checkInitialization(struct fcb *fcb);
+    Packet* processPacketNormal(struct fcb *fcb, Packet *packet);
+    Packet* processPacketRetransmission(struct fcb *fcb, Packet *packet);
 };
 
 CLICK_ENDDECLS

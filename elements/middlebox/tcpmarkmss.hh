@@ -5,12 +5,14 @@
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
 #include <click/element.hh>
+#include <click/batchelement.hh>
+#include "batchfcb.hh"
 #include "fcb.hh"
 #include "tcpelement.hh"
 
 CLICK_DECLS
 
-class TCPMarkMSS : public Element, public TCPElement
+class TCPMarkMSS : public BatchElement, public TCPElement
 {
 public:
     TCPMarkMSS() CLICK_COLD;
@@ -21,9 +23,13 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push(int, Packet *);
+    void push_packet(int, Packet *);
     Packet *pull(int);
 
+    #if HAVE_BATCH
+    void push_batch(int, PacketBatch *batch);
+    PacketBatch * pull_batch(int port, int max);
+    #endif
 
 private:
     Packet* markMSS(struct fcb *fcb, Packet *packet);

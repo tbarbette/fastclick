@@ -45,3 +45,4 @@ void IPIn::setPacketDirty(struct fcb *fcb, WritablePacket* p)
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPIn)
 ELEMENT_REQUIRES(IPElement)
+ELEMENT_MT_SAFE(IPIn)

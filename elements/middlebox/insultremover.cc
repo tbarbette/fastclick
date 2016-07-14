@@ -9,7 +9,9 @@ CLICK_DECLS
 
 InsultRemover::InsultRemover() : poolBufferEntries(POOL_BUFFER_ENTRIES_SIZE)
 {
-
+    #if HAVE_BATCH
+        in_batch_mode = BATCH_MODE_YES;
+    #endif
 }
 
 int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -52,12 +54,21 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     {
         click_chatter("Flushing");
         // Otherwise, we flush the buffer
-        WritablePacket *toPush = flowBuffer.dequeue();;
-        while(toPush != NULL)
-        {
-            output(0).push(toPush);
-            toPush = flowBuffer.dequeue();
-        }
+        #if HAVE_BATCH
+            PacketBatch *batch = NULL;
+            uint32_t max = flowBuffer.getSize();
+            MAKE_BATCH(flowBuffer.dequeue(), batch, max);
+
+            if(batch != NULL)
+                output_push_batch(0, batch);
+        #else
+            WritablePacket *toPush = flowBuffer.dequeue();
+            while(toPush != NULL)
+            {
+                output(0).push(toPush);
+                toPush = flowBuffer.dequeue();
+            }
+        #endif
     }
 
     return NULL;

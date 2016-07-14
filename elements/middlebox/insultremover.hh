@@ -24,6 +24,7 @@ protected:
     Packet* processPacket(struct fcb*, Packet*);
     int removeInsult(struct fcb* fcb, const char *insult);
 
+    // TODO ensure perthreadness
     MemoryPool<struct flowBufferEntry> poolBufferEntries;
 };
 

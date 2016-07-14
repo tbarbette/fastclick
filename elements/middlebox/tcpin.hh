@@ -60,13 +60,12 @@ private:
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
     void removeSACKPermitted(struct fcb* fcb, WritablePacket *packet);
 
-    // TODO Will be thread local as each TCPIn is managed by a different thread
+    // TODO ensure perthreadness
     MemoryPool<struct ModificationNode> poolModificationNodes;
     MemoryPool<struct ModificationList> poolModificationLists;
     RBTMemoryPoolStreamManager rbtManager;
 
-
-    // Lock when access these
+    // TODO Lock when access these
     HashTable<IPFlowID, struct fcb_tcp_common*> tableFcbTcpCommon;
     MemoryPool<struct fcb_tcp_common> poolFcbTcpCommon;
 

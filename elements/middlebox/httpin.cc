@@ -197,4 +197,4 @@ bool HTTPIn::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(HTTPIn)
-//ELEMENT_MT_SAFE(HTTPIn)
+ELEMENT_MT_SAFE(HTTPIn)

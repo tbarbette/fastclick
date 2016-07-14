@@ -23,7 +23,7 @@ int PathMerger::configure(Vector<String> &, ErrorHandler *)
     return 0;
 }
 
-void PathMerger::push(int port, Packet *packet)
+void PathMerger::push_packet(int port, Packet *packet)
 {
     // Similate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
@@ -36,6 +36,23 @@ void PathMerger::push(int port, Packet *packet)
     if(packet != NULL)
         output(0).push(packet);
 }
+
+#if HAVE_BATCH
+void PathMerger::push_batch(int port, PacketBatch *batch)
+{
+    // Similate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
+    // Add an entry to the hashtable in order to remember from which port
+    // this packet came from
+    FOR_EACH_PACKET(batch, packet)
+        addEntry(&fcbArray[flowDirection], packet, port);
+
+    if(batch != NULL)
+        output_push_batch(0, batch);
+}
+#endif
 
 
 int PathMerger::getPortForPacket(struct fcb* fcb, Packet *packet)
@@ -150,4 +167,4 @@ void PathMerger::addEntry(struct fcb *fcb, Packet *packet, int port)
 CLICK_ENDDECLS
 EXPORT_ELEMENT(PathMerger)
 ELEMENT_REQUIRES(TCPElement)
-//ELEMENT_MT_SAFE(PathMerger)
+ELEMENT_MT_SAFE(PathMerger)

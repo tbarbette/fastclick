@@ -11,7 +11,9 @@ CLICK_DECLS
 
 TCPReorder::TCPReorder() : pool(TCPREORDER_POOL_SIZE)
 {
-
+    #if HAVE_BATCH
+        in_batch_mode = BATCH_MODE_YES;
+    #endif
 }
 
 TCPReorder::~TCPReorder()
@@ -70,10 +72,18 @@ void TCPReorder::flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep
     }
 }
 
-void TCPReorder::push(int, Packet *packet)
+void TCPReorder::push_packet(int, Packet *packet)
 {
     processPacket(&fcbArray[flowDirection], packet);
 }
+
+#if HAVE_BATCH
+void TCPReorder::push_batch(int port, PacketBatch *batch)
+{
+    FOR_EACH_PACKET_SAFE(batch, packet)
+        processPacket(&fcbArray[flowDirection], packet);
+}
+#endif
 
 void TCPReorder::processPacket(struct fcb *fcb, Packet* packet)
 {
@@ -93,7 +103,15 @@ bool TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
     if(SEQ_LT(getSequenceNumber(packet), fcb->tcpreorder.expectedPacketSeq))
     {
         if(noutputs() == 2)
-            output(1).push(packet);
+        {
+            #if HAVE_BATCH
+                PacketBatch *batch = PacketBatch::make_from_packet(packet);
+                if(batch != NULL)
+                    output_push_batch(1, batch);
+            #else
+                output(1).push(packet);
+            #endif
+        }
         else
             packet->kill();
         return false;
@@ -105,6 +123,10 @@ bool TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
 void TCPReorder::sendEligiblePackets(struct fcb *fcb)
 {
     struct TCPPacketListNode* packetNode = fcb->tcpreorder.packetList;
+
+    #if HAVE_BATCH
+        PacketBatch* batch = NULL;
+    #endif
 
     while(packetNode != NULL)
     {
@@ -124,18 +146,39 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
         {
             click_chatter("Warning: received a retransmission with a different split");
             flushListFrom(fcb, NULL, packetNode);
+            #if HAVE_BATCH
+                // Check before exiting that we did not have a batch to send
+                if(batch != NULL)
+                    output_push_batch(0, batch);
+            #endif
             return;
         }
 
         // We check if the current packet is the expected one (if not, there is a gap)
         if(currentSeq != fcb->tcpreorder.expectedPacketSeq)
+        {
+            #if HAVE_BATCH
+                // Check before exiting that we did not have a batch to send
+                if(batch != NULL)
+                    output_push_batch(0, batch);
+            #endif
             return;
+        }
 
         // Compute sequence number of the next packet
         fcb->tcpreorder.expectedPacketSeq = getNextSequenceNumber(packetNode->packet);
 
         // Send packet
-        output(0).push(packetNode->packet);
+        #if HAVE_BATCH
+            // If we use batching, we build the batch while browsing the list
+            if(batch == NULL)
+                batch = PacketBatch::make_from_packet(packetNode->packet);
+            else
+                batch->append_packet(packetNode->packet);
+        #else
+            // If we don't use batching, push the packet immediately
+            output(0).push(packetNode->packet);
+        #endif
 
         // Free memory and remove node from the list
         struct TCPPacketListNode* toFree = packetNode;
@@ -143,6 +186,12 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
         fcb->tcpreorder.packetList = packetNode;
         fcb->tcpreorder.pool->releaseMemory(toFree);
     }
+
+    #if HAVE_BATCH
+        // We now send the batch we built
+        if(batch != NULL)
+            click_chatter("Sending a batch of %u element(s) after reordering", batch->count());
+    #endif
 }
 
 tcp_seq_t TCPReorder::getSequenceNumber(Packet* packet)

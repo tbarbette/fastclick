@@ -19,15 +19,20 @@ int IPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 
 Packet* IPOut::processPacket(struct fcb*, Packet* p)
 {
+    int flowDirection = determineFlowDirection();
+
+    click_chatter("Flow %d was managed by thread %u", flowDirection, click_current_cpu_id());
+
     WritablePacket *packet = p->uniqueify();
 
     // Recompute the IP checksum if the packet has been modified
     if(getAnnotationDirty(packet))
         computeIPChecksum(packet);
 
-    return p;
+    return packet;
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPOut)
 ELEMENT_REQUIRES(IPElement)
+ELEMENT_MT_SAFE(IPOut)

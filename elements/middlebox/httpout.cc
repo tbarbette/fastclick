@@ -9,7 +9,9 @@ CLICK_DECLS
 
 HTTPOut::HTTPOut() : poolBufferEntries(POOL_BUFFER_ENTRIES_SIZE)
 {
-
+    #if HAVE_BATCH
+        in_batch_mode = BATCH_MODE_YES;
+    #endif
 }
 
 int HTTPOut::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -45,7 +47,7 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
                 ++it;
             }
 
-            WritablePacket *toPush = flowBuffer.dequeue();;
+            WritablePacket *toPush = flowBuffer.dequeue();
 
             char bufferHeader[25];
 
@@ -54,11 +56,27 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
 
             click_chatter("Content-Length modified to %lu", newContentLength);
 
-            while(toPush != NULL)
-            {
-                output(0).push(toPush);
-                toPush = flowBuffer.dequeue();
-            }
+            #if HAVE_BATCH
+                PacketBatch *headBatch = PacketBatch::make_from_packet(toPush);
+
+                PacketBatch *tailBatch = NULL;
+                uint32_t max = flowBuffer.getSize();
+                MAKE_BATCH(flowBuffer.dequeue(), tailBatch, max);
+
+                if(headBatch != NULL)
+                {
+                    // Join the two batches
+                    if(tailBatch != NULL)
+                        headBatch->append_batch(tailBatch);
+                    output_push_batch(0, headBatch);
+                }
+            #else
+                while(toPush != NULL)
+                {
+                    output(0).push(toPush);
+                    toPush = flowBuffer.dequeue();
+                }
+            #endif
         }
 
         return NULL;

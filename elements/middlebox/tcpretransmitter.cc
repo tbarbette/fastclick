@@ -36,7 +36,7 @@ int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void TCPRetransmitter::push(int port, Packet *packet)
+void TCPRetransmitter::push_packet(int port, Packet *packet)
 {
 
     // Simulate Middleclick's FCB management
@@ -46,8 +46,41 @@ void TCPRetransmitter::push(int port, Packet *packet)
     unsigned int oppositeFlowDirection = 1 - flowDirection;
     struct fcb* fcb = &fcbArray[flowDirection];
 
-    if(fcb->tcp_common == NULL)
-        return;
+    if(port == 0)
+        packet = processPacketNormal(fcb, packet);
+    else
+        packet = processPacketRetransmission(fcb, packet);
+
+    if(packet != NULL)
+        output(0).push(packet);
+}
+
+#if HAVE_BATCH
+void TCPRetransmitter::push_batch(int port, PacketBatch *batch)
+{
+    // Simulate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
+    unsigned int oppositeFlowDirection = 1 - flowDirection;
+    struct fcb* fcb = &fcbArray[flowDirection];
+
+    if(port == 0)
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacketNormal, &fcbArray[flowDirection], batch, [](Packet* p){})
+    else
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacketRetransmission, &fcbArray[flowDirection], batch, [](Packet* p){})
+
+    if(batch != NULL)
+        output_push_batch(0, batch);
+}
+#endif
+
+void TCPRetransmitter::checkInitialization(struct fcb *fcb)
+{
+    // Simulate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
 
     RetransmissionTiming &manager = fcb->tcp_common->retransmissionTimings[flowDirection];
 
@@ -64,148 +97,179 @@ void TCPRetransmitter::push(int port, Packet *packet)
         circularBuffer = new(circularBuffer) CircularBuffer(rawBufferPool);
         manager.setCircularBuffer(circularBuffer, &circularPool);
     }
+}
 
+Packet* TCPRetransmitter::processPacketNormal(struct fcb *fcb, Packet *packet)
+{
+    // Simulate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
+    unsigned int oppositeFlowDirection = 1 - flowDirection;
+
+    if(fcb->tcp_common == NULL)
+    {
+        packet->kill();
+        return NULL;
+    }
+
+    RetransmissionTiming &manager = fcb->tcp_common->retransmissionTimings[flowDirection];
+    checkInitialization(fcb);
     CircularBuffer *buffer = manager.getCircularBuffer();
-
     ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[flowDirection];
 
-    if(port == 0)
+    // The packet comes on the normal input
+    // We thus need to add its content in the buffer and let it continue
+    const unsigned char* content = getPayloadConst(packet);
+    uint32_t contentSize = getPayloadLength(packet);
+    uint32_t seq = getSequenceNumber(packet);
+
+    if(contentSize > 0)
     {
-        // The packet comes on the normal input
-        // We thus need to add its content in the buffer and let it continue
-        const unsigned char* content = getPayloadConst(packet);
-        uint32_t contentSize = getPayloadLength(packet);
-        uint32_t seq = getSequenceNumber(packet);
+        // If this is the first content added to the buffer, we indicate
+        // the buffer the sequence number as an offset
+        // so that we will be able to give sequence number as indexes in
+        // the future
+        if(buffer->isBlank())
+            buffer->setStartOffset(seq);
 
-        if(contentSize > 0)
+        // Add packet content to the buffer
+        buffer->addDataAtEnd(content, contentSize);
+
+        // Start a new RTT measure if possible
+        fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
+
+        uint32_t lastAckSent = 0;
+        bool lastAckSentSet = fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet();
+        if(lastAckSentSet)
+            lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
+        // ackToReceive is the ACK that will be received for the current
+        // packet. We map it to be able to compare it with lastAckSent
+        // which is mapped
+        uint32_t ackToReceive = fcb->tcp_common->maintainers[flowDirection].mapAck(seq + contentSize);
+
+        if(lastAckSentSet && SEQ_LEQ(ackToReceive, lastAckSent))
         {
-            // If this is the first content added to the buffer, we indicate
-            // the buffer the sequence number as an offset
-            // so that we will be able to give sequence number as indexes in
-            // the future
-            if(buffer->isBlank())
-                buffer->setStartOffset(seq);
-
-            // Add packet content to the buffer
-            buffer->addDataAtEnd(content, contentSize);
-
-            // Start a new RTT measure if possible
-            fcb->tcp_common->retransmissionTimings[flowDirection].startRTTMeasure(seq);
-
-            uint32_t lastAckSent = 0;
-            bool lastAckSentSet = fcb->tcp_common->maintainers[oppositeFlowDirection].isLastAckSentSet();
-            if(lastAckSentSet)
-                lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
-            // ackToReceive is the ACK that will be received for the current
-            // packet. We map it to be able to compare it with lastAckSent
-            // which is mapped
-            uint32_t ackToReceive = fcb->tcp_common->maintainers[flowDirection].mapAck(seq + contentSize);
-
-            if(lastAckSentSet && SEQ_LEQ(ackToReceive, lastAckSent))
-            {
-                // We know that we are transmitting ACKed data
-                // We thus start the retransmission timer
-                fcb->tcp_common->retransmissionTimings[flowDirection].startTimer();
-            }
+            // We know that we are transmitting ACKed data
+            // We thus start the retransmission timer
+            fcb->tcp_common->retransmissionTimings[flowDirection].startTimer();
         }
-
-        // Push the packet to the next element
-        output(0).push(packet);
     }
-    else
+
+    return packet;
+}
+
+Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *packet)
+{
+    // Simulate Middleclick's FCB management
+    // We traverse the function stack waiting for TCPIn to give the flow
+    // direction.
+    unsigned int flowDirection = determineFlowDirection();
+    unsigned int oppositeFlowDirection = 1 - flowDirection;
+
+    if(fcb->tcp_common == NULL)
     {
-        // The packet comes on the second input
-        // It means we have a retransmission.
-        // We need to perform the mapping between the received packet and
-        // the data to retransmit from the tree
-
-        // The given packet is "raw", meaning the sequence number and the ack
-        // are unmodified. Thus, we need to perform the right mappings to
-        // have the connection with the packets in the tree
-
-        if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
-        {
-            packet->kill();
-            return;
-        }
-
-        // Get the sequence number that will be the key of the packet in the buffer
-        uint32_t seq = getSequenceNumber(packet);
-
-        uint32_t lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
-
-        if(SEQ_LT(seq, lastAckSent))
-        {
-            // We must check the lastAckSent by the other side
-            // If we receive data already ACKed, we must drop them and make the other side
-            // resend the last ACK, because it means that the ACK was lost.
-            // (We send an ACK and we receive retransmission nevertheless)
-            click_chatter("The source is trying to retransmit ACKed data, resending an ACK.");
-
-            // Resend the ACK for this packet
-            requestMorePackets(fcb, packet);
-            return;
-        }
-
-        uint32_t mappedSeq = maintainer.mapSeq(seq);
-
-        uint32_t payloadSize = getPayloadLength(packet);
-        uint32_t mappedSeqEnd = maintainer.mapSeq(seq + payloadSize);
-
-        // The lower bound of the interval to retransmit is "mappedSeq"
-        // The higher bound of the interval to retransmit is "mappedSeqEnd"
-        // mappedSeqEnd is not just mappedSeq + payloadSize as it must take
-        // into account the data removed inside the packet
-
-        // Check if we really have something to retransmit
-        // If the full content of the packet was removed, mappedSeqEnd = mappedSeq
-        uint32_t sizeOfRetransmission = mappedSeqEnd - mappedSeq;
-        if(sizeOfRetransmission <= 0)
-        {
-            click_chatter("Nothing to retransmit for packet with sequence %u", seq);
-            return;
-        }
-
-        click_chatter("Retransmitting %u bytes", sizeOfRetransmission);
-
-        // Get the data from the buffer
-        manager.getCircularBuffer()->getData(mappedSeq, sizeOfRetransmission, getBuffer);
-        // The data to retransmit is now in "getCircularBuffer"
-
-        // Map the previous ACK
-        uint32_t ack = getAckNumber(packet);
-        ack = fcb->tcp_common->maintainers[oppositeFlowDirection].mapAck(ack);
-
-        // Uniqueify the packet so we can modify it to replace its content
-        WritablePacket *newPacket = packet->uniqueify();
-
-        // Ensure that the packet has the right size
-        uint32_t previousPayloadSize = getPayloadLength(newPacket);
-        if(sizeOfRetransmission > previousPayloadSize)
-            newPacket = newPacket->put(sizeOfRetransmission - previousPayloadSize);
-        else if(sizeOfRetransmission < previousPayloadSize)
-            newPacket->take(previousPayloadSize - sizeOfRetransmission);
-
-        setAckNumber(newPacket, ack);
-        setSequenceNumber(newPacket, mappedSeq);
-
-        // Set the new size of the packet in the IP header (total size minus ethernet header)
-        setPacketTotalLength(newPacket, newPacket->length() - getIPHeaderOffset(packet));
-
-        // Copy the content of the buffer to the payload area
-        setPayload(newPacket, &getBuffer[0], sizeOfRetransmission);
-
-        // Recompute the checksums
-        computeTCPChecksum(newPacket);
-        computeIPChecksum(newPacket);
-
-        // Signal the retransmission to avoind taking retransmitted packets
-        // into account to compute the RTT
-        fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(mappedSeq + payloadSize);
-
-        // Push the packet with its new content
-        output(0).push(newPacket);
+        packet->kill();
+        return NULL;
     }
+
+    RetransmissionTiming &manager = fcb->tcp_common->retransmissionTimings[flowDirection];
+    checkInitialization(fcb);
+    CircularBuffer *buffer = manager.getCircularBuffer();
+    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[flowDirection];
+
+    // The packet comes on the second input
+    // It means we have a retransmission.
+    // We need to perform the mapping between the received packet and
+    // the data to retransmit from the tree
+
+    // The given packet is "raw", meaning the sequence number and the ack
+    // are unmodified. Thus, we need to perform the right mappings to
+    // have the connection with the packets in the tree
+
+    if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
+    {
+        packet->kill();
+        return NULL;
+    }
+
+    // Get the sequence number that will be the key of the packet in the buffer
+    uint32_t seq = getSequenceNumber(packet);
+
+    uint32_t lastAckSent = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckSent();
+
+    if(SEQ_LT(seq, lastAckSent))
+    {
+        // We must check the lastAckSent by the other side
+        // If we receive data already ACKed, we must drop them and make the other side
+        // resend the last ACK, because it means that the ACK was lost.
+        // (We send an ACK and we receive retransmission nevertheless)
+        click_chatter("The source is trying to retransmit ACKed data, resending an ACK.");
+
+        // Resend the ACK for this packet
+        requestMorePackets(fcb, packet);
+        packet->kill();
+        return NULL;
+    }
+
+    uint32_t mappedSeq = maintainer.mapSeq(seq);
+
+    uint32_t payloadSize = getPayloadLength(packet);
+    uint32_t mappedSeqEnd = maintainer.mapSeq(seq + payloadSize);
+
+    // The lower bound of the interval to retransmit is "mappedSeq"
+    // The higher bound of the interval to retransmit is "mappedSeqEnd"
+    // mappedSeqEnd is not just mappedSeq + payloadSize as it must take
+    // into account the data removed inside the packet
+
+    // Check if we really have something to retransmit
+    // If the full content of the packet was removed, mappedSeqEnd = mappedSeq
+    uint32_t sizeOfRetransmission = mappedSeqEnd - mappedSeq;
+    if(sizeOfRetransmission <= 0)
+    {
+        click_chatter("Nothing to retransmit for packet with sequence %u", seq);
+        packet->kill();
+        return NULL;
+    }
+
+    click_chatter("Retransmitting %u bytes", sizeOfRetransmission);
+
+    // Get the data from the buffer
+    manager.getCircularBuffer()->getData(mappedSeq, sizeOfRetransmission, getBuffer);
+    // The data to retransmit are now in "getBuffer"
+
+    // Map the previous ACK
+    uint32_t ack = getAckNumber(packet);
+    ack = fcb->tcp_common->maintainers[oppositeFlowDirection].mapAck(ack);
+
+    // Uniqueify the packet so we can modify it to replace its content
+    WritablePacket *newPacket = packet->uniqueify();
+
+    // Ensure that the packet has the right size
+    uint32_t previousPayloadSize = getPayloadLength(newPacket);
+    if(sizeOfRetransmission > previousPayloadSize)
+        newPacket = newPacket->put(sizeOfRetransmission - previousPayloadSize);
+    else if(sizeOfRetransmission < previousPayloadSize)
+        newPacket->take(previousPayloadSize - sizeOfRetransmission);
+
+    setAckNumber(newPacket, ack);
+    setSequenceNumber(newPacket, mappedSeq);
+
+    // Set the new size of the packet in the IP header (total size minus ethernet header)
+    setPacketTotalLength(newPacket, newPacket->length() - getIPHeaderOffset(packet));
+
+    // Copy the content of the buffer to the payload area
+    setPayload(newPacket, &getBuffer[0], sizeOfRetransmission);
+
+    // Recompute the checksums
+    computeTCPChecksum(newPacket);
+    computeIPChecksum(newPacket);
+
+    // Signal the retransmission to avoind taking retransmitted packets
+    // into account to compute the RTT
+    fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(mappedSeq + payloadSize);
+
+    return newPacket;
 }
 
 void TCPRetransmitter::prune(struct fcb *fcb)
@@ -310,7 +374,12 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(start + sizeOfRetransmission);
 
     // Push the packet
-    output(0).push(packet);
+    #if HAVE_BATCH
+        PacketBatch *batch = PacketBatch::make_from_packet(packet);
+        output_push_batch(0, batch);
+    #else
+        output(0).push(packet);
+    #endif
 
     fcb->tcp_common->retransmissionTimings[flowDirection].stopTimer();
     fcb->tcp_common->retransmissionTimings[flowDirection].startTimerDoubleRTO();

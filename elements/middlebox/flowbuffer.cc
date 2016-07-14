@@ -13,6 +13,7 @@ FlowBuffer::FlowBuffer()
     tail = NULL;
     owner = NULL;
     initialized = false;
+    size = 0;
 }
 
 FlowBuffer::~FlowBuffer()
@@ -63,6 +64,8 @@ void FlowBuffer::enqueue(WritablePacket *packet)
 
     if(head == NULL)
         head = entry;
+
+    size++;
 }
 
 FlowBufferContentIter FlowBuffer::contentBegin()
@@ -73,6 +76,11 @@ FlowBufferContentIter FlowBuffer::contentBegin()
 FlowBufferContentIter FlowBuffer::contentEnd()
 {
     return FlowBufferContentIter(this, NULL);
+}
+
+uint32_t FlowBuffer::getSize()
+{
+    return size;
 }
 
 int FlowBuffer::searchInFlow(const char *pattern)
@@ -116,6 +124,8 @@ WritablePacket* FlowBuffer::dequeue()
         head->prev = NULL;
 
     poolEntries->releaseMemory(toRemove);
+
+    size--;
 
     return packet;
 }
@@ -360,6 +370,29 @@ unsigned char& FlowBufferContentIter::operator*()
     return *(content + offsetInPacket);
 }
 
+void FlowBufferContentIter::repair()
+{
+    // Required after a deletion at the end of a packet
+    assert(entry != NULL);
+
+    // Check if we are pointing after the content of the current packet
+    if(offsetInPacket >= flowBuffer->getOwner()->getPacketContentSize(entry->packet))
+    {
+        // If so, we move to the next packet
+        uint16_t overflow = offsetInPacket - flowBuffer->getOwner()->getPacketContentSize(entry->packet);
+        offsetInPacket = overflow;
+        entry = entry->next;
+
+        // Check if we need to continue for the next packet
+        // It will be executed recursively until the iterator is repaired or
+        // we reached the end of the flow
+        if(entry != NULL)
+            repair();
+        else
+            offsetInPacket = 0;
+    }
+}
+
 FlowBufferContentIter& FlowBufferContentIter::operator++()
 {
     assert(entry != NULL);
@@ -374,7 +407,6 @@ FlowBufferContentIter& FlowBufferContentIter::operator++()
         entry = entry->next;
     }
 }
-
 
 CLICK_ENDDECLS
 

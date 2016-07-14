@@ -28,6 +28,7 @@ public:
 
     void enqueue(WritablePacket *packet);
     WritablePacket* dequeue();
+    uint32_t getSize();
 
     FlowBufferIter begin();
     FlowBufferIter end();
@@ -47,6 +48,7 @@ private:
     struct flowBufferEntry *tail;
     StackElement *owner;
     bool initialized;
+    uint32_t size;
 };
 
 class FlowBufferIter
@@ -77,6 +79,8 @@ public:
     FlowBufferContentIter& operator++();
 
 private:
+    void repair();
+
     FlowBuffer *flowBuffer;
     struct flowBufferEntry *entry;
     uint32_t offsetInPacket;

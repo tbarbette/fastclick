@@ -18,7 +18,11 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push(int port, Packet *packet);
+    void push_packet(int port, Packet *packet);
+
+    #if HAVE_BATCH
+    void push_batch(int port, PacketBatch *batch);
+    #endif
 
     virtual void addStackElementInList(StackElement* element, int port);
 

@@ -5,6 +5,8 @@
 #include <click/element.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
+#include <click/batchelement.hh>
+#include "batchfcb.hh"
 #include "tcpreordernode.hh"
 #include "memorypool.hh"
 #include "fcb.hh"
@@ -14,7 +16,7 @@
 
 CLICK_DECLS
 
-class TCPReorder : public Element, public TCPElement
+class TCPReorder : public BatchElement, public TCPElement
 {
 public:
     TCPReorder() CLICK_COLD;
@@ -27,7 +29,11 @@ public:
 
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
 
-    void push(int, Packet*);
+    void push_packet(int, Packet*);
+
+    #if HAVE_BATCH
+    void push_batch(int, PacketBatch *batch);
+    #endif
 
     // Custom method
     void processPacket(struct fcb *fcb, Packet* packet);
@@ -44,8 +50,10 @@ private:
     bool checkRetransmission(struct fcb *fcb, Packet* packet);
     tcp_seq_t getNextSequenceNumber(Packet* packet);
 
-    MemoryPool<struct TCPPacketListNode> pool; // TODO: Ensure that is it per-thread
     unsigned int flowDirection;
+
+    // TODO ensure perthreadness
+    MemoryPool<struct TCPPacketListNode> pool;
 };
 
 CLICK_ENDDECLS
