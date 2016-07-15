@@ -42,7 +42,7 @@ protected:
     virtual void setPacketDirty(struct fcb*, WritablePacket*);
     virtual void removeBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
     virtual WritablePacket* insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t) CLICK_WARN_UNUSED_RESULT;
-    virtual void requestMorePackets(struct fcb *fcb, Packet *packet);
+    virtual void requestMorePackets(struct fcb *fcb, Packet *packet, bool force = false);
     virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
     virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
@@ -56,7 +56,7 @@ protected:
 
 private:
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
-    void ackPacket(struct fcb *fcb, Packet* packet);
+    void ackPacket(struct fcb *fcb, Packet* packet, bool force = false);
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
     void manageOptions(struct fcb* fcb, WritablePacket *packet);
 

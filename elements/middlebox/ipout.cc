@@ -27,11 +27,11 @@ Packet* IPOut::processPacket(struct fcb*, Packet* p)
 
     counter++;
 
-    if(counter == 10)
+    /*if(counter == 10 && flowDirection == 1)
     {
         packet->kill();
         return NULL;
-    }
+    }*/
 
     // Recompute the IP checksum if the packet has been modified
     if(getAnnotationDirty(packet))

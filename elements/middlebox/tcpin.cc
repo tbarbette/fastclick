@@ -176,6 +176,8 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         {
             // Increase congestion window
             click_chatter("Congestion window increased");
+            uint16_t cwnd = fcb->tcp_common->maintainers[getOppositeFlowDirection()].getCongestionWindowSize();
+            fcb->tcp_common->maintainers[getOppositeFlowDirection()].setCongestionWindowSize(cwnd + 1);
             fcb->tcp_common->maintainers[getFlowDirection()].setDupAcks(0);
         }
 
@@ -374,15 +376,15 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
     return newPacket;
 }
 
-void TCPIn::requestMorePackets(struct fcb *fcb, Packet *packet)
+void TCPIn::requestMorePackets(struct fcb *fcb, Packet *packet, bool force)
 {
-    ackPacket(fcb, packet);
+    ackPacket(fcb, packet, force);
 
     // Continue in the stack function
-    StackElement::requestMorePackets(fcb, packet);
+    StackElement::requestMorePackets(fcb, packet, force);
 }
 
-void TCPIn::ackPacket(struct fcb *fcb, Packet* packet)
+void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool force)
 {
     // Get the information needed to ack the given packet
     uint32_t saddr = getDestinationAddress(packet);
@@ -401,7 +403,7 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet)
         ack++;
 
     // Craft and send the ack
-    outElement->sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack);
+    outElement->sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack, force);
 }
 
 void TCPIn::setPacketDirty(struct fcb *fcb, WritablePacket* packet)

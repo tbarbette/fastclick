@@ -215,13 +215,13 @@ WritablePacket* StackElement::insertBytes(struct fcb *fcb, WritablePacket* packe
     return previousStackElement->insertBytes(fcb, packet, position, length);
 }
 
-void StackElement::requestMorePackets(struct fcb *fcb, Packet *packet)
+void StackElement::requestMorePackets(struct fcb *fcb, Packet *packet, bool force)
 {
     // Call the "requestMorePackets" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->requestMorePackets(fcb, packet);
+    previousStackElement->requestMorePackets(fcb, packet, force);
 }
 
 bool StackElement::isLastUsefulPacket(struct fcb* fcb, Packet *packet)

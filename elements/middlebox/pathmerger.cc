@@ -119,12 +119,12 @@ WritablePacket* PathMerger::insertBytes(struct fcb *fcb, WritablePacket* packet,
         return NULL;
 }
 
-void PathMerger::requestMorePackets(struct fcb *fcb, Packet *packet)
+void PathMerger::requestMorePackets(struct fcb *fcb, Packet *packet, bool force)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);
 
     if(previousElem != NULL)
-        previousElem->requestMorePackets(fcb, packet);
+        previousElem->requestMorePackets(fcb, packet, force);
 }
 
 void PathMerger::packetSent(struct fcb *fcb, Packet* packet)

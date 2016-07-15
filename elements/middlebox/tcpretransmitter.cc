@@ -222,7 +222,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
         click_chatter("The source is trying to retransmit ACKed data, resending an ACK.");
 
         // Resend the ACK for this packet
-        requestMorePackets(fcb, packet);
+        requestMorePackets(fcb, packet, true);
         packet->kill();
         return NULL;
     }
@@ -345,6 +345,8 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
 
     click_chatter("Timer fired");
 
+    fcb->tcp_common->retransmissionTimings[flowDirection].setLastManualTransmission(fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived());
+
     if(manualTransmission(fcb, true))
     {
         fcb->tcp_common->retransmissionTimings[flowDirection].stopTimer();
@@ -451,6 +453,34 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
 
     ByteStreamMaintainer &otherMaintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
 
+    uint32_t inFlight = 0;
+    bool manualTransmissionDone = fcb->tcp_common->retransmissionTimings[flowDirection].isManualTransmissionDone();
+    if(manualTransmissionDone)
+    {
+        uint32_t lastManualTransmission = fcb->tcp_common->retransmissionTimings[flowDirection].getLastManualTransmission();
+        if(SEQ_GT(otherMaintainer.getLastAckReceived(), lastManualTransmission))
+            inFlight = 0;
+        else
+            inFlight = lastManualTransmission - otherMaintainer.getLastAckReceived();
+    }
+
+    // Check that we do not exceed the congestion window's size
+    uint64_t cwnd = fcb->tcp_common->maintainers[flowDirection].getCongestionWindowSize() * fcb->tcp_common->maintainers[flowDirection].getMSS();
+    if(inFlight + expected > cwnd)
+    {
+        if(canCut)
+        {
+            expected = cwnd - inFlight;
+            click_chatter("Transmission limited due to congestion window: %u in flight: %u, %u", cwnd, inFlight, expected);
+        }
+        else
+        {
+            click_chatter("Transmission aborted due to congestion window: %u in flight : %u", cwnd, inFlight);
+            return 0;
+        }
+
+    }
+
     // Check that we do not exceed the receiver's window size
     uint64_t windowSize = otherMaintainer.getWindowSize();
     if(otherMaintainer.getUseWindowScale())
@@ -476,6 +506,7 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
             windowSize /= otherMaintainer.getWindowScale();
         otherMaintainer.setWindowSize(windowSize);
     }
+
 
     return expected;
 }

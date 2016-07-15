@@ -148,7 +148,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     return packet;
 }
 
-void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack)
+void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force)
 {
     if(noutputs() < 2)
     {
@@ -157,7 +157,7 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     }
 
     // Check if the ACK does not bring any additional information
-    if(maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent()))
+    if(!force && maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent()))
         return;
 
     // Update the number of the last ack sent for the other side

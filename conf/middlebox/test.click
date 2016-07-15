@@ -19,10 +19,10 @@ reorderRight :: TCPReorder(1);
 retransmitterRight :: TCPRetransmitter();
 
 // Left path
-FromNetmapDevice(netmap:eth0, PROMISC true) -> Strip(14) -> chIN :: CheckIPHeader()[0] -> ipINLeft -> reorderLeft[0] -> TCPMarkMSS(0, 24) -> tcpINLeft -> httpINLeft -> httpOUTLeft -> tcpOUTLeft -> [0]retransmitterLeft -> ipOUTLeft -> outLeft :: Unstrip(14) -> ToNetmapDevice(netmap:eth1);
+FromNetmapDevice(netmap:eth0, PROMISC true) -> Strip(14) -> chIN :: CheckIPHeader()[0] -> ipINLeft -> reorderLeft[0] -> TCPMarkMSS(0, 24, OFFSET 40) -> tcpINLeft -> httpINLeft -> httpOUTLeft -> tcpOUTLeft -> [0]retransmitterLeft -> ipOUTLeft -> outLeft :: Unstrip(14) -> ToNetmapDevice(netmap:eth1);
 
 // Right path
-FromNetmapDevice(netmap:eth1, PROMISC true) -> chOUT :: CheckIPHeader(14)[0] -> Strip(14) -> ipINRight -> reorderRight[0] -> TCPMarkMSS(1, 24) -> tcpINRight -> httpINRight -> InsultRemover() -> httpOUTRight -> tcpOUTRight[0] -> [0]retransmitterRight -> ipOUTRight -> TCPFragmenter(MTU 1480) -> EtherEncap(0x800, 08:00:27:27:b5:9a, 08:00:27:db:83:16) -> outRight:: ToNetmapDevice(netmap:eth0);
+FromNetmapDevice(netmap:eth1, PROMISC true) -> chOUT :: CheckIPHeader(14)[0] -> Strip(14) -> ipINRight -> reorderRight[0] -> tcpINRight -> httpINRight -> InsultRemover() -> httpOUTRight -> tcpOUTRight[0] -> [0]retransmitterRight -> ipOUTRight -> TCPMarkMSS(1, 24, OFFSET 40) -> TCPFragmenter(MTU 1500, MTU_ANNO 24) -> EtherEncap(0x800, 08:00:27:27:b5:9a, 08:00:27:db:83:16) -> outRight:: ToNetmapDevice(netmap:eth0);
 
 // Retransmissions detected by TCPReorder go TCPRetransmitter
 reorderLeft[1] -> [1]retransmitterLeft;

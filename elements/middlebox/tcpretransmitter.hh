@@ -26,6 +26,8 @@ public:
     TCPRetransmitter() CLICK_COLD;
     ~TCPRetransmitter() CLICK_COLD;
 
+    bool isOutElement()                   { return true; }
+
     // Click related methods
     const char *class_name() const        { return "TCPRetransmitter"; }
     const char *port_count() const        { return "2/1"; }
@@ -36,9 +38,7 @@ public:
     #if HAVE_BATCH
     void push_batch(int port, PacketBatch *batch);
     #endif
-
-    bool isOutElement()                   { return true; }
-
+    
     void retransmissionTimerFired(struct fcb* fcb);
     void transmitMoreData(struct fcb* fcb);
 
