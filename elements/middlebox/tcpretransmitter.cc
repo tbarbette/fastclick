@@ -222,6 +222,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
         click_chatter("The source is trying to retransmit ACKed data, resending an ACK.");
 
         // Resend the ACK for this packet
+        setInitialAck(packet, getAckNumber(packet));
         requestMorePackets(fcb, packet, true);
         packet->kill();
         return NULL;
@@ -345,6 +346,16 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
 
     click_chatter("Timer fired");
 
+    // Sender segment size
+    uint16_t mss = fcb->tcp_common->maintainers[oppositeFlowDirection].getMSS();
+    // Set the new slow start threshold
+    uint64_t ssthresh = fcb->tcp_common->maintainers[flowDirection].getCongestionWindowSize() / 2;
+    if(ssthresh < 2 * mss)
+        ssthresh = 2 * mss;
+    fcb->tcp_common->maintainers[flowDirection].setSsthresh(ssthresh);
+    // Reset window size
+    fcb->tcp_common->maintainers[flowDirection].setCongestionWindowSize(mss);
+
     fcb->tcp_common->retransmissionTimings[flowDirection].setLastManualTransmission(fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived());
 
     if(manualTransmission(fcb, true))
@@ -465,7 +476,7 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
     }
 
     // Check that we do not exceed the congestion window's size
-    uint64_t cwnd = fcb->tcp_common->maintainers[flowDirection].getCongestionWindowSize() * fcb->tcp_common->maintainers[flowDirection].getMSS();
+    uint64_t cwnd = fcb->tcp_common->maintainers[flowDirection].getCongestionWindowSize();
     if(inFlight + expected > cwnd)
     {
         if(canCut)
@@ -485,12 +496,11 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
     uint64_t windowSize = otherMaintainer.getWindowSize();
     if(otherMaintainer.getUseWindowScale())
         windowSize *= otherMaintainer.getWindowScale();
-    if(expected > windowSize)
+    if(inFlight + expected > windowSize)
     {
         if(canCut)
         {
-            expected = windowSize;
-            otherMaintainer.setWindowSize(0);
+            expected = windowSize - inFlight;
             click_chatter("Manual retransmission limited to %lu bytes by receiver's window size", expected);
         }
         else
@@ -499,14 +509,6 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
             expected = 0;
         }
     }
-    else
-    {
-        windowSize -= expected;
-        if(otherMaintainer.getUseWindowScale())
-            windowSize /= otherMaintainer.getWindowScale();
-        otherMaintainer.setWindowSize(windowSize);
-    }
-
 
     return expected;
 }

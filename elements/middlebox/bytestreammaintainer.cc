@@ -24,7 +24,8 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     lastSeqSentSet = false;
     lastAckReceivedSet = false;
     mss = 536;
-    congestionWindow = 1;
+    congestionWindow = mss;
+    ssthresh = 65535;
     dupAcks = 0;
 }
 
@@ -379,14 +380,24 @@ void ByteStreamMaintainer::setDupAcks(uint8_t dupAcks)
     this->dupAcks = dupAcks;
 }
 
-uint16_t ByteStreamMaintainer::getCongestionWindowSize()
+uint64_t ByteStreamMaintainer::getCongestionWindowSize()
 {
     return congestionWindow;
 }
 
-void ByteStreamMaintainer::setCongestionWindowSize(uint16_t congestionWindow)
+void ByteStreamMaintainer::setCongestionWindowSize(uint64_t congestionWindow)
 {
     this->congestionWindow = congestionWindow;
+}
+
+uint64_t ByteStreamMaintainer::getSsthresh()
+{
+    return ssthresh;
+}
+
+void ByteStreamMaintainer::setSsthresh(uint64_t ssthresh)
+{
+    this->ssthresh = ssthresh;
 }
 
 int ByteStreamMaintainer::lastOffsetInAckTree()

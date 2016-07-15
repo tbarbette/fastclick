@@ -133,7 +133,9 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     manageOptions(fcb, packet);
 
     // Update the window size
-    fcb->tcp_common->maintainers[getFlowDirection()].setWindowSize(getWindowSize(packet));
+    uint16_t prevWindowSize = fcb->tcp_common->maintainers[getFlowDirection()].getWindowSize();
+    uint16_t newWindowSize = getWindowSize(packet);
+    fcb->tcp_common->maintainers[getFlowDirection()].setWindowSize(newWindowSize);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
@@ -175,9 +177,21 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
         {
             // Increase congestion window
-            click_chatter("Congestion window increased");
-            uint16_t cwnd = fcb->tcp_common->maintainers[getOppositeFlowDirection()].getCongestionWindowSize();
-            fcb->tcp_common->maintainers[getOppositeFlowDirection()].setCongestionWindowSize(cwnd + 1);
+            uint64_t cwnd = fcb->tcp_common->maintainers[getOppositeFlowDirection()].getCongestionWindowSize();
+            uint64_t ssthresh = fcb->tcp_common->maintainers[getOppositeFlowDirection()].getSsthresh();
+            // Sender segment size
+            uint16_t mss = fcb->tcp_common->maintainers[getFlowDirection()].getMSS();
+            uint64_t increase = 0;
+
+            // Check if we are in slow start mode
+            if(cwnd <= ssthresh)
+                increase = mss;
+            else
+                increase = mss * mss / cwnd;
+
+            fcb->tcp_common->maintainers[getOppositeFlowDirection()].setCongestionWindowSize(cwnd + increase);
+            click_chatter("Congestion window increased by %lu", increase);
+
             fcb->tcp_common->maintainers[getFlowDirection()].setDupAcks(0);
         }
 
@@ -192,7 +206,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(fcb, ackNumber);
 
         // Check if the current packet is just an ACK without more information
-        if(isJustAnAck(packet))
+        if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
         {
             // Check duplicate acks
             if(prevLastAckReceived == ackNumber)
@@ -201,6 +215,13 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
                 dupAcks++;
                 fcb->tcp_common->maintainers[getFlowDirection()].setDupAcks(dupAcks);
                 click_chatter("Duplicate ACK!");
+
+                // Fast retransmit
+                if(dupAcks >= 3)
+                {
+                    fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
+                    fcb->tcp_common->maintainers[getFlowDirection()].setDupAcks(0);
+                }
             }
 
             // Check that the ACK value is greater than what we have already
@@ -581,9 +602,11 @@ void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
         else if(optStart[0] == TCPOPT_MAXSEG && optStart[1] == TCPOLEN_MAXSEG)
         {
 
-            fcb->tcp_common->maintainers[flowDirection].setMSS((optStart[2] << 8) | optStart[3]);
+            uint16_t mss = (optStart[2] << 8) | optStart[3];
+            fcb->tcp_common->maintainers[flowDirection].setMSS(mss);
 
-            click_chatter("MSS: %u", fcb->tcp_common->maintainers[flowDirection].getMSS());
+            click_chatter("MSS: %u", mss);
+            fcb->tcp_common->maintainers[getOppositeFlowDirection()].setCongestionWindowSize(mss);
 
             optStart += optStart[1];
         }

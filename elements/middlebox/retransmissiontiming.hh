@@ -43,6 +43,7 @@ public:
     bool stopTimer();
     bool restartTimer();
     bool isTimerRunning();
+    bool fireNow();
 
     bool sendMoreData();
 

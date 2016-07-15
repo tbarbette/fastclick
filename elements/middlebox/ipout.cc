@@ -25,14 +25,15 @@ Packet* IPOut::processPacket(struct fcb*, Packet* p)
 
     WritablePacket *packet = p->uniqueify();
 
+    /*
+    // Test to check retransmission
     counter++;
-
-    /*if(counter == 10 && flowDirection == 1)
+    if(counter == 5 && flowDirection == 1)
     {
         packet->kill();
         return NULL;
-    }*/
-
+    }
+    */
     // Recompute the IP checksum if the packet has been modified
     if(getAnnotationDirty(packet))
         computeIPChecksum(packet);

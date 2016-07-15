@@ -234,6 +234,16 @@ bool RetransmissionTiming::restartTimer()
     return true;
 }
 
+bool RetransmissionTiming::fireNow()
+{
+    if(!isTimerInitialized())
+        return false;
+
+    timerRetransmit.schedule_now();
+
+    return true;
+}
+
 bool RetransmissionTiming::sendMoreData()
 {
     if(!isTimerInitialized())

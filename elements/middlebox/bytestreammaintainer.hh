@@ -126,8 +126,10 @@ class ByteStreamMaintainer
         bool getUseWindowScale();
         uint16_t getMSS();
         void setMSS(uint16_t mss);
-        uint16_t getCongestionWindowSize();
-        void setCongestionWindowSize(uint16_t congestionWindow);
+        uint64_t getCongestionWindowSize();
+        void setCongestionWindowSize(uint64_t congestionWindow);
+        void setSsthresh(uint64_t ssthresh);
+        uint64_t getSsthresh();
         void setIpSrc(uint32_t ipSrc);
         uint32_t getIpSrc();
         void setIpDst(uint32_t ipDst);
@@ -158,7 +160,8 @@ class ByteStreamMaintainer
         uint16_t windowScale;
         uint8_t dupAcks;
         bool useWindowScale;
-        uint16_t congestionWindow;
+        uint64_t congestionWindow;
+        uint64_t ssthresh;
         uint16_t mss;
         uint32_t ipSrc;
         uint32_t ipDst;
