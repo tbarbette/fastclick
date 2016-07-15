@@ -42,18 +42,21 @@ public:
     bool startTimerDoubleRTO();
     bool stopTimer();
     bool restartTimer();
-    bool restartTimerNow();
     bool isTimerRunning();
+
+    bool sendMoreData();
 
     bool isManualTransmissionDone();
     uint32_t getLastManualTransmission();
     void setLastManualTransmission(uint32_t lastManualTransmission);
 
-    static void timerFired(Timer *timer, void *data);
+    static void timerRetransmitFired(Timer *timer, void *data);
+    static void timerThreadFired(Timer *timer, void *data);
 
 private:
     // Retransmission timer
-    Timer timer;
+    Timer timerRetransmit;
+    Timer timerThread;
     struct retransmissionTimerData timerData;
     TCPRetransmitter *owner;
     CircularBuffer *buffer;

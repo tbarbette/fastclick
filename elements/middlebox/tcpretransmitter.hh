@@ -40,6 +40,7 @@ public:
     bool isOutElement()                   { return true; }
 
     void retransmissionTimerFired(struct fcb* fcb);
+    void transmitMoreData(struct fcb* fcb);
 
     void signalAck(struct fcb* fcb, uint32_t ack);
 
@@ -54,6 +55,8 @@ private:
     void checkInitialization(struct fcb *fcb);
     Packet* processPacketNormal(struct fcb *fcb, Packet *packet);
     Packet* processPacketRetransmission(struct fcb *fcb, Packet *packet);
+    bool manualTransmission(struct fcb *fcb, bool retransmission);
+    uint16_t getMaxAmountData(struct fcb *fcb, uint16_t expected, bool canCut);
 };
 
 CLICK_ENDDECLS

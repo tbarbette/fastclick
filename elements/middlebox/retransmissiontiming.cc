@@ -40,7 +40,7 @@ void RetransmissionTiming::computeClockGranularity()
     uint32_t epsilon = Timestamp::epsilon().msec();
 
     // We then check the precision of the timers
-    uint32_t timerAdjustment = timer.adjustment().msec();
+    uint32_t timerAdjustment = timerRetransmit.adjustment().msec();
 
     // We select the highest value between both of them
     if(epsilon < timerAdjustment)
@@ -52,13 +52,15 @@ void RetransmissionTiming::computeClockGranularity()
 void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter)
 {
     owner = retransmitter;
-    timer.initialize((Element*)retransmitter);
+    timerRetransmit.initialize((Element*)retransmitter);
+    timerThread.initialize((Element*)retransmitter);
     // Assign the callback of the timer
     // Give it a pointer to the fcb so that when the timer fires, we
     // can access it
     timerData.retransmitter = retransmitter;
     timerData.fcb = fcb;
-    timer.assign(RetransmissionTiming::timerFired, (void*)&timerData);
+    timerRetransmit.assign(RetransmissionTiming::timerRetransmitFired, (void*)&timerData);
+    timerThread.assign(RetransmissionTiming::timerThreadFired, (void*)&timerData);
 }
 
 void RetransmissionTiming::setCircularBuffer(CircularBuffer *buffer, MemoryPool<CircularBuffer> *bufferPool)
@@ -74,7 +76,7 @@ CircularBuffer* RetransmissionTiming::getCircularBuffer()
 
 bool RetransmissionTiming::isTimerInitialized()
 {
-    return timer.initialized();
+    return timerRetransmit.initialized();
 }
 
 bool RetransmissionTiming::startRTTMeasure(uint32_t seq)
@@ -189,7 +191,7 @@ bool RetransmissionTiming::startTimer()
     if(!isTimerInitialized() || isTimerRunning())
         return false;
 
-    timer.schedule_after_msec(rto);
+    timerRetransmit.schedule_after_msec(rto);
 
     click_chatter("Timer starting (%u)", rto);
 
@@ -203,7 +205,7 @@ bool RetransmissionTiming::startTimerDoubleRTO()
 
     rto *= 2;
     checkRTOMaxValue();
-    timer.schedule_after_msec(rto);
+    timerRetransmit.schedule_after_msec(rto);
 
     click_chatter("Timer starting with double RTO (%u)", rto);
 
@@ -215,7 +217,7 @@ bool RetransmissionTiming::stopTimer()
     if(!isTimerInitialized() || !isTimerRunning())
         return false;
 
-    timer.unschedule();
+    timerRetransmit.unschedule();
 
     click_chatter("Timer stopped");
 
@@ -232,15 +234,13 @@ bool RetransmissionTiming::restartTimer()
     return true;
 }
 
-bool RetransmissionTiming::restartTimerNow()
+bool RetransmissionTiming::sendMoreData()
 {
     if(!isTimerInitialized())
         return false;
 
-    stopTimer();
-
-    click_chatter("Restarting timer now!");
-    timer.schedule_now();
+    click_chatter("Sending more data");
+    timerThread.schedule_now();
 
     return true;
 }
@@ -250,7 +250,10 @@ bool RetransmissionTiming::isTimerRunning()
     if(!isTimerInitialized())
         return false;
 
-    return timer.scheduled();
+    if(!timerRetransmit.scheduled())
+        return false;
+
+    return timerRetransmit.expiry() >= Timestamp::now();
 }
 
 void RetransmissionTiming::checkRTOMaxValue()
@@ -267,11 +270,18 @@ void RetransmissionTiming::checkRTOMinValue()
         rto = 1000;
 }
 
-void RetransmissionTiming::timerFired(Timer *timer, void *data)
+void RetransmissionTiming::timerRetransmitFired(Timer *timer, void *data)
 {
     struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
     TCPRetransmitter *retransmitter = (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
     retransmitter->retransmissionTimerFired(fcb);
+}
+
+void RetransmissionTiming::timerThreadFired(Timer *timer, void *data)
+{
+    struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
+    TCPRetransmitter *retransmitter = (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
+    retransmitter->transmitMoreData(fcb);
 }
 
 bool RetransmissionTiming::isManualTransmissionDone()
