@@ -99,6 +99,9 @@ class FastUDPFlows : public Element {
   void cleanup(CleanupStage) CLICK_COLD;
   Packet *pull(int);
 
+  void cleanup_flows();
+  static int length_write_handler (const String &s, Element *e, void *, ErrorHandler *errh);
+
   void add_handlers() CLICK_COLD;
   void reset();
   unsigned count() { return _count; }

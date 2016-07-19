@@ -162,16 +162,21 @@ FastUDPFlows::initialize(ErrorHandler *)
 }
 
 void
+FastUDPFlows::cleanup_flows() {
+    if (_flows) {
+        for (unsigned i=0; i<_nflows; i++) {
+            _flows[i].packet->kill();
+            _flows[i].packet=0;
+        }
+        delete[] _flows;
+        _flows = 0;
+    }
+}
+
+void
 FastUDPFlows::cleanup(CleanupStage)
 {
-  if (_flows) {
-    for (unsigned i=0; i<_nflows; i++) {
-      _flows[i].packet->kill();
-      _flows[i].packet=0;
-    }
-    delete[] _flows;
-    _flows = 0;
-  }
+	cleanup_flows();
 }
 
 Packet *
@@ -278,6 +283,22 @@ FastUDPFlows_active_write_handler
   return 0;
 }
 
+int
+FastUDPFlows::length_write_handler
+(const String &s, Element *e, void *, ErrorHandler *errh)
+{
+  FastUDPFlows *c = (FastUDPFlows *)e;
+  int len;
+  if (!IntArg().parse(s, len))
+    return errh->error("length parameter must be integer");
+  if (len != c->_len) {
+	  c->_len = len;
+	  c->cleanup_flows();
+	  c->initialize(0);
+  }
+  return 0;
+}
+
 void
 FastUDPFlows::add_handlers()
 {
@@ -287,6 +308,8 @@ FastUDPFlows::add_handlers()
   add_write_handler("reset", FastUDPFlows_reset_write_handler, 0, Handler::BUTTON);
   add_write_handler("active", FastUDPFlows_active_write_handler, 0, Handler::CHECKBOX);
   add_write_handler("limit", FastUDPFlows_limit_write_handler, 0);
+  add_data_handlers("length", Handler::OP_READ, &_len);
+  add_write_handler("length", length_write_handler, 0, Handler::BUTTON);
 }
 
 CLICK_ENDDECLS
