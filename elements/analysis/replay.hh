@@ -17,7 +17,11 @@ class MultiReplayBase : public BatchElement { public:
     void cleanup(CleanupStage);
 protected:
     inline bool load_packets();
+    void cleanup_packets();
     inline void check_end_loop(Task* t);
+    static int write_handler(const String &, Element *e, void *thunk, ErrorHandler *errh);
+    void add_handlers();
+    void set_active(bool active);
 
     struct s_input {
 		NotifierSignal signal;
@@ -37,9 +41,6 @@ protected:
     Timestamp _current;
     bool _use_signal;
     bool _verbose;
-
-
-
 };
 
 
