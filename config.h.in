@@ -225,6 +225,15 @@
 # define CLICK_ALWAYS_INLINE /* nothing */
 #endif
 
+
+#if CLICK_LINUXMODULE
+# define CLICK_CACHE_ALIGN ____cacheline_aligned;
+#elif CLICK_USERLEVEL
+# define CLICK_CACHE_ALIGN __attribute__((aligned(CLICK_CACHE_LINE_SIZE)))
+#else
+# define CLICK_CACHE_ALIGN
+#endif
+
 /* Define macros for declaring packed structures. */
 #ifdef __GNUC__
 # define CLICK_PACKED_STRUCTURE(open, close) open close __attribute__((packed))

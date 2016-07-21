@@ -52,7 +52,7 @@ class per_thread
 private:
 	typedef struct {
         T v;
-    } __attribute__((aligned(64))) AT;
+    } CLICK_CACHE_ALIGN AT;
 
     void initialize(unsigned int n, T v) {
         _size = n;
