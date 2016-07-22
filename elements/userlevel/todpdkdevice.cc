@@ -25,8 +25,8 @@
 CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
-    _iqueues(), _port_id(0),
-	_timeout(0), _congestion_warning_printed(false)
+    _iqueues(), _dev(0),
+    _timeout(0), _congestion_warning_printed(false)
 {
 	 _blocking = false;
 	 _burst = -1;
@@ -39,15 +39,22 @@ ToDPDKDevice::~ToDPDKDevice()
 
 int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    int maxthreads = -1;
     int maxqueues = 128;
+    String dev;
 
     if (parse(Args(conf, this, errh)
-        .read_mp("PORT", _port_id))
+        .read_mp("PORT", dev))
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
         .complete() < 0)
             return -1;
+    if (!DPDKDeviceArg::parse(dev, _dev)) {
+        if (allow_nonexistent)
+            return 0;
+        else
+            return errh->error("%s : Unknown or invalid PORT", dev.c_str());
+    }
+
     //TODO : If user put multiple ToDPDKDevice with the same port and without the QUEUE parameter, try to share the available queues among them
     if (firstqueue == -1)
             firstqueue = 0;
@@ -64,7 +71,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         return ret;
 
     for (int i = 0; i < n_queues; i++) {
-        ret = DPDKDevice::add_tx_device(_port_id, i, ndesc , errh);
+        ret = _dev->add_tx_queue(i, ndesc , errh);
         if (ret != 0) return ret;    }
 
 #if HAVE_BATCH
@@ -95,7 +102,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         }
     }
 
-    _this_node = DPDKDevice::get_port_numa_node(_port_id);
+    _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
     if (all_initialized()) {
         int ret =DPDKDevice::initialize(errh);
@@ -104,7 +111,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     return 0;
 }
 
-void ToDPDKDevice::cleanup(CleanupStage stage)
+void ToDPDKDevice::cleanup(CleanupStage)
 {
 	cleanup_tasks();
 	for (unsigned i = 0; i < _iqueues.size();i++) {
@@ -126,12 +133,13 @@ inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
 		if (iqueue.nr_pending == 0)
 			iqueue.timeout.unschedule();
 	} else {
-			if (iqueue.nr_pending > 0)
+			if (iqueue.nr_pending > 0) {
 				//Pending packets, set timeout to flush packets after a while even without burst
 				if (_timeout == 0)
 					iqueue.timeout.schedule_now();
 				else
 					iqueue.timeout.schedule_after_msec(_timeout);
+				}
 	}
     }
 }
@@ -163,7 +171,7 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
             // The sub_burst wraps around the ring
             sub_burst = _internal_tx_queue_size - iqueue.index;
         //Todo : if there is multiple queue assigned to this thread, send on all of them
-        r = rte_eth_tx_burst(_port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
+        r = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
                              sub_burst);
         iqueue.nr_pending -= r;
         iqueue.index += r;

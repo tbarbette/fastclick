@@ -4,7 +4,7 @@
  * Intel's DPDK
  *
  * Copyright (c) 2014-2015 Cyril Soldani, University of Liège
- * Copyright (c) 2015 Tom Barbette, University of Liège
+ * Copyright (c) 2016 Tom Barbette, University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,7 +28,7 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _port_id(0)
+    _dev(0)
 {
 	#if HAVE_BATCH
 		in_batch_mode = BATCH_MODE_YES;
@@ -42,17 +42,25 @@ FromDPDKDevice::~FromDPDKDevice()
 
 int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-	//Default parameters
+    //Default parameters
     int numa_node = 0;
+    String dev;
 
     if (parse(Args(conf, this, errh)
-        .read_mp("PORT", _port_id))
+        .read_mp("PORT", dev))
         .read("NDESC", ndesc)
         .complete() < 0)
         return -1;
 
+    if (!DPDKDeviceArg::parse(dev, _dev)) {
+        if (allow_nonexistent)
+            return 0;
+        else
+            return errh->error("%s : Unknown or invalid PORT", dev.c_str());
+    }
+
     if (_use_numa) {
-        numa_node = DPDKDevice::get_port_numa_node(_port_id);
+        numa_node = DPDKDevice::get_port_numa_node(_dev->port_id);
     }
 
     int r;
@@ -79,11 +87,14 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;
 
+    if (!_dev)
+        return 0;
+
     ret = initialize_rx(errh);
     if (ret != 0) return ret;
 
     for (int i = firstqueue; i < firstqueue + n_queues; i++) {
-        ret = DPDKDevice::add_rx_device(_port_id, i , _promisc, ndesc, errh);
+        ret = _dev->add_rx_queue(i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }
 
@@ -122,7 +133,7 @@ bool FromDPDKDevice::run_task(Task * t)
 	 PacketBatch* head = 0;
      WritablePacket *last;
 #endif
-        unsigned n = rte_eth_rx_burst(_port_id, iqueue, pkts, _burst);
+        unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
 #if CLICK_PACKET_USE_DPDK
             rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));

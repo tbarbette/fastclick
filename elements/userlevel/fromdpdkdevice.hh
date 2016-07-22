@@ -34,7 +34,8 @@ Arguments:
 
 =item PORT
 
-Integer.  Port identifier of the device.
+Integer or PCI address.  Port identifier of the device, or a PCI address in the
+format fffff:ff:ff.f
 
 =item QUEUE
 
@@ -117,7 +118,7 @@ private:
         CLICK_COLD;
 
 
-    unsigned _port_id;
+    DPDKDevice* _dev;
 };
 
 CLICK_ENDDECLS

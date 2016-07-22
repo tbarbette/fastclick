@@ -43,6 +43,7 @@ protected:
     int queue_share;
     unsigned ndesc;
     int _verbose;
+    bool allow_nonexistent;
 
     int _maxthreads;
     int firstqueue;

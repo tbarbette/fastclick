@@ -20,10 +20,12 @@
 
 #include <click/packet.hh>
 #include <click/error.hh>
-#include <click/hashmap.hh>
+#include <click/hashtable.hh>
 #include <click/vector.hh>
+#include <click/args.hh>
 
 CLICK_DECLS
+class DPDKDeviceArg;
 
 #if HAVE_INT64_TYPES
 typedef uint64_t counter_t;
@@ -34,18 +36,29 @@ typedef uint32_t counter_t;
 class DPDKDevice {
 public:
 
+    unsigned port_id;
+
+    DPDKDevice() : port_id(-1), info() {
+    }
+
+    DPDKDevice(unsigned port_id) : port_id(port_id) {
+    } CLICK_COLD;
+
+    int add_rx_queue(int &queue_id, bool promisc,
+                             unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
+
+    int add_tx_queue(int &queue_id, unsigned n_desc,
+                             ErrorHandler *errh) CLICK_COLD;
+
+    unsigned int get_nb_txdesc();
+
     static struct rte_mempool *get_mpool(unsigned int);
-    inline static struct rte_mbuf* get_mbuf(Packet* p, bool create = true, int node = 0);
 
     static int get_port_numa_node(unsigned port_id);
 
-    static int add_rx_device(unsigned port_id, int &queue_id, bool promisc,
-                             unsigned n_desc, ErrorHandler *errh);
-
-    static int add_tx_device(unsigned port_id, int &queue_id, unsigned n_desc,
-                             ErrorHandler *errh);
     static int initialize(ErrorHandler *errh);
-	static int static_cleanup();
+
+    static int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {
         return p->buffer_destructor() == DPDKDevice::free_pkt;
@@ -55,31 +68,9 @@ public:
         return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
     }
 
-    inline static bool is_valid_dpdk_packet(Packet* p) {
-        struct rte_mbuf* mb = (struct rte_mbuf*)p->destructor_argument();
-        return mb && (mb->buf_addr == p->buffer());
-        /*for (int i = 0; i < _nr_pktmbuf_pools; i++) {
-            if (p->buffer() > _pktmbuf_pools[i]->elt_va_start && p->buffer() < _pktmbuf_pools[i]->elt_va_start)
-                return true;
-        }
-        return false;*/
-    }
-
-    inline static rte_mbuf* get_pkt(unsigned numa_node) {
-        struct rte_mbuf* mbuf = rte_pktmbuf_alloc(get_mpool(numa_node));
-        if (unlikely(!mbuf)) {
-            if (!DPDKDevice::no_more_buffer_msg_printed)
-                 click_chatter("No more DPDK buffer available ! Try using "
-                               "DPDKInfo to allocate more.");
-            else
-                DPDKDevice::no_more_buffer_msg_printed = true;
-        }
-        return mbuf;
-    }
-
-    inline static rte_mbuf* get_pkt() {
-        return get_pkt(rte_socket_id());
-    }
+    inline static rte_mbuf* get_pkt(unsigned numa_node);
+    inline static rte_mbuf* get_pkt();
+    inline static struct rte_mbuf* get_mbuf(Packet* p, bool create, int node);
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 
@@ -124,29 +115,59 @@ private:
         unsigned n_tx_descs;
     };
 
+    struct DevInfo info;
+
     static bool _is_initialized;
-    static HashMap<unsigned, DevInfo> _devs;
+    static HashTable<unsigned, DPDKDevice> _devs;
     static struct rte_mempool** _pktmbuf_pools;
     static int _nr_pktmbuf_pools;
-     static bool no_more_buffer_msg_printed;
+    static bool no_more_buffer_msg_printed;
 
-    static int initialize_device(unsigned port_id, DevInfo &info,
-                                 ErrorHandler *errh) CLICK_COLD;
+    int initialize_device(ErrorHandler *errh) CLICK_COLD;
+    int add_queue(Dir dir, int &queue_id, bool promisc,
+                   unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
     static void add_pool(const struct rte_mempool *, void *) CLICK_COLD;
     static bool alloc_pktmbufs() CLICK_COLD;
 
-    static int add_device(unsigned port_id, Dir dir, int &queue_id,
-                          bool promisc, unsigned n_desc, ErrorHandler *errh)
-        CLICK_COLD;
+    static DPDKDevice* get_device(unsigned port_id) {
+       return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
+    }
+
+    static int get_port_from_pci(uint16_t domain, uint8_t bus, uint8_t dev_id, uint8_t function) {
+       struct rte_eth_dev_info dev_info;
+       for (uint8_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
+          rte_eth_dev_info_get(port_id, &dev_info);
+          struct rte_pci_addr addr = dev_info.pci_dev->addr;
+          if (addr.domain   == domain &&
+              addr.bus      == bus &&
+              addr.devid    == dev_id &&
+              addr.function == function)
+              return port_id;
+       }
+       return -1;
+    }
+
+    friend class DPDKDeviceArg;
 };
+
+/** @class DPDKPortArg
+  @brief Parser class for DPDK Port, either an integer or a PCI address. */
+class DPDKDeviceArg { public:
+    static bool parse(const String &str, DPDKDevice* &result, const ArgContext &args = ArgContext());
+    static String unparse(DPDKDevice* dev) {
+        return String(dev->port_id);
+    }
+};
+
+template<> struct DefaultArg<DPDKDevice*> : public DPDKDeviceArg {};
 
 /**
  * Get a DPDK mbuf from a packet. If the packet buffer is a DPDK buffer, it will
- * 	give that one. If it isn't, it will allocate a new mbuf from a DPDK pool
- * 	and copy its content.
- * 	If compiled with CLICK_PACKET_USE_DPDK, it will simply return the packet
- * 	casted as it's already a DPDK buffer.
+ *     give that one. If it isn't, it will allocate a new mbuf from a DPDK pool
+ *     and copy its content.
+ *     If compiled with CLICK_PACKET_USE_DPDK, it will simply return the packet
+ *     casted as it's already a DPDK buffer.
  */
 inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node) {
     struct rte_mbuf* mbuf;
@@ -154,7 +175,7 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node) {
     mbuf = p->mb();
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *) p->destructor_argument()))
-		|| unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
+        || unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
         /* If the packet is an unshared DPDK packet, we can send
          *  the mbuf as it to DPDK*/
         rte_pktmbuf_pkt_len(mbuf) = p->length();
@@ -184,6 +205,22 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node) {
     }
     #endif
     return mbuf;
+}
+
+inline rte_mbuf* DPDKDevice::get_pkt(unsigned numa_node) {
+    struct rte_mbuf* mbuf = rte_pktmbuf_alloc(get_mpool(numa_node));
+    if (unlikely(!mbuf)) {
+        if (!DPDKDevice::no_more_buffer_msg_printed)
+            click_chatter("No more DPDK buffer available ! Try using "
+                               "DPDKInfo to allocate more.");
+        else
+            DPDKDevice::no_more_buffer_msg_printed = true;
+    }
+    return mbuf;
+}
+
+inline rte_mbuf* DPDKDevice::get_pkt() {
+    return get_pkt(rte_socket_id());
 }
 
 

@@ -1,5 +1,6 @@
 #! /usr/bin/perl -w
 use bytes;
+use MIME::Base64;
 
 sub usage () {
     print STDERR "Usage: click-linuxtool.pl [-V] -o OUTPUTDIR CFLAGS
@@ -162,14 +163,26 @@ for (my $i = 0; $i < @outputroot; ++$i) {
 }
 
 sub sprotect ($) {
-    my($t) = $_[0];
+    my($t) = encode_base64($_[0]);
     $t =~ tr/\000-\177/\200-\377/;
-    $t;
+    "\177" . $t;
+}
+
+sub sprotect_str ($) {
+    my($t) = $_[0];
+    $t =~ s{%P\[new\]}{%P[new_value]}g;
+    sprotect($t);
+}
+
+sub sunprotect1 ($) {
+    my($t) = $_[0];
+    $t =~ tr/\200-\377/\000-\177/;
+    decode_base64($t);
 }
 
 sub sunprotect ($) {
     my($t) = $_[0];
-    $t =~ tr/\200-\377/\000-\177/;
+    $t =~ s{\177([\200-\377]+)}{sunprotect1($1)}eg;
     $t;
 }
 
@@ -183,7 +196,7 @@ sub expand_initializer ($$$) {
     while (1) {
 	$v =~ s/\A\s+//;
 	if ($v =~ /\A\}(.*)\z/s) {
-	    die "(1)" if @prefix == 1;
+	    die "(1: $originalv)" if @prefix == 1;
 	    pop @prefix;
 	    $v = $1;
 	} elsif ($v =~ /\A,(.*)\z/s) {
@@ -277,6 +290,8 @@ sub one_includeroot ($$) {
 	    s{\.pushsection\s+\.smp_locks.*?\.popsection(?:\\n)?}{}sg;
 
 	    # Obscure comments and things that would confuse parsing.
+            # Assume no \177 characters.
+            die if m/\177/;
 
 	    # DO NOT do preprocessor directives; we need to fix their
 	    # definitions
@@ -284,12 +299,14 @@ sub one_includeroot ($$) {
 	    # C comments (assume no string includes '/*')
 	    s{(/\*.*?\*/)}{sprotect($1)}gse;
 	    # C++ comments (assume no string includes '//')
-	    s{(//.*?)}{sprotect($1)}ge;
+	    s{(//[^\r\n]*)}{sprotect($1)}gse;
+            # #error
+	    s{^(#\s*error[^\r\n]*)}{sprotect($1)}gme;
 	    # strings
 	    s{("")}{sprotect($1)}ge;
-	    s{"(.*?[^\\])"}{"\"" . sprotect($1) . "\""}sge;
+	    s{"((?:[^\\\"]|\\.)*)"}{"\"" . sprotect_str($1) . "\""}sge;
 	    # characters
-	    s{'(.*?[^\\])'}{"\'" . sprotect($1) . "\'"}sge;
+	    s{'((?:[^\\\']|\\.)*)'}{"\'" . sprotect($1) . "\'"}sge;
 
 	    # Now fix problems.
 
@@ -313,10 +330,10 @@ sub one_includeroot ($$) {
 	    # "new" and other keywords
 	    s{\bnew\b}{new_value}g;
 	    s{\band\b}{and_value}g;
+	    s{\bcompl\b}{compl_value}g;
+            s{\bprivate\b}{kprivate}g;
+            s{(PAGEFLAG[^)]*)kprivate}{$1private}g;
 	    s{\bswap\b}{linux_swap}g;
-	    # including "P[new]" in inline assembly string (look for
-	    # protected version)
-	    1 while (s{(asm.*\333)\356\345\367\335}{$1\356\345\367\337\366\341\354\365\345\335}g);
 
 	    # "sizeof" isn't nice to the preprocessor
 	    s{sizeof(?:\s+(?:unsigned\s+)?long|\s*\(\s*(?:unsigned\s+)?long\s*\))}{(BITS_PER_LONG/8 /*=BITS_PER_BYTE*/)}g;
@@ -330,16 +347,29 @@ sub one_includeroot ($$) {
 	    # constant expressions
 	    s{__cpu_to_be32 *\( *([0-9][0-9a-fxA-FX]*) *\)}{__constant_htonl($1)}g;
 
+            # user-defined string literals
+            s{("[^"\n]*")([_a-zA-Z]+)}{$1 $2}g;
+
+	    # de-const typeof in unions
+            if ($d eq "compiler.h") {
+                s{(union\s*\{\s*typeof\()x\)}{$1x + 0)}g;
+            }
+
+	    # fix illegal void* arithmetic
+	    s{(\w+)\s*-\s*\(\s*void\s*\*\s*\)}{(uintptr_t)$1 - (uintptr_t)}g;
+
 	    # stuff for particular files (what a shame)
-	    if ($d eq "page-flags.h") {
-		s{(#define PAGE_FLAGS_H)}{$1\n#undef private};
-		s{(#endif.*[\s\n]*)\z}{#define private linux_private\n$1};
-	    }
 	    if ($d eq "timer.h") {
 		s{enum hrtimer_restart}{int};
 	    }
 	    if ($d eq "route.h") {
-		s{\b(\w+)\s*=\s*\{(\s*\w+:.*)\}\s*;}{"$1;\n" . expand_initializer($1, $2, $f)}sge;
+		s{\b(\w+)\s*=\s*\{(\s*\w+:.*?)\}\s*;}{"$1;\n" . expand_initializer($1, $2, $f)}sge;
+	    }
+            if ($d eq "atomic.h") {
+                s{^(ATOMIC_OP.*?(?:and|or|compl))_value}{$1}mg;
+            }
+	    if ($d eq "fs.h") {
+		s{\(struct\s+(\w+)\)\s*\{(\s*\w+:.*?)\}}{"({ struct $1 __magic_struct_$1;\n" . expand_initializer("__magic_struct_$1", $2, $f) . "\n__magic_struct_$1; })"}sge;
 	    }
 	    if ($d eq "types.h") {
 		s{(typedef.*bool\s*;)}{#ifndef __cplusplus\n$1\n#endif};
@@ -359,12 +389,16 @@ sub one_includeroot ($$) {
 	    if ($d eq "sched.h") {
 		s<^(extern char ___assert_task_state)((?:.*?\n)*?.*?\;.*)$><\#ifndef __cplusplus\n$1$2\n\#endif>mg;
 	    }
+            if ($d eq "projid.h" || $d eq "uidgid.h") {
+                s{\bK([A-Z]+)T_INIT\(-1\)}{K$1T_INIT((\L$1\E_t) -1)}g;
+            }
 	    if ($d eq "kobject.h") {
 		s<(^#include[\000-\377]*)(^enum kobj_ns_type\s+\{[\000-\377]*?\}.*\n)><$2$1>mg;
 	    }
 	    if ($d eq "netdevice.h") {
 		1 while (s<(^struct net_device[ \n]*\{[\000-\377]*)^\tenum( \{[^}]*\}) (\w+)><enum net_device_$3$2;\n$1\tenum net_device_$3 $3>mg);
-	    }
+                s{\((\w+\s*\+\s*\w+)\)\s*-\s*\(void\s*\*\)(\w+\s*)->head}{((unsigned char*) $1) - $2->head}g;
+            }
             if ($d eq "aio.h") {
                 while (1) {
                     my($a) = s<^(\s*)(\S+)\s*=\s*\(struct kiocb\)\s*\{\s*(\w+):\s*(.*?),\s*><$1\($2\).$3 = $4;\n$1$2 = (struct kiocb) {>m;
@@ -397,12 +431,15 @@ sub one_includeroot ($$) {
 		s<struct\s+__raw_tickets\s+(\w+)\s*=\s*\{\s*tail:\s*(\S+?)\s*\};><struct __raw_tickets $1 = {}; $1.tail = $2;>;
 	    }
 	    if ($d eq "compiler.h" || $d eq "linkage.h") {
-		s<^#define ACCESS_ONCE\(x\) \(\*\(volatile typeof\(x\) \*\)\&\(x\)\)><#define ACCESS_ONCE(x) (*(typeof(x) * volatile)&(x))>m;
+		# s<^#define ACCESS_ONCE\(x\) \(\*\(volatile typeof\(x\) \*\)\&\(x\)\)><#define ACCESS_ONCE(x) (*(typeof(x) * volatile)&(x))>m;
 		s<^(#define\s+notrace\s+__attribute__\(\(no_instrument_function\)\))><// g++ has stricter rules about this attribute. We can't deal.\n#ifdef __cplusplus\n#define notrace\n#else\n$1\n#endif>m;
 	    }
 	    if ($d eq "sysctl.h") {
 		s<^(\s+)(proc_handler \*proc_handler;.*)$><#ifdef __cplusplus\n$1::$2\n#else\n$1$2\n#endif>m;
 	    }
+            if ($d eq "rbtree_latch.h") {
+                s{container_of\(node, (struct latch_tree_node), node\[idx\]\)}{(\{ ($1*) ((char*) node - offsetof($1, node[0]) - sizeof((($1*)0)->node[0]) * idx); \})};
+            }
 
 	    if ($d eq "fs.h" || $d eq "netfilter.h") {
 		s<enum (migrate_mode|ip_conntrack_info);><enum $1 \{$1_DUMMY\};>;
@@ -418,10 +455,14 @@ sub one_includeroot ($$) {
                 s<^#define (.*?) \\\n__typeof__\(__builtin_choose_expr\((.*?), (.*?), (.*?)\)\)(.*)><#if __cplusplus\n#define $1 typename click_conditional<($2), __typeof($3), __typeof($4)>::type$5\n#else\n#define $1 __typeof__(__builtin_choose_expr($2, $3, $4))$5\n#endif>m;
             }
             if ($d eq "cpufeature.h") {
-                s{^#include <linux/bitops.h>}{/* #include <linux/bitops.h> */}m;
+                s{^#include <linux/bitops.h>}{/* #include <linux/bitops.h> */}mg;
             }
             if ($d eq "sections.h") {
-                s{^extern(.*?) const void}{extern$1 const char}m;
+                s{^extern(.*?) const void}{extern$1 const char}mg;
+            }
+            if ($d eq "irq.h") {
+                s{enum irqchip_irq_state;}{}g;
+                s{enum irqchip_irq_state\b}{int}g;
             }
 
 	    # CLICK_CXX_PROTECTED check
