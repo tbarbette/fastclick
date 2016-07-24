@@ -35,12 +35,9 @@ public:
     void push_batch(int, PacketBatch *batch);
     #endif
 
-    // Custom method
-    void processPacket(struct fcb *fcb, Packet* packet);
-
-protected:
-
 private:
+    void processPacket(struct fcb *fcb, Packet* packet);
+    void processPacketBatch(struct fcb *fcb, PacketBatch* batch);
     void putPacketInList(struct fcb *fcb, Packet* packet);
     void sendEligiblePackets(struct fcb *fcb);
     tcp_seq_t getSequenceNumber(Packet* packet);
@@ -49,8 +46,10 @@ private:
     void flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep, struct TCPPacketListNode *toRemove);
     bool checkRetransmission(struct fcb *fcb, Packet* packet);
     tcp_seq_t getNextSequenceNumber(Packet* packet);
+    TCPPacketListNode* sortList(TCPPacketListNode *list);
 
     unsigned int flowDirection;
+    bool mergeSort;
 
     // TODO ensure perthreadness
     MemoryPool<struct TCPPacketListNode> pool;
