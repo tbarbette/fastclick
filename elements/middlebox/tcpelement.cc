@@ -93,7 +93,8 @@ const unsigned char* TCPElement::getPayloadConst(Packet* packet) const
     return (const unsigned char*)packet->transport_header() + tcph_len;
 }
 
-void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload, uint32_t length) const
+void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload,
+    uint32_t length) const
 {
     click_tcp *tcph = packet->tcp_header();
 
@@ -116,7 +117,8 @@ uint16_t TCPElement::getPayloadOffset(Packet* packet) const
 }
 
 WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
-                             uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags, uint32_t contentSize) const
+    uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags,
+    uint32_t contentSize) const
 {
     struct click_ip *ip;       // IP header
     struct click_tcp *tcp;     // TCP header

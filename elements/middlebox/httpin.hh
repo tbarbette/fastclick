@@ -22,7 +22,8 @@ public:
 protected:
     Packet* processPacket(struct fcb*, Packet*);
     void removeHeader(struct fcb *fcb, WritablePacket*, const char*);
-    void getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, char* buffer, uint32_t bufferSize);
+    void getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName,
+        char* buffer, uint32_t bufferSize);
     void setRequestParameters(struct fcb *fcb, WritablePacket *packet);
     WritablePacket* setHTTP10(struct fcb *fcb, WritablePacket *packet) CLICK_WARN_UNUSED_RESULT;
 

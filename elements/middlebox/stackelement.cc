@@ -56,7 +56,8 @@ void StackElement::push_batch(int, PacketBatch *batch)
     // direction.
     unsigned int flowDirection = determineFlowDirection();
 
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacket, &fcbArray[flowDirection], batch, [](Packet* p){})
+    struct fcb *fcb = &fcbArray[flowDirection];
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacket, fcb, batch, [](Packet* p){})
 
     if(batch != NULL)
         output_push_batch(0, batch);
@@ -71,7 +72,8 @@ PacketBatch* StackElement::pull_batch(int port, int max)
 
     PacketBatch *batch = input_pull_batch(port, max);
 
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacket, &fcbArray[flowDirection], batch, [](Packet* p){})
+    struct fcb *fcb = &fcbArray[flowDirection];
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacket, fcb, batch, [](Packet* p){})
 
 	return batch;
 }
@@ -132,16 +134,6 @@ bool StackElement::getAnnotationBit(Packet* p, int bit) const
     return (bool)value;
 }
 
-void StackElement::setAnnotationDirty(Packet* p, bool value) const
-{
-    setAnnotationBit(p, OFFSET_ANNOTATION_DIRTY, value);
-}
-
-bool StackElement::getAnnotationDirty(Packet* p) const
-{
-    return getAnnotationBit(p, OFFSET_ANNOTATION_DIRTY);
-}
-
 void StackElement::setAnnotationLastUseful(Packet *p, bool value) const
 {
     setAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL, value);
@@ -158,15 +150,6 @@ void StackElement::addStackElementInList(StackElement *element, int port)
     // alternative path
 
     previousStackElement = element;
-}
-
-void StackElement::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
-{
-    // Call the "setPacketDirty" method on every element in the stack
-    if(previousStackElement == NULL)
-        return;
-
-    previousStackElement->setPacketDirty(fcb, packet);
 }
 
 void StackElement::setInitialAck(Packet *p, uint32_t initialAck) const
@@ -188,7 +171,8 @@ void StackElement::packetSent(struct fcb *fcb, Packet* packet)
     previousStackElement->packetSent(fcb, packet);
 }
 
-void StackElement::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides)
+void StackElement::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful,
+     bool bothSides)
 {
     // Call the "closeConnection" method on every element in the stack
     if(previousStackElement == NULL)
@@ -197,7 +181,8 @@ void StackElement::closeConnection(struct fcb* fcb, WritablePacket *packet, bool
     previousStackElement->closeConnection(fcb, packet, graceful, bothSides);
 }
 
-void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position,
+    uint32_t length)
 {
     // Call the "removeBytes" method on every element in the stack
     if(previousStackElement == NULL)
@@ -206,7 +191,8 @@ void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t
     previousStackElement->removeBytes(fcb, packet, position, length);
 }
 
-WritablePacket* StackElement::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+WritablePacket* StackElement::insertBytes(struct fcb *fcb, WritablePacket* packet,
+    uint32_t position, uint32_t length)
 {
     // Call the "insertBytes" method on every element in the stack
     if(previousStackElement == NULL)

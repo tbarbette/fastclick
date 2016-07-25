@@ -171,7 +171,8 @@ void ModificationList::mergeNodes()
 
             // If the modification of this node is within the range of the
             // previous one and if they represent both a deletion, merge them
-            if(SEQ_LT(node->position, range) && prev->offset < 0 && sameSign(node->offset, prev->offset))
+            if(SEQ_LT(node->position, range)
+                && prev->offset < 0 && sameSign(node->offset, prev->offset))
             {
                 // Remove current node and merge its value with the previous node
                 prev->offset += node->offset;

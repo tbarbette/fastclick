@@ -38,7 +38,7 @@ private:
     int16_t offset;
     unsigned int flowDirection;
 
-    const uint16_t DEFAULT_MSS = 536;
+    const uint16_t DEFAULT_MSS = 536; // Minimum MSS for IPV4
 };
 
 CLICK_ENDDECLS

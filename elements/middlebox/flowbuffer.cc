@@ -23,6 +23,7 @@ FlowBuffer::~FlowBuffer()
 
     struct flowBufferEntry *current = head;
 
+    // Put back the nodes to the memory pool
     while(current != NULL)
     {
         struct flowBufferEntry* toRemove = current;
@@ -51,8 +52,10 @@ void FlowBuffer::enqueue(WritablePacket *packet)
         return;
     }
 
+    // Get memory from the pool to store a node
     struct flowBufferEntry *entry = poolEntries->getMemory();
 
+    // Add the node at the end of the list
     entry->packet = packet;
     entry->prev = tail;
     entry->next = NULL;
@@ -108,6 +111,7 @@ WritablePacket* FlowBuffer::dequeue()
         return NULL;
     }
 
+    // Remove the node from the beginning of the list
     if(head == NULL)
         return NULL;
 
@@ -123,10 +127,12 @@ WritablePacket* FlowBuffer::dequeue()
     if(head != NULL)
         head->prev = NULL;
 
+    // Put back the memory in the pool
     poolEntries->releaseMemory(toRemove);
 
     size--;
 
+    // Return the packet
     return packet;
 }
 
@@ -152,24 +158,29 @@ StackElement* FlowBuffer::getOwner()
     return owner;
 }
 
-FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char* pattern, int *feedback)
+FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char* pattern,
+    int *feedback)
 {
     const char *currentPattern = pattern;
     int nbFound = 0;
 
+    // Search until we reach the end of the buffer
     while(start != contentEnd())
     {
         currentPattern = pattern;
         FlowBufferContentIter currentContent = start;
         nbFound = 0;
 
-        while(currentContent != contentEnd() && (tolower(*currentContent) == tolower(*currentPattern)) && *currentPattern != '\0')
+        // Check if the characters in the buffer and in the pattern match (case insensitive)
+        while(currentContent != contentEnd()
+            && (tolower(*currentContent) == tolower(*currentPattern)) && *currentPattern != '\0')
         {
             ++currentPattern;
             ++currentContent;
             nbFound++;
         }
 
+        // We we reached the end of the pattern, it means that we found it
         if(*currentPattern == '\0')
         {
             *feedback = 1;
@@ -213,12 +224,15 @@ void FlowBuffer::remove(struct fcb *fcb, FlowBufferContentIter start, uint32_t l
     struct flowBufferEntry* entry = start.entry;
     WritablePacket *packet = entry->packet;
 
+    // Continue until there are still data to remove
     while(toRemove > 0)
     {
         assert(entry != NULL);
 
+        // Check how much data we have to remove in this packet
         uint32_t inThisPacket = packet->length() - offsetInPacket - owner->getContentOffset(packet);
 
+        // Update the counter of remaining data to remove
         if(inThisPacket > toRemove)
         {
             inThisPacket = toRemove;
@@ -227,8 +241,10 @@ void FlowBuffer::remove(struct fcb *fcb, FlowBufferContentIter start, uint32_t l
         else
             toRemove -= inThisPacket;
 
+        // Remove the data in this packet
         owner->removeBytes(fcb, packet, offsetInPacket, inThisPacket);
 
+        // Go to the next packet
         offsetInPacket = 0;
         entry = entry->next;
 
@@ -248,8 +264,10 @@ int FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char *
     uint32_t lenPattern = strlen(pattern);
     uint32_t lenReplacement = strlen(replacement);
 
+    // We compute the difference between the previous content and the new one
     long offset = lenReplacement - lenPattern;
 
+    // We compute how much bytes of the old content will be replaced by the new content
     uint32_t toReplace = lenPattern;
     if(toReplace > lenReplacement)
         toReplace = lenReplacement;
@@ -294,7 +312,8 @@ int FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char *
 
 
 // FlowBuffer Iterator
-FlowBufferIter::FlowBufferIter(FlowBuffer *_flowBuffer, flowBufferEntry* _entry) : flowBuffer(_flowBuffer), entry(_entry)
+FlowBufferIter::FlowBufferIter(FlowBuffer *_flowBuffer,
+    flowBufferEntry* _entry) : flowBuffer(_flowBuffer), entry(_entry)
 {
 
 }
@@ -334,7 +353,8 @@ bool FlowBufferIter::operator!=(const FlowBufferIter& other) const
 }
 
 // FlowBufferContent Iterator
-FlowBufferContentIter::FlowBufferContentIter(FlowBuffer *_flowBuffer, flowBufferEntry* _entry) : flowBuffer(_flowBuffer), entry(_entry), offsetInPacket(0)
+FlowBufferContentIter::FlowBufferContentIter(FlowBuffer *_flowBuffer,
+    flowBufferEntry* _entry) : flowBuffer(_flowBuffer), entry(_entry), offsetInPacket(0)
 {
 
 }
@@ -379,7 +399,8 @@ void FlowBufferContentIter::repair()
     if(offsetInPacket >= flowBuffer->getOwner()->getPacketContentSize(entry->packet))
     {
         // If so, we move to the next packet
-        uint16_t overflow = offsetInPacket - flowBuffer->getOwner()->getPacketContentSize(entry->packet);
+        uint16_t contentSize = flowBuffer->getOwner()->getPacketContentSize(entry->packet);
+        uint16_t overflow = offsetInPacket - contentSize;
         offsetInPacket = overflow;
         entry = entry->next;
 
@@ -401,7 +422,8 @@ FlowBufferContentIter& FlowBufferContentIter::operator++()
 
     // Check if we are at the end of the packet and must therefore switch to
     // the next one
-    if(flowBuffer->getOwner()->getContentOffset(entry->packet) + offsetInPacket >= entry->packet->length())
+    if(flowBuffer->getOwner()->getContentOffset(entry->packet) + offsetInPacket >=
+        entry->packet->length())
     {
         offsetInPacket = 0;
         entry = entry->next;

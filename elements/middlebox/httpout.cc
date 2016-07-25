@@ -25,16 +25,18 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
 
     assert(packet != NULL);
 
+    // Initialize the buffer if not already done
     if(!fcb->httpout.flowBuffer.isInitialized())
         fcb->httpout.flowBuffer.initialize(this, &poolBufferEntries);
 
+    // Check that the packet contains HTTP content
     if(!isPacketContentEmpty(packet) && fcb->httpin.contentLength > 0)
     {
         FlowBuffer &flowBuffer = fcb->httpout.flowBuffer;
         flowBuffer.enqueue(packet);
         requestMorePackets(fcb, packet);
 
-        // We have the whole content
+        // Check if we have the whole content in the buffer
         if(isLastUsefulPacket(fcb, packet))
         {
             // Compute the new Content-Length
@@ -56,6 +58,7 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
 
             click_chatter("Content-Length modified to %lu", newContentLength);
 
+            // Flush the buffer
             #if HAVE_BATCH
                 PacketBatch *headBatch = PacketBatch::make_from_packet(toPush);
 
@@ -85,7 +88,8 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
     return packet;
 }
 
-WritablePacket* HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content)
+WritablePacket* HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packet,
+    const char* headerName, const char* content)
 {
     unsigned char* source = getPayload(packet);
     unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);

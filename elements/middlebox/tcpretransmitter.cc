@@ -11,7 +11,8 @@
 #include "tcpelement.hh"
 #include "retransmissiontiming.hh"
 
-TCPRetransmitter::TCPRetransmitter() : circularPool(TCPRETRANSMITTER_BUFFER_NUMBER), getBuffer(TCPRETRANSMITTER_GET_BUFFER_SIZE, '\0')
+TCPRetransmitter::TCPRetransmitter() : circularPool(TCPRETRANSMITTER_BUFFER_NUMBER),
+    getBuffer(TCPRETRANSMITTER_GET_BUFFER_SIZE, '\0')
 {
     rawBufferPool = NULL;
 }
@@ -46,6 +47,8 @@ void TCPRetransmitter::push_packet(int port, Packet *packet)
     unsigned int oppositeFlowDirection = 1 - flowDirection;
     struct fcb* fcb = &fcbArray[flowDirection];
 
+    // Packets on the first input follow the normal path (first time transmitted)
+    // packet on the second input are retransmitted packets
     if(port == 0)
         packet = processPacketNormal(fcb, packet);
     else
@@ -66,9 +69,9 @@ void TCPRetransmitter::push_batch(int port, PacketBatch *batch)
     struct fcb* fcb = &fcbArray[flowDirection];
 
     if(port == 0)
-        EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacketNormal, &fcbArray[flowDirection], batch, [](Packet* p){})
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacketNormal, fcb, batch, [](Packet* p){})
     else
-        EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacketRetransmission, &fcbArray[flowDirection], batch, [](Packet* p){})
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE_FCB(processPacketRetransmission,fcb, batch, [](Packet* p){})
 
     if(batch != NULL)
         output_push_batch(0, batch);
@@ -147,7 +150,7 @@ Packet* TCPRetransmitter::processPacketNormal(struct fcb *fcb, Packet *packet)
         uint32_t ackToReceive = seq + contentSize;
         if(isFin(packet) || isSyn(packet))
             ackToReceive++;
-        uint32_t ackToReceiveMapped = fcb->tcp_common->maintainers[flowDirection].mapAck(seq + contentSize);
+        uint32_t ackToReceiveMapped = fcb->tcp_common->maintainers[flowDirection].mapAck(ackToReceive);
 
         if(lastAckSentSet && SEQ_LEQ(ackToReceiveMapped, lastAckSent))
         {
@@ -304,7 +307,8 @@ void TCPRetransmitter::prune(struct fcb *fcb)
     // We remove ACKed data in the buffer
     buffer->removeDataAtBeginning(maintainer.getLastAckReceived());
 
-    click_chatter("Retransmission buffer pruned! (new size: %u, ack: %u)", buffer->getSize(), maintainer.getLastAckReceived());
+    click_chatter("Retransmission buffer pruned! (new size: %u, ack: %u)", buffer->getSize(),
+        maintainer.getLastAckReceived());
 }
 
 bool TCPRetransmitter::dataToRetransmit(struct fcb *fcb)
@@ -316,6 +320,7 @@ bool TCPRetransmitter::dataToRetransmit(struct fcb *fcb)
     if(!maintainer.isLastAckSentSet() || !maintainer.isLastAckReceivedSet())
         return false;
 
+    // Check if the buffer is empty
     CircularBuffer *buffer = fcb->tcp_common->retransmissionTimings[flowDirection].getCircularBuffer();
     if(buffer == NULL)
         return false;
@@ -356,10 +361,13 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     // Reset window size
     fcb->tcp_common->maintainers[flowDirection].setCongestionWindowSize(mss);
 
-    fcb->tcp_common->retransmissionTimings[flowDirection].setLastManualTransmission(fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived());
+    fcb->tcp_common->retransmissionTimings[flowDirection].setLastManualTransmission(
+        fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived());
 
+    // Check if there are data to retransmit and do so if needed
     if(manualTransmission(fcb, true))
     {
+        // Double the RTO timer as we lost data
         fcb->tcp_common->retransmissionTimings[flowDirection].stopTimer();
         fcb->tcp_common->retransmissionTimings[flowDirection].startTimerDoubleRTO();
     }
@@ -369,8 +377,11 @@ void TCPRetransmitter::transmitMoreData(struct fcb* fcb)
 {
     unsigned int flowDirection = determineFlowDirection();
 
+    // Try to send more data waiting in the buffer
     if(manualTransmission(fcb, false))
     {
+        // Start the retransmission timer if not already done to be sure that
+        // these data will be transmitted correctly
         if(!fcb->tcp_common->retransmissionTimings[flowDirection].isTimerRunning())
             fcb->tcp_common->retransmissionTimings[flowDirection].startTimer();
     }
@@ -381,22 +392,30 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
+    // Check if the connection is closed before continuing
     if(fcb->tcp_common->closingStates[flowDirection] != TCPClosingState::OPEN)
         return false;
 
+    // Check if we already have tried to send data manually ACKed
     if(!fcb->tcp_common->retransmissionTimings[flowDirection].isManualTransmissionDone())
         return false;
 
+    // Check if there are data in the buffer
     if(!dataToRetransmit(fcb))
         return false;
 
     ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[flowDirection];
     ByteStreamMaintainer &otherMaintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
-    if(!maintainer.isLastAckSentSet() || !otherMaintainer.isLastAckSentSet() || !otherMaintainer.isLastAckReceivedSet())
+    if(!maintainer.isLastAckSentSet()
+        || !otherMaintainer.isLastAckSentSet()
+        || !otherMaintainer.isLastAckReceivedSet())
         return false;
 
     uint32_t start = 0;
 
+    // Depending on whether this is a retransmission of previously sent data
+    // or if we send new data put in the buffer waiting to be transmitted, we get the data
+    // from a different point in the buffer
     if(retransmission)
         start = otherMaintainer.getLastAckReceived();
     else
@@ -412,13 +431,19 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
 
     uint32_t sizeOfRetransmission = end - start;
 
+    // Check the maximum amount of data we can transmit according to the receiver's window
+    // and the congestion window
     sizeOfRetransmission = getMaxAmountData(fcb, sizeOfRetransmission, true);
 
+    // If nothing to transmit, abort
     if(sizeOfRetransmission == 0)
         return false;
 
-    fcb->tcp_common->retransmissionTimings[flowDirection].getCircularBuffer()->getData(start, sizeOfRetransmission, getBuffer);
+    // Otherwise, get the data from the buffer
+    fcb->tcp_common->retransmissionTimings[flowDirection].getCircularBuffer()->getData(start,
+        sizeOfRetransmission, getBuffer);
 
+    // Forge the packet with the right information
     uint32_t ack = maintainer.getLastAckSent();
     uint32_t ipSrc = maintainer.getIpSrc();
     uint32_t ipDst = maintainer.getIpDst();
@@ -426,8 +451,10 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     uint16_t portDst = maintainer.getPortDst();
     uint16_t winSize = maintainer.getWindowSize();
 
-    WritablePacket* packet = forgePacket(ipSrc, ipDst, portSrc, portDst, start, ack, winSize, TH_ACK, sizeOfRetransmission);
+    WritablePacket* packet = forgePacket(ipSrc, ipDst, portSrc, portDst, start, ack, winSize,
+        TH_ACK, sizeOfRetransmission);
 
+    // Indicate the ACK we are waiting to transmit more data from the buffer
     uint32_t ackToReceive = start + sizeOfRetransmission;
     fcb->tcp_common->retransmissionTimings[flowDirection].setLastManualTransmission(ackToReceive);
 
@@ -444,7 +471,10 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     // Signal the retransmission to avoind taking retransmitted packets
     // into account to compute the RTT
     if(retransmission)
-        fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(start + sizeOfRetransmission);
+    {
+        fcb->tcp_common->retransmissionTimings[flowDirection].signalRetransmission(
+            start + sizeOfRetransmission);
+    }
 
     // Push the packet
     #if HAVE_BATCH
@@ -464,11 +494,15 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
 
     ByteStreamMaintainer &otherMaintainer = fcb->tcp_common->maintainers[oppositeFlowDirection];
 
+    // Compute the amount of data "in flight"
     uint32_t inFlight = 0;
-    bool manualTransmissionDone = fcb->tcp_common->retransmissionTimings[flowDirection].isManualTransmissionDone();
+    bool manualTransmissionDone =
+        fcb->tcp_common->retransmissionTimings[flowDirection].isManualTransmissionDone();
     if(manualTransmissionDone)
     {
-        uint32_t lastManualTransmission = fcb->tcp_common->retransmissionTimings[flowDirection].getLastManualTransmission();
+        // Check if the data we manually transmitted before are ACKed
+        uint32_t lastManualTransmission =
+            fcb->tcp_common->retransmissionTimings[flowDirection].getLastManualTransmission();
         if(SEQ_GT(otherMaintainer.getLastAckReceived(), lastManualTransmission))
             inFlight = 0;
         else
@@ -482,11 +516,13 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
         if(canCut)
         {
             expected = cwnd - inFlight;
-            click_chatter("Transmission limited due to congestion window: %u in flight: %u, %u", cwnd, inFlight, expected);
+            click_chatter("Transmission limited due to congestion window: %u in flight: %u, %u",
+                cwnd, inFlight, expected);
         }
         else
         {
-            click_chatter("Transmission aborted due to congestion window: %u in flight : %u", cwnd, inFlight);
+            click_chatter("Transmission aborted due to congestion window: %u in flight : %u",
+                cwnd, inFlight);
             return 0;
         }
 
@@ -501,11 +537,13 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
         if(canCut)
         {
             expected = windowSize - inFlight;
-            click_chatter("Manual retransmission limited to %lu bytes by receiver's window size", expected);
+            click_chatter("Manual retransmission limited to %lu bytes by receiver's window size",
+                expected);
         }
         else
         {
-            click_chatter("Manual retransmission aborted (%u) by receiver's window size: %lu", expected, windowSize);
+            click_chatter("Manual retransmission aborted (%u) by receiver's window size: %lu",
+                expected, windowSize);
             expected = 0;
         }
     }

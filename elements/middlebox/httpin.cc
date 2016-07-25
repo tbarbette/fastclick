@@ -20,6 +20,7 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
 {
     WritablePacket *packet = p->uniqueify();
 
+    // Check that the packet contains HTTP content
     if(isPacketContentEmpty(packet))
         return packet;
 
@@ -56,10 +57,7 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
     fcb->httpin.contentSeen += currentContent;
     // Check if we have seen all the HTTP content
     if(fcb->httpin.contentSeen >= fcb->httpin.contentLength)
-    {
         setAnnotationLastUseful(packet, true);
-        click_chatter("Last HTTP packet!");
-    }
 
     return packet;
 }
@@ -68,28 +66,32 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
 void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* header)
 {
     unsigned char* source = getPayload(packet);
+
+    // Search the header name
     unsigned char* beginning = (unsigned char*)strstr((char*)source, header);
 
     if(beginning == NULL)
         return;
 
+    // Search the end of the header
     unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
     if(end == NULL)
         return;
 
+    // Compute the size of the header
     unsigned nbBytesToRemove = (end - beginning) + strlen("\r\n");
 
     uint32_t position = beginning - source;
 
+    // Remove data corresponding to the header
     removeBytes(fcb, packet, position, nbBytesToRemove);
-
-    click_chatter("Removed header: %s", header);
-    setPacketDirty(fcb, packet);
 }
 
-void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, char* buffer, uint32_t bufferSize)
+void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName,
+     char* buffer, uint32_t bufferSize)
 {
     unsigned char* source = getPayload(packet);
+    // Search the header name
     unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
 
     if(beginning == NULL)
@@ -98,8 +100,10 @@ void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const cha
         return;
     }
 
+    // Skip the colon
     beginning += strlen(headerName) + 1;
 
+    // Search the end of the header
     unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
     if(end == NULL)
     {
@@ -126,11 +130,13 @@ void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const cha
 WritablePacket* HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
 {
     unsigned char* source = getPayload(packet);
+    // Search the end of the first line
     unsigned char* endFirstLine = (unsigned char*)strstr((char*)source, "\r\n");
 
     if(endFirstLine == NULL)
         return packet;
 
+    // Search the HTTP version
     unsigned char* beginning = (unsigned char*)strstr((char*)source, "HTTP/");
 
     if(beginning == NULL || beginning > endFirstLine)
@@ -154,16 +160,19 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
 {
 
     unsigned char* source = getPayload(packet);
+    // Search the end of the first line
     unsigned char* endFirstLine = (unsigned char*)strstr((char*)source, "\r\n");
 
     if(endFirstLine == NULL)
         return;
 
+    // Search the beginning of the URL (after the first space)
     unsigned char* urlStart = (unsigned char*)strstr((char*)source, " ");
 
     if(urlStart == NULL || urlStart >= endFirstLine)
         return;
 
+    // Get the HTTP method (before the URL)
     uint16_t methodLength = urlStart - source;
     if(methodLength >= 16)
         methodLength = 15;
@@ -171,6 +180,7 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
     memcpy(fcb->httpin.method, source, methodLength);
     fcb->httpin.method[methodLength] = '\0';
 
+    // Search the end of the URL (before the second space)
     unsigned char* urlEnd = (unsigned char*)strstr((char*)(urlStart + 1), " ");
 
     if(urlEnd == NULL || urlEnd >= endFirstLine)

@@ -15,6 +15,8 @@ BufferPool::~BufferPool()
 {
     BufferPoolNode* current = head;
     BufferPoolNode* toDelete = NULL;
+
+    // Free the memory for each node
     while(current != NULL)
     {
         toDelete = current;
@@ -26,6 +28,7 @@ BufferPool::~BufferPool()
 
 void BufferPool::allocateMoreBuffers(uint32_t n)
 {
+    // Create n new BufferPoolNode and add them in the list
     for(int i = 0; i < n; ++i)
     {
         BufferPoolNode* newBuffer = new BufferPoolNode(initialSize);
@@ -43,6 +46,7 @@ void BufferPool::releaseBuffer(BufferPoolNode *buffer)
 
 BufferPoolNode* BufferPool::getBuffer()
 {
+    // If the pool is empty, create one more BufferPoolNode and return it
     if(head == NULL)
         allocateMoreBuffers(1);
 

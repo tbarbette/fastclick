@@ -43,7 +43,8 @@ private:
     tcp_seq_t getSequenceNumber(Packet* packet);
     void checkFirstPacket(struct fcb *fcb, Packet* packet);
     void flushList(struct fcb *fcb);
-    void flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep, struct TCPPacketListNode *toRemove);
+    void flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep,
+        struct TCPPacketListNode *toRemove);
     bool checkRetransmission(struct fcb *fcb, Packet* packet);
     tcp_seq_t getNextSequenceNumber(Packet* packet);
     TCPPacketListNode* sortList(TCPPacketListNode *list);

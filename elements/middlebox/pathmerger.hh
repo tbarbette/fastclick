@@ -27,12 +27,14 @@ public:
     virtual void addStackElementInList(StackElement* element, int port);
 
 protected:
-    virtual void setPacketDirty(struct fcb *fcb, WritablePacket* packet);
-    virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
-    virtual WritablePacket* insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length) CLICK_WARN_UNUSED_RESULT;
+    virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position,
+         uint32_t length);
+    virtual WritablePacket* insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position,
+         uint32_t length) CLICK_WARN_UNUSED_RESULT;
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet, bool force = false);
     virtual void packetSent(struct fcb *fcb, Packet* packet);
-    virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
+    virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful,
+        bool bothSides);
     virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
     virtual unsigned int determineFlowDirection();
 

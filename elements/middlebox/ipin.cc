@@ -21,8 +21,6 @@ Packet* IPIn::processPacket(struct fcb*, Packet* p)
 {
     WritablePacket* packet = p->uniqueify();
 
-    setAnnotationDirty(packet, false);
-
     // Compute the offset of the IP payload
     const click_ip *iph = packet->ip_header();
     unsigned iph_len = iph->ip_hl << 2;
@@ -30,16 +28,6 @@ Packet* IPIn::processPacket(struct fcb*, Packet* p)
     setContentOffset(packet, offset);
 
     return packet;
-}
-
-void IPIn::setPacketDirty(struct fcb *fcb, WritablePacket* p)
-{
-    // Annotate the packet to indicate it has been modified
-    // While going through "out elements", the checksum will be recomputed
-    setAnnotationDirty(p, true);
-
-    // Continue in the stack function
-    StackElement::setPacketDirty(fcb, p);
 }
 
 CLICK_ENDDECLS

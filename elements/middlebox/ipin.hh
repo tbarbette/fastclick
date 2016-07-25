@@ -20,7 +20,6 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
-    void setPacketDirty(struct fcb*, WritablePacket*);
 };
 
 CLICK_ENDDECLS

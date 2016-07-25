@@ -39,11 +39,12 @@ public:
 protected:
     virtual Packet* processPacket(struct fcb*, Packet*);
 
-    virtual void setPacketDirty(struct fcb*, WritablePacket*);
     virtual void removeBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t);
-    virtual WritablePacket* insertBytes(struct fcb*, WritablePacket*, uint32_t, uint32_t) CLICK_WARN_UNUSED_RESULT;
+    virtual WritablePacket* insertBytes(struct fcb*, WritablePacket*, uint32_t,
+         uint32_t) CLICK_WARN_UNUSED_RESULT;
     virtual void requestMorePackets(struct fcb *fcb, Packet *packet, bool force = false);
-    virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides);
+    virtual void closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful,
+         bool bothSides);
     virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
     // This method process the stack function until an element is able to

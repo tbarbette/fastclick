@@ -44,7 +44,8 @@ void TCPReorder::flushList(struct fcb *fcb)
     flushListFrom(fcb, NULL, head);
 }
 
-void TCPReorder::flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep, struct TCPPacketListNode *toRemove)
+void TCPReorder::flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep,
+    struct TCPPacketListNode *toRemove)
 {
     // toKeep will be the last packet in the list
     if(toKeep != NULL)
@@ -118,7 +119,7 @@ void TCPReorder::processPacketBatch(struct fcb *fcb, PacketBatch* batch)
         if(!checkRetransmission(fcb, packet))
             continue;
 
-        // Add the packet at the beginning of the list (O(1))
+        // Add the packet at the beginning of the list unsorted (O(1))
         struct TCPPacketListNode* toAdd = fcb->tcpreorder.pool->getMemory();
 
         toAdd->packet = packet;
@@ -134,6 +135,9 @@ void TCPReorder::processPacketBatch(struct fcb *fcb, PacketBatch* batch)
 
 bool TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
 {
+    // If we receive a packet with a sequence number lower than the expected one
+    // (taking into account the wrapping sequence numbers), we consider to have a
+    // retransmission
     if(SEQ_LT(getSequenceNumber(packet), fcb->tcpreorder.expectedPacketSeq))
     {
         if(noutputs() == 2)
@@ -239,8 +243,10 @@ tcp_seq_t TCPReorder::getNextSequenceNumber(Packet* packet)
 {
     tcp_seq_t currentSeq = getSequenceNumber(packet);
 
+    // Compute the size of the current payload
     tcp_seq_t nextSeq = currentSeq + getPayloadLength(packet);
 
+    // FIN and SYN packets count for one in the sequence number
     if(isFin(packet) || isSyn(packet))
         nextSeq++;
 
@@ -255,8 +261,10 @@ void TCPReorder::putPacketInList(struct fcb* fcb, Packet* packet)
     toAdd->packet = packet;
     toAdd->next = NULL;
 
-    // Browse the list until we find a packet with a greater sequence number than the packet to add in the list
-    while(packetNode != NULL && (SEQ_LT(getSequenceNumber(packetNode->packet), getSequenceNumber(packet))))
+    // Browse the list until we find a packet with a greater sequence number than the
+    // packet to add in the list
+    while(packetNode != NULL
+        && (SEQ_LT(getSequenceNumber(packetNode->packet), getSequenceNumber(packet))))
     {
         prevNode = packetNode;
         packetNode = packetNode->next;
@@ -268,7 +276,8 @@ void TCPReorder::putPacketInList(struct fcb* fcb, Packet* packet)
     else
         prevNode->next = toAdd; // If not, the previous node in the list now points to the node to add
 
-    toAdd->next = packetNode; // The node to add points to the first node with a greater sequence number
+     // The node to add points to the first node with a greater sequence number
+    toAdd->next = packetNode;
 }
 
 void TCPReorder::checkFirstPacket(struct fcb* fcb, Packet* packet)
@@ -281,7 +290,8 @@ void TCPReorder::checkFirstPacket(struct fcb* fcb, Packet* packet)
     {
         // Update the expected sequence number
         fcb->tcpreorder.expectedPacketSeq = getSequenceNumber(packet);
-        click_chatter("First packet received (%u) for flow %u", fcb->tcpreorder.expectedPacketSeq, flowDirection);
+        click_chatter("First packet received (%u) for flow %u", fcb->tcpreorder.expectedPacketSeq,
+            flowDirection);
 
         // Ensure that the list of waiting packets is free
         // (SYN should always be the first packet)
@@ -329,7 +339,7 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
 
     insize = 1;
 
-    while(1)
+    while(true)
     {
         p = list;
         list = NULL;
@@ -355,33 +365,41 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
             qsize = insize;
 
             /* now we have two lists; merge them */
-            while (psize > 0 || (qsize > 0 && q))
+            while(psize > 0 || (qsize > 0 && q))
             {
                 /* decide whether next element of merge comes from p or q */
-                if (psize == 0)
+                if(psize == 0)
                 {
                     /* p is empty; e must come from q. */
-                    e = q; q = q->next; qsize--;
+                    e = q;
+                    q = q->next;
+                    qsize--;
                 }
                 else if(qsize == 0 || !q)
                 {
                     /* q is empty; e must come from p. */
-                    e = p; p = p->next; psize--;
+                    e = p;
+                    p = p->next;
+                    psize--;
                 }
                 else if(SEQ_LT(getSequenceNumber(p->packet), getSequenceNumber(q->packet)))
                 {
                     /* First element of p is lower (or same);
                      * e must come from p. */
-                    e = p; p = p->next; psize--;
+                    e = p;
+                    p = p->next;
+                    psize--;
                 }
                 else
                 {
                     /* First element of q is lower; e must come from q. */
-                    e = q; q = q->next; qsize--;
+                    e = q;
+                    q = q->next;
+                    qsize--;
                 }
 
                 /* add the next element to the merged list */
-                if (tail)
+                if(tail)
                     tail->next = e;
                 else
                     list = e;
@@ -396,7 +414,7 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
         tail->next = NULL;
 
         /* If we have done only one merge, we're finished. */
-        if (nmerges <= 1)   /* allow for nmerges==0, the empty list case */
+        if(nmerges <= 1)   /* allow for nmerges==0, the empty list case */
             return list;
 
         /* Otherwise repeat, merging lists twice the size */

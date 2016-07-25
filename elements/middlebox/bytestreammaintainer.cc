@@ -23,9 +23,9 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     lastAckSentSet = false;
     lastSeqSentSet = false;
     lastAckReceivedSet = false;
-    mss = 536;
+    mss = 536; // Minimum IPV4 MSS
     congestionWindow = mss;
-    ssthresh = 65535;
+    ssthresh = 65535; // RFC 2001
     dupAcks = 0;
 }
 
@@ -59,6 +59,7 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 
     uint32_t positionSeek = position;
 
+    // Find the element with the greatest key that is below or equal to the given position
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &positionSeek);
     rb_red_blk_node* pred = treeAck->nil;
     rb_red_blk_node* succ = treeAck->nil;
@@ -66,15 +67,17 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
     int nodeInfo = 0;
     uint32_t newPosition = position;
 
+    // If no node was found, no mapping to perform
     if(node == treeAck->nil)
         return position;
 
-    // Compute the new position
+    // Compute the new position if a node has been found
     nodeKey = *((uint32_t*)node->key);
     nodeInfo = *((int*)node->info);
 
     newPosition += nodeInfo;
 
+    // Search the predecessor and the successor of the node
     pred = TreePredecessor(treeAck, node);
     succ = TreeSuccessor(treeAck, node);
 
@@ -86,8 +89,9 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
         predOffset = *((int*)pred->info);
     }
 
+    // We check that the value we computed is not below the greatest value we could have
+    // obtained via the predecessor
     uint32_t predBound = nodeKey + predOffset;
-
     if(SEQ_LT(newPosition, predBound))
         newPosition = predBound;
 
@@ -98,6 +102,8 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
         uint32_t succPosition = *((uint32_t*)succ->key);
         int succOffset = *((int*)succ->info);
 
+        // This checking only applies if the offset of the successor is positive
+        // as a negative offset would give a value lower than the value of the successor key
         if(succOffset > 0)
         {
             uint32_t succBound = 0;
@@ -120,12 +126,30 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
         return 0;
     }
 
+    // We do not search the requested position but the position just before it
+    // as we do not want to take into account the modifications done at the position itself
+    // but the modifications before it for the mapping of the sequence number.
+    // For instance, if we send a packet with a sequence number equals to 1, containing
+    // a b c d e
+    // and then we add "y y y" at the beginning of the next packet (sequence number equals
+    // to 6) containing
+    // f g h i j
+    // we thus send the packet "y y y f g h i j" and we add to the seq tree the modification
+    // 6: 3
+    // If we receive a retransmission for the second packet because it was lost, we will map
+    // its sequence number (6) and thus have a mapped sequence number equals to 9 (6 + 3).
+    // We will therefore not retransmit the added data and the destination will see a gap
+    // (it will receive a packet with a sequence number equals to 9 instead of 6).
+    // This does not occur if we search the position just before the given one (therefore 5 instead
+    // of 6), we will not take into account the modification in the packet itself.
     uint32_t positionSeek = position - 1;
 
+    // Find the element with the greatest key that is below or equal to the given position
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeSeq, &positionSeek);
     rb_red_blk_node* pred = treeSeq->nil;
     uint32_t newPosition = position;
 
+    // If no node was found, no mapping to perform
     if(node == treeSeq->nil)
         return position;
 
@@ -135,6 +159,7 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
 
     newPosition += nodeInfo;
 
+    // Search the predecessor of the node
     pred = TreePredecessor(treeSeq, node);
 
     int predOffset = 0;
@@ -145,8 +170,9 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
         predOffset = *((int*)pred->info);
     }
 
+    // We check that the value we computed is not below the greatest value we could have
+    // obtained via the predecessor
     uint32_t predBound = nodeKey + predOffset;
-
     if(SEQ_LT(newPosition, predBound))
         newPosition = predBound;
 
@@ -172,11 +198,10 @@ void ByteStreamMaintainer::prune(uint32_t position)
 
     pruneCounter++;
 
-    // Avoid pruning at every ack
+    // We only prune the trees every time we receive BS_PRUNE_THRESHOLD acks
     if(pruneCounter < BS_PRUNE_THRESHOLD)
         return;
 
-    click_chatter("Tree pruned");
     pruneCounter = 0;
 
     // Remove every element in the tree with a key < position
@@ -184,13 +209,15 @@ void ByteStreamMaintainer::prune(uint32_t position)
 
     // Map the value to have a valid seq number
     uint32_t positionSeq = mapAck(position);
+    // Remove every element in the tree with a key < position
     RBPrune(treeSeq, &positionSeq);
 
 }
 
 void ByteStreamMaintainer::setLastAckSent(uint32_t ackNumber)
 {
-    // TODO comment
+    // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
+    // 0) for it and check that the given one is greater as we could have false negatives
     if(!lastAckSentSet || SEQ_GT(ackNumber, lastAckSent))
         lastAckSent = ackNumber;
 
@@ -207,7 +234,8 @@ uint32_t ByteStreamMaintainer::getLastAckSent()
 
 void ByteStreamMaintainer::setLastSeqSent(uint32_t seqNumber)
 {
-    // TODO comment
+    // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
+    // 0) for it and check that the given one is greater as we could have false negatives
     if(!lastSeqSentSet || SEQ_GT(seqNumber, lastSeqSent))
         lastSeqSent = seqNumber;
 
@@ -260,7 +288,8 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
 
 void ByteStreamMaintainer::setLastAckReceived(uint32_t ackNumber)
 {
-    // TODO comment
+    // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
+    // 0) for it and check that the given one is greater as we could have false negatives
     if(!lastAckReceivedSet || SEQ_GT(ackNumber, lastAckReceived))
         lastAckReceived = ackNumber;
 
@@ -402,8 +431,7 @@ void ByteStreamMaintainer::setSsthresh(uint64_t ssthresh)
 
 int ByteStreamMaintainer::lastOffsetInAckTree()
 {
-    // Return the offset with the greatest key in the ack tree
-    // or 0 if the tree is empty
+    // Return the offset with the greatest key in the ack tree or 0 if the tree is empty
     rb_red_blk_node* current = RBMax(treeAck);
 
     if(current == treeAck->nil)

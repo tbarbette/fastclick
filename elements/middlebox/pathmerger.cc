@@ -83,14 +83,6 @@ StackElement* PathMerger::getElementForPacket(struct fcb* fcb, Packet* packet)
     return previousElem;
 }
 
-void PathMerger::setPacketDirty(struct fcb *fcb, WritablePacket* packet)
-{
-    StackElement *previousElem = getElementForPacket(fcb, packet);
-
-    if(previousElem != NULL)
-        previousElem->setPacketDirty(fcb, packet);
-}
-
 bool PathMerger::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);
@@ -101,7 +93,8 @@ bool PathMerger::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
         return false;
 }
 
-void PathMerger::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void PathMerger::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position,
+    uint32_t length)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);
 
@@ -109,7 +102,8 @@ void PathMerger::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t p
         previousElem->removeBytes(fcb, packet, position, length);
 }
 
-WritablePacket* PathMerger::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+WritablePacket* PathMerger::insertBytes(struct fcb *fcb, WritablePacket* packet,
+    uint32_t position, uint32_t length)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);
 
@@ -144,7 +138,8 @@ unsigned int PathMerger::determineFlowDirection()
     return previousStackElements[0]->determineFlowDirection();
 }
 
-void PathMerger::closeConnection(struct fcb *fcb, WritablePacket* packet, bool graceful, bool bothSides)
+void PathMerger::closeConnection(struct fcb *fcb, WritablePacket* packet, bool graceful,
+    bool bothSides)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);
 

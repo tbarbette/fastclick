@@ -54,7 +54,6 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
 
     if(prevSeq != newSeq)
     {
-        click_chatter("Sequence number %u modified to %u in flow %u", prevSeq, newSeq, flowDirection);
         setSequenceNumber(packet, newSeq);
         seqModified = true;
     }
@@ -81,66 +80,64 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
             ackModified = true;
     }
 
-    // Check if the packet has been modified
-    if(getAnnotationDirty(packet) || seqModified || ackModified)
+    // Check the length to see if bytes were added or removed
+    uint16_t initialLength = packetTotalLength(packet);
+    uint16_t currentLength = (uint16_t)packet->length() - getIPHeaderOffset(packet);
+    int offsetModification = -(initialLength - currentLength);
+    uint32_t prevPayloadSize = getPayloadLength(packet);
+
+    // Update the "total length" field in the IP header (required to compute the
+    // tcp checksum as it is in the pseudo header)
+    setPacketTotalLength(packet, initialLength + offsetModification);
+
+    // Check if the modificationlist has to be committed
+    if(hasModificationList)
     {
-        // Check the length to see if bytes were added or removed
-        uint16_t initialLength = packetTotalLength(packet);
-        uint16_t currentLength = (uint16_t)packet->length() - getIPHeaderOffset(packet);
-        int offsetModification = -(initialLength - currentLength);
-        uint32_t prevPayloadSize = getPayloadLength(packet);
+        // We know that the packet has been modified and its size has changed
+        modList->commit(fcb->tcp_common->maintainers[getFlowDirection()]);
 
-        // Update the "total length" field in the IP header (required to compute the tcp checksum as it is in the pseudo header)
-        setPacketTotalLength(packet, initialLength + offsetModification);
-
-        // Check if the modificationlist has to be committed
-        if(hasModificationList)
+        // Check if the full packet content has been removed
+        if(getPayloadLength(packet) == 0)
         {
-            // We know that the packet has been modified and its size has changed
-            modList->commit(fcb->tcp_common->maintainers[getFlowDirection()]);
+            uint32_t saddr = getDestinationAddress(packet);
+            uint32_t daddr = getSourceAddress(packet);
+            uint16_t sport = getDestinationPort(packet);
+            uint16_t dport = getSourcePort(packet);
+            // The SEQ value is the initial ACK value in the packet sent
+            // by the source.
+            tcp_seq_t seq = getInitialAck(packet);
 
-            // Check if the full packet content has been removed
-            if(getPayloadLength(packet) == 0)
+            // The ACK is the sequence number sent by the source
+            // to which we add the old size of the payload to acknowledge it
+            tcp_seq_t ack = prevSeq + prevPayloadSize;
+
+            if(isFin(packet) || isSyn(packet))
+                ack++;
+
+            // Craft and send the ack
+            sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+                sport, dport, seq, ack);
+
+            // Even if the packet is empty it can still contain relevant
+            // information (significant ACK value or another flag)
+            if(isJustAnAck(packet))
             {
-                uint32_t saddr = getDestinationAddress(packet);
-                uint32_t daddr = getSourceAddress(packet);
-                uint16_t sport = getDestinationPort(packet);
-                uint16_t dport = getSourcePort(packet);
-                // The SEQ value is the initial ACK value in the packet sent
-                // by the source.
-                tcp_seq_t seq = getInitialAck(packet);
-
-                // The ACK is the sequence number sent by the source
-                // to which we add the old size of the payload to acknowledge it
-                tcp_seq_t ack = prevSeq + prevPayloadSize;
-
-                if(isFin(packet) || isSyn(packet))
-                    ack++;
-
-                // Craft and send the ack
-                sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr, sport, dport, seq, ack);
-
-                // Even if the packet is empty it can still contain relevant
-                // information (significant ACK value or another flag)
-                if(isJustAnAck(packet))
+                // Check if the ACK of the packet was significant or not
+                if(prevLastAckSet && SEQ_LEQ(prevAck, prevLastAck))
                 {
-                    // Check if the ACK of the packet was significant or not
-                    if(prevLastAckSet && SEQ_LEQ(prevAck, prevLastAck))
-                    {
-                        // If this is not the case, drop the packet as it
-                        // does not contain any relevant information
-                        // (And anyway it would be considered as a duplicate ACK)
-                        click_chatter("Empty packet dropped");
-                        packet->kill();
-                        return NULL;
-                    }
+                    // If this is not the case, drop the packet as it
+                    // does not contain any relevant information
+                    // (And anyway it would be considered as a duplicate ACK)
+                    click_chatter("Empty packet dropped");
+                    packet->kill();
+                    return NULL;
                 }
             }
         }
-
-        // Recompute the checksum
-        computeTCPChecksum(packet);
     }
+
+    // Recompute the checksum
+    computeTCPChecksum(packet);
 
     // Notify the stack function that this packet has been sent
     packetSent(fcb, packet);
@@ -148,7 +145,8 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     return packet;
 }
 
-void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force)
+void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
+    uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force)
 {
     if(noutputs() < 2)
     {
@@ -185,7 +183,8 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     #endif
 }
 
-void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
+void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
+    uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
 {
     if(noutputs() < 2)
     {
@@ -234,17 +233,21 @@ void TCPOut::setInElement(TCPIn* inElement)
 
 bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
 {
-    if(fcb->tcp_common->closingStates[getFlowDirection()] == TCPClosingState::OPEN)
+    TCPClosingState::Value closingState = fcb->tcp_common->closingStates[getFlowDirection()];
+
+    // If the connection is open, we do nothing
+    if(closingState == TCPClosingState::OPEN)
         return true;
 
-    if(fcb->tcp_common->closingStates[getFlowDirection()] == TCPClosingState::BEING_CLOSED_GRACEFUL)
+    // If the connection is being closed and we received the last packet, close it completely
+    if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL)
     {
         if(isFin(packet))
             fcb->tcp_common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_GRACEFUL;
 
         return true;
     }
-    else if(fcb->tcp_common->closingStates[getFlowDirection()] == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
+    else if(closingState == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
     {
         if(isRst(packet))
             fcb->tcp_common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_UNGRACEFUL;
@@ -252,7 +255,7 @@ bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
         return true;
     }
 
-    // Otherwise, the connection is closed
+    // Otherwise, the connection is closed and we will not transmit any further packet
     return false;
 }
 

@@ -27,6 +27,8 @@ uint32_t BufferPoolNode::getSize() const
 
 void BufferPoolNode::resize(uint32_t newSize)
 {
+    // Resize the vector to have the requested size and set the value of the potential new elements
+    // to 0
     buffer.resize(newSize, '\0');
 }
 

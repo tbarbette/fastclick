@@ -25,7 +25,7 @@ Packet* IPOut::processPacket(struct fcb*, Packet* p)
 
     WritablePacket *packet = p->uniqueify();
 
-    /*
+
     // Test to check retransmission
     counter++;
     if(counter == 5 && flowDirection == 1)
@@ -33,10 +33,9 @@ Packet* IPOut::processPacket(struct fcb*, Packet* p)
         packet->kill();
         return NULL;
     }
-    */
-    // Recompute the IP checksum if the packet has been modified
-    if(getAnnotationDirty(packet))
-        computeIPChecksum(packet);
+    
+    // Recompute the IP checksum
+    computeIPChecksum(packet);
 
     return packet;
 }

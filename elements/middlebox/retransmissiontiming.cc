@@ -63,7 +63,8 @@ void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransm
     timerThread.assign(RetransmissionTiming::timerThreadFired, (void*)&timerData);
 }
 
-void RetransmissionTiming::setCircularBuffer(CircularBuffer *buffer, MemoryPool<CircularBuffer> *bufferPool)
+void RetransmissionTiming::setCircularBuffer(CircularBuffer *buffer,
+    MemoryPool<CircularBuffer> *bufferPool)
 {
     this->buffer = buffer;
     this->bufferPool = bufferPool;
@@ -81,11 +82,13 @@ bool RetransmissionTiming::isTimerInitialized()
 
 bool RetransmissionTiming::startRTTMeasure(uint32_t seq)
 {
+    // We ensure that we are not already performing a measure at the moment
     if(measureInProgress)
         return false;
 
     measureInProgress = true;
     rttSeq = seq;
+    // Save the current time to be able to compute the RTT when we receive the corresponding ACK
     measureStartTime.assign_now();
 
     return true;
@@ -283,14 +286,16 @@ void RetransmissionTiming::checkRTOMinValue()
 void RetransmissionTiming::timerRetransmitFired(Timer *timer, void *data)
 {
     struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
-    TCPRetransmitter *retransmitter = (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
+    TCPRetransmitter *retransmitter =
+        (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
     retransmitter->retransmissionTimerFired(fcb);
 }
 
 void RetransmissionTiming::timerThreadFired(Timer *timer, void *data)
 {
     struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
-    TCPRetransmitter *retransmitter = (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
+    TCPRetransmitter *retransmitter =
+        (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
     retransmitter->transmitMoreData(fcb);
 }
 

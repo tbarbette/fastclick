@@ -8,6 +8,7 @@ CLICK_DECLS
 CircularBuffer::CircularBuffer(BufferPool* bufferPool)
 {
     this->bufferPool = bufferPool;
+    // Obtain a buffer node from the memory pool to have memory for this circular buffer
     this->bufferNode = bufferPool->getBuffer();
     bufferStart = 0;
     bufferEnd = 0;
@@ -19,7 +20,7 @@ CircularBuffer::CircularBuffer(BufferPool* bufferPool)
 
 CircularBuffer::~CircularBuffer()
 {
-    // Put the buffer node into its memory pool
+    // Put back the buffer node into its memory pool. We got this memory in the constructor
     bufferPool->releaseBuffer(bufferNode);
 }
 
@@ -100,9 +101,17 @@ void CircularBuffer::addDataAtEnd(const unsigned char* data, uint32_t length)
 
     bufferEnd += length;
 
+    // Check if the end pointer needs to wrap
     if(bufferEnd >= getCapacity())
         bufferEnd = bufferEnd - getCapacity();
 
+    // There are two cases possible when we add the data in the circular buffer.
+    // Either all the data fit between the start pointer and the end of the array used for the
+    // buffer and no wrap is needed.
+    // Or the end of the data must be added at the beginning of the array because we have a wrap.
+    // E.g. we have an array of size 10, the start pointer is set to 6 and the end pointer is set
+    // to 3. We want to add 6 bytes in the buffer. We will add the first 4 bytes in the array
+    // at the positions [6, 9] and the last two bytes at the positions [0, 1] of the array.
     uint32_t firstEnd = addPosition + length;
     uint32_t remainToAdd = 0;
     uint32_t firstAddLength = length;
@@ -116,7 +125,7 @@ void CircularBuffer::addDataAtEnd(const unsigned char* data, uint32_t length)
     memcpy(&buffer[addPosition], data, firstAddLength);
 
     // Check if there is still data to add at the beginning of the buffer
-    // because it circled
+    // because it wrapped
     if(remainToAdd > 0)
         memcpy(&buffer[0], &data[firstAddLength], remainToAdd);
 
@@ -142,14 +151,17 @@ bool CircularBuffer::isBlank()
 
 void CircularBuffer::getData(uint32_t start, uint32_t length, Vector<unsigned char> &getBuffer)
 {
+    // Check that the data are in the buffer
     if(SEQ_LT(start, getStartOffset()) || start - getStartOffset() > getSize())
     {
         click_chatter("Error: TCPRetransmission: data not in the buffer.");
         return;
     }
 
+    // Check if we requested data
     if(length == 0)
     {
+        // If no data requested, set the "get buffer" to have a size of 0
         getBuffer.resize(0);
         return;
     }
@@ -164,7 +176,7 @@ void CircularBuffer::getData(uint32_t start, uint32_t length, Vector<unsigned ch
     // Ensure that the "get buffer" has the right size to contain the data
     getBuffer.resize(length);
 
-    // Get the first part of the data (at the end of the buffer)
+    // Get the first part of the data (at the end of the array)
     uint32_t firstLength = length;
     uint32_t secondLength = 0;
     if(start + firstLength >= getCapacity())
@@ -176,7 +188,7 @@ void CircularBuffer::getData(uint32_t start, uint32_t length, Vector<unsigned ch
 
     memcpy(&getBuffer[0], &buffer[start], firstLength);
 
-    // Potentially get the rest of the data (at the beginning of the buffer)
+    // Potentially get the rest of the data (at the beginning of the array)
     if(secondLength > 0)
         memcpy(&getBuffer[firstLength], &buffer[0], secondLength);
 }

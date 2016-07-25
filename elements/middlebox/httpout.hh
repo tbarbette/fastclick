@@ -26,7 +26,8 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
-    WritablePacket* setHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName, const char* content) CLICK_WARN_UNUSED_RESULT;
+    WritablePacket* setHeaderContent(struct fcb *fcb, WritablePacket* packet,
+        const char* headerName, const char* content) CLICK_WARN_UNUSED_RESULT;
 
     // TODO ensure perthreadness
     MemoryPool<struct flowBufferEntry> poolBufferEntries;
