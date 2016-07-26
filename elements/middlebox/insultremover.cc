@@ -16,6 +16,10 @@ InsultRemover::InsultRemover() : poolBufferEntries(POOL_BUFFER_ENTRIES_SIZE)
 
 int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    // Build the list of "insults"
+    insults.push_back("and");
+    insults.push_back("astronomical");
+
     return 0;
 }
 
@@ -35,13 +39,12 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
 
     bool needMorePackets = false;
 
-    int result = removeInsult(fcb, "and");
-    if(result == 0)
-        needMorePackets = true;
-
-    result = removeInsult(fcb, "astronomical");
-    if(result == 0)
-        needMorePackets = true;
+    for(int i = 0; i < insults.size(); ++i)
+    {
+        int result = removeInsult(fcb, insults.at(i));
+        if(result == 0)
+            needMorePackets = true;
+    }
 
     // If the beginning of an insult could be found at the end of a packet
     // we keep it in the buffer. Otherwise, we flush the buffer as we know
@@ -71,46 +74,6 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     }
 
     return NULL;
-
-    /*
-
-    unsigned char *source = getPacketContent(packet);
-    uint32_t contentOffset = getContentOffset(packet);
-    unsigned char* firstOccur = NULL;
-
-    static int nbPackets = 0;
-
-    nbPackets++;
-
-    if(nbPackets < 15)
-        requestMorePackets(fcb, packet);
-    */
-    /*
-    if(nbPackets == 10)
-        closeConnection(fcb, packet, false, true);
-    */
-    /*
-    packet = insertBytes(fcb, packet, 0, 6);
-
-    source[0] = 'H';
-    source[1] = 'E';
-    source[2] = 'L';
-    source[3] = 'L';
-    source[4] = 'O';
-    source[5] = ' ';
-
-    source = getPacketContent(packet);
-    firstOccur = source;
-    while(firstOccur != NULL)
-    {
-        firstOccur = (unsigned char*)strstr((char*)firstOccur, "and");
-        if(firstOccur != NULL)
-        {
-            uint32_t position = firstOccur - source;
-            removeBytes(fcb, packet, position, 3);
-        }
-    }
-    */
 }
 
 int InsultRemover::removeInsult(struct fcb* fcb, const char *insult)

@@ -1,6 +1,7 @@
 #ifndef MIDDLEBOX_INSULTREM_HH
 #define MIDDLEBOX_INSULTREM_HH
 #include <click/element.hh>
+#include <click/vector.hh>
 #include "stackelement.hh"
 #include "flowbuffer.hh"
 #include "flowbufferentry.hh"
@@ -27,6 +28,8 @@ protected:
     // Will be associated to the thread managing this direction of the flow as an InsultRemover
     // element is responsible for a direction of the flow and thus used by only one thread
     MemoryPool<struct flowBufferEntry> poolBufferEntries;
+
+    Vector<const char*> insults;
 };
 
 CLICK_ENDDECLS
