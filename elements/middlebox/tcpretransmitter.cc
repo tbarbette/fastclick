@@ -233,7 +233,6 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
         // If we receive data already ACKed, we must drop them and make the other side
         // resend the last ACK, because it means that the ACK was lost.
         // (We send an ACK and we receive retransmission nevertheless)
-        click_chatter("The source is trying to retransmit ACKed data, resending an ACK.");
 
         // Resend the ACK for this packet
         setInitialAck(packet, getAckNumber(packet));
@@ -258,13 +257,10 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
     uint32_t sizeOfRetransmission = mappedSeqEnd - mappedSeq;
     if(sizeOfRetransmission <= 0)
     {
-        click_chatter("Nothing to retransmit for packet with sequence %u", seq);
         packet->kill();
         fcb->tcp_common->lock.release();
         return NULL;
     }
-
-    click_chatter("Retransmitting %u bytes", sizeOfRetransmission);
 
     // Get the data from the buffer
     manager.getCircularBuffer()->getData(mappedSeq, sizeOfRetransmission, getBuffer);
@@ -329,9 +325,6 @@ void TCPRetransmitter::prune(struct fcb *fcb)
     // We remove ACKed data in the buffer
     buffer->removeDataAtBeginning(maintainer.getLastAckReceived());
 
-    click_chatter("Retransmission buffer pruned! (new size: %u, ack: %u)", buffer->getSize(),
-        maintainer.getLastAckReceived());
-
     fcb->tcp_common->lock.release();
 }
 
@@ -386,7 +379,6 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
     fcb->tcp_common->lock.acquire();
-    click_chatter("Timer fired");
 
     // Sender segment size
     uint16_t mss = fcb->tcp_common->maintainers[oppositeFlowDirection].getMSS();
@@ -486,8 +478,6 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
         return false;
     }
 
-    click_chatter("There are data to transmit");
-
     uint32_t sizeOfRetransmission = end - start;
 
     // Check the maximum amount of data we can transmit according to the receiver's window
@@ -525,7 +515,6 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     // Copy the content of the buffer to the payload area
     setPayload(packet, &getBuffer[0], sizeOfRetransmission);
 
-    click_chatter("Transmitting manually %u bytes.", sizeOfRetransmission);
     // Compute the checksums
     computeTCPChecksum(packet);
     computeIPChecksum(packet);
@@ -580,16 +569,9 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
     if(inFlight + expected > cwnd)
     {
         if(canCut)
-        {
             expected = cwnd - inFlight;
-            click_chatter("Transmission limited due to congestion window: %u in flight: %u, %u",
-                cwnd, inFlight, expected);
-        }
         else
         {
-            click_chatter("Transmission aborted due to congestion window: %u in flight : %u",
-                cwnd, inFlight);
-
             fcb->tcp_common->lock.release();
             return 0;
         }
@@ -603,17 +585,9 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
     if(inFlight + expected > windowSize)
     {
         if(canCut)
-        {
             expected = windowSize - inFlight;
-            click_chatter("Manual retransmission limited to %lu bytes by receiver's window size",
-                expected);
-        }
         else
-        {
-            click_chatter("Manual retransmission aborted (%u) by receiver's window size: %lu",
-                expected, windowSize);
             expected = 0;
-        }
     }
 
     fcb->tcp_common->lock.release();
@@ -666,3 +640,4 @@ ELEMENT_REQUIRES(BufferPoolNode)
 ELEMENT_REQUIRES(TCPElement)
 ELEMENT_REQUIRES(RetransmissionTiming)
 EXPORT_ELEMENT(TCPRetransmitter)
+ELEMENT_MT_SAFE(TCPRetransmitter)

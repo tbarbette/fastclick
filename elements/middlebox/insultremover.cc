@@ -52,7 +52,6 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
         requestMorePackets(fcb, packet);
     else
     {
-        click_chatter("Flushing");
         // Otherwise, we flush the buffer
         #if HAVE_BATCH
             PacketBatch *batch = NULL;
@@ -130,4 +129,4 @@ int InsultRemover::removeInsult(struct fcb* fcb, const char *insult)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(InsultRemover)
-//ELEMENT_MT_SAFE(InsultRemover)
+ELEMENT_MT_SAFE(InsultRemover)

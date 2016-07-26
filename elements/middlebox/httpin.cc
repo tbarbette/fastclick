@@ -38,9 +38,6 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
         char buffer[250];
         getHeaderContent(fcb, packet, "Content-Length", buffer, 250);
         fcb->httpin.contentLength = (uint64_t)atol(buffer);
-
-        if(fcb->httpin.contentLength > 0)
-            click_chatter("Content-Length: %lu", fcb->httpin.contentLength);
     }
 
     // Compute the offset of the HTML payload
@@ -195,8 +192,6 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
     fcb->httpin.url[urlLength] = '\0';
 
     fcb->httpin.isRequest = true;
-
-    click_chatter("Method: %s. Url: %s.", fcb->httpin.method, fcb->httpin.url);
 }
 
 

@@ -38,14 +38,15 @@ public:
     #if HAVE_BATCH
     void push_batch(int port, PacketBatch *batch);
     #endif
-    
+
     void retransmissionTimerFired(struct fcb* fcb);
     void transmitMoreData(struct fcb* fcb);
 
     void signalAck(struct fcb* fcb, uint32_t ack);
 
 private:
-    // TODO ensure perthreadness
+    // Will be associated to the thread managing this direction of the flow as a TCPRetransmitter
+    // element is responsible for a direction of the flow and thus used by only one thread
     BufferPool *rawBufferPool;
     MemoryPool<CircularBuffer> circularPool;
     Vector<unsigned char> getBuffer;

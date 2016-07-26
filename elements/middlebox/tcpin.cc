@@ -104,7 +104,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         // Check that the packet is not a SYN packet
         if(isSyn(p))
         {
-            click_chatter("Unexpected SYN packet. Dropping it");
+            click_chatter("Warning: Unexpected SYN packet. Dropping it");
             p->kill();
 
             return NULL;
@@ -155,7 +155,6 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
             // This case occurs when the ACK is lost between the middlebox and
             // the destination.
             // In this case, we ACK the content and we discard it
-            click_chatter("Lost ACK detected: %u, resending it");
             ackPacket(fcb, packet);
             packet->kill();
             fcb->tcp_common->lock.release();
@@ -197,7 +196,6 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
                 increase = mss * mss / cwnd;
 
             otherMaintainer.setCongestionWindowSize(cwnd + increase);
-            click_chatter("Congestion window increased by %lu", increase);
 
             maintainer.setDupAcks(0);
         }
@@ -223,7 +221,6 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
                 uint8_t dupAcks = maintainer.getDupAcks();
                 dupAcks++;
                 maintainer.setDupAcks(dupAcks);
-                click_chatter("Duplicate ACK!");
 
                 // Fast retransmit
                 if(dupAcks >= 3)
@@ -362,7 +359,6 @@ bool TCPIn::hasModificationList(struct fcb *fcb, Packet* packet)
 
 void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
 {
-    //click_chatter("Removing %u bytes", length);
     ModificationList* list = getModificationList(fcb, packet);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
@@ -628,7 +624,7 @@ void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
             uint16_t mss = (optStart[2] << 8) | optStart[3];
             fcb->tcp_common->maintainers[flowDirection].setMSS(mss);
 
-            click_chatter("MSS: %u", mss);
+            click_chatter("MSS for flow %u: %u", flowDirection, mss);
             fcb->tcp_common->maintainers[getOppositeFlowDirection()].setCongestionWindowSize(mss);
 
             optStart += optStart[1];
@@ -664,4 +660,4 @@ ELEMENT_REQUIRES(ModificationList)
 ELEMENT_REQUIRES(TCPElement)
 ELEMENT_REQUIRES(RetransmissionTiming)
 EXPORT_ELEMENT(TCPIn)
-//ELEMENT_MT_SAFE(TCPIn)
+ELEMENT_MT_SAFE(TCPIn)

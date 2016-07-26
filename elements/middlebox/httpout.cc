@@ -56,8 +56,6 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
             sprintf(bufferHeader, "%lu", newContentLength);
             toPush = setHeaderContent(fcb, toPush, "Content-Length", bufferHeader);
 
-            click_chatter("Content-Length modified to %lu", newContentLength);
-
             // Flush the buffer
             #if HAVE_BATCH
                 PacketBatch *headBatch = PacketBatch::make_from_packet(toPush);
@@ -129,4 +127,4 @@ WritablePacket* HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packe
 CLICK_ENDDECLS
 EXPORT_ELEMENT(HTTPOut)
 ELEMENT_REQUIRES(FlowBuffer)
-//ELEMENT_MT_SAFE(HTTPOut)
+ELEMENT_MT_SAFE(HTTPOut)

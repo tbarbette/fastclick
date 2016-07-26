@@ -29,7 +29,8 @@ protected:
     WritablePacket* setHeaderContent(struct fcb *fcb, WritablePacket* packet,
         const char* headerName, const char* content) CLICK_WARN_UNUSED_RESULT;
 
-    // TODO ensure perthreadness
+    // Will be associated to the thread managing this direction of the flow as a HTTPOut
+    // element is responsible for a direction of the flow and thus used by only one thread
     MemoryPool<struct flowBufferEntry> poolBufferEntries;
 };
 

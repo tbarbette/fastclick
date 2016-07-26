@@ -19,21 +19,8 @@ int IPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 
 Packet* IPOut::processPacket(struct fcb*, Packet* p)
 {
-    int flowDirection = determineFlowDirection();
-
-    click_chatter("Flow %d was managed by thread %u", flowDirection, click_current_cpu_id());
-
     WritablePacket *packet = p->uniqueify();
 
-
-    // Test to check retransmission
-    counter++;
-    if(counter == 5 && flowDirection == 1)
-    {
-        packet->kill();
-        return NULL;
-    }
-    
     // Recompute the IP checksum
     computeIPChecksum(packet);
 

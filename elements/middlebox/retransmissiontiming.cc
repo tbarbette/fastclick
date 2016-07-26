@@ -153,8 +153,6 @@ bool RetransmissionTiming::signalAck(struct fcb *fcb, uint32_t ack)
         else
             rto += rttvarFactor;
 
-        click_chatter("RTT measured: %u, RTO: %u", srtt, rto);
-
         checkRTOMinValue();
         checkRTOMaxValue();
 
@@ -196,8 +194,6 @@ bool RetransmissionTiming::startTimer()
 
     timerRetransmit.schedule_after_msec(rto);
 
-    click_chatter("Timer starting (%u)", rto);
-
     return true;
 }
 
@@ -210,8 +206,6 @@ bool RetransmissionTiming::startTimerDoubleRTO()
     checkRTOMaxValue();
     timerRetransmit.schedule_after_msec(rto);
 
-    click_chatter("Timer starting with double RTO (%u)", rto);
-
     return true;
 }
 
@@ -221,8 +215,6 @@ bool RetransmissionTiming::stopTimer()
         return false;
 
     timerRetransmit.unschedule();
-
-    click_chatter("Timer stopped");
 
     return true;
 }
@@ -252,7 +244,6 @@ bool RetransmissionTiming::sendMoreData()
     if(!isTimerInitialized())
         return false;
 
-    click_chatter("Sending more data");
     timerThread.schedule_now();
 
     return true;

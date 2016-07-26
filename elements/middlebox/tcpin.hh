@@ -62,7 +62,8 @@ private:
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
     void manageOptions(struct fcb* fcb, WritablePacket *packet);
 
-    // TODO ensure perthreadness
+    // Will be associated to the thread managing this direction of the flow as a TCPIn
+    // element is responsible for a direction of the flow and thus used by only one thread
     MemoryPool<struct ModificationNode> poolModificationNodes;
     MemoryPool<struct ModificationList> poolModificationLists;
     RBTMemoryPoolStreamManager rbtManager;

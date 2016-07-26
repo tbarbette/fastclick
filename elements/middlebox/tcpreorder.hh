@@ -52,7 +52,8 @@ private:
     unsigned int flowDirection;
     bool mergeSort;
 
-    // TODO ensure perthreadness
+    // Will be associated to the thread managing this direction of the flow as a TCPReorder
+    // element is responsible for a direction of the flow and thus used by only one thread
     MemoryPool<struct TCPPacketListNode> pool;
 };
 

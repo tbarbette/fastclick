@@ -425,4 +425,4 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
 CLICK_ENDDECLS
 EXPORT_ELEMENT(TCPReorder)
 ELEMENT_REQUIRES(TCPElement)
-//ELEMENT_MT_SAFE(TCPReorder)
+ELEMENT_MT_SAFE(TCPReorder)

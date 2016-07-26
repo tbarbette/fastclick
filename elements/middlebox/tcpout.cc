@@ -130,7 +130,6 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                     // If this is not the case, drop the packet as it
                     // does not contain any relevant information
                     // (And anyway it would be considered as a duplicate ACK)
-                    click_chatter("Empty packet dropped");
                     packet->kill();
                     fcb->tcp_common->lock.release();
                     return NULL;
@@ -174,7 +173,6 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     uint16_t winSize = maintainer.getWindowSize();
 
     // The packet is now empty, we discard it and send an ACK directly to the source
-    click_chatter("Sending an ACK! (%u)", ack);
 
     // Craft the packet
     Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, TH_ACK);
@@ -204,8 +202,6 @@ void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr,
         seq = maintainer.getLastSeqSent();
 
     uint16_t winSize = maintainer.getWindowSize();
-
-    click_chatter("Sending a closing packet");
 
     uint8_t flag = TH_ACK;
 
@@ -292,4 +288,4 @@ ELEMENT_REQUIRES(ByteStreamMaintainer)
 ELEMENT_REQUIRES(ModificationList)
 ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(TCPOut)
-//ELEMENT_MT_SAFE(TCPOut)
+ELEMENT_MT_SAFE(TCPOut)
