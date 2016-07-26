@@ -67,7 +67,6 @@ private:
     MemoryPool<struct ModificationList> poolModificationLists;
     RBTMemoryPoolStreamManager rbtManager;
 
-    // TODO Lock when access these
     Spinlock lock;
     HashTable<IPFlowID, struct fcb_tcp_common*> tableFcbTcpCommon;
     MemoryPool<struct fcb_tcp_common> poolFcbTcpCommon;

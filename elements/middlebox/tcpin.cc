@@ -111,9 +111,12 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         }
     }
 
+    fcb->tcp_common->lock.acquire();
+
     if(!checkConnectionClosed(fcb, p))
     {
         p->kill();
+        fcb->tcp_common->lock.release();
         return NULL;
     }
 
@@ -155,6 +158,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
             click_chatter("Lost ACK detected: %u, resending it");
             ackPacket(fcb, packet);
             packet->kill();
+            fcb->tcp_common->lock.release();
             return NULL;
         }
     }
@@ -206,7 +210,9 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
 
         // Update the statistics regarding the RTT
         // And potentially update the retransmission timer
+        fcb->tcp_common->lock.release();
         fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(fcb, ackNumber);
+        fcb->tcp_common->lock.acquire();
 
         // Check if the current packet is just an ACK without more information
         if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
@@ -222,7 +228,9 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
                 // Fast retransmit
                 if(dupAcks >= 3)
                 {
+                    fcb->tcp_common->lock.release();
                     fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
+                    fcb->tcp_common->lock.acquire();
                     maintainer.setDupAcks(0);
                 }
             }
@@ -234,6 +242,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
                 // If this is not the case, the packet does not give any information
                 // We can drop it
                 packet->kill();
+                fcb->tcp_common->lock.release();
                 return NULL;
             }
         }
@@ -243,6 +252,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
             setAckNumber(packet, newAckNumber);
     }
 
+    fcb->tcp_common->lock.release();
     return packet;
 }
 
@@ -264,6 +274,8 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
         newFlag = TH_FIN;
     else
         newFlag = TH_RST;
+
+    fcb->tcp_common->lock.acquire();
 
     click_tcp *tcph = packet->tcp_header();
 
@@ -307,6 +319,8 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
 
     click_chatter("Closing connection on flow %u (graceful: %u, both sides: %u)",
         getFlowDirection(), graceful, bothSides);
+
+    fcb->tcp_common->lock.release();
 
     StackElement::closeConnection(fcb, packet, graceful, bothSides);
 }
@@ -423,13 +437,17 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool force)
     if(isFin(packet) || isSyn(packet))
         ack++;
 
+    fcb->tcp_common->lock.acquire();
     // Craft and send the ack
     outElement->sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr,
         sport, dport, seq, ack, force);
+    fcb->tcp_common->lock.release();
 }
 
 bool TCPIn::checkConnectionClosed(struct fcb* fcb, Packet *packet)
 {
+    fcb->tcp_common->lock.acquire();
+
     TCPClosingState::Value closingState = fcb->tcp_common->closingStates[getFlowDirection()];
     if(closingState != TCPClosingState::OPEN)
     {
@@ -441,9 +459,11 @@ bool TCPIn::checkConnectionClosed(struct fcb* fcb, Packet *packet)
                 ackPacket(fcb, packet);
         }
 
+        fcb->tcp_common->lock.release();
         return false;
     }
 
+    fcb->tcp_common->lock.release();
     return true;
 }
 
@@ -481,6 +501,9 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
     }
     else
     {
+        // Acquire the lock for the pool of tcp_common structurs
+        lock.acquire();
+
         IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
         // We are the initiator, we need to allocate memory
         struct fcb_tcp_common *allocated = poolFcbTcpCommon.getMemory();
@@ -502,6 +525,8 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         fcb->tcpin.flowID = flowID;
         fcb->tcpin.tableTcpCommon = &tableFcbTcpCommon;
         fcb->tcpin.poolTcpCommon = &poolFcbTcpCommon;
+
+        lock.release();
     }
 
     // Set information about the flow
@@ -524,12 +549,20 @@ bool TCPIn::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
 
 struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
+    lock.acquire();
+
     HashTable<IPFlowID, struct fcb_tcp_common*>::iterator it = tableFcbTcpCommon.find(flowID);
 
     if(it == tableFcbTcpCommon.end())
+    {
+        lock.release();
         return NULL; // Not in the table
+    }
     else
+    {
+        lock.release();
         return it.value();
+    }
 }
 
 void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
