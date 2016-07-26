@@ -7,11 +7,14 @@
 
 CLICK_DECLS
 
-HTTPOut::HTTPOut() : poolBufferEntries(POOL_BUFFER_ENTRIES_SIZE)
+HTTPOut::HTTPOut()
 {
     #if HAVE_BATCH
         in_batch_mode = BATCH_MODE_YES;
     #endif
+
+    for(unsigned int i = 0; i < poolBufferEntries.size(); ++i)
+        poolBufferEntries.get_value(i).initialize(POOL_BUFFER_ENTRIES_SIZE);
 }
 
 int HTTPOut::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -27,7 +30,7 @@ Packet* HTTPOut::processPacket(struct fcb* fcb, Packet* p)
 
     // Initialize the buffer if not already done
     if(!fcb->httpout.flowBuffer.isInitialized())
-        fcb->httpout.flowBuffer.initialize(this, &poolBufferEntries);
+        fcb->httpout.flowBuffer.initialize(this, &(*poolBufferEntries));
 
     // Check that the packet contains HTTP content
     if(!isPacketContentEmpty(packet) && fcb->httpin.contentLength > 0)

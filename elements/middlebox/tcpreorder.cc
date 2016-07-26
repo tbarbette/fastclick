@@ -9,11 +9,15 @@
 
 CLICK_DECLS
 
-TCPReorder::TCPReorder() : pool(TCPREORDER_POOL_SIZE)
+TCPReorder::TCPReorder()
 {
     #if HAVE_BATCH
         in_batch_mode = BATCH_MODE_YES;
     #endif
+
+    for(unsigned int i = 0; i < pool.size(); ++i)
+        pool.get_value(i).initialize(TCPREORDER_POOL_SIZE);
+
     mergeSort = true;
 }
 
@@ -97,7 +101,7 @@ void TCPReorder::processPacket(struct fcb *fcb, Packet* packet)
 {
     // Ensure that the pointer in the FCB is set
     if(fcb->tcpreorder.pool == NULL)
-        fcb->tcpreorder.pool = &pool;
+        fcb->tcpreorder.pool = &(*pool);
 
     checkFirstPacket(fcb, packet);
     if(!checkRetransmission(fcb, packet))
@@ -110,7 +114,7 @@ void TCPReorder::processPacketBatch(struct fcb *fcb, PacketBatch* batch)
 {
     // Ensure that the pointer in the FCB is set
     if(fcb->tcpreorder.pool == NULL)
-        fcb->tcpreorder.pool = &pool;
+        fcb->tcpreorder.pool = &(*pool);
 
     FOR_EACH_PACKET_SAFE(batch, packet)
     {

@@ -11,16 +11,25 @@
 #include "tcpelement.hh"
 #include "retransmissiontiming.hh"
 
-TCPRetransmitter::TCPRetransmitter() : circularPool(TCPRETRANSMITTER_BUFFER_NUMBER),
-    getBuffer(TCPRETRANSMITTER_GET_BUFFER_SIZE, '\0')
+TCPRetransmitter::TCPRetransmitter()
 {
-    rawBufferPool = NULL;
+    for(unsigned int i = 0; i < circularPool.size(); ++i)
+        circularPool.get_value(i).initialize(TCPRETRANSMITTER_BUFFER_NUMBER);
+
+    for(unsigned int i = 0; i < getBuffer.size(); ++i)
+        getBuffer.get_value(i).resize(TCPRETRANSMITTER_GET_BUFFER_SIZE, '\0');
+
+    for(unsigned int i = 0; i < rawBufferPool.size(); ++i)
+        rawBufferPool.get_value(i) = NULL;
 }
 
 TCPRetransmitter::~TCPRetransmitter()
 {
-    if(rawBufferPool != NULL)
-        delete rawBufferPool;
+    for(unsigned int i = 0; i < rawBufferPool.size(); ++i)
+    {
+        if(rawBufferPool.get_value(i) != NULL)
+            delete rawBufferPool.get_value(i);
+    }
 }
 
 int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -32,7 +41,8 @@ int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
     .complete() < 0)
         return -1;
 
-    rawBufferPool = new BufferPool(TCPRETRANSMITTER_BUFFER_NUMBER, initialBufferSize);
+    for(unsigned int i = 0; i < rawBufferPool.size(); ++i)
+        rawBufferPool.get_value(i) = new BufferPool(TCPRETRANSMITTER_BUFFER_NUMBER, initialBufferSize);
 
     return 0;
 }
@@ -97,10 +107,10 @@ void TCPRetransmitter::checkInitialization(struct fcb *fcb)
     // for this flow
     if(manager.getCircularBuffer() == NULL)
     {
-        CircularBuffer *circularBuffer = circularPool.getMemory();
+        CircularBuffer *circularBuffer = (*circularPool).getMemory();
         // Call the constructor of CircularBuffer with the pool of raw buffers
-        circularBuffer = new(circularBuffer) CircularBuffer(rawBufferPool);
-        manager.setCircularBuffer(circularBuffer, &circularPool);
+        circularBuffer = new(circularBuffer) CircularBuffer(*rawBufferPool);
+        manager.setCircularBuffer(circularBuffer, &(*circularPool));
     }
 
     fcb->tcp_common->lock.release();
@@ -263,7 +273,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
     }
 
     // Get the data from the buffer
-    manager.getCircularBuffer()->getData(mappedSeq, sizeOfRetransmission, getBuffer);
+    manager.getCircularBuffer()->getData(mappedSeq, sizeOfRetransmission, *getBuffer);
     // The data to retransmit are now in "getBuffer"
 
     // Map the previous ACK
@@ -287,7 +297,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
     setPacketTotalLength(newPacket, newPacket->length() - getIPHeaderOffset(packet));
 
     // Copy the content of the buffer to the payload area
-    setPayload(newPacket, &getBuffer[0], sizeOfRetransmission);
+    setPayload(newPacket, &((*getBuffer)[0]), sizeOfRetransmission);
 
     // Recompute the checksums
     computeTCPChecksum(newPacket);
@@ -493,7 +503,7 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
 
     // Otherwise, get the data from the buffer
     fcb->tcp_common->retransmissionTimings[flowDirection].getCircularBuffer()->getData(start,
-        sizeOfRetransmission, getBuffer);
+        sizeOfRetransmission, *getBuffer);
 
     // Forge the packet with the right information
     uint32_t ack = maintainer.getLastAckSent();
@@ -513,7 +523,7 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     setPacketTotalLength(packet, packet->length() - getIPHeaderOffset(packet));
 
     // Copy the content of the buffer to the payload area
-    setPayload(packet, &getBuffer[0], sizeOfRetransmission);
+    setPayload(packet, &((*getBuffer)[0]), sizeOfRetransmission);
 
     // Compute the checksums
     computeTCPChecksum(packet);

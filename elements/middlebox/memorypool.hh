@@ -17,6 +17,13 @@ template <typename T>
 class MemoryPool
 {
 public:
+    /** @brief Construct an empty MemoryPool
+     */
+    MemoryPool()
+    {
+        first = NULL;
+    }
+
     /** @brief Construct a MemoryPool
      * @param initialSize The initial number of elements in the pool
      */
@@ -26,7 +33,7 @@ public:
 
         // Perform the first allocation. 'initialSize' memory chunks will be
         // allocated
-        allocateMoreMemory(initialSize);
+        initialize(initialSize);
     }
 
     /** @brief Destruct the memory pool
@@ -45,6 +52,19 @@ public:
             // Free the node
             free(toDelete);
         }
+    }
+
+    /** @brief Initialize the MemoryPool
+     * @param initialSize The initial number of elements in the pool
+     */
+    void initialize(unsigned int initialSize)
+    {
+        if(first != NULL)
+            return;
+
+        // Perform the first allocation. 'initialSize' memory chunks will be
+        // allocated
+        allocateMoreMemory(initialSize);
     }
 
     /** @brief Obtain memory from the memory pool

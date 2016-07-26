@@ -10,11 +10,14 @@
 CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
-    poolModificationNodes(MODIFICATIONNODES_POOL_SIZE),
-    poolModificationLists(MODIFICATIONLISTS_POOL_SIZE),
     poolFcbTcpCommon(TCPCOMMON_POOL_SIZE),
     tableFcbTcpCommon(NULL)
 {
+    for(unsigned int i = 0; i < poolModificationNodes.size(); ++i)
+        poolModificationNodes.get_value(i).initialize(MODIFICATIONNODES_POOL_SIZE);
+
+    for(unsigned int i = 0; i < poolModificationLists.size(); ++i)
+        poolModificationLists.get_value(i).initialize(MODIFICATIONLISTS_POOL_SIZE);
 }
 
 int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -78,10 +81,13 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
 {
     // Ensure that the pointers in the FCB are set
     if(fcb->tcpin.poolModificationNodes == NULL)
-        fcb->tcpin.poolModificationNodes = &poolModificationNodes;
+        fcb->tcpin.poolModificationNodes = &(*poolModificationNodes);
 
     if(fcb->tcpin.poolModificationLists == NULL)
-        fcb->tcpin.poolModificationLists = &poolModificationLists;
+        fcb->tcpin.poolModificationLists = &(*poolModificationLists);
+
+    if(fcb->tcpin.lock == NULL)
+        fcb->tcpin.lock = &lock;
 
     // Assign the tcp_common structure if not already done
     if(fcb->tcp_common == NULL)
@@ -341,7 +347,7 @@ ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* pa
     {
         ModificationList* listPtr = fcb->tcpin.poolModificationLists->getMemory();
         // Call the constructor manually to have a clean object
-        list = new(listPtr) ModificationList(&poolModificationNodes);
+        list = new(listPtr) ModificationList(&(*poolModificationNodes));
         modificationLists.set(getSequenceNumber(packet), list);
     }
 
@@ -492,7 +498,7 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         // Get the struct allocated by the initiator
         fcb->tcp_common = returnElement->getTCPCommon(flowID);
         // Initialize the RBT with the RBTManager
-        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager, flowStart);
+        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
         fcb->tcpin.inChargeOfTcpCommon = false;
     }
     else
@@ -513,7 +519,7 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         // Set the pointer in the structure
         fcb->tcp_common = allocated;
         // Initialize the RBT with the RBTManager
-        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&rbtManager, flowStart);
+        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
 
         // Store in our structure information needed to free the memory
         // of the common structure

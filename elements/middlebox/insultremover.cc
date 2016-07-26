@@ -7,11 +7,14 @@
 
 CLICK_DECLS
 
-InsultRemover::InsultRemover() : poolBufferEntries(POOL_BUFFER_ENTRIES_SIZE)
+InsultRemover::InsultRemover()
 {
     #if HAVE_BATCH
         in_batch_mode = BATCH_MODE_YES;
     #endif
+
+    for(unsigned int i = 0; i < poolBufferEntries.size(); ++i)
+        poolBufferEntries.get_value(i).initialize(POOL_BUFFER_ENTRIES_SIZE);
 }
 
 int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -29,7 +32,7 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
     assert(packet != NULL);
 
     if(!fcb->insultremover.flowBuffer.isInitialized())
-        fcb->insultremover.flowBuffer.initialize(this, &poolBufferEntries);
+        fcb->insultremover.flowBuffer.initialize(this, &(*poolBufferEntries));
 
     if(isPacketContentEmpty(packet))
         return packet;

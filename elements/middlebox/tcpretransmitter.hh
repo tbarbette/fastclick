@@ -6,6 +6,8 @@
 #include <click/element.hh>
 #include <click/timer.hh>
 #include <click/timestamp.hh>
+#include <click/sync.hh>
+#include <click/multithread.hh>
 #include <click/vector.hh>
 #include <clicknet/tcp.h>
 #include "stackelement.hh"
@@ -45,11 +47,9 @@ public:
     void signalAck(struct fcb* fcb, uint32_t ack);
 
 private:
-    // Will be associated to the thread managing this direction of the flow as a TCPRetransmitter
-    // element is responsible for a direction of the flow and thus used by only one thread
-    BufferPool *rawBufferPool;
-    MemoryPool<CircularBuffer> circularPool;
-    Vector<unsigned char> getBuffer;
+    per_thread<BufferPool*> rawBufferPool;
+    per_thread<MemoryPool<CircularBuffer>> circularPool;
+    per_thread<Vector<unsigned char>> getBuffer;
 
     void prune(struct fcb *fcb);
     bool dataToRetransmit(struct fcb *fcb);

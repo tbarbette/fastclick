@@ -4,6 +4,7 @@
 #include <click/ipflowid.hh>
 #include <click/hashtable.hh>
 #include <click/sync.hh>
+#include <click/multithread.hh>
 #include "memorypool.hh"
 #include "modificationlist.hh"
 #include "tcpclosingstate.hh"
@@ -62,11 +63,9 @@ private:
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
     void manageOptions(struct fcb* fcb, WritablePacket *packet);
 
-    // Will be associated to the thread managing this direction of the flow as a TCPIn
-    // element is responsible for a direction of the flow and thus used by only one thread
-    MemoryPool<struct ModificationNode> poolModificationNodes;
-    MemoryPool<struct ModificationList> poolModificationLists;
-    RBTMemoryPoolStreamManager rbtManager;
+    per_thread<MemoryPool<struct ModificationNode>> poolModificationNodes;
+    per_thread<MemoryPool<struct ModificationList>> poolModificationLists;
+    per_thread<RBTMemoryPoolStreamManager> rbtManager;
 
     Spinlock lock;
     HashTable<IPFlowID, struct fcb_tcp_common*> tableFcbTcpCommon;

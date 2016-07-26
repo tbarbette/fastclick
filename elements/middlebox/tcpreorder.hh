@@ -6,6 +6,7 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include <click/batchelement.hh>
+#include <click/multithread.hh>
 #include "batchfcb.hh"
 #include "tcpreordernode.hh"
 #include "memorypool.hh"
@@ -52,9 +53,7 @@ private:
     unsigned int flowDirection;
     bool mergeSort;
 
-    // Will be associated to the thread managing this direction of the flow as a TCPReorder
-    // element is responsible for a direction of the flow and thus used by only one thread
-    MemoryPool<struct TCPPacketListNode> pool;
+    per_thread<MemoryPool<struct TCPPacketListNode>> pool;
 };
 
 CLICK_ENDDECLS

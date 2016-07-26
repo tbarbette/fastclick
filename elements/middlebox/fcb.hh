@@ -6,6 +6,7 @@
 #include <click/ipflowid.hh>
 #include <click/timer.hh>
 #include <click/sync.hh>
+#include <click/multithread.hh>
 #include "bytestreammaintainer.hh"
 #include "modificationlist.hh"
 #include "memorypool.hh"
@@ -89,15 +90,17 @@ struct fcb_tcpin
     // Members used to be able to free memory for tcp_common
     // destroyed
     MemoryPool<struct fcb_tcp_common>* poolTcpCommon;
+    HashTable<IPFlowID, struct fcb_tcp_common*> *tableTcpCommon;
+    Spinlock *lock; // Lock for the 2 structures above
     bool inChargeOfTcpCommon;
     struct fcb_tcp_common *commonToDelete;
     IPFlowID flowID;
-    HashTable<IPFlowID, struct fcb_tcp_common*> *tableTcpCommon;
 
     fcb_tcpin()
     {
         poolModificationLists = NULL;
         poolModificationNodes = NULL;
+        lock = NULL;
 
         poolTcpCommon = NULL;
         commonToDelete = NULL;
@@ -123,8 +126,10 @@ struct fcb_tcpin
         if(inChargeOfTcpCommon && commonToDelete != NULL)
         {
             commonToDelete->~fcb_tcp_common();
+            lock->acquire();
             tableTcpCommon->erase(flowID);
             poolTcpCommon->releaseMemory(commonToDelete);
+            lock->release();
             commonToDelete = NULL;
         }
     }
