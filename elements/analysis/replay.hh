@@ -53,7 +53,7 @@ class MultiReplay : public MultiReplayBase { public:
     const char *flow_code() const	{ return "#/#"; }
     const char *processing() const	{ return PULL; }
 
-    bool get_runnable_thread(Bitvector& bmp) {
+    bool get_runnable_thread(Bitvector&) {
         return false;
     }
 

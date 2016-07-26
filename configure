@@ -13764,7 +13764,7 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
-if test "x$use_netmap" = xyes; then
+if test "x$use_netmap" != xno; then
     provisions="$provisions netmap"
 fi
 

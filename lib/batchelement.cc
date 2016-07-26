@@ -13,7 +13,9 @@ CLICK_DECLS
 
 #ifdef HAVE_BATCH
 
-BatchElement::BatchElement() : current_batch(NULL),inflow(0),in_batch_mode(Element::BATCH_MODE_IFPOSSIBLE),receives_batch(false),ports_upgraded(false)
+BatchElement::BatchElement() :
+    in_batch_mode(Element::BATCH_MODE_IFPOSSIBLE),receives_batch(false),
+    ports_upgraded(false), current_batch(NULL), inflow(0)
 {
 
 }
@@ -113,7 +115,7 @@ void BatchElement::PullBatchPort::bind_batchelement() {
     }
 }
 
-bool BatchElement::BatchModePropagate::visit(Element *e, bool isoutput, int port,
+bool BatchElement::BatchModePropagate::visit(Element *e, bool, int,
 		Element *from, int from_port, int) {
 	//Do not continue if we change from pull to push
 	if ((ispush && !from->output_is_push(from_port)) || (!ispush && !from->input_is_pull(from_port))) return false;
