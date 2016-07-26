@@ -30,6 +30,8 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
 
     WritablePacket *packet = p->uniqueify();
 
+    fcb->tcp_common->lock.acquire();
+
     bool hasModificationList = inElement->hasModificationList(fcb, packet);
     ByteStreamMaintainer &byteStreamMaintainer = fcb->tcp_common->maintainers[getFlowDirection()];
     ModificationList *modList = NULL;
@@ -130,11 +132,14 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
                     // (And anyway it would be considered as a duplicate ACK)
                     click_chatter("Empty packet dropped");
                     packet->kill();
+                    fcb->tcp_common->lock.release();
                     return NULL;
                 }
             }
         }
     }
+
+    fcb->tcp_common->lock.release();
 
     // Recompute the checksum
     computeTCPChecksum(packet);
@@ -233,11 +238,16 @@ void TCPOut::setInElement(TCPIn* inElement)
 
 bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
 {
+    fcb->tcp_common->lock.acquire();
+
     TCPClosingState::Value closingState = fcb->tcp_common->closingStates[getFlowDirection()];
 
     // If the connection is open, we do nothing
     if(closingState == TCPClosingState::OPEN)
+    {
+        fcb->tcp_common->lock.release();
         return true;
+    }
 
     // If the connection is being closed and we received the last packet, close it completely
     if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL)
@@ -245,6 +255,7 @@ bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
         if(isFin(packet))
             fcb->tcp_common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_GRACEFUL;
 
+        fcb->tcp_common->lock.release();
         return true;
     }
     else if(closingState == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
@@ -252,9 +263,11 @@ bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
         if(isRst(packet))
             fcb->tcp_common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_UNGRACEFUL;
 
+        fcb->tcp_common->lock.release();
         return true;
     }
 
+    fcb->tcp_common->lock.release();
     // Otherwise, the connection is closed and we will not transmit any further packet
     return false;
 }
