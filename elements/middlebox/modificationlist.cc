@@ -194,6 +194,12 @@ void ModificationList::mergeNodes()
     }
 }
 
+bool ModificationList::isCommitted()
+{
+    return committed;
+}
+
+
 void ModificationList::commit(ByteStreamMaintainer &maintainer)
 {
     struct ModificationNode* node = head;

@@ -13,6 +13,7 @@ TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
     poolFcbTcpCommon(TCPCOMMON_POOL_SIZE),
     tableFcbTcpCommon(NULL)
 {
+    // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.size(); ++i)
         poolModificationNodes.get_value(i).initialize(MODIFICATIONNODES_POOL_SIZE);
 

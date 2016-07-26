@@ -1,3 +1,10 @@
+/*
+ * bufferpool.cc - Class used to provide a pool of buffers that can have a dynamic size
+ * and be resized at any moment
+ *
+ * Romain Gaillard.
+ */
+ 
 #include <click/config.h>
 #include <click/glue.hh>
 #include "bufferpool.hh"

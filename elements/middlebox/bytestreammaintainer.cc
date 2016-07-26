@@ -1,3 +1,11 @@
+/*
+ * bytestreammaintainer.cc - Class used to manage a flow. Stores the modifications in it
+ * (bytes removed or inserted) as well as information such as the MSS, ports, ips, last
+ * ack received, last ack sent, ...
+ *
+ * Romain Gaillard.
+ */
+
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>

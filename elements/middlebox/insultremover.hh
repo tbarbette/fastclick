@@ -9,26 +9,50 @@
 
 CLICK_DECLS
 
+/*
+=c
+
+InsultRemover()
+
+=s middlebox
+
+remove insults in web pages
+
+=d
+
+This element removes insults in web pages
+
+=a HTTPIn, HTTPOut */
+
 #define POOL_BUFFER_ENTRIES_SIZE 300
 
 class InsultRemover : public StackElement
 {
 public:
+    /** @brief Construct an InsultRemover element
+     */
     InsultRemover() CLICK_COLD;
 
     const char *class_name() const        { return "InsultRemover"; }
     const char *port_count() const        { return PORTS_1_1; }
-    const char *processing() const        { return PROCESSING_A_AH; }
+    const char *processing() const        { return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
+
+    /** @brief Remove an insult in the web page stored in the buffer
+     * @param fcb Pointer to the FCB of the flow
+     * @param insult The insult to remove
+     * @return The result of the deletion (1: insult found and removed, -1 insult not found, 0
+     * insult not found but may start at the end of the last packet in the buffer)
+     */
     int removeInsult(struct fcb* fcb, const char *insult);
 
     per_thread<MemoryPool<struct flowBufferEntry>> poolBufferEntries;
 
-    Vector<const char*> insults;
+    Vector<const char*> insults; // Vector containing the words to remove from the web pages
 };
 
 CLICK_ENDDECLS

@@ -1,3 +1,10 @@
+/*
+ * ipelement.cc - Provides several methods that can be used by elements to manage IP packets
+ *
+ * Romain Gaillard.
+ */
+
+
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/ip.h>

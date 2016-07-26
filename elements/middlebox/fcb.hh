@@ -21,6 +21,10 @@
  * This file is used to simulate the FCB provided by Middleclick
  */
 
+/**
+ * Common structure accessed by both side of a TCP connection.
+ * The lock must be acquired before accessing the members of the structure
+ */
 struct fcb_tcp_common
 {
     // One maintainer for each direction of the connection
@@ -44,6 +48,9 @@ struct fcb_tcp_common
     }
 };
 
+/**
+ * Structure used by the TCPReorder element
+ */
 struct fcb_tcpreorder
 {
     struct TCPPacketListNode* packetList;
@@ -81,6 +88,9 @@ struct fcb_tcpreorder
     }
 };
 
+/**
+ * Structure used by the TCPIn element
+ */
 struct fcb_tcpin
 {
     HashTable<tcp_seq_t, ModificationList*> modificationLists;
@@ -135,6 +145,9 @@ struct fcb_tcpin
     }
 };
 
+/**
+ * Structure used by the HTTPIn element
+ */
 struct fcb_httpin
 {
     bool headerFound;
@@ -155,6 +168,9 @@ struct fcb_httpin
     }
 };
 
+/**
+ * Structure used by the PathMerger element
+ */
 struct fcb_pathmerger
 {
     HashTable<tcp_seq_t, int> portMap;
@@ -164,7 +180,9 @@ struct fcb_pathmerger
     }
 };
 
-
+/**
+ * Structure used by the TCPMarkMSS element
+ */
 struct fcb_tcpmarkmss
 {
     uint16_t mss;
@@ -175,11 +193,17 @@ struct fcb_tcpmarkmss
     }
 };
 
+/**
+ * Structure used by the HTTPOut element
+ */
 struct fcb_httpout
 {
     FlowBuffer flowBuffer;
 };
 
+/**
+ * Structure used by the InsultRemover element
+ */
 struct fcb_insultremover
 {
     FlowBuffer flowBuffer;
@@ -191,6 +215,9 @@ struct fcb_insultremover
     }
 };
 
+/**
+ * Global structure used by the elements to store information about a flow
+ */
 struct fcb
 {
     struct fcb_tcp_common* tcp_common;

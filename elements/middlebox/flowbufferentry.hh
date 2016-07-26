@@ -1,3 +1,11 @@
+/*
+ * flowbufferentry.hh - Structure that represents an entry in the FlowBuffer.
+ * An entry consists of a packet that contains data of the flow, a pointer to the previous
+ * flowBufferEntry and a pointer to the next one. It is thus a double linked list.
+ *
+ * Romain Gaillard.
+ */
+ 
 #ifndef MIDDLEBOX_FLOWBUFFERENTRY_HH
 #define MIDDLEBOX_FLOWBUFFERENTRY_HH
 

@@ -48,6 +48,9 @@ public:
      * struct ModificationNode.
      */
     ModificationList(MemoryPool<struct ModificationNode>* poolNodes);
+
+    /** @brief Destruct a ModificationList and free the memory
+     */
     ~ModificationList();
 
     /** @brief Print the current state of the list in the console using
@@ -66,12 +69,15 @@ public:
      */
     bool addModification(uint32_t firstPosition, uint32_t position, int offset);
 
-    bool isCommitted()
-    {
-        return committed;
-    }
+    /** @brief Tell if the list has been committed
+     * @return True if the list has been committed
+     */
+    bool isCommitted();
 
-        void commit(ByteStreamMaintainer& maintainer);
+    /** @brief Commit the modifications stored in the list into the ByteStreamMaintainer
+     * @param maintainer The ByteStreamMaintainer in which the modifications will be committed
+     */
+    void commit(ByteStreamMaintainer& maintainer);
 
 private:
     /** @brief Indicate if two integers have the same sign

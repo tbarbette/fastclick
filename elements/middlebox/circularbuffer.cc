@@ -1,3 +1,11 @@
+/*
+ * circularbuffer.cc - Class used to represent a circular buffer with a dynamic size.
+ * The operations are O(1) and the buffer automatically grows to be able to store
+ * the data.
+ *
+ * Romain Gaillard.
+ */
+
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>

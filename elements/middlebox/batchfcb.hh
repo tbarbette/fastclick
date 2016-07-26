@@ -1,12 +1,11 @@
-#ifndef MIDDLEBOX_BATCHFCB_HH
-#define MIDDLEBOX_BATCHFCB_HH
-
 /*
  * batchfcb.hh - This file provides modified versions of the macros
  * provided in FastClick used to manage batch of packets. These new versions
  * can be used to pass the fcb to the function applied on the batch.
  */
-
+ 
+#ifndef MIDDLEBOX_BATCHFCB_HH
+#define MIDDLEBOX_BATCHFCB_HH
 
 /**
  * Execute a function on each packets of a batch. The function may return

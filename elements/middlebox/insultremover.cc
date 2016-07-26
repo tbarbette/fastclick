@@ -1,3 +1,9 @@
+/*
+ * insultremover.{cc,hh} -- remove insults in web pages
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -13,6 +19,7 @@ InsultRemover::InsultRemover()
         in_batch_mode = BATCH_MODE_YES;
     #endif
 
+    // Initialize the memory pool of each thread
     for(unsigned int i = 0; i < poolBufferEntries.size(); ++i)
         poolBufferEntries.get_value(i).initialize(POOL_BUFFER_ENTRIES_SIZE);
 }

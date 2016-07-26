@@ -6,9 +6,28 @@
 
 CLICK_DECLS
 
+/*
+=c
+
+IPOut()
+
+=s middlebox
+
+exit point of an IP path in the stack of the middlebox
+
+=d
+
+This element is the exit point of an IP path in the stack of the middlebox by which all
+IP packets must go after their IP content has been processed. Each path containing a IPOut element
+must also contain a IPIn element
+
+=a IPIn */
+
 class IPOut : public StackElement, public IPElement
 {
 public:
+    /** @brief Construct an IPOut element
+     */
     IPOut() CLICK_COLD;
 
     const char *class_name() const        { return "IPOut"; }
@@ -21,7 +40,6 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
-    int counter;
 };
 
 CLICK_ENDDECLS

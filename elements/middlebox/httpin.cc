@@ -1,3 +1,9 @@
+/*
+ * httpin.{cc,hh} -- entry point of a HTTP path in the stack of the middlebox
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>

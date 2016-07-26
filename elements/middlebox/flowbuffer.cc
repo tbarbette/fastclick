@@ -1,3 +1,11 @@
+/*
+ * flowbuffer.hh - Class used to buffer the packets of a flow in order to be able to
+ * search, replace or remove data in them as in a contiguous flow.
+ * This file also defines the iterators used to achieve this goal.
+ *
+ * Romain Gaillard.
+ */
+ 
 #include <click/config.h>
 #include <click/glue.hh>
 #include "fcb.hh"
@@ -330,6 +338,8 @@ FlowBufferIter& FlowBufferIter::operator++()
     assert(entry != NULL);
 
     entry = entry->next;
+
+    return *this;
 }
 
 
@@ -428,6 +438,8 @@ FlowBufferContentIter& FlowBufferContentIter::operator++()
         offsetInPacket = 0;
         entry = entry->next;
     }
+
+    return *this;
 }
 
 CLICK_ENDDECLS

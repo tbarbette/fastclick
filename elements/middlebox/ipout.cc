@@ -1,3 +1,9 @@
+/*
+ * ipout.{cc,hh} -- exit point of an IP path in the stack of the middlebox
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -9,7 +15,7 @@ CLICK_DECLS
 
 IPOut::IPOut()
 {
-    counter = 0;
+
 }
 
 int IPOut::configure(Vector<String> &conf, ErrorHandler *errh)

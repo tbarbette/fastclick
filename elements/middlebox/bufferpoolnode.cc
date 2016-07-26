@@ -1,3 +1,9 @@
+/*
+ * bufferpoolnode.cc - Class used to manage a buffer obtained via a BufferPool
+ *
+ * Romain Gaillard.
+ */
+ 
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/vector.hh>

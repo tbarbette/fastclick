@@ -13,6 +13,7 @@
 
 TCPRetransmitter::TCPRetransmitter()
 {
+    // Initialize the memory pools and buffer of each thread
     for(unsigned int i = 0; i < circularPool.size(); ++i)
         circularPool.get_value(i).initialize(TCPRETRANSMITTER_BUFFER_NUMBER);
 

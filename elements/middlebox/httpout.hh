@@ -10,16 +10,36 @@
 
 CLICK_DECLS
 
+/*
+=c
+
+HTPPOut()
+
+=s middlebox
+
+exit point of a HTTP path in the stack of the middlebox
+
+=d
+
+This element is the exit point of a HTTP path in the stack of the middlebox by which all
+HTTP packets must go before their HTTP content has been processed. Each path containing a HTTPOut
+element must also contain a HTTPIn element
+
+=a HTTPIn */
+
+
 #define POOL_BUFFER_ENTRIES_SIZE 300
 
 class HTTPOut : public StackElement, public TCPElement
 {
 public:
+    /** @brief Construct a HTTPOut element
+     */
     HTTPOut() CLICK_COLD;
 
     const char *class_name() const        { return "HTTPOut"; }
     const char *port_count() const        { return PORTS_1_1; }
-    const char *processing() const        { return PROCESSING_A_AH; }
+    const char *processing() const        { return PUSH; }
 
     bool isOutElement()                   { return true; }
 
@@ -27,6 +47,14 @@ public:
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
+
+    /** @brief Modify the content of a HTTP header
+     * @param fcb Pointer to the FCB of the flow
+     * @param packet Packet in which the header is located
+     * @param headerName Name of the header to modify
+     * @param content New content of the header
+     * @return The packet with the HTTP header modified
+     */
     WritablePacket* setHeaderContent(struct fcb *fcb, WritablePacket* packet,
         const char* headerName, const char* content) CLICK_WARN_UNUSED_RESULT;
 

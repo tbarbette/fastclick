@@ -1,3 +1,9 @@
+/*
+ * ipin.{cc,hh} -- entry point of an IP path in the stack of the middlebox
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
