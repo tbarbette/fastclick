@@ -28,12 +28,16 @@
 #include <click/straccum.hh>
 #include <click/elemfilter.hh>
 #include <click/routervisitor.hh>
+#include <click/batchelement.hh>
 #include <click/confparse.hh>
 #include <click/timer.hh>
 #include <click/master.hh>
 #include <click/notifier.hh>
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
+#if HAVE_NETMAP_PACKET_POOL
+#include <click/netmapdevice.hh>
+#endif
 #if CLICK_STATS >= 2
 # include <click/hashtable.hh>
 #endif
@@ -1165,6 +1169,53 @@ Router::initialize(ErrorHandler *errh)
         }
     }
 
+#if HAVE_BATCH
+    if (all_ok) {
+        //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instanciating batches
+        for (int ord = 0; ord < _elements.size(); ord++) {
+            int i = _element_configure_order[ord];
+            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
+            if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES && !e->ports_upgraded) {
+                BatchElement::BatchModePropagate p;
+                p.ispush = true;
+                for (int i = 0; i < e->noutputs(); i++) {
+                    if (e->output_is_push(i))
+                        visit(e,true,i,&p);
+                }
+
+                p.ispush = false;
+
+                for (int i = 0; i < e->ninputs(); i++) {
+                    if (e->input_is_pull(i))
+                        visit(e,false,i,&p);
+                }
+            }
+        }
+
+        for (int ord = 0; ord < _elements.size(); ord++) {
+            int i = _element_configure_order[ord];
+            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
+            if (e != NULL) {
+                if (e->batch_mode() == Element::BATCH_MODE_NO) {
+                    e->receives_batch = false;
+                    continue; //This element is traversed by packets... nothing to do.
+                }
+
+                if (e->batch_mode() == Element::BATCH_MODE_IFPOSSIBLE) {
+                    e->in_batch_mode = Element::BATCH_MODE_NO;
+                    e->receives_batch = false;
+#if HAVE_VERBOSE_BATCH
+            click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
+#endif
+                    continue;
+                }
+                e->upgrade_ports();
+                e->bind_ports();
+            }
+        }
+    }
+#endif
+
 #if CLICK_DMALLOC
     CLICK_DMALLOC_REG("iHoo");
 #endif
@@ -1179,6 +1230,13 @@ Router::initialize(ErrorHandler *errh)
 #if CLICK_DMALLOC
             sprintf(dmalloc_buf, "i%d  ", i);
             CLICK_DMALLOC_REG(dmalloc_buf);
+#endif
+#if HAVE_NETMAP_PACKET_POOL
+            if (element_stage[i] < Element::CONFIGURE_PHASE_PRIVILEGED && !NetmapBufQ::initialized()) {
+                click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-packet-pool to configure script to disable this feature.");
+                all_ok = false;
+                break;
+            }
 #endif
             RouterContextErrh cerrh(errh, "While initializing", element(i));
             assert(!cerrh.nerrors());
