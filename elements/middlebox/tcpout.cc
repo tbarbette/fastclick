@@ -1,3 +1,10 @@
+/*
+ * tcpout.{cc,hh} -- exit point of a TCP path in the stack of the middlebox
+ * Romain Gaillard
+ *
+ */
+
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>

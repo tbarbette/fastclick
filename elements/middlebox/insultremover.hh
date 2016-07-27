@@ -12,7 +12,7 @@ CLICK_DECLS
 /*
 =c
 
-InsultRemover()
+InsultRemover([CLOSECONNECTION])
 
 =s middlebox
 
@@ -21,6 +21,13 @@ remove insults in web pages
 =d
 
 This element removes insults in web pages
+
+=item CLOSECONNECTION
+
+Boolean that can be set to true if the connection must be closed if an insult is found.
+In this case, the content of the page is replaced by an error message telling the user
+that the web page has been blocked because it contains insults and the connection is closed.
+Default value: false.
 
 =a HTTPIn, HTTPOut */
 
@@ -53,6 +60,9 @@ protected:
     per_thread<MemoryPool<struct flowBufferEntry>> poolBufferEntries;
 
     Vector<const char*> insults; // Vector containing the words to remove from the web pages
+
+    bool closeAfterInsults;
+    bool closed;
 };
 
 CLICK_ENDDECLS

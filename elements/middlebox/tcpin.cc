@@ -1,3 +1,9 @@
+/*
+ * tcpin.{cc,hh} -- entry point of a TCP path in the stack of the middlebox
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -381,7 +387,7 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     if(position > packet->length())
     {
         click_chatter("Error: Invalid removeBytes call (packet length: %u, position: %u)",
-            length, position);
+            packet->length(), position);
         return;
     }
     uint32_t bytesAfter = packet->length() - position;
@@ -459,7 +465,10 @@ bool TCPIn::checkConnectionClosed(struct fcb* fcb, Packet *packet)
         {
             // We ACK every packet and we discard it
             if(isFin(packet) || isSyn(packet) || getPayloadLength(packet) > 0)
+            {
+                setInitialAck(packet, getAckNumber(packet));
                 ackPacket(fcb, packet);
+            }
         }
 
         fcb->tcp_common->lock.release();

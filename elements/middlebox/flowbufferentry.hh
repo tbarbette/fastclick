@@ -5,7 +5,7 @@
  *
  * Romain Gaillard.
  */
- 
+
 #ifndef MIDDLEBOX_FLOWBUFFERENTRY_HH
 #define MIDDLEBOX_FLOWBUFFERENTRY_HH
 

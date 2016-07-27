@@ -1,3 +1,9 @@
+/*
+ * rbt.cc - Set of methods and structures used to create and manage red black trees
+ *
+ * Romain Gaillard - Adapted from the Red Black Tree implementation of Emin Martinian.
+ */
+
 #include <click/config.h>
 #include <click/glue.hh>
 #include "rbt.hh"
@@ -10,6 +16,8 @@ CLICK_DECLS
  * (http://web.mit.edu/~emin/www.old/source_code/red_black_tree/index.html)
  * (http://web.mit.edu/~emin/www.old/source_code/red_black_tree/LICENSE)
  */
+
+/********* Functions that were adapted *********/
 
 /***********************************************************************/
 /*  FUNCTION:  RBTreeCreate */
@@ -96,7 +104,7 @@ void LeftRotate(rb_red_blk_tree* tree, rb_red_blk_node* x)
 
 
 /***********************************************************************/
-/*  FUNCTION:  RighttRotate */
+/*  FUNCTION:  RightRotate */
 /**/
 /*  INPUTS:  This takes a tree so that it can access the appropriate */
 /*           root and nil pointers, and the node to rotate on. */
@@ -196,7 +204,7 @@ void TreeInsertHelp(rb_red_blk_tree* tree, rb_red_blk_node* z)
 /*           pointed to by key and info pointed to by info.  */
 /**/
 /*  OUTPUT:  This function returns a pointer to the newly inserted node */
-/*           which is guarunteed to be valid until this node is deleted. */
+/*           which is guaranteed to be valid until this node is deleted. */
 /*           What this means is if another data structure stores this */
 /*           pointer then the tree does not need to be searched when this */
 /*           is to be deleted. */
@@ -604,10 +612,8 @@ void RBDelete(rb_red_blk_tree* tree, rb_red_blk_node* z)
 
 
 
-/********* Added functions *********/
-/**
- * Complexity: O(log(n)) where n is the number of elements in the tree
- */
+/********* Added functions (by Romain Gaillard) *********/
+
 rb_red_blk_node* RBFindElementGreatestBelow(rb_red_blk_tree* tree, void* q)
 {
     rb_red_blk_node* x = tree->root->left;
@@ -640,9 +646,6 @@ rb_red_blk_node* RBFindElementGreatestBelow(rb_red_blk_tree* tree, void* q)
     return result;
 }
 
-/**
- * Complexity: O(log(n)) where n is the number of elements in the tree
- */
 rb_red_blk_node* RBMin(rb_red_blk_tree* tree)
 {
     rb_red_blk_node* nil = tree->nil;
@@ -659,9 +662,6 @@ rb_red_blk_node* RBMin(rb_red_blk_tree* tree)
     return min;
 }
 
-/**
- * Complexity: O(log(n)) where n is the number of elements in the tree
- */
 rb_red_blk_node* RBMax(rb_red_blk_tree* tree)
 {
     rb_red_blk_node* nil = tree->nil;
@@ -678,10 +678,6 @@ rb_red_blk_node* RBMax(rb_red_blk_tree* tree)
     return max;
 }
 
-/**
- * Complexity: O(k * log(n)) where k is the number of elements with a key < q
- * and n is the total number of elements in the tree
- */
 void RBPrune(rb_red_blk_tree* tree, void* q)
 {
     rb_red_blk_node* nil = tree->nil;
@@ -703,12 +699,12 @@ void RBPrune(rb_red_blk_tree* tree, void* q)
 
     rb_red_blk_node* pred = TreePredecessor(tree, end);
     end = pred;
-    if(end == nil)
+    if(end == nil || end == current)
         return;
 
     pred = TreePredecessor(tree, end);
     end = pred;
-    if(end == nil)
+    if(end == nil || end == current)
         return;
 
     // Browse the tree starting at the min element and going each time to the successor

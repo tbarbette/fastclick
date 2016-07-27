@@ -100,6 +100,12 @@ WritablePacket* HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packe
     const char* headerName, const char* content)
 {
     unsigned char* source = getPayload(packet);
+
+    // We set the content pointer to the TCP payload as we want to manipulate HTTP headers
+    // and the current content pointer is set to the HTTP payload
+    uint16_t offsetTcp = getPayloadOffset(packet);
+    setContentOffset(packet, offsetTcp);
+
     unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
 
     if(beginning == NULL)

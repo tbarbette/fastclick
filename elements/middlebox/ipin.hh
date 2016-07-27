@@ -14,7 +14,7 @@ IPIn()
 
 =s middlebox
 
-enty point of an IP path in the stack of the middlebox
+entry point of an IP path in the stack of the middlebox
 
 =d
 

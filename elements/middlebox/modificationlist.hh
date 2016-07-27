@@ -28,7 +28,8 @@ struct ModificationNode
         struct ModificationNode* next; /** Pointer to the next node */
 };
 
-/** @class ModificationList
+/**
+ * @class ModificationList
  * @brief Class used to store the modifications performed in a packet's structure
  *
  * This class is used to store the modifications made in the structure of a

@@ -47,10 +47,6 @@ public:
     void signalAck(struct fcb* fcb, uint32_t ack);
 
 private:
-    per_thread<BufferPool*> rawBufferPool;
-    per_thread<MemoryPool<CircularBuffer>> circularPool;
-    per_thread<Vector<unsigned char>> getBuffer;
-
     void prune(struct fcb *fcb);
     bool dataToRetransmit(struct fcb *fcb);
     void checkInitialization(struct fcb *fcb);
@@ -58,6 +54,10 @@ private:
     Packet* processPacketRetransmission(struct fcb *fcb, Packet *packet);
     bool manualTransmission(struct fcb *fcb, bool retransmission);
     uint16_t getMaxAmountData(struct fcb *fcb, uint16_t expected, bool canCut);
+    
+    per_thread<BufferPool*> rawBufferPool;
+    per_thread<MemoryPool<CircularBuffer>> circularPool;
+    per_thread<Vector<unsigned char>> getBuffer;
 };
 
 CLICK_ENDDECLS

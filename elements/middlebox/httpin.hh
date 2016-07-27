@@ -42,6 +42,9 @@ public:
 protected:
     Packet* processPacket(struct fcb*, Packet*);
 
+    virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
+
+private:
     /** @brief Remove a HTTP header from a request or a response
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the header is located
@@ -72,8 +75,6 @@ protected:
      * @return The packet with the HTTP version modified
      */
     WritablePacket* setHTTP10(struct fcb *fcb, WritablePacket *packet) CLICK_WARN_UNUSED_RESULT;
-
-    virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 };
 
 CLICK_ENDDECLS

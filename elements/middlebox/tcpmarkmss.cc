@@ -1,3 +1,9 @@
+/*
+ * tcpmarkmss.{cc,hh} -- annotate packets with the MSS of the flow
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -6,6 +12,7 @@
 #include "tcpmarkmss.hh"
 
 CLICK_DECLS
+
 
 TCPMarkMSS::TCPMarkMSS()
 {

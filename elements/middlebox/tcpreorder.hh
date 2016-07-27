@@ -17,6 +17,38 @@
 
 CLICK_DECLS
 
+/*
+=c
+
+TCPReorder(FLOWDIRECTION [, MERGESORT])
+
+=s middlebox
+
+reorder TCP packets
+
+=d
+
+This element reorder TCP packets before sending them on its first output.
+
+=item FLOWDIRECTION
+
+ID of the path for the connection (0 or 1). The return path must have the other ID.
+Thus, each direction of a TCP connection has a different ID.
+
+=item MERGESORT
+
+Only used with batching. Add each packets of the batch at the beginning of the list and reorder
+the list using merge sort instead of adding each packet of the batch directly at the right position.
+
+Complexity to process a batch with this option: O((n + k) * log (n + k))
+Complexity to process a batch without this option: O(k * n)
+
+Where k is the number of packets in the batch and n is the number of packets in the waiting list
+
+Default value: true.
+
+=a TCPIn, TCPOut */
+
 class TCPReorder : public BatchElement, public TCPElement
 {
 public:

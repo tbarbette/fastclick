@@ -203,7 +203,7 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
 
 bool HTTPIn::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
 {
-    return getAnnotationLastUseful(packet);
+    return (getAnnotationLastUseful(packet) || StackElement::isLastUsefulPacket(fcb, packet));
 }
 
 CLICK_ENDDECLS

@@ -1,3 +1,9 @@
+/*
+ * pathmerger.{cc,hh} -- Used to merge two paths into one in the middlebox stack
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -25,7 +31,7 @@ int PathMerger::configure(Vector<String> &, ErrorHandler *)
 
 void PathMerger::push_packet(int port, Packet *packet)
 {
-    // Similate Middleclick's FCB management
+    // Simulate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();
@@ -40,7 +46,7 @@ void PathMerger::push_packet(int port, Packet *packet)
 #if HAVE_BATCH
 void PathMerger::push_batch(int port, PacketBatch *batch)
 {
-    // Similate Middleclick's FCB management
+    // Simulate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();
@@ -134,7 +140,7 @@ void PathMerger::packetSent(struct fcb *fcb, Packet* packet)
 
 unsigned int PathMerger::determineFlowDirection()
 {
-    // We could chose either of the inputs as the answer would be the same
+    // We could choose either of the inputs as the answer would be the same
     return previousStackElements[0]->determineFlowDirection();
 }
 

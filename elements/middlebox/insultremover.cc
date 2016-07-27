@@ -22,6 +22,9 @@ InsultRemover::InsultRemover()
     // Initialize the memory pool of each thread
     for(unsigned int i = 0; i < poolBufferEntries.size(); ++i)
         poolBufferEntries.get_value(i).initialize(POOL_BUFFER_ENTRIES_SIZE);
+
+    closeAfterInsults = false;
+    closed = false;
 }
 
 int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -29,6 +32,11 @@ int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
     // Build the list of "insults"
     insults.push_back("and");
     insults.push_back("astronomical");
+
+    if(Args(conf, this, errh)
+    .read_p("CLOSECONNECTION", closeAfterInsults)
+    .complete() < 0)
+        return -1;
 
     return 0;
 }
@@ -40,6 +48,9 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
 
     if(!fcb->insultremover.flowBuffer.isInitialized())
         fcb->insultremover.flowBuffer.initialize(this, &(*poolBufferEntries));
+
+    if(closed)
+        return packet;
 
     if(isPacketContentEmpty(packet))
         return packet;
@@ -56,12 +67,25 @@ Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
             needMorePackets = true;
     }
 
+    // If the parameter "CLOSECONNECTION" is set and if insults have been found
+    // we close the connection after this packet and we replace its content by an error message
+    if(closeAfterInsults && fcb->insultremover.counterRemoved > 0)
+    {
+        closed = true;
+        closeConnection(fcb, packet, true, true);
+        removeBytes(fcb, packet, 0, getPacketContentSize(packet));
+        const char *message = "<font color='red'>The web page contains insults and has been "
+            "blocked</font><br />";
+        packet = insertBytes(fcb, packet, 0, strlen(message) + 1);
+        strcpy((char*)getPacketContent(packet), message);
+    }
+
     // If the beginning of an insult could be found at the end of a packet
     // we keep it in the buffer. Otherwise, we flush the buffer as we know
     // that we will not be able to find a part of an insult in it
     // Of course, if we have the last packet of the flow, we know
     // that it is useless to buffer it until the next one.
-    if(!isLastUsefulPacket(fcb, packet) && needMorePackets)
+    if(!isLastUsefulPacket(fcb, packet) && needMorePackets && !closed)
         requestMorePackets(fcb, packet);
     else
     {

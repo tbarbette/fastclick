@@ -1,10 +1,10 @@
 /*
  * bufferpool.hh - Class used to provide a pool of buffers that can have a dynamic size
- * and be resized at any moment
+ * and be resized at any moment.
  *
  * Romain Gaillard.
  */
- 
+
 #ifndef MIDDLEBOX_BUFFERPOOL_HH
 #define MIDDLEBOX_BUFFERPOOL_HH
 

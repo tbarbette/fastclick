@@ -1,3 +1,9 @@
+/*
+ * tcpelement.cc - Provides several methods that can be used by elements to manage TCP packets
+ *
+ * Romain Gaillard.
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>

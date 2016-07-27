@@ -1,3 +1,10 @@
+/*
+ * retransmissiontiming.cc - Class used to manage the timings of TCP retransmissions.
+ * Provides methods used to compute the RTT, retransmission timers, etc.
+ *
+ * Romain Gaillard.
+ */
+
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>

@@ -6,10 +6,39 @@
 
 CLICK_DECLS
 
+/*
+=c
+
+PathMerger()
+
+=s middlebox
+
+used to merge two paths into one in the middlebox stack
+
+=d
+
+This element is used to merge two paths into one in the middlebox. It must be used instead of
+connecting the output of two components to the input of another one. This is required as when
+an element calls a method of the stack, it propagates the call to the element connected to its
+input. If two outputs are connected to one input of an element, it cannot know which one of the
+two outputs was used to send the packet.
+PathMerger associates a packet to the input where it came from and thus it is able to propagate
+the method call to the right element by selecting the right input when a method of the stack
+is called on a packet.
+To merge two paths into one, connect each path to a different input of a PathMerger and the unique
+output will correspond to the merged path.
+
+*/
+
 class PathMerger : public TCPElement, public StackElement
 {
 public:
+    /** @brief Construct an PathMerger element
+     */
     PathMerger() CLICK_COLD;
+
+    /** @brief Destruct a PathMerger element
+     */
     ~PathMerger() CLICK_COLD;
 
     const char *class_name() const        { return "PathMerger"; }
@@ -39,12 +68,40 @@ protected:
     virtual unsigned int determineFlowDirection();
 
 private:
-    StackElement* previousStackElements[2];
+    StackElement* previousStackElements[2]; // Previous element for the two inputs
 
+    /** @brief Return the input number for a given packet
+     * @param fcb Pointer to the FCB of the flow
+     * @param packet The packet
+     * @return Input number from which the given packet came from
+     */
     int getPortForPacket(struct fcb *fcb, Packet *packet);
+
+    /** @brief Set the input number for a given packet
+     * @param fcb Pointer to the FCB of the flow
+     * @param packet The packet
+     * @param port Input number from which the given packet came from
+     */
     void setPortForPacket(struct fcb *fcb, Packet *packet, int port);
+
+    /** @brief Return the element from which came a given packet
+     * @param fcb Pointer to the FCB of the flow
+     * @param packet The packet
+     * @return Element from which came a given packet
+     */
     StackElement* getElementForPacket(struct fcb *fcb, Packet* packet);
+
+    /** @brief Remove the entry associating a packet to an input number
+     * @param fcb Pointer to the FCB of the flow
+     * @param packet The packet
+     */
     void removeEntry(struct fcb *fcb, Packet* packet);
+
+    /** @brief Add an entry associating a packet to an input number
+     * @param fcb Pointer to the FCB of the flow
+     * @param packet The packet
+     * @param port The input number
+     */
     void addEntry(struct fcb *fcb, Packet* packet, int port);
 };
 

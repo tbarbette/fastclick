@@ -1,3 +1,9 @@
+/*
+ * stackelement.{cc,hh} -- base class for elements of the stack of the middlebox
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -22,7 +28,7 @@ StackElement::~StackElement()
 
 void StackElement::push_packet(int, Packet *packet)
 {
-    // Similate Middleclick's FCB management
+    // Simulate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();
@@ -39,7 +45,7 @@ Packet* StackElement::pull(int)
     if(packet == NULL)
         return NULL;
 
-    // Similate Middleclick's FCB management
+    // Simulate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();
@@ -51,7 +57,7 @@ Packet* StackElement::pull(int)
 #if HAVE_BATCH
 void StackElement::push_batch(int, PacketBatch *batch)
 {
-    // Similate Middleclick's FCB management
+    // Simulate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();
@@ -65,7 +71,7 @@ void StackElement::push_batch(int, PacketBatch *batch)
 
 PacketBatch* StackElement::pull_batch(int port, int max)
 {
-    // Similate Middleclick's FCB management
+    // Simulate Middleclick's FCB management
     // We traverse the function stack waiting for TCPIn to give the flow
     // direction.
     unsigned int flowDirection = determineFlowDirection();

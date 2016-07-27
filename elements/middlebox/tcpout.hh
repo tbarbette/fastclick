@@ -10,9 +10,32 @@ class TCPIn;
 
 CLICK_DECLS
 
+/*
+=c
+
+TCPOut()
+
+=s middlebox
+
+exit point of a TCP path in the stack of the middlebox
+
+=d
+
+This element is the exit point of a TCP path in the stack of the middlebox by which all
+TCP packets must go after their TCP content has been processed. Each path containing a TCPOut element
+must also contain a TCPIn element
+
+The first output corresponds to the normal path. The second output is optional and is used
+to send packet back to the source (for instance to acknowledge packets).
+
+=a TCPIn */
+
 class TCPOut : public StackElement, public TCPElement
 {
 public:
+    /**
+     * @brief Construct a TCPOut element
+     */
     TCPOut() CLICK_COLD;
 
     const char *class_name() const        { return "TCPOut"; }
@@ -22,22 +45,77 @@ public:
     bool isOutElement()                   { return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+
+    /**
+     * @brief Send a ACK packet on the second output
+     * @param maintainer ByteStreamMaintainer of the other side of the connection (used to get
+     * information such as the window size)
+     * @param saddr IP source address
+     * @param daddr IP destination address
+     * @param sport Source port
+     * @param dport Destination port
+     * @param seq Sequence number
+     * @param ack Ack number
+     * @param force Boolean used to force the sending of the ACK even if a previous ack for the same
+     * data as already been sent
+     */
     void sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport,
          uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force = false);
+
+     /**
+      * @brief Send a packet to close the connection on the second output
+      * @param maintainer ByteStreamMaintainer of the other side of the connection (used to get
+      * information such as the window size)
+      * @param saddr IP source address
+      * @param daddr IP destination address
+      * @param sport Source port
+      * @param dport Destination port
+      * @param seq Sequence number
+      * @param ack Ack number
+      * @param graceful Boolean indicating if the connection must be closed gracefully (via a FIN
+      * packet) or ungracefully (via a RST packet)
+      */
     void sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
         uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful);
 
-    void setInElement(TCPIn*);
+    /**
+     * @brief Set the TCPIn element associated
+     * @param element A pointer to the TCPIn element associated
+     */
+    void setInElement(TCPIn* element);
 
+    /**
+     * @brief Set the flow direction
+     * @param flowDirection The flow direction
+     */
     void setFlowDirection(unsigned int flowDirection);
+
+    /**
+     * @brief Return the flow direction
+     * @return The flow direction
+     */
     unsigned int getFlowDirection();
+
+    /**
+     * @brief Return the flow direction of the other path
+     * @return The flow direction of the other path
+     */
     unsigned int getOppositeFlowDirection();
 
 protected:
     Packet* processPacket(struct fcb*, Packet*);
-    TCPIn* inElement;
+
+    TCPIn* inElement; // TCPIn element of this path
+
 private:
+    /**
+     * @brief Check whether the connection has been closed or not
+     * @param fcb A pointer to the FCB of this flow
+     * @param packet The packet
+     * @return A boolean indicating if the connection is still open
+     */
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
+
     unsigned int flowDirection;
 };
 

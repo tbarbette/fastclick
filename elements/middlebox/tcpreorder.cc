@@ -1,3 +1,9 @@
+/*
+ * tcpreorder.{cc,hh} -- reorder TCP packets
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>

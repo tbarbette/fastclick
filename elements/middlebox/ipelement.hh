@@ -13,7 +13,8 @@
 
 CLICK_DECLS
 
-/** @class IPElement
+/**
+ * @class IPElement
  * @brief This class provides several methods that can be used by elements that inherits
  * from it to manage IP packets.
  */

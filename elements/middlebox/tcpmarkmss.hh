@@ -12,9 +12,42 @@
 
 CLICK_DECLS
 
+/*
+=c
+
+TCPMarkMSS(FLOWDIRECTION, ANNOTATION [, OFFSET])
+
+=s middlebox
+
+annotate packets with the MSS of the flow
+
+=d
+
+This element detects the MSS of a TCP flows and annotates every packet of the flow with this MSS.
+It is typically used in conjunction with TCPFragmenter to ensure that the TCP packets are not
+too big.
+
+=item FLOWDIRECTION
+
+ID of the path for the connection (0 or 1). The return path must have the other ID.
+Thus, each direction of a TCP connection has a different ID.
+
+=item ANNOTATION
+
+Offset of the annotation
+
+=item OFFSET
+
+Offset to add to the MSS before setting the annotation (can be negative)
+
+=a TCPFragmenter */
+
 class TCPMarkMSS : public BatchElement, public TCPElement
 {
 public:
+    /**
+     * @brief Construct a TCPMarkMSS element
+     */
     TCPMarkMSS() CLICK_COLD;
 
     const char *class_name() const        { return "TCPMarkMSS"; }
@@ -32,6 +65,12 @@ public:
     #endif
 
 private:
+    /**
+     * @brief Annotate the packet with the MSS of the flow.
+     * @param fcb A pointer to the FCB of the flow
+     * @param packet The packet
+     * @return The packet annotated with the MSS of the flow
+     */
     Packet* markMSS(struct fcb *fcb, Packet *packet);
 
     int8_t annotation;
