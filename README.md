@@ -2,8 +2,7 @@ FastClick
 =========
 This is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It is the result of
-our ANCS paper available at http://hdl.handle.net/2268/181954
-You'll find more details on http://fastclick.run.montefiore.ulg.ac.be
+our ANCS paper available at http://hdl.handle.net/2268/181954 .
 
 Partial DPDK support is now reverted into vanilla Click (without support for batching, auto-thread assignment, thread vector, ...).
 
@@ -82,6 +81,27 @@ FYI, the reason why push has been renamed to push\_packet is that when a
 non-batch combatible element want to call push on your element, it wants to call 
 PacketBatch::push and not your version because the former one will actually 
 rebuild a batch if needed and call your element's putch\_batch instead.
+
+Differences with the ANCS paper
+-------------------------------
+For simplicity, we reference all input element as "FromDevice" and output
+element as "ToDevice". However in practice our I/O elements are 
+FromNetmapDevice/ToNetmapDevice and FromDpdkDevice/ToDpdkDevice. They both
+inherit from QueueDevice, which is a generic abstract element to implement a
+device which supports multiple queues (or in a more generic way I/O through
+multiple different threads).
+Thread vector and bit vector designate the same thing.
+
+The --enable-dpdk-packet flag allows to use the metadata of the DPDK packets
+and use the click Packet class only as a wrapper, as such the Click buffer
+and the Click pool is completly unused. However we did not spoke of that feature
+in the paper as this doesn't improve performance. DPDK metadata is written
+in the beginning of the packet buffer. And writing the huge Click annotation
+space (~164 bytes) leads to more cache miss than with the Click pool where a
+few Click Packet descriptors are re-used to "link" to differents DPDK buffers
+using the pool recycling mechanism. Even when reducing the annotation to a
+minimal size (dpdk metadata + next + prev + transport header + ...) this still
+force us to fetch a new cacheline.
 
 
 Getting help
