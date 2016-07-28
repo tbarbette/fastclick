@@ -66,9 +66,7 @@ void TCPReorder::flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep
 
     // Update the head if the list is going to be empty
     if(fcb->tcpreorder.packetList == toRemove)
-    {
         fcb->tcpreorder.packetList = NULL;
-    }
 
     struct TCPPacketListNode* toFree = NULL;
 
@@ -93,13 +91,7 @@ void TCPReorder::push_packet(int, Packet *packet)
 #if HAVE_BATCH
 void TCPReorder::push_batch(int port, PacketBatch *batch)
 {
-    if(mergeSort)
-        processPacketBatch(&fcbArray[flowDirection], batch);
-    else
-    {
-        FOR_EACH_PACKET_SAFE(batch, packet)
-            processPacket(&fcbArray[flowDirection], packet);
-    }
+    processPacketBatch(&fcbArray[flowDirection], batch);
 }
 #endif
 
@@ -122,6 +114,7 @@ void TCPReorder::processPacketBatch(struct fcb *fcb, PacketBatch* batch)
     if(fcb->tcpreorder.pool == NULL)
         fcb->tcpreorder.pool = &(*pool);
 
+    // O(k)
     FOR_EACH_PACKET_SAFE(batch, packet)
     {
         checkFirstPacket(fcb, packet);
@@ -129,16 +122,24 @@ void TCPReorder::processPacketBatch(struct fcb *fcb, PacketBatch* batch)
         if(!checkRetransmission(fcb, packet))
             continue;
 
-        // Add the packet at the beginning of the list unsorted (O(1))
-        struct TCPPacketListNode* toAdd = fcb->tcpreorder.pool->getMemory();
+        if(mergeSort)
+        {
+            // Add the packet at the beginning of the list unsorted (O(1))
+            struct TCPPacketListNode* toAdd = fcb->tcpreorder.pool->getMemory();
 
-        toAdd->packet = packet;
-        toAdd->next = fcb->tcpreorder.packetList;
-        fcb->tcpreorder.packetList = toAdd;
+            toAdd->packet = packet;
+            toAdd->next = fcb->tcpreorder.packetList;
+            fcb->tcpreorder.packetList = toAdd;
+        }
+        else
+            putPacketInList(fcb, packet); // Put the packet directly at the right position O(n + k)
     }
 
-    // Sort the list of waiting packets (O(n*log(n)))
-    fcb->tcpreorder.packetList = sortList(fcb->tcpreorder.packetList);
+    if(mergeSort)
+    {
+        // Sort the list of waiting packets (O((n + k) * log(n + k)))
+        fcb->tcpreorder.packetList = sortList(fcb->tcpreorder.packetList);
+    }
 
     sendEligiblePackets(fcb);
 }
@@ -267,7 +268,9 @@ void TCPReorder::putPacketInList(struct fcb* fcb, Packet* packet)
     // Browse the list until we find a packet with a greater sequence number than the
     // packet to add in the list
     while(packetNode != NULL
-        && (SEQ_LT(getSequenceNumber(packetNode->packet), getSequenceNumber(packet))))
+        && (SEQ_LT(getSequenceNumber(packetNode->packet), getSequenceNumber(packet))
+            || (getSequenceNumber(packetNode->packet) == getSequenceNumber(packet)
+                && SEQ_LT(getAckNumber(packetNode->packet), getAckNumber(packet)))))
     {
         prevNode = packetNode;
         packetNode = packetNode->next;
@@ -385,7 +388,9 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
                     p = p->next;
                     psize--;
                 }
-                else if(SEQ_LT(getSequenceNumber(p->packet), getSequenceNumber(q->packet)))
+                else if(SEQ_LT(getSequenceNumber(p->packet), getSequenceNumber(q->packet))
+                    || ((getSequenceNumber(p->packet) == getSequenceNumber(q->packet))
+                        && SEQ_LT(getAckNumber(p->packet), getAckNumber(q->packet))))
                 {
                     /* First element of p is lower (or same);
                      * e must come from p. */

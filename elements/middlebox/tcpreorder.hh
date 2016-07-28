@@ -49,7 +49,7 @@ Where k is the number of packets in the batch and n is the number of packets in 
 
 Default value: true.
 
-=a TCPIn, TCPOut */
+=a TCPIn, TCPOut, TCPRetransmitter */
 
 class TCPReorder : public BatchElement, public TCPElement
 {
@@ -79,15 +79,14 @@ public:
 
 private:
     /**
-     * @brief Process a packet. In batching mode, this corresponds to the naive approach.
+     * @brief Process a packet (ensure that it is in order)
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet
      */
     void processPacket(struct fcb *fcb, Packet* packet);
 
     /**
-     * @brief Process a packet of batch all at the same time instead of processing each packet
-     * of the batch one after the other. This method applies the merge sort mechanism.
+     * @brief Process a batch of packets (ensure that they are in order)
      * @param fcb A pointer to the FCB of the flow
      * @param batch The batch of packets
      */
