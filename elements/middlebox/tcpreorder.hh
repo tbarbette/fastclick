@@ -28,7 +28,9 @@ reorder TCP packets
 
 =d
 
-This element reorder TCP packets before sending them on its first output.
+This element reorder TCP packets before sending them on its first output. It can be used outside
+of the stack of the middlebox. The second output is optional and is used to push retransmitted
+packets. If the second output is not used, retransmitted packets are dropped.
 
 =item FLOWDIRECTION
 
@@ -52,7 +54,14 @@ Default value: true.
 class TCPReorder : public BatchElement, public TCPElement
 {
 public:
+    /**
+     * @brief Construct a TCPReorder element
+     */
     TCPReorder() CLICK_COLD;
+
+    /**
+     * @brief Destruct a TCPReorder element
+     */
     ~TCPReorder() CLICK_COLD;
 
     // Click related methods
@@ -69,17 +78,79 @@ public:
     #endif
 
 private:
+    /**
+     * @brief Process a packet. In batching mode, this corresponds to the naive approach.
+     * @param fcb A pointer to the FCB of the flow
+     * @param packet The packet
+     */
     void processPacket(struct fcb *fcb, Packet* packet);
+
+    /**
+     * @brief Process a packet of batch all at the same time instead of processing each packet
+     * of the batch one after the other. This method applies the merge sort mechanism.
+     * @param fcb A pointer to the FCB of the flow
+     * @param batch The batch of packets
+     */
     void processPacketBatch(struct fcb *fcb, PacketBatch* batch);
+
+    /**
+     * @brief Put a packet in the list of waiting packets
+     * @param fcb A pointer to the FCB of the flow
+     * @param packet The packet to add
+     */
     void putPacketInList(struct fcb *fcb, Packet* packet);
+
+    /**
+     * @brief Send the set of in order packets from the list of waiting packets
+     * @param fcb A pointer to the FCB of the flow
+     */
     void sendEligiblePackets(struct fcb *fcb);
-    tcp_seq_t getSequenceNumber(Packet* packet);
+
+    /**
+     * @brief Check if the packet is the first one of the flow and acts consequently.
+     * In particular, it flushes the list of waiting packets and set the sequence number of the
+     * next expected packet
+     * @param fcb A pointer to the FCB of the flow
+     * @param packet The packet to check
+     */
     void checkFirstPacket(struct fcb *fcb, Packet* packet);
+
+    /**
+     * @brief Flush the list of waiting packets
+     * @param fcb A pointer to the FCB of the flow
+     */
     void flushList(struct fcb *fcb);
+
+    /**
+     * @brief Flush the list of waiting packets after a given packet
+     * @param fcb A pointer to the FCB of the flow
+     * @param toKeep Pointer to the last element that will be kept in the list
+     * @param toRemove Pointer to the first element that will be removed
+     */
     void flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep,
         struct TCPPacketListNode *toRemove);
+
+    /**
+     * @brief Check if a given packet is a retransmission
+     * @param fcb A pointer to the FCB of the flow
+     * @param packet The packet to check
+     * @return True if the given packet is a retransmission
+     */
     bool checkRetransmission(struct fcb *fcb, Packet* packet);
+
+    /**
+     * @brief Return the sequence number of the packet that will be received after the given one
+     * @param fcb A pointer to the FCB of the flow
+     * @param packet The packet to check
+     * @return The sequence number of the packet after the given one
+     */
     tcp_seq_t getNextSequenceNumber(Packet* packet);
+
+    /**
+     * @brief Sort the list of waiting packets using merge sort
+     * @param list A pointer to the head of the list of waiting packets
+     * @return A pointer to the new head of the list of waiting packets
+     */
     TCPPacketListNode* sortList(TCPPacketListNode *list);
 
     unsigned int flowDirection;

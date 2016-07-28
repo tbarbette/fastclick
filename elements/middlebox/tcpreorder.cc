@@ -242,13 +242,6 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
     #endif
 }
 
-tcp_seq_t TCPReorder::getSequenceNumber(Packet* packet)
-{
-    const click_tcp *tcph = packet->tcp_header();
-
-    return ntohl(tcph->th_seq);
-}
-
 tcp_seq_t TCPReorder::getNextSequenceNumber(Packet* packet)
 {
     tcp_seq_t currentSeq = getSequenceNumber(packet);

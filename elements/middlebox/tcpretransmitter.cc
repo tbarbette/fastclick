@@ -1,3 +1,11 @@
+/*
+ * tcpretransmitter.{cc,hh} -- manages the tcp retransmissions and ensures that data we are
+ * responsible for (data we ACKed) is correctly received and that their transmission
+ * is done correctly, using the tcp mechanisms such as slow start.
+ * Romain Gaillard
+ *
+ */
+
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
