@@ -43,7 +43,7 @@ Only used with batching. Add each packets of the batch at the beginning of the l
 the list using merge sort instead of adding each packet of the batch directly at the right position.
 
 Complexity to process a batch with this option: O((n + k) * log (n + k))
-Complexity to process a batch without this option: O(k * n)
+Complexity to process a batch without this option: O(k * (n + k))
 
 Where k is the number of packets in the batch and n is the number of packets in the waiting list
 
