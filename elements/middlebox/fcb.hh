@@ -243,6 +243,18 @@ struct fcb
 
 // Global array of the two FCBs corresponding to each direction of the
 // connection
+
+// Note about the global variables used to simulate the FCB system:
+// As the FCB is represented by a global variable for the purpose of the simulation, when the
+// program is closed, it is destructed after all the others elements. Thus, the destructor
+// of the structures in the FCB may try to access variables that do not exist anymore as the
+// elements such as TCPOut and TCPIn have already been destroyed (as they are destroyed before
+// global variables), such as memory pools.
+// This may lead to invalid memory access when the program is closed.
+//
+// This problem will not occur when the system is integrated to Middleclick as the FCB will
+// be destructed before the elements such as TCPOut and TCPIn and will be able to access the
+// right variables.
 extern struct fcb fcbArray[2];
 
 #endif
