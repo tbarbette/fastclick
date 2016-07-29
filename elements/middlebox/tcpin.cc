@@ -25,6 +25,14 @@ TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
 
     for(unsigned int i = 0; i < poolModificationLists.size(); ++i)
         poolModificationLists.get_value(i).initialize(MODIFICATIONLISTS_POOL_SIZE);
+
+    // Warning about the fact that the system must be integrated to Middleclick in order to
+    // work properly.
+    #ifndef HAVE_FLOW
+        click_chatter("WARNING: You are using a version of this program that is not compatible"
+            " with the flow management system provided by Middleclick. Therefore, you will"
+            " only be able to use one flow.");
+    #endif
 }
 
 int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -119,6 +127,14 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         {
             click_chatter("Warning: Unexpected SYN packet. Dropping it");
             p->kill();
+
+            // Warning about the fact that the system must be integrated to Middleclick in order to
+            // work properly.
+            #ifndef HAVE_FLOW
+                click_chatter("WARNING: You are using a version of this program that is not compatible"
+                    " with the flow management system provided by Middleclick. Therefore, you will"
+                    " only be able to use one flow.");
+            #endif
 
             return NULL;
         }
