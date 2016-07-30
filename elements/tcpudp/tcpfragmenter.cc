@@ -31,6 +31,10 @@ TCPFragmenter::TCPFragmenter()
     _fragments = 0;
     _fragmented_count = 0;
     _count = 0;
+
+    #if HAVE_BATCH
+        in_batch_mode = BATCH_MODE_YES;
+    #endif
 }
 
 TCPFragmenter::~TCPFragmenter()
