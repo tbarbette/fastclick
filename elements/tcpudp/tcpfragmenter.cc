@@ -58,7 +58,7 @@ TCPFragmenter::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-TCPFragmenter::push(int, Packet *p)
+TCPFragmenter::push_packet(int, Packet *p)
 {
     int mtu = _mtu;
     if (_mtu_anno >= 0 && p->anno_u16(_mtu_anno) &&
@@ -124,6 +124,97 @@ TCPFragmenter::push(int, Packet *p)
         output(0).push(q);
     }
 }
+
+#if HAVE_BATCH
+void
+TCPFragmenter::push_batch(int, PacketBatch *batch)
+{
+    // We create a new batch because the TCP fragmentation may result in the creation of
+    // new packets in the middle of the batch
+    PacketBatch* newBatch = NULL;
+
+    // We process each packet of the old batch
+    FOR_EACH_PACKET_SAFE(batch, p)
+    {
+        int mtu = _mtu;
+        if (_mtu_anno >= 0 && p->anno_u16(_mtu_anno) &&
+    	(!mtu || mtu > p->anno_u16(_mtu_anno)))
+    	mtu = p->anno_u16(_mtu_anno);
+
+        int32_t hlen;
+        int32_t tcp_len;
+        {
+            const click_ip *ip = p->ip_header();
+            const click_tcp *tcp = p->tcp_header();
+            hlen = (ip->ip_hl<<2) + (tcp->th_off<<2);
+            tcp_len = ntohs(ip->ip_len) - hlen;
+        }
+
+        int max_tcp_len = mtu - hlen;
+
+        _count++;
+        if (!mtu || max_tcp_len <= 0 || tcp_len < max_tcp_len) {
+            // We add the packet to the batch we are building instead of sending it immediately
+            if(newBatch == NULL)
+                newBatch = PacketBatch::make_from_packet(p);
+            else
+                newBatch->append_packet(p);
+            // Process the next packet
+            continue;
+        }
+
+        _fragmented_count++;
+        for (int offset = 0; offset < tcp_len; offset += max_tcp_len) {
+            Packet *p_clone;
+            if (offset + max_tcp_len < tcp_len)
+                p_clone = p->clone();
+            else {
+                p_clone = p;
+                p = 0;
+            }
+            if (!p_clone)
+                break;
+            WritablePacket *q = p_clone->uniqueify();
+            p_clone = 0;
+            click_ip *ip = q->ip_header();
+            click_tcp *tcp = q->tcp_header();
+            uint8_t *tcp_data = ((uint8_t *)tcp) + (tcp->th_off<<2);
+            int this_len = tcp_len - offset > max_tcp_len ? max_tcp_len : tcp_len - offset;
+            if (offset != 0)
+                memcpy(tcp_data, tcp_data + offset, this_len);
+            q->take(tcp_len - this_len);
+            ip->ip_len = htons(q->end_data() - q->network_header());
+            ip->ip_sum = 0;
+            #if HAVE_FAST_CHECKSUM
+                    ip->ip_sum = ip_fast_csum((unsigned char *)ip, q->network_header_length() >> 2);
+            #else
+                    ip->ip_sum = click_in_cksum((unsigned char *)ip, q->network_header_length());
+            #endif
+
+            if ((tcp->th_flags & TH_FIN) && offset + mtu < tcp_len)
+                tcp->th_flags ^= TH_FIN;
+
+            tcp->th_seq = htonl(ntohl(tcp->th_seq) + offset);
+            tcp->th_sum = 0;
+
+            // now calculate tcp header cksum
+            int plen = q->end_data() - (uint8_t*)tcp;
+            unsigned csum = click_in_cksum((unsigned char *)tcp, plen);
+            tcp->th_sum = click_in_cksum_pseudohdr(csum, ip, plen);
+            _fragments++;
+            // We add the packet to the batch we are building instead of sending it immediately
+            if(newBatch == NULL)
+                newBatch = PacketBatch::make_from_packet(q);
+            else
+                newBatch->append_packet(q);
+        }
+    }
+
+    // We now send the batch we built
+    if(newBatch != NULL)
+        output_push_batch(0, newBatch);
+}
+#endif
 
 void
 TCPFragmenter::add_handlers()
