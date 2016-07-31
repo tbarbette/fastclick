@@ -274,6 +274,26 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
     // Check if we really have something to retransmit
     // If the full content of the packet was removed, mappedSeqEnd = mappedSeq
     uint32_t sizeOfRetransmission = mappedSeqEnd - mappedSeq;
+
+    // If the packet is just a FIN or RST packet, we let it go as it, with seq and ack mapped
+    if(getPayloadLength(packet) == 0 && (isFin(packet) || isRst(packet)))
+    {
+        WritablePacket *newPacket = packet->uniqueify();
+
+        // Map the previous ACK
+        uint32_t ack = getAckNumber(newPacket);
+        ack = fcb->tcp_common->maintainers[oppositeFlowDirection].mapAck(ack);
+        setAckNumber(newPacket, ack);
+        setSequenceNumber(newPacket, mappedSeq);
+
+        // Recompute the checksums
+        computeTCPChecksum(newPacket);
+        computeIPChecksum(newPacket);
+
+        fcb->tcp_common->lock.release();
+        return newPacket;
+    }
+
     if(sizeOfRetransmission <= 0)
     {
         packet->kill();
@@ -486,7 +506,11 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     if(retransmission)
         start = otherMaintainer.getLastAckReceived();
     else
+    {
         start = fcb->tcp_common->retransmissionTimings[flowDirection].getLastManualTransmission();
+        if(SEQ_LT(start, otherMaintainer.getLastAckReceived()))
+            start = otherMaintainer.getLastAckReceived();
+    }
 
     uint32_t end = otherMaintainer.getLastAckSent();
     end = maintainer.mapSeq(end);
