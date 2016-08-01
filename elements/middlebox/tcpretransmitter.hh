@@ -160,7 +160,7 @@ private:
      * canCut is true, the method can return any amount in the interval [0, expected]
      * @return The amount of data we can send
      */
-    uint16_t getMaxAmountData(struct fcb *fcb, uint16_t expected, bool canCut);
+    uint32_t getMaxAmountData(struct fcb *fcb, uint32_t expected, bool canCut);
 
     per_thread<BufferPool*> rawBufferPool;
     per_thread<MemoryPool<CircularBuffer>> circularPool;

@@ -275,7 +275,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
     // If the full content of the packet was removed, mappedSeqEnd = mappedSeq
     uint32_t sizeOfRetransmission = mappedSeqEnd - mappedSeq;
 
-    // If the packet is just a FIN or RST packet, we let it go as it, with seq and ack mapped
+    // If the packet is just a FIN or RST packet, we let it go as it is, with seq and ack mapped
     if(getPayloadLength(packet) == 0 && (isFin(packet) || isRst(packet)))
     {
         WritablePacket *newPacket = packet->uniqueify();
@@ -449,6 +449,7 @@ void TCPRetransmitter::transmitMoreData(struct fcb* fcb)
 
     fcb->tcp_common->lock.acquire();
     // Try to send more data waiting in the buffer
+
     if(manualTransmission(fcb, false))
     {
         // Start the retransmission timer if not already done to be sure that
@@ -583,7 +584,7 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     return true;
 }
 
-uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, bool canCut)
+uint32_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint32_t expected, bool canCut)
 {
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
@@ -625,6 +626,7 @@ uint16_t TCPRetransmitter::getMaxAmountData(struct fcb *fcb, uint16_t expected, 
     uint64_t windowSize = otherMaintainer.getWindowSize();
     if(otherMaintainer.getUseWindowScale())
         windowSize *= otherMaintainer.getWindowScale();
+
     if(inFlight + expected > windowSize)
     {
         if(canCut)

@@ -43,7 +43,7 @@ void CircularBuffer::increaseBufferSize(uint32_t addSize)
     {
         // In this case, the end of the buffer has an index lower than
         // the start, meaning that we indeed have a circularity in the buffer
-        // This case is problematic when when increase the size of the buffer
+        // This case is problematic when we increase the size of the buffer
         // has it means that some new elements would be added between the start
         // and the end.
         // To overcome this, we simply move the elements between the start
@@ -102,8 +102,8 @@ void CircularBuffer::addDataAtEnd(const unsigned char* data, uint32_t length)
     blank = false;
 
     // Check that the buffer is large enough, otherwise increase its size
-    if(getSize() + length > getCapacity())
-        increaseBufferSize(getSize() + length - getCapacity());
+    if(getSize() + length >= getCapacity())
+        increaseBufferSize(getSize() + length - getCapacity() + 1);
 
     uint32_t addPosition = bufferEnd;
 
