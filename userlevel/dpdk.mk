@@ -88,6 +88,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_MBUF_OFFLOAD)   += -lrte_mbuf_offload
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IP_FRAG)        += -lrte_ip_frag
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ETHER)          += -lethdev
 _LDLIBS-$(CONFIG_RTE_LIBRTE_CRYPTODEV)      += -lrte_cryptodev
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MALLOC)         += -lrte_malloc
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MEMPOOL)        += -lrte_mempool
 _LDLIBS-$(CONFIG_RTE_LIBRTE_RING)           += -lrte_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EAL)            += -lrte_eal
@@ -102,7 +103,13 @@ ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),n)
 # plugins (link only if static libraries)
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VMXNET3_PMD)    += -lrte_pmd_vmxnet3_uio
+
+ifeq ($(shell [ \( $(RTE_VER_MAJOR) -ge 2 \) -a \( $(RTE_VER_MINOR) -ge 1  \) ] && echo true),true)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD)     += -lrte_pmd_virtio
+else
+_LDLIBS-$(CONFIG_RTE_LIBRTE_VIRTIO_PMD)     += -lrte_pmd_virtio_uio
+endif
+
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BNX2X_PMD)      += -lrte_pmd_bnx2x
 _LDLIBS-$(CONFIG_RTE_LIBRTE_CXGBE_PMD)      += -lrte_pmd_cxgbe
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ENIC_PMD)       += -lrte_pmd_enic
