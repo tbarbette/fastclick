@@ -215,54 +215,6 @@ void ModificationList::commit(ByteStreamMaintainer &maintainer)
         uint32_t newPositionAck = node->position + offsetTotal;
         offsetTotal += node->offset;
 
-        if(node->offset > 0 && offsetTotal < 0)
-        {
-            /* When we insert bytes in the packets, by default, when committed,
-             * it will create an entry in the tree at the position of the
-             * insertion with a negative offset (corresponding to the number of
-             * bytes inserted).
-             * When we convert a position, it will decrease this position
-             * by the offset PROVIDED THAT the new position is not below the
-             * position of the node.
-             * e.g: we insert 4 bytes at the positon 3, if we commit, it creates
-             * an entry in the tree (3, -4). Thus, all the positions in the
-             * interval [3, 7] will be converted to 2 (to ensure the new
-             * value is at least equal to the max value obtain via
-             * the predecessor: 2)
-             *
-             * A problem occurs when modifications occuring earlier in the stream
-             * result in a positive total offset. For instance, if we had the key
-             * (1, 6), the modification described above will create the key
-             * (3, 2) and we can see that the offset is now positive.
-             * This is problematic as we do not have the behaviour described
-             * above anymore: no interval will be converted in a given key.
-             *
-             * To overcome this problem, we insert two keys instead of one.
-             * The first one at the beginning of the insertion that will
-             * have an offset to which the length of the insertion is added
-             * The second key is added at the position after the insertion
-             * with the original offset.
-             * With the example above, we now have three keys:
-             * (1, 6)
-             * (3, 6) (6 is 2 (original offset) + 4 (length of the insertion))
-             * (7, 2) (7 is 3 (original position) + 4 (length of the insertion))
-             *
-             * Thus, if we request a position in the inserted area, we will
-             * obtain a position after this area, which will be corrected to be
-             * at most the position of the insertion (here 7 + 2 = 9)
-             * during the mapping. Therefore, every position in the interval
-             * [3, 7] will be converted to the same position, 9, and we get back
-             * the behaviour we wanted
-             */
-
-            // We add the length of the insertion to the new offset
-            int insertedOffset = -(offsetTotal - node->offset);
-
-            maintainer.insertInAckTree(newPositionAck, insertedOffset);
-
-            newPositionAck += (unsigned)node->offset;
-        }
-
         // The position of the SEQ mapping remains unchanged
         uint32_t newPositionSeq = node->position;
 
