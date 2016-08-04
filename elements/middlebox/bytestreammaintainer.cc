@@ -70,7 +70,6 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
     // Find the element with the greatest key that is below or equal to the given position
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &positionSeek);
     rb_red_blk_node* pred = treeAck->nil;
-    rb_red_blk_node* succ = treeAck->nil;
     uint32_t nodeKey = 0;
     int nodeInfo = 0;
     uint32_t newPosition = position;
@@ -85,9 +84,8 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 
     newPosition += nodeInfo;
 
-    // Search the predecessor and the successor of the node
+    // Search the predecessor of the node
     pred = TreePredecessor(treeAck, node);
-    succ = TreeSuccessor(treeAck, node);
 
     int predOffset = 0;
     // If the node has a predecessor
@@ -102,26 +100,6 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
     uint32_t predBound = nodeKey + predOffset;
     if(SEQ_LT(newPosition, predBound))
         newPosition = predBound;
-
-    // Check that the computed value is at most equal to the lowest value
-    // obtained via the successor
-    if(succ != treeAck->nil)
-    {
-        uint32_t succPosition = *((uint32_t*)succ->key);
-        int succOffset = *((int*)succ->info);
-
-        // This checking only applies if the offset of the successor is positive
-        // as a negative offset would give a value lower than the value of the successor key
-        if(succOffset > 0)
-        {
-            uint32_t succBound = 0;
-
-            succBound = succPosition + succOffset;
-
-            if(SEQ_GT(newPosition, succBound))
-                newPosition = succBound;
-        }
-    }
 
     return newPosition;
 }
