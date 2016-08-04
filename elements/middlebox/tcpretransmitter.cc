@@ -263,6 +263,11 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
 
     uint32_t mappedSeq = maintainer.mapSeq(seq);
 
+    // Ensure that the sequence number is at least equal to the last ack received to avoid
+    // sending useless data
+    if(SEQ_LT(mappedSeq, fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived()))
+        mappedSeq = fcb->tcp_common->maintainers[oppositeFlowDirection].getLastAckReceived();
+
     uint32_t payloadSize = getPayloadLength(packet);
     uint32_t mappedSeqEnd = maintainer.mapSeq(seq + payloadSize);
 
@@ -273,7 +278,10 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
 
     // Check if we really have something to retransmit
     // If the full content of the packet was removed, mappedSeqEnd = mappedSeq
-    uint32_t sizeOfRetransmission = mappedSeqEnd - mappedSeq;
+    uint32_t sizeOfRetransmission = 0;
+
+    if(SEQ_LT(mappedSeq, mappedSeqEnd))
+        sizeOfRetransmission = mappedSeqEnd - mappedSeq;
 
     // If the packet is just a FIN or RST packet, we let it go as it is, with seq and ack mapped
     if(getPayloadLength(packet) == 0 && (isFin(packet) || isRst(packet)))
