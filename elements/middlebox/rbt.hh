@@ -80,55 +80,37 @@ public:
      * @brief Allocate and return memory for a node
      * @return A pointer to the allocated node
      */
-    virtual rb_red_blk_node* allocateNode(void)
-    {
-        return (rb_red_blk_node*)malloc(sizeof(rb_red_blk_node));
-    }
+    virtual rb_red_blk_node* allocateNode(void) = 0;
 
     /**
      * @brief Allocate and return memory for a tree
      * @return A pointer to the allocated tree
      */
-    virtual rb_red_blk_tree* allocateTree(void)
-    {
-        return (rb_red_blk_tree*) malloc(sizeof(rb_red_blk_tree));
-    }
+    virtual rb_red_blk_tree* allocateTree(void) = 0;
 
     /**
      * @brief Free the memory used by a tree
      * @param tree Pointer to the tree
      */
-    virtual void freeTree(rb_red_blk_tree* tree)
-    {
-        free(tree);
-    }
+    virtual void freeTree(rb_red_blk_tree* tree) = 0;
 
     /**
      * @brief Free the memory used by a node
      * @param node Pointer to the node
      */
-    virtual void freeNode(rb_red_blk_node* node)
-    {
-        free(node);
-    }
+    virtual void freeNode(rb_red_blk_node* node) = 0;
 
     /**
      * @brief Free the memory used by a key
      * @param key Pointer to the key
      */
-    virtual void freeKey(void* key)
-    {
-        free(key);
-    }
+    virtual void freeKey(void* key) = 0;
 
     /**
      * @brief Free the memory used by an info
      * @param info Pointer to the info
      */
-    virtual void freeInfo(void* info)
-    {
-        free(info);
-    }
+    virtual void freeInfo(void* info) = 0;
 };
 
 /**

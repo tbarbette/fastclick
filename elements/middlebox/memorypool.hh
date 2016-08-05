@@ -50,7 +50,7 @@ public:
             node = node->next;
 
             // Free the node
-            free(toDelete);
+            delete toDelete;
         }
     }
 
@@ -100,6 +100,18 @@ private:
     {
         MemoryPoolNode *next; /** Pointer to the next element */
         T data; /** Object of type T stored in the pool */
+
+        // Constructors and destructors required since T can be an object with a constructor
+        // that will be deleted from the union (C++11)
+        MemoryPoolNode()
+        {
+            next = NULL;
+        }
+
+        ~MemoryPoolNode()
+        {
+
+        }
     };
 
     /** @brief Allocate more memory for the pool
@@ -112,7 +124,7 @@ private:
         for(int i = 0; i < size; ++i)
         {
             // Allocate the node
-            node = (MemoryPoolNode*)malloc(sizeof(MemoryPoolNode));
+            node = new MemoryPoolNode;
 
             node->next = first;
             first = node;

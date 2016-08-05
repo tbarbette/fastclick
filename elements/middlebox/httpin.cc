@@ -145,8 +145,12 @@ WritablePacket* HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
     if(beginning == NULL || beginning > endFirstLine)
         return packet;
 
+    unsigned char* endVersion = (unsigned char*)strstr((char*)beginning, " ");
+    if(endVersion == NULL || endVersion > endFirstLine)
+        endVersion = endFirstLine;
+
     // Ensure the line has the right length
-    int offset = endFirstLine - beginning - 8; // 8 is the length of "HTTP/1.1"
+    int offset = endVersion - beginning - 8; // 8 is the length of "HTTP/1.1"
     if(offset > 0)
         removeBytes(fcb, packet, beginning - source + 8, offset);
     else
