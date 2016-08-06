@@ -1700,7 +1700,7 @@ bool Element::get_runnable_threads(Bitvector& bmp) {
 }
 
 Bitvector Element::get_threads(bool is_pull) {
-	if (!router()->configured()) {
+	if (!router()->initialized()) {
 		click_chatter("Invalid call to get_thread() before initialization !");
 		abort();
 	}

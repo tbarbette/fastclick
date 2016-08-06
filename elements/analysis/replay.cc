@@ -119,12 +119,59 @@ inline void MultiReplayBase::check_end_loop(Task* t) {
 	t->fast_reschedule();
 }
 
-void MultiReplayBase::cleanup(CleanupStage) {
+void MultiReplayBase::cleanup_packets() {
 	while (_queue_head) {
 		Packet* next = _queue_head->next();
 		_queue_head->kill();
 		_queue_head = next;
 	}
+}
+
+void MultiReplayBase::cleanup(CleanupStage) {
+    cleanup_packets();
+}
+
+void
+MultiReplayBase::set_active(bool active) {
+    _active = active;
+    if (active)
+        _task.reschedule();
+    else
+        _task.unschedule();
+}
+
+int
+MultiReplayBase::write_handler(const String & s_in, Element *e, void *thunk, ErrorHandler *errh)
+{
+    MultiReplayBase *q = static_cast<MultiReplayBase *>(e);
+    int which = reinterpret_cast<intptr_t>(thunk);
+    String s = cp_uncomment(s_in);
+    switch (which) {
+      case 0: {
+        bool active;
+        if (BoolArg().parse(s, active)) {
+          q->set_active(active);
+          return 0;
+        } else
+          return errh->error("type mismatch");
+        }
+        return 0;
+      case 1:
+          q->cleanup_packets();
+          q->_loaded = false;
+          return 0;
+      default:
+        return errh->error("internal error");
+    }
+}
+
+void
+MultiReplayBase::add_handlers()
+{
+    add_write_handler("active", write_handler, 0, Handler::BUTTON);
+    add_write_handler("reset", write_handler, 1, Handler::BUTTON);
+    add_data_handlers("active", Handler::OP_READ, &_active);
+    add_data_handlers("stop", Handler::OP_READ | Handler::OP_WRITE, &_stop);
 }
 
 MultiReplay::MultiReplay() : _queue(1024)
@@ -154,6 +201,7 @@ MultiReplay::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("STOP", _stop)
 	.read("QUICK_CLONE", _quick_clone)
 	.read("USE_SIGNAL",_use_signal)
+	.read("ACTIVE",_active)
 	.complete() < 0)
     return -1;
     return 0;
@@ -185,7 +233,7 @@ MultiReplay::initialize(ErrorHandler * errh) {
 	for (int i = 0; i < _output.size(); i++) {
 		_output[i].ring.initialize(_queue);
 	}
-	ScheduleInfo::initialize_task(this,&_task,true,errh);
+	ScheduleInfo::initialize_task(this,&_task,_active,errh);
 	return 0;
 }
 
@@ -245,6 +293,7 @@ MultiReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("STOP", _stop)
 	.read("QUICK_CLONE", _quick_clone)
 	.read("USE_SIGNAL",_use_signal)
+	.read("ACTIVE",_active)
 	.complete() < 0)
     return -1;
     return 0;
