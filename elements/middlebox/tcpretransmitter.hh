@@ -55,6 +55,7 @@ Default value: 65535
 
 #define TCPRETRANSMITTER_BUFFER_NUMBER 10
 #define TCPRETRANSMITTER_GET_BUFFER_SIZE 1500
+#define MAX_TRANSMIT 65535 - 40 // Max size of the content of a packet (40 is for the headers)
 
 class TCPRetransmitter : public StackElement, public TCPElement
 {

@@ -151,7 +151,11 @@ bool TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
     // retransmission
     if(SEQ_LT(getSequenceNumber(packet), fcb->tcpreorder.expectedPacketSeq))
     {
-        if(noutputs() == 2)
+        // We do not send the packet to the second output if the retransmission is a packet
+        // that has not already been sent to the next component. In this case, this is a
+        // retransmission for a packet we already have in the waiting list so we can discard
+        // the retransmission
+        if(noutputs() == 2 && SEQ_GEQ(getSequenceNumber(packet), fcb->tcpreorder.lastSent))
         {
             #if HAVE_BATCH
                 PacketBatch *batch = PacketBatch::make_from_packet(packet);
@@ -216,6 +220,9 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
 
         // Compute sequence number of the next packet
         fcb->tcpreorder.expectedPacketSeq = getNextSequenceNumber(packetNode->packet);
+
+        // Store the sequence number of the last packet sent
+        fcb->tcpreorder.lastSent = currentSeq;
 
         // Send packet
         #if HAVE_BATCH

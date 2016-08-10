@@ -47,7 +47,8 @@ Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
     }
 
     // Compute the offset of the HTML payload
-    const char* source = strstr((const char*)getPacketContentConst(packet), "\r\n\r\n");
+    char* source = searchInContent((char*)getPacketContent(packet), "\r\n\r\n",
+        getPacketContentSize(packet));
     if(source != NULL)
     {
         uint32_t offset = (int)(source - (char*)packet->data() + 4);
@@ -71,13 +72,16 @@ void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* h
     unsigned char* source = getPayload(packet);
 
     // Search the header name
-    unsigned char* beginning = (unsigned char*)strstr((char*)source, header);
+    unsigned char* beginning = (unsigned char*)searchInContent((char*)source, header,
+        getPayloadLength(packet));
 
     if(beginning == NULL)
         return;
 
+    uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
+
     // Search the end of the header
-    unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
+    unsigned char* end = (unsigned char*)searchInContent((char*)beginning, "\r\n", lengthLeft);
     if(end == NULL)
         return;
 
@@ -95,7 +99,8 @@ void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const cha
 {
     unsigned char* source = getPayload(packet);
     // Search the header name
-    unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
+    unsigned char* beginning = (unsigned char*)searchInContent((char*)source, headerName,
+        getPayloadLength(packet));
 
     if(beginning == NULL)
     {
@@ -106,8 +111,10 @@ void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const cha
     // Skip the colon
     beginning += strlen(headerName) + 1;
 
+    uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
+
     // Search the end of the header
-    unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
+    unsigned char* end = (unsigned char*)searchInContent((char*)beginning, "\r\n", lengthLeft);
     if(end == NULL)
     {
         buffer[0] = '\0';
@@ -134,18 +141,22 @@ WritablePacket* HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
 {
     unsigned char* source = getPayload(packet);
     // Search the end of the first line
-    unsigned char* endFirstLine = (unsigned char*)strstr((char*)source, "\r\n");
+    unsigned char* endFirstLine = (unsigned char*)searchInContent((char*)source, "\r\n",
+        getPayloadLength(packet));
 
     if(endFirstLine == NULL)
         return packet;
 
     // Search the HTTP version
-    unsigned char* beginning = (unsigned char*)strstr((char*)source, "HTTP/");
+    unsigned char* beginning = (unsigned char*)searchInContent((char*)source, "HTTP/",
+        getPayloadLength(packet));
 
     if(beginning == NULL || beginning > endFirstLine)
         return packet;
 
-    unsigned char* endVersion = (unsigned char*)strstr((char*)beginning, " ");
+    uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
+
+    unsigned char* endVersion = (unsigned char*)searchInContent((char*)beginning, " ", lengthLeft);
     if(endVersion == NULL || endVersion > endFirstLine)
         endVersion = endFirstLine;
 
@@ -168,13 +179,15 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
 
     unsigned char* source = getPayload(packet);
     // Search the end of the first line
-    unsigned char* endFirstLine = (unsigned char*)strstr((char*)source, "\r\n");
+    unsigned char* endFirstLine = (unsigned char*)searchInContent((char*)source, "\r\n",
+        getPayloadLength(packet));
 
     if(endFirstLine == NULL)
         return;
 
     // Search the beginning of the URL (after the first space)
-    unsigned char* urlStart = (unsigned char*)strstr((char*)source, " ");
+    unsigned char* urlStart = (unsigned char*)searchInContent((char*)source, " ",
+        getPayloadLength(packet));
 
     if(urlStart == NULL || urlStart >= endFirstLine)
         return;
@@ -187,8 +200,10 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
     memcpy(fcb->httpin.method, source, methodLength);
     fcb->httpin.method[methodLength] = '\0';
 
+    uint32_t lengthLeft = getPayloadLength(packet) - (urlStart - source);
+
     // Search the end of the URL (before the second space)
-    unsigned char* urlEnd = (unsigned char*)strstr((char*)(urlStart + 1), " ");
+    unsigned char* urlEnd = (unsigned char*)searchInContent((char*)(urlStart + 1), " ", lengthLeft - 1);
 
     if(urlEnd == NULL || urlEnd >= endFirstLine)
         return;

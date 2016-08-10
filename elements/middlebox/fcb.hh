@@ -55,12 +55,14 @@ struct fcb_tcpreorder
 {
     struct TCPPacketListNode* packetList;
     tcp_seq_t expectedPacketSeq;
+    tcp_seq_t lastSent;
     MemoryPool<struct TCPPacketListNode> *pool;
 
     fcb_tcpreorder()
     {
         packetList = NULL;
         expectedPacketSeq = 0;
+        lastSent = 0;
         pool = NULL;
     }
 

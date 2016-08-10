@@ -295,6 +295,26 @@ unsigned int StackElement::determineFlowDirection()
     return previousStackElement->determineFlowDirection();
 }
 
+char* StackElement::searchInContent(char *content, const char *pattern, uint32_t length)
+{
+    // We use this method instead of a mere strstr because the content of the packet
+    // is not necessarily NULL-terminated
+    
+    uint32_t patternLen = strlen(pattern);
+
+    for(uint32_t i = 0; i < length; ++i)
+    {
+        if(patternLen + i > length)
+            return NULL;
+
+        if(strncmp(&content[i], pattern, patternLen) == 0)
+            return &content[i];
+    }
+
+    return NULL;
+}
+
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StackElement)
 ELEMENT_MT_SAFE(StackElement)

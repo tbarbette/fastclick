@@ -106,14 +106,17 @@ WritablePacket* HTTPOut::setHeaderContent(struct fcb *fcb, WritablePacket* packe
     uint16_t offsetTcp = getPayloadOffset(packet);
     setContentOffset(packet, offsetTcp);
 
-    unsigned char* beginning = (unsigned char*)strstr((char*)source, headerName);
+    unsigned char* beginning = (unsigned char*)searchInContent((char*)source, headerName,
+        getPayloadLength(packet));
 
     if(beginning == NULL)
         return packet;
 
     beginning += strlen(headerName) + 1;
 
-    unsigned char* end = (unsigned char*)strstr((char*)beginning, "\r\n");
+    uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
+
+    unsigned char* end = (unsigned char*)searchInContent((char*)beginning, "\r\n", lengthLeft);
     if(end == NULL)
         return packet;
 

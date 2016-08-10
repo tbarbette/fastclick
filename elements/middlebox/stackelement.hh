@@ -113,7 +113,6 @@ protected:
      * It depends on the elements by which the packet went through. For instance, after TCPIN
      * the offset points to the TCP payload. After HTTPIn, the offset points to the body
      * of a HTTP request/response.
-
      * @param packet The packet
      * @return The current offset of the content
      */
@@ -124,7 +123,6 @@ protected:
      * It depends on the elements by which the packet went through. For instance, after TCPIN
      * it points to the TCP payload. After HTTPIn, it points to the body
      * of a HTTP request/response.
-
      * @param packet The packet
      * @return A pointer to the constant current useful content of the packet
      */
@@ -135,11 +133,20 @@ protected:
      * It depends on the elements by which the packet went through. For instance, after TCPIN
      * it points to the TCP payload. After HTTPIn, it points to the body
      * of a HTTP request/response.
-
      * @param packet The packet
      * @return A pointer to the current useful content of the packet
      */
     unsigned char* getPacketContent(WritablePacket* packet) const;
+
+    /**
+     * @brief Search a given pattern in the given content. The content does not have
+     * to be NULL-terminated.
+     * @param content The content in which the pattern will be searched
+     * @param pattern The pattern to search
+     * @param length The length of the content
+     * @return A pointer to the first byte of pattern in the content or NULL if it cannot be found
+     */
+    char* searchInContent(char *content, const char *pattern, uint32_t length);
 
     /**
      * @brief Set the offset at which the current useful content starts.

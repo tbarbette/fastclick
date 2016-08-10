@@ -215,7 +215,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
             uint64_t cwnd = otherMaintainer.getCongestionWindowSize();
             uint64_t ssthresh = otherMaintainer.getSsthresh();
             // Sender segment size
-            uint16_t mss = maintainer.getMSS();
+            uint16_t mss = otherMaintainer.getMSS();
             uint64_t increase = 0;
 
             // Check if we are in slow start mode
@@ -657,7 +657,7 @@ void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
             fcb->tcp_common->maintainers[flowDirection].setMSS(mss);
 
             click_chatter("MSS for flow %u: %u", flowDirection, mss);
-            fcb->tcp_common->maintainers[getOppositeFlowDirection()].setCongestionWindowSize(mss);
+            fcb->tcp_common->maintainers[flowDirection].setCongestionWindowSize(mss);
 
             optStart += optStart[1];
         }

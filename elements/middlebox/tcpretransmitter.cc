@@ -185,7 +185,7 @@ Packet* TCPRetransmitter::processPacketNormal(struct fcb *fcb, Packet *packet)
 
             uint16_t sizeOfTransmission = getMaxAmountData(fcb, getPayloadLength(packet), false);
 
-            // We delay the transmission of this data
+            // We delay the transmission of these data
             if(sizeOfTransmission == 0)
             {
                 packet->kill();
@@ -302,7 +302,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(struct fcb *fcb, Packet *p
         return newPacket;
     }
 
-    if(sizeOfRetransmission <= 0)
+    if(sizeOfRetransmission == 0)
     {
         packet->kill();
         fcb->tcp_common->lock.release();
@@ -428,7 +428,7 @@ void TCPRetransmitter::retransmissionTimerFired(struct fcb* fcb)
     fcb->tcp_common->lock.acquire();
 
     // Sender segment size
-    uint16_t mss = fcb->tcp_common->maintainers[oppositeFlowDirection].getMSS();
+    uint16_t mss = fcb->tcp_common->maintainers[flowDirection].getMSS();
     // Set the new slow start threshold
     uint64_t ssthresh = fcb->tcp_common->maintainers[flowDirection].getCongestionWindowSize() / 2;
     if(ssthresh < 2 * mss)
@@ -455,7 +455,14 @@ void TCPRetransmitter::transmitMoreData(struct fcb* fcb)
 {
     unsigned int flowDirection = determineFlowDirection();
 
-    fcb->tcp_common->lock.acquire();
+    if(!fcb->tcp_common->lock.attempt())
+    {
+        // If it is not possible to acquire the lock now, reschedule the timer instead of
+        // looping to acquire it
+        fcb->tcp_common->retransmissionTimings[flowDirection].sendMoreData();
+        return;
+    }
+
     // Try to send more data waiting in the buffer
 
     if(manualTransmission(fcb, false))
@@ -536,6 +543,14 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     // and the congestion window
     sizeOfRetransmission = getMaxAmountData(fcb, sizeOfRetransmission, true);
 
+    // Check if we can fit all these data in a packet
+    bool maxReached = false;
+    if(sizeOfRetransmission > MAX_TRANSMIT)
+    {
+        sizeOfRetransmission = MAX_TRANSMIT;
+        maxReached = true;
+    }
+
     // If nothing to transmit, abort
     if(sizeOfRetransmission == 0)
     {
@@ -588,6 +603,13 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     #else
         output(0).push(packet);
     #endif
+
+    // Check if we wanted to send more data that we can fit in a packet
+    if(maxReached)
+    {
+        // In this case, we will transmit the rest right now
+        manualTransmission(fcb, retransmission);
+    }
 
     return true;
 }
