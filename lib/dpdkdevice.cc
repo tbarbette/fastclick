@@ -374,7 +374,11 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
     return true;
 }
 
+#if HAVE_DPDK_PACKET_POOL
+int DPDKDevice::NB_MBUF = 32*4096*2; //Must be able to fill the packet data pool, and then have some packets for IO
+#else
 int DPDKDevice::NB_MBUF = 65536;
+#endif
 int DPDKDevice::MBUF_DATA_SIZE =
     2048 + RTE_PKTMBUF_HEADROOM;
 int DPDKDevice::MBUF_CACHE_SIZE = 256;
