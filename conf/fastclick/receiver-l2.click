@@ -11,12 +11,8 @@
  * switch can learn our mac address.
  *
  * A launch line would be :
- *   sudo bin/click -c 0x1 -n 4 -- conf/fastclick/pktgen-recv-l2-1if.click
+ *   sudo bin/click -c 0xf -n 4 -- conf/fastclick/receiver-l2.click
  */
-
-//!!!!
-//Please read loop.click first to learn about some FastClick basics!
-//!!!!
 
 //You do not need to change these, we send a packet with our virtual mac source before launching the pktgen so any switch can learn about us
 define($mymac 90:e2:ba:c3:76:6e)

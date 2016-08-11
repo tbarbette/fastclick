@@ -1,18 +1,15 @@
 /* 
- *This file implements a fast L2 pktgen which sends UDP traffic on one NIC towards a second NIC
+ * This configuration count the number of packets received on one interface, it
+ * does respond to ARP packets and is therefore L3
  *
- * This can be used to test the throughput of a L2 switch.
- *
- * The second port is used to receive the traffic back and compute 
- * some statistics. We do not respond to ARP packets, hence the L2 limitation.
+ * As this configuration does not send the packets it receive, it runs best if
+ *  compiled with --disable-dpdk-pool, as the internal packet pool would be 
+ *  filled up by DPDK packets, the input only using Click packet to associate
+ *  them with DPDK buffer.
  *
  * A launch line would be :
- *   sudo bin/click -c 0x7 -n 4 -- conf/fastclick/pktgen.click L=60 S=1000000 N=100
+ *   sudo bin/click -c 0xf -n 4 -- conf/fastclick/receiver-l3.click
  */
-
-//!!!!
-//Please read loop.click first to learn about some FastClick basics!
-//!!!!
 
 //You do not need to change these, we send a packet with our virtual mac source before launching the pktgen so any switch can learn about us
 define($smac 90:e2:ba:c3:76:6e)
