@@ -22,8 +22,8 @@
 CLICK_DECLS
 
 #define BS_TREE_POOL_SIZE 10
-#define BS_POOL_SIZE 40
-#define BS_PRUNE_THRESHOLD BS_POOL_SIZE / 2
+#define BS_POOL_SIZE 5000
+#define BS_PRUNE_THRESHOLD 10
 
 /** @class RBTMemoryPoolStreamManager
  * @brief Manager of RBT that uses memory pool to allocate memory and compares

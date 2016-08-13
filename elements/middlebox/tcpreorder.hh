@@ -13,7 +13,7 @@
 #include "fcb.hh"
 #include "tcpelement.hh"
 
-#define TCPREORDER_POOL_SIZE 20
+#define TCPREORDER_POOL_SIZE 100
 
 CLICK_DECLS
 

@@ -193,11 +193,15 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
         // had been lost, and the source retransmits the packets with the
         // content split differently.
         // Thus, the previous packets that were after the gap are not
-        // correctly align and must be dropped as the source will retransmit
+        // correctly aligned and must be dropped as the source will retransmit
         // them with the new alignment.
         if(SEQ_LT(currentSeq, fcb->tcpreorder.expectedPacketSeq))
         {
             click_chatter("Warning: received a retransmission with a different split");
+            #ifndef HAVE_FLOW
+            // Warning if the system is used outside middleclick
+            click_chatter("This may be the sign that a second flow is interfering, this can cause bugs.");
+            #endif
             flushListFrom(fcb, NULL, packetNode);
             #if HAVE_BATCH
                 // Check before exiting that we did not have a batch to send

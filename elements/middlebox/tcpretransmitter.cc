@@ -544,6 +544,9 @@ bool TCPRetransmitter::manualTransmission(struct fcb *fcb, bool retransmission)
     sizeOfRetransmission = getMaxAmountData(fcb, sizeOfRetransmission, true);
 
     // Check if we can fit all these data in a packet
+    // The fact that the packet might by too big for the receiver or the network will be
+    // handled by TCPFragmenter, but we must still ensure that the crafted packet is valid
+    // regarding its size
     bool maxReached = false;
     if(sizeOfRetransmission > MAX_TRANSMIT)
     {

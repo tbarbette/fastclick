@@ -244,9 +244,11 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         // Check if the current packet is just an ACK without more information
         if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
         {
+            bool isDup = false;
             // Check duplicate acks
             if(prevLastAckReceived == ackNumber)
             {
+                isDup = true;
                 uint8_t dupAcks = maintainer.getDupAcks();
                 dupAcks++;
                 maintainer.setDupAcks(dupAcks);
@@ -262,10 +264,12 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
             }
 
             // Check that the ACK value is greater than what we have already
-            // sent to the destination
-            if(maintainer.isLastAckSentSet() && SEQ_LT(newAckNumber, maintainer.getLastAckSent()))
+            // sent to the destination.
+            // If this is a duplicate ACK, we don't discard it so that the mechanism
+            // of fast retransmission is preserved
+            if(maintainer.isLastAckSentSet() && SEQ_LEQ(newAckNumber, maintainer.getLastAckSent()) && !isDup)
             {
-                // If this is not the case, the packet does not give any information
+                // If this is not the case, the packet does not bring any additional information
                 // We can drop it
                 packet->kill();
                 fcb->tcp_common->lock.release();
