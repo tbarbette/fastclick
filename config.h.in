@@ -113,6 +113,9 @@
 /* Define if nanosecond-granularity timestamps are enabled. */
 #undef HAVE_NANOTIMESTAMP_ENABLED
 
+/* Define if user-provided clock system is supported. */
+#undef HAVE_USER_TIMESTAMP
+
 /* Define if you want to use the stride scheduler. */
 #undef HAVE_STRIDE_SCHED
 

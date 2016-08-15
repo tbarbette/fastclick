@@ -851,6 +851,7 @@ with_freebsd
 enable_smaller_code
 enable_int64
 enable_nanotimestamp
+enable_user_timestamp
 enable_bound_port_transfer
 enable_tools
 enable_dynamic_linking
@@ -1561,6 +1562,7 @@ Optional Features:
   --enable-smaller-code   generate smaller code (sometimes slower)
   --disable-int64         disable 64-bit integer support
   --enable-nanotimestamp  enable nanosecond timestamps
+  --enable-user-timestamp enable support for user-provided clock system
   --enable-bound-port-transfer
                           enable port transfer function ptr optimization
   --enable-tools=WHERE    enable tools (host/build/mixed/no) [[mixed]]
@@ -8804,6 +8806,27 @@ $as_echo "#define HAVE_NANOTIMESTAMP_ENABLED 1" >>confdefs.h
 
 fi
 
+# Check whether --enable-user_timestamp was given.
+if test "${enable_user_timestamp+set}" = set; then :
+  enableval=$enable_user_timestamp; :
+else
+  enable_user_timestamp=no
+fi
+
+
+if test "x$enable_user_timestamp" = xyes; then
+if test "x$have_int64_types" != xyes; then
+    as_fn_error $? "
+=========================================
+
+User-based timestamp needs 64bits types !
+
+=========================================" "$LINENO" 5
+fi
+
+$as_echo "#define HAVE_USER_TIMESTAMP 1" >>confdefs.h
+
+fi
 
 
 # Check whether --enable-bound-port-transfer was given.
@@ -13749,6 +13772,11 @@ fi
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 fi
+
+if test "x$enable_user_timestamp" = xyes; then
+    provisions="$provisions usertimestamp"
+fi
+
 
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"

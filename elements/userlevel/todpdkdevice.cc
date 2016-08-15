@@ -267,7 +267,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
             if (mbuf != NULL) {
-                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size] = mbuf;
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) & (_internal_tx_queue_size - 1)] = mbuf;
                 iqueue.nr_pending++;
             }
             next = p->next();

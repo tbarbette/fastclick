@@ -83,6 +83,7 @@ CLICK_CXX_UNPROTECT
 # include <string.h>
 # include <ctype.h>
 # include <errno.h>
+# include <unistd.h>
 # include <limits.h>
 # include <time.h>
 # include <sys/socket.h>
@@ -95,6 +96,10 @@ extern "C" int simclick_gettimeofday(struct timeval *);
 #  include <pthread.h>
 #  include <sched.h>
 # endif
+
+#if HAVE_DPDK && !CLICK_TOOL
+#include <rte_cycles.h>
+#endif
 
 #endif
 
@@ -486,6 +491,33 @@ CLICK_ENDDECLS
 # error "SIZEOF_CLICK_JIFFIES_T declared incorrectly"
 #endif
 
+#if CLICK_LINUXMODULE
+#define sleep(ms) ssleep(ms)
+#endif
+
+#if HAVE_DPDK && !CLICK_TOOL
+#  define current_cycles() rte_get_timer_cycles()
+#  define cycles_hz() rte_get_timer_hz()
+#else
+#  if __x86_64__
+inline unsigned long current_cycles() {
+    unsigned long lo, hi;
+    asm( "rdtsc" : "=a" (lo), "=d" (hi) );
+    return( lo | (hi << 32) );
+}
+#  else
+inline unsigned long current_cycles() {
+    unsigned long lo, hi;
+    asm( "rdtsc" : "=a" (lo), "=d" (hi));
+    return lo;
+}
+#  endif
+inline int64_t cycles_hz() {
+	int64_t tsc_freq = current_cycles();
+	sleep(1);
+	tsc_freq = current_cycles() - tsc_freq;
+}
+#endif
 
 // TIMEVAL OPERATIONS
 
