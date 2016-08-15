@@ -24,9 +24,9 @@ This element removes insults in web pages
 
 =item CLOSECONNECTION
 
-Boolean that can be set to true if the connection must be closed if an insult is found.
+Boolean that can be set to true if the connection must be closed when an insult is found.
 In this case, the content of the page is replaced by an error message telling the user
-that the web page has been blocked because it contains insults and the connection is closed.
+that the web page has been blocked because it contains insults then the TCP connection is closed.
 Default value: false.
 
 =a HTTPIn, HTTPOut */

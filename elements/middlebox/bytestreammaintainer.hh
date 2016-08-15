@@ -1,10 +1,10 @@
 /*
- * bytestreammaintainer.hh - Class used to manage a flow. Stores the modifications in it
+ * bytestreammaintainer.hh - Class used to manage a flow. Stores the modifications in the flow
  * (bytes removed or inserted) as well as information such as the MSS, ports, ips, last
  * ack received, last ack sent, ...
  *
  * This file also contains the declaration and definition of RBTMemoryPoolStreamManager
- * which is the RBT manager used by ByteStreamMaintainer to store the modifications in the flow.
+ * which is the RBTManager used by ByteStreamMaintainer to store the modifications in the flow.
  *
  * Romain Gaillard.
  */
@@ -26,7 +26,7 @@ CLICK_DECLS
 #define BS_PRUNE_THRESHOLD 10
 
 /** @class RBTMemoryPoolStreamManager
- * @brief Manager of RBT that uses memory pool to allocate memory and compares
+ * @brief RBTManager that uses memory pools to allocate memory and compares
  * the keys as sequence numbers.
  *
  * The keys are sequence numbers (uint32_t)
@@ -111,7 +111,7 @@ private:
 };
 
 /** @class ByteStreamMaintainer
- * @brief Class used to manage a flow. Stores the modifications in it
+ * @brief Class used to manage a flow. Stores the modifications in the flow
  * (bytes removed or inserted) as well as information such as the MSS, ports, ips, last
  * ack received, last ack sent, ...
  *
@@ -124,14 +124,14 @@ class ByteStreamMaintainer
 
     public:
         /** @brief Construct a ByteStreamMaintainer
-         * The ByteStreamMaintainer must be initialized before being used
+         * ByteStreamMaintainer must be initialized before being used
          */
         ByteStreamMaintainer();
         /** @brief Destruct a ByteStreamMaintainer
          */
         ~ByteStreamMaintainer();
 
-        /** @brief Map a ack number
+        /** @brief Map an ack number
          * @param position Initial ack value
          * @return New value, taking into account the modifications in the flow
          */
@@ -143,7 +143,7 @@ class ByteStreamMaintainer
          */
         uint32_t mapSeq(uint32_t position);
 
-        /** @brief Returns the offset corresponding to the last modification in the ack tree
+        /** @brief Return the offset corresponding to the last modification in the ack tree
          * @return The offset with the greatest key in the ack tree or 0 if the tree is empty
          */
         int lastOffsetInAckTree();
@@ -152,8 +152,8 @@ class ByteStreamMaintainer
          */
         void printTrees();
 
-        /** @brief Initialize the ByteStreamMaintainer (required before use)
-         * @param rbtManager The RBT Manager used to manage the trees
+        /** @brief Initialize the ByteStreamMaintainer (required before beging use)
+         * @param rbtManager The RBTManager used to manage the trees
          * @param flowStart The first sequence number in the flow
          */
         void initialize(RBTMemoryPoolStreamManager *rbtManager, uint32_t flowStart);
@@ -168,43 +168,43 @@ class ByteStreamMaintainer
          */
         void setLastAckSent(uint32_t ackNumber);
 
-        /** @brief Returns the value of the last ack sent by this side of the connection
+        /** @brief Return the value of the last ack sent by this side of the connection
          * @return Value of the last ack sent by this side of the connection
          */
         uint32_t getLastAckSent();
 
-        /** @brief Indicates whether the last ack sent value has been set.
-         * @return True if the last ack sent value has been set
+        /** @brief Indicate whether the "last ack sent" value has been set.
+         * @return True if the "last ack sent" value has been set
          */
         bool isLastAckSentSet();
 
-        /** @brief Sets the value of the last seq sent by this side of the connection
-         * @param seqNumber Value of the last seq sent by this side of the connection
+        /** @brief Set the value of the "last seq sent" by this side of the connection
+         * @param seqNumber Value of the "last seq sent" by this side of the connection
          */
         void setLastSeqSent(uint32_t seqNumber);
 
-        /** @brief Returns the value of the last seq sent by this side of the connection
-         * @return Value of the last seq sent by this side of the connection
+        /** @brief Return the value of the "last seq sent" by this side of the connection
+         * @return Value of the "last seq sent" by this side of the connection
          */
         uint32_t getLastSeqSent();
 
-        /** @brief Indicates whether the last seq sent value has been set.
-         * @return True if the last seq sent value has been set
+        /** @brief Indicate whether the "last seq sent" value has been set.
+         * @return True if the "last seq sent" value has been set
          */
         bool isLastSeqSentSet();
 
-        /** @brief Sets the value of the last ack received by this side of the connection
-         * @param ackNumber Value of the last ack received by this side of the connection
+        /** @brief Set the value of the "last ack received" by this side of the connection
+         * @param ackNumber Value of the "last ack received" by this side of the connection
          */
         void setLastAckReceived(uint32_t ackNumber);
 
-        /** @brief Returns the value of the last ack received by this side of the connection
-         * @return Value of the last ack received by this side of the connection
+        /** @brief Return the value of the "last ack received" by this side of the connection
+         * @return Value of the "last ack received" by this side of the connection
          */
         uint32_t getLastAckReceived();
 
-        /** @brief Indicates whether the last ack received value has been set.
-         * @return True if the last ack received value has been set
+        /** @brief Indicate whether the "last ack received" value has been set.
+         * @return True if the "last ack received" value has been set
          */
         bool isLastAckReceivedSet();
 
@@ -218,13 +218,13 @@ class ByteStreamMaintainer
          */
         void setDupAcks(uint8_t dupAcks);
 
-        /** @brief Set the window size of the source (will be used as received's windows size
+        /** @brief Set the window size of the source (will be used as the receiver's windows size
          * by the other side of the connection when sending packets)
          * @param windowSize The window size of the source
          */
         void setWindowSize(uint16_t windowSize);
 
-        /** @brief Return the window size of the source (will be used as received's windows size
+        /** @brief Return the window size of the source (will be used as the receiver's windows size
          * by the other side of the connection when sending packets)
          * @return The window size of the source
          */
@@ -344,8 +344,8 @@ class ByteStreamMaintainer
 
         rb_red_blk_tree* treeAck; // Tree used to map the ack numbers
         rb_red_blk_tree* treeSeq; // Tree used to map the sequence numbers
-        RBTManager* rbtManager; // Manager of the trees (used to allocate memory inter alia)
-        uint32_t pruneCounter; // Used to avoid pruning at each ack received
+        RBTManager* rbtManager; // Manager of the trees (used to allocate memory among others)
+        uint32_t pruneCounter; // Used to avoid pruning for each ack received
         bool initialized;
         bool lastAckSentSet; // Indicates whether the value lastAckSent is meaningful
         bool lastSeqSentSet; // Indicates whether the value lastSeqSent is meaningful

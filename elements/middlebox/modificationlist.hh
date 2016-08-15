@@ -70,18 +70,18 @@ public:
      */
     bool addModification(uint32_t firstPosition, uint32_t position, int offset);
 
-    /** @brief Tell if the list has been committed
+    /** @brief Indicate whether the list has been committed
      * @return True if the list has been committed
      */
     bool isCommitted();
 
-    /** @brief Commit the modifications stored in the list into the ByteStreamMaintainer
+    /** @brief Commit the modifications stored in the list into a ByteStreamMaintainer
      * @param maintainer The ByteStreamMaintainer in which the modifications will be committed
      */
     void commit(ByteStreamMaintainer& maintainer);
 
 private:
-    /** @brief Indicate if two integers have the same sign
+    /** @brief Indicate whether two integers have the same sign
      * @param first The first integer
      * @param second The second integer
      * @return  True if both integers have the same sign
@@ -91,11 +91,6 @@ private:
     /** @brief Merge nodes that represent overlapping deletions
      */
     void mergeNodes();
-
-    /** @brief Commit the modifications in the ByteStreamMaintainer.
-     * @param maintainer The ByteStreamMaintainer in which the modifications
-     * will be committed
-     */
 
     /** @brief Clear the modification list
      */

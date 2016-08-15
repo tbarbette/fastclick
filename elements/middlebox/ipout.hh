@@ -19,7 +19,7 @@ exit point of an IP path in the stack of the middlebox
 
 This element is the exit point of an IP path in the stack of the middlebox by which all
 IP packets must go after their IP content has been processed. Each path containing a IPOut element
-must also contain a IPIn element
+must also contain an IPIn element
 
 =a IPIn */
 

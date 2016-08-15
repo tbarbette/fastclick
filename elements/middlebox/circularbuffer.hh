@@ -5,7 +5,7 @@
  *
  * Romain Gaillard.
  */
- 
+
 #ifndef MIDDLEBOX_CIRCULARBUFFER_HH
 #define MIDDLEBOX_CIRCULARBUFFER_HH
 
@@ -44,14 +44,14 @@ public:
     uint32_t getCapacity();
 
     /** @brief Return the start offset. Offset of the first byte in the buffer. Used to be able to
-     * manipulate sequence numbers. This offset is substracted from the requested data position in
+     * manipulate sequence numbers. This offset is substracted from the requested data's position in
      * order to obtain a position in the buffer.
      * @return The start offset
      */
     uint32_t getStartOffset();
 
     /** @brief Set the start offset. Offset of the first byte in the buffer. Used to be able to
-     * manipulate sequence numbers. This offset is substracted from the requested data position in
+     * manipulate sequence numbers. This offset is substracted from the requested data's position in
      * order to obtain a position in the buffer.
      * @param startOffset The start offset
      */
@@ -88,7 +88,7 @@ private:
     uint32_t bufferEnd; // Position in the buffer of the end of the data
     uint32_t startOffset;
     uint32_t size; // Current size of the circular buffer (not necessarily the size of the
-                   // buffer in the BufferPoolNode, which is the capacity).
+                   // buffer in the BufferPoolNode, which is the capacity instead).
     bool blank;
     bool useStartOffset; // Indicates whether we use the start offset or not
 

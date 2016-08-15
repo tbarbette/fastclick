@@ -17,7 +17,7 @@ CLICK_DECLS
  * (http://web.mit.edu/~emin/www.old/source_code/red_black_tree/LICENSE)
  */
 
-/********* Functions that were adapted *********/
+/********* Functions that were adapted (with their original documentation) *********/
 
 /***********************************************************************/
 /*  FUNCTION:  RBTreeCreate */

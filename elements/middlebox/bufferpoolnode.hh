@@ -3,7 +3,7 @@
  *
  * Romain Gaillard.
  */
- 
+
 #ifndef MIDDLEBOX_BUFFERPOOLNODE_HH
 #define MIDDLEBOX_BUFFERPOOLNODE_HH
 
@@ -25,23 +25,24 @@ public:
      * @param initialSize The initial size of the buffer
      */
     BufferPoolNode(uint32_t initialSize);
+
     /** @brief Destruct a BufferPoolNode
      */
     ~BufferPoolNode();
 
-    /** @brief Returns the buffer in itself (the area of memory).
+    /** @brief Return the actual buffer (the area of memory).
      * Note that the size of the buffer is random, so be
      * sure to resize it to fit your needs.
      * @return A pointer to the buffer managed by this BufferPoolNode
      */
     unsigned char* getBuffer();
 
-    /** @brief Returns the size of the buffer
+    /** @brief Return the size of the buffer
      * @return The size of the buffer
      */
     uint32_t getSize() const;
 
-    /** @brief Resizes the buffer. This operation is efficient if the capacity of the buffer
+    /** @brief Resize the buffer. This operation is efficient if the capacity of the buffer
      * is greater than the requested size. The capacity of the buffer depends on its previous
      * sizes.
      * @param newSize The new size of the buffer. If the buffer grows, the new memory will be

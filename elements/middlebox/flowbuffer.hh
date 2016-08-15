@@ -25,7 +25,7 @@ struct fcb;
  * @brief This buffer allows to search, replace or remove data in the packets buffered
  * as in a contiguous flow. It also allows to determine if a pattern could be starting at the
  * end of the last packet in the buffer and thus if buffering more packets is required to
- * take a decision.
+ * make a decision.
  */
 class FlowBuffer
 {
@@ -43,7 +43,7 @@ public:
 
     /** @brief Initialize the FlowBuffer (required in order to be used)
      * @param owner StackElement that owns this FlowBuffer
-     * @param poolEntries MemoryPool in which the buffer entries will be retrieved
+     * @param poolEntries MemoryPool from which the buffer entries will be retrieved
      */
     void initialize(StackElement *owner, MemoryPool<struct flowBufferEntry> *poolEntries);
 
@@ -77,8 +77,8 @@ public:
      */
     uint32_t getSize();
 
-    /** @brief Return an iterator pointing to the first packet in the buffer
-     * @return An iterator pointing to the first packet in the buffer
+    /** @brief Return an iterator pointing to the first packet of the buffer
+     * @return An iterator pointing to the first packet of the buffer
      */
     FlowBufferIter begin();
 
@@ -118,13 +118,13 @@ public:
     int replaceInFlow(struct fcb *fcb, const char* pattern, const char *replacement);
 
 private:
-    /** @brief Return an iterator pointing to the byte of the content in the buffer
-     * @return An iterator pointing to the byte of the content in the buffer
+    /** @brief Return a content iterator pointing to the first byte of content in the buffer
+     * @return A content iterator pointing to the first byte of content in the buffer
      */
     FlowBufferContentIter contentBegin();
 
-    /** @brief Return an iterator pointing after the end of the content in the buffer
-     * @return An iterator pointing after the end of the content in the buffer
+    /** @brief Return a content iterator pointing after the end of the content in the buffer
+     * @return A content iterator pointing after the end of the content in the buffer
      */
     FlowBufferContentIter contentEnd();
 
@@ -133,7 +133,7 @@ private:
      * @param pattern The pattern to search
      * @param feedback An int in which the result of the search will be put (1 if found, -1 if
      * not found, 0 if not found but could start at the end of the last packet)
-     * @return A content iterator pointing to the beginning of the pattern in the flow if found
+     * @return An iterator pointing to the beginning of the pattern in the flow if found
      * or after the end of the content if not found
      */
     FlowBufferContentIter search(FlowBufferContentIter start, const char* pattern, int *feedback);
@@ -230,8 +230,8 @@ public:
 
 private:
     /** @brief Repair a FlowBufferContentIter. After a deletion at the end of a packet,
-     * the iterator may point after the content of the packet and thus have an invalid position.
-     * This method fixes it and makes the iterator point to the next packet
+     * the iterator may point after the new content of the packet and thus have an invalid position.
+     * This method fixes it and ensures that the iterator point to the next packet
      */
     void repair();
 

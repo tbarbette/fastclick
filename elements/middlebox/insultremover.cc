@@ -114,7 +114,7 @@ int InsultRemover::removeInsult(struct fcb* fcb, const char *insult)
 {
     int result = fcb->insultremover.flowBuffer.removeInFlow(fcb, insult);
 
-    // While we keep finding entire insults in the packet
+    // While we keep finding complete insults in the packet
     while(result == 1)
     {
         fcb->insultremover.counterRemoved += 1;

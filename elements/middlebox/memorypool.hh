@@ -43,7 +43,7 @@ public:
         MemoryPoolNode *node = first;
         MemoryPoolNode *toDelete = NULL;
 
-        // Search the node in the full list
+        // Free each node of the list
         while(node != NULL)
         {
             toDelete = node;
@@ -68,7 +68,7 @@ public:
     }
 
     /** @brief Obtain memory from the memory pool
-     * @return A pointer to an object of the type T
+     * @return A pointer to an object of type T
      */
     T* getMemory()
     {
@@ -85,8 +85,8 @@ public:
         return (T*)node;
     }
 
-    /** @brief Release memory and put it back to the pool
-     * @param p Pointer the the object of type T
+    /** @brief Release memory and put it back in the pool
+     * @param p Pointer to the object of type T
      */
     void releaseMemory(T* p)
     {

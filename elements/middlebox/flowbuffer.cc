@@ -5,7 +5,7 @@
  *
  * Romain Gaillard.
  */
- 
+
 #include <click/config.h>
 #include <click/glue.hh>
 #include "fcb.hh"
@@ -31,7 +31,7 @@ FlowBuffer::~FlowBuffer()
 
     struct flowBufferEntry *current = head;
 
-    // Put back the nodes to the memory pool
+    // Put back the nodes in the memory pool
     while(current != NULL)
     {
         struct flowBufferEntry* toRemove = current;
@@ -60,7 +60,7 @@ void FlowBuffer::enqueue(WritablePacket *packet)
         return;
     }
 
-    // Get memory from the pool to store a node
+    // Get memory from the pool in order to store a node
     struct flowBufferEntry *entry = poolEntries->getMemory();
 
     // Add the node at the end of the list
@@ -188,15 +188,15 @@ FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char
             nbFound++;
         }
 
-        // We we reached the end of the pattern, it means that we found it
+        // We have reached the end of the pattern, it means that we found it
         if(*currentPattern == '\0')
         {
             *feedback = 1;
             return start;
         }
 
-        // If we have found at least one matching character at the end, tell it
-        // as the rest may be in the next packet
+        // If we have found at least one matching character at the end, the rest may be in the
+        // next packet
         if(currentContent == contentEnd() && nbFound > 0)
         {
             *feedback = 0;
@@ -272,16 +272,15 @@ int FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char *
     uint32_t lenPattern = strlen(pattern);
     uint32_t lenReplacement = strlen(replacement);
 
-    // We compute the difference between the previous content and the new one
+    // We compute the difference between the size of the previous content and the new one
     long offset = lenReplacement - lenPattern;
 
-    // We compute how much bytes of the old content will be replaced by the new content
+    // We compute how many bytes of the old content will be replaced by the new content
     uint32_t toReplace = lenPattern;
     if(toReplace > lenReplacement)
         toReplace = lenReplacement;
 
-    // Replace pattern by replacement until we reach the end of one of
-    // the two strings
+    // Replace pattern by "replacement" until we reach the end of one of the two strings
     for(int i = 0; i < toReplace; ++i)
     {
         *iter = replacement[i];
@@ -297,7 +296,7 @@ int FlowBuffer::replaceInFlow(struct fcb *fcb, const char* pattern, const char *
     // if the replacement if longer
     if(offset > 0)
     {
-        // Insert a number of bytes equal to the difference between
+        // Insert a number of bytes equal to the difference between the lengths of
         // the replacement and the pattern
         packet = owner->insertBytes(fcb, packet, offsetInPacket, offset);
         entry->packet = packet;
@@ -402,7 +401,8 @@ unsigned char& FlowBufferContentIter::operator*()
 
 void FlowBufferContentIter::repair()
 {
-    // Required after a deletion at the end of a packet
+    // This method must be called after a deletion at the end of a packet
+
     assert(entry != NULL);
 
     // Check if we are pointing after the content of the current packet

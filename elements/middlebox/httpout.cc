@@ -1,5 +1,5 @@
 /*
- * httpout.{cc,hh} -- exit point of a HTTP path in the stack of the middlebox
+ * httpout.{cc,hh} -- exit point of an HTTP path in the stack of the middlebox
  * Romain Gaillard
  *
  */

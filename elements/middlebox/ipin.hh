@@ -20,7 +20,7 @@ entry point of an IP path in the stack of the middlebox
 
 This element is the entry point of an IP path in the stack of the middlebox by which all
 IP packets must go before their IP content is processed. Each path containing a IPIn element
-must also contain a IPOut element
+must also contain an IPOut element
 
 =a IPOut */
 

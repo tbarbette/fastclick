@@ -22,7 +22,7 @@
  */
 
 /**
- * Common structure accessed by both side of a TCP connection.
+ * Common structure accessed by both sides of a TCP connection.
  * The lock must be acquired before accessing the members of the structure
  */
 struct fcb_tcp_common
@@ -99,8 +99,7 @@ struct fcb_tcpin
     MemoryPool<struct ModificationList>* poolModificationLists;
     MemoryPool<struct ModificationNode>* poolModificationNodes;
 
-    // Members used to be able to free memory for tcp_common
-    // destroyed
+    // Members used to be able to free memory for the tcp_common structure when destructed
     MemoryPool<struct fcb_tcp_common>* poolTcpCommon;
     HashTable<IPFlowID, struct fcb_tcp_common*> *tableTcpCommon;
     Spinlock *lock; // Lock for the 2 structures above
@@ -127,7 +126,7 @@ struct fcb_tcpin
         for(HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.begin();
             it != modificationLists.end(); ++it)
         {
-            // Call the destructor to release object's own memory
+            // Call the destructor to release the object's own memory
             (it.value())->~ModificationList();
             // Put it back in the pool
             poolModificationLists->releaseMemory(it.value());
@@ -250,9 +249,9 @@ struct fcb
 // As the FCB is represented by a global variable for the purpose of the simulation, when the
 // program is closed, it is destructed after all the others elements. Thus, the destructor
 // of the structures in the FCB may try to access variables that do not exist anymore as the
-// elements such as TCPOut and TCPIn have already been destroyed (as they are destroyed before
-// global variables), such as memory pools.
-// This may lead to invalid memory access when the program is closed.
+// elements such as TCPOut and TCPIn have already been destroyed (as they are destructed before
+// global variables), for instance memory pools.
+// This may lead to an invalid memory access when the program is closed.
 //
 // This problem will not occur when the system is integrated to Middleclick as the FCB will
 // be destructed before the elements such as TCPOut and TCPIn and will be able to access the

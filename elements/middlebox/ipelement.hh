@@ -16,14 +16,14 @@ CLICK_DECLS
 /**
  * @class IPElement
  * @brief This class provides several methods that can be used by elements that inherits
- * from it to manage IP packets.
+ * from it in order to manage IP packets.
  */
 class IPElement
 {
 public:
-    /** @brief Return the length of the IP packet obtained from the header
+    /** @brief Return the length of the IP packet, obtained from the header
      * @param packet The IP packet
-     * @return The length of the given IP packet obtained from the IP header
+     * @return The length of the given IP packet, obtained from the IP header
      */
     uint16_t packetTotalLength(Packet* packet) const;
 

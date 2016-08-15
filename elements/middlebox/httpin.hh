@@ -13,13 +13,13 @@ HTPPIn()
 
 =s middlebox
 
-entry point of a HTTP path in the stack of the middlebox
+entry point of an HTTP path in the stack of the middlebox
 
 =d
 
-This element is the entry point of a HTTP path in the stack of the middlebox by which all
-HTTP packets must go before their HTTP content is processed. Each path containing a HTTPIn element
-must also contain a HTTPOut element
+This element is the entry point of an HTTP path in the stack of the middlebox by which all
+HTTP packets must go before their HTTP content is processed. Each path containing an HTTPIn element
+must also contain an HTTPOut element
 
 =a HTTPOut */
 
@@ -29,7 +29,7 @@ class HTTPIn : public StackElement, public TCPElement
 public:
     friend class HTTPOut;
 
-    /** @brief Construct a HTTPIn element
+    /** @brief Construct an HTTPIn element
      */
     HTTPIn() CLICK_COLD;
 
@@ -45,14 +45,14 @@ protected:
     virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
 
 private:
-    /** @brief Remove a HTTP header from a request or a response
+    /** @brief Remove an HTTP header from a request or a response
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the header is located
      * @param header Name of the header to remove
      */
     void removeHeader(struct fcb *fcb, WritablePacket* packet, const char *header);
 
-    /** @brief Return the content of a HTTP header
+    /** @brief Return the content of an HTTP header
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the header is located
      * @param headerName Name of the header to remove
@@ -63,7 +63,7 @@ private:
     void getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName,
         char* buffer, uint32_t bufferSize);
 
-    /** @brief Process the headers and set the URL and the method in the httpin part of the fcb
+    /** @brief Process the headers and set the URL and the method in the httpin part of the FCB
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the headers are located
      */

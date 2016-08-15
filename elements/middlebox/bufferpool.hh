@@ -16,9 +16,9 @@ CLICK_DECLS
  * @brief Class used to provide a pool of buffers that can have a dynamic size
  * and be resized at any moment
  *
- * Contrarily to MemoryPool, BufferPool provides a pool of buffer that can have a dynamic size
- * and can be resized at any moment. The drawback is that the BufferPool does not directly
- * return a chunk of memory (as MemoryPool does) but a pointer to BufferPoolNode that contains
+ * Contrarily to MemoryPool, BufferPool provides a pool of buffers that can have a dynamic size
+ * and be resized at any moment. The drawback is that the BufferPool does not directly
+ * return a chunk of memory (as MemoryPool does) but a pointer to a BufferPoolNode that contains
  * the memory chunk. The pointer to the BufferPoolNode must also be used to release memory.
  */
 class BufferPool
@@ -29,11 +29,12 @@ public:
      * @param initialSize The initial size of the buffers in the pool
      */
     BufferPool(uint32_t initialNumber, uint32_t initialSize);
+
     /** @brief Destruct a BufferPool and free the memory
      */
     ~BufferPool();
 
-    /** @brief Returns a buffer from the pool. Note that the size of the buffer is random, so be
+    /** @brief Return a buffer from the pool. Note that the size of the buffer is random, so be
      * sure to resize it to fit your needs.
      * @return A pointer to a BufferPoolNode used to manage the buffer
      */

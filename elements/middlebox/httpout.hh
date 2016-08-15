@@ -17,13 +17,13 @@ HTPPOut()
 
 =s middlebox
 
-exit point of a HTTP path in the stack of the middlebox
+exit point of an HTTP path in the stack of the middlebox
 
 =d
 
-This element is the exit point of a HTTP path in the stack of the middlebox by which all
-HTTP packets must go before their HTTP content has been processed. Each path containing a HTTPOut
-element must also contain a HTTPIn element
+This element is the exit point of an HTTP path in the stack of the middlebox by which all
+HTTP packets must go after their HTTP content has been processed. Each path containing an HTTPOut
+element must also contain an HTTPIn element
 
 =a HTTPIn */
 
@@ -33,7 +33,7 @@ element must also contain a HTTPIn element
 class HTTPOut : public StackElement, public TCPElement
 {
 public:
-    /** @brief Construct a HTTPOut element
+    /** @brief Construct an HTTPOut element
      */
     HTTPOut() CLICK_COLD;
 
@@ -48,7 +48,7 @@ public:
 protected:
     Packet* processPacket(struct fcb*, Packet*);
 
-    /** @brief Modify the content of a HTTP header
+    /** @brief Modify the content of an HTTP header
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the header is located
      * @param headerName Name of the header to modify

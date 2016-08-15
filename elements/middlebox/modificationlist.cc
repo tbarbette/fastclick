@@ -33,7 +33,7 @@ void ModificationList::clear()
 
     struct ModificationNode* node = head;
 
-    // Browse the list to free remaining nodes
+    // Browse the list in order to free remaining nodes
     while(node != NULL)
     {
         freed = true; // Indicate that we had to free a node
@@ -104,8 +104,7 @@ bool ModificationList::addModification(uint32_t firstPosition, uint32_t position
         node = node->next;
     }
 
-    // We went one node too far during the exploration so get back the previous
-    // node
+    // We went one node too far during the exploration so get back the previous node
     node = prev;
 
     // Add the node in the linked list
@@ -131,13 +130,13 @@ bool ModificationList::addModification(uint32_t firstPosition, uint32_t position
         }
         else
         {
-            // Case 2b: Add the node in the middle or the end of the list
+            // Case 2b: Add the node in the middle or at the end of the list
             newNode->next = node->next;
             node->next = newNode;
         }
     }
 
-    // Try to merge node to reduce their number
+    // Try to merge node
     /* Example where merge is required:
      * We have "abcdefgh"
      * We remove "ef" and add to the list: (4, -2)
@@ -174,7 +173,7 @@ void ModificationList::mergeNodes()
             if(SEQ_LT(node->position, range)
                 && prev->offset < 0 && sameSign(node->offset, prev->offset))
             {
-                // Remove current node and merge its value with the previous node
+                // Remove the current node and merge its value with the previous node
                 prev->offset += node->offset;
                 prev->next = node->next;
                 poolNodes->releaseMemory(node);
@@ -206,7 +205,8 @@ void ModificationList::commit(ByteStreamMaintainer &maintainer)
 
     // Get the last value in the tree to obtain the effects of
     // the modifications in the previous packets
-    // Ack offsets have the opposite sign as the elements in the modification list
+    // Offsets in the ack tree have the opposite sign with respect to the elements in
+    // the modification list
     int offsetTotal = -(maintainer.lastOffsetInAckTree());
 
     while(node != NULL)
@@ -224,10 +224,10 @@ void ModificationList::commit(ByteStreamMaintainer &maintainer)
 
         // The modification to apply to perform the mapping for the ACK has the
         // opposite sign as the modification that was performed so that they
-        // counterbalance
+        // counterbalance each other
         newOffsetAck = -(newOffsetAck);
 
-        // Insert the node in the tree. In case of duplicate, keep only the
+        // Insert the node in the tree. In case of duplicates, keep only the
         // new value
         maintainer.insertInAckTree(newPositionAck, newOffsetAck);
         maintainer.insertInSeqTree(newPositionSeq, newOffsetSeq);

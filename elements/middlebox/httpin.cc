@@ -1,5 +1,5 @@
 /*
- * httpin.{cc,hh} -- entry point of a HTTP path in the stack of the middlebox
+ * httpin.{cc,hh} -- entry point of an HTTP path in the stack of the middlebox
  * Romain Gaillard
  *
  */
@@ -160,7 +160,7 @@ WritablePacket* HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
     if(endVersion == NULL || endVersion > endFirstLine)
         endVersion = endFirstLine;
 
-    // Ensure the line has the right length
+    // Ensure that the line has the right length
     int offset = endVersion - beginning - 8; // 8 is the length of "HTTP/1.1"
     if(offset > 0)
         removeBytes(fcb, packet, beginning - source + 8, offset);

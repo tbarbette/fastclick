@@ -1,5 +1,5 @@
 /*
- * bytestreammaintainer.cc - Class used to manage a flow. Stores the modifications in it
+ * bytestreammaintainer.cc - Class used to manage a flow. Stores the modifications in ths flow
  * (bytes removed or inserted) as well as information such as the MSS, ports, ips, last
  * ack received, last ack sent, ...
  *
@@ -51,7 +51,7 @@ void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager, ui
 
     initialized = true;
 
-    // Insert a key indicating the beginning of the flow that will be used
+    // Insert a key indicating the beginning of the flow. It will be used
     // as a guard
     insertInAckTree(flowStart, 0);
     insertInSeqTree(flowStart, 0);
@@ -67,14 +67,14 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
 
     uint32_t positionSeek = position;
 
-    // Find the element with the greatest key that is below or equal to the given position
+    // Find the element with the greatest key that is less or equal to the given position
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeAck, &positionSeek);
     rb_red_blk_node* pred = treeAck->nil;
     uint32_t nodeKey = 0;
     int nodeInfo = 0;
     uint32_t newPosition = position;
 
-    // If no node was found, no mapping to perform
+    // If no node found, no mapping to perform
     if(node == treeAck->nil)
         return position;
 
@@ -115,27 +115,27 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
     // We do not search the requested position but the position just before it
     // as we do not want to take into account the modifications done at the position itself
     // but the modifications before it for the mapping of the sequence number.
-    // For instance, if we send a packet with a sequence number equals to 1, containing
+    // For instance, if we send a packet with a sequence number equal to 1, containing
     // a b c d e
-    // and then we add "y y y" at the beginning of the next packet (sequence number equals
+    // and then we add "y y y" at the beginning of the next packet (with sequence number equal
     // to 6) containing
     // f g h i j
     // we thus send the packet "y y y f g h i j" and we add to the seq tree the modification
     // 6: 3
     // If we receive a retransmission for the second packet because it was lost, we will map
-    // its sequence number (6) and thus have a mapped sequence number equals to 9 (6 + 3).
+    // its sequence number (6) and thus have a mapped sequence number equal to 9 (6 + 3).
     // We will therefore not retransmit the added data and the destination will see a gap
-    // (it will receive a packet with a sequence number equals to 9 instead of 6).
+    // (it will receive a packet with a sequence number equal to 9 instead of 6).
     // This does not occur if we search the position just before the given one (therefore 5 instead
-    // of 6), we will not take into account the modification in the packet itself.
+    // of 6), we will not take into account the modifications in the packet itself.
     uint32_t positionSeek = position - 1;
 
-    // Find the element with the greatest key that is below or equal to the given position
+    // Find the element with the greatest key that is less or equal to the given position
     rb_red_blk_node* node = RBFindElementGreatestBelow(treeSeq, &positionSeek);
     rb_red_blk_node* pred = treeSeq->nil;
     uint32_t newPosition = position;
 
-    // If no node was found, no mapping to perform
+    // If no node found, no mapping to perform
     if(node == treeSeq->nil)
         return position;
 
@@ -184,7 +184,7 @@ void ByteStreamMaintainer::prune(uint32_t position)
 
     pruneCounter++;
 
-    // We only prune the trees every time we receive BS_PRUNE_THRESHOLD acks
+    // We only prune the trees every time we receive BS_PRUNE_THRESHOLD ACKs
     if(pruneCounter < BS_PRUNE_THRESHOLD)
         return;
 
@@ -203,7 +203,7 @@ void ByteStreamMaintainer::prune(uint32_t position)
 void ByteStreamMaintainer::setLastAckSent(uint32_t ackNumber)
 {
     // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
-    // 0) for it and check that the given one is greater as we could have false negatives
+    // 0) for them and check that the given one is greater as we could have false negatives
     if(!lastAckSentSet || SEQ_GT(ackNumber, lastAckSent))
         lastAckSent = ackNumber;
 
@@ -221,7 +221,7 @@ uint32_t ByteStreamMaintainer::getLastAckSent()
 void ByteStreamMaintainer::setLastSeqSent(uint32_t seqNumber)
 {
     // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
-    // 0) for it and check that the given one is greater as we could have false negatives
+    // 0) for them and check that the given one is greater as we could have false negatives
     if(!lastSeqSentSet || SEQ_GT(seqNumber, lastSeqSent))
         lastSeqSent = seqNumber;
 
@@ -275,7 +275,7 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
 void ByteStreamMaintainer::setLastAckReceived(uint32_t ackNumber)
 {
     // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
-    // 0) for it and check that the given one is greater as we could have false negatives
+    // 0) for them and check that the given one is greater as we could have false negatives
     if(!lastAckReceivedSet || SEQ_GT(ackNumber, lastAckReceived))
         lastAckReceived = ackNumber;
 
