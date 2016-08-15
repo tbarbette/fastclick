@@ -44,7 +44,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     String dev;
 
     if (parse(Args(conf, this, errh)
-        .read_mp("PORT", dev))
+        .read_mp("PORT", dev), errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
         .complete() < 0)

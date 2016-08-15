@@ -45,7 +45,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int burst = -1;
 
     if (parse(Args(conf, this, errh)
-    .read_mp("DEVNAME", ifname))
+    .read_mp("DEVNAME", ifname), errh)
     .complete() < 0)
     	return -1;
 
