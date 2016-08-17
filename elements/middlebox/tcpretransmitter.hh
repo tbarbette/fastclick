@@ -26,24 +26,24 @@ TCPRetransmitter([INITIALBUFFERSIZE])
 
 =s middlebox
 
-manages the tcp retransmissions and ensures that data we are responsible for (data we ACKed) is
+manages the tcp retransmissions and ensures that data we are responsible for (data we ACKed) are
 correctly received and that their transmission is done correctly, using the tcp mechanisms
 such as slow start.
 
 =d
 
-This element bufferizes the data we are transmitting until it is ACKed in order to be retransmitted
+This element stores the data we are transmitting until it is ACKed in order to be retransmitted
 if needed. When packets are modified by the middlebox, this is required as we must not reprocess
 retransmitted packets but instead, retransmit the corresponding processed data.
 
 This element also ensures that the data we are now responsible for (data we ACKed via the
 requestMorePackets method) and that is not managed by the source anymore will be received correctly
-by the destination (because we ACKed it, the source will never retransmit them as it thinks the
+by the destination (because we ACKed them, the source will never retransmit them as it thinks the
 destination received them) and that we transmit these data correctly, following the TCP requirements
 such as taking into account the congestion window and the receiver's window size. This is important
 because an element can bufferize a large number of packets and flush the buffer suddently. This
-element avoids that in this case, an amount of data too large for the network or the receiver
-is sent naively. For this purpose, it implements a version of TCP Tahoe for the transmission of these
+element avoids that, in this case, an amount of data too large for the network or the receiver
+is sent naively. For this purpose, it implements TCP Tahoe for the transmission of these
 data.
 
 =item INITIALBUFFERSIZE
@@ -97,10 +97,10 @@ public:
     void transmitMoreData(struct fcb* fcb);
 
     /**
-     * @brief Signal that we received an ACK. Will prune the buffer, manage the retransmission timer
-     * and potentially send more data we are responsible for.
+     * @brief Signal that we received an ACK. It will prune the buffer, manage the retransmission
+     * timer and potentially send more data we are responsible for.
      * @param fcb A pointer to the FCB of the flow
-     * @param ack Number of the last received ack
+     * @param ack Number of the last ack received
      */
     void signalAck(struct fcb* fcb, uint32_t ack);
 
@@ -120,13 +120,13 @@ private:
     bool dataToRetransmit(struct fcb *fcb);
 
     /**
-     * @brief Ensure that the component in correctly initialized
+     * @brief Ensure that the component is correctly initialized
      * @param fcb A pointer to the FCB of the flow
      */
     void checkInitialization(struct fcb *fcb);
 
     /**
-     * @brief Process a packet coming from the stack of the middlebox (the first input)
+     * @brief Process a packet coming from the stack of the middlebox (on the first input)
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet to process
      * @return A pointer to the processed packet
@@ -142,7 +142,7 @@ private:
     Packet* processPacketRetransmission(struct fcb *fcb, Packet *packet);
 
     /**
-     * @brief Transmit data we are responsible for, waiting in the buffer. It will ensure
+     * @brief Transmit data we are responsible for, currently waiting in the buffer. It will ensure
      * that we do not transmit an amount of data too large for the network or the receiver.
      * @param fcb A pointer to the FCB of the flow
      * @param retransmission A boolean indicating whether these data have already been transmitted

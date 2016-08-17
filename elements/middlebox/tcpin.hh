@@ -137,7 +137,7 @@ private:
      * @brief Assign a tcp_common structure in the FCB of this flow. If the given packet
      * is a SYN packet, it will allocate a structure and set the pointer in the fcb.
      * If the packet is a SYNACK packet, it will get the structure allocated by the other direction
-     * of the path (when it received the SYN packet) and set the pointer in the fcb
+     * of the connection (when it received the SYN packet) and set the pointer in the fcb
      * @param fcb A pointer to the FCB of this flow
      * @param packet The packet
      * @return A boolean indicating whether the structure has been assigned
@@ -145,7 +145,7 @@ private:
     bool assignTCPCommon(struct fcb *fcb, Packet *packet);
 
     /**
-     * @brief Send a ACK for a packet to its source
+     * @brief Send an ACK for a packet to its source
      * @param fcb A pointer to the FCB of this flow
      * @param packet The packet
      * @param force A boolean indicating if the ack must be resent even though a similar ack
@@ -162,8 +162,8 @@ private:
     bool checkConnectionClosed(struct fcb* fcb, Packet *packet);
 
     /**
-     * @brief Manage the TCP options. It will disable the SACK option if needed, get the MSS
-     * and set the window scale factor if needed.
+     * @brief Manage the TCP options. It will disable the SACK-permitted option if needed,
+     * get the MSS, and set the window scale factor if needed.
      * @param fcb A pointer to the FCB of this flow
      * @param packet The packet
      */
@@ -173,7 +173,7 @@ private:
     per_thread<MemoryPool<struct ModificationList>> poolModificationLists;
     per_thread<RBTMemoryPoolStreamManager> rbtManager;
 
-    Spinlock lock; // Lock for access to the two elements above
+    Spinlock lock; // Lock to access to the two elements below
     HashTable<IPFlowID, struct fcb_tcp_common*> tableFcbTcpCommon;
     MemoryPool<struct fcb_tcp_common> poolFcbTcpCommon;
 

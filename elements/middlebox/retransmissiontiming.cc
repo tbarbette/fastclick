@@ -111,7 +111,7 @@ bool RetransmissionTiming::signalAck(struct fcb *fcb, uint32_t ack)
 
     if(SEQ_GT(ack, rttSeq))
     {
-        // The ACK is greater than the sequence number used to start measure
+        // The ACK is greater than the sequence number used to start the measure
         // It means the destination received the data used to estimate
         // the RTT
         measureEndTime.assign_now();

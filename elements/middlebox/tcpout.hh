@@ -26,7 +26,7 @@ TCP packets must go after their TCP content has been processed. Each path contai
 must also contain a TCPIn element
 
 The first output corresponds to the normal path. The second output is optional and is used
-to send packet back to the source (for instance to acknowledge packets).
+to send packets back to the source (for instance to acknowledge packets).
 
 =a TCPIn */
 
@@ -47,7 +47,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     /**
-     * @brief Send a ACK packet on the second output
+     * @brief Send an ACK packet on the second output
      * @param maintainer ByteStreamMaintainer of the other side of the connection (used to get
      * information such as the window size)
      * @param saddr IP source address
@@ -56,8 +56,8 @@ public:
      * @param dport Destination port
      * @param seq Sequence number
      * @param ack Ack number
-     * @param force Boolean used to force the sending of the ACK even if a previous ack for the same
-     * data as already been sent
+     * @param force Boolean used to force the sending of the ACK even if a previous ACK for the same
+     * data has already been sent
      */
     void sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport,
          uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force = false);

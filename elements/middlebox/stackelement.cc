@@ -87,7 +87,7 @@ PacketBatch* StackElement::pull_batch(int port, int max)
 
 Packet* StackElement::processPacket(struct fcb *fcb, Packet* p)
 {
-    click_chatter("Warning: A stack element has processed a packet in a generic way");
+    click_chatter("Warning: A stack element is processing a packet in a generic way");
 
     return p;
 }
@@ -152,7 +152,7 @@ bool StackElement::getAnnotationLastUseful(Packet *p) const
 
 void StackElement::addStackElementInList(StackElement *element, int port)
 {
-    // Check that this element was not already added in the list via an
+    // Check that this element has not already been added in the list via an
     // alternative path
 
     previousStackElement = element;
@@ -297,9 +297,9 @@ unsigned int StackElement::determineFlowDirection()
 
 char* StackElement::searchInContent(char *content, const char *pattern, uint32_t length)
 {
-    // We use this method instead of a mere strstr because the content of the packet
+    // We use this method instead of a mere 'strstr' because the content of the packet
     // is not necessarily NULL-terminated
-    
+
     uint32_t patternLen = strlen(pattern);
 
     for(uint32_t i = 0; i < length; ++i)

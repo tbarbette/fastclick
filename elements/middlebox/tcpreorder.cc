@@ -114,7 +114,7 @@ void TCPReorder::processPacketBatch(struct fcb *fcb, PacketBatch* batch)
     if(fcb->tcpreorder.pool == NULL)
         fcb->tcpreorder.pool = &(*pool);
 
-    // O(k)
+    // Complexity: O(k) (k elements in the batch)
     FOR_EACH_PACKET_SAFE(batch, packet)
     {
         checkFirstPacket(fcb, packet);
@@ -124,7 +124,7 @@ void TCPReorder::processPacketBatch(struct fcb *fcb, PacketBatch* batch)
 
         if(mergeSort)
         {
-            // Add the packet at the beginning of the list unsorted (O(1))
+            // Add the packet at the beginning of the list (unsorted) (O(1))
             struct TCPPacketListNode* toAdd = fcb->tcpreorder.pool->getMemory();
 
             toAdd->packet = packet;
@@ -152,7 +152,7 @@ bool TCPReorder::checkRetransmission(struct fcb *fcb, Packet* packet)
     if(SEQ_LT(getSequenceNumber(packet), fcb->tcpreorder.expectedPacketSeq))
     {
         // We do not send the packet to the second output if the retransmission is a packet
-        // that has not already been sent to the next component. In this case, this is a
+        // that has not already been sent to the next element. In this case, this is a
         // retransmission for a packet we already have in the waiting list so we can discard
         // the retransmission
         if(noutputs() == 2 && SEQ_GEQ(getSequenceNumber(packet), fcb->tcpreorder.lastSent))
@@ -222,7 +222,7 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
             return;
         }
 
-        // Compute sequence number of the next packet
+        // Compute the sequence number of the next packet
         fcb->tcpreorder.expectedPacketSeq = getNextSequenceNumber(packetNode->packet);
 
         // Store the sequence number of the last packet sent
@@ -248,7 +248,7 @@ void TCPReorder::sendEligiblePackets(struct fcb *fcb)
     }
 
     #if HAVE_BATCH
-        // We now send the batch we built
+        // We now send the batch we just built
         if(batch != NULL)
             output_push_batch(0, batch);
     #endif
@@ -287,7 +287,7 @@ void TCPReorder::putPacketInList(struct fcb* fcb, Packet* packet)
         packetNode = packetNode->next;
     }
 
-    // Check if we need to add the node at the head of the list
+    // Check if we need to add the node as the head of the list
     if(prevNode == NULL)
         fcb->tcpreorder.packetList = toAdd; // If so, the list points to the node to add
     else

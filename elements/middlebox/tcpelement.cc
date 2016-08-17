@@ -146,7 +146,7 @@ WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t
     ip->ip_v = 4; // IPv4
     ip->ip_hl = 5; // Set IP header length (no options and 5 is the minimum value)
     ip->ip_tos = 0; // Set type of service to 0
-    // Set the current length of the packet (with empty TCP payload)
+    // Set the current length of the packet
     ip->ip_len = htons(packet->length());
     ip->ip_id = htons(0);      // Set fragment id to 0
     ip->ip_off = htons(IP_DF); // Indicate not to fragment
@@ -232,7 +232,7 @@ bool TCPElement::isJustAnAck(Packet* packet) const
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
 
-    // If we have a payload, we are more than just a ACK
+    // If we have a payload, we are more than just an ACK
     if(getPayloadLength(packet) > 0)
         return false;
 

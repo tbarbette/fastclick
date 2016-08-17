@@ -2,7 +2,7 @@
  * rbt.hh - Set of methods and structures used to create and manage red black trees
  *
  * This file only declares and documents the methods that can be used publicly to manage RBTs
- * For helper method used internally, please refer to rbt.cc
+ * For helper methods used internally, please refer to rbt.cc
  *
  * Romain Gaillard - Adapted from the Red Black Tree implementation of Emin Martinian.
  */
@@ -173,13 +173,13 @@ rb_red_blk_node* TreeSuccessor(rb_red_blk_tree*, rb_red_blk_node*);
 rb_red_blk_node* RBExactQuery(rb_red_blk_tree* tree, void* key);
 
 /**
- * @brief Search the node with the largest key lower or equal to the given one
+ * @brief Search the node with the largest key less or equal to the given one
  *
  * Complexity: O(log(n)) where n is the number of elements in the tree
  *
  * @param tree A pointer to the tree
  * @param key A pointer to the key
- * @return A pointer to the node containing the largest key in the tree lower or equal to the given
+ * @return A pointer to the node containing the largest key in the tree less or equal to the given
  * one or tree->nil if the tree is empty
  */
 rb_red_blk_node* RBFindElementGreatestBelow(rb_red_blk_tree* tree, void* key);

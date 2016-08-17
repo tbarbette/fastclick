@@ -46,7 +46,7 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     if(hasModificationList)
         modList = inElement->getModificationList(fcb, packet);
 
-    // Update the sequence number (according to modifications made on previous packets)
+    // Update the sequence number (according to the modifications made on previous packets)
     tcp_seq_t prevSeq = getSequenceNumber(packet);
     tcp_seq_t newSeq =  byteStreamMaintainer.mapSeq(prevSeq);
     bool seqModified = false;
@@ -99,13 +99,13 @@ Packet* TCPOut::processPacket(struct fcb* fcb, Packet* p)
     // tcp checksum as it is in the pseudo header)
     setPacketTotalLength(packet, initialLength + offsetModification);
 
-    // Check if the modificationlist has to be committed
+    // Check if the ModificationList has to be committed
     if(hasModificationList)
     {
         // We know that the packet has been modified and its size has changed
         modList->commit(fcb->tcp_common->maintainers[getFlowDirection()]);
 
-        // Check if the full packet content has been removed
+        // Check if the full content of the packet has been removed
         if(getPayloadLength(packet) == 0)
         {
             uint32_t saddr = getDestinationAddress(packet);
@@ -215,7 +215,7 @@ void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr,
     if(graceful)
     {
         flag = flag | TH_FIN;
-        // Ensure that further packet will have seq + 1 (for FIN flag) as a
+        // Ensure that further packets will have seq + 1 (for the FIN flag) as a
         // sequence number
         maintainer.setLastSeqSent(seq + 1);
     }
@@ -252,7 +252,7 @@ bool TCPOut::checkConnectionClosed(struct fcb* fcb, Packet *packet)
         return true;
     }
 
-    // If the connection is being closed and we received the last packet, close it completely
+    // If the connection is being closed and we have received the last packet, close it completely
     if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL)
     {
         if(isFin(packet))

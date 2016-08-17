@@ -22,7 +22,7 @@ connecting the output of two components to the input of another one. This is req
 an element calls a method of the stack, it propagates the call to the element connected to its
 input. If two outputs are connected to one input of an element, it cannot know which one of the
 two outputs was used to send the packet.
-PathMerger associates a packet to the input where it came from and thus it is able to propagate
+PathMerger associates a packet to the input it came from and thus it is able to propagate
 the method call to the right element by selecting the right input when a method of the stack
 is called on a packet.
 To merge two paths into one, connect each path to a different input of a PathMerger and the unique
@@ -68,7 +68,7 @@ protected:
     virtual unsigned int determineFlowDirection();
 
 private:
-    StackElement* previousStackElements[2]; // Previous element for the two inputs
+    StackElement* previousStackElements[2]; // Previous elements for the two inputs
 
     /** @brief Return the input number for a given packet
      * @param fcb Pointer to the FCB of the flow
@@ -84,10 +84,10 @@ private:
      */
     void setPortForPacket(struct fcb *fcb, Packet *packet, int port);
 
-    /** @brief Return the element from which came a given packet
+    /** @brief Return the element from which a given packet came from
      * @param fcb Pointer to the FCB of the flow
      * @param packet The packet
-     * @return Element from which came a given packet
+     * @return Element from which a given packet came from
      */
     StackElement* getElementForPacket(struct fcb *fcb, Packet* packet);
 

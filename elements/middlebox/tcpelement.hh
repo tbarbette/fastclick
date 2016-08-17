@@ -36,7 +36,7 @@ public:
      * @param ack Ack number
      * @param windowSize Window size
      * @param flags The TCP flags on one byte
-     * @param contentSize Extra space to allocate for TCP payload
+     * @param contentSize Extra space to allocate for the TCP payload
      * @return The created TCP packet
      */
     WritablePacket* forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport, uint16_t dport,
@@ -72,9 +72,9 @@ public:
     tcp_seq_t getAckNumber(Packet* packet) const;
 
     /**
-     * @brief Return the window size set in a packet
+     * @brief Return the window size set in the header of a packet
      * @param packet The packet
-     * @return The window size set in the packet
+     * @return The window size set in the header of the packet
      */
     uint16_t getWindowSize(Packet *packet) const;
 
@@ -93,7 +93,7 @@ public:
     bool isSyn(Packet* packet) const;
 
     /**
-     * @brief Indicate whether a packet is a FINpacket
+     * @brief Indicate whether a packet is a FIN packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is a FIN packet
      */
@@ -107,9 +107,9 @@ public:
     bool isRst(Packet* packet) const;
 
     /**
-     * @brief Indicate whether a packet is a ACK packet
+     * @brief Indicate whether a packet is an ACK packet
      * @param packet The packet
-     * @return A boolean indicating whether the packet is a ACK packet
+     * @return A boolean indicating whether the packet is an ACK packet
      */
     bool isAck(Packet* packet) const;
 
@@ -172,9 +172,9 @@ public:
     void setAckNumber(WritablePacket* packet, tcp_seq_t ack) const;
 
     /**
-     * @brief Indicate whether the packet is just an ACK without an additional information
+     * @brief Indicate whether the packet is just an ACK without any additional information
      * @param packet The packet
-     * @return A boolean indicating whether the packet is just an ACK without an additional
+     * @return A boolean indicating whether the packet is just an ACK without any additional
      * information
      */
     bool isJustAnAck(Packet* packet) const;

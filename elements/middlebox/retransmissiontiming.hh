@@ -93,7 +93,7 @@ public:
 
     /**
      * @brief Signal that a ACK has been received. This is used to stop RTT measures and
-     * to prune the circular buffer.
+     * prune the circular buffer.
      * @param fcb A pointer to the FCB for this side of the flow
      * @param ack The ACK number received
      * @return A boolean indicating whether the RTT measure has been stopped. False means
@@ -110,8 +110,8 @@ public:
     bool signalRetransmission(uint32_t expectedAck);
 
     /**
-     * @brief Return a boolean indicating whether a RTT measure is un progress
-     * @return A boolean indicating whether a RTT measure is un progress
+     * @brief Return a boolean indicating whether a RTT measure is in progress
+     * @return A boolean indicating whether a RTT measure is in progress
      */
     bool isMeasureInProgress();
 
@@ -154,7 +154,7 @@ public:
 
     /**
      * @brief Try to send more data from the circular buffer to the destination
-     * @return A boolean equals to false if it fails because the timer has not been initialized
+     * @return A boolean equal to false if it fails because the timer has not been initialized
      * (required for this operation)
      */
     bool sendMoreData();
@@ -198,8 +198,7 @@ public:
 
 private:
     /**
-     * @brief Compute the clock granularity (the smallest amount of time measurable for the RTT
-     * values)
+     * @brief Compute the clock granularity (the smallest amount of time measurable for the RTT)
      */
     void computeClockGranularity();
 
@@ -217,7 +216,7 @@ private:
     Timer timerRetransmit; // Retransmission timer
     Timer timerThread; // Timer used to ensure that when we call "sendMoreData", it is executed
                        // in the right thread (not necessarily the thread calling the method but
-                       // the thread responsible for this timer) but scheduling the timer
+                       // the thread responsible for this timer) by scheduling the timer
                        // immediately.
     struct retransmissionTimerData timerData; // Data passed by the retransmission timer
     TCPRetransmitter *owner;

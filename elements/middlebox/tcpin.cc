@@ -159,8 +159,8 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     setContentOffset(packet, offset);
 
     // Manage the TCP options:
-    // - Remove the SACK permitted option
-    // - Detect the Window scale
+    // - Remove the SACK-permitted option
+    // - Detect the window scale
     // - Detect MSS
     manageOptions(fcb, packet);
 
@@ -183,7 +183,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
             // We receive content that has already been ACKed.
             // This case occurs when the ACK is lost between the middlebox and
             // the destination.
-            // In this case, we ACK the content and we discard it
+            // In this case, we re-ACK the content and we discard it
             ackPacket(fcb, packet);
             packet->kill();
             fcb->tcp_common->lock.release();
@@ -197,7 +197,7 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
     tcp_seq_t newAckNumber = 0;
     if(isAnAck)
     {
-        // Map the ack number according to the bytestreammaintainer of the other direction
+        // Map the ack number according to the ByteStreamMaintainer of the other direction
         ackNumber = getAckNumber(packet);
         newAckNumber = otherMaintainer.mapAck(ackNumber);
 
@@ -235,13 +235,13 @@ Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
         // Prune the ByteStreamMaintainer of the other side
         otherMaintainer.prune(ackNumber);
 
-        // Update the statistics regarding the RTT
+        // Update the statistics about the RTT
         // And potentially update the retransmission timer
         fcb->tcp_common->lock.release();
         fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(fcb, ackNumber);
         fcb->tcp_common->lock.acquire();
 
-        // Check if the current packet is just an ACK without more information
+        // Check if the current packet is just an ACK without additional information
         if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
         {
             bool isDup = false;
@@ -336,7 +336,7 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
         tcp_seq_t seq = getInitialAck(packet);
 
         // The ACK is the sequence number sent by the source
-        // to which we add the size of the payload to acknowledge it
+        // to which we add the size of the payload in order to acknowledge it
         tcp_seq_t ack = getSequenceNumber(packet) + getPayloadLength(packet);
 
         if(isFin(packet) || isSyn(packet))
@@ -460,7 +460,7 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool force)
     tcp_seq_t seq = getInitialAck(packet);
 
     // The ACK is the sequence number sent by the source
-    // to which we add the size of the payload to acknowledge it
+    // to which we add the size of the payload in order to acknowledge it
     tcp_seq_t ack = getSequenceNumber(packet) + getPayloadLength(packet);
 
     if(isFin(packet) || isSyn(packet))
@@ -522,7 +522,7 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
     // (if ACK flag, we are not the initiator)
     if(flags & TH_ACK)
     {
-        // Getting the flow ID for the opposite side of the connection
+        // Get the flow ID for the opposite side of the connection
         IPFlowID flowID(iph->ip_dst, tcph->th_dport, iph->ip_src, tcph->th_sport);
 
         // Get the struct allocated by the initiator
@@ -533,11 +533,11 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
     }
     else
     {
-        // Acquire the lock for the pool of tcp_common structurs
+        // Acquire the lock for the pool of tcp_common structures
         lock.acquire();
 
         IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
-        // We are the initiator, we need to allocate memory
+        // We are the initiator, so we need to allocate memory
         struct fcb_tcp_common *allocated = poolFcbTcpCommon.getMemory();
         // Call the constructor with some parameters that will be used
         // to free the memory of the structure when not needed anymore
@@ -551,7 +551,7 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         // Initialize the RBT with the RBTManager
         fcb->tcp_common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
 
-        // Store in our structure information needed to free the memory
+        // Store in our structure the information needed to free the memory
         // of the common structure
         fcb->tcpin.inChargeOfTcpCommon = true;
         fcb->tcpin.flowID = flowID;
@@ -599,7 +599,7 @@ struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 
 void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
 {
-    // The option can only be present in SYN packets
+    // The options we are looking for can only be present in SYN packets
     if(!isSyn(packet))
         return;
 
@@ -643,9 +643,9 @@ void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
             if(isAck(packet))
             {
                 // Here, we have a SYNACK
-                // It means that we now if the other side of the flow
+                // It means that we know if the other side of the flow
                 // has the option enabled
-                // if this is not the case, we disable it for use as well
+                // if this is not the case, we disable it for this side as well
                 if(!fcb->tcp_common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
                 {
                     fcb->tcp_common->maintainers[flowDirection].setUseWindowScale(false);

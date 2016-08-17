@@ -19,11 +19,11 @@ TCPMarkMSS(FLOWDIRECTION, ANNOTATION [, OFFSET])
 
 =s middlebox
 
-annotate packets with the MSS of the flow
+annotates packets with the MSS of the flow
 
 =d
 
-This element detects the MSS of a TCP flows and annotates every packet of the flow with this MSS.
+This element detects the MSS of a TCP flow and annotates every packet of the flow with this MSS.
 It is typically used in conjunction with TCPFragmenter to ensure that the TCP packets are not
 too big.
 

@@ -134,7 +134,7 @@ void PathMerger::packetSent(struct fcb *fcb, Packet* packet)
     if(previousElem != NULL)
         previousElem->packetSent(fcb, packet);
 
-    // Remove the entry corresponding to the packet to free memory
+    // Remove the entry corresponding to the packet in order to free memory
     removeEntry(fcb, packet);
 }
 

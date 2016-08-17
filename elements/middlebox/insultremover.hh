@@ -16,7 +16,7 @@ InsultRemover([CLOSECONNECTION])
 
 =s middlebox
 
-remove insults in web pages
+removes insults in web pages
 
 =d
 

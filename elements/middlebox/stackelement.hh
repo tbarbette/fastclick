@@ -26,7 +26,7 @@ It provides useful methods and the mechanism of function stack. This element is 
 directly in a click configuration. Instead, use elements that inherit from it.
 
 To use the function stack, simply call one of the methods using this mechanism and the method
-will be called automatically on upstream elements until a IPIn element is reached. For instance,
+will be called automatically on upstream elements until an IPIn element is reached. For instance,
 to remove bytes in a packet, elements can simply call removeBytes, giving it the right parameters
 and the method will be called on upstream elements that will handle the request and act
 consequently.
@@ -72,15 +72,15 @@ public:
     // Custom methods
 
     /**
-     * @brief Indicate whether the element is an exit point of the stack
-     * @return A boolean indicating whether the element is an exit point of the stack
+     * @brief Indicate whether the element is an exit point element of the stack
+     * @return A boolean indicating whether the element is an exit point element of the stack
      */
     virtual bool isOutElement()          { return false; }
 
     /**
-     * @brief Method used during the building of the function stack to set the element
-     * on which this one must call the corresponding method to propagate the call in the stack
-     * @param element The next element in the function stack
+     * @brief Method used during the building of the function stack. It sets the element
+     * on which we must call the corresponding method to propagate the call in the stack
+     * @param element The next element (upstream) in the function stack
      * @param port The input port connected to this element
      */
     virtual void addStackElementInList(StackElement* element, int port);
@@ -110,9 +110,9 @@ protected:
 
     /**
      * @brief Get the offset at which the current useful content starts.
-     * It depends on the elements by which the packet went through. For instance, after TCPIN
+     * It depends on the elements by which the packet went through. For instance, after TCPIn,
      * the offset points to the TCP payload. After HTTPIn, the offset points to the body
-     * of a HTTP request/response.
+     * of the HTTP request/response.
      * @param packet The packet
      * @return The current offset of the content
      */
@@ -120,9 +120,9 @@ protected:
 
     /**
      * @brief Get the current useful content of the packet
-     * It depends on the elements by which the packet went through. For instance, after TCPIN
+     * It depends on the elements by which the packet went through. For instance, after TCPIn,
      * it points to the TCP payload. After HTTPIn, it points to the body
-     * of a HTTP request/response.
+     * of the HTTP request/response.
      * @param packet The packet
      * @return A pointer to the constant current useful content of the packet
      */
@@ -130,9 +130,9 @@ protected:
 
     /**
      * @brief Get the current useful content of the packet
-     * It depends on the elements by which the packet went through. For instance, after TCPIN
+     * It depends on the elements by which the packet went through. For instance, after TCPIn,
      * it points to the TCP payload. After HTTPIn, it points to the body
-     * of a HTTP request/response.
+     * of the HTTP request/response.
      * @param packet The packet
      * @return A pointer to the current useful content of the packet
      */
@@ -156,7 +156,7 @@ protected:
     void setContentOffset(Packet* packet, uint16_t offset) const;
 
     /**
-     * @brief Set the INITIAL_ACK annotation for the packet. This annotation stores the initial
+     * @brief Set the INITIAL_ACK annotation of the packet. This annotation stores the initial
      * ACK number that the packet had before modification.
      * @param packet The packet
      * @param initialAck The initial ACK number of the packet
@@ -172,7 +172,7 @@ protected:
     uint32_t getInitialAck(Packet *packet) const;
 
     /**
-     * @brief Indicate whether the packet has useful content
+     * @brief Indicate whether the packet has useful content for the current protocol
      * @param The packet
      * @return A boolean indicating if the useful content of the packet is empty
      */
@@ -186,8 +186,8 @@ protected:
     uint16_t getPacketContentSize(Packet *packet) const;
 
     /**
-     * @brief Used to create the function stack. It will start a StackVisitor
-     * upstream that will register this element as the next element in the function stack
+     * @brief Used to create the function stack. It will run a StackVisitor
+     * downstream that will register this element as the next element in the function stack
      * of the next stack element.
      */
     void buildFunctionStack();
@@ -208,7 +208,7 @@ protected:
      * @brief Remove bytes in a packet
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet
-     * @param position The position (relative to the useful content)
+     * @param position The position (relative to the current useful content)
      * @param length Number of bytes to remove
      */
     virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position,
@@ -216,13 +216,13 @@ protected:
 
     /**
      * @brief Insert bytes in a packet. This method creates room for the new bytes and moves
-     * the content after the insertion point so it is after the new bytes.
+     * the content after the insertion point so that it is after the new bytes.
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet
-     * @param position The position (relative to the useful content)
+     * @param position The position (relative to the current useful content)
      * @param length Number of bytes to insert
      * @return A pointer to the packet with the bytes inserted (can be different from the given
-     * pointer to the packet)
+     * pointer)
      */
     virtual WritablePacket* insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position,
         uint32_t length) CLICK_WARN_UNUSED_RESULT;
@@ -266,8 +266,9 @@ protected:
 
     /**
      * @brief Determine the flow ID for this path (0 or 1).
-     * Each side of a TCP connection has a different flow direction (0 for one and 1 for the other).
-     * This ID is defined in the click configuration.
+     * Each side of a TCP connection has a different flow direction (0 for one of them and 1
+     * for the other).
+     * This ID is defined in the Click configuration.
      * @return An unsigned int representing the ID (called direction) of the flow in the connection
      */
     virtual unsigned int determineFlowDirection();
@@ -277,16 +278,16 @@ private:
      * @brief Set a bit in the annotation byte used to store booleans. This annotation is used
      * to store up to 8 boolean values
      * @param packet The packet
-     * @param bit The offset of the bit [0, 7]
+     * @param bit The offset of the bit (in [0, 7])
      * @param value The new value of the bit
      */
     void setAnnotationBit(Packet* packet, int bit, bool value) const;
 
     /**
-     * @brief Return a bit value in the annotation byte used to store booleans. This annotation is
-     * used to store up to 8 boolean values
+     * @brief Return the value of a bit in the annotation byte used to store booleans. This
+     * annotation is used to store up to 8 boolean values
      * @param packet The packet
-     * @param bit The offset of the bit [0, 7]
+     * @param bit The offset of the bit (in [0, 7])
      * @return Value of the bit
      */
     bool getAnnotationBit(Packet* packet, int bit) const;
@@ -304,7 +305,7 @@ private:
  * @brief This class defines a RouterVisitor that will be used to build the function stack
  * Each element starts a visitor downsteam so that when the visitor reaches the next StackElement,
  * the object that started the visitor will be registered as the next element in the function stack
- * for the visited element.
+ * of the visited element.
  */
 class StackVisitor : public RouterVisitor
 {
@@ -326,9 +327,9 @@ public:
     }
 
     /**
-     * @brief Visit the path of elements until we find a stack element. We will tell to this
+     * @brief Visit the path of elements until we find a stack element. We will indicate to this
      * element that we are the next element in the function stack so that it will propagate
-     * the calls to us. See the click documentation for the description of the parameters
+     * the calls to us. See the Click documentation for the description of the parameters
      */
     bool visit(Element *e, bool, int port, Element*, int, int)
     {

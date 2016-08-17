@@ -24,11 +24,11 @@ TCPReorder(FLOWDIRECTION [, MERGESORT])
 
 =s middlebox
 
-reorder TCP packets
+reorders TCP packets
 
 =d
 
-This element reorder TCP packets before sending them on its first output. It can be used outside
+This element reorders TCP packets before sending them on its first output. It can be used outside
 of the stack of the middlebox. The second output is optional and is used to push retransmitted
 packets. If the second output is not used, retransmitted packets are dropped.
 
@@ -39,8 +39,8 @@ Thus, each direction of a TCP connection has a different ID.
 
 =item MERGESORT
 
-Only used with batching. Add each packets of the batch at the beginning of the list and reorder
-the list using merge sort instead of adding each packet of the batch directly at the right position.
+Only used with batching. Adds each packet of the batch at the beginning of the list and reorders
+the list using merge sort instead of adding each packet of the batch directly to the right position.
 
 Complexity to process a batch with this option: O((n + k) * log (n + k))
 Complexity to process a batch without this option: O(k * (n + k))
@@ -100,14 +100,14 @@ private:
     void putPacketInList(struct fcb *fcb, Packet* packet);
 
     /**
-     * @brief Send the set of in order packets from the list of waiting packets
+     * @brief Send the in-order packets from the list of waiting packets
      * @param fcb A pointer to the FCB of the flow
      */
     void sendEligiblePackets(struct fcb *fcb);
 
     /**
      * @brief Check if the packet is the first one of the flow and acts consequently.
-     * In particular, it flushes the list of waiting packets and set the sequence number of the
+     * In particular, it flushes the list of waiting packets and sets the sequence number of the
      * next expected packet
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet to check
