@@ -336,7 +336,10 @@ ConfParseTest::initialize(ErrorHandler *errh)
     CHECK(t.unparse() == "-1.001000");
 #if CLICK_HZ == 1000		/* true at userlevel */
     CHECK(t == Timestamp::make_jiffies((click_jiffies_difference_t) -1001));
+
+#if SIZEOF_CLICK_JIFFIES_T < 8 || !TIMESTAMP_REP_FLAT64
     CHECK(t < Timestamp::make_jiffies((click_jiffies_t) -1001));
+#endif
     CHECK(-t == Timestamp::make_jiffies((click_jiffies_t) 1001));
     CHECK(-t == Timestamp::make_jiffies((click_jiffies_difference_t) 1001));
 #endif

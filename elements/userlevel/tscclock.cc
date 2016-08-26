@@ -418,6 +418,6 @@ __thread int64_t TSCClock::local_tsc_offset = 0;
 __thread int TSCClock::local_synchronize_bad = 0;
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(usertimestamp)
+ELEMENT_REQUIRES(usertiming)
 EXPORT_ELEMENT(TSCClock)
 ELEMENT_MT_SAFE(TSCClock)

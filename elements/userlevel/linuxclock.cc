@@ -77,6 +77,6 @@ void LinuxClock::add_handlers() {
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(usertimestamp)
+ELEMENT_REQUIRES(usertiming)
 EXPORT_ELEMENT(LinuxClock)
 ELEMENT_MT_SAFE(LinuxClock)

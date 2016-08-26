@@ -8969,7 +8969,7 @@ User-based timestamp needs 64bits types !
 =========================================" "$LINENO" 5
 fi
 
-$as_echo "#define HAVE_USER_TIMESTAMP 1" >>confdefs.h
+$as_echo "#define HAVE_USER_TIMING 1" >>confdefs.h
 
 fi
 
@@ -13982,7 +13982,7 @@ if test "x$enable_user_multithread" = xyes; then
 fi
 
 if test "x$enable_user_timestamp" = xyes; then
-    provisions="$provisions usertimestamp"
+    provisions="$provisions usertiming"
 fi
 
 if test "x$enable_wifi" = xyes; then

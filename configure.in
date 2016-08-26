@@ -768,7 +768,7 @@ User-based timestamp needs 64bits types !
 
 =========================================])
 fi
-    AC_DEFINE([HAVE_USER_TIMESTAMP], [1], [Define if user-provided clock system is supported.])
+    AC_DEFINE([HAVE_USER_TIMING], [1], [Define if user-provided clock system is supported.])
 fi
 
 dnl
@@ -2257,9 +2257,9 @@ if test "x$enable_user_multithread" = xyes; then
     provisions="$provisions umultithread"
 fi
 
-dnl add 'usertimestamp' if compiled with --enable-user-timestamp
+dnl add 'usertiming' if compiled with --enable-user-timestamp
 if test "x$enable_user_timestamp" = xyes; then
-    provisions="$provisions usertimestamp"
+    provisions="$provisions usertiming"
 fi
 
 dnl add 'wifi' if wifi elements are available

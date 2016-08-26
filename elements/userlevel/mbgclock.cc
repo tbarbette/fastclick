@@ -99,6 +99,6 @@ void MBGClock::add_handlers() {
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(usertimestamp mbglib)
+ELEMENT_REQUIRES(usertiming mbglib)
 EXPORT_ELEMENT(MBGClock)
 ELEMENT_MT_SAFE(MBGClock)
