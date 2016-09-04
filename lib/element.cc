@@ -1664,6 +1664,14 @@ Element::home_thread() const
     return master()->thread(router()->home_thread_id(this));
 }
 
+/** @brief Return the element's home thread. */
+int
+Element::home_thread_id() const
+{
+    return router()->home_thread_id(this);
+}
+
+
 class InputThreadVisitor: public RouterVisitor {
 public:
      Bitvector& bitmask;

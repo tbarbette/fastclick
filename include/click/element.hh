@@ -162,6 +162,7 @@ class Element { public:
 
     RouterThread *home_thread() const;
 
+    int home_thread_id() const;
 #if CLICK_USERLEVEL
     // SELECT
     int add_select(int fd, int mask);
