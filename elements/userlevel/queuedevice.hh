@@ -266,7 +266,7 @@ protected:
     /**
      * Common parsing for all RXQueueDevice
      */
-    Args& parse(Args &args);
+    Args& parse(Args &args, ErrorHandler* errh);
 
     int configure_tx(int hardminqueues, int hardmaxqueues, ErrorHandler *errh);
     int initialize_tx(ErrorHandler *errh);
