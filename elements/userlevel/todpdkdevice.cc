@@ -94,7 +94,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (unsigned i = 0; i < _iqueues.size();i++) {
+    for (unsigned i = 0; i < _iqueues.weight();i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
         if (_timeout >= 0) {
             _iqueues.get_value(i).timeout.assign(this);
@@ -115,7 +115,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 void ToDPDKDevice::cleanup(CleanupStage)
 {
 	cleanup_tasks();
-	for (unsigned i = 0; i < _iqueues.size();i++) {
+	for (unsigned i = 0; i < _iqueues.weight();i++) {
 			delete[] _iqueues.get_value(i).pkts;
 	}
 }

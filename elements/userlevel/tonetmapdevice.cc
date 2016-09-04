@@ -572,7 +572,7 @@ void
 ToNetmapDevice::cleanup(CleanupStage)
 {
     cleanup_tasks();
-    for (unsigned int i = 0; i < state.size(); i++) {
+    for (unsigned int i = 0; i < state.weight(); i++) {
         if (state.get_value(i).q) {
         	Packet* next = state.get_value(i).q->next();
         	state.get_value(i).q->kill();
