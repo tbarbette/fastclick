@@ -237,22 +237,6 @@ class per_thread_omem { private:
 public:
     per_thread_omem() {
     }
-    inline size_t size() {
-        return _size;
-    }
-    void compress(Bitvector usable) {
-        storage = new AT[usable.weight()];
-        int id = 0;
-        for (int i = 0; i < click_max_cpu_ids(); i++) {
-            if (usable[i]) {
-                mapping[i] = id++;
-            } else {
-                mapping[i] = 0;
-            }
-        }
-        _size = id;
-    }
-
 
     void initialize(Bitvector usable, T v=T()) {
         storage = new AT[usable.weight()];
@@ -295,7 +279,6 @@ public:
     inline T operator--(int) const {
         return storage[mapping[click_current_cpu_id()]].v--;
     }
-
 };
 
 CLICK_ENDDECLS
