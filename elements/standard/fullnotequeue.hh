@@ -77,7 +77,7 @@ class FullNoteQueue : public NotifierQueue { public:
 #if CLICK_DEBUG_SCHEDULING
     void add_handlers() CLICK_COLD;
 #endif
-    void push_packet(int port, Packet *p);
+    void push(int port, Packet *p);
     Packet *pull(int port);
 
   protected:

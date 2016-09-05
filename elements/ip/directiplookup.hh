@@ -97,7 +97,7 @@ class DirectIPLookup : public IPRouteTable { public:
     void cleanup(CleanupStage stage) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    void push_packet(int port, Packet* p);
+    void push(int port, Packet* p);
 
     int add_route(const IPRoute&, bool, IPRoute*, ErrorHandler *);
     int remove_route(const IPRoute&, IPRoute*, ErrorHandler *);

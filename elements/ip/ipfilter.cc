@@ -1390,7 +1390,7 @@ IPFilter::push_batch(int, PacketBatch *batch)
 }
 #endif
 void
-IPFilter::push_packet(int, Packet *p)
+IPFilter::push(int, Packet *p)
 {
     checked_output_push(match(_zprog, p), p);
 }

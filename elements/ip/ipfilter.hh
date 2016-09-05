@@ -133,7 +133,7 @@ class IPFilter : public BatchElement { public:
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *);
 #endif
-    void push_packet(int port, Packet *);
+    void push(int port, Packet *);
 
     typedef Classification::Wordwise::CompressedProgram IPFilterProgram;
     static void parse_program(IPFilterProgram &zprog,

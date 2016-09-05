@@ -6,6 +6,7 @@
 #include <click/string.hh>
 #include <click/packet.hh>
 #include <click/handler.hh>
+#include <click/multithread.hh>
 CLICK_DECLS
 class Router;
 class Master;
@@ -19,6 +20,8 @@ class Bitvector;
 class EtherAddress;
 
 class BatchElement;
+
+#define BATCH_MAX_PULL 256
 
 /** @file <click/element.hh>
  * @brief Click's Element class.
@@ -36,7 +39,9 @@ class Element { public:
 
     // RUNTIME
     virtual void push(int port, Packet *p);
+    virtual void push_batch(int port, PacketBatch *p);
     virtual Packet *pull(int port) CLICK_WARN_UNUSED_RESULT;
+    virtual PacketBatch* pull_batch(int port,unsigned max) CLICK_WARN_UNUSED_RESULT;
     virtual Packet *simple_action(Packet *p);
 
     virtual bool run_task(Task *task);  // return true iff did useful work
@@ -52,9 +57,6 @@ class Element { public:
     Bitvector get_threads(bool is_pull=false);
 
     enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_YES};
-    virtual enum batch_mode batch_mode() {
-        return BATCH_MODE_NO;
-    }
 
     inline void checked_output_push(int port, Packet *p) const;
     inline Packet* checked_input_pull(int port) const;
@@ -230,7 +232,13 @@ class Element { public:
         inline int port() const;
 
         inline void push(Packet* p) const;
+        inline void push_batch(PacketBatch* p) const;
+
         inline Packet* pull() const;
+        inline PacketBatch* pull_batch(unsigned max) const;
+
+        inline void start_batch();
+        inline void end_batch();
 
 #if CLICK_STATS >= 1
         unsigned npackets() const       { return _packets; }
@@ -242,16 +250,19 @@ class Element { public:
 
         Element* _e;
         int _port;
-        bool e_in_batch_mode;
+        per_thread<PacketBatch*> current_batch;
+
 #if HAVE_BOUND_PORT_TRANSFER
         union {
             void (*push)(Element *e, int port, Packet *p);
             Packet *(*pull)(Element *e, int port);
-#if HAVE_BATCH
-            void (*push_batch)(BatchElement *e, int port, PacketBatch *p);
-            PacketBatch* (*pull_batch)(BatchElement *e, int port, unsigned max);
-#endif
         } _bound;
+        union {
+#if HAVE_BATCH
+            void (*push_batch)(Element *e, int port, PacketBatch *p);
+            PacketBatch* (*pull_batch)(Element *e, int port, unsigned max);
+#endif
+        } _bound_batch;
 #endif
 
 #if CLICK_STATS >= 1
@@ -274,6 +285,10 @@ class Element { public:
     String id() const CLICK_DEPRECATED;
     String landmark() const CLICK_DEPRECATED;
     /** @endcond never */
+
+  protected:
+    enum batch_mode in_batch_mode;
+    bool receives_batch;
 
   private:
 
@@ -545,7 +560,7 @@ Element::input_is_push(int port) const
 
 inline
 Element::Port::Port()
-    : _e(0), _port(-2), e_in_batch_mode(false)
+    : _e(0), _port(-2)
 {
     PORT_ASSIGN(0);
 }
@@ -555,15 +570,21 @@ Element::Port::assign(bool isoutput, Element *e, int port)
 {
     _e = e;
     _port = port;
+    for (int i = 0; i < current_batch.weight() ; i++)
+        current_batch.set_value(i,0);
     (void) isoutput;
 #if HAVE_BOUND_PORT_TRANSFER
     if (e) {
         if (isoutput) {
             void (Element::*pusher)(int, Packet *) = &Element::push;
             _bound.push = (void (*)(Element *, int, Packet *)) (e->*pusher);
+            void (Element::*pushbatcher)(int, PacketBatch *) = &Element::push_batch;
+            _bound_batch.push_batch = (void (*)(Element *, int, PacketBatch *)) (e->*pushbatcher);
         } else {
             Packet *(Element::*puller)(int) = &Element::pull;
             _bound.pull = (Packet *(*)(Element *, int)) (e->*puller);
+             PacketBatch *(Element::*pullbatcher)(int,unsigned) = &Element::pull_batch;
+             _bound_batch.pull_batch = (PacketBatch *(*)(Element *, int, unsigned)) (e->*pullbatcher);
         }
     }
 #endif
@@ -647,13 +668,76 @@ Element::Port::push(Packet* p) const
     _e->_xfer_own_cycles += own_delta;
     _owner->_child_cycles += all_delta;
 #else
+    if (_e->in_batch_mode == BATCH_MODE_YES && *current_batch != 0) {
+        if (*current_batch == (PacketBatch*)-1) {
+            *current_batch = PacketBatch::make_from_packet(p);
+        } else {
+            (*current_batch)->append_packet(p);
+        }
+    } else {
 # if HAVE_BOUND_PORT_TRANSFER
     _bound.push(_e, _port, p);
 # else
     _e->push(_port, p);
 # endif
+    }
 #endif
 }
+
+/**
+ * Push a batch through this port
+ */
+void
+Element::Port::push_batch(PacketBatch* batch) const {
+#if BATCH_DEBUG
+    click_chatter("Pushing batch of %d packets to %p{element}",batch->count(),_e);
+#endif
+#if HAVE_BOUND_PORT_TRANSFER
+    _bound_batch.push_batch(_e,_port,batch);
+#else
+    _e->push_batch(_port,batch);
+#endif
+}
+
+void Element::Port::start_batch() {
+#if BATCH_DEBUG
+    click_chatter("Starting batch in port to %p{element}",_e);
+#endif
+    if (_e->in_batch_mode) { //Rebuild for the next element
+        current_batch.set((PacketBatch*)-1);
+    } else { //Pass the rebuild message
+        if (*current_batch != (PacketBatch*)-1) {
+            *current_batch = (PacketBatch*)-1;
+            for (int i = 0; i < _e->noutputs(); i++) {
+                if (_e->output_is_push(i))
+                    _e->_ports[1][i].start_batch();
+            }
+        }
+    }
+}
+
+void Element::Port::end_batch() {
+    PacketBatch* &cur = *current_batch;
+#if BATCH_DEBUG
+    click_chatter("Ending batch in port to %p{element}",_e);
+#endif
+    if (_e->in_batch_mode) { //Send the buffered batch to the next element
+        if (cur != 0) {
+           if (cur != (PacketBatch*)-1) {
+               _e->push_batch(_port,current_batch.get());
+           }
+           cur = 0;
+        }
+    } else { //Pass the message
+        if (*current_batch == (PacketBatch*)-1) {
+            *current_batch = 0;
+            for (int i = 0; i < _e->noutputs(); i++) {
+                if (_e->output_is_push(i))
+                    _e->_ports[1][i].end_batch();
+            }
+        }
+    }
+};
 
 /** @brief Pull a packet over this port and return it.
  *
@@ -702,6 +786,18 @@ Element::Port::pull() const
         ++_packets;
 #endif
     return p;
+}
+
+
+PacketBatch*
+Element::Port::pull_batch(unsigned max) const {
+    PacketBatch* batch = NULL;
+#if HAVE_BOUND_PORT_TRANSFER
+    batch = _bound_batch.pull_batch(_e,_port, max);
+#else
+    batch = _e->pull_batch(_port, max);
+#endif
+    return batch;
 }
 
 /**

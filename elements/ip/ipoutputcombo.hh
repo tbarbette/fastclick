@@ -58,7 +58,7 @@ class IPOutputCombo : public BatchElement {
 #if HAVE_BATCH
   void push_batch(int, PacketBatch *);
 #endif
-  void push_packet(int, Packet *);
+  void push(int, Packet *);
 
  private:
 

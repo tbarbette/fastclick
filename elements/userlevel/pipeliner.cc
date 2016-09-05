@@ -123,7 +123,7 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
 }
 #endif
 
-void Pipeliner::push_packet(int,Packet* p) {
+void Pipeliner::push(int,Packet* p) {
 	retry:
     if (storage->insert(p)) {
         stats->sent++;

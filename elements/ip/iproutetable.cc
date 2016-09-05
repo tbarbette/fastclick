@@ -169,7 +169,7 @@ IPRouteTable::process(int, Packet *p)
 }
 
 void
-IPRouteTable::push_packet(int port, Packet *p)
+IPRouteTable::push(int port, Packet *p)
 {
     int output_port = process(port, p);
 	if ( output_port < 0 ) {

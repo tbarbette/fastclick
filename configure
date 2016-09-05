@@ -710,6 +710,7 @@ RTE_VER_MAJOR
 RTE_TARGET
 RTE_SDK
 PTHREAD_LIBS
+HAVE_AUTO_BATCH
 HAVE_VERBOSE_BATCH
 HAVE_BATCH
 AR_CREATEFLAGS
@@ -800,6 +801,7 @@ enable_userlevel
 enable_user_multithread
 enable_batch
 enable_verbose_batch
+enable_auto_batch
 enable_netmap_pool
 enable_select
 enable_poll
@@ -1511,6 +1513,7 @@ Optional Features:
     --disable-batch       disable batching support
     --disable-verbose-batch
                           disable warnings and information about batching
+    --enable-auto-batch   make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click
                           malloc'ed buffers
     --enable-select=[select|poll|kqueue]
@@ -6458,6 +6461,21 @@ if test "x$enable_verbose_batch" = "xyes"; then
     $as_echo "#define HAVE_VERBOSE_BATCH 1" >>confdefs.h
 
     HAVE_VERBOSE_BATCH=yes
+
+fi
+
+# Check whether --enable-auto-batch was given.
+if test "${enable_auto_batch+set}" = set; then :
+  enableval=$enable_auto_batch; :
+else
+  enable_auto_batch=no
+fi
+
+
+if test "x$enable_auto_batch" = "xyes"; then
+    $as_echo "#define HAVE_AUTO_BATCH 1" >>confdefs.h
+
+    HAVE_AUTO_BATCH=yes
 
 fi
 

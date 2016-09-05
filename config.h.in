@@ -101,6 +101,9 @@
 /* Define if warnings and information about batching are enabled. */
 #undef HAVE_VERBOSE_BATCH
 
+/* Define if make vanilla elements batch-compatible automatically */
+#undef HAVE_AUTO_BATCH
+
 /* Define if IPv6 support is enabled. */
 #undef HAVE_IP6
 

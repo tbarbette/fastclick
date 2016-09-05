@@ -1174,8 +1174,8 @@ Router::initialize(ErrorHandler *errh)
         //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instanciating batches
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
-            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
-            if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES && !e->ports_upgraded) {
+            Element* e = _elements[i];
+            if (e != NULL && e->in_batch_mode == Element::BATCH_MODE_YES) {
                 BatchElement::BatchModePropagate p;
                 p.ispush = true;
                 for (int i = 0; i < e->noutputs(); i++) {
@@ -1184,7 +1184,6 @@ Router::initialize(ErrorHandler *errh)
                 }
 
                 p.ispush = false;
-
                 for (int i = 0; i < e->ninputs(); i++) {
                     if (e->input_is_pull(i))
                         visit(e,false,i,&p);
@@ -1194,23 +1193,19 @@ Router::initialize(ErrorHandler *errh)
 
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
-            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
-            if (e != NULL) {
-                if (e->batch_mode() == Element::BATCH_MODE_NO) {
-                    e->receives_batch = false;
-                    continue; //This element is traversed by packets... nothing to do.
-                }
+            Element* e = _elements[i];
+            if (e->in_batch_mode == Element::BATCH_MODE_NO) {
+                e->receives_batch = false;
+                continue; //This element is traversed by packets... nothing to do.
+            }
 
-                if (e->batch_mode() == Element::BATCH_MODE_IFPOSSIBLE) {
-                    e->in_batch_mode = Element::BATCH_MODE_NO;
-                    e->receives_batch = false;
+            if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
+                e->in_batch_mode = Element::BATCH_MODE_NO;
+                e->receives_batch = false;
 #if HAVE_VERBOSE_BATCH
-            click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
+                click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
 #endif
-                    continue;
-                }
-                e->upgrade_ports();
-                e->bind_ports();
+                continue;
             }
         }
     }
@@ -1233,7 +1228,7 @@ Router::initialize(ErrorHandler *errh)
 #endif
 #if HAVE_NETMAP_PACKET_POOL
             if (element_stage[i] < Element::CONFIGURE_PHASE_PRIVILEGED && !NetmapBufQ::initialized()) {
-                click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-packet-pool to configure script to disable this feature.");
+                click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-pool to configure script to disable this feature.");
                 all_ok = false;
                 break;
             }

@@ -53,7 +53,7 @@ FullNoteQueue::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-FullNoteQueue::push_packet(int, Packet *p)
+FullNoteQueue::push(int, Packet *p)
 {
     // Code taken from SimpleQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);

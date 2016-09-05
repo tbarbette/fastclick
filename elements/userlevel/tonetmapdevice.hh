@@ -102,7 +102,7 @@ public:
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch*);
 #endif
-    void push_packet(int, Packet*);
+    void push(int, Packet*);
     void run_timer(Timer *timer);
 
     bool run_task(Task *);

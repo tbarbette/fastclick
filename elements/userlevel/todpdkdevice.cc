@@ -191,7 +191,7 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
         iqueue.index = 0;
 }
 
-void ToDPDKDevice::push_packet(int, Packet *p)
+void ToDPDKDevice::push(int, Packet *p)
 {
     // Get the thread-local internal queue
     TXInternalQueue &iqueue = _iqueues.get();

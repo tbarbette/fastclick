@@ -110,6 +110,15 @@ if test "x$enable_verbose_batch" = "xyes"; then
     AC_SUBST(HAVE_VERBOSE_BATCH, yes)
 fi
 
+AC_ARG_ENABLE([auto-batch],
+    [AS_HELP_STRING([  --enable-auto-batch], [make vanilla elements batch-compatible automatically])],
+    [:], [enable_auto_batch=no])
+
+if test "x$enable_auto_batch" = "xyes"; then
+    AC_DEFINE([HAVE_AUTO_BATCH])
+    AC_SUBST(HAVE_AUTO_BATCH, yes)
+fi
+
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [use netmap buffers instead of standard Click malloc'ed buffers])],
     [:], [enable_netmap_pool=no])

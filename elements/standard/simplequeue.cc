@@ -161,7 +161,7 @@ SimpleQueue::cleanup(CleanupStage)
 #if HAVE_BATCH
 void SimpleQueue::push_batch(int port, PacketBatch* batch) {
 	FOR_EACH_PACKET_SAFE(batch,p) {
-		push_packet(port,p);
+		push(port,p);
 	}
 }
 
@@ -173,9 +173,9 @@ PacketBatch* SimpleQueue::pull_batch(int port,unsigned max) {
 #endif
 
 inline void
-SimpleQueue::push_packet(int, Packet *p)
+SimpleQueue::push(int, Packet *p)
 {
-    // If you change this code, also change NotifierQueue::push_packet()
+    // If you change this code, also change NotifierQueue::push()
     // and FullNoteQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);
 

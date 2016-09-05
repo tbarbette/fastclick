@@ -246,7 +246,7 @@ ToDPDKRing::flush_internal_tx_ring(TXInternalQueue &iqueue)
 }
 
 void
-ToDPDKRing::push_packet(int, Packet *p)
+ToDPDKRing::push(int, Packet *p)
 {
 	// Get the internal queue
 	TXInternalQueue &iqueue = _iqueue;
