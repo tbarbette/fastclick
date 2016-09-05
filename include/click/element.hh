@@ -39,7 +39,7 @@ class Element { public:
     virtual Packet *pull(int port) CLICK_WARN_UNUSED_RESULT;
     virtual Packet *simple_action(Packet *p);
 
-    virtual bool run_task(Task *task);	// return true iff did useful work
+    virtual bool run_task(Task *task);  // return true iff did useful work
     virtual void run_timer(Timer *timer);
 #if CLICK_USERLEVEL
     enum { SELECT_READ = 1, SELECT_WRITE = 2 };
@@ -88,11 +88,11 @@ class Element { public:
 
     // CONFIGURATION, INITIALIZATION, AND CLEANUP
     enum ConfigurePhase {
-	CONFIGURE_PHASE_FIRST = 0,
-	CONFIGURE_PHASE_INFO = 20,
-	CONFIGURE_PHASE_PRIVILEGED = 90,
-	CONFIGURE_PHASE_DEFAULT = 100,
-	CONFIGURE_PHASE_LAST = 2000
+        CONFIGURE_PHASE_FIRST = 0,
+        CONFIGURE_PHASE_INFO = 20,
+        CONFIGURE_PHASE_PRIVILEGED = 90,
+        CONFIGURE_PHASE_DEFAULT = 100,
+        CONFIGURE_PHASE_LAST = 2000
     };
     virtual int configure_phase() const;
 
@@ -106,14 +106,14 @@ class Element { public:
     virtual Element *hotswap_element() const;
 
     enum CleanupStage {
-	CLEANUP_NO_ROUTER,
-	CLEANUP_BEFORE_CONFIGURE = CLEANUP_NO_ROUTER,
-	CLEANUP_CONFIGURE_FAILED,
-	CLEANUP_CONFIGURED,
-	CLEANUP_INITIALIZE_FAILED,
-	CLEANUP_INITIALIZED,
-	CLEANUP_ROUTER_INITIALIZED,
-	CLEANUP_MANUAL
+        CLEANUP_NO_ROUTER,
+        CLEANUP_BEFORE_CONFIGURE = CLEANUP_NO_ROUTER,
+        CLEANUP_CONFIGURE_FAILED,
+        CLEANUP_CONFIGURED,
+        CLEANUP_INITIALIZE_FAILED,
+        CLEANUP_INITIALIZED,
+        CLEANUP_ROUTER_INITIALIZED,
+        CLEANUP_MANUAL
     };
     virtual void cleanup(CleanupStage stage);
 
@@ -132,9 +132,9 @@ class Element { public:
     inline Master *master() const;
 
     inline void attach_router(Router *r, int eindex) {
-	assert(!_router);
-	_router = r;
-	_eindex = eindex;
+        assert(!_router);
+        _router = r;
+        _eindex = eindex;
     }
 
     // INPUTS AND OUTPUTS
@@ -181,16 +181,16 @@ class Element { public:
     void set_handler(const char *name, int flags, HandlerCallback callback, int read_user_data = 0, int write_user_data = 0);
     int set_handler_flags(const String &name, int set_flags, int clear_flags = 0);
     enum { TASKHANDLER_WRITE_SCHEDULED = 1,
-	   TASKHANDLER_WRITE_TICKETS = 2,
-	   TASKHANDLER_WRITE_HOME_THREAD = 4,
-	   TASKHANDLER_WRITE_ALL = 7,
-	   TASKHANDLER_DEFAULT = 6 };
+           TASKHANDLER_WRITE_TICKETS = 2,
+           TASKHANDLER_WRITE_HOME_THREAD = 4,
+           TASKHANDLER_WRITE_ALL = 7,
+           TASKHANDLER_DEFAULT = 6 };
     void add_task_handlers(Task *task, NotifierSignal *signal, int flags, const String &prefix = String());
     inline void add_task_handlers(Task *task, NotifierSignal *signal, const String &prefix = String()) {
-	add_task_handlers(task, signal, TASKHANDLER_DEFAULT, prefix);
+        add_task_handlers(task, signal, TASKHANDLER_DEFAULT, prefix);
     }
     inline void add_task_handlers(Task *task, const String &prefix = String()) {
-	add_task_handlers(task, 0, TASKHANDLER_DEFAULT, prefix);
+        add_task_handlers(task, 0, TASKHANDLER_DEFAULT, prefix);
     }
 
     void add_data_handlers(const char *name, int flags, uint8_t *data);
@@ -225,47 +225,48 @@ class Element { public:
 
     class Port { public:
 
-	inline bool active() const;
-	inline Element* element() const;
-	inline int port() const;
+        inline bool active() const;
+        inline Element* element() const;
+        inline int port() const;
 
-	inline void push(Packet* p) const;
-	inline Packet* pull() const;
+        inline void push(Packet* p) const;
+        inline Packet* pull() const;
 
 #if CLICK_STATS >= 1
-	unsigned npackets() const	{ return _packets; }
+        unsigned npackets() const       { return _packets; }
 #endif
 
-	inline void assign(bool isoutput, Element *e, int port);
+        inline void assign(bool isoutput, Element *e, int port);
 
       private:
 
-	Element* _e;
-	int _port;
-	bool e_in_batch_mode;
+        Element* _e;
+        int _port;
+        bool e_in_batch_mode;
 #if HAVE_BOUND_PORT_TRANSFER
-	union {
-	    void (*push)(Element *e, int port, Packet *p);
-	    Packet *(*pull)(Element *e, int port);
+        union {
+            void (*push)(Element *e, int port, Packet *p);
+            Packet *(*pull)(Element *e, int port);
 #if HAVE_BATCH
-	    void (*push_batch)(BatchElement *e, int port, PacketBatch *p);
-	    PacketBatch* (*pull_batch)(BatchElement *e, int port, unsigned max);
+            void (*push_batch)(BatchElement *e, int port, PacketBatch *p);
+            PacketBatch* (*pull_batch)(BatchElement *e, int port, unsigned max);
 #endif
-	} _bound;
+        } _bound;
 #endif
 
 #if CLICK_STATS >= 1
-	mutable unsigned _packets;	// How many packets have we moved?
+        mutable unsigned _packets;      // How many packets have we moved?
 #endif
 #if CLICK_STATS >= 2
-	Element* _owner;		// Whose input or output are we?
+        Element* _owner;                // Whose input or output are we?
 #endif
 
-	inline Port();
-	inline void assign(bool isoutput, Element *owner, Element *e, int port);
+        inline Port();
+        inline void assign(bool isoutput, Element *owner, Element *e, int port);
 
-	friend class Element;
-	friend class BatchElement;
+        friend class Element;
+        friend class BatchElement;
+
     };
 
     // DEPRECATED
@@ -289,19 +290,19 @@ class Element { public:
 
 #if CLICK_STATS >= 2
     // STATISTICS
-    unsigned _xfer_calls;	// Push and pull calls into this element.
-    click_cycles_t _xfer_own_cycles;	// Cycles spent in self from push and pull.
-    click_cycles_t _child_cycles;	// Cycles spent in children.
+    unsigned _xfer_calls;       // Push and pull calls into this element.
+    click_cycles_t _xfer_own_cycles;    // Cycles spent in self from push and pull.
+    click_cycles_t _child_cycles;       // Cycles spent in children.
 
-    unsigned _task_calls;	// Calls to tasks owned by this element.
-    click_cycles_t _task_own_cycles;	// Cycles spent in self from tasks.
+    unsigned _task_calls;       // Calls to tasks owned by this element.
+    click_cycles_t _task_own_cycles;    // Cycles spent in self from tasks.
 
-    unsigned _timer_calls;	// Calls to timers owned by this element.
-    click_cycles_t _timer_own_cycles;	// Cycles spent in self from timers.
+    unsigned _timer_calls;      // Calls to timers owned by this element.
+    click_cycles_t _timer_own_cycles;   // Cycles spent in self from timers.
 
     inline void reset_cycles() {
-	_xfer_calls = _task_calls = _timer_calls = 0;
-	_xfer_own_cycles = _task_own_cycles = _timer_own_cycles = _child_cycles = 0;
+        _xfer_calls = _task_calls = _timer_calls = 0;
+        _xfer_own_cycles = _task_own_cycles = _timer_own_cycles = _child_cycles = 0;
     }
     static String read_cycles_handler(Element *, void *);
     static int write_cycles_handler(const String &, Element *, void *, ErrorHandler *);
@@ -493,7 +494,7 @@ inline bool
 Element::port_active(bool isoutput, int port) const
 {
     return (unsigned) port < (unsigned) nports(isoutput)
-	&& _ports[isoutput][port].active();
+        && _ports[isoutput][port].active();
 }
 
 /** @brief Check whether output @a port is push.
@@ -512,7 +513,7 @@ inline bool
 Element::output_is_pull(int port) const
 {
     return (unsigned) port < (unsigned) nports(true)
-	&& !_ports[1][port].active();
+        && !_ports[1][port].active();
 }
 
 /** @brief Check whether input @a port is pull.
@@ -531,7 +532,7 @@ inline bool
 Element::input_is_push(int port) const
 {
     return (unsigned) port < (unsigned) nports(false)
-	&& !_ports[0][port].active();
+        && !_ports[0][port].active();
 }
 
 #if CLICK_STATS >= 2
@@ -557,13 +558,13 @@ Element::Port::assign(bool isoutput, Element *e, int port)
     (void) isoutput;
 #if HAVE_BOUND_PORT_TRANSFER
     if (e) {
-	if (isoutput) {
-	    void (Element::*pusher)(int, Packet *) = &Element::push;
-	    _bound.push = (void (*)(Element *, int, Packet *)) (e->*pusher);
-	} else {
-	    Packet *(Element::*puller)(int) = &Element::pull;
-	    _bound.pull = (Packet *(*)(Element *, int)) (e->*puller);
-	}
+        if (isoutput) {
+            void (Element::*pusher)(int, Packet *) = &Element::push;
+            _bound.push = (void (*)(Element *, int, Packet *)) (e->*pusher);
+        } else {
+            Packet *(Element::*puller)(int) = &Element::pull;
+            _bound.pull = (Packet *(*)(Element *, int)) (e->*puller);
+        }
     }
 #endif
 }
@@ -634,14 +635,14 @@ Element::Port::push(Packet* p) const
 #if CLICK_STATS >= 2
     ++_e->input(_port)._packets;
     click_cycles_t start_cycles = click_get_cycles(),
-	start_child_cycles = _e->_child_cycles;
+        start_child_cycles = _e->_child_cycles;
 # if HAVE_BOUND_PORT_TRANSFER
     _bound.push(_e, _port, p);
 # else
     _e->push(_port, p);
 # endif
     click_cycles_t all_delta = click_get_cycles() - start_cycles,
-	own_delta = all_delta - (_e->_child_cycles - start_child_cycles);
+        own_delta = all_delta - (_e->_child_cycles - start_child_cycles);
     _e->_xfer_calls += 1;
     _e->_xfer_own_cycles += own_delta;
     _owner->_child_cycles += all_delta;
@@ -676,16 +677,16 @@ Element::Port::pull() const
     assert(_e);
 #if CLICK_STATS >= 2
     click_cycles_t start_cycles = click_get_cycles(),
-	old_child_cycles = _e->_child_cycles;
+        old_child_cycles = _e->_child_cycles;
 # if HAVE_BOUND_PORT_TRANSFER
     Packet *p = _bound.pull(_e, _port);
 # else
     Packet *p = _e->pull(_port);
 # endif
     if (p)
-	_e->output(_port)._packets += 1;
+        _e->output(_port)._packets += 1;
     click_cycles_t all_delta = click_get_cycles() - start_cycles,
-	own_delta = all_delta - (_e->_child_cycles - old_child_cycles);
+        own_delta = all_delta - (_e->_child_cycles - old_child_cycles);
     _e->_xfer_calls += 1;
     _e->_xfer_own_cycles += own_delta;
     _owner->_child_cycles += all_delta;
@@ -698,7 +699,7 @@ Element::Port::pull() const
 #endif
 #if CLICK_STATS >= 1
     if (p)
-	++_packets;
+        ++_packets;
 #endif
     return p;
 }
@@ -732,9 +733,9 @@ inline void
 Element::checked_output_push(int port, Packet* p) const
 {
     if ((unsigned) port < (unsigned) noutputs())
-	_ports[1][port].push(p);
+        _ports[1][port].push(p);
     else
-	p->kill();
+        p->kill();
 }
 
 /** @brief Pull a packet from input @a port, or return 0 if @a port is out of
@@ -751,9 +752,9 @@ inline Packet*
 Element::checked_input_pull(int port) const
 {
     if ((unsigned) port < (unsigned) ninputs())
-	return _ports[0][port].pull();
+        return _ports[0][port].pull();
     else
-	return 0;
+        return 0;
 }
 
 #undef PORT_ASSIGN
