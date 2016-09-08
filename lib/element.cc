@@ -418,13 +418,14 @@ void BetterIPCounter3::push(int port, Packet *p) {
 
 /** @brief Construct an Element. */
 Element::Element()
-    : _router(0), _eindex(-1),
-    receives_batch(false),
+    :
 #if HAVE_AUTO_BATCH
-    in_batch_mode(BATCH_MODE_IFPOSSIBLE)
+    in_batch_mode(BATCH_MODE_IFPOSSIBLE),
 #else
-    in_batch_mode(BATCH_MODE_NO)
+    in_batch_mode(BATCH_MODE_NO),
 #endif
+    receives_batch(false),
+    _router(0), _eindex(-1), _is_fullpush(false)
 {
     nelements_allocated++;
     _ports[0] = _ports[1] = &_inline_ports[0];

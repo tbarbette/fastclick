@@ -703,7 +703,7 @@ void Element::Port::start_batch() {
 #if BATCH_DEBUG
     click_chatter("Starting batch in port to %p{element}",_e);
 #endif
-    if (_e->in_batch_mode) { //Rebuild for the next element
+    if (_e->in_batch_mode == BATCH_MODE_YES) { //Rebuild for the next element
         current_batch.set((PacketBatch*)-1);
     } else { //Pass the rebuild message
         if (*current_batch != (PacketBatch*)-1) {
@@ -721,7 +721,7 @@ void Element::Port::end_batch() {
 #if BATCH_DEBUG
     click_chatter("Ending batch in port to %p{element}",_e);
 #endif
-    if (_e->in_batch_mode) { //Send the buffered batch to the next element
+    if (_e->in_batch_mode == BATCH_MODE_YES) { //Send the buffered batch to the next element
         if (cur != 0) {
            if (cur != (PacketBatch*)-1) {
                _e->push_batch(_port,current_batch.get());

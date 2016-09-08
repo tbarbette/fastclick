@@ -107,7 +107,6 @@ AC_ARG_ENABLE([verbose-batch],
 
 if test "x$enable_verbose_batch" = "xyes"; then
     AC_DEFINE([HAVE_VERBOSE_BATCH])
-    AC_SUBST(HAVE_VERBOSE_BATCH, yes)
 fi
 
 AC_ARG_ENABLE([auto-batch],
@@ -116,7 +115,6 @@ AC_ARG_ENABLE([auto-batch],
 
 if test "x$enable_auto_batch" = "xyes"; then
     AC_DEFINE([HAVE_AUTO_BATCH])
-    AC_SUBST(HAVE_AUTO_BATCH, yes)
 fi
 
 AC_ARG_ENABLE([netmap-pool],
