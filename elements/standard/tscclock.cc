@@ -99,7 +99,7 @@ TSCClock::initialize(ErrorHandler*) {
 
     //Initialize real clock
     last_timestamp[0] = get_real_timestamp();
-    last_cycles[0] = current_cycles();
+    last_cycles[0] = click_get_cycles();
 
     max_precision = 100 * (double)Timestamp::subsec_per_sec/(double)tsc_freq;
     //Need to converge quickly enough, but have a period large enough so that the cycle is still correct
@@ -117,7 +117,7 @@ TSCClock::initialize(ErrorHandler*) {
  * measured frequency to the base value until the final value is good enough.
  */
 bool TSCClock::stabilize_tick() {
-    int64_t cur_cycles = current_cycles();
+    int64_t cur_cycles = click_get_cycles();
     int64_t real_current_timestamp = get_real_timestamp();
 
     //Number of ticks during last period
@@ -177,7 +177,7 @@ bool TSCClock::accumulate_tick(Timer* t) {
 
     unsigned next_clock = (current_clock == 0? 1 : 0);
 
-    steady_cycle[next_clock] = current_cycles();
+    steady_cycle[next_clock] = click_get_cycles();
     steady_timestamp[next_clock] = steady_timestamp[current_clock] + tick_to_subsec_steady(steady_cycle[next_clock] - steady_cycle[current_clock]);
     //Check that the timer period was not too high, as this could cause TSC computation overflow in tick_to_subsec
     if ((steady_timestamp[next_clock] - steady_timestamp[current_clock]) > (update_period_subsec * 2)) {
@@ -196,7 +196,7 @@ bool TSCClock::accumulate_tick(Timer* t) {
     }
 
     //We want to always take current cycle as close as possible to real timestamp, so we read it again just before get real timestamp
-    int64_t cur_cycles = current_cycles();
+    int64_t cur_cycles = click_get_cycles();
     int64_t real_current_timestamp = get_real_timestamp();
 
     int64_t delta_tick = cur_cycles - last_cycles[current_clock];
@@ -244,7 +244,7 @@ bool TSCClock::accumulate_tick(Timer* t) {
      * function, to prevent jump we recompute the current approximated
      * time again and use that as a basis for next new frequency
      * multiplication.*/
-    last_cycles[next_clock] = current_cycles();
+    last_cycles[next_clock] = click_get_cycles();
     last_timestamp[next_clock] = last_timestamp[current_clock] + tick_to_subsec_wall(last_cycles[next_clock] - last_cycles[current_clock]);
 
     //Swap clock
@@ -320,11 +320,11 @@ void TSCClock::run_timer(Timer* timer) {
         if (stabilize_tick()) {
             //Initialize steady clock
             steady_timestamp[current_clock] = get_real_timestamp(true);
-            steady_cycle[current_clock] = current_cycles();
+            steady_cycle[current_clock] = click_get_cycles();
             steady_cycles_per_subsec_mult = cycles_per_subsec_mult[current_clock];
 
             //Initialize wall clock
-            last_cycles[current_clock] = current_cycles();
+            last_cycles[current_clock] = click_get_cycles();
             last_timestamp[current_clock] = get_real_timestamp(false);
 
             alpha = 0.5;

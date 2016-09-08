@@ -495,30 +495,6 @@ CLICK_ENDDECLS
 #define sleep(ms) ssleep(ms)
 #endif
 
-#if HAVE_DPDK && !CLICK_TOOL
-#  define current_cycles() rte_get_timer_cycles()
-#  define cycles_hz() rte_get_timer_hz()
-#else
-#  if __x86_64__
-inline unsigned long current_cycles() {
-    unsigned long lo, hi;
-    asm( "rdtsc" : "=a" (lo), "=d" (hi) );
-    return( lo | (hi << 32) );
-}
-#  else
-inline unsigned long current_cycles() {
-    unsigned long lo, hi;
-    asm( "rdtsc" : "=a" (lo), "=d" (hi));
-    return lo;
-}
-#  endif
-inline int64_t cycles_hz() {
-	int64_t tsc_freq = current_cycles();
-	sleep(1);
-	tsc_freq = current_cycles() - tsc_freq;
-}
-#endif
-
 // TIMEVAL OPERATIONS
 
 #ifndef timercmp
@@ -728,6 +704,17 @@ click_get_cycles()
     return 0;
 #endif
 }
+
+#if HAVE_DPDK && !CLICK_TOOL
+#  define cycles_hz() rte_get_timer_hz()
+#else
+inline click_cycles_t cycles_hz() {
+    click_cycles_t tsc_freq = click_get_cycles();
+    sleep(1);
+    return click_get_cycles() - tsc_freq;
+}
+#endif
+
 
 CLICK_ENDDECLS
 

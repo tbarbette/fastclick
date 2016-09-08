@@ -93,11 +93,11 @@ private:
   inline double delta_to_freq(int64_t tick, int64_t time);
 
   inline int64_t compute_now_steady() {
-      return steady_timestamp[current_clock] + tick_to_subsec_steady(current_cycles() + local_tsc_offset - steady_cycle[current_clock]);
+      return steady_timestamp[current_clock] + tick_to_subsec_steady(click_get_cycles() + local_tsc_offset - steady_cycle[current_clock]);
   }
 
   inline int64_t compute_now_wall(int clock) {
-      return last_timestamp[clock] + tick_to_subsec_wall(current_cycles() + local_tsc_offset- last_cycles[clock]);
+      return last_timestamp[clock] + tick_to_subsec_wall(click_get_cycles() + local_tsc_offset- last_cycles[clock]);
   }
 
   inline int64_t compute_now_wall() {
