@@ -51,7 +51,7 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool, int,
         the downwards batch elements, we have to propagate until them*/
     if (ispush) {
 #if BATCH_DEBUG
-        click_chatter("Starting bridge traversal at %p{element}->%p{element}",from_batch_e,e);
+        click_chatter("Starting bridge traversal at %p{element}->%p{element}",from,e);
 #endif
         PushToPushBatchVisitor v(e);
         e->router()->visit(e,1,-1,&v);
@@ -69,7 +69,7 @@ BatchElement::PushToPushBatchVisitor::PushToPushBatchVisitor(Element* origin) :_
 
 bool
 BatchElement::PushToPushBatchVisitor::visit(Element *e, bool, int,
-        Element *from_e, int from_port, int) {
+        Element *, int, int) {
     if (e->in_batch_mode == BATCH_MODE_IFPOSSIBLE) {
         e->in_batch_mode = BATCH_MODE_YES;
 #if BATCH_DEBUG

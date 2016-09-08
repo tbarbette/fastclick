@@ -570,7 +570,7 @@ Element::Port::assign(bool isoutput, Element *e, int port)
 {
     _e = e;
     _port = port;
-    for (int i = 0; i < current_batch.weight() ; i++)
+    for (unsigned i = 0; i < current_batch.weight() ; i++)
         current_batch.set_value(i,0);
     (void) isoutput;
 #if HAVE_BOUND_PORT_TRANSFER
