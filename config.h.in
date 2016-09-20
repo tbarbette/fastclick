@@ -99,7 +99,7 @@
 #undef HAVE_BATCH
 
 /* Define if warnings and information about batching are enabled. */
-#define HAVE_VERBOSE_BATCH 1
+#undef HAVE_VERBOSE_BATCH
 
 /* Define if make vanilla elements batch-compatible automatically */
 #undef HAVE_AUTO_BATCH
