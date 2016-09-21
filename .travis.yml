@@ -32,7 +32,6 @@ matrix:
 env:
   global:
     - FLAGS="--enable-ip6 --enable-json -disable-linuxmodule"
-    - CXXFLAGS="-std=gnu++11"
     - GCC_VERSION="4.8"
   matrix:
     - FRAMEWORK=vanilla CONFIG="--enable-batch --disable-verbose-batch"
