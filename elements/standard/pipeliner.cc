@@ -38,14 +38,14 @@ Pipeliner::get_runnable_threads(Bitvector& b) {
 
 void Pipeliner::cleanup(CleanupStage) {
     for (unsigned i = 0; i < storage.weight(); i++) {
-    	Packet* p;
+	Packet* p;
         while ((p = storage.get_value(i).extract()) != 0) {
 #if HAVE_BATCH
-        	if (receives_batch == 1)
-        		static_cast<PacketBatch*>(p)->kill();
-        	else
+		if (receives_batch == 1)
+			static_cast<PacketBatch*>(p)->kill();
+		else
 #endif
-        		p->kill();
+			p->kill();
         }
     }
 }
@@ -115,10 +115,10 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
         //click_chatter("Drop!");
 	    if (_block) {
 			if (sleepiness >= _ring_size / 4)
-            	_task->reschedule();
+		_task->reschedule();
 	        goto retry;
 		}
-     	head->kill();
+	head->kill();
     }
 }
 #endif
@@ -156,15 +156,15 @@ Pipeliner::run_task(Task* t)
 #if HAVE_BATCH
             PacketBatch* b = static_cast<PacketBatch*>(s.extract());
             if (unlikely(!receives_batch)) {
-            	if (out == NULL) {
-            		b->set_tail(b);
-            		b->set_count(1);
-            		out = b;
-            	} else {
-            		out->append_packet(b);
-            	}
+		if (out == NULL) {
+			b->set_tail(b);
+			b->set_count(1);
+			out = b;
+		} else {
+			out->append_packet(b);
+		}
             } else {
-            	if (out == NULL) {
+		if (out == NULL) {
 					out = b;
 				} else {
 					out->append_batch(b);
