@@ -1,9 +1,10 @@
 /*
  * counter.{cc,hh} -- element counts packets, measures packet rate
- * Eddie Kohler
+ * Eddie Kohler, Tom Barbette
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2008 Regents of the University of California
+ * Copyright (c) 2016 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,26 +25,41 @@
 #include <click/handlercall.hh>
 CLICK_DECLS
 
-Counter::Counter()
+template <typename counter_t>
+CounterBase<counter_t>::CounterBase()
   : _count_trigger_h(0), _byte_trigger_h(0)
 {
 }
 
-Counter::~Counter()
+template <typename counter_t>
+CounterBase<counter_t>::~CounterBase()
 {
   delete _count_trigger_h;
   delete _byte_trigger_h;
 }
 
-void
-Counter::reset()
+template <typename counter_t>
+void*
+CounterBase<counter_t>::cast(const char *name)
 {
-  _count = _byte_count = 0;
+    if (strcmp("CounterT", name) == 0)
+        return (CounterT *)this;
+    else
+        return Element::cast(name);
+}
+
+template <typename counter_t>
+void
+CounterBase<counter_t>::reset()
+{
+  counter_set(_count,0);
+  counter_set(_byte_count,0);
   _count_triggered = _byte_triggered = false;
 }
 
+template <typename counter_t>
 int
-Counter::configure(Vector<String> &conf, ErrorHandler *errh)
+CounterBase<counter_t>::configure(Vector<String> &conf, ErrorHandler *errh)
 {
   String count_call, byte_count_call;
   if (Args(conf, this, errh)
@@ -59,7 +75,7 @@ Counter::configure(Vector<String> &conf, ErrorHandler *errh)
       errh->error("COUNT_CALL overflow, max %s", String(_count_trigger).c_str());
     _count_trigger_h = new HandlerCall(count_call);
   } else
-    _count_trigger = (counter_t)(-1);
+    _count_trigger = (counter_int_type)(-1);
 
   if (byte_count_call) {
     IntArg ia;
@@ -69,13 +85,18 @@ Counter::configure(Vector<String> &conf, ErrorHandler *errh)
       errh->error("BYTE_COUNT_CALL overflow, max %s", String(_count_trigger).c_str());
     _byte_trigger_h = new HandlerCall(byte_count_call);
   } else
-    _byte_trigger = (counter_t)(-1);
+    _byte_trigger = (counter_int_type)(-1);
+
+  if ((count_call || byte_count_call) && name() == "CounterMP") {
+	  return errh->error("CounterMP cannot use handler calls");
+  }
 
   return 0;
 }
 
+template <typename counter_t>
 int
-Counter::initialize(ErrorHandler *errh)
+CounterBase<counter_t>::initialize(ErrorHandler *errh)
 {
   if (_count_trigger_h && _count_trigger_h->initialize_write(this, errh) < 0)
     return -1;
@@ -85,41 +106,23 @@ Counter::initialize(ErrorHandler *errh)
   return 0;
 }
 
-Packet *
-Counter::simple_action(Packet *p)
-{
-    _count++;
-    _byte_count += p->length();
-    _rate.update(1);
-    _byte_rate.update(p->length());
+enum { H_COUNT, H_BYTE_COUNT, H_RESET,
+       H_COUNT_CALL, H_BYTE_COUNT_CALL,
+       H_RATE = 0x100, H_BIT_RATE, H_BYTE_RATE,};
 
-  if (_count == _count_trigger && !_count_triggered) {
-    _count_triggered = true;
-    if (_count_trigger_h)
-      (void) _count_trigger_h->call_write();
-  }
-  if (_byte_count >= _byte_trigger && !_byte_triggered) {
-    _byte_triggered = true;
-    if (_byte_trigger_h)
-      (void) _byte_trigger_h->call_write();
-  }
-
-  return p;
-}
-
-
-enum { H_COUNT, H_BYTE_COUNT, H_RATE, H_BIT_RATE, H_BYTE_RATE, H_RESET,
-       H_COUNT_CALL, H_BYTE_COUNT_CALL };
-
+template <typename counter_t>
 String
-Counter::read_handler(Element *e, void *thunk)
+CounterBase<counter_t>::read_handler(Element *e, void *thunk)
 {
-    Counter *c = (Counter *)e;
+    CounterBase *c = (CounterBase *)e;
+    if (c->cast("CounterMP") != 0 && (((intptr_t)thunk) & H_RATE)) {
+        return "CounterMP does not support rate operations";
+    }
     switch ((intptr_t)thunk) {
       case H_COUNT:
-	return String(c->_count);
+	return String(counter_sum(c->_count));
       case H_BYTE_COUNT:
-	return String(c->_byte_count);
+	return String(counter_sum(c->_byte_count));
       case H_RATE:
 	c->_rate.update(0);	// drop rate after idle period
 	return c->_rate.unparse_rate();
@@ -144,11 +147,12 @@ Counter::read_handler(Element *e, void *thunk)
     }
 }
 
+template <typename counter_t>
 int
-Counter::write_handler(const String &in_str, Element *e, void *thunk, ErrorHandler *errh)
+CounterBase<counter_t>::write_handler(const String &in_str, Element *e, void *thunk, ErrorHandler *errh)
 {
-    Counter *c = (Counter *)e;
-    String str = in_str;
+    CounterBase *c = (CounterBase *)e;
+    String str = cp_uncomment(in_str);
     switch ((intptr_t)thunk) {
       case H_COUNT_CALL:
 	  if (!IntArg().parse(cp_shift_spacevec(str), c->_count_trigger))
@@ -172,23 +176,25 @@ Counter::write_handler(const String &in_str, Element *e, void *thunk, ErrorHandl
     }
 }
 
+template <typename counter_t>
 void
-Counter::add_handlers()
+CounterBase<counter_t>::add_handlers()
 {
-    add_read_handler("count", read_handler, H_COUNT);
-    add_read_handler("byte_count", read_handler, H_BYTE_COUNT);
-    add_read_handler("rate", read_handler, H_RATE);
-    add_read_handler("bit_rate", read_handler, H_BIT_RATE);
-    add_read_handler("byte_rate", read_handler, H_BYTE_RATE);
-    add_write_handler("reset", write_handler, H_RESET, Handler::f_button);
-    add_write_handler("reset_counts", write_handler, H_RESET, Handler::f_button | Handler::f_uncommon);
-    add_read_handler("count_call", read_handler, H_COUNT_CALL);
-    add_write_handler("count_call", write_handler, H_COUNT_CALL);
-    add_write_handler("byte_count_call", write_handler, H_BYTE_COUNT_CALL);
+    add_read_handler("count", CounterBase<counter_t>::read_handler, H_COUNT);
+    add_read_handler("byte_count", CounterBase<counter_t>::read_handler, H_BYTE_COUNT);
+    add_read_handler("rate", CounterBase<counter_t>::read_handler, H_RATE);
+    add_read_handler("bit_rate", CounterBase<counter_t>::read_handler, H_BIT_RATE);
+    add_read_handler("byte_rate", CounterBase<counter_t>::read_handler, H_BYTE_RATE);
+    add_write_handler("reset", CounterBase<counter_t>::write_handler, H_RESET, Handler::f_button);
+    add_write_handler("reset_counts", CounterBase<counter_t>::write_handler, H_RESET, Handler::f_button | Handler::f_uncommon);
+    add_read_handler("count_call", CounterBase<counter_t>::read_handler, H_COUNT_CALL);
+    add_write_handler("count_call", CounterBase<counter_t>::write_handler, H_COUNT_CALL);
+    add_write_handler("byte_count_call", CounterBase<counter_t>::write_handler, H_BYTE_COUNT_CALL);
 }
 
+template <typename counter_t>
 int
-Counter::llrpc(unsigned command, void *data)
+CounterBase<counter_t>::llrpc(unsigned command, void *data)
 {
   if (command == CLICK_LLRPC_GET_RATE) {
     uint32_t *val = reinterpret_cast<uint32_t *>(data);
@@ -202,7 +208,7 @@ Counter::llrpc(unsigned command, void *data)
     uint32_t *val = reinterpret_cast<uint32_t *>(data);
     if (*val != 0 && *val != 1)
       return -EINVAL;
-    *val = (*val == 0 ? _count : _byte_count);
+    *val = (*val == 0 ? counter_sum(_count) : counter_sum(_byte_count));
     return 0;
 
   } else if (command == CLICK_LLRPC_GET_COUNTS) {
@@ -213,9 +219,9 @@ Counter::llrpc(unsigned command, void *data)
       return -EINVAL;
     for (unsigned i = 0; i < cs.n; i++) {
       if (cs.keys[i] == 0)
-	cs.values[i] = _count;
+	cs.values[i] = counter_sum(_count);
       else if (cs.keys[i] == 1)
-	cs.values[i] = _byte_count;
+	cs.values[i] = counter_sum(_byte_count);
       else
 	return -EINVAL;
     }
@@ -225,5 +231,55 @@ Counter::llrpc(unsigned command, void *data)
     return Element::llrpc(command, data);
 }
 
+Counter::Counter()
+{
+}
+
+Counter::~Counter()
+{
+}
+
+Packet*
+Counter::simple_action(Packet *p)
+{
+    _count++;
+    _byte_count += p->length();
+    _rate.update(1);
+    _byte_rate.update(p->length());
+
+  if (_count == _count_trigger && !_count_triggered) {
+    _count_triggered = true;
+    if (_count_trigger_h)
+      (void) _count_trigger_h->call_write();
+  }
+  if (_byte_count >= _byte_trigger && !_byte_triggered) {
+    _byte_triggered = true;
+    if (_byte_trigger_h)
+      (void) _byte_trigger_h->call_write();
+  }
+
+  return p;
+}
+
+CounterMP::CounterMP()
+{
+}
+
+CounterMP::~CounterMP()
+{
+}
+
+Packet*
+CounterMP::simple_action(Packet *p)
+{
+  _count++;
+  _byte_count += p->length();
+  return p;
+}
+
+
 CLICK_ENDDECLS
+
 EXPORT_ELEMENT(Counter)
+EXPORT_ELEMENT(CounterMP)
+ELEMENT_MT_SAFE(CounterMP)

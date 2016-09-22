@@ -4,8 +4,20 @@
 #include <click/element.hh>
 #include <click/ewma.hh>
 #include <click/llrpc.h>
+#include <click/sync.hh>
+#include <click/multithread.hh>
 CLICK_DECLS
 class HandlerCall;
+
+#ifdef HAVE_INT64_TYPES
+#define counter_sum per_thread_arithmetic::usum_long
+#define counter_set per_thread_arithmetic::uset_long
+#define counter_int_type uint64_t
+#else
+#define counter_sum per_thread_arithmetic::usum
+#define counter_set per_thread_arithmetic::uset
+#define counter_int_type uint32_t
+#endif
 
 /*
 =c
@@ -98,21 +110,23 @@ components.
 
 */
 
-class Counter : public Element { public:
-#ifdef HAVE_INT64_TYPES
-    typedef uint64_t counter_t;
-#else
-    typedef uint32_t counter_t;
-#endif
+/**
+ * Ancestor of all types of counter so external elements can access count and byte_count
+ * independently of the storage type
+ */
+class CounterT { public :
+    virtual counter_int_type count() = 0;
+    virtual counter_int_type byte_count() = 0;
+};
 
-    Counter() CLICK_COLD;
-    ~Counter() CLICK_COLD;
+template <typename counter_t>
+class CounterBase : public Element, public CounterT { public:
 
-    const char *class_name() const		{ return "Counter"; }
-    const char *port_count() const		{ return PORTS_1_1; }
+	CounterBase() CLICK_COLD;
+    ~CounterBase() CLICK_COLD;
 
-    counter_t count() const                     { return _count; }
-    counter_t byte_count() const                { return _byte_count; }
+    void* cast(const char *name);
+
     void reset();
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -120,9 +134,7 @@ class Counter : public Element { public:
     void add_handlers() CLICK_COLD;
     int llrpc(unsigned, void *);
 
-    Packet *simple_action(Packet *);
-
-  private:
+  protected:
 
 #ifdef HAVE_INT64_TYPES
     // Reduce bits of fraction for byte rate to avoid overflow
@@ -138,10 +150,10 @@ class Counter : public Element { public:
     rate_t _rate;
     byte_rate_t _byte_rate;
 
-    counter_t _count_trigger;
+    counter_int_type _count_trigger;
     HandlerCall *_count_trigger_h;
 
-    counter_t _byte_trigger;
+    counter_int_type _byte_trigger;
     HandlerCall *_byte_trigger_h;
 
     bool _count_triggered : 1;
@@ -150,6 +162,63 @@ class Counter : public Element { public:
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
 
+};
+
+class Counter : public CounterBase<counter_int_type> { public:
+
+	Counter() CLICK_COLD;
+    ~Counter() CLICK_COLD;
+
+    const char *class_name() const		{ return "Counter"; }
+    const char *processing() const		{ return AGNOSTIC; }
+    const char *port_count() const		{ return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("Counter", name) == 0)
+            return (Counter *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    Packet *simple_action(Packet *);
+
+    counter_int_type count() {
+        return counter_sum(_count);
+    }
+
+    counter_int_type byte_count() {
+        return counter_sum(_byte_count);
+    }
+};
+
+
+class CounterMP : public CounterBase<per_thread<counter_int_type> > { public:
+
+	CounterMP() CLICK_COLD;
+    ~CounterMP() CLICK_COLD;
+
+    const char *class_name() const		{ return "CounterMP"; }
+    const char *processing() const		{ return AGNOSTIC; }
+    const char *port_count() const		{ return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("CounterMP", name) == 0)
+            return (CounterMP *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    Packet *simple_action(Packet *);
+
+    counter_int_type count() {
+        return counter_sum(_count);
+    }
+
+    counter_int_type byte_count() {
+        return counter_sum(_byte_count);
+    }
 };
 
 CLICK_ENDDECLS
