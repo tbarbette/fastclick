@@ -2128,14 +2128,9 @@ if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
 fi
 
-dnl add 'flow' if compiled with --enable-flow
-if test "x$enable_flow" = xyes; then
-    provisions="$provisions flow"
-fi
-
-dnl add 'dpdk' if compiled with --enable-dpdk
-if test "x$enable_dpdk" = xyes; then
-    provisions="$provisions dpdk"
+dnl add 'autobatch' if autobatch is enabed
+if test "x$enable_auto_batch" = xyes; then
+    provisions="$provisions autobatch"
 fi
 
 dnl add 'batch' if compiled with --enable-batch
@@ -2143,11 +2138,15 @@ if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 fi
 
-dnl add 'usertimestamp' if compiled with --enable-user-timestamp
-if test "x$enable_user_timestamp" = xyes; then
-    provisions="$provisions usertimestamp"
+dnl add 'dpdk' if compiled with --enable-dpdk
+if test "x$enable_dpdk" = xyes; then
+    provisions="$provisions dpdk"
 fi
 
+dnl add 'flow' if compiled with --enable-flow
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
+fi
 
 dnl add 'experimental' if --enable-experimental was supplied
 if test "x$enable_experimental" = xyes; then
@@ -2203,6 +2202,11 @@ fi
 dnl add 'umultithread' if compiled with --enable-user-multithread
 if test "x$enable_user_multithread" = xyes; then
     provisions="$provisions umultithread"
+fi
+
+dnl add 'usertimestamp' if compiled with --enable-user-timestamp
+if test "x$enable_user_timestamp" = xyes; then
+    provisions="$provisions usertimestamp"
 fi
 
 dnl add 'wifi' if wifi elements are available

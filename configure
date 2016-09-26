@@ -710,8 +710,6 @@ RTE_VER_MAJOR
 RTE_TARGET
 RTE_SDK
 PTHREAD_LIBS
-HAVE_AUTO_BATCH
-HAVE_VERBOSE_BATCH
 HAVE_BATCH
 AR_CREATEFLAGS
 STRIP
@@ -6462,8 +6460,6 @@ fi
 if test "x$enable_verbose_batch" = "xyes"; then
     $as_echo "#define HAVE_VERBOSE_BATCH 1" >>confdefs.h
 
-    HAVE_VERBOSE_BATCH=yes
-
 fi
 
 # Check whether --enable-auto-batch was given.
@@ -6476,8 +6472,6 @@ fi
 
 if test "x$enable_auto_batch" = "xyes"; then
     $as_echo "#define HAVE_AUTO_BATCH 1" >>confdefs.h
-
-    HAVE_AUTO_BATCH=yes
 
 fi
 
