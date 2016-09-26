@@ -71,6 +71,25 @@ String cp_shift_spacevec(String &str);
 
 String cp_unspacevec(const String *begin, const String *end);
 inline String cp_unspacevec(const Vector<String> &conf);
+
+/// @brief  Remove and return the first line from @a str.
+/// @param[in,out]  str  string
+///
+/// The first line in the configuration string is removed and returned.
+/// Unlike cp_shift_spacevec(), comments and quotes are not obeyed, and the
+/// returned argument is not passed through cp_uncomment().  The line is ended
+/// by "\n", "\r", or "\r\n"; the line ender is included in the returned
+/// string.  @a str is set to the remaining portion of the string.
+String cp_shift_line(String &str);
+
+/// @brief  Remove and return the first delimiter-separated argument from @a str.
+/// @param[in,out]  str  delimiter-separated string
+/// @param[in]  delim  delimiter
+///
+/// All characters up to the first delimiter character are removed and
+/// returned.  @a str is set to the remaining portion of the string,
+/// with up to one delimiter character removed.
+String cp_shift_delimiter(String &str, char delim);
 //@}
 
 /// @name Direct Parsing Functions

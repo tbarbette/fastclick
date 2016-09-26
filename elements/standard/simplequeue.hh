@@ -94,6 +94,7 @@ class SimpleQueue : public BatchElement, public Storage { public:
     void cleanup(CleanupStage) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }
     int live_reconfigure(Vector<String>&, ErrorHandler*);
+    virtual bool do_mt_safe_check(ErrorHandler*);
     void take_state(Element*, ErrorHandler*);
     void add_handlers() CLICK_COLD;
 
@@ -110,6 +111,7 @@ class SimpleQueue : public BatchElement, public Storage { public:
     Packet* volatile * _q;
     volatile int _drops;
     int _highwater_length;
+    bool _nouseless;
 
     friend class MixedQueue;
     friend class TokenQueue;

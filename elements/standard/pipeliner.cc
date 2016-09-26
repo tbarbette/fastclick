@@ -95,7 +95,7 @@ int
 Pipeliner::initialize(ErrorHandler *errh)
 {
 
-    Bitvector passing = get_threads();
+    Bitvector passing = get_passing_threads();
     storage.compress(passing);
     stats.compress(passing);
     _home_thread_id = router()->home_thread_id(this);

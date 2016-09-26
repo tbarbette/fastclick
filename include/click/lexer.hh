@@ -57,6 +57,10 @@ class Lexer { public:
     Lexer();
     virtual ~Lexer();
 
+    static Lexer* get_lexer();
+    static bool lexer_initialized();
+    static void static_cleanup();
+
     int begin_parse(const String &data, const String &filename, LexerExtra *, ErrorHandler * = 0);
     void end_parse(int);
 
@@ -86,6 +90,8 @@ class Lexer { public:
 #else
     int add_element_type(const String &, ElementFactory factory, uintptr_t thunk, bool scoped = false);
 #endif
+    void add_element_mtsafe(const String &);
+
     int element_type(const String &name) const {
 	return _element_type_map[name];
     }
@@ -94,6 +100,8 @@ class Lexer { public:
     void element_type_names(Vector<String> &) const;
 
     int remove_element_type(int t)	{ return remove_element_type(t, 0); }
+
+    bool is_mt_safe(String element) const;
 
     String element_name(int) const;
     String element_landmark(int) const;
@@ -159,6 +167,7 @@ class Lexer { public:
 	int next;
     };
     HashTable<String, int> _element_type_map;
+    HashTable<String, bool> _element_mtsafe_map;
     Vector<ElementType> _element_types;
     enum { ET_SCOPED = 0x80000000, ET_TMASK = 0x7FFFFFFF, ET_NULL = 0x7FFFFFFF };
     int _last_element_type;
@@ -181,6 +190,9 @@ class Lexer { public:
 
     // errors
     ErrorHandler *_errh;
+
+    // global lexer
+    static Lexer* _lexer;
 
     int lerror(const char *, ...);
     int lerror_syntax(const Lexeme &t);
