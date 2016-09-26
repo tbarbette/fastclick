@@ -118,6 +118,9 @@ Timestamp operator+(Timestamp, const Timestamp &);
 # define TIMESTAMP_WARPABLE 1
 #endif
 
+#if HAVE_USER_TIMESTAMP
+typedef int64_t (*user_clock_fct)(void* user, bool steady);
+#endif
 
 class Timestamp { public:
 
@@ -256,6 +259,11 @@ class Timestamp { public:
 # else
     inline struct timespec timespec() const;
 # endif
+#endif
+
+#if HAVE_INT64_TYPES
+    inline int64_t longval() const;
+    inline void assignlong(int64_t);
 #endif
 
 #if HAVE_FLOAT_TYPES
@@ -486,6 +494,11 @@ class Timestamp { public:
      * @sa recent_steady(), assign_now_steady() */
     inline void assign_recent_steady();
 
+    /** @brief Set this timestamp to the current clock time
+     * without calling the user clock if one is set
+     */
+    inline void assign_now_nouser(bool steady);
+
 
     /** @brief Unparse this timestamp into a String.
      *
@@ -578,18 +591,14 @@ class Timestamp { public:
 
 
     /** @brief Return the active timewarp class. */
-    static inline int warp_class() {
-        return _warp_class;
-    }
+    static inline int warp_class();
 
     /** @brief Return the timewarp speed.
      *
      * Timewarp speed measures how much faster Timestamp::now() appears to
      * move compared with wall-clock time.  Only meaningful if warp_class() is
      * #warp_linear or #warp_nowait. */
-    static inline double warp_speed() {
-        return _warp_speed;
-    }
+    static inline double warp_speed();
 
 
     /** @brief Set the timewarp class to @a w.
@@ -636,9 +645,7 @@ class Timestamp { public:
     inline Timestamp warp_real_delay() const;
 
     /** @brief Return true iff time skips ahead around timer expirations. */
-    static inline bool warp_jumping() {
-        return _warp_class >= warp_nowait;
-    }
+    static inline bool warp_jumping();
 
     /** @brief Move Click time past a timer expiration.
      *
@@ -673,9 +680,18 @@ class Timestamp { public:
     //@}
 #endif
 
+#if HAVE_USER_TIMESTAMP
+    static bool set_clock(user_clock_fct clock, void* user);
+#endif
+
   private:
 
     rep_t _t;
+
+#if HAVE_USER_TIMESTAMP
+    static void* _user_data;
+    static user_clock_fct _user_clock;
+#endif
 
     inline void add_fix() {
 #if TIMESTAMP_REP_FLAT64
@@ -712,21 +728,11 @@ class Timestamp { public:
         div = quot;
     }
 
-    inline void assign_now(bool recent, bool steady, bool unwarped);
+    inline void assign_now(bool recent, bool steady, bool unwarped, bool no_user = false);
 
 #if TIMESTAMP_WARPABLE
-    static warp_class_type _warp_class;
-    static double _warp_speed;
-    static Timestamp _warp_flat_offset[2];
-    static double _warp_offset[2];
-
     static inline void warp_adjust(bool steady, const Timestamp &t_raw, const Timestamp &t_warped);
-    inline Timestamp warped(bool steady) const {
-        Timestamp t = *this;
-        if (_warp_class)
-            t.warp(steady, false);
-        return t;
-    }
+    inline Timestamp warped(bool steady) const;
     void warp(bool steady, bool from_now);
 #endif
 
@@ -737,6 +743,38 @@ class Timestamp { public:
     friend inline Timestamp &operator-=(Timestamp &a, const Timestamp &b);
 
 };
+
+
+#if TIMESTAMP_WARPABLE
+/** @cond never */
+class TimestampWarp {
+    static Timestamp::warp_class_type kind;
+    static double speed;
+    static Timestamp flat_offset[2];
+    static double offset[2];
+    friend class Timestamp;
+};
+/** @endcond never */
+
+inline int Timestamp::warp_class() {
+    return TimestampWarp::kind;
+}
+
+inline double Timestamp::warp_speed() {
+    return TimestampWarp::speed;
+}
+
+inline bool Timestamp::warp_jumping() {
+    return TimestampWarp::kind >= warp_nowait;
+}
+
+inline Timestamp Timestamp::warped(bool steady) const {
+    Timestamp t = *this;
+    if (TimestampWarp::kind)
+        t.warp(steady, false);
+    return t;
+}
+#endif
 
 
 /** @brief Create a Timestamp measuring @a tv.
@@ -769,9 +807,9 @@ Timestamp::operator unspecified_bool_type() const
 }
 
 inline void
-Timestamp::assign_now(bool recent, bool steady, bool unwarped)
+Timestamp::assign_now(bool recent, bool steady, bool unwarped, bool nouser)
 {
-    (void) recent, (void) steady, (void) unwarped;
+    (void) recent, (void) steady, (void) unwarped, (void) nouser;
 
 #if TIMESTAMP_PUNS_TIMESPEC
 # define TIMESTAMP_DECLARE_TSP struct timespec &tsp = _t.tspec
@@ -788,6 +826,13 @@ Timestamp::assign_now(bool recent, bool steady, bool unwarped)
 # define TIMESTAMP_RESOLVE_TVP assign(tvp.tv_sec, usec_to_subsec(tvp.tv_usec))
 #endif
 
+#if HAVE_USER_TIMESTAMP
+    if (!nouser && _user_clock != 0) {
+        int64_t current = _user_clock(_user_data,steady);
+        assignlong(current);
+    } else
+#endif
+    {
 #if CLICK_LINUXMODULE
 # if !TIMESTAMP_NANOSEC
     if (!recent && !steady) {
@@ -886,9 +931,10 @@ Timestamp::assign_now(bool recent, bool steady, bool unwarped)
 #undef TIMESTAMP_DECLARE_TVP
 #undef TIMESTAMP_RESOLVE_TVP
 
+    }
 #if TIMESTAMP_WARPABLE
     // timewarping
-    if (!unwarped && _warp_class)
+    if (!unwarped && TimestampWarp::kind)
         warp(steady, true);
 #endif
 }
@@ -948,6 +994,13 @@ Timestamp::recent_steady()
     t.assign_recent_steady();
     return t;
 }
+
+inline void
+Timestamp::assign_now_nouser(bool steady)
+{
+    assign_now(false, steady, false, true);
+}
+
 
 #if TIMESTAMP_WARPABLE
 inline void
@@ -1332,6 +1385,28 @@ operator-(const Timestamp &a)
 #endif
 }
 
+#if HAVE_INT64_TYPES
+/** @brief Return this timestamp's value in subseconds*/
+inline int64_t
+Timestamp::longval() const
+{
+#if TIMESTAMP_REP_FLAT64
+    return _t.x;
+#else
+    return _t.sec * subsec_per_sec + _t.subsec;
+#endif
+}
+
+inline void Timestamp::assignlong(int64_t i) {
+#if TIMESTAMP_REP_FLAT64
+    _t.x = i;
+#else
+	_t.sec = i / subsec_per_sec;
+	_t.subsec = i % subsec_per_sec;
+#endif
+}
+#endif
+
 #if HAVE_FLOAT_TYPES
 /** @brief Return this timestamp's value, converted to a real number. */
 inline double
@@ -1428,10 +1503,10 @@ StringAccum& operator<<(StringAccum&, const Timestamp&);
 inline Timestamp
 Timestamp::warp_real_delay() const
 {
-    if (likely(!_warp_class) || _warp_speed == 1.0)
+    if (likely(!TimestampWarp::kind) || TimestampWarp::speed == 1.0)
         return *this;
     else
-        return *this / _warp_speed;
+        return *this / TimestampWarp::speed;
 }
 #endif
 

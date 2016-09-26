@@ -34,7 +34,7 @@ class Tee : public BatchElement {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  void push_packet(int, Packet *);
+  void push(int, Packet *);
   #if HAVE_BATCH
   void push_batch(int, PacketBatch *);
   #endif

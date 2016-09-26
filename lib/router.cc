@@ -87,7 +87,7 @@ Router::Router(const String &configuration, Master *master)
       _configuration(configuration),
       _notifier_signals(0),
       _arena_factory(new HashMap_ArenaFactory),
-      _hotswap_router(0), _thread_sched(0), _name_info(0), _next_router(0), _is_fullpush(false)
+      _hotswap_router(0), _thread_sched(0), _name_info(0), _next_router(0)
 {
     _refcount = 0;
     _runcount = 0;
@@ -568,17 +568,17 @@ Router::check_hookup_completeness(ErrorHandler *errh)
 
     // check that connections don't reuse active ports
     if (_conn.size())
-	for (int p = 0; p < 2; ++p) {
-	    int ci = (p ? _conn_output_sorter[0] : 0);
-	    Port last = _conn[ci][p];
-	    for (int cix = 1; cix < _conn.size(); ++cix) {
-		ci = (p ? _conn_output_sorter[cix] : cix);
-		if (likely(last != _conn[ci][p]))
-		    last = _conn[ci][p];
-		else if (_elements[last.idx]->port_active(p, last.port) && !_conn[ci]._double)
-		    hookup_error(last, p, "illegal reuse of %<%p{element}%> %s %d", errh, true);
-	    }
-	}
+        for (int p = 0; p < 2; ++p) {
+            int ci = (p ? _conn_output_sorter[0] : 0);
+            Port last = _conn[ci][p];
+            for (int cix = 1; cix < _conn.size(); ++cix) {
+                ci = (p ? _conn_output_sorter[cix] : cix);
+                if (likely(last != _conn[ci][p]))
+                    last = _conn[ci][p];
+                else if (_elements[last.idx]->port_active(p, last.port))
+                    hookup_error(last, p, "illegal reuse of %<%p{element}%> %s %d", errh, true);
+            }
+        }
 
     // check for unused ports
     for (int p = 0; p < 2; ++p) {
@@ -710,15 +710,15 @@ Router::check_push_and_pull(ErrorHandler *errh)
     Vector<Connection> conn = _conn;
     Bitvector bv;
     for (int ei = 0, *inputp = input_pers.begin(); ei < _elements.size(); ++ei) {
-	assert(inputp - input_pers.begin() == gport(false, Port(ei, 0)));
-	for (int port = 0; port < _elements[ei]->ninputs(); ++port, ++inputp)
-	    if (*inputp == Element::VAGNOSTIC || *inputp == Element::VDOUBLE) {
-		_elements[ei]->port_flow(false, port, &bv);
-		int og = gport(true, Port(ei, 0));
-		for (int j = 0; j < bv.size(); ++j)
-		    if (bv[j] && output_pers[og + j] == Element::VAGNOSTIC)
-			conn.push_back(Connection(ei, j, ei, port));
-	    }
+        assert(inputp - input_pers.begin() == gport(false, Port(ei, 0)));
+        for (int port = 0; port < _elements[ei]->ninputs(); ++port, ++inputp)
+            if (*inputp == Element::VAGNOSTIC || *inputp == Element::VDOUBLE) {
+                _elements[ei]->port_flow(false, port, &bv);
+                int og = gport(true, Port(ei, 0));
+                for (int j = 0; j < bv.size(); ++j)
+                    if (bv[j] && output_pers[og + j] == Element::VAGNOSTIC)
+                        conn.push_back(Connection(ei, j, ei, port));
+        }
     }
 
     int before = errh->nerrors();
@@ -727,59 +727,60 @@ Router::check_push_and_pull(ErrorHandler *errh)
     // spread personalities
     while (true) {
 
-	bool changed = false;
-	for (Connection *cp = conn.begin(); cp != conn.end(); ++cp) {
-	    if ((*cp)[1].idx < 0)
-		continue;
+        bool changed = false;
+        for (Connection *cp = conn.begin(); cp != conn.end(); ++cp) {
+            if ((*cp)[1].idx < 0)
+                continue;
 
-	    int gf = gport(true, (*cp)[1]);
-	    int gt = gport(false, (*cp)[0]);
-	    int pf = output_pers[gf];
-	    int pt = input_pers[gt];
-	    switch (pt) {
-	      case Element::VDOUBLE:
-	    if (!cp->_double) {
-	        if (pf == Element::VDOUBLE) {
-	            input_pers[gt] = Element::VPUSH;
-	        } else {
-	        	if (pf == Element::VAGNOSTIC)
-	        		input_pers[gt] = Element::VPUSH;
-	        	else
-	        		input_pers[gt] = pf;
-	        }
-	        changed = true;
+            int gf = gport(true, (*cp)[1]);
+            int gt = gport(false, (*cp)[0]);
+            int pf = output_pers[gf];
+            int pt = input_pers[gt];
 
-	    	break;
-	    }
-	    if (pt != Element::VDOUBLE) {
-	        input_pers[gt] = pf;
-	        changed = true;
-	        click_chatter("%<%p{element}%> -> %<%p{element}%> now a %d, allowed : %d",_elements[(*cp)[1].idx],_elements[(*cp)[0].idx],pf,cp->_double);
-	    }
-	    break;
-	      case Element::VAGNOSTIC:
-		if (pf != Element::VAGNOSTIC) {
-		    input_pers[gt] = pf;
-		    changed = true;
-		}
-		break;
+            switch (pt) {
+              case Element::VDOUBLE:
+            if (!cp->_double) {
+                if (pf == Element::VDOUBLE) {
+                    input_pers[gt] = Element::VPUSH;
+                } else {
+                        if (pf == Element::VAGNOSTIC)
+                                input_pers[gt] = Element::VPUSH;
+                        else
+                                input_pers[gt] = pf;
+                }
+                changed = true;
 
-	      case Element::VPUSH:
-	      case Element::VPULL:
-		if (pf == Element::VAGNOSTIC || pf == Element::VDOUBLE) {
-		    output_pers[gf] = pt;
-		    changed = true;
-		} else if (pf != pt) {
-		    processing_error(*cp, cp >= first_agnostic, pf, errh);
-		    (*cp)[1].idx = -1;
-		}
-		break;
+                    break;
+            }
+            if (pt != Element::VDOUBLE) {
+                input_pers[gt] = pf;
+                changed = true;
+                click_chatter("%<%p{element}%> -> %<%p{element}%> now a %d, allowed : %d",_elements[(*cp)[1].idx],_elements[(*cp)[0].idx],pf,cp->_double);
+            }
+            break;
+              case Element::VAGNOSTIC:
+                if (pf != Element::VAGNOSTIC) {
+                    input_pers[gt] = pf;
+                    changed = true;
+                }
+                break;
 
-	    }
-	}
+              case Element::VPUSH:
+              case Element::VPULL:
+                if (pf == Element::VAGNOSTIC || pf == Element::VDOUBLE) {
+                    output_pers[gf] = pt;
+                    changed = true;
+                } else if (pf != pt) {
+                    processing_error(*cp, cp >= first_agnostic, pf, errh);
+                    (*cp)[1].idx = -1;
+                }
+                break;
 
-	if (!changed)
-	    break;
+            }
+        }
+
+        if (!changed)
+            break;
     }
 
     if (errh->nerrors() != before)
@@ -1192,20 +1193,16 @@ Router::initialize(ErrorHandler *errh)
         //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instanciating batches
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
-            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
-            if (e != NULL && e->batch_mode() == Element::BATCH_MODE_YES) {
-# if BATCH_DEBUG && HAVE_VERBOSE_BATCH
-                click_chatter("%s is in batch mode",e->name().c_str());
-# endif
+            Element* e = _elements[i];
+            if (e != NULL && e->in_batch_mode == Element::BATCH_MODE_YES) {
                 BatchElement::BatchModePropagate p;
                 p.ispush = true;
                 for (int i = 0; i < e->noutputs(); i++) {
-			if (e->output_is_push(i))
-				visit(e,true,i,&p);
+                    if (e->output_is_push(i))
+                        visit(e,true,i,&p);
                 }
 
                 p.ispush = false;
-
                 for (int i = 0; i < e->ninputs(); i++) {
                     if (e->input_is_pull(i))
                         visit(e,false,i,&p);
@@ -1215,28 +1212,14 @@ Router::initialize(ErrorHandler *errh)
 
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
-            BatchElement* e = dynamic_cast<BatchElement*>(_elements[i]);
-            if (e != NULL) {
-                switch (e->batch_mode()) {
-                case Element::BATCH_MODE_NO:
-                    e->receives_batch = false;
-                    break;
-                case Element::BATCH_MODE_IFPOSSIBLE:
-                    e->in_batch_mode = Element::BATCH_MODE_NO;
-                    e->receives_batch = false;
-#if HAVE_VERBOSE_BATCH
-            click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
-#endif
-                    break;
-                case Element::BATCH_MODE_NEEDED:
-                    click_chatter("%s needs to receive batch ! Please check your configuration.",e->name().c_str());
-                    all_ok = false;
-                    break;
-                case Element::BATCH_MODE_YES:
-                    e->upgrade_ports();
-                    e->bind_ports();
-                    break;
-                }
+            Element* e = _elements[i];
+            if (e->in_batch_mode == Element::BATCH_MODE_NO) {
+                e->receives_batch = false;
+                continue; //This element is traversed by packets... nothing to do.
+            } else if (e->in_batch_mode == Element::BATCH_MODE_NEEDED) {
+                click_chatter("%s needs to receive batch ! Please check your configuration.",e->name().c_str());
+                all_ok = false;
+                break;
             }
         }
     }
@@ -1259,7 +1242,7 @@ Router::initialize(ErrorHandler *errh)
 #endif
 #if HAVE_NETMAP_PACKET_POOL
             if (element_stage[i] < Element::CONFIGURE_PHASE_PRIVILEGED && !NetmapBufQ::initialized()) {
-                click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-packet-pool to configure script to disable this feature.");
+                click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-pool to configure script to disable this feature.");
                 all_ok = false;
                 break;
             }

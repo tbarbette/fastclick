@@ -45,9 +45,9 @@ NotifierQueue::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-NotifierQueue::push_packet(int, Packet *p)
+NotifierQueue::push(int, Packet *p)
 {
-    // Code taken from SimpleQueue::push_packet().
+    // Code taken from SimpleQueue::push().
     int h = head(), t = tail(), nt = next_i(t);
 
     if (nt != h) {

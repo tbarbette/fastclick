@@ -95,7 +95,7 @@ EtherEncap::smaction(Packet *p)
     }
 #endif
 inline void
-EtherEncap::push_packet(int, Packet *p)
+EtherEncap::push(int, Packet *p)
 {
 	if (Packet *q = smaction(p))
 	output(0).push(q);

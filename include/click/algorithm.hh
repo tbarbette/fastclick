@@ -2,6 +2,8 @@
 #define CLICK_ALGORITHM_HH
 CLICK_DECLS
 
+#define is_pow2(n) ((n & (n - 1)) == 0)
+
 template <typename T>
 inline T *find(T *begin, T *end, const T &val)
 {

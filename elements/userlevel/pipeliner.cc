@@ -37,7 +37,7 @@ Pipeliner::get_runnable_threads(Bitvector& b) {
 
 
 void Pipeliner::cleanup(CleanupStage) {
-    for (unsigned i = 0; i < storage.size(); i++) {
+    for (unsigned i = 0; i < storage.weight(); i++) {
     	Packet* p;
         while ((p = storage.get_value(i).extract()) != 0) {
 #if HAVE_BATCH
@@ -85,11 +85,11 @@ Pipeliner::initialize(ErrorHandler *errh)
 		}
     }
 
-    for (unsigned i = 0; i < storage.size(); i++) {
+    for (unsigned i = 0; i < storage.weight(); i++) {
         storage.get_value(i).initialize(_ring_size);
     }
 
-    for (int i = 0; i < v.size(); i++) {
+    for (int i = 0; i < v.weight(); i++) {
         if (v[i]) {
             click_chatter("Pipeline from %d to %d",i,out_id);
             WritablePacket::pool_transfer(out_id,i);
@@ -123,7 +123,7 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
 }
 #endif
 
-void Pipeliner::push_packet(int,Packet* p) {
+void Pipeliner::push(int,Packet* p) {
 	retry:
     if (storage->insert(p)) {
         stats->sent++;
@@ -148,8 +148,8 @@ Pipeliner::run_task(Task* t)
 {
     bool r = false;
     last_start++; //Used to RR the balancing of revert storage
-    for (unsigned j = 0; j < storage.size(); j++) {
-        int i = (last_start + j) % storage.size();
+    for (unsigned j = 0; j < storage.weight(); j++) {
+        int i = (last_start + j) % storage.weight();
         PacketRing& s = storage.get_value(i);
         PacketBatch* out = NULL;
         while (!s.is_empty()) {

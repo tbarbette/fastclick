@@ -258,7 +258,7 @@ MultiReplay::run_task(Task* task)
 		} else {
 			_queue_current = p->next();
 			Packet* q;
-			if (_stop > 1) {
+			if (_stop != 1) {
 				q = p->clone(_quick_clone);
 			} else {
 				q = p;
@@ -328,7 +328,7 @@ MultiReplayUnqueue::run_task(Task* task)
 
 			_queue_current = p->next();
 			Packet* q;
-			if (_stop > 1) {
+			if (_stop != 1) {
 				q = p->clone(_quick_clone);
 				if (_quick_clone)
 					SET_PAINT_ANNO(q,PAINT_ANNO(p));

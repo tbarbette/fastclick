@@ -46,20 +46,20 @@ public:
 #if HAVE_BATCH
     void push_batch(int,PacketBatch*);
 #endif
-    void push_packet(int,Packet*);
+    void push(int,Packet*);
 
     bool run_task(Task *);
 
     unsigned long int n_dropped() {
         unsigned long int total = 0;
-        for (unsigned i = 0; i < stats.size(); i++)
+        for (unsigned i = 0; i < stats.weight(); i++)
             total += stats.get_value(i).dropped;
         return total;
     }
 
     unsigned long int n_sent() {
         unsigned long int total = 0;
-        for (unsigned i = 0; i < stats.size(); i++)
+        for (unsigned i = 0; i < stats.weight(); i++)
             total += stats.get_value(i).sent;
         return total;
     }
@@ -83,7 +83,7 @@ public:
 
     typedef DynamicRing<Packet*> PacketRing;
 
-    per_thread_compressed<PacketRing> storage;
+    per_thread_oread<PacketRing> storage;
     struct stats {
         stats() : dropped(0), sent(0) {
 
@@ -91,7 +91,7 @@ public:
         unsigned long int dropped;
         unsigned long int sent;
     };
-    per_thread_compressed<struct stats> stats;
+    per_thread_oread<struct stats> stats;
     int out_id;
     volatile int sleepiness;
 

@@ -255,7 +255,7 @@ void IPOutputCombo::push_batch(int, PacketBatch * head) {
 }
 #endif
 inline void
-IPOutputCombo::push_packet(int, Packet *p_in)
+IPOutputCombo::push(int, Packet *p_in)
 {
 	int o = action(p_in, 1);
 	if (o == 1) {

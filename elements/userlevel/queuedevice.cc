@@ -86,10 +86,13 @@ Args& RXQueueDevice::parse(Args &args) {
 	return args;
 }
 
-Args& TXQueueDevice::parse(Args &args) {
+Args& TXQueueDevice::parse(Args &args, ErrorHandler* errh) {
 	QueueDevice::parse(args);
 	args.read("IQUEUE", _internal_tx_queue_size)
 		.read("BLOCKING", _blocking);
+    if ((_internal_tx_queue_size & (_internal_tx_queue_size - 1)) != 0) {
+        errh->error("IQUEUE must be a power of 2");
+    }
 	return args;
 }
 

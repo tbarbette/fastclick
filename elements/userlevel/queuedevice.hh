@@ -104,7 +104,7 @@ protected:
 
     inline unsigned long long n_count() {
         unsigned long long total = 0;
-        for (unsigned int i = 0; i < thread_state.size(); i ++) {
+        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
             total += thread_state.get_value(i)._count;
         }
         return total;
@@ -112,14 +112,14 @@ protected:
 
     inline unsigned long long n_dropped() {
         unsigned long long total = 0;
-        for (unsigned int i = 0; i < thread_state.size(); i ++) {
+        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
             total += thread_state.get_value(i)._dropped;
         }
         return total;
     }
 
     inline void reset_count() {
-        for (unsigned int i = 0; i < thread_state.size(); i ++) {
+        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
             thread_state.get_value(i)._count = 0;
             thread_state.get_value(i)._dropped = 0;
         }
@@ -266,7 +266,7 @@ protected:
     /**
      * Common parsing for all RXQueueDevice
      */
-    Args& parse(Args &args);
+    Args& parse(Args &args, ErrorHandler* errh);
 
     int configure_tx(int hardminqueues, int hardmaxqueues, ErrorHandler *errh);
     int initialize_tx(ErrorHandler *errh);

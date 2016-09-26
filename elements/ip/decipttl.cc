@@ -84,7 +84,7 @@ DecIPTTL::simple_action(Packet *p)
 PacketBatch *
 DecIPTTL::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *p){});
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet *){});
     return batch;
 }
 #endif

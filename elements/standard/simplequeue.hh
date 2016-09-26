@@ -97,7 +97,7 @@ class SimpleQueue : public BatchElement, public Storage { public:
     void take_state(Element*, ErrorHandler*);
     void add_handlers() CLICK_COLD;
 
-    void push_packet(int port, Packet*);
+    void push(int port, Packet*);
     Packet* pull(int port);
 
 #if HAVE_BATCH

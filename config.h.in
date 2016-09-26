@@ -68,6 +68,12 @@
 /* Define if right shift of signed integers acts by sign extension. */
 #undef HAVE_ARITHMETIC_RIGHT_SHIFT
 
+/* Define if make vanilla elements batch-compatible automatically */
+#undef HAVE_AUTO_BATCH
+
+/* Define if Batching support is enabled. */
+#undef HAVE_BATCH
+
 /* Define if Port::push/Port::pull should use bound function pointers. */
 #undef HAVE_BOUND_PORT_TRANSFER
 
@@ -86,6 +92,9 @@
 /* Define if the C++ compiler understands template alias. */
 #undef HAVE_CXX_TEMPLATE_ALIAS
 
+/* Define if Flow support is enabled. */
+#undef HAVE_FLOW
+
 /* Define if the machine is indifferent to alignment. */
 #undef HAVE_INDIFFERENT_ALIGNMENT
 
@@ -94,15 +103,6 @@
 
 /* Define if 64-bit integer types are enabled. */
 #undef HAVE_INT64_TYPES
-
-/* Define if Batching support is enabled. */
-#undef HAVE_BATCH
-
-/* Define if warnings and information about batching are enabled. */
-#undef HAVE_VERBOSE_BATCH
-
-/* Define if Flow support is enabled. */
-#undef HAVE_FLOW
 
 /* Define if IPv6 support is enabled. */
 #undef HAVE_IP6
@@ -129,6 +129,12 @@
 /* Define if you want task scheduling to use a heap, not a linked list. */
 #undef HAVE_TASK_HEAP
 #endif
+
+/* Define if user-provided clock system is supported. */
+#undef HAVE_USER_TIMESTAMP
+
+/* Define if warnings and information about batching are enabled. */
+#undef HAVE_VERBOSE_BATCH
 
 /* The size of a `int', as computed by sizeof. */
 #undef SIZEOF_INT

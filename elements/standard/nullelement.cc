@@ -40,7 +40,7 @@ PushNullElement::PushNullElement()
 }
 
 void
-PushNullElement::push_packet(int, Packet *p)
+PushNullElement::push(int, Packet *p)
 {
   output(0).push(p);
 }

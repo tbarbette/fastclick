@@ -18,6 +18,7 @@
 
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
+#include <rte_errno.h>
 
 CLICK_DECLS
 
@@ -92,7 +93,7 @@ bool DPDKDevice::alloc_pktmbufs()
                 if (!_pktmbuf_pools[i]) {
                         const char* name = (DPDKDevice::MEMPOOL_PREFIX + String(i)).c_str();
                         _pktmbuf_pools[i] =
-#if RTE_VERSION > RTE_VERSION_NUM(2,2,0,0)-1
+#if RTE_VERSION >= RTE_VERSION_NUM(2,2,0,0)
                         rte_pktmbuf_pool_create(name, NB_MBUF,
                                                 MBUF_CACHE_SIZE, 0, MBUF_DATA_SIZE, i);
 #else
@@ -151,7 +152,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             "Cannot initialize DPDK port %u with %u RX and %u TX queues",
             port_id, info.rx_queues.size(), info.tx_queues.size());
     struct rte_eth_rxconf rx_conf;
-#if RTE_VERSION > RTE_VERSION_NUM(2,0,0,0)-1
+#if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&rx_conf, &dev_info.default_rxconf, sizeof rx_conf);
 #else
     bzero(&rx_conf,sizeof rx_conf);
@@ -161,7 +162,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
 
     struct rte_eth_txconf tx_conf;
-#if RTE_VERSION > RTE_VERSION_NUM(2,0,0,0)-1
+#if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&tx_conf, &dev_info.default_txconf, sizeof tx_conf);
 #else
     bzero(&tx_conf,sizeof tx_conf);
@@ -177,8 +178,8 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 port_id, i, info.n_rx_descs, numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
             return errh->error(
-                "Cannot initialize RX queue %u of port %u on node %u",
-                i, port_id, numa_node);
+                "Cannot initialize RX queue %u of port %u on node %u : %s",
+                i, port_id, numa_node, rte_strerror(rte_errno));
     }
 
     for (int i = 0; i < info.tx_queues.size(); ++i)
@@ -284,7 +285,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return 0;
 
     click_chatter("Initializing DPDK");
-#if RTE_VERSION > RTE_VERSION_NUM(2,0,0,0)-1
+#if RTE_VERSION < RTE_VERSION_NUM(2,0,0,0)
     if (rte_eal_pci_probe())
         return errh->error("Cannot probe the PCI bus");
 #endif
@@ -373,7 +374,11 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
     return true;
 }
 
+#if HAVE_DPDK_PACKET_POOL
+int DPDKDevice::NB_MBUF = 32*4096*2; //Must be able to fill the packet data pool, and then have some packets for IO
+#else
 int DPDKDevice::NB_MBUF = 65536;
+#endif
 int DPDKDevice::MBUF_DATA_SIZE =
     2048 + RTE_PKTMBUF_HEADROOM;
 int DPDKDevice::MBUF_CACHE_SIZE = 256;

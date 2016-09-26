@@ -34,6 +34,7 @@ FromDPDKDevice::FromDPDKDevice() :
 		in_batch_mode = BATCH_MODE_YES;
 	#endif
 	_burst = 32;
+	ndesc = 256;
 }
 
 FromDPDKDevice::~FromDPDKDevice()
@@ -154,7 +155,7 @@ bool FromDPDKDevice::run_task(Task * t)
 #endif
             p->set_packet_type_anno(Packet::HOST);
             if (_set_rss_aggregate)
-#if RTE_VER_YEAR ||  RTE_VER_MAJOR > 1 || RTE_VER_MINOR > 7
+#if RTE_VERSION > RTE_VERSION_NUM(1,7,0,0)
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);

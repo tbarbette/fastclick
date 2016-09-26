@@ -419,7 +419,14 @@ void BetterIPCounter3::push(int port, Packet *p) {
 
 /** @brief Construct an Element. */
 Element::Element()
-    : _router(0), _eindex(-1)
+    :
+#if HAVE_AUTO_BATCH
+    in_batch_mode(BATCH_MODE_IFPOSSIBLE),
+#else
+    in_batch_mode(BATCH_MODE_NO),
+#endif
+    receives_batch(false),
+    _router(0), _eindex(-1), _is_fullpush(false)
 {
     nelements_allocated++;
     _ports[0] = _ports[1] = &_inline_ports[0];
@@ -1668,6 +1675,14 @@ Element::home_thread() const
 {
     return master()->thread(router()->home_thread_id(this));
 }
+
+/** @brief Return the element's home thread. */
+int
+Element::home_thread_id() const
+{
+    return router()->home_thread_id(this);
+}
+
 
 class InputThreadVisitor: public RouterVisitor {
 public:
@@ -2963,6 +2978,26 @@ Element::pull(int port)
     if (p)
 	p = simple_action(p);
     return p;
+}
+
+void Element::push_batch(int port, PacketBatch* batch) {
+    for (int i = 0; i < noutputs(); i++) {
+        if (output_is_push(i))
+            _ports[1][i].start_batch();
+    }
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        push(port,p);
+    }
+    for (int i = 0; i < noutputs(); i++) {
+        if (output_is_push(i))
+            _ports[1][i].end_batch();
+    }
+}
+
+PacketBatch* Element::pull_batch(int port, unsigned max) {
+    PacketBatch* batch;
+    MAKE_BATCH(pull(port),batch,max);
+    return batch;
 }
 
 /** @brief Process a packet for a simple packet filter.

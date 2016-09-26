@@ -47,7 +47,7 @@ Tee::push_batch(int, PacketBatch *p)
 }
 #endif
 void
-Tee::push_packet(int, Packet *p)
+Tee::push(int, Packet *p)
 {
   int n = noutputs();
   for (int i = 0; i < n - 1; i++)

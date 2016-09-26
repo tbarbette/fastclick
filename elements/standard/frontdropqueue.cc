@@ -104,7 +104,7 @@ FrontDropQueue::take_state(Element *e, ErrorHandler *errh)
 }
 
 void
-FrontDropQueue::push_packet(int, Packet *p)
+FrontDropQueue::push(int, Packet *p)
 {
     assert(p);
 

@@ -45,7 +45,7 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int burst = -1;
 
     if (parse(Args(conf, this, errh)
-    .read_mp("DEVNAME", ifname))
+    .read_mp("DEVNAME", ifname), errh)
     .complete() < 0)
     	return -1;
 
@@ -245,7 +245,7 @@ do_send_batch:
 }
 #endif
 void
-ToNetmapDevice::push_packet(int, Packet* p) {
+ToNetmapDevice::push(int, Packet* p) {
 	State &s = state.get();
 	if (s.q == NULL) {
 		s.q = p;
@@ -585,7 +585,7 @@ void
 ToNetmapDevice::cleanup(CleanupStage)
 {
     cleanup_tasks();
-    for (unsigned int i = 0; i < state.size(); i++) {
+    for (unsigned int i = 0; i < state.weight(); i++) {
         if (state.get_value(i).q) {
         	Packet* next = state.get_value(i).q->next();
         	state.get_value(i).q->kill();

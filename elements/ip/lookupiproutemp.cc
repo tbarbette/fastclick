@@ -161,7 +161,7 @@ LookupIPRouteMP::cleanup(CleanupStage)
 }
 
 void
-LookupIPRouteMP::push_packet(int, Packet *p)
+LookupIPRouteMP::push(int, Packet *p)
 {
   IPAddress a = p->dst_ip_anno();
   IPAddress gw;

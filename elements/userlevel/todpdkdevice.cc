@@ -31,6 +31,7 @@ ToDPDKDevice::ToDPDKDevice() :
 	 _blocking = false;
 	 _burst = -1;
 	 _internal_tx_queue_size = 1024;
+	 ndesc = 256;
 }
 
 ToDPDKDevice::~ToDPDKDevice()
@@ -43,7 +44,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     String dev;
 
     if (parse(Args(conf, this, errh)
-        .read_mp("PORT", dev))
+        .read_mp("PORT", dev), errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
         .complete() < 0)
@@ -93,7 +94,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (unsigned i = 0; i < _iqueues.size();i++) {
+    for (unsigned i = 0; i < _iqueues.weight();i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
         if (_timeout >= 0) {
             _iqueues.get_value(i).timeout.assign(this);
@@ -114,7 +115,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 void ToDPDKDevice::cleanup(CleanupStage)
 {
 	cleanup_tasks();
-	for (unsigned i = 0; i < _iqueues.size();i++) {
+	for (unsigned i = 0; i < _iqueues.weight();i++) {
 			delete[] _iqueues.get_value(i).pkts;
 	}
 }
@@ -190,7 +191,7 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
         iqueue.index = 0;
 }
 
-void ToDPDKDevice::push_packet(int, Packet *p)
+void ToDPDKDevice::push(int, Packet *p)
 {
     // Get the thread-local internal queue
     TXInternalQueue &iqueue = _iqueues.get();
@@ -266,7 +267,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
             if (mbuf != NULL) {
-                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size] = mbuf;
+                iqueue.pkts[(iqueue.index + iqueue.nr_pending) & (_internal_tx_queue_size - 1)] = mbuf;
                 iqueue.nr_pending++;
             }
             next = p->next();

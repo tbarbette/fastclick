@@ -5,6 +5,8 @@
 #include <click/glue.hh>
 #include <click/vector.hh>
 #include <click/bitvector.hh>
+#include <click/machine.hh>
+#include <click/sync.hh>
 
 CLICK_DECLS
 
@@ -60,31 +62,34 @@ private:
             storage[i].v = v;
         }
     }
+
+    //Disable copy constructor. It will always be a user error
+    per_thread (const per_thread<T> &o);
 public:
-    per_thread() {
+    explicit per_thread() {
         _size = click_max_cpu_ids();
         storage = new AT[_size];
     }
 
-    per_thread(T v) {
+    explicit per_thread(T v) {
         initialize(click_max_cpu_ids(),v);
     }
 
-    per_thread(T v, int n) {
+    explicit per_thread(T v, int n) {
         initialize(n,v);
-    }
-
-    ~per_thread() {
-        delete[] storage;
     }
 
     /**
      * Resize must be called if per_thread was initialized before click_max_cpu_ids() is set (such as in static functions)
      * This will destroy all data
      */
-    void resize(unsigned int n,T v) {
+    void resize(unsigned int max_cpu_id,T v) {
         delete[] storage;
-        initialize(n,v);
+        initialize(max_cpu_id,v);
+    }
+
+    ~per_thread() {
+        delete[] storage;
     }
 
     inline T* operator->() const {
@@ -133,24 +138,41 @@ public:
         return storage[click_current_cpu_id()].v;
     }
 
-    inline T& get_value_for_thread(int i) const{
-        return storage[i].v;
+    /**
+     * get_value_for_thread get the value for a given thread id
+     * Do not do for (int i = 0; i < size(); i++) get_value_for_thread
+     * as in omem and oread version, not all threads are represented,
+     * this would lead to a bug !
+     */
+    inline T& get_value_for_thread(int thread_id) const{
+        return storage[thread_id].v;
     }
 
-    inline void set_value_for_thread(int i, T v) {
-            storage[i].v = v;
+    inline void set_value_for_thread(int thread_id, T v) {
+        storage[thread_id].v = v;
     }
 
-    inline size_t size() {
-        return _size;
-    }
-
-    inline T& get_value(int i) const{
-        return storage[i].v;
+    /**
+     * get_value can be used to iterate around all per-thread vairables.
+     * On the normal version it is the same as get_value_for_thread, but on
+     * omem and oread version of per_thread, this iterate only over thread
+     * that will really be used.
+     */
+    inline T& get_value(int i) const {
+        return get_value_for_thread(i);
     }
 
     inline void set_value(int i, T v) {
-        storage[i].v = v;
+        set_value_for_thread(i, v);
+    }
+
+    /**
+     * Number of elements inside the vector.
+     * This may not the number of threads, only use this
+     * to iterate with get_value()/set_value(), not get_value_for_thread()
+     */
+    inline size_t weight() {
+        return _size;
     }
 
     inline unsigned int get_mapping(int i) {
@@ -162,15 +184,16 @@ protected:
 };
 
 /*
- * Not compressed for now, just avoid parcouring unused threads
+ * Read efficient version of per thread, by giving a bitvector telling
+ * which threads will be used, a mapping can be used to only read from
+ * variables actually used
+ *
+ * Mapping is from index inside the storage vector to thread id
  */
 template <typename T>
-class per_thread_compressed : public per_thread<T> {
-
-public:
-    void compress(Bitvector v) {
-        usable = v;
-        mapping.resize(v.weight(),0);
+class per_thread_oread : public per_thread<T> { public:
+    void compress(Bitvector usable) {
+        mapping.resize(usable.weight(),0);
         int id = 0;
         for (int i = 0; i < usable.size(); i++) {
             if (usable[i]) {
@@ -178,29 +201,83 @@ public:
                 id++;
             }
         }
-        _size = id;
-    }
-
-    inline size_t size() {
-        return _size;
+        per_thread<T>::_size = id;
     }
 
     inline T& get_value(int i) const{
         return per_thread<T>::storage[mapping[i]].v;
     }
 
-    inline void set_value(int i,T v) {
+    inline void set_value(int i, T v) {
         per_thread<T>::storage[mapping[i]].v = v;
     }
 
-    inline unsigned int get_mapping(int i) {
-        return mapping[i];
-    }
+private:
+    Vector<unsigned int> mapping;
+};
 
-    Bitvector usable;
+/*
+ * Memory efficient version which only duplicate the variable per thread
+ * actually used, given a bitvector telling which one they are. However
+ * this comes at the price of one more indirection as we
+ * need a table to map thread ids to posiitions inside the storage
+ * vector. The mapping table itself is a vector of integers, so
+ * it your data structure is not bigger than two ints, it is not worth it.
+ */
+template <typename T>
+class per_thread_omem { private:
+    typedef struct {
+        T v;
+    } CLICK_CACHE_ALIGN AT;
+
+    AT* storage;
     Vector<unsigned int> mapping;
     size_t _size;
+public:
+    per_thread_omem() {
+    }
 
+    void initialize(Bitvector usable, T v=T()) {
+        storage = new AT[usable.weight()];
+        int id = 0;
+        for (int i = 0; i < click_max_cpu_ids(); i++) {
+            if (usable[i]) {
+                storage[id] = v;
+                mapping[i] = id++;
+            } else {
+                mapping[i] = 0;
+            }
+        }
+        _size = id;
+    }
+
+    inline T* operator->() const {
+        return &(storage[mapping[click_current_cpu_id()]].v);
+    }
+    inline T& operator*() const {
+        return storage[mapping[click_current_cpu_id()]].v;
+    }
+
+    inline T& operator+=(const T& add) const {
+        storage[mapping[click_current_cpu_id()]].v += add;
+        return storage[mapping[click_current_cpu_id()]].v;
+    }
+
+    inline T& operator++() const { // prefix ++
+        return ++(storage[mapping[click_current_cpu_id()]].v);
+    }
+
+    inline T operator++(int) const { // postfix ++
+        return storage[mapping[click_current_cpu_id()]].v++;
+    }
+
+    inline T& operator--() const {
+        return --(storage[mapping[click_current_cpu_id()]].v);
+    }
+
+    inline T operator--(int) const {
+        return storage[mapping[click_current_cpu_id()]].v--;
+    }
 };
 
 CLICK_ENDDECLS
