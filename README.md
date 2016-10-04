@@ -57,14 +57,14 @@ you probably want to have only batch-compatible elements in your fast path as
 this will be really faster.
 
 Batch-compatible element should extend the BatchElement instead of the Element 
-class. They also have to implement push\_packet instead of push, and 
-a version of push receiving PacketBatch\* instead of Packet\* called 
+class. They also have to implement 
+a version of push receiving a PacketBatch\* argument instead of Packet\* called 
 push\_batch. 
 
-The reson why batch element must provide a good old push\_packet version is that
+The reason why batch element must provide a good old push fonction is that
 it may be not worth it to rebuild a batch before your element, and then 
-unbatch-it because your element is betweem to vanilla elements. In this case the
-push\_packet version of your element will be used.
+unbatch-it because your element is betweem two vanilla elements. In this case
+the push version of your element will be used.
 
 To let click compile with --disable-batch, always enclose push\_batch prototype
 and implementation around #if HAVE\_BATCH .. #endif
@@ -78,19 +78,25 @@ manager rebuild a batch before passing it to your element. The default is
 BATCH\_MODE\_IFPOSSIBLE, telling that it should run in batch mode if it can, and 
 vanilla element are fixed to BATCH\_MODE\_NO.
 
-FYI, the reason why push has been renamed to push\_packet is that when a 
-non-batch combatible element want to call push on your element, it wants to call 
-PacketBatch::push and not your version because the former one will actually 
-rebuild a batch if needed and call your element's putch\_batch instead.
+If you provide --enable-auto-batch, the vanilla Elements will be set in mode 
+BATCH\_MODE\_IFPOSSIBLE, with a special push\_batch function which will simply
+call push() for each packets. However the push ports of the elements will
+rebuild batches instead of letting them go through.
+
+Without auto-batch, the batches will be un-batched before a vanilla Element and
+re-batched when hitting the next BatchElement. It is referenced as the "jump"
+mode as the batch "jump over" the vanilla Element. This is the behaviour
+described in the ANCS paper and still the default mode.
 
 Differences with the ANCS paper
 -------------------------------
 For simplicity, we reference all input element as "FromDevice" and output
 element as "ToDevice". However in practice our I/O elements are 
-FromNetmapDevice/ToNetmapDevice and FromDpdkDevice/ToDpdkDevice. They both
+FromNetmapDevice/ToNetmapDevice and FromDPDKDevice/ToDPDKDevice. They both
 inherit from QueueDevice, which is a generic abstract element to implement a
 device which supports multiple queues (or in a more generic way I/O through
 multiple different threads).
+
 Thread vector and bit vector designate the same thing.
 
 The --enable-dpdk-packet flag allows to use the metadata of the DPDK packets
