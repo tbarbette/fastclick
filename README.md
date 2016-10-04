@@ -4,7 +4,8 @@ This is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It is the result of
 our ANCS paper available at http://hdl.handle.net/2268/181954 .
 
-Partial DPDK support is now reverted into vanilla Click (without support for batching, auto-thread assignment, thread vector, ...).
+Partial DPDK support is now reverted into vanilla Click (without support for 
+batching, auto-thread assignment, thread vector, ...).
 
 Netmap
 ------
@@ -106,8 +107,11 @@ force us to fetch a new cacheline.
 
 Getting help
 ------------
-Use the github issue tracker or contact tom.barbette at ulg.ac.be if you encounter any problem.
+Use the github issue tracker (https://github.com/tbarbette/fastclick/issues) or
+contact tom.barbette at ulg.ac.be if you encounter any problem.
 
 Please do not ask FastClick-related problems on the vanilla Click mailing list.
+If you are sure that your problem is Click related, post it on vanilla Click's
+issue tracker (https://github.com/kohler/click/issues).
 
 The original Click readme is available in the README.original file.
