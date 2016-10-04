@@ -197,6 +197,82 @@ NetmapDevice::~NetmapDevice() {
 	};
 }
 
+# if HAVE_NETMAP_PACKET_POOL
+WritablePacket* NetmapDevice::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
+    WritablePacket* p = WritablePacket::pool_data_allocate();
+    if (!p) return NULL;
+    p->initialize();
+    slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
+    p->set_buffer(data,rxring->nr_buf_size,slot->len);
+    slot->flags = NS_BUF_CHANGED;
+    return p;
+}
+
+/**
+ * Creates a batch of packet directly from a netmap ring.
+ */
+PacketBatch* NetmapDevice::make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur) {
+    if (n <= 0) return NULL;
+    struct netmap_slot* slot;
+    WritablePacket* last = 0;
+
+    PacketPool& packet_pool = *WritablePacket::make_local_packet_pool();
+
+    WritablePacket*& _head = packet_pool.pd;
+    unsigned int & _count = packet_pool.pdcount;
+
+    if (_count == 0) {
+        _head = WritablePacket::pool_data_allocate();
+        _count = 1;
+    }
+
+    //Next is the current packet in the batch
+    Packet* next = _head;
+    //P_batch_saved is the saved head of the batch.
+    PacketBatch* p_batch = static_cast<PacketBatch*>(_head);
+
+    int toreceive = n;
+    while (toreceive > 0) {
+
+        last = static_cast<WritablePacket*>(next);
+
+        slot = &rxring->slot[cur];
+
+        unsigned char* data = (unsigned char*)NETMAP_BUF(rxring, slot->buf_idx);
+        __builtin_prefetch(data);
+
+        slot->buf_idx = NETMAP_BUF_IDX(rxring,last->buffer());
+
+        slot->flags = NS_BUF_CHANGED;
+
+        next = last->next(); //Correct only if count != 0
+        last->initialize();
+
+        last->set_buffer(data,NetmapBufQ::buffer_size(),slot->len);
+        cur = nm_ring_next(rxring, cur);
+        toreceive--;
+        _count --;
+
+        if (_count == 0) {
+
+            _head = 0;
+
+            next = WritablePacket::pool_data_allocate();
+            _count++; // We use the packet already out of the pool
+        }
+        last->set_next(next);
+
+    }
+
+    _head = static_cast<WritablePacket*>(next);
+
+    p_batch->set_count(n);
+    p_batch->set_tail(last);
+    last->set_next(NULL);
+    return p_batch;
+}
+# endif //HAVE_NETMAP_PACKET_POOL
+
 NetmapDevice* NetmapDevice::open(String ifname) {
 	NetmapDevice* d = nics.find(ifname);
 	if (d == NULL) {

@@ -293,7 +293,7 @@ static inline PacketPool& local_packet_pool() {
 }
 
 /** @brief Create and return a local packet pool for this thread. */
-static inline PacketPool* make_local_packet_pool() {
+PacketPool* WritablePacket::make_local_packet_pool() {
 #  if HAVE_MULTITHREAD
     PacketPool *pp = thread_packet_pool;
     if (unlikely(!pp && (pp = new PacketPool))) {
@@ -377,7 +377,7 @@ WritablePacket::pool_allocate()
 /**
  * Allocate a packet with a buffer
  */
-inline WritablePacket *
+WritablePacket *
 WritablePacket::pool_data_allocate()
 {
     PacketPool& packet_pool = *make_local_packet_pool();
@@ -442,19 +442,6 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)from;
     (void)to;
 }
-
-
-#  if HAVE_NETMAP_PACKET_POOL
-WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
-    WritablePacket* p = pool_data_allocate();
-    if (!p) return NULL;
-    p->initialize();
-    slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
-    p->set_buffer(data,rxring->nr_buf_size,slot->len);
-    slot->flags = NS_BUF_CHANGED;
-    return p;
-}
-#  endif //HAVE_NETMAP_PACKET_POOL
 
 inline void
 WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
