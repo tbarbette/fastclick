@@ -263,7 +263,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
 			sent+=n;
 
 #if HAVE_NETMAP_PACKET_POOL && HAVE_BATCH
-			PacketBatch *batch_head = WritablePacket::make_netmap_batch(n,rxring,cur);
+			PacketBatch *batch_head = NetmapDevice::make_netmap_batch(n,rxring,cur);
 			if (!batch_head) goto error;
 #else
 
