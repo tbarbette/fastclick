@@ -55,10 +55,6 @@ class Element { public:
     virtual void selected(int fd);
 #endif
 
-    virtual bool get_runnable_threads(Bitvector& b);
-    inline bool is_fullpush() const;
-    Bitvector get_threads(bool is_pull=false);
-
     enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_NEEDED, BATCH_MODE_YES};
 
     inline void checked_output_push(int port, Packet *p) const;
@@ -168,7 +164,18 @@ class Element { public:
 
     RouterThread *home_thread() const;
 
+    virtual bool get_spawning_threads(Bitvector& b, bool isoutput);
+    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, int level = 0);
+    Bitvector get_passing_threads(Element* origin, int level = 0);
+    Bitvector get_passing_threads();
+
     int home_thread_id() const;
+    virtual bool is_mt_safe();
+    virtual bool do_mt_safe_check(ErrorHandler*);
+    void add_remote_element(Element* e);
+
+    inline bool is_fullpush() const;
+
 #if CLICK_USERLEVEL
     // SELECT
     int add_select(int fd, int mask);
@@ -305,7 +312,10 @@ class Element { public:
 
     Router* _router;
     int _eindex;
+
     bool _is_fullpush;
+
+    Vector<Element*> _remote_elements;
 
 #if CLICK_STATS >= 2
     // STATISTICS
@@ -815,7 +825,6 @@ Element::Port::pull_batch(unsigned max) const {
 inline bool Element::is_fullpush() const {
     return _is_fullpush;
 }
-
 
 /** @brief Push packet @a p to output @a port, or kill it if @a port is out of
  * range.

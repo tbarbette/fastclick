@@ -135,7 +135,7 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
         else
             n_threads = min(_maxthreads,master()->nthreads() - router()->home_thread_id(this));
     } else {
-        usable_threads = get_threads();
+        usable_threads = get_passing_threads();
         if (_maxthreads == -1)
             n_threads = usable_threads.weight();
         else

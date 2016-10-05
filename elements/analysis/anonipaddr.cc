@@ -136,7 +136,7 @@ AnonymizeIPAddr::initialize(ErrorHandler *errh)
     _special_nodes[0].input = _special_nodes[0].output = 0;
     _special_nodes[1].input = _special_nodes[1].output = 0xFFFFFFFF;
 
-    _mt = get_threads().weight() > 1;
+    _mt = get_passing_threads().weight() > 1;
     return 0;
 }
 

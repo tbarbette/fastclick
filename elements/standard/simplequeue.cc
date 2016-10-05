@@ -25,7 +25,7 @@
 CLICK_DECLS
 
 SimpleQueue::SimpleQueue()
-    : _q(0)
+    : _q(0), _nouseless(false)
 {
 }
 
@@ -45,9 +45,14 @@ int
 SimpleQueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     unsigned new_capacity = 1000;
-    if (Args(conf, this, errh).read_p("CAPACITY", new_capacity).complete() < 0)
+    bool nouseless = false;
+    if (Args(conf, this, errh)
+            .read_p("CAPACITY", new_capacity)
+            .read("NOUSELESS", nouseless)
+            .complete() < 0)
 	return -1;
     _capacity = new_capacity;
+    _nouseless = nouseless;
     return 0;
 }
 
@@ -61,7 +66,7 @@ SimpleQueue::initialize(ErrorHandler *errh)
     _drops = 0;
     _highwater_length = 0;
 
-    Bitvector b = get_threads();
+    Bitvector b = get_passing_threads();
     unsigned int thisthread = router()->home_thread_id(this);
 
     for (unsigned i = 0; i < (unsigned)b.size(); i++) {
@@ -70,13 +75,35 @@ SimpleQueue::initialize(ErrorHandler *errh)
        }
     }
 
-    if (get_threads().weight() > 1 && !String(class_name()).equals("ThreadSafeQueue"))
-        return errh->error("%s: %s queue is not multithread-safe ! Use ThreadSafeQueue instead.",name().c_str(),class_name());
-
     return 0;
 }
 
+bool
+SimpleQueue::do_mt_safe_check(ErrorHandler* errh) {
+    Bitvector b(master()->nthreads());
+    for (int i = 0; i < ninputs(); i++) {
+        if (input_is_push(i))
+            b |= get_passing_threads(false, i, this, 0);
+    }
+    int ninput = b.weight();
+    b.zero();
+    for (int i = 0; i < noutputs(); i++) {
+        if (output_is_pull(i))
+            b |= get_passing_threads(true, i, this, 0);
+    }
+    int noutput = b.weight();
 
+    if (ninput <= 1 && noutput <= 1) {
+        if (cast("ThreadSafeQueue") != 0 && !_nouseless) {
+            errh->warning("Useless ThreadSafeQueue in a non-mt environment. Set NOUSELESS to true to avoid this warning if this is normal.");
+        }
+        return true;
+    } else if (cast("ThreadSafeQueue") != 0) {
+        return true;
+    } else
+        return errh->error("Queue %s is not multithread-safe ! Use ThreadSafeQueue instead.",class_name());
+    return true;
+}
 
 bool
 SimpleQueue::get_runnable_threads(Bitvector& b) {

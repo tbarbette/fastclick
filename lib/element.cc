@@ -31,7 +31,9 @@
 #include <click/master.hh>
 #include <click/straccum.hh>
 #include <click/etheraddress.hh>
+#include <click/bitvector.hh>
 #include <click/routervisitor.hh>
+#include <click/lexer.hh>
 #if CLICK_DEBUG_SCHEDULING
 # include <click/notifier.hh>
 #endif
@@ -1673,55 +1675,127 @@ Element::configuration() const
 RouterThread *
 Element::home_thread() const
 {
-    return master()->thread(router()->home_thread_id(this));
+    return master()->thread(home_thread_id());
 }
 
-/** @brief Return the element's home thread. */
+/** @brief Return the element's home thread id. */
 int
 Element::home_thread_id() const
 {
     return router()->home_thread_id(this);
 }
 
-
 class InputThreadVisitor: public RouterVisitor {
 public:
      Bitvector& bitmask;
      bool fullpush;
+     Element* origin;
 
-     InputThreadVisitor(Bitvector& b): bitmask(b), fullpush(true) {}
+     InputThreadVisitor(Bitvector& b, Element* o): bitmask(b), fullpush(true), origin(o) {}
 
-     virtual bool visit(Element *e, bool, int,
+     virtual bool visit(Element *e, bool isoutput, int,
                    Element *, int, int) {
-         bool ret = e->get_runnable_threads(bitmask);
+         bool ret = e->get_spawning_threads(bitmask, isoutput);
          if (ret == false)
              fullpush = false;
          return ret;
      }
 };
 
-bool Element::get_runnable_threads(Bitvector& bmp) {
-    unsigned int thisthread = router()->home_thread_id(this);
-    if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) { //Push to pull
-        bmp[thisthread] = 1;
+/**
+ * Set threads in bitvector than will start pushing or pulling from this element
+ * This function implements the expected behaviour, but should be overriden by
+ * elements with another behaviour.
+ * Default behaviour :
+ *  - If Push to pull : stop traversing, spawn the home thread id if port is output
+ *  - If Pull to push : stop traversing, spawn the home thread id if port is input
+ *  - If no input, and output is push : spawn the home thread id
+ *  - Else : Continue traversing, not spawning anything
+ * @return false if this element is switching threads, so that the traversing
+ *  to get all threads on this path should stop here. Queues would return false
+ *  for example as an element after the queue will only be traversed by the
+ *  threads of the queue, not the one before.
+ */
+bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
+    unsigned int thisthread = home_thread_id();
+
+    if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) {
         return false;
     } else if (ninputs() > 0 && noutputs() > 0 && input_is_pull(0) && output_is_push(0)) { //Pull to push
         bmp[thisthread] = 1;
         return false;
     } else if (ninputs() == 0 && noutputs() > 0 && output_is_push(0)) { //Task which outputs something
         bmp[thisthread] = 1;
+    } else if (noutputs() == 0 && ninputs() > 0 && input_is_pull(0)) { //Task which pulls
+        bmp[thisthread] = 1;
+    } else if (noutputs() == 0 && ninputs() == 0) { //Task with no I/O, probably spawn his home thread
+        bmp[thisthread] = 1;
     }
+
     return true;
 }
 
-Bitvector Element::get_threads(bool is_pull) {
+Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, int level) {
     Bitvector b(master()->nthreads());
-    InputThreadVisitor visitor(b);
-    router()->visit(this,is_pull,-1,&visitor);
+    InputThreadVisitor visitor(b, origin);
+    router()->visit(this,forward,port,&visitor);
+
+    if (origin != this) {//Prevent loop if we get passing thread of this, and it is not the first call
+        if (origin == 0)
+            origin = this;
+        for (int i = 0; i < _remote_elements.size() ; i++) {
+            click_chatter("%s has remote %s!",name().c_str(),_remote_elements[i]->name().c_str());
+            b |= _remote_elements[i]->get_passing_threads(origin, level + 1);
+        }
+    } else {
+        if (origin != 0 && level > 0)
+            click_chatter("loop avoided for %s",name().c_str());
+    }
+
     _is_fullpush = visitor.fullpush;
-    if (!_is_fullpush)
-        router()->non_fullpush();
+
     return b;
+}
+
+Bitvector Element::get_passing_threads(Element* origin, int level) {
+    Bitvector b(master()->nthreads());
+    for (int i = 0; i < ninputs(); i++) {
+        if (input_is_push(i))
+            b |= get_passing_threads(false, i, this, level);
+    }
+    for (int i = 0; i < noutputs(); i++) {
+        if (output_is_pull(i))
+            b |= get_passing_threads(true, i, this, level);
+    }
+    //Add ourself
+    get_spawning_threads(b, false);
+    get_spawning_threads(b, true);
+    return b;
+}
+
+Bitvector Element::get_passing_threads() {
+	return get_passing_threads(this, 0);
+}
+
+bool Element::is_mt_safe() {
+    return Lexer::get_lexer()->is_mt_safe(class_name());
+}
+
+bool Element::do_mt_safe_check(ErrorHandler* errh) {
+    Bitvector bmp = get_passing_threads();
+    int n = bmp.weight();
+	if (n == 0) {
+		/*This makes a lot of testie fails because this message is added in a lot of case where it is normal in
+		test conditions where we use Idle to test only handlers. Before-reenabling this, add ignore line to all
+		failing testies*/
+		//errh->warning("%s seems to be traversed by no threads...",name().c_str());
+		return true;
+	}
+    return n <= 1 || is_mt_safe();
+}
+
+void Element::add_remote_element(Element* e) {
+	_remote_elements.push_back(e);
 }
 
 // SELECT
@@ -2062,6 +2136,25 @@ read_ports_handler(Element *e, void *)
     return e->router()->element_ports_string(e);
 }
 
+static String
+read_threads_handler(Element *e, void * thunk)
+{
+    Bitvector b(e->master()->nthreads());
+    switch (reinterpret_cast<intptr_t>(thunk)) {
+      case 0:
+        return e->get_passing_threads().unparse();
+      case 1:
+        e->get_spawning_threads(b, false);
+        e->get_spawning_threads(b, true);
+        return b.unparse();
+      case 2:
+        return String(e->router()->home_thread_id(e));
+      case 3:
+        return String(e->is_mt_safe());
+    }
+    return "";
+}
+
 String
 Element::read_handlers_handler(Element *e, void *)
 {
@@ -2159,6 +2252,10 @@ Element::add_default_handlers(bool allow_write_config)
     add_write_handler("config", write_config_handler, 0);
   add_read_handler("ports", read_ports_handler, 0, Handler::f_calm);
   add_read_handler("handlers", read_handlers_handler, 0, Handler::f_calm);
+  add_read_handler("passing_threads", read_threads_handler, 0, Handler::f_expensive);
+  add_read_handler("spawning_threads", read_threads_handler, 1, Handler::f_calm);
+  add_read_handler("home_thread", read_threads_handler, 2, Handler::f_calm);
+  add_read_handler("mt_safe", read_threads_handler, 3, Handler::f_calm);
 #if CLICK_STATS >= 1
   add_read_handler("icounts", read_icounts_handler, 0);
   add_read_handler("ocounts", read_ocounts_handler, 0);

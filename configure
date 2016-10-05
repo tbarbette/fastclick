@@ -13791,22 +13791,21 @@ if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
 fi
 
-if test "x$enable_flow" = xyes; then
-    provisions="$provisions flow"
-fi
-
-if test "x$enable_dpdk" = xyes; then
-    provisions="$provisions dpdk"
+if test "x$enable_auto_batch" = xyes; then
+    provisions="$provisions autobatch"
 fi
 
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 fi
 
-if test "x$enable_user_timestamp" = xyes; then
-    provisions="$provisions usertimestamp"
+if test "x$enable_dpdk" = xyes; then
+    provisions="$provisions dpdk"
 fi
 
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
+fi
 
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
@@ -13852,6 +13851,10 @@ fi
 
 if test "x$enable_user_multithread" = xyes; then
     provisions="$provisions umultithread"
+fi
+
+if test "x$enable_user_timestamp" = xyes; then
+    provisions="$provisions usertimestamp"
 fi
 
 if test "x$enable_wifi" = xyes; then
