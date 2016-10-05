@@ -293,7 +293,7 @@ static inline PacketPool& local_packet_pool() {
 }
 
 /** @brief Create and return a local packet pool for this thread. */
-static inline PacketPool* make_local_packet_pool() {
+PacketPool* WritablePacket::make_local_packet_pool() {
 #  if HAVE_MULTITHREAD
     PacketPool *pp = thread_packet_pool;
     if (unlikely(!pp && (pp = new PacketPool))) {
@@ -312,11 +312,11 @@ static inline PacketPool* make_local_packet_pool() {
 #  endif
 }
 
-#if HAVE_BATCH
 /**
  * Allocate a batch of packets without buffer
+ * The returned list is a simple linked list, not a standard PacketBatch
  */
-inline WritablePacket *
+WritablePacket *
 WritablePacket::pool_batch_allocate(uint16_t count)
 {
         PacketPool& packet_pool = *make_local_packet_pool();
@@ -326,17 +326,19 @@ WritablePacket::pool_batch_allocate(uint16_t count)
         int taken_from_pool = 0;
 
         while (count > 0) {
-			p = packet_pool.p;
-			if (!p) {
-				p = pool_allocate();
-			} else {
-				packet_pool.p = static_cast<WritablePacket*>(p->next());
-				taken_from_pool++;
-			}
-			if (head == 0) {
-				head = p;
-			}
-			count --;
+            p = packet_pool.p;
+            if (!p) {
+                packet_pool.pcount -= taken_from_pool;
+                taken_from_pool = 0;
+                p = pool_allocate();
+            } else {
+                packet_pool.p = static_cast<WritablePacket*>(p->next());
+                taken_from_pool++;
+            }
+            if (head == 0) {
+                head = p;
+            }
+            count --;
         }
         packet_pool.pcount -= taken_from_pool;
 
@@ -344,7 +346,6 @@ WritablePacket::pool_batch_allocate(uint16_t count)
 
         return head;
 }
-#endif
 
 inline WritablePacket *
 WritablePacket::pool_allocate()
@@ -376,7 +377,7 @@ WritablePacket::pool_allocate()
 /**
  * Allocate a packet with a buffer
  */
-inline WritablePacket *
+WritablePacket *
 WritablePacket::pool_data_allocate()
 {
     PacketPool& packet_pool = *make_local_packet_pool();
@@ -441,86 +442,6 @@ void WritablePacket::pool_transfer(int from, int to) {
     (void)from;
     (void)to;
 }
-
-
-#  if HAVE_NETMAP_PACKET_POOL
-WritablePacket* WritablePacket::make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot) {
-    WritablePacket* p = pool_data_allocate();
-    if (!p) return NULL;
-    p->initialize();
-    slot->buf_idx = NETMAP_BUF_IDX(rxring, p->buffer());
-    p->set_buffer(data,rxring->nr_buf_size,slot->len);
-    slot->flags = NS_BUF_CHANGED;
-    return p;
-}
-
-
-#   if HAVE_BATCH
-/**
- * Creates a batch of packet directly from a netmap ring.
- */
-PacketBatch* WritablePacket::make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur) {
-    if (n <= 0) return NULL;
-    struct netmap_slot* slot;
-    WritablePacket* last = 0;
-
-    PacketPool& packet_pool = *make_local_packet_pool();
-
-    WritablePacket*& _head = packet_pool.pd;
-    unsigned int & _count = packet_pool.pdcount;
-
-    if (_count == 0) {
-        _head = pool_data_allocate();
-        _count = 1;
-    }
-
-    //Next is the current packet in the batch
-    Packet* next = _head;
-    //P_batch_saved is the saved head of the batch.
-    PacketBatch* p_batch = static_cast<PacketBatch*>(_head);
-
-    int toreceive = n;
-    while (toreceive > 0) {
-
-        last = static_cast<WritablePacket*>(next);
-
-        slot = &rxring->slot[cur];
-
-        unsigned char* data = (unsigned char*)NETMAP_BUF(rxring, slot->buf_idx);
-        __builtin_prefetch(data);
-
-        slot->buf_idx = NETMAP_BUF_IDX(rxring,last->buffer());
-
-        slot->flags = NS_BUF_CHANGED;
-
-        next = last->next(); //Correct only if count != 0
-        last->initialize();
-
-        last->set_buffer(data,NetmapBufQ::buffer_size(),slot->len);
-        cur = nm_ring_next(rxring, cur);
-        toreceive--;
-        _count --;
-
-        if (_count == 0) {
-
-            _head = 0;
-
-            next = pool_data_allocate();
-            _count++; // We use the packet already out of the pool
-        }
-        last->set_next(next);
-
-    }
-
-    _head = static_cast<WritablePacket*>(next);
-
-    p_batch->set_count(n);
-    p_batch->set_tail(last);
-    last->set_next(NULL);
-    return p_batch;
-}
-#   endif //HAVE_BATCH
-#  endif //HAVE_NETMAP_PACKET_POOL
 
 inline void
 WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
@@ -634,37 +555,37 @@ WritablePacket::recycle(WritablePacket *p)
 
 }
 
-#  if HAVE_BATCH
 /**
  * @Precond : _use_count == 1 for all packets
  */
 void
-WritablePacket::recycle_packet_batch(PacketBatch *p_batch)
+WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
     PacketPool& packet_pool = *make_local_packet_pool();
 
-    FOR_EACH_PACKET_SAFE(p_batch,p) {
+    Packet* next = ((head != 0)? head->next() : 0 );
+    Packet* p = head;
+    for (;p != 0;p=next,next=(p==0?0:p->next())) {
         ((WritablePacket*)p)->~WritablePacket();
     }
     check_packet_pool_size(packet_pool);
-    packet_pool.pcount += p_batch->count();
-    p_batch->tail()->set_next(packet_pool.p);
-    packet_pool.p = p_batch;
+    packet_pool.pcount += count;
+    tail->set_next(packet_pool.p);
+    packet_pool.p = head;
 }
 
 /**
  * @Precond : _use_count == 1 for all packets
  */
 void
-WritablePacket::recycle_data_batch(PacketBatch *pd_batch)
+WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
     PacketPool& packet_pool = *make_local_packet_pool();
     check_data_pool_size(packet_pool);
-    packet_pool.pdcount += pd_batch->count();
-    pd_batch->tail()->set_next(packet_pool.pd);
-    packet_pool.pd = pd_batch;
+    packet_pool.pdcount += count;
+    tail->set_next(packet_pool.pd);
+    packet_pool.pd = head;
 }
-#  endif /* HAVE_BATCH */
 
 # endif /* HAVE_CLICK_PACKET_POOL */
 
@@ -859,56 +780,6 @@ assert(false); //TODO
 # endif
 }
 
-
-#if HAVE_BATCH
-/** @brief Create and return a batch of packets made from a contiguous buffer
- * @param count number of packets
- *
- * @param data data used in the new packet
- * @param length array of packets length
- * @param destructor destructor function
- * @param argument argument to destructor function
- * @return new packet batch, or null if no packet could be created
- *
- **/
-PacketBatch *
-Packet::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
-		buffer_destructor_type destructor, void* argument )
-{
-#if CLICK_PACKET_USE_DPDK
-assert(false); //TODO
-#endif
-
-# if HAVE_CLICK_PACKET_POOL
-    WritablePacket *p = WritablePacket::pool_batch_allocate(count);
-# else
-    WritablePacket *p = new WritablePacket;
-# endif
-    WritablePacket *head = p;
-    WritablePacket *last = p;
-    uint16_t i = 0;
-    while(p) {
-		p->initialize();
-		p->_head = p->_data = data;
-		p->_tail = p->_end = data + length[i];
-		data += length[i] & 63 ? (length[i] & ~63) + 64 : length[i];
-		++i;
-		p->_destructor = destructor;
-		p->_destructor_argument = argument;
-		last = p;
-#if HAVE_CLICK_PACKET_POOL
-        p = static_cast<WritablePacket *>(p->next());
-#else
-        WritablePacket *p = new WritablePacket;
-#endif
-    }
-    if (i != count) {
-        click_chatter("Size of list %d, expected %d\n", i, count);
-    }
-    return PacketBatch::make_from_simple_list(head, last, i);
-}
-#endif
-
 #endif
 void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
@@ -1037,70 +908,26 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 #if CLICK_LINUXMODULE
 
     struct sk_buff *nskb = skb();
-    unsigned char *old_head = nskb->head;
-    uint32_t old_headroom = headroom(), old_length = length();
 
-    uint32_t size = buffer_length() + extra_headroom + extra_tailroom;
-    size = SKB_DATA_ALIGN(size);
-    unsigned char *new_head = reinterpret_cast<unsigned char *>(kmalloc(size + sizeof(struct skb_shared_info), GFP_ATOMIC));
-    if (!new_head) {
-	if (free_on_failure)
-	    kill();
-	return 0;
+    // preserve this, which otherwise loses a ref here
+    if (!free_on_failure)
+        if (!(nskb = skb_clone(nskb, GFP_ATOMIC)))
+            return NULL;
+
+    // nskb is now not shared, which psk_expand_head asserts
+    if (!(nskb = skb_share_check(nskb, GFP_ATOMIC)))
+        return NULL;
+
+    if (pskb_expand_head(nskb, extra_headroom, extra_tailroom, GFP_ATOMIC)) {
+        kfree_skb(nskb);
+        return NULL;
     }
 
-    unsigned char *start_copy = old_head + (extra_headroom >= 0 ? 0 : -extra_headroom);
-    unsigned char *end_copy = old_head + buffer_length() + (extra_tailroom >= 0 ? 0 : extra_tailroom);
-    memcpy(new_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
+    // success, so kill the clone from above
+    if (!free_on_failure)
+        kill();
 
-    if (!nskb->cloned || atomic_dec_and_test(&(skb_shinfo(nskb)->dataref))) {
-	assert(!skb_shinfo(nskb)->nr_frags && !skb_shinfo(nskb)->frag_list);
-	kfree(old_head);
-    }
-
-    nskb->head = new_head;
-    nskb->data = new_head + old_headroom + extra_headroom;
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-    skb_set_tail_pointer(nskb, old_length);
-# else
-    nskb->tail = nskb->data + old_length;
-# endif
-# ifdef NET_SKBUFF_DATA_USES_OFFSET
-    nskb->end = size;
-# else
-    nskb->end = new_head + size;
-# endif
-    nskb->len = old_length;
-    nskb->cloned = 0;
-
-    nskb->truesize = size + sizeof(struct sk_buff);
-    struct skb_shared_info *nskb_shinfo = skb_shinfo(nskb);
-    atomic_set(&nskb_shinfo->dataref, 1);
-    nskb_shinfo->nr_frags = 0;
-    nskb_shinfo->frag_list = 0;
-# if HAVE_LINUX_SKB_SHINFO_GSO_SIZE
-    nskb_shinfo->gso_size = 0;
-    nskb_shinfo->gso_segs = 0;
-    nskb_shinfo->gso_type = 0;
-# elif HAVE_LINUX_SKB_SHINFO_TSO_SIZE
-    nskb_shinfo->tso_size = 0;
-    nskb_shinfo->tso_segs = 0;
-# endif
-# if HAVE_LINUX_SKB_SHINFO_UFO_SIZE
-    nskb_shinfo->ufo_size = 0;
-# endif
-# if HAVE_LINUX_SKB_SHINFO_IP6_FRAG_ID
-    nskb_shinfo->ip6_frag_id = 0;
-# endif
-# if HAVE_LINUX_SKB_SHINFO_TX_FLAGS_UNION
-    nskb_shinfo->tx_flags.flags = 0;
-# endif
-# if HAVE_LINUX_SKB_SHINFO_TX_FLAGS_SKBTX_DEV_ZEROCOPY
-    nskb_shinfo->tx_flags = 0;
-# endif
-
-    shift_header_annotations(old_head, extra_headroom);
-    return static_cast<WritablePacket *>(this);
+    return reinterpret_cast<WritablePacket *>(nskb);
 
 #elif CLICK_PACKET_USE_DPDK /* !CLICK_LINUXMODULE */
     struct rte_mbuf *mb = this->mb();
@@ -1439,33 +1266,6 @@ Packet::static_cleanup()
 	# endif
 #endif
 }
-
-#if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
-/**
- * Recycle a whole batch of unshared packets of the same type
- *
- * @precond No packet are shared
- */
-void PacketBatch::safe_kill(bool is_data) {
-    if (is_data) {
-        WritablePacket::recycle_data_batch(this);
-    } else {
-        WritablePacket::recycle_packet_batch(this);
-    }
-}
-
-/**
- * Recycle a whole batch, faster in most cases
- */
-void PacketBatch::fast_kill() {
-    BATCH_RECYCLE_START();
-    FOR_EACH_PACKET_SAFE(this,up) {
-        WritablePacket* p = static_cast<WritablePacket*>(up);
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
-    }
-    BATCH_RECYCLE_END();
-}
-#endif
 
 
 #if HAVE_STATIC_ANNO

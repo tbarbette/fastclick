@@ -5,6 +5,7 @@
 #include <click/vector.hh>
 #include <click/string.hh>
 #include <click/packet.hh>
+#include <click/packetbatch.hh>
 #include <click/handler.hh>
 #include <click/multithread.hh>
 CLICK_DECLS
