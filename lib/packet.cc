@@ -785,9 +785,9 @@ void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }
 
-/** @brief Copying the content and annotations of another packet (userlevel).
+/** @brief Copy the content and annotations of another packet (userlevel).
  * @param source packet
- * @return new packet, or null if no packet could be created
+ * @param headroom for the new packet
  */
 void
 Packet::copy(Packet* p, int headroom)

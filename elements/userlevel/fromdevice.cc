@@ -50,7 +50,13 @@
 # include <net/if.h>
 # include <features.h>
 # include <linux/if_packet.h>
-# include <net/ethernet.h>
+# if HAVE_DPDK
+#  define ether_addr ether_addr_undefined
+# endif
+#  include <net/ethernet.h>
+# if HAVE_DPDK
+#  undef ether_addr
+# endif
 #endif
 
 CLICK_DECLS
