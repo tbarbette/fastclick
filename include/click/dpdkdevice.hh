@@ -151,7 +151,7 @@ private:
     friend class DPDKDeviceArg;
 };
 
-/** @class DPDKPortArg
+/** @class DPDKDeviceArg
   @brief Parser class for DPDK Port, either an integer or a PCI address. */
 class DPDKDeviceArg { public:
     static bool parse(const String &str, DPDKDevice* &result, const ArgContext &args = ArgContext());
@@ -222,7 +222,6 @@ inline rte_mbuf* DPDKDevice::get_pkt(unsigned numa_node) {
 inline rte_mbuf* DPDKDevice::get_pkt() {
     return get_pkt(rte_socket_id());
 }
-
 
 CLICK_ENDDECLS
 
