@@ -1,9 +1,9 @@
 // -*- c-basic-offset: 4; related-file-name: "ensuredpdkbuffer.hh" -*-
 /*
  * ensuredpdkbuffer.{cc,hh} - Ensure DPDK Buffer
+ * Tom Barbette
  *
  * Copyright (c) 2015 University of Liège
- * Copyright (c) 2015 Tom Barbette
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@ EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false), _extra_headroom(0), _warn_
 
 EnsureDPDKBuffer::~EnsureDPDKBuffer()
 {
-	//TODO : make this work even without FromDPDK/ToDPDK
+    //TODO : make this work even without FromDPDK/ToDPDK
 }
 
 
@@ -38,9 +38,9 @@ int
 EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	.read_p("FORCE_COPY", _force)
-	.read_p("EXTRA_HEADROOM", _extra_headroom)
-	.complete() < 0)
+    .read_p("FORCE_COPY", _force)
+    .read_p("EXTRA_HEADROOM", _extra_headroom)
+    .complete() < 0)
     return -1;
 
     return 0;
@@ -48,25 +48,29 @@ EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
 
 inline Packet*
 EnsureDPDKBuffer::smaction(Packet* p) {
-	if (!_force && (DPDKDevice::is_dpdk_buffer(p))) {
-		return p;
-	} else {
-		struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
-		if (!mbuf) {
-			p->kill();
-			if (_warn_count++ < 5)
-				click_chatter("%s : No more DPDK Buffer ! Dropping packet.",name().c_str());
-			return 0;
-		}
-		WritablePacket* q = WritablePacket::make(
-				(unsigned char*)mbuf->buf_addr,
-				DPDKDevice::MBUF_DATA_SIZE,
-				DPDKDevice::free_pkt,
-				(void*)mbuf);
-		q->copy(p,rte_pktmbuf_headroom(mbuf) + _extra_headroom);
-		p->kill();
-		return q;
-	}
+    if (!_force && (DPDKDevice::is_dpdk_buffer(p))) {
+        return p;
+    } else {
+        struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
+        if (!mbuf) {
+            p->kill();
+            if (_warn_count++ < 5)
+                click_chatter("%s : No more DPDK Buffer ! Dropping packet.",name().c_str());
+            return 0;
+        }
+        WritablePacket* q = WritablePacket::make(
+                (unsigned char*)mbuf->buf_addr,
+                DPDKDevice::MBUF_DATA_SIZE,
+                DPDKDevice::free_pkt,
+                (void*)mbuf);
+        if (q->copy(p,rte_pktmbuf_headroom(mbuf) + _extra_headroom)) {
+            p->kill();
+            return q;
+        } else {
+            p->kill();
+            return 0;
+        }
+    }
 }
 
 #if HAVE_BATCH
@@ -74,17 +78,17 @@ PacketBatch*
 EnsureDPDKBuffer::simple_action_batch(PacketBatch *head)
 {
 #if HAVE_ZEROCOPY
-	EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction,head,[](Packet* p) {click_chatter("No more DPDK buffer ! Dropping packet %p !",p);});
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction,head,[](Packet* p) {click_chatter("No more DPDK buffer ! Dropping packet %p !",p);});
 #endif
-	return head;
+    return head;
 }
 #endif
 Packet*
 EnsureDPDKBuffer::simple_action(Packet* p) {
 #if HAVE_ZEROCOPY
-	return smaction(p);
+    return smaction(p);
 #else
-	return p;
+    return p;
 #endif
 }
 

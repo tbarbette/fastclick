@@ -98,7 +98,7 @@ bool DPDKDevice::alloc_pktmbufs()
                                                 MBUF_CACHE_SIZE, 0, MBUF_DATA_SIZE, i);
 #else
                         rte_mempool_create(
-                                        name, NB_MBUF, MBUF_DATA_SIZE + sizeof (struct rte_mbuf), MBUF_CACHE_SIZE,
+                                        name, NB_MBUF, MBUF_SIZE, MBUF_CACHE_SIZE,
                                         sizeof (struct rte_pktmbuf_pool_private),
                                         rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
                                         i, 0);
@@ -369,7 +369,7 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
     else {
         ctx.error("Cannot resolve PCI address to DPDK device");
         return false;
-        }
+	}
 
     return true;
 }
@@ -379,8 +379,9 @@ int DPDKDevice::NB_MBUF = 32*4096*2; //Must be able to fill the packet data pool
 #else
 int DPDKDevice::NB_MBUF = 65536;
 #endif
-int DPDKDevice::MBUF_DATA_SIZE =
-    2048 + RTE_PKTMBUF_HEADROOM;
+int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM;
+int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE 
+                          + sizeof (struct rte_mbuf);
 int DPDKDevice::MBUF_CACHE_SIZE = 256;
 int DPDKDevice::RX_PTHRESH = 8;
 int DPDKDevice::RX_HTHRESH = 8;
