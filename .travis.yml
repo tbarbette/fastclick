@@ -35,13 +35,10 @@ matrix:
       env: FRAMEWORK=dpdk VERSION=2.1.0 CONFIG="--disable-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
-    - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
-    - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.07 CONFIG="--disable-batch"
 env:
   global:
     - FLAGS="--enable-ip6 --enable-json -disable-linuxmodule"
+    - CXXFLAGS="-std=gnu++11"
     - GCC_VERSION="4.8"
   matrix:
     - FRAMEWORK=vanilla CONFIG="--enable-batch --disable-verbose-batch"
