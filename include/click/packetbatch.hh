@@ -1,6 +1,9 @@
 // -*- related-file-name: "../../lib/packetbatch.cc" -*-
 #ifndef CLICK_PACKETBATCH_HH
 #define CLICK_PACKETBATCH_HH
+#if HAVE_DPDK_PACKET_POOL
+# include <click/dpdkdevice.hh>
+#endif
 #include <click/packet.hh>
 CLICK_DECLS
 

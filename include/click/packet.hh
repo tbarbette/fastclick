@@ -313,7 +313,7 @@ class Packet { public:
     inline void change_headroom_and_length(uint32_t headroom, uint32_t length);
     inline void change_buffer_length(uint32_t length);
 #endif
-    void copy(Packet* p, int headroom=0);
+    bool copy(Packet* p, int headroom=0);
     //@}
 
     /** @name Header Pointers */

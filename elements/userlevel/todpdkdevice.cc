@@ -28,10 +28,10 @@ ToDPDKDevice::ToDPDKDevice() :
     _iqueues(), _dev(0),
     _timeout(0), _congestion_warning_printed(false)
 {
-	 _blocking = false;
-	 _burst = -1;
-	 _internal_tx_queue_size = 1024;
-	 ndesc = 256;
+     _blocking = false;
+     _burst = -1;
+     _internal_tx_queue_size = 1024;
+     ndesc = 256;
 }
 
 ToDPDKDevice::~ToDPDKDevice()
@@ -82,12 +82,12 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     } else
 #endif
     {
-		if (_burst < 0)
-			_burst = 32;
+        if (_burst < 0)
+            _burst = 32;
 
-		if (ndesc > 0 && (unsigned)_burst > ndesc / 2 ) {
-			errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
-		}
+        if (ndesc > 0 && (unsigned)_burst > ndesc / 2 ) {
+            errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
+        }
     }
 
     ret = initialize_tasks(false,errh);
@@ -114,10 +114,10 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
 void ToDPDKDevice::cleanup(CleanupStage)
 {
-	cleanup_tasks();
-	for (unsigned i = 0; i < _iqueues.weight();i++) {
-			delete[] _iqueues.get_value(i).pkts;
-	}
+    cleanup_tasks();
+    for (unsigned i = 0; i < _iqueues.weight();i++) {
+            delete[] _iqueues.get_value(i).pkts;
+    }
 }
 
 void ToDPDKDevice::add_handlers()
@@ -129,19 +129,19 @@ void ToDPDKDevice::add_handlers()
 
 inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
     if (_timeout >= 0) {
-	if (iqueue.timeout.scheduled()) {
-		//No more pending packets, remove timer
-		if (iqueue.nr_pending == 0)
-			iqueue.timeout.unschedule();
-	} else {
-			if (iqueue.nr_pending > 0) {
-				//Pending packets, set timeout to flush packets after a while even without burst
-				if (_timeout == 0)
-					iqueue.timeout.schedule_now();
-				else
-					iqueue.timeout.schedule_after_msec(_timeout);
-				}
-	}
+    if (iqueue.timeout.scheduled()) {
+        //No more pending packets, remove timer
+        if (iqueue.nr_pending == 0)
+            iqueue.timeout.unschedule();
+    } else {
+            if (iqueue.nr_pending > 0) {
+                //Pending packets, set timeout to flush packets after a while even without burst
+                if (_timeout == 0)
+                    iqueue.timeout.schedule_now();
+                else
+                    iqueue.timeout.schedule_after_msec(_timeout);
+                }
+    }
     }
 }
 
@@ -231,10 +231,10 @@ void ToDPDKDevice::push(int, Packet *p)
     } while (unlikely(_blocking && congestioned));
 
 #if !CLICK_PACKET_USE_DPDK
-	if (likely(is_fullpush()))
-	    p->safe_kill();
-	else
-	    p->kill();
+    if (likely(is_fullpush()))
+        p->safe_kill();
+    else
+        p->kill();
 #endif
 }
 
@@ -249,20 +249,20 @@ void ToDPDKDevice::push(int, Packet *p)
 #if HAVE_BATCH
 void ToDPDKDevice::push_batch(int, PacketBatch *head)
 {
-	// Get the thread-local internal queue
-	TXInternalQueue &iqueue = _iqueues.get();
+    // Get the thread-local internal queue
+    TXInternalQueue &iqueue = _iqueues.get();
 
-	Packet* p = head;
-	Packet* next;
+    Packet* p = head;
+    Packet* next;
 
-	//No recycling through click if we have DPDK-backed packets
-	bool congestioned;
+    //No recycling through click if we have DPDK-backed packets
+    bool congestioned;
 #if !CLICK_PACKET_USE_DPDK
     BATCH_RECYCLE_START();
 #endif
-	do {
-		congestioned = false;
-		//First, place the packets in the queue
+    do {
+        congestioned = false;
+        //First, place the packets in the queue
         while (iqueue.nr_pending < _internal_tx_queue_size && p) { // Internal queue is full
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
@@ -298,17 +298,17 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
     } while (unlikely(_blocking && congestioned));
 
 #if !CLICK_PACKET_USE_DPDK
-	//If non-blocking, drop all packets that could not be sent
-	while (p) {
-		next = p->next();
+    //If non-blocking, drop all packets that could not be sent
+    while (p) {
+        next = p->next();
         BATCH_RECYCLE_UNSAFE_PACKET(p);
         p = next;
         add_dropped(1);
-	}
+    }
 #endif
 
 #if !CLICK_PACKET_USE_DPDK
-	BATCH_RECYCLE_END();
+    BATCH_RECYCLE_END();
 #endif
 
 }
