@@ -30,12 +30,12 @@ CLICK_DECLS
 class EnsureDPDKBuffer: public BatchElement  {
 
 public:
-	EnsureDPDKBuffer() CLICK_COLD;
-	~EnsureDPDKBuffer() CLICK_COLD;
+    EnsureDPDKBuffer() CLICK_COLD;
+    ~EnsureDPDKBuffer() CLICK_COLD;
 
-    const char *class_name() const		{ return "EnsureDPDKBuffer"; }
-    const char *port_count() const		{ return PORTS_1_1; }
-    const char *processing() const		{ return AGNOSTIC; }
+    const char *class_name() const        { return "EnsureDPDKBuffer"; }
+    const char *port_count() const        { return PORTS_1_1; }
+    const char *processing() const        { return AGNOSTIC; }
     int configure(Vector<String> &conf, ErrorHandler *errh);
 
     Packet* smaction(Packet*);
@@ -47,7 +47,7 @@ public:
 private:
     bool _force;
     int _extra_headroom;
-	int _warn_count;
+    int _warn_count;
 };
 
 CLICK_ENDDECLS

@@ -789,17 +789,17 @@ void Packet::empty_destructor(unsigned char *, size_t, void *) {
  * @param source packet
  * @param headroom for the new packet
  */
-void
+bool
 Packet::copy(Packet* p, int headroom)
 {
-	_data = _head + headroom;
-	memcpy(_data,p->data(),p->length());
-	_tail = _data + p->length();
-	copy_annotations(p);
-    ptrdiff_t shift = _data - p->_data;
-    set_mac_header(p->mac_header() ? p->mac_header() + shift : 0);
-    set_network_header(p->network_header() ? p->network_header() + shift : 0);
-    set_transport_header(p->transport_header() ? p->transport_header() + shift : 0);
+    if (headroom + p->length() > buffer_length())
+        return false;
+    _data = _head + headroom;
+    memcpy(_data,p->data(),p->length());
+    _tail = _data + p->length();
+    copy_annotations(p);
+    set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
+    set_network_header(p->network_header() ? data() + p->network_header_offset() : 0, p->network_header_length());
 }
 
 //
