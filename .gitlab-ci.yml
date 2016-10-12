@@ -7,10 +7,15 @@ ip6:
 mt:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule --disable-batch && make && make check
-dpdk:
+dpdk-batch:
     script:
         - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --enable-batch --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+
+dpdk-nobatch:
+    script:
+        - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --disable--batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
 
 netmap_single:
     script:
@@ -24,6 +29,7 @@ netmap_nopool:
 netmap_nopool_nozc:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
+
 before_script:
     - gcc -v
     - if [ `sudo -n whoami` = "root" ] ; then sudo modprobe netmap && sudo chmod 666 /dev/netmap ; fi
