@@ -7,10 +7,15 @@ ip6:
 mt:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule --disable-batch && make && make check
-dpdk:
+dpdk-batch:
     script:
         - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --enable-batch --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+
+dpdk-nobatch:
+    script:
+        - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --disable--batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
 
 netmap_single:
     script:

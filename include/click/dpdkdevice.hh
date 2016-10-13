@@ -33,6 +33,8 @@ typedef uint64_t counter_t;
 typedef uint32_t counter_t;
 #endif
 
+extern bool dpdk_enabled;
+
 class DPDKDevice {
 public:
 
@@ -96,6 +98,8 @@ public:
     static unsigned RING_POOL_CACHE_SIZE;
     static unsigned RING_PRIV_DATA_SIZE;
 
+    static struct rte_mempool** _pktmbuf_pools;
+
 private:
 
     enum Dir { RX, TX };
@@ -119,7 +123,6 @@ private:
 
     static bool _is_initialized;
     static HashTable<unsigned, DPDKDevice> _devs;
-    static struct rte_mempool** _pktmbuf_pools;
     static int _nr_pktmbuf_pools;
     static bool no_more_buffer_msg_printed;
 
@@ -127,7 +130,6 @@ private:
     int add_queue(Dir dir, int &queue_id, bool promisc,
                    unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
-    static void add_pool(const struct rte_mempool *, void *) CLICK_COLD;
     static bool alloc_pktmbufs() CLICK_COLD;
 
     static DPDKDevice* get_device(unsigned port_id) {
