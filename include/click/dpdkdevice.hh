@@ -33,6 +33,8 @@ typedef uint64_t counter_t;
 typedef uint32_t counter_t;
 #endif
 
+extern bool dpdk_enabled;
+
 class DPDKDevice {
 public:
 
