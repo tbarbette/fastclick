@@ -41,12 +41,16 @@ unsigned int DPDKDevice::get_nb_txdesc()
  * This function is called by DPDK when Click run as a secondary process. It
  *     checks that the prefix match with the given config prefix and add it if it does so.
  */
-void DPDKDevice::add_pool(const struct rte_mempool * rte, void *arg){
+#if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
+void add_pool(struct rte_mempool * rte, void *arg){
+#else
+void add_pool(const struct rte_mempool * rte, void *arg){
+#endif
     int* i = (int*)arg;
     if (strncmp(DPDKDevice::MEMPOOL_PREFIX.c_str(), const_cast<struct rte_mempool *>(rte)->name, DPDKDevice::MEMPOOL_PREFIX.length()) != 0)
         return;
-    _pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
-    click_chatter("Found DPDK pool %s",*i,rte,_pktmbuf_pools[*i]->name);
+    DPDKDevice::_pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
+    click_chatter("Found DPDK pool %s",*i,rte,DPDKDevice::_pktmbuf_pools[*i]->name);
     (*i)++;
 }
 
@@ -283,6 +287,10 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 {
     if (_is_initialized)
         return 0;
+
+	if (!dpdk_enabled)
+		return errh->error( "You have to launch Click with --dpdk to use the "
+							"DPDK");
 
     click_chatter("Initializing DPDK");
 #if RTE_VERSION < RTE_VERSION_NUM(2,0,0,0)
