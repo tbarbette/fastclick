@@ -347,7 +347,7 @@ class Element { public:
     void add_default_handlers(bool writable_config);
     inline void add_data_handlers(const char *name, int flags, HandlerCallback callback, void *data);
 
-	friend class BatchElement;
+    friend class BatchElement;
     friend class Router;
 #if CLICK_STATS >= 2
     friend class Task;
