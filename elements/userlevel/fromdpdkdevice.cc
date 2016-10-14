@@ -22,6 +22,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
+#include <click/etheraddress.hh>
 
 #include "fromdpdkdevice.hh"
 
@@ -118,12 +119,6 @@ void FromDPDKDevice::cleanup(CleanupStage)
 	cleanup_tasks();
 }
 
-void FromDPDKDevice::add_handlers()
-{
-    add_read_handler("count", count_handler, 0);
-    add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
-}
-
 bool FromDPDKDevice::run_task(Task * t)
 {
     struct rte_mbuf *pkts[_burst];
@@ -186,6 +181,100 @@ bool FromDPDKDevice::run_task(Task * t)
      * available and dpdk has no select mechanism*/
     t->fast_reschedule();
     return (ret);
+}
+
+String FromDPDKDevice::read_handler(Element *e, void * thunk)
+{
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+
+    switch((uintptr_t) thunk) {
+        case h_active:
+              if (!fd->_dev)
+                  return "false";
+              else
+                  return "true";
+        case h_mac: {
+            if (!fd->_dev)
+                return String::make_empty();
+            struct ether_addr mac_addr;
+            rte_eth_macaddr_get(fd->_dev->port_id, &mac_addr);
+            return EtherAddress((unsigned char*)&mac_addr).unparse();
+        }
+    }
+
+    return 0;
+}
+
+String FromDPDKDevice::status_handler(Element *e, void * thunk)
+{
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    struct rte_eth_link link;
+    if (!fd->_dev)
+        return "0";
+
+    rte_eth_link_get_nowait(fd->_dev->port_id, &link);
+#ifndef ETH_LINK_UP
+    #define ETH_LINK_UP 1
+#endif
+    switch((uintptr_t) thunk) {
+      case h_carrier:
+          return (link.link_status == ETH_LINK_UP ? "1" : "0");
+      case h_duplex:
+          return (link.link_status == ETH_LINK_UP ? (link.link_duplex == ETH_LINK_FULL_DUPLEX ? "1" : "0") : "-1");
+#if RTE_VERSION >= RTE_VERSION_NUM(16,04,0,0)
+      case h_autoneg:
+          return String(link.link_autoneg);
+#endif
+      case h_speed:
+          return String(link.link_speed);
+    }
+    return 0;
+}
+
+String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
+{
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    struct rte_eth_stats stats;
+    if (!fd->_dev)
+        return "0";
+
+    if (rte_eth_stats_get(fd->_dev->port_id, &stats))
+        return String::make_empty();
+
+    switch((uintptr_t) thunk) {
+        case h_ipackets:
+            return String(stats.ipackets);
+        case h_ibytes:
+            return String(stats.ibytes);
+        case h_ierrors:
+            return String(stats.ierrors);
+    }
+
+    return 0;
+}
+
+void FromDPDKDevice::add_handlers()
+{
+
+
+    add_read_handler("duplex",status_handler, h_duplex);
+#if RTE_VERSION >= RTE_VERSION_NUM(16,04,0,0)
+    add_read_handler("autoneg",status_handler, h_autoneg);
+#endif
+    add_read_handler("speed",status_handler, h_speed);
+    add_read_handler("carrier",status_handler, h_carrier);
+
+    add_read_handler("active", read_handler, h_active);
+    add_read_handler("count", count_handler, 0);
+    add_read_handler("mac",read_handler, h_mac);
+
+    add_read_handler("hw_count",statistics_handler, h_ipackets);
+    add_read_handler("hw_bytes",statistics_handler, h_ibytes);
+    add_read_handler("hw_errors",statistics_handler, h_ierrors);
+
+    add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
+
+    add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
 
 CLICK_ENDDECLS
