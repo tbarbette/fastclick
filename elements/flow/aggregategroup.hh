@@ -1,5 +1,5 @@
-#ifndef CLICK_AggregateGroup_HH
-#define CLICK_AggregateGroup_HH
+#ifndef CLICK_AGGREGATEGROUP_HH
+#define CLICK_AGGREGATEGROUP_HH
 
 #include <click/string.hh>
 #include <click/timer.hh>
@@ -10,7 +10,7 @@ CLICK_DECLS
 class AggregateGroup: public BatchElement {
 	class State {
 	public:
-		State() : timers(0), last_packet(0){};
+		State() : last_packet(0), timers(0) {};
 
 		PacketBatch* last_packet;
 		Timer*  timers;
