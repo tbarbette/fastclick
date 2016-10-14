@@ -93,7 +93,7 @@ private:
     	FlowControlBlock* p;
         unsigned count;
         operator int() const { return count; }
-        SFCBList (int c ) : count( c ), p(0) {
+        SFCBList (int c ) : p(0), count( c ) {
         }
     	SFCBList() : p(0), count(0) {
 
@@ -129,7 +129,7 @@ private:
 	SFCBListRing global_fcb_list_ring;
 
 	size_t _data_size;
-	per_thread_compressed<SFCBList> lists;
+	per_thread_oread<SFCBList> lists;
 public:
 	FCBPool() : _data_size(0), lists() {
 
@@ -137,7 +137,7 @@ public:
 
 	~FCBPool() {
 		//Free all per-thread caches
-		for (int i = 0; i < lists.size(); i++) {
+		for (unsigned i = 0; i < lists.weight(); i++) {
 			SFCBList &list = lists.get_value(i);
 			FlowControlBlock* fcb;
 			while (list.count > 0 && (fcb = list.get()) != NULL) {
@@ -162,7 +162,7 @@ public:
 
 	void compress(Bitvector threads) {
 		lists.compress(threads);
-		for (int i = 0; i < lists.size(); i++) {
+		for (unsigned i = 0; i < lists.weight(); i++) {
 			SFCBList &list = lists.get_value(i);
 			for (int j = 0; j < SFCB_POOL_SIZE; j++) {
 				FlowControlBlock* fcb = alloc_new();

@@ -14,13 +14,11 @@
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
-
-#include "flowunstrip.hh"
-
 #include <click/config.h>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+#include "flowunstrip.hh"
 CLICK_DECLS
 
 FlowUnstrip::FlowUnstrip(unsigned nbytes)

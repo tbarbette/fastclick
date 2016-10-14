@@ -119,7 +119,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
 	if (input_is_pull(0)) {
 		assert(input(0).element());
 	}
-    _table.get_pool().compress(get_threads());
+    _table.get_pool().compress(get_passing_threads());
 
     FlowNode* table = FlowElementVisitor::get_downward_table(this, 0);
 
@@ -134,7 +134,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     if (_verbose)
     	_table.get_root()->print();
 
-    for (int i = 0; i < _cache.size(); i++) {
+    for (int i = 0; i < _cache.weight(); i++) {
         _cache.get_value(i) = (FlowControlBlock**)CLICK_LALLOC(sizeof(FlowControlBlock*) * 8192);
         bzero(_cache.get_value(i),sizeof(FlowControlBlock*) * 8192);
     }

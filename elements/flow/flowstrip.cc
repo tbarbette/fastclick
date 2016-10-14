@@ -16,12 +16,12 @@
  * legally binding.
  */
 
-#include "flowstrip.hh"
-
 #include <click/config.h>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+
+#include "flowstrip.hh"
 CLICK_DECLS
 
 FlowStrip::FlowStrip()
