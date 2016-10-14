@@ -30,7 +30,7 @@ class BatchTest : public BatchElement { public:
 /*
 =c
 
-BatchEleme,tTest()
+BatchTest()
 
 =s test
 
