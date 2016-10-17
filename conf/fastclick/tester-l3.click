@@ -6,7 +6,7 @@
  * or DHCP.
  *
  * This configuration will send one UDP flow from LAN to WAN at max rate and
- * will print statistics as it expect to receive traffic on the LAN port.
+ * will print statistics about the throughput and loss of the DUT.
  */
 
 define($block true)
