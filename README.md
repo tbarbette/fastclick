@@ -47,6 +47,10 @@ DPDK only supports full push mode.
 As for Netmap --enable-dpdk-pool option allows to use only DPDK buffers instead of Click malloc'ed buffers.
 The --enable-dpdk-packet option allows to use DPDK packet handling mechanism instead of of Click's Packet object. All Packet function will be changed by wrappers around DPDK's rte\_pktmbuf functions. However this feature while reducing memory footprint do not enhance the performances as Packets objects are recyced in LIFO and stays in cache while every new access to metadata inside the rte\_mbuf produce a cache miss.
 
+Examples
+--------
+See conf/fastclick/README.md
+
 How to make an element batch-compatible
 ---------------------------------------
 FastClick is backward compatible with all vanilla element, and it should work 
