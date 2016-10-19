@@ -70,7 +70,7 @@ class SimpleQueue : public BatchElement, public Storage { public:
     int highwater_length() const		{ return _highwater_length; }
 
 
-    bool get_spawning_threads(Bitvector& b);
+    bool get_spawning_threads(Bitvector& b) override;
 
     inline bool enq(Packet*);
     inline void lifo_enq(Packet*);
