@@ -55,6 +55,12 @@ class Element { public:
 
     enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_YES};
 
+    virtual bool get_runnable_threads(Bitvector&) final {
+        //Deprecated name, implement get_spawning_threads
+        assert(false);
+        return false;
+    }
+
     inline void checked_output_push(int port, Packet *p) const;
     inline Packet* checked_input_pull(int port) const;
 
