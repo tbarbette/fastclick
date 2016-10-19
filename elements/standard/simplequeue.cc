@@ -61,7 +61,7 @@ SimpleQueue::initialize(ErrorHandler *errh)
     _drops = 0;
     _highwater_length = 0;
 
-    Bitvector b = get_threads();
+    Bitvector b = get_passing_threads();
     unsigned int thisthread = router()->home_thread_id(this);
 
     for (unsigned i = 0; i < (unsigned)b.size(); i++) {
@@ -70,7 +70,7 @@ SimpleQueue::initialize(ErrorHandler *errh)
        }
     }
 
-    if (get_threads().weight() > 1 && !String(class_name()).equals("ThreadSafeQueue"))
+    if (get_passing_threads().weight() > 1 && !String(class_name()).equals("ThreadSafeQueue"))
         return errh->error("%s: %s queue is not multithread-safe ! Use ThreadSafeQueue instead.",name().c_str(),class_name());
 
     return 0;
@@ -79,7 +79,7 @@ SimpleQueue::initialize(ErrorHandler *errh)
 
 
 bool
-SimpleQueue::get_runnable_threads(Bitvector& b) {
+SimpleQueue::get_spawning_threads(Bitvector& b) {
     unsigned int thisthread = router()->home_thread_id(this);
     b[thisthread] = 1;
     return false;

@@ -1688,14 +1688,14 @@ public:
 
      virtual bool visit(Element *e, bool, int,
                    Element *, int, int) {
-         bool ret = e->get_runnable_threads(bitmask);
+         bool ret = e->get_spawning_threads(bitmask);
          if (ret == false)
              fullpush = false;
          return ret;
      }
 };
 
-bool Element::get_runnable_threads(Bitvector& bmp) {
+bool Element::get_spawning_threads(Bitvector& bmp) {
     unsigned int thisthread = router()->home_thread_id(this);
     if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) { //Push to pull
         bmp[thisthread] = 1;
@@ -1709,7 +1709,7 @@ bool Element::get_runnable_threads(Bitvector& bmp) {
     return true;
 }
 
-Bitvector Element::get_threads(bool is_pull) {
+Bitvector Element::get_passing_threads(bool is_pull) {
     Bitvector b(master()->nthreads());
     InputThreadVisitor visitor(b);
     router()->visit(this,is_pull,-1,&visitor);

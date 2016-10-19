@@ -192,7 +192,7 @@ ToDump::initialize(ErrorHandler *errh)
     }
     _active = true;
 
-    _mt = get_threads().weight() > 1;
+    _mt = get_passing_threads().weight() > 1;
     return 0;
 }
 

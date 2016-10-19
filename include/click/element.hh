@@ -53,11 +53,17 @@ class Element { public:
     virtual void selected(int fd);
 #endif
 
-    virtual bool get_runnable_threads(Bitvector& b);
+    virtual bool get_spawning_threads(Bitvector& b);
     inline bool is_fullpush() const;
-    Bitvector get_threads(bool is_pull=false);
+    Bitvector get_passing_threads(bool is_pull=false);
 
     enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_YES};
+
+    virtual bool get_runnable_threads(Bitvector&) final {
+        //Deprecated name, implement get_spawning_threads
+        assert(false);
+        return false;
+    }
 
     inline void checked_output_push(int port, Packet *p) const;
     inline Packet* checked_input_pull(int port) const;
@@ -804,7 +810,7 @@ Element::Port::pull_batch(unsigned max) const {
 /**
  * @brief Tell if the path up to this element is a full push path
  *
- * @pre get_threads() have to be called on this element or any downstream element
+ * @pre get_passing_threads() have to be called on this element or any downstream element
  *
  * If this element is part of a full push path, it means that packets passing
  *  through will always be handled by the same thread and are not shared.
