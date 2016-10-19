@@ -36,6 +36,8 @@ void
 BatchTest::push_batch(int port,PacketBatch* batch)
 {
     click_chatter("%p{element}: Batch push of %d packets",this,batch->count());
+    assert(batch->count() == batch->find_count());
+    assert(batch->tail() == batch->find_tail());
     output_push_batch(port, batch);
 }
 

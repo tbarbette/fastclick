@@ -29,6 +29,7 @@ CLICK_DECLS
  * Recycle a whole batch of unshared packets of the same type
  *
  * @precond No packet are shared
+ * @precond all packets are of the same type
  */
 void PacketBatch::safe_kill(bool is_data) {
     if (is_data) {
