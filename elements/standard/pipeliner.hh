@@ -45,7 +45,7 @@ public:
         return _block;
     }
 
-    bool get_spawning_threads(Bitvector& b);
+    bool get_spawning_threads(Bitvector& b, bool isoutput);
 
 #if HAVE_BATCH
     void push_batch(int,PacketBatch*);
