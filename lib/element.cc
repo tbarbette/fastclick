@@ -1735,12 +1735,12 @@ bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
         return true;
     }
 #ifdef CLICK_DEBUG_THREADVECTOR
-    click_chatter("%p{element} : thread vector becomes %s",this,bmp.unparse());
+    click_chatter("%p{element} : thread vector becomes %s",this,bmp.unparse().c_str());
 #endif
     return true;
     stop:
 #ifdef CLICK_DEBUG_THREADVECTOR
-    click_chatter("%p{element} : thread vector stops with %s",this,bmp.unparse());
+    click_chatter("%p{element} : thread vector stops with %s",this,bmp.unparse().c_str());
 #endif
     return false;
 }
