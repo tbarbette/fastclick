@@ -176,6 +176,12 @@ class Element { public:
 
     inline bool is_fullpush() const;
 
+    bool get_runnable_threads(Bitvector&) final {
+        //Deprecated name, implement get_spawining_threads
+        static_assert(false);
+        return false;
+    }
+
 #if CLICK_USERLEVEL
     // SELECT
     int add_select(int fd, int mask);
