@@ -157,7 +157,7 @@ protected:
         thread_state->_dropped += n;
     }
 
-    bool get_spawning_threads(Bitvector& bmk)
+    bool get_spawning_threads(Bitvector& bmk, bool isoutput)
     {
     	if (noutputs()) { //RX
 		for (int i = 0; i < n_queues; i++) {

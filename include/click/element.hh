@@ -176,11 +176,9 @@ class Element { public:
 
     inline bool is_fullpush() const;
 
-    virtual bool get_runnable_threads(Bitvector&) final {
-        //Deprecated name, implement get_spawining_threads
-        assert(false);
-        return false;
-    }
+    //Deprecated name, implement get_spawining_threads
+    virtual bool get_runnable_threads(Bitvector&) final = delete;
+    virtual bool get_spawning_threads(Bitvector&) final = delete;
 
 #if CLICK_USERLEVEL
     // SELECT
