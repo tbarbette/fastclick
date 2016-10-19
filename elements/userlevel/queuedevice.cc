@@ -160,9 +160,9 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
     n_initialized++;
     if (_verbose > 1) {
 		if (input_is_push(0))
-			click_chatter("%s : %d threads can end up in this output devices (%s). %d queues will be used, so %d queues for %d thread",this, n_threads, usable_threads.unparse().c_str(), n_queues,queue_per_threads,thread_share);
+			click_chatter("%p{element} : %d threads can end up in this output devices (%s). %d queues will be used, so %d queues for %d thread",this, n_threads, usable_threads.unparse().c_str(), n_queues,queue_per_threads,thread_share);
 		else
-			click_chatter("%s : %d threads will be used to pull packets upstream (%s). %d queues will be used, so %d queues for %d thread",this, n_threads, usable_threads.unparse().c_str(), n_queues,queue_per_threads,thread_share);
+			click_chatter("%p{element} : %d threads will be used to pull packets upstream (%s). %d queues will be used, so %d queues for %d thread",this, n_threads, usable_threads.unparse().c_str(), n_queues,queue_per_threads,thread_share);
     }
     return 0;
 }

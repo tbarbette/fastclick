@@ -823,7 +823,7 @@ Element::Port::pull_batch(unsigned max) const {
 /**
  * @brief Tell if the path up to this element is a full push path
  *
- * @pre get_threads() have to be called on this element or any downstream element
+ * @pre get_passing_threads() have to be called on this element or any downstream element
  *
  * If this element is part of a full push path, it means that packets passing
  *  through will always be handled by the same thread and are not shared.

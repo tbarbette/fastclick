@@ -52,6 +52,7 @@ CLICK_CXX_PROTECT
 CLICK_CXX_UNPROTECT
 # include <click/cxxunprotect.h>
 #endif
+#define CLICK_DEBUG_THREADVECTOR 1
 CLICK_DECLS
 
 const char Element::PORTS_0_0[] = "0";
@@ -1720,19 +1721,28 @@ bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
     unsigned int thisthread = home_thread_id();
 
     if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) {
-        return false;
+        goto stop;
     } else if (ninputs() > 0 && noutputs() > 0 && input_is_pull(0) && output_is_push(0)) { //Pull to push
         bmp[thisthread] = 1;
-        return false;
+        goto stop;
     } else if (ninputs() == 0 && noutputs() > 0 && output_is_push(0)) { //Task which outputs something
         bmp[thisthread] = 1;
     } else if (noutputs() == 0 && ninputs() > 0 && input_is_pull(0)) { //Task which pulls
         bmp[thisthread] = 1;
     } else if (noutputs() == 0 && ninputs() == 0) { //Task with no I/O, probably spawn his home thread
         bmp[thisthread] = 1;
+    } else {
+        return true;
     }
-
+#ifdef CLICK_DEBUG_THREADVECTOR
+    click_chatter("%p{element} : thread vector becomes %s",this,bmp.unparse());
+#endif
     return true;
+    stop:
+#ifdef CLICK_DEBUG_THREADVECTOR
+    click_chatter("%p{element} : thread vector stops with %s",this,bmp.unparse());
+#endif
+    return false;
 }
 
 Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, int level) {
