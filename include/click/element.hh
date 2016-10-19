@@ -176,9 +176,9 @@ class Element { public:
 
     inline bool is_fullpush() const;
 
-    bool get_runnable_threads(Bitvector&) final {
+    virtual bool get_runnable_threads(Bitvector&) final {
         //Deprecated name, implement get_spawining_threads
-        static_assert(false);
+        assert(false);
         return false;
     }
 
