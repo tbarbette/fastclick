@@ -247,13 +247,14 @@ class Element { public:
         inline int port() const;
 
         inline void push(Packet* p) const;
-        inline void push_batch(PacketBatch* p) const;
-
         inline Packet* pull() const;
+#if HAVE_BATCH
+        inline void push_batch(PacketBatch* p) const;
         inline PacketBatch* pull_batch(unsigned max) const;
 
         inline void start_batch();
         inline void end_batch();
+#endif
 
 #if CLICK_STATS >= 1
         unsigned npackets() const       { return _packets; }
@@ -596,13 +597,17 @@ Element::Port::assign(bool isoutput, Element *e, int port)
         if (isoutput) {
             void (Element::*pusher)(int, Packet *) = &Element::push;
             _bound.push = (void (*)(Element *, int, Packet *)) (e->*pusher);
+# if HAVE_BATCH
             void (Element::*pushbatcher)(int, PacketBatch *) = &Element::push_batch;
             _bound_batch.push_batch = (void (*)(Element *, int, PacketBatch *)) (e->*pushbatcher);
+# endif
         } else {
             Packet *(Element::*puller)(int) = &Element::pull;
             _bound.pull = (Packet *(*)(Element *, int)) (e->*puller);
+# if HAVE_BATCH
              PacketBatch *(Element::*pullbatcher)(int,unsigned) = &Element::pull_batch;
              _bound_batch.pull_batch = (PacketBatch *(*)(Element *, int, unsigned)) (e->*pullbatcher);
+# endif
         }
     }
 #endif
@@ -702,6 +707,56 @@ Element::Port::push(Packet* p) const
 #endif
 }
 
+/** @brief Pull a packet over this port and return it.
+ *
+ * Pulls a packet from upstream in the router configuration by calling the
+ * previous element's @link Element::pull() pull() @endlink function.  When
+ * the router finishes processing, returns the result.
+ *
+ * This port must be an active() pull input port.  Usually called from element
+ * code like @link Element::input input(i) @endlink .pull().
+ *
+ * input(i).pull() basically behaves like the following code, although it
+ * maintains additional statistics depending on how CLICK_STATS is defined:
+ *
+ * @code
+ * input(i).element()->pull(input(i).port())
+ * @endcode
+ */
+inline Packet*
+Element::Port::pull() const
+{
+    assert(_e);
+#if CLICK_STATS >= 2
+    click_cycles_t start_cycles = click_get_cycles(),
+        old_child_cycles = _e->_child_cycles;
+# if HAVE_BOUND_PORT_TRANSFER
+    Packet *p = _bound.pull(_e, _port);
+# else
+    Packet *p = _e->pull(_port);
+# endif
+    if (p)
+        _e->output(_port)._packets += 1;
+    click_cycles_t all_delta = click_get_cycles() - start_cycles,
+        own_delta = all_delta - (_e->_child_cycles - old_child_cycles);
+    _e->_xfer_calls += 1;
+    _e->_xfer_own_cycles += own_delta;
+    _owner->_child_cycles += all_delta;
+#else
+# if HAVE_BOUND_PORT_TRANSFER
+    Packet *p = _bound.pull(_e, _port);
+# else
+    Packet *p = _e->pull(_port);
+# endif
+#endif
+#if CLICK_STATS >= 1
+    if (p)
+        ++_packets;
+#endif
+    return p;
+}
+
+#if HAVE_BATCH
 /**
  * Push a batch through this port
  */
@@ -757,55 +812,6 @@ void Element::Port::end_batch() {
     }
 };
 
-/** @brief Pull a packet over this port and return it.
- *
- * Pulls a packet from upstream in the router configuration by calling the
- * previous element's @link Element::pull() pull() @endlink function.  When
- * the router finishes processing, returns the result.
- *
- * This port must be an active() pull input port.  Usually called from element
- * code like @link Element::input input(i) @endlink .pull().
- *
- * input(i).pull() basically behaves like the following code, although it
- * maintains additional statistics depending on how CLICK_STATS is defined:
- *
- * @code
- * input(i).element()->pull(input(i).port())
- * @endcode
- */
-inline Packet*
-Element::Port::pull() const
-{
-    assert(_e);
-#if CLICK_STATS >= 2
-    click_cycles_t start_cycles = click_get_cycles(),
-        old_child_cycles = _e->_child_cycles;
-# if HAVE_BOUND_PORT_TRANSFER
-    Packet *p = _bound.pull(_e, _port);
-# else
-    Packet *p = _e->pull(_port);
-# endif
-    if (p)
-        _e->output(_port)._packets += 1;
-    click_cycles_t all_delta = click_get_cycles() - start_cycles,
-        own_delta = all_delta - (_e->_child_cycles - old_child_cycles);
-    _e->_xfer_calls += 1;
-    _e->_xfer_own_cycles += own_delta;
-    _owner->_child_cycles += all_delta;
-#else
-# if HAVE_BOUND_PORT_TRANSFER
-    Packet *p = _bound.pull(_e, _port);
-# else
-    Packet *p = _e->pull(_port);
-# endif
-#endif
-#if CLICK_STATS >= 1
-    if (p)
-        ++_packets;
-#endif
-    return p;
-}
-
 
 PacketBatch*
 Element::Port::pull_batch(unsigned max) const {
@@ -817,6 +823,7 @@ Element::Port::pull_batch(unsigned max) const {
 #endif
     return batch;
 }
+#endif
 
 /**
  * @brief Tell if the path up to this element is a full push path

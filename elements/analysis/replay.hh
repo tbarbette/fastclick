@@ -53,7 +53,7 @@ class MultiReplay : public MultiReplayBase { public:
     const char *flow_code() const	{ return "#/#"; }
     const char *processing() const	{ return PULL; }
 
-    bool get_runnable_thread(Bitvector&) {
+    bool get_spawning_threads(Bitvector&, bool) override {
         return false;
     }
 
@@ -92,7 +92,7 @@ class MultiReplayUnqueue : public MultiReplayBase { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
-    bool get_runnable_thread(Bitvector& bmp) {
+    bool get_spawning_threads(Bitvector& bmp, bool) override {
         for (int i = 0; i < noutputs(); i++)
            bmp[router()->home_thread_id(this)] = true;
         return false;

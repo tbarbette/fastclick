@@ -423,7 +423,7 @@ void BetterIPCounter3::push(int port, Packet *p) {
 /** @brief Construct an Element. */
 Element::Element()
     :
-#if HAVE_AUTO_BATCH
+#if HAVE_BATCH && HAVE_AUTO_BATCH
     in_batch_mode(BATCH_MODE_IFPOSSIBLE),
 #else
     in_batch_mode(BATCH_MODE_NO),
@@ -3083,6 +3083,7 @@ Element::pull(int port)
     return p;
 }
 
+#if HAVE_BATCH
 void Element::push_batch(int port, PacketBatch* batch) {
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_push(i))
@@ -3102,6 +3103,7 @@ PacketBatch* Element::pull_batch(int port, unsigned max) {
     MAKE_BATCH(pull(port),batch,max);
     return batch;
 }
+#endif
 
 /** @brief Process a packet for a simple packet filter.
  *
