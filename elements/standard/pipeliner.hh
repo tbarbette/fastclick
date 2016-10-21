@@ -26,7 +26,6 @@ class Pipeliner: public BatchElement {
 public:
 
     Pipeliner();
-
     ~Pipeliner();
 
 

@@ -18,7 +18,7 @@ CLICK_DECLS
 Pipeliner::Pipeliner()
     :   _ring_size(-1),_block(false),out_id(0),sleepiness(0),_task(NULL),last_start(0) {
 #if HAVE_BATCH
-	in_batch_mode = BATCH_MODE_YES;
+    in_batch_mode = BATCH_MODE_YES;
 #endif
 }
 
@@ -38,14 +38,14 @@ Pipeliner::get_spawning_threads(Bitvector& b) {
 
 void Pipeliner::cleanup(CleanupStage) {
     for (unsigned i = 0; i < storage.weight(); i++) {
-    	Packet* p;
+        Packet* p;
         while ((p = storage.get_value(i).extract()) != 0) {
 #if HAVE_BATCH
-        	if (receives_batch == 1)
-        		static_cast<PacketBatch*>(p)->kill();
-        	else
+            if (receives_batch == 1)
+                static_cast<PacketBatch*>(p)->kill();
+            else
 #endif
-        		p->kill();
+                p->kill();
         }
     }
 }
@@ -58,7 +58,7 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
 
     if (Args(conf, this, errh)
     .read_p("SIZE", _ring_size)
-	.read_p("BLOCKING", _block)
+    .read_p("BLOCKING", _block)
     .complete() < 0)
         return -1;
     return 0;
@@ -75,14 +75,14 @@ Pipeliner::initialize(ErrorHandler *errh)
     out_id = router()->home_thread_id(this);
 
     if (_ring_size == -1) {
-	#  if HAVE_BATCH
-		if (receives_batch) {
-			_ring_size = 16;
-		} else
-	#  endif
-		{
-			_ring_size = 1024;
-		}
+    #  if HAVE_BATCH
+        if (receives_batch) {
+            _ring_size = 16;
+        } else
+    #  endif
+        {
+            _ring_size = 1024;
+        }
     }
 
     for (unsigned i = 0; i < storage.weight(); i++) {
@@ -105,7 +105,7 @@ Pipeliner::initialize(ErrorHandler *errh)
 
 #if HAVE_BATCH
 void Pipeliner::push_batch(int,PacketBatch* head) {
-	retry:
+    retry:
     int count = head->count();
     if (storage->insert(head)) {
         stats->sent += count;
@@ -113,18 +113,18 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
                     _task->reschedule();
     } else {
         //click_chatter("Drop!");
-	    if (_block) {
-			if (sleepiness >= _ring_size / 4)
-            	_task->reschedule();
-	        goto retry;
-		}
-     	head->kill();
+        if (_block) {
+            if (sleepiness >= _ring_size / 4)
+                _task->reschedule();
+            goto retry;
+        }
+         head->kill();
     }
 }
 #endif
 
 void Pipeliner::push(int,Packet* p) {
-	retry:
+    retry:
     if (storage->insert(p)) {
         stats->sent++;
     } else {
@@ -135,8 +135,8 @@ void Pipeliner::push(int,Packet* p) {
         }
         p->kill();
         stats->dropped++;
-		if (stats->dropped < 10 || stats->dropped % 100 == 1)
-			click_chatter("%s : Dropped %d packets : have %d packets in ring", name().c_str(), stats->dropped, storage->count());
+        if (stats->dropped < 10 || stats->dropped % 100 == 1)
+            click_chatter("%s : Dropped %d packets : have %d packets in ring", name().c_str(), stats->dropped, storage->count());
     }
     if (sleepiness >= _ring_size / 4)
         _task->reschedule();
@@ -156,19 +156,19 @@ Pipeliner::run_task(Task* t)
 #if HAVE_BATCH
             PacketBatch* b = static_cast<PacketBatch*>(s.extract());
             if (unlikely(!receives_batch)) {
-            	if (out == NULL) {
-            		b->set_tail(b);
-            		b->set_count(1);
-            		out = b;
-            	} else {
-            		out->append_packet(b);
-            	}
+                if (out == NULL) {
+                    b->set_tail(b);
+                    b->set_count(1);
+                    out = b;
+                } else {
+                    out->append_packet(b);
+                }
             } else {
-            	if (out == NULL) {
-					out = b;
-				} else {
-					out->append_batch(b);
-				}
+                if (out == NULL) {
+                    out = b;
+                } else {
+                    out->append_batch(b);
+                }
             }
             //pool_hint(b->count(),storage.get_mapping(i));
 
