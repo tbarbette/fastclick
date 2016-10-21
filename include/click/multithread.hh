@@ -173,7 +173,7 @@ public:
      * This may not the number of threads, only use this
      * to iterate with get_value()/set_value(), not get_value_for_thread()
      */
-    inline size_t weight() {
+    inline unsigned weight() {
         return _size;
     }
 
@@ -182,7 +182,7 @@ public:
     }
 protected:
     AT* storage;
-    size_t _size;
+    unsigned _size;
 };
 
 /*
@@ -234,22 +234,29 @@ class per_thread_omem { private:
 
     AT* storage;
     Vector<unsigned int> mapping;
-    size_t _size;
+    unsigned _size;
 
 public:
+    per_thread_omem() : storage(0),mapping(),_size(0) {
+
+    }
+
+    ~per_thread_omem() {
+        if (storage)
+            delete[] storage;
+    }
 
     void initialize(Bitvector usable, T v=T()) {
-        storage = new AT[usable.weight()];
+        _size = usable.weight();
+        storage = new AT[_size];
+        mapping.resize(click_max_cpu_ids(), 0);
         int id = 0;
-        for (int i = 0; i < click_max_cpu_ids(); i++) {
+        for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
             if (usable[i]) {
-                storage[id] = v;
+                storage[id].v = v;
                 mapping[i] = id++;
-            } else {
-                mapping[i] = 0;
             }
         }
-        _size = id;
     }
 
     inline T* operator->() const {
@@ -314,53 +321,53 @@ public:
         storage[i] = v;
     }
 
-    inline size_t weight() {
+    inline unsigned weight() {
         return _size;
     }
 };
 
 #define PER_THREAD_SET(pt,value) \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         pt.set_value(i, value); \
     }
 
 #define PER_THREAD_POINTER_SET(pt,member,value) \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         pt.get_value(i)->member = value; \
     }
 
 #define PER_THREAD_MEMBER_SET(pt,member,value) \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         pt.get_value(i).member = value; \
     }
 
 #define PER_THREAD_VECTOR_SET(pt,member,value) \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         for (int j = 0; j < pt.get_value(i).size(); j++) \
             (pt.get_value(i))[j].member = value; \
     }
 
 #define PER_THREAD_SUM(type, var, pt) \
     type var = 0; \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         var += pt.get_value(i); \
     }
 
 #define PER_THREAD_POINTER_SUM(type, var, pt, member) \
     type var = 0; \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         var += pt.get_value(i)->member; \
     }
 
 #define PER_THREAD_MEMBER_SUM(type, var, pt, member) \
     type var = 0; \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         var += pt.get_value(i).member; \
     }
 
 #define PER_THREAD_VECTOR_SUM(type, var, pt, index, member) \
     type var = 0; \
-    for (size_t i = 0; i < pt.weight(); i++) { \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
         var += pt.get_value(i)[index].member; \
     }
 
