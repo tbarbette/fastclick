@@ -126,11 +126,11 @@ Pipeliner::initialize(ErrorHandler *errh)
 
     if (_block && !_allow_direct_traversal && passing[_home_thread_id]) {
         return errh->error("Possible deadlock ! Pipeliner is served by thread "
-						   "%d, and the same thread can push packets to it. "
-						   "As Pipeliner is in blocking mode without direct "
-						   "traversal, it could block trying to push a "
-						   "packet, preventing the very same thread to drain "
-						   "the queue.");
+                           "%d, and the same thread can push packets to it. "
+                           "As Pipeliner is in blocking mode without direct "
+                           "traversal, it could block trying to push a "
+                           "packet, preventing the very same thread to drain "
+                           "the queue.");
     }
 
     if (!_nouseless && passing.weight() == 1 && passing[_home_thread_id] == 1) {
