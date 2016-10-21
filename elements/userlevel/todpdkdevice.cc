@@ -77,17 +77,21 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (batch_mode() == BATCH_MODE_YES) {
-        if (_burst > 0)
-            errh->warning("BURST is unused with batching !");
+        if (_burst < 0)
+            _burst = 1;
     } else
 #endif
     {
         if (_burst < 0)
             _burst = 32;
+    }
 
-        if (ndesc > 0 && (unsigned)_burst > ndesc / 2 ) {
-            errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
-        }
+    if (ndesc > 0 && (unsigned)_burst > ndesc / 2 ) {
+        errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
+    }
+
+    if (_burst == 1) {
+        _timeout = -1;
     }
 
     ret = initialize_tasks(false,errh);
@@ -129,19 +133,19 @@ void ToDPDKDevice::add_handlers()
 
 inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
     if (_timeout >= 0) {
-    if (iqueue.timeout.scheduled()) {
-        //No more pending packets, remove timer
-        if (iqueue.nr_pending == 0)
-            iqueue.timeout.unschedule();
-    } else {
+        if (iqueue.timeout.scheduled()) {
+            //No more pending packets, remove timer
+            if (iqueue.nr_pending == 0)
+                iqueue.timeout.unschedule();
+        } else {
             if (iqueue.nr_pending > 0) {
                 //Pending packets, set timeout to flush packets after a while even without burst
                 if (_timeout == 0)
                     iqueue.timeout.schedule_now();
                 else
                     iqueue.timeout.schedule_after_msec(_timeout);
-                }
-    }
+            }
+        }
     }
 }
 
@@ -289,7 +293,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         }
 
         //Flush the queue if we have pending packets
-        if ((int)iqueue.nr_pending > 0) {
+        if ((int)iqueue.nr_pending >= _burst || congestioned) {
             flush_internal_tx_queue(iqueue);
         }
         set_flush_timer(iqueue);
