@@ -90,7 +90,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
     }
 
-    if (_burst == 1) {
+    if (_burst == 1 && _timeout == 0) {
         _timeout = -1;
     }
 
@@ -132,7 +132,7 @@ void ToDPDKDevice::add_handlers()
 }
 
 inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
-    if (_timeout >= 0) {
+    if (_timeout >= 0 || iqueue.nr_pending) {
         if (iqueue.timeout.scheduled()) {
             //No more pending packets, remove timer
             if (iqueue.nr_pending == 0)
@@ -140,7 +140,7 @@ inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
         } else {
             if (iqueue.nr_pending > 0) {
                 //Pending packets, set timeout to flush packets after a while even without burst
-                if (_timeout == 0)
+                if (_timeout <= 0)
                     iqueue.timeout.schedule_now();
                 else
                     iqueue.timeout.schedule_after_msec(_timeout);
@@ -168,7 +168,7 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
      */
     unsigned sub_burst;
 
-    lock();
+    lock(); // ! This is a queue lock, not a thread lock.
 
     do {
         sub_burst = iqueue.nr_pending > 32 ? 32 : iqueue.nr_pending;
@@ -189,10 +189,6 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
     unlock();
 
     add_count(sent);
-
-    // If ring is empty, reset the index to avoid wrap ups
-    if (iqueue.nr_pending == 0)
-        iqueue.index = 0;
 }
 
 void ToDPDKDevice::push(int, Packet *p)
