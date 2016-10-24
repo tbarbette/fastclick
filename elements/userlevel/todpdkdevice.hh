@@ -79,7 +79,8 @@ processed by the Click pipeline. Setting a negative value disable the timer,
 this is generally acceptable if the thoughput of this element rarely drops
 below 32000 pps (~50 Mbps with maximal size packets) with a BURST of 32, as the
 internal queue will wait on average 1 ms before containing 32 packets. Defaults
-to 0 (immediate flush).
+to 0 (immediate flush). The timeout will be disabled (-1) if BURST is 1, as the
+packets will never wait in the internal queue.
 
 =item NDESC
 

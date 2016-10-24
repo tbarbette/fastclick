@@ -132,7 +132,7 @@ void ToDPDKDevice::add_handlers()
 }
 
 inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
-    if (_timeout >= 0) {
+    if (_timeout >= 0 || iqueue.nr_pending) {
         if (iqueue.timeout.scheduled()) {
             //No more pending packets, remove timer
             if (iqueue.nr_pending == 0)
@@ -140,7 +140,7 @@ inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
         } else {
             if (iqueue.nr_pending > 0) {
                 //Pending packets, set timeout to flush packets after a while even without burst
-                if (_timeout == 0)
+                if (_timeout <= 0)
                     iqueue.timeout.schedule_now();
                 else
                     iqueue.timeout.schedule_after_msec(_timeout);

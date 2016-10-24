@@ -41,10 +41,12 @@ class Element { public:
 
     // RUNTIME
     virtual void push(int port, Packet *p);
-    virtual void push_batch(int port, PacketBatch *p);
     virtual Packet *pull(int port) CLICK_WARN_UNUSED_RESULT;
-    virtual PacketBatch* pull_batch(int port,unsigned max) CLICK_WARN_UNUSED_RESULT;
     virtual Packet *simple_action(Packet *p);
+#if HAVE_BATCH
+    virtual void push_batch(int port, PacketBatch *p);
+    virtual PacketBatch* pull_batch(int port,unsigned max) CLICK_WARN_UNUSED_RESULT;
+#endif
 
     virtual bool run_task(Task *task);  // return true iff did useful work
     virtual void run_timer(Timer *timer);
