@@ -20,6 +20,8 @@
 #include "batchstats.hh"
 #include <click/string.hh>
 #include <click/straccum.hh>
+#include <click/args.hh>
+
 CLICK_DECLS
 
 BatchStats::BatchStats()
