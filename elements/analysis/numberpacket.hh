@@ -1,14 +1,24 @@
 #ifndef CLICK_NUMBERPACKET_HH
 #define CLICK_NUMBERPACKET_HH
 
-#include <click/element.hh>
+#include <click/batchelement.hh>
 
 CLICK_DECLS
 
 /*
- * TODO: documentation.
- */
-class NumberPacket : public Element {
+=c
+
+NumberPacket()
+
+=s
+
+Set an increasing number inside the payload of each packets
+
+=a
+
+RecordTimestamp, TimestampDiff */
+
+class NumberPacket : public BatchElement {
 public:
     NumberPacket() CLICK_COLD;
     ~NumberPacket() CLICK_COLD;
@@ -17,15 +27,18 @@ public:
     const char *port_count() const { return PORTS_1_1; }
     const char *processing() const { return PUSH; }
     const char *flow_code() const { return "x/x"; }
-    int configure_phase() const { return CONFIGURE_PHASE_DEFAULT; }
-    bool can_live_reconfigure() const { return false; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     void push(int, Packet *);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
 
 private:
     uint64_t _count;
+
+    inline Packet* smaction(Packet* p) CLICK_WARN_UNUSED_RESULT;
 };
 
 constexpr unsigned HEADER_SIZE = 40; // Skip enough for TCP header
