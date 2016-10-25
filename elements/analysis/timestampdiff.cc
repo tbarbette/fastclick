@@ -1,7 +1,8 @@
 /*
  * timestampdiff.{cc,hh} -- Store a packet count inside packet payload
+ * Cyril Soldani, Tom Barbette
  *
- * Copyright (c) 2015-2016 Cyril Soldani, University of Liège
+ * Copyright (c) 2015-2016 University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -88,7 +89,7 @@ void TimestampDiff::add_handlers() {
     add_read_handler("stddev", read_handler, TSD_STD_HANDLER);
 }
 
-void TimestampDiff::push(int, Packet *p) {
+inline void TimestampDiff::smaction(Packet* p) {
     Timestamp now = Timestamp::now_steady();
     uint64_t i = read_number_of_packet(p);
     Timestamp old = get_recordtimestamp_instance()->get(i);
@@ -98,8 +99,21 @@ void TimestampDiff::push(int, Packet *p) {
                       i, diff.sec() * 1000000 + diff.usec());
     else
         _delays.push_back(diff.usec());
+}
+
+void TimestampDiff::push(int, Packet *p) {
+    smaction(p);
     output(0).push(p);
 }
+
+#if HAVE_BATCH
+void
+TimestampDiff::push_batch(int, PacketBatch * batch) {
+    FOR_EACH_PACKET(batch,p)
+            smaction(p);
+    output(0).push_batch(batch);
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)

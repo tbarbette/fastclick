@@ -1,7 +1,8 @@
 /*
  * recordtimestamp.{cc,hh} -- Store a packet count inside packet payload
+ * Cyril Soldani, Tom Barbette
  *
- * Copyright (c) 2015-2016 Cyril Soldani, University of Liège
+ * Copyright (c) 2015-2016 University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -35,6 +36,7 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     unsigned n = 0;
     if (Args(conf, this, errh).read("N", n).complete() < 0)
         return -1;
+
     if (n == 0)
         n = 65536;
     _timestamps.reserve(n);
@@ -53,6 +55,14 @@ void RecordTimestamp::push(int, Packet *p) {
     _timestamps.push_back(Timestamp::now_steady());
     output(0).push(p);
 }
+
+#if HAVE_BATCH
+void RecordTimestamp::push_batch(int, PacketBatch *batch) {
+    FOR_EACH_PACKET(batch, p)
+            _timestamps.push_back(Timestamp::now_steady());
+    output(0).push_batch(batch);
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)

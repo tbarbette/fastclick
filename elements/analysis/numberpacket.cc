@@ -1,7 +1,8 @@
 /*
  * numberpacket.{cc,hh} -- Store a packet count inside packet payload
+ * Cyril Soldani, Tom Barbette
  *
- * Copyright (c) 2015-2016 Cyril Soldani, University of Liège
+ * Copyright (c) 2015-2016 University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -14,7 +15,7 @@
  * legally binding.
  */
 
-#include <click/config.h> // Doc says this should come first
+#include <click/config.h>
 
 #include "numberpacket.hh"
 
@@ -36,7 +37,7 @@ int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
-void NumberPacket::push(int, Packet *p) {
+inline Packet* NumberPacket::smaction(Packet* p) {
     WritablePacket *wp = nullptr;
     if (p->length() >= HEADER_SIZE + 8)
         wp = p->uniqueify();
@@ -47,8 +48,22 @@ void NumberPacket::push(int, Packet *p) {
     }
     // Skip header
     *reinterpret_cast<uint64_t *>(wp->data() + HEADER_SIZE) = _count++;
-    output(0).push(wp);
+
+    return wp;
 }
+
+void NumberPacket::push(int, Packet *p) {
+    output(0).push(smaction(p));
+}
+
+#if HAVE_BATCH
+void NumberPacket::push_batch(int, PacketBatch *batch) {
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        p = smaction(p);
+    }
+    output(0).push_batch(batch);
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)
