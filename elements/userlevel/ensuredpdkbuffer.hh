@@ -47,6 +47,7 @@ public:
 private:
     bool _force;
     int _extra_headroom;
+    bool _noalloc;
     int _warn_count;
 };
 
