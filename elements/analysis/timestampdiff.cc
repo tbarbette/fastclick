@@ -38,7 +38,9 @@ TimestampDiff::~TimestampDiff() {
 }
 
 int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh) {
-    if (Args(conf, this, errh).complete() < 0)
+    if (Args(conf, this, errh)
+            .read("OFFSET",_offset)
+            .complete() < 0)
         return -1;
 
     return 0;
@@ -91,7 +93,7 @@ void TimestampDiff::add_handlers() {
 
 inline void TimestampDiff::smaction(Packet* p) {
     Timestamp now = Timestamp::now_steady();
-    uint64_t i = read_number_of_packet(p);
+    uint64_t i = NumberPacket::read_number_of_packet(p,_offset);
     Timestamp old = get_recordtimestamp_instance()->get(i);
     Timestamp diff = now - old;
     if (diff.sec() > 0)

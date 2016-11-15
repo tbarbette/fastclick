@@ -44,6 +44,7 @@ public:
 
 private:
     std::vector<unsigned> _delays;
+    int _offset;
     void smaction(Packet* p);
 };
 
