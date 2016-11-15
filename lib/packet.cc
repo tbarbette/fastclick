@@ -800,8 +800,7 @@ Packet::copy(Packet* p, int headroom)
     copy_annotations(p);
     set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
     set_network_header(p->network_header() ? data() + p->network_header_offset() : 0);
-    if (p->has_transport_header())
-        set_transport_header(data() + p->transport_header_offset());
+    set_transport_header(p->has_transport_header() ? data() + p->transport_header_offset() : 0);
     return true;
 }
 
