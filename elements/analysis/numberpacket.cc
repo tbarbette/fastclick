@@ -24,14 +24,17 @@
 
 CLICK_DECLS
 
-NumberPacket::NumberPacket() : _count(0) {
+NumberPacket::NumberPacket() : _offset(40) {
+    _count = 0;
 }
 
 NumberPacket::~NumberPacket() {
 }
 
 int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
-    if (Args(conf, this, errh).complete() < 0)
+    if (Args(conf, this, errh)
+        .read_p("OFFSET", _offset)
+        .complete() < 0)
         return -1;
 
     return 0;
@@ -39,32 +42,55 @@ int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 inline Packet* NumberPacket::smaction(Packet* p) {
     WritablePacket *wp = nullptr;
-    if (p->length() >= HEADER_SIZE + 8)
+    if (p->length() >= _offset + 8)
         wp = p->uniqueify();
     else {
-        wp = p->put(HEADER_SIZE + 8 - p->length());
+        wp = p->put(_offset + 8 - p->length());
         assert(wp);
-        wp->ip_header()->ip_len = htons(HEADER_SIZE + 8);
+        wp->ip_header()->ip_len = htons(_offset + 8);
     }
     // Skip header
-    *reinterpret_cast<uint64_t *>(wp->data() + HEADER_SIZE) = _count++;
+    *reinterpret_cast<uint64_t *>(wp->data() + _offset) = _count.fetch_and_add(1);
 
     return wp;
 }
 
-void NumberPacket::push(int, Packet *p) {
-    output(0).push(smaction(p));
+Packet*
+NumberPacket::simple_action(Packet *p) {
+    return smaction(p);
 }
 
 #if HAVE_BATCH
-void NumberPacket::push_batch(int, PacketBatch *batch) {
+PacketBatch*
+NumberPacket::simple_action_batch(PacketBatch *batch) {
     FOR_EACH_PACKET_SAFE(batch,p) {
         p = smaction(p);
     }
-    output(0).push_batch(batch);
+    return batch;
 }
 #endif
+
+
+String
+NumberPacket::read_handler(Element *e, void *thunk)
+{
+    NumberPacket *fd = static_cast<NumberPacket *>(e);
+    switch ((intptr_t)thunk) {
+      case H_COUNT: {
+          return String(fd->_count);
+      }
+      default:
+    return "<error>";
+    }
+}
+
+void
+NumberPacket::add_handlers()
+{
+    add_read_handler("count", read_handler, H_COUNT, 0);
+}
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)
 EXPORT_ELEMENT(NumberPacket)
+ELEMENT_MT_SAFE(NumberPacket)
