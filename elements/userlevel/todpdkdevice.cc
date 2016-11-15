@@ -100,11 +100,9 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
     for (unsigned i = 0; i < _iqueues.weight();i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
-        if (_timeout >= 0) {
-            _iqueues.get_value(i).timeout.assign(this);
-            _iqueues.get_value(i).timeout.initialize(this);
-            _iqueues.get_value(i).timeout.move_thread(i);
-        }
+        _iqueues.get_value(i).timeout.assign(this);
+        _iqueues.get_value(i).timeout.initialize(this);
+        _iqueues.get_value(i).timeout.move_thread(i);
     }
 
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
