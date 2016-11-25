@@ -780,7 +780,6 @@ assert(false); //TODO
 # endif
 }
 
-#endif
 void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }
@@ -804,6 +803,8 @@ Packet::copy(Packet* p, int headroom)
         set_transport_header(data() + p->transport_header_offset());
     return true;
 }
+
+#endif
 
 //
 // UNIQUEIFICATION
