@@ -68,7 +68,7 @@ script:
       export RTE_SDK=`pwd`/dpdk-$VERSION;
       export RTE_TARGET=x86_64-native-linuxapp-gcc;
       if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" -o ! -e "$RTE_SDK/$RTE_TARGET/build/lib/librte_eal/linuxapp/eal/librte_eal.a" ]; then
-        wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$VERSION.tar.gz &&
+            wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
             tar -zxf dpdk-$VERSION.tar.gz &&
             cd dpdk-$VERSION &&
             sed -i "s/CONFIG_RTE_KNI_KMOD=.*/CONFIG_RTE_KNI_KMOD=n/g" config/common_linuxapp &&
