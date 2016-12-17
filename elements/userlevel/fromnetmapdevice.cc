@@ -134,12 +134,12 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 	DIR *dir;
 	struct dirent *ent;
 
-	int i =0;
+	int i = 0;
 	if ((dir = opendir (netinfo)) != NULL) {
 	  while ((ent = readdir (dir)) != NULL && i < firstqueue + n_queues) {
 		int n = atoi(ent->d_name);
 		if (n == 0) continue;
-		if (i < firstqueue) continue;
+		if (i < firstqueue) {i++; continue;}
 
 		char irqpath[100];
 		int irq_n = n;
