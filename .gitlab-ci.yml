@@ -1,3 +1,6 @@
+variables:
+    DPDK_VERSION: "16.07"
+    NETMAP_VERSION: "11.1"
 batch:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule --disable-verbose-batch && make && make check
@@ -9,27 +12,40 @@ mt:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule --disable-batch && make && make check
 dpdk-batch:
     script:
-        - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --enable-batch --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
 
 dpdk-nobatch:
     script:
-        - echo "RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET"
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --disable--batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
 
 netmap_single:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --with-netmap --disable-linuxmodule --disable-verbose-batch && make
+        - ./configure CXXFLAGS="-std=gnu++11" $CONFIG_NETMAP --disable-linuxmodule --disable-verbose-batch && make
 netmap:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --enable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --enable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make
 netmap_nopool:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
 netmap_nopool_nozc:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --disable-netmap-pool --disable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
-
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --disable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
+cache:
+    paths:
+        - dpdk-$DPDK_VERSION
+        - netmap-$NETMAP_VERSION
 before_script:
     - gcc -v
-    - if [ `sudo -n whoami` = "root" ] ; then sudo modprobe netmap && sudo chmod 666 /dev/netmap ; fi
+    - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
+      export RTE_TARGET=x86_64-native-linuxapp-gcc;
+      if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
+        wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
+            tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
+            cd dpdk-$DPDK_VERSION &&
+            make config T=$RTE_TARGET &&
+            make install T=$RTE_TARGET &&
+            cd ..;
+      fi;
+    - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers && cd .. && cd .. ; fi
+    - if [ `sudo -n whoami` = "root" ] ; then sudo insmod netmap-$NETMAP_VERSION/LINUX/netmap.ko && sudo chmod 666 /dev/netmap ; fi
+    - export CONFIG_NETMAP="--with-netmap=`pwd`/netmap-$NETMAP_VERSION/sys/"

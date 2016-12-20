@@ -5,7 +5,7 @@
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology.
  * Copyright (c) 2008 Meraki, Inc.
  * Copyright (c) 1999-2013 Eddie Kohler
- * Copyright (c) 2015 University of Liege
+ * Copyright (c) 2015-2016 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,11 +23,11 @@
 #include <click/confparse.hh>
 #include <click/error.hh>
 #include <click/nameinfo.hh>
-#include "spinlockpush.hh"
+#include "pathspinlock.hh"
 CLICK_DECLS
 
 int
-SpinlockPush::configure(Vector<String> &conf, ErrorHandler *errh)
+PathSpinlock::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String name;
     if (Args(conf, this, errh).read_mp("LOCK", name).complete() < 0)
@@ -37,5 +37,19 @@ SpinlockPush::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+
+void PathSpinlock::push(int,Packet *p)	{ 
+	_lock->acquire();
+	output(0).push(p);
+	_lock->release();
+}
+
+Packet* PathSpinlock::pull(int)	{ 
+	_lock->acquire();
+	Packet* p = input(0).pull();
+	_lock->release(); 
+	return p;
+}
+ 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(SpinlockPush)
+EXPORT_ELEMENT(PathSpinlock)

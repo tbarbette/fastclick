@@ -87,7 +87,7 @@ static const Clp_Option options[] = {
     { "allow-reconfigure", 'R', ALLOW_RECONFIG_OPT, 0, Clp_Negate },
     { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
     { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
-	{ "dpdk", 'd', DPDK_OPT, Clp_ValStringDashTerimnated, 0 },
+    { "dpdk", 0, DPDK_OPT, 0, 0 },
     { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
     { "handler", 'h', HANDLER_OPT, Clp_ValString, 0 },
     { "help", 0, HELP_OPT, 0, 0 },
@@ -133,8 +133,7 @@ Options:\n\
   -j, --threads N               Start N threads (default 1).\n", program_name);
 #if HAVE_DPDK
     printf("\
-  -d, --dpdk DPDK_ARGS --     Enable DPDK and give DPDK's own arguments. End "
-            "the arguments list with double dash (--).\n");
+      --dpdk DPDK_ARGS --       Enable DPDK and give DPDK's own arguments.\n");
 #endif
 #if HAVE_DECL_PTHREAD_SETAFFINITY_NP
     printf("\
@@ -482,8 +481,9 @@ static void *thread_driver(void *user_data)
 }
 #if HAVE_DPDK
 static int thread_driver_dpdk(void *user_data) {
-	thread_driver(user_data);
-	return 0;
+    RouterThread *thread = static_cast<RouterThread *>(user_data);
+    thread->driver();
+    return 0;
 }
 #endif
 }
@@ -532,8 +532,7 @@ main(int argc, char **argv)
   bool allow_reconfigure = false;
   Vector<String> handlers;
   String exit_handler;
-  char** dpdk_argv = 0;
-  int dpdk_argc = 0;
+  Vector<char*> dpdk_arg;
 
   while (1) {
     int opt = Clp_Next(clp);
@@ -625,15 +624,16 @@ main(int argc, char **argv)
       warnings = clp->negated;
       break;
 #if HAVE_DPDK
-     case DPDK_OPT:
-      dpdk_argv = (char**)malloc(sizeof(char*) * clp->have_val + 1);
-      dpdk_argv[0] = argv[0];
-      for (int i = 0; i < clp->have_val; i++) {
-        dpdk_argv[i+1] = clp->val.ps[i];
-      }
+     case DPDK_OPT: {
+      const char* arg;
+      do {
+        arg = Clp_Shift(clp, 1);
+        if (arg == NULL) break;
+        dpdk_arg.push_back(const_cast<char*>(arg));
+      } while (strcmp(arg, "--") != 0);
       dpdk_enabled = true;
-      dpdk_argc = clp->have_val + 1;
       break;
+     }
 #endif // HAVE_DPDK
      case THREADS_OPT:
       click_nthreads = clp->val.i;
@@ -700,7 +700,7 @@ particular purpose.\n");
       if (click_nthreads > 1 || set_affinity) {
           errh->warning("In DPDK mode, set the number of cores and affinity with DPDK EAL arguments");
       }
-      int n_eal_args = rte_eal_init(dpdk_argc, dpdk_argv);
+      int n_eal_args = rte_eal_init(dpdk_arg.size(), dpdk_arg.data());
       if (n_eal_args < 0)
       rte_exit(EXIT_FAILURE,
              "Click was built with Intel DPDK support but there was an\n"
@@ -771,22 +771,22 @@ particular purpose.\n");
 #if HAVE_MULTITHREAD
 # if HAVE_DPDK
     if (dpdk_enabled) {
-	unsigned t = 1;
-		unsigned lcore_id;
-		RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-			rte_eal_remote_launch(thread_driver_dpdk, click_router->master()->thread(t++),
-								  lcore_id);
-		}
+        unsigned t = 1;
+        unsigned lcore_id;
+        RTE_LCORE_FOREACH_SLAVE(lcore_id) {
+            rte_eal_remote_launch(thread_driver_dpdk, click_router->master()->thread(t++),
+                                  lcore_id);
+        }
     } else
 # endif //HAVE_DPDK
     {
-		for (int t = 1; t < click_nthreads; ++t) {
-			pthread_t p;
-			pthread_create(&p, 0, thread_driver, click_master->thread(t));
-			other_threads.push_back(p);
-			do_set_affinity(p, t);
-		}
-		do_set_affinity(pthread_self(), 0);
+        for (int t = 1; t < click_nthreads; ++t) {
+            pthread_t p;
+            pthread_create(&p, 0, thread_driver, click_master->thread(t));
+            other_threads.push_back(p);
+            do_set_affinity(p, t);
+        }
+        do_set_affinity(pthread_self(), 0);
     }
 #endif
 
@@ -842,15 +842,17 @@ particular purpose.\n");
 # if HAVE_DPDK
   if (dpdk_enabled) {
       rte_eal_mp_wait_lcore();
-  } else
-# endif
-  {
-      for (int i = 0; i < other_threads.size(); ++i)
-          click_master->thread(i + 1)->wake();
-      for (int i = 0; i < other_threads.size(); ++i)
-          (void) pthread_join(other_threads[i], 0);
+      goto click_cleanup;
   }
+# endif
+
+  for (int i = 0; i < other_threads.size(); ++i)
+      click_master->thread(i + 1)->wake();
+  for (int i = 0; i < other_threads.size(); ++i)
+      (void) pthread_join(other_threads[i], 0);
 #endif
+
+click_cleanup:
   click_router->unuse();
   return cleanup(clp, exit_value);
 }

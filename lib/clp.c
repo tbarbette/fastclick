@@ -253,7 +253,6 @@ static const Clp_Option clp_option_sentinel[] = {
 
 
 static int parse_string(Clp_Parser *, const char *, int, void *);
-static int parse_dash_string(Clp_Parser *, const char *, int, void *);
 static int parse_int(Clp_Parser *, const char *, int, void *);
 static int parse_bool(Clp_Parser *, const char *, int, void *);
 static int parse_double(Clp_Parser *, const char *, int, void *);
@@ -546,7 +545,6 @@ Clp_NewParser(int argc, const char * const *argv, int nopt, const Clp_Option *op
     /* Add default type parsers */
     cli->nvaltype = 0;
     Clp_AddType(clp, Clp_ValString, 0, parse_string, 0);
-    Clp_AddType(clp, Clp_ValStringDashTerimnated, Clp_DashTerminated, parse_dash_string, 0);
     Clp_AddType(clp, Clp_ValStringNotOption, Clp_DisallowOptions, parse_string, 0);
     Clp_AddType(clp, Clp_ValInt, 0, parse_int, (void*) (uintptr_t) 0);
     Clp_AddType(clp, Clp_ValUnsigned, 0, parse_int, (void*) (uintptr_t) 1);
@@ -1093,13 +1091,6 @@ parse_string(Clp_Parser *clp, const char *arg, int complain, void *user_data)
 }
 
 static int
-parse_dash_string(Clp_Parser *clp, const char *arg, int complain, void *user_data)
-{
-    (void)complain; (void)user_data; (void)clp; (void) arg;
-    return 1;
-}
-
-static int
 parse_int(Clp_Parser* clp, const char* arg, int complain, void* user_data)
 {
     const char *val;
@@ -1571,7 +1562,7 @@ get_oclass(Clp_Parser *clp, const char *text, int *ocharskip)
 }
 
 static int
-next_argument(Clp_Parser *clp, int want_argument, int dash_terminated)
+next_argument(Clp_Parser *clp, int want_argument)
      /* Moves clp to the next argument.
 	Returns 1 if it finds another option.
 	Returns 0 if there aren't any more arguments.
@@ -1581,8 +1572,6 @@ next_argument(Clp_Parser *clp, int want_argument, int dash_terminated)
 	want_argument == 1: Accept arguments that start with Clp_NotOption
 		or Clp_LongImplicit.
 	want_argument == 2: Accept ALL arguments.
-	if dash_terminated is true, indicates that the option is
-	terminated only when it encounters double dash
 
 	Where is the option stored when this returns?
 	Well, cli->argv[0] holds the whole of the next command line argument.
@@ -1692,17 +1681,8 @@ next_argument(Clp_Parser *clp, int want_argument, int dash_terminated)
 
       not_option:
       case Clp_NotOption:
-    if (dash_terminated) {
-        clp->val.ps = (char**)(cli->argv);
-        while (cli->argc > 0 && (cli->argv[0][0] != '-' || cli->argv[0][1] != '-' || cli->argv[0][2] != '\0')) {
-            cli->argc--;
-            cli->argv++;
-            clp->have_val++;
-        }
-    } else {
-        clp->have_val = 1;
-    }
 	cli->is_short = 0;
+	clp->have_val = 1;
 	clp->vstr = text;
 	return 0;
 
@@ -1870,7 +1850,7 @@ Clp_Next(Clp_Parser *clp)
     cli->ambiguous = 0;
 
     /* Get the next argument or option */
-    if (!next_argument(clp, cli->option_processing ? 0 : 2, 0)) {
+    if (!next_argument(clp, cli->option_processing ? 0 : 2)) {
 	clp->val.s = clp->vstr;
 	optno = clp->have_val ? Clp_NotOption : Clp_Done;
 	clp->option = &clp_option_sentinel[-optno];
@@ -1958,7 +1938,7 @@ Clp_Next(Clp_Parser *clp)
 	/* Allow arguments to options to start with a dash, but only if the
 	   argument type allows it by not setting Clp_DisallowOptions */
 	int disallow = (cli->valtype[vtpos].flags & Clp_DisallowOptions) != 0;
-	next_argument(clp, disallow ? 1 : 2, (cli->valtype[vtpos].flags & Clp_DashTerminated));
+	next_argument(clp, disallow ? 1 : 2);
 	if (!clp->have_val) {
 	    int got_option = cli->xtext != 0;
 	    Clp_RestoreParser(clp, &clpsave);
@@ -1971,11 +1951,10 @@ Clp_Next(Clp_Parser *clp)
 	}
 
     } else if (cli->is_short && !clp->have_val
-	       && cli->xtext[clp_utf8_charlen(cli, cli->xtext)]) {
+	       && cli->xtext[clp_utf8_charlen(cli, cli->xtext)])
 	/* The -[option]argument case:
 	   Assume that the rest of the current string is the argument. */
-	next_argument(clp, 1, 0);
-    }
+	next_argument(clp, 1);
 
     /* Parse the argument */
     clp->option = opt;
@@ -2012,7 +1991,7 @@ Clp_Shift(Clp_Parser *clp, int allow_options)
 {
     Clp_ParserState clpsave;
     Clp_SaveParser(clp, &clpsave);
-    next_argument(clp, allow_options ? 2 : 1, 0);
+    next_argument(clp, allow_options ? 2 : 1);
     if (!clp->have_val)
 	Clp_RestoreParser(clp, &clpsave);
     return clp->vstr;
