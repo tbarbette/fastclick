@@ -518,6 +518,19 @@ AC_DEFUN([CLICK_CHECK_NUMA], [
 ])
 
 dnl
+dnl CLICK_CHECK_ZLIB
+dnl Check if zlib is available.
+dnl
+
+AC_DEFUN([CLICK_CHECK_ZLIB], [
+    AC_CHECK_LIB(z, zError, [ac_have_zlib=yes], [ac_have_zlib=no])
+    if test "x$ac_have_zlib" = xyes; then
+        AC_SUBST([HAVE_ZLIB], [y])
+    fi
+])
+
+
+dnl
 dnl CLICK_PROG_INSTALL
 dnl Substitute both INSTALL and INSTALL_IF_CHANGED.
 dnl
