@@ -340,16 +340,16 @@ MultiReplayUnqueue::run_task(Task* task)
             if (head == 0) {
                 head = PacketBatch::start_head(q);
                 if (_quick_clone)
-                    SET_PAINT_ANNO(head,PAINT_ANNO(q));
+                    SET_PAINT_ANNO(head,PAINT_ANNO(p));
                 last = head;
                 c = 1;
             } else {
                 //If next packet is for another output, send the pending batch and start a new one
-                if (PAINT_ANNO(q) != PAINT_ANNO(head)) {
+                if (PAINT_ANNO(p) != PAINT_ANNO(head)) {
                     output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
                     head = PacketBatch::start_head(q);
                     if (_quick_clone)
-                        SET_PAINT_ANNO(head,PAINT_ANNO(q));
+                        SET_PAINT_ANNO(head,PAINT_ANNO(p));
                     last = head;
                     c = 1;
                 } else {
@@ -360,7 +360,7 @@ MultiReplayUnqueue::run_task(Task* task)
                 }
             }
 #else
-            output(PAINT_ANNO(q)).push(q);
+            output(PAINT_ANNO(p)).push(q);
 #endif
         n++;
     }
