@@ -43,7 +43,7 @@ int CheckNumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
-inline Packet* CheckNumberPacket::smaction(Packet* p) {
+inline int CheckNumberPacket::smaction(Packet* p) {
     WritablePacket *wp = nullptr;
     if (p->length() >= _offset + 8) {
         wp = p->uniqueify();
@@ -55,24 +55,25 @@ inline Packet* CheckNumberPacket::smaction(Packet* p) {
     uint64_t n = *reinterpret_cast<uint64_t *>(wp->data() + _offset);
     if (n >= (uint64_t)_count) {
         click_chatter("%p{element} : %lu out of scope (count is %d) !",this,n,_count);
+        return 1;
     } else {
         _numbers[n]++;
     }
-    return wp;
+    return 0;
 }
 
-Packet*
-CheckNumberPacket::simple_action(Packet *p) {
-    return smaction(p);
+void
+CheckNumberPacket::push(int i, Packet *p) {
+    checked_output_push(smaction(p), p);
 }
 
 #if HAVE_BATCH
-PacketBatch*
-CheckNumberPacket::simple_action_batch(PacketBatch *batch) {
-    FOR_EACH_PACKET_SAFE(batch,p) {
-        p = smaction(p);
-    }
-    return batch;
+void
+CheckNumberPacket::push_batch(int i, PacketBatch *batch) {
+    PacketBatch* ok = 0;
+    CLASSIFY_EACH_PACKET(noutputs(),smaction,batch,[this](int i, PacketBatch* b){
+        this->checked_output_push_batch(i, b);
+    });
 }
 #endif
 

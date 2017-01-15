@@ -28,15 +28,15 @@ public:
     ~CheckNumberPacket() CLICK_COLD;
 
     const char *class_name() const { return "CheckNumberPacket"; }
-    const char *port_count() const { return PORTS_1_1; }
-    const char *processing() const { return AGNOSTIC; }
+    const char *port_count() const { return PORTS_1_1X2; }
+    const char *processing() const { return PUSH; }
     const char *flow_code() const { return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    Packet * simple_action(Packet *) override;
+    void push(int,Packet *) override;
 #if HAVE_BATCH
-    PacketBatch * simple_action_batch(PacketBatch *) override;
+    void push_batch(int,PacketBatch *) override;
 #endif
 
     static inline uint64_t read_number_of_packet(const Packet *p,int offset) {
@@ -54,7 +54,7 @@ private:
     static int write_handler(const String &s_in, Element *e, void *thunk, ErrorHandler *errh);
     static String read_handler(Element *e, void *thunk);
 
-    inline Packet* smaction(Packet* p) CLICK_WARN_UNUSED_RESULT;
+    inline int smaction(Packet* p) CLICK_WARN_UNUSED_RESULT;
 
 
 };
