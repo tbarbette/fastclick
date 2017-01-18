@@ -1190,7 +1190,7 @@ Router::initialize(ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (all_ok) {
-        //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instanciating batches
+        //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instantiating batches
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
             Element* e = _elements[i];
@@ -1217,7 +1217,10 @@ Router::initialize(ErrorHandler *errh)
                 e->receives_batch = false;
                 continue; //This element is traversed by packets... nothing to do.
             } else if (e->in_batch_mode == Element::BATCH_MODE_NEEDED) {
-                click_chatter("%s needs to receive batch ! Please check your configuration.",e->name().c_str());
+                click_chatter("%p{element} is a batch-only element ! Please "
+                        "check that all elements sending packets to it are "
+                        "producing batches of packets instead of single "
+                        "packets.",this);
                 all_ok = false;
                 break;
             }

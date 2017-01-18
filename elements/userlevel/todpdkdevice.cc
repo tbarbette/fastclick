@@ -90,7 +90,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         errh->warning("BURST should not be upper than half the number of descriptor (%d)",ndesc);
     }
 
-    if (_burst == 1) {
+    if (_burst == 1 && _timeout == 0) {
         _timeout = -1;
     }
 
@@ -100,11 +100,9 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
     for (unsigned i = 0; i < _iqueues.weight();i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
-        if (_timeout >= 0) {
-            _iqueues.get_value(i).timeout.assign(this);
-            _iqueues.get_value(i).timeout.initialize(this);
-            _iqueues.get_value(i).timeout.move_thread(i);
-        }
+        _iqueues.get_value(i).timeout.assign(this);
+        _iqueues.get_value(i).timeout.initialize(this);
+        _iqueues.get_value(i).timeout.move_thread(i);
     }
 
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
@@ -168,7 +166,7 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
      */
     unsigned sub_burst;
 
-    lock();
+    lock(); // ! This is a queue lock, not a thread lock.
 
     do {
         sub_burst = iqueue.nr_pending > 32 ? 32 : iqueue.nr_pending;
@@ -189,10 +187,6 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
     unlock();
 
     add_count(sent);
-
-    // If ring is empty, reset the index to avoid wrap ups
-    if (iqueue.nr_pending == 0)
-        iqueue.index = 0;
 }
 
 void ToDPDKDevice::push(int, Packet *p)

@@ -705,6 +705,7 @@ xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
 USE_DPDK
+RTE_VER_MONTH
 RTE_VER_YEAR
 RTE_VER_MINOR
 RTE_VER_MAJOR
@@ -6669,6 +6670,7 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
     rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
     rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
     rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
 
 
 
@@ -6677,6 +6679,8 @@ Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
     RTE_VER_MINOR=$rte_ver_minor
 
     RTE_VER_YEAR=$rte_ver_year
+
+    RTE_VER_MONTH=$rte_ver_month
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
@@ -13244,9 +13248,9 @@ $as_echo_n "checking for GNU make... " >&6; }
 if ${ac_cv_gnu_make+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  if /bin/sh -c 'make -f /dev/null -n --version | grep GNU' >/dev/null 2>&1; then
+  if /bin/sh -c 'make -f /dev/null -n --version | grep GNU' >/dev/null 2>/dev/null; then
             ac_cv_gnu_make='make'
-        elif /bin/sh -c 'gmake -f /dev/null -n --version | grep GNU' >/dev/null 2>&1; then
+        elif /bin/sh -c 'gmake -f /dev/null -n --version | grep GNU' >/dev/null 2>/dev/null; then
             ac_cv_gnu_make='gmake'
         else
             ac_cv_gnu_make='not found'
@@ -13256,7 +13260,7 @@ fi
 $as_echo "$ac_cv_gnu_make" >&6; }
         test "$ac_cv_gnu_make" != 'not found' && GMAKE="$ac_cv_gnu_make"
     else
-        /bin/sh -c '$GMAKE -f /dev/null -n --version | grep GNU' >/dev/null 2>&1 || GMAKE=''
+        /bin/sh -c '$GMAKE -f /dev/null -n --version | grep GNU' >/dev/null 2>/dev/null || GMAKE='1'
     fi
 
     SUBMAKE=''

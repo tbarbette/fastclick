@@ -26,7 +26,7 @@ CLICK_DECLS
 MultiReplayBase::MultiReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false)
 {
 #if HAVE_BATCH
-	in_batch_mode = BATCH_MODE_YES;
+    in_batch_mode = BATCH_MODE_YES;
 #endif
 }
 
@@ -36,95 +36,95 @@ MultiReplayBase::~MultiReplayBase()
 
 
 inline bool MultiReplayBase::load_packets() {
-		Packet* p_input[ninputs()];
-		bzero(p_input,sizeof(Packet*) * ninputs());
-		int first_i = -1;
-		Timestamp first_t;
-		Packet* queue_tail = 0;
-		int count = 0;
+        Packet* p_input[ninputs()];
+        bzero(p_input,sizeof(Packet*) * ninputs());
+        int first_i = -1;
+        Timestamp first_t;
+        Packet* queue_tail = 0;
+        int count = 0;
 
-		click_chatter("Loading %s with %d inputs.",name().c_str(),ninputs());
-		//Dry is the index of the first input to dry out
-		int dry = -1;
-		do {
-			for (int i = 0; i < ninputs(); i++) {
-				if (p_input[i] == 0) {
-					do_pull:
+        click_chatter("Loading %s with %d inputs.",name().c_str(),ninputs());
+        //Dry is the index of the first input to dry out
+        int dry = -1;
+        do {
+            for (int i = 0; i < ninputs(); i++) {
+                if (p_input[i] == 0) {
+                    do_pull:
 #if HAVE_BATCH
-					p_input[i] = input_pull_batch(i,1);
+                    p_input[i] = input_pull_batch(i,1);
 #else
-					p_input[i] = input(i).pull();
+                    p_input[i] = input(i).pull();
 #endif
-					if (p_input[i] == 0) {
-						if (_use_signal && _input[i].signal.active()) {
-							goto do_pull;
-						}
-						dry = i;
-						break;
-					}
-				}
+                    if (p_input[i] == 0) {
+                        if (_use_signal && _input[i].signal.active()) {
+                            goto do_pull;
+                        }
+                        dry = i;
+                        break;
+                    }
+                }
 
-				Packet*& p = p_input[i];
-				Timestamp t = p->timestamp_anno();
-				if (i == 0) {
-					first_i = 0;
-					first_t = t;
-				} else {
-					if (t <  first_t) {
-						first_i = i;
-						first_t = t;
-					}
-				}
-			}
-			if (dry >= 0)
-				break;
-			if (!_queue_head) {
-				_queue_head = p_input[first_i];
-			} else {
-				queue_tail->set_next(p_input[first_i]);
-			}
-			queue_tail = p_input[first_i];
-			SET_PAINT_ANNO(p_input[first_i],first_i);
-			p_input[first_i] = 0;
-			count++;
-			if (!router()->running())
-				return false;
-		} while(dry < 0);
+                Packet*& p = p_input[i];
+                Timestamp t = p->timestamp_anno();
+                if (i == 0) {
+                    first_i = 0;
+                    first_t = t;
+                } else {
+                    if (t <  first_t) {
+                        first_i = i;
+                        first_t = t;
+                    }
+                }
+            }
+            if (dry >= 0)
+                break;
+            if (!_queue_head) {
+                _queue_head = p_input[first_i];
+            } else {
+                queue_tail->set_next(p_input[first_i]);
+            }
+            queue_tail = p_input[first_i];
+            SET_PAINT_ANNO(p_input[first_i],first_i);
+            p_input[first_i] = 0;
+            count++;
+            if (!router()->running())
+                return false;
+        } while(dry < 0);
 
-		click_chatter("%s : Successfully loaded %d packets. Input %d dried out.",name().c_str(),count,dry);
+        click_chatter("%s : Successfully loaded %d packets. Input %d dried out.",name().c_str(),count,dry);
 
-		//Clean left overs
-		for (int i = 0; i < ninputs(); i++) {
-			if (p_input[i])
-				p_input[i]->kill();
-		}
-		_loaded = true;
-		_queue_current = _queue_head;
-		return true;
+        //Clean left overs
+        for (int i = 0; i < ninputs(); i++) {
+            if (p_input[i])
+                p_input[i]->kill();
+        }
+        _loaded = true;
+        _queue_current = _queue_head;
+        return true;
 }
 
 inline void MultiReplayBase::check_end_loop(Task* t) {
-	if (unlikely(!_queue_current)) {
-		_queue_current = _queue_head;
-		if (_stop > 0)
-			_stop--;
-		if (_stop == 0) {
-			router()->please_stop_driver();
-			_active = false;
-			return;
-		}
-		if (_verbose)
-			click_chatter("MultiReplay loop");
-	}
-	t->fast_reschedule();
+    if (unlikely(!_queue_current)) {
+        _queue_current = _queue_head;
+        if (_stop > 0)
+            _stop--;
+        if (_stop == 0) {
+            router()->please_stop_driver();
+            _active = false;
+            return;
+        }
+        if (_verbose)
+            click_chatter("MultiReplay loop");
+    }
+    t->fast_reschedule();
 }
 
 void MultiReplayBase::cleanup_packets() {
-	while (_queue_head) {
-		Packet* next = _queue_head->next();
-		_queue_head->kill();
-		_queue_head = next;
-	}
+    while (_queue_head) {
+        Packet* next = _queue_head->next();
+        _queue_head->kill();
+        _queue_head = next;
+    }
 }
 
 void MultiReplayBase::cleanup(CleanupStage) {
@@ -187,9 +187,9 @@ void *
 MultiReplay::cast(const char *n)
 {
     if (strcmp(n, Notifier::EMPTY_NOTIFIER) == 0)
-	return static_cast<Notifier *>(&_notifier);
+    return static_cast<Notifier *>(&_notifier);
     else
-	return Element::cast(n);
+    return Element::cast(n);
 }
 
 
@@ -197,25 +197,26 @@ int
 MultiReplay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	.read_p("QUEUE", _queue)
-	.read("STOP", _stop)
-	.read("QUICK_CLONE", _quick_clone)
-	.read("USE_SIGNAL",_use_signal)
-	.read("ACTIVE",_active)
-	.complete() < 0)
+        .read_p("QUEUE", _queue)
+        .read("STOP", _stop)
+        .read("QUICK_CLONE", _quick_clone)
+        .read("USE_SIGNAL",_use_signal)
+        .read("ACTIVE",_active)
+        .read("VERBOSE", _verbose)
+    .complete() < 0)
     return -1;
     return 0;
 }
 
 Packet* MultiReplay::pull(int port) {
-	_task.reschedule();
+    _task.reschedule();
     return _output[port].ring.extract();
 }
 
 #if HAVE_BATCH
 PacketBatch* MultiReplay::pull_batch(int port, unsigned max) {
-	PacketBatch* head;
-	_task.reschedule();
+    PacketBatch* head;
+    _task.reschedule();
     MAKE_BATCH(_output[port].ring.extract(),head,max);
     return head;
 }
@@ -223,18 +224,18 @@ PacketBatch* MultiReplay::pull_batch(int port, unsigned max) {
 
 int
 MultiReplay::initialize(ErrorHandler * errh) {
-	_notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
-	_notifier.set_active(false,false);
-	_input.resize(ninputs());
-	for (int i = 0 ; i < ninputs(); i++) {
-		_input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
-	}
-	_output.resize(noutputs());
-	for (int i = 0; i < _output.size(); i++) {
-		_output[i].ring.initialize(_queue);
-	}
-	ScheduleInfo::initialize_task(this,&_task,_active,errh);
-	return 0;
+    _notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
+    _notifier.set_active(false,false);
+    _input.resize(ninputs());
+    for (int i = 0 ; i < ninputs(); i++) {
+        _input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
+    }
+    _output.resize(noutputs());
+    for (int i = 0; i < _output.size(); i++) {
+        _output[i].ring.initialize(_queue);
+    }
+    ScheduleInfo::initialize_task(this,&_task,_active,errh);
+    return 0;
 }
 
 
@@ -242,37 +243,37 @@ MultiReplay::initialize(ErrorHandler * errh) {
 bool
 MultiReplay::run_task(Task* task)
 {
-	if (!_active)
-		return false;
+    if (!_active)
+        return false;
 
-	if (unlikely(!_loaded && !load_packets()))
-		return false;
+    if (unlikely(!_loaded && !load_packets()))
+        return false;
 
-	unsigned int n = 0;
-	while (_queue_current != 0 && n < _burst) {
-		Packet* p = _queue_current;
+    unsigned int n = 0;
+    while (_queue_current != 0 && n < _burst) {
+        Packet* p = _queue_current;
 
-		if (_output[PAINT_ANNO(p)].ring.is_full()) {
-			_notifier.sleep();
-			return n > 0;
-		} else {
-			_queue_current = p->next();
-			Packet* q;
-			if (_stop != 1) {
-				q = p->clone(_quick_clone);
-			} else {
-				q = p;
-				_queue_head = _queue_current;
-			}
-			assert(_output[PAINT_ANNO(p)].ring.insert(q));
-			_notifier.wake();
-		}
-		n++;
-	}
+        if (_output[PAINT_ANNO(p)].ring.is_full()) {
+            _notifier.sleep();
+            return n > 0;
+        } else {
+            _queue_current = p->next();
+            Packet* q;
+            if (_stop != 1) {
+                q = p->clone(_quick_clone);
+            } else {
+                q = p;
+                _queue_head = _queue_current;
+            }
+            assert(_output[PAINT_ANNO(p)].ring.insert(q));
+            _notifier.wake();
+        }
+        n++;
+    }
 
-	check_end_loop(task);
+    check_end_loop(task);
 
-	return n > 0;
+    return n > 0;
 }
 
 
@@ -290,87 +291,90 @@ int
 MultiReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	.read("STOP", _stop)
-	.read("QUICK_CLONE", _quick_clone)
-	.read("USE_SIGNAL",_use_signal)
-	.read("ACTIVE",_active)
-	.complete() < 0)
+        .read("STOP", _stop)
+        .read("QUICK_CLONE", _quick_clone)
+        .read("USE_SIGNAL",_use_signal)
+        .read("ACTIVE",_active)
+        .read("VERBOSE", _verbose)
+        .complete() < 0)
     return -1;
     return 0;
 }
 
 int
 MultiReplayUnqueue::initialize(ErrorHandler * errh) {
-	_input.resize(ninputs());
-	for (int i = 0 ; i < ninputs(); i++) {
-		_input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
-	}
-	ScheduleInfo::initialize_task(this,&_task,true,errh);
-	return 0;
+    _input.resize(ninputs());
+    for (int i = 0 ; i < ninputs(); i++) {
+        _input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
+    }
+    ScheduleInfo::initialize_task(this,&_task,true,errh);
+    return 0;
 }
 
 bool
 MultiReplayUnqueue::run_task(Task* task)
 {
-	if (!_active)
-		return false;
+    if (!_active)
+        return false;
 
-	if (unlikely(!_loaded && !load_packets()))
-		return false;
-	unsigned int n = 0;
+    if (unlikely(!_loaded && !load_packets()))
+        return false;
+    unsigned int n = 0;
 #if HAVE_BATCH
-	unsigned int c = 0;
-	PacketBatch* head = 0;
-	Packet* last = 0;
+    unsigned int c = 0;
+    PacketBatch* head = 0;
+    Packet* last = 0;
 #endif
-	while (_queue_current != 0 && n < _burst) {
-		Packet* p = _queue_current;
+    while (_queue_current != 0 && n < _burst) {
+        Packet* p = _queue_current;
 
-			_queue_current = p->next();
-			Packet* q;
-			if (_stop != 1) {
-				q = p->clone(_quick_clone);
-				if (_quick_clone)
-					SET_PAINT_ANNO(q,PAINT_ANNO(p));
-			} else {
-				q = p;
-				_queue_head = _queue_current;
-			}
+            _queue_current = p->next();
+            Packet* q;
+            if (_stop != 1) {
+                q = p->clone(_quick_clone);
+            } else {
+                q = p;
+                _queue_head = _queue_current;
+            }
 #if HAVE_BATCH
-			if (head == 0) {
-				head = PacketBatch::start_head(q);
-				last = head;
-				c = 1;
-			} else {
-				//If next packet is for another output, send the pending batch and start a new one
-				if (PAINT_ANNO(q) != PAINT_ANNO(head)) {
-					output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
-					head = PacketBatch::start_head(q);
-					last = head;
-					c = 1;
-				} else {
-					//Just add the packet to the end of the batch
-					last->set_next(q);
-					last = q;
-					c++;
-				}
-			}
+            if (head == 0) {
+                head = PacketBatch::start_head(q);
+                if (_quick_clone)
+                    SET_PAINT_ANNO(head,PAINT_ANNO(q));
+                last = head;
+                c = 1;
+            } else {
+                //If next packet is for another output, send the pending batch and start a new one
+                if (PAINT_ANNO(q) != PAINT_ANNO(head)) {
+                    output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
+                    head = PacketBatch::start_head(q);
+                    if (_quick_clone)
+                        SET_PAINT_ANNO(head,PAINT_ANNO(q));
+                    last = head;
+                    c = 1;
+                } else {
+                    //Just add the packet to the end of the batch
+                    last->set_next(q);
+                    last = q;
+                    c++;
+                }
+            }
 #else
-			output(PAINT_ANNO(q)).push(q);
+            output(PAINT_ANNO(q)).push(q);
 #endif
-		n++;
-	}
+        n++;
+    }
 
 #if HAVE_BATCH
-	//Flush pending batch
-	if (head)
-		output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
+    //Flush pending batch
+    if (head)
+        output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
 #endif
 
 
-	check_end_loop(task);
+    check_end_loop(task);
 
-	return n > 0;
+    return n > 0;
 }
 
 

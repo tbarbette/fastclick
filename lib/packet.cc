@@ -780,7 +780,6 @@ assert(false); //TODO
 # endif
 }
 
-#endif
 void Packet::empty_destructor(unsigned char *, size_t, void *) {
 
 }
@@ -799,8 +798,13 @@ Packet::copy(Packet* p, int headroom)
     _tail = _data + p->length();
     copy_annotations(p);
     set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
-    set_network_header(p->network_header() ? data() + p->network_header_offset() : 0, p->network_header_length());
+    set_network_header(p->network_header() ? data() + p->network_header_offset() : 0);
+    if (p->has_transport_header())
+        set_transport_header(data() + p->transport_header_offset());
+    return true;
 }
+
+#endif
 
 //
 // UNIQUEIFICATION

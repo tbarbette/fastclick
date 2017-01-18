@@ -18,6 +18,8 @@
 
 #include <click/config.h>
 #include <click/netmapdevice.hh>
+#include <click/args.hh>
+#include <click/netmapdevice.hh>
 #include "ensurenetmapbuffer.hh"
 
 CLICK_DECLS
