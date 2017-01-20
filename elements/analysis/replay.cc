@@ -249,6 +249,12 @@ MultiReplay::run_task(Task* task)
     if (unlikely(!_loaded && !load_packets()))
         return false;
 
+    if (_stop == 0) {
+        router()->please_stop_driver();
+        _active = false;
+        return false;
+    }
+
     unsigned int n = 0;
     while (_queue_current != 0 && n < _burst) {
         Packet* p = _queue_current;
@@ -319,6 +325,13 @@ MultiReplayUnqueue::run_task(Task* task)
 
     if (unlikely(!_loaded && !load_packets()))
         return false;
+
+    if (_stop == 0) {
+        router()->please_stop_driver();
+        _active = false;
+        return false;
+    }
+
     unsigned int n = 0;
 #if HAVE_BATCH
     unsigned int c = 0;

@@ -21,9 +21,10 @@
 #include <clicknet/ip.h>
 #include <click/ipaddress.hh>
 #include <click/glue.hh>
+#include <click/args.hh>
 CLICK_DECLS
 
-TCPReflector::TCPReflector()
+TCPReflector::TCPReflector() : _data("")
 {
 }
 
@@ -31,9 +32,20 @@ TCPReflector::~TCPReflector()
 {
 }
 
-Packet *
-TCPReflector::tcp_input(Packet *xp)
+
+int
+TCPReflector::configure (Vector<String> &conf, ErrorHandler *errh)
 {
+    int ret;
+
+    ret = Args(conf, this, errh)
+            .read("DATA", _data)
+            .complete();
+    return ret;
+}
+
+Packet *
+TCPReflector::tcp_input(Packet *xp) {
   WritablePacket *p = xp->uniqueify();
   unsigned seq, ack, off, hlen;
   unsigned plen = p->length();
@@ -44,13 +56,17 @@ TCPReflector::tcp_input(Packet *xp)
   click_ip *ip;
   click_tcp *th;
 
-  if(plen < sizeof(click_ip) + sizeof(click_tcp))
-    goto ignore;
+  if (plen < sizeof(click_ip) + sizeof(click_tcp)) {
+      click_chatter("Packet too small for TCP");
+      goto ignore;
+  }
 
   ip = (click_ip *) p->data();
   hlen = ip->ip_hl << 2;
-  if (hlen < sizeof(click_ip) || hlen > plen)
+  if (hlen < sizeof(click_ip) || hlen > plen) {
+    click_chatter("Packet too small for IP");
     goto ignore;
+  }
 
   th = (click_tcp *) (((char *)ip) + hlen);
   off = th->th_off << 2;
@@ -83,6 +99,7 @@ TCPReflector::tcp_input(Packet *xp)
       th->th_ack = htonl(seq + dlen);
     }
   } else {
+      click_chatter("Unknown ignored");
     goto ignore;
   }
 
@@ -95,7 +112,28 @@ TCPReflector::tcp_input(Packet *xp)
   th->th_dport = sport;
   th->th_win = htons(60 * 1024);
 
+    if(dlen > 0 and _data) {
+
+        int diff = _data.length() + off + hlen - plen ;
+        if (diff > 0) {
+            p = p->put(diff);
+        } else {
+            p->take(-diff);
+        }
+
+        dlen = _data.length();
+        unsigned char* data = ((unsigned char *)th) + off;
+        memcpy(data,_data.data(),_data.length());
+
+        plen = p->length();
+        ip->ip_len = htons(plen - 20);
+        th->th_flags |= TH_FIN;
+
+
+    }
+
   memcpy(itmp, ip, 9);
+
   memset(ip, '\0', 9);
   ip->ip_sum = 0;
   ip->ip_len = htons(plen - 20);
