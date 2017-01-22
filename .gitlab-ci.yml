@@ -1,3 +1,6 @@
+variables:
+    DPDK_VERSION: "16.07"
+    NETMAP_VERSION: "11.1"
 batch:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule --disable-verbose-batch && make && make check
@@ -34,7 +37,7 @@ fbatch:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --enable-flow --enable-batch --disable-linuxmodule --disable-verbose-batch && make
 fnetmap:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --with-netmap --enable-flow --enable-batch  --enable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --enable-flow --enable-batch  --enable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make
 
 cache:
     paths:
