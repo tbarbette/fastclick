@@ -27,16 +27,19 @@ public:
 			       Element *from_e, int from_port, int distance) {
 		VirtualFlowBufferElement* fbe = dynamic_cast<VirtualFlowBufferElement*>(e);
 
-		if (fbe != NULL) {
+		if (fbe != NULL) { //The visited element is an element that need FCB space
+
 			//Resize the map if needed
 			if (fbe->flow_data_offset() + fbe->flow_data_size() > map.size()) map.resize(map.size() * 2);
+
 
 			if (fbe->flow_data_offset() != -1) { //If flow already have some classifier
 				if (fbe->flow_data_offset() >= data_size) {
 					data_size = fbe->flow_data_offset() + fbe->flow_data_size();
 				} else {
 					if (map.weight_range(fbe->flow_data_offset(),fbe->flow_data_size()) > 0 && !(fbe->flow_data_index() >= 0 && shared_position[fbe->flow_data_index()] == fbe->flow_data_offset())) {
-						click_chatter("ERROR : multiple assigner can assign flows for %s at overlapped positions, use the RESERVE parameter to provision space.",e->name().c_str());
+						click_chatter("ERROR : multiple assigner can assign flows for %s at overlapped positions, "
+											  "use the RESERVE parameter to provision space.",e->name().c_str());
 						e->router()->please_stop_driver();
 					}
 					if (data_size < fbe->flow_data_offset() + fbe->flow_data_size()) {
@@ -59,7 +62,9 @@ public:
 				fbe->_classifier = _classifier;
 			}
 			map.set_range(fbe->flow_data_offset(),fbe->flow_data_size(),true);
-			//click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
+#if DEBUG_FLOW
+			click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
+#endif
 		}
 		return true;
 	}

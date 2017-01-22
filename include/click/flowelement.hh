@@ -28,6 +28,9 @@ public:
 };
 
 
+/**
+ * Element that needs FCB space
+ */
 class VirtualFlowBufferElement : public FlowElement {
 public:
 	VirtualFlowBufferElement() :_flow_data_offset(-1), _classifier(0){
