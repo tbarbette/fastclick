@@ -15,29 +15,29 @@ int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* HTTPIn::processPacket(struct fcb *fcb, Packet* p)
+
+void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 {
-    WritablePacket *packet = p->uniqueify();
+    FOR_EACH_PACKET(flow, packet) {
+        if (!fcb->headerFound) {
+            //removeHeader(packet, "Content-Length");
+            //removeHeader(packet, "Transfer-Encoding");
+        }
 
-    if(!fcb->httpin.headerFound)
-    {
-        //removeHeader(packet, "Content-Length");
-        //removeHeader(packet, "Transfer-Encoding");
+        // Compute the offset of the HTML payload
+        const char *source = strstr((const char *) getPacketContentConst(packet), "\r\n\r\n");
+        if (source != NULL) {
+            uint32_t offset = (int) (source - (char *) packet->data() + 4);
+            setContentOffset(packet, offset);
+            fcb->headerFound = true;
+        }
     }
+    output(0).push_batch(flow);
 
-    // Compute the offset of the HTML payload
-    const char* source = strstr((const char*)getPacketContentConst(packet), "\r\n\r\n");
-    if(source != NULL)
-    {
-        uint32_t offset = (int)(source - (char*)packet->data() + 4);
-        setContentOffset(packet, offset);
-        fcb->httpin.headerFound = true;
-    }
 
-    return packet;
 }
 
-void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* header)
+void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
 {
     unsigned char* source = getPacketContent(packet);
     unsigned char* beginning = (unsigned char*)strstr((char*)source, header);
@@ -56,8 +56,8 @@ void HTTPIn::removeHeader(struct fcb *fcb, WritablePacket* packet, const char* h
 
     uint32_t position = beginning - packet->data();
 
-    removeBytes(fcb, packet, position, nbBytesToRemove);
-    setPacketModified(fcb, packet);
+    removeBytes(packet, position, nbBytesToRemove);
+    setPacketModified(packet);
 }
 
 CLICK_ENDDECLS

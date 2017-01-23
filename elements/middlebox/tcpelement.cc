@@ -10,14 +10,9 @@
 
 CLICK_DECLS
 
-TCPElement::TCPElement()
-{
 
-}
+TCPElement::TCPElement() {
 
-int TCPElement::configure(Vector<String> &conf, ErrorHandler *errh)
-{
-    return 0;
 }
 
 void TCPElement::computeChecksum(WritablePacket *packet)
@@ -118,7 +113,8 @@ Packet* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
     packet->pull(14);
 
     computeChecksum(packet);
-    setAnnotationModification(packet, true);
+
+    StackElement::setAnnotationModification(packet, true);
 
     return packet;
 }
@@ -153,5 +149,4 @@ unsigned int TCPElement::getOppositeFlowDirection()
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(TCPElement)
-//ELEMENT_MT_SAFE(TCPElement)
+ELEMENT_PROVIDES(TCPElement)

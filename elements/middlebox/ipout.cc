@@ -17,15 +17,17 @@ int IPOut::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* IPOut::processPacket(struct fcb*, Packet* p)
+void IPOut::push_batch(int port, PacketBatch* flow)
 {
-    WritablePacket *packet = p->uniqueify();
+    EXECUTE_FOR_EACH_PACKET([this](Packet* p){
+        WritablePacket *packet = p->uniqueify();
 
-    // Recompute the IP checksum if the packet has been modified
-    if(getAnnotationModification(packet))
-        computeChecksum(packet);
-
-    return p;
+        // Recompute the IP checksum if the packet has been modified
+        if (getAnnotationModification(packet))
+            computeChecksum(packet);
+        return packet;
+    }, flow);
+    output(0).push_batch(flow);
 }
 
 CLICK_ENDDECLS

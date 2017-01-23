@@ -5,7 +5,18 @@
 
 CLICK_DECLS
 
-class HTTPIn : public StackElement
+class fcb_httpin
+{
+public:
+    bool headerFound;
+
+    fcb_httpin()
+    {
+        headerFound = false;
+    }
+};
+
+class HTTPIn : public StackBufferElement<fcb_httpin>
 {
 public:
     HTTPIn() CLICK_COLD;
@@ -16,9 +27,10 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+    void push_batch(int port, fcb_httpin* fcb, PacketBatch* flow) override;
+
 protected:
-    Packet* processPacket(struct fcb*, Packet*);
-    void removeHeader(struct fcb *fcb, WritablePacket*, const char*);
+    void removeHeader(WritablePacket*, const char*);
 };
 
 CLICK_ENDDECLS

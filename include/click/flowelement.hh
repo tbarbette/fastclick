@@ -73,12 +73,18 @@ public :
 	virtual const size_t flow_data_size()  const { return sizeof(T); }
 
 
-	void push_batch(int port,PacketBatch* head) {
+	void push_batch(int port,PacketBatch* head) final {
 			T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);
 			push_batch(port, flowdata, head);
 	};
 
+	virtual PacketBatch* pull_batch(int port) final {
+		click_chatter("ERROR : Flow Elements do not support pull");
+		return 0;
+	}
+
 	virtual void push_batch(int port, T* flowdata, PacketBatch* head) = 0;
+
 
 
 

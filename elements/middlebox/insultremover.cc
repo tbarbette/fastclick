@@ -16,31 +16,30 @@ int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* InsultRemover::processPacket(struct fcb *fcb, Packet* p)
+void InsultRemover::push_batch(int port, PacketBatch* flow)
 {
-    WritablePacket *packet = p->uniqueify();
-    if(isPacketContentEmpty(packet))
-        return packet;
+    FOR_EACH_PACKET_SAFE(flow, p) {
+        WritablePacket *packet = p->uniqueify();
+        if (isPacketContentEmpty(packet))
+            continue;
 
-    unsigned char *source = getPacketContent(packet);
-    uint32_t contentOffset = getContentOffset(packet);
-    unsigned char* firstOccur = NULL;
+        unsigned char *source = getPacketContent(packet);
+        uint32_t contentOffset = getContentOffset(packet);
+        unsigned char *firstOccur = NULL;
 
-    while(source != NULL)
-    {
-        firstOccur = (unsigned char*)strstr((char*)source, "and");
-        if(firstOccur != NULL)
-        {
-            uint32_t position = firstOccur - packet->data();
+        while (source != NULL) {
+            firstOccur = (unsigned char *) strstr((char *) source, "and");
+            if (firstOccur != NULL) {
+                uint32_t position = firstOccur - packet->data();
 
-            removeBytes(fcb, packet, position, 3);
-            setPacketModified(fcb, packet);
+                removeBytes(packet, position, 3);
+                setPacketModified(packet);
+            }
+
+            source = firstOccur;
         }
-
-        source = firstOccur;
     }
-
-    return packet;
+    output(0).push_batch(flow);
 }
 
 CLICK_ENDDECLS

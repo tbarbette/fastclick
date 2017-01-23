@@ -2,18 +2,53 @@
 #define MIDDLEBOX_TCPREORDER_HH
 
 #include <click/config.h>
-#include <click/element.hh>
+#include <click/flowelement.hh>
 #include <click/memorypool.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include "tcpreordernode.hh"
-#include "fcb.hh"
 
 #define TCPREORDER_POOL_SIZE 20
 
 CLICK_DECLS
 
-class TCPReorder : public Element
+
+class fcb_tcpreorder
+{
+public:
+    struct TCPPacketListNode* packetList;
+    tcp_seq_t expectedPacketSeq;
+    MemoryPool<struct TCPPacketListNode> *pool;
+
+    fcb_tcpreorder()
+    {
+        packetList = NULL;
+        expectedPacketSeq = 0;
+        pool = NULL;
+    }
+
+    ~fcb_tcpreorder()
+    {
+        // Clean the list and free memory
+        struct TCPPacketListNode* node = packetList;
+        struct TCPPacketListNode* toDelete = NULL;
+
+        while(node != NULL)
+        {
+            toDelete = node;
+            node = node->next;
+
+            // Kill packet
+            toDelete->packet->kill();
+
+            // Put back node in memory pool
+            pool->releaseMemory(toDelete);
+        }
+        packetList = NULL;
+    }
+};
+
+class TCPReorder : public FlowBufferElement<fcb_tcpreorder>
 {
 public:
     TCPReorder() CLICK_COLD;
@@ -26,22 +61,19 @@ public:
 
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
 
-    void push(int, Packet*);
-
-    // Custom method
-    void processPacket(struct fcb *fcb, Packet* packet);
+    void push_batch(int port, fcb_tcpreorder* flowdata, PacketBatch* flow) override;
 
 protected:
 
 private:
-    void putPacketInList(struct fcb *fcb, Packet* packet);
-    void sendEligiblePackets(struct fcb *fcb);
+    void putPacketInList(fcb_tcpreorder *fcb, Packet* packet);
+    void sendEligiblePackets(fcb_tcpreorder *fcb);
     tcp_seq_t getSequenceNumber(Packet* packet);
     unsigned getPacketLength(Packet* packet);
-    void checkFirstPacket(struct fcb *fcb, Packet* packet);
+    void checkFirstPacket(fcb_tcpreorder *fcb, Packet* packet);
     bool isFinOrSyn(Packet* packet);
-    void flushList(struct fcb *fcb);
-    void checkRetransmission(struct fcb *fcb, Packet* packet);
+    void flushList(fcb_tcpreorder *fcb);
+    void checkRetransmission(fcb_tcpreorder *fcb, Packet* packet);
 
     MemoryPool<struct TCPPacketListNode> pool; // TODO: Ensure that is it per-thread
     unsigned int flowDirection;

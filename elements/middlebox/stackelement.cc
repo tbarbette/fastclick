@@ -3,9 +3,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include "stackelement.hh"
-
-// Simulation of the Middleclick FCBs
-struct fcb fcbArray[2];
+#include "httpin.hh"
 
 CLICK_DECLS
 
@@ -17,41 +15,6 @@ StackElement::StackElement()
 StackElement::~StackElement()
 {
 
-}
-
-void StackElement::push(int, Packet *packet)
-{
-    // Similate Middleclick's FCB management
-    // We traverse the function stack waiting for TCPIn to give the flow
-    // direction.
-    unsigned int flowDirection = determineFlowDirection();
-    Packet *p = processPacket(&fcbArray[flowDirection], packet);
-
-    if(p != NULL)
-        output(0).push(p);
-}
-
-Packet* StackElement::pull(int)
-{
-    Packet *packet = input(0).pull();
-
-    if(packet == NULL)
-        return NULL;
-
-    // Similate Middleclick's FCB management
-    // We traverse the function stack waiting for TCPIn to give the flow
-    // direction.
-    unsigned int flowDirection = determineFlowDirection();
-    Packet* p = processPacket(&fcbArray[flowDirection], packet);
-
-    return p;
-}
-
-Packet* StackElement::processPacket(struct fcb *fcb, Packet* p)
-{
-    click_chatter("Warning: A stack element has processed a packet in a generic way");
-
-    return p;
 }
 
 void StackElement::setContentOffset(Packet* p, uint16_t offset)
@@ -130,49 +93,49 @@ void StackElement::addStackElementInList(StackElement *element, int port)
     previousStackElement = element;
 }
 
-void StackElement::setPacketModified(struct fcb *fcb, WritablePacket* packet)
+void StackElement::setPacketModified(WritablePacket* packet)
 {
     // Call the "setPacketModified" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->setPacketModified(fcb, packet);
+    previousStackElement->setPacketModified(packet);
 }
 
-void StackElement::packetSent(struct fcb *fcb, Packet* packet)
+void StackElement::packetSent(Packet* packet)
 {
     // Call the "packetSent" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->packetSent(fcb, packet);
+    previousStackElement->packetSent(packet);
 }
 
-void StackElement::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void StackElement::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
     // Call the "removeBytes" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->removeBytes(fcb, packet, position, length);
+    previousStackElement->removeBytes(packet, position, length);
 }
 
-void StackElement::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void StackElement::insertBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
     // Call the "insertBytes" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->insertBytes(fcb, packet, position, length);
+    previousStackElement->insertBytes(packet, position, length);
 }
 
-void StackElement::requestMoreBytes(struct fcb *fcb)
+void StackElement::requestMoreBytes()
 {
     // Call the "requestMoreBytes" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->requestMoreBytes(fcb);
+    previousStackElement->requestMoreBytes();
 }
 
 bool StackElement::isStackElement(Element* element)

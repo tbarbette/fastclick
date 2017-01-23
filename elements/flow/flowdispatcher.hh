@@ -23,7 +23,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
-    void push_batch(int, int* flowdata, PacketBatch* batch);
+    void push_batch(int, int* flowdata, PacketBatch* batch) override;
 
     FlowNode* get_table();
 

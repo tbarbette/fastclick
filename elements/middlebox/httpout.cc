@@ -16,9 +16,9 @@ int HTTPOut::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* HTTPOut::processPacket(struct fcb*, Packet* p)
+void HTTPOut::push_batch(int, PacketBatch* flow)
 {
-    return p;
+    output(0).push_batch(flow);
 }
 
 CLICK_ENDDECLS

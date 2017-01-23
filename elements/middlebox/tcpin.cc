@@ -76,40 +76,41 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
+void TCPIn::push_batch(int port, fcb_tcpin* fcb, PacketBatch* flow)
 {
-    // Ensure that the pointers in the FCB are set
-    if(fcb->tcpin.poolModificationNodes == NULL)
-        fcb->tcpin.poolModificationNodes = &poolModificationNodes;
+    auto fnt = [this,fcb](Packet* p){
+        // Ensure that the pointers in the FCB are set
+        if (fcb->poolModificationNodes == NULL)
+            fcb->poolModificationNodes = &poolModificationNodes;
 
-    if(fcb->tcpin.poolModificationLists == NULL)
-        fcb->tcpin.poolModificationLists = &poolModificationLists;
+        if (fcb->poolModificationLists == NULL)
+            fcb->poolModificationLists = &poolModificationLists;
 
-    WritablePacket *packet = p->uniqueify();
+        WritablePacket *packet = p->uniqueify();
 
-    const click_tcp *tcph = packet->tcp_header();
+        const click_tcp *tcph = packet->tcp_header();
 
-    // Compute the offset of the TCP payload
-    unsigned tcph_len = tcph->th_off << 2;
-    uint16_t offset = (uint16_t)(packet->transport_header() + tcph_len - packet->data());
-    setContentOffset(packet, offset);
+        // Compute the offset of the TCP payload
+        unsigned tcph_len = tcph->th_off << 2;
+        uint16_t offset = (uint16_t) (packet->transport_header() + tcph_len - packet->data());
+        setContentOffset(packet, offset);
 
-    // Update the ack number according to the bytestreammaintainer of the other direction
-    tcp_seq_t ackNumber = getAckNumber(packet);
-    tcp_seq_t newAckNumber = fcb->tcp_common.maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
+        // Update the ack number according to the bytestreammaintainer of the other direction
+        tcp_seq_t ackNumber = getAckNumber(packet);
+        tcp_seq_t newAckNumber = fcb->maintainers[getOppositeFlowDirection()].mapAck(ackNumber);
 
-    if(ackNumber != newAckNumber)
-    {
-        click_chatter("Ack number %u becomes %u in flow %u", ackNumber, newAckNumber, flowDirection);
-        setAckNumber(packet, newAckNumber);
-        setPacketModified(fcb, packet);
-    }
-    else
-    {
-        click_chatter("Ack number %u stays the same in flow %u", ackNumber, flowDirection);
-    }
+        if (ackNumber != newAckNumber) {
+            click_chatter("Ack number %u becomes %u in flow %u", ackNumber, newAckNumber, flowDirection);
+            setAckNumber(packet, newAckNumber);
+            setPacketModified(packet);
+        } else {
+            click_chatter("Ack number %u stays the same in flow %u", ackNumber, flowDirection);
+        }
+        return packet;
+    };
+    EXECUTE_FOR_EACH_PACKET(fnt,flow);
+    output(0).push_batch(flow);
 
-    return packet;
 }
 
 TCPOut* TCPIn::getOutElement()
@@ -122,13 +123,13 @@ TCPIn* TCPIn::getReturnElement()
     return returnElement;
 }
 
-void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uint16_t sport,
+void TCPIn::closeConnection(fcb_tcpin* fcb, uint32_t saddr, uint32_t daddr, uint16_t sport,
                              uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
 {
     closeConnection(fcb, saddr, daddr, sport, dport, seq, ack, graceful, true);
 }
 
-void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uint16_t sport,
+void TCPIn::closeConnection(fcb_tcpin* fcb, uint32_t saddr, uint32_t daddr, uint16_t sport,
                              uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful, bool initiator)
 {
     // TODO: ungraceful part (RST)
@@ -137,43 +138,43 @@ void TCPIn::closeConnection(struct fcb* fcb, uint32_t saddr, uint32_t daddr, uin
 
     Packet *packet = forgePacket(saddr, daddr, sport, dport, seq, ack, TH_FIN);
     push(0, packet);
-    fcb->tcpin.closingState = TCPClosingState::FIN_WAIT;
+    fcb->closingState = TCPClosingState::FIN_WAIT;
 
     if(initiator)
         returnElement->closeConnection(fcb, daddr, saddr, dport, sport, ack, seq, graceful, false);
 }
 
-ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* packet)
+ModificationList* TCPIn::getModificationList(fcb_tcpin* fcb, WritablePacket* packet)
 {
-    HashTable<tcp_seq_t, ModificationList*> modificationLists = fcb->tcpin.modificationLists;
+    HashTable<tcp_seq_t, ModificationList*> modificationLists = fcb->modificationLists;
 
-    ModificationList* list = fcb->tcpin.modificationLists.get(getSequenceNumber(packet));
+    ModificationList* list = fcb->modificationLists.get(getSequenceNumber(packet));
 
     // If no list was assigned to this packet, create a new one
     if(list == NULL)
     {
-        ModificationList* listPtr = fcb->tcpin.poolModificationLists->getMemory();
+        ModificationList* listPtr = fcb->poolModificationLists->getMemory();
         // Call the constructor manually to have a clean object
         list = new(listPtr) ModificationList(&poolModificationNodes);
-        fcb->tcpin.modificationLists.set(getSequenceNumber(packet), list);
+        fcb->modificationLists.set(getSequenceNumber(packet), list);
     }
 
     return list;
 }
 
-bool TCPIn::hasModificationList(struct fcb *fcb, Packet* packet)
+bool TCPIn::hasModificationList(fcb_tcpin* fcb, Packet* packet)
 {
-    HashTable<tcp_seq_t, ModificationList*> modificationLists = fcb->tcpin.modificationLists;
+    HashTable<tcp_seq_t, ModificationList*> modificationLists = fcb->modificationLists;
 
-    ModificationList* list = fcb->tcpin.modificationLists.get(getSequenceNumber(packet));
+    ModificationList* list = fcb->modificationLists.get(getSequenceNumber(packet));
 
     return (list != NULL);
 }
 
-void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
     click_chatter("Removing %u bytes", length);
-    ModificationList* list = getModificationList(fcb, packet);
+    ModificationList* list = getModificationList(fcb(), packet);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
@@ -186,45 +187,45 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     packet->take(length);
 
     // Continue in the stack function
-    StackElement::removeBytes(fcb, packet, position, length);
+    StackElement::removeBytes(packet, position, length);
 }
 
-void TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void TCPIn::insertBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
     click_chatter("Adding %u bytes", length);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
-    getModificationList(fcb, packet)->addModification(seqNumber + position, (int)length);
+    getModificationList(fcb(), packet)->addModification(seqNumber + position, (int)length);
 
     unsigned char *source = packet->data();
     uint32_t bytesAfter = packet->length() + position;
 
     packet = packet->put(length);
     assert(packet != NULL);
-    
+
     memmove(&source[position + length], &source[position], bytesAfter);
 
     // Continue in the stack function
-    StackElement::insertBytes(fcb, packet, position, length);
+    StackElement::insertBytes(packet, position, length);
 }
 
-void TCPIn::requestMoreBytes(struct fcb *fcb)
+void TCPIn::requestMoreBytes()
 {
     //TODO
 
     // Continue in the stack function
-    StackElement::requestMoreBytes(fcb);
+    StackElement::requestMoreBytes();
 }
 
-void TCPIn::setPacketModified(struct fcb *fcb, WritablePacket* packet)
+void TCPIn::setPacketModified(WritablePacket* packet)
 {
     // Annotate the packet to indicate it has been modified
     // While going through "out elements", the checksum will be recomputed
     setAnnotationModification(packet, true);
 
     // Continue in the stack function
-    StackElement::setPacketModified(fcb, packet);
+    StackElement::setPacketModified(packet);
 }
 
 unsigned int TCPIn::determineFlowDirection()

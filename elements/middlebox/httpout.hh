@@ -18,8 +18,8 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-protected:
-    Packet* processPacket(struct fcb*, Packet*);
+    void push_batch(int, PacketBatch*) override;
+
 };
 
 CLICK_ENDDECLS

@@ -4,7 +4,7 @@
 #include <click/error.hh>
 #include "pathmerger.hh"
 #include "tcpelement.hh"
-
+/*
 CLICK_DECLS
 
 PathMerger::PathMerger()
@@ -23,28 +23,13 @@ int PathMerger::configure(Vector<String> &, ErrorHandler *)
     return 0;
 }
 
-void PathMerger::push(int port, Packet *packet)
-{
-    // Similate Middleclick's FCB management
-    // We traverse the function stack waiting for TCPIn to give the flow
-    // direction.
-    unsigned int flowDirection = determineFlowDirection();
-    // Add an entry to the hashtable in order to remember from which port
-    // this packet came from
-    addEntry(&fcbArray[flowDirection], packet, port);
-
-    if(packet != NULL)
-        output(0).push(packet);
-}
-
-
-int PathMerger::getPortForPacket(struct fcb* fcb, Packet *packet)
+int PathMerger::getPortForPacket(Packet *packet)
 {
     tcp_seq_t seqNumber = TCPElement::getSequenceNumber(packet);
     return fcb->pathmerger.portMap.get(seqNumber);
 }
 
-void PathMerger::setPortForPacket(struct fcb *fcb, Packet *packet, int port)
+void PathMerger::setPortForPacket(Packet *packet, int port)
 {
     tcp_seq_t seqNumber = TCPElement::getSequenceNumber(packet);
     fcb->pathmerger.portMap.set(seqNumber, port);
@@ -55,10 +40,10 @@ void PathMerger::addStackElementInList(StackElement* element, int port)
     previousStackElements[port] = element;
 }
 
-StackElement* PathMerger::getElementForPacket(struct fcb* fcb, Packet* packet)
+StackElement* PathMerger::getElementForPacket(Packet* packet)
 {
     StackElement *previousElem = NULL;
-    int port = getPortForPacket(fcb, packet);
+    int port = getPortForPacket(packet);
 
     if(port == 0 || port == 1)
         previousElem = previousStackElements[port];
@@ -66,31 +51,31 @@ StackElement* PathMerger::getElementForPacket(struct fcb* fcb, Packet* packet)
     return previousElem;
 }
 
-void PathMerger::setPacketModified(struct fcb *fcb, WritablePacket* packet)
+void PathMerger::setPacketModified(WritablePacket* packet)
 {
-    StackElement *previousElem = getElementForPacket(fcb, packet);
+    StackElement *previousElem = getElementForPacket(packet);
 
     if(previousElem != NULL)
-        previousElem->setPacketModified(fcb, packet);
+        previousElem->setPacketModified(packet);
 }
 
-void PathMerger::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void PathMerger::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
-    StackElement *previousElem = getElementForPacket(fcb, packet);
+    StackElement *previousElem = getElementForPacket(packet);
 
     if(previousElem != NULL)
-        previousElem->removeBytes(fcb, packet, position, length);
+        previousElem->removeBytes(packet, position, length);
 }
 
-void PathMerger::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void PathMerger::insertBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
-    StackElement *previousElem = getElementForPacket(fcb, packet);
+    StackElement *previousElem = getElementForPacket(packet);
 
     if(previousElem != NULL)
-        previousElem->insertBytes(fcb, packet, position, length);
+        previousElem->insertBytes(packet, position, length);
 }
 
-void PathMerger::requestMoreBytes(struct fcb *fcb)
+void PathMerger::requestMoreBytes()
 {
     // Only send this message on one of the path
     // The message is intented to be received by TCPIn which is at the
@@ -102,29 +87,29 @@ void PathMerger::requestMoreBytes(struct fcb *fcb)
     previousElem->requestMoreBytes(fcb);
 }
 
-void PathMerger::packetSent(struct fcb *fcb, Packet* packet)
+void PathMerger::packetSent(Packet* packet)
 {
-    StackElement *previousElem = getElementForPacket(fcb, packet);
+    StackElement *previousElem = getElementForPacket(packet);
 
     if(previousElem != NULL)
-        previousElem->packetSent(fcb, packet);
+        previousElem->packetSent(packet);
 
     // Remove the entry corresponding to the packet to free memory
-    removeEntry(fcb, packet);
+    removeEntry(packet);
 }
 
-void PathMerger::removeEntry(struct fcb *fcb, Packet *packet)
+void PathMerger::removeEntry(Packet *packet)
 {
     tcp_seq_t seqNumber = TCPElement::getSequenceNumber(packet);
     fcb->pathmerger.portMap.erase(seqNumber);
 }
 
-void PathMerger::addEntry(struct fcb *fcb, Packet *packet, int port)
+void PathMerger::addEntry(Packet *packet, int port)
 {
     tcp_seq_t seqNumber = TCPElement::getSequenceNumber(packet);
     fcb->pathmerger.portMap.set(seqNumber, port);
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(PathMerger)
-//ELEMENT_MT_SAFE(PathMerger)
+*/
+

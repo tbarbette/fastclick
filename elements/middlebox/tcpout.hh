@@ -9,7 +9,7 @@ class TCPIn;
 
 CLICK_DECLS
 
-class TCPOut : public TCPElement
+class TCPOut : public StackElement, TCPElement
 {
 public:
     TCPOut() CLICK_COLD;
@@ -24,9 +24,12 @@ public:
 
     void setInElement(TCPIn*);
 
+    void push_batch(int, PacketBatch*) override;
+
 protected:
-    Packet* processPacket(struct fcb*, Packet*);
+
     TCPIn* inElement;
+    friend class TCPIn;
 };
 
 CLICK_ENDDECLS

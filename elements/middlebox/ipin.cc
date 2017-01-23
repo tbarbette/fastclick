@@ -17,29 +17,31 @@ int IPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* IPIn::processPacket(struct fcb*, Packet* p)
+void IPIn::push_batch(int port, PacketBatch* flow)
 {
-    WritablePacket* packet = p->uniqueify();
+    EXECUTE_FOR_EACH_PACKET([this](Packet* p){
+        WritablePacket *packet = p->uniqueify();
 
-    setAnnotationModification(packet, false);
+        setAnnotationModification(packet, false);
 
-    // Compute the offset of the IP payload
-    const click_ip *iph = packet->ip_header();
-    unsigned iph_len = iph->ip_hl << 2;
-    uint16_t offset = (uint16_t)(packet->network_header() + iph_len - packet->data());
-    setContentOffset(packet, offset);
-
-    return packet;
+        // Compute the offset of the IP payload
+        const click_ip *iph = packet->ip_header();
+        unsigned iph_len = iph->ip_hl << 2;
+        uint16_t offset = (uint16_t) (packet->network_header() + iph_len - packet->data());
+        setContentOffset(packet, offset);
+        return packet;
+    }, flow);
+    output(0).push_batch(flow);
 }
 
-void IPIn::setPacketModified(struct fcb *fcb, WritablePacket* p)
+void IPIn::setPacketModified(WritablePacket* p)
 {
     // Annotate the packet to indicate it has been modified
     // While going through "out elements", the checksum will be recomputed
     setAnnotationModification(p, true);
 
     // Continue in the stack function
-    StackElement::setPacketModified(fcb, p);
+    StackElement::setPacketModified(p);
 }
 
 CLICK_ENDDECLS

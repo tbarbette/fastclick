@@ -2,6 +2,17 @@
 #define MIDDLEBOX_PATHMERGER_HH
 #include <click/element.hh>
 #include "stackelement.hh"
+/*
+
+class fcb_pathmerger
+{
+    HashTable<tcp_seq_t, int> portMap;
+
+    fcb_pathmerger() : portMap(-1)
+    {
+    }
+};
+
 
 CLICK_DECLS
 
@@ -17,26 +28,24 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push(int port, Packet *packet);
-
     virtual void addStackElementInList(StackElement* element, int port);
 
 protected:
-    virtual void setPacketModified(struct fcb *fcb, WritablePacket* packet);
-    virtual void removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
-    virtual void insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length);
-    virtual void requestMoreBytes(struct fcb *fcb);
-    virtual void packetSent(struct fcb *fcb, Packet* packet);
+    virtual void setPacketModified(WritablePacket* packet);
+    virtual void removeBytes(WritablePacket* packet, uint32_t position, uint32_t length);
+    virtual void insertBytes(WritablePacket* packet, uint32_t position, uint32_t length);
+    virtual void requestMoreBytes();
+    virtual void packetSent(Packet* packet);
 
 private:
     StackElement* previousStackElements[2];
 
-    int getPortForPacket(struct fcb *fcb, Packet *packet);
-    void setPortForPacket(struct fcb *fcb, Packet *packet, int port);
-    StackElement* getElementForPacket(struct fcb *fcb, Packet* packet);
-    void removeEntry(struct fcb *fcb, Packet* packet);
-    void addEntry(struct fcb *fcb, Packet* packet, int port);
-};
+    int getPortForPacket(Packet *packet);
+    void setPortForPacket(Packet *packet, int port);
+    StackElement* getElementForPacket(Packet* packet);
+    void removeEntry(Packet* packet);
+    void addEntry(Packet* packet, int port);
+};*/
 
 CLICK_ENDDECLS
 

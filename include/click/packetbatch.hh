@@ -24,7 +24,7 @@ CLICK_DECLS
                 Packet* p = batch;\
                 Packet* last = NULL;\
                 for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
-            Packet* q = fnt(p);\
+            Packet* q = (fnt)(p);\
                     if (q != p) {\
                         if (last) {\
                             last->set_next(q);\
@@ -38,7 +38,7 @@ CLICK_DECLS
 
 /**
  * Execute a function on each packet of a batch. The function may return
- * another packet, or null if the packet could be dropped.
+ * another packet, or null if the packet was dropped.
  */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\

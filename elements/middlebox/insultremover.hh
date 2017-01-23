@@ -16,8 +16,9 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+    void push_batch(int port, PacketBatch*) override;
 protected:
-    Packet* processPacket(struct fcb*, Packet*);
+
 };
 
 CLICK_ENDDECLS
