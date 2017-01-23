@@ -5,7 +5,6 @@
 #include <click/flowelement.hh>
 #include <click/router.hh>
 #include <click/routervisitor.hh>
-#include "fcb.hh"
 
 
 CLICK_DECLS
