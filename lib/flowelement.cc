@@ -41,6 +41,7 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 	}
 	return merged;
 }
+
 FlowNode*
 FlowElement::get_table() {
 	return FlowElementVisitor::get_downward_table(this,-1);

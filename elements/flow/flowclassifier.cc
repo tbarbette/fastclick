@@ -32,7 +32,6 @@ public:
 			//Resize the map if needed
 			if (fbe->flow_data_offset() + fbe->flow_data_size() > map.size()) map.resize(map.size() * 2);
 
-
 			if (fbe->flow_data_offset() != -1) { //If flow already have some classifier
 				if (fbe->flow_data_offset() >= data_size) {
 					data_size = fbe->flow_data_offset() + fbe->flow_data_size();
@@ -193,7 +192,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 	int count =0;
 	FlowControlBlock* fcb = 0;
 	while (p != NULL) {
-#if DEBUG_CLASSIFIER
+#if DEBUG_CLASSIFIER > 1
 		click_chatter("Packet %p in %s",p,name().c_str());
 #endif
 		Packet* next = p->next();
@@ -269,7 +268,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 	//click_chatter("Have %d packets.",batch->count());
 
 	while (p != NULL) {
-#if DEBUG_CLASSIFIER
+#if DEBUG_CLASSIFIER > 1
 		click_chatter("Packet %p in %s",p,name().c_str());
 #endif
 		Packet* next = p->next();

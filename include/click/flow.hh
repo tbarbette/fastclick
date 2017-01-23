@@ -51,6 +51,8 @@ public:
 	inline bool is_long() const {
 		return _islong;
 	}
+
+    virtual FlowLevel *duplicate() = 0;
 };
 
 class FlowNode;
@@ -104,14 +106,14 @@ public :
 		return !_is_leaf;
 	}
 
-	inline FlowNodePtr duplicate() {
+/*	inline FlowNodePtr duplicate() {
 		FlowNodePtr v;
 		v.ptr = ptr;
 		v._is_leaf = _is_leaf;
 		v.set_data(data());
 		return v;
 	}
-
+*/
 	void print();
 
 };
@@ -130,6 +132,7 @@ protected:
 
 	void duplicate_internal(FlowNode* node, bool recursive, int use_count) {
 		assign(node);
+        this->_level = node->level()->duplicate();
 		if (unlikely(recursive)) {
 			if (_default.ptr && _default.is_node()) {
 				_default.set_node(node->_default.node->duplicate(recursive, use_count));
@@ -150,7 +153,29 @@ protected:
 				}
 			}
 		}
+#if DEBUG_CLASSIFIER
+    this->assert_diff(node);
+#endif
+
 	}
+    void assert_diff(FlowNode* node) {
+        assert(node->level() != this->level());
+        FlowNode::NodeIterator* it = this->iterator();
+        FlowNode::NodeIterator* ito = node->iterator();
+	FlowNodePtr* child;
+	FlowNodePtr* childo;
+	while ((child = it->next()) != 0) {
+            childo = ito->next();
+            assert(child != childo);
+            assert(child->is_leaf() == childo->is_leaf());
+            if (child->is_leaf()) {
+            } else {
+                child->node->assert_diff(childo->node);
+            }
+        }
+        assert(this->default_ptr() != node->default_ptr());
+    }
+
 public:
 	FlowNodeData node_data;
 
@@ -361,6 +386,10 @@ public:
 	String print() {
 		return String("ANY");
 	}
+
+    FlowLevelDummy* duplicate() override {
+        return new FlowLevelDummy();
+    }
 };
 
 
@@ -370,11 +399,15 @@ public:
 class FlowLevelAggregate  : public FlowLevel {
 public:
 
-	FlowLevelAggregate() : offset(0), mask(-1) {
+    FlowLevelAggregate(int offset, uint32_t mask) : offset(offset), mask(mask) {
+    }
 
-	}
+    FlowLevelAggregate() : FlowLevelAggregate(0,-1) {
 
-	int offset;
+    }
+
+
+    int offset;
 	uint32_t mask;
 
 	inline long unsigned get_max_value() {
@@ -382,12 +415,18 @@ public:
 	}
 
 	inline FlowNodeData get_data(Packet* packet) {
-		return (FlowNodeData){.data_32 = (AGGREGATE_ANNO(packet) >> offset) & mask};
+        FlowNodeData data;
+		data.data_32 = (AGGREGATE_ANNO(packet) >> offset) & mask;
+        return data;
 	}
 
 	String print() {
 		return String("AGG");
 	}
+
+    FlowLevelAggregate* duplicate() override {
+        return new FlowLevelAggregate(0,-1);
+    }
 };
 
 /**
@@ -412,6 +451,10 @@ public:
 	String print() {
 		return String("THREAD");
 	}
+
+    FlowLevelThread* duplicate() override {
+        return new FlowLevelThread(_numthreads);
+    }
 };
 
 class FlowLevelOffset : public FlowLevel {
@@ -420,9 +463,13 @@ protected:
 
 public:
 
-	FlowLevelOffset() :  _offset(0) {
+	FlowLevelOffset(int offset) :  _offset(offset) {
 
 	}
+    FlowLevelOffset() :  FlowLevelOffset(0) {
+
+    }
+
 
 	void add_offset(int offset) {
 		_offset += offset;
@@ -436,15 +483,24 @@ public:
 		click_chatter("Offset equals");
 		return ((FlowLevel::equals(level))&& (_offset == dynamic_cast<FlowLevelOffset*>(level)->_offset));
 	}
+
 };
 /**
  * Flow level for any offset/mask of 8 bits
  */
 class FlowLevelGeneric8 : public FlowLevelOffset {
 private:
-	uint8_t _mask;
+
+
+    uint8_t _mask;
 public:
 
+    FlowLevelGeneric8(uint8_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
+
+    }
+    FlowLevelGeneric8() : FlowLevelGeneric8(0,0) {
+
+    }
 	void set_match(int offset, uint8_t mask) {
 		_mask = mask;
 		_offset = offset;
@@ -465,6 +521,11 @@ public:
 	String print() {
 		return String(_offset) + "/" + String((uint32_t)_mask) ;
 	}
+
+
+    FlowLevelGeneric8* duplicate() override {
+        return new FlowLevelGeneric8(_mask,_offset);
+    }
 };
 
 /**
@@ -474,6 +535,13 @@ class FlowLevelGeneric16 : public FlowLevelOffset {
 private:
 	uint16_t _mask;
 public:
+    FlowLevelGeneric16(uint16_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
+
+    }
+
+    FlowLevelGeneric16() : FlowLevelGeneric16(0,0) {
+
+    }
 
 	void set_match(int offset, uint16_t mask) {
 		_mask = htons(mask);
@@ -489,12 +557,18 @@ public:
 	}
 
 	inline FlowNodeData get_data(Packet* packet) {
-		return (FlowNodeData){.data_16 = (uint16_t)(*((uint16_t*)(packet->data() + _offset)) & _mask)};
+		FlowNodeData data;
+        data.data_16 = (uint16_t)(*((uint16_t*)(packet->data() + _offset)) & _mask);
+        return data;
 	}
 
 	String print() {
 		return String(_offset) + "/" + String(_mask) ;
 	}
+
+    FlowLevelGeneric16* duplicate() override {
+        return new FlowLevelGeneric16(_mask,_offset);
+    }
 };
 
 /**
@@ -505,7 +579,15 @@ private:
 	uint32_t _mask;
 public:
 
-	void set_match(int offset, uint32_t mask) {
+
+    FlowLevelGeneric32(uint32_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
+
+    }
+
+    FlowLevelGeneric32() : FlowLevelGeneric32(0,0) {
+
+    }
+    void set_match(int offset, uint32_t mask) {
 		_mask = htonl(mask);
 		_offset = offset;
 	}
@@ -519,12 +601,18 @@ public:
 	}
 
 	inline FlowNodeData get_data(Packet* packet) {
-		return (FlowNodeData){.data_32 = (uint32_t)(*((uint32_t*) (packet->data() + _offset)) & _mask)};
+        FlowNodeData data;
+		data.data_32 = (uint32_t)(*((uint32_t*) (packet->data() + _offset)) & _mask);
+        return data;
 	}
 
 	String print() {
 		return String(_offset) + "/" + String(_mask) ;
 	}
+
+    FlowLevelGeneric32* duplicate() override {
+        return new FlowLevelGeneric32(_mask,_offset);
+    }
 };
 
 /**
@@ -533,6 +621,10 @@ public:
 class FlowLevelGeneric64 : public FlowLevelOffset {
 	uint64_t _mask;
 public:
+
+    FlowLevelGeneric64(uint64_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
+
+    }
 
 	FlowLevelGeneric64() : _mask(0) {
 		_islong = true;
@@ -552,12 +644,18 @@ public:
 	}
 
 	inline FlowNodeData get_data(Packet* packet) {
-		return (FlowNodeData){.data_64 = (uint64_t)(*((uint64_t*) (packet->data() + _offset)) & _mask)};
+        FlowNodeData data;
+        data.data_64 = (uint64_t)(*((uint64_t*) (packet->data() + _offset)) & _mask);
+        return data;
 	}
 
 	String print() {
 		return String(_offset) + "/" + String(_mask) ;
 	}
+
+    FlowLevelGeneric64* duplicate() override {
+        return new FlowLevelGeneric64(_mask,_offset);
+    }
 };
 
 /**
@@ -627,7 +725,7 @@ public:
 		childs.resize(max_size);
 	}
 
-	FlowNode* duplicate(bool recursive,int use_count) {
+	FlowNode* duplicate(bool recursive,int use_count) override {
 		FlowNodeArray* fa = new FlowNodeArray(childs.size());
 		fa->duplicate_internal(this,recursive,use_count);
 		return fa;
@@ -830,7 +928,7 @@ class FlowNodeHash : public FlowNode  {
 
 	public:
 
-	FlowNode* duplicate(bool recursive,int use_count) {
+	FlowNode* duplicate(bool recursive,int use_count) override {
 		FlowNodeHash* fh = new FlowNodeHash();
 		fh->duplicate_internal(this,recursive,use_count);
 		return fh;
@@ -935,7 +1033,7 @@ class FlowNodeDummy : public FlowNode {
 			return "DUMMY";
 		}
 
-	FlowNode* duplicate(bool recursive,int use_count) {
+	FlowNode* duplicate(bool recursive,int use_count) override {
 		FlowNodeDummy* fh = new FlowNodeDummy();
 		fh->duplicate_internal(this,recursive,use_count);
 		return fh;
@@ -987,7 +1085,7 @@ class FlowNodeTwoCase : public FlowNode  {
 			return "TWOCASE";
 	}
 
-	FlowNode* duplicate(bool recursive,int use_count) {
+	FlowNode* duplicate(bool recursive,int use_count) override {
 		FlowNodeTwoCase* fh = new FlowNodeTwoCase(child);
 		fh->duplicate_internal(this,recursive,use_count);
 		return fh;
@@ -1074,7 +1172,7 @@ class FlowNodeThreeCase : public FlowNode  {
 		return "THREECASE";
 	}
 
-	FlowNode* duplicate(bool recursive,int use_count) {
+	FlowNode* duplicate(bool recursive,int use_count) override {
 		FlowNodeThreeCase* fh = new FlowNodeThreeCase(childA,childB);
 		fh->duplicate_internal(this,recursive,use_count);
 		return fh;

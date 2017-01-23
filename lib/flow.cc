@@ -108,9 +108,9 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 		if (_default.ptr != 0) {
 			if (_default.is_leaf() || (other->default_ptr() && other->default_ptr()->is_leaf())) {
 				click_chatter("COMBINE : Cannot combine leaf (a is %d, b is %d)!",_default.is_leaf(),other->default_ptr() && other->default_ptr()->is_leaf());
-			this->print();
-			other->print();
-			click_chatter("So, what do i do?");
+				this->print();
+				other->print();
+				click_chatter("So, what do i do?");
 				assert(false);
 			}
 			set_default(_default.node->combine(other->_default.node));
@@ -129,18 +129,21 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 		other->_default.ptr = 0; //Remove default from other node so it's not freed
 		delete other;
 		return this;
-	} else if (dynamic_cast<FlowLevelOffset*>(level()) && dynamic_cast<FlowLevelOffset*>(other->level())) {
+	}
+    /*
+    else if (dynamic_cast<FlowLevelOffset*>(level()) && dynamic_cast<FlowLevelOffset*>(other->level())) {
 #if DEBUG_CLASSIFIER
 		click_chatter("COMBINE : two level offset");
 #endif
+        assert(false);
 		FlowLevelOffset* o1 = dynamic_cast<FlowLevelOffset*>(level());
 		FlowLevelOffset* o2 = dynamic_cast<FlowLevelOffset*>(other->level());
 
-		/*if (o1->get_max_value() == o2->get_max_value() && abs(o1->offset() - o2->offset())) { //Offset is different
+//if (o1->get_max_value() == o2->get_max_value() && abs(o1->offset() - o2->offset())) { //Offset is different
 
-		}*/
+//		}
 	}
-
+*/
 	click_chatter("Combining different tables (%s and %s) is not supported for now, the first one will be added as default !",level()->print().c_str(),other->level()->print().c_str());
 	if (dynamic_cast<FlowLevelDummy*>(this->level()) != 0) {
 		//If this is a dummy, we can directly set our leaf as the child

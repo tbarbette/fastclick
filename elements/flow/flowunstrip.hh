@@ -36,7 +36,7 @@ class FlowUnstrip : public FlowElement {
   PacketBatch *simple_action_batch(PacketBatch *);
 
   inline void apply_offset(FlowNode* node) {
-  	node->level()->add_offset(_nbytes);
+	node->level()->add_offset(-_nbytes);
 
   	FlowNode::NodeIterator* it = node->iterator();
 		FlowNodePtr* child;
