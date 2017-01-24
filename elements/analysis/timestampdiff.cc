@@ -24,6 +24,7 @@
 
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/straccum.hh>
 #include <click/timestamp.hh>
 
 #include "numberpacket.hh"
@@ -50,7 +51,8 @@ enum {
     TSD_AVG_HANDLER,
     TSD_MIN_HANDLER,
     TSD_MAX_HANDLER,
-    TSD_STD_HANDLER
+    TSD_STD_HANDLER,
+    TSD_DUMP_HANDLER
 };
 
 String TimestampDiff::read_handler(Element *e, void *arg) {
@@ -79,6 +81,12 @@ String TimestampDiff::read_handler(Element *e, void *arg) {
                 var += pow(delay - mean, 2);
             return String(sqrt(var / tsd->_delays.size()));
         }
+        case TSD_DUMP_HANDLER: {
+            StringAccum s;
+            for (size_t i = 0; i < tsd->_delays.size(); ++i)
+                s << i << ": " << String(tsd->_delays[i]) << "\n";
+            return s.take_string();
+        }
         default:
             return String("Unknown read handler for TimestampDiff");
     }
@@ -89,6 +97,7 @@ void TimestampDiff::add_handlers() {
     add_read_handler("min", read_handler, TSD_MIN_HANDLER);
     add_read_handler("max", read_handler, TSD_MAX_HANDLER);
     add_read_handler("stddev", read_handler, TSD_STD_HANDLER);
+    add_read_handler("dump", read_handler, TSD_DUMP_HANDLER);
 }
 
 inline void TimestampDiff::smaction(Packet* p) {
