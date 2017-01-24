@@ -31,7 +31,7 @@
 
 CLICK_DECLS
 
-TimestampDiff::TimestampDiff() {
+TimestampDiff::TimestampDiff() : _delays(), _offset(40) {
 }
 
 TimestampDiff::~TimestampDiff() {
