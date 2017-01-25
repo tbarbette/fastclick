@@ -46,11 +46,11 @@ private:
 			use_count = 0;
 		}
 
-		inline void acquire(int packets_nr) {
+		inline void acquire(int packets_nr = 1) {
 			use_count+=packets_nr;
 		}
 
-		inline void release(int packets_nr);
+		inline void release(int packets_nr = 1);
 
 		inline void clear() {
 			use_count = 0;

@@ -5,14 +5,26 @@
 #include <click/multithread.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
+
+#define IPLOADBALANCER_MP 1
+#if IPLOADBALANCER_MP
 #include <click/hashtablemp.hh>
+#else
+#include <click/hashtable.hh>
+#endif
 CLICK_DECLS
+
+
 
 class IPPair {
   public:
 
     IPAddress src;
     IPAddress dst;
+    IPPair() {
+        src = 0;
+        dst = 0;
+    }
     IPPair(IPAddress a, IPAddress b) {
         src = a;
         dst = b;
@@ -42,7 +54,11 @@ struct LBEntry {
    }
 
 };
+#if IPLOADBALANCER_MP
 typedef HashTableMP<LBEntry,IPPair> LBHashtable;
+#else
+typedef HashTable<LBEntry,IPPair> LBHashtable;
+#endif
 class FlowIPLoadBalancer : public FlowBufferElement<IPPair> {
 
 public:
@@ -61,7 +77,8 @@ public:
 private:
     per_thread<int> _last;
     Vector<IPAddress> _dsts;
-    IPAddress _sip;
+    Vector<IPAddress> _sips;
+    //IPAddress _sip;
 
     LBHashtable _map;
     friend class FlowIPLoadBalancerReverse;

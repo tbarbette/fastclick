@@ -922,7 +922,7 @@ class FlowNodeHash : public FlowNode  {
 	};
 
 	void resize() {
-
+/*
 		int current_size = hash_size;
 		if (size_n < HASH_SIZES_NR)
 			hash_size = hash_sizes[size_n];
@@ -955,7 +955,7 @@ class FlowNodeHash : public FlowNode  {
 					}
 				}
 			}
-		}
+		}*/
 
 
 	}
@@ -968,8 +968,8 @@ class FlowNodeHash : public FlowNode  {
 		return fh;
 	}
 
-	FlowNodeHash() :size_n(1){
-		hash_size = hash_sizes[0];
+	FlowNodeHash() :size_n(FlowNodeHash::HASH_SIZES_NR){
+		hash_size = hash_sizes[size_n -1];
 		mask = hash_size - 1;
 		highwater = hash_size / 3;
 		max_highwater = hash_size / 2;
@@ -990,8 +990,8 @@ class FlowNodeHash : public FlowNode  {
 		//If it's a released node
 		if (childs[idx].ptr && childs[idx].is_node() && _child_deletable && childs[idx].node->released()) {
 			num++;
-			if (num > max_highwater)
-				resize();
+			/*if (num > max_highwater)
+				resize();*/
 		}
 		//TODO : should not it be the contrary?
 
@@ -1347,7 +1347,9 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 					if (parent->level()->is_dynamic()) {
 						parent->inc_num();
 						if (parent->get_default().is_leaf()) { //Leaf are not duplicated, we need to do it ourself
+#if DEBUG_CLASSIFIER
 							click_chatter("DUPLICATE leaf");
+#endif
 							//click_chatter("New leaf with data '%x'",data.data_64);
 							//click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
 							child_ptr->set_leaf(_pool.allocate());
@@ -1356,7 +1358,9 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 							child_ptr->leaf->release_fnt = _pool_release_fnt;
 							child_ptr->set_data(data);
 							memcpy(&child_ptr->leaf->node_data[1], &parent->default_ptr()->leaf->node_data[1] ,_pool.data_size() - sizeof(FlowNodeData));
+#if DEBUG_CLASSIFIER
 							_root->print();
+#endif
 							return child_ptr->leaf;
 						} else {
 							click_chatter("DUPLICATE child");

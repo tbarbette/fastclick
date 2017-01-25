@@ -28,8 +28,8 @@ CLICK_DECLS
 __thread FlowControlBlock* fcb_stack = 0;
 
 const int FlowNodeHash::HASH_SIZES_NR = 10;
-//const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
-const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {256,512,1024,2048,4096,8192};
+const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
+//const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {256,512,1024,2048,4096,8192};
 
 void FlowClassificationTable::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt) {
 	_pool_release_fnt = pool_release_fnt;

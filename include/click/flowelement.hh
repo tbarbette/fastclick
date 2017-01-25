@@ -72,10 +72,21 @@ public :
 
 	virtual const size_t flow_data_size()  const { return sizeof(T); }
 
+	inline void fcb_acquire() {
+	    fcb_stack->acquire();
+	}
+
+	inline void fcb_release() {
+	        fcb_stack->release();
+	    }
+
+	inline T* fcb_data() {
+	    T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);
+	    return flowdata;
+	}
 
 	void push_batch(int port,PacketBatch* head) final {
-			T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);
-			push_batch(port, flowdata, head);
+			push_batch(port, fcb_data(), head);
 	};
 
 	virtual PacketBatch* pull_batch(int port) final {

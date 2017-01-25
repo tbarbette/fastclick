@@ -12,7 +12,7 @@
 
 CLICK_DECLS
 
-#define DEBUG_LB 1
+#define DEBUG_LB 0
 int _offset = 0;
 
 inline void rewrite_ips(WritablePacket* q, IPPair pair) {
@@ -44,10 +44,12 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
-               .read("SIP",_sip)
+               .read("SIP",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_sips)
                .complete() < 0)
         return -1;
-    click_chatter("%p{element} has %d routes",this,_dsts.size());
+    click_chatter("%p{element} has %d routes and %d sources",this,_dsts.size(),_sips.size());
+    if (_dsts.size() !=_sips.size())
+        return errh->error("The number of SIP must match DST");
     return 0;
 }
 
@@ -66,7 +68,7 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
         int server = _last++;
         if (*_last >= _dsts.size())
             *_last = 0;
-        flowdata->src = _sip;
+        flowdata->src = _sips[server];
         flowdata->dst = _dsts[server];
 #if DEBUG_LB
         click_chatter("New output %d, next is %d",server,*_last);
@@ -81,6 +83,7 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
 #if DEBUG_LB
         click_chatter("Adding entry %s %d",entry.chosen_server.unparse().c_str(),entry.port);
 #endif
+        fcb_acquire();
     }
 
     EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
@@ -127,20 +130,31 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
         auto ip = batch->ip_header();
         auto th = batch->tcp_header();
         LBEntry entry = LBEntry(ip->ip_src, th->th_dport);
+#if IPLOADBALANCER_MP
         LBHashtable::ptr ptr = _lb->_map.find(entry);
+#else
+        LBHashtable::iterator ptr = _lb->_map.find(entry);
+#endif
         if (!ptr) {
-            checked_output_push_batch(0, batch);
+
 #if DEBUG_LB
             click_chatter("Could not find %s %d",IPAddress(ip->ip_src).unparse().c_str(),th->th_dport);
 #endif
             //assert(false);
+            //checked_output_push_batch(0, batch);
+            batch->kill();
             return;
         } else{
 #if DEBUG_LB
             click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->src.unparse().c_str(),ptr->dst.unparse().c_str());
 #endif
         }
+#if IPLOADBALANCER_MP
         *flowdata = *ptr;
+#else
+        *flowdata = ptr.value();
+#endif
+        fcb_acquire();
     } else {
 #if DEBUG_LB
         click_chatter("Saved entry %s -> %s",flowdata->src.unparse().c_str(),flowdata->dst.unparse().c_str());

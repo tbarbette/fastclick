@@ -193,12 +193,13 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
 
     _table.set_root(table->optimize());
 	_table.get_root()->check();
+	if (_verbose) {
     click_chatter("Table of %s after optimization :",name().c_str());
     _table.get_root()->print();
+	}
     _table.set_release_fnt(release_subflow);
 
-    if (_verbose)
-    	_table.get_root()->print();
+
 
     for (int i = 0; i < _cache.weight(); i++) {
         _cache.get_value(i) = (FlowControlBlock**)CLICK_LALLOC(sizeof(FlowControlBlock*) * 8192);

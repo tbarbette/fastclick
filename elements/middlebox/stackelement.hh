@@ -91,7 +91,7 @@ public :
     virtual const size_t flow_data_size()  const { return sizeof(T); }
 
 
-
+//Todo : rename as fcb data
     inline T* fcb() {
         T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);
         return flowdata;
