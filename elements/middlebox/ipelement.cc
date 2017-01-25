@@ -40,7 +40,7 @@ void IPElement::computeChecksum(WritablePacket *packet)
 {
     click_ip *iph = packet->ip_header();
 
-    unsigned plen = ntohs(iph->ip_len) - (iph->ip_hl << 2);
+    //unsigned plen = ntohs(iph->ip_len) - (iph->ip_hl << 2);
     unsigned hlen = iph->ip_hl << 2;
 
     iph->ip_sum = 0;

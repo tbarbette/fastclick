@@ -1,6 +1,6 @@
 #ifndef CLICK_ARPQUERIER_HH
 #define CLICK_ARPQUERIER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/sync.hh>
@@ -170,7 +170,7 @@ Clear the ARP table.
 ARPTable, ARPResponder, ARPFaker, AddressInfo
 */
 
-class ARPQuerier : public Element { public:
+class ARPQuerier : public BatchElement { public:
 
     ARPQuerier() CLICK_COLD;
     ~ARPQuerier() CLICK_COLD;
@@ -192,6 +192,9 @@ class ARPQuerier : public Element { public:
     void take_state(Element *e, ErrorHandler *errh);
 
     void push(int port, Packet *p);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *p);
+#endif
 
   private:
 
@@ -212,8 +215,8 @@ class ARPQuerier : public Element { public:
 
     void send_query_for(const Packet *p, bool ether_dhost_valid);
 
-    void handle_ip(Packet *p, bool response);
-    void handle_response(Packet *p);
+    Packet* handle_ip(Packet *p, bool response);
+    PacketBatch* handle_response(Packet *p);
 
     static void expire_hook(Timer *, void *);
     static String read_table(Element *, void *);

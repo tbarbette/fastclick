@@ -173,7 +173,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 					if (maskv & valuev == 0) { //If a mask is provided, value is dynamic
 						//click_chatter("Dynamic node to output %d",output);
 						parent_ptr = node->default_ptr();
-						node->level()->_dynamic = true;
+						node->level()->set_dynamic();
 						lastvalue = (FlowNodeData){.data_64 = (uint64_t)-1};
 					} else {
 						//click_chatter("Value %d to output %d",valuev, output);
@@ -202,7 +202,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 			parent_ptr->leaf->acquire(1);
 			parent_ptr->leaf->data[_flow_data_offset] = output;
 
-
+			root->check();
 			rules.push_back((Rule){.root = root, .output = output});
 		} else {
 			return errh->error("argument %d is not a valid defined subflow (%s)", i+1,s.c_str());
@@ -317,6 +317,7 @@ FlowNode* FlowDispatcher::get_table() {
 			if (rules[i].output > -1 && rules[i].output < noutputs()) {
 				FlowNode* child_table = FlowElementVisitor::get_downward_table(this, rules[i].output);
 				if (child_table) {
+					child_table->check();
 					FlowNodePtr* leaf_ptr = rules[i].root->get_first_leaf_ptr();
 					FlowControlBlock* leaf = leaf_ptr->leaf;
 					FlowNode* parent = leaf_ptr->parent();
@@ -341,6 +342,9 @@ FlowNode* FlowDispatcher::get_table() {
 				*((uint32_t*)((uint8_t*)&leaf->data[_flow_data_offset])) = rules[i].output;
 			}
 
+			if (_verbose)
+				click_chatter("Merging rule %d of %p{element}",i,this);
+
 			if (merged == 0) {
 				merged = rules[i].root;
 			} else {
@@ -348,17 +352,34 @@ FlowNode* FlowDispatcher::get_table() {
 			}
 		}
 		assert(merged);
+		//Insert a "- drop" rule
+		if (merged->default_ptr()->ptr == 0) {
+			click_chatter("ADDING ! %s to %s",merged->name().c_str(),merged->level()->print().c_str());
+			FlowNodePtr* parent_ptr = merged->default_ptr();
+			parent_ptr->set_leaf(upstream_classifier()->table().get_pool().allocate());
+			parent_ptr->leaf->parent = merged;
+			parent_ptr->leaf->acquire(1);
+			parent_ptr->leaf->data[_flow_data_offset] = -1;
+		}
+		merged->check();
+		merged->print();
 		if (_verbose) {
 			click_chatter("Table for %s :",name().c_str());
 			merged->print();
 		}
 		_table = merged;
-	}
+        _table->print();
+        _table->check();
+	} else {
+        _table->print();
+        _table->check();
+    }
 	//click_chatter("Table before duplicate : ");
-	//_table->print();
+
 	FlowNode* tmp = _table->duplicate(true,1);
 	//click_chatter("Table after duplicate :");
-	//tmp->print();
+	tmp->print();
+	tmp->check();
 	return tmp;
 }
 

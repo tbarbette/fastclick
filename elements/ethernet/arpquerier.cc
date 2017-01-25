@@ -260,14 +260,14 @@ ARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
  * May save the packet in the ARP table for later sending.
  * May call p->kill().
  */
-void
+Packet*
 ARPQuerier::handle_ip(Packet *p, bool response)
 {
     // delete packet if we are not configured
     if (!_my_ip) {
 	p->kill();
 	++_drops;
-	return;
+	return 0;
     }
 
     // make room for Ethernet header
@@ -277,7 +277,7 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 	q = p->uniqueify();
     } else if (!(q = p->push_mac_header(sizeof(click_ether)))) {
 	++_drops;
-	return;
+	return 0;
     } else
 	q->ether_header()->ether_type = htons(ETHERTYPE_IP);
 
@@ -325,14 +325,14 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 		send_query_for(q, false); // q is on the ARP entry's queue
 	    // if r >= 0, do not q->kill() since it is stored in some ARP entry.
 	}
-	return;
+	return 0;
     }
 
     // It's time to emit the packet with our Ethernet address as source.  (Set
     // the source address immediately before send in case the user changes the
     // source address while packets are enqueued.)
     memcpy(&q->ether_header()->ether_shost, _my_en.data(), 6);
-    output(0).push(q);
+    return q;
 }
 
 /*
@@ -340,11 +340,11 @@ ARPQuerier::handle_ip(Packet *p, bool response)
  * Update our ARP table.
  * If there was a packet waiting to be sent, return it.
  */
-void
+PacketBatch*
 ARPQuerier::handle_response(Packet *p)
 {
     if (p->length() < sizeof(click_ether) + sizeof(click_ether_arp))
-	return;
+	return 0;
 
     ++_arp_responses;
 
@@ -361,24 +361,66 @@ ARPQuerier::handle_response(Packet *p)
 	_arpt->insert(ipa, ena, &cached_packet);
 
 	// Send out packets in the order in which they arrived
+	PacketBatch* head = 0;
 	while (cached_packet) {
 	    Packet *next = cached_packet->next();
-	    handle_ip(cached_packet, true);
+	    Packet* q = handle_ip(cached_packet, true);
+	    if (q) {
+	        if (head) {
+	            head->append_packet(q);
+	        } else {
+	            head = PacketBatch::start_head(q);
+	        }
+	    }
 	    cached_packet = next;
 	}
+    return head;
     }
 }
 
 void
 ARPQuerier::push(int port, Packet *p)
 {
-    if (port == 0)
-	handle_ip(p, false);
-    else {
-	handle_response(p);
-	p->kill();
+    if (port == 0) {
+        Packet* q = handle_ip(p, false);
+        if (q) {
+            output(0).push(q);
+        }
+    } else {
+        PacketBatch* buffered = handle_response(p);
+        p->kill();
+        if (buffered) {
+            FOR_EACH_PACKET(buffered,p) {
+                output(0).push(p);
+            }
+        }
     }
 }
+
+#if HAVE_BATCH
+void
+ARPQuerier::push_batch(int port, PacketBatch *batch)
+{
+    PacketBatch* head = 0;
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        if (port == 0) {
+            Packet*q = handle_ip(p, false);
+            if (q) {
+                if (head) {
+                    head->append_packet(q);
+                } else {
+                    head = PacketBatch::make_from_packet(q);
+                }
+            }
+        } else {
+            head = handle_response(p);
+            p->kill();
+        }
+    }
+    if (head)
+        output(0).push_batch(head);
+}
+#endif
 
 String
 ARPQuerier::read_handler(Element *e, void *thunk)

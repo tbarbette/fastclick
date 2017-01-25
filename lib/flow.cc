@@ -42,6 +42,7 @@ void FlowClassificationTable::set_release_fnt(SubFlowRealeaseFnt pool_release_fn
  */
 FlowNode* FlowNode::combine(FlowNode* other) {
 	if (other == 0) return this;
+    other->check();
 
 
 	/*if (other->level()->get_max_value() > level()->get_max_value()) {
@@ -99,6 +100,7 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 			other->dec_num();
 		}
 		delete other;
+        this->check();
 		return this;
 	} else if (dynamic_cast<FlowLevelDummy*>(other->level()) != 0) { //Other level is dummy
 #if DEBUG_CLASSIFIER
@@ -128,6 +130,7 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 		_default.set_parent(this);
 		other->_default.ptr = 0; //Remove default from other node so it's not freed
 		delete other;
+        this->check();
 		return this;
 	}
     /*
@@ -144,13 +147,17 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 //		}
 	}
 */
-	click_chatter("Combining different tables (%s and %s) is not supported for now, the first one will be added as default !",level()->print().c_str(),other->level()->print().c_str());
+
 	if (dynamic_cast<FlowLevelDummy*>(this->level()) != 0) {
 		//If this is a dummy, we can directly set our leaf as the child
 		assert(this->default_ptr()->is_leaf());
 		if (other->default_ptr()->ptr == 0) {
+            other->check();
+            click_chatter("A");
 			other->set_default(this->default_ptr()->leaf);
+            other->check();
 		} else {
+            click_chatter("B");
 			if (other->default_ptr()->is_node())
 				other->set_default(other->default_ptr()->node->combine(this));
 			else {
@@ -164,7 +171,9 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 				assert(false);
 			}
 		}
+        other->check();
 	} else {
+        click_chatter("Combining different tables (%s and %s) is not supported for now, the first one will be added as default !",level()->print().c_str(),other->level()->print().c_str());
 		if (other->default_ptr()->ptr == 0) {
 			other->set_default(this);
 		} else {
@@ -182,6 +191,7 @@ FlowNode* FlowNode::combine(FlowNode* other) {
 			}
 		}
 	}
+    other->check();
 	return other;
 
 
@@ -207,18 +217,17 @@ FlowNode* FlowNode::optimize() {
 	if (!level()->is_dynamic()) {
 		if (getNum() == 0) {
 			//No nead for this level
-			if (default_ptr()->is_leaf()) {
-#if DEBUG_CLASSIFIER
-				click_chatter("Optimize : no need for this level");
-#endif
-				return default_ptr()->node;
-			} else {
+			if (default_ptr()->is_node()) {
 				if (dynamic_cast<FlowNodeDummy*>(this) == 0) {
+#if DEBUG_CLASSIFIER
+                    click_chatter("Optimize : no need for this level");
+#endif
 					FlowNodeDummy* fl = new FlowNodeDummy();
 					fl->assign(this);
 					fl->_default = _default;
 					_default.ptr = 0;
 					delete this;
+                    fl->check();
 					return fl;
 				}
 			}
@@ -259,6 +268,7 @@ FlowNode* FlowNode::optimize() {
 			child->ptr = 0;
 			dec_num();
 			delete this;
+            newnode->check();
 			return newnode;
 		} else if (getNum() == 2) {
 			FlowNode* newnode;
@@ -294,6 +304,7 @@ FlowNode* FlowNode::optimize() {
 			dec_num();
 			dec_num();
 			delete this;
+            newnode->check();
 			return newnode;
 		} else {
 #if DEBUG_CLASSIFIER
@@ -327,6 +338,47 @@ FlowNodePtr* FlowNode::get_first_leaf_ptr() {
 
 }
 
+#if DEBUG_CLASSIFIER
+/**
+ * Esure consistency of the tree
+ * @param node
+ */
+void FlowNode::check() {
+    FlowNode* node = this;
+    NodeIterator* it = node->iterator();
+    FlowNodePtr* cur = 0;
+    int num = 0;
+    while ((cur = it->next()) != 0) {
+        num++;
+        if (cur->is_node()) {
+            if (cur->node->parent() != node)
+                goto error;
+            cur->node->check();
+        }
+    }
+
+    if (num != getNum()) {
+        click_chatter("Number of child error (live count %d != theorical count %d) in :",num,getNum());
+        print();
+        assert(num == getNum());
+    }
+
+    if (node->default_ptr()->ptr != 0) {
+        if (node->default_ptr()->parent() != node)
+            goto error;
+        if (node->default_ptr()->is_node()) {
+            assert(node->level()->is_dynamic() || node->get_default().node->parent() == node);
+            node->get_default().node->check();
+        }
+    }
+    return;
+    error:
+    click_chatter("Parent concistancy error in :");
+    print();
+    assert(false);
+}
+#endif
+
 void FlowNode::print(FlowNode* node,String prefix) {
 	click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
 
@@ -336,7 +388,6 @@ void FlowNode::print(FlowNode* node,String prefix) {
 
 		if (!cur->is_leaf()) {
 			click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().data_64,cur->parent());
-			assert(cur->node->parent() == node);
 			print(cur->node,prefix + "|  ");
 		} else {
 			cur->leaf->print(prefix + "|->");
@@ -361,7 +412,7 @@ void FlowControlBlock::print(String prefix) {
 		sprintf(&data_str[j],"%02x",data[i]);
 		j+=2;
 	}
-	click_chatter("%s %lu Parent:%p UC:%d (data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),data_str);
+	click_chatter("%s %lu Parent:%p UC:%d (%p data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),this,data_str);
 }
 
 void FlowNodePtr::print() {

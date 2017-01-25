@@ -11,7 +11,64 @@
 #include "flowdispatcher.hh"
 
 CLICK_DECLS
+/*
+class FlowBufferVisitor2 : public RouterVisitor {
+public:
+    size_t data_size;
+    FlowClassifier* _classifier;
+    static int shared_position[NR_SHARED_FLOW];
 
+
+    FlowBufferVisitor2(FlowClassifier* classifier,size_t myoffset) : data_size(myoffset), _classifier(classifier), map(64,false) {
+
+        map.set_range(0,myoffset,1);
+    }
+
+
+    bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance) {
+        VirtualFlowBufferElement* fbe = dynamic_cast<VirtualFlowBufferElement*>(e);
+
+        if (fbe != NULL) { //The visited element is an element that need FCB space
+
+            //Resize the map if needed
+            if (fbe->flow_data_offset() + fbe->flow_data_size() > map.size()) map.resize(map.size() * 2);
+
+            if (fbe->flow_data_offset() != -1) { //If flow already have some classifier
+                if (fbe->flow_data_offset() >= data_size) {
+                    data_size = fbe->flow_data_offset() + fbe->flow_data_size();
+                } else {
+                    if (map.weight_range(fbe->flow_data_offset(),fbe->flow_data_size()) > 0 && !(fbe->flow_data_index() >= 0 && shared_position[fbe->flow_data_index()] == fbe->flow_data_offset())) {
+
+                    }
+                    if (data_size < fbe->flow_data_offset() + fbe->flow_data_size()) {
+                        data_size = fbe->flow_data_offset() + fbe->flow_data_size();
+                    }
+                }
+            } else {
+                if (fbe->flow_data_index() >= 0) {
+                    if (shared_position[fbe->flow_data_index()] == -1) {
+                        fbe->_flow_data_offset = data_size;
+                        shared_position[fbe->flow_data_index()] = data_size;
+                        data_size += fbe->flow_data_size();
+                    } else {
+                        fbe->_flow_data_offset = shared_position[fbe->flow_data_index()];
+                    }
+                } else {
+                    fbe->_flow_data_offset = data_size;
+                    data_size += fbe->flow_data_size();
+                }
+                fbe->_classifier = _classifier;
+            }
+            map.set_range(fbe->flow_data_offset(),fbe->flow_data_size(),true);
+#if DEBUG_FLOW
+            click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
+#endif
+        }
+        return true;
+    }
+};
+*/
 class FlowBufferVisitor : public RouterVisitor {
 public:
 	size_t data_size;
@@ -22,6 +79,7 @@ public:
 	FlowBufferVisitor(FlowClassifier* classifier,size_t myoffset) : data_size(myoffset), _classifier(classifier), map(64,false) {
 		map.set_range(0,myoffset,1);
 	}
+
 
 	bool visit(Element *e, bool isoutput, int port,
 			       Element *from_e, int from_port, int distance) {
@@ -37,9 +95,11 @@ public:
 					data_size = fbe->flow_data_offset() + fbe->flow_data_size();
 				} else {
 					if (map.weight_range(fbe->flow_data_offset(),fbe->flow_data_size()) > 0 && !(fbe->flow_data_index() >= 0 && shared_position[fbe->flow_data_index()] == fbe->flow_data_offset())) {
-						click_chatter("ERROR : multiple assigner can assign flows for %s at overlapped positions, "
+					    //TODO !
+						/*click_chatter("ERROR : multiple assigner can assign flows for %s at overlapped positions, "
 											  "use the RESERVE parameter to provision space.",e->name().c_str());
-						e->router()->please_stop_driver();
+						click_chatter("Vector : %s, trying offset %d length %d",map.unparse().c_str(),fbe->flow_data_offset(), fbe->flow_data_size());
+						e->router()->please_stop_driver();*/
 					}
 					if (data_size < fbe->flow_data_offset() + fbe->flow_data_size()) {
 						data_size = fbe->flow_data_offset() + fbe->flow_data_size();
@@ -57,6 +117,7 @@ public:
 				} else {
 					fbe->_flow_data_offset = data_size;
 					data_size += fbe->flow_data_size();
+                    click_chatter("%s from %d to %d",e->name().c_str(),fbe->_flow_data_offset,data_size);
 				}
 				fbe->_classifier = _classifier;
 			}
@@ -131,6 +192,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
 
     _table.set_root(table->optimize());
+	_table.get_root()->check();
     click_chatter("Table of %s after optimization :",name().c_str());
     _table.get_root()->print();
     _table.set_release_fnt(release_subflow);

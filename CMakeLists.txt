@@ -224,6 +224,10 @@ set(SOURCE_FILES
         elements/etherswitch/listenetherswitch.hh
         elements/etherswitch/spantree.cc
         elements/etherswitch/spantree.hh
+        elements/flow/flowclassifier.cc
+        elements/flow/flowclassifier.hh
+        elements/flow/flowdiploadbalancer.cc
+        elements/flow/flowdiploadbalancer.hh
         elements/flow/flowdispatcher.cc
         elements/flow/flowdispatcher.hh
         elements/grid/ackresponder.cc

@@ -23,10 +23,14 @@ CLICK_DECLS
 typedef void (*sfcb_combiner)(FlowControlBlock* old_sfcb, FlowControlBlock* new_sfcb);
 
 class FlowLevel {
+protected:
+    bool deletable;
+    bool _dynamic;
+    bool _islong = false;
 public:
 	FlowLevel() : deletable(true),_dynamic(false) {};
 
-	bool deletable;
+
 
 	virtual ~FlowLevel() {};
 	virtual long unsigned get_max_value() = 0;
@@ -34,23 +38,39 @@ public:
 	virtual void add_offset(int offset) {};
 
 	virtual bool equals(FlowLevel* level) {
-		click_chatter("level equals");
 		return typeid(*this) == typeid(*level);
 	}
 
-	bool _dynamic;
+
+
 
 	bool is_dynamic() {
 		return _dynamic;
 	}
 
-	virtual String print() = 0;
+    void set_dynamic() {
+        _dynamic = true;
+    }
 
-	bool _islong = false;
+    bool is_deletable() {
+        return deletable;
+    }
+
+
+    virtual String print() = 0;
+
+
 
 	inline bool is_long() const {
 		return _islong;
 	}
+
+    FlowLevel* assign(FlowLevel* l) {
+        _dynamic = l->_dynamic;
+        deletable = l->deletable;
+        _islong = l->_islong;
+        return this;
+    }
 
     virtual FlowLevel *duplicate() = 0;
 };
@@ -132,10 +152,14 @@ protected:
 
 	void duplicate_internal(FlowNode* node, bool recursive, int use_count) {
 		assign(node);
-        this->_level = node->level()->duplicate();
 		if (unlikely(recursive)) {
-			if (_default.ptr && _default.is_node()) {
-				_default.set_node(node->_default.node->duplicate(recursive, use_count));
+            this->_level = node->level()->duplicate();
+			if (_default.ptr) {
+                if ( _default.is_node()) {
+                    _default.set_node(node->_default.node->duplicate(recursive, use_count));
+                } else {
+                    _default.set_leaf(_default.leaf->duplicate(1));
+                }
 				_default.set_parent(this);
 			}
 
@@ -152,19 +176,23 @@ protected:
 					add_node(child->data(),new_node);
 				}
 			}
-		}
 #if DEBUG_CLASSIFIER
-    this->assert_diff(node);
+            this->assert_diff(node);
 #endif
-
+        }
 	}
+
+    /**
+     * Check that a duplication is correct
+     * @param node
+     */
     void assert_diff(FlowNode* node) {
         assert(node->level() != this->level());
         FlowNode::NodeIterator* it = this->iterator();
         FlowNode::NodeIterator* ito = node->iterator();
-	FlowNodePtr* child;
-	FlowNodePtr* childo;
-	while ((child = it->next()) != 0) {
+        FlowNodePtr* child;
+        FlowNodePtr* childo;
+        while ((child = it->next()) != 0) {
             childo = ito->next();
             assert(child != childo);
             assert(child->is_leaf() == childo->is_leaf());
@@ -260,7 +288,7 @@ public:
 			assert(ptr.ptr != this);
 			_default = ptr;
 			_default.set_parent(this);
-			click_chatter("Changing default of %p",_default.ptr);
+			click_chatter("Changing default of %p to %p",_default.ptr);
 		} else {
 			click_chatter("No default");
 		}
@@ -294,7 +322,13 @@ public:
 		_parent = parent;
 	}
 
-	static inline FlowNode* create(FlowNode* parent, FlowLevel* level);
+#if DEBUG_CLASSIFIER
+    void check();
+#else
+    inline void check() {};
+#endif
+
+    static inline FlowNode* create(FlowNode* parent, FlowLevel* level);
 
 	virtual FlowNode* optimize() CLICK_WARN_UNUSED_RESULT;
 
@@ -387,8 +421,8 @@ public:
 		return String("ANY");
 	}
 
-    FlowLevelDummy* duplicate() override {
-        return new FlowLevelDummy();
+    FlowLevel* duplicate() override {
+        return (new FlowLevelDummy())->assign(this);
     }
 };
 
@@ -424,8 +458,8 @@ public:
 		return String("AGG");
 	}
 
-    FlowLevelAggregate* duplicate() override {
-        return new FlowLevelAggregate(0,-1);
+    FlowLevel* duplicate() override {
+        return (new FlowLevelAggregate(0,-1))->assign(this);
     }
 };
 
@@ -452,8 +486,8 @@ public:
 		return String("THREAD");
 	}
 
-    FlowLevelThread* duplicate() override {
-        return new FlowLevelThread(_numthreads);
+    FlowLevel* duplicate() override {
+        return (new FlowLevelThread(_numthreads))->assign(this);
     }
 };
 
@@ -523,8 +557,8 @@ public:
 	}
 
 
-    FlowLevelGeneric8* duplicate() override {
-        return new FlowLevelGeneric8(_mask,_offset);
+    FlowLevel* duplicate() override {
+        return (new FlowLevelGeneric8(_mask,_offset))->assign(this);
     }
 };
 
@@ -566,8 +600,8 @@ public:
 		return String(_offset) + "/" + String(_mask) ;
 	}
 
-    FlowLevelGeneric16* duplicate() override {
-        return new FlowLevelGeneric16(_mask,_offset);
+    FlowLevel* duplicate() override {
+        return (new FlowLevelGeneric16(_mask,_offset))->assign(this);
     }
 };
 
@@ -610,8 +644,8 @@ public:
 		return String(_offset) + "/" + String(_mask) ;
 	}
 
-    FlowLevelGeneric32* duplicate() override {
-        return new FlowLevelGeneric32(_mask,_offset);
+    FlowLevel* duplicate() override {
+        return (new FlowLevelGeneric32(_mask,_offset))->assign(this);
     }
 };
 
@@ -653,8 +687,8 @@ public:
 		return String(_offset) + "/" + String(_mask) ;
 	}
 
-    FlowLevelGeneric64* duplicate() override {
-        return new FlowLevelGeneric64(_mask,_offset);
+    FlowLevel* duplicate() override {
+        return (new FlowLevelGeneric64(_mask,_offset))->assign(this);
     }
 };
 
@@ -1092,7 +1126,7 @@ class FlowNodeTwoCase : public FlowNode  {
 	}
 
 	FlowNodeTwoCase(FlowNodePtr c) : child(c) {
-
+        c.set_parent(this);
 	}
 
 	FlowNodePtr* find(FlowNodeData data) {
@@ -1415,7 +1449,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 		else
 			fl = new FlowNodeArray(level->get_max_value());
 		fl->_level = level;
-		fl->_child_deletable = level->deletable;
+		fl->_child_deletable = level->is_deletable();
 		fl->_parent = parent;
 		return fl;
 	}
