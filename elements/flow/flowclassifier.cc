@@ -245,6 +245,10 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p,uint32_t agg) {
 
 }
 
+/**
+ * Push batch simple simply classify packets and push a batch when a packet
+ * is different
+ */
 inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 	PacketBatch* awaiting_batch = NULL;
 	Packet* p = batch;
@@ -259,7 +263,6 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 		click_chatter("Packet %p in %s",p,name().c_str());
 #endif
 		Packet* next = p->next();
-
 
 		if (_aggcache) {
 			uint32_t agg = AGGREGATE_ANNO(p);
@@ -307,8 +310,12 @@ typedef struct {
 	FlowControlBlock* fcb;
 } FlowBatch;
 
-#define RING_SIZE 32
+#define RING_SIZE 128
 
+/**
+ * Push_batch_builder use double connection to build a ring and process packets trying to reconcile flows more
+ *
+ */
 inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 	Packet* p = batch;
 	int curbatch = -1;

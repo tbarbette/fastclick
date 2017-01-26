@@ -1363,7 +1363,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 #endif
 							return child_ptr->leaf;
 						} else {
-							click_chatter("DUPLICATE child");
+							click_chatter("DUPLICATE node");
 							child_ptr->set_node(parent->default_ptr()->node->duplicate(false, 0));
 							child_ptr->set_data(data);
 							child_ptr->set_parent(parent);
