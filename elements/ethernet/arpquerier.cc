@@ -250,7 +250,12 @@ ARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
     SET_VLAN_TCI_ANNO(q, VLAN_TCI_ANNO(p));
 
     _arp_queries++;
-    output(noutputs() - 1).push(q);
+
+    if (in_batch_mode) {
+        output(noutputs() - 1).push_batch(PacketBatch::make_from_packet(q));
+    } else {
+        output(noutputs() - 1).push(q);
+    }
 }
 
 /*

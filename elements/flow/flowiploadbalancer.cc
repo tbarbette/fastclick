@@ -81,7 +81,7 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
         LBEntry entry = LBEntry(flowdata->dst, th->th_sport);
         _map.find_insert(entry, IPPair(odip,osip));
 #if DEBUG_LB
-        click_chatter("Adding entry %s %d",entry.chosen_server.unparse().c_str(),entry.port);
+        click_chatter("Adding entry %s %d [%d]",entry.chosen_server.unparse().c_str(),entry.port,*_last);
 #endif
         fcb_acquire();
     }
@@ -164,6 +164,7 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
     EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
             WritablePacket* q=p->uniqueify();
             rewrite_ips(q, *flowdata);
+            q->set_dst_ip_anno(flowdata->dst);
             return q;
         }, batch);
 

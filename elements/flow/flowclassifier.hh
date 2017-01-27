@@ -16,6 +16,7 @@ class FlowClassifier: public BatchElement {
     bool _aggcache;
     int _pull_burst;
     bool _verbose;
+    bool _builder;
 public:
 
     FlowClassifier() CLICK_COLD;

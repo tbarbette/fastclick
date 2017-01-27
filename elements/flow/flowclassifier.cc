@@ -130,7 +130,7 @@ public:
 	}
 };
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(), _pull_burst(0), _verbose(false) {
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(), _pull_burst(0), _verbose(false),_builder(true) {
 	in_batch_mode = BATCH_MODE_NEEDED;
 }
 
@@ -146,6 +146,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
     		.read_p("AGGCACHE",_aggcache)
     		.read_p("RESERVE",reserve)
+		.read("BUILDER",_builder)
 			.read("VERBOSE",_verbose)
 			.complete() < 0)
     	return -1;
@@ -159,7 +160,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 void release_subflow(FlowControlBlock* fcb) {
-	click_chatter("Release fcb %p idx %d",fcb,fcb->data_64[0]);
+	/*click_chatter("Release fcb %p idx %d",fcb,fcb->data_64[0]);
 	if (fcb->parent == NULL) return;
 
 	//Parent of the fcb is release_ptr
@@ -172,7 +173,7 @@ void release_subflow(FlowControlBlock* fcb) {
 		child = parent;
 		parent = child->parent();
 		parent->release_child(FlowNodePtr(child));
-	};
+	};*/
 }
 
 
@@ -310,7 +311,7 @@ typedef struct {
 	FlowControlBlock* fcb;
 } FlowBatch;
 
-#define RING_SIZE 128
+#define RING_SIZE 32
 
 /**
  * Push_batch_builder use double connection to build a ring and process packets trying to reconcile flows more
@@ -438,8 +439,10 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
 
 void FlowClassifier::push_batch(int port, PacketBatch* batch) {
-	push_batch_builder(port,batch);
-	//push_batch_simple(port,batch);
+    if (_builder)
+        push_batch_builder(port,batch);
+    else
+        push_batch_simple(port,batch);
 }
 
 

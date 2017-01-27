@@ -30,6 +30,7 @@ public:
     MemoryPool<struct ModificationList>* poolModificationLists;
     MemoryPool<struct ModificationNode>* poolModificationNodes;
 
+    //TODO : ALl this will be ignored
     fcb_tcpin() : modificationLists(NULL)
     {
         closingState = TCPClosingState::OPEN;
