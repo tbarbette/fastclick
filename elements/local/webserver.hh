@@ -1,9 +1,10 @@
-#ifndef CLICK_TCPREFLECTOR_HH
-#define CLICK_TCPREFLECTOR_HH
+#ifndef CLICK_WEBSERVER_HH
+#define CLICK_WEBSERVER_HH
 #include <click/element.hh>
 #include <click/glue.hh>
 #include <click/timer.hh>
 #include <click/ipaddress.hh>
+#include "tcpreflector.hh"
 CLICK_DECLS
 
 /*
@@ -27,21 +28,17 @@ CLICK_DECLS
  *   -> ToDevice(eth1);
  */
 
-class TCPReflector : public Element {
+class WebServer : public TCPReflector {
  public:
 
-  TCPReflector() CLICK_COLD;
-  ~TCPReflector() CLICK_COLD;
+    WebServer() CLICK_COLD;
+  ~WebServer() CLICK_COLD;
 
-  const char *class_name() const		{ return "TCPReflector"; }
+  const char *class_name() const		{ return "WebServer"; }
   const char *port_count() const		{ return PORTS_1_1; }
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
-  Packet *simple_action(Packet *);
-  Packet *tcp_input(Packet *xp);
-protected:
-    String _data;
 };
 
 CLICK_ENDDECLS

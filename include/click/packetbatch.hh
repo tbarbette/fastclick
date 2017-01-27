@@ -76,7 +76,7 @@ CLICK_DECLS
  * Split a batch into multiple batch according to a given function which will
  * give the index of an output to choose.
  * @fnt Function to call which will return a value between 0 and nbatches
- * #on_finish function which take an output index and a number to call when classification is finished
+ * #on_finish function which take an output index and the batch when classification is finished
  */
 #define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
     {\

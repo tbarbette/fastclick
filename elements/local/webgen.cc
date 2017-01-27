@@ -32,7 +32,7 @@ timestamp_diff(const Timestamp &t1, const Timestamp &t2)
 }
 
 WebGen::WebGen()
-  : _timer(this)
+  : _timer(this), _limit(-1), _active(false)
 {
 
   cbfree = NULL;
@@ -54,9 +54,12 @@ WebGen::configure (Vector<String> &conf, ErrorHandler *errh)
   int cps;
 
   ret = Args(conf, this, errh)
-      .read_mp("PREFIX", IPPrefixArg(true), _src_prefix, _mask)
-      .read_mp("DST", _dst)
-      .read_mp("RATE", cps)
+          .read_mp("PREFIX", IPPrefixArg(true), _src_prefix, _mask)
+          .read_mp("DST", _dst)
+          .read_mp("RATE", cps)
+          .read("LIMIT", _limit)
+          .read("ACTIVE", _active)
+          .read("VERBOSE", _verbose)
       .complete();
 
   start_interval = 1000000 / cps;
@@ -84,7 +87,8 @@ int
 WebGen::initialize (ErrorHandler *)
 {
   _timer.initialize (this);
-  _timer.schedule_now ();
+  if (_active)
+    _timer.schedule_now ();
 
   int ncbs = 2 * (resend_dt / start_interval) * resend_max;
   for (int i = 0; i < ncbs; i++) {
@@ -183,6 +187,10 @@ WebGen::run_timer (Timer *)
       cb->add_to_list (&cbhash[hv]);
       tcp_send(cb, 0);
       perfcnt.initiated++;
+        if (perfcnt.initiated >= _limit) {
+            set_active(false);
+            return;
+        }
     } else {
       click_chatter ("out of available CBs\n");
     }
@@ -267,6 +275,7 @@ WebGen::tcp_input (Packet *p)
 		ip->ip_src, th->th_sport,
 		th->th_ack, th->th_seq, TH_RST,
 		NULL, 0);
+      //click_chatter("Received packet for unknown cb? Sending RST");
     return;
   }
 
@@ -282,13 +291,15 @@ WebGen::tcp_input (Packet *p)
     cb->_rcv_nxt = cb->_irs + 1;
     cb->_connected = 1;
     cb->_do_send = 1;
-    //click_chatter("WebGen connected %d %d",
-    //              ntohs(cb->_sport),
-    //              ntohs(cb->_dport));
+      if (_verbose > 0)
+    click_chatter("WebGen connected %d %d",
+                  ntohs(cb->_sport),
+                  ntohs(cb->_dport));
   } else if (dlen > 0) {
     cb->_do_send = 1;
     if (seq + dlen > cb->_rcv_nxt) {
-      //click_chatter("_rcv_nxt %d + %d -> %d\n", cb->_rcv_nxt, dlen, seq+dlen);
+        if (_verbose > 0)
+      click_chatter("_rcv_nxt %d + %d -> %d\n", cb->_rcv_nxt, dlen, seq+dlen);
       cb->_rcv_nxt = seq + dlen;
     }
   }
@@ -308,7 +319,8 @@ WebGen::tcp_input (Packet *p)
   }
 
   if (th->th_flags & TH_RST) {
-    // click_chatter("RST %d %d", ntohs (th->th_sport), ntohs (th->th_dport));
+      if (_verbose > 0)
+     click_chatter("%p{element} RST %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
     p->kill ();
     recycle (cb);
     perfcnt.reset++;
@@ -459,6 +471,43 @@ WebGen::tcp_output (WritablePacket *p,
   ip->ip_sum = click_in_cksum ((unsigned char *) ip, sizeof (click_ip));
 
   output (0).push (p);
+}
+void
+WebGen::set_active(bool active) {
+    _active = active;
+    if (active)
+        _timer.schedule_now();
+    else
+        _timer.unschedule();
+}
+
+int
+WebGen::write_handler(const String & s_in, Element *e, void *thunk, ErrorHandler *errh)
+{
+    WebGen *q = static_cast<WebGen *>(e);
+    int which = reinterpret_cast<intptr_t>(thunk);
+    String s = cp_uncomment(s_in);
+    switch (which) {
+        case 0: {
+            bool active;
+            if (BoolArg().parse(s, active)) {
+                q->set_active(active);
+                return 0;
+            } else
+                return errh->error("type mismatch");
+        }
+            return 0;
+        default:
+            return errh->error("internal error");
+    }
+}
+
+
+void
+WebGen::add_handlers()
+{
+    add_write_handler("active", write_handler, 0, Handler::BUTTON);
+    add_data_handlers("active", Handler::OP_READ, &_active);
 }
 
 WebGen::CB::CB ()
