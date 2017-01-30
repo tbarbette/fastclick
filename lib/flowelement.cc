@@ -26,9 +26,13 @@ CLICK_DECLS
 FlowNode*
 FlowElementVisitor::get_downward_table(Element* e,int output) {
 	FlowNode* merged = 0;
-	FlowElementVisitor v;
-	e->router()->visit(e,true,output,&v);
-	for (int i = 0; i < v.dispatchers.size(); i++) {
+
+    FlowElementVisitor v(e);
+
+    e->router()->visit(e,true,output,&v);
+    click_chatter("Children of %p{element} : ",e);
+    for (int i = 0; i < v.dispatchers.size(); i++) {
+        click_chatter("%p{element}",v.dispatchers[i]);
 		if (v.dispatchers[i] == (FlowElement*)e) {
 			click_chatter("Classification loops are unsupported, place another FlowClassifier before reinjection of the packets.");
 			e->router()->please_stop_driver();

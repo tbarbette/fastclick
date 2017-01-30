@@ -1314,12 +1314,16 @@ private:
  */
 bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 	FlowNode* parent = (FlowNode*)sfcb->parent;
-	if (parent->level()->get_data(p).data_64 != sfcb->node_data[0].data_64) return false;
+	if (parent->default_ptr()->ptr != sfcb && parent->level()->get_data(p).data_64 != sfcb->node_data[0].data_64) {
+	    click_chatter("Leaf %x %x",parent->level()->get_data(p).data_64, sfcb->node_data[0].data_64);
+	    return false;
+	}
 
 	do {
 		FlowNode* child = parent;
 		parent = parent->parent();
-		if (parent->level()->get_data(p).data_64 != child->node_data.data_64) {
+		if (parent->default_ptr()->ptr != child && parent->level()->get_data(p).data_64 != child->node_data.data_64) {
+		    click_chatter("Child %x %x",parent->level()->get_data(p).data_64, child->node_data.data_64);
 			return false;
 		}
 	} while (parent != _root);

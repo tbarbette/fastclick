@@ -123,8 +123,8 @@ DefineFlowSharedBuffer(Paint,int,0);
 
 class FlowElementVisitor : public RouterVisitor {
 public:
-
-	FlowElementVisitor() {
+    Element* origin;
+	FlowElementVisitor(Element* e) : origin(e) {
 
 	}
 
@@ -134,10 +134,18 @@ public:
 			       Element *from_e, int from_port, int distance) {
 		FlowElement* dispatcher = dynamic_cast<FlowElement*>(e);
 		if (dispatcher != NULL) {
+		    if (dispatcher == origin)
+		        return false;
 			dispatchers.push_back(dispatcher);
 			return false;
 		} else {
+
 		}
+        /*if (v.dispatchers[i] == (FlowElement*)e) {
+            click_chatter("Classification loops are unsupported, place another FlowClassifier before reinjection of the packets.");
+            e->router()->please_stop_driver();
+            return 0;
+        }*/
 		return true;
 	}
 

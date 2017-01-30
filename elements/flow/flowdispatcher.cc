@@ -304,6 +304,7 @@ FlowNode* FlowDispatcher::get_table() {
 		if (_verbose) {
 			click_chatter("%s : Computing table with %d rules :",name().c_str(),rules.size());
 			for (int i = 0; i < rules.size(); ++i) {
+			    rules[i].root->check();
 				rules[i].root->print();
 			}
 		}
@@ -311,6 +312,7 @@ FlowNode* FlowDispatcher::get_table() {
 
 		for (int i = rules.size() - 1; i >= 0 ; --i) {
 			//First merge the table after the output to the final node of this rule
+		    rules[i].root->check();
 			if (_verbose)
 				click_chatter("Merging this rule of %s :",name().c_str());
 			rules[i].root->print();
@@ -322,7 +324,9 @@ FlowNode* FlowDispatcher::get_table() {
 					FlowControlBlock* leaf = leaf_ptr->leaf;
 					FlowNode* parent = leaf_ptr->parent();
 					assert(parent);
-				//	click_chatter("Leaf data %lu is now replaced with child table :",current_ptr->data().data_64);
+#if DEBUG_CLASSIFIER
+					//click_chatter("Leaf data %lu is now replaced with child table :",current_ptr->data().data_64);
+#endif
 					leaf_ptr->set_node(child_table);
 					leaf_ptr->set_parent(parent);
 					leaf_ptr->set_data(leaf->node_data[0]);
@@ -333,6 +337,8 @@ FlowNode* FlowDispatcher::get_table() {
 					}
 				}
 			}
+
+			rules[i].root->check();
 
 
 			//Now set data for all leaf of the rule (now appended with all leafs of the child)

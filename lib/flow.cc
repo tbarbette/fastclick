@@ -43,6 +43,7 @@ void FlowClassificationTable::set_release_fnt(SubFlowRealeaseFnt pool_release_fn
 FlowNode* FlowNode::combine(FlowNode* other) {
 	if (other == 0) return this;
     other->check();
+    this->check();
 
 
 	/*if (other->level()->get_max_value() > level()->get_max_value()) {
