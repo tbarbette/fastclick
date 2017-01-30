@@ -133,6 +133,7 @@ private:
     enum {h_carrier,h_duplex,h_autoneg,h_speed,h_ipackets,h_ibytes,h_ierrors,h_active,h_mac};
 
     DPDKDevice* _dev;
+    bool _active;
 };
 
 CLICK_ENDDECLS
