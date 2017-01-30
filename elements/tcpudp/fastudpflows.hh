@@ -116,6 +116,8 @@ class FastUDPFlows : public Element {
   unsigned count() { return _count; }
   click_jiffies_t first() { return _first; }
   click_jiffies_t last() { return _last; }
+private:
+  static int eth_write_handler(const String &, Element *, void *, ErrorHandler *);
 };
 
 CLICK_ENDDECLS

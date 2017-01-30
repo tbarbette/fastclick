@@ -303,6 +303,27 @@ FastUDPFlows::length_write_handler
   return 0;
 }
 
+int
+FastUDPFlows::eth_write_handler
+(const String &s, Element *e, void * param, ErrorHandler *errh)
+{
+  FastUDPFlows *c = (FastUDPFlows *)e;
+  EtherAddress eth;
+  if (!EtherAddressArg().parse(s, eth))
+    return errh->error("Invalid argument");
+  if (reinterpret_cast<int*>(param) == 0) {
+     memcpy(c->_ethh.ether_shost,eth.sdata(),6);
+  } else {
+     memcpy(c->_ethh.ether_dhost,eth.sdata(),6);
+  }
+  if (c->_flows) {
+      for (unsigned i=0; i<c->_nflows; i++) {
+          if (c->_flows[i].packet)
+              memcpy(static_cast<WritablePacket*>(c->_flows[i].packet)->data(),c->_ethh.ether_dhost,12);
+      }
+  }
+  return 0;
+}
 void
 FastUDPFlows::add_handlers()
 {
@@ -312,6 +333,8 @@ FastUDPFlows::add_handlers()
   add_write_handler("reset", FastUDPFlows_reset_write_handler, 0, Handler::BUTTON);
   add_write_handler("active", FastUDPFlows_active_write_handler, 0, Handler::CHECKBOX);
   add_write_handler("limit", FastUDPFlows_limit_write_handler, 0);
+  add_write_handler("srceth", FastUDPFlows::eth_write_handler, 0);
+  add_write_handler("dsteth", FastUDPFlows::eth_write_handler, 1);
   add_data_handlers("length", Handler::OP_READ, &_len);
   add_write_handler("length", length_write_handler, 0);
 }
