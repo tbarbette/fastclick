@@ -35,6 +35,7 @@ struct click_udp;
 
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
+#include <clicknet/udp.h>
 
 CLICK_DECLS
 
@@ -899,7 +900,7 @@ class WritablePacket : public Packet { public:
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
 
-    inline void rewrite_ips(IPPair pair);
+    inline void rewrite_ips(IPPair pair, bool is_tcp = true);
 
     inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
 
@@ -2825,7 +2826,7 @@ WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t
 }
 
 inline void
-WritablePacket::rewrite_ips(IPPair pair) {
+WritablePacket::rewrite_ips(IPPair pair, bool is_tcp) {
     assert(this->network_header());
     uint16_t *x = reinterpret_cast<uint16_t *>(&this->ip_header()->ip_src);
     uint32_t old_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
@@ -2837,7 +2838,10 @@ WritablePacket::rewrite_ips(IPPair pair) {
     new_hw += (new_hw >> 16);
     click_ip *iph = this->ip_header();
     click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
-    click_update_in_cksum(&this->tcp_header()->th_sum, old_hw, new_hw);
+    if (is_tcp)
+        click_update_in_cksum(&this->tcp_header()->th_sum, old_hw, new_hw);
+    else
+        click_update_in_cksum(&this->udp_header()->uh_sum, old_hw, new_hw);
 
 }
 
