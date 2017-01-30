@@ -138,7 +138,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-    dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
+    dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_TCP | ETH_RSS_UDP;
 
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
