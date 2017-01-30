@@ -14,31 +14,6 @@
 #endif
 CLICK_DECLS
 
-
-
-class IPPair {
-  public:
-
-    IPAddress src;
-    IPAddress dst;
-    IPPair() {
-        src = 0;
-        dst = 0;
-    }
-    IPPair(IPAddress a, IPAddress b) {
-        src = a;
-        dst = b;
-    }
-
-    inline hashcode_t hashcode() const {
-       return CLICK_NAME(hashcode)(src) + CLICK_NAME(hashcode)(dst);
-   }
-
-   inline bool operator==(IPPair other) const {
-       return (other.src == src && other.dst == dst);
-   }
-};
-
 struct LBEntry {
     IPAddress chosen_server;
     uint16_t port;

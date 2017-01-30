@@ -13,25 +13,7 @@
 CLICK_DECLS
 
 
-#define DEBUG_LB 0
-int _offset = 0;
-
-inline void rewrite_ips(WritablePacket* q, IPPair pair) {
-    assert(q->network_header());
-    uint16_t *x = reinterpret_cast<uint16_t *>(&q->ip_header()->ip_src);
-    uint32_t old_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
-    old_hw += (old_hw >> 16);
-
-    memcpy(x, &pair, 8);
-
-    uint32_t new_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
-    new_hw += (new_hw >> 16);
-    click_ip *iph = q->ip_header();
-    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
-    click_update_in_cksum(&q->tcp_header()->th_sum, old_hw, new_hw);
-
-}
-
+#define DEBUG_NAT 0
 
 FlowIPNAT::FlowIPNAT() : _sip(){
 
@@ -59,7 +41,7 @@ int FlowIPNAT::initialize(ErrorHandler *errh) {
 }
 
 void FlowIPNAT::push_batch(int port, IPPair* flowdata, PacketBatch* batch) {
-    if (flowdata->src == 0) {
+    if (flowdata->src == IPAddress(0)) {
 #if DEBUG_NAT
         click_chatter("New flow");
 #endif
@@ -69,7 +51,7 @@ void FlowIPNAT::push_batch(int port, IPPair* flowdata, PacketBatch* batch) {
         auto th = batch->tcp_header();
         NATEntry entry = NATEntry(flowdata->dst, th->th_sport);
         _map.find_insert(entry, IPPair(odip,osip));
-#if DEBUG_LB
+#if DEBUG_NAT
         click_chatter("Adding entry %s %d [%d]",entry.dst.unparse().c_str(),entry.port);
 #endif
         fcb_acquire();
@@ -77,39 +59,48 @@ void FlowIPNAT::push_batch(int port, IPPair* flowdata, PacketBatch* batch) {
 
     EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
-        rewrite_ips(q, *flowdata);
+        q->rewrite_ips(*flowdata);
         q->set_dst_ip_anno(flowdata->dst);
         return q;
     }, batch);
 
-    checked_output_push_batch(*flowdata, batch);
+    checked_output_push_batch(0, batch);
 }
+
+FlowIPNATReverse::FlowIPNATReverse() {
+
+};
+
+FlowIPNATReverse::~FlowIPNATReverse() {
+
+}
+
 
 int
 FlowIPNATReverse::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    Element* e;
     if (Args(conf, this, errh)
-                .read_mp("NAT",_in)
+                .read_mp("NAT",e)
                 .complete() < 0)
         return -1;
-
+    _in = reinterpret_cast<FlowIPNAT*>(e);
     return 0;
 }
 
 void FlowIPNATReverse::push_batch(int port, IPPair* flowdata, PacketBatch* batch) {
-    IPAddress mapped;
     if (flowdata->src == IPAddress(0)) {
         auto ip = batch->ip_header();
         auto th = batch->tcp_header();
-        LBEntry entry = LBEntry(ip->ip_src, th->th_dport);
+        NATEntry entry = NATEntry(ip->ip_src, th->th_dport);
 #if IPLOADBALANCER_MP
-        LBHashtable::ptr ptr = _lb->_map.find(entry);
+        NATHashtable::ptr ptr = _in->_map.find(entry);
 #else
-        LBHashtable::iterator ptr = _lb->_map.find(entry);
+        NATHashtable::iterator ptr = _in->_map.find(entry);
 #endif
         if (!ptr) {
 
-#if DEBUG_LB
+#if DEBUG_NAT
             click_chatter("Could not find %s %d",IPAddress(ip->ip_src).unparse().c_str(),th->th_dport);
 #endif
             //assert(false);
@@ -117,7 +108,7 @@ void FlowIPNATReverse::push_batch(int port, IPPair* flowdata, PacketBatch* batch
             batch->kill();
             return;
         } else{
-#if DEBUG_LB
+#if DEBUG_NAT
             click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->src.unparse().c_str(),ptr->dst.unparse().c_str());
 #endif
         }
@@ -127,15 +118,11 @@ void FlowIPNATReverse::push_batch(int port, IPPair* flowdata, PacketBatch* batch
         *flowdata = ptr.value();
 #endif
         fcb_acquire();
-    } else {
-        mapped = *flowdata;
-        if (mapped == 0)
-            output_push_batch(0,batch);
     }
 
     EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
             WritablePacket* q=p->uniqueify();
-            rewrite_ips(q, *flowdata);
+            q->rewrite_ips(*flowdata);
             q->set_dst_ip_anno(flowdata->dst);
             return q;
         }, batch);

@@ -15,31 +15,6 @@ CLICK_DECLS
 #endif
 CLICK_DECLS
 
-
-
-class IPPair {
-  public:
-
-    IPAddress src;
-    IPAddress dst;
-    IPPair() {
-        src = 0;
-        dst = 0;
-    }
-    IPPair(IPAddress a, IPAddress b) {
-        src = a;
-        dst = b;
-    }
-
-    inline hashcode_t hashcode() const {
-       return CLICK_NAME(hashcode)(src) + CLICK_NAME(hashcode)(dst);
-   }
-
-   inline bool operator==(IPPair other) const {
-       return (other.src == src && other.dst == dst);
-   }
-};
-
 struct NATEntry {
     IPAddress dest;
     uint16_t port;
@@ -56,9 +31,9 @@ struct NATEntry {
 
 };
 #if IPLOADBALANCER_MP
-typedef HashTableMP<NATEntry,IPPair> LBHashtable;
+typedef HashTableMP<NATEntry,IPPair> NATHashtable;
 #else
-typedef HashTable<NATEntry,IPPair> LBHashtable;
+typedef HashTable<NATEntry,IPPair> NATHashtable;
 #endif
 
 class FlowIPNAT : public FlowBufferElement<IPPair> {
@@ -77,12 +52,12 @@ public:
 
     void push_batch(int, IPPair*, PacketBatch *);
 
-    LBHashtable _map;
+    NATHashtable _map;
 private:
     IPAddress _sip;
 };
 
-class FlowIPNATReverse : public FlowBufferElement<IPAddress> {
+class FlowIPNATReverse : public FlowBufferElement<IPPair> {
 
 public:
 
@@ -94,9 +69,9 @@ public:
     const char *processing() const		{ return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh);
+    //int initialize(ErrorHandler *errh);
 
-    void push_batch(int, IPAddress*, PacketBatch *);
+    void push_batch(int, IPPair*, PacketBatch *);
 
     friend class FlowIPLoadBalancerReverse;
 

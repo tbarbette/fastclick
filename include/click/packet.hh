@@ -32,6 +32,10 @@ struct click_icmp;
 struct click_ip6;
 struct click_tcp;
 struct click_udp;
+
+#include <clicknet/ip.h>
+#include <clicknet/tcp.h>
+
 CLICK_DECLS
 
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
@@ -894,6 +898,8 @@ class WritablePacket : public Packet { public:
     inline click_icmp *icmp_header() const;
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
+
+    inline void rewrite_ips(IPPair pair);
 
     inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
 
@@ -2816,6 +2822,23 @@ WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t
 	_tail = data + data_length;
 	_end = data + buffer_length;
 # endif
+}
+
+inline void
+WritablePacket::rewrite_ips(IPPair pair) {
+    assert(this->network_header());
+    uint16_t *x = reinterpret_cast<uint16_t *>(&this->ip_header()->ip_src);
+    uint32_t old_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
+    old_hw += (old_hw >> 16);
+
+    memcpy(x, &pair, 8);
+
+    uint32_t new_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
+    new_hw += (new_hw >> 16);
+    click_ip *iph = this->ip_header();
+    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
+    click_update_in_cksum(&this->tcp_header()->th_sum, old_hw, new_hw);
+
 }
 
 typedef Packet::PacketType PacketType;

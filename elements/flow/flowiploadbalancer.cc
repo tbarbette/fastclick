@@ -13,23 +13,6 @@
 CLICK_DECLS
 
 #define DEBUG_LB 0
-int _offset = 0;
-
-inline void rewrite_ips(WritablePacket* q, IPPair pair) {
-    assert(q->network_header());
-    uint16_t *x = reinterpret_cast<uint16_t *>(&q->ip_header()->ip_src);
-    uint32_t old_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
-    old_hw += (old_hw >> 16);
-
-    memcpy(x, &pair, 8);
-
-    uint32_t new_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
-    new_hw += (new_hw >> 16);
-    click_ip *iph = q->ip_header();
-    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
-    click_update_in_cksum(&q->tcp_header()->th_sum, old_hw, new_hw);
-
-}
 
 FlowIPLoadBalancer::FlowIPLoadBalancer() : _last(0){
 
@@ -88,7 +71,7 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
 
     EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
-        rewrite_ips(q, *flowdata);
+        q->rewrite_ips(*flowdata);
         q->set_dst_ip_anno(flowdata->dst);
         return q;
     }, batch);
@@ -163,7 +146,7 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
 
     EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
             WritablePacket* q=p->uniqueify();
-            rewrite_ips(q, *flowdata);
+            q->rewrite_ips(*flowdata);
             q->set_dst_ip_anno(flowdata->dst);
             return q;
         }, batch);
