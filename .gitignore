@@ -1,5 +1,6 @@
 +*
 .dotest
+.idea
 .*.cmd
 Makefile
 autom4te*
