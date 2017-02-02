@@ -1,9 +1,11 @@
 #ifndef CLICK_RATEDSOURCE_HH
 #define CLICK_RATEDSOURCE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/tokenbucket.hh>
 #include <click/task.hh>
+#include <click/notifier.hh>
 CLICK_DECLS
+class HandlerCall;
 
 /*
 =c
@@ -87,40 +89,66 @@ Makes the element active or inactive.
 
 InfiniteSource, Script */
 
-class RatedSource : public Element { public:
+class RatedSource : public BatchElement, public ActiveNotifier {
+	public:
 
-    RatedSource() CLICK_COLD;
+		RatedSource() CLICK_COLD;
 
-    const char *class_name() const		{ return "RatedSource"; }
-    const char *port_count() const		{ return PORTS_0_1; }
-    void add_handlers() CLICK_COLD;
+		const char *class_name() const		{ return "RatedSource"; }
+		const char *port_count() const		{ return PORTS_0_1; }
+		void add_handlers() CLICK_COLD;
 
-    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
-    int initialize(ErrorHandler *errh) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
+		int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
+		int initialize(ErrorHandler *errh) CLICK_COLD;
+		bool can_live_reconfigure() const 	{ return true; }
+		void cleanup(CleanupStage) CLICK_COLD;
 
-    bool run_task(Task *task);
-    Packet *pull(int);
+		bool run_task(Task *task);
 
-  protected:
+		Packet      *pull(int);
+	#if HAVE_BATCH
+		PacketBatch *pull_batch(int port, unsigned max) {
+			PacketBatch *batch;
+			click_chatter("Pull batch\n");
+			MAKE_BATCH(pull(port), batch, max);
+			return batch;
+		}
+	#endif
 
-    static const unsigned NO_LIMIT = 0xFFFFFFFFU;
+	protected:
 
-    TokenBucket _tb;
-    unsigned _count;
-    unsigned _limit;
-    int _datasize;
-    bool _active;
-    bool _stop;
-    Packet *_packet;
-    Task _task;
-    Timer _timer;
-    String _data;
+		static const unsigned NO_LIMIT = 0xFFFFFFFFU;
+		static const unsigned DEF_BATCH_SIZE = 32;
 
-    void setup_packet();
+	#if HAVE_INT64_TYPES
+		typedef uint64_t ucounter_t;
+		typedef int64_t counter_t;
+	#else
+		typedef uint32_t ucounter_t;
+		typedef int32_t counter_t;
+	#endif
 
-    static String read_param(Element *, void *) CLICK_COLD;
-    static int change_param(const String &, Element *, void *, ErrorHandler *);
+		TokenBucket _tb;
+		ucounter_t  _count;
+		ucounter_t  _limit;
+	#if HAVE_BATCH
+		unsigned _batch_size;
+	#endif
+		int    _datasize;
+		bool   _active;
+		bool   _stop;
+		Packet *_packet;
+		Task   _task;
+		Timer  _timer;
+		String _data;
+
+		NotifierSignal _nonfull_signal;
+		HandlerCall   *_end_h;
+
+		void setup_packet();
+
+		static String read_param(Element *, void *) CLICK_COLD;
+		static int change_param(const String &, Element *, void *, ErrorHandler *);
 
 };
 
