@@ -6,7 +6,7 @@
  *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2008 Regents of the University of California
- * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -70,7 +70,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	_data = data;
 	_datasize = datasize;
-	
+
 	if (bandwidth > 0) {
 		rate = bandwidth / (_datasize < 0 ? _data.length() : _datasize);
 	}
@@ -153,7 +153,7 @@ RatedSource::run_task(Task *)
 	Packet      *last;
 
 	// Refill the token bucket
-	_tb.set_full();
+	_tb.refill();
 
 	unsigned n = _batch_size;
 	unsigned count = 0;
@@ -234,8 +234,8 @@ RatedSource::pull(int)
 		Packet *p = _packet->clone();
 		p->set_timestamp_anno(Timestamp::now());
 		return p;
-	} 
-	
+	}
+
 	return 0;
 }
 
