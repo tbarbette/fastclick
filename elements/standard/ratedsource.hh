@@ -92,20 +92,20 @@ InfiniteSource, Script */
 class RatedSource : public BatchElement, public ActiveNotifier {
     public:
 
-    RatedSource() CLICK_COLD;
+        RatedSource() CLICK_COLD;
 
-    const char *class_name() const        { return "RatedSource"; }
-    const char *port_count() const        { return PORTS_0_1; }
-    void add_handlers() CLICK_COLD;
+        const char *class_name() const        { return "RatedSource"; }
+        const char *port_count() const        { return PORTS_0_1; }
+        void add_handlers() CLICK_COLD;
 
-    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
-    int initialize(ErrorHandler *errh) CLICK_COLD;
+        int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
+        int initialize(ErrorHandler *errh) CLICK_COLD;
         bool can_live_reconfigure() const     { return true; }
-    void cleanup(CleanupStage) CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
 
-    bool run_task(Task *task);
+        bool run_task(Task *task);
 
-    Packet *pull(int);
+        Packet      *pull(int);
     #if HAVE_BATCH
         PacketBatch *pull_batch(int port, unsigned max) {
             PacketBatch *batch;
@@ -115,9 +115,9 @@ class RatedSource : public BatchElement, public ActiveNotifier {
         }
     #endif
 
-  protected:
+    protected:
 
-    static const unsigned NO_LIMIT = 0xFFFFFFFFU;
+        static const unsigned NO_LIMIT = 0xFFFFFFFFU;
         static const unsigned DEF_BATCH_SIZE = 32;
 
     #if HAVE_INT64_TYPES
@@ -128,27 +128,27 @@ class RatedSource : public BatchElement, public ActiveNotifier {
         typedef int32_t counter_t;
     #endif
 
-    TokenBucket _tb;
+        TokenBucket _tb;
         ucounter_t  _count;
         ucounter_t  _limit;
     #if HAVE_BATCH
         unsigned _batch_size;
     #endif
-    int _datasize;
-    bool _active;
-    bool _stop;
-    Packet *_packet;
-    Task _task;
-    Timer _timer;
-    String _data;
+        int    _datasize;
+        bool   _active;
+        bool   _stop;
+        Packet *_packet;
+        Task   _task;
+        Timer  _timer;
+        String _data;
 
         NotifierSignal _nonfull_signal;
         HandlerCall   *_end_h;
 
-    void setup_packet();
+        void setup_packet();
 
-    static String read_param(Element *, void *) CLICK_COLD;
-    static int change_param(const String &, Element *, void *, ErrorHandler *);
+        static String read_param(Element *, void *) CLICK_COLD;
+        static int change_param(const String &, Element *, void *, ErrorHandler *);
 
 };
 

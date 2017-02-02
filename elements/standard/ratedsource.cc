@@ -67,18 +67,18 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("BANDWIDTH", BandwidthArg(), bandwidth)
         .read("END_CALL", HandlerCallArg(HandlerCall::writable), end_h)
         .complete() < 0)
-    return -1;
+        return -1;
 
     _data = data;
     _datasize = datasize;
 
     if (bandwidth > 0) {
-    rate = bandwidth / (_datasize < 0 ? _data.length() : _datasize);
+        rate = bandwidth / (_datasize < 0 ? _data.length() : _datasize);
     }
 
     int burst = rate < 200 ? 2 : rate / 100;
     if (bandwidth > 0 && burst < 2 * datasize) {
-    burst = 2 * datasize;
+        burst = 2 * datasize;
     }
 
 #if HAVE_BATCH
@@ -110,7 +110,7 @@ RatedSource::initialize(ErrorHandler *errh)
 
     _count = 0;
     if (output_is_push(0)) {
-    ScheduleInfo::initialize_task(this, &_task, errh);
+        ScheduleInfo::initialize_task(this, &_task, errh);
         _nonfull_signal = Notifier::downstream_full_signal(this, 0, &_task);
     }
 
@@ -132,7 +132,7 @@ void
 RatedSource::cleanup(CleanupStage)
 {
     if (_packet)
-    _packet->kill();
+        _packet->kill();
 
     _packet = 0;
     delete _end_h;
@@ -142,22 +142,25 @@ bool
 RatedSource::run_task(Task *)
 {
     if (!_active)
-    return false;
+        return false;
     if (_limit != NO_LIMIT && _count >= _limit) {
-    if (_stop)
-        router()->please_stop_driver();
-    return false;
+        if (_stop)
+            router()->please_stop_driver();
+        return false;
     }
+
+    // Refill the token bucket
+    _tb.refill();
 
 #if HAVE_BATCH
     PacketBatch *head = 0;
     Packet      *last;
 
-    // Refill the token bucket
-    _tb.set_full();
-
     unsigned n = _batch_size;
     unsigned count = 0;
+
+    if (_limit != NO_LIMIT && n + _count >= _limit)
+        n = _limit - _count;
 
     // Create a batch
     for (int i=0 ; i<n; i++) {
@@ -167,15 +170,13 @@ RatedSource::run_task(Task *)
 
             if (head == NULL) {
                 head = PacketBatch::start_head(p);
-            }
-            else {
+            } else {
                 last->set_next(p);
             }
             last = p;
 
             count++;
-        }
-        else {
+        } else {
             _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(_batch_size)));
             return false;
         }
@@ -188,9 +189,7 @@ RatedSource::run_task(Task *)
 
         _task.fast_reschedule();
         return true;
-    }
-    else {
-
+    } else {
         if (_end_h && _limit >= 0 && _count >= (ucounter_t) _limit)
             (void) _end_h->call_write();
         _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
@@ -198,22 +197,19 @@ RatedSource::run_task(Task *)
         return false;
     }
 #else
-    _tb.refill();
     if (_tb.remove_if(1)) {
-    Packet *p = _packet->clone();
-    p->set_timestamp_anno(Timestamp::now());
-    output(0).push(p);
-    _count++;
-
-    _task.fast_reschedule();
-    return true;
-    }
-    else {
+        Packet *p = _packet->clone();
+        p->set_timestamp_anno(Timestamp::now());
+        output(0).push(p);
+        _count++;
+        _task.fast_reschedule();
+        return true;
+    } else {
         if (_end_h && _limit >= 0 && _count >= (ucounter_t) _limit)
             (void) _end_h->call_write();
-    _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
+        _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
 
-    return false;
+        return false;
     }
 #endif
 }
@@ -230,11 +226,12 @@ RatedSource::pull(int)
     }
 
     _tb.refill();
+
     if (_tb.remove_if(1)) {
-    _count++;
-    Packet *p = _packet->clone();
-    p->set_timestamp_anno(Timestamp::now());
-    return p;
+        _count++;
+        Packet *p = _packet->clone();
+        p->set_timestamp_anno(Timestamp::now());
+        return p;
     }
 
     return 0;
@@ -244,22 +241,20 @@ void
 RatedSource::setup_packet()
 {
     if (_packet)
-    _packet->kill();
+        _packet->kill();
 
     // note: if you change `headroom', change `click-align'
     unsigned int headroom = 16+20+24;
 
     if (_datasize < 0) {
         _packet = Packet::make(headroom, _data.data(), _data.length(), 0);
-    }
-    else if (_datasize <= _data.length()) {
+    } else if (_datasize <= _data.length()) {
         _packet = Packet::make(headroom, _data.data(), _datasize, 0);
-    }
-    else {
-    // make up some data to fill extra space
-    StringAccum sa;
-    while (sa.length() < _datasize)
-        sa << _data;
+    } else {
+        // make up some data to fill extra space
+        StringAccum sa;
+        while (sa.length() < _datasize)
+            sa << _data;
         _packet = Packet::make(headroom, sa.data(), _datasize, 0);
     }
 }
@@ -283,68 +278,62 @@ RatedSource::read_param(Element *e, void *vparam)
 int
 RatedSource::change_param(const String &s, Element *e, void *vparam, ErrorHandler *errh)
 {
-  RatedSource *rs = (RatedSource *)e;
-  switch ((intptr_t)vparam) {
-
-  case 0:            // data
-      rs->_data = s;
-      if (rs->_packet)
-      rs->_packet->kill();
-      rs->_packet = Packet::make(rs->_data.data(), rs->_data.length());
-      break;
-
-  case 1: {            // rate
-      unsigned rate;
-      if (!IntArg().parse(s, rate))
-      return errh->error("syntax error");
-      rs->_tb.assign_adjust(rate, rate < 200 ? 2 : rate / 100);
-      break;
-  }
-
-   case 2: {            // limit
-     int limit;
-     if (!IntArg().parse(s, limit))
-       return errh->error("syntax error");
-     rs->_limit = (limit >= 0 ? unsigned(limit) : NO_LIMIT);
-     break;
-   }
-
-  case 3: {            // active
-      bool active;
-      if (!BoolArg().parse(s, active))
-      return errh->error("syntax error");
-      rs->_active = active;
-      if (rs->output_is_push(0) && !rs->_task.scheduled() && active) {
+    RatedSource *rs = (RatedSource *)e;
+    switch ((intptr_t)vparam) {
+      case 0:            // data
+          rs->_data = s;
+          if (rs->_packet)
+              rs->_packet->kill();
+          rs->_packet = Packet::make(rs->_data.data(), rs->_data.length());
+          break;
+      case 1: {            // rate
+          unsigned rate;
+          if (!IntArg().parse(s, rate))
+              return errh->error("syntax error");
+          rs->_tb.assign_adjust(rate, rate < 200 ? 2 : rate / 100);
+          break;
+      }
+      case 2: {            // limit
+          int limit;
+          if (!IntArg().parse(s, limit))
+             return errh->error("syntax error");
+          rs->_limit = (limit >= 0 ? unsigned(limit) : NO_LIMIT);
+          break;
+      }
+      case 3: {            // active
+          bool active;
+          if (!BoolArg().parse(s, active))
+              return errh->error("syntax error");
+          rs->_active = active;
+          if (rs->output_is_push(0) && !rs->_task.scheduled() && active) {
+#if HAVE_BATCH
+              rs->_tb.set(DEF_BATCH_SIZE);
+#else
+              rs->_tb.set(1);
+#endif
+              rs->_task.reschedule();
+          }
+          break;
+      }
+      case 5: {            // reset
+          rs->_count = 0;
 #if HAVE_BATCH
           rs->_tb.set(DEF_BATCH_SIZE);
 #else
           rs->_tb.set(1);
 #endif
-      rs->_task.reschedule();
+          if (rs->output_is_push(0) && !rs->_task.scheduled() && rs->_active)
+          rs->_task.reschedule();
+          break;
       }
-      break;
-  }
-
-  case 5: {            // reset
-      rs->_count = 0;
-#if HAVE_BATCH
-      rs->_tb.set(DEF_BATCH_SIZE);
-#else
-      rs->_tb.set(1);
-#endif
-      if (rs->output_is_push(0) && !rs->_task.scheduled() && rs->_active)
-      rs->_task.reschedule();
-      break;
-  }
-
-  case 6: {            // datasize
-      int datasize;
-      if (!IntArg().parse(s, datasize))
-      return errh->error("syntax error");
-      rs->_datasize = datasize;
-      rs->setup_packet();
-      break;
-  }
+      case 6: {            // datasize
+          int datasize;
+          if (!IntArg().parse(s, datasize))
+          return errh->error("syntax error");
+          rs->_datasize = datasize;
+          rs->setup_packet();
+          break;
+      }
   }
 
   return 0;
@@ -365,12 +354,12 @@ RatedSource::add_handlers()
     add_write_handler("reset", change_param, 5, Handler::f_button);
     add_data_handlers("length", Handler::f_read, &_datasize);
     add_write_handler("length", change_param, 6);
-  // deprecated
+    //deprecated
     add_data_handlers("datasize", Handler::f_read | Handler::f_deprecated, &_datasize);
     add_write_handler("datasize", change_param, 6);
 
-  if (output_is_push(0))
-      add_task_handlers(&_task);
+    if (output_is_push(0))
+        add_task_handlers(&_task);
 }
 
 CLICK_ENDDECLS

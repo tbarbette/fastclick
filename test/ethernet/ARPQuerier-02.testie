@@ -30,5 +30,5 @@ DriverManager(wait_stop 3, print c.count, print c2.count, print c3.count)
 
 %expect stdout
 {{9|10}}
-{{9|10}}
+{{8|9|10}}
 {{2|3}}
