@@ -41,6 +41,7 @@ protected:
     Timestamp _current;
     bool _use_signal;
     bool _verbose;
+    bool _freeonterminate;
 };
 
 
