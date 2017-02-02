@@ -1,9 +1,11 @@
 #ifndef CLICK_RATEDSOURCE_HH
 #define CLICK_RATEDSOURCE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/tokenbucket.hh>
 #include <click/task.hh>
+#include <click/notifier.hh>
 CLICK_DECLS
+class HandlerCall;
 
 /*
 =c
@@ -87,7 +89,8 @@ Makes the element active or inactive.
 
 InfiniteSource, Script */
 
-class RatedSource : public Element { public:
+class RatedSource : public BatchElement, public ActiveNotifier {
+    public:
 
     RatedSource() CLICK_COLD;
 
@@ -97,18 +100,40 @@ class RatedSource : public Element { public:
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
+        bool can_live_reconfigure() const     { return true; }
     void cleanup(CleanupStage) CLICK_COLD;
 
     bool run_task(Task *task);
+
     Packet *pull(int);
+    #if HAVE_BATCH
+        PacketBatch *pull_batch(int port, unsigned max) {
+            PacketBatch *batch;
+            click_chatter("Pull batch\n");
+            MAKE_BATCH(pull(port), batch, max);
+            return batch;
+        }
+    #endif
 
   protected:
 
     static const unsigned NO_LIMIT = 0xFFFFFFFFU;
+        static const unsigned DEF_BATCH_SIZE = 32;
+
+    #if HAVE_INT64_TYPES
+        typedef uint64_t ucounter_t;
+        typedef int64_t counter_t;
+    #else
+        typedef uint32_t ucounter_t;
+        typedef int32_t counter_t;
+    #endif
 
     TokenBucket _tb;
-    unsigned _count;
-    unsigned _limit;
+        ucounter_t  _count;
+        ucounter_t  _limit;
+    #if HAVE_BATCH
+        unsigned _batch_size;
+    #endif
     int _datasize;
     bool _active;
     bool _stop;
@@ -116,6 +141,9 @@ class RatedSource : public Element { public:
     Task _task;
     Timer _timer;
     String _data;
+
+        NotifierSignal _nonfull_signal;
+        HandlerCall   *_end_h;
 
     void setup_packet();
 

@@ -2,8 +2,11 @@
  * ratedsource.{cc,hh} -- generates configurable rated stream of packets.
  * Benjie Chen, Eddie Kohler (based on udpgen.o)
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2008 Regents of the University of California
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,18 +27,26 @@
 #include <click/straccum.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/glue.hh>
+#include <click/handlercall.hh>
 CLICK_DECLS
 
 const unsigned RatedSource::NO_LIMIT;
+const unsigned RatedSource::DEF_BATCH_SIZE;
 
 RatedSource::RatedSource()
-  : _packet(0), _task(this), _timer(&_task)
+  : _packet(0), _task(this), _timer(&_task), _end_h(0)
 {
+    #if HAVE_BATCH
+        in_batch_mode = BATCH_MODE_YES;
+        _batch_size   = DEF_BATCH_SIZE;
+    #endif
 }
 
 int
 RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    ActiveNotifier::initialize(Notifier::EMPTY_NOTIFIER, router());
+
     String data =
       "Random bullshit in a packet, at least 64 bytes long. Well, now it is.";
     unsigned rate = 10;
@@ -43,6 +54,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
     int limit = -1;
     int datasize = -1;
     bool active = true, stop = false;
+    HandlerCall end_h;
 
     if (Args(conf, this, errh)
         .read_p("DATA", data)
@@ -53,22 +65,40 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("DATASIZE", datasize) // deprecated
         .read("STOP", stop)
         .read("BANDWIDTH", BandwidthArg(), bandwidth)
+        .read("END_CALL", HandlerCallArg(HandlerCall::writable), end_h)
         .complete() < 0)
     return -1;
 
     _data = data;
     _datasize = datasize;
-    if (bandwidth > 0)
+
+    if (bandwidth > 0) {
     rate = bandwidth / (_datasize < 0 ? _data.length() : _datasize);
+    }
+
     int burst = rate < 200 ? 2 : rate / 100;
-    if (bandwidth > 0 && burst < 2 * datasize)
+    if (bandwidth > 0 && burst < 2 * datasize) {
     burst = 2 * datasize;
+    }
+
+#if HAVE_BATCH
+    if ( burst < _batch_size ) {
+        _batch_size = burst;
+    }
+#endif
+
     _tb.assign(rate, burst);
     _limit = (limit >= 0 ? unsigned(limit) : NO_LIMIT);
     _active = active;
     _stop = stop;
 
-    setup_packet();
+    delete _end_h;
+    if (end_h)
+        _end_h = new HandlerCall(end_h);
+    else if (stop)
+        _end_h = new HandlerCall("stop");
+    else
+        _end_h = 0;
 
     return 0;
 }
@@ -76,11 +106,25 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 RatedSource::initialize(ErrorHandler *errh)
 {
+    setup_packet();
+
     _count = 0;
-    if (output_is_push(0))
+    if (output_is_push(0)) {
     ScheduleInfo::initialize_task(this, &_task, errh);
+        _nonfull_signal = Notifier::downstream_full_signal(this, 0, &_task);
+    }
+
+#if HAVE_BATCH
+    _tb.set(_batch_size);
+#else
     _tb.set(1);
+#endif
+
     _timer.initialize(this);
+
+    if (_end_h && _end_h->initialize_write(this, errh) < 0)
+        return -1;
+
     return 0;
 }
 
@@ -89,7 +133,9 @@ RatedSource::cleanup(CleanupStage)
 {
     if (_packet)
     _packet->kill();
+
     _packet = 0;
+    delete _end_h;
 }
 
 bool
@@ -103,18 +149,73 @@ RatedSource::run_task(Task *)
     return false;
     }
 
+#if HAVE_BATCH
+    PacketBatch *head = 0;
+    Packet      *last;
+
+    // Refill the token bucket
+    _tb.set_full();
+
+    unsigned n = _batch_size;
+    unsigned count = 0;
+
+    // Create a batch
+    for (int i=0 ; i<n; i++) {
+        if (_tb.remove_if(1)) {
+            Packet *p = _packet->clone();
+            p->set_timestamp_anno(Timestamp::now());
+
+            if (head == NULL) {
+                head = PacketBatch::start_head(p);
+            }
+            else {
+                last->set_next(p);
+            }
+            last = p;
+
+            count++;
+        }
+        else {
+            _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(_batch_size)));
+            return false;
+        }
+    }
+
+    // Push the batch
+    if (head) {
+        output_push_batch(0, head->make_tail(last, count));
+        _count += count;
+
+        _task.fast_reschedule();
+        return true;
+    }
+    else {
+
+        if (_end_h && _limit >= 0 && _count >= (ucounter_t) _limit)
+            (void) _end_h->call_write();
+        _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
+
+        return false;
+    }
+#else
     _tb.refill();
     if (_tb.remove_if(1)) {
     Packet *p = _packet->clone();
     p->set_timestamp_anno(Timestamp::now());
     output(0).push(p);
     _count++;
+
     _task.fast_reschedule();
     return true;
-    } else {
+    }
+    else {
+        if (_end_h && _limit >= 0 && _count >= (ucounter_t) _limit)
+            (void) _end_h->call_write();
     _timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
+
     return false;
     }
+#endif
 }
 
 Packet *
@@ -134,7 +235,8 @@ RatedSource::pull(int)
     Packet *p = _packet->clone();
     p->set_timestamp_anno(Timestamp::now());
     return p;
-    } else
+    }
+
     return 0;
 }
 
@@ -147,16 +249,18 @@ RatedSource::setup_packet()
     // note: if you change `headroom', change `click-align'
     unsigned int headroom = 16+20+24;
 
-    if (_datasize < 0)
-    _packet = Packet::make(headroom, (unsigned char *) _data.data(), _data.length(), 0);
-    else if (_datasize <= _data.length())
-    _packet = Packet::make(headroom, (unsigned char *) _data.data(), _datasize, 0);
+    if (_datasize < 0) {
+        _packet = Packet::make(headroom, _data.data(), _data.length(), 0);
+    }
+    else if (_datasize <= _data.length()) {
+        _packet = Packet::make(headroom, _data.data(), _datasize, 0);
+    }
     else {
     // make up some data to fill extra space
     StringAccum sa;
     while (sa.length() < _datasize)
         sa << _data;
-    _packet = Packet::make(headroom, (unsigned char *) sa.data(), _datasize, 0);
+        _packet = Packet::make(headroom, sa.data(), _datasize, 0);
     }
 }
 
@@ -177,8 +281,7 @@ RatedSource::read_param(Element *e, void *vparam)
 }
 
 int
-RatedSource::change_param(const String &s, Element *e, void *vparam,
-              ErrorHandler *errh)
+RatedSource::change_param(const String &s, Element *e, void *vparam, ErrorHandler *errh)
 {
   RatedSource *rs = (RatedSource *)e;
   switch ((intptr_t)vparam) {
@@ -212,7 +315,11 @@ RatedSource::change_param(const String &s, Element *e, void *vparam,
       return errh->error("syntax error");
       rs->_active = active;
       if (rs->output_is_push(0) && !rs->_task.scheduled() && active) {
-      rs->_tb.set(1);
+#if HAVE_BATCH
+          rs->_tb.set(DEF_BATCH_SIZE);
+#else
+          rs->_tb.set(1);
+#endif
       rs->_task.reschedule();
       }
       break;
@@ -220,7 +327,11 @@ RatedSource::change_param(const String &s, Element *e, void *vparam,
 
   case 5: {            // reset
       rs->_count = 0;
+#if HAVE_BATCH
+      rs->_tb.set(DEF_BATCH_SIZE);
+#else
       rs->_tb.set(1);
+#endif
       if (rs->output_is_push(0) && !rs->_task.scheduled() && rs->_active)
       rs->_task.reschedule();
       break;
@@ -235,6 +346,7 @@ RatedSource::change_param(const String &s, Element *e, void *vparam,
       break;
   }
   }
+
   return 0;
 }
 
