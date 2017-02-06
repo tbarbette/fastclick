@@ -92,6 +92,12 @@ re-batched when hitting the next BatchElement. It is referenced as the "jump"
 mode as the batch "jump over" the vanilla Element. This is the behaviour
 described in the ANCS paper and still the default mode.
 
+Batching and make check
+-----------------------
+To ensure people not familiar with batching get warned about bad configuration including non-batch compatible element, some messages are printed to inform a potential slower configuration.
+
+However testies (used by "make check"- does not cope well with those message to stdout. To disable them and allow make check to run, you must pass --disable-verbose-batch to configure.
+
 Differences with the ANCS paper
 -------------------------------
 For simplicity, we reference all input element as "FromDevice" and output
