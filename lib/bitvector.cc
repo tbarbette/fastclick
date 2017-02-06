@@ -19,6 +19,9 @@
  */
 
 #include <click/config.h>
+#include <click/straccum.hh>
+#include <click/confparse.hh>
+#include <click/args.hh>
 #include <click/bitvector.hh>
 CLICK_DECLS
 
@@ -301,6 +304,55 @@ Bitvector Bitvector::from_mask(unsigned long mask) {
 		++pow;
 	}
 	return v;
+}
+
+bool
+Bitvector::parse(const String &str, int min_val, int max_val, int offset)
+{
+    if (offset < 0 || max_val < min_val)
+        return false;
+
+    Bitvector result(max_val - min_val + 1 + offset, false);
+    String work_copy = str;
+    while (String part = cp_shift_delimiter(work_copy, ',')) {
+        // initialize val & val_end unnecessarily to avoid uninitialized variable warnings
+        int val = 0, val_end = 0, dash_offset = part.find_left('-', 1);
+        if (dash_offset >= 1 &&
+            dash_offset + 1 < part.length() &&
+            BoundedIntArg(min_val, max_val).parse(part.substring(0, dash_offset), val) &&
+            BoundedIntArg(min_val, max_val).parse(part.substring(dash_offset + 1), val_end) &&
+            val <= val_end) {
+            for (int i = val; i <= val_end; ++i)
+                result[i - min_val + offset] = true;
+        } else if (BoundedIntArg(min_val, max_val).parse(part, val)) {
+            result[val - min_val + offset] = true;
+        } else {
+            return false;
+        }
+    }
+
+    swap(result);
+    return true;
+}
+
+String
+Bitvector::unparse(int read_offset, int output_offset) const
+{
+    StringAccum sa;
+    int start_range = -1;
+    for (int i = (read_offset < 0 ? 0 : read_offset); i <= size(); ++i) {
+        if (i < size() && start_range < 0 && (*this)[i]) {
+            start_range = i;
+        } else if (start_range >= 0 && (i >= size() || !(*this)[i])) {
+            if (sa)
+                sa << ',';
+            sa << (start_range - read_offset + output_offset);
+            if (i > start_range + 1)
+                sa << '-' << (i - 1 - read_offset + output_offset);
+            start_range = -1;
+        }
+    }
+    return sa.take_string();
 }
 
 CLICK_ENDDECLS

@@ -1,6 +1,7 @@
 // -*- c-basic-offset: 4; related-file-name: "../../lib/bitvector.cc" -*-
 #ifndef CLICK_BITVECTOR_HH
 #define CLICK_BITVECTOR_HH
+#include <click/string.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -74,6 +75,9 @@ class Bitvector {
     void swap(Bitvector &x);
 
     inline int weight();
+
+    bool parse(const String &str, int min_val, int max_val, int offset = 0);
+    String unparse(int read_offset = 0, int output_offset = 0) const;
 
     /** @cond never */
     typedef word_type data_word_type CLICK_DEPRECATED;
