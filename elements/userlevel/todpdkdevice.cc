@@ -229,9 +229,6 @@ void ToDPDKDevice::push(int, Packet *p)
     } while (unlikely(_blocking && congestioned));
 
 #if !CLICK_PACKET_USE_DPDK
-//    if (likely(is_fullpush()))
-//        p->safe_kill();
-//    else
         p->kill();
 #endif
 }

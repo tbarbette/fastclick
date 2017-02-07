@@ -239,6 +239,7 @@ class RXQueueDevice : public QueueDevice {
 protected:
 	bool _promisc;
 	bool _set_rss_aggregate;
+	bool _set_timestamp;
 	int _threadoffset;
 	bool _use_numa;
 

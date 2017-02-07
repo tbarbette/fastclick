@@ -31,10 +31,37 @@ const int FlowNodeHash::HASH_SIZES_NR = 10;
 const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
 //const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {256,512,1024,2048,4096,8192};
 
+
+/*******************************
+ * FlowClassificationTable
+ *******************************/
+FlowClassificationTable::FlowClassificationTable() : _root(0), _pool(), _pool_release_fnt(0) {
+
+}
+void FlowClassificationTable::set_root(FlowNode* node) {
+    assert(node);
+    assert(_pool_release_fnt);
+    _root = node;
+    auto fnt = [this](FlowControlBlock* fcb){fcb->release_fnt = _pool_release_fnt;};
+    node->traverse<decltype(fnt)>(fnt);
+}
+
+FlowNode* FlowClassificationTable::get_root() {
+    return _root;
+}
+
 void FlowClassificationTable::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt) {
 	_pool_release_fnt = pool_release_fnt;
 }
 
+FCBPool& FlowClassificationTable::get_pool() {
+    return _pool;
+}
+
+
+/*******************************
+ * FlowNode
+ *******************************/
 
 /**
  * Combine this rule with rule of higher priority if its level is not equal
@@ -355,6 +382,8 @@ void FlowNode::check() {
             if (cur->node->parent() != node)
                 goto error;
             cur->node->check();
+        } else {
+            assert(cur->leaf->release_pool);
         }
     }
 
@@ -370,6 +399,8 @@ void FlowNode::check() {
         if (node->default_ptr()->is_node()) {
             assert(node->level()->is_dynamic() || node->get_default().node->parent() == node);
             node->get_default().node->check();
+        } else {
+            assert(node->default_ptr()->leaf->release_pool);
         }
     }
     return;

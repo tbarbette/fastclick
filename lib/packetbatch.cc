@@ -29,7 +29,7 @@ CLICK_DECLS
  * Recycle a whole batch of unshared packets of the same type
  *
  * @precond No packet are shared
- * @precond all packets are of the same type
+ * @precond all packets are of the same type (data or without data)
  */
 void PacketBatch::safe_kill(bool is_data) {
     if (is_data) {
@@ -40,7 +40,7 @@ void PacketBatch::safe_kill(bool is_data) {
 }
 
 /**
- * Recycle a whole batch, faster in most cases
+ * Recycle a whole batch of unspecified packets (shared or not, data or not), faster in most cases
  */
 void PacketBatch::fast_kill() {
     BATCH_RECYCLE_START();

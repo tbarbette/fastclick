@@ -7,9 +7,9 @@
 #include <click/allocator.hh>
 #include <click/multithread.hh>
 #if CLICK_DEBUG_HASHMAP
-# define click_hash_assert(x) assert(x)
+# define click_hashmp_assert(x) assert(x)
 #else
-# define click_hash_assert(x)
+# define click_hashmp_assert(x)
 #endif
 CLICK_DECLS
 
@@ -438,7 +438,7 @@ retry:\
         }\
         ListItem* e = allocate(ListItem(key,value));\
         V* v = e->item.unprotected_ptr();\
-        click_hash_assert(e->item.refcnt() == 0);\
+        click_hashmp_assert(e->item.refcnt() == 0);\
         e->_hashnext = bucket.list->head;\
 \
         bucket.list->head = e;\
@@ -454,7 +454,7 @@ template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::ptr
 HashContainerMP<K,V,Item>::find_insert(const K &key,const V &value) {
     MAKE_FIND_INSERT(ptr);
-    click_hash_assert(p.refcnt() > 0);
+    click_hashmp_assert(p.refcnt() > 0);
     return p;
 }
 
@@ -462,7 +462,7 @@ template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::write_ptr
 HashContainerMP<K,V,Item>::find_insert_write(const K &key,const V &value) {
     MAKE_FIND_INSERT(write_ptr);
-    click_hash_assert(p.refcnt() == -1);
+    click_hashmp_assert(p.refcnt() == -1);
     return p;
 }
 
@@ -598,9 +598,9 @@ HashContainerMP<K,V,Item>::find_prefer(const K &key)
 template <typename K, typename V, typename Item>
 T *HashContainerMP<K,V,Item>::set(iterator &it, T *element, bool balance)
 {
-    click_hash_assert(it._hc == this && it._bucket < _nbuckets);
-    click_hash_assert(bucket(_hashkey(element)) == it._bucket);
-    click_hash_assert(!it._element || _hashkeyeq(_hashkey(element), _hashkey(it._element)));
+    click_hashmp_assert(it._hc == this && it._bucket < _nbuckets);
+    click_hashmp_assert(bucket(_hashkey(element)) == it._bucket);
+    click_hashmp_assert(!it._element || _hashkeyeq(_hashkey(element), _hashkey(it._element)));
     T *old = it.get();
     if (unlikely(old == element))
     return old;
@@ -646,7 +646,7 @@ void HashContainerMP<K,V,Item>::rehash(size_type n)
     size_type new_nbuckets = 1;
     while (new_nbuckets < n && new_nbuckets < max_bucket_count)
     new_nbuckets = ((new_nbuckets + 1) << 1) - 1;
-    click_hash_assert(new_nbuckets > 0 && new_nbuckets <= max_bucket_count);
+    click_hashmp_assert(new_nbuckets > 0 && new_nbuckets <= max_bucket_count);
     if (_nbuckets == new_nbuckets)
     return;
 

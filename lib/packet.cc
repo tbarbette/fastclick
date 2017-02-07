@@ -534,6 +534,12 @@ WritablePacket::recycle(WritablePacket *p)
     PacketPool& packet_pool = *make_local_packet_pool();
     bool data = is_from_data_pool(p);
 
+#if HAVE_FLOW
+    if (fcb_stack) {
+        fcb_stack->release(1);
+    }
+#endif
+
     if (likely(data)) {
         check_data_pool_size(packet_pool);
         ++packet_pool.pdcount;
@@ -557,17 +563,17 @@ WritablePacket::recycle(WritablePacket *p)
 
 /**
  * @Precond : _use_count == 1 for all packets
+ * @Precod : ~WritablePacket has been called for each packets
  */
 void
 WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-
-    Packet* next = ((head != 0)? head->next() : 0 );
-    Packet* p = head;
-    for (;p != 0;p=next,next=(p==0?0:p->next())) {
-        ((WritablePacket*)p)->~WritablePacket();
+#if HAVE_FLOW
+    if (fcb_stack) {
+        fcb_stack->release(count);
     }
+#endif
+    PacketPool& packet_pool = *make_local_packet_pool();
     check_packet_pool_size(packet_pool);
     packet_pool.pcount += count;
     tail->set_next(packet_pool.p);
@@ -580,6 +586,11 @@ WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigne
 void
 WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
+#if HAVE_FLOW
+    if (fcb_stack) {
+        fcb_stack->release(count);
+    }
+#endif
     PacketPool& packet_pool = *make_local_packet_pool();
     check_data_pool_size(packet_pool);
     packet_pool.pdcount += count;

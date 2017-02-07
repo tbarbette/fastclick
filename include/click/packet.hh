@@ -1671,15 +1671,15 @@ Packet::kill()
 		# endif
 		skbmgr_recycle_skbs(b);
     #elif CLICK_PACKET_USE_DPDK
+#if HAVE_FLOW
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
 		//Dpdk takes care of indirect and related things
         rte_pktmbuf_free(mb());
 	#elif HAVE_CLICK_PACKET_POOL
 		if (_use_count.dec_and_test()) {
-			#if HAVE_FLOW
-				if (fcb_stack) {
-					fcb_stack->release(1);
-				}
-			#endif
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
 	#else
@@ -1707,14 +1707,14 @@ Packet::safe_kill()
     # endif
         skbmgr_recycle_skbs(b);
 #elif CLICK_PACKET_USE_DPDK
+#if HAVE_FLOW
+        if (fcb_stack) {
+            fcb_stack->release(1);
+        }
+#endif
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
         if (_use_count.unatomic_dec_and_test()) {
-			#if HAVE_FLOW
-				if (fcb_stack) {
-					fcb_stack->release(1);
-				}
-			#endif
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
     }

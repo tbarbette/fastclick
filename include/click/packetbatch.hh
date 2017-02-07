@@ -392,6 +392,7 @@ inline void PacketBatch::kill() {
 		last_packet->set_next(p);\
 		last_packet = static_cast<WritablePacket*>(p);\
 	}\
+	last_packet->~WritablePacket();\
 	n_packet++;}
 
 #define BATCH_RECYCLE_DATA_PACKET(p) {\

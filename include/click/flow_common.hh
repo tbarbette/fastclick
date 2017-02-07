@@ -42,6 +42,15 @@ private:
 
 		FlowNode* parent;
 
+        union {
+            uint8_t data[0];
+            uint16_t data_16[0];
+            uint32_t data_32[0];
+            uint64_t data_64[0];
+            FlowNodeData node_data[0];
+        };
+        //No data after this
+
 		inline void initialize() {
 			use_count = 0;
 		}
@@ -65,14 +74,6 @@ private:
 		}
 
 		inline FlowControlBlock* duplicate(int use_count);
-
-		union {
-			uint8_t data[0];
-			uint16_t data_16[0];
-			uint32_t data_32[0];
-			uint64_t data_64[0];
-			FlowNodeData node_data[0];
-		};
 
 		void print(String prefix);
 		//Nothing after this line !
@@ -136,6 +137,8 @@ public:
 	}
 
 	~FCBPool() {
+	    //TODO
+	    /*
 		//Free all per-thread caches
 		for (unsigned i = 0; i < lists.weight(); i++) {
 			SFCBList &list = lists.get_value(i);
@@ -152,7 +155,7 @@ public:
 			while (list.count > 0 && (fcb = list.get()) != NULL) {
 				CLICK_LFREE(fcb,sizeof(FlowControlBlock) + _data_size);
 			}
-		}
+		}*/
 	}
 
 
