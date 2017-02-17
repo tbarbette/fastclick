@@ -19,11 +19,8 @@ class FlowClassifier;
 
 class FlowElement : public BatchElement {
 public:
-	FlowElement() {
-		if (in_batch_mode < BATCH_MODE_NEEDED)
-			in_batch_mode = BATCH_MODE_NEEDED;
-	};
-	~FlowElement() {};
+	FlowElement();
+	~FlowElement();
 	virtual FlowNode* get_table();
 };
 
@@ -65,7 +62,7 @@ public :
 
 	virtual int initialize(ErrorHandler *errh) {
 		if (_flow_data_offset == -1) {
-			return errh->error("No SFCBAssigner() element sets the flow context for %s !",name().c_str());
+			return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
 		}
 		return 0;
 	}

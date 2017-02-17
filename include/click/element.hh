@@ -257,18 +257,29 @@ class Element { public:
         inline void start_batch();
         inline void end_batch();
 #endif
+#if HAVE_FLOW
+        inline void set_unstack(bool unstack) {
+            _unstack = unstack;
+        }
+        inline bool unstack() {
+            return _unstack;
+        }
+#endif
 
 #if CLICK_STATS >= 1
         unsigned npackets() const       { return _packets; }
 #endif
 
-        inline void assign(bool isoutput, Element *e, int port);
+        inline void assign(bool isoutput, Element *e, int port, bool unstack);
 
       private:
 
         Element* _e;
         int _port;
         per_thread<PacketBatch*> current_batch;
+#if HAVE_FLOW
+        bool _unstack;
+#endif
 
 #if HAVE_BOUND_PORT_TRANSFER
         union {
@@ -291,7 +302,7 @@ class Element { public:
 #endif
 
         inline Port();
-        inline void assign(bool isoutput, Element *owner, Element *e, int port);
+        inline void assign(bool isoutput, Element *owner, Element *e, int port, bool unstack);
 
         friend class Element;
         friend class BatchElement;
@@ -581,16 +592,19 @@ Element::input_is_push(int port) const
 
 inline
 Element::Port::Port()
-    : _e(0), _port(-2)
+    : _e(0), _port(-2), _unstack(false)
 {
     PORT_ASSIGN(0);
 }
 
 inline void
-Element::Port::assign(bool isoutput, Element *e, int port)
+Element::Port::assign(bool isoutput, Element *e, int port, bool unstack)
 {
     _e = e;
     _port = port;
+#if HAVE_FLOW
+    _unstack = unstack;
+#endif
     for (unsigned i = 0; i < current_batch.weight() ; i++)
         current_batch.set_value(i,0);
     (void) isoutput;
@@ -616,10 +630,10 @@ Element::Port::assign(bool isoutput, Element *e, int port)
 }
 
 inline void
-Element::Port::assign(bool isoutput, Element *owner, Element *e, int port)
+Element::Port::assign(bool isoutput, Element *owner, Element *e, int port, bool unstack)
 {
     PORT_ASSIGN(owner);
-    assign(isoutput, e, port);
+    assign(isoutput, e, port, unstack);
 }
 
 /** @brief Returns whether this port is active (a push output or a pull input).
@@ -675,6 +689,14 @@ inline void
 Element::Port::push(Packet* p) const
 {
     assert(_e && p);
+#if HAVE_FLOW
+    FlowControlBlock* tmp_stack;
+    if (_unstack) {
+        tmp_stack = fcb_stack;
+        fcb_stack->release(1);
+        fcb_stack = 0;
+    }
+#endif
 #if CLICK_STATS >= 1
     ++_packets;
 #endif
@@ -705,6 +727,11 @@ Element::Port::push(Packet* p) const
 # else
     _e->push(_port, p);
 # endif
+    }
+#endif
+#if HAVE_FLOW
+    if (_unstack) {
+        fcb_stack = tmp_stack;
     }
 #endif
 }
@@ -764,6 +791,15 @@ Element::Port::pull() const
  */
 void
 Element::Port::push_batch(PacketBatch* batch) const {
+#if HAVE_FLOW
+    FlowControlBlock* tmp_stack = 0;
+    if (_unstack) {
+        tmp_stack = fcb_stack;
+        fcb_stack->release(batch->count());
+        fcb_stack = 0;
+    }
+#endif
+
 #if BATCH_DEBUG
     click_chatter("Pushing batch of %d packets to %p{element}",batch->count(),_e);
 #endif
@@ -771,6 +807,11 @@ Element::Port::push_batch(PacketBatch* batch) const {
     _bound_batch.push_batch(_e,_port,batch);
 #else
     _e->push_batch(_port,batch);
+#endif
+#if HAVE_FLOW
+    if (_unstack) {
+        fcb_stack = tmp_stack;
+    }
 #endif
 }
 

@@ -26,6 +26,7 @@ CLICK_DECLS
 
 
 __thread FlowControlBlock* fcb_stack = 0;
+__thread FlowTableHolder* fcb_table = 0;
 
 const int FlowNodeHash::HASH_SIZES_NR = 10;
 const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
@@ -35,29 +36,27 @@ const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {257,521,1031,
 /*******************************
  * FlowClassificationTable
  *******************************/
-FlowClassificationTable::FlowClassificationTable() : _root(0), _pool(), _pool_release_fnt(0) {
+FlowClassificationTable::FlowClassificationTable() : _root(0)
+{
 
 }
 void FlowClassificationTable::set_root(FlowNode* node) {
     assert(node);
     assert(_pool_release_fnt);
     _root = node;
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
     auto fnt = [this](FlowControlBlock* fcb){fcb->release_fnt = _pool_release_fnt;};
     node->traverse<decltype(fnt)>(fnt);
+#endif
 }
 
 FlowNode* FlowClassificationTable::get_root() {
     return _root;
 }
 
-void FlowClassificationTable::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt) {
+void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt) {
 	_pool_release_fnt = pool_release_fnt;
 }
-
-FCBPool& FlowClassificationTable::get_pool() {
-    return _pool;
-}
-
 
 /*******************************
  * FlowNode
@@ -383,7 +382,9 @@ void FlowNode::check() {
                 goto error;
             cur->node->check();
         } else {
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
             assert(cur->leaf->release_pool);
+#endif
         }
     }
 
@@ -400,7 +401,9 @@ void FlowNode::check() {
             assert(node->level()->is_dynamic() || node->get_default().node->parent() == node);
             node->get_default().node->check();
         } else {
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
             assert(node->default_ptr()->leaf->release_pool);
+#endif
         }
     }
     return;
@@ -440,7 +443,8 @@ void FlowNode::print(FlowNode* node,String prefix) {
 void FlowControlBlock::print(String prefix) {
 	char data_str[64];
 	int j = 0;
-	for (int i = 0; i < release_pool->data_size() && j < 60;i++) {
+
+	for (int i = 0; i < get_pool()->data_size() && j < 60;i++) {
 		sprintf(&data_str[j],"%02x",data[i]);
 		j+=2;
 	}
@@ -453,6 +457,7 @@ void FlowNodePtr::print() {
 	else
 		node->print();
 }
+
 
 int NR_SHARED_FLOW = 0;
 

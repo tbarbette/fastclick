@@ -11,64 +11,8 @@
 #include "flowdispatcher.hh"
 
 CLICK_DECLS
-/*
-class FlowBufferVisitor2 : public RouterVisitor {
-public:
-    size_t data_size;
-    FlowClassifier* _classifier;
-    static int shared_position[NR_SHARED_FLOW];
 
 
-    FlowBufferVisitor2(FlowClassifier* classifier,size_t myoffset) : data_size(myoffset), _classifier(classifier), map(64,false) {
-
-        map.set_range(0,myoffset,1);
-    }
-
-
-    bool visit(Element *e, bool isoutput, int port,
-                   Element *from_e, int from_port, int distance) {
-        VirtualFlowBufferElement* fbe = dynamic_cast<VirtualFlowBufferElement*>(e);
-
-        if (fbe != NULL) { //The visited element is an element that need FCB space
-
-            //Resize the map if needed
-            if (fbe->flow_data_offset() + fbe->flow_data_size() > map.size()) map.resize(map.size() * 2);
-
-            if (fbe->flow_data_offset() != -1) { //If flow already have some classifier
-                if (fbe->flow_data_offset() >= data_size) {
-                    data_size = fbe->flow_data_offset() + fbe->flow_data_size();
-                } else {
-                    if (map.weight_range(fbe->flow_data_offset(),fbe->flow_data_size()) > 0 && !(fbe->flow_data_index() >= 0 && shared_position[fbe->flow_data_index()] == fbe->flow_data_offset())) {
-
-                    }
-                    if (data_size < fbe->flow_data_offset() + fbe->flow_data_size()) {
-                        data_size = fbe->flow_data_offset() + fbe->flow_data_size();
-                    }
-                }
-            } else {
-                if (fbe->flow_data_index() >= 0) {
-                    if (shared_position[fbe->flow_data_index()] == -1) {
-                        fbe->_flow_data_offset = data_size;
-                        shared_position[fbe->flow_data_index()] = data_size;
-                        data_size += fbe->flow_data_size();
-                    } else {
-                        fbe->_flow_data_offset = shared_position[fbe->flow_data_index()];
-                    }
-                } else {
-                    fbe->_flow_data_offset = data_size;
-                    data_size += fbe->flow_data_size();
-                }
-                fbe->_classifier = _classifier;
-            }
-            map.set_range(fbe->flow_data_offset(),fbe->flow_data_size(),true);
-#if DEBUG_FLOW
-            click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
-#endif
-        }
-        return true;
-    }
-};
-*/
 class FlowBufferVisitor : public RouterVisitor {
 public:
     size_t data_size;
@@ -125,6 +69,19 @@ public:
 #if DEBUG_FLOW
             click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
 #endif
+        } else {
+            /*Bitvector b;
+            e->port_flow(false,port,&b);*/
+            const char *f = e->router()->flow_code_override(e->eindex());
+            if (!f)
+                f = e->flow_code();
+            if (strcmp(f,Element::COMPLETE_FLOW) != 0) {
+#if DEBUG_CLASSIFIER > 0
+                click_chatter("%p{element}: Unstacking flows from port %d",e,port);
+#endif
+                const_cast<Element::Port&>(from_e->port(true,from_port)).set_unstack(true);
+                return false;
+            }
         }
         return true;
     }
@@ -156,8 +113,10 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 
     FlowBufferVisitor v(this, sizeof(FlowNodeData) + reserve);
     router()->visit(this,true,-1,&v);
-    //click_chatter("%s : pool size %d",name().c_str(),v.data_size);
-    _table.get_pool().initialize(v.data_size);
+#if DEBUG_CLASSIFIER
+    click_chatter("%s : pool size %d",name().c_str(),v.data_size);
+#endif
+    _table.get_pool()->initialize(v.data_size);
     _cache_mask = _cache_size - 1;
     if ((_cache_size & _cache_mask) != 0)
         return errh->error("Chache size must be a power of 2 !");
@@ -194,8 +153,11 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     if (input_is_pull(0)) {
         assert(input(0).element());
     }
-    _table.get_pool().compress(get_passing_threads());
+    _table.get_pool()->compress(get_passing_threads());
 
+#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    fcb_table = &_table;
+#endif
     FlowNode* table = FlowElementVisitor::get_downward_table(this, 0);
 
     if (!table)
@@ -205,8 +167,8 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     _table.set_root(table->optimize());
     _table.get_root()->check();
     if (_verbose) {
-    click_chatter("Table of %s after optimization :",name().c_str());
-    _table.get_root()->print();
+        click_chatter("Table of %s after optimization :",name().c_str());
+        _table.get_root()->print();
     }
 
     if (_aggcache) {
@@ -215,6 +177,9 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
             bzero(_cache.get_value(i), sizeof(FlowCache) * _cache_size * _cache_ring_size);
         }
     }
+#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    fcb_table = 0;
+#endif
     return 0;
 }
 
@@ -238,10 +203,11 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
         FlowControlBlock* fcb = 0;
         int hash = (agg ^ (agg >> 16)) & _cache_mask;
 #if USE_CACHE_RING
-        FlowCache* c = _cache.get() + hash * _cache_ring_size;
+        FlowCache* bucket = _cache.get() + hash * _cache_ring_size;
 #else
-        FlowCache* c = _cache.get() + hash;
+        FlowCache* bucket = _cache.get() + hash;
 #endif
+        FlowCache* c = bucket;
         int ic = 0;
         do {
             if (c->agg == 0) { //Empty slot
@@ -311,7 +277,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
 
         } while (ic < _cache_ring_size);
 
-        c -= _cache_ring_size;
+        c = bucket;
         FlowCache* oldest = c;
         c++;
         ic = 1;
@@ -326,12 +292,11 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
             ic++;
         }
         //click_chatter("Oldest is %d",o );
-        c -= _cache_ring_size;
+        c = bucket;
         if (o != 0) {
             oldest->agg = c->agg;
             oldest->fcb = c->fcb;
         }
-
 
         #if DEBUG_CLASSIFIER > 1
         click_chatter("Cache miss with full ring !");
@@ -539,10 +504,16 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
 
 void FlowClassifier::push_batch(int port, PacketBatch* batch) {
+#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    fcb_table = &_table;
+#endif
     if (_builder)
         push_batch_builder(port,batch);
     else
         push_batch_simple(port,batch);
+#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    fcb_table = 0;
+#endif
 }
 
 

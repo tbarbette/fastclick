@@ -422,6 +422,7 @@ ARPQuerier::push_batch(int port, PacketBatch *batch)
             p->kill();
         }
     }
+
     if (head)
         output(0).push_batch(head);
 }

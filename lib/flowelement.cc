@@ -31,6 +31,7 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 
     e->router()->visit(e,true,output,&v);
     click_chatter("Children of %p{element} : ",e);
+    //TODO : Do not catch all bugs
     for (int i = 0; i < v.dispatchers.size(); i++) {
         click_chatter("%p{element}",v.dispatchers[i]);
 		if (v.dispatchers[i] == (FlowElement*)e) {
@@ -45,6 +46,19 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 	}
 	return merged;
 }
+
+FlowElement::FlowElement() {
+    if (flow_code() != Element::COMPLETE_FLOW) {
+        click_chatter("Flow Elements must be x/x in their flows");
+        assert(flow_code() == Element::COMPLETE_FLOW);
+    }
+    if (in_batch_mode < BATCH_MODE_NEEDED)
+        in_batch_mode = BATCH_MODE_NEEDED;
+};
+
+FlowElement::~FlowElement() {
+
+};
 
 FlowNode*
 FlowElement::get_table() {

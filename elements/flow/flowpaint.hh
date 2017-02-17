@@ -32,7 +32,6 @@ class FlowPaint : public FlowSharedBufferPaintElement { public:
     const char *class_name() const		{ return "FlowPaint"; }
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
-    const char *flow_code() const		{ return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }

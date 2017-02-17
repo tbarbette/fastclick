@@ -196,7 +196,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 				parent_ptr = root->default_ptr();
 			}
 
-			parent_ptr->set_leaf(upstream_classifier()->table().get_pool().allocate());
+			parent_ptr->set_leaf(upstream_classifier()->table().get_pool()->allocate());
 			parent_ptr->set_data(lastvalue);
 			parent_ptr->leaf->parent = parent;
 			parent_ptr->leaf->acquire(1);
@@ -362,7 +362,7 @@ FlowNode* FlowDispatcher::get_table() {
 		if (merged->default_ptr()->ptr == 0) {
 			click_chatter("ADDING ! %s to %s",merged->name().c_str(),merged->level()->print().c_str());
 			FlowNodePtr* parent_ptr = merged->default_ptr();
-			parent_ptr->set_leaf(upstream_classifier()->table().get_pool().allocate());
+			parent_ptr->set_leaf(upstream_classifier()->table().get_pool()->allocate());
 			parent_ptr->leaf->parent = merged;
 			parent_ptr->leaf->acquire(1);
 			parent_ptr->leaf->data[_flow_data_offset] = -1;

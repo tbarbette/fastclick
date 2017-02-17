@@ -18,7 +18,6 @@ public:
     const char *class_name() const		{ return "FlowDispatcher"; }
     const char *port_count() const		{ return "1/-"; }
     const char *processing() const		{ return PUSH; }
-    const char *flow_code() const		{ return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

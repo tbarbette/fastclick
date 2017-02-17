@@ -7,6 +7,12 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
+#define DEBUG_CLASSIFIER_MATCH 0 //0 no, 1 build-time only, 2 whole time, 3 print table after each dup
+#define DEBUG_CLASSIFIER_RELEASE 0
+#define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
+
+#define HAVE_DYNAMIC_FLOW_RELEASE_FNT 0
+
 class FlowControlBlock;
 class FCBPool;
 class FlowNode;
@@ -36,9 +42,10 @@ private:
 		uint32_t flags;*/
 
 		Timestamp lastseen;
-
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		SubFlowRealeaseFnt release_fnt ;
 		FCBPool* release_pool;
+#endif
 
 		FlowNode* parent;
 
@@ -55,10 +62,7 @@ private:
 			use_count = 0;
 		}
 
-		inline void acquire(int packets_nr = 1) {
-			use_count+=packets_nr;
-		}
-
+		inline void acquire(int packets_nr = 1);
 		inline void release(int packets_nr = 1);
 
 		inline void clear() {
@@ -74,12 +78,14 @@ private:
 		}
 
 		inline FlowControlBlock* duplicate(int use_count);
+        inline FCBPool* get_pool() const;
 
 		void print(String prefix);
 		//Nothing after this line !
 };
 
 extern __thread FlowControlBlock* fcb_stack;
+
 
 #define SFCB_STACK(fnt) \
 		{FlowControlBlock* fcb_save = fcb_stack;fcb_stack=0;fnt;fcb_stack=fcb_save;}
@@ -118,8 +124,10 @@ private:
 
 	inline FlowControlBlock* alloc_new() {
 		FlowControlBlock* fcb = (FlowControlBlock*)CLICK_LALLOC(sizeof(FlowControlBlock) + _data_size);
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		fcb->release_fnt = 0;
 		fcb->release_pool = this;
+#endif
 		fcb->clear();
 		bzero(&fcb->data,_data_size);
 		return fcb;
@@ -207,31 +215,93 @@ public:
 };
 
 inline FlowControlBlock* FlowControlBlock::duplicate(int use_count) {
-	FlowControlBlock* fcb = release_pool->allocate();
+    FlowControlBlock* fcb;
+    fcb = get_pool()->allocate();
 	//fcb->release_ptr = release_ptr;
 	//fcb->release_fnt = release_fnt;
-	memcpy(fcb, this ,sizeof(FlowControlBlock) + release_pool->data_size());
+	memcpy(fcb, this ,sizeof(FlowControlBlock) + get_pool()->data_size());
 	fcb->use_count = use_count;
 	return fcb;
 }
 
-inline void FlowControlBlock::release(int packets_nr) {
 
+class FlowTableHolder {
+public:
+
+    FlowTableHolder() : _pool(), _pool_release_fnt(0) {
+
+    }
+    ~FlowTableHolder() {
+
+    }
+
+    FCBPool* get_pool() {
+        return &_pool;
+    }
+
+
+    void set_release_fnt(SubFlowRealeaseFnt pool_release_fnt);
+
+
+    inline void release(FlowControlBlock* fcb) {
+        if (likely(_pool_release_fnt))
+            _pool_release_fnt(fcb);
+        _pool.release(fcb);
+    }
+
+protected:
+    FCBPool _pool;
+    SubFlowRealeaseFnt _pool_release_fnt;
+
+};
+
+
+#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+extern __thread FlowTableHolder* fcb_table;
+#endif
+
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+        inline FCBPool* FlowControlBlock::get_pool() const {
+            return release_pool;
+        }
+#else
+        inline FCBPool* FlowControlBlock::get_pool() const {
+            return fcb_table->get_pool();
+        }
+#endif
+
+inline void FlowControlBlock::acquire(int packets_nr) {
+            use_count+=packets_nr;
+#if DEBUG_CLASSIFIER_RELEASE > 1
+            click_chatter("Acquire %d to %p, total is %d",packets_nr,this,use_count);
+#endif
+        }
+
+inline void FlowControlBlock::release(int packets_nr) {
 	if (use_count <= 0) {
 		click_chatter("ERROR : negative release : release %p, use_count = %d",this,use_count);
 		assert(use_count > 0);
 	}
-	//click_chatter("Release %d packets",packets_nr);
 	use_count -= packets_nr;
+
+#if DEBUG_CLASSIFIER_RELEASE > 1
+            click_chatter("Release %d to %p, total is %d",packets_nr,this,use_count);
+#endif
 	if (use_count <= 0) {
 		//click_chatter("Release fcb %p",this);
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		if (release_fnt)
 			release_fnt(this);
 		else
 			click_chatter("No release fnt? Should not happen in practice...");
-		release_pool->release(this);
+        get_pool()->release(this);
+#else
+		fcb_table->release(this);
+#endif
+
 	}
 }
+
 #else
 #define SFCB_STACK(fnt) \
 		{fnt;}

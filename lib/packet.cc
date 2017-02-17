@@ -537,6 +537,10 @@ WritablePacket::recycle(WritablePacket *p)
 #if HAVE_FLOW
     if (fcb_stack) {
         fcb_stack->release(1);
+    } else {
+#if DEBUG_CLASSIFIER_RELEASE > 1
+        click_chatter("Warning : kill in recycle  without FCB");
+#endif
     }
 #endif
 
@@ -571,6 +575,10 @@ WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigne
 #if HAVE_FLOW
     if (fcb_stack) {
         fcb_stack->release(count);
+    } else {
+#if DEBUG_CLASSIFIER_RELEASE > 1
+        click_chatter("Warning : kill in recycle_packet_batch without FCB");
+#endif
     }
 #endif
     PacketPool& packet_pool = *make_local_packet_pool();
@@ -589,6 +597,10 @@ WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned 
 #if HAVE_FLOW
     if (fcb_stack) {
         fcb_stack->release(count);
+    } else {
+#if DEBUG_CLASSIFIER_RELEASE > 1
+        click_chatter("Warning : kill in recycle_data_batch without FCB");
+#endif
     }
 #endif
     PacketPool& packet_pool = *make_local_packet_pool();
@@ -721,6 +733,10 @@ Packet::make(uint32_t headroom, const void *data,
     if (data)
         memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
     (void) tailroom;
+#if HAVE_FLOW
+            if (fcb_stack)
+                fcb_stack->acquire(1);
+#endif
     return reinterpret_cast<WritablePacket *>(mb);
 #else
 
@@ -741,6 +757,10 @@ Packet::make(uint32_t headroom, const void *data,
 		# endif
 			if (data)
 			memcpy(p->data(), data, length);
+#if HAVE_FLOW
+			if (fcb_stack)
+			    fcb_stack->acquire(1);
+#endif
 			return p;
 		#endif
 
@@ -786,6 +806,10 @@ assert(false); //TODO
 	p->_end = p->_tail + tailroom;
 	p->_destructor = destructor;
 	p->_destructor_argument = argument;
+#if HAVE_FLOW
+    if (fcb_stack)
+        fcb_stack->acquire(1);
+#endif
     }
     return p;
 # endif
@@ -909,6 +933,10 @@ Packet::clone(bool fast)
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
     }
+#if HAVE_FLOW
+//    if (fcb_stack)
+//        fcb_stack->acquire(1);
+#endif
     return p;
 
 #endif /* CLICK_LINUXMODULE */
@@ -982,6 +1010,10 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
             kill();
         return 0;
     }
+#if HAVE_FLOW
+    if (likely(fcb_stack))
+        fcb_stack->acquire(1);
+#endif
 
     uint8_t *old_head = _head, *old_end = _end;
     int headroom = this->headroom();

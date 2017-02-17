@@ -1651,6 +1651,10 @@ Packet::make(struct rte_mbuf *mb)
     }*/
     Packet *p = reinterpret_cast<Packet *>(mb);
     p->clear_annotations();
+#if HAVE_FLOW
+    if (fcb_stack)
+        fcb_stack->acquire(1);
+#endif
     return p;
 }
 #endif
