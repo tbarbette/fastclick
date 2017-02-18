@@ -446,14 +446,17 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
                 curbatch = head % RING_SIZE;
                 head++;
 
+
+
                 if (tail % RING_SIZE == head % RING_SIZE) {
-                    click_chatter("Ring full, processing now !");
+                    auto &b = batches[tail % RING_SIZE];
+                    click_chatter("Ring full with %d, processing now !", b.batch->count());
                     //Ring full, process batch NOW
-                    fcb_stack = batches[tail % RING_SIZE].fcb;
-                    fcb_stack->acquire(batches[tail % RING_SIZE].batch->count());
+                    fcb_stack = b.fcb;
+                    fcb_stack->acquire(b.batch->count());
                     fcb_stack->lastseen = now;
                     //click_chatter("FPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-                    output_push_batch(port,batches[tail % RING_SIZE].batch);
+                    output_push_batch(port,b.batch);
                     tail++;
                 }
                 //click_chatter("batches[%d].batch = %p",curbatch,batch);
@@ -477,11 +480,12 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
     }
     for (;tail < head;) {
         //click_chatter("%d: batch %p of %d packets with fcb %p",i,batches[i].batch,batches[i].batch->count(),batches[i].fcb);
-        fcb_stack = batches[tail % RING_SIZE].fcb;
-        fcb_stack->acquire(batches[tail % RING_SIZE].batch->count());
-        fcb_stack->lastseen = batches[tail % RING_SIZE].batch->tail()->timestamp_anno();
+        auto &b = batches[tail % RING_SIZE];
+        fcb_stack = b.fcb;
+        fcb_stack->acquire(b.batch->count());
+        fcb_stack->lastseen = now;
         //click_chatter("EPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-        output_push_batch(port,batches[tail % RING_SIZE].batch);
+        output_push_batch(port,b.batch);
 
         curbatch = -1;
         lastfcb = 0;

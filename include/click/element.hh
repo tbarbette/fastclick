@@ -690,7 +690,7 @@ Element::Port::push(Packet* p) const
 {
     assert(_e && p);
 #if HAVE_FLOW
-    FlowControlBlock* tmp_stack;
+    FlowControlBlock* tmp_stack = 0;
     if (_unstack) {
         tmp_stack = fcb_stack;
         fcb_stack->release(1);
