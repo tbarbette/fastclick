@@ -1,0 +1,15 @@
+ChatterSocket("TCP", 10002, RETRIES 3, RETRY_WARNINGS false, CHANNEL openbox);
+ControlSocket("TCP", 10001, RETRIES 3, RETRY_WARNINGS false);
+require(package "openbox");
+from_dump@_@from_dump::FromDump(/home/dev/workspace/obsi/openbox-click-package/conf/test_load_balance.pcap);
+from_dump@_@counter::Counter();
+out1@_@to_dump::ToDump(/home/dev/workspace/obsi/openbox-click-package/conf/output1.pcap);
+out2@_@to_dump::ToDump(/home/dev/workspace/obsi/openbox-click-package/conf/output2.pcap);
+cc@_@classifier::Classifier(12/0800, -);
+cc@_@counter::MultiCounter();
+from_dump@_@from_dump[0]->[0]from_dump@_@counter;
+cc@_@classifier[0]->[0]cc@_@counter;
+cc@_@classifier[1]->[1]cc@_@counter;
+from_dump@_@counter[0]->[0]cc@_@classifier;
+cc@_@counter[0]->[0]out1@_@to_dump;
+cc@_@counter[1]->[0]out2@_@to_dump;
