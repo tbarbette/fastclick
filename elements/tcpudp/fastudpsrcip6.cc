@@ -1,7 +1,11 @@
 /*
  * fastudpsourceip6.{cc,hh} -- fast udp source, a benchmark tool
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,6 +31,9 @@ const unsigned FastUDPSourceIP6::NO_LIMIT;
 FastUDPSourceIP6::FastUDPSourceIP6()
   : _packet(0)
 {
+#if HAVE_BATCH
+  in_batch_mode = BATCH_MODE_YES;
+#endif
   _rate_limited = true;
   _first = _last = 0;
   _count = 0;
