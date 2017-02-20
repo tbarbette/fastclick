@@ -79,6 +79,10 @@ to share the threads available on the device's NUMA node equally.
 
 Integer.  Number of descriptors per ring. The default is 256.
 
+=item ACTIVE
+Boolean. If False, the device is only initialized. Use this when you want
+to read packet using secondary DPDK applications.
+
 =back
 
 This element is only available at user level, when compiled with DPDK
@@ -126,6 +130,7 @@ private:
 
 
     DPDKDevice* _dev;
+    bool _active;
 };
 
 CLICK_ENDDECLS

@@ -28,7 +28,7 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0)
+    _dev(0), _active(true)
 {
 	#if HAVE_BATCH
 		in_batch_mode = BATCH_MODE_YES;
@@ -50,6 +50,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
+        .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
 
@@ -99,7 +100,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
         if (ret != 0) return ret;
     }
 
-    ret = initialize_tasks(true,errh);
+    ret = initialize_tasks(_active,errh);
     if (ret != 0) return ret;
 
     if (queue_share > 1)
