@@ -1,7 +1,6 @@
 cache:
   apt: true
   directories:
-    - dpdk-1.8.0
     - dpdk-2.2.0
     - dpdk-16.04
     - dpdk-16.07
@@ -14,15 +13,11 @@ compiler:
 matrix:
   exclude:
     - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--enable-batch --disable-verbose-batch"
-    - compiler: clang
       env: FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--enable-batch --disable-verbose-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=16.07 CONFIG="--enable-batch --disable-verbose-batch"
-    - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--disable-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
     - compiler: clang
@@ -39,13 +34,11 @@ env:
   matrix:
     - FRAMEWORK=vanilla CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=16.07 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=vanilla CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=16.07 CONFIG="--disable-batch"
