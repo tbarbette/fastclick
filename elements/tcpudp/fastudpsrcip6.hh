@@ -50,7 +50,7 @@
  *    -> ToDevice;
  */
 
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/gaprate.hh>
 #include <click/packet.hh>
@@ -58,7 +58,7 @@
 #include <clicknet/udp.h>
 #include <click/ip6address.hh>
 
-class FastUDPSourceIP6 : public Element {
+class FastUDPSourceIP6 : public BatchElement {
 
   bool _rate_limited; // obey _rate? rather than as fast as possible.
   unsigned _len;
@@ -96,6 +96,14 @@ class FastUDPSourceIP6 : public Element {
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;
   Packet *pull(int);
+
+#if HAVE_BATCH
+  PacketBatch *pull_batch(int port, unsigned max) {
+      PacketBatch *batch;
+      MAKE_BATCH(pull(port), batch, max);
+      return batch;
+  }
+#endif
 
   void add_handlers() CLICK_COLD;
   void reset();
