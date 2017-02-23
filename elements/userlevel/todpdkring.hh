@@ -110,80 +110,80 @@ Returns the number of packets dropped by the device.
 
 class ToDPDKRing : public BatchElement {
 
-	public:
-		ToDPDKRing () CLICK_COLD;
-		~ToDPDKRing() CLICK_COLD;
+    public:
+        ToDPDKRing () CLICK_COLD;
+        ~ToDPDKRing() CLICK_COLD;
 
-		const char    *class_name() const { return "ToDPDKRing"; }
-		const char    *port_count() const { return PORTS_1_0; }
-		const char    *processing() const { return PUSH; }
-		int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED; }
-		bool can_live_reconfigure() const { return false; }
+        const char    *class_name() const { return "ToDPDKRing"; }
+        const char    *port_count() const { return PORTS_1_0; }
+        const char    *processing() const { return PUSH; }
+        int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED; }
+        bool can_live_reconfigure() const { return false; }
 
-		int  configure   (Vector<String> &, ErrorHandler *) 	CLICK_COLD;
-		int  initialize  (ErrorHandler *) 			CLICK_COLD;
-		void cleanup     (CleanupStage stage) 			CLICK_COLD;
-		void add_handlers() 					CLICK_COLD;
+        int  configure   (Vector<String> &, ErrorHandler *)     CLICK_COLD;
+        int  initialize  (ErrorHandler *)           CLICK_COLD;
+        void cleanup     (CleanupStage stage)           CLICK_COLD;
+        void add_handlers()                     CLICK_COLD;
 
-		void run_timer(Timer *);
+        void run_timer(Timer *);
 
-	#if HAVE_BATCH
-		void push_batch (int port, PacketBatch *head);
-	#endif
-		void push(int port, Packet      *p);
+    #if HAVE_BATCH
+        void push_batch (int port, PacketBatch *head);
+    #endif
+        void push(int port, Packet      *p);
 
-	private:
-		/*
-		* TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
-		* to be sent. It is used as an internal buffer to be passed to DPDK ring
-		* queue.
-		* |-> index is the index of the first valid packet awaiting to be sent, while
-		*     nr_pending is the number of packets.
-		* |-> index + nr_pending may be greater than
-		*     _internal_tx_queue_size but index should be wrapped-around.
-		*/
-		class TXInternalQueue {
-			public:
-				TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
+    private:
+        /*
+        * TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
+        * to be sent. It is used as an internal buffer to be passed to DPDK ring
+        * queue.
+        * |-> index is the index of the first valid packet awaiting to be sent, while
+        *     nr_pending is the number of packets.
+        * |-> index + nr_pending may be greater than
+        *     _internal_tx_queue_size but index should be wrapped-around.
+        */
+        class TXInternalQueue {
+            public:
+                TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
 
-				// Array of DPDK Buffers
-				struct rte_mbuf **pkts;
-				// Index of the first valid packet in the packets array
-				unsigned int index;
-				// Number of valid packets awaiting to be sent after index
-				unsigned int nr_pending;
+                // Array of DPDK Buffers
+                struct rte_mbuf **pkts;
+                // Index of the first valid packet in the packets array
+                unsigned int index;
+                // Number of valid packets awaiting to be sent after index
+                unsigned int nr_pending;
 
-				// Timer to limit time a batch will take to be completed
-				Timer timeout;
-		} __attribute__((aligned(64)));
+                // Timer to limit time a batch will take to be completed
+                Timer timeout;
+        } __attribute__((aligned(64)));
 
-		inline void set_flush_timer(TXInternalQueue &iqueue);
-		void flush_internal_tx_ring(TXInternalQueue &iqueue);
+        inline void set_flush_timer(TXInternalQueue &iqueue);
+        void flush_internal_tx_ring(TXInternalQueue &iqueue);
 
-		struct rte_mempool *_message_pool;
-		struct rte_ring    *_send_ring;
-		TXInternalQueue     _iqueue;
+        struct rte_mempool *_message_pool;
+        struct rte_ring    *_send_ring;
+        TXInternalQueue     _iqueue;
 
-		String _MEM_POOL;
-		String _PROC_1;
-		String _PROC_2;
-		String _origin;
-		String _destination;
+        String _MEM_POOL;
+        String _PROC_1;
+        String _PROC_2;
+        String _origin;
+        String _destination;
 
-		unsigned     _ndesc;
-		unsigned     _burst_size;
-		unsigned     _def_burst_size;
-		unsigned int _internal_tx_queue_size;
-		short        _numa_zone;
+        unsigned     _ndesc;
+        unsigned     _burst_size;
+        unsigned     _def_burst_size;
+        unsigned int _internal_tx_queue_size;
+        short        _numa_zone;
 
-		short        _timeout;
-		bool         _blocking;
-		bool         _congestion_warning_printed;
+        short        _timeout;
+        bool         _blocking;
+        bool         _congestion_warning_printed;
 
-		counter_t    _n_sent;
-		counter_t    _n_dropped;
+        counter_t    _n_sent;
+        counter_t    _n_dropped;
 
-		static String read_handler(Element*, void*) CLICK_COLD;
+        static String read_handler(Element*, void*) CLICK_COLD;
 };
 
 CLICK_ENDDECLS
