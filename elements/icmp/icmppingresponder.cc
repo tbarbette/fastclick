@@ -43,17 +43,17 @@ ICMPPingResponder::simple_action(Packet *p_in)
     const click_icmp *icmph_in = p_in->icmp_header();
 
     if (p_in->transport_length() < (int) sizeof(click_icmp_sequenced)
-	|| iph_in->ip_p != IP_PROTO_ICMP || icmph_in->icmp_type != ICMP_ECHO) {
-	if (noutputs() == 2)
-	    output(1).push(p_in);
-	else
-	    p_in->kill();
-	return 0;
+    || iph_in->ip_p != IP_PROTO_ICMP || icmph_in->icmp_type != ICMP_ECHO) {
+        if (noutputs() == 2)
+            output(1).push(p_in);
+        else
+            p_in->kill();
+        return 0;
     }
 
     WritablePacket *q = p_in->uniqueify();
-    if (!q)			// out of memory
-	return 0;
+    if (!q)         // out of memory
+        return 0;
 
     // swap src and target ip addresses (checksum remains valid)
     click_ip *iph = q->ip_header();
