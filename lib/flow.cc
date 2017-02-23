@@ -66,7 +66,7 @@ void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt) {
  */
 void FlowTableHolder::release_later(FlowControlBlock* fcb) {
     fcb_list& head = old_flows.get();;
-#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 1
     assert(!(fcb->flags & FLOW_TIMEOUT_INLIST));
     assert(!head.find(fcb));
     unsigned count = 0;
@@ -89,7 +89,7 @@ bool FlowTableHolder::check_release() {
 
     FlowControlBlock* b = head.next;
     FlowControlBlock** prev = &head.next;
-    Timestamp now = Timestamp::recent();
+    Timestamp now = Timestamp::recent_steady();
     bool released_something = false;
 
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK
@@ -130,7 +130,7 @@ bool FlowTableHolder::check_release() {
             click_chatter("Time passed : %d/%d",(now - b->lastseen).msecval(),t);
 #endif
             prev = &b->next;
-#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 0
             check_count++;
 #endif
         }
@@ -139,7 +139,7 @@ bool FlowTableHolder::check_release() {
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
     click_chatter("Released  %d->%d==%d",orig_count,head.count,check_count);
 #endif
-#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 0
     assert(check_count == head.count);
 #endif
     return released_something;

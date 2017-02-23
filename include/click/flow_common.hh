@@ -10,7 +10,7 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER_MATCH 0 //0 no, 1 build-time only, 2 whole time, 3 print table after each dup
 #define DEBUG_CLASSIFIER_RELEASE 0
 #define DEBUG_CLASSIFIER_TIMEOUT 0
-#define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0
+#define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
 #define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
 #define HAVE_DYNAMIC_FLOW_RELEASE_FNT 0
@@ -45,7 +45,7 @@ private:
         #define FLOW_TIMEOUT_INLIST       0x40 //Timeout is already in list
 		#define FLOW_TIMEOUT              0x80 //Timeout set
         #define FLOW_TIMEOUT_SHIFT           8
-		#define FLOW_TIMEOUT_MASK   0xffffff00 //Delta + lastseen timestamp in msec
+		#define FLOW_TIMEOUT_MASK   0x000000ff //Delta + lastseen timestamp in msec
 
 		uint32_t flags;
 
@@ -339,7 +339,7 @@ inline void FlowControlBlock::acquire(int packets_nr) {
         }
 
 inline void FlowControlBlock::_do_release() {
-#if DEBUG_CLASSIFIER_TIMEOUT
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK && HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     assert(!(flags & FLOW_TIMEOUT_INLIST));
 #endif
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
@@ -371,13 +371,15 @@ inline void FlowControlBlock::release(int packets_nr) {
 	        if (this->flags & FLOW_TIMEOUT_INLIST) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 2
                 click_chatter("Not releasing %p because timeout is in list",this);
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 1
                 assert(fcb_table->old_flows.get().find(this));
+#endif
 #endif
 	            return;
 	        }
 
 	        //Timeout is not in list yet
-	        if (!this->timeoutPassed(Timestamp::recent())) {
+	        if (!this->timeoutPassed(Timestamp::recent_steady())) {
 #if DEBUG_CLASSIFIER_TIMEOUT  > 2
 	            click_chatter("Not releasing %p because timeout is not passed",this);
 #endif
@@ -385,7 +387,8 @@ inline void FlowControlBlock::release(int packets_nr) {
 	            return;
 	        } else {
 #if DEBUG_CLASSIFIER_TIMEOUT  > 2
-                click_chatter("Timeout  %p has passed (%d msec)!",this, (lastseen - Timestamp::recent()).msecval());
+	            unsigned t = (flags >> FLOW_TIMEOUT_SHIFT);
+                click_chatter("Timeout %p has passed (%d/%d msec)!",this, (Timestamp::recent_steady() - lastseen).msecval(),t);
 #endif
 	        }
 	    } else {
@@ -394,7 +397,6 @@ inline void FlowControlBlock::release(int packets_nr) {
 #endif
 	    }
 #endif
-
 	    this->_do_release();
 
 	}

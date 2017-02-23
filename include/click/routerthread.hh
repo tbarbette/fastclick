@@ -149,7 +149,7 @@ class RouterThread { public:
     atomic_uint32_t _task_blocker;
     atomic_uint32_t _task_blocker_waiting;
 
-    bool _idle_dorun;
+    int _idle_dorun;
     IdleTask* _idletask;
     Task::Pending _pending_head;
     Task::Pending *_pending_tail;

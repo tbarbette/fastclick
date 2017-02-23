@@ -77,8 +77,8 @@ public :
 	    fcb_stack->release();
 	}
 
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 	inline void fcb_acquire_timeout(int nmsec) {
-
 	    //Do not set a smaller timeout
 	    if ((fcb_stack->flags & FLOW_TIMEOUT) &&
 	            nmsec < (fcb_stack->flags >> FLOW_TIMEOUT_SHIFT)) {
@@ -103,6 +103,16 @@ public :
         else
             fcb_stack->flags = 0;
     }
+#else
+    inline void fcb_acquire_timeout(int nmsec) {
+        //TODO : use a local timer
+        fcb_acquire();
+    }
+
+    inline void fcb_release_timeout() {
+
+    }
+#endif
 
 
 	inline T* fcb_data() {

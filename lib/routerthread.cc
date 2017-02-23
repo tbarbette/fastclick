@@ -68,7 +68,7 @@ static unsigned long greedy_schedule_jiffies;
  */
 
 RouterThread::RouterThread(Master *master, int id)
-    : _stop_flag(0),  _idletask(0), _idle_dorun(false), _master(master), _id(id), _driver_entered(false)
+    : _stop_flag(0),  _idletask(0), _idle_dorun(0), _master(master), _id(id), _driver_entered(false)
 {
     _pending_head.x = 0;
     _pending_tail = &_pending_head;
@@ -370,9 +370,9 @@ RouterThread::run_tasks(int ntasks)
 #if HAVE_MULTITHREAD
     int runs;
 #endif
-    bool work_done;
 
     for (; ntasks >= 0; --ntasks) {
+        bool work_done;
         t = task_begin();
         if (t == task_end() || _stop_flag)
             break;
@@ -393,7 +393,7 @@ RouterThread::run_tasks(int ntasks)
 
         t->_status.is_scheduled = false;
         work_done = t->fire();
-       if (work_done)
+        if (work_done)
            any_work_done = true;
 
 #if HAVE_MULTITHREAD
@@ -481,7 +481,7 @@ RouterThread::run_os()
 #endif
 
 #if CLICK_USERLEVEL
-    select_set().run_selects(this);
+    work_done = select_set().run_selects(this);
 #elif CLICK_MINIOS
     /*
      * MiniOS uses a cooperative scheduler. By schedule() we'll give a chance
@@ -621,10 +621,10 @@ RouterThread::driver()
             if (PASS_GT(_clients[C_CLICK].pass, _clients[C_KERNEL].pass))
                 break;
 #endif
-        if (run_tasks(_tasks_per_iter)) {
-            any_work_done = true;
-        }
-   } while (0);
+            if (run_tasks(_tasks_per_iter)) {
+                any_work_done = true;
+            }
+        } while (0);
 
 #if CLICK_USERLEVEL
         // run signals
@@ -659,15 +659,21 @@ RouterThread::driver()
                 any_work_done = true;
         } while (0);
 
-        if (any_work_done) {
-            _idle_dorun = true;
-        } else if (_idle_dorun && !any_work_done) {
-            _idle_dorun = false;
-            IdleTask* t = _idletask;
-            while (t != 0) {
-                if (t->fire())
-                   _idle_dorun = true;
-                t = t->_next;
+        if (_idletask) {
+            if (any_work_done) {
+                _idle_dorun = 0;
+            } else if (_idle_dorun >= 0) {
+                if (++_idle_dorun > 1) { //Only run after 1 idle runs
+                    Timestamp now = Timestamp::recent_steady();
+                    _idle_dorun = -1; //Prevent re-runing idle task if there was no work done
+                    IdleTask* t = _idletask;
+                    while (t != 0) {
+                        if (t->is_due(now) && t->fire(now)) {
+                           _idle_dorun = 2;
+                        }
+                        t = t->_next;
+                    }
+                }
             }
         }
 

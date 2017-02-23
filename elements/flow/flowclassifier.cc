@@ -183,7 +183,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
         IdleTask* idletask = new IdleTask(this);
-        idletask->initialize(this, i);
+        idletask->initialize(this, i, 100);
     }
 #endif
 
@@ -202,7 +202,7 @@ void FlowClassifier::cleanup(CleanupStage stage) {
 #define USE_CACHE_RING 1
 
 bool FlowClassifier::run_idle_task(IdleTask*) {
-    /*
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 #if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = &_table;
 #endif
@@ -213,8 +213,9 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
 #if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = 0;
 #endif
-    return work_done;*/
-    return false;
+    //return work_done;
+#endif
+    return false; //No reschedule
 }
 
 inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) {
@@ -373,7 +374,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
     Packet* p = batch;
     Packet* last = NULL;
     uint32_t lastagg = 0;
-    Timestamp now = Timestamp::recent();
+    Timestamp now = Timestamp::recent_steady();
 
     int count =0;
     FlowControlBlock* fcb = 0;
@@ -416,7 +417,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
                 fcb_stack->acquire(count);
                 PacketBatch* new_batch = NULL;
                 awaiting_batch->cut(last,count,new_batch);
-                fcb->lastseen = now;
+                fcb_stack->lastseen = now;
                 output_push_batch(port,awaiting_batch);
                 awaiting_batch = new_batch;
                 fcb_stack = fcb;
@@ -432,6 +433,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 
     if (awaiting_batch) {
         fcb_stack->acquire(count);
+        fcb_stack->lastseen = now;
         output_push_batch(port,awaiting_batch);
         fcb_stack = 0;
     }
@@ -458,7 +460,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
     int head = 0;
     int tail = 0;
 
-    Timestamp now = Timestamp::recent();
+    Timestamp now = Timestamp::recent_steady();
     process:
 
 
@@ -580,6 +582,7 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
         push_batch_builder(port,batch);
     else
         push_batch_simple(port,batch);
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     auto &head = _table.old_flows.get();
     if (head.count > head.count_thresh) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
@@ -594,9 +597,11 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
         click_chatter("%p{element} Forced release count %d thresh %d",this,head.count, head.count_thresh);
 #endif
     }
+#endif
 #if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = 0;
 #endif
+
 }
 
 
