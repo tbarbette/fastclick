@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-MultiReplayBase::MultiReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false)
+MultiReplayBase::MultiReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -203,6 +203,7 @@ MultiReplay::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("USE_SIGNAL",_use_signal)
         .read("ACTIVE",_active)
         .read("VERBOSE", _verbose)
+        .read("FREEONTERMINATE", _freeonterminate)
     .complete() < 0)
     return -1;
     return 0;
@@ -265,7 +266,7 @@ MultiReplay::run_task(Task* task)
         } else {
             _queue_current = p->next();
             Packet* q;
-            if (_stop != 1) {
+            if (_stop != 1 || _freeonterminate) {
                 q = p->clone(_quick_clone);
             } else {
                 q = p;
@@ -302,6 +303,7 @@ MultiReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("USE_SIGNAL",_use_signal)
         .read("ACTIVE",_active)
         .read("VERBOSE", _verbose)
+        .read("FREEONTERMINATE", _freeonterminate)
         .complete() < 0)
     return -1;
     return 0;
@@ -343,7 +345,7 @@ MultiReplayUnqueue::run_task(Task* task)
 
             _queue_current = p->next();
             Packet* q;
-            if (_stop != 1) {
+            if (_stop != 1 || _freeonterminate) {
                 q = p->clone(_quick_clone);
             } else {
                 q = p;

@@ -1,6 +1,6 @@
 #ifndef FASTUDPFLOWS_HH
 #define FASTUDPFLOWS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/gaprate.hh>
 #include <click/packet.hh>
@@ -56,7 +56,7 @@ CLICK_DECLS
  *    -> ToDevice;
  */
 
-class FastUDPFlows : public Element {
+class FastUDPFlows : public BatchElement {
 
   bool _rate_limited;
   unsigned _len;
@@ -107,6 +107,14 @@ class FastUDPFlows : public Element {
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;
   Packet *pull(int);
+
+#if HAVE_BATCH
+  PacketBatch *pull_batch(int port, unsigned max) {
+      PacketBatch *batch;
+      MAKE_BATCH(pull(port), batch, max);
+      return batch;
+  }
+#endif
 
   void cleanup_flows();
   static int length_write_handler (const String &s, Element *e, void *, ErrorHandler *errh);

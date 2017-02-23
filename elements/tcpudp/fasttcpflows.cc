@@ -2,7 +2,11 @@
  * fasttcpflows.{cc,hh} -- fast tcp flow source, a benchmark tool
  * Benjie Chen
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2001 Massachusetts Institute of Technology
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -31,6 +35,9 @@ const unsigned FastTCPFlows::NO_LIMIT;
 FastTCPFlows::FastTCPFlows()
   : _flows(0)
 {
+#if HAVE_BATCH
+  in_batch_mode = BATCH_MODE_YES;
+#endif
   _rate_limited = true;
   _first = _last = 0;
   _count = 0;

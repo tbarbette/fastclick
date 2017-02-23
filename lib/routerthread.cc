@@ -137,7 +137,7 @@ RouterThread::~RouterThread()
     assert(!active());
 }
 
-inline void
+void
 RouterThread::driver_lock_tasks()
 {
     set_thread_state(S_LOCKTASKS);
@@ -161,14 +161,6 @@ RouterThread::driver_lock_tasks()
     }
 }
 
-inline void
-RouterThread::driver_unlock_tasks()
-{
-    uint32_t val = _task_blocker.compare_swap((uint32_t) -1, 0);
-    (void) val;
-    assert(val == (uint32_t) -1);
-}
-
 void
 RouterThread::scheduled_tasks(Router *router, Vector<Task *> &x)
 {
@@ -177,27 +169,6 @@ RouterThread::scheduled_tasks(Router *router, Vector<Task *> &x)
         if (t->router() == router)
             x.push_back(t);
     unlock_tasks();
-}
-
-void
-RouterThread::request_stop()
-{
-    _stop_flag = 1;
-    if (current_thread_is_running()) {
-        // Set the current thread's tasks to "is_strong_unscheduled 2" so
-        // the driver loop will not run them. (We cannot call
-        // Task::remove_from_scheduled_list(), because run_tasks keeps the
-        // current task in limbo, so it must stay in the scheduled list.)
-        Task::Status want_status;
-        want_status.home_thread_id = thread_id();
-        want_status.is_scheduled = true;
-        want_status.is_strong_unscheduled = false;
-        Task::Status new_status(want_status);
-        new_status.is_strong_unscheduled = 2;
-
-        for (Task *t = task_begin(); t != task_end(); t = task_next(t))
-            atomic_uint32_t::compare_swap(t->_status.status, want_status.status, new_status.status);
-    }
 }
 
 
@@ -403,14 +374,13 @@ RouterThread::run_tasks(int ntasks)
 
     for (; ntasks >= 0; --ntasks) {
         t = task_begin();
-        if (t == task_end())
+        if (t == task_end() || _stop_flag)
             break;
         assert(t->_thread == this);
 
         if (unlikely(t->_status.status != want_status.status)) {
-            if (t->_status.home_thread_id != want_status.home_thread_id
-                || t->_status.is_strong_unscheduled == 2)
-                t->add_pending(0);
+            if (t->_status.home_thread_id != want_status.home_thread_id)
+                t->add_pending(false);
             t->remove_from_scheduled_list();
             continue;
         }
@@ -500,7 +470,7 @@ RouterThread::run_tasks(int ntasks)
 inline bool
 RouterThread::run_os()
 {
-	bool work_done = false;
+    bool work_done = false;
 #if CLICK_LINUXMODULE
     // set state to interruptible early to avoid race conditions
     set_current_state(TASK_INTERRUPTIBLE);
@@ -511,7 +481,7 @@ RouterThread::run_os()
 #endif
 
 #if CLICK_USERLEVEL
-    work_done = select_set().run_selects(this);
+    select_set().run_selects(this);
 #elif CLICK_MINIOS
     /*
      * MiniOS uses a cooperative scheduler. By schedule() we'll give a chance
@@ -582,7 +552,7 @@ RouterThread::process_pending()
     _pending_lock.release(flags);
 
     // process the list
-    while (my_pending.x > 1) {
+    while (my_pending.x > 2) {
         Task *t = my_pending.t;
         my_pending = t->_pending_nextptr;
         t->process_pending(this);
@@ -633,13 +603,8 @@ RouterThread::driver()
 
 #if !BSD_NETISRSCHED
         // check to see if driver is stopped
-        if (_stop_flag > 0) {
-            driver_unlock_tasks();
-            bool b = _master->check_driver();
-            driver_lock_tasks();
-            if (!b)
-                break;
-        }
+        if (_stop_flag && _master->verify_stop(this))
+            break;
 #endif
 
         // run occasional tasks: timers, select, etc.
@@ -658,7 +623,7 @@ RouterThread::driver()
 #endif
         if (run_tasks(_tasks_per_iter)) {
             any_work_done = true;
-	    }
+        }
    } while (0);
 
 #if CLICK_USERLEVEL
@@ -690,21 +655,21 @@ RouterThread::driver()
 #elif BSD_NETISRSCHED
             break;
 #endif
-	    if (run_os())
-	        any_work_done = true;
-	} while (0);
+            if (run_os())
+                any_work_done = true;
+        } while (0);
 
-	if (any_work_done) {
-		_idle_dorun = true;
-	} else if (_idle_dorun && !any_work_done) {
-		_idle_dorun = false;
-		IdleTask* t = _idletask;
-		while (t != 0) {
-			if (t->fire())
-				_idle_dorun = true;
-			t = t->_next;
-		}
-	}
+        if (any_work_done) {
+            _idle_dorun = true;
+        } else if (_idle_dorun && !any_work_done) {
+            _idle_dorun = false;
+            IdleTask* t = _idletask;
+            while (t != 0) {
+                if (t->fire())
+                   _idle_dorun = true;
+                t = t->_next;
+            }
+        }
 
 #if CLICK_NS || BSD_NETISRSCHED
         // Everyone except the NS driver stays in driver() until the driver is

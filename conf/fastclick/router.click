@@ -47,7 +47,7 @@ elementclass Input { $device,$ip,$eth |
     t[0] -> Print("Input to linux") -> [2]output; //To linux
     t[1] -> Print("Arp response") -> [1]output; //Directly output
     
-    //Normal IP tou output 0
+    //Normal IP to output 0
     c0[2] -> [0]output;
     
     // Unknown ethernet type numbers.

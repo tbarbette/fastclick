@@ -31,6 +31,7 @@ ToDPDKDevice::ToDPDKDevice() :
      _blocking = false;
      _burst = -1;
      _internal_tx_queue_size = 1024;
+     _vlan = true;
      ndesc = 256;
 }
 
@@ -47,6 +48,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("PORT", dev), errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
+        .read("SET_VLAN",_vlan)
         .complete() < 0)
             return -1;
     if (!DPDKDeviceArg::parse(dev, _dev)) {

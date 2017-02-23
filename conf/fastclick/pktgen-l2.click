@@ -23,7 +23,7 @@ define($blocking true)
 // TX
 //###################
 //Create a UDP flow of $N packets
-FastUDPFlows(RATE 0, LIMIT $N, LENGTH $L, SRCETH $mymac, DSTETH $dmac, myip $srcip, DSTIP $dstip, FLOWS 1, FLOWSIZE $N)
+FastUDPFlows(RATE 0, LIMIT $N, LENGTH $L, SRCETH $mymac, DSTETH $dmac, SRCIP $myip, DSTIP $dstip, FLOWS 1, FLOWSIZE $N)
 -> MarkMACHeader
 //EnsureDPDKBuffer will copy the packet inside a DPDK buffer, so there is no more copies (not even to the NIC) afterwards when we replay the packet many time
 -> EnsureDPDKBuffer
