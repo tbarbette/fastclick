@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKARPHEADER_HH
 #define CLICK_CHECKARPHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -62,7 +62,7 @@ ARPPrint, ARPQuerier, ARPResponder, ARPFaker
 
 */
 
-class CheckARPHeader : public Element {
+class CheckARPHeader : public BatchElement {
 
     public:
         CheckARPHeader() CLICK_COLD;
@@ -75,7 +75,10 @@ class CheckARPHeader : public Element {
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         void add_handlers() CLICK_COLD;
 
-        Packet *simple_action(Packet *);
+        Packet      *simple_action      (Packet *);
+    #if HAVE_BATCH
+        PacketBatch *simple_action_batch(PacketBatch *);
+    #endif
 
     private:
 
