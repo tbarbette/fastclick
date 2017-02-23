@@ -1,6 +1,6 @@
 #ifndef CLICK_ARPPRINT_HH
 #define CLICK_ARPPRINT_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -50,7 +50,7 @@ Returns or sets the ACTIVE parameter.
 
 =a Print, CheckARPHeader */
 
-class ARPPrint : public Element {
+class ARPPrint : public BatchElement {
     public:
 
         ARPPrint() CLICK_COLD;
@@ -65,7 +65,9 @@ class ARPPrint : public Element {
         void add_handlers() CLICK_COLD;
 
         Packet      *simple_action      (Packet *);
-
+    #if HAVE_BATCH
+        PacketBatch *simple_action_batch(PacketBatch *);
+    #endif
 
     private:
 
