@@ -696,7 +696,7 @@ RouterThread::driver()
 
 	if (any_work_done) {
 		_idle_dorun = true;
-	} else if (_idle_dorun) {
+	} else if (_idle_dorun && !any_work_done) {
 		_idle_dorun = false;
 		IdleTask* t = _idletask;
 		while (t != 0) {

@@ -74,8 +74,36 @@ public :
 	}
 
 	inline void fcb_release() {
-	        fcb_stack->release();
+	    fcb_stack->release();
+	}
+
+	inline void fcb_acquire_timeout(int nmsec) {
+
+	    //Do not set a smaller timeout
+	    if ((fcb_stack->flags & FLOW_TIMEOUT) &&
+	            nmsec < (fcb_stack->flags >> FLOW_TIMEOUT_SHIFT)) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+        click_chatter("Acquiring timeout of %p, not changing it",this);
+#endif
+	        return;
 	    }
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+        click_chatter("Acquiring timeout of %p to %d",this,nmsec);
+#endif
+        fcb_stack->flags = (nmsec << FLOW_TIMEOUT_SHIFT) | FLOW_TIMEOUT;
+	}
+
+    inline void fcb_release_timeout() {
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+        click_chatter("Releasing timeout of %p",this);
+#endif
+        //If the timeout is in list, we must not put it back in the pool
+        if ((fcb_stack->flags & FLOW_TIMEOUT) and (fcb_stack->flags & FLOW_TIMEOUT_INLIST))
+            fcb_stack->flags = 0 | FLOW_TIMEOUT | FLOW_TIMEOUT_INLIST;
+        else
+            fcb_stack->flags = 0;
+    }
+
 
 	inline T* fcb_data() {
 	    T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);

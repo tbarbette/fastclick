@@ -57,6 +57,7 @@ public:
     void push_batch(int port, PacketBatch*);
 
 
+    bool run_idle_task(IdleTask*) override;
 public:
 	FlowClassificationTable& table() {
 		return _table;

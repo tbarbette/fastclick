@@ -9,6 +9,7 @@
 #include <click/flowelement.hh>
 #include "flowclassifier.hh"
 #include "flowdispatcher.hh"
+#include <click/idletask.hh>
 
 CLICK_DECLS
 
@@ -61,12 +62,14 @@ public:
                 } else {
                     fbe->_flow_data_offset = data_size;
                     data_size += fbe->flow_data_size();
+#if DEBUG_CLASSIFIER
                     click_chatter("%s from %d to %d",e->name().c_str(),fbe->_flow_data_offset,data_size);
+#endif
                 }
                 fbe->_classifier = _classifier;
             }
             map.set_range(fbe->flow_data_offset(),fbe->flow_data_size(),true);
-#if DEBUG_FLOW
+#if DEBUG_CLASSIFIER
             click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
 #endif
         } else {
@@ -177,6 +180,13 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
             bzero(_cache.get_value(i), sizeof(FlowCache) * _cache_size * _cache_ring_size);
         }
     }
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+    for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
+        IdleTask* idletask = new IdleTask(this);
+        idletask->initialize(this, i);
+    }
+#endif
+
 #if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = 0;
 #endif
@@ -190,6 +200,22 @@ void FlowClassifier::cleanup(CleanupStage stage) {
 }
 
 #define USE_CACHE_RING 1
+
+bool FlowClassifier::run_idle_task(IdleTask*) {
+    /*
+#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    fcb_table = &_table;
+#endif
+#if DEBUG_CLASSIFIER_TIMEOUT > 0
+    click_chatter("%p{element} Idle release",this);
+#endif
+    bool work_done = _table.check_release();
+#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    fcb_table = 0;
+#endif
+    return work_done;*/
+    return false;
+}
 
 inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) {
 
@@ -313,6 +339,31 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
 
 }
 
+static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+            if (fcb->count() == 0 && fcb->hasTimeout()) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 0
+                assert(fcb->flags & FLOW_TIMEOUT_INLIST);
+#endif
+                if (fcb->timeoutPassed(now)) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+                    click_chatter("Timeout of %p passed or released, reinitializing",fcb);
+#endif
+                    //Do not call initialize as everything is still set, just reinit timeout
+                    fcb->flags = FLOW_TIMEOUT | FLOW_TIMEOUT_INLIST;
+                } else {
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+                    click_chatter("Timeout recovered %p",fcb);
+#endif
+                }
+            } else {
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+                click_chatter("Fcb %p Still valid : Fcb count is %d and hasTimeout %d",fcb, fcb->count(),fcb->hasTimeout());
+#endif
+            }
+#endif
+}
+
 /**
  * Push batch simple simply classify packets and push a batch when a packet
  * is different
@@ -326,6 +377,9 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 
     int count =0;
     FlowControlBlock* fcb = 0;
+#if DEBUG_CLASSIFIER > 1
+    click_chatter("Simple have %d packets.",batch->count());
+#endif
     while (p != NULL) {
 #if DEBUG_CLASSIFIER > 1
         click_chatter("Packet %p in %s",p,name().c_str());
@@ -342,13 +396,23 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             fcb = _table.match(p,_aggcache);
         }
 
+        check_fcb_still_valid(fcb, now);
         if (awaiting_batch == NULL) {
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("New fcb %p",fcb);
+#endif
             fcb_stack = fcb;
             awaiting_batch = batch;
         } else {
             if (fcb == fcb_stack) {
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("Same fcb %p",fcb);
+#endif
                 //Do nothing as we follow the LL
             } else {
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("Different fcb %p, last was %p",fcb,fcb_stack);
+#endif
                 fcb_stack->acquire(count);
                 PacketBatch* new_batch = NULL;
                 awaiting_batch->cut(last,count,new_batch);
@@ -400,7 +464,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
 
 
-    //click_chatter("Have %d packets.",batch->count());
+    click_chatter("Builder have %d packets.",batch->count());
 
     while (p != NULL) {
 #if DEBUG_CLASSIFIER > 1
@@ -417,6 +481,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         {
             fcb = _table.match(p,_aggcache);
         }
+        check_fcb_still_valid(fcb, now);
         if (_verbose)
             _table.get_root()->print();
         //click_chatter("p %p fcb %p - tail %d / curbatch %d / head %d",p,fcb,tail,curbatch,head);
@@ -515,6 +580,20 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
         push_batch_builder(port,batch);
     else
         push_batch_simple(port,batch);
+    auto &head = _table.old_flows.get();
+    if (head.count > head.count_thresh) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 0
+        click_chatter("%p{element} Forced release",this);
+#endif
+        _table.check_release();
+        if (unlikely(head.count < (head.count_thresh / 8) && head.count_thresh > FlowTableHolder::fcb_list::DEFAULT_THRESH)) {
+            head.count_thresh /= 2;
+        } else
+            head.count_thresh *= 2;
+#if DEBUG_CLASSIFIER_TIMEOUT > 0
+        click_chatter("%p{element} Forced release count %d thresh %d",this,head.count, head.count_thresh);
+#endif
+    }
 #if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = 0;
 #endif

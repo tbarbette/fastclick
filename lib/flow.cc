@@ -58,6 +58,93 @@ void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt) {
 	_pool_release_fnt = pool_release_fnt;
 }
 
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+
+
+/**
+ * @precond Timeout is not in list already
+ */
+void FlowTableHolder::release_later(FlowControlBlock* fcb) {
+    fcb_list& head = old_flows.get();;
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
+    assert(!(fcb->flags & FLOW_TIMEOUT_INLIST));
+    assert(!head.find(fcb));
+    unsigned count = 0;
+    FlowControlBlock* b = head.next;
+    while (b!= 0) {
+        count++;
+        b = b->next;
+    }
+    assert(count == head.count);
+#endif
+    fcb->next = head.next;
+    head.next = fcb;
+    head.count++;
+    fcb->flags |= FLOW_TIMEOUT_INLIST;
+
+}
+
+bool FlowTableHolder::check_release() {
+    fcb_list& head = old_flows.get();
+
+    FlowControlBlock* b = head.next;
+    FlowControlBlock** prev = &head.next;
+    Timestamp now = Timestamp::recent();
+    bool released_something = false;
+
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
+    unsigned count = 0;
+    FlowControlBlock* bc = head.next;
+    while (bc!= 0) {
+        count++;
+        bc = bc->next;
+    }
+    assert(count == head.count);
+#endif
+
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK || DEBUG_CLASSIFIER_TIMEOUT
+    unsigned orig_count = head.count;
+    unsigned check_count = 0;
+#endif
+    while (b != 0) {
+        if (b->count() > 0) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 2
+            click_chatter("FCB %p not releasable anymore as UC is %d",b,b->count());
+#endif
+            released_something = true;
+            b->flags &= ~FLOW_TIMEOUT_INLIST;
+            *prev = b->next;
+            head.count--;
+        }  else if (b->timeoutPassed(now)) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 2
+            click_chatter("FCB %p has passed timeout",b);
+#endif
+            released_something = true;
+            b->flags = 0;
+            b->_do_release();
+            *prev = b->next;
+            head.count--;
+        } else {
+            unsigned t = (b->flags >> FLOW_TIMEOUT_SHIFT);
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+            click_chatter("Time passed : %d/%d",(now - b->lastseen).msecval(),t);
+#endif
+            prev = &b->next;
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
+            check_count++;
+#endif
+        }
+        b = b->next;
+    }
+#if DEBUG_CLASSIFIER_TIMEOUT > 0
+    click_chatter("Released  %d->%d==%d",orig_count,head.count,check_count);
+#endif
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
+    assert(check_count == head.count);
+#endif
+    return released_something;
+}
+#endif
 /*******************************
  * FlowNode
  *******************************/
@@ -444,7 +531,7 @@ void FlowControlBlock::print(String prefix) {
 	char data_str[64];
 	int j = 0;
 
-	for (int i = 0; i < get_pool()->data_size() && j < 60;i++) {
+	for (unsigned i = 0; i < get_pool()->data_size() && j < 60;i++) {
 		sprintf(&data_str[j],"%02x",data[i]);
 		j+=2;
 	}

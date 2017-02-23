@@ -9,9 +9,12 @@ CLICK_DECLS
 
 #define DEBUG_CLASSIFIER_MATCH 0 //0 no, 1 build-time only, 2 whole time, 3 print table after each dup
 #define DEBUG_CLASSIFIER_RELEASE 0
+#define DEBUG_CLASSIFIER_TIMEOUT 0
+#define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0
 #define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
 #define HAVE_DYNAMIC_FLOW_RELEASE_FNT 0
+#define HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT 1
 
 class FlowControlBlock;
 class FCBPool;
@@ -34,14 +37,30 @@ private:
 
 	public:
 
-		/*#define FLOW_RELEASE			  0x01 //Release me when you got free time, my packets will never arrive again
-		#define FLOW_PERMANENT 			  0x02 //Never release
-		#define FLOW_TIMEOUT 		      0x80 //Timeout set
-		#define FLOW_TIMEOUT_MASK	0xffffff00 //Delta + lastseen timestamp (max 16s)
+        Timestamp lastseen; //Last seen is also used without sloppy timeout for cache purposes
 
-		uint32_t flags;*/
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+		//#define FLOW_RELEASE			  0x01 //Release me when you got free time, my packets will never arrive again
+		//#define FLOW_PERMANENT 			  0x02 //Never release
+        #define FLOW_TIMEOUT_INLIST       0x40 //Timeout is already in list
+		#define FLOW_TIMEOUT              0x80 //Timeout set
+        #define FLOW_TIMEOUT_SHIFT           8
+		#define FLOW_TIMEOUT_MASK   0xffffff00 //Delta + lastseen timestamp in msec
 
-		Timestamp lastseen;
+		uint32_t flags;
+
+		FlowControlBlock* next;
+
+        inline bool hasTimeout() {
+            return flags & FLOW_TIMEOUT;
+        }
+
+		inline bool timeoutPassed(Timestamp now) {
+		    unsigned t = (flags >> FLOW_TIMEOUT_SHIFT);
+		    return t == 0 || (now - lastseen).msecval() > t;
+		}
+#endif
+
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		SubFlowRealeaseFnt release_fnt ;
 		FCBPool* release_pool;
@@ -60,18 +79,21 @@ private:
 
 		inline void initialize() {
 			use_count = 0;
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+			flags = 0;
+			next = 0; //TODO : only once?
+#endif
 		}
 
 		inline void acquire(int packets_nr = 1);
 		inline void release(int packets_nr = 1);
 
-		inline void clear() {
-			use_count = 0;
-		}
+		inline void _do_release();
 
+/*
 		inline bool released() {
 			return use_count == 0;
-		}
+		}*/
 
 		inline int count() {
 			return use_count;
@@ -81,8 +103,9 @@ private:
         inline FCBPool* get_pool() const;
 
 		void print(String prefix);
-		//Nothing after this line !
+
 };
+
 
 extern __thread FlowControlBlock* fcb_stack;
 
@@ -116,7 +139,7 @@ private:
         	FlowControlBlock* fcb = p;
         	p = *((FlowControlBlock**)fcb);
         	count--;
-        	fcb->clear();
+        	fcb->initialize();
         	return fcb;
         }
     };
@@ -128,7 +151,7 @@ private:
 		fcb->release_fnt = 0;
 		fcb->release_pool = this;
 #endif
-		fcb->clear();
+		fcb->initialize();
 		bzero(&fcb->data,_data_size);
 		return fcb;
 	}
@@ -228,7 +251,12 @@ inline FlowControlBlock* FlowControlBlock::duplicate(int use_count) {
 class FlowTableHolder {
 public:
 
-    FlowTableHolder() : _pool(), _pool_release_fnt(0) {
+    FlowTableHolder() :
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+old_flows(fcb_list()),
+#endif
+_pool(), _pool_release_fnt(0)
+    {
 
     }
     ~FlowTableHolder() {
@@ -248,6 +276,39 @@ public:
             _pool_release_fnt(fcb);
         _pool.release(fcb);
     }
+
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+    void release_later(FlowControlBlock* fcb);
+    bool check_release();
+    struct fcb_list {
+        static const unsigned DEFAULT_THRESH = 64;
+        fcb_list() : next(0), count(0), count_thresh(DEFAULT_THRESH) {
+
+        }
+        FlowControlBlock* next;
+        unsigned count;
+        unsigned count_thresh;
+
+        inline FlowControlBlock* find(FlowControlBlock* fcb) {
+            FlowControlBlock* head = next;
+        #if DEBUG_CLASSIFIER_TIMEOUT > 3
+            click_chatter("FIND head %p",head);
+        #endif
+            while (head != 0) {
+                if (fcb == head)
+                    return fcb;
+
+                assert(head != head->next);
+                head = head->next;
+        #if DEBUG_CLASSIFIER_TIMEOUT > 3
+                click_chatter("FIND next %p",head);
+        #endif
+            }
+            return 0;
+        }
+    };
+    per_thread<fcb_list> old_flows;
+#endif
 
 protected:
     FCBPool _pool;
@@ -277,6 +338,21 @@ inline void FlowControlBlock::acquire(int packets_nr) {
 #endif
         }
 
+inline void FlowControlBlock::_do_release() {
+#if DEBUG_CLASSIFIER_TIMEOUT
+    assert(!(flags & FLOW_TIMEOUT_INLIST));
+#endif
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+       if (release_fnt)
+           release_fnt(this);
+       else
+           click_chatter("No release fnt? Should not happen in practice...");
+       get_pool()->release(this);
+#else
+       fcb_table->release(this);
+#endif
+}
+
 inline void FlowControlBlock::release(int packets_nr) {
 	if (use_count <= 0) {
 		click_chatter("ERROR : negative release : release %p, use_count = %d",this,use_count);
@@ -287,17 +363,39 @@ inline void FlowControlBlock::release(int packets_nr) {
 #if DEBUG_CLASSIFIER_RELEASE > 1
             click_chatter("Release %d to %p, total is %d",packets_nr,this,use_count);
 #endif
+
 	if (use_count <= 0) {
 		//click_chatter("Release fcb %p",this);
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
-		if (release_fnt)
-			release_fnt(this);
-		else
-			click_chatter("No release fnt? Should not happen in practice...");
-        get_pool()->release(this);
-#else
-		fcb_table->release(this);
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+	    if (this->hasTimeout()) {
+	        if (this->flags & FLOW_TIMEOUT_INLIST) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 2
+                click_chatter("Not releasing %p because timeout is in list",this);
+                assert(fcb_table->old_flows.get().find(this));
 #endif
+	            return;
+	        }
+
+	        //Timeout is not in list yet
+	        if (!this->timeoutPassed(Timestamp::recent())) {
+#if DEBUG_CLASSIFIER_TIMEOUT  > 2
+	            click_chatter("Not releasing %p because timeout is not passed",this);
+#endif
+	            fcb_table->release_later(this);
+	            return;
+	        } else {
+#if DEBUG_CLASSIFIER_TIMEOUT  > 2
+                click_chatter("Timeout  %p has passed (%d msec)!",this, (lastseen - Timestamp::recent()).msecval());
+#endif
+	        }
+	    } else {
+#if DEBUG_CLASSIFIER_TIMEOUT  > 2
+                click_chatter("No timeout for fcb %p",this);
+#endif
+	    }
+#endif
+
+	    this->_do_release();
 
 	}
 }

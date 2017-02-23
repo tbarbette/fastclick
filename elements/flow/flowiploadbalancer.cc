@@ -14,6 +14,8 @@ CLICK_DECLS
 
 #define DEBUG_LB 0
 
+#define FLOW_TIMEOUT 60 * 1000
+
 FlowIPLoadBalancer::FlowIPLoadBalancer() : _last(0){
 
 };
@@ -66,15 +68,27 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
 #if DEBUG_LB
         click_chatter("Adding entry %s %d [%d]",entry.chosen_server.unparse().c_str(),entry.port,*_last);
 #endif
-        fcb_acquire();
+        fcb_acquire_timeout(FLOW_TIMEOUT);
+    } else {
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+        if (!fcb_stack->hasTimeout())
+            click_chatter("Forward received without timeout?");
+#endif
     }
 
-    EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
+    auto fnt = [flowdata,this](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
         q->rewrite_ips(*flowdata);
         q->set_dst_ip_anno(flowdata->dst);
+        if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
+#if DEBUG_LB || DEBUG_CLASSIFIER_TIMEOUT > 1
+            click_chatter("Forward Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
+#endif
+            fcb_release_timeout();
+        }
         return q;
-    }, batch);
+    };
+    EXECUTE_FOR_EACH_PACKET(fnt, batch);
 
     checked_output_push_batch(0, batch);
 }
@@ -137,19 +151,34 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
 #else
         *flowdata = ptr.value();
 #endif
-        fcb_acquire();
+        fcb_acquire_timeout(FLOW_TIMEOUT);
     } else {
 #if DEBUG_LB
         click_chatter("Saved entry %s -> %s",flowdata->src.unparse().c_str(),flowdata->dst.unparse().c_str());
 #endif
+#if DEBUG_CLASSIFIER_TIMEOUT > 1
+        if (!fcb_stack->hasTimeout()) {
+            click_chatter("Reverse received without timeout?");
+        }
+#endif
     }
 
-    EXECUTE_FOR_EACH_PACKET([flowdata](Packet*p) -> Packet*{
-            WritablePacket* q=p->uniqueify();
-            q->rewrite_ips(*flowdata);
-            q->set_dst_ip_anno(flowdata->dst);
-            return q;
-        }, batch);
+
+    auto fnt = [this,flowdata](Packet*p) -> Packet*{
+        WritablePacket* q=p->uniqueify();
+        q->rewrite_ips(*flowdata);
+        q->set_dst_ip_anno(flowdata->dst);
+        if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
+#if DEBUG_LB || DEBUG_CLASSIFIER_TIMEOUT > 1
+            click_chatter("Reverse Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
+#endif
+            fcb_release_timeout();
+        }
+        return q;
+    };
+
+    EXECUTE_FOR_EACH_PACKET(fnt, batch);
+
 
     checked_output_push_batch(0, batch);
 }
