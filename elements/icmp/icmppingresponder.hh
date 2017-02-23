@@ -1,6 +1,6 @@
 #ifndef CLICK_ICMPPINGRESPONDER_HH
 #define CLICK_ICMPPINGRESPONDER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -30,7 +30,7 @@ ICMPPingResponder does not pay attention to source route options; it should.
 
 ICMPSendPings, ICMPError */
 
-class ICMPPingResponder : public Element {
+class ICMPPingResponder : public BatchElement {
     public:
 
         ICMPPingResponder() CLICK_COLD;
@@ -40,7 +40,10 @@ class ICMPPingResponder : public Element {
         const char *port_count() const    { return PORTS_1_1X2; }
         const char *processing() const    { return PROCESSING_A_AH; }
 
-        Packet *simple_action(Packet *);
+        Packet      *simple_action      (Packet *);
+    #if HAVE_BATCH
+        PacketBatch *simple_action_batch(PacketBatch *);
+    #endif
 
 };
 

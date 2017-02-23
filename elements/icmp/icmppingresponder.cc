@@ -3,8 +3,12 @@
  * icmppingresponder.{cc,hh} -- element constructs ICMP echo response packets
  * Robert Morris, Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2001 International Computer Science Institute
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -90,6 +94,15 @@ ICMPPingResponder::simple_action(Packet *p_in)
 
     return q;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+ICMPPingResponder::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet*){});
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(ICMPPingResponder)
