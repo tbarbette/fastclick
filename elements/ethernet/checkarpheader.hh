@@ -62,41 +62,41 @@ ARPPrint, ARPQuerier, ARPResponder, ARPFaker
 
 */
 
-class CheckARPHeader : public Element { public:
+class CheckARPHeader : public Element {
 
-  CheckARPHeader() CLICK_COLD;
-  ~CheckARPHeader() CLICK_COLD;
+    public:
+        CheckARPHeader() CLICK_COLD;
+        ~CheckARPHeader() CLICK_COLD;
 
-    const char *class_name() const		{ return "CheckARPHeader"; }
-    const char *port_count() const		{ return PORTS_1_1X2; }
-    const char *processing() const		{ return PROCESSING_A_AH; }
+        const char *class_name() const    { return "CheckARPHeader"; }
+        const char *port_count() const    { return PORTS_1_1X2; }
+        const char *processing() const    { return PROCESSING_A_AH; }
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  void add_handlers() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
 
-  Packet *simple_action(Packet *);
+        Packet *simple_action(Packet *);
 
- private:
+    private:
 
-  unsigned _offset;
+        unsigned _offset;
 
-  bool _verbose : 1;
+        bool _verbose : 1;
 
-  atomic_uint32_t _drops;
-  atomic_uint32_t *_reason_drops;
+        atomic_uint32_t _drops;
+        atomic_uint32_t *_reason_drops;
 
-  enum Reason {
-    MINISCULE_PACKET,
-    BAD_LENGTH,
-    BAD_HRD,
-    BAD_PRO,
-    NREASONS
-  };
-  static const char * const reason_texts[NREASONS];
+        enum Reason {
+        MINISCULE_PACKET,
+        BAD_LENGTH,
+        BAD_HRD,
+        BAD_PRO,
+        NREASONS
+        };
+        static const char * const reason_texts[NREASONS];
 
-  Packet *drop(Reason, Packet *);
-  static String read_handler(Element *, void *) CLICK_COLD;
-
+        Packet *drop(Reason, Packet *);
+        static String read_handler(Element *, void *) CLICK_COLD;
 };
 
 CLICK_ENDDECLS
