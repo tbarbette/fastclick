@@ -194,9 +194,14 @@ ARPResponder::simple_action(Packet *p)
 	    q = make_response(ea->arp_sha, ea->arp_spa, ena->data(), ea->arp_tpa, p);
     }
     if (q)
-	p->kill();
-    else
-	checked_output_push(1, p);
+        p->kill();
+    else {
+        if (this->in_batch_mode > BATCH_MODE_NO) {
+            checked_output_push_batch(1, PacketBatch::make_from_packet(p));
+        } else {
+            checked_output_push(1, p);
+        }
+    }
     return q;
 }
 
