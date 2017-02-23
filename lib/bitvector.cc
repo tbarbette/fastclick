@@ -283,6 +283,18 @@ Bitvector::swap(Bitvector &x)
     x._data = (d == _f ? x._f : d);
 }
 
+Bitvector Bitvector::from_mask(unsigned long mask) {
+	int vsize = sizeof(unsigned long) * 8;
+	Bitvector v(vsize);
+	int pow = 0;
+	while (pow < vsize) {
+		v[pow] = mask & 1;
+		mask >>= 1;
+		++pow;
+	}
+	return v;
+}
+
 bool
 Bitvector::parse(const String &str, int min_val, int max_val, int offset)
 {
@@ -310,18 +322,6 @@ Bitvector::parse(const String &str, int min_val, int max_val, int offset)
 
     swap(result);
     return true;
-}
-
-Bitvector Bitvector::from_mask(unsigned long mask) {
-	int vsize = sizeof(unsigned long) * 8;
-	Bitvector v(vsize);
-	int pow = 0;
-	while (pow < vsize) {
-		v[pow] = mask & 1;
-		mask >>= 1;
-		++pow;
-	}
-	return v;
 }
 
 String

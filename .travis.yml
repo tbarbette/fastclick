@@ -1,7 +1,6 @@
 cache:
   apt: true
   directories:
-    - dpdk-1.8.0
     - dpdk-2.2.0
     - dpdk-16.04
     - dpdk-16.07
@@ -14,15 +13,11 @@ compiler:
 matrix:
   exclude:
     - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--enable-batch --disable-verbose-batch"
-    - compiler: clang
       env: FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--enable-batch --disable-verbose-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=16.07 CONFIG="--enable-batch --disable-verbose-batch"
-    - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--disable-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
     - compiler: clang
@@ -33,19 +28,19 @@ matrix:
 
 env:
   global:
-    - FLAGS="--enable-ip6 --enable-json -disable-linuxmodule"
+    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule"
     - CXXFLAGS="-std=gnu++11"
     - GCC_VERSION="4.8"
   matrix:
     - FRAMEWORK=vanilla CONFIG="--enable-batch --disable-verbose-batch"
+    - FRAMEWORK=umultithread CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=16.07 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=vanilla CONFIG="--disable-batch"
+    - FRAMEWORK=umultithread CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=1.8.0 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=16.07 CONFIG="--disable-batch"
@@ -72,8 +67,8 @@ script:
       fi;
     fi
 
-  - if [ $FRAMEWORK = "vanilla" ] ; then
-      FRAMEWORK_FLAGS="--enable-ip6 --enable-json";
+  - if [ $FRAMEWORK = "umultithread" ] ; then
+      FRAMEWORK_FLAGS="--enable-user-multithread";
     fi
 
   - ./configure $CONFIG $FLAGS $FRAMEWORK_FLAGS && make

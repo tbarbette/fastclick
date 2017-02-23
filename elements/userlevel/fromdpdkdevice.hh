@@ -84,6 +84,10 @@ Integer.  Number of descriptors per ring. The default is 256.
 Boolean.  Do not fail if the PORT do not existent. If it's the case the task
 will never run and this element will behave like Idle.
 
+=item ACTIVE
+Boolean. If False, the device is only initialized. Use this when you want
+to read packet using secondary DPDK applications.
+
 =back
 
 This element is only available at user level, when compiled with DPDK

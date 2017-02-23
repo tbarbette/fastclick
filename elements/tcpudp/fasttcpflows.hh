@@ -1,6 +1,6 @@
 #ifndef FASTTCPFLOWS_HH
 #define FASTTCPFLOWS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/gaprate.hh>
 #include <click/packet.hh>
@@ -57,7 +57,7 @@ CLICK_DECLS
  *               100, 10)
  *    -> ToDevice;
  */
-class FastTCPFlows : public Element {
+class FastTCPFlows : public BatchElement {
 
   bool _rate_limited;
   bool _sent_all_fins;
@@ -102,6 +102,14 @@ class FastTCPFlows : public Element {
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;
   Packet *pull(int);
+
+#if HAVE_BATCH
+  PacketBatch *pull_batch(int port, unsigned max) {
+      PacketBatch *batch;
+      MAKE_BATCH(pull(port), batch, max);
+      return batch;
+  }
+#endif
 
   void add_handlers() CLICK_COLD;
   void reset();

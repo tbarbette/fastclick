@@ -117,7 +117,7 @@ class RouterThread { public:
 
     // LOCAL STATE GROUP
     TaskLink _task_link;
-    volatile int _stop_flag;
+    volatile bool _stop_flag;
 #if HAVE_TASK_HEAP
     Vector<task_heap_element> _task_heap;
 #endif
@@ -218,8 +218,13 @@ class RouterThread { public:
 #endif
 
     // task running functions
-    inline void driver_lock_tasks();
-    inline void driver_unlock_tasks();
+    void driver_lock_tasks();
+    inline void driver_unlock_tasks() {
+        uint32_t val = _task_blocker.compare_swap((uint32_t) -1, 0);
+        (void) val;
+        assert(val == (uint32_t) -1);
+    }
+
     inline void run_tasks(int ntasks);
     inline void process_pending();
     inline void run_os();
@@ -233,8 +238,6 @@ class RouterThread { public:
     static inline bool running_in_interrupt();
     inline bool current_thread_is_running() const;
     inline bool current_thread_is_running_cleanup() const;
-    void request_stop();
-    inline void request_go();
 
     friend class Task;
     friend class Master;
@@ -475,12 +478,6 @@ inline bool
 RouterThread::stop_flag() const
 {
     return _stop_flag;
-}
-
-inline void
-RouterThread::request_go()
-{
-    _stop_flag = 0;
 }
 
 inline void

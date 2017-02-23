@@ -48,31 +48,31 @@ Return or set the ETHERTYPE parameter.
 EtherVLANEncap, ARPQuerier, EnsureEther, StoreEtherAddress, EtherRewrite */
 
 
-class EtherEncap : public BatchElement { public:
+class EtherEncap : public BatchElement {
+    public:
 
-    EtherEncap() CLICK_COLD;
-    ~EtherEncap() CLICK_COLD;
+        EtherEncap() CLICK_COLD;
+        ~EtherEncap() CLICK_COLD;
 
-    const char *class_name() const	{ return "EtherEncap"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+        const char *class_name() const    { return "EtherEncap"; }
+        const char *port_count() const    { return PORTS_1_1; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    bool can_live_reconfigure() const	{ return true; }
-    void add_handlers() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        bool can_live_reconfigure() const    { return true; }
+        void add_handlers() CLICK_COLD;
 
-    inline Packet *smaction(Packet *);
+        inline Packet *smaction(Packet *);
 
-    Packet *pull(int);
+        Packet *pull(int);
 
-#if HAVE_BATCH
-    void push_batch(int, PacketBatch *);
-#endif
-    void push(int, Packet *);
+        void push      (int, Packet*);
+    #if HAVE_BATCH
+        void push_batch(int, PacketBatch*);
+    #endif
 
-  private:
+    private:
 
-    click_ether _ethh;
-
+        click_ether _ethh;
 };
 
 CLICK_ENDDECLS
