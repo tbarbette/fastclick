@@ -215,6 +215,14 @@ ARPPrint::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+ARPPrint::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
+}
+#endif
 
 void
 ARPPrint::add_handlers()
