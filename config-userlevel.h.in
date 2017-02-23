@@ -217,6 +217,9 @@
 /* Define if Zero-copy is enabled. */
 #undef HAVE_ZEROCOPY
 
+/* Define if Flow sloppy timeout is enabled. */
+#undef HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+
 /* Define if Netmap support is enabled. */
 #undef HAVE_NETMAP
 

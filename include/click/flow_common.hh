@@ -14,7 +14,6 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
 #define HAVE_DYNAMIC_FLOW_RELEASE_FNT 0
-#define HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT 1
 
 class FlowControlBlock;
 class FCBPool;
