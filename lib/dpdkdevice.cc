@@ -50,7 +50,7 @@ void add_pool(const struct rte_mempool * rte, void *arg){
     if (strncmp(DPDKDevice::MEMPOOL_PREFIX.c_str(), const_cast<struct rte_mempool *>(rte)->name, DPDKDevice::MEMPOOL_PREFIX.length()) != 0)
         return;
     DPDKDevice::_pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
-    click_chatter("Found DPDK primary pool #%d %s",*i,rte,DPDKDevice::_pktmbuf_pools[*i]->name);
+    click_chatter("Found DPDK primary pool #%d %s",*i, DPDKDevice::_pktmbuf_pools[*i]->name);
     (*i)++;
 }
 
