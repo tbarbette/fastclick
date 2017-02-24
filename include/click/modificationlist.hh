@@ -10,8 +10,10 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/memorypool.hh>
-#include <click/bytestreammaintainer.hh>
+#include "memorypool.hh"
+#include "bytestreammaintainer.hh"
+
+CLICK_DECLS
 
 class ByteStreamMaintainer;
 
@@ -20,13 +22,14 @@ class ByteStreamMaintainer;
  */
 struct ModificationNode
 {
-        unsigned int position; /** Position of the modification */
+        uint32_t position; /** Position of the modification */
         int offset; /** Offset of the modification (positive if bytes are added
                         or negative if bytes are removed) */
         struct ModificationNode* next; /** Pointer to the next node */
 };
 
-/** @class ModificationList
+/**
+ * @class ModificationList
  * @brief Class used to store the modifications performed in a packet's structure
  *
  * This class is used to store the modifications made in the structure of a
@@ -46,12 +49,18 @@ public:
      * struct ModificationNode.
      */
     ModificationList(MemoryPool<struct ModificationNode>* poolNodes);
+
+    /** @brief Destruct a ModificationList and free the memory
+     */
     ~ModificationList();
+
     /** @brief Print the current state of the list in the console using
      * click_chatter
      */
     void printList();
+
     /** @brief Add a modification in the list
+     * @param firstPosition The lowest position possible for this packet
      * @param position The position at which the modification occurs
      * @param offset The offset representing the modification (a positive
      * number if bytes are added and a negative number if bytes are removed)
@@ -59,29 +68,30 @@ public:
      * if the list does not accept any new modification because a commit
      * has been made.
      */
-    bool addModification(unsigned int position, int offset);
+    bool addModification(uint32_t firstPosition, uint32_t position, int offset);
 
-    bool isCommitted()
-    {
-        return committed;
-    }
+    /** @brief Indicate whether the list has been committed
+     * @return True if the list has been committed
+     */
+    bool isCommitted();
+
+    /** @brief Commit the modifications stored in the list into a ByteStreamMaintainer
+     * @param maintainer The ByteStreamMaintainer in which the modifications will be committed
+     */
+    void commit(ByteStreamMaintainer& maintainer);
 
 private:
-    /** @brief Indicate if two integers have the same sign
+    /** @brief Indicate whether two integers have the same sign
      * @param first The first integer
      * @param second The second integer
      * @return  True if both integers have the same sign
      */
     bool sameSign(int first, int second);
-    /** @brief Merge nodes that represent overlapping modifications of the
-     * same kind
+
+    /** @brief Merge nodes that represent overlapping deletions
      */
     void mergeNodes();
-    /** @brief Commit the modifications in the ByteStreamMaintainer.
-     * @param maintainer The ByteStreamMaintainer in which the modifications
-     * will be committed
-     */
-    void commit(ByteStreamMaintainer& maintainer);
+
     /** @brief Clear the modification list
      */
     void clear();
@@ -90,5 +100,8 @@ private:
     struct ModificationNode *head;
     bool committed; /** Becomes true when a commit is made */
 };
+
+
+CLICK_ENDDECLS
 
 #endif

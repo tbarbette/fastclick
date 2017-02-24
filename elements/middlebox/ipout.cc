@@ -1,3 +1,9 @@
+/*
+ * ipout.{cc,hh} -- exit point of an IP path in the stack of the middlebox
+ * Romain Gaillard
+ * Tom Barbette
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -22,9 +28,9 @@ void IPOut::push_batch(int port, PacketBatch* flow)
     EXECUTE_FOR_EACH_PACKET([this](Packet* p){
         WritablePacket *packet = p->uniqueify();
 
-        // Recompute the IP checksum if the packet has been modified
-        if (getAnnotationModification(packet))
-            computeChecksum(packet);
+        // Recompute the IP checksum
+        computeIPChecksum(packet);
+
         return packet;
     }, flow);
     output(0).push_batch(flow);
@@ -32,4 +38,5 @@ void IPOut::push_batch(int port, PacketBatch* flow)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPOut)
-//ELEMENT_MT_SAFE(IPOut)
+ELEMENT_REQUIRES(IPElement)
+ELEMENT_MT_SAFE(IPOut)

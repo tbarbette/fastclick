@@ -17,6 +17,13 @@ template <typename T>
 class MemoryPool
 {
 public:
+    /** @brief Construct an empty MemoryPool
+     */
+    MemoryPool()
+    {
+        first = NULL;
+    }
+
     /** @brief Construct a MemoryPool
      * @param initialSize The initial number of elements in the pool
      */
@@ -26,7 +33,7 @@ public:
 
         // Perform the first allocation. 'initialSize' memory chunks will be
         // allocated
-        allocateMoreMemory(initialSize);
+        initialize(initialSize);
     }
 
     /** @brief Destruct the memory pool
@@ -36,19 +43,32 @@ public:
         MemoryPoolNode *node = first;
         MemoryPoolNode *toDelete = NULL;
 
-        // Search the node in the full list
+        // Free each node of the list
         while(node != NULL)
         {
             toDelete = node;
             node = node->next;
 
             // Free the node
-            free(toDelete);
+            delete toDelete;
         }
     }
 
+    /** @brief Initialize the MemoryPool
+     * @param initialSize The initial number of elements in the pool
+     */
+    void initialize(unsigned int initialSize)
+    {
+        if(first != NULL)
+            return;
+
+        // Perform the first allocation. 'initialSize' memory chunks will be
+        // allocated
+        allocateMoreMemory(initialSize);
+    }
+
     /** @brief Obtain memory from the memory pool
-     * @return A pointer to an object of the type T
+     * @return A pointer to an object of type T
      */
     T* getMemory()
     {
@@ -65,8 +85,8 @@ public:
         return (T*)node;
     }
 
-    /** @brief Release memory and put it back to the pool
-     * @param p Pointer the the object of type T
+    /** @brief Release memory and put it back in the pool
+     * @param p Pointer to the object of type T
      */
     void releaseMemory(T* p)
     {
@@ -80,6 +100,18 @@ private:
     {
         MemoryPoolNode *next; /** Pointer to the next element */
         T data; /** Object of type T stored in the pool */
+
+        // Constructors and destructors required since T can be an object with a constructor
+        // that will be deleted from the union (C++11)
+        MemoryPoolNode()
+        {
+            next = NULL;
+        }
+
+        ~MemoryPoolNode()
+        {
+
+        }
     };
 
     /** @brief Allocate more memory for the pool
@@ -92,7 +124,7 @@ private:
         for(int i = 0; i < size; ++i)
         {
             // Allocate the node
-            node = (MemoryPoolNode*)malloc(sizeof(MemoryPoolNode));
+            node = new MemoryPoolNode;
 
             node->next = first;
             first = node;

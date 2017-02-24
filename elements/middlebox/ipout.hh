@@ -2,12 +2,32 @@
 #define MIDDLEBOX_IPOUT_HH
 #include <click/element.hh>
 #include "ipelement.hh"
+#include "stackelement.hh"
 
 CLICK_DECLS
 
-class IPOut : public IPElement
+/*
+=c
+
+IPOut()
+
+=s middlebox
+
+exit point of an IP path in the stack of the middlebox
+
+=d
+
+This element is the exit point of an IP path in the stack of the middlebox by which all
+IP packets must go after their IP content has been processed. Each path containing a IPOut element
+must also contain an IPIn element
+
+=a IPIn */
+
+class IPOut : public StackElement, public IPElement
 {
 public:
+    /** @brief Construct an IPOut element
+     */
     IPOut() CLICK_COLD;
 
     const char *class_name() const        { return "IPOut"; }

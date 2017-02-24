@@ -2,8 +2,9 @@
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/packet_anno.hh>
 #include "stackelement.hh"
-#include "httpin.hh"
+
 
 CLICK_DECLS
 
@@ -17,17 +18,18 @@ StackElement::~StackElement()
 
 }
 
-void StackElement::setContentOffset(Packet* p, uint16_t offset)
+
+void StackElement::setContentOffset(Packet* p, uint16_t offset) const
 {
-    p->set_anno_u16(offsetContentOffset, offset);
+    p->set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
 }
 
-uint16_t StackElement::getContentOffset(Packet* p)
+uint16_t StackElement::getContentOffset(Packet* p) const
 {
-    return p->anno_u16(offsetContentOffset);
+    return p->anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
 }
 
-void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
+void StackElement::setAnnotationBit(Packet* p, int bit, bool value) const
 {
     // Build masks
     unsigned char clearMask = 1;
@@ -38,7 +40,7 @@ void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
     mask = mask << bit;
 
     // Get previous value
-    unsigned char previousValue = (unsigned char)(p->anno_u8(offsetAnnotationBools));
+    unsigned char previousValue = (unsigned char)(p->anno_u8(MIDDLEBOX_BOOLS_OFFSET));
 
     // Apply masks
     // Clear the bit to modify
@@ -47,17 +49,17 @@ void StackElement::setAnnotationBit(Packet* p, int bit, bool value)
     previousValue |= mask;
 
     // Set the new value
-    p->set_anno_u8(offsetAnnotationBools, previousValue);
+    p->set_anno_u8(MIDDLEBOX_BOOLS_OFFSET, previousValue);
 }
 
-bool StackElement::getAnnotationBit(Packet* p, int bit)
+bool StackElement::getAnnotationBit(Packet* p, int bit) const
 {
     // Build mask
     unsigned char mask = 1;
     mask = mask << bit;
 
     // Get full value
-    unsigned char value = (unsigned char)(p->anno_u8(offsetAnnotationBools));
+    unsigned char value = (unsigned char)(p->anno_u8(MIDDLEBOX_BOOLS_OFFSET));
 
     // Apply mask
     value &= mask;
@@ -65,41 +67,32 @@ bool StackElement::getAnnotationBit(Packet* p, int bit)
     return (bool)value;
 }
 
-void StackElement::setAnnotationModification(Packet* p, bool value)
+void StackElement::setAnnotationLastUseful(Packet *p, bool value) const
 {
-    setAnnotationBit(p, offsetAnnotationModified, value);
+    setAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL, value);
 }
 
-bool StackElement::getAnnotationModification(Packet* p)
+bool StackElement::getAnnotationLastUseful(Packet *p) const
 {
-    return getAnnotationBit(p, offsetAnnotationModified);
-}
-
-void StackElement::setAnnotationAcked(Packet* p, bool value)
-{
-    setAnnotationBit(p, offsetAnnotationAcked, value);
-}
-
-bool StackElement::getAnnotationAcked(Packet* p)
-{
-    return getAnnotationBit(p, offsetAnnotationAcked);
+    return getAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL);
 }
 
 void StackElement::addStackElementInList(StackElement *element, int port)
 {
-    // Check that this element was not already added in the list via an
+    // Check that this element has not already been added in the list via an
     // alternative path
 
     previousStackElement = element;
 }
 
-void StackElement::setPacketModified(WritablePacket* packet)
+void StackElement::setInitialAck(Packet *p, uint32_t initialAck) const
 {
-    // Call the "setPacketModified" method on every element in the stack
-    if(previousStackElement == NULL)
-        return;
+    p->set_anno_u32(MIDDLEBOX_INIT_ACK_OFFSET, initialAck);
+}
 
-    previousStackElement->setPacketModified(packet);
+uint32_t StackElement::getInitialAck(Packet *p) const
+{
+    return (uint32_t)p->anno_u32(MIDDLEBOX_INIT_ACK_OFFSET);
 }
 
 void StackElement::packetSent(Packet* packet)
@@ -111,7 +104,18 @@ void StackElement::packetSent(Packet* packet)
     previousStackElement->packetSent(packet);
 }
 
-void StackElement::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
+void StackElement::closeConnection(WritablePacket *packet, bool graceful,
+     bool bothSides)
+{
+    // Call the "closeConnection" method on every element in the stack
+    if(previousStackElement == NULL)
+        return;
+
+    previousStackElement->closeConnection(packet, graceful, bothSides);
+}
+
+void StackElement::removeBytes(WritablePacket* packet, uint32_t position,
+    uint32_t length)
 {
     // Call the "removeBytes" method on every element in the stack
     if(previousStackElement == NULL)
@@ -120,22 +124,32 @@ void StackElement::removeBytes(WritablePacket* packet, uint32_t position, uint32
     previousStackElement->removeBytes(packet, position, length);
 }
 
-void StackElement::insertBytes(WritablePacket* packet, uint32_t position, uint32_t length)
+WritablePacket* StackElement::insertBytes(WritablePacket* packet,
+    uint32_t position, uint32_t length)
 {
     // Call the "insertBytes" method on every element in the stack
     if(previousStackElement == NULL)
-        return;
+        return NULL;
 
-    previousStackElement->insertBytes(packet, position, length);
+    return previousStackElement->insertBytes(packet, position, length);
 }
 
-void StackElement::requestMoreBytes()
+void StackElement::requestMorePackets(Packet *packet, bool force)
 {
-    // Call the "requestMoreBytes" method on every element in the stack
+    // Call the "requestMorePackets" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->requestMoreBytes();
+    previousStackElement->requestMorePackets(packet, force);
+}
+
+bool StackElement::isLastUsefulPacket(Packet *packet)
+{
+    // Call the "isLastUsefulPacket" method on every element in the stack
+    if(previousStackElement == NULL)
+        return false;
+
+    return previousStackElement->isLastUsefulPacket(packet);
 }
 
 bool StackElement::isStackElement(Element* element)
@@ -168,21 +182,21 @@ int StackElement::initialize(ErrorHandler*  errh)
     return Element::initialize(errh);
 }
 
-const unsigned char* StackElement::getPacketContentConst(Packet* p)
+const unsigned char* StackElement::getPacketContentConst(Packet* p) const
 {
     uint16_t offset = getContentOffset(p);
 
     return (p->data() + offset);
 }
 
-unsigned char* StackElement::getPacketContent(WritablePacket* p)
+unsigned char* StackElement::getPacketContent(WritablePacket* p) const
 {
     uint16_t offset = getContentOffset(p);
 
     return (p->data() + offset);
 }
 
-bool StackElement::isPacketContentEmpty(Packet* packet)
+bool StackElement::isPacketContentEmpty(Packet* packet) const
 {
     uint16_t offset = getContentOffset(packet);
 
@@ -192,6 +206,13 @@ bool StackElement::isPacketContentEmpty(Packet* packet)
         return false;
 }
 
+uint16_t StackElement::getPacketContentSize(Packet *packet) const
+{
+    uint16_t offset = getContentOffset(packet);
+
+    return packet->length() - offset;
+}
+
 unsigned int StackElement::determineFlowDirection()
 {
     // Call the "determineFlowDirection" method on every element in the stack
@@ -199,6 +220,16 @@ unsigned int StackElement::determineFlowDirection()
         return -1; // We've reached the end of the path and nobody answered
 
     return previousStackElement->determineFlowDirection();
+}
+
+template<typename T>
+StackBufferElement<T>::StackBufferElement() : StackElement() {
+
+}
+
+template<typename T>
+StackBufferElement<T>::~StackBufferElement() {
+
 }
 
 CLICK_ENDDECLS
