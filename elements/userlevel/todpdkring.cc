@@ -116,7 +116,15 @@ ToDPDKRing::initialize(ErrorHandler *errh)
             _PROC_1.c_str(), DPDKDevice::RING_SIZE,
             rte_socket_id(), DPDKDevice::RING_FLAGS
         );
+    }
+    // If secondary process, search for the appropriate memory and attach to it.
+    else {
+        _send_ring    = rte_ring_lookup   (_PROC_2.c_str());
+    }
 
+    _message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
+
+    if (!_message_pool) {
         _message_pool = rte_mempool_create(
             _MEM_POOL.c_str(), _ndesc,
             DPDKDevice::MBUF_DATA_SIZE,
@@ -125,11 +133,6 @@ ToDPDKRing::initialize(ErrorHandler *errh)
             NULL, NULL, NULL, NULL,
             rte_socket_id(), DPDKDevice::RING_FLAGS
         );
-    }
-    // If secondary process, search for the appropriate memory and attach to it.
-    else {
-        _send_ring    = rte_ring_lookup   (_PROC_2.c_str());
-        _message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
     }
 
     if ( !_send_ring )
