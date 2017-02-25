@@ -2,9 +2,13 @@
  * arpprint.{cc,hh} -- element prints packet contents to system log
  * Jose Maria Gonzalez
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Shameless graft of ipprint.hh/cc and tcpdump-3.8.3/print-arp.c
  *
  * Copyright (c) 2005-2006 Regents of the University of California
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
