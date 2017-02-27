@@ -3,6 +3,8 @@
 #include <click/element.hh>
 #include <click/etheraddress.hh>
 #include <click/hashtable.hh>
+#include <click/bitvector.hh>
+#include <click/vector.hh>
 CLICK_DECLS
 
 /*
@@ -85,8 +87,26 @@ class EtherSwitch : public Element { public:
     typedef HashTable<EtherAddress, AddrInfo> Table;
     Table _table;
     uint32_t _timeout;
+    struct PortForwardRule {
+        Bitvector bv; /* Each bit is a port used in determining forwarding to of packets */
+        int w; /* Sum of bv */
+        void calculate_weight() {
+            w = bv.weight();
+        }
+        void configure(int i, int n) {
+            bv.resize(n);
+            for (int j = 0; j < n; j++)
+                bv[j] = true;
+            assert((unsigned) i < (unsigned) n);
+            bv[i] = false;
+            calculate_weight();
+        }
+    };
+    Vector<PortForwardRule> _pfrs;
 
     void broadcast(int source, Packet*);
+    int remove_port_forwarding(String portmaps, ErrorHandler *errh);
+    void reset_port_forwarding();
 
     static String reader(Element *, void *);
     static int writer(const String &, Element *, void *, ErrorHandler *);
