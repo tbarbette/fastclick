@@ -41,7 +41,7 @@ CheckARPHeader::CheckARPHeader()
 
 CheckARPHeader::~CheckARPHeader()
 {
-  delete[] _reason_drops;
+    delete[] _reason_drops;
 }
 
 int
@@ -52,15 +52,15 @@ CheckARPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
     bool details = false;
 
     if (Args(conf, this, errh)
-	.read_p("OFFSET", _offset)
-	.read("VERBOSE", verbose)
-	.read("DETAILS", details)
-	.complete() < 0)
-	return -1;
+        .read_p("OFFSET", _offset)
+        .read("VERBOSE", verbose)
+        .read("DETAILS", details)
+        .complete() < 0)
+    return -1;
 
     _verbose = verbose;
     if (details)
-	_reason_drops = new atomic_uint32_t[NREASONS];
+    _reason_drops = new atomic_uint32_t[NREASONS];
 
     return 0;
 }
@@ -68,49 +68,60 @@ CheckARPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 Packet *
 CheckARPHeader::drop(Reason reason, Packet *p)
 {
-  if (_drops == 0 || _verbose)
-    click_chatter("ARP header check failed: %s", reason_texts[reason]);
-  _drops++;
+    if (_drops == 0 || _verbose)
+        click_chatter("ARP header check failed: %s", reason_texts[reason]);
+    _drops++;
 
-  if (_reason_drops)
-    _reason_drops[reason]++;
+    if (_reason_drops)
+        _reason_drops[reason]++;
 
-  checked_output_push(1, p);
-  return 0;
+    checked_output_push(1, p);
+
+    return 0;
 }
 
 Packet *
 CheckARPHeader::simple_action(Packet *p)
 {
-  const click_arp *ap = reinterpret_cast<const click_arp *>(p->data() + _offset);
-  unsigned plen = p->length() - _offset;
-  unsigned hlen;
+    const click_arp *ap = reinterpret_cast<const click_arp *>(p->data() + _offset);
+    unsigned plen = p->length() - _offset;
+    unsigned hlen;
 
-  // cast to int so very large plen is interpreted as negative
-  if ((int) plen < (int) sizeof(click_arp))
-      return drop(MINISCULE_PACKET, p);
+    // cast to int so very large plen is interpreted as negative
+    if ((int) plen < (int) sizeof(click_arp))
+        return drop(MINISCULE_PACKET, p);
 
-  hlen = (int) sizeof(click_arp) + 2*ap->ar_hln + 2*ap->ar_pln;
-  if ((int) plen < (int) hlen)
-      return drop(BAD_LENGTH, p);
-  else if (ap->ar_hrd == htons(ARPHRD_ETHER) && ap->ar_hln != 6)
-      return drop(BAD_HRD, p);
-  else if ((ap->ar_pro == htons(ETHERTYPE_IP) && ap->ar_pln != 4)
-	   || (ap->ar_pro == htons(ETHERTYPE_IP6) && ap->ar_pln != 16))
-      return drop(BAD_PRO, p);
+    hlen = (int) sizeof(click_arp) + 2*ap->ar_hln + 2*ap->ar_pln;
+    if ((int) plen < (int) hlen)
+        return drop(BAD_LENGTH, p);
+    else if (ap->ar_hrd == htons(ARPHRD_ETHER) && ap->ar_hln != 6)
+        return drop(BAD_HRD, p);
+    else if ((ap->ar_pro == htons(ETHERTYPE_IP) && ap->ar_pln != 4)
+            || (ap->ar_pro == htons(ETHERTYPE_IP6) && ap->ar_pln != 16))
+        return drop(BAD_PRO, p);
 
-  p->set_network_header((const unsigned char *) ap, hlen);
-  return p;
+    p->set_network_header((const unsigned char *) ap, hlen);
+
+    return p;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+CheckARPHeader::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet*){});
+    return batch;
+}
+#endif
 
 String
 CheckARPHeader::read_handler(Element *e, void *)
 {
-  CheckARPHeader *c = reinterpret_cast<CheckARPHeader *>(e);
-  StringAccum sa;
-  for (int i = 0; i < NREASONS; i++)
-      sa << c->_reason_drops[i] << '\t' << reason_texts[i] << '\n';
-  return sa.take_string();
+    CheckARPHeader *c = reinterpret_cast<CheckARPHeader *>(e);
+    StringAccum sa;
+    for (int i = 0; i < NREASONS; i++)
+        sa << c->_reason_drops[i] << '\t' << reason_texts[i] << '\n';
+    return sa.take_string();
 }
 
 void
@@ -118,7 +129,7 @@ CheckARPHeader::add_handlers()
 {
     add_data_handlers("drops", Handler::OP_READ, &_drops);
     if (_reason_drops)
-	add_read_handler("drop_details", read_handler, 1);
+	   add_read_handler("drop_details", read_handler, 1);
 }
 
 CLICK_ENDDECLS
