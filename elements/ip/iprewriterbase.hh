@@ -3,7 +3,9 @@
 #define CLICK_IPREWRITERBASE_HH
 #include <click/timer.hh>
 #include "elements/ip/iprwmapping.hh"
+#include <click/batchelement.hh>
 #include <click/bitvector.hh>
+
 CLICK_DECLS
 class IPMapper;
 class IPRewriterPattern;
@@ -78,7 +80,7 @@ class IPRewriterHeap { public:
 
 };
 
-class IPRewriterBase : public Element { public:
+class IPRewriterBase : public BatchElement { public:
 
     typedef HashContainer<IPRewriterEntry> Map;
     enum {
@@ -105,13 +107,14 @@ class IPRewriterBase : public Element { public:
     void cleanup(CleanupStage) CLICK_COLD;
 
     const IPRewriterHeap *flow_heap() const {
-	return _heap;
+	return _heap[click_current_cpu_id()];
     }
     IPRewriterBase *reply_element(int input) const {
 	return _input_specs[input].reply_element;
     }
     virtual HashContainer<IPRewriterEntry> *get_map(int mapid) {
-	return likely(mapid == IPRewriterInput::mapid_default) ? &_map : 0;
+	return likely(mapid == IPRewriterInput::mapid_default) ?
+               &_map[click_current_cpu_id()] : 0;
     }
 
     enum {
@@ -124,19 +127,22 @@ class IPRewriterBase : public Element { public:
 				      int input) = 0;
     virtual void destroy_flow(IPRewriterFlow *flow) = 0;
     virtual click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + _timeouts[0] - _timeouts[1];
+	return flow->expiry() +
+               _timeouts[click_current_cpu_id()][0] -
+               _timeouts[click_current_cpu_id()][1];
     }
 
     int llrpc(unsigned command, void *data);
 
   protected:
 
-    Map _map;
+    unsigned _mem_units_no;
 
+    Map *_map;
     Vector<IPRewriterInput> _input_specs;
+    IPRewriterHeap **_heap;
+    uint32_t **_timeouts;
 
-    IPRewriterHeap *_heap;
-    uint32_t _timeouts[2];
     uint32_t _gc_interval_sec;
     Timer _gc_timer;
 
@@ -212,7 +218,7 @@ IPRewriterInput::rewrite_flowid(const IPFlowID &flowid,
     case i_pattern: {
 	HashContainer<IPRewriterEntry> *reply_map;
 	if (likely(mapid == mapid_default))
-	    reply_map = &reply_element->_map;
+	    reply_map = &reply_element->_map[click_current_cpu_id()];
 	else
 	    reply_map = reply_element->get_map(mapid);
 	i = u.pattern->rewrite_flowid(flowid, rewritten_flowid, *reply_map);
@@ -236,10 +242,12 @@ IPRewriterBase::unmap_flow(IPRewriterFlow *flow, Map &map,
 {
     //click_chatter("kill %s", hashkey().s().c_str());
     if (!reply_map_ptr)
-	reply_map_ptr = &flow->owner()->reply_element->_map;
+	reply_map_ptr = &flow->owner()->reply_element->_map[click_current_cpu_id()];
+
     Map::iterator it = map.find(flow->entry(0).hashkey());
     if (it.get() == &flow->entry(0))
 	map.erase(it);
+
     it = reply_map_ptr->find(flow->entry(1).hashkey());
     if (it.get() == &flow->entry(1))
 	reply_map_ptr->erase(it);
