@@ -191,24 +191,35 @@ class UDPRewriter : public IPRewriterBase { public:
 			      const IPFlowID &rewritten_flowid, int input);
     void destroy_flow(IPRewriterFlow *flow);
     click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>(flow)) - _timeouts[1];
+	return flow->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>(flow)) -
+               _timeouts[click_current_cpu_id()][1];
     }
 
     void push(int, Packet *);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *batch);
+#endif
 
     void add_handlers() CLICK_COLD;
 
   private:
+#if HAVE_USER_MULTITHREAD
+    unsigned _maps_no;
+    SizedHashAllocator<sizeof(UDPFlow)> *_allocator;
+#else
+    SizedHashAllocator<sizeof(UDPFlow)> _allocator[CLICK_CPU_MAX];
+#endif
 
-    SizedHashAllocator<sizeof(UDPFlow)> _allocator;
     unsigned _annos;
     uint32_t _udp_streaming_timeout;
+
+    int process(int port, Packet *p_in);
 
     int udp_flow_timeout(const UDPFlow *mf) const {
 	if (mf->streaming())
 	    return _udp_streaming_timeout;
 	else
-	    return _timeouts[0];
+	    return _timeouts[click_current_cpu_id()][0];
     }
 
     static String dump_mappings_handler(Element *, void *);
@@ -221,9 +232,9 @@ class UDPRewriter : public IPRewriterBase { public:
 inline void
 UDPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map);
+    unmap_flow(flow, _map[click_current_cpu_id()]);
     flow->~IPRewriterFlow();
-    _allocator.deallocate(flow);
+    _allocator[click_current_cpu_id()].deallocate(flow);
 }
 
 CLICK_ENDDECLS
