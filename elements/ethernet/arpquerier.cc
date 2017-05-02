@@ -374,7 +374,7 @@ ARPQuerier::handle_response(Packet *p)
 	        if (head) {
 	            head->append_packet(q);
 	        } else {
-	            head = PacketBatch::start_head(q);
+	            head = PacketBatch::make_from_packet(q);
 	        }
 	    }
 	    cached_packet = next;
@@ -418,13 +418,21 @@ ARPQuerier::push_batch(int port, PacketBatch *batch)
                 }
             }
         } else {
-            head = handle_response(p);
+            PacketBatch* resphead = handle_response(p);
+            if (resphead) {
+                if (head) {
+                    head->append_batch(resphead);
+                } else {
+                    head = resphead;
+                }
+            }
             p->kill();
         }
-    }
+    };
 
-    if (head)
+    if (head) {
         output(0).push_batch(head);
+    }
 }
 #endif
 
