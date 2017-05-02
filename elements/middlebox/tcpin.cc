@@ -14,10 +14,10 @@ TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
     tableFcbTcpCommon(NULL)
 {
     // Initialize the memory pools of each thread
-    for(unsigned int i = 0; i < poolModificationNodes.size(); ++i)
+    for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
         poolModificationNodes.get_value(i).initialize(MODIFICATIONNODES_POOL_SIZE);
 
-    for(unsigned int i = 0; i < poolModificationLists.size(); ++i)
+    for(unsigned int i = 0; i < poolModificationLists.weight(); ++i)
         poolModificationLists.get_value(i).initialize(MODIFICATIONLISTS_POOL_SIZE);
 
     // Warning about the fact that the system must be integrated to Middleclick in order to
@@ -27,6 +27,10 @@ TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
             " with the flow management system provided by Middleclick. Therefore, you will"
             " only be able to use one flow.");
     #endif
+}
+
+TCPIn::~TCPIn() {
+
 }
 
 int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -86,198 +90,206 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* TCPIn::processPacket(struct fcb *fcb, Packet* p)
+FlowNode* TCPIn::get_table(int iport) {
+    return upstream_classifier_table()->parse("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff").root->replace_leaves(FlowElement::get_table(iport));
+}
+
+void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 {
-    // Ensure that the pointers in the FCB are set
-    if(fcb->tcpin.poolModificationNodes == NULL)
-        fcb->tcpin.poolModificationNodes = &(*poolModificationNodes);
+    auto fnt = [this,fcb_in](Packet* p) -> Packet* {
+        // Ensure that the pointers in the FCB are set
+        if(fcb_in->poolModificationNodes == NULL)
+            fcb_in->poolModificationNodes = &(*poolModificationNodes);
 
-    if(fcb->tcpin.poolModificationLists == NULL)
-        fcb->tcpin.poolModificationLists = &(*poolModificationLists);
+        if(fcb_in->poolModificationLists == NULL)
+            fcb_in->poolModificationLists = &(*poolModificationLists);
 
-    if(fcb->tcpin.lock == NULL)
-        fcb->tcpin.lock = &lock;
+        if(fcb_in->lock == NULL)
+            fcb_in->lock = &lock;
 
-    // Assign the tcp_common structure if not already done
-    if(fcb->tcp_common == NULL)
-    {
-        if(!assignTCPCommon(fcb, p))
+        // Assign the tcp_common structure if not already done
+        if(fcb_in->common == NULL)
         {
-            // The allocation failed, meaning that the packet is not a SYN
-            // packet. This is not supposed to happen and it means that
-            // the first two packets of the connection are not SYN packets
-            click_chatter("Warning: Trying to assign a common tcp memory area"
-                " for a non-SYN packet");
-            p->kill();
-
-            return NULL;
-        }
-    }
-    else
-    {
-        // The structure has been assigned so the three-way handshake is over
-        // Check that the packet is not a SYN packet
-        if(isSyn(p))
-        {
-            click_chatter("Warning: Unexpected SYN packet. Dropping it");
-            p->kill();
-
-            // Warning about the fact that the system must be integrated to Middleclick in order to
-            // work properly.
-            #ifndef HAVE_FLOW
-                click_chatter("WARNING: You are using a version of this program that is not compatible"
-                    " with the flow management system provided by Middleclick. Therefore, you will"
-                    " only be able to use one flow.");
-            #endif
-
-            return NULL;
-        }
-    }
-
-    fcb->tcp_common->lock.acquire();
-
-    if(!checkConnectionClosed(fcb, p))
-    {
-        p->kill();
-        fcb->tcp_common->lock.release();
-        return NULL;
-    }
-
-    WritablePacket *packet = p->uniqueify();
-
-    // Set the annotation indicating the initial ACK value
-    setInitialAck(packet, getAckNumber(packet));
-
-    // Compute the offset of the TCP payload
-    uint16_t offset = getPayloadOffset(packet);
-    setContentOffset(packet, offset);
-
-    // Manage the TCP options:
-    // - Remove the SACK-permitted option
-    // - Detect the window scale
-    // - Detect MSS
-    manageOptions(fcb, packet);
-
-    ByteStreamMaintainer &maintainer = fcb->tcp_common->maintainers[getFlowDirection()];
-    ByteStreamMaintainer &otherMaintainer = fcb->tcp_common->maintainers[getOppositeFlowDirection()];
-
-    // Update the window size
-    uint16_t prevWindowSize = maintainer.getWindowSize();
-    uint16_t newWindowSize = getWindowSize(packet);
-    maintainer.setWindowSize(newWindowSize);
-
-    tcp_seq_t seqNumber = getSequenceNumber(packet);
-
-    if(otherMaintainer.isLastAckSentSet())
-    {
-        tcp_seq_t lastAckSentOtherSide = otherMaintainer.getLastAckSent();
-
-        if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
-        {
-            // We receive content that has already been ACKed.
-            // This case occurs when the ACK is lost between the middlebox and
-            // the destination.
-            // In this case, we re-ACK the content and we discard it
-            ackPacket(fcb, packet);
-            packet->kill();
-            fcb->tcp_common->lock.release();
-            return NULL;
-        }
-    }
-
-    // Take care of the ACK value in the packet
-    bool isAnAck = isAck(packet);
-    tcp_seq_t ackNumber = 0;
-    tcp_seq_t newAckNumber = 0;
-    if(isAnAck)
-    {
-        // Map the ack number according to the ByteStreamMaintainer of the other direction
-        ackNumber = getAckNumber(packet);
-        newAckNumber = otherMaintainer.mapAck(ackNumber);
-
-        // Check the value of the previous ack received if it exists
-        bool lastAckReceivedSet = maintainer.isLastAckReceivedSet();
-        uint32_t prevLastAckReceived = 0;
-        if(lastAckReceivedSet)
-            prevLastAckReceived = maintainer.getLastAckReceived();
-
-
-        // Check if we acknowledged new data
-        if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
-        {
-            // Increase congestion window
-            uint64_t cwnd = otherMaintainer.getCongestionWindowSize();
-            uint64_t ssthresh = otherMaintainer.getSsthresh();
-            // Sender segment size
-            uint16_t mss = otherMaintainer.getMSS();
-            uint64_t increase = 0;
-
-            // Check if we are in slow start mode
-            if(cwnd <= ssthresh)
-                increase = mss;
-            else
-                increase = mss * mss / cwnd;
-
-            otherMaintainer.setCongestionWindowSize(cwnd + increase);
-
-            maintainer.setDupAcks(0);
-        }
-
-        // Update the value of the last ACK received
-        maintainer.setLastAckReceived(ackNumber);
-
-        // Prune the ByteStreamMaintainer of the other side
-        otherMaintainer.prune(ackNumber);
-
-        // Update the statistics about the RTT
-        // And potentially update the retransmission timer
-        fcb->tcp_common->lock.release();
-        fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].signalAck(fcb, ackNumber);
-        fcb->tcp_common->lock.acquire();
-
-        // Check if the current packet is just an ACK without additional information
-        if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
-        {
-            bool isDup = false;
-            // Check duplicate acks
-            if(prevLastAckReceived == ackNumber)
+            if(!assignTCPCommon(p))
             {
-                isDup = true;
-                uint8_t dupAcks = maintainer.getDupAcks();
-                dupAcks++;
-                maintainer.setDupAcks(dupAcks);
+                // The allocation failed, meaning that the packet is not a SYN
+                // packet. This is not supposed to happen and it means that
+                // the first two packets of the connection are not SYN packets
+                click_chatter("Warning: Trying to assign a common tcp memory area"
+                    " for a non-SYN packet");
+                p->kill();
 
-                // Fast retransmit
-                if(dupAcks >= 3)
-                {
-                    fcb->tcp_common->lock.release();
-                    fcb->tcp_common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
-                    fcb->tcp_common->lock.acquire();
-                    maintainer.setDupAcks(0);
-                }
+                return NULL;
             }
-
-            // Check that the ACK value is greater than what we have already
-            // sent to the destination.
-            // If this is a duplicate ACK, we don't discard it so that the mechanism
-            // of fast retransmission is preserved
-            if(maintainer.isLastAckSentSet() && SEQ_LEQ(newAckNumber, maintainer.getLastAckSent()) && !isDup)
+        }
+        else
+        {
+            // The structure has been assigned so the three-way handshake is over
+            // Check that the packet is not a SYN packet
+            if(isSyn(p))
             {
-                // If this is not the case, the packet does not bring any additional information
-                // We can drop it
-                packet->kill();
-                fcb->tcp_common->lock.release();
+                click_chatter("Warning: Unexpected SYN packet. Dropping it");
+                p->kill();
+
+                // Warning about the fact that the system must be integrated to Middleclick in order to
+                // work properly.
+                #ifndef HAVE_FLOW
+                    click_chatter("WARNING: You are using a version of this program that is not compatible"
+                        " with the flow management system provided by Middleclick. Therefore, you will"
+                        " only be able to use one flow.");
+                #endif
+
                 return NULL;
             }
         }
 
-        // If needed, update the ACK value in the packet with the mapped one
-        if(ackNumber != newAckNumber)
-            setAckNumber(packet, newAckNumber);
-    }
+        fcb_in->common->lock.acquire();
 
-    fcb->tcp_common->lock.release();
-    return packet;
+        if(!checkConnectionClosed(p))
+        {
+            p->kill();
+            fcb_in->common->lock.release();
+            return NULL;
+        }
+
+        WritablePacket *packet = p->uniqueify();
+
+        // Set the annotation indicating the initial ACK value
+        setInitialAck(packet, getAckNumber(packet));
+
+        // Compute the offset of the TCP payload
+        uint16_t offset = getPayloadOffset(packet);
+        setContentOffset(packet, offset);
+
+        // Manage the TCP options:
+        // - Remove the SACK-permitted option
+        // - Detect the window scale
+        // - Detect MSS
+        manageOptions(packet);
+
+        ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
+        ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
+
+        // Update the window size
+        uint16_t prevWindowSize = maintainer.getWindowSize();
+        uint16_t newWindowSize = getWindowSize(packet);
+        maintainer.setWindowSize(newWindowSize);
+
+        tcp_seq_t seqNumber = getSequenceNumber(packet);
+
+        if(otherMaintainer.isLastAckSentSet())
+        {
+            tcp_seq_t lastAckSentOtherSide = otherMaintainer.getLastAckSent();
+
+            if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
+            {
+                // We receive content that has already been ACKed.
+                // This case occurs when the ACK is lost between the middlebox and
+                // the destination.
+                // In this case, we re-ACK the content and we discard it
+                ackPacket(packet);
+                packet->kill();
+                fcb_in->common->lock.release();
+                return NULL;
+            }
+        }
+
+        // Take care of the ACK value in the packet
+        bool isAnAck = isAck(packet);
+        tcp_seq_t ackNumber = 0;
+        tcp_seq_t newAckNumber = 0;
+        if(isAnAck)
+        {
+            // Map the ack number according to the ByteStreamMaintainer of the other direction
+            ackNumber = getAckNumber(packet);
+            newAckNumber = otherMaintainer.mapAck(ackNumber);
+
+            // Check the value of the previous ack received if it exists
+            bool lastAckReceivedSet = maintainer.isLastAckReceivedSet();
+            uint32_t prevLastAckReceived = 0;
+            if(lastAckReceivedSet)
+                prevLastAckReceived = maintainer.getLastAckReceived();
+
+
+            // Check if we acknowledged new data
+            if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
+            {
+                // Increase congestion window
+                uint64_t cwnd = otherMaintainer.getCongestionWindowSize();
+                uint64_t ssthresh = otherMaintainer.getSsthresh();
+                // Sender segment size
+                uint16_t mss = otherMaintainer.getMSS();
+                uint64_t increase = 0;
+
+                // Check if we are in slow start mode
+                if(cwnd <= ssthresh)
+                    increase = mss;
+                else
+                    increase = mss * mss / cwnd;
+
+                otherMaintainer.setCongestionWindowSize(cwnd + increase);
+
+                maintainer.setDupAcks(0);
+            }
+
+            // Update the value of the last ACK received
+            maintainer.setLastAckReceived(ackNumber);
+
+            // Prune the ByteStreamMaintainer of the other side
+            otherMaintainer.prune(ackNumber);
+
+            // Update the statistics about the RTT
+            // And potentially update the retransmission timer
+            fcb_in->common->lock.release();
+            fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
+            fcb_in->common->lock.acquire();
+
+            // Check if the current packet is just an ACK without additional information
+            if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
+            {
+                bool isDup = false;
+                // Check duplicate acks
+                if(prevLastAckReceived == ackNumber)
+                {
+                    isDup = true;
+                    uint8_t dupAcks = maintainer.getDupAcks();
+                    dupAcks++;
+                    maintainer.setDupAcks(dupAcks);
+
+                    // Fast retransmit
+                    if(dupAcks >= 3)
+                    {
+                        fcb_in->common->lock.release();
+                        fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
+                        fcb_in->common->lock.acquire();
+                        maintainer.setDupAcks(0);
+                    }
+                }
+
+                // Check that the ACK value is greater than what we have already
+                // sent to the destination.
+                // If this is a duplicate ACK, we don't discard it so that the mechanism
+                // of fast retransmission is preserved
+                if(maintainer.isLastAckSentSet() && SEQ_LEQ(newAckNumber, maintainer.getLastAckSent()) && !isDup)
+                {
+                    // If this is not the case, the packet does not bring any additional information
+                    // We can drop it
+                    packet->kill();
+                    fcb_in->common->lock.release();
+                    return NULL;
+                }
+            }
+
+            // If needed, update the ACK value in the packet with the mapped one
+            if(ackNumber != newAckNumber)
+                setAckNumber(packet, newAckNumber);
+        }
+
+        fcb_in->common->lock.release();
+        return packet;
+    };
+    EXECUTE_FOR_EACH_PACKET(fnt, flow);
+    output(0).push_batch(flow);
 }
 
 TCPOut* TCPIn::getOutElement()
@@ -290,8 +302,9 @@ TCPIn* TCPIn::getReturnElement()
     return returnElement;
 }
 
-void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool graceful, bool bothSides)
+void TCPIn::closeConnection(WritablePacket *packet, bool graceful, bool bothSides)
 {
+    auto fcb_in = fcb();
     uint8_t newFlag = 0;
 
     if(graceful)
@@ -299,7 +312,7 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
     else
         newFlag = TH_RST;
 
-    fcb->tcp_common->lock.acquire();
+    fcb_in->common->lock.acquire();
 
     click_tcp *tcph = packet->tcp_header();
 
@@ -314,11 +327,11 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
         newStateSelf = TCPClosingState::BEING_CLOSED_UNGRACEFUL;
         newStateOther = TCPClosingState::CLOSED_UNGRACEFUL;
     }
-    fcb->tcp_common->closingStates[getFlowDirection()] = newStateSelf;
+    fcb_in->common->closingStates[getFlowDirection()] = newStateSelf;
 
     if(bothSides)
     {
-        fcb->tcp_common->closingStates[getOppositeFlowDirection()] = newStateOther;
+        fcb_in->common->closingStates[getOppositeFlowDirection()] = newStateOther;
 
         // Get the information needed to ack the given packet
         uint32_t saddr = getDestinationAddress(packet);
@@ -337,21 +350,22 @@ void TCPIn::closeConnection(struct fcb* fcb, WritablePacket *packet, bool gracef
             ack++;
 
         // Craft and send the ack
-        outElement->sendClosingPacket(fcb->tcp_common->maintainers[getOppositeFlowDirection()],
+        outElement->sendClosingPacket(fcb_in->common->maintainers[getOppositeFlowDirection()],
             saddr, daddr, sport, dport, seq, ack, graceful);
     }
 
     click_chatter("Closing connection on flow %u (graceful: %u, both sides: %u)",
         getFlowDirection(), graceful, bothSides);
 
-    fcb->tcp_common->lock.release();
+    fcb_in->common->lock.release();
 
-    StackElement::closeConnection(fcb, packet, graceful, bothSides);
+    StackElement::closeConnection(packet, graceful, bothSides);
 }
 
-ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* packet)
+ModificationList* TCPIn::getModificationList(WritablePacket* packet)
 {
-    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb->tcpin.modificationLists;
+    auto fcb_in = fcb();
+    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb_in->modificationLists;
 
     ModificationList* list = NULL;
 
@@ -366,7 +380,7 @@ ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* pa
     // If no list was assigned to this packet, create a new one
     if(list == NULL)
     {
-        ModificationList* listPtr = fcb->tcpin.poolModificationLists->getMemory();
+        ModificationList* listPtr = fcb_in->poolModificationLists->getMemory();
         // Call the constructor manually to have a clean object
         list = new(listPtr) ModificationList(&(*poolModificationNodes));
         modificationLists.set(getSequenceNumber(packet), list);
@@ -375,18 +389,19 @@ ModificationList* TCPIn::getModificationList(struct fcb *fcb, WritablePacket* pa
     return list;
 }
 
-bool TCPIn::hasModificationList(struct fcb *fcb, Packet* packet)
+bool TCPIn::hasModificationList(Packet* packet)
 {
-    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb->tcpin.modificationLists;
+    auto fcb_in = fcb();
+    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb_in->modificationLists;
     HashTable<tcp_seq_t, ModificationList*>::iterator it =
         modificationLists.find(getSequenceNumber(packet));
 
     return (it != modificationLists.end());
 }
 
-void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position, uint32_t length)
+void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
-    ModificationList* list = getModificationList(fcb, packet);
+    ModificationList* list = getModificationList(packet);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
@@ -410,10 +425,10 @@ void TCPIn::removeBytes(struct fcb *fcb, WritablePacket* packet, uint32_t positi
     packet->take(length);
 
     // Continue in the stack function
-    StackElement::removeBytes(fcb, packet, position, length);
+    StackElement::removeBytes(packet, position, length);
 }
 
-WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint32_t position,
+WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
      uint32_t length)
 {
     tcp_seq_t seqNumber = getSequenceNumber(packet);
@@ -421,7 +436,7 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
     uint16_t tcpOffset = getPayloadOffset(packet);
     uint16_t contentOffset = getContentOffset(packet);
     position += contentOffset;
-    getModificationList(fcb, packet)->addModification(seqNumber, seqNumber + position - tcpOffset,
+    getModificationList(packet)->addModification(seqNumber, seqNumber + position - tcpOffset,
          (int)length);
 
     uint32_t bytesAfter = packet->length() - position;
@@ -434,16 +449,17 @@ WritablePacket* TCPIn::insertBytes(struct fcb *fcb, WritablePacket* packet, uint
     return newPacket;
 }
 
-void TCPIn::requestMorePackets(struct fcb *fcb, Packet *packet, bool force)
+void TCPIn::requestMorePackets(Packet *packet, bool force)
 {
-    ackPacket(fcb, packet, force);
+    ackPacket(packet, force);
 
     // Continue in the stack function
-    StackElement::requestMorePackets(fcb, packet, force);
+    StackElement::requestMorePackets(packet, force);
 }
 
-void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool force)
+void TCPIn::ackPacket(Packet* packet, bool force)
 {
+    auto fcb_in = fcb();
     // Get the information needed to ack the given packet
     uint32_t saddr = getDestinationAddress(packet);
     uint32_t daddr = getSourceAddress(packet);
@@ -460,18 +476,19 @@ void TCPIn::ackPacket(struct fcb *fcb, Packet* packet, bool force)
     if(isFin(packet) || isSyn(packet))
         ack++;
 
-    fcb->tcp_common->lock.acquire();
+    fcb_in->common->lock.acquire();
     // Craft and send the ack
-    outElement->sendAck(fcb->tcp_common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+    outElement->sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
         sport, dport, seq, ack, force);
-    fcb->tcp_common->lock.release();
+    fcb_in->common->lock.release();
 }
 
-bool TCPIn::checkConnectionClosed(struct fcb* fcb, Packet *packet)
+bool TCPIn::checkConnectionClosed(Packet *packet)
 {
-    fcb->tcp_common->lock.acquire();
+    auto fcb_in = fcb();
+    fcb_in->common->lock.acquire();
 
-    TCPClosingState::Value closingState = fcb->tcp_common->closingStates[getFlowDirection()];
+    TCPClosingState::Value closingState = fcb_in->common->closingStates[getFlowDirection()];
     if(closingState != TCPClosingState::OPEN)
     {
         if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL
@@ -481,15 +498,15 @@ bool TCPIn::checkConnectionClosed(struct fcb* fcb, Packet *packet)
             if(isFin(packet) || isSyn(packet) || getPayloadLength(packet) > 0)
             {
                 setInitialAck(packet, getAckNumber(packet));
-                ackPacket(fcb, packet);
+                ackPacket(packet);
             }
         }
 
-        fcb->tcp_common->lock.release();
+        fcb_in->common->lock.release();
         return false;
     }
 
-    fcb->tcp_common->lock.release();
+    fcb_in->common->lock.release();
     return true;
 }
 
@@ -498,8 +515,10 @@ unsigned int TCPIn::determineFlowDirection()
     return getFlowDirection();
 }
 
-bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
+bool TCPIn::assignTCPCommon(Packet *packet)
 {
+    auto fcb_in = fcb();
+
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
     const click_ip *iph = packet->ip_header();
@@ -520,10 +539,10 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         IPFlowID flowID(iph->ip_dst, tcph->th_dport, iph->ip_src, tcph->th_sport);
 
         // Get the struct allocated by the initiator
-        fcb->tcp_common = returnElement->getTCPCommon(flowID);
+        fcb_in->common = returnElement->getTCPCommon(flowID);
         // Initialize the RBT with the RBTManager
-        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
-        fcb->tcpin.inChargeOfTcpCommon = false;
+        fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
+        fcb_in->inChargeOfTcpCommon = false;
     }
     else
     {
@@ -541,30 +560,30 @@ bool TCPIn::assignTCPCommon(struct fcb *fcb, Packet *packet)
         tableFcbTcpCommon.set(flowID, allocated);
 
         // Set the pointer in the structure
-        fcb->tcp_common = allocated;
+        fcb_in->common = allocated;
         // Initialize the RBT with the RBTManager
-        fcb->tcp_common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
+        fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
 
         // Store in our structure the information needed to free the memory
         // of the common structure
-        fcb->tcpin.inChargeOfTcpCommon = true;
-        fcb->tcpin.flowID = flowID;
-        fcb->tcpin.tableTcpCommon = &tableFcbTcpCommon;
-        fcb->tcpin.poolTcpCommon = &poolFcbTcpCommon;
+        fcb_in->inChargeOfTcpCommon = true;
+        fcb_in->flowID = flowID;
+        fcb_in->tableTcpCommon = &tableFcbTcpCommon;
+        fcb_in->poolTcpCommon = &poolFcbTcpCommon;
 
         lock.release();
     }
 
     // Set information about the flow
-    fcb->tcp_common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));
-    fcb->tcp_common->maintainers[getFlowDirection()].setIpDst(getDestinationAddress(packet));
-    fcb->tcp_common->maintainers[getFlowDirection()].setPortSrc(getSourcePort(packet));
-    fcb->tcp_common->maintainers[getFlowDirection()].setPortDst(getDestinationPort(packet));
+    fcb_in->common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));
+    fcb_in->common->maintainers[getFlowDirection()].setIpDst(getDestinationAddress(packet));
+    fcb_in->common->maintainers[getFlowDirection()].setPortSrc(getSourcePort(packet));
+    fcb_in->common->maintainers[getFlowDirection()].setPortDst(getDestinationPort(packet));
 
     return true;
 }
 
-bool TCPIn::isLastUsefulPacket(struct fcb* fcb, Packet *packet)
+bool TCPIn::isLastUsefulPacket(Packet *packet)
 {
     if(isFin(packet) || isRst(packet))
         return true;
@@ -591,8 +610,9 @@ struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
     }
 }
 
-void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
+void TCPIn::manageOptions(WritablePacket *packet)
 {
+    auto fcb_in = fcb();
     // The options we are looking for can only be present in SYN packets
     if(!isSyn(packet))
         return;
@@ -630,8 +650,8 @@ void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
             if(winScale >= 1)
                 winScale = 2 << (winScale - 1);
 
-            fcb->tcp_common->maintainers[flowDirection].setWindowScale(winScale);
-            fcb->tcp_common->maintainers[flowDirection].setUseWindowScale(true);
+            fcb_in->common->maintainers[flowDirection].setWindowScale(winScale);
+            fcb_in->common->maintainers[flowDirection].setUseWindowScale(true);
             click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
 
             if(isAck(packet))
@@ -640,9 +660,9 @@ void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
                 // It means that we know if the other side of the flow
                 // has the option enabled
                 // if this is not the case, we disable it for this side as well
-                if(!fcb->tcp_common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
+                if(!fcb_in->common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
                 {
-                    fcb->tcp_common->maintainers[flowDirection].setUseWindowScale(false);
+                    fcb_in->common->maintainers[flowDirection].setUseWindowScale(false);
                     click_chatter("Window scaling disabled");
                 }
             }
@@ -652,10 +672,10 @@ void TCPIn::manageOptions(struct fcb *fcb, WritablePacket *packet)
         {
 
             uint16_t mss = (optStart[2] << 8) | optStart[3];
-            fcb->tcp_common->maintainers[flowDirection].setMSS(mss);
+            fcb_in->common->maintainers[flowDirection].setMSS(mss);
 
             click_chatter("MSS for flow %u: %u", flowDirection, mss);
-            fcb->tcp_common->maintainers[flowDirection].setCongestionWindowSize(mss);
+            fcb_in->common->maintainers[flowDirection].setCongestionWindowSize(mss);
 
             optStart += optStart[1];
         }
@@ -679,15 +699,8 @@ unsigned int TCPIn::getOppositeFlowDirection()
     return (1 - flowDirection);
 }
 
-TCPIn::~TCPIn()
-{
-
-}
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(ByteStreamMaintainer)
-ELEMENT_REQUIRES(ModificationList)
 ELEMENT_REQUIRES(TCPElement)
-ELEMENT_REQUIRES(RetransmissionTiming)
 EXPORT_ELEMENT(TCPIn)
 ELEMENT_MT_SAFE(TCPIn)

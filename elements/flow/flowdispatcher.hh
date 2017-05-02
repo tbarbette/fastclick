@@ -24,16 +24,11 @@ public:
 
     void push_batch(int, int* flowdata, PacketBatch* batch) override;
 
-    FlowNode* get_table();
+    FlowNode* get_table(int) override;
 
 private :
-    typedef struct {
-        FlowNode* root;
-        int output;
-    } Rule;
 
-
-    Vector<Rule> rules;
+    Vector<FlowClassificationTable::Rule> rules;
 
     FlowNode* _table;
 

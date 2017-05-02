@@ -809,6 +809,7 @@ enable_dpdk
 enable_dpdk_pool
 enable_dpdk_packet
 enable_zerocopy
+enable_sloppy
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -1516,6 +1517,7 @@ Optional Features:
                           buffer
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
+    --disable-sloppy      disable Sloppy flow timeouts
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -6725,6 +6727,18 @@ fi
 
 if test "x$enable_zerocopy" = xyes; then
     $as_echo "#define HAVE_ZEROCOPY 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-sloppy was given.
+if test "${enable_sloppy+set}" = set; then :
+  enableval=$enable_sloppy; :
+else
+  enable_sloppy=yes
+fi
+
+if test "x$enable_sloppy" = xyes; then
+    $as_echo "#define HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT 1" >>confdefs.h
 
 fi
 

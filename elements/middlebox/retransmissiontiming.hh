@@ -19,7 +19,6 @@
 CLICK_DECLS
 
 class TCPRetransmitter;
-struct fcb;
 
 /**
  * Structure used to store information that the retransmission timer will pass when it fires
@@ -27,7 +26,7 @@ struct fcb;
 struct retransmissionTimerData
 {
     TCPRetransmitter *retransmitter; // TCPRetransmitter that owns this RetransmissionTiming
-    struct fcb *fcb; // Pointer to the FCB of the flow
+    //TODO struct fcb *fcb; // Pointer to the FCB of the flow
 };
 
 /**
@@ -56,7 +55,7 @@ public:
      * @param fcb A pointer to the FCB of the flow
      * @param retransmitter A pointer to the TCPRetransmitter of this side of the flow
      */
-    void initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter);
+    void initTimer(TCPRetransmitter *retransmitter);
 
     /**
      * @brief Return a boolean indicating whether the retransmission timer is initialized
@@ -99,7 +98,7 @@ public:
      * @return A boolean indicating whether the RTT measure has been stopped. False means
      * that no measures were in progress
      */
-    bool signalAck(struct fcb* fcb, uint32_t ack);
+    bool signalAck(uint32_t ack);
 
     /**
      * @brief Signal a retransmission. This is used to avoid measuring RTT for retransmitted packets

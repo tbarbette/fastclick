@@ -1,6 +1,6 @@
 #ifndef CLICK_ARPQUERIER_HH
 #define CLICK_ARPQUERIER_HH
-#include <click/batchelement.hh>
+#include <click/flowelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/sync.hh>
@@ -170,7 +170,7 @@ Clear the ARP table.
 ARPTable, ARPResponder, ARPFaker, AddressInfo
 */
 
-class ARPQuerier : public BatchElement { public:
+class ARPQuerier : public FlowElement { public:
 
     ARPQuerier() CLICK_COLD;
     ~ARPQuerier() CLICK_COLD;
@@ -183,7 +183,14 @@ class ARPQuerier : public BatchElement { public:
     const char *flags() const			{ return "L2"; }
     void *cast(const char *name);
 
+    FlowNode* get_table(int iport) override {
+        if (iport == 1) {
+            return upstream_classifier_table()->parse("12/0806 20/0002").root->replace_leaves(FlowElement::get_table(iport));
+        }
+        return FlowElement::get_table(iport);
+    }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+
     int live_reconfigure(Vector<String> &, ErrorHandler *);
     bool can_live_reconfigure() const		{ return true; }
     int initialize(ErrorHandler *errh) CLICK_COLD;

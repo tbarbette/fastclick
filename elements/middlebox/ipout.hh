@@ -40,6 +40,7 @@ public:
 
     void push_batch(int, PacketBatch*) override;
 protected:
+    bool _readonly;
 };
 
 CLICK_ENDDECLS

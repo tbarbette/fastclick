@@ -13,26 +13,32 @@
 
 CLICK_DECLS
 
-IPOut::IPOut()
+IPOut::IPOut() : _readonly(false)
 {
 
 }
 
 int IPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    if(Args(conf, this, errh)
+        .read_p("READONLY", _readonly)
+        .complete() < 0)
+            return -1;
     return 0;
 }
 
 void IPOut::push_batch(int port, PacketBatch* flow)
 {
-    EXECUTE_FOR_EACH_PACKET([this](Packet* p){
-        WritablePacket *packet = p->uniqueify();
+    if (!_readonly) {
+        EXECUTE_FOR_EACH_PACKET([this](Packet* p){
+            WritablePacket *packet = p->uniqueify();
 
-        // Recompute the IP checksum
-        computeIPChecksum(packet);
+            // Recompute the IP checksum
+            computeIPChecksum(packet);
 
-        return packet;
-    }, flow);
+            return packet;
+        }, flow);
+    }
     output(0).push_batch(flow);
 }
 

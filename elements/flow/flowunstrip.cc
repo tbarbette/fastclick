@@ -59,7 +59,7 @@ FlowUnstrip::simple_action_batch(PacketBatch *head)
 
 
 FlowNode*
-FlowUnstrip::get_table() {
+FlowUnstrip::get_table(int) {
  	FlowNode* root = FlowElementVisitor::get_downward_table(this, 0);
  	if (root)
  		apply_offset(root);

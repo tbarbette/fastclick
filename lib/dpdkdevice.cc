@@ -113,8 +113,8 @@ bool DPDKDevice::alloc_pktmbufs()
                 }
         }
     } else {
-                int i = 0;
-                rte_mempool_walk(add_pool,(void*)&i);
+        int i = 0;
+        rte_mempool_walk(add_pool,(void*)&i);
         if (i == 0) {
                 click_chatter("Could not get pools from the primary DPDK process");
                 return false;

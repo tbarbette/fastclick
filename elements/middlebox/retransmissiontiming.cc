@@ -8,7 +8,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
-#include "retransmissiontiming.hh"
+#include <click/retransmissiontiming.hh>
 #include "tcpretransmitter.hh"
 
 CLICK_DECLS
@@ -56,7 +56,7 @@ void RetransmissionTiming::computeClockGranularity()
         clockGranularity = epsilon;
 }
 
-void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransmitter)
+void RetransmissionTiming::initTimer(TCPRetransmitter *retransmitter)
 {
     owner = retransmitter;
     timerRetransmit.initialize((Element*)retransmitter);
@@ -65,7 +65,7 @@ void RetransmissionTiming::initTimer(struct fcb* fcb, TCPRetransmitter *retransm
     // Give it a pointer to the fcb so that when the timer fires, we
     // can access it
     timerData.retransmitter = retransmitter;
-    timerData.fcb = fcb;
+    //TODO timerData.fcb = fcb;
     timerRetransmit.assign(RetransmissionTiming::timerRetransmitFired, (void*)&timerData);
     timerThread.assign(RetransmissionTiming::timerThreadFired, (void*)&timerData);
 }
@@ -101,10 +101,10 @@ bool RetransmissionTiming::startRTTMeasure(uint32_t seq)
     return true;
 }
 
-bool RetransmissionTiming::signalAck(struct fcb *fcb, uint32_t ack)
+bool RetransmissionTiming::signalAck(uint32_t ack)
 {
     if(owner != NULL)
-        owner->signalAck(fcb, ack);
+        owner->signalAck(ack);
 
     if(!measureInProgress)
         return false;
@@ -283,18 +283,18 @@ void RetransmissionTiming::checkRTOMinValue()
 
 void RetransmissionTiming::timerRetransmitFired(Timer *timer, void *data)
 {
-    struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
+    //struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
     TCPRetransmitter *retransmitter =
         (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
-    retransmitter->retransmissionTimerFired(fcb);
+    retransmitter->retransmissionTimerFired();
 }
 
 void RetransmissionTiming::timerThreadFired(Timer *timer, void *data)
 {
-    struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
+    //struct fcb *fcb = (struct fcb*)((struct retransmissionTimerData*)data)->fcb;
     TCPRetransmitter *retransmitter =
         (TCPRetransmitter*)((struct retransmissionTimerData*)data)->retransmitter;
-    retransmitter->transmitMoreData(fcb);
+    retransmitter->transmitMoreData();
 }
 
 bool RetransmissionTiming::isManualTransmissionDone()

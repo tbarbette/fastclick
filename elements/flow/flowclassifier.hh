@@ -62,7 +62,7 @@ public:
 	FlowClassificationTable& table() {
 		return _table;
 	}
-
 };
+
 CLICK_ENDDECLS
 #endif

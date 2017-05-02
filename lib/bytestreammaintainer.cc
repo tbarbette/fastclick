@@ -9,9 +9,9 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
-#include "rbt.hh"
-#include "bytestreammaintainer.hh"
-#include "memorypool.hh"
+#include <click/rbt.hh>
+#include <click/bytestreammaintainer.hh>
+#include <click/memorypool.hh>
 
 CLICK_DECLS
 

@@ -437,13 +437,13 @@ Router::add_element(Element *e, const String &ename, const String &conf,
 }
 
 int
-Router::add_connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double)
+Router::add_connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double, bool is_context, String context)
 {
     assert(from_idx >= 0 && from_port >= 0 && to_idx >= 0 && to_port >= 0);
     if (_state != ROUTER_NEW)
         return -1;
 
-    Connection c(from_idx, from_port, to_idx, to_port, allow_double);
+    Connection c(from_idx, from_port, to_idx, to_port, allow_double, is_context, context);
 
     // check for continuing sorted order
     if (_conn_sorted && _conn.size() && c < _conn.back())
@@ -575,7 +575,7 @@ Router::check_hookup_completeness(ErrorHandler *errh)
                 ci = (p ? _conn_output_sorter[cix] : cix);
                 if (likely(last != _conn[ci][p]))
                     last = _conn[ci][p];
-                else if (_elements[last.idx]->port_active(p, last.port))
+                else if (_elements[last.idx]->port_active(p, last.port) && !_conn[ci]._context)
                     hookup_error(last, p, "illegal reuse of %<%p{element}%> %s %d", errh, true);
             }
         }
@@ -603,7 +603,6 @@ Router::check_hookup_completeness(ErrorHandler *errh)
 
     return errh->nerrors() == before_all ? 0 : -1;
 }
-
 
 // PORT INDEXES
 

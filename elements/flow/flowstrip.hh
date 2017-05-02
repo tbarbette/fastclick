@@ -26,13 +26,13 @@ class FlowStrip : public FlowElement { public:
     const char *class_name() const		{ return "FlowStrip"; }
     const char *port_count() const		{ return PORTS_1_1; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
-    PacketBatch *simple_action_batch(PacketBatch *);
+    PacketBatch *simple_action_batch(PacketBatch *) override;
 
     void apply_offset(FlowNode* node);
 
-    FlowNode* get_table();
+    FlowNode* get_table(int) override;
   private:
 
     unsigned _nbytes;

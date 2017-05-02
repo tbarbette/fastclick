@@ -125,7 +125,7 @@ class Router { public:
 
     void add_requirement(const String &type, const String &value);
     int add_element(Element *e, const String &name, const String &conf, const String &filename, unsigned lineno);
-    int add_connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double);
+    int add_connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double, bool is_context, String context);
 #if CLICK_LINUXMODULE
     int add_module_ref(struct module* module);
 #endif
@@ -171,17 +171,22 @@ class Router { public:
     struct Connection {
         Port p[2];
         bool _double;
+        bool _is_context;
+        String _context;
 
-        Connection() : _double(false) {
+
+        Connection() : _double(false), _is_context(false), _context("") {
         }
-        Connection(int from_idx, int from_port, int to_idx, int to_port) : _double(false) {
+        Connection(int from_idx, int from_port, int to_idx, int to_port) : _double(false), _is_context(false), _context("") {
             p[0] = Port(to_idx, to_port);
             p[1] = Port(from_idx, from_port);
         }
-        Connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double) {
+        Connection(int from_idx, int from_port, int to_idx, int to_port, bool allow_double, bool is_context, String context) {
             p[0] = Port(to_idx, to_port);
             p[1] = Port(from_idx, from_port);
             _double = allow_double;
+            _is_context = is_context;
+            _context = context;
         }
 
         const Port &operator[](int i) const {
@@ -355,6 +360,7 @@ class Router { public:
     /** @cond never */
     friend class Master;
     friend class Task;
+    friend class Lexer;
     friend int Element::set_nports(int, int);
     /** @endcond never */
 

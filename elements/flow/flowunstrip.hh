@@ -48,7 +48,7 @@ class FlowUnstrip : public FlowElement {
 			apply_offset(node->default_ptr()->node);
   }
 
-  FlowNode* get_table();
+  FlowNode* get_table(int) override;
 
 };
 

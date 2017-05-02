@@ -2,7 +2,7 @@
 #define MIDDLEBOX_TCPOUT_HH
 #include <click/element.hh>
 #include "stackelement.hh"
-#include "bytestreammaintainer.hh"
+#include <click/bytestreammaintainer.hh>
 #include "tcpelement.hh"
 
 // Forward declaration
@@ -45,6 +45,8 @@ public:
     bool isOutElement()                   { return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+
+    void push_batch(int port, PacketBatch* flow);
 
     /**
      * @brief Send an ACK packet on the second output

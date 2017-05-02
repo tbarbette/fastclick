@@ -372,6 +372,16 @@ private:
     StackElement* startElement; // Element that started the visit
 };
 
+template<typename T>
+StackBufferElement<T>::StackBufferElement() : StackElement() {
+
+}
+
+template<typename T>
+StackBufferElement<T>::~StackBufferElement() {
+
+}
+
 CLICK_ENDDECLS
 
 #endif

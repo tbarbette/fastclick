@@ -11,11 +11,12 @@
 #include <click/vector.hh>
 #include <clicknet/tcp.h>
 #include "stackelement.hh"
-#include "memorypool.hh"
-#include "bufferpool.hh"
+#include <click/memorypool.hh>
+#include <click/bufferpool.hh>
 #include "tcpelement.hh"
-#include "bufferpoolnode.hh"
-#include "bytestreammaintainer.hh"
+#include "tcpin.hh"
+#include <click/bufferpoolnode.hh>
+#include <click/bytestreammaintainer.hh>
 
 CLICK_DECLS
 
@@ -78,23 +79,20 @@ public:
     const char *processing() const        { return PUSH; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push_packet(int port, Packet *packet);
-    #if HAVE_BATCH
     void push_batch(int port, PacketBatch *batch);
-    #endif
 
     /**
      * @brief Called when the retransmission timer fired. Will retransmit the corresponding data
      * @param fcb A pointer to the FCB of the flow
      */
-    void retransmissionTimerFired(struct fcb* fcb);
+    void retransmissionTimerFired();
 
     /**
      * @brief Transmit more data we are responsible for from the buffer. Called after previously sent
      * data have been ACKed.
      * @param fcb A pointer to the FCB of the flow
      */
-    void transmitMoreData(struct fcb* fcb);
+    void transmitMoreData();
 
     /**
      * @brief Signal that we received an ACK. It will prune the buffer, manage the retransmission
@@ -102,7 +100,7 @@ public:
      * @param fcb A pointer to the FCB of the flow
      * @param ack Number of the last ack received
      */
-    void signalAck(struct fcb* fcb, uint32_t ack);
+    void signalAck(uint32_t ack);
 
 private:
 
@@ -110,20 +108,20 @@ private:
      * @brief Prune the circular buffer. Used when data are ACKed by the destination
      * @param fcb A pointer to the FCB of the flow
      */
-    void prune(struct fcb *fcb);
+    void prune();
 
     /**
      * @brief Indicate if there are data we are responsible for to retransmit
      * @param fcb A pointer to the FCB of the flow
      * @return A boolean indicating if the buffer contains data we are responsible for to retransmit
      */
-    bool dataToRetransmit(struct fcb *fcb);
+    bool dataToRetransmit();
 
     /**
      * @brief Ensure that the component is correctly initialized
      * @param fcb A pointer to the FCB of the flow
      */
-    void checkInitialization(struct fcb *fcb);
+    void checkInitialization();
 
     /**
      * @brief Process a packet coming from the stack of the middlebox (on the first input)
@@ -131,7 +129,7 @@ private:
      * @param packet The packet to process
      * @return A pointer to the processed packet
      */
-    Packet* processPacketNormal(struct fcb *fcb, Packet *packet);
+    Packet* processPacketNormal(Packet *packet);
 
     /**
      * @brief Process a retransmitted packet (coming on the second input)
@@ -139,7 +137,7 @@ private:
      * @param packet The packet to process
      * @return A pointer to the processed packet
      */
-    Packet* processPacketRetransmission(struct fcb *fcb, Packet *packet);
+    Packet* processPacketRetransmission(Packet *packet);
 
     /**
      * @brief Transmit data we are responsible for, currently waiting in the buffer. It will ensure
@@ -149,7 +147,7 @@ private:
      * before
      * @return A boolean indicating whether data have been sent
      */
-    bool manualTransmission(struct fcb *fcb, bool retransmission);
+    bool manualTransmission(bool retransmission);
 
     /**
      * @brief Return the maximum amount of data we can send in order to respect the congestion
@@ -161,11 +159,13 @@ private:
      * canCut is true, the method can return any amount in the interval [0, expected]
      * @return The amount of data we can send
      */
-    uint32_t getMaxAmountData(struct fcb *fcb, uint32_t expected, bool canCut);
+    uint32_t getMaxAmountData(uint32_t expected, bool canCut);
 
     per_thread<BufferPool*> rawBufferPool;
     per_thread<MemoryPool<CircularBuffer>> circularPool;
     per_thread<Vector<unsigned char>> getBuffer;
+
+    TCPIn* _in;
 };
 
 CLICK_ENDDECLS

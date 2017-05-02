@@ -1,10 +1,10 @@
 #include <click/config.h>
 #include <click/glue.hh>
-#include "modificationlist.hh"
+#include <click/modificationlist.hh>
 #ifdef CLICK_USERLEVEL
 #include <math.h>
 #endif
-#include "memorypool.hh"
+#include <click/memorypool.hh>
 
 CLICK_DECLS
 

@@ -40,4 +40,3 @@ void BufferPoolNode::resize(uint32_t newSize)
 
 CLICK_ENDDECLS
 
-ELEMENT_PROVIDES(BufferPoolNode)

@@ -21,7 +21,13 @@ class FlowElement : public BatchElement {
 public:
 	FlowElement();
 	~FlowElement();
-	virtual FlowNode* get_table();
+	virtual FlowNode* get_table(int iport);
+
+    FlowClassifier* _classifier;
+    FlowClassifier* upstream_classifier() {
+        return _classifier;
+    }
+    FlowClassificationTable* upstream_classifier_table();
 };
 
 
@@ -30,7 +36,7 @@ public:
  */
 class VirtualFlowBufferElement : public FlowElement {
 public:
-	VirtualFlowBufferElement() :_flow_data_offset(-1), _classifier(0){
+	VirtualFlowBufferElement() :_flow_data_offset(-1) {
 	}
 	virtual const size_t flow_data_size() const = 0;
 	virtual const int flow_data_index() const {
@@ -44,12 +50,9 @@ public:
 
 protected:
 	int _flow_data_offset;
-	FlowClassifier* _classifier;
 	friend class FlowBufferVisitor;
 
-	FlowClassifier* upstream_classifier() {
-		return _classifier;
-	}
+
 };
 
 template<typename T> class FlowBufferElement : public VirtualFlowBufferElement {
@@ -163,7 +166,11 @@ public:
 
 	}
 
-	Vector<FlowElement*> dispatchers;
+	struct inputref {
+	    FlowElement* elem;
+	    int iport;
+	};
+	Vector<struct inputref> dispatchers;
 
 	bool visit(Element *e, bool isoutput, int port,
 			       Element *from_e, int from_port, int distance) {
@@ -171,7 +178,8 @@ public:
 		if (dispatcher != NULL) {
 		    if (dispatcher == origin)
 		        return false;
-			dispatchers.push_back(dispatcher);
+		    struct inputref ref = {.elem = dispatcher, .iport = port};
+			dispatchers.push_back(ref);
 			return false;
 		} else {
 
@@ -184,7 +192,7 @@ public:
 		return true;
 	}
 
-	static FlowNode* get_downward_table(Element* e,int output);
+	static FlowNode* get_downward_table(Element* e, int output);
 };
 
 #endif

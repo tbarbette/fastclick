@@ -221,17 +221,6 @@ unsigned int StackElement::determineFlowDirection()
 
     return previousStackElement->determineFlowDirection();
 }
-
-template<typename T>
-StackBufferElement<T>::StackBufferElement() : StackElement() {
-
-}
-
-template<typename T>
-StackBufferElement<T>::~StackBufferElement() {
-
-}
-
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StackElement)
 //ELEMENT_MT_SAFE(StackElement)

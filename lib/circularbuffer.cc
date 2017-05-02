@@ -9,7 +9,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
-#include "circularbuffer.hh"
+#include <click/circularbuffer.hh>
 
 CLICK_DECLS
 

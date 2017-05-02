@@ -5,9 +5,10 @@
 #include <click/hashtable.hh>
 #include <click/sync.hh>
 #include <click/multithread.hh>
-#include "memorypool.hh"
-#include "modificationlist.hh"
-#include "tcpclosingstate.hh"
+#include <click/memorypool.hh>
+#include <click/modificationlist.hh>
+#include <click/tcpclosingstate.hh>
+#include <click/retransmissiontiming.hh>
 #include "stackelement.hh"
 #include "tcpelement.hh"
 #include "tcpout.hh"
@@ -57,6 +58,8 @@ struct fcb_tcpin
     HashTable<tcp_seq_t, ModificationList*> modificationLists;
     MemoryPool<struct ModificationList>* poolModificationLists;
     MemoryPool<struct ModificationNode>* poolModificationNodes;
+
+    struct fcb_tcp_common *common;
 
     // Members used to be able to free memory for the tcp_common structure when destructed
     MemoryPool<struct fcb_tcp_common>* poolTcpCommon;
@@ -156,6 +159,9 @@ public:
     const char *processing() const        { return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    FlowNode* get_table(int iport) override;
+
+    void push_batch(int port, fcb_tcpin* fcb, PacketBatch* flow);
 
     /**
      * @brief Return the TCPOut element associated
@@ -193,8 +199,6 @@ public:
     struct fcb_tcp_common* getTCPCommon(IPFlowID flowID);
 
 protected:
-    virtual Packet* processPacket(Packet*);
-
     virtual void removeBytes(WritablePacket*, uint32_t, uint32_t);
     virtual WritablePacket* insertBytes(WritablePacket*, uint32_t,
          uint32_t) CLICK_WARN_UNUSED_RESULT;

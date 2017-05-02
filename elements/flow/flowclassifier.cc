@@ -28,8 +28,12 @@ public:
 
     bool visit(Element *e, bool isoutput, int port,
                    Element *from_e, int from_port, int distance) {
-        VirtualFlowBufferElement* fbe = dynamic_cast<VirtualFlowBufferElement*>(e);
+        FlowElement* fe = dynamic_cast<FlowElement*>(e);
+        if (fe != NULL) {
+            fe->_classifier = _classifier;
+        }
 
+        VirtualFlowBufferElement* fbe = dynamic_cast<VirtualFlowBufferElement*>(e);
         if (fbe != NULL) { //The visited element is an element that need FCB space
 
             //Resize the map if needed
@@ -483,6 +487,13 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         {
             fcb = _table.match(p,_aggcache);
         }
+        if (!fcb) {
+            if (last) //TODO : early drop still cause some bug
+                last->set_next(next);
+            p->kill();
+            p = next;
+            continue;
+        }
         check_fcb_still_valid(fcb, now);
         if (_verbose)
             _table.get_root()->print();
@@ -538,8 +549,11 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         lastfcb = fcb;
     }
 
-    batches[curbatch].batch->set_tail(last);
-    batches[curbatch].batch->set_count(count);
+
+    if (batches[curbatch].batch != 0) {
+        batches[curbatch].batch->set_tail(last);
+        batches[curbatch].batch->set_count(count);
+    }
 
     //click_chatter("%d batches :",head-tail);
     for (int i = tail;i < head;i++) {
@@ -604,6 +618,10 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
 
 }
 
+
+FlowClassificationTable* FlowElement::upstream_classifier_table() {
+    return &upstream_classifier()->table();
+}
 
 int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};
 

@@ -112,6 +112,14 @@ public :
      */
     void print();
 
+    //---
+    //Compile time functions
+    //---
+
+    FlowNodePtr optimize();
+
+    bool else_drop();
+
 };
 
 class FlowNode {
@@ -123,6 +131,7 @@ protected:
     FlowLevel* _level;
     FlowNodePtr _default;
     FlowNode* _parent;
+
     bool _child_deletable;
     bool _released;
 
@@ -227,7 +236,8 @@ public:
         ptr->set_data(data);
     }
 
-    FlowNode* combine(FlowNode* other) CLICK_WARN_UNUSED_RESULT;
+    FlowNode* combine(FlowNode* other, bool as_child) CLICK_WARN_UNUSED_RESULT;
+    FlowNode* replace_leaves(FlowNode* other);
 
     virtual FlowNode* duplicate(bool recursive,int use_count) = 0;
 
@@ -324,14 +334,12 @@ public:
     inline void set_parent(FlowNode* parent) {
         _parent = parent;
     }
-
+    FlowNode* create_final();
 #if DEBUG_CLASSIFIER
     void check();
 #else
     inline void check() {};
 #endif
-
-    static inline FlowNode* create(FlowNode* parent, FlowLevel* level);
 
     virtual FlowNode* optimize() CLICK_WARN_UNUSED_RESULT;
 
@@ -396,24 +404,29 @@ public:
     }
 
     template<typename F>
-    void traverse(F fnt) {
+    void traverse_ptr(F fnt) {
         NodeIterator* it = this->iterator();
         FlowNodePtr* cur;
         while ((cur = it->next()) != 0) {
             if (cur->is_leaf()) {
-                fnt(cur->leaf);
+                fnt(cur);
             } else {
-                cur->node->traverse(fnt);
+                cur->node->traverse_ptr(fnt);
             }
         }
         if (this->default_ptr()->ptr != 0) {
             cur = this->default_ptr();
             if (cur->is_leaf()) {
-                fnt(cur->leaf);
+                fnt(cur);
             } else {
-                cur->node->traverse(fnt);
+                cur->node->traverse_ptr(fnt);
             }
         }
+    }
+
+    template<typename F>
+    void traverse(F fnt) {
+        traverse_ptr([fnt](FlowNodePtr* ptr) {fnt(ptr->leaf);});
     }
 
     void print() {
@@ -452,7 +465,6 @@ public:
         return (new FlowLevelDummy())->assign(this);
     }
 };
-
 
 /**
  * FlowLevel based on the aggregate
@@ -1070,6 +1082,8 @@ class FlowNodeHash : public FlowNode  {
 };
 
 
+
+
 /**
  * Dummy node for root with one child
  */
@@ -1240,7 +1254,8 @@ class FlowNodeThreeCase : public FlowNode  {
     }
 
     FlowNodeThreeCase(FlowNodePtr a,FlowNodePtr b) : childA(a),childB(b) {
-
+        a.set_parent(this);
+        b.set_parent(this);
     }
 
     FlowNodePtr* find(FlowNodeData data) {
@@ -1286,5 +1301,30 @@ class FlowNodeThreeCase : public FlowNode  {
         return new ThreeCaseIterator(this);
     }
 };
+
+/**
+ * Flow to be replaced by optimizer containing multiple supplementary informations
+ *  not to be used at runtime !
+ */
+class FlowNodeDefinition : public FlowNodeHash { public:
+    bool _else_drop;
+
+    FlowNodeDefinition() : _else_drop(false) {
+
+    }
+
+    String name() {
+        return String("DEFINITION") + (_else_drop?"!":"");
+    }
+
+    FlowNodeDefinition* duplicate(bool recursive,int use_count) override {
+        FlowNodeDefinition* fh = new FlowNodeDefinition();
+        fh->_else_drop = _else_drop;
+        fh->duplicate_internal(this,recursive,use_count);
+        return fh;
+    }
+};
+
+
 
 #endif

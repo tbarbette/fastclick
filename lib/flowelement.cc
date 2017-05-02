@@ -17,7 +17,8 @@
  */
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/flowelement.hh>
+#include <click/flowelement.hh>>
+
 
 CLICK_DECLS
 
@@ -30,24 +31,31 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
     FlowElementVisitor v(e);
 
     e->router()->visit(e,true,output,&v);
-    click_chatter("Children of %p{element} : ",e);
+    if (v.dispatchers.size() > 0)
+        click_chatter("Children of %p{element}[%d] : ",e,output);
+    else
+        click_chatter("%p{element}[%d] has no children",e,output);
     //TODO : Do not catch all bugs
     for (int i = 0; i < v.dispatchers.size(); i++) {
-        click_chatter("%p{element}",v.dispatchers[i]);
-		if (v.dispatchers[i] == (FlowElement*)e) {
+        click_chatter("%p{element}",v.dispatchers[i].elem);
+		if (v.dispatchers[i].elem == (FlowElement*)e) {
 			click_chatter("Classification loops are unsupported, place another FlowClassifier before reinjection of the packets.");
 			e->router()->please_stop_driver();
 			return 0;
 		}
+        click_chatter("%p{element} %d",v.dispatchers[i].elem,v.dispatchers[i].iport);
 		if (merged)
-			merged = merged->combine(v.dispatchers[i]->get_table());
+			merged = merged->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport),false);
 		else
-			merged = v.dispatchers[i]->get_table();
+			merged = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
+		if (merged)
+		    merged->print();
+		click_chatter("End get down %p",merged);
 	}
 	return merged;
 }
 
-FlowElement::FlowElement() {
+FlowElement::FlowElement() : _classifier(0) {
     if (flow_code() != Element::COMPLETE_FLOW) {
         click_chatter("Flow Elements must be x/x in their flows");
         assert(flow_code() == Element::COMPLETE_FLOW);
@@ -61,8 +69,10 @@ FlowElement::~FlowElement() {
 };
 
 FlowNode*
-FlowElement::get_table() {
-	return FlowElementVisitor::get_downward_table(this,-1);
+FlowElement::get_table(int iport) {
+
+    return FlowElementVisitor::get_downward_table(this,-1);
 }
+
 #endif
 CLICK_ENDDECLS

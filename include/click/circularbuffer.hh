@@ -10,8 +10,8 @@
 #define MIDDLEBOX_CIRCULARBUFFER_HH
 
 #include <click/vector.hh>
-#include "bufferpool.hh"
-#include "bufferpoolnode.hh"
+#include <click/bufferpool.hh>
+#include <click/bufferpoolnode.hh>
 
 CLICK_DECLS
 

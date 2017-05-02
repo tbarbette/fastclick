@@ -33,6 +33,12 @@ public:
 
     inline FlowControlBlock* match(Packet* p,bool always_dup);
     inline bool reverse_match(FlowControlBlock* sfcb, Packet* p);
+
+    typedef struct {
+        FlowNode* root;
+        int output;
+    } Rule;
+    Rule parse(String s, bool verbose = false);
 protected:
     FlowNode* _root;
 };
@@ -131,7 +137,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                         return child_ptr->leaf;
                 }
             } else {
-                click_chatter("ERROR : no classification node and no default path !");
+                click_chatter("ERROR : no classification node and no default path !");// allowed with the "!" symbol
                 return 0;
             }
         } else if (child_ptr->is_leaf()) {
@@ -198,21 +204,6 @@ inline void FlowNodePtr::set_parent(FlowNode* parent) {
         leaf->parent = parent;
     else
         node->set_parent(parent);
-}
-
-inline FlowNode* FlowNode::create(FlowNode* parent, FlowLevel* level) {
-    FlowNode * fl;
-    //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
-    if (level->get_max_value() == 0)
-        fl = new FlowNodeDummy();
-    else if (level->get_max_value() > 256)
-        fl = new FlowNodeHash();
-    else
-        fl = new FlowNodeArray(level->get_max_value());
-    fl->_level = level;
-    fl->_child_deletable = level->is_deletable();
-    fl->_parent = parent;
-    return fl;
 }
 
 #endif

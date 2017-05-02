@@ -37,6 +37,9 @@
 #if CLICK_USERLEVEL
 # include <click/userutils.hh>
 #endif
+# if HAVE_FLOW
+#  include "../elements/flow/flowdispatcher.hh"
+# endif
 CLICK_DECLS
 
 #ifdef CLICK_LINUXMODULE
@@ -149,7 +152,7 @@ class Lexer::Compound : public Element { public:
     inline int assign_arguments(const Vector<String> &args, Vector<String> *values) const;
     int resolve(Lexer *, int etype, int ninputs, int noutputs, Vector<String> &, ErrorHandler *, const String &landmark);
     void expand_into(Lexer *, int, VariableEnvironment &);
-    void connect(int from_idx, int from_port, int to_idx, int to_port, bool allow_double);
+    void connect(int from_idx, int from_port, int to_idx, int to_port, bool allow_double, bool is_context, String context);
 
     String deanonymize_element_name(int eidx);
 
@@ -240,13 +243,13 @@ Lexer::Compound::define(const String &name, const String &value, bool isformal, 
 }
 
 void
-Lexer::Compound::connect(int from_idx, int from_port, int to_idx, int to_port, bool allow_double)
+Lexer::Compound::connect(int from_idx, int from_port, int to_idx, int to_port, bool allow_double, bool is_context, String context)
 {
   if (from_port < 0)
     from_port = 0;
   if (to_port < 0)
     to_port = 0;
-  _conn.push_back(Router::Connection(from_idx, from_port, to_idx, to_port, allow_double));
+  _conn.push_back(Router::Connection(from_idx, from_port, to_idx, to_port, allow_double, is_context, context));
   if (_element_nports[0][to_idx] <= to_port)
     _element_nports[0][to_idx] = to_port + 1;
   if (_element_nports[1][from_idx] <= from_port)
@@ -418,7 +421,7 @@ Lexer::Compound::expand_into(Lexer *lexer, int which, VariableEnvironment &ve)
     for (const Connection *cp = _conn.begin(); cp != _conn.end(); ++cp)
         if (eidx_map[(*cp)[0].idx] >= 0 && eidx_map[(*cp)[0].idx] >= 0)
             lexer->_c->connect(eidx_map[(*cp)[1].idx], (*cp)[1].port,
-                               eidx_map[(*cp)[0].idx], (*cp)[0].port, cp->_double);
+                               eidx_map[(*cp)[0].idx], (*cp)[0].port, cp->_double, cp->_is_context, cp->_context);
 
     // now expand those
     for (int i = 2; i < eidx_map.size(); i++)
@@ -454,6 +457,7 @@ struct Lexer::ParseState {
 
     Vector<int> last_elements;
     int connector;
+    String context;
 
     ElementState *_head;
     ElementState *_tail;
@@ -808,6 +812,19 @@ Lexer::FileState::next_lexeme(Lexer *lexer)
       s--;
   }
 
+  //Check for context link
+  if (*s == '~') {
+      s++;
+      while (s < _end && (isalnum((unsigned char) *s)))
+            s++;
+      //TODO : more click-like
+      assert(*s == '>');
+      s++;
+      _pos = s;
+      String word = _big_string.substring(word_pos, s);
+      return Lexeme(lexContextArrow, word);
+  }
+
   if (s + 1 < _end) {
     if (*s == '-' && s[1] == '>') {
       _pos = s + 2;
@@ -815,9 +832,9 @@ Lexer::FileState::next_lexeme(Lexer *lexer)
     } else if (*s == '=' && s[1] == '>') {
       _pos = s + 2;
       return Lexeme(lex2Arrow, _big_string.substring(s, s + 2));
-    } else if (*s == '<' && s[1] == '-' && s[2] == '>') {
-       _pos = s + 3;
-       return Lexeme(lexBiArrow, _big_string.substring(s, s + 3));
+    } else if (s + 2 < _end && *s == '<' && s[1] == '-' && s[2] == '>') {
+      _pos = s + 3;
+      return Lexeme(lexBiArrow, _big_string.substring(s, s + 3));
     } else if (*s == ':' && s[1] == ':') {
       _pos = s + 2;
       return Lexeme(lex2Colon, _big_string.substring(s, s + 2));
@@ -1356,7 +1373,7 @@ Lexer::yelement_name()
             return;
         } else {
             bool nested = _c->depth() || _ps->_parent;
-            if (nested && (t.is(lexArrow) || t.is(lex2Arrow) || t.is(lexBiArrow))) {
+            if (nested && (t.is(lexArrow) || t.is(lexContextArrow) || t.is(lex2Arrow) || t.is(lexBiArrow))) {
                 this_implicit = _ps->first_element_set()
                     && (_ps->nports(false) || !_ps->cur_epos);
                 if (this_implicit && !_ps->nports(false)
@@ -1463,13 +1480,13 @@ Lexer::yelement_next()
     unlex(t);
 
     // maybe complain about implicits
-    if (_ps->any_implicit && !_ps->first_element_set() && (t.is(lexArrow) || t.is(lex2Arrow) || t.is(lexBiArrow)))
+    if (_ps->any_implicit && !_ps->first_element_set() && (t.is(lexArrow) || t.is(lexContextArrow) || t.is(lex2Arrow) || t.is(lexBiArrow)))
         lerror("implicit ports used in the middle of a chain");
 
     // maybe spread class and configuration for standalone
     // multiple-element declaration
     if (_ps->_head->next && _ps->first_element_set()
-        && !(t.is(lexArrow) || t.is(lex2Arrow) || t.is(lexBiArrow))
+        && !(t.is(lexArrow) || t.is(lexContextArrow) || t.is(lex2Arrow) || t.is(lexBiArrow))
         && !_ps->any_ports && !_ps->any_implicit) {
         ElementState *last = _ps->_head;
         while (last->next && last->bare)
@@ -1537,7 +1554,7 @@ Lexer::yconnection_analyze_ports(const Vector<int> &x, bool isoutput,
 
 void
 Lexer::yconnection_connect_all(Vector<int> &outputs, Vector<int> &inputs,
-                               int connector)
+                               int connector, String context)
 {
     int minp[2];
     int expandable[2];
@@ -1585,7 +1602,7 @@ Lexer::yconnection_connect_all(Vector<int> &outputs, Vector<int> &inputs,
                 port[k] = np ? it[k][3 + (k ? it[k][1] : 0)] : 0;
             }
 
-        _c->connect(it[1][0], port[1], it[0][0], port[0], connector == lexBiArrow);
+        _c->connect(it[1][0], port[1], it[0][0], port[0], connector == lexBiArrow, connector == lexContextArrow, context);
 
         for (int k = 0; k < 2; ++k)
             if (step[k]) {
@@ -1620,7 +1637,7 @@ Lexer::yconnection_connector()
     if (_ps->first_element_set())
         yconnection_check_useless(_ps->elements, false);
     else
-        yconnection_connect_all(_ps->last_elements, _ps->elements, _ps->connector);
+        yconnection_connect_all(_ps->last_elements, _ps->elements, _ps->connector, _ps->context);
     _ps->last_elements.swap(_ps->elements);
 
     Lexeme t;
@@ -1632,6 +1649,8 @@ Lexer::yconnection_connector()
     case lex2Colon:
         lerror_syntax(t);
         goto relex;
+    case lexContextArrow:
+        _ps->context = t.string();
     case lexBiArrow:
     case lexArrow:
     case lex2Arrow:
@@ -2021,6 +2040,7 @@ Lexer::ystatement()
     case '{':
     case '(':
     case lexBiArrow:
+    case lexContextArrow:
     case lexArrow:
     case lex2Arrow:
         unlex(t);
@@ -2142,7 +2162,7 @@ Lexer::add_router_connections(int c, const Vector<int> &router_id)
       for (int t = 0; t < hto.size(); t++) {
         int tidx = router_id[hto[t].idx];
         if (tidx >= 0)
-          _c->connect(hfrom[f].idx, hfrom[f].port, hto[t].idx, hto[t].port, _c->_conn[c]._double);
+          _c->connect(hfrom[f].idx, hfrom[f].port, hto[t].idx, hto[t].port, _c->_conn[c]._double, _c->_conn[c]._is_context, _c->_conn[c]._context);
       }
   }
 }
@@ -2255,11 +2275,72 @@ Lexer::create_router(Master *master)
     (*cp)[1].idx = router_id[(*cp)[1].idx];
   }
 
+  // expand context connections
+  bool change_made = false;
+  if ( _c->_conn.size()) {
+      for (int eidx = 0; eidx < router->_elements.size(); ++eidx) {
+          Vector<Router::Connection*> connections;
+          for (int cix = 0; cix < _c->_conn.size(); ++cix) {
+              int ci = cix; //_conn_output_sorter[cix];
+              if (_c->_conn[cix][1].idx == eidx && _c->_conn[cix]._is_context) {
+                  connections.push_back(&_c->_conn[cix]);
+                  click_chatter("%d has conn %d %d as context / %d",eidx,_c->_conn[ci][0].idx,_c->_conn[cix][1].idx,router->_elements.size());
+                  if (_c->_conn[ci][0].idx >= 0 && _c->_conn[cix][1].idx >= 0)
+                      click_chatter("%p{element} %p{element}",router->_elements[_c->_conn[ci][0].idx], router->_elements[_c->_conn[cix][1].idx]);
+                  click_chatter("%s",_c->_conn[cix]._context.c_str());
+              }
+          }
+          if (connections.size() > 0) {
+              change_made = true;
+              FlowDispatcher* fd = new FlowDispatcher();
+              int fdidx = router->_elements.size();
+              String conf = "";
+              for (int cid = 0; cid < connections.size(); cid++) {
+                  conf +="- "+String(cid);
+                  if (cid < connections.size() - 1)
+                      conf +=",";
+              }
+              if (!router->add_element(fd, "context_flowdispatcher_"+String(eidx), conf, "click", 0)) {
+                  _errh->lerror(_c->element_landmark(eidx), "Could not dynamically add context resolver");
+              }
+              router->add_connection(eidx, 0, fdidx, 0, false, false, "");
+
+              for (int cid = 0; cid < connections.size(); cid++) {
+                  connections[cid]->_is_context = false;
+                  if (connections[cid]->_context != "~>") {
+                      click_chatter("Specific context %s",connections[cid]->_context.c_str());
+                      String ename;
+                      if (connections[cid]->_context == "~ip>") {
+                          ename = "IPIn";
+                      } else if (connections[cid]->_context == "~tcp>") {
+                          ename = "TCPIn";
+                      } else {
+                          _errh->lerror(_c->element_landmark(eidx), "Unknown context link %s",connections[cid]->_context .c_str());
+                          return router;
+                      }
+                      int etype = element_type(ename);
+
+                      int stidx = router->_elements.size();
+                      Element* st = (*_element_types[etype].factory)(_element_types[etype].thunk);
+                      router->add_element(st, "context_stack_"+String(eidx), "", "click", 0);
+                      router->add_connection(fdidx, cid, stidx, 0, false, false, "");
+                      connections[cid]->p[1].idx = stidx;
+                      connections[cid]->p[1].port = 0;
+                  } else {
+                      connections[cid]->p[1].idx = fdidx;
+                      connections[cid]->p[1].port = cid;
+                  }
+                  connections[cid]->_context = "";
+              }
+          }
+      }
+  }
+
   // sort and add connections to router
   click_qsort(_c->_conn.begin(), _c->_conn.size());
   for (Connection *cp = _c->_conn.begin(); cp != _c->_conn.end(); ++cp)
     if ((*cp)[0].idx >= 0 && (*cp)[1].idx >= 0)
-      router->add_connection((*cp)[1].idx, (*cp)[1].port, (*cp)[0].idx, (*cp)[0].port, cp->_double);
+      router->add_connection((*cp)[1].idx, (*cp)[1].port, (*cp)[0].idx, (*cp)[0].port, cp->_double, cp->_is_context, cp->_context);
 
   // add requirements to router
   for (int i = 0; i < _requirements.size(); i += 2)

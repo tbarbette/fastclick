@@ -59,7 +59,7 @@ void FlowStrip::apply_offset(FlowNode* node) {
 		apply_offset(node->default_ptr()->node);
 }
 
-FlowNode* FlowStrip::get_table() {
+FlowNode* FlowStrip::get_table(int) {
 	FlowNode* root = FlowElementVisitor::get_downward_table(this, 0);
 	if (root)
 		apply_offset(root);
