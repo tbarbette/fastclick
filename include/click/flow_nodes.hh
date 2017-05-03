@@ -236,7 +236,11 @@ public:
         ptr->set_data(data);
     }
 
+    template<typename F> void apply(F fnt);
+    template<typename F> void apply_default(F fnt);
+
     FlowNode* combine(FlowNode* other, bool as_child) CLICK_WARN_UNUSED_RESULT;
+    FlowNodePtr prune(FlowLevel* level,FlowNodeData data) CLICK_WARN_UNUSED_RESULT;
     FlowNode* replace_leaves(FlowNode* other);
 
     virtual FlowNode* duplicate(bool recursive,int use_count) = 0;

@@ -172,6 +172,8 @@ WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t
     computeTCPChecksum(packet);
     computeIPChecksum(packet);
 
+    packet->set_dst_ip_anno(daddr);
+
     return packet;
 }
 

@@ -11,7 +11,8 @@ CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
     poolFcbTcpCommon(TCPCOMMON_POOL_SIZE),
-    tableFcbTcpCommon(NULL)
+    tableFcbTcpCommon(NULL),
+    _allow_resize(false)
 {
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
@@ -43,6 +44,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     .read_mp("FLOWDIRECTION", flowDirectionParam)
     .read_mp("OUTNAME", outName)
     .read_mp("RETURNNAME", returnName)
+    .read("ALLOW_RESIZE", _allow_resize)
     .complete() < 0)
         return -1;
 
@@ -82,7 +84,8 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     {
         this->returnElement = (TCPIn*)returnElement;
         this->outElement = (TCPOut*)outElement;
-        this->outElement->setInElement(this);
+        if (this->outElement->setInElement(this, errh) != 0)
+            return -1;
         setFlowDirection((unsigned int)flowDirectionParam);
         this->outElement->setFlowDirection(getFlowDirection());
     }
@@ -96,18 +99,23 @@ FlowNode* TCPIn::get_table(int iport) {
 
 void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 {
-    auto fnt = [this,fcb_in](Packet* p) -> Packet* {
+    // Assign the tcp_common structure if not already done
+    click_chatter("Fcb in : %p, Common : %p, Batch : %p", fcb_in, fcb_in->common,flow);
+
+    if (_allow_resize) {
         // Ensure that the pointers in the FCB are set
         if(fcb_in->poolModificationNodes == NULL)
             fcb_in->poolModificationNodes = &(*poolModificationNodes);
 
         if(fcb_in->poolModificationLists == NULL)
             fcb_in->poolModificationLists = &(*poolModificationLists);
+    }
 
-        if(fcb_in->lock == NULL)
-            fcb_in->lock = &lock;
+    if(fcb_in->lock == NULL) //TODO : Does not seem really needed
+        fcb_in->lock = &lock;
 
-        // Assign the tcp_common structure if not already done
+
+    auto fnt = [this,fcb_in](Packet* p) -> Packet* {
         if(fcb_in->common == NULL)
         {
             if(!assignTCPCommon(p))
@@ -116,13 +124,29 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
                 // packet. This is not supposed to happen and it means that
                 // the first two packets of the connection are not SYN packets
                 click_chatter("Warning: Trying to assign a common tcp memory area"
-                    " for a non-SYN packet");
+                    " for a non-SYN packet or a non-matching tupple");
                 p->kill();
 
                 return NULL;
             }
+
+            //If not syn, drop the flow
+            if(!isSyn(p)) {
+                WritablePacket* packet = p->uniqueify();
+                closeConnection(packet, false, true);
+                packet->kill();
+                return NULL;
+            }
+
+            // Manage the TCP options:
+            // - Remove the SACK-permitted option
+            // - Detect the window scale
+            // - Detect MSS
+            WritablePacket* packet = p->uniqueify();
+            manageOptions(packet);
+            p = packet;
         }
-        else
+        else // At least one packet of the flow has been seen
         {
             // The structure has been assigned so the three-way handshake is over
             // Check that the packet is not a SYN packet
@@ -130,166 +154,160 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
             {
                 click_chatter("Warning: Unexpected SYN packet. Dropping it");
                 p->kill();
-
-                // Warning about the fact that the system must be integrated to Middleclick in order to
-                // work properly.
-                #ifndef HAVE_FLOW
-                    click_chatter("WARNING: You are using a version of this program that is not compatible"
-                        " with the flow management system provided by Middleclick. Therefore, you will"
-                        " only be able to use one flow.");
-                #endif
-
                 return NULL;
             }
         }
 
-        fcb_in->common->lock.acquire();
 
         if(!checkConnectionClosed(p))
         {
             p->kill();
-            fcb_in->common->lock.release();
             return NULL;
         }
 
-        WritablePacket *packet = p->uniqueify();
-
-        // Set the annotation indicating the initial ACK value
-        setInitialAck(packet, getAckNumber(packet));
-
-        // Compute the offset of the TCP payload
-        uint16_t offset = getPayloadOffset(packet);
-        setContentOffset(packet, offset);
-
-        // Manage the TCP options:
-        // - Remove the SACK-permitted option
-        // - Detect the window scale
-        // - Detect MSS
-        manageOptions(packet);
-
-        ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
-        ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
-
-        // Update the window size
-        uint16_t prevWindowSize = maintainer.getWindowSize();
-        uint16_t newWindowSize = getWindowSize(packet);
-        maintainer.setWindowSize(newWindowSize);
-
-        tcp_seq_t seqNumber = getSequenceNumber(packet);
-
-        if(otherMaintainer.isLastAckSentSet())
-        {
-            tcp_seq_t lastAckSentOtherSide = otherMaintainer.getLastAckSent();
-
-            if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
-            {
-                // We receive content that has already been ACKed.
-                // This case occurs when the ACK is lost between the middlebox and
-                // the destination.
-                // In this case, we re-ACK the content and we discard it
-                ackPacket(packet);
-                packet->kill();
-                fcb_in->common->lock.release();
-                return NULL;
-            }
-        }
-
-        // Take care of the ACK value in the packet
-        bool isAnAck = isAck(packet);
-        tcp_seq_t ackNumber = 0;
-        tcp_seq_t newAckNumber = 0;
-        if(isAnAck)
-        {
-            // Map the ack number according to the ByteStreamMaintainer of the other direction
-            ackNumber = getAckNumber(packet);
-            newAckNumber = otherMaintainer.mapAck(ackNumber);
-
-            // Check the value of the previous ack received if it exists
-            bool lastAckReceivedSet = maintainer.isLastAckReceivedSet();
-            uint32_t prevLastAckReceived = 0;
-            if(lastAckReceivedSet)
-                prevLastAckReceived = maintainer.getLastAckReceived();
-
-
-            // Check if we acknowledged new data
-            if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
-            {
-                // Increase congestion window
-                uint64_t cwnd = otherMaintainer.getCongestionWindowSize();
-                uint64_t ssthresh = otherMaintainer.getSsthresh();
-                // Sender segment size
-                uint16_t mss = otherMaintainer.getMSS();
-                uint64_t increase = 0;
-
-                // Check if we are in slow start mode
-                if(cwnd <= ssthresh)
-                    increase = mss;
-                else
-                    increase = mss * mss / cwnd;
-
-                otherMaintainer.setCongestionWindowSize(cwnd + increase);
-
-                maintainer.setDupAcks(0);
-            }
-
-            // Update the value of the last ACK received
-            maintainer.setLastAckReceived(ackNumber);
-
-            // Prune the ByteStreamMaintainer of the other side
-            otherMaintainer.prune(ackNumber);
-
-            // Update the statistics about the RTT
-            // And potentially update the retransmission timer
-            fcb_in->common->lock.release();
-            fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
+        if (_allow_resize) {
+            //TODO : fine-grain this lock
             fcb_in->common->lock.acquire();
 
-            // Check if the current packet is just an ACK without additional information
-            if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
+            WritablePacket *packet = p->uniqueify();
+
+            // Set the annotation indicating the initial ACK value
+            setInitialAck(packet, getAckNumber(packet));
+
+            // Compute the offset of the TCP payload
+            uint16_t offset = getPayloadOffset(packet);
+            setContentOffset(packet, offset);
+
+            ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
+            ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
+
+            // Update the window size
+            uint16_t prevWindowSize = maintainer.getWindowSize();
+            uint16_t newWindowSize = getWindowSize(packet);
+            maintainer.setWindowSize(newWindowSize);
+
+            tcp_seq_t seqNumber = getSequenceNumber(packet);
+
+            if(otherMaintainer.isLastAckSentSet())
             {
-                bool isDup = false;
-                // Check duplicate acks
-                if(prevLastAckReceived == ackNumber)
-                {
-                    isDup = true;
-                    uint8_t dupAcks = maintainer.getDupAcks();
-                    dupAcks++;
-                    maintainer.setDupAcks(dupAcks);
+                tcp_seq_t lastAckSentOtherSide = otherMaintainer.getLastAckSent();
 
-                    // Fast retransmit
-                    if(dupAcks >= 3)
-                    {
-                        fcb_in->common->lock.release();
-                        fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
-                        fcb_in->common->lock.acquire();
-                        maintainer.setDupAcks(0);
-                    }
-                }
-
-                // Check that the ACK value is greater than what we have already
-                // sent to the destination.
-                // If this is a duplicate ACK, we don't discard it so that the mechanism
-                // of fast retransmission is preserved
-                if(maintainer.isLastAckSentSet() && SEQ_LEQ(newAckNumber, maintainer.getLastAckSent()) && !isDup)
+                if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
                 {
-                    // If this is not the case, the packet does not bring any additional information
-                    // We can drop it
+                    // We receive content that has already been ACKed.
+                    // This case occurs when the ACK is lost between the middlebox and
+                    // the destination.
+                    // In this case, we re-ACK the content and we discard it
+                    ackPacket(packet);
                     packet->kill();
                     fcb_in->common->lock.release();
                     return NULL;
                 }
             }
 
-            // If needed, update the ACK value in the packet with the mapped one
-            if(ackNumber != newAckNumber)
-                setAckNumber(packet, newAckNumber);
-        }
+            // Take care of the ACK value in the packet
+            bool isAnAck = isAck(packet);
+            tcp_seq_t ackNumber = 0;
+            tcp_seq_t newAckNumber = 0;
+            if(isAnAck)
+            {
+                // Map the ack number according to the ByteStreamMaintainer of the other direction
+                ackNumber = getAckNumber(packet);
+                newAckNumber = otherMaintainer.mapAck(ackNumber);
 
-        fcb_in->common->lock.release();
-        return packet;
+                // Check the value of the previous ack received if it exists
+                bool lastAckReceivedSet = maintainer.isLastAckReceivedSet();
+                uint32_t prevLastAckReceived = 0;
+                if(lastAckReceivedSet)
+                    prevLastAckReceived = maintainer.getLastAckReceived();
+
+
+                // Check if we acknowledged new data
+                if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
+                {
+                    // Increase congestion window
+                    uint64_t cwnd = otherMaintainer.getCongestionWindowSize();
+                    uint64_t ssthresh = otherMaintainer.getSsthresh();
+                    // Sender segment size
+                    uint16_t mss = otherMaintainer.getMSS();
+                    uint64_t increase = 0;
+
+                    // Check if we are in slow start mode
+                    if(cwnd <= ssthresh)
+                        increase = mss;
+                    else
+                        increase = mss * mss / cwnd;
+
+                    otherMaintainer.setCongestionWindowSize(cwnd + increase);
+
+                    maintainer.setDupAcks(0);
+                }
+
+                // Update the value of the last ACK received
+                maintainer.setLastAckReceived(ackNumber);
+
+                // Prune the ByteStreamMaintainer of the other side
+                otherMaintainer.prune(ackNumber);
+
+                // Update the statistics about the RTT
+                // And potentially update the retransmission timer
+                fcb_in->common->lock.release();
+                fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
+                fcb_in->common->lock.acquire();
+
+                // Check if the current packet is just an ACK without additional information
+                if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
+                {
+                    bool isDup = false;
+                    // Check duplicate acks
+                    if(prevLastAckReceived == ackNumber)
+                    {
+                        isDup = true;
+                        uint8_t dupAcks = maintainer.getDupAcks();
+                        dupAcks++;
+                        maintainer.setDupAcks(dupAcks);
+
+                        // Fast retransmit
+                        if(dupAcks >= 3)
+                        {
+                            fcb_in->common->lock.release();
+                            fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
+                            fcb_in->common->lock.acquire();
+                            maintainer.setDupAcks(0);
+                        }
+                    }
+
+                    // Check that the ACK value is greater than what we have already
+                    // sent to the destination.
+                    // If this is a duplicate ACK, we don't discard it so that the mechanism
+                    // of fast retransmission is preserved
+                    if(maintainer.isLastAckSentSet() && SEQ_LEQ(newAckNumber, maintainer.getLastAckSent()) && !isDup)
+                    {
+                        // If this is not the case, the packet does not bring any additional information
+                        // We can drop it
+                        packet->kill();
+                        fcb_in->common->lock.release();
+                        return NULL;
+                    }
+                }
+
+                // If needed, update the ACK value in the packet with the mapped one
+                if(ackNumber != newAckNumber)
+                    setAckNumber(packet, newAckNumber);
+            }
+            fcb_in->common->lock.release();
+            return packet;
+        } else { //Resize not allowed
+            // Compute the offset of the TCP payload
+            uint16_t offset = getPayloadOffset(p);
+            setContentOffset(p, offset);
+            return p;
+        }
     };
-    EXECUTE_FOR_EACH_PACKET(fnt, flow);
-    output(0).push_batch(flow);
+    auto drop = [](Packet* p){};
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, drop);
+    if (flow)
+        output(0).push_batch(flow);
 }
 
 TCPOut* TCPIn::getOutElement()
@@ -302,7 +320,7 @@ TCPIn* TCPIn::getReturnElement()
     return returnElement;
 }
 
-void TCPIn::closeConnection(WritablePacket *packet, bool graceful, bool bothSides)
+void TCPIn::closeConnection(Packet *packet, bool graceful, bool bothSides)
 {
     auto fcb_in = fcb();
     uint8_t newFlag = 0;
@@ -314,10 +332,10 @@ void TCPIn::closeConnection(WritablePacket *packet, bool graceful, bool bothSide
 
     fcb_in->common->lock.acquire();
 
-    click_tcp *tcph = packet->tcp_header();
+    click_tcp tcph = *packet->tcp_header();
 
     // Change the flags of the packet
-    tcph->th_flags = tcph->th_flags | newFlag;
+    tcph.th_flags = tcph.th_flags | newFlag;
 
     TCPClosingState::Value newStateSelf = TCPClosingState::BEING_CLOSED_GRACEFUL;
     TCPClosingState::Value newStateOther = TCPClosingState::CLOSED_GRACEFUL;
@@ -399,8 +417,16 @@ bool TCPIn::hasModificationList(Packet* packet)
     return (it != modificationLists.end());
 }
 
+bool TCPIn::allowResize() {
+    return _allow_resize;
+}
+
 void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
+    if (unlikely(!_allow_resize)) {
+        click_chatter("ERROR : An element is trying to insert bytes while TCPIn was configured without allowing modifications. Insertion ignored.");
+        return;
+    }
     ModificationList* list = getModificationList(packet);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
@@ -431,6 +457,10 @@ void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t leng
 WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
      uint32_t length)
 {
+    if (unlikely(!_allow_resize)) {
+        click_chatter("ERROR : An element is trying to insert bytes while TCPIn was configured without allowing modifications. Insertion ignored.");
+        return packet;
+    }
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
     uint16_t tcpOffset = getPayloadOffset(packet);
@@ -451,6 +481,7 @@ WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
 
 void TCPIn::requestMorePackets(Packet *packet, bool force)
 {
+    click_chatter("requestMorePackets");
     ackPacket(packet, force);
 
     // Continue in the stack function
@@ -467,7 +498,12 @@ void TCPIn::ackPacket(Packet* packet, bool force)
     uint16_t dport = getSourcePort(packet);
     // The SEQ value is the initial ACK value in the packet sent
     // by the source.
-    tcp_seq_t seq = getInitialAck(packet);
+    tcp_seq_t seq;
+    if (_allow_resize) {
+        seq = getInitialAck(packet);
+    } else {
+        seq = getAckNumber(packet);
+    }
 
     // The ACK is the sequence number sent by the source
     // to which we add the size of the payload in order to acknowledge it
@@ -540,9 +576,15 @@ bool TCPIn::assignTCPCommon(Packet *packet)
 
         // Get the struct allocated by the initiator
         fcb_in->common = returnElement->getTCPCommon(flowID);
-        // Initialize the RBT with the RBTManager
-        fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
+        if (fcb_in->common == 0)
+            return false;
+
+        if (_allow_resize) {
+            // Initialize the RBT with the RBTManager
+            fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
+        }
         fcb_in->inChargeOfTcpCommon = false;
+        click_chatter("RE Common is %p",fcb_in->common);
     }
     else
     {
@@ -561,8 +603,10 @@ bool TCPIn::assignTCPCommon(Packet *packet)
 
         // Set the pointer in the structure
         fcb_in->common = allocated;
-        // Initialize the RBT with the RBTManager
-        fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
+        if (_allow_resize) {
+            // Initialize the RBT with the RBTManager
+            fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
+        }
 
         // Store in our structure the information needed to free the memory
         // of the common structure
@@ -570,6 +614,8 @@ bool TCPIn::assignTCPCommon(Packet *packet)
         fcb_in->flowID = flowID;
         fcb_in->tableTcpCommon = &tableFcbTcpCommon;
         fcb_in->poolTcpCommon = &poolFcbTcpCommon;
+
+        click_chatter("AL Common is %p",fcb_in->common);
 
         lock.release();
     }
@@ -613,9 +659,6 @@ struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 void TCPIn::manageOptions(WritablePacket *packet)
 {
     auto fcb_in = fcb();
-    // The options we are looking for can only be present in SYN packets
-    if(!isSyn(packet))
-        return;
 
     click_tcp *tcph = packet->tcp_header();
 
@@ -645,25 +688,28 @@ void TCPIn::manageOptions(WritablePacket *packet)
         }
         else if(optStart[0] == TCPOPT_WSCALE && optStart[1] == TCPOLEN_WSCALE)
         {
-            uint16_t winScale = optStart[2];
+            if (_allow_resize) {
+                uint16_t winScale = optStart[2];
 
-            if(winScale >= 1)
-                winScale = 2 << (winScale - 1);
+                if(winScale >= 1)
+                    winScale = 2 << (winScale - 1);
 
-            fcb_in->common->maintainers[flowDirection].setWindowScale(winScale);
-            fcb_in->common->maintainers[flowDirection].setUseWindowScale(true);
-            click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
+                fcb_in->common->maintainers[flowDirection].setWindowScale(winScale);
+                fcb_in->common->maintainers[flowDirection].setUseWindowScale(true);
 
-            if(isAck(packet))
-            {
-                // Here, we have a SYNACK
-                // It means that we know if the other side of the flow
-                // has the option enabled
-                // if this is not the case, we disable it for this side as well
-                if(!fcb_in->common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
+                click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
+
+                if(isAck(packet))
                 {
-                    fcb_in->common->maintainers[flowDirection].setUseWindowScale(false);
-                    click_chatter("Window scaling disabled");
+                    // Here, we have a SYNACK
+                    // It means that we know if the other side of the flow
+                    // has the option enabled
+                    // if this is not the case, we disable it for this side as well
+                    if(!fcb_in->common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
+                    {
+                        fcb_in->common->maintainers[flowDirection].setUseWindowScale(false);
+                        click_chatter("Window scaling disabled");
+                    }
                 }
             }
             optStart += optStart[1];
@@ -671,11 +717,13 @@ void TCPIn::manageOptions(WritablePacket *packet)
         else if(optStart[0] == TCPOPT_MAXSEG && optStart[1] == TCPOLEN_MAXSEG)
         {
 
-            uint16_t mss = (optStart[2] << 8) | optStart[3];
-            fcb_in->common->maintainers[flowDirection].setMSS(mss);
+            if (_allow_resize) {
+                uint16_t mss = (optStart[2] << 8) | optStart[3];
+                fcb_in->common->maintainers[flowDirection].setMSS(mss);
 
-            click_chatter("MSS for flow %u: %u", flowDirection, mss);
-            fcb_in->common->maintainers[flowDirection].setCongestionWindowSize(mss);
+                click_chatter("MSS for flow %u: %u", flowDirection, mss);
+                fcb_in->common->maintainers[flowDirection].setCongestionWindowSize(mss);
+            }
 
             optStart += optStart[1];
         }

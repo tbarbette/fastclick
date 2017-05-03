@@ -7,7 +7,7 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
-#include "bufferpool.hh"
+#include <click/bufferpool.hh>
 
 CLICK_DECLS
 

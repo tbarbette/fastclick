@@ -130,6 +130,16 @@ protected:
     unsigned char* getPacketContent(WritablePacket* packet) const;
 
     /**
+     * @brief Get the current useful content of the packet
+     * It depends on the elements by which the packet went through. For instance, after TCPIn,
+     * it points to the TCP payload. After HTTPIn, it points to the body
+     * of the HTTP request/response.
+     * @param packet The packet
+     * @return A pointer to the current useful content of the packet
+     */
+    const unsigned char* getPacketContent(Packet* packet) const;
+
+    /**
      * @brief Search a given pattern in the given content. The content does not have
      * to be NULL-terminated.
      * @param content The content in which the pattern will be searched
@@ -186,6 +196,11 @@ protected:
     // Methods using the function stack mechanism
 
     /**
+     * @brief Tell if removeBytes and insertBytes are allowed by the current stack
+     */
+    virtual bool allowResize();
+
+    /**
      * @brief Remove bytes in a packet
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet
@@ -228,12 +243,12 @@ protected:
     /**
      * @brief Close the connection
      * @param fcb A pointer to the FCB of the flow
-     * @param packet The packet
+     * @param packet A packet from the connection, used for initialization
      * @param grafecul A boolean indicating whether the connection must be closed gracefully or not
      * @param bothSides A boolean indicating if the connection must be closed for both sides or
      * just this one.
      */
-    virtual void closeConnection(WritablePacket *packet, bool graceful,
+    virtual void closeConnection(Packet *packet, bool graceful,
         bool bothSides);
 
     /**
@@ -292,8 +307,9 @@ public :
 
 
     virtual int initialize(ErrorHandler *errh) {
+        StackElement::initialize(errh);
         if (_flow_data_offset == -1) {
-            return errh->error("No SFCBAssigner() element sets the flow context for %s !",name().c_str());
+            return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
         }
         return 0;
     }
@@ -307,6 +323,7 @@ public :
     }
 
     void push_batch(int port,PacketBatch* head) final {
+        click_chatter("Pushing packet batch %p with fcb %p",head,fcb());
         push_batch(port, fcb(), head);
     }
 
@@ -356,8 +373,8 @@ public:
         StackElement *element = reinterpret_cast<StackElement*>(e);
 
         // Add the starting element in the list of the current element
-        click_chatter("Adding element %s as predecessor of %s", startElement->class_name(),
-            element->class_name());
+        click_chatter("Adding element %p{element} as predecessor of %p{element}", startElement,
+            element);
         element->addStackElementInList(startElement, port);
 
         // Stop search when we encounter the IPOut Element

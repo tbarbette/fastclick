@@ -70,7 +70,7 @@ CLICK_DECLS
                     batch->set_count(count);\
                     batch->set_tail(last);\
                 }\
-            }\
+            }
 
 /**
  * Split a batch into multiple batch according to a given function which will
@@ -275,7 +275,7 @@ public :
     }
 
     /**
-     * Build a batch from a linked list of packet
+     * Build a batch from a linked list of packet with prev already set to the tail
      *
      * @param head The first packet of the batch
      * @param size Number of packets in the linkedlist

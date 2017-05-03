@@ -104,7 +104,7 @@ void StackElement::packetSent(Packet* packet)
     previousStackElement->packetSent(packet);
 }
 
-void StackElement::closeConnection(WritablePacket *packet, bool graceful,
+void StackElement::closeConnection(Packet *packet, bool graceful,
      bool bothSides)
 {
     // Call the "closeConnection" method on every element in the stack
@@ -112,6 +112,14 @@ void StackElement::closeConnection(WritablePacket *packet, bool graceful,
         return;
 
     previousStackElement->closeConnection(packet, graceful, bothSides);
+}
+
+bool StackElement::allowResize() {
+    // Call the "removeBytes" method on every element in the stack
+    if(previousStackElement == NULL)
+        return true;
+
+    previousStackElement->allowResize();
 }
 
 void StackElement::removeBytes(WritablePacket* packet, uint32_t position,
@@ -136,6 +144,8 @@ WritablePacket* StackElement::insertBytes(WritablePacket* packet,
 
 void StackElement::requestMorePackets(Packet *packet, bool force)
 {
+    click_chatter("%p{element} : requestMorePackets", previousStackElement);
+
     // Call the "requestMorePackets" method on every element in the stack
     if(previousStackElement == NULL)
         return;
@@ -190,6 +200,14 @@ const unsigned char* StackElement::getPacketContentConst(Packet* p) const
 }
 
 unsigned char* StackElement::getPacketContent(WritablePacket* p) const
+{
+    uint16_t offset = getContentOffset(p);
+
+    return (p->data() + offset);
+}
+
+
+const unsigned char* StackElement::getPacketContent(Packet* p) const
 {
     uint16_t offset = getContentOffset(p);
 

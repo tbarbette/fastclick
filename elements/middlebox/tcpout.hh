@@ -84,7 +84,7 @@ public:
      * @brief Set the TCPIn element associated
      * @param element A pointer to the TCPIn element associated
      */
-    void setInElement(TCPIn* element);
+    int setInElement(TCPIn* element, ErrorHandler* errh);
 
     /**
      * @brief Set the flow direction
@@ -119,6 +119,8 @@ private:
     bool checkConnectionClosed(Packet *packet);
 
     unsigned int flowDirection;
+    bool _readonly;
+    bool _allow_resize; //Setted by the inElement
 };
 
 CLICK_ENDDECLS

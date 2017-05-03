@@ -67,7 +67,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o packetbatch.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
-	element.o batchelement.o rbt.o \
+	element.o batchelement.o rbt.o flowbuffer.o bufferpool.o bufferpoolnode.o \
 	bytestreammaintainer.o modificationlist.o circularbuffer.o \
 	flow.o flowelement.o\
 	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \

@@ -5,12 +5,11 @@
 #include <click/element.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
-#include <click/batchelement.hh>
+#include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include "batchfcb.hh"
 #include "tcpreordernode.hh"
-#include "memorypool.hh"
-#include "fcb.hh"
+#include <click/memorypool.hh>
 #include "tcpelement.hh"
 
 #define TCPREORDER_POOL_SIZE 100
@@ -28,14 +27,15 @@ struct fcb_tcpreorder
 
     fcb_tcpreorder()
     {
-        packetList = NULL;
+        /*packetList = NULL;
         expectedPacketSeq = 0;
         lastSent = 0;
-        pool = NULL;
+        pool = NULL;*/
     }
 
     ~fcb_tcpreorder()
     {
+        //TODO : call this on release
         // Clean the list and free memory
         struct TCPPacketListNode* node = packetList;
         struct TCPPacketListNode* toDelete = NULL;
@@ -115,37 +115,21 @@ public:
 
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
 
-    #if HAVE_BATCH
-    void push_batch(int, PacketBatch *batch);
-    #endif
+    void push_batch(int, fcb_tcpreorder* fcb, PacketBatch *batch) override;
 
 private:
-    /**
-     * @brief Process a packet (ensure that it is in order)
-     * @param fcb A pointer to the FCB of the flow
-     * @param packet The packet
-     */
-    void processPacket(struct fcb *fcb, Packet* packet);
-
-    /**
-     * @brief Process a batch of packets (ensure that they are in order)
-     * @param fcb A pointer to the FCB of the flow
-     * @param batch The batch of packets
-     */
-    void processPacketBatch(struct fcb *fcb, PacketBatch* batch);
-
     /**
      * @brief Put a packet in the list of waiting packets
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet to add
      */
-    void putPacketInList(struct fcb *fcb, Packet* packet);
+    void putPacketInList(struct fcb_tcpreorder *fcb, Packet* packet);
 
     /**
      * @brief Send the in-order packets from the list of waiting packets
      * @param fcb A pointer to the FCB of the flow
      */
-    void sendEligiblePackets(struct fcb *fcb);
+    void sendEligiblePackets(struct fcb_tcpreorder *fcb);
 
     /**
      * @brief Check if the packet is the first one of the flow and acts consequently.
@@ -154,13 +138,13 @@ private:
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet to check
      */
-    void checkFirstPacket(struct fcb *fcb, Packet* packet);
+    void checkFirstPacket(struct fcb_tcpreorder *fcb, Packet* packet);
 
     /**
      * @brief Flush the list of waiting packets
      * @param fcb A pointer to the FCB of the flow
      */
-    void flushList(struct fcb *fcb);
+    void flushList(struct fcb_tcpreorder *fcb);
 
     /**
      * @brief Flush the list of waiting packets after a given packet
@@ -168,7 +152,7 @@ private:
      * @param toKeep Pointer to the last element that will be kept in the list
      * @param toRemove Pointer to the first element that will be removed
      */
-    void flushListFrom(struct fcb *fcb, struct TCPPacketListNode *toKeep,
+    void flushListFrom(struct fcb_tcpreorder *fcb, struct TCPPacketListNode *toKeep,
         struct TCPPacketListNode *toRemove);
 
     /**
@@ -177,7 +161,7 @@ private:
      * @param packet The packet to check
      * @return True if the given packet is a retransmission
      */
-    bool checkRetransmission(struct fcb *fcb, Packet* packet);
+    bool checkRetransmission(struct fcb_tcpreorder *fcb, Packet* packet);
 
     /**
      * @brief Return the sequence number of the packet that will be received after the given one

@@ -6,8 +6,8 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
-#include "rbt.hh"
-#include "memorypool.hh"
+#include <click/rbt.hh>
+#include <click/memorypool.hh>
 
 CLICK_DECLS
 

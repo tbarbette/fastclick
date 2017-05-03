@@ -71,17 +71,18 @@ struct fcb_tcpin
 
     fcb_tcpin()
     {
-        poolModificationLists = NULL;
+        //FCB are zero-initialized, setting anything here is pointless
+        /*poolModificationLists = NULL;
         poolModificationNodes = NULL;
         lock = NULL;
 
         poolTcpCommon = NULL;
         commonToDelete = NULL;
         inChargeOfTcpCommon = false;
-        tableTcpCommon = NULL;
+        tableTcpCommon = NULL;*/
     }
 
-    ~fcb_tcpin()
+    ~fcb_tcpin() //Remember this function has to be called manually
     {
         // Put back in the corresponding memory pool all the modification lists
         // in use (in the hashtable)
@@ -198,15 +199,20 @@ public:
      */
     struct fcb_tcp_common* getTCPCommon(IPFlowID flowID);
 
+    inline bool allow_resize() {
+        return _allow_resize;
+    }
+
 protected:
-    virtual void removeBytes(WritablePacket*, uint32_t, uint32_t);
+    virtual bool allowResize() override;
+    virtual void removeBytes(WritablePacket*, uint32_t, uint32_t) override;
     virtual WritablePacket* insertBytes(WritablePacket*, uint32_t,
-         uint32_t) CLICK_WARN_UNUSED_RESULT;
-    virtual void requestMorePackets(Packet *packet, bool force = false);
-    virtual void closeConnection(WritablePacket *packet, bool graceful,
-         bool bothSides);
-    virtual bool isLastUsefulPacket(Packet *packet);
-    virtual unsigned int determineFlowDirection();
+         uint32_t) override CLICK_WARN_UNUSED_RESULT;
+    virtual void requestMorePackets(Packet *packet, bool force = false) override;
+    virtual void closeConnection(Packet *packet, bool graceful,
+         bool bothSides) override;
+    virtual bool isLastUsefulPacket(Packet *packet) override;
+    virtual unsigned int determineFlowDirection() override;
 
     /**
      * @brief Set the flow direction
@@ -274,6 +280,8 @@ private:
     TCPOut* outElement; // TCPOut element of this path
     TCPIn* returnElement; // TCPIn element of the return path
     unsigned int flowDirection;
+
+    bool _allow_resize;
 };
 
 CLICK_ENDDECLS

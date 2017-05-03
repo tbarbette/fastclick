@@ -506,8 +506,50 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child) {
 	}
     other->check();
 	return other;
+}
 
+template<typename F>
+void FlowNode::apply(F fnt) {
+    NodeIterator* it = iterator();
+    FlowNodePtr* cur = 0;
+    while ((cur = it->next()) != 0) {
+        fnt(cur);
+    }
+}
 
+template<typename F>
+void FlowNode::apply_default(F fnt) {
+    apply(fnt);
+    if (_default.ptr) {
+        fnt(&_default);
+    }
+}
+
+FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data)  {
+    if (level->equals(this->level())) { //Same level
+        FlowNodePtr* ptr = find_or_default(data);
+        FlowNodePtr child = *ptr;
+        dec_num();
+        ptr->ptr = 0;
+        delete this;
+        return child;
+    }
+
+    apply_default([this,level,data](FlowNodePtr* cur){
+        if (cur->is_leaf()) {
+            return;
+        }
+        FlowNodeData data = cur->data();
+        FlowNodePtr newcur = cur->node->prune(level,data);
+        assert(newcur.ptr != 0);
+        if (newcur.is_node()) {
+            newcur.node->check();
+        }
+        *cur = newcur;
+        cur->set_data(data);
+        cur->set_parent(this);
+    });
+    return FlowNodePtr(this);
 }
 
 /**
@@ -524,10 +566,22 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other)  {
             ptr->leaf->release(1);
             ptr->leaf = 0;
 
-            FlowNode* no = other->duplicate(true, 1);
-            ptr->set_node(no);
+            FlowNodePtr no(other->duplicate(true, 1));
+
+            FlowNode* gparent = parent;
+            FlowNodeData gdata = data;
+            while (gparent != NULL) {
+                no = no.node->prune(gparent->level(),gdata);
+                if (no.is_leaf()) {
+                    break;
+                }
+                gdata = gparent->node_data;
+                gparent = gparent->parent();
+            }
+
+            *ptr = no;
             ptr->set_data(data);
-            no->_parent = parent;
+            ptr->set_parent(parent);
 
         };
         this->traverse_ptr(fnt);

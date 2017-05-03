@@ -10,13 +10,17 @@
 
 CLICK_DECLS
 
-TCPOut::TCPOut()
+TCPOut::TCPOut() : inElement(NULL),_readonly(false)
 {
-    inElement = NULL;
+
 }
 
 int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    if(Args(conf, this, errh)
+        .read_p("READONLY", _readonly)
+        .complete() < 0)
+            return -1;
     return 0;
 }
 
@@ -30,125 +34,152 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             return NULL;
         }
 
-        WritablePacket *packet = p->uniqueify();
+        if (_allow_resize) {
+            WritablePacket *packet = p->uniqueify();
+            fcb_in->common->lock.acquire();
 
-        fcb_in->common->lock.acquire();
+            bool hasModificationList = inElement->hasModificationList(packet);
+            ByteStreamMaintainer &byteStreamMaintainer = fcb_in->common->maintainers[getFlowDirection()];
+            ModificationList *modList = NULL;
 
-        bool hasModificationList = inElement->hasModificationList(packet);
-        ByteStreamMaintainer &byteStreamMaintainer = fcb_in->common->maintainers[getFlowDirection()];
-        ModificationList *modList = NULL;
+            if(hasModificationList)
+                modList = inElement->getModificationList(packet);
 
-        if(hasModificationList)
-            modList = inElement->getModificationList(packet);
+            // Update the sequence number (according to the modifications made on previous packets)
+            tcp_seq_t prevSeq = getSequenceNumber(packet);
+            tcp_seq_t newSeq =  byteStreamMaintainer.mapSeq(prevSeq);
+            bool seqModified = false;
+            bool ackModified = false;
+            tcp_seq_t prevAck = getAckNumber(packet);
+            tcp_seq_t prevLastAck = 0;
+            bool prevLastAckSet = false;
 
-        // Update the sequence number (according to the modifications made on previous packets)
-        tcp_seq_t prevSeq = getSequenceNumber(packet);
-        tcp_seq_t newSeq =  byteStreamMaintainer.mapSeq(prevSeq);
-        bool seqModified = false;
-        bool ackModified = false;
-        tcp_seq_t prevAck = getAckNumber(packet);
-        tcp_seq_t prevLastAck = 0;
-        bool prevLastAckSet = false;
-
-        if(byteStreamMaintainer.isLastAckSentSet())
-        {
-            prevLastAck = byteStreamMaintainer.getLastAckSent();
-            prevLastAckSet = true;
-        }
-
-        if(prevSeq != newSeq)
-        {
-            setSequenceNumber(packet, newSeq);
-            seqModified = true;
-        }
-
-        // Update the last sequence number seen
-        // This number is used when crafting ACKs
-        byteStreamMaintainer.setLastSeqSent(newSeq);
-
-        // Update the window size
-        byteStreamMaintainer.setWindowSize(getWindowSize(packet));
-
-        // Update the value of the last ACK sent
-        if(isAck(packet))
-        {
-            byteStreamMaintainer.setLastAckSent(prevAck);
-
-            // Ensure that the value of the ACK is not below the last ACKed position
-            // This solves the following problem:
-            // - We ACK a packet manually for any reason
-            // -> The "manual" ACK is lost
-            setAckNumber(packet, byteStreamMaintainer.getLastAckSent());
-
-            if(getAckNumber(packet) != prevAck)
-                ackModified = true;
-        }
-
-        // Check the length to see if bytes were added or removed
-        uint16_t initialLength = packetTotalLength(packet);
-        uint16_t currentLength = (uint16_t)packet->length() - getIPHeaderOffset(packet);
-        int offsetModification = -(initialLength - currentLength);
-        uint32_t prevPayloadSize = getPayloadLength(packet);
-
-        // Update the "total length" field in the IP header (required to compute the
-        // tcp checksum as it is in the pseudo header)
-        setPacketTotalLength(packet, initialLength + offsetModification);
-
-        // Check if the ModificationList has to be committed
-        if(hasModificationList)
-        {
-            // We know that the packet has been modified and its size has changed
-            modList->commit(fcb_in->common->maintainers[getFlowDirection()]);
-
-            // Check if the full content of the packet has been removed
-            if(getPayloadLength(packet) == 0)
+            if(byteStreamMaintainer.isLastAckSentSet())
             {
-                uint32_t saddr = getDestinationAddress(packet);
-                uint32_t daddr = getSourceAddress(packet);
-                uint16_t sport = getDestinationPort(packet);
-                uint16_t dport = getSourcePort(packet);
-                // The SEQ value is the initial ACK value in the packet sent
-                // by the source.
-                tcp_seq_t seq = getInitialAck(packet);
+                prevLastAck = byteStreamMaintainer.getLastAckSent();
+                prevLastAckSet = true;
+            }
 
-                // The ACK is the sequence number sent by the source
-                // to which we add the old size of the payload to acknowledge it
-                tcp_seq_t ack = prevSeq + prevPayloadSize;
+            if(prevSeq != newSeq)
+            {
+                setSequenceNumber(packet, newSeq);
+                seqModified = true;
+            }
 
-                if(isFin(packet) || isSyn(packet))
-                    ack++;
+            // Update the last sequence number seen
+            // This number is used when crafting ACKs
+            byteStreamMaintainer.setLastSeqSent(newSeq);
 
-                // Craft and send the ack
-                sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
-                    sport, dport, seq, ack);
+            // Update the window size
+            byteStreamMaintainer.setWindowSize(getWindowSize(packet));
 
-                // Even if the packet is empty it can still contain relevant
-                // information (significant ACK value or another flag)
-                if(isJustAnAck(packet))
+            // Update the value of the last ACK sent
+            if(isAck(packet))
+            {
+                byteStreamMaintainer.setLastAckSent(prevAck);
+
+                // Ensure that the value of the ACK is not below the last ACKed position
+                // This solves the following problem:
+                // - We ACK a packet manually for any reason
+                // -> The "manual" ACK is lost
+                setAckNumber(packet, byteStreamMaintainer.getLastAckSent());
+
+                if(getAckNumber(packet) != prevAck)
+                    ackModified = true;
+            }
+
+            // Check the length to see if bytes were added or removed
+            uint16_t initialLength = packetTotalLength(packet);
+            uint16_t currentLength = (uint16_t)packet->length() - getIPHeaderOffset(packet);
+            int offsetModification = -(initialLength - currentLength);
+            uint32_t prevPayloadSize = getPayloadLength(packet);
+
+            // Update the "total length" field in the IP header (required to compute the
+            // tcp checksum as it is in the pseudo header)
+            setPacketTotalLength(packet, initialLength + offsetModification);
+
+            // Check if the ModificationList has to be committed
+            if(hasModificationList)
+            {
+                // We know that the packet has been modified and its size has changed
+                modList->commit(fcb_in->common->maintainers[getFlowDirection()]);
+
+                // Check if the full content of the packet has been removed
+                if(getPayloadLength(packet) == 0)
                 {
-                    // Check if the ACK of the packet was significant or not
-                    if(prevLastAckSet && SEQ_LEQ(prevAck, prevLastAck))
+                    uint32_t saddr = getDestinationAddress(packet);
+                    uint32_t daddr = getSourceAddress(packet);
+                    uint16_t sport = getDestinationPort(packet);
+                    uint16_t dport = getSourcePort(packet);
+                    // The SEQ value is the initial ACK value in the packet sent
+                    // by the source.
+                    tcp_seq_t seq = getInitialAck(packet);
+
+                    // The ACK is the sequence number sent by the source
+                    // to which we add the old size of the payload to acknowledge it
+                    tcp_seq_t ack = prevSeq + prevPayloadSize;
+
+                    if(isFin(packet) || isSyn(packet))
+                        ack++;
+
+                    // Craft and send the ack
+                    sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+                        sport, dport, seq, ack);
+
+                    // Even if the packet is empty it can still contain relevant
+                    // information (significant ACK value or another flag)
+                    if(isJustAnAck(packet))
                     {
-                        // If this is not the case, drop the packet as it
-                        // does not contain any relevant information
-                        // (And anyway it would be considered as a duplicate ACK)
-                        packet->kill();
-                        fcb_in->common->lock.release();
-                        return NULL;
+                        // Check if the ACK of the packet was significant or not
+                        if(prevLastAckSet && SEQ_LEQ(prevAck, prevLastAck))
+                        {
+                            // If this is not the case, drop the packet as it
+                            // does not contain any relevant information
+                            // (And anyway it would be considered as a duplicate ACK)
+                            packet->kill();
+                            fcb_in->common->lock.release();
+                            return NULL;
+                        }
                     }
                 }
             }
+
+            fcb_in->common->lock.release();
+
+            computeTCPChecksum(packet);
+        } else {
+            tcp_seq_t seq = getSequenceNumber(p);
+            tcp_seq_t ack = getAckNumber(p);
+            uint16_t winSize = getWindowSize(p);
+            fcb_in->common->lock.acquire();
+
+            // Update the last sequence number seen
+            // This number is used when crafting ACKs
+            ByteStreamMaintainer &byteStreamMaintainer = fcb_in->common->maintainers[getFlowDirection()];
+            byteStreamMaintainer.setLastSeqSent(seq);
+
+            // Update the window size
+            byteStreamMaintainer.setWindowSize(winSize);
+
+            // Update the value of the last ACK sent
+            if(isAck(p))
+            {
+                byteStreamMaintainer.setLastAckSent(ack);
+            }
+            fcb_in->common->lock.release();
+
+            if (!_readonly) {
+                // Recompute the checksum
+                WritablePacket *packet = p->uniqueify();
+                p = packet;
+                computeTCPChecksum(packet);
+            }
         }
 
-        fcb_in->common->lock.release();
-
-        // Recompute the checksum
-        computeTCPChecksum(packet);
-
         // Notify the stack function that this packet has been sent
-        packetSent(packet);
+        packetSent(p);
 
-        return packet;
+        return p;
     };
     EXECUTE_FOR_EACH_PACKET(fnt, flow);
     output(0).push_batch(flow);
@@ -157,11 +188,13 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
 void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
     uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force)
 {
+    click_chatter("Gen ack");
     if(noutputs() < 2)
     {
         click_chatter("Warning: trying to send an ack on a TCPOut with only 1 output");
         return;
     }
+
 
     // Check if the ACK does not bring any additional information
     if(!force && maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent()))
@@ -232,9 +265,14 @@ void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr,
     #endif
 }
 
-void TCPOut::setInElement(TCPIn* inElement)
+int TCPOut::setInElement(TCPIn* inElement, ErrorHandler* errh)
 {
     this->inElement = inElement;
+    this->_allow_resize = inElement->allow_resize();
+    if (_allow_resize && _readonly) {
+        return errh->error("Cannot modify packets in read-only mode !");
+    }
+    return 0;
 }
 
 bool TCPOut::checkConnectionClosed(Packet *packet)
