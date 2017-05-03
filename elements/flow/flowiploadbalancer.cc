@@ -24,6 +24,10 @@ FlowIPLoadBalancer::~FlowIPLoadBalancer() {
 
 }
 
+FlowNode* FlowIPLoadBalancer::get_table(int iport) {
+    return upstream_classifier_table()->parse("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff").root->combine(upstream_classifier_table()->parse("9/11! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff").root,false)->replace_leaves(FlowElement::get_table(iport));
+}
+
 int
 FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -99,6 +103,10 @@ FlowIPLoadBalancerReverse::FlowIPLoadBalancerReverse() {
 
 FlowIPLoadBalancerReverse::~FlowIPLoadBalancerReverse() {
 
+}
+
+FlowNode* FlowIPLoadBalancerReverse::get_table(int iport) {
+    return upstream_classifier_table()->parse("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff").root->combine(upstream_classifier_table()->parse("9/11! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff").root,false)->replace_leaves(FlowElement::get_table(iport));
 }
 
 int

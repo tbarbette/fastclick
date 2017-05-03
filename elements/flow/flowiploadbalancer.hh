@@ -45,6 +45,8 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
+    FlowNode* get_table(int iport);
+
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
 
@@ -69,6 +71,8 @@ public:
     const char *class_name() const      { return "FlowIPLoadBalancerReverse"; }
     const char *port_count() const      { return "1/1"; }
     const char *processing() const      { return PUSH; }
+
+    FlowNode* get_table(int iport);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
