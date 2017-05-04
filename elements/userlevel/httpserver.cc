@@ -29,96 +29,7 @@ canonical_handler_name(const String &n)
 		return n;
 }
 
-int HTTPServer::ahc_echo(void * cls,
-		struct MHD_Connection * connection,
-		const char * url,
-		const char * method,
-		const char * version,
-		const char * upload_data,
-		size_t * upload_data_size,
-		void ** ptr) {
-	static int dummy;
-	HTTPServer* server = reinterpret_cast<HTTPServer*>(cls);
-
-	int ret = MHD_YES;
-
-	/* if (0 != strcmp(method, "GET"))
-    return MHD_NO; */
-
-	if (&dummy != *ptr)
-	{
-		/* The first time only the headers are valid,
-		 do not respond in the first round... */
-		*ptr = &dummy;
-		return MHD_YES;
-	}
-	click_chatter("[%s] %s",method,url);
-
-	if (0 != *upload_data_size)
-		return MHD_NO; /* upload data in a GET!? */
-	*ptr = NULL; /* clear context pointer */
-
-
-	//Processing request
-	Request* request = new Request();
-	request->connection = connection;
-	click_chatter("Handled by thread %d",click_current_cpu_id());
-	String body;
-	int status;
-	struct MHD_Response * response;
-	const Handler* h;
-
-	String full_name = String(&url[1]);
-	String canonical_name = canonical_handler_name(full_name);
-
-	Element *e;
-	const char *dot = find(canonical_name, '/');
-	String hname;
-
-	if (dot != canonical_name.end()) {
-		String ename = canonical_name.substring(canonical_name.begin(), dot);
-		e = server->router()->find(ename);
-		if (!e) {
-			int num;
-			if (IntArg().parse(ename, num) && num > 0 && num <= server->router()->nelements())
-				e = server->router()->element(num - 1);
-		}
-		if (!e) {
-			body =  "No element named '" + ename + "'";
-			status = 404;
-			goto send;
-		}
-		hname = canonical_name.substring(dot + 1, canonical_name.end());
-	} else {
-		e = server->router()->root_element();
-		hname = canonical_name;
-	}
-
-	// Then find handler.
-	h = Router::handler(e, hname);
-	if (h && h->visible()) {
-		body = h->call_read(e, ErrorHandler::default_handler());
-		status = MHD_HTTP_OK;
-		goto send;
-	} else {
-		body = "No handler named '" + full_name + "'";
-		status = 404;
-		goto send;
-	}
-
-	send:
-	response = MHD_create_response_from_buffer (body.length(),
-			(void*)body.c_str(),
-			MHD_RESPMEM_MUST_COPY);
-	MHD_queue_response(request->connection,
-			status,
-			response);
-	MHD_destroy_response(response);
-
-	return ret;
-}
-
-HTTPServer::HTTPServer() : _port(4000), _daemon(0), _task(this) {
+HTTPServer::HTTPServer() : _port(80), _daemon(0), _task(this) {
 	FD_ZERO(&_read_fd_set);
 	FD_ZERO(&_write_fd_set);
 	FD_ZERO(&_except_fd_set);
@@ -188,6 +99,97 @@ int HTTPServer::initialize(ErrorHandler *errh) {
 	ScheduleInfo::initialize_task(this, &_task,false,errh);
 	click_chatter("Finish init");
 	return 0;
+}
+
+
+int HTTPServer::ahc_echo(void * cls,
+		struct MHD_Connection * connection,
+		const char * url,
+		const char * method,
+		const char * version,
+		const char * upload_data,
+		size_t * upload_data_size,
+		void ** ptr) {
+	static int dummy;
+	HTTPServer* server = reinterpret_cast<HTTPServer*>(cls);
+
+	int ret = MHD_YES;
+
+	/* if (0 != strcmp(method, "GET"))
+    return MHD_NO; */
+
+	if (&dummy != *ptr)
+	{
+		/* The first time only the headers are valid,
+		 do not respond in the first round... */
+		*ptr = &dummy;
+		return MHD_YES;
+	}
+	click_chatter("[%s] %s",method,url);
+
+	if (0 != *upload_data_size)
+		return MHD_NO; /* upload data in a GET!? */
+	*ptr = NULL; /* clear context pointer */
+
+
+	//Processing request
+	Request* request = new Request();
+	request->connection = connection;
+	click_chatter("Handled by thread %d",click_current_cpu_id());
+	String body;
+	int status;
+	struct MHD_Response * response;
+	const Handler* h;
+
+	//Following is taken from ControlSocket mostly
+	String full_name = String(&url[1]);
+	String canonical_name = canonical_handler_name(full_name);
+
+	Element *e;
+	const char *dot = find(canonical_name, '/');
+	String hname;
+
+	if (dot != canonical_name.end()) {
+		String ename = canonical_name.substring(canonical_name.begin(), dot);
+		e = server->router()->find(ename);
+		if (!e) {
+			int num;
+			if (IntArg().parse(ename, num) && num > 0 && num <= server->router()->nelements())
+				e = server->router()->element(num - 1);
+		}
+		if (!e) {
+			body =  "No element named '" + ename + "'";
+			status = 404;
+			goto send;
+		}
+		hname = canonical_name.substring(dot + 1, canonical_name.end());
+	} else {
+		e = server->router()->root_element();
+		hname = canonical_name;
+	}
+
+	// Then find handler.
+	h = Router::handler(e, hname);
+	if (h && h->visible()) {
+		body = h->call_read(e, ErrorHandler::default_handler());
+		status = MHD_HTTP_OK;
+		goto send;
+	} else {
+		body = "No handler named '" + full_name + "'";
+		status = 404;
+		goto send;
+	}
+
+	send:
+	response = MHD_create_response_from_buffer (body.length(),
+			(void*)body.c_str(),
+			MHD_RESPMEM_MUST_COPY);
+	MHD_queue_response(request->connection,
+			status,
+			response);
+	MHD_destroy_response(response);
+
+	return ret;
 }
 
 void HTTPServer::cleanup(CleanupStage stage) {

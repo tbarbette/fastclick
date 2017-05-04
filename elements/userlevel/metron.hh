@@ -31,6 +31,7 @@ class Metron : public Element { public:
     	h_ressources
     };
 
+    Vector<Element*> _nics;
 
 private:
 

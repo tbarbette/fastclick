@@ -143,20 +143,21 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     if (n_threads == 0) {
-        return errh->error("No threads end up in this queuedevice...? Aborting.");
+        errh->warning("No threads end up in this queuedevice...?");
     }
 
     if (n_threads >= _maxqueues)
         n_queues = _maxqueues;
     else
         n_queues = max(_minqueues,n_threads);
-
-    queue_per_threads = n_queues / n_threads;
-    if (queue_per_threads == 0) {
-        queue_per_threads = 1;
-        thread_share = n_threads / n_queues;
+    click_chatter("Nqueues %d %d %d", n_queues, _minqueues,_maxqueues);
+    if (n_threads > 0) {
+        queue_per_threads = n_queues / n_threads;
+        if (queue_per_threads == 0) {
+            queue_per_threads = 1;
+            thread_share = n_threads / n_queues;
+        }
     }
-
     n_initialized++;
     if (_verbose > 1) {
 		if (input_is_push(0))
