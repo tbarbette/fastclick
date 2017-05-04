@@ -56,10 +56,15 @@ String Metron::read_handler(Element *e, void *user_data) {
 		for (auto e: m->_nics) {
 			Json nic = Json::make_object();
 			nic.set("id",e->name());
-			const Handler* h = Router::handler(e, "speed");
-			if (h && h->visible()) {
-				nic.set("speed",h->call_read(e, ErrorHandler::default_handler()));
+			const Handler* hS = Router::handler(e, "speed");
+			if (hS && hS->visible()) {
+				nic.set("speed",hS->call_read(e, ErrorHandler::default_handler()));
 			}
+			const Handler* hC = Router::handler(e, "carrier");
+			if (hC && hC->visible()) {
+				nic.set("carrier",hC->call_read(e, ErrorHandler::default_handler()));
+			}
+
 			nics.push_back(nic);
 		}
 		j.set("nic",nics);

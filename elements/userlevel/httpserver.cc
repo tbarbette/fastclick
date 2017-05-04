@@ -30,9 +30,6 @@ canonical_handler_name(const String &n)
 }
 
 HTTPServer::HTTPServer() : _port(80), _daemon(0), _task(this) {
-	FD_ZERO(&_read_fd_set);
-	FD_ZERO(&_write_fd_set);
-	FD_ZERO(&_except_fd_set);
 }
 
 HTTPServer::~HTTPServer() {
@@ -40,20 +37,23 @@ HTTPServer::~HTTPServer() {
 }
 
 bool HTTPServer::run_task(Task* task) {
-
 	click_chatter("Running task");
 	//TODO : deprectaed, via select the function run as click thread
 }
 
 void HTTPServer::selected(int fd, int mask) {
-	click_chatter("Selected !");
-	remove_select(fd,mask);
+	click_chatter("Selected %d %d !",fd, mask);
+	remove_select(fd, mask);
 	MHD_run(_daemon);
 	update_fd_set();
 }
 
 void HTTPServer::update_fd_set() {
 	int max_fd = 0;
+
+	FD_ZERO(&_read_fd_set);
+	FD_ZERO(&_write_fd_set);
+	FD_ZERO(&_except_fd_set);
 
 	if (MHD_get_fdset(_daemon,&_read_fd_set,&_write_fd_set,&_except_fd_set,&max_fd) != MHD_YES) {
 		click_chatter("Could not get fd set");
@@ -62,11 +62,11 @@ void HTTPServer::update_fd_set() {
 	for (int i = 0; i <= max_fd; i++) {
 		if (FD_ISSET(i,&_read_fd_set)) {
 			add_select(i,SELECT_READ);
-			//click_chatter("Add fd %d read !",i);
+			click_chatter("Add fd %d read !",i);
 		}
 		if (FD_ISSET(i,&_write_fd_set)) {
 			add_select(i,SELECT_WRITE);
-			//click_chatter("Add fd %d write !",i);
+			click_chatter("Add fd %d write !",i);
 		}
 	}
 }
@@ -83,7 +83,7 @@ int HTTPServer::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 int HTTPServer::initialize(ErrorHandler *errh) {
 	click_chatter("Starting");
-	_daemon = MHD_start_daemon(MHD_NO_FLAG,
+	_daemon = MHD_start_daemon(MHD_USE_DEBUG,
 			_port,
 			&ahc_policy,
 			NULL,
@@ -112,6 +112,7 @@ int HTTPServer::ahc_echo(void * cls,
 		void ** ptr) {
 	static int dummy;
 	HTTPServer* server = reinterpret_cast<HTTPServer*>(cls);
+click_chatter("echo");
 
 	int ret = MHD_YES;
 
@@ -119,12 +120,11 @@ int HTTPServer::ahc_echo(void * cls,
     return MHD_NO; */
 
 	if (&dummy != *ptr)
-	{
-		/* The first time only the headers are valid,
-		 do not respond in the first round... */
+	{	
 		*ptr = &dummy;
 		return MHD_YES;
 	}
+*ptr = NULL;
 	click_chatter("[%s] %s",method,url);
 
 	if (0 != *upload_data_size)
@@ -184,7 +184,9 @@ int HTTPServer::ahc_echo(void * cls,
 	response = MHD_create_response_from_buffer (body.length(),
 			(void*)body.c_str(),
 			MHD_RESPMEM_MUST_COPY);
-	MHD_queue_response(request->connection,
+	if (NULL == response)
+	    return MHD_NO;
+	ret = MHD_queue_response(request->connection,
 			status,
 			response);
 	MHD_destroy_response(response);
