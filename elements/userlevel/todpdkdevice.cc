@@ -61,7 +61,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (firstqueue == -1)
        firstqueue = 0;
     if (n_queues == -1) {
-	configure_tx(1,128,errh);
+    	configure_tx(1,128,errh);
     } else {
         configure_tx(n_queues,n_queues,errh);
     }

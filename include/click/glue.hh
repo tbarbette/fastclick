@@ -392,6 +392,7 @@ extern __thread int click_current_thread_id;
 #endif
 
 #if CLICK_USERLEVEL
+extern char* click_path;
 extern int click_nthreads;
 #endif
 

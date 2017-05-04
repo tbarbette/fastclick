@@ -26,12 +26,9 @@ class HTTPServer : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
-    /*void add_handlers() CLICK_COLD;
-*/
+
     void selected(int fd, int mask);
     void update_fd_set();
-
-    bool run_task(Task *);
 
     static int ahc_echo(void * cls,
     		    struct MHD_Connection * connection,
@@ -44,8 +41,6 @@ class HTTPServer : public Element { public:
 private:
     int _port;
     struct MHD_Daemon * _daemon;
-    Task _task;
-	fd_set _read_fd_set,_write_fd_set,_except_fd_set;
 
 
     class Request {

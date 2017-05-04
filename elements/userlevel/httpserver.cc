@@ -14,7 +14,9 @@ CLICK_DECLS
 
 
 static int ahc_policy(void* cls, const struct sockaddr * addr, socklen_t addrlen) {
-	click_chatter("Policy");
+    (void)cls;
+    (void)addr;
+    (void)addrlen;
 	return MHD_YES;
 }
 
@@ -29,20 +31,15 @@ canonical_handler_name(const String &n)
 		return n;
 }
 
-HTTPServer::HTTPServer() : _port(80), _daemon(0), _task(this) {
+HTTPServer::HTTPServer() : _port(80), _daemon(0) {
 }
 
 HTTPServer::~HTTPServer() {
 
 }
 
-bool HTTPServer::run_task(Task* task) {
-	click_chatter("Running task");
-	//TODO : deprectaed, via select the function run as click thread
-}
 
 void HTTPServer::selected(int fd, int mask) {
-	click_chatter("Selected %d %d !",fd, mask);
 	remove_select(fd, mask);
 	MHD_run(_daemon);
 	update_fd_set();
@@ -50,6 +47,7 @@ void HTTPServer::selected(int fd, int mask) {
 
 void HTTPServer::update_fd_set() {
 	int max_fd = 0;
+    fd_set _read_fd_set,_write_fd_set,_except_fd_set;
 
 	FD_ZERO(&_read_fd_set);
 	FD_ZERO(&_write_fd_set);
@@ -62,11 +60,9 @@ void HTTPServer::update_fd_set() {
 	for (int i = 0; i <= max_fd; i++) {
 		if (FD_ISSET(i,&_read_fd_set)) {
 			add_select(i,SELECT_READ);
-			click_chatter("Add fd %d read !",i);
 		}
 		if (FD_ISSET(i,&_write_fd_set)) {
 			add_select(i,SELECT_WRITE);
-			click_chatter("Add fd %d write !",i);
 		}
 	}
 }
@@ -82,7 +78,6 @@ int HTTPServer::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 
 int HTTPServer::initialize(ErrorHandler *errh) {
-	click_chatter("Starting");
 	_daemon = MHD_start_daemon(MHD_USE_DEBUG,
 			_port,
 			&ahc_policy,
@@ -92,12 +87,9 @@ int HTTPServer::initialize(ErrorHandler *errh) {
 			MHD_OPTION_END);
 	if (_daemon == NULL)
 		return 1;
-	click_chatter("Running");
 
 	update_fd_set();
 
-	ScheduleInfo::initialize_task(this, &_task,false,errh);
-	click_chatter("Finish init");
 	return 0;
 }
 
@@ -124,18 +116,13 @@ click_chatter("echo");
 		*ptr = &dummy;
 		return MHD_YES;
 	}
-*ptr = NULL;
 	click_chatter("[%s] %s",method,url);
 
-	if (0 != *upload_data_size)
-		return MHD_NO; /* upload data in a GET!? */
 	*ptr = NULL; /* clear context pointer */
-
 
 	//Processing request
 	Request* request = new Request();
 	request->connection = connection;
-	click_chatter("Handled by thread %d",click_current_cpu_id());
 	String body;
 	int status;
 	struct MHD_Response * response;
@@ -144,7 +131,6 @@ click_chatter("echo");
 	//Following is taken from ControlSocket mostly
 	String full_name = String(&url[1]);
 	String canonical_name = canonical_handler_name(full_name);
-
 	Element *e;
 	const char *dot = find(canonical_name, '/');
 	String hname;
@@ -171,8 +157,29 @@ click_chatter("echo");
 	// Then find handler.
 	h = Router::handler(e, hname);
 	if (h && h->visible()) {
-		body = h->call_read(e, ErrorHandler::default_handler());
-		status = MHD_HTTP_OK;
+	    if (strcmp("GET",method) == 0) {
+	        if (h->readable()) {
+	            body = h->call_read(e, ErrorHandler::default_handler());
+	            status = MHD_HTTP_OK;
+	        } else {
+	            body = "This request is not readable";
+	            status = MHD_HTTP_BAD_REQUEST;
+	        }
+	    } else {
+	        String data = String(upload_data);
+	        if (h->writable()) {
+	            int ret = h->call_write(data, e, ErrorHandler::default_handler());
+	            if (ret == 0) {
+	                body = "success";
+	            } else {
+	                body = "error";
+	            }
+                status = MHD_HTTP_OK;
+	        } else {
+	            body = "This request is not writable";
+	            status = MHD_HTTP_BAD_REQUEST;
+	        }
+	    }
 		goto send;
 	} else {
 		body = "No handler named '" + full_name + "'";
@@ -194,7 +201,7 @@ click_chatter("echo");
 	return ret;
 }
 
-void HTTPServer::cleanup(CleanupStage stage) {
+void HTTPServer::cleanup(CleanupStage) {
 	if (_daemon != NULL)
 		MHD_stop_daemon(_daemon);
 }

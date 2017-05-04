@@ -338,6 +338,7 @@ static Vector<String> cs_unix_sockets;
 static Vector<String> cs_ports;
 static Vector<String> cs_sockets;
 static bool warnings = true;
+char* click_path;
 int click_nthreads = 1;
 bool dpdk_enabled = false;
 
@@ -518,6 +519,8 @@ main(int argc, char **argv)
 {
   click_static_initialize();
   errh = ErrorHandler::default_handler();
+
+  click_path = argv[0];
 
   // read command line arguments
   Clp_Parser *clp =
