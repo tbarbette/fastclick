@@ -70,6 +70,8 @@ class Metron : public Element { public:
     int addChain(ServiceChain* sc, ErrorHandler *errh);
 
 private:
+    Vector<String> _args;
+    Vector<String> _dpdk_args;
 
     HashMap<String,NIC> _nics;
     HashMap<String,ServiceChain*> _scs;

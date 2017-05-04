@@ -25,6 +25,8 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
     Vector<Element*> nics;
     if (Args(conf, this, errh)
         .read_all("NIC",nics)
+        .read_all("SLAVE_DPDK_ARGS",_dpdk_args)
+        .read_all("SLAVE_ARGS",_args)
         .complete() < 0)
         return -1;
 
@@ -95,22 +97,35 @@ int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
         return errh->error("Fork error. Too many processes?");
     }
     if (pid == 0) {
+        int i;
         String cpulist = "";
+        int ret;
         for (int i = 0; i < click_max_cpu_ids(); i++) {
             cpulist += String(i) + (i < click_max_cpu_ids() -1? ",":"");
         }
 
         char* program = click_path;
 
-        char* argv[] = {
+        char* argv[256] = {
                 program,
                 "--dpdk",
                 "-l",
                 const_cast<char*>(cpulist.c_str()),
                 "--proc-type=secondary",
-                "--"
         };
-        int ret;
+        int argpos = 5;
+        for (i = 0; i < _dpdk_args.size(); i++) {
+            argv[argpos++] = const_cast<char*>(_dpdk_args[i].c_str());
+        }
+        argv[argpos++] = "--";
+        for (i = 0; i < _args.size(); i++) {
+            argv[argpos++] = const_cast<char*>(_args[i].c_str());
+        }
+        argv[argpos++] = 0;
+        for (i = 0; i < argpos; i++)  {
+            click_chatter("ARG %s",argv[i]);
+        }
+
         if (ret = execv(program, argv)) {
             click_chatter("Could not launch slave process : %d %d",ret,errno);
         }
