@@ -194,6 +194,11 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
                   return "false";
               else
                   return "true";
+        case h_device:
+              if (!fd->_dev)
+                  return "undefined";
+              else
+                  return String(fd->_dev->port_id);
         case h_mac: {
             if (!fd->_dev)
                 return String::make_empty();
@@ -256,7 +261,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
 
 void FromDPDKDevice::add_handlers()
 {
-
+    add_read_handler("device",read_handler, h_device);
 
     add_read_handler("duplex",status_handler, h_duplex);
 #if RTE_VERSION >= RTE_VERSION_NUM(16,04,0,0)
