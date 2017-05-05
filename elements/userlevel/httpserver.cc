@@ -101,23 +101,20 @@ int HTTPServer::ahc_echo(void * cls,
 		const char * version,
 		const char * upload_data,
 		size_t * upload_data_size,
-		void ** ptr) {
+		void ** con_cls) {
 	static int dummy;
 	HTTPServer* server = reinterpret_cast<HTTPServer*>(cls);
 
 	int ret = MHD_YES;
 
-	/* if (0 != strcmp(method, "GET"))
-    return MHD_NO; */
+	if (NULL == *con_cls)
+	    {*con_cls = new String("");
 
-	if (&dummy != *ptr)
-	{	
-		*ptr = &dummy;
-		return MHD_YES;
-	}
+	      return MHD_YES;
+	    }
+
 	click_chatter("[%s] %s",method,url);
 
-	*ptr = NULL; /* clear context pointer */
 
 	//Processing request
 	Request* request = new Request();
@@ -153,7 +150,6 @@ int HTTPServer::ahc_echo(void * cls,
 		hname = canonical_name;
 	}
 
-	click_chatter("%s-%s",hname.c_str(), canonical_name.c_str());
 	if ((hname == "" || hname=="/") && strcmp("GET",method) == 0) {
 	    /*Json jelements = Json::make_array();
         for (int i = 0; i < server->router()->nelements(); i++) {
@@ -172,6 +168,7 @@ int HTTPServer::ahc_echo(void * cls,
 	    }
 	}
 
+
 	// Then find handler.
 	h = Router::handler(e, hname);
 	if (h && h->visible()) {
@@ -183,20 +180,32 @@ int HTTPServer::ahc_echo(void * cls,
 	            body = "This request is not readable";
 	            status = MHD_HTTP_BAD_REQUEST;
 	        }
-	    } else {
-	        String data = String(upload_data);
-	        if (h->writable()) {
-	            int ret = h->call_write(data, e, ErrorHandler::default_handler());
-	            if (ret == 0) {
-	                body = "success";
-	            } else {
-	                body = "error";
-	            }
-                status = MHD_HTTP_OK;
-	        } else {
-	            body = "This request is not writable";
-	            status = MHD_HTTP_BAD_REQUEST;
+	    } else   if (0 == strcmp (method, "POST"))
+	    {
+	          if (*upload_data_size != 0) {
+	              static_cast<String*>(*con_cls)->append(String(upload_data, *upload_data_size));
+	              *upload_data_size = 0;
+
+	              return MHD_YES;
 	        }
+	      else {
+	          String data = *static_cast<String*>(*con_cls);
+	          click_chatter("Last call with data %s",data.c_str());
+              if (h->writable()) {
+                  int ret = h->call_write(data, e, ErrorHandler::default_handler());
+                  click_chatter("Ret is %d",ret);
+                  if (ret == 0) {
+                      body = "success";
+                  } else {
+                      body = "error";
+                  }
+                  status = MHD_HTTP_OK;
+              } else {
+                  body = "This request is not writable";
+                  status = MHD_HTTP_BAD_REQUEST;
+              }
+              delete *con_cls;
+	      }
 	    }
 		goto send;
 	} else {
@@ -209,11 +218,14 @@ int HTTPServer::ahc_echo(void * cls,
 	response = MHD_create_response_from_buffer (body.length(),
 			(void*)body.c_str(),
 			MHD_RESPMEM_MUST_COPY);
-	if (NULL == response)
+	if (NULL == response) {
+	    click_chatter("Could not create response");
 	    return MHD_NO;
+	}
 	ret = MHD_queue_response(request->connection,
 			status,
 			response);
+	click_chatter("Queue response return %d",ret);
 	MHD_destroy_response(response);
 
 	return ret;
