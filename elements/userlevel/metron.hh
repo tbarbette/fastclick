@@ -30,6 +30,7 @@ class Metron : public Element { public:
     static String read_handler(Element *e, void *user_data) CLICK_COLD;
     static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler* errh) CLICK_COLD;
 
+    Json toJSON();
 
     class NIC { public:
         Element* element;
@@ -38,7 +39,11 @@ class Metron : public Element { public:
             return element->name();
         }
 
+        String getDeviceId();
+
         Json toJSON();
+    private:
+        String callRead(String h);
     };
 
     class ServiceChain { public:
@@ -46,9 +51,13 @@ class Metron : public Element { public:
         String id;
         int vlanid;
         String config;
-        int cpu;
+        int cpu_nr;
         Vector<Metron::NIC*> nic;
         enum ScStatus status;
+
+        ServiceChain(Metron* m) : _metron(m) {
+
+        }
 
         static ServiceChain* fromJSON(Json j,Metron* m, ErrorHandler* errh);
 
@@ -58,9 +67,46 @@ class Metron : public Element { public:
             return id;
         }
 
-        String generateConfig() {
-            return config;
+        int getCpuNr() {
+            return cpu_nr;
         }
+
+        String generateConfig();
+        Vector<String> buildCmdLine(int socketfd) {
+            Vector<String> argv;
+            int i;
+
+            String cpulist = "";
+
+
+            for (int i = 0; i < click_max_cpu_ids(); i++) {
+                cpulist += String(i) + (i < click_max_cpu_ids() -1? ",":"");
+            }
+
+            argv.push_back(click_path);
+            argv.push_back("--dpdk");
+            argv.push_back("-l");
+            argv.push_back(cpulist);
+            argv.push_back("--proc-type=secondary");
+
+            for (i = 0; i < _metron->_dpdk_args.size(); i++) {
+                argv.push_back(_metron->_dpdk_args[i]);
+            }
+            argv.push_back("--");
+            argv.push_back("--socket");
+            argv.push_back(String(socketfd));
+            for (i = 0; i < _metron->_args.size(); i++) {
+                argv.push_back(_metron->_args[i]);
+            }
+
+            for (i = 0; i < argv.size(); i++)  {
+                click_chatter("ARG %s",argv[i].c_str());
+            }
+            return argv;
+        }
+    private:
+        Metron* _metron;
+        Vector<int> _cpus;
     };
     enum {
         h_resources,
@@ -69,13 +115,28 @@ class Metron : public Element { public:
 
     int addChain(ServiceChain* sc, ErrorHandler *errh);
 
+    int getCpuNr() {
+        return click_max_cpu_ids();
+    }
+
+    int getAssignedCpuNr();
+
+    bool assignCpus(ServiceChain* sc, Vector<int>& map);
+
 private:
+    String _id;
     Vector<String> _args;
     Vector<String> _dpdk_args;
 
     HashMap<String,NIC> _nics;
     HashMap<String,ServiceChain*> _scs;
 
+    Vector<ServiceChain*> _cpu_map;
+
+    String _vendor;
+    String _hw;
+    String _sw;
+    String _serial;
 };
 
 CLICK_ENDDECLS
