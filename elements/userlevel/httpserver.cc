@@ -104,7 +104,6 @@ int HTTPServer::ahc_echo(void * cls,
 		void ** ptr) {
 	static int dummy;
 	HTTPServer* server = reinterpret_cast<HTTPServer*>(cls);
-click_chatter("echo");
 
 	int ret = MHD_YES;
 
@@ -152,6 +151,25 @@ click_chatter("echo");
 	} else {
 		e = server->router()->root_element();
 		hname = canonical_name;
+	}
+
+	click_chatter("%s-%s",hname.c_str(), canonical_name.c_str());
+	if ((hname == "" || hname=="/") && strcmp("GET",method) == 0) {
+	    /*Json jelements = Json::make_array();
+        for (int i = 0; i < server->router()->nelements(); i++) {
+            String ename = server->router()->element(i)->name();
+            Json je = Json::make_object();
+            je.set("name",ename);
+            jelements.push_back(je);
+        }
+        body = jelements.unparse();
+        status = MHD_HTTP_OK;
+        goto send;*/
+	    if (canonical_name.length() > 0) {
+	        hname = "handlers";
+	    } else {
+	        hname = "list";
+	    }
 	}
 
 	// Then find handler.
