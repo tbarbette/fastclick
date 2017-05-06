@@ -234,10 +234,10 @@ Json Metron::NIC::toJSON() {
     nic.set("id",getId());
     nic.set("speed",callRead("speed"));
     nic.set("status",callRead("carrier"));
-    nic.set("hw_addr",callRead("mac"));
-    nic.set("rx_count",callRead("hw_count"));
-    nic.set("rx_bytes",callRead("hw_bytes"));
-    nic.set("hw_errors",callRead("hw_errors"));
+    nic.set("hwAddr",callRead("mac").replace('-',':'));
+    nic.set("rxCount",callRead("hw_count"));
+    nic.set("rxBytes",callRead("hw_bytes"));
+    nic.set("hwErrors",callRead("hw_errors"));
     return nic;
 }
 
@@ -259,14 +259,14 @@ Json Metron::toJSON() {
     jroot.set("id",Json(_id));
 
     //Cpu ressources
-    jroot.set("cpu",Json(getCpuNr()));
-    jroot.set("assignedCpu",Json(getAssignedCpuNr()));
-    jroot.set("freeCpu",Json(getCpuNr() - getAssignedCpuNr()));
+    jroot.set("cpus",Json(getCpuNr()));
+    jroot.set("busyCpus",Json(getAssignedCpuNr()));
+    jroot.set("freeCpus",Json(getCpuNr() - getAssignedCpuNr()));
 
     //Infos
-    jroot.set("vendor",Json(_vendor));
-    jroot.set("hw",Json(_hw));
-    jroot.set("sw",Json(_sw));
+    jroot.set("manufacturer",Json(_vendor));
+    jroot.set("hwVersion",Json(_hw));
+    jroot.set("swVersion",Json("Click"+_sw));
     jroot.set("serial",Json(_serial));
 
     //Nics ressources
@@ -276,7 +276,7 @@ Json Metron::toJSON() {
         jnics.push_back(begin.value().toJSON());
         begin++;
     }
-    jroot.set("nic",jnics);
+    jroot.set("nics",jnics);
     return jroot;
 }
 
@@ -324,7 +324,7 @@ Json Metron::ServiceChain::toJSON() {
     for (auto n : nic) {
         jnics.push_back(Json::make_string(n->getId()));
     }
-    jsc.set("nic",jnics);
+    jsc.set("nics",jnics);
     return jsc;
 }
 

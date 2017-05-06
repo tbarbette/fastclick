@@ -819,6 +819,19 @@ String::trim_space() const
     return String();
 }
 
+/** @brief Return a string with from replaced by to */
+String
+String::replace(char from, char to) const
+{
+    String newStr = *this;
+    char* data = const_cast<char*>(_r.data);
+    for (int i = 0; i < length(); i ++) {
+        if (data[i] == from)
+            data[i] = to;
+    }
+    return newStr;
+}
+
 /** @brief Return a hex-quoted version of the string.
 
     For example, the string "Abcd" would convert to "\<41626364>". */
