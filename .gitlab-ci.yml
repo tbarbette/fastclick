@@ -1,5 +1,5 @@
 variables:
-    DPDK_VERSION: "16.07"
+    DPDK_VERSION: "17.02"
     NETMAP_VERSION: "11.1"
 batch:
     script:
