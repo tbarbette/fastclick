@@ -31,6 +31,7 @@ class Metron : public Element { public:
     static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler* errh) CLICK_COLD;
 
     Json toJSON();
+    Json statsToJSON();
 
     class NIC { public:
         Element* element;
@@ -41,7 +42,7 @@ class Metron : public Element { public:
 
         String getDeviceId();
 
-        Json toJSON();
+        Json toJSON(bool stats = false);
     private:
         String callRead(String h);
     };
@@ -109,7 +110,7 @@ class Metron : public Element { public:
         Vector<int> _cpus;
     };
     enum {
-        h_resources,
+        h_resources,h_stats,
 	h_chains
     };
 

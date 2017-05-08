@@ -103,6 +103,10 @@ String Metron::read_handler(Element *e, void *user_data) {
 			jroot = m->toJSON();
 			break;
         }
+        case h_stats: {
+            jroot = m->statsToJSON();
+            break;
+        }
         case h_chains: {
             //NICs ressources
             Json jscs = Json::make_array();
@@ -205,7 +209,6 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
                 if (!sc) {
                     return errh->error("Could not instantiate a chain");
                 }
-                click_chatter("Adding chain");
                 int ret = m->addChain(sc, errh);
                 if (ret != 0) {
                     sc->status = ServiceChain::SC_FAILED;
@@ -214,7 +217,6 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
                     sc->status = ServiceChain::SC_OK;
                 }
             }
-            click_chatter("Chain up and running");
         return 0;
     }
     return -1;
@@ -222,6 +224,7 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
 
 void Metron::add_handlers() {
 	add_read_handler("resources", read_handler, h_resources);
+	add_read_handler("stats", read_handler, h_stats);
 	add_read_handler("chains", read_handler, h_chains);
 	add_write_handler("chains", write_handler, h_chains);
 }
@@ -229,15 +232,26 @@ void Metron::add_handlers() {
 /**
  * NIC
  */
-Json Metron::NIC::toJSON() {
+Json Metron::NIC::toJSON(bool stats) {
     Json nic = Json::make_object();
     nic.set("id",getId());
-    nic.set("speed",callRead("speed"));
-    nic.set("status",callRead("carrier"));
-    nic.set("hwAddr",callRead("mac").replace('-',':'));
-    nic.set("rxCount",callRead("hw_count"));
-    nic.set("rxBytes",callRead("hw_bytes"));
-    nic.set("hwErrors",callRead("hw_errors"));
+    if (!stats) {
+        nic.set("speed",callRead("speed"));
+        nic.set("status",callRead("carrier"));
+        nic.set("hwAddr",callRead("mac").replace('-',':'));
+        Json jtagging = Json::make_array();
+        jtagging.push_back("vlan");
+        jtagging.push_back("mac");
+        nic.set("tagging",jtagging);
+    } else {
+        nic.set("rxCount",callRead("hw_count"));
+        nic.set("rxBytes",callRead("hw_bytes"));
+        nic.set("rxDropped",callRead("hw_dropped"));
+        nic.set("rxErrors",callRead("hw_errors"));
+        nic.set("txCount",callRead("tx_count"));
+        nic.set("txBytes",callRead("tx_bytes"));
+        nic.set("txErrors",callRead("tx_errors"));
+    }
     return nic;
 }
 
@@ -260,8 +274,6 @@ Json Metron::toJSON() {
 
     //Cpu ressources
     jroot.set("cpus",Json(getCpuNr()));
-    jroot.set("busyCpus",Json(getAssignedCpuNr()));
-    jroot.set("freeCpus",Json(getCpuNr() - getAssignedCpuNr()));
 
     //Infos
     jroot.set("manufacturer",Json(_vendor));
@@ -273,7 +285,25 @@ Json Metron::toJSON() {
     Json jnics = Json::make_array();
     auto begin = _nics.begin();
     while (begin != _nics.end()) {
-        jnics.push_back(begin.value().toJSON());
+        jnics.push_back(begin.value().toJSON(false));
+        begin++;
+    }
+    jroot.set("nics",jnics);
+    return jroot;
+}
+
+Json Metron::statsToJSON() {
+    Json jroot = Json::make_object();
+
+    //Cpu ressources
+    jroot.set("busyCpus",Json(getAssignedCpuNr()));
+    jroot.set("freeCpus",Json(getCpuNr() - getAssignedCpuNr()));
+
+    //Nics ressources
+    Json jnics = Json::make_array();
+    auto begin = _nics.begin();
+    while (begin != _nics.end()) {
+        jnics.push_back(begin.value().toJSON(true));
         begin++;
     }
     jroot.set("nics",jnics);
@@ -288,8 +318,8 @@ Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHan
     sc->id = j.get_s("id");
     sc->vlanid = j.get_i("vlanid");
     sc->config = j.get_s("config");
-    sc->cpu_nr = j.get_i("cpu");
-    Json jnics = j.get("nic");
+    sc->cpu_nr = j.get_i("cpus");
+    Json jnics = j.get("nics");
     for (auto jnic : jnics) {
         Metron::NIC* nic = m->_nics.findp(jnic.second.as_s());
         if (!nic) {
@@ -314,7 +344,7 @@ Json Metron::ServiceChain::toJSON() {
     jsc.set("vlanid",vlanid);
     jsc.set("config",config);
     jsc.set("expanded_config", generateConfig());
-    jsc.set("cpu", getCpuNr());
+    jsc.set("cpus", getCpuNr());
     jsc.set("status", status);
     Json jnics = Json::make_array();
     for (auto n : nic) {

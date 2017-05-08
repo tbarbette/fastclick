@@ -134,7 +134,7 @@ private:
         CLICK_COLD;
     static String status_handler(Element *e, void * thunk) CLICK_COLD;
     static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
-    enum {h_carrier,h_duplex,h_autoneg,h_speed,h_ipackets,h_ibytes,h_ierrors,h_active,h_mac,h_device};
+    enum {h_carrier,h_duplex,h_autoneg,h_speed,h_ipackets,h_opackets,h_ibytes,h_obytes,h_imissed,h_ierrors,h_oerrors,h_active,h_mac,h_device};
 
     DPDKDevice* _dev;
     bool _active;
