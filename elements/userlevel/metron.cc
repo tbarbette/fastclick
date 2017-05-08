@@ -266,7 +266,7 @@ Json Metron::toJSON() {
     //Infos
     jroot.set("manufacturer",Json(_vendor));
     jroot.set("hwVersion",Json(_hw));
-    jroot.set("swVersion",Json("Click"+_sw));
+    jroot.set("swVersion",Json("Click "+_sw));
     jroot.set("serial",Json(_serial));
 
     //Nics ressources
@@ -285,13 +285,11 @@ Json Metron::toJSON() {
  */
 Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
     Metron::ServiceChain* sc = new ServiceChain(m);
-    click_chatter("Parsing SC");
     sc->id = j.get_s("id");
     sc->vlanid = j.get_i("vlanid");
     sc->config = j.get_s("config");
     sc->cpu_nr = j.get_i("cpu");
     Json jnics = j.get("nic");
-    click_chatter("Parsing SC nic");
     for (auto jnic : jnics) {
         Metron::NIC* nic = m->_nics.findp(jnic.second.as_s());
         if (!nic) {
@@ -301,14 +299,12 @@ Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHan
         }
         sc->nic.push_back(nic);
     }
-    click_chatter("Parsing SC cpus");
     sc->_cpus.resize(sc->cpu_nr);
     if (!m->assignCpus(sc,sc->_cpus)) {
         errh->error("Could not assign enough CPUs");
         delete sc;
         return 0;
     }
-    click_chatter("Parsing SC OK");
     return sc;
 }
 
