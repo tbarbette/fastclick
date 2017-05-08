@@ -47,10 +47,12 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     //Default parameters
     int numa_node = 0;
     String dev;
+    String mode = "";
 
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
+        .read("MODE", mode)
         .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
@@ -81,9 +83,13 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
             firstqueue = 0;
         r = configure_rx(numa_node,n_queues,n_queues,errh);
     }
-    if (r != 0) return r;
 
-    return 0;
+    if (r != 0)
+        return r;
+
+    r = _dev->set_mode(mode,errh);
+
+    return r;
 }
 
 int FromDPDKDevice::initialize(ErrorHandler *errh)

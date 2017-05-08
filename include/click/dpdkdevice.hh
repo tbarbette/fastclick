@@ -58,6 +58,8 @@ public:
 
     static int get_port_numa_node(unsigned port_id);
 
+    int set_mode(String mode, ErrorHandler *errh);
+
     static int initialize(ErrorHandler *errh);
 
     static int static_cleanup();
@@ -107,7 +109,7 @@ private:
     struct DevInfo {
         inline DevInfo() :
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0) {
+            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -117,6 +119,7 @@ private:
         bool promisc;
         unsigned n_rx_descs;
         unsigned n_tx_descs;
+        enum rte_eth_rx_mq_mode mq_mode;
     };
 
     struct DevInfo info;

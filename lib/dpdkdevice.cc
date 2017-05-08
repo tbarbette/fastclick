@@ -128,6 +128,33 @@ struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
 
+int DPDKDevice::set_mode(String mode, ErrorHandler *errh) {
+    mode = mode.lower();
+
+    enum rte_eth_rx_mq_mode m;
+
+
+    if (mode == "") {
+        return 0;
+    } else if (mode == "none") {
+            m = ETH_MQ_RX_NONE;
+    } else if (mode == "rss") {
+            m = ETH_MQ_RX_RSS;
+    } else if (mode == "vmdq") {
+            m = ETH_MQ_RX_VMDQ_ONLY;
+    } else if (mode == "vmdq_rss") {
+            m = ETH_MQ_RX_VMDQ_RSS;
+    } else {
+        return errh->error("Unknown mode %s",mode.c_str());
+    }
+
+    if (m != info.mq_mode && info.mq_mode != -1) {
+        return errh->error("Device can only have one mode.");
+    }
+    info.mq_mode = m;
+    return 0;
+}
+
 int DPDKDevice::initialize_device(ErrorHandler *errh)
 {
     struct rte_eth_conf dev_conf;
@@ -136,7 +163,18 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     rte_eth_dev_info_get(port_id, &dev_info);
 
-    dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
+    dev_conf.rxmode.mq_mode = (info.mq_mode == -1? ETH_MQ_RX_RSS : info.mq_mode);
+    int num_pools = 16;
+    if (info.mq_mode == ETH_MQ_RX_VMDQ_ONLY || info.mq_mode == ETH_MQ_RX_VMDQ_RSS) {
+        dev_conf.rx_adv_conf.vmdq_rx_conf.nb_queue_pools =  (enum rte_eth_nb_pools)num_pools;
+        dev_conf.rx_adv_conf.vmdq_rx_conf.enable_default_pool = 0;
+        dev_conf.rx_adv_conf.vmdq_rx_conf.default_pool = 0;
+        dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps = num_pools;
+        for (int i = 0; i < dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps; i++) {
+            dev_conf.rx_adv_conf.vmdq_rx_conf.pool_map[i].vlan_id = i + 1;
+            dev_conf.rx_adv_conf.vmdq_rx_conf.pool_map[i].pools = (1UL << (i % num_pools));
+        }
+    }
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
 
