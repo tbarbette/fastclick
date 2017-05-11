@@ -20,17 +20,6 @@ static int ahc_policy(void* cls, const struct sockaddr * addr, socklen_t addrlen
 	return MHD_YES;
 }
 
-
-static String
-canonical_handler_name(const String &n)
-{
-	const char *dot = find(n, '/');
-	if (dot == n.begin() || (dot == n.begin() + 1 && n.front() == '0'))
-		return n.substring(dot + 1, n.end());
-	else
-		return n;
-}
-
 HTTPServer::HTTPServer() : _port(80), _daemon(0) {
 }
 
@@ -124,33 +113,59 @@ int HTTPServer::ahc_echo(void * cls,
 	struct MHD_Response * response;
 	const Handler* h;
 
-	//Following is taken from ControlSocket mostly
-	String full_name = String(&url[1]);
-	String canonical_name = canonical_handler_name(full_name);
-	Element *e;
-	const char *dot = find(canonical_name, '/');
-	String hname;
+	String path = String(&url[1]);
+	if (path[0] == '/')
+	    path = path.substring(1);
 
-	if (dot != canonical_name.end()) {
-		String ename = canonical_name.substring(canonical_name.begin(), dot);
-		e = server->router()->find(ename);
-		if (!e) {
-			int num;
-			if (IntArg().parse(ename, num) && num > 0 && num <= server->router()->nelements())
-				e = server->router()->element(num - 1);
-		}
-		if (!e) {
-			body =  "No element named '" + ename + "'";
-			status = 404;
-			goto send;
-		}
-		hname = canonical_name.substring(dot + 1, canonical_name.end());
-	} else {
-		e = server->router()->root_element();
-		hname = canonical_name;
-	}
+    Element *e;
+    String ename;
+    String fullpath = "";
+    do {
+        int pos = path.find_left('/');
+        String en;
+        if (pos == -1) {
+            en = path;
+        } else {
+            en = path.substring(0,pos);
+        }
 
-	if ((hname == "" || hname=="/") && strcmp("GET",method) == 0) {
+        Element* et = server->router()->find(fullpath + en);
+        if (!et) {
+            break;
+        }
+        e = et;
+        ename = en;
+        fullpath = en + "/";
+        if (pos == -1) {
+            path = "";
+            break;
+        } else {
+            path = path.substring(pos + 1);
+        }
+    } while (1);
+    click_chatter("Final ename is %s, path is %s",ename.c_str(), path.c_str());
+
+
+    String hname;
+    String param;
+    int pos = path.find_left('/');
+    if (pos == -1) {
+        hname = path;
+        param = "";
+    } else {
+        hname = path.substring(0,pos);
+        param = path.substring(pos + 1);
+    }
+    click_chatter("Element %s, handler %s, param %s",ename.c_str(), hname.c_str(),param.c_str());
+
+    if (!e) {
+        body =  "No element named '" + ename + "'";
+        status = 404;
+        goto send;
+    }
+
+
+	if ((hname == "") && strcmp("GET",method) == 0) {
 	    /*Json jelements = Json::make_array();
         for (int i = 0; i < server->router()->nelements(); i++) {
             String ename = server->router()->element(i)->name();
@@ -161,58 +176,88 @@ int HTTPServer::ahc_echo(void * cls,
         body = jelements.unparse();
         status = MHD_HTTP_OK;
         goto send;*/
-	    if (canonical_name.length() > 0) {
+	    if (hname.length() > 0) {
 	        hname = "handlers";
 	    } else {
 	        hname = "list";
 	    }
 	}
 
-
 	// Then find handler.
-	h = Router::handler(e, hname);
-	if (h && h->visible()) {
+
 	    if (strcmp("GET",method) == 0) {
-	        if (h->readable()) {
-	            body = h->call_read(e, ErrorHandler::default_handler());
-	            status = MHD_HTTP_OK;
+	        h = Router::handler(e, hname);
+	        if (h && h->visible()) {
+                if (h->readable()) {
+                    if (h->flags() & Handler::f_read_param) {
+                        body = h->call_read(e, hname, ErrorHandler::default_handler());
+                    } else {
+                        body = h->call_read(e, ErrorHandler::default_handler());
+                    }
+                    status = MHD_HTTP_OK;
+                } else {
+                    body = "This request is not readable";
+                    status = MHD_HTTP_BAD_REQUEST;
+                }
+                goto send;
 	        } else {
-	            body = "This request is not readable";
-	            status = MHD_HTTP_BAD_REQUEST;
+	            goto bad_handler;
 	        }
-	    } else   if (0 == strcmp (method, "POST"))
-	    {
+	    } else if (0 == strcmp (method, "POST")) {
+	        h = Router::handler(e, hname);
+	        if (h && h->visible()) {
 	          if (*upload_data_size != 0) {
 	              static_cast<String*>(*con_cls)->append(String(upload_data, *upload_data_size));
 	              *upload_data_size = 0;
 
 	              return MHD_YES;
-	        }
-	      else {
-	          String data = *static_cast<String*>(*con_cls);
-	          click_chatter("Last call with data %s",data.c_str());
-              if (h->writable()) {
-                  int ret = h->call_write(data, e, ErrorHandler::default_handler());
-                  click_chatter("Ret is %d",ret);
-                  if (ret == 0) {
-                      body = "success";
+	          } else {
+                  String data = *static_cast<String*>(*con_cls);
+                  click_chatter("Last call with data %s",data.c_str());
+                  if (h->writable()) {
+                      int ret = h->call_write(data, e, ErrorHandler::default_handler());
+                      if (ret == 0) {
+                          body = "success";
+                      } else {
+                          body = "error";
+                      }
+                      status = MHD_HTTP_OK;
                   } else {
-                      body = "error";
+                      body = "This request is not writable";
+                      status = MHD_HTTP_BAD_REQUEST;
                   }
-                  status = MHD_HTTP_OK;
-              } else {
-                  body = "This request is not writable";
-                  status = MHD_HTTP_BAD_REQUEST;
-              }
-              delete *con_cls;
-	      }
+                  delete *con_cls;
+	          }
+	          goto send;
+            } else {
+                goto bad_handler;
+            }
+	    } else if (strcmp("DELETE",method) == 0) {
+	        hname = "delete_" + hname;
+            h = Router::handler(e, hname);
+            if (h && h->visible()) {
+                int ret = h->call_write(hname, e, ErrorHandler::default_handler());
+                if (ret == 0) {
+                    body = "success";
+                } else {
+                    body = "error";
+                }
+                status = MHD_HTTP_OK;
+                goto send;
+            } else {
+                goto bad_handler;
+            }
+	    } else {
+            body = "Unsupported method";
+            status = MHD_HTTP_METHOD_NOT_ALLOWED;
+            goto send;
 	    }
-		goto send;
-	} else {
-		body = "No handler named '" + full_name + "'";
+	assert(false);
+
+	bad_handler:
+		body = "Invalid path '" + String(url) + "' or no " + hname + " in " + ename;
 		status = 404;
 		goto send;
-	}
 
 	send:
 	response = MHD_create_response_from_buffer (body.length(),
@@ -225,7 +270,6 @@ int HTTPServer::ahc_echo(void * cls,
 	ret = MHD_queue_response(request->connection,
 			status,
 			response);
-	click_chatter("Queue response return %d",ret);
 	MHD_destroy_response(response);
 
 	return ret;
