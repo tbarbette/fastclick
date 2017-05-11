@@ -22,9 +22,9 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
-#include <click/etheraddress.hh>
 
 #include "fromdpdkdevice.hh"
+#include "../json/json.hh"
 
 CLICK_DECLS
 
@@ -48,11 +48,15 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int numa_node = 0;
     String dev;
     String mode = "";
+    int num_pools = 0;
+    Vector<int> vf_vlan;
 
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
         .read("MODE", mode)
+        .read("VF_POOLS", num_pools)
+        .read_all("VF_VLAN", vf_vlan)
         .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
@@ -87,7 +91,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (r != 0)
         return r;
 
-    r = _dev->set_mode(mode,errh);
+    r = _dev->set_mode(mode,num_pools,vf_vlan,errh);
 
     return r;
 }
@@ -162,6 +166,10 @@ bool FromDPDKDevice::run_task(Task * t)
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
 #endif
+            if (_set_paint_anno) {
+                click_chatter("Queue %d",iqueue);
+                SET_PAINT_ANNO(p, iqueue);
+            }
 #if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);
@@ -205,12 +213,26 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
                   return "undefined";
               else
                   return String(fd->_dev->port_id);
+        case h_nb_rx_queues:
+            return String(fd->_dev->nbRXQueues());
+        case h_nb_tx_queues:
+            return String(fd->_dev->nbTXQueues());
+        case h_nb_vf_pools:
+            return String(fd->_dev->nbVFPools());
         case h_mac: {
             if (!fd->_dev)
                 return String::make_empty();
             struct ether_addr mac_addr;
             rte_eth_macaddr_get(fd->_dev->port_id, &mac_addr);
-            return EtherAddress((unsigned char*)&mac_addr).unparse();
+            return EtherAddress((unsigned char*)&mac_addr).unparse_colon();
+        }
+        case h_vf_mac: {
+            Json jaddr = Json::make_array();
+            for (int i = 0; i < fd->_dev->nbVFPools(); i++) {
+                struct ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id,i);
+                jaddr.push_back(EtherAddress(reinterpret_cast<unsigned char *>(&mac)).unparse_colon());
+            }
+            return jaddr.unparse();
         }
     }
 
@@ -273,6 +295,29 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
     return 0;
 }
 
+int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, ErrorHandler* errh) {
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    if (!fd->_dev)
+        return errh->error("thunk is not a valid FromDPDKDevice");
+
+    switch((uintptr_t) thunk) {
+        case h_add_mac:
+            EtherAddress mac;
+            int pool = 2;
+            int ret;
+            if (!EtherAddressArg().parse(input, mac)) {
+                return errh->error("Invalid MAC address %s",input.c_str());
+            }
+
+            ret = rte_eth_dev_mac_addr_add(fd->_dev->port_id, reinterpret_cast<ether_addr*>(mac.data()), pool);
+            if (ret != 0) {
+                return errh->error("Could not add mac address !");
+            }
+            return 0;
+    }
+    return -1;
+}
+
 void FromDPDKDevice::add_handlers()
 {
     add_read_handler("device",read_handler, h_device);
@@ -286,7 +331,15 @@ void FromDPDKDevice::add_handlers()
 
     add_read_handler("active", read_handler, h_active);
     add_read_handler("count", count_handler, 0);
+
+    add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);
+    add_read_handler("nb_tx_queues",read_handler, h_nb_tx_queues);
+    add_read_handler("nb_vf_pools",read_handler, h_nb_vf_pools);
+
     add_read_handler("mac",read_handler, h_mac);
+    add_write_handler("add_mac",write_handler, h_add_mac, 0);
+    add_write_handler("remove_mac",write_handler, h_remove_mac, 0);
+    add_read_handler("vf_mac_addr",read_handler, h_vf_mac);
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);

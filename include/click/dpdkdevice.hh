@@ -23,6 +23,7 @@
 #include <click/hashtable.hh>
 #include <click/vector.hh>
 #include <click/args.hh>
+#include <click/etheraddress.hh>
 
 CLICK_DECLS
 class DPDKDeviceArg;
@@ -58,7 +59,7 @@ public:
 
     static int get_port_numa_node(unsigned port_id);
 
-    int set_mode(String mode, ErrorHandler *errh);
+    int set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorHandler *errh);
 
     static int initialize(ErrorHandler *errh);
 
@@ -102,6 +103,12 @@ public:
 
     static struct rte_mempool** _pktmbuf_pools;
 
+    inline int nbRXQueues();
+    inline int nbTXQueues();
+    inline int nbVFPools();
+
+    struct ether_addr gen_mac(int a, int b);
+
 private:
 
     enum Dir { RX, TX };
@@ -109,7 +116,7 @@ private:
     struct DevInfo {
         inline DevInfo() :
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1) {
+            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), num_pools(0), vf_vlan() {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -120,6 +127,8 @@ private:
         unsigned n_rx_descs;
         unsigned n_tx_descs;
         enum rte_eth_rx_mq_mode mq_mode;
+        int num_pools;
+        Vector<int> vf_vlan;
     };
 
     struct DevInfo info;
@@ -133,7 +142,7 @@ private:
     int add_queue(Dir dir, int &queue_id, bool promisc,
                    unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
-    static bool alloc_pktmbufs() CLICK_COLD;
+    static int alloc_pktmbufs() CLICK_COLD;
 
     static DPDKDevice* get_device(unsigned port_id) {
        return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
@@ -227,6 +236,18 @@ inline rte_mbuf* DPDKDevice::get_pkt(unsigned numa_node) {
 inline rte_mbuf* DPDKDevice::get_pkt() {
     return get_pkt(rte_socket_id());
 }
+
+int DPDKDevice::nbRXQueues() {
+    return info.rx_queues.size();
+};
+
+int DPDKDevice::nbTXQueues() {
+    return info.tx_queues.size();
+};
+
+int DPDKDevice::nbVFPools() {
+    return info.num_pools;
+};
 
 CLICK_ENDDECLS
 

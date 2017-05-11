@@ -19,6 +19,9 @@
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
 #include <rte_errno.h>
+extern "C" {
+#include <rte_pmd_ixgbe.h>
+}
 
 CLICK_DECLS
 
@@ -59,7 +62,7 @@ int core_to_numa_node(unsigned lcore_id) {
        return (numa_node < 0) ? 0 : numa_node;
 }
 
-bool DPDKDevice::alloc_pktmbufs()
+int DPDKDevice::alloc_pktmbufs()
 {
     /* Count NUMA sockets for each device and each node, we do not want to
      * allocate a unused pool
@@ -80,7 +83,7 @@ bool DPDKDevice::alloc_pktmbufs()
 
 
     if (max_socket == -1)
-        return false;
+        return -1;
 
     _nr_pktmbuf_pools = max_socket + 1;
 
@@ -88,7 +91,7 @@ bool DPDKDevice::alloc_pktmbufs()
     typedef struct rte_mempool *rte_mempool_p;
     _pktmbuf_pools = new rte_mempool_p[_nr_pktmbuf_pools];
     if (!_pktmbuf_pools)
-        return false;
+        return -1;
     memset(_pktmbuf_pools, 0, _nr_pktmbuf_pools * sizeof(rte_mempool_p));
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
@@ -109,26 +112,26 @@ bool DPDKDevice::alloc_pktmbufs()
 #endif
 
                         if (!_pktmbuf_pools[i])
-                                return false;
+                                return rte_errno;
                 }
         }
     } else {
-                int i = 0;
-                rte_mempool_walk(add_pool,(void*)&i);
+        int i = 0;
+        rte_mempool_walk(add_pool,(void*)&i);
         if (i == 0) {
                 click_chatter("Could not get pools from the primary DPDK process");
-                return false;
+                return -1;
         }
     }
 
-    return true;
+    return 0;
 }
 
 struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
 
-int DPDKDevice::set_mode(String mode, ErrorHandler *errh) {
+int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorHandler *errh) {
     mode = mode.lower();
 
     enum rte_eth_rx_mq_mode m;
@@ -144,6 +147,10 @@ int DPDKDevice::set_mode(String mode, ErrorHandler *errh) {
             m = ETH_MQ_RX_VMDQ_ONLY;
     } else if (mode == "vmdq_rss") {
             m = ETH_MQ_RX_VMDQ_RSS;
+    } else if (mode == "vmdq_dcb") {
+            m = ETH_MQ_RX_VMDQ_DCB;
+    } else if (mode == "vmdq_dcb_rss") {
+            m = ETH_MQ_RX_VMDQ_DCB_RSS;
     } else {
         return errh->error("Unknown mode %s",mode.c_str());
     }
@@ -151,8 +158,41 @@ int DPDKDevice::set_mode(String mode, ErrorHandler *errh) {
     if (m != info.mq_mode && info.mq_mode != -1) {
         return errh->error("Device can only have one mode.");
     }
+
+    if (m & ETH_MQ_RX_VMDQ_FLAG) {
+        if (num_pools != info.num_pools && info.num_pools != 0) {
+            return errh->error("Number of VF pools must be consistent for the same device");
+        }
+        if (vf_vlan.size() > 0) {
+            if (info.vf_vlan.size() > 0)
+                return errh->error("VF_VLAN can only be setted once per device");
+            if (vf_vlan.size() != num_pools) {
+                return errh->error("Number of VF_VLAN must be equal to the number of pools");
+            }
+            info.vf_vlan = vf_vlan;
+        }
+
+        if (num_pools) {
+            info.num_pools = num_pools;
+        }
+
+    }
+
     info.mq_mode = m;
+
     return 0;
+}
+
+static struct ether_addr pool_addr_template = {
+        .addr_bytes = {0x52, 0x54, 0x00, 0x12, 0x00, 0x00}
+};
+
+struct ether_addr DPDKDevice::gen_mac(int a, int b) {
+    struct ether_addr mac;
+    mac = pool_addr_template;
+    mac.addr_bytes[4] = a;
+    mac.addr_bytes[5] = b;
+    return mac;
 }
 
 int DPDKDevice::initialize_device(ErrorHandler *errh)
@@ -163,20 +203,31 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     rte_eth_dev_info_get(port_id, &dev_info);
 
-    dev_conf.rxmode.mq_mode = (info.mq_mode == -1? ETH_MQ_RX_RSS : info.mq_mode);
-    int num_pools = 16;
-    if (info.mq_mode == ETH_MQ_RX_VMDQ_ONLY || info.mq_mode == ETH_MQ_RX_VMDQ_RSS) {
-        dev_conf.rx_adv_conf.vmdq_rx_conf.nb_queue_pools =  (enum rte_eth_nb_pools)num_pools;
+    info.mq_mode = (info.mq_mode == -1? ETH_MQ_RX_RSS : info.mq_mode);
+    dev_conf.rxmode.mq_mode = info.mq_mode;
+    dev_conf.rxmode.hw_vlan_filter = 0;
+
+    if (info.mq_mode & ETH_MQ_RX_VMDQ_FLAG) {
+        dev_conf.rx_adv_conf.vmdq_rx_conf.nb_queue_pools =  (enum rte_eth_nb_pools)info.num_pools;
         dev_conf.rx_adv_conf.vmdq_rx_conf.enable_default_pool = 0;
         dev_conf.rx_adv_conf.vmdq_rx_conf.default_pool = 0;
-        dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps = num_pools;
-        for (int i = 0; i < dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps; i++) {
-            dev_conf.rx_adv_conf.vmdq_rx_conf.pool_map[i].vlan_id = i + 1;
-            dev_conf.rx_adv_conf.vmdq_rx_conf.pool_map[i].pools = (1UL << (i % num_pools));
+        if (info.vf_vlan.size() > 0) {
+            dev_conf.rx_adv_conf.vmdq_rx_conf.rx_mode = 0;
+            dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps = info.num_pools;
+            for (int i = 0; i < dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps; i++) {
+                dev_conf.rx_adv_conf.vmdq_rx_conf.pool_map[i].vlan_id = info.vf_vlan[i];
+                dev_conf.rx_adv_conf.vmdq_rx_conf.pool_map[i].pools = (1UL << (i % info.num_pools));
+            }
+        } else {
+            dev_conf.rx_adv_conf.vmdq_rx_conf.rx_mode = ETH_VMDQ_ACCEPT_UNTAG;
+            dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps = 0;
         }
+
     }
-    dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-    dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP;
+    if (info.mq_mode & ETH_MQ_RX_RSS_FLAG) {
+        dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
+        dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
+    }
 
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
@@ -193,6 +244,20 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         return errh->error(
             "Cannot initialize DPDK port %u with %u RX and %u TX queues",
             port_id, info.rx_queues.size(), info.tx_queues.size());
+
+    rte_eth_dev_info_get(port_id, &dev_info);
+
+    if (dev_info.nb_rx_queues != info.rx_queues.size()) {
+        return errh->error("Device only initialized %d RX queues instead of %d. "
+                "Please check configuration.", dev_info.nb_rx_queues,
+                info.rx_queues.size());
+    }
+    if (dev_info.nb_tx_queues != info.tx_queues.size()) {
+        return errh->error("Device only initialized %d TX queues instead of %d. "
+                "Please check configuration.", dev_info.nb_tx_queues,
+                info.tx_queues.size());
+    }
+
     struct rte_eth_rxconf rx_conf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&rx_conf, &dev_info.default_rxconf, sizeof rx_conf);
@@ -238,6 +303,29 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     if (info.promisc)
         rte_eth_promiscuous_enable(port_id);
+
+
+    if (info.mq_mode & ETH_MQ_RX_VMDQ_FLAG) {
+        /*
+         * Set mac for each pool and parameters
+         */
+        for (int q = 0; q < info.num_pools; q++) {
+                struct ether_addr mac;
+                mac = gen_mac(port_id, q);
+                printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
+                        port_id, q,
+                        mac.addr_bytes[0], mac.addr_bytes[1],
+                        mac.addr_bytes[2], mac.addr_bytes[3],
+                        mac.addr_bytes[4], mac.addr_bytes[5]);
+                int retval = rte_eth_dev_mac_addr_add(port_id, &mac,
+                                q);
+                if (retval) {
+                        printf("mac addr add failed at pool %d\n", q);
+                        return retval;
+                }
+        }
+    }
+
 
     return 0;
 }
@@ -324,6 +412,8 @@ int DPDKDevice::add_tx_queue(int &queue_id, unsigned n_desc,
 
 int DPDKDevice::initialize(ErrorHandler *errh)
 {
+    int ret;
+
     if (_is_initialized)
         return 0;
 
@@ -345,8 +435,8 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         if (it.key() >= n_ports)
             return errh->error("Cannot find DPDK port %u", it.key());
 
-    if (!alloc_pktmbufs())
-        return errh->error("Could not allocate packet MBuf pools");
+    if ((ret = alloc_pktmbufs()) != 0)
+        return errh->error("Could not allocate packet MBuf pools, error %d : %s",ret,rte_strerror(ret));
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         for (HashTable<unsigned, DPDKDevice>::iterator it = _devs.begin();

@@ -226,11 +226,18 @@ ToDPDKRing::flush_internal_tx_ring(TXInternalQueue &iqueue)
         if (iqueue.index + sub_burst >= _internal_tx_queue_size)
             sub_burst = _internal_tx_queue_size - iqueue.index;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        n = rte_ring_enqueue_burst(
+            _send_ring, (void* const*)(&iqueue.pkts[iqueue.index]),
+            sub_burst,
+            0
+        );
+#else
         n = rte_ring_enqueue_burst(
             _send_ring, (void* const*)(&iqueue.pkts[iqueue.index]),
             sub_burst
         );
-
+#endif
         iqueue.nr_pending -= n;
         iqueue.index      += n;
 
