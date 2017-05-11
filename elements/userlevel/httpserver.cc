@@ -117,7 +117,7 @@ int HTTPServer::ahc_echo(void * cls,
 	if (path[0] == '/')
 	    path = path.substring(1);
 
-    Element *e;
+    Element *e = 0;
     String ename;
     String fullpath = "";
     do {
@@ -143,7 +143,6 @@ int HTTPServer::ahc_echo(void * cls,
             path = path.substring(pos + 1);
         }
     } while (1);
-    click_chatter("Final ename is %s, path is %s",ename.c_str(), path.c_str());
 
 
     String hname;
@@ -159,9 +158,13 @@ int HTTPServer::ahc_echo(void * cls,
     click_chatter("Element %s, handler %s, param %s",ename.c_str(), hname.c_str(),param.c_str());
 
     if (!e) {
-        body =  "No element named '" + ename + "'";
-        status = 404;
-        goto send;
+        if (hname == "") {
+            e = server->router()->root_element();
+        } else {
+            body =  "No element named '" + ename + "'";
+            status = 404;
+            goto send;
+        }
     }
 
 
@@ -176,7 +179,7 @@ int HTTPServer::ahc_echo(void * cls,
         body = jelements.unparse();
         status = MHD_HTTP_OK;
         goto send;*/
-	    if (hname.length() > 0) {
+	    if (ename.length() > 0) {
 	        hname = "handlers";
 	    } else {
 	        hname = "list";

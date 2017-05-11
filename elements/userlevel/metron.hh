@@ -72,16 +72,7 @@ class Metron : public Element { public:
                 return nic->cpuToQueue(cpuid);
             }
 
-            virtual void apply(NIC* nic, Bitvector cpus) {
-                //Only mac supported for now, only thing to do is to get addr
-                Json jaddrs = Json::parse(nic->callRead("vf_mac_addr"));
-                for (int i = 0; i < cpus.size(); i++) {
-                    if (!cpus[i])
-                        continue;
-                     addr.push_back(jaddrs.get_s(String(i)));
-                }
-
-            }
+            virtual int apply(NIC* nic, Bitvector cpus, ErrorHandler* errh);
         };
 
         enum ScStatus{SC_OK,SC_FAILED};
@@ -157,7 +148,7 @@ class Metron : public Element { public:
     };
     enum {
         h_resources,h_stats,
-        h_chains,h_delete_chains;
+        h_chains, h_delete_chains
     };
 
     int addChain(ServiceChain* sc, ErrorHandler *errh);

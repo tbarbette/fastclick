@@ -131,9 +131,25 @@ String Metron::read_handler(Element *e, void *user_data) {
     return jroot.unparse(true);
 }
 
+int Metron::ServiceChain::RxFilter::apply(NIC* nic, Bitvector cpus, ErrorHandler* errh) {
+    //Only mac supported for now, only thing to do is to get addr
+    Json jaddrs = Json::parse(nic->callRead("vf_mac_addr"));
+    for (int i = 0; i < cpus.size(); i++) {
+        if (!cpus[i])
+            continue;
+         if (atoi(nic->callRead("nb_vf_pools").c_str()) < i) {
+             return errh->error("Not enough VF pools");
+         }
+         addr.push_back(jaddrs.get_s(String(i)));
+    }
+    return 0;
+
+}
+
 int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
     for (int i = 0; i < sc->nic.size(); i++) {
-        sc->rxFilter->apply(sc->nic[i],sc->assignedCpus());
+        if (sc->rxFilter->apply(sc->nic[i],sc->assignedCpus(),errh) != 0)
+            return -1;
     }
     _scs.insert(sc->getId(),sc);
 
@@ -265,7 +281,7 @@ Json Metron::NIC::toJSON(bool stats) {
         Json jtagging = Json::make_array();
         //jtagging.push_back("vlan"); TODO : support
         jtagging.push_back("mac");
-        nic.set("tagging",jtagging);
+        nic.set("rxFilter",jtagging);
     } else {
         nic.set("rxCount",callRead("hw_count"));
         nic.set("rxBytes",callRead("hw_bytes"));
