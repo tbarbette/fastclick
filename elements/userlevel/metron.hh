@@ -43,14 +43,50 @@ class Metron : public Element { public:
         String getDeviceId();
 
         Json toJSON(bool stats = false);
-    private:
+
+        int queuePerPool() {
+            return atoi(callRead("nb_rx_queues").c_str()) / atoi(callRead("nb_vf_pools").c_str());
+        }
+
+        int cpuToQueue(int id) {
+            return id * (queuePerPool());
+        }
+
         String callRead(String h);
     };
 
     class ServiceChain { public:
+        class RxFilter { public:
+
+            RxFilter(ServiceChain* sc) : _sc(sc) {
+
+            }
+            String method;
+            Vector<String> addr;
+            ServiceChain* _sc;
+
+            static RxFilter* fromJSON(Json j, ServiceChain* sc, ErrorHandler* errh);
+            Json toJSON();
+
+            int cpuToQueue(NIC* nic, int cpuid) {
+                return nic->cpuToQueue(cpuid);
+            }
+
+            virtual void apply(NIC* nic, Bitvector cpus) {
+                //Only mac supported for now, only thing to do is to get addr
+                Json jaddrs = Json::parse(nic->callRead("vf_mac_addr"));
+                for (int i = 0; i < cpus.size(); i++) {
+                    if (!cpus[i])
+                        continue;
+                     addr.push_back(jaddrs.get_s(String(i)));
+                }
+
+            }
+        };
+
         enum ScStatus{SC_OK,SC_FAILED};
         String id;
-        int vlanid;
+        RxFilter* rxFilter;
         String config;
         int cpu_nr;
         Vector<Metron::NIC*> nic;
@@ -58,6 +94,13 @@ class Metron : public Element { public:
 
         ServiceChain(Metron* m) : _metron(m) {
 
+        }
+
+        ~ServiceChain() {
+            for (auto n : nic) {
+                delete n;
+            }
+            delete rxFilter;
         }
 
         static ServiceChain* fromJSON(Json j,Metron* m, ErrorHandler* errh);
@@ -72,7 +115,10 @@ class Metron : public Element { public:
             return cpu_nr;
         }
 
+        Bitvector assignedCpus();
+
         String generateConfig();
+
         Vector<String> buildCmdLine(int socketfd) {
             Vector<String> argv;
             int i;
@@ -111,7 +157,7 @@ class Metron : public Element { public:
     };
     enum {
         h_resources,h_stats,
-	h_chains
+        h_chains,h_delete_chains;
     };
 
     int addChain(ServiceChain* sc, ErrorHandler *errh);

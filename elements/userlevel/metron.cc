@@ -92,6 +92,15 @@ bool Metron::assignCpus(ServiceChain* sc, Vector<int>& map) {
     return false;
 }
 
+Bitvector Metron::ServiceChain::assignedCpus() {
+    Bitvector b;
+    b.resize(_metron->_cpu_map.size());
+    for (int i = 0; i < b.size(); i ++) {
+        b[i] = _metron->_cpu_map[i] == this;
+    }
+    return b;
+}
+
 String Metron::read_handler(Element *e, void *user_data) {
 	Metron *m = static_cast<Metron *>(e);
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
@@ -119,10 +128,13 @@ String Metron::read_handler(Element *e, void *user_data) {
             break;
         }
     }
-    return jroot.unparse();
+    return jroot.unparse(true);
 }
 
 int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
+    for (int i = 0; i < sc->nic.size(); i++) {
+        sc->rxFilter->apply(sc->nic[i],sc->assignedCpus());
+    }
     _scs.insert(sc->getId(),sc);
 
     int configpipe[2], ctlsocket[2];
@@ -222,11 +234,22 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
     return -1;
 }
 
+/*
+int
+Metron::chains_handler(int, String &param, Element *e, const Handler *, ErrorHandler *errh)
+{
+    Metron *m = static_cast<Metron *>(e);
+
+}*/
+
 void Metron::add_handlers() {
 	add_read_handler("resources", read_handler, h_resources);
 	add_read_handler("stats", read_handler, h_stats);
 	add_read_handler("chains", read_handler, h_chains);
 	add_write_handler("chains", write_handler, h_chains);
+	add_write_handler("delete_chains", write_handler, h_delete_chains);
+
+	//set_handler("chains", f_write, delete_chain_handler);
 }
 
 /**
@@ -240,7 +263,7 @@ Json Metron::NIC::toJSON(bool stats) {
         nic.set("status",callRead("carrier"));
         nic.set("hwAddr",callRead("mac").replace('-',':'));
         Json jtagging = Json::make_array();
-        jtagging.push_back("vlan");
+        //jtagging.push_back("vlan"); TODO : support
         jtagging.push_back("mac");
         nic.set("tagging",jtagging);
     } else {
@@ -311,12 +334,40 @@ Json Metron::statsToJSON() {
 }
 
 /**
+ * RxFilter
+ */
+Metron::ServiceChain::RxFilter* Metron::ServiceChain::RxFilter::fromJSON(Json j, ServiceChain* sc, ErrorHandler* errh) {
+    Metron::ServiceChain::RxFilter* rf = new RxFilter(sc);
+    rf->method = j.get_s("method").lower();
+    if (rf->method != "mac") {
+        errh->error("Unsupported RX Filter method : %s",rf->method.c_str());
+        return 0;
+    }
+    Json jaddrs = j.get("addr");
+    for (int i = 0; i < jaddrs.size(); i++) {
+        rf->addr.push_back(jaddrs.get_s(String(i)));
+    }
+    return rf;
+}
+
+Json Metron::ServiceChain::RxFilter::toJSON() {
+    Json j;
+    j.set("method",method);
+    Json jaddr = Json::make_array();
+    for (int i = 0; i < addr.size(); i++) {
+        jaddr.push_back(addr[i]);
+    }
+    j.set("addr",jaddr);
+    return j;
+}
+
+/**
  * Service Chain
  */
 Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
     Metron::ServiceChain* sc = new ServiceChain(m);
     sc->id = j.get_s("id");
-    sc->vlanid = j.get_i("vlanid");
+    sc->rxFilter = Metron::ServiceChain::RxFilter::fromJSON(j.get("rxFilter"), sc, errh);
     sc->config = j.get_s("config");
     sc->cpu_nr = j.get_i("cpus");
     Json jnics = j.get("nics");
@@ -341,7 +392,7 @@ Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHan
 Json Metron::ServiceChain::toJSON() {
     Json jsc = Json::make_object();
     jsc.set("id",getId());
-    jsc.set("vlanid",vlanid);
+    jsc.set("rxFilter",rxFilter->toJSON());
     jsc.set("config",config);
     jsc.set("expanded_config", generateConfig());
     jsc.set("cpus", getCpuNr());
@@ -363,7 +414,8 @@ String Metron::ServiceChain::generateConfig()
        for (int j = 0; j < cpu_nr; j++) {
            String js = String(j);
            int cpuid = _cpus[j];
-           newconf += "slaveFD"+is+ "C"+js+" :: "+nic[i]->element->class_name()+"("+nic[i]->getDeviceId()+",QUEUE "+String(cpuid)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, VERBOSE 99);\n";
+           int queue_no = rxFilter->cpuToQueue(nic[i],cpuid);
+           newconf += "slaveFD"+is+ "C"+js+" :: "+nic[i]->element->class_name()+"("+nic[i]->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, VERBOSE 99);\n";
            newconf += "slaveFD"+is+ "C"+js+" -> [" + is + "]slave;\n";
        }
 

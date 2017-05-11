@@ -72,8 +72,10 @@ Args& RXQueueDevice::parse(Args &args) {
 #endif
 	_threadoffset = -1;
 	_set_rss_aggregate = false;
+	_set_paint_anno = false;
 
 	args.read("RSS_AGGREGATE", _set_rss_aggregate)
+        .read("PAINT_QUEUE", _set_paint_anno)
 		.read("NUMA", _use_numa)
 		.read("THREADOFFSET", _threadoffset);
 
