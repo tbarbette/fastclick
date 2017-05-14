@@ -122,6 +122,7 @@ public:
     const char *class_name() const { return "ToDPDKDevice"; }
     const char *port_count() const { return PORTS_1_0; }
     const char *processing() const { return PUSH; }
+
     int configure_phase() const {
         return CONFIGURE_PHASE_PRIVILEGED;
     }
@@ -132,7 +133,12 @@ public:
 
     void cleanup(CleanupStage stage) CLICK_COLD;
 
+    static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
     void add_handlers() CLICK_COLD;
+
+    enum {
+        h_opackets,h_obytes,h_oerrors
+    };
 
     void run_timer(Timer *);
 #if HAVE_BATCH
@@ -172,6 +178,8 @@ private:
     int _timeout;
     bool _congestion_warning_printed;
     bool _vlan;
+
+    friend class FromDPDKDevice;
 };
 
 CLICK_ENDDECLS

@@ -128,11 +128,37 @@ void ToDPDKDevice::cleanup(CleanupStage)
     }
 }
 
+String ToDPDKDevice::statistics_handler(Element *e, void * thunk)
+{
+    ToDPDKDevice *td = static_cast<ToDPDKDevice *>(e);
+    struct rte_eth_stats stats;
+    if (!td->_dev)
+        return "0";
+
+    if (rte_eth_stats_get(td->_dev->port_id, &stats))
+        return String::make_empty();
+
+    switch((uintptr_t) thunk) {
+        case h_opackets:
+            return String(stats.opackets);
+        case h_obytes:
+            return String(stats.obytes);
+        case h_oerrors:
+            return String(stats.oerrors);
+    }
+
+    return 0;
+}
+
 void ToDPDKDevice::add_handlers()
 {
-    add_read_handler("n_sent", count_handler, 0);
-    add_read_handler("n_dropped", dropped_handler, 0);
+    add_read_handler("count", count_handler, 0);
+    add_read_handler("dropped", dropped_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
+
+    add_read_handler("hw_count",statistics_handler, h_opackets);
+    add_read_handler("hw_bytes",statistics_handler, h_obytes);
+    add_read_handler("hw_errors",statistics_handler, h_oerrors);
 }
 
 inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {

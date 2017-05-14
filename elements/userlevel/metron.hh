@@ -27,6 +27,7 @@ class Metron : public Element { public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     void add_handlers() CLICK_COLD;
+    static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
     static String read_handler(Element *e, void *user_data) CLICK_COLD;
     static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler* errh) CLICK_COLD;
 
@@ -53,6 +54,7 @@ class Metron : public Element { public:
         }
 
         String callRead(String h);
+        String callTxRead(String h);
     };
 
     class ServiceChain { public:
@@ -61,6 +63,7 @@ class Metron : public Element { public:
             RxFilter(ServiceChain* sc) : _sc(sc) {
 
             }
+
             String method;
             Vector<String> addr;
             ServiceChain* _sc;
@@ -97,12 +100,13 @@ class Metron : public Element { public:
         static ServiceChain* fromJSON(Json j,Metron* m, ErrorHandler* errh);
 
         Json toJSON();
+        Json statsToJSON();
 
-        String getId() {
+        inline String getId() {
             return id;
         }
 
-        int getCpuNr() {
+        inline int getCpuNr() {
             return cpu_nr;
         }
 
@@ -142,16 +146,66 @@ class Metron : public Element { public:
             }
             return argv;
         }
+
+        void controlInit(int fd, int pid) {
+            _socket = fd;
+            _pid = pid;
+        }
+
+        int controlReadLine(String& line) {
+            char buf[1024];
+            int n = read(_socket, &buf, 1024);
+            if (n <= 0)
+                return n;
+            line = String(buf);
+            while (n == 1024) {
+                n = read(_socket, &buf, 1024);
+                line += String(buf);
+            }
+            return line.length();
+        }
+
+        void controlWriteLine(String cmd) {
+            int n = write(_socket,(cmd + "\r\n").c_str(),cmd.length() + 1);
+        }
+
+        String controlSendCommand(String cmd) {
+            controlWriteLine(cmd);
+            String ret;
+            controlReadLine(ret);
+            return ret;
+        }
+
+        String callRead(String handler) {
+            String ret = controlSendCommand("READ " + handler);
+            click_chatter("GOT %s",ret.c_str());
+            int code = atoi(ret.substring(0, 3).c_str());
+            click_chatter("Code %d",code);
+            ret = ret.substring(ret.find_left("\r\n") + 2);
+            click_chatter("Data %s",ret.c_str());
+            assert(ret.starts_with("DATA "));
+            ret = ret.substring(5);
+            int eof = ret.find_left("\r\n");
+            int n = atoi(ret.substring(0, eof).c_str());
+            click_chatter("Length %d",n);
+            ret = ret.substring(2, n);
+            return ret;
+        }
+
     private:
         Metron* _metron;
         Vector<int> _cpus;
+        int _socket;
+        int _pid;
     };
     enum {
         h_resources,h_stats,
-        h_chains, h_delete_chains
+        h_chains, h_delete_chains,h_chains_stats
     };
 
+    ServiceChain* findChainById(String id);
     int addChain(ServiceChain* sc, ErrorHandler *errh);
+    int removeChain(ServiceChain* sc, ErrorHandler *errh);
 
     int getCpuNr() {
         return click_max_cpu_ids();

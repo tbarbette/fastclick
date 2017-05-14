@@ -8,7 +8,10 @@
 #include <click/userutils.hh>
 #include <sys/ioctl.h>
 #include <sys/fcntl.h>
-
+#include <sys/types.h>
+#include <signal.h>
+#include "fromdpdkdevice.hh"
+#include "todpdkdevice.hh"
 
 
 CLICK_DECLS
@@ -116,17 +119,7 @@ String Metron::read_handler(Element *e, void *user_data) {
             jroot = m->statsToJSON();
             break;
         }
-        case h_chains: {
-            //NICs ressources
-            Json jscs = Json::make_array();
-            auto begin = m->_scs.begin();
-            while (begin != m->_scs.end()) {
-                jscs.push_back(begin.value()->toJSON());
-                begin++;
-            }
-            jroot.set("servicechains",jscs);
-            break;
-        }
+
     }
     return jroot.unparse(true);
 }
@@ -146,13 +139,15 @@ int Metron::ServiceChain::RxFilter::apply(NIC* nic, Bitvector cpus, ErrorHandler
 
 }
 
+Metron::ServiceChain* Metron::findChainById(String id) {
+    return _scs.find(id);
+}
+
 int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
     for (int i = 0; i < sc->nic.size(); i++) {
         if (sc->rxFilter->apply(sc->nic[i],sc->assignedCpus(),errh) != 0)
             return -1;
     }
-    _scs.insert(sc->getId(),sc);
-
     int configpipe[2], ctlsocket[2];
     if (pipe(configpipe) == -1)
         return errh->error("Could not create pipe");
@@ -191,13 +186,13 @@ int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
         close(configpipe[0]);
         close(ctlsocket[1]);
         int flags = 1;
-        int fd = ctlsocket[0];
+        /*int fd = ctlsocket[0];
         if (ioctl(fd, FIONBIO, &flags) != 0) {
             flags = fcntl(fd, F_GETFL);
             if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
                 return errh->error("%s", strerror(errno));
         }
-
+*/
         String conf = sc->generateConfig();
         click_chatter("Writing config %s",conf.c_str());
 
@@ -214,58 +209,140 @@ int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
         if (pos != conf.length()) {
             close(configpipe[1]);
             close(ctlsocket[0]);
+            return -1;
         } else {
             close(configpipe[1]);
             /*GIOChannel *channel = g_io_channel_unix_new(ctlsocket[0]);
             g_io_channel_set_encoding(channel, NULL, NULL);
             new csocket_cdriver(this, channel, true);*/
+            sc->controlInit(ctlsocket[0], pid);
         }
+        String s;
+        int v = sc->controlReadLine(s);
+        if (v <= 0) {
+            return errh->error("Could not read from control socket : error %d",v);
+        }
+        if (!s.starts_with("Click::ControlSocket/1.")) {
+            kill(pid, SIGKILL);
+            return errh->error("Unexpected ControlSocket command");
+        }
+        _scs.insert(sc->getId(),sc);
+        return 0;
     }
-    return 0;
+    assert(0);
+    return -1;
+}
 
+int Metron::removeChain(ServiceChain* sc, ErrorHandler*) {
+    sc->controlSendCommand("WRITE stop");
+    _scs.remove(sc->getId());
+    return 0;
 }
 
 int Metron::write_handler( const String &data, Element *e, void *user_data, ErrorHandler *errh) {
     Metron *m = static_cast<Metron *>(e);
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
     switch (what) {
-        case h_chains:
-            Json jroot = Json::parse(data);
-            Json jlist = jroot.get("servicechains");
-            for (auto jsc : jlist) {
-                ServiceChain* sc = ServiceChain::fromJSON(jsc.second,m,errh);
-                if (!sc) {
-                    return errh->error("Could not instantiate a chain");
-                }
-                int ret = m->addChain(sc, errh);
-                if (ret != 0) {
-                    sc->status = ServiceChain::SC_FAILED;
-                    return errh->error("Could not start the chain");
-                } else {
-                    sc->status = ServiceChain::SC_OK;
-                }
+        case h_delete_chains: {
+            ServiceChain* sc = m->findChainById(data);
+            if (sc == 0) {
+                return errh->error("Unknown ID %s",data.c_str());
             }
-        return 0;
+            return m->removeChain(sc,errh);
+        }
     }
     return -1;
 }
 
-/*
+
 int
-Metron::chains_handler(int, String &param, Element *e, const Handler *, ErrorHandler *errh)
+Metron::param_handler(int operation, String &param, Element *e, const Handler * h, ErrorHandler *errh)
 {
     Metron *m = static_cast<Metron *>(e);
+    if (operation == Handler::f_read) {
+        Json jroot = Json::make_object();
 
-}*/
+        intptr_t what = reinterpret_cast<intptr_t>(h->read_user_data());
+        switch (what) {
+            case h_chains: {
+                if (param == "") {
+                    Json jscs = Json::make_array();
+                    auto begin = m->_scs.begin();
+                    while (begin != m->_scs.end()) {
+                        jscs.push_back(begin.value()->toJSON());
+                        begin++;
+                    }
+                    jroot.set("servicechains",jscs);
+                } else {
+                    ServiceChain* sc = m->findChainById(param);
+                    if (!sc) {
+                        return errh->error("Unkown ID %s", param.c_str());
+                    }
+                    jroot = sc->toJSON();
+                }
+                break;
+            }
+            case h_chains_stats: {
+                if (param == "") {
+                    Json jscs = Json::make_array();
+                    auto begin = m->_scs.begin();
+                    while (begin != m->_scs.end()) {
+                        jscs.push_back(begin.value()->statsToJSON());
+                        begin++;
+                    }
+                    jroot.set("servicechains",jscs);
+                } else {
+                    ServiceChain* sc = m->findChainById(param);
+                    if (!sc) {
+                        return errh->error("Unkown ID %s", param.c_str());
+                    }
+                    jroot = sc->statsToJSON();
+                }
+                break;
+            }
+            default:
+            {
+                return errh->error("Invalid operation");
+            }
+        }
+
+        param = jroot.unparse(true);
+        return 0;
+    } else if (operation == Handler::f_write) {
+        intptr_t what = reinterpret_cast<intptr_t>(h->write_user_data());
+        switch (what) {
+            case h_chains: {
+                Json jroot = Json::parse(param);
+                Json jlist = jroot.get("servicechains");
+                for (auto jsc : jlist) {
+                    ServiceChain* sc = ServiceChain::fromJSON(jsc.second,m,errh);
+                    if (!sc) {
+                        return errh->error("Could not instantiate a chain");
+                    }
+                    int ret = m->addChain(sc, errh);
+                    if (ret != 0) {
+                        sc->status = ServiceChain::SC_FAILED;
+                        return errh->error("Could not start the chain");
+                    } else {
+                        sc->status = ServiceChain::SC_OK;
+                    }
+                }
+                return 0;
+            }
+        }
+        return -1;
+    } else {
+        return errh->error("Unknown operation");
+    }
+}
 
 void Metron::add_handlers() {
 	add_read_handler("resources", read_handler, h_resources);
 	add_read_handler("stats", read_handler, h_stats);
-	add_read_handler("chains", read_handler, h_chains);
-	add_write_handler("chains", write_handler, h_chains);
 	add_write_handler("delete_chains", write_handler, h_delete_chains);
 
-	//set_handler("chains", f_write, delete_chain_handler);
+    set_handler("chains", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains, h_chains);
+    set_handler("chains_stats", Handler::f_read | Handler::f_read_param, param_handler, h_chains_stats);
 }
 
 /**
@@ -287,9 +364,9 @@ Json Metron::NIC::toJSON(bool stats) {
         nic.set("rxBytes",callRead("hw_bytes"));
         nic.set("rxDropped",callRead("hw_dropped"));
         nic.set("rxErrors",callRead("hw_errors"));
-        nic.set("txCount",callRead("tx_count"));
-        nic.set("txBytes",callRead("tx_bytes"));
-        nic.set("txErrors",callRead("tx_errors"));
+        nic.set("txCount",callTxRead("hw_count"));
+        nic.set("txBytes",callTxRead("hw_bytes"));
+        nic.set("txErrors",callTxRead("hw_errors"));
     }
     return nic;
 }
@@ -300,7 +377,20 @@ String Metron::NIC::callRead(String h) {
         return hC->call_read(element, ErrorHandler::default_handler());
     }
     return "undefined";
+}
 
+String Metron::NIC::callTxRead(String h) {
+    //TODO : ensure elem type
+    ToDPDKDevice* td = dynamic_cast<FromDPDKDevice*>(element)->findOutputElement();
+    if (!td) {
+        return "Could not find matching ToDPDKDevice !";
+    }
+
+    const Handler* hC = Router::handler(td, h);
+    if (hC && hC->visible()) {
+        return hC->call_read(td, ErrorHandler::default_handler());
+    }
+    return "undefined";
 }
 
 String Metron::NIC::getDeviceId() {
@@ -416,6 +506,50 @@ Json Metron::ServiceChain::toJSON() {
     Json jnics = Json::make_array();
     for (auto n : nic) {
         jnics.push_back(Json::make_string(n->getId()));
+    }
+    jsc.set("nics",jnics);
+    return jsc;
+}
+
+Json Metron::ServiceChain::statsToJSON() {
+    Json jsc = Json::make_object();
+    jsc.set("id",getId());
+
+   // jsc.set("cpus", jcpus);
+
+    Json jnics = Json::make_array();
+    for (int i = 0; i < nic.size(); i++) {
+        String is = String(i);
+        uint64_t rx_count = 0;
+        uint64_t rx_bytes = 0;
+        uint64_t rx_dropped = 0;
+        uint64_t rx_errors = 0;
+        uint64_t tx_count = 0;
+        uint64_t tx_bytes = 0;
+        uint64_t tx_dropped = 0;
+        uint64_t tx_errors = 0;
+        for (int j = 0; j < getCpuNr(); j ++) {
+            String js = String(j);
+            rx_count += atol(callRead( "slaveFD"+is+ "C"+js+".count").c_str());
+            //rx_bytes += atol(callRead( "slaveFD"+is+ "C"+js+".bytes").c_str());
+            //rx_dropped += atol(callRead( "slaveFD"+is+ "C"+js+".dropped").c_str());
+            //rx_errors += atol(callRead( "slaveFD"+is+ "C"+js+".errors").c_str());
+
+        }
+        tx_count += atol(callRead( "slaveTD"+is+ ".count").c_str());
+        //tx_bytes += atol(callRead( "slaveTD"+is+ ".bytes").c_str());
+        tx_dropped += atol(callRead( "slaveTD"+is+ ".dropped").c_str());
+        //tx_errors += atol(callRead( "slaveTD"+is+ ".errors").c_str());
+        Json nic = Json::make_object();
+        nic.set("rxCount",rx_count);
+        nic.set("rxBytes",rx_bytes);
+        nic.set("rxDropped",rx_dropped);
+        nic.set("rxErrors",rx_errors);
+        nic.set("txCount",tx_count);
+        nic.set("txBytes",tx_bytes);
+        nic.set("txDropped",tx_dropped);
+        nic.set("txErrors",tx_errors);
+        jnics.push_back(nic);
     }
     jsc.set("nics",jnics);
     return jsc;

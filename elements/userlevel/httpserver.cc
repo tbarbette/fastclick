@@ -155,10 +155,10 @@ int HTTPServer::ahc_echo(void * cls,
         hname = path.substring(0,pos);
         param = path.substring(pos + 1);
     }
-    click_chatter("Element %s, handler %s, param %s",ename.c_str(), hname.c_str(),param.c_str());
+    click_chatter("Element '%s', handler '%s', param '%s'",ename.c_str(), hname.c_str(),param.c_str());
 
     if (!e) {
-        if (hname == "") {
+        if (hname == "" || ename == "") {
             e = server->router()->root_element();
         } else {
             body =  "No element named '" + ename + "'";
@@ -193,7 +193,7 @@ int HTTPServer::ahc_echo(void * cls,
 	        if (h && h->visible()) {
                 if (h->readable()) {
                     if (h->flags() & Handler::f_read_param) {
-                        body = h->call_read(e, hname, ErrorHandler::default_handler());
+                        body = h->call_read(e, param, ErrorHandler::default_handler());
                     } else {
                         body = h->call_read(e, ErrorHandler::default_handler());
                     }
@@ -239,7 +239,7 @@ int HTTPServer::ahc_echo(void * cls,
 	        hname = "delete_" + hname;
             h = Router::handler(e, hname);
             if (h && h->visible()) {
-                int ret = h->call_write(hname, e, ErrorHandler::default_handler());
+                int ret = h->call_write(param, e, ErrorHandler::default_handler());
                 if (ret == 0) {
                     body = "success";
                 } else {
