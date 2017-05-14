@@ -106,6 +106,7 @@ Returns the number of packets read by the device.
 Resets "count" to zero.
 
 =a DPDKInfo, ToDPDKDevice */
+class ToDPDKDevice;
 
 class FromDPDKDevice : public RXQueueDevice {
 public:
@@ -127,6 +128,8 @@ public:
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
     
+    ToDPDKDevice* findOutputElement();
+
 private:
 
     static String read_handler(Element*, void*) CLICK_COLD;
@@ -135,7 +138,7 @@ private:
     static String status_handler(Element *e, void * thunk) CLICK_COLD;
     static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
     enum {h_carrier,h_duplex,h_autoneg,h_speed,
-        h_ipackets,h_opackets,h_ibytes,h_obytes,h_imissed,h_ierrors,h_oerrors,
+        h_ipackets,h_ibytes,h_imissed,h_ierrors,
         h_active,
         h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
         h_mac,h_add_mac,h_remove_mac,h_vf_mac,

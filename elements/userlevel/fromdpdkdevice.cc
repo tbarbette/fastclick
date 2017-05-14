@@ -24,6 +24,7 @@
 #include <click/standard/scheduleinfo.hh>
 
 #include "fromdpdkdevice.hh"
+#include "todpdkdevice.hh"
 #include "../json/json.hh"
 
 CLICK_DECLS
@@ -198,6 +199,16 @@ bool FromDPDKDevice::run_task(Task * t)
     return (ret);
 }
 
+ToDPDKDevice* FromDPDKDevice::findOutputElement() {
+    for (auto e : router()->elements()) {
+        ToDPDKDevice* td = dynamic_cast<ToDPDKDevice*>(e);
+        if (td != 0 && td->_dev->port_id == _dev->port_id) {
+            return td;
+        }
+    }
+    return 0;
+}
+
 String FromDPDKDevice::read_handler(Element *e, void * thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
@@ -284,12 +295,6 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
-        case h_opackets:
-            return String(stats.opackets);
-        case h_obytes:
-            return String(stats.obytes);
-        case h_oerrors:
-            return String(stats.oerrors);
     }
 
     return 0;
@@ -331,6 +336,7 @@ void FromDPDKDevice::add_handlers()
 
     add_read_handler("active", read_handler, h_active);
     add_read_handler("count", count_handler, 0);
+    add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 
     add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);
     add_read_handler("nb_tx_queues",read_handler, h_nb_tx_queues);
@@ -346,12 +352,6 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
 
-    //Not very clean to have this here but it is usefull
-    add_read_handler("tx_count",statistics_handler, h_opackets);
-    add_read_handler("tx_bytes",statistics_handler, h_obytes);
-    add_read_handler("tx_errors",statistics_handler, h_oerrors);
-
-    add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
