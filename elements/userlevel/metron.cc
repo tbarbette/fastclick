@@ -104,6 +104,14 @@ Bitvector Metron::ServiceChain::assignedCpus() {
     return b;
 }
 
+void Metron::ServiceChain::checkAlive() {
+    if (kill(_pid, 0) != 0) {
+        _metron->removeChain(this, ErrorHandler::default_handler());
+    } else {
+        click_chatter("Pid %d is alive", _pid);
+    }
+}
+
 String Metron::read_handler(Element *e, void *user_data) {
 	Metron *m = static_cast<Metron *>(e);
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
@@ -300,6 +308,20 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler * 
                 }
                 break;
             }
+            case h_chains_proxy: {
+                int pos = param.find_left("/");
+                if (pos <= 0) {
+                    param = "You must give an id then a command";
+                    return 0;
+                }
+                String ids = param.substring(0, pos);
+                ServiceChain* sc = m->findChainById(ids);
+                if (!sc) {
+                    return errh->error("Unknown ID %s",ids.c_str());
+                }
+                param = sc->callRead(param.substring(pos + 1));
+                return 0;
+            }
             default:
             {
                 return errh->error("Invalid operation");
@@ -343,6 +365,7 @@ void Metron::add_handlers() {
 
     set_handler("chains", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains, h_chains);
     set_handler("chains_stats", Handler::f_read | Handler::f_read_param, param_handler, h_chains_stats);
+    set_handler("chains_proxy", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains_proxy);
 }
 
 /**
@@ -354,6 +377,7 @@ Json Metron::NIC::toJSON(bool stats) {
     if (!stats) {
         nic.set("speed",callRead("speed"));
         nic.set("status",callRead("carrier"));
+        nic.set("portType",callRead("type"));
         nic.set("hwAddr",callRead("mac").replace('-',':'));
         Json jtagging = Json::make_array();
         //jtagging.push_back("vlan"); TODO : support
@@ -473,6 +497,9 @@ Json Metron::ServiceChain::RxFilter::toJSON() {
 Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
     Metron::ServiceChain* sc = new ServiceChain(m);
     sc->id = j.get_s("id");
+    if (sc->id == "") {
+        sc->id = String(m->getNbChains());
+    }
     sc->rxFilter = Metron::ServiceChain::RxFilter::fromJSON(j.get("rxFilter"), sc, errh);
     sc->config = j.get_s("config");
     sc->cpu_nr = j.get_i("cpus");
@@ -515,7 +542,22 @@ Json Metron::ServiceChain::statsToJSON() {
     Json jsc = Json::make_object();
     jsc.set("id",getId());
 
-   // jsc.set("cpus", jcpus);
+    Json jcpus = Json::make_array();
+    for (int j = 0; j < getCpuNr(); j ++) {
+        String js = String(j);
+        int avg_max = 0;
+        for (int i = 0; i < nic.size(); i++) {
+            String is = String(i);
+            int avg = atoi(callRead( "batchAvg"+is+ "C"+js+".average").c_str());
+            if (avg > avg_max)
+                avg_max = avg;
+        }
+        Json jcpu = Json::make_object();
+        jcpu.set("id", j);
+        jcpu.set("load", (float)avg_max / 32.0f);
+        jcpus.push_back(jcpu);
+    }
+    jsc.set("cpus", jcpus);
 
     Json jnics = Json::make_array();
     for (int i = 0; i < nic.size(); i++) {
@@ -565,12 +607,14 @@ String Metron::ServiceChain::generateConfig()
            String js = String(j);
            int cpuid = _cpus[j];
            int queue_no = rxFilter->cpuToQueue(nic[i],cpuid);
-           newconf += "slaveFD"+is+ "C"+js+" :: "+nic[i]->element->class_name()+"("+nic[i]->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, VERBOSE 99);\n";
-           newconf += "slaveFD"+is+ "C"+js+" -> [" + is + "]slave;\n";
+           newconf += "slaveFD"+is+ "C"+js+" :: "+nic[i]->element->class_name()+"("+nic[i]->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, BURST 32, VERBOSE 99);\n";
+           newconf += "slaveFD"+is+ "C"+js+" -> batchAvg"+is+ "C"+js+ " :: AverageBatchCounter() -> [" + is + "]slave;\n";
+        //   newconf += "Script(label s, read batchAvg"+is+ "C"+js+ ".average, wait 1s, goto s);\n";
        }
 
        newconf += "slaveTD"+is+ " :: ToDPDKDevice("+nic[i]->getDeviceId()+");"; //TODO : allowed CPU bitmap
        newconf += "slave[" + is + "] -> slaveTD" + is + ";\n";
+
     }
     return newconf;
 }

@@ -78,7 +78,7 @@ class Metron : public Element { public:
             virtual int apply(NIC* nic, Bitvector cpus, ErrorHandler* errh);
         };
 
-        enum ScStatus{SC_OK,SC_FAILED};
+        enum ScStatus{SC_FAILED,SC_OK=1};
         String id;
         RxFilter* rxFilter;
         String config;
@@ -176,19 +176,28 @@ class Metron : public Element { public:
             return ret;
         }
 
+        void checkAlive();
+
         String callRead(String handler) {
             String ret = controlSendCommand("READ " + handler);
+            if (ret == "") {
+                checkAlive();
+                return "";
+            }
             click_chatter("GOT %s",ret.c_str());
             int code = atoi(ret.substring(0, 3).c_str());
-            click_chatter("Code %d",code);
+            if (code >= 500)
+                return ret.substring(4);
+            click_chatter("Read Code %d",code);
             ret = ret.substring(ret.find_left("\r\n") + 2);
-            click_chatter("Data %s",ret.c_str());
+            click_chatter("Read Data %s",ret.c_str());
             assert(ret.starts_with("DATA "));
             ret = ret.substring(5);
             int eof = ret.find_left("\r\n");
             int n = atoi(ret.substring(0, eof).c_str());
             click_chatter("Length %d",n);
-            ret = ret.substring(2, n);
+            ret = ret.substring(3, n);
+            click_chatter("Content is '%s'",ret.c_str());
             return ret;
         }
 
@@ -200,7 +209,7 @@ class Metron : public Element { public:
     };
     enum {
         h_resources,h_stats,
-        h_chains, h_delete_chains,h_chains_stats
+        h_chains, h_delete_chains,h_chains_stats,h_chains_proxy
     };
 
     ServiceChain* findChainById(String id);
@@ -209,6 +218,10 @@ class Metron : public Element { public:
 
     int getCpuNr() {
         return click_max_cpu_ids();
+    }
+
+    int getNbChains() {
+        return _scs.size();
     }
 
     int getAssignedCpuNr();

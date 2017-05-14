@@ -1,9 +1,9 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * anonipaddr.{cc,hh} -- anonymize packet IP addresses
- * Eddie Kohler after Greg Minshall
+ * batchstats.{cc,hh} -- anonymize packet IP addresses
+ * Tom Barbette
  *
- * Copyright (c) 2001 International Computer Science Institute
+ * Copyright (c) 2016 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),

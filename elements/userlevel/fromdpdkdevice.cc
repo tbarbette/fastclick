@@ -272,6 +272,9 @@ String FromDPDKDevice::status_handler(Element *e, void * thunk)
 #endif
       case h_speed:
           return String(link.link_speed);
+      case h_type:
+          //TODO
+          return String("fiber");
     }
     return 0;
 }
@@ -303,7 +306,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
 int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, ErrorHandler* errh) {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     if (!fd->_dev)
-        return errh->error("thunk is not a valid FromDPDKDevice");
+        return -1;
 
     switch((uintptr_t) thunk) {
         case h_add_mac:
@@ -323,6 +326,38 @@ int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, 
     return -1;
 }
 
+int FromDPDKDevice::xstats_handler(int operation, String& input, Element* e, const Handler *handler, ErrorHandler* errh) {
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    if (!fd->_dev)
+        return -1;
+
+        struct rte_eth_xstat_name* names;
+        int len = rte_eth_xstats_get_names(fd->_dev->port_id, 0, 0);
+        names = static_cast<struct rte_eth_xstat_name*>(malloc(sizeof(struct rte_eth_xstat_name) * len));
+        rte_eth_xstats_get_names(fd->_dev->port_id,names,len);
+        struct rte_eth_xstat* xstats;
+        xstats = static_cast<struct rte_eth_xstat*>(malloc(sizeof(struct rte_eth_xstat) * len));
+        rte_eth_xstats_get(fd->_dev->port_id,xstats,len);
+        if (input == "") {
+            StringAccum acc;
+            for (int i = 0; i < len; i++) {
+                acc << names[i].name << "["<< xstats[i].id << "] = " << xstats[i].value << "\n";
+            }
+
+            input = acc.take_string();
+        } else {
+            for (int i = 0; i < len; i++) {
+                if (strcmp(names[i].name,input.c_str()) == 0) {
+                    input = String(xstats[i].value);
+                    return 0;
+                }
+            }
+            return -1;
+        }
+    return 0;
+}
+
+
 void FromDPDKDevice::add_handlers()
 {
     add_read_handler("device",read_handler, h_device);
@@ -333,6 +368,9 @@ void FromDPDKDevice::add_handlers()
 #endif
     add_read_handler("speed",status_handler, h_speed);
     add_read_handler("carrier",status_handler, h_carrier);
+    add_read_handler("type",status_handler, h_type);
+
+    set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler);
 
     add_read_handler("active", read_handler, h_active);
     add_read_handler("count", count_handler, 0);
