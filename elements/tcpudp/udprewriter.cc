@@ -71,19 +71,10 @@ UDPRewriter::UDPFlow::apply(WritablePacket *p, bool direction, unsigned annos)
 
 UDPRewriter::UDPRewriter()
 {
-#if HAVE_USER_MULTITHREAD
-    _maps_no = ( click_max_cpu_ids() == 0 )? 1 : click_max_cpu_ids();
-    _allocator = new SizedHashAllocator<sizeof(UDPFlow)>[_maps_no];
-    //click_chatter("[%s]: Allocated %d UDP maps", class_name(), _maps_no);
-#endif
 }
 
 UDPRewriter::~UDPRewriter()
 {
-#if HAVE_USER_MULTITHREAD
-    if ( _allocator )
-        delete [] _allocator;
-#endif
 }
 
 void *
@@ -122,8 +113,11 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
-    if (!has_udp_streaming_timeout && !has_streaming_timeout)
-	_udp_streaming_timeout = _timeouts[click_current_cpu_id()][0];
+    if (!has_udp_streaming_timeout && !has_streaming_timeout) {
+        for (int i = 0; i < _mem_units_no; i++) {
+            _udp_streaming_timeout = _timeouts[i][0];
+        }
+    }
     _udp_streaming_timeout *= CLICK_HZ; // IPRewriterBase handles the others
 
     return IPRewriterBase::configure(conf, errh);
@@ -133,9 +127,9 @@ IPRewriterEntry *
 UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
 		      const IPFlowID &rewritten_flowid, int input)
 {
-    void *data = _allocator[click_current_cpu_id()].allocate();
+    void *data = _allocator->allocate();
     if (!data)
-	return 0;
+        return 0;
 
     UDPFlow *flow = new(data) UDPFlow
 	(&_input_specs[input], flowid, rewritten_flowid, ip_p,
@@ -150,7 +144,7 @@ UDPRewriter::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     if (!p) {
-	return -1;
+        return -1;
     }
 
     click_ip *iph = p->ip_header();
@@ -160,11 +154,11 @@ UDPRewriter::process(int port, Packet *p_in)
     if ((ip_p != IP_PROTO_TCP && ip_p != IP_PROTO_UDP && ip_p != IP_PROTO_DCCP)
 	|| !IP_FIRSTFRAG(iph)
 	|| p->transport_length() < 8) {
-	const IPRewriterInput &is = _input_specs[port];
-	if (is.kind == IPRewriterInput::i_nochange) {
+        const IPRewriterInput &is = _input_specs[port];
+        if (is.kind == IPRewriterInput::i_nochange) {
             return is.foutput;
         }
-	return -1;
+        return -1;
     }
 
     IPFlowID flowid(p);
@@ -214,63 +208,16 @@ UDPRewriter::push(int port, Packet *p)
 void
 UDPRewriter::push_batch(int port, PacketBatch *batch)
 {
-    unsigned short outports = noutputs();
-    PacketBatch* out[outports];
-    bzero(out,sizeof(PacketBatch*)*outports);
-    PacketBatch *next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );
-    PacketBatch *p = batch;
-    PacketBatch *last = NULL;
-    int last_o = -1;
-    int passed = 0;
-    int count  = 0;
-    for (; p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {
-        // The actual job of this element
-        int o = process(port, p);
-
-        if (o < 0 || o>=(outports)) {
-            o = (outports - 1);
+    auto fnt = [this,port](Packet* p){return process(port,p);};
+    auto drop_fnt = [this](int i, PacketBatch* b) {
+        if (i >= 0) {
+            this->checked_output_push_batch(i, b);
+        } else {
+            b->kill();
         }
+    };
 
-        if (o == last_o) {
-            passed ++;
-        }
-        else {
-            if (!last) {
-                out[o] = p;
-                p->set_count(1);
-                p->set_tail(p);
-            }
-            else {
-                out[last_o]->set_tail(last);
-                out[last_o]->set_count(out[last_o]->count() + passed);
-                if (!out[o]) {
-                    out[o] = p;
-                    out[o]->set_count(1);
-                    out[o]->set_tail(p);
-                }
-                else {
-                    out[o]->append_packet(p);
-                }
-                passed = 0;
-            }
-        }
-        last = p;
-        last_o = o;
-        count++;
-    }
-
-    if (passed) {
-        out[last_o]->set_tail(last);
-        out[last_o]->set_count(out[last_o]->count() + passed);
-    }
-
-    int i = 0;
-    for (; i < outports; i++) {
-        if (out[i]) {
-            out[i]->tail()->set_next(NULL);
-            checked_output_push_batch(i, out[i]);
-        }
-    }
+    CLASSIFY_EACH_PACKET(noutputs(),fnt,batch,drop_fnt);
 }
 #endif
 
