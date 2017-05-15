@@ -473,7 +473,7 @@ Metron::ServiceChain::RxFilter* Metron::ServiceChain::RxFilter::fromJSON(Json j,
         errh->error("Unsupported RX Filter method : %s",rf->method.c_str());
         return 0;
     }
-    Json jaddrs = j.get("addr");
+    Json jaddrs = j.get("values");
     for (int i = 0; i < jaddrs.size(); i++) {
         rf->addr.push_back(jaddrs.get_s(String(i)));
     }
@@ -487,7 +487,7 @@ Json Metron::ServiceChain::RxFilter::toJSON() {
     for (int i = 0; i < addr.size(); i++) {
         jaddr.push_back(addr[i]);
     }
-    j.set("addr",jaddr);
+    j.set("values",jaddr);
     return j;
 }
 
