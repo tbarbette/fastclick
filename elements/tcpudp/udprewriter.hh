@@ -68,6 +68,11 @@ installed:
 Thus, the input packet is emitted on output port FOUTPUT unchanged, and
 packets from the reply flow are emitted on output port ROUTPUT unchanged.
 
+Warning about multi-threading : this element is multi-thread safe, by
+duplicating mutable data structures per-thread. It also means that packets
+from the same flow must always be handled by the same thread. This is generally
+achieved by using RSS for input fanout.
+
 =item 'pattern SADDR SPORT DADDR DPORT FOUTPUT ROUTPUT'
 
 Creates a mapping according to the given pattern, 'SADDR SPORT DADDR DPORT'.
