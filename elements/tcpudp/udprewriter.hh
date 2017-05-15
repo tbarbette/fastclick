@@ -203,12 +203,7 @@ class UDPRewriter : public IPRewriterBase { public:
     void add_handlers() CLICK_COLD;
 
   private:
-#if HAVE_USER_MULTITHREAD
-    unsigned _maps_no;
-    SizedHashAllocator<sizeof(UDPFlow)> *_allocator;
-#else
-    SizedHashAllocator<sizeof(UDPFlow)> _allocator[CLICK_CPU_MAX];
-#endif
+    per_thread<SizedHashAllocator<sizeof(UDPFlow)>> _allocator;
 
     unsigned _annos;
     uint32_t _udp_streaming_timeout;
@@ -234,7 +229,7 @@ UDPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
     unmap_flow(flow, _map[click_current_cpu_id()]);
     flow->~IPRewriterFlow();
-    _allocator[click_current_cpu_id()].deallocate(flow);
+    _allocator->deallocate(flow);
 }
 
 CLICK_ENDDECLS
