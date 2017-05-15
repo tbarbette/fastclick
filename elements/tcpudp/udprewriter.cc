@@ -69,7 +69,7 @@ UDPRewriter::UDPFlow::apply(WritablePacket *p, bool direction, unsigned annos)
 	_tflags += 2;
 }
 
-UDPRewriter::UDPRewriter()
+UDPRewriter::UDPRewriter() : _allocator()
 {
 }
 
@@ -96,6 +96,7 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     int reply_anno;
     uint32_t timeouts[2];
     timeouts[0] = 300;		// 5 minutes
+    timeouts[1] = default_guarantee;
 
     if (Args(this, errh).bind(conf)
 	.read("DST_ANNO", dst_anno)
@@ -109,7 +110,8 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
 
     for (unsigned i=0; i<_mem_units_no; i++) {
-        _timeouts[i] = timeouts;
+        _timeouts[i][0] = timeouts[0];
+        _timeouts[i][1] = timeouts[1];
     }
 
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
@@ -144,7 +146,7 @@ UDPRewriter::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     if (!p) {
-        return -1;
+        return -2;
     }
 
     click_ip *iph = p->ip_header();
@@ -157,26 +159,27 @@ UDPRewriter::process(int port, Packet *p_in)
         const IPRewriterInput &is = _input_specs[port];
         if (is.kind == IPRewriterInput::i_nochange) {
             return is.foutput;
+        } else {
+            return -1;
         }
-        return -1;
     }
 
     IPFlowID flowid(p);
     IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
 
     if (!m) {			// create new mapping
-	IPRewriterInput &is = _input_specs.unchecked_at(port);
-	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
+        IPRewriterInput &is = _input_specs.unchecked_at(port);
+        IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 
-	int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
-	if (result == rw_addmap) {
-	    m = UDPRewriter::add_flow(ip_p, flowid, rewritten_flowid, port);
+        int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
+        if (result == rw_addmap) {
+            m = UDPRewriter::add_flow(ip_p, flowid, rewritten_flowid, port);
         }
 
-	if (!m) {
-	    return result;
-	} else if (_annos & 2) {
-	    m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
+        if (!m) {
+            return result;
+        } else if (_annos & 2) {
+            m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
         }
     }
 
@@ -196,12 +199,13 @@ void
 UDPRewriter::push(int port, Packet *p)
 {
     int output_port = process(port, p);
-    if ( output_port < 0 ) {
-        p->kill();
+    if (output_port < 0) {
+        if (likely(output_port) == -1)
+            p->kill();
         return;
     }
 
-    output(output_port).push(p);
+    checked_output_push(output_port, p);
 }
 
 #if HAVE_BATCH
@@ -227,9 +231,11 @@ UDPRewriter::dump_mappings_handler(Element *e, void *)
     UDPRewriter *rw = (UDPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); ++iter) {
-	iter->flow()->unparse(sa, iter->direction(), now);
-	sa << '\n';
+    for (int i = 0; i < rw->_mem_units_no; i++) {
+        for (Map::iterator iter = rw->_map[i].begin(); iter.live(); ++iter) {
+            iter->flow()->unparse(sa, iter->direction(), now);
+            sa << '\n';
+        }
     }
     return sa.take_string();
 }

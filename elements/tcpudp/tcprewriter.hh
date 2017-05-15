@@ -178,12 +178,7 @@ class TCPRewriter : public IPRewriterBase { public:
     void add_handlers() CLICK_COLD;
 
  protected:
-#if HAVE_USER_MULTITHREAD
-    unsigned _maps_no;
-    SizedHashAllocator<sizeof(TCPFlow)> *_allocator;
-#else
-    SizedHashAllocator<sizeof(TCPFlow)> _allocator[CLICK_CPU_MAX];
-#endif
+    per_thread<SizedHashAllocator<sizeof(TCPFlow)>> _allocator;
 
     unsigned _annos;
     uint32_t _tcp_data_timeout;
@@ -214,7 +209,7 @@ TCPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
     unmap_flow(flow, _map[click_current_cpu_id()]);
     static_cast<TCPFlow *>(flow)->~TCPFlow();
-    _allocator[click_current_cpu_id()].deallocate(flow);
+    _allocator->deallocate(flow);
 }
 
 inline tcp_seq_t

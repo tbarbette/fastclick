@@ -237,21 +237,12 @@ TCPRewriter::TCPFlow::unparse(StringAccum &sa, bool direction, click_jiffies_t n
 
 // TCPRewriter
 
-TCPRewriter::TCPRewriter()
+TCPRewriter::TCPRewriter() : _allocator()
 {
-#if HAVE_USER_MULTITHREAD
-    _maps_no = ( click_max_cpu_ids() == 0 )? 1 : click_max_cpu_ids();
-    _allocator = new SizedHashAllocator<sizeof(TCPFlow)>[_maps_no];
-    //click_chatter("[%s]: Allocated %d TCP maps", class_name(), _maps_no);
-#endif
 }
 
 TCPRewriter::~TCPRewriter()
 {
-#if HAVE_USER_MULTITHREAD
-    if ( _allocator )
-        delete [] _allocator;
-#endif
 }
 
 void *
@@ -272,6 +263,7 @@ TCPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 
     // numbers in seconds
     timeouts[0] = 300;		// nodata: 5 minutes (should be > TCP_DONE)
+    timeouts[1] = default_guarantee;
 
     _tcp_data_timeout = 86400;	// 24 hours
     _tcp_done_timeout = 240;	// 4 minutes
@@ -290,7 +282,8 @@ TCPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
 
     for (unsigned i=0; i<_mem_units_no; i++) {
-        _timeouts[i] = timeouts;
+        _timeouts[i][0] = timeouts[0];
+        _timeouts[i][1] = timeouts[1];
     }
 
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
@@ -305,7 +298,7 @@ TCPRewriter::add_flow(int /*ip_p*/, const IPFlowID &flowid,
 		      const IPFlowID &rewritten_flowid, int input)
 {
     void *data;
-    if (!(data = _allocator[click_current_cpu_id()].allocate()))
+    if (!(data = _allocator->allocate()))
 	return 0;
 
     TCPFlow *flow = new(data) TCPFlow
