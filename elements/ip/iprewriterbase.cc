@@ -71,7 +71,7 @@ IPMapper::rewrite_flowid(IPRewriterInput *, const IPFlowID &, IPFlowID &,
 //
 
 IPRewriterBase::IPRewriterBase()
-    : _gc_timer(gc_timer_hook, this)
+    : _gc_timer(Timer(gc_timer_hook, this))
 {
     _gc_interval_sec = default_gc_interval;
 
@@ -232,9 +232,13 @@ IPRewriterBase::initialize(ErrorHandler *errh)
 	if (_input_specs[i].kind == IPRewriterInput::i_mapper)
 	    _input_specs[i].u.mapper->notify_rewriter(this, &_input_specs[i], &cerrh);
     }
-    _gc_timer.initialize(this);
-    if (_gc_interval_sec)
-	_gc_timer.schedule_after_sec(_gc_interval_sec);
+    for (int i = 0; i < _gc_timer.weight(); i ++) {
+        Timer& gc_timer = _gc_timer.get_value(i);
+        gc_timer.initialize(this);
+        gc_timer.move_thread(_gc_timer.get_mapping(i));
+        if (_gc_interval_sec)
+        gc_timer.schedule_after_sec(_gc_interval_sec);
+    }
     return errh->nerrors() ? -1 : 0;
 }
 
