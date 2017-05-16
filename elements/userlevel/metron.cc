@@ -159,6 +159,7 @@ int Metron::instanciateChain(ServiceChain* sc, ErrorHandler *errh) {
     if (ret == 0) {
         sc->status = ServiceChain::SC_OK;
         _scs.insert(sc->getId(),sc);
+        return 0;
     } else {
         unassignCpus(sc);
         return -1;
@@ -172,8 +173,9 @@ int Metron::instanciateChain(ServiceChain* sc, ErrorHandler *errh) {
  */
 int Metron::runChain(ServiceChain* sc, ErrorHandler *errh) {
     for (int i = 0; i < sc->nic.size(); i++) {
-        if (sc->rxFilter->apply(sc->nic[i],sc->assignedCpus(),errh) != 0)
-            return -1;
+        if (sc->rxFilter->apply(sc->nic[i],sc->assignedCpus(),errh) != 0) {
+            return errh->error("Could not apply RX filter");
+        }
     }
     int configpipe[2], ctlsocket[2];
     if (pipe(configpipe) == -1)
