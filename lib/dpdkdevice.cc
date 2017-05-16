@@ -184,7 +184,7 @@ int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorH
 }
 
 static struct ether_addr pool_addr_template = {
-        .addr_bytes = {0x52, 0x54, 0x00, 0x12, 0x00, 0x00}
+        .addr_bytes = {0x52, 0x54, 0x00, 0x00, 0x00, 0x00}
 };
 
 struct ether_addr DPDKDevice::gen_mac(int a, int b) {
@@ -416,6 +416,9 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
     if (_is_initialized)
         return 0;
+
+    pool_addr_template.addr_bytes[2] = click_random();
+    pool_addr_template.addr_bytes[3] = click_random();
 
     if (!dpdk_enabled)
         return errh->error( "Supply the --dpdk argument to use DPDK.");

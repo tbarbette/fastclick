@@ -30,7 +30,7 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0), _active(true)
+    _dev(0), _active(true), _rx_intr(-1)
 {
 	#if HAVE_BATCH
 		in_batch_mode = BATCH_MODE_YES;
@@ -59,6 +59,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
         .read("ACTIVE", _active)
+        .read("RX_INTR", _rx_intr)
         .complete() < 0)
         return -1;
 
@@ -123,6 +124,19 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
         if (ret != 0) return ret;
     }
 
+    if (_rx_intr >= 0) {
+        for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+            uint64_t data = _dev->port_id << CHAR_BIT | i;
+            ret = rte_eth_dev_rx_intr_ctl_q(_dev->port_id, i,
+                                            RTE_EPOLL_PER_THREAD,
+                                            RTE_INTR_EVENT_ADD,
+                                            (void *)((uintptr_t)data));
+            if (ret != 0) {
+                return errh->error("Cannot initialize RX interrupt on this device");
+            }
+        }
+    }
+
     return ret;
 }
 
@@ -138,8 +152,8 @@ bool FromDPDKDevice::run_task(Task * t)
 
     for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
 #if HAVE_BATCH
-	 PacketBatch* head = 0;
-     WritablePacket *last;
+         PacketBatch* head = 0;
+         WritablePacket *last;
 #endif
         unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
@@ -147,10 +161,11 @@ bool FromDPDKDevice::run_task(Task * t)
             rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
             WritablePacket *p = Packet::make(pkts[i]);
 #elif HAVE_ZEROCOPY
-    rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
-    WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
+            rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
+            WritablePacket *p =
+                    Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
                      rte_pktmbuf_data_len(pkts[i]),
-					 DPDKDevice::free_pkt,
+                     DPDKDevice::free_pkt,
                      pkts[i],
                      rte_pktmbuf_headroom(pkts[i]),
                      rte_pktmbuf_tailroom(pkts[i])
@@ -168,7 +183,6 @@ bool FromDPDKDevice::run_task(Task * t)
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
 #endif
             if (_set_paint_anno) {
-                click_chatter("Queue %d",iqueue);
                 SET_PAINT_ANNO(p, iqueue);
             }
 #if HAVE_BATCH
@@ -178,7 +192,7 @@ bool FromDPDKDevice::run_task(Task * t)
                 last->set_next(p);
             last = p;
 #else
-             output(0).push(p);
+            output(0).push(p);
 #endif
         }
 #if HAVE_BATCH
@@ -193,10 +207,39 @@ bool FromDPDKDevice::run_task(Task * t)
         }
     }
 
-    /*We reschedule directly, as we cannot know if there is actually packet
-     * available and dpdk has no select mechanism*/
+    if (ret == 0 && _rx_intr >= 0) {
+        for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
+            if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
+                click_chatter("Could not enable interrupts");
+                t->fast_reschedule();
+                return 0;
+            }
+        }
+        struct rte_epoll_event event[queue_per_threads];
+        int n, i;
+        uint8_t port_id, queue_id;
+        void *data;
+        n = rte_epoll_wait(RTE_EPOLL_PER_THREAD, event, queue_per_threads, -1);
+        for (i = 0; i < n; i++) {
+                data = event[i].epdata.data;
+                port_id = ((uintptr_t)data) >> CHAR_BIT;
+                assert(port_id == _dev->port_id);
+        }
+        this->selected(0, SELECT_READ);
+
+    }
     t->fast_reschedule();
     return (ret);
+}
+
+void FromDPDKDevice::selected(int fd, int mask) {
+    for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
+        if (rte_eth_dev_rx_intr_disable(_dev->port_id, iqueue) != 0) {
+            click_chatter("Could not disable interrupts");
+            return;
+        }
+    }
+    task_for_thread()->reschedule();
 }
 
 ToDPDKDevice* FromDPDKDevice::findOutputElement() {

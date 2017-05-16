@@ -127,6 +127,7 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
+    void selected(int fd, int mask);
     
     ToDPDKDevice* findOutputElement();
 
@@ -147,6 +148,7 @@ private:
 
     DPDKDevice* _dev;
     bool _active;
+    int _rx_intr;
 };
 
 CLICK_ENDDECLS
