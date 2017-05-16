@@ -573,7 +573,7 @@ String ServiceChain::generateConfig()
            String js = String(j);
            int cpuid = _cpus[j];
            int queue_no = rxFilter->cpuToQueue(nic[i],cpuid);
-           newconf += "slaveFD"+is+ "C"+js+" :: "+nic[i]->element->class_name()+"("+nic[i]->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, BURST 32, VERBOSE 99);\n";
+           newconf += "slaveFD"+is+ "C"+js+" :: "+nic[i]->element->class_name()+"("+nic[i]->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, BURST 32, NUMA false, VERBOSE 99);\n";
            newconf += "slaveFD"+is+ "C"+js+" -> batchAvg"+is+ "C"+js+ " :: AverageBatchCounter() -> [" + is + "]slave;\n";
         //   newconf += "Script(label s, read batchAvg"+is+ "C"+js+ ".average, wait 1s, goto s);\n";
        }
