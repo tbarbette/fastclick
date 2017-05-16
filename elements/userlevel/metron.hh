@@ -98,62 +98,28 @@ class ServiceChain { public:
 
         Vector<String> buildCmdLine(int socketfd);
 
-        void controlInit(int fd, int pid) {
-            _socket = fd;
-            _pid = pid;
-        }
+        void controlInit(int fd, int pid);
 
-        int controlReadLine(String& line) {
-            char buf[1024];
-            int n = read(_socket, &buf, 1024);
-            if (n <= 0)
-                return n;
-            line = String(buf);
-            while (n == 1024) {
-                n = read(_socket, &buf, 1024);
-                line += String(buf);
-            }
-            return line.length();
-        }
+        int controlReadLine(String& line);
 
-        void controlWriteLine(String cmd) {
-            int n = write(_socket,(cmd + "\r\n").c_str(),cmd.length() + 1);
-        }
+        void controlWriteLine(String cmd);
 
-        String controlSendCommand(String cmd) {
-            controlWriteLine(cmd);
-            String ret;
-            controlReadLine(ret);
-            return ret;
-        }
+        String controlSendCommand(String cmd);
 
         void checkAlive();
 
-        String callRead(String handler) {
-            String ret = controlSendCommand("READ " + handler);
-            if (ret == "") {
-                checkAlive();
-                return "";
-            }
-            click_chatter("GOT %s",ret.c_str());
-            int code = atoi(ret.substring(0, 3).c_str());
-            if (code >= 500)
-                return ret.substring(4);
-            click_chatter("Read Code %d",code);
-            ret = ret.substring(ret.find_left("\r\n") + 2);
-            click_chatter("Read Data %s",ret.c_str());
-            assert(ret.starts_with("DATA "));
-            ret = ret.substring(5);
-            int eof = ret.find_left("\r\n");
-            int n = atoi(ret.substring(0, eof).c_str());
-            click_chatter("Length %d",n);
-            ret = ret.substring(3, n);
-            click_chatter("Content is '%s'",ret.c_str());
-            return ret;
-        }
+        String callRead(String handler);
 
         Vector<int>& getCpuMapRef() {
             return _cpus;
+        }
+
+        struct timing_stats {
+            Timestamp start,parse,launch;
+            Json toJSON();
+        };
+        void setTimingStats(struct timing_stats ts) {
+            _timing_stats = ts;
         }
 
     private:
@@ -161,6 +127,7 @@ class ServiceChain { public:
         Vector<int> _cpus;
         int _socket;
         int _pid;
+        struct timing_stats _timing_stats;
     };
 
 /*
@@ -223,6 +190,8 @@ private:
     String _hw;
     String _sw;
     String _serial;
+
+    bool _timing_stats;
 
     int runChain(ServiceChain* sc, ErrorHandler *errh);
 

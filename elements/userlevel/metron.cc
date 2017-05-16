@@ -17,7 +17,7 @@
 CLICK_DECLS
 
 
-Metron::Metron() {
+Metron::Metron() : _timing_stats(true) {
 
 }
 
@@ -33,6 +33,7 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
         .read_all("NIC",nics)
         .read_all("SLAVE_DPDK_ARGS",_dpdk_args)
         .read_all("SLAVE_ARGS",_args)
+        .read("TIMING_STATS", _timing_stats)
         .complete() < 0)
         return -1;
 
@@ -359,7 +360,14 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler * 
                 Json jroot = Json::parse(param);
                 Json jlist = jroot.get("servicechains");
                 for (auto jsc : jlist) {
+                    struct ServiceChain::timing_stats ts;
+                    if (m->_timing_stats) {
+                        ts.start = Timestamp::now_steady();
+                    }
                     ServiceChain* sc = ServiceChain::fromJSON(jsc.second,m,errh);
+                    if (m->_timing_stats) {
+                        ts.parse = Timestamp::now_steady();
+                    }
                     if (!sc) {
                         return errh->error("Could not instantiate a chain");
                     }
@@ -371,6 +379,10 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler * 
                     if (ret != 0) {
                         delete sc;
                         return errh->error("Could not start the chain");
+                    }
+                    if (m->_timing_stats) {
+                        ts.launch = Timestamp::now_steady();
+                        sc->setTimingStats(ts);
                     }
                 }
                 return 0;
@@ -564,7 +576,18 @@ Json ServiceChain::statsToJSON() {
         jnics.push_back(nic);
     }
     jsc.set("nics",jnics);
+    if (_metron->_timing_stats) {
+        jsc.set("timing_stats", _timing_stats.toJSON());
+    }
     return jsc;
+}
+
+Json ServiceChain::timing_stats::toJSON() {
+    Json j = Json::make_object();
+    j.set("parse",(parse-start).nsecval());
+    j.set("launch",(launch-parse).nsecval());
+    j.set("total",(launch-start).nsecval());
+    return j;
 }
 
 String ServiceChain::generateConfig()
@@ -638,6 +661,53 @@ void ServiceChain::checkAlive() {
     } else {
         click_chatter("Pid %d is alive", _pid);
     }
+}
+
+void ServiceChain::controlInit(int fd, int pid) {
+    _socket = fd;
+    _pid = pid;
+}
+
+int ServiceChain::controlReadLine(String& line) {
+    char buf[1024];
+    int n = read(_socket, &buf, 1024);
+    if (n <= 0)
+        return n;
+    line = String(buf);
+    while (n == 1024) {
+        n = read(_socket, &buf, 1024);
+        line += String(buf);
+    }
+    return line.length();
+}
+
+void ServiceChain::controlWriteLine(String cmd) {
+    int n = write(_socket,(cmd + "\r\n").c_str(),cmd.length() + 1);
+}
+
+String ServiceChain::controlSendCommand(String cmd) {
+    controlWriteLine(cmd);
+    String ret;
+    controlReadLine(ret);
+    return ret;
+}
+
+String ServiceChain::callRead(String handler) {
+    String ret = controlSendCommand("READ " + handler);
+    if (ret == "") {
+        checkAlive();
+        return "";
+    }
+    int code = atoi(ret.substring(0, 3).c_str());
+    if (code >= 500)
+        return ret.substring(4);
+    ret = ret.substring(ret.find_left("\r\n") + 2);
+    assert(ret.starts_with("DATA "));
+    ret = ret.substring(5);
+    int eof = ret.find_left("\r\n");
+    int n = atoi(ret.substring(0, eof).c_str());
+    ret = ret.substring(3, n);
+    return ret;
 }
 
 /******************************
