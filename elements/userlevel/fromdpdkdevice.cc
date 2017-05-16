@@ -47,10 +47,13 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     //Default parameters
     int numa_node = 0;
     String dev;
+    EtherAddress mac;
+    bool has_mac = false;
 
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
+        .read("MAC", mac).read_status(has_mac)
         .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
@@ -82,6 +85,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         r = configure_rx(numa_node,n_queues,n_queues,errh);
     }
     if (r != 0) return r;
+
+    if (has_mac)
+        _dev->set_mac(mac);
 
     return 0;
 }
