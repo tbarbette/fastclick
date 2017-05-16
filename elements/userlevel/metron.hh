@@ -10,54 +10,32 @@
 #include "../json/json.hh"
 CLICK_DECLS
 
-/*
-=c
+class Metron;
 
-Metron */
+class NIC { public:
+    Element* element;
 
-class Metron : public Element { public:
+    String getId() {
+        return element->name();
+    }
 
-	Metron() CLICK_COLD;
-    ~Metron() CLICK_COLD;
+    String getDeviceId();
 
-    const char *class_name() const	{ return "Metron"; }
-    const char *port_count() const	{ return PORTS_0_0; }
+    Json toJSON(bool stats = false);
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
-    void add_handlers() CLICK_COLD;
-    static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
-    static String read_handler(Element *e, void *user_data) CLICK_COLD;
-    static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler* errh) CLICK_COLD;
+    int queuePerPool() {
+        return atoi(callRead("nb_rx_queues").c_str()) / atoi(callRead("nb_vf_pools").c_str());
+    }
 
-    Json toJSON();
-    Json statsToJSON();
+    int cpuToQueue(int id) {
+        return id * (queuePerPool());
+    }
 
-    class NIC { public:
-        Element* element;
+    String callRead(String h);
+    String callTxRead(String h);
+};
 
-        String getId() {
-            return element->name();
-        }
-
-        String getDeviceId();
-
-        Json toJSON(bool stats = false);
-
-        int queuePerPool() {
-            return atoi(callRead("nb_rx_queues").c_str()) / atoi(callRead("nb_vf_pools").c_str());
-        }
-
-        int cpuToQueue(int id) {
-            return id * (queuePerPool());
-        }
-
-        String callRead(String h);
-        String callTxRead(String h);
-    };
-
-    class ServiceChain { public:
+class ServiceChain { public:
         class RxFilter { public:
 
             RxFilter(ServiceChain* sc) : _sc(sc) {
@@ -83,18 +61,17 @@ class Metron : public Element { public:
         RxFilter* rxFilter;
         String config;
         int cpu_nr;
-        Vector<Metron::NIC*> nic;
+        Vector<NIC*> nic;
         enum ScStatus status;
 
-        ServiceChain(Metron* m) : _metron(m) {
+        ServiceChain(Metron* m) : rxFilter(0),_metron(m) {
 
         }
 
         ~ServiceChain() {
-            for (auto n : nic) {
-                delete n;
-            }
-            delete rxFilter;
+            //Do not delete nics, we are not the owner of those pointers
+            if (rxFilter)
+                delete rxFilter;
         }
 
         static ServiceChain* fromJSON(Json j,Metron* m, ErrorHandler* errh);
@@ -110,42 +87,16 @@ class Metron : public Element { public:
             return cpu_nr;
         }
 
+        inline int getCpuMap(int i) {
+            return _cpus[i];
+        }
+
+
         Bitvector assignedCpus();
 
         String generateConfig();
 
-        Vector<String> buildCmdLine(int socketfd) {
-            Vector<String> argv;
-            int i;
-
-            String cpulist = "";
-
-
-            for (int i = 0; i < click_max_cpu_ids(); i++) {
-                cpulist += String(i) + (i < click_max_cpu_ids() -1? ",":"");
-            }
-
-            argv.push_back(click_path);
-            argv.push_back("--dpdk");
-            argv.push_back("-l");
-            argv.push_back(cpulist);
-            argv.push_back("--proc-type=secondary");
-
-            for (i = 0; i < _metron->_dpdk_args.size(); i++) {
-                argv.push_back(_metron->_dpdk_args[i]);
-            }
-            argv.push_back("--");
-            argv.push_back("--socket");
-            argv.push_back(String(socketfd));
-            for (i = 0; i < _metron->_args.size(); i++) {
-                argv.push_back(_metron->_args[i]);
-            }
-
-            for (i = 0; i < argv.size(); i++)  {
-                click_chatter("ARG %s",argv[i].c_str());
-            }
-            return argv;
-        }
+        Vector<String> buildCmdLine(int socketfd);
 
         void controlInit(int fd, int pid) {
             _socket = fd;
@@ -201,20 +152,49 @@ class Metron : public Element { public:
             return ret;
         }
 
+        Vector<int>& getCpuMapRef() {
+            return _cpus;
+        }
+
     private:
         Metron* _metron;
         Vector<int> _cpus;
         int _socket;
         int _pid;
     };
+
+/*
+=c
+
+Metron */
+class Metron : public Element { public:
+
+	Metron() CLICK_COLD;
+    ~Metron() CLICK_COLD;
+
+    const char *class_name() const	{ return "Metron"; }
+    const char *port_count() const	{ return PORTS_0_0; }
+
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
+    void add_handlers() CLICK_COLD;
+    static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
+    static String read_handler(Element *e, void *user_data) CLICK_COLD;
+    static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler* errh) CLICK_COLD;
+
+    Json toJSON();
+    Json statsToJSON();
+
     enum {
         h_resources,h_stats,
         h_chains, h_delete_chains,h_chains_stats,h_chains_proxy
     };
 
     ServiceChain* findChainById(String id);
-    int addChain(ServiceChain* sc, ErrorHandler *errh);
+
     int removeChain(ServiceChain* sc, ErrorHandler *errh);
+    int instanciateChain(ServiceChain* sc, ErrorHandler *errh);
 
     int getCpuNr() {
         return click_max_cpu_ids();
@@ -227,6 +207,7 @@ class Metron : public Element { public:
     int getAssignedCpuNr();
 
     bool assignCpus(ServiceChain* sc, Vector<int>& map);
+    void unassignCpus(ServiceChain* sc);
 
 private:
     String _id;
@@ -242,6 +223,10 @@ private:
     String _hw;
     String _sw;
     String _serial;
+
+    int runChain(ServiceChain* sc, ErrorHandler *errh);
+
+    friend class ServiceChain;
 };
 
 CLICK_ENDDECLS

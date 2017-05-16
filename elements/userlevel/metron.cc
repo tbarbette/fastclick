@@ -95,22 +95,15 @@ bool Metron::assignCpus(ServiceChain* sc, Vector<int>& map) {
     return false;
 }
 
-Bitvector Metron::ServiceChain::assignedCpus() {
-    Bitvector b;
-    b.resize(_metron->_cpu_map.size());
-    for (int i = 0; i < b.size(); i ++) {
-        b[i] = _metron->_cpu_map[i] == this;
+void Metron::unassignCpus(ServiceChain* sc) {
+    int j = 0;
+    for (int i = 0; i < getCpuNr(); i++) {
+        if (_cpu_map[i] == sc) {
+            _cpu_map[i] = 0;
+        }
     }
-    return b;
 }
 
-void Metron::ServiceChain::checkAlive() {
-    if (kill(_pid, 0) != 0) {
-        _metron->removeChain(this, ErrorHandler::default_handler());
-    } else {
-        click_chatter("Pid %d is alive", _pid);
-    }
-}
 
 String Metron::read_handler(Element *e, void *user_data) {
 	Metron *m = static_cast<Metron *>(e);
@@ -132,7 +125,7 @@ String Metron::read_handler(Element *e, void *user_data) {
     return jroot.unparse(true);
 }
 
-int Metron::ServiceChain::RxFilter::apply(NIC* nic, Bitvector cpus, ErrorHandler* errh) {
+int ServiceChain::RxFilter::apply(NIC* nic, Bitvector cpus, ErrorHandler* errh) {
     //Only mac supported for now, only thing to do is to get addr
     Json jaddrs = Json::parse(nic->callRead("vf_mac_addr"));
     for (int i = 0; i < cpus.size(); i++) {
@@ -147,11 +140,36 @@ int Metron::ServiceChain::RxFilter::apply(NIC* nic, Bitvector cpus, ErrorHandler
 
 }
 
-Metron::ServiceChain* Metron::findChainById(String id) {
+ServiceChain* Metron::findChainById(String id) {
     return _scs.find(id);
 }
 
-int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
+/**
+ * Assign cpus to the chain and run it. If it succeed, the chain is added
+ * to the internal chains list. On failure, cpus are unassigned.
+ * It is the responsability of the caller to delete the chain on error.
+ */
+int Metron::instanciateChain(ServiceChain* sc, ErrorHandler *errh) {
+    if (!assignCpus(sc,sc->getCpuMapRef())) {
+        errh->error("Could not assign enough CPUs");
+        return -1;
+    }
+    int ret = runChain(sc, errh);
+    if (ret == 0) {
+        sc->status = ServiceChain::SC_OK;
+        _scs.insert(sc->getId(),sc);
+    } else {
+        unassignCpus(sc);
+        return -1;
+    }
+}
+
+/**
+ * Run a service chain and keep a control socket to it
+ *
+ * CPUs must be already assigned.
+ */
+int Metron::runChain(ServiceChain* sc, ErrorHandler *errh) {
     for (int i = 0; i < sc->nic.size(); i++) {
         if (sc->rxFilter->apply(sc->nic[i],sc->assignedCpus(),errh) != 0)
             return -1;
@@ -220,9 +238,6 @@ int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
             return -1;
         } else {
             close(configpipe[1]);
-            /*GIOChannel *channel = g_io_channel_unix_new(ctlsocket[0]);
-            g_io_channel_set_encoding(channel, NULL, NULL);
-            new csocket_cdriver(this, channel, true);*/
             sc->controlInit(ctlsocket[0], pid);
         }
         String s;
@@ -234,16 +249,20 @@ int Metron::addChain(ServiceChain* sc, ErrorHandler *errh) {
             kill(pid, SIGKILL);
             return errh->error("Unexpected ControlSocket command");
         }
-        _scs.insert(sc->getId(),sc);
         return 0;
     }
     assert(0);
     return -1;
 }
 
+/**
+ * Stop and remove a chain from the internal list, then unassign cpus.
+ * It is the responsability of the caller to delete the chain.
+ */
 int Metron::removeChain(ServiceChain* sc, ErrorHandler*) {
     sc->controlSendCommand("WRITE stop");
     _scs.remove(sc->getId());
+    unassignCpus(sc);
     return 0;
 }
 
@@ -256,7 +275,10 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
             if (sc == 0) {
                 return errh->error("Unknown ID %s",data.c_str());
             }
-            return m->removeChain(sc,errh);
+            int ret = m->removeChain(sc,errh);
+            if (ret == 0)
+                delete(sc);
+            return ret;
         }
     }
     return -1;
@@ -341,12 +363,10 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler * 
                     if (!sc) {
                         return errh->error("Could not instantiate a chain");
                     }
-                    int ret = m->addChain(sc, errh);
+                    int ret = m->instanciateChain(sc, errh);
                     if (ret != 0) {
-                        sc->status = ServiceChain::SC_FAILED;
+                        delete sc;
                         return errh->error("Could not start the chain");
-                    } else {
-                        sc->status = ServiceChain::SC_OK;
                     }
                 }
                 return 0;
@@ -366,59 +386,6 @@ void Metron::add_handlers() {
     set_handler("chains", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains, h_chains);
     set_handler("chains_stats", Handler::f_read | Handler::f_read_param, param_handler, h_chains_stats);
     set_handler("chains_proxy", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains_proxy);
-}
-
-/**
- * NIC
- */
-Json Metron::NIC::toJSON(bool stats) {
-    Json nic = Json::make_object();
-    nic.set("id",getId());
-    if (!stats) {
-        nic.set("speed",callRead("speed"));
-        nic.set("status",callRead("carrier"));
-        nic.set("portType",callRead("type"));
-        nic.set("hwAddr",callRead("mac").replace('-',':'));
-        Json jtagging = Json::make_array();
-        //jtagging.push_back("vlan"); TODO : support
-        jtagging.push_back("mac");
-        nic.set("rxFilter",jtagging);
-    } else {
-        nic.set("rxCount",callRead("hw_count"));
-        nic.set("rxBytes",callRead("hw_bytes"));
-        nic.set("rxDropped",callRead("hw_dropped"));
-        nic.set("rxErrors",callRead("hw_errors"));
-        nic.set("txCount",callTxRead("hw_count"));
-        nic.set("txBytes",callTxRead("hw_bytes"));
-        nic.set("txErrors",callTxRead("hw_errors"));
-    }
-    return nic;
-}
-
-String Metron::NIC::callRead(String h) {
-    const Handler* hC = Router::handler(element, h);
-    if (hC && hC->visible()) {
-        return hC->call_read(element, ErrorHandler::default_handler());
-    }
-    return "undefined";
-}
-
-String Metron::NIC::callTxRead(String h) {
-    //TODO : ensure elem type
-    ToDPDKDevice* td = dynamic_cast<FromDPDKDevice*>(element)->findOutputElement();
-    if (!td) {
-        return "Could not find matching ToDPDKDevice !";
-    }
-
-    const Handler* hC = Router::handler(td, h);
-    if (hC && hC->visible()) {
-        return hC->call_read(td, ErrorHandler::default_handler());
-    }
-    return "undefined";
-}
-
-String Metron::NIC::getDeviceId() {
-    return callRead("device");
 }
 
 Json Metron::toJSON() {
@@ -463,11 +430,11 @@ Json Metron::statsToJSON() {
     return jroot;
 }
 
-/**
+/***************************************
  * RxFilter
- */
-Metron::ServiceChain::RxFilter* Metron::ServiceChain::RxFilter::fromJSON(Json j, ServiceChain* sc, ErrorHandler* errh) {
-    Metron::ServiceChain::RxFilter* rf = new RxFilter(sc);
+ **************************************/
+ServiceChain::RxFilter* ServiceChain::RxFilter::fromJSON(Json j, ServiceChain* sc, ErrorHandler* errh) {
+    ServiceChain::RxFilter* rf = new RxFilter(sc);
     rf->method = j.get_s("method").lower();
     if (rf->method != "mac") {
         errh->error("Unsupported RX Filter method : %s",rf->method.c_str());
@@ -480,7 +447,7 @@ Metron::ServiceChain::RxFilter* Metron::ServiceChain::RxFilter::fromJSON(Json j,
     return rf;
 }
 
-Json Metron::ServiceChain::RxFilter::toJSON() {
+Json ServiceChain::RxFilter::toJSON() {
     Json j;
     j.set("method",method);
     Json jaddr = Json::make_array();
@@ -491,21 +458,22 @@ Json Metron::ServiceChain::RxFilter::toJSON() {
     return j;
 }
 
-/**
+/************************
  * Service Chain
- */
-Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
-    Metron::ServiceChain* sc = new ServiceChain(m);
+ ************************/
+ServiceChain* ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
+    ServiceChain* sc = new ServiceChain(m);
     sc->id = j.get_s("id");
     if (sc->id == "") {
         sc->id = String(m->getNbChains());
     }
-    sc->rxFilter = Metron::ServiceChain::RxFilter::fromJSON(j.get("rxFilter"), sc, errh);
+    sc->rxFilter = ServiceChain::RxFilter::fromJSON(j.get("rxFilter"), sc, errh);
     sc->config = j.get_s("config");
     sc->cpu_nr = j.get_i("cpus");
+    sc->_cpus.resize(sc->cpu_nr);
     Json jnics = j.get("nics");
     for (auto jnic : jnics) {
-        Metron::NIC* nic = m->_nics.findp(jnic.second.as_s());
+        NIC* nic = m->_nics.findp(jnic.second.as_s());
         if (!nic) {
             errh->error("Unknown NIC : %s",jnic.second.as_s().c_str());
             delete sc;
@@ -513,22 +481,20 @@ Metron::ServiceChain* Metron::ServiceChain::fromJSON(Json j, Metron* m, ErrorHan
         }
         sc->nic.push_back(nic);
     }
-    sc->_cpus.resize(sc->cpu_nr);
-    if (!m->assignCpus(sc,sc->_cpus)) {
-        errh->error("Could not assign enough CPUs");
-        delete sc;
-        return 0;
-    }
     return sc;
 }
 
-Json Metron::ServiceChain::toJSON() {
+Json ServiceChain::toJSON() {
     Json jsc = Json::make_object();
     jsc.set("id",getId());
     jsc.set("rxFilter",rxFilter->toJSON());
     jsc.set("config",config);
     jsc.set("expanded_config", generateConfig());
-    jsc.set("cpus", getCpuNr());
+    Json jcpus = Json::make_array();
+    for (int i = 0; i < getCpuNr(); i++) {
+        jcpus.push_back(getCpuMap(i));
+    }
+    jsc.set("cpus", jcpus);
     jsc.set("status", status);
     Json jnics = Json::make_array();
     for (auto n : nic) {
@@ -538,7 +504,7 @@ Json Metron::ServiceChain::toJSON() {
     return jsc;
 }
 
-Json Metron::ServiceChain::statsToJSON() {
+Json ServiceChain::statsToJSON() {
     Json jsc = Json::make_object();
     jsc.set("id",getId());
 
@@ -597,7 +563,7 @@ Json Metron::ServiceChain::statsToJSON() {
     return jsc;
 }
 
-String Metron::ServiceChain::generateConfig()
+String ServiceChain::generateConfig()
 {
     String newconf = "elementclass MetronSlave {\n" + config + "\n};\n\n";
     newconf += "slave :: MetronSlave();\n\n";
@@ -619,6 +585,109 @@ String Metron::ServiceChain::generateConfig()
     return newconf;
 }
 
+Vector<String> ServiceChain::buildCmdLine(int socketfd) {
+    Vector<String> argv;
+    int i;
+
+    String cpulist = "";
+
+
+    for (int i = 0; i < click_max_cpu_ids(); i++) {
+        cpulist += String(i) + (i < click_max_cpu_ids() -1? ",":"");
+    }
+
+    argv.push_back(click_path);
+    argv.push_back("--dpdk");
+    argv.push_back("-l");
+    argv.push_back(cpulist);
+    argv.push_back("--proc-type=secondary");
+
+    for (i = 0; i < _metron->_dpdk_args.size(); i++) {
+        argv.push_back(_metron->_dpdk_args[i]);
+    }
+    argv.push_back("--");
+    argv.push_back("--socket");
+    argv.push_back(String(socketfd));
+    for (i = 0; i < _metron->_args.size(); i++) {
+        argv.push_back(_metron->_args[i]);
+    }
+
+    for (i = 0; i < argv.size(); i++)  {
+        click_chatter("ARG %s",argv[i].c_str());
+    }
+    return argv;
+}
+
+
+Bitvector ServiceChain::assignedCpus() {
+    Bitvector b;
+    b.resize(_metron->_cpu_map.size());
+    for (int i = 0; i < b.size(); i ++) {
+        b[i] = _metron->_cpu_map[i] == this;
+    }
+    return b;
+}
+
+void ServiceChain::checkAlive() {
+    if (kill(_pid, 0) != 0) {
+        _metron->removeChain(this, ErrorHandler::default_handler());
+    } else {
+        click_chatter("Pid %d is alive", _pid);
+    }
+}
+
+/******************************
+ * NIC
+ ******************************/
+Json NIC::toJSON(bool stats) {
+    Json nic = Json::make_object();
+    nic.set("id",getId());
+    if (!stats) {
+        nic.set("speed",callRead("speed"));
+        nic.set("status",callRead("carrier"));
+        nic.set("portType",callRead("type"));
+        nic.set("hwAddr",callRead("mac").replace('-',':'));
+        Json jtagging = Json::make_array();
+        //jtagging.push_back("vlan"); TODO : support
+        jtagging.push_back("mac");
+        nic.set("rxFilter",jtagging);
+    } else {
+        nic.set("rxCount",callRead("hw_count"));
+        nic.set("rxBytes",callRead("hw_bytes"));
+        nic.set("rxDropped",callRead("hw_dropped"));
+        nic.set("rxErrors",callRead("hw_errors"));
+        nic.set("txCount",callTxRead("hw_count"));
+        nic.set("txBytes",callTxRead("hw_bytes"));
+        nic.set("txErrors",callTxRead("hw_errors"));
+    }
+    return nic;
+}
+
+String NIC::callRead(String h) {
+    const Handler* hC = Router::handler(element, h);
+    if (hC && hC->visible()) {
+        return hC->call_read(element, ErrorHandler::default_handler());
+    }
+    return "undefined";
+}
+
+String NIC::callTxRead(String h) {
+    //TODO : ensure elem type
+    ToDPDKDevice* td = dynamic_cast<FromDPDKDevice*>(element)->findOutputElement();
+    if (!td) {
+        return "Could not find matching ToDPDKDevice !";
+    }
+
+    const Handler* hC = Router::handler(td, h);
+    if (hC && hC->visible()) {
+        return hC->call_read(td, ErrorHandler::default_handler());
+    }
+    return "undefined";
+}
+
+String NIC::getDeviceId() {
+    return callRead("device");
+}
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)
