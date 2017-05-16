@@ -363,6 +363,10 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler * 
                     if (!sc) {
                         return errh->error("Could not instantiate a chain");
                     }
+                    if (m->findChainById(sc->id) != 0) {
+                        delete sc;
+                        return errh->error("A chain with this ID already exists. Delete it first.");
+                    }
                     int ret = m->instanciateChain(sc, errh);
                     if (ret != 0) {
                         delete sc;
