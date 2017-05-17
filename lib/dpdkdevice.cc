@@ -98,7 +98,8 @@ int DPDKDevice::alloc_pktmbufs()
         // Create a pktmbuf pool for each active socket
         for (int i = 0; i < _nr_pktmbuf_pools; i++) {
                 if (!_pktmbuf_pools[i]) {
-                        const char* name = (DPDKDevice::MEMPOOL_PREFIX + String(i)).c_str();
+                        String mempool_name = DPDKDevice::MEMPOOL_PREFIX + String(i);
+                        const char* name = mempool_name.c_str();
                         _pktmbuf_pools[i] =
 #if RTE_VERSION >= RTE_VERSION_NUM(2,2,0,0)
                         rte_pktmbuf_pool_create(name, NB_MBUF,
