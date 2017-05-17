@@ -567,15 +567,16 @@ Json ServiceChain::statsToJSON() {
         //tx_bytes += atol(callRead( "slaveTD"+is+ ".bytes").c_str());
         tx_dropped += atol(callRead( "slaveTD"+is+ ".dropped").c_str());
         //tx_errors += atol(callRead( "slaveTD"+is+ ".errors").c_str());
-        Json nic = Json::make_object();
-        nic.set("rxCount",rx_count);
-        nic.set("rxBytes",rx_bytes);
-        nic.set("rxDropped",rx_dropped);
-        nic.set("rxErrors",rx_errors);
-        nic.set("txCount",tx_count);
-        nic.set("txBytes",tx_bytes);
-        nic.set("txDropped",tx_dropped);
-        nic.set("txErrors",tx_errors);
+        Json jnic = Json::make_object();
+        jnic.set("id",nic[i]->getId());
+        jnic.set("rxCount",rx_count);
+        jnic.set("rxBytes",rx_bytes);
+        jnic.set("rxDropped",rx_dropped);
+        jnic.set("rxErrors",rx_errors);
+        jnic.set("txCount",tx_count);
+        jnic.set("txBytes",tx_bytes);
+        jnic.set("txDropped",tx_dropped);
+        jnic.set("txErrors",tx_errors);
         jnics.push_back(nic);
     }
     jsc.set("nics",jnics);
