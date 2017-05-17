@@ -2,9 +2,13 @@
  * arpprint.{cc,hh} -- element prints packet contents to system log
  * Jose Maria Gonzalez
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Shameless graft of ipprint.hh/cc and tcpdump-3.8.3/print-arp.c
  *
  * Copyright (c) 2005-2006 Regents of the University of California
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -69,17 +73,18 @@ ARPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
     String channel;
 
     if (Args(conf, this, errh)
-	.read_p("LABEL", _label)
-	.read("TIMESTAMP", _print_timestamp)
-	.read("ETHER", _print_ether)
-	.read("ACTIVE", _active)
-#if CLICK_USERLEVEL
-	.read("OUTFILE", FilenameArg(), _outfilename)
-#endif
-	.complete() < 0)
-	return -1;
+        .read_p("LABEL", _label)
+        .read("TIMESTAMP", _print_timestamp)
+        .read("ETHER", _print_ether)
+        .read("ACTIVE", _active)
+    #if CLICK_USERLEVEL
+        .read("OUTFILE", FilenameArg(), _outfilename)
+    #endif
+        .complete() < 0)
+    return -1;
 
     _errh = router()->chatter_channel(channel);
+
     return 0;
 }
 
@@ -87,15 +92,16 @@ int
 ARPPrint::initialize(ErrorHandler *errh)
 {
 #if CLICK_USERLEVEL
-  if (_outfilename) {
-    _outfile = fopen(_outfilename.c_str(), "wb");
-    if (!_outfile)
-      return errh->error("%s: %s", _outfilename.c_str(), strerror(errno));
-  }
+    if (_outfilename) {
+        _outfile = fopen(_outfilename.c_str(), "wb");
+        if (!_outfile)
+            return errh->error("%s: %s", _outfilename.c_str(), strerror(errno));
+    }
 #else
-  (void) errh;
+    (void) errh;
 #endif
-  return 0;
+
+return 0;
 }
 
 void
@@ -103,7 +109,7 @@ ARPPrint::cleanup(CleanupStage)
 {
 #if CLICK_USERLEVEL
     if (_outfile)
-	fclose(_outfile);
+        fclose(_outfile);
     _outfile = 0;
 #endif
 }
@@ -113,103 +119,114 @@ Packet *
 ARPPrint::simple_action(Packet *p)
 {
     if (!_active || !p->has_network_header())
-	return p;
+        return p;
 
     StringAccum sa;
+
     if (_label)
-	sa << _label << ": ";
+        sa << _label << ": ";
     if (_print_timestamp)
-	sa << p->timestamp_anno() << ": ";
+        sa << p->timestamp_anno() << ": ";
 
     if (_print_ether) {
-	const unsigned char *x = p->mac_header();
-	if (!x)
-	    x = p->data();
-	if (x + 14 <= p->network_header() && x + 14 <= p->end_data()) {
-	    const click_ether *ethh = reinterpret_cast<const click_ether *>(x);
-	    sa << EtherAddress(ethh->ether_shost) << " > "
-	       << EtherAddress(ethh->ether_dhost) << ": ";
-	}
+        const unsigned char *x = p->mac_header();
+        if (!x)
+            x = p->data();
+        if (x + 14 <= p->network_header() && x + 14 <= p->end_data()) {
+            const click_ether *ethh = reinterpret_cast<const click_ether *>(x);
+            sa << EtherAddress(ethh->ether_shost) << " > "
+               << EtherAddress(ethh->ether_dhost) << ": ";
+        }
     }
 
-    if (p->network_length() < (int) sizeof(click_arp))
-	sa << "truncated-arp (" << p->network_length() << ")";
+    if (p->network_length() < (int) sizeof(click_arp)) {
+        sa << "truncated-arp (" << p->network_length() << ")";
+    }
     else {
-	const click_ether_arp *ap = (const click_ether_arp *) p->network_header();
-	uint16_t hrd = ntohs(ap->ea_hdr.ar_hrd);
-	uint16_t pro = ntohs(ap->ea_hdr.ar_pro);
-	uint8_t hln = ap->ea_hdr.ar_hln;
-	uint8_t pln = ap->ea_hdr.ar_pln;
-	uint16_t op = ntohs(ap->ea_hdr.ar_op);
+        const click_ether_arp *ap = (const click_ether_arp *) p->network_header();
+        uint16_t hrd = ntohs(ap->ea_hdr.ar_hrd);
+        uint16_t pro = ntohs(ap->ea_hdr.ar_pro);
+        uint8_t hln = ap->ea_hdr.ar_hln;
+        uint8_t pln = ap->ea_hdr.ar_pln;
+        uint16_t op = ntohs(ap->ea_hdr.ar_op);
 
-	if ((pro != ETHERTYPE_IP && pro != ETHERTYPE_TRAIL) ||
-		pln != 4 || hln == 0) {
-	    sa << "arp-#" << op << " for proto #" << pro << " (" << pln << ") "
-	    << "hardware #" << hrd << " (" << hln << ")";
-	    return p;
-	}
-	const unsigned char *sha = (const unsigned char *)ap->arp_sha;
-	const unsigned char *spa = (const unsigned char *)ap->arp_spa;
-	const unsigned char *tha = (const unsigned char *)ap->arp_tha;
-	const unsigned char *tpa = (const unsigned char *)ap->arp_tpa;
+        if ((pro != ETHERTYPE_IP && pro != ETHERTYPE_TRAIL) ||
+            pln != 4 || hln == 0) {
+            sa << "arp-#" << op << " for proto #" << pro << " (" << pln << ") "
+                << "hardware #" << hrd << " (" << hln << ")";
+            return p;
+        }
 
-	if (pro == ETHERTYPE_TRAIL)
-	    sa << "trailer-";
+        const unsigned char *sha = (const unsigned char *)ap->arp_sha;
+        const unsigned char *spa = (const unsigned char *)ap->arp_spa;
+        const unsigned char *tha = (const unsigned char *)ap->arp_tha;
+        const unsigned char *tpa = (const unsigned char *)ap->arp_tpa;
 
-	switch (op) {
-	case ARPOP_REQUEST:
-	    {
-	    const unsigned char ezero[6] = {0,0,0,0,0,0};
-	    sa << "arp who-has " << IPAddress(tpa);
-	    if ( memcmp (ezero, tha, hln) != 0 )
-		sa << " (" << EtherAddress(tha) << ")";
-	    sa << " tell " << IPAddress(spa);
-	    break;
-	    }
+        if (pro == ETHERTYPE_TRAIL)
+            sa << "trailer-";
 
-	case ARPOP_REPLY:
-	    sa << "arp reply " << IPAddress(spa);
-	    sa << " is-at " << EtherAddress(sha);
-	    break;
+        switch (op) {
+            case ARPOP_REQUEST:
+                {
+                const unsigned char ezero[6] = {0,0,0,0,0,0};
+                sa << "arp who-has " << IPAddress(tpa);
+                if ( memcmp (ezero, tha, hln) != 0 )
+                sa << " (" << EtherAddress(tha) << ")";
+                sa << " tell " << IPAddress(spa);
+                break;
+                }
 
-	case ARPOP_REVREQUEST:
-	    sa << "rarp who-is " << EtherAddress(tha) << " tell " <<
-		EtherAddress(sha);
-	    break;
+            case ARPOP_REPLY:
+                sa << "arp reply " << IPAddress(spa);
+                sa << " is-at " << EtherAddress(sha);
+                break;
 
-	case ARPOP_REVREPLY:
-	    sa << "rarp reply " << EtherAddress(tha) << " at " << IPAddress(tpa);
-	    break;
+            case ARPOP_REVREQUEST:
+                sa << "rarp who-is " << EtherAddress(tha) << " tell " <<
+                EtherAddress(sha);
+                break;
 
-	case ARPOP_INVREQUEST:
-	    sa << "invarp who-is " << EtherAddress(tha) << " tell " <<
-		EtherAddress(sha);
-	    break;
+            case ARPOP_REVREPLY:
+                sa << "rarp reply " << EtherAddress(tha) << " at " << IPAddress(tpa);
+                break;
 
-	case ARPOP_INVREPLY:
-	    sa << "invarp reply " << EtherAddress(tha) << " at " <<
-		IPAddress(tpa);
-	    break;
+            case ARPOP_INVREQUEST:
+                sa << "invarp who-is " << EtherAddress(tha) << " tell " <<
+                EtherAddress(sha);
+                break;
 
-	default:
-	    sa << "arp-#" << op;
-	    // default_print((const u_char *)ap, caplen);
-	}
-	if (hrd != ARPHRD_ETHER)
-	    sa << "hardware #" << hrd;
+            case ARPOP_INVREPLY:
+                sa << "invarp reply " << EtherAddress(tha) << " at " <<
+                IPAddress(tpa);
+                break;
+
+            default:
+                sa << "arp-#" << op;
+                // default_print((const u_char *)ap, caplen);
+        }
+        if (hrd != ARPHRD_ETHER)
+            sa << "hardware #" << hrd;
     }
 
 #if CLICK_USERLEVEL
     if (_outfile) {
-	sa << '\n';
-	ignore_result(fwrite(sa.data(), 1, sa.length(), _outfile));
+        sa << '\n';
+        ignore_result(fwrite(sa.data(), 1, sa.length(), _outfile));
     } else
 #endif
-	_errh->message("%s", sa.c_str());
+    _errh->message("%s", sa.c_str());
 
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+ARPPrint::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    return batch;
+}
+#endif
 
 void
 ARPPrint::add_handlers()

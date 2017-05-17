@@ -1,6 +1,6 @@
 #ifndef CLICK_ARPPRINT_HH
 #define CLICK_ARPPRINT_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -50,34 +50,37 @@ Returns or sets the ACTIVE parameter.
 
 =a Print, CheckARPHeader */
 
-class ARPPrint : public Element { public:
+class ARPPrint : public BatchElement {
+    public:
 
-    ARPPrint() CLICK_COLD;
-    ~ARPPrint() CLICK_COLD;
+        ARPPrint() CLICK_COLD;
+        ~ARPPrint() CLICK_COLD;
 
-    const char *class_name() const		{ return "ARPPrint"; }
-    const char *port_count() const		{ return PORTS_1_1; }
+        const char *class_name() const      { return "ARPPrint"; }
+        const char *port_count() const      { return PORTS_1_1; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
-    void add_handlers() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *) CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+        Packet      *simple_action      (Packet *);
+    #if HAVE_BATCH
+        PacketBatch *simple_action_batch(PacketBatch *);
+    #endif
 
- private:
+    private:
 
-    String _label;
-    bool _print_timestamp;
-    bool _print_ether;
-    bool _active;
+        String _label;
+        bool _print_timestamp;
+        bool _print_ether;
+        bool _active;
 
-#if CLICK_USERLEVEL
-    String _outfilename;
-    FILE *_outfile;
-#endif
-    ErrorHandler *_errh;
-
+        #if CLICK_USERLEVEL
+        String _outfilename;
+        FILE *_outfile;
+        #endif
+        ErrorHandler *_errh;
 };
 
 CLICK_ENDDECLS

@@ -1,0 +1,33 @@
+%info
+Test that Click launches with DPDK and works using a virtual ring-based dev
+
+%require
+click-buildtool provides dpdk
+
+%script
+click --dpdk --no-huge -m 128MB -c 0x3 -n 1 --vdev=eth_ring0 -- CONFIG
+
+%file CONFIG
+DPDKInfo(2048)
+
+i :: InfiniteSource("A", LIMIT 2, ACTIVE false, STOP false) -> ToDPDKDevice(0)
+FromDPDKDevice(0) -> Print() -> Discard
+
+Script(wait 10ms, print "Starting pktgen" ,write i.active true, wait 100ms, stop)
+
+%expect stdout
+Starting pktgen
+
+%expect stderr
+Initializing DPDK
+   1 | 41
+   1 | 41
+
+
+%ignorex stdout
+EAL.*
+PMD.*
+
+%ignorex stderr
+EAL.*
+PMD.*
