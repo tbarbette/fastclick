@@ -91,8 +91,6 @@ StringClassifier::is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh
 	return valid;
 }
 
-
-
 int
 StringClassifier::find_output(Packet *p) {
 	int output = _matcher.match_first(p, false);

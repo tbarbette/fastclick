@@ -1,6 +1,6 @@
 #ifndef CLICK_REGEXCLASSIFIER_HH
 #define CLICK_REGEXCLASSIFIER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include "regexset.hh"
 CLICK_DECLS
 
@@ -51,7 +51,7 @@ handlers as there are output ports.
 
 =a Classifier, IPFilter, CheckIPHeader, MarkIPHeader, CheckIPHeader2,
 tcpdump(1) */
-class RegexClassifier : public Element {
+class RegexClassifier : public BatchElement {
 	public:
 
 		RegexClassifier() CLICK_COLD;
@@ -66,9 +66,13 @@ class RegexClassifier : public Element {
 
 		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 		void add_handlers() CLICK_COLD;
-		void push(int port, Packet *);
+		void push(int port, Packet *p);
+	#if HAVE_BATCH
+		void push_batch(int, PacketBatch *batch);
+	#endif
 
 	private:
+		int find_output(Packet *p);
 		bool is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) const;
 		static String read_handler(Element *, void *) CLICK_COLD;
 		static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;

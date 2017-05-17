@@ -1,3 +1,22 @@
+/*
+ * regexclassifier.{cc,hh} -- element classifies packets by contents
+ * using regular expression matching
+ *
+ * Computational batching support by Georgios Katsikas
+ *
+ * Copyright (c) 2017 KTH Royal Institute of Technology
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
+ */
+
 #include <click/config.h>
 #include "regexclassifier.hh"
 #include <click/glue.hh>
@@ -126,8 +145,8 @@ RegexClassifier::add_handlers() {
 	add_write_handler("payload_only", write_handler, H_PAYLOAD_ONLY);
 }
 
-void 
-RegexClassifier::push(int, Packet* p) {
+int
+RegexClassifier::find_output(Packet *p) {
 	char* data = (char *) p->data();
 	int length = p->length();
 	if (_payload_only) {
@@ -140,8 +159,78 @@ RegexClassifier::push(int, Packet* p) {
 			length = p->transport_length();
 		}
 	}
-	checked_output_push(_program->match_first(data, length), p);
+
+	return _program->match_first(data, length);
 }
+
+void
+RegexClassifier::push(int, Packet *p) {
+	int port = find_output(p);
+	checked_output_push(port, p);
+}
+
+#if HAVE_BATCH
+void
+RegexClassifier::push_batch(int, PacketBatch *batch)
+{
+	unsigned short outports = noutputs();
+	PacketBatch *out[outports];
+	bzero(out,sizeof(PacketBatch*)*outports);
+	PacketBatch *next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );
+	PacketBatch *p = batch;
+	PacketBatch *last = NULL;
+	int last_o = -1;
+	int passed = 0;
+	int count  = 0;
+
+	for ( ;p != NULL; p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next())) ) {
+		// The actual job of this element
+		int o = find_output(p);
+
+		if (o < 0 || o>=(outports)) o = (outports - 1);
+
+		if (o == last_o) {
+			passed ++;
+		}
+		else {
+			if ( !last ) {
+				out[o] = p;
+				p->set_count(1);
+				p->set_tail(p);
+			}
+			else {
+				out[last_o]->set_tail(last);
+				out[last_o]->set_count(out[last_o]->count() + passed);
+				if (!out[o]) {
+					out[o] = p;
+					out[o]->set_count(1);
+					out[o]->set_tail(p);
+				}
+				else {
+					out[o]->append_packet(p);
+				}
+				passed = 0;
+			}
+		}
+		last = p;
+		last_o = o;
+		count++;
+	}
+
+	if (passed) {
+		out[last_o]->set_tail(last);
+		out[last_o]->set_count(out[last_o]->count() + passed);
+	}
+
+	int i = 0;
+	for (; i < outports; i++) {
+		if (out[i]) {
+			out[i]->tail()->set_next(NULL);
+			checked_output_push_batch(i, out[i]);
+		}
+	}
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(RegexClassifier)
