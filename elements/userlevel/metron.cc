@@ -64,10 +64,11 @@ int Metron::initialize(ErrorHandler * errh) {
 }
 
 void Metron::cleanup(CleanupStage) {
-    auto begin = _scs.begin();
+    //TODO : not sure why but buggy...
+    /*auto begin = _scs.begin();
     while (begin != _scs.end()) {
         delete begin.value();
-    }
+    }*/
 }
 
 int Metron::getAssignedCpuNr() {
@@ -675,10 +676,10 @@ int ServiceChain::controlReadLine(String& line) {
     int n = read(_socket, &buf, 1024);
     if (n <= 0)
         return n;
-    line = String(buf);
+    line = String(buf,n);
     while (n == 1024) {
         n = read(_socket, &buf, 1024);
-        line += String(buf);
+        line += String(buf,n);
     }
     return line.length();
 }

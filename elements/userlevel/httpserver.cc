@@ -106,8 +106,6 @@ int HTTPServer::ahc_echo(void * cls,
 
 
 	//Processing request
-	Request* request = new Request();
-	request->connection = connection;
 	String body;
 	int status;
 	struct MHD_Response * response;
@@ -270,7 +268,7 @@ int HTTPServer::ahc_echo(void * cls,
 	    click_chatter("Could not create response");
 	    return MHD_NO;
 	}
-	ret = MHD_queue_response(request->connection,
+	ret = MHD_queue_response(connection,
 			status,
 			response);
 	MHD_destroy_response(response);

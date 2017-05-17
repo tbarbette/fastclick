@@ -42,6 +42,10 @@ class ServiceChain { public:
 
             }
 
+            ~RxFilter() {
+
+            }
+
             String method;
             Vector<String> addr;
             ServiceChain* _sc;
