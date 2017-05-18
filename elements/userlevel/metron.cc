@@ -577,7 +577,7 @@ Json ServiceChain::statsToJSON() {
         jnic.set("txBytes",tx_bytes);
         jnic.set("txDropped",tx_dropped);
         jnic.set("txErrors",tx_errors);
-        jnics.push_back(nic);
+        jnics.push_back(jnic);
     }
     jsc.set("nics",jnics);
     if (_metron->_timing_stats) {
