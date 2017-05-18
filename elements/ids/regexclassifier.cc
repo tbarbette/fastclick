@@ -2,6 +2,8 @@
  * regexclassifier.{cc,hh} -- element classifies packets by contents
  * using regular expression matching
  *
+ * Element originally imported from http://www.openboxproject.org/
+ *
  * Computational batching support by Georgios Katsikas
  *
  * Copyright (c) 2017 KTH Royal Institute of Technology

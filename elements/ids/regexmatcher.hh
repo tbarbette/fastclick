@@ -52,7 +52,7 @@ Returns or sets the element's pattern 0. There are as many C<pattern>
 handlers as there are output ports.
 
 =a RegexClassifier */
-class RegexMatcher : public Element {
+class RegexMatcher : public BatchElement {
 	public:
 
 		RegexMatcher() CLICK_COLD;
@@ -65,7 +65,11 @@ class RegexMatcher : public Element {
 
 		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 		void add_handlers() CLICK_COLD;
+		int processPacket(Packet* p);
 		void push(int port, Packet* p);
+#if HAVE_BATCH
+        void push_batch(int port, PacketBatch* p);
+#endif
 
 	private:
 		bool is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) const;

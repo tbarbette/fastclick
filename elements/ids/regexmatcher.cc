@@ -1,3 +1,23 @@
+/*
+ * regexmatcher.{cc,hh} -- element classifies packets by contents
+ * using regular expression matching
+ *
+ * Element originally imported from http://www.openboxproject.org/
+ *
+ * Computational batching support by Tom Barbette
+ *
+ * Copyright (c) 2017 University of Liege
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
+ */
 #include <click/config.h>
 #include "regexmatcher.hh"
 #include <click/glue.hh>
@@ -78,8 +98,8 @@ RegexMatcher::is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) co
 	return valid;
 }
 
-void
-RegexMatcher::push(int, Packet* p) {
+int
+RegexMatcher::processPacket(Packet* p) {
 	char* data = (char *) p->data();
 	int length = p->length();
 	if (_payload_only) {
@@ -95,18 +115,30 @@ RegexMatcher::push(int, Packet* p) {
 
 	if (_match_all) {
 		if (_program.match_all(data, length)) {
-			output(0).push(p);
+		    return 0;
 		} else {
-			checked_output_push(1, p);
+			return 1;
 		}
 	} else {
 		if (_program.match_any(data, length)) {
-			output(0).push(p);
+		    return 0;
 		} else {
-			checked_output_push(1, p);
+		    return 1;
 		}
 	}
 }
+
+void
+RegexMatcher::push(int, Packet* p) {
+    checked_output_push(processPacket(p), p);
+}
+
+#if HAVE_BATCH
+void
+RegexMatcher::push_batch(int, PacketBatch* batch) {
+    CLASSIFY_EACH_PACKET(2,processPacket,batch,checked_output_push_batch);
+}
+#endif
 
 enum { H_PAYLOAD_ONLY, H_MATCH_ALL};
 
