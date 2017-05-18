@@ -53,6 +53,8 @@ public:
     int add_tx_queue(int &queue_id, unsigned n_desc,
                              ErrorHandler *errh) CLICK_COLD;
 
+    void set_mac(EtherAddress mac);
+
     unsigned int get_nb_txdesc();
 
     static struct rte_mempool *get_mpool(unsigned int);
@@ -116,7 +118,7 @@ private:
     struct DevInfo {
         inline DevInfo() :
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), num_pools(0), vf_vlan() {
+            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), num_pools(0), vf_vlan(), mac() {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -129,6 +131,7 @@ private:
         enum rte_eth_rx_mq_mode mq_mode;
         int num_pools;
         Vector<int> vf_vlan;
+        EtherAddress mac;
     };
 
     struct DevInfo info;

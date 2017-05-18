@@ -538,7 +538,7 @@ Json ServiceChain::statsToJSON() {
                 avg_max = avg;
         }
         Json jcpu = Json::make_object();
-        jcpu.set("id", j);
+        jcpu.set("id", getCpuMap(j));
         jcpu.set("load", (float)avg_max / 32.0f);
         jcpus.push_back(jcpu);
     }

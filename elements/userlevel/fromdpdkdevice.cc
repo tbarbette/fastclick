@@ -22,6 +22,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
+#include <click/etheraddress.hh>
 
 #include "fromdpdkdevice.hh"
 #include "todpdkdevice.hh"
@@ -48,6 +49,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     //Default parameters
     int numa_node = 0;
     String dev;
+    EtherAddress mac;
+    bool has_mac = false;
     String mode = "";
     int num_pools = 0;
     Vector<int> vf_vlan;
@@ -55,6 +58,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
+        .read("MAC", mac).read_status(has_mac)
         .read("MODE", mode)
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
@@ -89,9 +93,11 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
             firstqueue = 0;
         r = configure_rx(numa_node,n_queues,n_queues,errh);
     }
-
     if (r != 0)
         return r;
+
+    if (has_mac)
+        _dev->set_mac(mac);
 
     r = _dev->set_mode(mode,num_pools,vf_vlan,errh);
 

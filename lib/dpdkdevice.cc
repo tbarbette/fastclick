@@ -305,6 +305,11 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     if (info.promisc)
         rte_eth_promiscuous_enable(port_id);
 
+    if (info.mac != EtherAddress()) {
+        struct ether_addr addr;
+        memcpy(&addr,info.mac.data(),sizeof(struct ether_addr));
+        rte_eth_dev_default_mac_addr_set(port_id, &addr);
+    }
 
     if (info.mq_mode & ETH_MQ_RX_VMDQ_FLAG) {
         /*
@@ -327,8 +332,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         }
     }
 
-
     return 0;
+}
+
+void DPDKDevice::set_mac(EtherAddress mac) {
+    assert(!_is_initialized);
+    info.mac = mac;
 }
 
 /**
