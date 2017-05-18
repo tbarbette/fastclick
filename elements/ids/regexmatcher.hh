@@ -1,6 +1,6 @@
 #ifndef CLICK_REGEXMATCHER_HH
 #define CLICK_REGEXMATCHER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include "regexset.hh"
 CLICK_DECLS
 
@@ -65,7 +65,7 @@ class RegexMatcher : public BatchElement {
 
 		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 		void add_handlers() CLICK_COLD;
-		int processPacket(Packet* p);
+		int find_output(Packet* p);
 		void push(int port, Packet* p);
 #if HAVE_BATCH
         void push_batch(int port, PacketBatch* p);

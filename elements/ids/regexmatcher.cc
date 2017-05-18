@@ -99,7 +99,7 @@ RegexMatcher::is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) co
 }
 
 int
-RegexMatcher::processPacket(Packet* p) {
+RegexMatcher::find_output(Packet* p) {
 	char* data = (char *) p->data();
 	int length = p->length();
 	if (_payload_only) {
@@ -130,13 +130,13 @@ RegexMatcher::processPacket(Packet* p) {
 
 void
 RegexMatcher::push(int, Packet* p) {
-    checked_output_push(processPacket(p), p);
+    checked_output_push(find_output(p), p);
 }
 
 #if HAVE_BATCH
 void
 RegexMatcher::push_batch(int, PacketBatch* batch) {
-    CLASSIFY_EACH_PACKET(2,processPacket,batch,checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(2,find_output,batch,checked_output_push_batch);
 }
 #endif
 
