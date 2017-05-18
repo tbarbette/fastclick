@@ -547,6 +547,8 @@ ControlSocket::write_command(connection &conn, const String &handlername, String
   if (_read_only)
     return conn.message(CSERR_PERMISSION, "Permission denied for '" + handlername + "'");
 
+#undef LARGEST_HANDLER_WRITE
+
 #ifdef LARGEST_HANDLER_WRITE
   if (data.length() > LARGEST_HANDLER_WRITE)
     return conn.message(CSERR_DATA_TOO_BIG, "Data too large for write handler '" + handlername + "'");
