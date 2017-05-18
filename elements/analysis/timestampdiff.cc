@@ -32,7 +32,7 @@
 
 CLICK_DECLS
 
-TimestampDiff::TimestampDiff() : _delays(), _offset(40) {
+TimestampDiff::TimestampDiff() : _delays(), _offset(40),_max_delay(1000) {
 }
 
 TimestampDiff::~TimestampDiff() {
@@ -41,6 +41,7 @@ TimestampDiff::~TimestampDiff() {
 int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(conf, this, errh)
             .read("OFFSET",_offset)
+            .read("MAXDELAY", _max_delay)
             .complete() < 0)
         return -1;
 
@@ -105,7 +106,7 @@ inline void TimestampDiff::smaction(Packet* p) {
     uint64_t i = NumberPacket::read_number_of_packet(p,_offset);
     Timestamp old = get_recordtimestamp_instance()->get(i);
     Timestamp diff = now - old;
-    if (diff.sec() > 0)
+    if (diff.msecval() > _max_delay)
         click_chatter("delay over 1s for packet %" PRIu64 ": %uµs",
                       i, diff.sec() * 1000000 + diff.usec());
     else
