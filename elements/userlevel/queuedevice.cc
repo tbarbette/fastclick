@@ -180,12 +180,15 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
         usable_threads[router()->thread_sched()
             ->initial_home_thread_id(this)] = 1;
         n_threads = 1;
-        if (n_threads >= _maxqueues)
-            n_queues = _maxqueues;
-        else
-            n_queues = max(_minqueues,n_threads);
+        if (n_queues == -1) {
+            if (n_threads >= _maxqueues)
+                n_queues = _maxqueues;
+            else
+                n_queues = max(_minqueues,n_threads);
+        }
+        queue_per_threads = n_queues / n_threads;
 
-	   click_chatter(
+	    click_chatter(
 				"%s : remove StaticThreadSched to use FastClick's "
 				"auto-thread assignment", class_name());
 		goto end;
