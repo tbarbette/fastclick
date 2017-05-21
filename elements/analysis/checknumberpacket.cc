@@ -71,9 +71,7 @@ CheckNumberPacket::push(int i, Packet *p) {
 void
 CheckNumberPacket::push_batch(int i, PacketBatch *batch) {
     PacketBatch* ok = 0;
-    CLASSIFY_EACH_PACKET(noutputs(),smaction,batch,[this](int i, PacketBatch* b){
-        this->checked_output_push_batch(i, b);
-    });
+    CLASSIFY_EACH_PACKET(2,smaction,batch,checked_output_push_batch);
 }
 #endif
 

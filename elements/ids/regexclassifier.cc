@@ -175,7 +175,7 @@ RegexClassifier::push(int, Packet *p) {
 void
 RegexClassifier::push_batch(int, PacketBatch *batch)
 {
-    CLASSIFY_EACH_PACKET(noutputs(),find_output,batch,checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(noutputs() + 1,find_output,batch,checked_output_push_batch);
 }
 #endif
 

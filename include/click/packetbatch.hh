@@ -80,8 +80,8 @@ CLICK_DECLS
  */
 #define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
     {\
-        PacketBatch* out[nbatches];\
-        bzero(out,sizeof(PacketBatch*)*nbatches);\
+        PacketBatch* out[(nbatches)];\
+        bzero(out,sizeof(PacketBatch*)*(nbatches));\
         PacketBatch* next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
         PacketBatch* p = batch;\
         PacketBatch* last = NULL;\
@@ -89,7 +89,7 @@ CLICK_DECLS
         int passed = 0;\
         for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
-            if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
+            if (o < 0 || o>=(nbatches)) o = ((nbatches) - 1);\
             if (o == last_o) {\
                 passed ++;\
             } else {\
@@ -120,7 +120,7 @@ CLICK_DECLS
         }\
 \
         int i = 0;\
-        for (; i < nbatches; i++) {\
+        for (; i < (nbatches); i++) {\
             if (out[i]) {\
                 out[i]->tail()->set_next(NULL);\
                 (on_finish(i,out[i]));\

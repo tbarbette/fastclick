@@ -256,7 +256,7 @@ Classifier::push_batch(int, PacketBatch * batch)
 	CLASSIFY_EACH_PACKET(	(noutputs() + 1),
 							_prog.match,
 							batch,
-							[this](int output,PacketBatch* batch){if (batch) {checked_output_push_batch(output,batch);};});
+							checked_output_push_batch);
 
 }
 
