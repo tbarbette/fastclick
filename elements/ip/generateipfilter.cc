@@ -97,8 +97,8 @@ GenerateIPFilter::read_handler(Element *e, void *user_data) {
         }
     }
     for (auto flow : g->_map) {
-        acc << "allow src " << flow.flowid().saddr() << '/' << String(32-n) << " && "
-                 << " dst " << flow.flowid().daddr() << '/' << String(32-n);
+        acc << "allow src net " << flow.flowid().saddr() << '/' << String(32-n) << " && "
+                 << " dst net " << flow.flowid().daddr() << '/' << String(32-n);
         if (g->_keep_sport)
             acc << " && src port " << flow.flowid().sport();
         if (g->_keep_dport) {
