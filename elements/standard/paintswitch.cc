@@ -71,13 +71,14 @@ PaintSwitch::push_batch(int, PacketBatch *batch) {
             return noutputs() - 1;
         }
     };
-    CLASSIFY_EACH_PACKET(noutputs() + 1, fnt, batch, [this](int port, PacketBatch* batch) {
-        if (likely(port < noutputs()))
+    auto on_finish = [this](int port, PacketBatch* batch) {
+        if (likely(port < noutputs())) {
             output(port).push_batch(batch);
-        else {
+        } else {
             batch->fast_kill();
         }
-    });
+    };
+    CLASSIFY_EACH_PACKET((noutputs() + 1), fnt, batch, on_finish);
 }
 #endif
 
