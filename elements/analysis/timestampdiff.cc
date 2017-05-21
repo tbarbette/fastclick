@@ -107,7 +107,7 @@ inline void TimestampDiff::smaction(Packet* p) {
     Timestamp old = get_recordtimestamp_instance()->get(i);
     Timestamp diff = now - old;
     if (diff.msecval() > _max_delay)
-        click_chatter("delay over 1s for packet %" PRIu64 ": %uµs",
+        click_chatter("delay over 1s for packet %llu: %uµs",
                       i, diff.sec() * 1000000 + diff.usec());
     else
         _delays.push_back(diff.usec());
