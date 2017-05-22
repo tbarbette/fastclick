@@ -1,10 +1,10 @@
 // -*- c-basic-offset: 4; related-file-name: "fromdpdkdevice.hh" -*-
 /*
  * fromdpdkdevice.{cc,hh} -- element reads packets live from network via
- * Intel's DPDK
+ * the DPDK
  *
  * Copyright (c) 2014-2015 Cyril Soldani, University of Liège
- * Copyright (c) 2016 Tom Barbette, University of Liège
+ * Copyright (c) 2016-2017 Tom Barbette, University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),

@@ -19,10 +19,11 @@
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
 #include <rte_errno.h>
+#if RTE_VERSION >= RTE_VERSION_NUM(17,02,0,0)
 extern "C" {
 #include <rte_pmd_ixgbe.h>
 }
-
+#endif
 CLICK_DECLS
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
@@ -209,6 +210,11 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     dev_conf.rxmode.hw_vlan_filter = 0;
 
     if (info.mq_mode & ETH_MQ_RX_VMDQ_FLAG) {
+
+        if (info.num_pools > dev_info.max_vmdq_pools) {
+            return errh->error("The number of VF Pools exceeds the hardware limit of %d",dev_info.max_vmdq_pools);
+        }
+
         dev_conf.rx_adv_conf.vmdq_rx_conf.nb_queue_pools =  (enum rte_eth_nb_pools)info.num_pools;
         dev_conf.rx_adv_conf.vmdq_rx_conf.enable_default_pool = 0;
         dev_conf.rx_adv_conf.vmdq_rx_conf.default_pool = 0;
@@ -248,6 +254,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     rte_eth_dev_info_get(port_id, &dev_info);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
     if (dev_info.nb_rx_queues != info.rx_queues.size()) {
         return errh->error("Device only initialized %d RX queues instead of %d. "
                 "Please check configuration.", dev_info.nb_rx_queues,
@@ -258,6 +265,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 "Please check configuration.", dev_info.nb_tx_queues,
                 info.tx_queues.size());
     }
+#endif
 
     struct rte_eth_rxconf rx_conf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
