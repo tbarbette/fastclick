@@ -2,9 +2,13 @@
  * checkarpheader.{cc,hh} -- element checks ARP header for correctness
  * Jose Maria Gonzalez
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2003 International Computer Science Institute
  * Copyright (c) 2006 Regents of the University of California
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
