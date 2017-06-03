@@ -152,7 +152,7 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
         n_queues = _maxqueues;
     else
         n_queues = max(_minqueues,n_threads);
-    click_chatter("Nqueues %d %d %d", n_queues, _minqueues,_maxqueues);
+
     if (n_threads > 0) {
         queue_per_threads = n_queues / n_threads;
         if (queue_per_threads == 0) {

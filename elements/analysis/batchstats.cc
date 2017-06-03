@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * batchstats.{cc,hh} -- anonymize packet IP addresses
+ * batchstats.{cc,hh} -- batch statistics counter
  * Tom Barbette
  *
  * Copyright (c) 2016 University of Liege
