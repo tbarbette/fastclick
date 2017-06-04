@@ -7,6 +7,8 @@
 
 CLICK_DECLS
 
+class RecordTimestamp;
+
 /*
 =c
 
@@ -45,7 +47,10 @@ public:
 private:
     std::vector<unsigned> _delays;
     int _offset;
+    RecordTimestamp* _rt;
     void smaction(Packet* p);
+
+    RecordTimestamp* get_recordtimestamp_instance();
 };
 
 CLICK_ENDDECLS
