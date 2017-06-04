@@ -55,13 +55,8 @@ class Element { public:
     virtual void selected(int fd);
 #endif
 
-    virtual bool get_spawning_threads(Bitvector& b);
     inline bool is_fullpush() const;
-    Bitvector get_passing_threads(bool is_pull=false);
-
-    enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_YES};
-
-    virtual bool get_runnable_threads(Bitvector&) final = delete;
+    enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_NEEDED, BATCH_MODE_YES};
 
     inline void checked_output_push(int port, Packet *p) const;
     inline Packet* checked_input_pull(int port) const;
@@ -169,7 +164,17 @@ class Element { public:
 
     RouterThread *home_thread() const;
 
+    virtual bool get_spawning_threads(Bitvector& b, bool isoutput);
+    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, int level = 0);
+    Bitvector get_passing_threads(Element* origin, int level = 0);
+    Bitvector get_passing_threads();
+
     int home_thread_id() const;
+
+    //Deprecated name, implement get_spawning_threads
+    virtual bool get_runnable_threads(Bitvector&) final = delete;
+    virtual bool get_spawning_threads(Bitvector&) final = delete;
+
 #if CLICK_USERLEVEL
     // SELECT
     int add_select(int fd, int mask);

@@ -40,7 +40,7 @@ public:
     void cleanup(CleanupStage);
 
 
-    bool get_spawning_threads(Bitvector& b) override;
+    bool get_spawning_threads(Bitvector& b, bool isoutput) override;
 
 #if HAVE_BATCH
     void push_batch(int,PacketBatch*);
