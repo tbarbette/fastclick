@@ -1,9 +1,9 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 /*
- * replay.{cc,hh} -- Replay some packets
+ * multireplay.{cc,hh} -- MultiReplay some packets
  * Tom Barbette
  *
- * Copyright (c) 2015 University of Liege
+ * Copyright (c) 2015-2017 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -18,88 +18,22 @@
 
 #include <click/config.h>
 #include <click/error.hh>
-#include "replay.hh"
+#include "multireplay.hh"
 #include <click/args.hh>
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true)
-{
-#if HAVE_BATCH
-    in_batch_mode = BATCH_MODE_YES;
-#endif
-}
-
-ReplayBase::~ReplayBase()
+MultiReplay::MultiReplay() : _queue(1024)
 {
 }
 
-void ReplayBase::cleanup_packets() {
-    while (_queue_head) {
-        Packet* next = _queue_head->next();
-        _queue_head->kill();
-        _queue_head = next;
-    }
-}
-
-void ReplayBase::cleanup(CleanupStage) {
-    cleanup_packets();
-}
-
-void
-ReplayBase::set_active(bool active) {
-    _active = active;
-    if (active)
-        _task.reschedule();
-    else
-        _task.unschedule();
-}
-
-int
-ReplayBase::write_handler(const String & s_in, Element *e, void *thunk, ErrorHandler *errh)
-{
-    ReplayBase *q = static_cast<ReplayBase *>(e);
-    int which = reinterpret_cast<intptr_t>(thunk);
-    String s = cp_uncomment(s_in);
-    switch (which) {
-      case 0: {
-        bool active;
-        if (BoolArg().parse(s, active)) {
-          q->set_active(active);
-          return 0;
-        } else
-          return errh->error("type mismatch");
-        }
-        return 0;
-      case 1:
-          q->cleanup_packets();
-          q->_loaded = false;
-          return 0;
-      default:
-        return errh->error("internal error");
-    }
-}
-
-void
-ReplayBase::add_handlers()
-{
-    add_write_handler("active", write_handler, 0, Handler::BUTTON);
-    add_write_handler("reset", write_handler, 1, Handler::BUTTON);
-    add_data_handlers("active", Handler::OP_READ, &_active);
-    add_data_handlers("stop", Handler::OP_READ | Handler::OP_WRITE, &_stop);
-}
-
-Replay::Replay() : _queue(1024)
-{
-}
-
-Replay::~Replay()
+MultiReplay::~MultiReplay()
 {
 }
 
 
 void *
-Replay::cast(const char *n)
+MultiReplay::cast(const char *n)
 {
     if (strcmp(n, Notifier::EMPTY_NOTIFIER) == 0)
     return static_cast<Notifier *>(&_notifier);
@@ -109,7 +43,7 @@ Replay::cast(const char *n)
 
 
 int
-Replay::configure(Vector<String> &conf, ErrorHandler *errh)
+MultiReplay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
         .read_p("QUEUE", _queue)
@@ -124,27 +58,32 @@ Replay::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-Packet* Replay::pull(int) {
+Packet* MultiReplay::pull(int port) {
     _task.reschedule();
-    return _output.ring.extract();
+    return _output[port].ring.extract();
 }
 
 #if HAVE_BATCH
-PacketBatch* Replay::pull_batch(int, unsigned max) {
+PacketBatch* MultiReplay::pull_batch(int port, unsigned max) {
     PacketBatch* head;
     _task.reschedule();
-    MAKE_BATCH(_output.ring.extract(),head,max);
+    MAKE_BATCH(_output[port].ring.extract(),head,max);
     return head;
 }
 #endif
 
 int
-Replay::initialize(ErrorHandler * errh) {
+MultiReplay::initialize(ErrorHandler * errh) {
     _notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
     _notifier.set_active(false,false);
-    _input.resize(1);
-     _input[0].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
-    _output.ring.initialize(_queue);
+    _input.resize(ninputs());
+    for (int i = 0 ; i < ninputs(); i++) {
+        _input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
+    }
+    _output.resize(noutputs());
+    for (int i = 0; i < _output.size(); i++) {
+        _output[i].ring.initialize(_queue);
+    }
     ScheduleInfo::initialize_task(this,&_task,_active,errh);
     return 0;
 }
@@ -152,7 +91,7 @@ Replay::initialize(ErrorHandler * errh) {
 
 
 bool
-Replay::run_task(Task* task)
+MultiReplay::run_task(Task* task)
 {
     if (!_active)
         return false;
@@ -170,7 +109,7 @@ Replay::run_task(Task* task)
     while (_queue_current != 0 && n < _burst) {
         Packet* p = _queue_current;
 
-        if (_output.ring.is_full()) {
+        if (_output[PAINT_ANNO(p)].ring.is_full()) {
             _notifier.sleep();
             return n > 0;
         } else {
@@ -182,7 +121,7 @@ Replay::run_task(Task* task)
                 q = p;
                 _queue_head = _queue_current;
             }
-            assert(_output.ring.insert(q));
+            assert(_output[PAINT_ANNO(p)].ring.insert(q));
             _notifier.wake();
         }
         n++;
@@ -194,18 +133,18 @@ Replay::run_task(Task* task)
 }
 
 
-ReplayUnqueue::ReplayUnqueue()
+MultiReplayUnqueue::MultiReplayUnqueue()
 {
 
 }
 
-ReplayUnqueue::~ReplayUnqueue()
+MultiReplayUnqueue::~MultiReplayUnqueue()
 {
 }
 
 
 int
-ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
+MultiReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
         .read("STOP", _stop)
@@ -220,15 +159,17 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-ReplayUnqueue::initialize(ErrorHandler * errh) {
-    _input.resize(1);
-    _input[0].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
+MultiReplayUnqueue::initialize(ErrorHandler * errh) {
+    _input.resize(ninputs());
+    for (int i = 0 ; i < ninputs(); i++) {
+        _input[i].signal = Notifier::upstream_empty_signal(this, i, (Task*)NULL);
+    }
     ScheduleInfo::initialize_task(this,&_task,true,errh);
     return 0;
 }
 
 bool
-ReplayUnqueue::run_task(Task* task)
+MultiReplayUnqueue::run_task(Task* task)
 {
     if (!_active)
         return false;
@@ -262,16 +203,28 @@ ReplayUnqueue::run_task(Task* task)
 #if HAVE_BATCH
             if (head == 0) {
                 head = PacketBatch::start_head(q);
+                if (_quick_clone)
+                    SET_PAINT_ANNO(head,PAINT_ANNO(p));
                 last = head;
                 c = 1;
             } else {
-                //Just add the packet to the end of the batch
-                last->set_next(q);
-                last = q;
-                c++;
+                //If next packet is for another output, send the pending batch and start a new one
+                if (PAINT_ANNO(p) != PAINT_ANNO(head)) {
+                    output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
+                    head = PacketBatch::start_head(q);
+                    if (_quick_clone)
+                        SET_PAINT_ANNO(head,PAINT_ANNO(p));
+                    last = head;
+                    c = 1;
+                } else {
+                    //Just add the packet to the end of the batch
+                    last->set_next(q);
+                    last = q;
+                    c++;
+                }
             }
 #else
-            output(0).push(q);
+            output(PAINT_ANNO(p)).push(q);
 #endif
         n++;
     }
@@ -279,7 +232,7 @@ ReplayUnqueue::run_task(Task* task)
 #if HAVE_BATCH
     //Flush pending batch
     if (head)
-        output_push_batch(0,head->make_tail(last,c));
+        output_push_batch(PAINT_ANNO(head),head->make_tail(last,c));
 #endif
 
 
@@ -290,7 +243,7 @@ ReplayUnqueue::run_task(Task* task)
 
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(Replay)
-ELEMENT_MT_SAFE(Replay)
-EXPORT_ELEMENT(ReplayUnqueue)
-ELEMENT_MT_SAFE(ReplayUnqueue)
+EXPORT_ELEMENT(MultiReplay)
+ELEMENT_MT_SAFE(MultiReplay)
+EXPORT_ELEMENT(MultiReplayUnqueue)
+ELEMENT_MT_SAFE(MultiReplayUnqueue)
