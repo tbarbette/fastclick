@@ -52,7 +52,7 @@ template <typename T>
 class per_thread
 {
 private:
-	typedef struct {
+    typedef struct {
         T v;
     } CLICK_CACHE_ALIGN AT;
 
@@ -65,7 +65,7 @@ private:
     }
 
     //Disable copy constructor. It will always be a user error
-    per_thread (const per_thread<T> &o);
+    per_thread (const per_thread<T> &);
 public:
     explicit per_thread() {
         _size = click_max_cpu_ids();
@@ -81,10 +81,11 @@ public:
     }
 
     /**
-     * Resize must be called if per_thread was initialized before click_max_cpu_ids() is set (such as in static functions)
+     * Resize must be called if per_thread was initialized before
+     * click_max_cpu_ids() is set (such as in static functions)
      * This will destroy all data
      */
-    void resize(unsigned int max_cpu_id,T v) {
+    void resize(unsigned int max_cpu_id, T v) {
         delete[] storage;
         initialize(max_cpu_id,v);
     }
@@ -154,7 +155,7 @@ public:
     }
 
     /**
-     * get_value can be used to iterate around all per-thread vairables.
+     * get_value can be used to iterate around all per-thread variables.
      * On the normal version it is the same as get_value_for_thread, but on
      * omem and oread version of per_thread, this iterate only over thread
      * that will really be used.
@@ -172,7 +173,7 @@ public:
      * This may not the number of threads, only use this
      * to iterate with get_value()/set_value(), not get_value_for_thread()
      */
-    inline size_t weight() {
+    inline unsigned weight() {
         return _size;
     }
 
@@ -181,7 +182,7 @@ public:
     }
 protected:
     AT* storage;
-    size_t _size;
+    unsigned _size;
 };
 
 /*
@@ -221,9 +222,9 @@ private:
  * Memory efficient version which only duplicate the variable per thread
  * actually used, given a bitvector telling which one they are. However
  * this comes at the price of one more indirection as we
- * need a table to map thread ids to posiitions inside the storage
+ * need a table to map thread ids to positions inside the storage
  * vector. The mapping table itself is a vector of integers, so
- * it your data structure is not bigger than two ints, it is not worth it.
+ * if your data structure is not bigger than two ints, it is not worth it.
  */
 template <typename T>
 class per_thread_omem { private:
@@ -233,23 +234,29 @@ class per_thread_omem { private:
 
     AT* storage;
     Vector<unsigned int> mapping;
-    size_t _size;
+    unsigned _size;
+
 public:
-    per_thread_omem() {
+    per_thread_omem() : storage(0),mapping(),_size(0) {
+
+    }
+
+    ~per_thread_omem() {
+        if (storage)
+            delete[] storage;
     }
 
     void initialize(Bitvector usable, T v=T()) {
-        storage = new AT[usable.weight()];
+        _size = usable.weight();
+        storage = new AT[_size];
+        mapping.resize(click_max_cpu_ids(), 0);
         int id = 0;
-        for (int i = 0; i < click_max_cpu_ids(); i++) {
+        for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
             if (usable[i]) {
-                storage[id] = v;
+                storage[id].v = v;
                 mapping[i] = id++;
-            } else {
-                mapping[i] = 0;
             }
         }
-        _size = id;
     }
 
     inline T* operator->() const {
@@ -279,6 +286,269 @@ public:
     inline T operator--(int) const {
         return storage[mapping[click_current_cpu_id()]].v--;
     }
+
+    inline T& operator=(T value) const {
+        set(value);
+        return storage[mapping[click_current_cpu_id()]].v;
+    }
+
+    inline void set(T v) {
+        storage[mapping[click_current_cpu_id()]].v = v;
+    }
+
+    inline void setAll(T v) {
+        for (int i = 0; i < weight(); i++)
+            storage[i].v = v;
+    }
+
+    inline T& get() const{
+        return storage[mapping[click_current_cpu_id()]].v;
+    }
+
+    inline T& get_value_for_thread(int thread_id) const{
+        return storage[mapping[thread_id]].v;
+    }
+
+    inline void set_value_for_thread(int thread_id, T v) {
+        storage[mapping[thread_id]].v = v;
+    }
+
+    inline T& get_value(int i) const {
+        return storage[i].v;
+    }
+
+    inline void set_value(int i, T v) {
+        storage[i] = v;
+    }
+
+    inline unsigned weight() {
+        return _size;
+    }
+};
+
+#define PER_THREAD_SET(pt,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        pt.set_value(i, value); \
+    }
+
+#define PER_THREAD_POINTER_SET(pt,member,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        pt.get_value(i)->member = value; \
+    }
+
+#define PER_THREAD_MEMBER_SET(pt,member,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        pt.get_value(i).member = value; \
+    }
+
+#define PER_THREAD_VECTOR_SET(pt,member,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        for (int j = 0; j < pt.get_value(i).size(); j++) \
+            (pt.get_value(i))[j].member = value; \
+    }
+
+#define PER_THREAD_SUM(type, var, pt) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i); \
+    }
+
+#define PER_THREAD_POINTER_SUM(type, var, pt, member) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i)->member; \
+    }
+
+#define PER_THREAD_MEMBER_SUM(type, var, pt, member) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i).member; \
+    }
+
+#define PER_THREAD_VECTOR_SUM(type, var, pt, index, member) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i)[index].member; \
+    }
+
+/**
+ * Convenient class to have MP and non-MP version of the same thimg eg :
+ *
+ * per_thread_arithmetic::sum(a); will work if a is an int or if a is a per_thread<int>
+ */
+class per_thread_arithmetic { public:
+
+    static int sum(int i) {
+        return i;
+    }
+
+    static unsigned usum(unsigned i) {
+        return i;
+    }
+
+    static int sum(per_thread<int> &v) {
+        PER_THREAD_SUM(unsigned, s, v);
+        return s;
+    }
+
+    static unsigned sum(per_thread<unsigned> &v) {
+        PER_THREAD_SUM(unsigned, s, v);
+        return s;
+    }
+
+    static void set(int &i, int v) {
+        i = v;
+    }
+
+    static void uset(unsigned &i, unsigned v) {
+        i = v;
+    }
+
+    static void set(per_thread<int> &pt, int v) {
+        PER_THREAD_SET(pt , v);
+    }
+
+    static void uset(per_thread<unsigned> &pt, unsigned v) {
+        PER_THREAD_SET(pt , v);
+    }
+
+#if HAVE_INT64_TYPES
+    static int64_t sum_long(int64_t i) {
+        return i;
+    }
+
+    static uint64_t usum_long(uint64_t i) {
+        return i;
+    }
+
+    static void set_long(int64_t &i, int64_t v) {
+        i = v;
+    }
+
+    static void uset_long(uint64_t &i, uint64_t v) {
+        i = v;
+    }
+
+    static int64_t sum_long(per_thread<int64_t> &v) {
+        PER_THREAD_SUM(int64_t, s, v);
+        return s;
+    }
+
+    static int64_t usum_long(per_thread<uint64_t> &v) {
+        PER_THREAD_SUM(uint64_t, s, v);
+        return s;
+    }
+
+    static void set_long(per_thread<int64_t> &pt, int64_t v) {
+        PER_THREAD_SET(pt, v);
+    }
+
+    static void uset_long(per_thread<uint64_t> &pt, uint64_t v) {
+        PER_THREAD_SET(pt, v);
+    }
+#endif
+};
+
+/**
+ * unprotected_rcu_singlewriter implements a very simple SINGLE
+ * writer, multiple-reader rcu.
+ *
+ * rcu allows to do a kind of atomic write with any structure. A temp copy
+ * is made for the writer, and when the writer has finished his write, he
+ * commits the change by changing the pointer for all subsequent readers.
+ *
+ * Unlike usual RCU implementation, this one does not need lock for readers,
+ * however memory will be corrupted if N subsequent writes happens while a
+ * reader is obtaining a reference. If N cannot be asserted in your use-case,
+ * this structure is not for you. Hence, the unprotected in the name to attract
+ * attention to this fact.
+ *
+ * This works by having a ring of N elements. The writer updates the next
+ * element of the ring, and when it has finished, it updates the current ring
+ * index to the next element. For fast wrap-up computing, N must be
+ * a power of 2.
+ *
+ * Using a ring allows for getting rid of atomic reference count, but introduces
+ * the N problem.
+ *
+ * For this to work, the template class must be able to copy itself with "=", eg :
+ * T b;
+ * b.do_something();
+ * T a = b;
+ * This is true for primitive, but you may need to implement operator= for class
+ *
+ * Usage :
+ *   unprotected_rcu_singlewriter<my_struct,2> rcu_struct;
+ *  reader :
+ *   click_chatter("Member is %d.", rcu_struct.read().member);
+ *   click_chatter("Member is %d.", rcu_struct->member); //Same, more convenient
+ *  writer :
+ *   my_struct &tmp_write = rcu_struct->write_begin();
+ *   tmp_write->member++;
+ *   rcu_struct->write_commit();
+ */
+template <typename T, int N>
+class unprotected_rcu_singlewriter { public:
+
+    unprotected_rcu_singlewriter() : rcu_current(0) {
+    }
+
+    unprotected_rcu_singlewriter(T v) : rcu_current(0) {
+        storage[rcu_current] = v;
+    }
+
+    ~unprotected_rcu_singlewriter() {
+    }
+
+    inline void initialize(T v) {
+        storage[rcu_current] = v;
+    }
+
+    inline const T& read_begin() {
+        return storage[rcu_current];
+    }
+
+    inline void read_end() {
+
+    }
+
+    inline const T& read() const {
+        return storage[rcu_current];
+    }
+
+    inline const T operator*() const {
+        return read();
+    }
+
+    inline const T* operator->() const {
+        return &read();
+    }
+
+    inline T& write_begin() {
+        int rcu_next = (rcu_current + 1) & (N - 1);
+        storage[rcu_next] = storage[rcu_current];
+        return storage[rcu_next];
+    }
+
+    inline void write_commit() {
+        click_write_fence();
+        rcu_current = (rcu_current + 1) & (N - 1);
+    }
+
+    inline void write_abort() {
+    }
+
+    inline const T& read_begin(int) {
+        return read_begin();
+    }
+
+    inline void read_end(int) {
+        return read_end();
+    }
+
+protected:
+    T storage[N];
+    volatile int rcu_current;
 };
 
 CLICK_ENDDECLS
