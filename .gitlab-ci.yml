@@ -1,5 +1,5 @@
 variables:
-    DPDK_VERSION: "16.07"
+    DPDK_VERSION: "17.02"
     NETMAP_VERSION: "11.1"
 batch:
     script:
@@ -41,11 +41,12 @@ before_script:
       if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
         wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
             tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
-            cd dpdk-$DPDK_VERSION &&
+            cd dpdk-$DPDK_VERSION ;
             make config T=$RTE_TARGET &&
-            make install T=$RTE_TARGET &&
+            make install T=$RTE_TARGET ;
             cd ..;
       fi;
     - if [ ! -e "netmap-$NETMAP_VERSION/sys/net/netmap.h" ] ; then wget https://github.com/luigirizzo/netmap/archive/v$NETMAP_VERSION.tar.gz && tar -xvf v$NETMAP_VERSION.tar.gz && cd netmap-$NETMAP_VERSION && cd LINUX && ./configure --no-drivers && cd .. && cd .. ; fi
+    - ls -al
     - if [ `sudo -n whoami` = "root" ] ; then sudo insmod netmap-$NETMAP_VERSION/LINUX/netmap.ko && sudo chmod 666 /dev/netmap ; fi
     - export CONFIG_NETMAP="--with-netmap=`pwd`/netmap-$NETMAP_VERSION/sys/"
