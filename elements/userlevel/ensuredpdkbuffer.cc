@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 
-EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false), _extra_headroom(0), _warn_count(0)
+EnsureDPDKBuffer::EnsureDPDKBuffer() : _force(false), _extra_headroom(0), _noalloc(false), _warn_count(0)
 {
 }
 
@@ -40,8 +40,13 @@ EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
     .read_p("FORCE_COPY", _force)
     .read_p("EXTRA_HEADROOM", _extra_headroom)
+    .read("FAIL",_noalloc)
     .complete() < 0)
     return -1;
+
+    if (_force && _noalloc) {
+        return errh->error("You cannot have both FORCE_COPY and FAIL at the same time");
+    }
 
     return 0;
 }
@@ -50,6 +55,11 @@ inline Packet*
 EnsureDPDKBuffer::smaction(Packet* p) {
     if (!_force && (DPDKDevice::is_dpdk_buffer(p))) {
         return p;
+    } else if (_noalloc) {
+        p->kill();
+        if (_warn_count++ < 5)
+            click_chatter("%p{element} : Not a DPDK packet",this);
+        return 0;
     } else {
         struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
         if (!mbuf) {
