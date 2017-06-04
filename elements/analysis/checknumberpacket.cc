@@ -45,7 +45,7 @@ int CheckNumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 inline int CheckNumberPacket::smaction(Packet* p) {
     WritablePacket *wp = nullptr;
-    if (p->length() >= _offset + 8) {
+    if ((int)p->length() >= _offset + 8) {
         wp = p->uniqueify();
     } else {
         wp = p->put(_offset + 8 - p->length());
@@ -63,17 +63,14 @@ inline int CheckNumberPacket::smaction(Packet* p) {
 }
 
 void
-CheckNumberPacket::push(int i, Packet *p) {
+CheckNumberPacket::push(int, Packet *p) {
     checked_output_push(smaction(p), p);
 }
 
 #if HAVE_BATCH
 void
-CheckNumberPacket::push_batch(int i, PacketBatch *batch) {
-    PacketBatch* ok = 0;
-    CLASSIFY_EACH_PACKET(noutputs(),smaction,batch,[this](int i, PacketBatch* b){
-        this->checked_output_push_batch(i, b);
-    });
+CheckNumberPacket::push_batch(int, PacketBatch *batch) {
+    CLASSIFY_EACH_PACKET(noutputs(),smaction,batch,checked_output_push_batch);
 }
 #endif
 
@@ -86,7 +83,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
         StringAccum s;
         int max = -1;
         int imax = -1;
-        for (unsigned j = 0; j < fd->_numbers.size(); j++) {
+        for (unsigned j = 0; j < (unsigned)fd->_numbers.size(); j++) {
             if (fd->_numbers[j] > max) {
                 imax=j;
                 max = fd->_numbers[j];
@@ -98,7 +95,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
           StringAccum s;
           int min = INT_MAX;
           int imin = -1;
-          for (unsigned j = 0; j < fd->_numbers.size(); j++) {
+          for (unsigned j = 0; j < (unsigned)fd->_numbers.size(); j++) {
               if (fd->_numbers[j] < min) {
                   imin=j;
                   min = fd->_numbers[j];
@@ -111,7 +108,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
       }
       case H_DUMP: {
           StringAccum s;
-          for (unsigned j = 0; j < fd->_numbers.size(); j++) {
+          for (unsigned j = 0; j < (unsigned)fd->_numbers.size(); j++) {
                   s << j << ": " << fd->_numbers[j] << "\n";
           }
           return s.take_string();
@@ -122,7 +119,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
 }
 
 int
-CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, ErrorHandler *errh)
+CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, ErrorHandler *)
 {
     CheckNumberPacket *fd = static_cast<CheckNumberPacket *>(e);
     String s = cp_uncomment(s_in);
@@ -132,12 +129,11 @@ CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, Er
           if (IntArg().parse(s, n)) {
               fd->_count = n;
               fd->_numbers.resize(n,0);
-              break;
+              return 0;
           }
       }
-      default:
-    return -EINVAL;
     }
+    return -EINVAL;
 }
 
 
