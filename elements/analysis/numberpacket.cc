@@ -42,7 +42,7 @@ int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 inline Packet* NumberPacket::smaction(Packet* p) {
     WritablePacket *wp = nullptr;
-    if (p->length() >= _offset + 8)
+    if ((int)p->length() >= _offset + 8)
         wp = p->uniqueify();
     else {
         wp = p->put(_offset + 8 - p->length());
