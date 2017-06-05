@@ -30,7 +30,7 @@ class PathSpinlock : public Element { public:
     ~PathSpinlock()			{}
 
     const char *class_name() const	{ return "PathSpinlock"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *port_count() const	{ return "1-/="; }
     const char *processing() const	{ return AGNOSTIC; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -39,7 +39,7 @@ class PathSpinlock : public Element { public:
     Packet* pull(int);
 
   private:
-
+    bool _lock_release;
     Spinlock *_lock;
 
 };
