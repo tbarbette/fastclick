@@ -23,6 +23,7 @@
 #include <click/hashtable.hh>
 #include <click/vector.hh>
 #include <click/args.hh>
+#include <click/etheraddress.hh>
 
 CLICK_DECLS
 class DPDKDeviceArg;
@@ -51,6 +52,8 @@ public:
 
     int add_tx_queue(int &queue_id, unsigned n_desc,
                              ErrorHandler *errh) CLICK_COLD;
+
+    void set_mac(EtherAddress mac);
 
     unsigned int get_nb_txdesc();
 
@@ -107,7 +110,7 @@ private:
     struct DevInfo {
         inline DevInfo() :
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0) {
+            n_tx_descs(0), mac() {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -117,6 +120,7 @@ private:
         bool promisc;
         unsigned n_rx_descs;
         unsigned n_tx_descs;
+        EtherAddress mac;
     };
 
     struct DevInfo info;
