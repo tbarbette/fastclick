@@ -253,6 +253,8 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
             return String(stats.ipackets);
         case h_ibytes:
             return String(stats.ibytes);
+        case h_idropped:
+            return String(stats.idropped);
         case h_ierrors:
             return String(stats.ierrors);
     }
@@ -277,6 +279,7 @@ void FromDPDKDevice::add_handlers()
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
+    add_read_handler("hw_dropped",statistics_handler, h_idropped);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
 
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
