@@ -254,7 +254,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
         case h_ibytes:
             return String(stats.ibytes);
         case h_idropped:
-            return String(stats.idropped);
+            return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
     }
