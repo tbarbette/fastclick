@@ -16,12 +16,29 @@
  */
 
 #include <click/config.h>
+#include <click/args.hh>
 #include "rrswitch.hh"
 CLICK_DECLS
 
 RoundRobinSwitch::RoundRobinSwitch()
 {
   _next = 0;
+  _max = 0;
+}
+
+int
+RoundRobinSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    int max = -1;
+    if (Args(conf, this, errh)
+        .read_p("MAX", max)
+        .complete() < 0)
+	    return -1;
+
+    if (max < 0)
+        max = noutputs();
+    _max = max;
+    return 0;
 }
 
 void
@@ -30,13 +47,13 @@ RoundRobinSwitch::push(int, Packet *p)
   int i = _next;
 #ifndef __MTCLICK__
   _next++;
-  if (_next >= (uint32_t)noutputs())
+  if (_next >= _max)
     _next = 0;
 #else
   // in MT case try our best to be rr, but don't worry about it if we mess up
   // once in awhile
   int newval = i+1;
-  if (newval >= noutputs())
+  if (newval >= _max)
     newval = 0;
   _next.compare_swap(i, newval);
 #endif
@@ -50,13 +67,13 @@ RoundRobinSwitch::push_batch(int, PacketBatch *p)
   int i = _next;
 #ifndef __MTCLICK__
   _next++;
-  if (_next >= (uint32_t)noutputs())
+  if (_next >= _max)
     _next = 0;
 #else
   // in MT case try our best to be rr, but don't worry about it if we mess up
   // once in awhile
   int newval = i+1;
-  if (newval >= noutputs())
+  if (newval >= _max)
     newval = 0;
   _next.compare_swap(i, newval);
 #endif

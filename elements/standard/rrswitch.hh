@@ -21,7 +21,7 @@ CLICK_DECLS
 class RoundRobinSwitch : public BatchElement {
 
   atomic_uint32_t _next;
-
+  uint32_t _max;
  public:
 
   RoundRobinSwitch() CLICK_COLD;
@@ -29,6 +29,8 @@ class RoundRobinSwitch : public BatchElement {
   const char *class_name() const	{ return "RoundRobinSwitch"; }
   const char *port_count() const	{ return "1/1-"; }
   const char *processing() const	{ return PUSH; }
+
+  int configure(Vector<String> &conf, ErrorHandler *errh);
 
   void push(int, Packet *);
 #if HAVE_BATCH
