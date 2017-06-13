@@ -1,6 +1,6 @@
 #ifndef CLICK_RRSWITCH_HH
 #define CLICK_RRSWITCH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -18,7 +18,7 @@ CLICK_DECLS
  * =a StrideSwitch, Switch, HashSwitch, RandomSwitch, RoundRobinSched
  */
 
-class RoundRobinSwitch : public Element {
+class RoundRobinSwitch : public BatchElement {
 
   atomic_uint32_t _next;
 
@@ -31,6 +31,9 @@ class RoundRobinSwitch : public Element {
   const char *processing() const	{ return PUSH; }
 
   void push(int, Packet *);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+#endif
 
 };
 
