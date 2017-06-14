@@ -559,7 +559,7 @@ Json ServiceChain::statsToJSON() {
             String js = String(j);
             rx_count += atol(callRead( "slaveFD"+is+ "C"+js+".count").c_str());
             //rx_bytes += atol(callRead( "slaveFD"+is+ "C"+js+".bytes").c_str());
-            //rx_dropped += atol(callRead( "slaveFD"+is+ "C"+js+".dropped").c_str());
+            rx_dropped += atol(callRead( "slaveFD"+is+ "C"+js+".dropped").c_str());
             //rx_errors += atol(callRead( "slaveFD"+is+ "C"+js+".errors").c_str());
 
         }

@@ -47,7 +47,7 @@ int
 AverageBatchCounter::initialize(ErrorHandler *errh)
 {
     _timer.initialize(this);
-    _timer.schedule_after_ms(_interval);
+    _timer.schedule_after_msec(_interval);
     return 0;
 }
 
@@ -75,7 +75,7 @@ AverageBatchCounter::run_timer(Timer* t)
     _stats_total.write_commit();
     _stats_last_tick.write_commit();
 
-    t->reschedule_after_ms(_interval);
+    t->reschedule_after_msec(_interval);
 }
 
 PacketBatch*

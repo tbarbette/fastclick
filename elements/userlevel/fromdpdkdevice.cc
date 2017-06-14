@@ -381,6 +381,7 @@ int FromDPDKDevice::xstats_handler(int operation, String& input, Element* e, con
         return -1;
 
         struct rte_eth_xstat_name* names;
+#if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
         int len = rte_eth_xstats_get_names(fd->_dev->port_id, 0, 0);
         names = static_cast<struct rte_eth_xstat_name*>(malloc(sizeof(struct rte_eth_xstat_name) * len));
         rte_eth_xstats_get_names(fd->_dev->port_id,names,len);
@@ -403,6 +404,10 @@ int FromDPDKDevice::xstats_handler(int operation, String& input, Element* e, con
             }
             return -1;
         }
+#else
+        input = "unsupported with DPDK < 16.07";
+        return -1;
+#endif
     return 0;
 }
 
