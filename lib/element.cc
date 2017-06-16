@@ -1790,6 +1790,30 @@ void Element::add_remote_element(Element* e) {
 	_remote_elements.push_back(e);
 }
 
+void Element::thread_configuration(ThreadReconfigurationStage stage) {
+
+}
+
+class ThreadReconfigureVisitor : RouterVisitor {
+    Element::ThreadReconfigurationStage _stage;
+
+    ThreadReconfigureVisitor(Element::ThreadReconfigurationStage stage) : _stage(stage) {
+
+    }
+
+    bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance) {
+        e->thread_configuration(_stage);
+        return true;
+    }
+};
+
+void Element::trigger_thread_reconfiguration(ThreadReconfigurationStage stage) {
+    ThreadReconfigureVisitor tr(stage);
+    router()->visit(this, true, -1, &tr);
+    router()->visit(this, false, -1, &tr);
+}
+
 // SELECT
 
 #if CLICK_USERLEVEL

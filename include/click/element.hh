@@ -173,7 +173,15 @@ class Element { public:
     virtual bool do_mt_safe_check(ErrorHandler*);
     void add_remote_element(Element* e);
 
-    //Deprecated name, implement get_spawining_threads
+    enum ThreadReconfigurationStage {
+        THREAD_RECONFIGURE_PRE,
+        THREAD_RECONFIGURE_POST
+    };
+
+    virtual void thread_configuration(ThreadReconfigurationStage stage);
+    void trigger_thread_reconfiguration(ThreadReconfigurationStage);
+
+    //Deprecated name, implement get_spawning_threads
     virtual bool get_runnable_threads(Bitvector&) final = delete;
     virtual bool get_spawning_threads(Bitvector&) final = delete;
 
