@@ -58,7 +58,7 @@ class ServiceChain { public:
                 return nic->cpuToQueue(cpuid);
             }
 
-            virtual int apply(NIC* nic, Bitvector cpus, ErrorHandler* errh);
+            virtual int apply(NIC* nic, ErrorHandler* errh);
 
             Vector<Vector<String>> values;
         };
@@ -81,6 +81,7 @@ class ServiceChain { public:
         }
 
         static ServiceChain* fromJSON(Json j,Metron* m, ErrorHandler* errh);
+        int reconfigureFromJSON(Json j, Metron* m, ErrorHandler* errh);
 
         Json toJSON();
         Json statsToJSON();
@@ -129,6 +130,9 @@ class ServiceChain { public:
         Bitvector assignedCpus();
 
         String generateConfig();
+        String generateConfigSlaveFDName(int nic_index, int cpu_index) {
+            return "slaveFD"+String(nic_index)+ "C"+String(cpu_index);
+        }
 
         Vector<String> buildCmdLine(int socketfd);
 
@@ -142,7 +146,10 @@ class ServiceChain { public:
 
         void checkAlive();
 
-        String callRead(String handler);
+        int call(String fnt, String handler, String& response, String params);
+        String simpleCallRead(String handler);
+        int callRead(String handler, String& response, String params="");
+        int callWrite(String handler, String& response, String params="");
 
         Vector<int>& getCpuMapRef() {
             return _cpus;
@@ -193,7 +200,7 @@ class Metron : public Element { public:
 
     enum {
         h_resources,h_stats,
-        h_chains, h_delete_chains,h_chains_stats,h_chains_proxy
+        h_chains, h_delete_chains,h_put_chains,h_chains_stats,h_chains_proxy
     };
 
     ServiceChain* findChainById(String id);

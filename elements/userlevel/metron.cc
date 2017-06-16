@@ -127,7 +127,7 @@ String Metron::read_handler(Element *e, void *user_data) {
     return jroot.unparse(true);
 }
 
-int ServiceChain::RxFilter::apply(NIC* nic, Bitvector cpus, ErrorHandler* errh) {
+int ServiceChain::RxFilter::apply(NIC* nic, ErrorHandler* errh) {
     //Only mac supported for now, only thing to do is to get addr
     Json jaddrs = Json::parse(nic->callRead("vf_mac_addr"));
     int inic = _sc->getNICIndex(nic);
@@ -135,15 +135,11 @@ int ServiceChain::RxFilter::apply(NIC* nic, Bitvector cpus, ErrorHandler* errh) 
     if (values.size() <= _sc->getNICNr())
         values.resize(_sc->getNICNr());
     values[inic].resize(_sc->getMaxCpuNr());
-    int i = 0;
-    for (int icpu = 0; icpu < cpus.size() ; icpu++) {
-        if (!cpus[icpu])
-            continue;
-         if (atoi(nic->callRead("nb_vf_pools").c_str()) <= icpu) {
+    for (int i = 0; i < _sc->getMaxCpuNr() ; i++) {
+         if (atoi(nic->callRead("nb_vf_pools").c_str()) <= _sc->getCpuMap(i)) {
              return errh->error("Not enough VF pools");
          }
-         values[inic][i] = jaddrs[icpu].to_s();
-         i++;
+         values[inic][i] = jaddrs[_sc->getCpuMap(i)].to_s();
     }
     return 0;
 
@@ -181,7 +177,7 @@ int Metron::instanciateChain(ServiceChain* sc, ErrorHandler *errh) {
  */
 int Metron::runChain(ServiceChain* sc, ErrorHandler *errh) {
     for (int i = 0; i < sc->getNICNr(); i++) {
-        if (sc->rxFilter->apply(sc->getNICByIndex(i),sc->assignedCpus(),errh) != 0) {
+        if (sc->rxFilter->apply(sc->getNICByIndex(i),errh) != 0) {
             return errh->error("Could not apply RX filter");
         }
     }
@@ -291,6 +287,15 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
                 delete(sc);
             return ret;
         }
+        case h_put_chains: {
+            String id = data.substring(0, data.find_left('\n'));
+            String changes = data.substring(id.length() + 1);
+            ServiceChain* sc = m->findChainById(id);
+            if (sc == 0) {
+                return errh->error("Unknown ID %s",id.c_str());
+            }
+            return sc->reconfigureFromJSON(Json::parse(changes), m, errh);
+        }
     }
     return -1;
 }
@@ -352,7 +357,7 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler * 
                 if (!sc) {
                     return errh->error("Unknown ID %s",ids.c_str());
                 }
-                param = sc->callRead(param.substring(pos + 1));
+                param = sc->simpleCallRead(param.substring(pos + 1));
                 return 0;
             }
             default:
@@ -408,6 +413,7 @@ void Metron::add_handlers() {
 	add_read_handler("resources", read_handler, h_resources);
 	add_read_handler("stats", read_handler, h_stats);
 	add_write_handler("delete_chains", write_handler, h_delete_chains);
+	add_write_handler("put_chains", write_handler, h_put_chains);
 
     set_handler("chains", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains, h_chains);
     set_handler("chains_stats", Handler::f_read | Handler::f_read_param, param_handler, h_chains_stats);
@@ -567,7 +573,7 @@ Json ServiceChain::statsToJSON() {
         int avg_max = 0;
         for (int i = 0; i < getNICNr(); i++) {
             String is = String(i);
-            int avg = atoi(callRead( "batchAvg"+is+ "C"+js+".average").c_str());
+            int avg = atoi(simpleCallRead( "batchAvg"+is+ "C"+js+".average").c_str());
             if (avg > avg_max)
                 avg_max = avg;
         }
@@ -591,16 +597,16 @@ Json ServiceChain::statsToJSON() {
         uint64_t tx_errors = 0;
         for (int j = 0; j < getMaxCpuNr(); j ++) {
             String js = String(j);
-            rx_count += atol(callRead( "slaveFD"+is+ "C"+js+".count").c_str());
-            //rx_bytes += atol(callRead( "slaveFD"+is+ "C"+js+".bytes").c_str());
-            rx_dropped += atol(callRead( "slaveFD"+is+ "C"+js+".dropped").c_str());
-            //rx_errors += atol(callRead( "slaveFD"+is+ "C"+js+".errors").c_str());
+            rx_count += atol(simpleCallRead( "slaveFD"+is+ "C"+js+".count").c_str());
+            //rx_bytes += atol(simpleCallRead( "slaveFD"+is+ "C"+js+".bytes").c_str());
+            rx_dropped += atol(simpleCallRead( "slaveFD"+is+ "C"+js+".dropped").c_str());
+            //rx_errors += atol(simpleCallRead( "slaveFD"+is+ "C"+js+".errors").c_str());
 
         }
-        tx_count += atol(callRead( "slaveTD"+is+ ".count").c_str());
-        //tx_bytes += atol(callRead( "slaveTD"+is+ ".bytes").c_str());
-        tx_dropped += atol(callRead( "slaveTD"+is+ ".dropped").c_str());
-        //tx_errors += atol(callRead( "slaveTD"+is+ ".errors").c_str());
+        tx_count += atol(simpleCallRead( "slaveTD"+is+ ".count").c_str());
+        //tx_bytes += atol(simpleCallRead( "slaveTD"+is+ ".bytes").c_str());
+        tx_dropped += atol(simpleCallRead( "slaveTD"+is+ ".dropped").c_str());
+        //tx_errors += atol(simpleCallRead( "slaveTD"+is+ ".errors").c_str());
         Json jnic = Json::make_object();
         jnic.set("id",getNICByIndex(i)->getId());
         jnic.set("rxCount",rx_count);
@@ -628,6 +634,49 @@ Json ServiceChain::timing_stats::toJSON() {
     return j;
 }
 
+int ServiceChain::reconfigureFromJSON(Json j, Metron* m, ErrorHandler* errh) {
+    for (auto jfield : j) {
+        if (jfield.first == "cpus") {
+            int newCpusNr = jfield.second.to_i();
+            int ret;
+            String response = "";
+            if (newCpusNr == getUsedCpuNr())
+                continue;
+            if (newCpusNr > getUsedCpuNr()) {
+                if (newCpusNr > getMaxCpuNr()) {
+                    return errh->error("Number of used cpus must be smaller or equal to the max number of CPUs!");
+                }
+                for (int inic = 0; inic < getNICNr(); inic++) {
+                    for (int i = getUsedCpuNr(); i < newCpusNr; i++) {
+                        ret = callWrite(generateConfigSlaveFDName(inic, getCpuMap(i))+".active",response,"1");
+                        if (ret < 200 || ret >= 300)
+                            return errh->error("Response to activate input was %d : %s",ret,response.c_str());
+                        click_chatter("Response %d %s",ret,response.c_str());
+                    }
+                }
+            } else {
+                if (newCpusNr < 0) {
+                    return errh->error("Number of used cpus must be bigger or equal to 0!");
+                }
+                for (int inic = 0; inic < getNICNr(); inic++) {
+                    for (int i = newCpusNr; i < getUsedCpuNr(); i++) {
+                        int ret = callWrite(generateConfigSlaveFDName(inic, getCpuMap(i))+".active",response,"0");
+                        if (ret < 200 || ret >= 300)
+                            return errh->error("Response to activate input was %d : %s",ret,response.c_str());
+                    }
+                }
+            }
+            click_chatter("Used cpunr is now %d",newCpusNr);
+            _used_cpu_nr = newCpusNr;
+            return 0;
+        } else {
+            return errh->error("Unsupported reconfigure option %s", jfield.first.c_str());
+        }
+    }
+    return 0;
+}
+
+
 String ServiceChain::generateConfig()
 {
     String newconf = "elementclass MetronSlave {\n" + config + "\n};\n\n";
@@ -636,12 +685,12 @@ String ServiceChain::generateConfig()
        String is = String(i);
        NIC* nic = getNICByIndex(i);
        for (int j = 0; j < getMaxCpuNr(); j++) {
-
            String js = String(j);
+           String active = (j < getUsedCpuNr() ? "1":"0");
            int cpuid = _cpus[j];
            int queue_no = rxFilter->cpuToQueue(nic,cpuid);
-           newconf += "slaveFD"+is+ "C"+js+" :: "+nic->element->class_name()+"("+nic->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, BURST 32, NUMA false, VERBOSE 99);\n";
-           newconf += "slaveFD"+is+ "C"+js+" -> batchAvg"+is+ "C"+js+ " :: AverageBatchCounter() -> [" + is + "]slave;\n";
+           newconf += generateConfigSlaveFDName(i,j) + " :: "+nic->element->class_name()+"("+nic->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, BURST 32, NUMA false, ACTIVE "+active+", VERBOSE 99);\n";
+           newconf += generateConfigSlaveFDName(i,j) + " -> batchAvg"+is+ "C"+js+ " :: AverageBatchCounter() -> [" + is + "]slave;\n";
         //   newconf += "Script(label s, read batchAvg"+is+ "C"+js+ ".average, wait 1s, goto s);\n";
        }
 
@@ -732,22 +781,40 @@ String ServiceChain::controlSendCommand(String cmd) {
     return ret;
 }
 
-String ServiceChain::callRead(String handler) {
-    String ret = controlSendCommand("READ " + handler);
+int ServiceChain::call(String fnt, String handler,String& response, String params) {
+    String ret = controlSendCommand(fnt + " " + handler + (params?" "+params:""));
     if (ret == "") {
         checkAlive();
-        return "";
+        return -1;
     }
     int code = atoi(ret.substring(0, 3).c_str());
-    if (code >= 500)
-        return ret.substring(4);
+    if (code >= 500) {
+        response = ret.substring(4);
+        return code;
+    }
     ret = ret.substring(ret.find_left("\r\n") + 2);
     assert(ret.starts_with("DATA "));
     ret = ret.substring(5);
     int eof = ret.find_left("\r\n");
     int n = atoi(ret.substring(0, eof).c_str());
-    ret = ret.substring(3, n);
-    return ret;
+    response = ret.substring(3, n);
+    return code;
+}
+
+String ServiceChain::simpleCallRead(String handler) {
+    String response;
+    int code = call("READ",handler,response,"");
+    if (code >= 200 && code < 300)
+        return response;
+    return "";
+}
+
+int ServiceChain::callRead(String handler,String& response,String params) {
+    return call("READ",handler,response,params);
+}
+
+int ServiceChain::callWrite(String handler, String& response,String params) {
+    return call("WRITE",handler,response,params);
 }
 
 /******************************
