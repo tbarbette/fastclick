@@ -73,8 +73,9 @@ protected:
     };
     per_thread<ThreadState> thread_state;
 
-
     int _this_node; //Numa node index
+
+    bool _active;
 
     inline bool lock_attempt() {
         if (_locks[id_for_thread()] != NO_LOCK) {
@@ -160,16 +161,20 @@ protected:
     bool get_spawning_threads(Bitvector& bmk, bool)
     {
     	if (noutputs()) { //RX
-		for (int i = 0; i < n_queues; i++) {
-    			for (int j = 0; j < queue_share; j++) {
-    				bmk[thread_for_queue(i) - j] = 1;
-    			}
-    		}
-    		return true;
+            if (_active) {
+                for (int i = 0; i < n_queues; i++) {
+                    for (int j = 0; j < queue_share; j++) {
+                        bmk[thread_for_queue(i) - j] = 1;
+                    }
+                }
+            }
+            return true;
     	} else { //TX
-    		if (input_is_pull(0)) {
-    			bmk[router()->home_thread_id(this)] = 1;
-    		}
+            if (_active) {
+                if (input_is_pull(0)) {
+                    bmk[router()->home_thread_id(this)] = 1;
+                }
+            }
     		return true;
     	}
     }

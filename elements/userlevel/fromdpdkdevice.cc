@@ -31,7 +31,7 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0), _active(true), _rx_intr(-1)
+    _dev(0), _rx_intr(-1)
 {
 	#if HAVE_BATCH
 		in_batch_mode = BATCH_MODE_YES;
@@ -267,7 +267,7 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
               if (!fd->_dev)
                   return "false";
               else
-                  return "true";
+                  return String(fd->_active);
         case h_device:
               if (!fd->_dev)
                   return "undefined";
@@ -358,7 +358,7 @@ int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, 
         return -1;
 
     switch((uintptr_t) thunk) {
-        case h_add_mac:
+        case h_add_mac: {
             EtherAddress mac;
             int pool = 2;
             int ret;
@@ -371,6 +371,27 @@ int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, 
                 return errh->error("Could not add mac address !");
             }
             return 0;
+        }
+        case h_active: {
+            bool active;
+            if (!BoolArg::parse(input,active))
+                return errh->error("Not a valid boolean");
+            if (fd->_active != active) {
+                fd->_active = active;
+                fd->trigger_thread_reconfiguration(THREAD_RECONFIGURE_PRE);
+                if (fd->_active) {
+                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
+                        fd->_tasks[i]->reschedule();
+                    }
+                } else {
+                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
+                        fd->_tasks[i]->unschedule();
+                    }
+                }
+                fd->trigger_thread_reconfiguration(THREAD_RECONFIGURE_POST);
+            }
+            return 0;
+        }
     }
     return -1;
 }
@@ -427,6 +448,7 @@ void FromDPDKDevice::add_handlers()
     set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler);
 
     add_read_handler("active", read_handler, h_active);
+    add_write_handler("active", write_handler, h_active);
     add_read_handler("count", count_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 

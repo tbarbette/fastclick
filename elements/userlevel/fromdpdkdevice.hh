@@ -147,7 +147,6 @@ private:
         h_device};
 
     DPDKDevice* _dev;
-    bool _active;
     int _rx_intr;
 };
 
