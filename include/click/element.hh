@@ -113,6 +113,8 @@ class Element { public:
         CLEANUP_CONFIGURED,
         CLEANUP_INITIALIZE_FAILED,
         CLEANUP_INITIALIZED,
+        CLEANUP_THREAD_INITIALZE_FAILED,
+        CLEANUP_THREAD_INITIALIZED,
         CLEANUP_ROUTER_INITIALIZED,
         CLEANUP_MANUAL
     };
@@ -174,11 +176,12 @@ class Element { public:
     void add_remote_element(Element* e);
 
     enum ThreadReconfigurationStage {
+        THREAD_INITIALIZE,
         THREAD_RECONFIGURE_PRE,
         THREAD_RECONFIGURE_POST
     };
 
-    virtual void thread_configuration(ThreadReconfigurationStage stage);
+    virtual int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh);
     void trigger_thread_reconfiguration(ThreadReconfigurationStage);
 
     //Deprecated name, implement get_spawning_threads

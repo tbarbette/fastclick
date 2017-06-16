@@ -146,7 +146,7 @@ class ServiceChain { public:
 
         void checkAlive();
 
-        int call(String fnt, String handler, String& response, String params);
+        int call(String fnt, bool hasResponse, String handler, String& response, String params);
         String simpleCallRead(String handler);
         int callRead(String handler, String& response, String params="");
         int callWrite(String handler, String& response, String params="");

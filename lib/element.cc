@@ -1790,26 +1790,28 @@ void Element::add_remote_element(Element* e) {
 	_remote_elements.push_back(e);
 }
 
-void Element::thread_configuration(ThreadReconfigurationStage stage) {
-
+int Element::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh) {
+    return 0;
 }
 
-class ThreadReconfigureVisitor : RouterVisitor {
+class ThreadReconfigureVisitor : public RouterVisitor {
+public:
     Element::ThreadReconfigurationStage _stage;
+    ErrorHandler* _errh;
 
-    ThreadReconfigureVisitor(Element::ThreadReconfigurationStage stage) : _stage(stage) {
-
+    ThreadReconfigureVisitor(Element::ThreadReconfigurationStage stage,
+            ErrorHandler* errh) : _stage(stage), _errh(errh) {
     }
 
     bool visit(Element *e, bool isoutput, int port,
                    Element *from_e, int from_port, int distance) {
-        e->thread_configuration(_stage);
+        e->thread_configure(_stage, _errh);
         return true;
     }
 };
 
 void Element::trigger_thread_reconfiguration(ThreadReconfigurationStage stage) {
-    ThreadReconfigureVisitor tr(stage);
+    ThreadReconfigureVisitor tr(stage,ErrorHandler::default_handler());
     router()->visit(this, true, -1, &tr);
     router()->visit(this, false, -1, &tr);
 }

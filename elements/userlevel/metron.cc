@@ -781,7 +781,7 @@ String ServiceChain::controlSendCommand(String cmd) {
     return ret;
 }
 
-int ServiceChain::call(String fnt, String handler,String& response, String params) {
+int ServiceChain::call(String fnt, bool hasResponse, String handler,String& response, String params) {
     String ret = controlSendCommand(fnt + " " + handler + (params?" "+params:""));
     if (ret == "") {
         checkAlive();
@@ -792,29 +792,33 @@ int ServiceChain::call(String fnt, String handler,String& response, String param
         response = ret.substring(4);
         return code;
     }
-    ret = ret.substring(ret.find_left("\r\n") + 2);
-    assert(ret.starts_with("DATA "));
-    ret = ret.substring(5);
-    int eof = ret.find_left("\r\n");
-    int n = atoi(ret.substring(0, eof).c_str());
-    response = ret.substring(3, n);
+    if (hasResponse) {
+        ret = ret.substring(ret.find_left("\r\n") + 2);
+        assert(ret.starts_with("DATA "));
+        ret = ret.substring(5);
+        int eof = ret.find_left("\r\n");
+        int n = atoi(ret.substring(0, eof).c_str());
+        response = ret.substring(3, n);
+    } else {
+        response = ret.substring(4);
+    }
     return code;
 }
 
 String ServiceChain::simpleCallRead(String handler) {
     String response;
-    int code = call("READ",handler,response,"");
+    int code = call("READ",true, handler,response,"");
     if (code >= 200 && code < 300)
         return response;
     return "";
 }
 
 int ServiceChain::callRead(String handler,String& response,String params) {
-    return call("READ",handler,response,params);
+    return call("READ",true,handler,response,params);
 }
 
 int ServiceChain::callWrite(String handler, String& response,String params) {
-    return call("WRITE",handler,response,params);
+    return call("WRITE",false,handler,response,params);
 }
 
 /******************************

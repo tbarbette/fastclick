@@ -36,7 +36,7 @@ public:
     const char *processing() const      { return PUSH; }
 
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
-
+    int thread_configure(ThreadReconfigurationStage, ErrorHandler*) override CLICK_COLD;
     int initialize(ErrorHandler*) CLICK_COLD;
 
     void cleanup(CleanupStage);

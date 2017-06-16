@@ -69,6 +69,14 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+int ToDPDKDevice::thread_configure(ThreadReconfigurationStage stage, ErrorHandler*) {
+    if (stage != THREAD_INITIALIZE && stage != THREAD_RECONFIGURE_PRE) {
+        return 0;
+    }
+
+    //TODO
+}
+
 int ToDPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;

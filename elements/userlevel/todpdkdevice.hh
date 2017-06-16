@@ -128,10 +128,11 @@ public:
     }
     bool can_live_reconfigure() const { return false; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int thread_configure(ThreadReconfigurationStage, ErrorHandler*) override CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
 
-    void cleanup(CleanupStage stage) CLICK_COLD;
+    void cleanup(CleanupStage stage) override CLICK_COLD;
 
     static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
     void add_handlers() CLICK_COLD;
