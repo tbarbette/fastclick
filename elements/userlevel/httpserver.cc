@@ -145,6 +145,8 @@ int HTTPServer::ahc_echo(void * cls,
 
     String hname;
     String param;
+    int isNotPost = strcmp (method, "POST");
+    int isNotPut = strcmp (method, "PUT");
     int pos = path.find_left('/');
     if (pos == -1) {
         hname = path;
@@ -185,7 +187,6 @@ int HTTPServer::ahc_echo(void * cls,
 	}
 
 	// Then find handler.
-
 	    if (strcmp("GET",method) == 0) {
 	        h = Router::handler(e, hname);
 	        if (h && h->visible()) {
@@ -204,7 +205,10 @@ int HTTPServer::ahc_echo(void * cls,
 	        } else {
 	            goto bad_handler;
 	        }
-	    } else if (0 == strcmp (method, "POST")) {
+	    } else if (0 == isNotPost or 0 == isNotPut) {
+	        if (isNotPost) {
+	            hname = "put_" + hname;
+	        }
 	        h = Router::handler(e, hname);
 	        if (h && h->visible()) {
 	          if (*upload_data_size != 0) {
@@ -216,7 +220,11 @@ int HTTPServer::ahc_echo(void * cls,
                   String data = *static_cast<String*>(*con_cls);
                   click_chatter("Last call with data %s",data.c_str());
                   if (h->writable()) {
-                      int ret = h->call_write(data, e, ErrorHandler::default_handler());
+                      int ret;
+                      if (isNotPost)
+                          ret = h->call_write(param + "\n" + data, e, ErrorHandler::default_handler());
+                      else
+                          ret = h->call_write(data, e, ErrorHandler::default_handler());
                       if (ret == 0) {
                           body = "success";
                       } else {
