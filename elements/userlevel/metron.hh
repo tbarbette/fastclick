@@ -33,6 +33,8 @@ class NIC { public:
 
     String callRead(String h);
     String callTxRead(String h);
+
+
 };
 
 class ServiceChain { public:
@@ -47,7 +49,6 @@ class ServiceChain { public:
             }
 
             String method;
-            Vector<String> addr;
             ServiceChain* _sc;
 
             static RxFilter* fromJSON(Json j, ServiceChain* sc, ErrorHandler* errh);
@@ -58,6 +59,8 @@ class ServiceChain { public:
             }
 
             virtual int apply(NIC* nic, Bitvector cpus, ErrorHandler* errh);
+
+            Vector<Vector<String>> values;
         };
 
         enum ScStatus{SC_FAILED,SC_OK=1};
@@ -65,7 +68,6 @@ class ServiceChain { public:
         RxFilter* rxFilter;
         String config;
 
-        Vector<NIC*> nic;
         enum ScStatus status;
 
         ServiceChain(Metron* m) : rxFilter(0),_metron(m) {
@@ -100,6 +102,29 @@ class ServiceChain { public:
             return _cpus[i];
         }
 
+        inline int getNICNr() {
+            return _nics.size();
+        }
+
+        inline NIC* getNICById(String id) {
+            for (NIC* nic : _nics) {
+                if (nic->getId() == id)
+                    return nic;
+            }
+            return 0;
+        }
+
+        inline int getNICIndex(NIC* nic) {
+            for (int i = 0; i < _nics.size(); i++) {
+                if (_nics[i] == nic)
+                    return i;
+            }
+            return -1;
+        }
+
+        inline NIC* getNICByIndex(int i) {
+            return _nics[i];
+        }
 
         Bitvector assignedCpus();
 
@@ -134,6 +159,7 @@ class ServiceChain { public:
     private:
         Metron* _metron;
         Vector<int> _cpus;
+        Vector<NIC*> _nics;
         int _socket;
         int _pid;
         struct timing_stats _timing_stats;
