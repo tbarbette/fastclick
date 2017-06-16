@@ -83,14 +83,14 @@ int Metron::getAssignedCpuNr() {
 
 bool Metron::assignCpus(ServiceChain* sc, Vector<int>& map) {
     int j = 0;
-    if (this->getAssignedCpuNr() + sc->getCpuNr() > this->getCpuNr()) {
+    if (this->getAssignedCpuNr() + sc->getMaxCpuNr() > this->getCpuNr()) {
         return false;
     }
     for (int i = 0; i < getCpuNr(); i++) {
         if (_cpu_map[i] == 0) {
             _cpu_map[i] = sc;
             map[j++] = i;
-            if (j == sc->getCpuNr())
+            if (j == sc->getMaxCpuNr())
                 return true;
         }
     }
@@ -488,8 +488,12 @@ ServiceChain* ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
     }
     sc->rxFilter = ServiceChain::RxFilter::fromJSON(j.get("rxFilter"), sc, errh);
     sc->config = j.get_s("config");
-    sc->cpu_nr = j.get_i("cpus");
-    sc->_cpus.resize(sc->cpu_nr);
+    sc->_used_cpu_nr = j.get_i("cpus");
+    sc->_max_cpu_nr = j.get_i("maxCpus");
+    sc->_autoscale = false;
+    if (!j.get("autoscale",sc->_autoscale))
+        errh->warning("Autoscale is not present or not bool");
+    sc->_cpus.resize(sc->_max_cpu_nr);
     Json jnics = j.get("nics");
     for (auto jnic : jnics) {
         NIC* nic = m->_nics.findp(jnic.second.as_s());
@@ -510,10 +514,16 @@ Json ServiceChain::toJSON() {
     jsc.set("config",config);
     jsc.set("expanded_config", generateConfig());
     Json jcpus = Json::make_array();
-    for (int i = 0; i < getCpuNr(); i++) {
+    for (int i = 0; i < getUsedCpuNr(); i++) {
         jcpus.push_back(getCpuMap(i));
     }
     jsc.set("cpus", jcpus);
+    Json jmaxcpus = Json::make_array();
+    for (int i = 0; i < getMaxCpuNr(); i++) {
+        jmaxcpus.push_back(getCpuMap(i));
+    }
+    jsc.set("maxCpus", jmaxcpus);
+    jsc.set("autoscale", _autoscale);
     jsc.set("status", status);
     Json jnics = Json::make_array();
     for (auto n : nic) {
@@ -528,7 +538,7 @@ Json ServiceChain::statsToJSON() {
     jsc.set("id",getId());
 
     Json jcpus = Json::make_array();
-    for (int j = 0; j < getCpuNr(); j ++) {
+    for (int j = 0; j < getMaxCpuNr(); j ++) {
         String js = String(j);
         int avg_max = 0;
         for (int i = 0; i < nic.size(); i++) {
@@ -555,7 +565,7 @@ Json ServiceChain::statsToJSON() {
         uint64_t tx_bytes = 0;
         uint64_t tx_dropped = 0;
         uint64_t tx_errors = 0;
-        for (int j = 0; j < getCpuNr(); j ++) {
+        for (int j = 0; j < getMaxCpuNr(); j ++) {
             String js = String(j);
             rx_count += atol(callRead( "slaveFD"+is+ "C"+js+".count").c_str());
             //rx_bytes += atol(callRead( "slaveFD"+is+ "C"+js+".bytes").c_str());
@@ -600,7 +610,7 @@ String ServiceChain::generateConfig()
     newconf += "slave :: MetronSlave();\n\n";
     for (int i = 0; i < nic.size(); i++) {
        String is = String(i);
-       for (int j = 0; j < cpu_nr; j++) {
+       for (int j = 0; j < getMaxCpuNr(); j++) {
            String js = String(j);
            int cpuid = _cpus[j];
            int queue_no = rxFilter->cpuToQueue(nic[i],cpuid);

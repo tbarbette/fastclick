@@ -64,7 +64,7 @@ class ServiceChain { public:
         String id;
         RxFilter* rxFilter;
         String config;
-        int cpu_nr;
+
         Vector<NIC*> nic;
         enum ScStatus status;
 
@@ -87,9 +87,14 @@ class ServiceChain { public:
             return id;
         }
 
-        inline int getCpuNr() {
-            return cpu_nr;
+        inline int getUsedCpuNr() {
+            return _used_cpu_nr;
         }
+
+        inline int getMaxCpuNr() {
+            return _max_cpu_nr;
+        }
+
 
         inline int getCpuMap(int i) {
             return _cpus[i];
@@ -132,6 +137,9 @@ class ServiceChain { public:
         int _socket;
         int _pid;
         struct timing_stats _timing_stats;
+        int _used_cpu_nr;
+        int _max_cpu_nr;
+        bool _autoscale;
     };
 
 /*
