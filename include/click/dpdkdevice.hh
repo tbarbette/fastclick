@@ -109,7 +109,7 @@ public:
     inline int nbTXQueues();
     inline int nbVFPools();
 
-    struct ether_addr gen_mac(int a, int b);
+    struct ether_addr gen_mac(struct ether_addr, int a, int b);
 
 private:
 
