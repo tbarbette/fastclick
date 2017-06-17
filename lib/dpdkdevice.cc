@@ -218,6 +218,9 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             return errh->error("The number of VF Pools exceeds the hardware limit of %d",dev_info.max_vmdq_pools);
         }
 
+        if (info.rx_queues.size() % info.num_pools != 0) {
+            info.rx_queues.resize(((info.rx_queues.size() / info.num_pools) + 1) * info.num_pools);
+        }
         dev_conf.rx_adv_conf.vmdq_rx_conf.nb_queue_pools =  (enum rte_eth_nb_pools)info.num_pools;
         dev_conf.rx_adv_conf.vmdq_rx_conf.enable_default_pool = 0;
         dev_conf.rx_adv_conf.vmdq_rx_conf.default_pool = 0;
