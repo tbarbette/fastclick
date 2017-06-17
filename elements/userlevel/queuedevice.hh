@@ -47,6 +47,7 @@ protected:
 
     int _maxthreads;
     int firstqueue;
+    int lastqueue;
 
     // n_queues will be the final choice in [_minqueues, _maxqueues].
     int n_queues;
@@ -203,7 +204,11 @@ protected:
     }
 
     inline int queue_for_thread_end(int tid) {
-        return _thread_to_firstqueue[tid] + queue_per_threads - 1;
+        int q =  _thread_to_firstqueue[tid] + queue_per_threads - 1;
+        if (unlikely(q > lastqueue))
+            return lastqueue;
+        return q;
+
     }
 
     inline int queue_for_thisthread_begin() {
