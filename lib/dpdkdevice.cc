@@ -189,9 +189,12 @@ static struct ether_addr pool_addr_template = {
         .addr_bytes = {0x52, 0x54, 0x00, 0x00, 0x00, 0x00}
 };
 
-struct ether_addr DPDKDevice::gen_mac(struct ether_addr base_mac, int a, int b) {
+struct ether_addr DPDKDevice::gen_mac( int a, int b) {
     struct ether_addr mac;
-    mac = base_mac;
+     if (info.mac != EtherAddress()) {
+         memcpy(&mac,info.mac.data(),sizeof(struct ether_addr));
+     } else
+         mac = pool_addr_template;
     mac.addr_bytes[4] = a;
     mac.addr_bytes[5] = b;
     return mac;
@@ -325,12 +328,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
          */
         for (int q = 0; q < info.num_pools; q++) {
                 struct ether_addr mac;
-                if (info.mac != EtherAddress()) {
-                    struct ether_addr addr;
-                    memcpy(&addr,info.mac.data(),sizeof(struct ether_addr));
-                    mac = gen_mac(addr, port_id, q);
-                } else
-                    mac = gen_mac(pool_addr_template, port_id, q);
+                mac = gen_mac(port_id, q);
                 printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
                         port_id, q,
                         mac.addr_bytes[0], mac.addr_bytes[1],
