@@ -75,6 +75,7 @@ int ToDPDKDevice::thread_configure(ThreadReconfigurationStage stage, ErrorHandle
     }
 
     //TODO
+    return 0;
 }
 
 int ToDPDKDevice::initialize(ErrorHandler *errh)
