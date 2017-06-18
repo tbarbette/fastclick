@@ -96,7 +96,7 @@ void Metron::run_timer(Timer* t) {
                sc->nic_stats[stat_idx].count = count;
                if (useful_diff + useless_diff == 0) {
                    sc->nic_stats[stat_idx].load = 0;
-                   click_chatter("[SC %d] Load NIC %d CPU %d - %f : No data yet",sn ,i,j,sc->nic_stats[stat_idx].load);
+                   //click_chatter("[SC %d] Load NIC %d CPU %d - %f : No data yet",sn ,i,j,sc->nic_stats[stat_idx].load);
                    continue;
                }
                double load = (double)useful_diff / (double)(useful_diff + useless_diff);
@@ -107,7 +107,7 @@ void Metron::run_timer(Timer* t) {
                    alpha = alpha_down;
                }
                sc->nic_stats[stat_idx].load = (sc->nic_stats[stat_idx].load * (1-alpha)) + ((alpha) * load);
-               click_chatter("[SC %d] Load NIC %d CPU %d - %f %f - diff usefull %lld useless %lld",sn, i,j,load,sc->nic_stats[stat_idx].load,useful_diff,useless_diff);
+//               click_chatter("[SC %d] Load NIC %d CPU %d - %f %f - diff usefull %lld useless %lld",sn, i,j,load,sc->nic_stats[stat_idx].load,useful_diff,useless_diff);
                if (sc->nic_stats[stat_idx].load > cpuload)
                    cpuload = sc->nic_stats[stat_idx].load;
            }

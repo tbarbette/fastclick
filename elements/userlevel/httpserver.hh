@@ -40,6 +40,7 @@ class HTTPServer : public Element { public:
                         void ** ptr);
 private:
     int _port;
+    bool _verbose;
     struct MHD_Daemon * _daemon;
 
 

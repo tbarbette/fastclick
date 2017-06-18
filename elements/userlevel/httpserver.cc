@@ -20,7 +20,7 @@ static int ahc_policy(void* cls, const struct sockaddr * addr, socklen_t addrlen
 	return MHD_YES;
 }
 
-HTTPServer::HTTPServer() : _port(80), _daemon(0) {
+HTTPServer::HTTPServer() : _verbose(false), _port(80), _daemon(0) {
 }
 
 HTTPServer::~HTTPServer() {
@@ -59,6 +59,7 @@ void HTTPServer::update_fd_set() {
 int HTTPServer::configure(Vector<String> &conf, ErrorHandler *errh) {
 	if (Args(conf, this, errh)
 			.read_p("PORT", _port) //TODO AUTH
+            .read("VERBOSE", _verbose)
 			.complete() < 0)
 		return -1;
 
@@ -102,6 +103,7 @@ int HTTPServer::ahc_echo(void * cls,
 	      return MHD_YES;
 	    }
 
+    if (server->_verbose)
 	click_chatter("[%s] %s",method,url);
 
 
