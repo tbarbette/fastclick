@@ -166,19 +166,29 @@ class TCPRewriter : public IPRewriterBase { public:
 			      const IPFlowID &rewritten_flowid, int input);
     void destroy_flow(IPRewriterFlow *flow);
     click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) - _timeouts[1];
+	return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) -
+               _timeouts[click_current_cpu_id()][1];
     }
 
     void push(int, Packet *);
+#if HAVE_BATCH
+     void push_batch(int port, PacketBatch *batch);
+#endif
 
     void add_handlers() CLICK_COLD;
 
  protected:
+    per_thread<SizedHashAllocator<sizeof(TCPFlow)>> _allocator;
 
-    SizedHashAllocator<sizeof(TCPFlow)> _allocator;
     unsigned _annos;
     uint32_t _tcp_data_timeout;
     uint32_t _tcp_done_timeout;
+
+    /**
+     * The actual processing of this element is abstracted from the push operation.
+     * This allows both push and push_batch to exploit the same logic.
+     */
+    int process(int port, Packet *p_in);
 
     int tcp_flow_timeout(const TCPFlow *mf) const {
 	if (mf->both_done())
@@ -186,7 +196,7 @@ class TCPRewriter : public IPRewriterBase { public:
 	else if (mf->both_data())
 	    return _tcp_data_timeout;
 	else
-	    return _timeouts[0];
+	    return _timeouts[click_current_cpu_id()][0];
     }
 
     static String tcp_mappings_handler(Element *, void *);
@@ -197,9 +207,9 @@ class TCPRewriter : public IPRewriterBase { public:
 inline void
 TCPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map);
+    unmap_flow(flow, _map[click_current_cpu_id()]);
     static_cast<TCPFlow *>(flow)->~TCPFlow();
-    _allocator.deallocate(flow);
+    _allocator->deallocate(flow);
 }
 
 inline tcp_seq_t

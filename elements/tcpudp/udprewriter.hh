@@ -68,6 +68,11 @@ installed:
 Thus, the input packet is emitted on output port FOUTPUT unchanged, and
 packets from the reply flow are emitted on output port ROUTPUT unchanged.
 
+Warning about multi-threading : this element is multi-thread safe, by
+duplicating mutable data structures per-thread. It also means that packets
+from the same flow must always be handled by the same thread. This is generally
+achieved by using RSS for input fanout.
+
 =item 'pattern SADDR SPORT DADDR DPORT FOUTPUT ROUTPUT'
 
 Creates a mapping according to the given pattern, 'SADDR SPORT DADDR DPORT'.
@@ -191,24 +196,30 @@ class UDPRewriter : public IPRewriterBase { public:
 			      const IPFlowID &rewritten_flowid, int input);
     void destroy_flow(IPRewriterFlow *flow);
     click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>(flow)) - _timeouts[1];
+	return flow->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>(flow)) -
+               _timeouts[click_current_cpu_id()][1];
     }
 
     void push(int, Packet *);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *batch);
+#endif
 
     void add_handlers() CLICK_COLD;
 
   private:
+    per_thread<SizedHashAllocator<sizeof(UDPFlow)>> _allocator;
 
-    SizedHashAllocator<sizeof(UDPFlow)> _allocator;
     unsigned _annos;
     uint32_t _udp_streaming_timeout;
+
+    int process(int port, Packet *p_in);
 
     int udp_flow_timeout(const UDPFlow *mf) const {
 	if (mf->streaming())
 	    return _udp_streaming_timeout;
 	else
-	    return _timeouts[0];
+	    return _timeouts[click_current_cpu_id()][0];
     }
 
     static String dump_mappings_handler(Element *, void *);
@@ -221,9 +232,9 @@ class UDPRewriter : public IPRewriterBase { public:
 inline void
 UDPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map);
+    unmap_flow(flow, _map[click_current_cpu_id()]);
     flow->~IPRewriterFlow();
-    _allocator.deallocate(flow);
+    _allocator->deallocate(flow);
 }
 
 CLICK_ENDDECLS
