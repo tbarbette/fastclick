@@ -69,11 +69,13 @@ void Metron::run_timer(Timer* t) {
     auto sci = _scs.begin();
     double alpha_up = 0.5;
     double alpha_down = 0.3;
+    double total_alpha = 0.5;
+
     int sn = 0;
     while (sci != _scs.end()) {
        ServiceChain* sc = sci.value();
-
-       float total_cpuload;
+       float max_cpuload = 0;
+       float total_cpuload = 0;
 
        for (int j = 0; j < sc->getMaxCpuNr(); j++) {
            float cpuload = 0;
@@ -111,11 +113,21 @@ void Metron::run_timer(Timer* t) {
            }
            sc->_cpuload[j] = cpuload;
            total_cpuload += cpuload;
+           if (cpuload > max_cpuload) {
+               max_cpuload = cpuload;
+           }
 
        }
-       sc->total_cpuload = sc->total_cpuload * 0.9 + (total_cpuload / sc->getUsedCpuNr()) * 0.1;
-       if (sc->_autoscale && sc->total_cpuload > 0.8) {
-           //sc->
+
+       if (sc->_autoscale) {
+           sc->total_cpuload = sc->total_cpuload * total_alpha + max_cpuload * (1 - total_alpha);
+           if (sc->total_cpuload > 0.8) {
+               sc->doAutoscale(1);
+           } else if (sc->total_cpuload < 0.4) {
+               sc->doAutoscale(-1);
+           }
+       } else {
+           sc->total_cpuload = sc->total_cpuload * total_alpha + (total_cpuload / sc->getUsedCpuNr()) * (1 - total_alpha);
        }
        sn++;
        sci++;
@@ -168,26 +180,6 @@ void Metron::unassignCpus(ServiceChain* sc) {
     }
 }
 
-
-String Metron::read_handler(Element *e, void *user_data) {
-	Metron *m = static_cast<Metron *>(e);
-    intptr_t what = reinterpret_cast<intptr_t>(user_data);
-
-    Json jroot = Json::make_object();
-
-    switch (what) {
-        case h_resources: {
-			jroot = m->toJSON();
-			break;
-        }
-        case h_stats: {
-            jroot = m->statsToJSON();
-            break;
-        }
-
-    }
-    return jroot.unparse(true);
-}
 
 int ServiceChain::RxFilter::apply(NIC* nic, ErrorHandler* errh) {
     //Only mac supported for now, only thing to do is to get addr
@@ -333,6 +325,26 @@ int Metron::removeChain(ServiceChain* sc, ErrorHandler*) {
     _scs.remove(sc->getId());
     unassignCpus(sc);
     return 0;
+}
+
+String Metron::read_handler(Element *e, void *user_data) {
+    Metron *m = static_cast<Metron *>(e);
+    intptr_t what = reinterpret_cast<intptr_t>(user_data);
+
+    Json jroot = Json::make_object();
+
+    switch (what) {
+        case h_resources: {
+            jroot = m->toJSON();
+            break;
+        }
+        case h_stats: {
+            jroot = m->statsToJSON();
+            break;
+        }
+
+    }
+    return jroot.unparse(true);
 }
 
 int Metron::write_handler( const String &data, Element *e, void *user_data, ErrorHandler *errh) {
@@ -750,21 +762,60 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron* m, ErrorHandler* errh) {
     return 0;
 }
 
+void ServiceChain::doAutoscale(int nCpuChange) {
+    ErrorHandler* errh = ErrorHandler::default_handler();
+    if ((Timestamp::now() - _last_autoscale).msecval() < 5000)
+        return;
+    _last_autoscale = Timestamp::now();
+    int nnew = _used_cpu_nr + nCpuChange ;
+    if (nnew <= 0 || nnew > getMaxCpuNr())
+        return;
+    _used_cpu_nr = nnew;
+    click_chatter("Autoscale : Chain %s use now %d CPU", this->getId().c_str(), _used_cpu_nr);
+    String response;
+    int ret = callWrite("slave/rrs.max",response,String(_used_cpu_nr));
+    if (ret < 200 || ret >= 300) {
+        errh->error("Response to change the number of core %d : %s",ret,response.c_str());
+        return;
+    }
+}
 
 String ServiceChain::generateConfig()
 {
     String newconf = "elementclass MetronSlave {\n" + config + "\n};\n\n";
-    newconf += "slave :: MetronSlave();\n\n";
+    if (_autoscale) {
+        newconf += "slave :: {\n";
+
+        newconf += "rrs :: RoundRobinSwitch(MAX "+String(getUsedCpuNr())+ ");\n";
+        newconf += "ps :: PaintSwitch();\n\n";
+
+        for (int i = 0 ; i < getMaxCpuNr(); i++) {
+            newconf += "rrs["+String(i)+"] -> slavep"+String(i)+" :: Pipeliner(CAPACITY 8, BLOCKING true) -> [0]ps; StaticThreadSched(slavep"+String(i)+" "+ String(getCpuMap(i)) + ");\n";
+        }
+        newconf+="\n";
+
+        for (int i = 0; i < getNICNr(); i++) {
+            String is = String(i);
+            newconf += "input["+is+"] -> Paint("+is+") -> rrs;\n";
+        }
+        newconf+="\n";
+
+        newconf += "ps => [0-"+String(getNICNr()-1)+"]real_slave :: MetronSlave() => [0-"+String(getNICNr()-1)+"]output }\n\n";
+    } else {
+        newconf += "slave :: MetronSlave();\n\n";
+    }
     for (int i = 0; i < getNICNr(); i++) {
        String is = String(i);
        NIC* nic = getNICByIndex(i);
        for (int j = 0; j < getMaxCpuNr(); j++) {
            String js = String(j);
            String active = (j < getUsedCpuNr() ? "1":"0");
-           int cpuid = _cpus[j];
+           int cpuid = getCpuMap(j);
            int queue_no = rxFilter->cpuToQueue(nic,cpuid);
            newconf += generateConfigSlaveFDName(i,j) + " :: "+nic->element->class_name()+"("+nic->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, BURST 32, NUMA false, ACTIVE "+active+", VERBOSE 99);\n";
-           newconf += generateConfigSlaveFDName(i,j) + " -> batchAvg"+is+ "C"+js+ " :: AverageBatchCounter() -> [" + is + "]slave;\n";
+           newconf += generateConfigSlaveFDName(i,j) + " " +
+                   //" -> batchAvg"+is+ "C"+js+ " :: AverageBatchCounter() " +
+                   " -> [" + is + "]slave;\n";
         //   newconf += "Script(label s, read batchAvg"+is+ "C"+js+ ".average, wait 1s, goto s);\n";
        }
 

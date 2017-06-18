@@ -151,7 +151,7 @@ private:
 
     int _rx_intr;
     class FDState { public:
-        FDState() : timer(), mustresched(1), useful(0) {};
+        FDState() : timer(), mustresched(0), useful(0) {};
         Timer* timer;
         int mustresched;
         int useful;

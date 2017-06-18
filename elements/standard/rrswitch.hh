@@ -21,7 +21,7 @@ CLICK_DECLS
 class RoundRobinSwitch : public BatchElement {
 
   atomic_uint32_t _next;
-  uint32_t _max;
+  unsigned _max;
  public:
 
   RoundRobinSwitch() CLICK_COLD;
@@ -36,6 +36,7 @@ class RoundRobinSwitch : public BatchElement {
 #if HAVE_BATCH
   void push_batch(int, PacketBatch *);
 #endif
+  void add_handlers();
 
 };
 

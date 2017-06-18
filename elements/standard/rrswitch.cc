@@ -47,13 +47,13 @@ RoundRobinSwitch::push(int, Packet *p)
   int i = _next;
 #ifndef __MTCLICK__
   _next++;
-  if (_next >= _max)
+  if (_next >= (uint32_t)_max)
     _next = 0;
 #else
   // in MT case try our best to be rr, but don't worry about it if we mess up
   // once in awhile
   int newval = i+1;
-  if (newval >= _max)
+  if (newval >= (uint32_t)_max)
     newval = 0;
   _next.compare_swap(i, newval);
 #endif
@@ -67,19 +67,23 @@ RoundRobinSwitch::push_batch(int, PacketBatch *p)
   int i = _next;
 #ifndef __MTCLICK__
   _next++;
-  if (_next >= _max)
+  if (_next >= (uint32_t)_max)
     _next = 0;
 #else
   // in MT case try our best to be rr, but don't worry about it if we mess up
   // once in awhile
   int newval = i+1;
-  if (newval >= _max)
+  if (newval >= (uint32_t)_max)
     newval = 0;
   _next.compare_swap(i, newval);
 #endif
   output(i).push_batch(p);
 }
 #endif
+
+void RoundRobinSwitch::add_handlers() {
+    add_data_handlers("max", Handler::f_read | Handler::f_write, &_max);
+}
 
 
 CLICK_ENDDECLS

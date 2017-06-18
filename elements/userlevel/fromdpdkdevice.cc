@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-#define LOAD_UNIT 10
+#define LOAD_UNIT 1
 
 FromDPDKDevice::FromDPDKDevice() :
     _dev(0), _rx_intr(-1)
@@ -247,12 +247,12 @@ bool FromDPDKDevice::run_task(Task * t)
            }
            this->selected(0, SELECT_READ);
        }
-
+/*
         if (_fdstate->useful > 0)
             t->fast_reschedule();
         else
-            _fdstate->mustresched = 1;
-
+            _fdstate->mustresched = 1;*/
+        t->fast_reschedule();
        return (ret);
     } else {
         _fdstate->useful++;
@@ -263,22 +263,18 @@ bool FromDPDKDevice::run_task(Task * t)
 
 void FromDPDKDevice::run_timer(Timer* t) {
 
-        int u = _fdstate->useful;
-        if (u > LOAD_UNIT)
-            u = LOAD_UNIT;
+    int u = _fdstate->useful;
+    if (u > LOAD_UNIT)
+        u = LOAD_UNIT;
 
-        thread_state->_useful += u;
-        thread_state->_useless += LOAD_UNIT - u;
-        _fdstate->useful = 0;
+    thread_state->_useful += u;
+    thread_state->_useless += LOAD_UNIT - u;
+    _fdstate->useful = 0;
 
-
-            if (_fdstate->mustresched == 1) {
-                _fdstate->mustresched = 0;
-                task_for_thread()->reschedule();
-
-
-            }
-
+    if (_fdstate->mustresched == 1) {
+        _fdstate->mustresched = 0;
+        task_for_thread()->reschedule();
+    }
 
     _fdstate->timer->reschedule_after_msec(1);
 }

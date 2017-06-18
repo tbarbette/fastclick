@@ -167,7 +167,9 @@ class ServiceChain { public:
             _timing_stats = ts;
         }
 
+        void doAutoscale(int nCpuChange);
     private:
+
         Metron* _metron;
         Vector<int> _cpus;
         Vector<NIC*> _nics;
@@ -179,6 +181,8 @@ class ServiceChain { public:
         int _used_cpu_nr;
         int _max_cpu_nr;
         bool _autoscale;
+        Timestamp _last_autoscale;
+
 
         friend class Metron;
     };
