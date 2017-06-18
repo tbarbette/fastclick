@@ -116,7 +116,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     ret = initialize_rx(errh);
     if (ret != 0) return ret;
 
-    for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+    for (int i = firstqueue; i <= lastqueue; i++) {
         ret = _dev->add_rx_queue(i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }

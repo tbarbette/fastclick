@@ -107,7 +107,7 @@ Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh
 
     for (int i = 0; i < passing.weight(); i++) {
         if (passing[i]) {
-            click_chatter("Pipeline from %d to %d",i,_home_thread_id);
+            click_chatter("%p{element} : Pipeline from %d to %d",this,i,_home_thread_id);
             WritablePacket::pool_transfer(_home_thread_id,i);
         }
     }

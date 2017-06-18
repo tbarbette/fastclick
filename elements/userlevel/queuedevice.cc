@@ -223,6 +223,9 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
                    click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
            } else
                usable_threads &= (~v);
+           if (_threadoffset != -1 && !usable_threads[_threadoffset]) {
+               click_chatter("WARNING : The THREADOFFSET parameter will be ignored because that thread is not usable / assigned to another element.");
+           }
        }
 
        cores_in_node = usable_threads.weight();

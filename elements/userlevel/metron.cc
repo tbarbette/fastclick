@@ -120,14 +120,14 @@ void Metron::run_timer(Timer* t) {
        }
 
        if (sc->_autoscale) {
-           sc->total_cpuload = sc->total_cpuload * total_alpha + max_cpuload * (1 - total_alpha);
+           sc->total_cpuload = sc->total_cpuload * (1 - total_alpha) + max_cpuload * (total_alpha);
            if (sc->total_cpuload > 0.8) {
                sc->doAutoscale(1);
            } else if (sc->total_cpuload < 0.4) {
                sc->doAutoscale(-1);
            }
        } else {
-           sc->total_cpuload = sc->total_cpuload * total_alpha + (total_cpuload / sc->getUsedCpuNr()) * (1 - total_alpha);
+           sc->total_cpuload = sc->total_cpuload * (1 - total_alpha) + (total_cpuload / sc->getUsedCpuNr()) * (total_alpha);
        }
        sn++;
        sci++;
@@ -790,7 +790,7 @@ String ServiceChain::generateConfig()
         newconf += "ps :: PaintSwitch();\n\n";
 
         for (int i = 0 ; i < getMaxCpuNr(); i++) {
-            newconf += "rrs["+String(i)+"] -> slavep"+String(i)+" :: Pipeliner(CAPACITY 8, BLOCKING true) -> [0]ps; StaticThreadSched(slavep"+String(i)+" "+ String(getCpuMap(i)) + ");\n";
+            newconf += "rrs["+String(i)+"] -> slavep"+String(i)+" :: Pipeliner(CAPACITY 8, BLOCKING false) -> [0]ps; StaticThreadSched(slavep"+String(i)+" "+ String(getCpuMap(i)) + ");\n";
         }
         newconf+="\n";
 
@@ -812,8 +812,10 @@ String ServiceChain::generateConfig()
            String active = (j < getUsedCpuNr() ? "1":"0");
            int cpuid = getCpuMap(j);
            int queue_no = rxFilter->cpuToQueue(nic,cpuid);
-           newconf += generateConfigSlaveFDName(i,j) + " :: "+nic->element->class_name()+"("+nic->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1,THREADOFFSET " +String(cpuid)+ ", MAXTHREADS 1, BURST 32, NUMA false, ACTIVE "+active+", VERBOSE 99);\n";
-           newconf += generateConfigSlaveFDName(i,j) + " " +
+           String ename = generateConfigSlaveFDName(i,j);
+           newconf += ename + " :: "+nic->element->class_name()+"("+nic->getDeviceId()+",QUEUE "+String(queue_no)+", N_QUEUES 1, MAXTHREADS 1, BURST 32, NUMA false, ACTIVE "+active+", VERBOSE 99);\n";
+           newconf += "StaticThreadSched(" +ename+ " " + String(cpuid)+ ");";
+           newconf += ename + " " +
                    //" -> batchAvg"+is+ "C"+js+ " :: AverageBatchCounter() " +
                    " -> [" + is + "]slave;\n";
         //   newconf += "Script(label s, read batchAvg"+is+ "C"+js+ ".average, wait 1s, goto s);\n";
