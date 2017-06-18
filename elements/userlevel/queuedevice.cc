@@ -359,5 +359,72 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 	return 0;
 
 }
+
+unsigned long long QueueDevice::n_count() {
+    unsigned long long total = 0;
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        total += thread_state.get_value(i)._count;
+    }
+    return total;
+}
+
+unsigned long long QueueDevice::n_useful() {
+    unsigned long long total = 0;
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        total += thread_state.get_value(i)._useful;
+    }
+    return total;
+}
+
+unsigned long long QueueDevice::n_useless() {
+    unsigned long long total = 0;
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        total += thread_state.get_value(i)._useless;
+    }
+    return total;
+}
+
+unsigned long long QueueDevice::n_dropped() {
+    unsigned long long total = 0;
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        total += thread_state.get_value(i)._dropped;
+    }
+    return total;
+}
+
+void QueueDevice::reset_count() {
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        thread_state.get_value(i)._count = 0;
+        thread_state.get_value(i)._dropped = 0;
+    }
+}
+
+String QueueDevice::count_handler(Element *e, void *user_data)
+{
+    QueueDevice *tdd = static_cast<QueueDevice *>(e);
+    intptr_t what = reinterpret_cast<intptr_t>(user_data);
+    switch (what) {
+        case h_count:
+            return String(tdd->n_count());
+        case h_useless:
+            return String(tdd->n_useless());
+        case h_useful:
+            return String(tdd->n_useful());
+    }
+}
+
+String QueueDevice::dropped_handler(Element *e, void *)
+{
+    QueueDevice *tdd = static_cast<QueueDevice *>(e);
+    return String(tdd->n_dropped());
+}
+
+int QueueDevice::reset_count_handler(const String &, Element *e, void *,
+                                ErrorHandler *)
+{
+    QueueDevice *tdd = static_cast<QueueDevice *>(e);
+    tdd->reset_count();
+    return 0;
+}
 CLICK_ENDDECLS
 ELEMENT_PROVIDES(QueueDevice)

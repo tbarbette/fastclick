@@ -17,7 +17,7 @@
 CLICK_DECLS
 
 
-Metron::Metron() : _timing_stats(true) {
+Metron::Metron() : _timing_stats(true), _timer(this) {
 
 }
 
@@ -60,8 +60,70 @@ int Metron::initialize(ErrorHandler * errh) {
     _sw = CLICK_VERSION;
     String swInfo = shell_command_output_string("dmidecode -t 1","",errh);
     _serial = parseHwInfo(swInfo,"Serial Number");
+    _timer.initialize(this);
+    _timer.schedule_after_sec(1);
 	return 0;
 }
+
+void Metron::run_timer(Timer* t) {
+    auto sci = _scs.begin();
+    double alpha_up = 0.5;
+    double alpha_down = 0.3;
+    int sn = 0;
+    while (sci != _scs.end()) {
+       ServiceChain* sc = sci.value();
+
+       float total_cpuload;
+
+       for (int j = 0; j < sc->getMaxCpuNr(); j++) {
+           float cpuload = 0;
+           for (int i = 0; i < sc->getNICNr(); i++) {
+               NIC* nic = sc->getNICByIndex(i);
+               assert(nic);
+               int stat_idx = (j * sc->getNICNr()) + i;
+
+               String name = sc->generateConfigSlaveFDName(i,j);
+               long long useless = atoll(sc->simpleCallRead(name+".useless").c_str());
+               long long useful = atoll(sc->simpleCallRead(name+".useful").c_str());
+               long long count = atoll(sc->simpleCallRead(name+".count").c_str());
+               long long useless_diff = useless - sc->nic_stats[stat_idx].useless;
+               long long useful_diff = useful - sc->nic_stats[stat_idx].useful;
+               long long count_diff = count - sc->nic_stats[stat_idx].count;
+               sc->nic_stats[stat_idx].useless = useless;
+               sc->nic_stats[stat_idx].useful = useful;
+               sc->nic_stats[stat_idx].count = count;
+               if (useful_diff + useless_diff == 0) {
+                   sc->nic_stats[stat_idx].load = 0;
+                   click_chatter("[SC %d] Load NIC %d CPU %d - %f : No data yet",sn ,i,j,sc->nic_stats[stat_idx].load);
+                   continue;
+               }
+               double load = (double)useful_diff / (double)(useful_diff + useless_diff);
+               double alpha;
+               if (load > sc->nic_stats[stat_idx].load) {
+                   alpha = alpha_up;
+               } else {
+                   alpha = alpha_down;
+               }
+               sc->nic_stats[stat_idx].load = (sc->nic_stats[stat_idx].load * (1-alpha)) + ((alpha) * load);
+               click_chatter("[SC %d] Load NIC %d CPU %d - %f %f - diff usefull %lld useless %lld",sn, i,j,load,sc->nic_stats[stat_idx].load,useful_diff,useless_diff);
+               if (sc->nic_stats[stat_idx].load > cpuload)
+                   cpuload = sc->nic_stats[stat_idx].load;
+           }
+           sc->_cpuload[j] = cpuload;
+           total_cpuload += cpuload;
+
+       }
+       sc->total_cpuload = sc->total_cpuload * 0.9 + (total_cpuload / sc->getUsedCpuNr()) * 0.1;
+       if (sc->_autoscale && sc->total_cpuload > 0.8) {
+           //sc->
+       }
+       sn++;
+       sci++;
+
+    }
+    _timer.reschedule_after_sec(1);
+}
+
 
 void Metron::cleanup(CleanupStage) {
     //TODO : not sure why but buggy...
@@ -506,6 +568,16 @@ Json ServiceChain::RxFilter::toJSON() {
 /************************
  * Service Chain
  ************************/
+ServiceChain::ServiceChain(Metron* m) : rxFilter(0),_metron(m), total_cpuload(0) {
+
+}
+
+ServiceChain::~ServiceChain() {
+    //Do not delete nics, we are not the owner of those pointers
+    if (rxFilter)
+        delete rxFilter;
+}
+
 ServiceChain* ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
     ServiceChain* sc = new ServiceChain(m);
     sc->id = j.get_s("id");
@@ -523,6 +595,7 @@ ServiceChain* ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
     if (!j.get("autoscale",sc->_autoscale))
         errh->warning("Autoscale is not present or not bool");
     sc->_cpus.resize(sc->_max_cpu_nr);
+    sc->_cpuload.resize(sc->_max_cpu_nr, 0);
     Json jnics = j.get("nics");
     for (auto jnic : jnics) {
         NIC* nic = m->_nics.findp(jnic.second.as_s());
@@ -533,6 +606,7 @@ ServiceChain* ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
         }
         sc->_nics.push_back(nic);
     }
+    sc->nic_stats.resize(sc->_nics.size() * sc->_max_cpu_nr,Stat());
     sc->rxFilter = ServiceChain::RxFilter::fromJSON(j.get("rxFilter"), sc, errh);
     return sc;
 }
@@ -579,7 +653,7 @@ Json ServiceChain::statsToJSON() {
         }
         Json jcpu = Json::make_object();
         jcpu.set("id", getCpuMap(j));
-        jcpu.set("load", (float)avg_max / 32.0f);
+        jcpu.set("load", _cpuload[j]);
         jcpus.push_back(jcpu);
     }
     jsc.set("cpus", jcpus);

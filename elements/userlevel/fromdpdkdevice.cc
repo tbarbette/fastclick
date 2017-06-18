@@ -30,6 +30,8 @@
 
 CLICK_DECLS
 
+#define LOAD_UNIT 10
+
 FromDPDKDevice::FromDPDKDevice() :
     _dev(0), _rx_intr(-1)
 {
@@ -131,7 +133,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     }
 
     if (_rx_intr >= 0) {
-        for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+        for (int i = firstqueue; i <= lastqueue; i++) {
             uint64_t data = _dev->port_id << CHAR_BIT | i;
             ret = rte_eth_dev_rx_intr_ctl_q(_dev->port_id, i,
                                             RTE_EPOLL_PER_THREAD,
@@ -141,6 +143,17 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
                 return errh->error("Cannot initialize RX interrupt on this device");
             }
         }
+    }
+
+    for (int q = firstqueue; q <= lastqueue; q++) {
+        int i = thread_for_queue(q);
+        if (_fdstate.get_value(i).timer != 0)
+            continue;
+        _fdstate.get_value(i).timer = new Timer(this);
+        _fdstate.get_value(i).timer->initialize(this);
+        _fdstate.get_value(i).timer->move_thread(_fdstate.get_mapping(i));
+        if (_active)
+            _fdstate.get_value(i).timer->schedule_after_msec(1);
     }
 
     return ret;
@@ -213,29 +226,61 @@ bool FromDPDKDevice::run_task(Task * t)
         }
     }
 
-    if (ret == 0 && _rx_intr >= 0) {
-        for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
-            if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
-                click_chatter("Could not enable interrupts");
-                t->fast_reschedule();
-                return 0;
-            }
-        }
-        struct rte_epoll_event event[queue_per_threads];
-        int n, i;
-        uint8_t port_id, queue_id;
-        void *data;
-        n = rte_epoll_wait(RTE_EPOLL_PER_THREAD, event, queue_per_threads, -1);
-        for (i = 0; i < n; i++) {
-                data = event[i].epdata.data;
-                port_id = ((uintptr_t)data) >> CHAR_BIT;
-                assert(port_id == _dev->port_id);
-        }
-        this->selected(0, SELECT_READ);
+    if (ret == 0) {
+        if (_rx_intr >= 0) {
+           for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
+               if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
+                   click_chatter("Could not enable interrupts");
+                   t->fast_reschedule();
+                   return 0;
+               }
+           }
+           struct rte_epoll_event event[queue_per_threads];
+           int n, i;
+           uint8_t port_id, queue_id;
+           void *data;
+           n = rte_epoll_wait(RTE_EPOLL_PER_THREAD, event, queue_per_threads, -1);
+           for (i = 0; i < n; i++) {
+                   data = event[i].epdata.data;
+                   port_id = ((uintptr_t)data) >> CHAR_BIT;
+                   assert(port_id == _dev->port_id);
+           }
+           this->selected(0, SELECT_READ);
+       }
 
+        if (_fdstate->useful > 0)
+            t->fast_reschedule();
+        else
+            _fdstate->mustresched = 1;
+
+       return (ret);
+    } else {
+        _fdstate->useful++;
+        t->fast_reschedule();
+        return (ret);
     }
-    t->fast_reschedule();
-    return (ret);
+}
+
+void FromDPDKDevice::run_timer(Timer* t) {
+
+        int u = _fdstate->useful;
+        if (u > LOAD_UNIT)
+            u = LOAD_UNIT;
+
+        thread_state->_useful += u;
+        thread_state->_useless += LOAD_UNIT - u;
+        _fdstate->useful = 0;
+
+
+            if (_fdstate->mustresched == 1) {
+                _fdstate->mustresched = 0;
+                task_for_thread()->reschedule();
+
+
+            }
+
+
+    _fdstate->timer->reschedule_after_msec(1);
 }
 
 void FromDPDKDevice::selected(int fd, int mask) {
@@ -383,9 +428,19 @@ int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, 
                     for (int i = 0; i < fd->usable_threads.weight(); i++) {
                         fd->_tasks[i]->reschedule();
                     }
+                    for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
+                        int i = fd->thread_for_queue(q);
+                        if (!fd->_fdstate.get_value(i).timer->scheduled())
+                            fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
+                    }
                 } else {
                     for (int i = 0; i < fd->usable_threads.weight(); i++) {
                         fd->_tasks[i]->unschedule();
+                    }
+                    for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
+                        int i = fd->thread_for_queue(q);
+                        if (fd->_fdstate.get_value(i).timer->scheduled())
+                            fd->_fdstate.get_value(i).timer->unschedule();
                     }
                 }
                 fd->trigger_thread_reconfiguration(THREAD_RECONFIGURE_POST);
@@ -449,7 +504,9 @@ void FromDPDKDevice::add_handlers()
 
     add_read_handler("active", read_handler, h_active);
     add_write_handler("active", write_handler, h_active);
-    add_read_handler("count", count_handler, 0);
+    add_read_handler("count", count_handler, h_count);
+    add_read_handler("useful", count_handler, h_useful);
+    add_read_handler("useless", count_handler, h_useless);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 
     add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);

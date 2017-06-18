@@ -127,6 +127,7 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
+    void run_timer(Timer* t);
     void selected(int fd, int mask);
     
     ToDPDKDevice* findOutputElement();
@@ -147,7 +148,15 @@ private:
         h_device};
 
     DPDKDevice* _dev;
+
     int _rx_intr;
+    class FDState { public:
+        FDState() : timer(), mustresched(1), useful(0) {};
+        Timer* timer;
+        int mustresched;
+        int useful;
+    };
+    per_thread<FDState> _fdstate;
 };
 
 CLICK_ENDDECLS

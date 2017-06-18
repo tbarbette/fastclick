@@ -33,8 +33,6 @@ class NIC { public:
 
     String callRead(String h);
     String callTxRead(String h);
-
-
 };
 
 class ServiceChain { public:
@@ -70,15 +68,21 @@ class ServiceChain { public:
 
         enum ScStatus status;
 
-        ServiceChain(Metron* m) : rxFilter(0),_metron(m) {
 
-        }
+        class Stat {
+        public:
+            long long useless;
+            long long useful;
+            long long count;
+            float load;
+            Stat() : useless(0), useful(0), count(0), load(0) {
 
-        ~ServiceChain() {
-            //Do not delete nics, we are not the owner of those pointers
-            if (rxFilter)
-                delete rxFilter;
-        }
+            }
+        };
+        Vector<Stat> nic_stats;
+
+        ServiceChain(Metron* m);
+        ~ServiceChain();
 
         static ServiceChain* fromJSON(Json j,Metron* m, ErrorHandler* errh);
         int reconfigureFromJSON(Json j, Metron* m, ErrorHandler* errh);
@@ -167,12 +171,16 @@ class ServiceChain { public:
         Metron* _metron;
         Vector<int> _cpus;
         Vector<NIC*> _nics;
+        Vector<float> _cpuload;
+        float total_cpuload;
         int _socket;
         int _pid;
         struct timing_stats _timing_stats;
         int _used_cpu_nr;
         int _max_cpu_nr;
         bool _autoscale;
+
+        friend class Metron;
     };
 
 /*
@@ -190,6 +198,9 @@ class Metron : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
+
+    void run_timer(Timer* t) override;
+
     void add_handlers() CLICK_COLD;
     static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
     static String read_handler(Element *e, void *user_data) CLICK_COLD;
@@ -240,6 +251,7 @@ private:
 
     int runChain(ServiceChain* sc, ErrorHandler *errh);
 
+    Timer _timer;
     friend class ServiceChain;
 };
 
