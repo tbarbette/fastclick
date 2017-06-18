@@ -68,9 +68,11 @@ protected:
 
     class ThreadState {
         public:
-        ThreadState() : _count(0), _dropped(0) {};
+        ThreadState() : _count(0), _dropped(0), _useful(0), _useless(0) {};
         long long unsigned _count;
         long long unsigned _dropped;
+        long long unsigned _useful;
+        long long unsigned _useless;
     };
     per_thread<ThreadState> thread_state;
 
@@ -104,48 +106,18 @@ protected:
             _locks[id_for_thread()] = (uint32_t)0;
     }
 
-    inline unsigned long long n_count() {
-        unsigned long long total = 0;
-        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-            total += thread_state.get_value(i)._count;
-        }
-        return total;
-    }
+    enum {h_count,h_useful,h_useless};
 
-    inline unsigned long long n_dropped() {
-        unsigned long long total = 0;
-        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-            total += thread_state.get_value(i)._dropped;
-        }
-        return total;
-    }
-
-    inline void reset_count() {
-        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-            thread_state.get_value(i)._count = 0;
-            thread_state.get_value(i)._dropped = 0;
-        }
-    }
-
-    static String count_handler(Element *e, void *)
-    {
-        QueueDevice *tdd = static_cast<QueueDevice *>(e);
-        return String(tdd->n_count());
-    }
-
-    static String dropped_handler(Element *e, void *)
-        {
-            QueueDevice *tdd = static_cast<QueueDevice *>(e);
-            return String(tdd->n_dropped());
-        }
+    unsigned long long n_count();
+    unsigned long long n_useful();
+    unsigned long long n_useless();
+    unsigned long long n_dropped();
+    void reset_count();
+    static String count_handler(Element *e, void *user_data);
+    static String dropped_handler(Element *e, void *);
 
     static int reset_count_handler(const String &, Element *e, void *,
-                                    ErrorHandler *)
-    {
-        QueueDevice *tdd = static_cast<QueueDevice *>(e);
-        tdd->reset_count();
-        return 0;
-    }
+                                    ErrorHandler *);
 
     inline void add_count(unsigned int n) {
         thread_state->_count += n;
