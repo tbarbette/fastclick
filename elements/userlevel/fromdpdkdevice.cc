@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-#define LOAD_UNIT 1
+#define LOAD_UNIT 10
 
 FromDPDKDevice::FromDPDKDevice() :
     _dev(0), _rx_intr(-1)
