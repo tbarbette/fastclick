@@ -187,6 +187,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
                 n_queues = max(_minqueues,n_threads);
         }
         queue_per_threads = n_queues / n_threads;
+        lastqueue = firstqueue + n_queues - 1;
 
 	    click_chatter(
 				"%s : remove StaticThreadSched to use FastClick's "
