@@ -592,7 +592,10 @@ Element::input_is_push(int port) const
 
 inline
 Element::Port::Port()
-    : _e(0), _port(-2), _unstack(false)
+    : _e(0), _port(-2)
+#if HAVE_FLOW
+      , _unstack(false)
+#endif
 {
     PORT_ASSIGN(0);
 }

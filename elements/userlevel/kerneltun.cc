@@ -24,6 +24,7 @@
 #include <click/bitvector.hh>
 #include <click/args.hh>
 #include <click/straccum.hh>
+#include <click/router.hh>
 #include <click/glue.hh>
 #include <clicknet/ether.h>
 #include <click/standard/scheduleinfo.hh>
@@ -572,6 +573,17 @@ KernelTun::one_selected(const Timestamp &now)
 }
 
 bool
+KernelTun::get_spawning_threads(Bitvector& b, bool isoutput) {
+    if (isoutput) {
+        unsigned int thisthread = router()->home_thread_id(this);
+        b[thisthread] = 1;
+    }
+    return false;
+}
+
+
+
+bool
 KernelTun::run_task(Task *)
 {
     Packet *p = input(0).pull();
@@ -672,6 +684,17 @@ KernelTun::push(int, Packet *p)
     } else
 	click_chatter("%s(%s): out of memory", class_name(), _dev_name.c_str());
 }
+
+#if HAVE_BATCH
+void
+KernelTun::push_batch(int port, PacketBatch *batch)
+{
+    //TODO : We can do better
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        push(port, p);
+    }
+}
+#endif
 
 void
 KernelTun::add_handlers()

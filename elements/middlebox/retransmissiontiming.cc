@@ -8,7 +8,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
-#include <click/retransmissiontiming.hh>
+#include "retransmissiontiming.hh"
 #include "tcpretransmitter.hh"
 
 CLICK_DECLS

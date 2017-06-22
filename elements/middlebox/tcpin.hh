@@ -8,7 +8,7 @@
 #include <click/memorypool.hh>
 #include <click/modificationlist.hh>
 #include <click/tcpclosingstate.hh>
-#include <click/retransmissiontiming.hh>
+#include "retransmissiontiming.hh"
 #include "stackelement.hh"
 #include "tcpelement.hh"
 #include "tcpout.hh"

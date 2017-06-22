@@ -17,7 +17,7 @@
  */
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/flowelement.hh>>
+#include <click/flowelement.hh>
 
 
 CLICK_DECLS

@@ -13,8 +13,8 @@
 #include <click/timer.hh>
 #include <clicknet/tcp.h>
 #include <click/timestamp.hh>
-#include "circularbuffer.hh"
-#include "memorypool.hh"
+#include <click/circularbuffer.hh>
+#include <click/memorypool.hh>
 
 CLICK_DECLS
 

@@ -11,9 +11,16 @@
 
 #include <clicknet/tcp.h>
 #include "memorypool.hh"
-#include "flowbufferentry.hh"
+#include <click/packet.hh>
 
 CLICK_DECLS
+
+struct flowBufferEntry
+{
+        WritablePacket *packet;
+            struct flowBufferEntry *prev;
+                struct flowBufferEntry *next;
+};
 
 class FlowBufferContentIter;
 class FlowBufferIter;
