@@ -51,6 +51,8 @@ private:
     void smaction(Packet* p);
 
     RecordTimestamp* get_recordtimestamp_instance();
+    void min_mean_max(std::vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max);
+    double percentile(std::vector<unsigned> &vec, double percent);
 };
 
 CLICK_ENDDECLS
