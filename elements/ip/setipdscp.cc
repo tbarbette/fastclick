@@ -57,12 +57,30 @@ SetIPDSCP::smaction(Packet *p)
     return q;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+SetIPDSCP::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet *){});
+    return batch;
+}
+#endif
+
 void
 SetIPDSCP::push(int, Packet *p)
 {
     if ((p = smaction(p)) != 0)
 	output(0).push(p);
 }
+
+#if HAVE_BATCH
+void
+SetIPDSCP::push_batch(int, PacketBatch *batch) {
+    FOR_EACH_PACKET(batch, p)
+        smaction(p);
+    output(0).push_batch(batch);
+}
+#endif
 
 Packet *
 SetIPDSCP::pull(int)
@@ -72,6 +90,15 @@ SetIPDSCP::pull(int)
 	p = smaction(p);
     return p;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+SetIPDSCP::pull_batch(int port, unsigned max) {
+    PacketBatch *batch;
+    MAKE_BATCH(pull(port), batch, max);
+    return batch;
+}
+#endif
 
 void
 SetIPDSCP::add_handlers()
