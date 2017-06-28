@@ -28,6 +28,6 @@ DriverManager(wait,read diff.average, read counter.count)
 Loading replay with 1 inputs.
 replay : Successfully loaded 1000 packets. Input 0 dried out.
 diff.average:
-{{[0-3][.][0-9]+}}
+{{[0-9]{1,2}[.][0-9]+}}
 counter.count:
 100000

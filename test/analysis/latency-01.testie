@@ -21,6 +21,6 @@ DriverManager(wait,read diff.average, read counter.count)
 
 %expect stderr
 diff.average:
-{{[0-3][.][0-9]+}}
+{{[0-9]{1,2}[.][0-9]+}}
 counter.count:
 10000
