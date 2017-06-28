@@ -14,7 +14,7 @@ CLICK_DECLS
 
 #define DEBUG_LB 0
 
-#define FLOW_TIMEOUT 60 * 1000
+#define LOADBALANCER_FLOW_TIMEOUT 60 * 1000
 
 FlowIPLoadBalancer::FlowIPLoadBalancer() : _last(0){
 
@@ -72,7 +72,7 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
 #if DEBUG_LB
         click_chatter("Adding entry %s %d [%d]",entry.chosen_server.unparse().c_str(),entry.port,*_last);
 #endif
-        fcb_acquire_timeout(FLOW_TIMEOUT);
+        fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
     } else {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         if (!fcb_stack->hasTimeout())
@@ -159,7 +159,7 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
 #else
         *flowdata = ptr.value();
 #endif
-        fcb_acquire_timeout(FLOW_TIMEOUT);
+        fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
     } else {
 #if DEBUG_LB
         click_chatter("Saved entry %s -> %s",flowdata->src.unparse().c_str(),flowdata->dst.unparse().c_str());
