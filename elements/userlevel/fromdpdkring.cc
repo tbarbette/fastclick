@@ -172,9 +172,12 @@ FromDPDKRing::run_task(Task *t)
 #endif
 
     struct rte_mbuf *pkts[_burst_size];
-
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    int n = rte_ring_dequeue_burst(_recv_ring, (void **)pkts, _burst_size, 0);
+#else
     int n = rte_ring_dequeue_burst(_recv_ring, (void **)pkts, _burst_size);
-    if ( n < 0 ) {
+#endif
+    if (n < 0) {
         click_chatter("[%s] Couldn't read from the Rx rings\n", name().c_str());
         return false;
     }
