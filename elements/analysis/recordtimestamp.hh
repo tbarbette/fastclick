@@ -2,8 +2,7 @@
 #define CLICK_RECORDTIMESTAMP_HH
 
 #include <cassert>
-#include <vector>
-
+#include <click/vector.hh>
 #include <click/batchelement.hh>
 #include <click/timestamp.hh>
 
@@ -23,6 +22,11 @@ element.
 
 Size of the vector, defaults to 65536
 
+=item OFFSET
+If offset is setted, the slot in the vector will be read from packet, assumed
+to previously been marked with NumberPacket. If unset or < 0, the vector
+will be filled in order.
+
 =a
 
 NumberPacket, TimestampDiff
@@ -39,6 +43,7 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+    inline void smaction(Packet *);
     void push(int, Packet *);
 #if HAVE_BATCH
     void push_batch(int, PacketBatch *);
@@ -47,8 +52,8 @@ public:
     Timestamp get(uint64_t i);
 
 private:
-    uint64_t _count;
-    std::vector<Timestamp> _timestamps;
+    int _offset;
+    Vector<Timestamp> _timestamps;
 };
 
 inline Timestamp RecordTimestamp::get(uint64_t i) {

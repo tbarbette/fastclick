@@ -80,7 +80,7 @@ bool DPDKDevice::alloc_pktmbufs()
 
 
     if (max_socket == -1)
-        return false;
+        max_socket = 0;
 
     _nr_pktmbuf_pools = max_socket + 1;
 
@@ -310,7 +310,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 #endif
 
     const unsigned n_ports = rte_eth_dev_count();
-    if (n_ports == 0)
+    if (n_ports == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
     for (HashTable<unsigned, DPDKDevice>::const_iterator it = _devs.begin();

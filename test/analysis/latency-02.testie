@@ -1,0 +1,33 @@
+%info
+Repeated RecordTimestamp
+
+Test the RecordTimestamp ecosystem (TimestampDiff, NumberPacket, ...) in
+repeat mode, that is the crafted packets are replayed multiple time through
+the same record timestamp. With OFFSET setted, RecordTimestamp should
+loop in its internal array reading the timestamp number instead of growing.
+
+%script
+click -j 1 CONFIG
+
+%file CONFIG
+define($STOP 100)
+
+InfiniteSource(LENGTH 64, LIMIT 1000)
+-> MarkMACHeader
+-> NumberPacket
+-> replay :: ReplayUnqueue(STOP $STOP, ACTIVE true, QUICK_CLONE 1)
+-> record:: RecordTimestamp(OFFSET 40)
+-> counter :: AverageCounter()
+-> CheckNumberPacket(OFFSET 40, COUNT 1000)
+-> diff :: TimestampDiff(RECORDER record)
+-> Discard
+
+DriverManager(wait,read diff.average, read counter.count)
+
+%expect stderr
+Loading replay with 1 inputs.
+replay : Successfully loaded 1000 packets. Input 0 dried out.
+diff.average:
+{{[0-9]{1,2}[.][0-9]+}}
+counter.count:
+100000

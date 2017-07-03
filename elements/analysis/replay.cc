@@ -85,6 +85,7 @@ ReplayBase::add_handlers()
 {
     add_write_handler("active", write_handler, 0, Handler::BUTTON);
     add_write_handler("reset", write_handler, 1, Handler::BUTTON);
+    add_data_handlers("loaded", Handler::OP_READ, &_loaded);
     add_data_handlers("active", Handler::OP_READ, &_active);
     add_data_handlers("stop", Handler::OP_READ | Handler::OP_WRITE, &_stop);
 }
