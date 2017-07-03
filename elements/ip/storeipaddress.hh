@@ -1,6 +1,6 @@
 #ifndef CLICK_STOREIPADDRESS_HH
 #define CLICK_STOREIPADDRESS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ipaddress.hh>
 CLICK_DECLS
 
@@ -51,7 +51,7 @@ checksums as well. Here's a useful compound element:
 IPAddrRewriter
 */
 
-class StoreIPAddress : public Element { public:
+class StoreIPAddress : public BatchElement { public:
 
     StoreIPAddress() CLICK_COLD;
     ~StoreIPAddress() CLICK_COLD;
@@ -63,6 +63,9 @@ class StoreIPAddress : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 
