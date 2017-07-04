@@ -441,6 +441,22 @@ inline void PacketBatch::kill() {
 #define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
 #endif
 
+#define BATCH_CREATE_INIT(batch) \
+        PacketBatch* batch = 0; \
+        int batch ## count = 0; \
+        Packet* batch ## last = 0;
+#define BATCH_CREATE_APPEND(batch,p) \
+        if (batch) { \
+            batch ## last->set_next(p); \
+        } else {\
+            batch = PacketBatch::start_head(p); \
+        }\
+        batch ## last = p;\
+        batch ## count++;
+#define BATCH_CREATE_FINISH(batch) \
+        if (batch) \
+            batch->make_tail(batch ## last, batch ## count)
+
 typedef Packet::PacketType PacketType;
 
 CLICK_ENDDECLS

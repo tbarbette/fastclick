@@ -1207,9 +1207,8 @@ Router::initialize(ErrorHandler *errh)
 #endif
                 continue;
             }
-
-            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO);
 #endif
+            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO);
         }
     }
 #endif
