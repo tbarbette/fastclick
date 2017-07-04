@@ -47,27 +47,42 @@ class BatchElement : public Element { public:
     }
 
     inline void checked_output_push_batch(int port, PacketBatch* batch) {
-         if ((unsigned) port < (unsigned) noutputs())
+         if ((unsigned) port < (unsigned) noutputs()) {
+#if BATCH_DEBUG
+             assert(in_batch_mode == BATCH_MODE_YES);
+#endif
              output_push_batch(port,batch);
-         else
+         } else
              batch->fast_kill();
     }
 
     inline void checked_output_push(int port, Packet* p)
     {
-        if (in_batch_mode == BATCH_MODE_YES) {
-            assert(false);
-            checked_output_push_batch(port, PacketBatch::make_from_packet(p));
+        if ((unsigned) port < (unsigned) noutputs()) {
+            if (in_batch_mode == BATCH_MODE_YES) {
+                output_push_batch(port,PacketBatch::make_from_packet(p));
+            } else {
+                _ports[1][port].push(p);
+            }
         } else {
-            Element::checked_output_push(port, p);
+            p->kill();
         }
     }
 
     inline void
     output_push_batch(int port, PacketBatch* batch) {
-        assert(false);
         output(port).push_batch(batch);
     }
+
+    inline void
+    output_push(int port, Packet* p) {
+        if (in_batch_mode == BATCH_MODE_YES) {
+            output(port).push_batch(PacketBatch::make_from_packet(p));
+        } else {
+            output(port).push(p);
+        }
+    }
+
 
     inline PacketBatch*
     input_pull_batch(int port, int max) {
@@ -107,7 +122,12 @@ protected :
 #else
 class BatchElement : public Element { public:
     inline void checked_output_push_batch(int port, PacketBatch* batch) {
-        output(port).push(batch);
+        static_assert(false);
+    }
+
+    inline void
+    output_push(int port, Packet* p) {
+        output(port).push(p);
     }
 };
 #endif

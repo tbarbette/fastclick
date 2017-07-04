@@ -109,7 +109,7 @@ CheckUDPHeader::simple_action(Packet *p)
 #if HAVE_BATCH
 PacketBatch*
 CheckUDPHeader::simple_action_batch(PacketBatch * batch) {
-	EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action,batch,[](Packet*){});
+	EXECUTE_FOR_EACH_PACKET_DROPPABLE(CheckUDPHeader::simple_action,batch,[](Packet*){});
 	return batch;
 }
 #endif
