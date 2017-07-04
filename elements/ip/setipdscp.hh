@@ -35,7 +35,6 @@ class SetIPDSCP : public BatchElement { public:
   Packet *pull(int);
 
 #if HAVE_BATCH
-    PacketBatch *simple_action_batch(PacketBatch *);
     void push_batch(int, PacketBatch *);
     PacketBatch *pull_batch(int port, unsigned max);
 #endif

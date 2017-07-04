@@ -60,15 +60,6 @@ SetIPDSCP::smaction(Packet *p)
     return q;
 }
 
-#if HAVE_BATCH
-PacketBatch *
-SetIPDSCP::simple_action_batch(PacketBatch *batch)
-{
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet *){});
-    return batch;
-}
-#endif
-
 void
 SetIPDSCP::push(int, Packet *p)
 {
