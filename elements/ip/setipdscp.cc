@@ -88,8 +88,9 @@ SetIPDSCP::pull(int)
 #if HAVE_BATCH
 PacketBatch *
 SetIPDSCP::pull_batch(int port, unsigned max) {
-    PacketBatch *batch;
-    MAKE_BATCH(pull(port), batch, max);
+    PacketBatch *batch = input_pull_batch(0,max);
+    FOR_EACH_PACKET(batch,p)
+        smaction(p);
     return batch;
 }
 #endif
