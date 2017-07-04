@@ -1198,6 +1198,18 @@ Router::initialize(ErrorHandler *errh)
                 e->receives_batch = false;
                 continue; //This element is traversed by packets... nothing to do.
             }
+#if !HAVE_AUTO_BATCH
+            if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
+                e->in_batch_mode = Element::BATCH_MODE_NO;
+                e->receives_batch = false;
+#if HAVE_VERBOSE_BATCH
+                click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
+#endif
+                continue;
+            }
+
+            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO);
+#endif
         }
     }
 #endif

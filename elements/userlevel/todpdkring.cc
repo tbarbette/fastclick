@@ -90,7 +90,7 @@ int
 ToDPDKRing::initialize(ErrorHandler *errh)
 {
 #if HAVE_BATCH
-    if (batch_mode() == BATCH_MODE_YES) {
+    if (in_batch_mode == BATCH_MODE_YES) {
         if ( _burst_size > 0 )
             errh->warning("[%s] BURST is unused with batching!", name().c_str());
     } else

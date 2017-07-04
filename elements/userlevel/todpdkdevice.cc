@@ -76,7 +76,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         if (ret != 0) return ret;    }
 
 #if HAVE_BATCH
-    if (batch_mode() == BATCH_MODE_YES) {
+    if (in_batch_mode == BATCH_MODE_YES) {
         if (_burst < 0)
             _burst = 1;
     } else
