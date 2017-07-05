@@ -765,12 +765,15 @@ Element::Port::push_batch(PacketBatch* batch) const {
 }
 
 void Element::Port::start_batch() {
-#if BATCH_DEBUG
-    click_chatter("Starting batch in port to %p{element}",_e);
-#endif
     if (_e->in_batch_mode == BATCH_MODE_YES) { //Rebuild for the next element
+#if BATCH_DEBUG
+        click_chatter("Starting batch in port to %p{element}",_e);
+#endif
         current_batch.set((PacketBatch*)-1);
     } else { //Pass the rebuild message
+#if BATCH_DEBUG
+    click_chatter("Passing start batch message in port to %p{element}",_e);
+#endif
         if (*current_batch != (PacketBatch*)-1) {
             *current_batch = (PacketBatch*)-1;
             for (int i = 0; i < _e->noutputs(); i++) {

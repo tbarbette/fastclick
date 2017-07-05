@@ -210,6 +210,16 @@ FastUDPFlows::pull(int)
   return(p);
 }
 
+#if HAVE_BATCH
+PacketBatch *
+FastUDPFlows::pull_batch(int port, unsigned max) {
+    PacketBatch *batch;
+    MAKE_BATCH(FastUDPFlows::pull(port), batch, max);
+    return batch;
+}
+#endif
+
+
 void
 FastUDPFlows::reset()
 {

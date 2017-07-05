@@ -7,8 +7,17 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
+/**
+ * Iterate over all packets of a batch. The batch cannot be modified during
+ *   iteration. Use _SAFE version if you want to modify it on the fly.
+ */
 #define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != NULL;p=p->next())
 
+/**
+ * Iterate over all packets of a batch. The current packet can be modified
+ *  during iteration as the "next" pointer is read before going in the core of
+ *  the loop.
+ */
 #define FOR_EACH_PACKET_SAFE(batch,p) \
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
@@ -38,7 +47,8 @@ CLICK_DECLS
 
 /**
  * Execute a function on each packet of a batch. The function may return
- * another packet, or null if the packet could be dropped.
+ * another packet and which case the packet of the batch will be replaced by
+ * that one, or null if the packet could be dropped.
  */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
                 Packet* next = ((batch != NULL)? batch->next() : NULL );\
@@ -75,8 +85,19 @@ CLICK_DECLS
 /**
  * Split a batch into multiple batch according to a given function which will
  * give the index of an output to choose.
- * @fnt Function to call which will return a value between 0 and nbatches
- * #on_finish function which take an output index and the batch when classification is finished
+ *
+ * The main use case is the classification element like Classifier, Switch, etc
+ *   where you split a batch checking which output each packets should take.
+ *
+ * @args nbatches Number of output batches. In many case you want noutputs() + 1
+ *      , keeping the last one for drops.
+ * @args fnt Function to call which will return a value between 0 and nbatches.
+ *  If the function returns a values < 0 or bigger than nbatches, th last batch
+ *  of nbatches will be used.
+ * @args batch The batch to be split
+ * @args on_finish function which take an output index and the batch when
+ *  classification is finished, usually you want that to be
+ *  checked_output_push_batch.
  */
 #define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
     {\
@@ -129,7 +150,17 @@ CLICK_DECLS
     }
 
 /**
- * Create a batch by calling multiple times (up to max) a given function
+ * Create a batch by calling multiple times (up to max) a given function and
+ *   linking them together in respect to the PacketBatch semantic.
+ *
+ * In most case this function should not be used. Because if you get packets
+ * per packets it means you don't get them upstream as a batch. You may prefer
+ * to somehow fetch a whole batch and then iterate through it. One bad
+ * use case is MAKE_BATCH(pull ...) in a x/x element which will create a batch
+ * by calling multiple times pull() until it returns no packets.
+ * This will break batching as it will call pull on the previous element
+ * instead of pull_batch. However this is fine in a source element where
+ * anyway the batch must be created packet per packet.
  */
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
@@ -371,7 +402,7 @@ public :
  */
 inline void PacketBatch::kill() {
     FOR_EACH_PACKET_SAFE(this,p) {
-	p->kill();
+        p->kill();
     }
 }
 
@@ -441,6 +472,9 @@ inline void PacketBatch::kill() {
 #define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
 #endif
 
+/**
+ * Set of functions to efficiently create a batch.
+ */
 #define BATCH_CREATE_INIT(batch) \
         PacketBatch* batch = 0; \
         int batch ## count = 0; \
