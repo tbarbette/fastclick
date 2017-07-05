@@ -92,7 +92,6 @@ int HTTPServer::ahc_echo(void * cls,
 		const char * upload_data,
 		size_t * upload_data_size,
 		void ** con_cls) {
-	static int dummy;
 	HTTPServer* server = reinterpret_cast<HTTPServer*>(cls);
 
 	int ret = MHD_YES;
