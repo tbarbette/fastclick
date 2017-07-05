@@ -99,7 +99,6 @@ class SimpleQueue : public BatchElement, public Storage { public:
 
     void push(int port, Packet*);
     Packet* pull(int port);
-
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *);
     PacketBatch* pull_batch(int port,unsigned max);

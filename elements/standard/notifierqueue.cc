@@ -90,6 +90,20 @@ NotifierQueue::pull(int)
     return p;
 }
 
+#if HAVE_BATCH
+void NotifierQueue::push_batch(int port, PacketBatch* batch) {
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        NotifierQueue::push(port,p);
+    }
+}
+
+PacketBatch* NotifierQueue::pull_batch(int port, unsigned max) {
+    PacketBatch* batch;
+    MAKE_BATCH(NotifierQueue::pull(port),batch,max);
+    return batch;
+}
+#endif
+
 #if CLICK_DEBUG_SCHEDULING
 String
 NotifierQueue::read_handler(Element *e, void *)

@@ -57,7 +57,10 @@ class FrontDropQueue : public NotifierQueue { public:
   int live_reconfigure(Vector<String> &, ErrorHandler *);
   void take_state(Element *, ErrorHandler *);
 
-  void push(int port, Packet *);
+  void push(int port, Packet *) final;
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *);
+#endif
 
 };
 

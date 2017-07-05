@@ -75,6 +75,19 @@ FullNoteQueue::pull(int)
     else
 	return pull_failure();
 }
+#if HAVE_BATCH
+void FullNoteQueue::push_batch(int port, PacketBatch* batch) {
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        FullNoteQueue::push(port,p);
+    }
+}
+
+PacketBatch* FullNoteQueue::pull_batch(int port, unsigned max) {
+    PacketBatch* batch;
+    MAKE_BATCH(FullNoteQueue::pull(port),batch,max);
+    return batch;
+}
+#endif
 
 #if CLICK_DEBUG_SCHEDULING
 String
