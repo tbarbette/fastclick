@@ -498,16 +498,16 @@ Json Metron::toJSON() {
     Json jroot = Json::make_object();
     jroot.set("id",Json(_id));
 
-    //Cpu ressources
+    // CPU resources
     jroot.set("cpus",Json(getCpuNr()));
 
-    //Infos
+    // Info
     jroot.set("manufacturer",Json(_vendor));
     jroot.set("hwVersion",Json(_hw));
     jroot.set("swVersion",Json("Click "+_sw));
     jroot.set("serial",Json(_serial));
 
-    //Nics ressources
+    // NIC resources
     Json jnics = Json::make_array();
     auto begin = _nics.begin();
     while (begin != _nics.end()) {
@@ -521,11 +521,54 @@ Json Metron::toJSON() {
 Json Metron::statsToJSON() {
     Json jroot = Json::make_object();
 
-    //Cpu ressources
+    // High-level CPU resources
     jroot.set("busyCpus",Json(getAssignedCpuNr()));
     jroot.set("freeCpus",Json(getCpuNr() - getAssignedCpuNr()));
 
-    //Nics ressources
+    // Per core load
+    Json jcpus = Json::make_array();
+
+    // First, inititialize the load of each core to 0
+    for (int j = 0; j < getCpuNr(); j++) {
+        Json jcpu = Json::make_object();
+        jcpu.set("id", j);
+        jcpu.set("load", 0);      // No load
+        jcpu.set("busy", false);  // This CPU core is free
+        jcpus.push_back(jcpu);
+    }
+
+    // Then, go through the active chains and search for active CPUs with some real load
+    auto sci = _scs.begin();
+    while (sci != _scs.end()) {
+        ServiceChain *sc = sci.value();
+
+        for (int j = 0; j < sc->getMaxCpuNr(); j++) {
+            int cpuId = sc->getCpuMap(j);
+            float cpuload = sc->_cpuload[j];
+
+            // Find the correct index
+            Json jcpu = -1;
+            for (int k = 0; k < getCpuNr(); k++) {
+                if (jcpus[k].get_i("id") == cpuId) {
+                    jcpu = jcpus.at(k);
+                    break;
+                }
+            }
+
+            assert(jcpu != -1);
+
+            // Replace the initialized values above with the real monitoring data
+            jcpu.set("id",   cpuId);
+            jcpu.set("load", cpuload);
+            jcpu.set("busy", true);      // This CPU core is busy
+        }
+    }
+
+    // At this point the JSON array should have load information for each core of this server
+    assert(jcpus.size() == getCpuNr());
+    jroot.set("cpus", jcpus);
+
+    // NIC resources
     Json jnics = Json::make_array();
     auto begin = _nics.begin();
     while (begin != _nics.end()) {
