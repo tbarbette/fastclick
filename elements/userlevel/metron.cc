@@ -538,6 +538,7 @@ Json Metron::statsToJSON() {
     }
 
     // Then, go through the active chains and search for active CPUs with some real load
+    int assignedCpus = 0;
     auto sci = _scs.begin();
     while (sci != _scs.end()) {
         ServiceChain *sc = sci.value();
@@ -550,22 +551,27 @@ Json Metron::statsToJSON() {
             Json jcpu = -1;
             for (int k = 0; k < getCpuNr(); k++) {
                 if (jcpus[k].get_i("id") == cpuId) {
-                    jcpu = jcpus.at(k);
+                    jcpu = jcpus[k];
                     break;
                 }
             }
 
+            // The search must succeed!
             assert(jcpu != -1);
 
             // Replace the initialized values above with the real monitoring data
             jcpu.set("id",   cpuId);
             jcpu.set("load", cpuload);
             jcpu.set("busy", true);      // This CPU core is busy
+
+            assignedCpus++;
         }
     }
 
     // At this point the JSON array should have load information for each core of this server
     assert(jcpus.size() == getCpuNr());
+    assert(assignedCpus == getAssignedCpuNr());
+
     jroot.set("cpus", jcpus);
 
     // NIC resources
