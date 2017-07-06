@@ -162,6 +162,7 @@ inline int TimestampDiff::smaction(Packet* p) {
                       i, diff.sec() * 1000000 + diff.usec());
     else
         _delays.push_back(diff.usec());
+    return 0;
 }
 
 void TimestampDiff::push(int, Packet *p) {
