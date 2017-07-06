@@ -66,7 +66,7 @@ CheckNumberPacket::push(int, Packet *p) {
 #if HAVE_BATCH
 void
 CheckNumberPacket::push_batch(int, PacketBatch *batch) {
-    CLASSIFY_EACH_PACKET(noutputs(),smaction,batch,checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(2,smaction,batch,checked_output_push_batch);
 }
 #endif
 
