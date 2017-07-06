@@ -45,14 +45,10 @@ int CheckNumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 inline int CheckNumberPacket::smaction(Packet* p) {
     WritablePacket *wp = nullptr;
-    if ((int)p->length() >= _offset + 8) {
-        wp = p->uniqueify();
-    } else {
-        wp = p->put(_offset + 8 - p->length());
-        assert(wp);
-        wp->ip_header()->ip_len = htons(_offset + 8);
+    if ((int)p->length() < _offset + 8) {
+        return 1;
     }
-    uint64_t n = *reinterpret_cast<uint64_t *>(wp->data() + _offset);
+    uint64_t n = *reinterpret_cast<const uint64_t *>(p->data() + _offset);
     if (n >= (uint64_t)_count) {
         click_chatter("%p{element} : %lu out of scope (count is %d) !",this,n,_count);
         return 1;
