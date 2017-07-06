@@ -49,7 +49,7 @@ public:
     void push_batch(int, PacketBatch *);
 #endif
 
-    Timestamp get(uint64_t i);
+    inline Timestamp get(uint64_t i);
 
 private:
     int _offset;
