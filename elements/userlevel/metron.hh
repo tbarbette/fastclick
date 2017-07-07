@@ -12,27 +12,46 @@ CLICK_DECLS
 
 class Metron;
 
-class NIC { public:
-    Element* element;
+class CPU {
+    public:
+        CPU(int id, String vendor, long _frequency)
+            : _id(id), _vendor(vendor), _frequency(_frequency) {
+        }
 
-    String getId() {
-        return element->name();
-    }
+        int getId();
+        String getVendor();
+        long getFrequency();
 
-    String getDeviceId();
+        Json toJSON();
 
-    Json toJSON(bool stats = false);
+    private:
+        int _id;
+        String _vendor;
+        long _frequency;
+};
 
-    int queuePerPool() {
-        return atoi(callRead("nb_rx_queues").c_str()) / atoi(callRead("nb_vf_pools").c_str());
-    }
+class NIC {
+    public:
+        Element *element;
 
-    int cpuToQueue(int id) {
-        return id * (queuePerPool());
-    }
+        String getId() {
+            return element->name();
+        }
 
-    String callRead(String h);
-    String callTxRead(String h);
+        String getDeviceId();
+
+        Json toJSON(bool stats = false);
+
+        int queuePerPool() {
+            return atoi(callRead("nb_rx_queues").c_str()) / atoi(callRead("nb_vf_pools").c_str());
+        }
+
+        int cpuToQueue(int id) {
+            return id * (queuePerPool());
+        }
+
+        String callRead(String h);
+        String callTxRead(String h);
 };
 
 class ServiceChain { public:

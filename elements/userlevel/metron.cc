@@ -1013,6 +1013,31 @@ int ServiceChain::callWrite(String handler, String& response,String params) {
 }
 
 /******************************
+ * CPU
+ ******************************/
+int CPU::getId() {
+    return this->_id;
+}
+
+String CPU::getVendor() {
+    return this->_vendor;
+}
+
+long CPU::getFrequency() {
+    return this->_frequency;
+}
+
+Json CPU::toJSON() {
+    Json cpu = Json::make_object();
+
+    cpu.set("id", getId());
+    cpu.set("vendor", getVendor());
+    cpu.set("frequency", getFrequency());
+
+    return cpu;
+}
+
+/******************************
  * NIC
  ******************************/
 Json NIC::toJSON(bool stats) {
