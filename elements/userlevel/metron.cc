@@ -45,21 +45,21 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
-static String parseHwInfo(String hwInfo, String key) {
+static String parseVendorInfo(String hwInfo, String key) {
     String s;
     s = hwInfo.substring(hwInfo.find_left(key) + key.length());
     int pos = s.find_left(':') + 2;
-    s = s.substring(pos,s.find_left("\n") - pos);
+    s = s.substring(pos, s.find_left("\n") - pos);
     return s;
 }
 int Metron::initialize(ErrorHandler * errh) {
     _cpu_map.resize(getCpuNr(),0);
     String hwInfo = file_string("/proc/cpuinfo");
-    _vendor = parseHwInfo(hwInfo,"vendor_id");
-    _hw = parseHwInfo(hwInfo,"model name");
+    _vendor = parseVendorInfo(hwInfo, "vendor_id");
+    _hw = parseVendorInfo(hwInfo, "model name");
     _sw = CLICK_VERSION;
-    String swInfo = shell_command_output_string("dmidecode -t 1","",errh);
-    _serial = parseHwInfo(swInfo,"Serial Number");
+    String swInfo = shell_command_output_string("dmidecode -t 1", "", errh);
+    _serial = parseVendorInfo(swInfo, "Serial Number");
     _timer.initialize(this);
     _timer.schedule_after_sec(1);
 	return 0;
@@ -498,14 +498,25 @@ Json Metron::toJSON() {
     Json jroot = Json::make_object();
     jroot.set("id",Json(_id));
 
-    // CPU resources
-    jroot.set("cpus",Json(getCpuNr()));
-
     // Info
     jroot.set("manufacturer",Json(_vendor));
     jroot.set("hwVersion",Json(_hw));
     jroot.set("swVersion",Json("Click "+_sw));
     jroot.set("serial",Json(_serial));
+
+    // CPU resources
+    // jroot.set("cpus",Json(getCpuNr()));
+    Json jcpus = Json::make_array();
+    for (int i = 0; i < getCpuNr(); i++) {
+        Json jcpu = Json::make_object();
+        jcpu.set("id", i);
+        // TODO: Retrieve `Intel` more gently :p
+        jcpu.set("vendor", "Intel");
+        // TODO: Retrieve the frequency dynamically
+        jcpu.set("frequency", 3200);
+        jcpus.push_back(jcpu);
+    }
+    jroot.set("cpus", jcpus);
 
     // NIC resources
     Json jnics = Json::make_array();
@@ -514,7 +525,7 @@ Json Metron::toJSON() {
         jnics.push_back(begin.value().toJSON(false));
         begin++;
     }
-    jroot.set("nics",jnics);
+    jroot.set("nics", jnics);
     return jroot;
 }
 
@@ -528,17 +539,12 @@ Json Metron::statsToJSON() {
     // Per core load
     Json jcpus = Json::make_array();
 
-    // First, inititialize the load of each core to 0
-    for (int j = 0; j < getCpuNr(); j++) {
-        Json jcpu = Json::make_object();
-        jcpu.set("id", j);
-        jcpu.set("load", 0);      // No load
-        jcpu.set("busy", false);  // This CPU core is free
-        jcpus.push_back(jcpu);
-    }
-
-    // Then, go through the active chains and search for active CPUs with some real load
+    /**
+     * First, go through the active chains and search for CPUs with some real load.
+     * Mark them so that we can find the idle ones next.
+     */
     int assignedCpus = 0;
+    Vector<int> busyCpus;
     auto sci = _scs.begin();
     while (sci != _scs.end()) {
         ServiceChain *sc = sci.value();
@@ -547,28 +553,37 @@ Json Metron::statsToJSON() {
             int cpuId = sc->getCpuMap(j);
             float cpuload = sc->_cpuload[j];
 
-            // Find the correct index
-            Json jcpu = -1;
-            for (int k = 0; k < getCpuNr(); k++) {
-                if (jcpus[k].get_i("id") == cpuId) {
-                    jcpu = jcpus[k];
-                    break;
-                }
-            }
-
-            // The search must succeed!
-            assert(jcpu != -1);
-
             // Replace the initialized values above with the real monitoring data
+            Json jcpu = Json::make_object();
             jcpu.set("id",   cpuId);
             jcpu.set("load", cpuload);
             jcpu.set("busy", true);      // This CPU core is busy
 
+            jcpus.push_back(jcpu);
+
             assignedCpus++;
+            busyCpus.push_back(cpuId);
         }
+
+        sci++;
     }
 
-    // At this point the JSON array should have load information for each core of this server
+    // Now, inititialize the load of each idle core to 0
+    for (int j = 0; j < getCpuNr(); j++) {
+        int *found = find(busyCpus.begin(), busyCpus.end(), j);
+        // This is a busy one
+        if (found != busyCpus.end()) {
+            continue;
+        }
+
+        Json jcpu = Json::make_object();
+        jcpu.set("id", j);
+        jcpu.set("load", 0);      // No load
+        jcpu.set("busy", false);  // This CPU core is free
+        jcpus.push_back(jcpu);
+    }
+
+    // At this point the JSON array should have load information for each core of this server.
     assert(jcpus.size() == getCpuNr());
     assert(assignedCpus == getAssignedCpuNr());
 
