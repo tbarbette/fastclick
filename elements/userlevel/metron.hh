@@ -28,6 +28,9 @@ class CPU {
         int _id;
         String _vendor;
         long _frequency;
+
+    public:
+        static const int MEGA_HZ = 1000000;
 };
 
 class NIC {

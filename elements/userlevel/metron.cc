@@ -505,15 +505,13 @@ Json Metron::toJSON() {
     jroot.set("serial",Json(_serial));
 
     // CPU resources
-    // jroot.set("cpus",Json(getCpuNr()));
     Json jcpus = Json::make_array();
     for (int i = 0; i < getCpuNr(); i++) {
         Json jcpu = Json::make_object();
         jcpu.set("id", i);
         // TODO: Retrieve `Intel` more gently :p
         jcpu.set("vendor", "Intel");
-        // TODO: Retrieve the frequency dynamically
-        jcpu.set("frequency", 3200);
+        jcpu.set("frequency", cycles_hz() / CPU::MEGA_HZ);  // In MHz
         jcpus.push_back(jcpu);
     }
     jroot.set("cpus", jcpus);
