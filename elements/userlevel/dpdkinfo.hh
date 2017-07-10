@@ -78,11 +78,6 @@ Used for interprocess communication. Defaults to 1024.
 Integer.  Number of frames to read/write from/to a DPDK device. 
 Defaults to 32.
 
-=item RING_FLAGS
-
-Integer.  Parameters to pass to a ring-based DPDK process communication.
-Defaults to 0.
-
 =item RING_SIZE
 
 Integer.  The size of the ring used for DPDK inter-process communication.

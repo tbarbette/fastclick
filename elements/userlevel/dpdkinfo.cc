@@ -41,7 +41,6 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
         .read("MEMPOOL_PREFIX", DPDKDevice::MEMPOOL_PREFIX)
         .read("DEF_RING_NDESC", DPDKDevice::DEF_RING_NDESC)
         .read("DEF_BURST_SIZE", DPDKDevice::DEF_BURST_SIZE)
-        .read("RING_FLAGS",     DPDKDevice::RING_FLAGS)
         .read("RING_SIZE",      DPDKDevice::RING_SIZE)
         .read("RING_POOL_CACHE_SIZE", DPDKDevice::RING_POOL_CACHE_SIZE)
         .read("RING_PRIV_DATA_SIZE",  DPDKDevice::RING_PRIV_DATA_SIZE)

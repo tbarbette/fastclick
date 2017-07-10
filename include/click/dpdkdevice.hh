@@ -41,11 +41,8 @@ public:
 
     unsigned port_id;
 
-    DPDKDevice() : port_id(-1), info() {
-    }
-
-    DPDKDevice(unsigned port_id) : port_id(port_id) {
-    } CLICK_COLD;
+    DPDKDevice();
+    DPDKDevice(unsigned port_id);
 
     int add_rx_queue(int &queue_id, bool promisc,
                              unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
@@ -96,7 +93,6 @@ public:
     static unsigned DEF_RING_NDESC;
     static unsigned DEF_BURST_SIZE;
 
-    static unsigned RING_FLAGS;
     static unsigned RING_SIZE;
     static unsigned RING_POOL_CACHE_SIZE;
     static unsigned RING_PRIV_DATA_SIZE;
@@ -155,6 +151,28 @@ private:
     }
 
     friend class DPDKDeviceArg;
+};
+
+class DPDKRing { public:
+
+    DPDKRing() CLICK_COLD;
+    ~DPDKRing() CLICK_COLD;
+
+    int parse(Args* args);
+
+    struct rte_mempool *_message_pool;
+    String _MEM_POOL;
+    String _PROC_1;
+    String _PROC_2;
+
+    unsigned     _ndesc;
+    unsigned     _burst_size;
+    short        _numa_zone;
+    int _flags;
+
+    struct rte_ring    *_ring;
+    counter_t    _count;
+
 };
 
 /** @class DPDKDeviceArg

@@ -27,16 +27,13 @@
 CLICK_DECLS
 
 FromDPDKRing::FromDPDKRing() :
-    _task(this), _message_pool(0), _recv_ring(0),
-    _numa_zone(0), _burst_size(0),
-    _pkts_recv(0), _bytes_recv(0)
+    _task(this)
 {
     #if HAVE_BATCH
         in_batch_mode = BATCH_MODE_YES;
     #endif
 
     _ndesc = DPDKDevice::DEF_RING_NDESC;
-    _def_burst_size = DPDKDevice::DEF_BURST_SIZE;
 }
 
 FromDPDKRing::~FromDPDKRing()
@@ -46,42 +43,13 @@ FromDPDKRing::~FromDPDKRing()
 int
 FromDPDKRing::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(conf, this, errh)
-        .read_mp("MEM_POOL",  _MEM_POOL)
-        .read_mp("FROM_PROC", _origin)
-        .read_mp("TO_PROC",   _destination)
-        .read("BURST",        _burst_size)
-        .read("NDESC",        _ndesc)
-        .read("NUMA_ZONE",    _numa_zone)
-        .complete() < 0)
+    Args args(conf, this, errh);
+    if (DPDKRing::parse(&args) != 0)
+            return -1;
+
+    if (args
+            .complete() < 0)
         return -1;
-
-    if ( _MEM_POOL.empty() || (_MEM_POOL.length() == 0) ) {
-        return errh->error("[%s] Enter FROM_PROC and TO_PROC names", name().c_str());
-    }
-
-    if ( _origin.empty() || _destination.empty() ) {
-        return errh->error("[%s] Enter FROM_PROC and TO_PROC names", name().c_str());
-    }
-
-    _MEM_POOL = DPDKDevice::MEMPOOL_PREFIX + _MEM_POOL;
-
-    if ( _ndesc == 0 ) {
-        _ndesc = DPDKDevice::DEF_RING_NDESC;
-        click_chatter("[%s] Default number of descriptors is set (%d)\n",
-                        name().c_str(), _ndesc);
-    }
-
-    // If user does not specify the port number
-    // we assume that the process belongs to the
-    // memory zone of device 0.
-    if ( _numa_zone < 0 ) {
-        click_chatter("[%s] Assuming NUMA zone 0\n", name().c_str());
-        _numa_zone = 0;
-    }
-
-    _PROC_1 = _origin+"_2_"+_destination;
-    _PROC_2 = _destination+"_2_"+_origin;
 
     return 0;
 }
@@ -90,7 +58,7 @@ int
 FromDPDKRing::initialize(ErrorHandler *errh)
 {
     if ( _burst_size == 0 ) {
-        _burst_size = _def_burst_size;
+        _burst_size = DPDKDevice::DEF_BURST_SIZE;
         errh->warning("[%s] Non-positive BURST number. Setting default (%d)\n",
                         name().c_str(), _burst_size);
     }
@@ -99,39 +67,44 @@ FromDPDKRing::initialize(ErrorHandler *errh)
         errh->warning("[%s] BURST should not be greater than half the number of descriptors (%d)\n",
                         name().c_str(), _ndesc);
     }
-    else if (_burst_size > _def_burst_size) {
+    else if (_burst_size > DPDKDevice::DEF_BURST_SIZE) {
         errh->warning("[%s] BURST should not be greater than 32 as DPDK won't send more packets at once\n",
                         name().c_str());
     }
+
+    if (DPDKDevice::initialize(errh) != 0)
+        return -1;
 
     // If primary process, create the ring buffer and memory pool.
     // The primary process is responsible for managing the memory
     // and acting as a bridge to interconnect various secondary processes
     if ( rte_eal_process_type() == RTE_PROC_PRIMARY ){
-        _recv_ring = rte_ring_create(
+        _ring = rte_ring_create(
             _PROC_1.c_str(), DPDKDevice::RING_SIZE,
-            rte_socket_id(), DPDKDevice::RING_FLAGS
+            rte_socket_id(), _flags
         );
     }
     // If secondary process, search for the appropriate memory and attach to it.
     else {
-        _recv_ring    = rte_ring_lookup   (_PROC_2.c_str());
+        _ring    = rte_ring_lookup   (_PROC_2.c_str());
     }
 
     _message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
+
     if (!_message_pool) {
+        click_chatter("Creating %s",_MEM_POOL.c_str());
         _message_pool = rte_mempool_create(
             _MEM_POOL.c_str(), _ndesc,
             DPDKDevice::MBUF_DATA_SIZE,
             DPDKDevice::RING_POOL_CACHE_SIZE,
             DPDKDevice::RING_PRIV_DATA_SIZE,
             NULL, NULL, NULL, NULL,
-            rte_socket_id(), DPDKDevice::RING_FLAGS
+            rte_socket_id(), _flags
         );
     }
 
 
-    if ( !_recv_ring )
+    if ( !_ring )
         return errh->error("[%s] Problem getting Rx ring. "
                     "Make sure that the involved processes have a correct ring configuration\n",
                     name().c_str());
@@ -173,9 +146,9 @@ FromDPDKRing::run_task(Task *t)
 
     struct rte_mbuf *pkts[_burst_size];
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    int n = rte_ring_dequeue_burst(_recv_ring, (void **)pkts, _burst_size, 0);
+    int n = rte_ring_dequeue_burst(_ring, (void **)pkts, _burst_size, 0);
 #else
-    int n = rte_ring_dequeue_burst(_recv_ring, (void **)pkts, _burst_size);
+    int n = rte_ring_dequeue_burst(_ring, (void **)pkts, _burst_size);
 #endif
     if (n < 0) {
         click_chatter("[%s] Couldn't read from the Rx rings\n", name().c_str());
@@ -220,8 +193,6 @@ FromDPDKRing::run_task(Task *t)
         output(0).push(p);
     #endif
 
-        // Keep statistics
-        _bytes_recv += p->length();
     }
 
 #if HAVE_BATCH
@@ -230,7 +201,7 @@ FromDPDKRing::run_task(Task *t)
         output_push_batch(0, head);
     }
 #endif
-    _pkts_recv += n;
+    _count += n;
 
     _task.fast_reschedule();
 
@@ -243,16 +214,13 @@ FromDPDKRing::read_handler(Element *e, void *thunk)
     FromDPDKRing *fr = static_cast<FromDPDKRing*>(e);
 
     if ( thunk == (void *) 0 )
-        return String(fr->_pkts_recv);
-    else
-        return String(fr->_bytes_recv);
+        return String(fr->_count);
 }
 
 void
 FromDPDKRing::add_handlers()
 {
-    add_read_handler("pkt_count",  read_handler, 0);
-    add_read_handler("byte_count", read_handler, 1);
+    add_read_handler("count",  read_handler, 0);
 }
 
 CLICK_ENDDECLS

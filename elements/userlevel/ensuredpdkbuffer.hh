@@ -37,7 +37,7 @@ public:
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return AGNOSTIC; }
     int configure_phase() const {
-        return CONFIGURE_PHASE_PRIVILEGED + 1;
+        return CONFIGURE_PHASE_PRIVILEGED + 3;
     }
     int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;

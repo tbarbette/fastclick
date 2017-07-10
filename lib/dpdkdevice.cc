@@ -18,9 +18,17 @@
 
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
+#include <click/element.hh>
 #include <rte_errno.h>
 
 CLICK_DECLS
+
+DPDKDevice::DPDKDevice() : port_id(-1), info() {
+}
+
+DPDKDevice::DPDKDevice(unsigned port_id) : port_id(port_id) {
+};
+
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
@@ -319,7 +327,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
             return errh->error("Cannot find DPDK port %u", it.key());
 
     if (!alloc_pktmbufs())
-        return errh->error("Could not allocate packet MBuf pools");
+        return errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         for (HashTable<unsigned, DPDKDevice>::iterator it = _devs.begin();
@@ -393,6 +401,75 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
     return true;
 }
 
+DPDKRing::DPDKRing() :
+    _message_pool(0),
+       _numa_zone(0), _burst_size(0), _flags(0), _ring(0),
+       _count(0), _MEM_POOL("") {
+}
+
+DPDKRing::~DPDKRing() {
+
+}
+
+int
+DPDKRing::parse(Args* args) {
+    bool spenq = false;
+    bool spdeq = false;
+    String origin;
+    String destination;
+    _flags = 0;
+    const Element* e = args->context();
+    ErrorHandler* errh = args->errh();
+
+    if (args ->  read_p("MEM_POOL",  _MEM_POOL)
+            .read_p("FROM_PROC", origin)
+            .read_p("TO_PROC",   destination)
+            .read("BURST",        _burst_size)
+            .read("NDESC",        _ndesc)
+            .read("NUMA_ZONE",    _numa_zone)
+            .read("SP_ENQ", spenq)
+            .read("SC_DEQ", spdeq)
+            .execute() < 0)
+        return -1;
+
+    if (spenq)
+        _flags |= RING_F_SP_ENQ;
+    if (spdeq)
+        _flags |= RING_F_SC_DEQ;
+
+    if ( _MEM_POOL.empty() || (_MEM_POOL.length() == 0) ) {
+        _MEM_POOL = "0";
+    }
+
+    if (origin.empty() || destination.empty() ) {
+        errh->error("Enter FROM_PROC and TO_PROC names");
+        return -1;
+    }
+
+    if ( _ndesc == 0 ) {
+        _ndesc = DPDKDevice::DEF_RING_NDESC;
+        click_chatter("Default number of descriptors is set (%d)\n",
+                        e->name().c_str(), _ndesc);
+    }
+
+    _MEM_POOL = DPDKDevice::MEMPOOL_PREFIX + _MEM_POOL;
+
+    // If user does not specify the port number
+    // we assume that the process belongs to the
+    // memory zone of device 0.
+    // TODO: Search the Click DAG to find a FromDPDKDevice, take its' port_id
+    //       and use _numa_zone = DPDKDevice::get_port_numa_node(_port_id);
+    if ( _numa_zone < 0 ) {
+        click_chatter("[%s] Assuming NUMA zone 0\n", e->name().c_str());
+        _numa_zone = 0;
+    }
+
+    _PROC_1 = origin+"_2_"+destination;
+    _PROC_2 = destination+"_2_"+origin;
+
+    return 0;
+}
+
 #if HAVE_DPDK_PACKET_POOL
 int DPDKDevice::NB_MBUF = 32*4096*2; //Must be able to fill the packet data pool, and then have some packets for IO
 #else
@@ -413,7 +490,6 @@ String DPDKDevice::MEMPOOL_PREFIX = "click_mempool_";
 unsigned DPDKDevice::DEF_RING_NDESC = 1024;
 unsigned DPDKDevice::DEF_BURST_SIZE = 32;
 
-unsigned DPDKDevice::RING_FLAGS = 0;
 unsigned DPDKDevice::RING_SIZE  = 64;
 unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
