@@ -208,8 +208,8 @@ Pipeliner::run_task(Task* t)
 
 void Pipeliner::add_handlers()
 {
-    add_read_handler("n_dropped", dropped_handler, 0);
-    add_read_handler("n_sent", sent_handler, 0);
+    add_read_handler("dropped", dropped_handler, 0);
+    add_read_handler("count", sent_handler, 0);
 }
 
 CLICK_ENDDECLS

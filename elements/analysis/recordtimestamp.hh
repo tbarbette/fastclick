@@ -1,7 +1,6 @@
 #ifndef CLICK_RECORDTIMESTAMP_HH
 #define CLICK_RECORDTIMESTAMP_HH
 
-#include <cassert>
 #include <click/vector.hh>
 #include <click/batchelement.hh>
 #include <click/timestamp.hh>

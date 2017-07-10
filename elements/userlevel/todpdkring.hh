@@ -98,11 +98,11 @@ This element is only available at user level, when compiled with DPDK support.
 
   ... -> ToDPDKRing(MEM_POOL 2, FROM_PROC nf1_tx, TO_PROC nf2_rx, IQUEUE 1024, BURST 32)
 
-=h n_sent read-only
+=h count read-only
 
 Returns the number of packets sent by the device.
 
-=h n_dropped read-only
+=h dropped read-only
 
 Returns the number of packets dropped by the device.
 
