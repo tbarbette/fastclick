@@ -19,9 +19,9 @@ CLICK_DECLS
  *  the loop.
  */
 #define FOR_EACH_PACKET_SAFE(batch,p) \
-                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* fep_next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
-                for (;p != NULL;p=next,next=(p==0?0:p->next()))
+                for (;p != NULL;p=fep_next,fep_next=(p==0?0:p->next()))
 
 /**
  * Execute a function on each packets of a batch. The function may return
@@ -29,10 +29,10 @@ CLICK_DECLS
  * Use _DROPPABLE version if the function could return null.
  */
 #define EXECUTE_FOR_EACH_PACKET(fnt,batch) \
-                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* efep_next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
                 Packet* last = NULL;\
-                for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
+                for (;p != NULL;p=efep_next,efep_next=(p==0?0:p->next())) {\
             Packet* q = fnt(p);\
                     if (q != p) {\
                         if (last) {\
@@ -40,7 +40,7 @@ CLICK_DECLS
                         } else {\
                             batch = static_cast<PacketBatch*>(q);\
                         }\
-                        q->set_next(next);\
+                        q->set_next(efep_next);\
                     }\
                     last = q;\
                 }
@@ -51,18 +51,18 @@ CLICK_DECLS
  * that one, or null if the packet could be dropped.
  */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
-                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* efepd_next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
                 Packet* last = NULL;\
                 int count = batch->count();\
-                for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
+                for (;p != NULL;p=efepd_next,efepd_next=(p==0?0:p->next())) {\
             Packet* q = fnt(p);\
             if (q == 0) {\
                 on_drop(p);\
                 if (last) {\
-                    last->set_next(next);\
+                    last->set_next(efepd_next);\
                 } else {\
-                    batch = PacketBatch::start_head(next);\
+                    batch = PacketBatch::start_head(efepd_next);\
                 }\
                         count--;\
                         continue;\
@@ -72,7 +72,7 @@ CLICK_DECLS
                         } else {\
                             batch = static_cast<PacketBatch*>(q);\
                         }\
-                        q->set_next(next);\
+                        q->set_next(efepd_next);\
                     }\
                     last = q;\
                 }\
@@ -103,12 +103,12 @@ CLICK_DECLS
     {\
         PacketBatch* out[nbatches];\
         bzero(out,sizeof(PacketBatch*)*nbatches);\
-        PacketBatch* next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
+        PacketBatch* cep_next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
         PacketBatch* p = batch;\
         PacketBatch* last = NULL;\
         int last_o = -1;\
         int passed = 0;\
-        for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
+        for (;p != NULL;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
             if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
             if (o == last_o) {\
