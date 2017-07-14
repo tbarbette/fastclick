@@ -11,7 +11,6 @@
 #include <click/packet_anno.hh>
 #include <click/multithread.hh>
 #include <click/routervisitor.hh>
-#include <list>
 
 CLICK_DECLS
 
