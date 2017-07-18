@@ -124,8 +124,8 @@ void ToDPDKDevice::cleanup(CleanupStage)
 
 void ToDPDKDevice::add_handlers()
 {
-    add_read_handler("n_sent", count_handler, 0);
-    add_read_handler("n_dropped", dropped_handler, 0);
+    add_read_handler("count", count_handler, 0);
+    add_read_handler("dropped", dropped_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 
