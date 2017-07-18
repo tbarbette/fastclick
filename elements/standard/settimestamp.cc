@@ -73,6 +73,7 @@ SetTimestamp::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
 PacketBatch *
 SetTimestamp::simple_action_batch(PacketBatch *batch)
 {
@@ -97,6 +98,7 @@ SetTimestamp::simple_action_batch(PacketBatch *batch)
 
     return batch;
 }
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(SetTimestamp)
