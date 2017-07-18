@@ -150,29 +150,30 @@ void TimestampDiff::add_handlers() {
     add_read_handler("dump", read_handler, TSD_DUMP_HANDLER);
 }
 
-inline void TimestampDiff::smaction(Packet* p) {
+inline int TimestampDiff::smaction(Packet* p) {
     Timestamp now = Timestamp::now_steady();
     uint64_t i = NumberPacket::read_number_of_packet(p,_offset);
     Timestamp old = get_recordtimestamp_instance()->get(i);
+    if (old == Timestamp::uninitialized_t())
+        return 1;
     Timestamp diff = now - old;
     if (diff.sec() > 0)
         click_chatter("delay over 1s for packet %llu: %uµs",
                       i, diff.sec() * 1000000 + diff.usec());
     else
         _delays.push_back(diff.usec());
+    return 0;
 }
 
 void TimestampDiff::push(int, Packet *p) {
-    smaction(p);
-    output(0).push(p);
+    int o = smaction(p);
+    checked_output_push(o,p);
 }
 
 #if HAVE_BATCH
 void
 TimestampDiff::push_batch(int, PacketBatch * batch) {
-    FOR_EACH_PACKET(batch,p)
-            smaction(p);
-    output(0).push_batch(batch);
+    CLASSIFY_EACH_PACKET(2,smaction,batch,checked_output_push_batch);
 }
 #endif
 
