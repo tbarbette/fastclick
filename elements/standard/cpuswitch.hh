@@ -27,6 +27,9 @@ class CPUSwitch : public Element {
   const char *processing() const		{ return PUSH; }
 
   void push(int port, Packet *);
+#if HAVE_BATCH
+  void push_batch(int port, PacketBatch *);
+#endif
 
 };
 
