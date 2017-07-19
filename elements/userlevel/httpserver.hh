@@ -16,11 +16,11 @@ HTTPServer */
 
 class HTTPServer : public Element { public:
 
-	HTTPServer() CLICK_COLD;
+    HTTPServer() CLICK_COLD;
     ~HTTPServer() CLICK_COLD;
 
-    const char *class_name() const	{ return "HTTPServer"; }
-    const char *port_count() const	{ return PORTS_0_0; }
+    const char *class_name() const  { return "HTTPServer"; }
+    const char *port_count() const  { return PORTS_0_0; }
 
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -30,14 +30,16 @@ class HTTPServer : public Element { public:
     void selected(int fd, int mask);
     void update_fd_set();
 
-    static int ahc_echo(void * cls,
-    		    struct MHD_Connection * connection,
-    		    const char * url,
-    		    const char * method,
-                const char * version,
-    		    const char * upload_data,
-    		    size_t * upload_data_size,
-                        void ** ptr);
+    static int ahc_echo(
+        void *cls,
+        struct MHD_Connection *connection,
+        const char *url,
+        const char *method,
+        const char *version,
+        const char *upload_data,
+        size_t *upload_data_size,
+        void **ptr
+    );
 private:
     int _port;
     bool _verbose;
@@ -46,11 +48,11 @@ private:
 
     class Request {
     public:
-    	struct MHD_Connection * connection;
+        struct MHD_Connection * connection;
 
-    	Request() : connection(0) {
+        Request() : connection(0) {
 
-    	}
+        }
 
     };
     MPMCRing<Request*,32> _requests;

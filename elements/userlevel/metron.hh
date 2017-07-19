@@ -57,10 +57,11 @@ class NIC {
         String callTxRead(String h);
 };
 
-class ServiceChain { public:
+class ServiceChain {
+    public:
         class RxFilter { public:
 
-            RxFilter(ServiceChain* sc) : _sc(sc) {
+            RxFilter(ServiceChain *sc) : _sc(sc) {
 
             }
 
@@ -71,14 +72,14 @@ class ServiceChain { public:
             String method;
             ServiceChain* _sc;
 
-            static RxFilter* fromJSON(Json j, ServiceChain* sc, ErrorHandler* errh);
+            static RxFilter* fromJSON(Json j, ServiceChain *sc, ErrorHandler *errh);
             Json toJSON();
 
-            int cpuToQueue(NIC* nic, int cpuid) {
+            int cpuToQueue(NIC *nic, int cpuid) {
                 return nic->cpuToQueue(cpuid);
             }
 
-            virtual int apply(NIC* nic, ErrorHandler* errh);
+            virtual int apply(NIC* nic, ErrorHandler *errh);
 
             Vector<Vector<String>> values;
         };
@@ -103,11 +104,11 @@ class ServiceChain { public:
         };
         Vector<Stat> nic_stats;
 
-        ServiceChain(Metron* m);
+        ServiceChain(Metron *m);
         ~ServiceChain();
 
-        static ServiceChain* fromJSON(Json j,Metron* m, ErrorHandler* errh);
-        int reconfigureFromJSON(Json j, Metron* m, ErrorHandler* errh);
+        static ServiceChain *fromJSON(Json j, Metron *m, ErrorHandler *errh);
+        int reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh);
 
         Json toJSON();
         Json statsToJSON();
@@ -133,15 +134,15 @@ class ServiceChain { public:
             return _nics.size();
         }
 
-        inline NIC* getNICById(String id) {
-            for (NIC* nic : _nics) {
+        inline NIC *getNICById(String id) {
+            for (NIC *nic : _nics) {
                 if (nic->getId() == id)
                     return nic;
             }
             return 0;
         }
 
-        inline int getNICIndex(NIC* nic) {
+        inline int getNICIndex(NIC *nic) {
             for (int i = 0; i < _nics.size(); i++) {
                 if (_nics[i] == nic)
                     return i;
@@ -149,7 +150,7 @@ class ServiceChain { public:
             return -1;
         }
 
-        inline NIC* getNICByIndex(int i) {
+        inline NIC *getNICByIndex(int i) {
             return _nics[i];
         }
 
@@ -164,7 +165,7 @@ class ServiceChain { public:
 
         void controlInit(int fd, int pid);
 
-        int controlReadLine(String& line);
+        int controlReadLine(String &line);
 
         void controlWriteLine(String cmd);
 
@@ -172,10 +173,10 @@ class ServiceChain { public:
 
         void checkAlive();
 
-        int call(String fnt, bool hasResponse, String handler, String& response, String params);
+        int call(String fnt, bool hasResponse, String handler, String &response, String params);
         String simpleCallRead(String handler);
-        int callRead(String handler, String& response, String params="");
-        int callWrite(String handler, String& response, String params="");
+        int callRead(String handler, String &response, String params="");
+        int callWrite(String handler, String &response, String params="");
 
         Vector<int>& getCpuMapRef() {
             return _cpus;
@@ -192,9 +193,9 @@ class ServiceChain { public:
         void doAutoscale(int nCpuChange);
     private:
 
-        Metron* _metron;
+        Metron *_metron;
         Vector<int> _cpus;
-        Vector<NIC*> _nics;
+        Vector<NIC *> _nics;
         Vector<float> _cpuload;
         float total_cpuload;
         int _socket;
@@ -215,11 +216,11 @@ class ServiceChain { public:
 Metron */
 class Metron : public Element { public:
 
-	Metron() CLICK_COLD;
+    Metron() CLICK_COLD;
     ~Metron() CLICK_COLD;
 
-    const char *class_name() const	{ return "Metron"; }
-    const char *port_count() const	{ return PORTS_0_0; }
+    const char *class_name() const  { return "Metron"; }
+    const char *port_count() const  { return PORTS_0_0; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
@@ -230,7 +231,7 @@ class Metron : public Element { public:
     void add_handlers() CLICK_COLD;
     static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
     static String read_handler(Element *e, void *user_data) CLICK_COLD;
-    static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler* errh) CLICK_COLD;
+    static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler *errh) CLICK_COLD;
 
     Json toJSON();
     Json statsToJSON();
@@ -242,8 +243,8 @@ class Metron : public Element { public:
 
     ServiceChain* findChainById(String id);
 
-    int removeChain(ServiceChain* sc, ErrorHandler *errh);
-    int instanciateChain(ServiceChain* sc, ErrorHandler *errh);
+    int removeChain(ServiceChain *sc, ErrorHandler *errh);
+    int instanciateChain(ServiceChain *sc, ErrorHandler *errh);
 
     int getCpuNr() {
         return click_max_cpu_ids();
@@ -255,8 +256,8 @@ class Metron : public Element { public:
 
     int getAssignedCpuNr();
 
-    bool assignCpus(ServiceChain* sc, Vector<int>& map);
-    void unassignCpus(ServiceChain* sc);
+    bool assignCpus(ServiceChain *sc, Vector<int> &map);
+    void unassignCpus(ServiceChain *sc);
 
 private:
     String _id;
@@ -264,9 +265,9 @@ private:
     Vector<String> _dpdk_args;
 
     HashMap<String,NIC> _nics;
-    HashMap<String,ServiceChain*> _scs;
+    HashMap<String,ServiceChain *> _scs;
 
-    Vector<ServiceChain*> _cpu_map;
+    Vector<ServiceChain *> _cpu_map;
 
     String _vendor;
     String _hw;
@@ -275,7 +276,7 @@ private:
 
     bool _timing_stats;
 
-    int runChain(ServiceChain* sc, ErrorHandler *errh);
+    int runChain(ServiceChain *sc, ErrorHandler *errh);
 
     Timer _timer;
     friend class ServiceChain;

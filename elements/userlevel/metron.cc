@@ -27,7 +27,7 @@ Metron::~Metron() {
 
 
 int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
-    Vector<Element*> nics;
+    Vector<Element *> nics;
     if (Args(conf, this, errh)
         .read_mp("ID", _id)
         .read_all("NIC",nics)
@@ -37,7 +37,7 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
         .complete() < 0)
         return -1;
 
-    for (Element* e : nics) {
+    for (Element *e : nics) {
         NIC nic;
         nic.element = e;
         _nics.insert(nic.getId(), nic);
@@ -52,7 +52,7 @@ static String parseVendorInfo(String hwInfo, String key) {
     s = s.substring(pos, s.find_left("\n") - pos);
     return s;
 }
-int Metron::initialize(ErrorHandler * errh) {
+int Metron::initialize(ErrorHandler *errh) {
     _cpu_map.resize(getCpuNr(),0);
     String hwInfo = file_string("/proc/cpuinfo");
     _vendor = parseVendorInfo(hwInfo, "vendor_id");
@@ -62,7 +62,7 @@ int Metron::initialize(ErrorHandler * errh) {
     _serial = parseVendorInfo(swInfo, "Serial Number");
     _timer.initialize(this);
     _timer.schedule_after_sec(1);
-	return 0;
+    return 0;
 }
 
 void Metron::run_timer(Timer* t) {
@@ -73,14 +73,14 @@ void Metron::run_timer(Timer* t) {
 
     int sn = 0;
     while (sci != _scs.end()) {
-       ServiceChain* sc = sci.value();
+       ServiceChain *sc = sci.value();
        float max_cpuload = 0;
        float total_cpuload = 0;
 
        for (int j = 0; j < sc->getMaxCpuNr(); j++) {
            float cpuload = 0;
            for (int i = 0; i < sc->getNICNr(); i++) {
-               NIC* nic = sc->getNICByIndex(i);
+               NIC *nic = sc->getNICByIndex(i);
                assert(nic);
                int stat_idx = (j * sc->getNICNr()) + i;
 
@@ -155,7 +155,7 @@ int Metron::getAssignedCpuNr() {
     return tot;
 }
 
-bool Metron::assignCpus(ServiceChain* sc, Vector<int>& map) {
+bool Metron::assignCpus(ServiceChain *sc, Vector<int> &map) {
     int j = 0;
     if (this->getAssignedCpuNr() + sc->getMaxCpuNr() >= this->getCpuNr()) {
         return false;
@@ -171,7 +171,7 @@ bool Metron::assignCpus(ServiceChain* sc, Vector<int>& map) {
     return false;
 }
 
-void Metron::unassignCpus(ServiceChain* sc) {
+void Metron::unassignCpus(ServiceChain *sc) {
     int j = 0;
     for (int i = 0; i < getCpuNr(); i++) {
         if (_cpu_map[i] == sc) {
@@ -181,7 +181,7 @@ void Metron::unassignCpus(ServiceChain* sc) {
 }
 
 
-int ServiceChain::RxFilter::apply(NIC* nic, ErrorHandler* errh) {
+int ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh) {
     //Only mac supported for now, only thing to do is to get addr
     Json jaddrs = Json::parse(nic->callRead("vf_mac_addr"));
     int inic = _sc->getNICIndex(nic);
@@ -208,7 +208,7 @@ ServiceChain* Metron::findChainById(String id) {
  * to the internal chains list. On failure, cpus are unassigned.
  * It is the responsability of the caller to delete the chain on error.
  */
-int Metron::instanciateChain(ServiceChain* sc, ErrorHandler *errh) {
+int Metron::instanciateChain(ServiceChain *sc, ErrorHandler *errh) {
     if (!assignCpus(sc,sc->getCpuMapRef())) {
         errh->error("Could not assign enough CPUs");
         return -1;
@@ -229,7 +229,7 @@ int Metron::instanciateChain(ServiceChain* sc, ErrorHandler *errh) {
  *
  * CPUs must be already assigned.
  */
-int Metron::runChain(ServiceChain* sc, ErrorHandler *errh) {
+int Metron::runChain(ServiceChain *sc, ErrorHandler *errh) {
     for (int i = 0; i < sc->getNICNr(); i++) {
         if (sc->rxFilter->apply(sc->getNICByIndex(i),errh) != 0) {
             return errh->error("Could not apply RX filter");
@@ -259,7 +259,7 @@ int Metron::runChain(ServiceChain* sc, ErrorHandler *errh) {
 
         Vector<String> argv = sc->buildCmdLine(ctlsocket[1]);
 
-        char* argv_char[argv.size() + 1];
+        char *argv_char[argv.size() + 1];
         for (int i = 0; i < argv.size(); i++) {
             argv_char[i] = strdup(argv[i].c_str());
         }
@@ -279,7 +279,7 @@ int Metron::runChain(ServiceChain* sc, ErrorHandler *errh) {
             if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
                 return errh->error("%s", strerror(errno));
         }
-*/
+        */
         String conf = sc->generateConfig();
         click_chatter("Writing config %s",conf.c_str());
 
@@ -320,7 +320,7 @@ int Metron::runChain(ServiceChain* sc, ErrorHandler *errh) {
  * Stop and remove a chain from the internal list, then unassign cpus.
  * It is the responsability of the caller to delete the chain.
  */
-int Metron::removeChain(ServiceChain* sc, ErrorHandler*) {
+int Metron::removeChain(ServiceChain *sc, ErrorHandler *) {
     sc->controlSendCommand("WRITE stop");
     _scs.remove(sc->getId());
     unassignCpus(sc);
@@ -352,7 +352,7 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
     switch (what) {
         case h_delete_chains: {
-            ServiceChain* sc = m->findChainById(data);
+            ServiceChain *sc = m->findChainById(data);
             if (sc == 0) {
                 return errh->error("Unknown ID %s",data.c_str());
             }
@@ -376,7 +376,7 @@ int Metron::write_handler( const String &data, Element *e, void *user_data, Erro
 
 
 int
-Metron::param_handler(int operation, String &param, Element *e, const Handler * h, ErrorHandler *errh)
+Metron::param_handler(int operation, String &param, Element *e, const Handler *h, ErrorHandler *errh)
 {
     Metron *m = static_cast<Metron *>(e);
     if (operation == Handler::f_read) {
@@ -484,10 +484,10 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler * 
 }
 
 void Metron::add_handlers() {
-	add_read_handler("resources", read_handler, h_resources);
-	add_read_handler("stats", read_handler, h_stats);
-	add_write_handler("delete_chains", write_handler, h_delete_chains);
-	add_write_handler("put_chains", write_handler, h_put_chains);
+    add_read_handler("resources", read_handler, h_resources);
+    add_read_handler("stats", read_handler, h_stats);
+    add_write_handler("delete_chains", write_handler, h_delete_chains);
+    add_write_handler("put_chains", write_handler, h_put_chains);
 
     set_handler("chains", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains, h_chains);
     set_handler("chains_stats", Handler::f_read | Handler::f_read_param, param_handler, h_chains_stats);
@@ -601,8 +601,8 @@ Json Metron::statsToJSON() {
 /***************************************
  * RxFilter
  **************************************/
-ServiceChain::RxFilter* ServiceChain::RxFilter::fromJSON(Json j, ServiceChain* sc, ErrorHandler* errh) {
-    ServiceChain::RxFilter* rf = new RxFilter(sc);
+ServiceChain::RxFilter* ServiceChain::RxFilter::fromJSON(Json j, ServiceChain *sc, ErrorHandler *errh) {
+    ServiceChain::RxFilter *rf = new RxFilter(sc);
     rf->method = j.get_s("method").lower();
     if (rf->method != "mac") {
         errh->error("Unsupported RX Filter method : %s",rf->method.c_str());
@@ -610,9 +610,9 @@ ServiceChain::RxFilter* ServiceChain::RxFilter::fromJSON(Json j, ServiceChain* s
     }
     rf->values.resize(sc->getNICNr(), Vector<String>());
     Json jnic_values = j.get("values");
-    int inic=0;
+    int inic = 0;
     for (auto jnic : jnic_values) {
-        NIC* nic = sc->getNICById(jnic.first);
+        NIC *nic = sc->getNICById(jnic.first);
         rf->values[inic].resize(jnic.second.size());
         int j = 0;
         for (auto jchild : jnic.second) {
@@ -628,7 +628,7 @@ Json ServiceChain::RxFilter::toJSON() {
     j.set("method",method);
     Json jnic_values = Json::make_object();
     for (int i = 0; i < _sc->getNICNr(); i++) {
-        NIC* nic = _sc->getNICByIndex(i);
+        NIC *nic = _sc->getNICByIndex(i);
         Json jaddrs = Json::make_array();
         for (int j = 0; j < _sc->getMaxCpuNr(); j++) {
             jaddrs.push_back(values[i][j]);
@@ -642,7 +642,7 @@ Json ServiceChain::RxFilter::toJSON() {
 /************************
  * Service Chain
  ************************/
-ServiceChain::ServiceChain(Metron* m) : rxFilter(0),_metron(m), total_cpuload(0) {
+ServiceChain::ServiceChain(Metron *m) : rxFilter(0),_metron(m), total_cpuload(0) {
 
 }
 
@@ -652,8 +652,8 @@ ServiceChain::~ServiceChain() {
         delete rxFilter;
 }
 
-ServiceChain* ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
-    ServiceChain* sc = new ServiceChain(m);
+ServiceChain* ServiceChain::fromJSON(Json j, Metron *m, ErrorHandler *errh) {
+    ServiceChain *sc = new ServiceChain(m);
     sc->id = j.get_s("id");
     if (sc->id == "") {
         sc->id = String(m->getNbChains());
@@ -672,7 +672,7 @@ ServiceChain* ServiceChain::fromJSON(Json j, Metron* m, ErrorHandler* errh) {
     sc->_cpuload.resize(sc->_max_cpu_nr, 0);
     Json jnics = j.get("nics");
     for (auto jnic : jnics) {
-        NIC* nic = m->_nics.findp(jnic.second.as_s());
+        NIC *nic = m->_nics.findp(jnic.second.as_s());
         if (!nic) {
             errh->error("Unknown NIC : %s",jnic.second.as_s().c_str());
             delete sc;
@@ -782,7 +782,7 @@ Json ServiceChain::timing_stats::toJSON() {
     return j;
 }
 
-int ServiceChain::reconfigureFromJSON(Json j, Metron* m, ErrorHandler* errh) {
+int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh) {
     for (auto jfield : j) {
         if (jfield.first == "cpus") {
             int newCpusNr = jfield.second.to_i();
@@ -825,7 +825,7 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron* m, ErrorHandler* errh) {
 }
 
 void ServiceChain::doAutoscale(int nCpuChange) {
-    ErrorHandler* errh = ErrorHandler::default_handler();
+    ErrorHandler *errh = ErrorHandler::default_handler();
     if ((Timestamp::now() - _last_autoscale).msecval() < 5000)
         return;
     _last_autoscale = Timestamp::now();
@@ -868,7 +868,7 @@ String ServiceChain::generateConfig()
     }
     for (int i = 0; i < getNICNr(); i++) {
        String is = String(i);
-       NIC* nic = getNICByIndex(i);
+       NIC *nic = getNICByIndex(i);
        for (int j = 0; j < getMaxCpuNr(); j++) {
            String js = String(j);
            String active = (j < getUsedCpuNr() ? "1":"0");
@@ -946,7 +946,7 @@ void ServiceChain::controlInit(int fd, int pid) {
     _pid = pid;
 }
 
-int ServiceChain::controlReadLine(String& line) {
+int ServiceChain::controlReadLine(String &line) {
     char buf[1024];
     int n = read(_socket, &buf, 1024);
     if (n <= 0)
@@ -970,7 +970,7 @@ String ServiceChain::controlSendCommand(String cmd) {
     return ret;
 }
 
-int ServiceChain::call(String fnt, bool hasResponse, String handler,String& response, String params) {
+int ServiceChain::call(String fnt, bool hasResponse, String handler,String &response, String params) {
     String ret = controlSendCommand(fnt + " " + handler + (params?" "+params:""));
     if (ret == "") {
         checkAlive();
@@ -1002,11 +1002,11 @@ String ServiceChain::simpleCallRead(String handler) {
     return "";
 }
 
-int ServiceChain::callRead(String handler,String& response,String params) {
+int ServiceChain::callRead(String handler,String &response,String params) {
     return call("READ",true,handler,response,params);
 }
 
-int ServiceChain::callWrite(String handler, String& response,String params) {
+int ServiceChain::callWrite(String handler, String &response,String params) {
     return call("WRITE",false,handler,response,params);
 }
 
@@ -1063,7 +1063,7 @@ Json NIC::toJSON(bool stats) {
 }
 
 String NIC::callRead(String h) {
-    const Handler* hC = Router::handler(element, h);
+    const Handler *hC = Router::handler(element, h);
     if (hC && hC->visible()) {
         return hC->call_read(element, ErrorHandler::default_handler());
     }
@@ -1072,12 +1072,12 @@ String NIC::callRead(String h) {
 
 String NIC::callTxRead(String h) {
     //TODO : ensure elem type
-    ToDPDKDevice* td = dynamic_cast<FromDPDKDevice*>(element)->findOutputElement();
+    ToDPDKDevice *td = dynamic_cast<FromDPDKDevice *>(element)->findOutputElement();
     if (!td) {
         return "Could not find matching ToDPDKDevice !";
     }
 
-    const Handler* hC = Router::handler(td, h);
+    const Handler *hC = Router::handler(td, h);
     if (hC && hC->visible()) {
         return hC->call_read(td, ErrorHandler::default_handler());
     }
