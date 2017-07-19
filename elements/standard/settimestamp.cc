@@ -44,7 +44,7 @@ SetTimestamp::configure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
     if (delta)
 	return errh->error("SetTimestamp(DELTA) is deprecated, use SetTimestampDelta(TYPE FIRST)");
-#if HAVE_BATCH
+#ifndef HAVE_BATCH
     if (has_per_batch)
         errh->warning("PER_BATCH is defined but batching is not enabled. Value will be ignored.");
 #endif
