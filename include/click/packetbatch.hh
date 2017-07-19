@@ -99,12 +99,12 @@ CLICK_DECLS
  *  classification is finished, usually you want that to be
  *  checked_output_push_batch.
  */
-#define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
+#define CLASSIFY_EACH_PACKET(nbatches,fnt,cep_batch,on_finish)\
     {\
         PacketBatch* out[nbatches];\
         bzero(out,sizeof(PacketBatch*)*nbatches);\
-        PacketBatch* cep_next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
-        PacketBatch* p = batch;\
+        PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
+        PacketBatch* p = cep_batch;\
         PacketBatch* last = NULL;\
         int last_o = -1;\
         int passed = 0;\
