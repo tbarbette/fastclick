@@ -59,8 +59,6 @@ FromDPDKRing::initialize(ErrorHandler *errh)
 {
     if ( _burst_size == 0 ) {
         _burst_size = DPDKDevice::DEF_BURST_SIZE;
-        errh->warning("[%s] Non-positive BURST number. Setting default (%d)\n",
-                        name().c_str(), _burst_size);
     }
 
     if ( (_ndesc > 0) && ((unsigned)_burst_size > _ndesc / 2) ) {
@@ -112,18 +110,6 @@ FromDPDKRing::initialize(ErrorHandler *errh)
         return errh->error("[%s] Problem getting message pool. "
                     "Make sure that the involved processes have a correct ring configuration\n",
                     name().c_str());
-
-    // The other end of this element might be in a different process (hence Click configuration),
-    // thus it is important to make sure that the configuration of that element agrees with ours.
-    /*
-    click_chatter("[%s] Initialized with the following options: \n", name().c_str());
-    click_chatter("|->  MEM_POOL: %s \n", _MEM_POOL.c_str());
-    click_chatter("|-> FROM_PROC: %s \n", _origin.c_str());
-    click_chatter("|->   TO_PROC: %s \n", _destination.c_str());
-    click_chatter("|-> NUMA ZONE: %d \n", _numa_zone);
-    click_chatter("|->     BURST: %d \n", _burst_size);
-    click_chatter("|->     NDESC: %d \n", _ndesc);
-    */
 
     // Schedule the element
     ScheduleInfo::initialize_task(this, &_task, true, errh);
