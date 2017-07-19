@@ -602,12 +602,15 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
     unsigned char *d = 0;
     if (n <= CLICK_PACKET_POOL_SIZE) {
 #  if HAVE_DPDK_PACKET_POOL
-		struct rte_mbuf *mb = DPDKDevice::get_pkt();
-		if (mb) {
-		  d = (unsigned char*)mb->buf_addr;
-		  _destructor = DPDKDevice::free_pkt;
-		  _destructor_argument = mb;
-		}
+        struct rte_mbuf *mb = DPDKDevice::get_pkt();
+        if (likely(mb)) {
+          d = (unsigned char*)mb->buf_addr;
+          _destructor = DPDKDevice::free_pkt;
+          _destructor_argument = mb;
+        } else {
+            click_chatter("WARNING : No more DPDK buffer, allocate more with DPDKInfo !");
+            return 0;
+        }
 #  elif HAVE_NETMAP_PACKET_POOL
     d = NetmapBufQ::local_pool()->extract_p();
 #  endif
