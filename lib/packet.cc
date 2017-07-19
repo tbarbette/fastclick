@@ -608,7 +608,6 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
           _destructor = DPDKDevice::free_pkt;
           _destructor_argument = mb;
         } else {
-            click_chatter("WARNING : No more DPDK buffer, allocate more with DPDKInfo !");
             return 0;
         }
 #  elif HAVE_NETMAP_PACKET_POOL
@@ -818,7 +817,10 @@ Packet::copy(Packet* p, int headroom)
  * reference count of this packet. The buffer won't be freed in any way and an
  * empty destructor will be set. It is usefull if you won't release this packet
  * before you're sure that the clone will be killed and plan on managing the
- * buffer yourself.
+ * buffer yourself. This is usefull for pktgen applications where it would
+ * be hard to achieve good performances.
+ * If the packet is a DPDK packet, it will be referenced as a DPDK packet and
+ * the DPDK buffer counter will be updated.
  *
  * @return the cloned packet
  *
@@ -871,7 +873,6 @@ Packet::clone(bool fast)
 	return 0;
     if (unlikely(fast)) {
         p->_use_count = 1;
-        p->_data_packet = 0;
         p->_head = _head;
         p->_data = _data;
         p->_tail = _tail;
@@ -880,12 +881,17 @@ Packet::clone(bool fast)
         if (DPDKDevice::is_dpdk_packet(this)) {
           p->_destructor = DPDKDevice::free_pkt;
           p->_destructor_argument = destructor_argument();
-          rte_mbuf_refcnt_update((struct rte_mbuf*)p->destructor_argument(), 1);
+          rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
+        } else if (data_packet() && DPDKDevice::is_dpdk_packet(data_packet())) {
+           p->_destructor = DPDKDevice::free_pkt;
+           p->_destructor_argument = data_packet()->destructor_argument();
+           rte_mbuf_refcnt_update((rte_mbuf*)p->_destructor_argument, 1);
         } else
 #endif
         {
         p->_destructor = empty_destructor;
         }
+        p->_data_packet = 0;
     } else {
         Packet* origin = this;
         if (origin->_data_packet)
