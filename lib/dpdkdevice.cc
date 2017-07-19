@@ -158,12 +158,19 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         info.n_tx_descs = 64;
     }
 
+    if (info.rx_queues.size() > dev_info.max_rx_queues) {
+        return errh->error("Port %d can only use %d RX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+    }
+    if (info.tx_queues.size() > dev_info.max_tx_queues) {
+        return errh->error("Port %d can only use %d TX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+    }
+
     int ret;
     if ((ret = rte_eth_dev_configure(port_id, info.rx_queues.size(), info.tx_queues.size(),
                               &dev_conf)) < 0)
         return errh->error(
             "Cannot initialize DPDK port %u with %u RX and %u TX queues.\nError %d : %s",
-            port_id, info.rx_queues.size(), info.tx_queues.size(), ret,rte_strerror(ret));
+            port_id, info.rx_queues.size(), info.tx_queues.size(), ret,strerror(ret));
     struct rte_eth_rxconf rx_conf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&rx_conf, &dev_info.default_rxconf, sizeof rx_conf);

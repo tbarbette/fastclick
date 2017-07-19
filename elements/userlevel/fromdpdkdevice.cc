@@ -46,6 +46,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     //Default parameters
     int numa_node = 0;
+    int maxqueues = 128;
     String dev;
     EtherAddress mac;
     bool has_mac = false;
@@ -54,6 +55,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
+        .read("MAXQUEUES",maxqueues)
         .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
@@ -74,7 +76,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (firstqueue == -1) {
 		firstqueue = 0;
 		//With DPDK we'll take as many queues as available threads
-		 r = configure_rx(numa_node,1,128,errh);
+		 r = configure_rx(numa_node,1,maxqueues,errh);
 	} else {
 		//If a queue number is setted, user probably want only one queue
 		r = configure_rx(numa_node,1,1,errh);
