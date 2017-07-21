@@ -118,7 +118,8 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
                 _task->reschedule();
             goto retry;
         }
-         head->kill();
+        stats->dropped+= count;
+        head->kill();
     }
 }
 #endif
