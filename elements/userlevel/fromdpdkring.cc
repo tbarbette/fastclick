@@ -125,6 +125,7 @@ FromDPDKRing::cleanup(CleanupStage)
 bool
 FromDPDKRing::run_task(Task *t)
 {
+    unsigned avail = 0;
 #if HAVE_BATCH
     PacketBatch    *head = NULL;
     WritablePacket *last = NULL;
@@ -132,9 +133,10 @@ FromDPDKRing::run_task(Task *t)
 
     struct rte_mbuf *pkts[_burst_size];
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    int n = rte_ring_dequeue_burst(_ring, (void **)pkts, _burst_size, 0);
+    int n = rte_ring_dequeue_burst(_ring, (void **)pkts, _burst_size, &avail);
 #else
     int n = rte_ring_dequeue_burst(_ring, (void **)pkts, _burst_size);
+    avail = n;
 #endif
     if (n < 0) {
         click_chatter("[%s] Couldn't read from the Rx rings\n", name().c_str());
@@ -191,7 +193,7 @@ FromDPDKRing::run_task(Task *t)
 
     _task.fast_reschedule();
 
-    return true;
+    return avail > 0;
 }
 
 String
