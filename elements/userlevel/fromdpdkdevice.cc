@@ -156,6 +156,7 @@ bool FromDPDKDevice::run_task(Task * t)
             WritablePacket *p = Packet::make(data,
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
+            data = p->data();
 #endif
             p->set_packet_type_anno(Packet::HOST);
             p->set_mac_header(data);
