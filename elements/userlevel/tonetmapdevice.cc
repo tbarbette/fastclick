@@ -433,7 +433,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 				slot->flags |= NS_REPORT;
 			}
 
-			BATCH_RECYCLE_UNSAFE_PACKET(p);
+			BATCH_RECYCLE_PACKET_CONTEXT(p);
 
 			sent++;
 			cur = nm_ring_next(txring,cur);

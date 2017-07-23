@@ -55,6 +55,7 @@ class atomic_uint32_t { public:
     // operator= instead.
 
     inline uint32_t value() const;
+    inline uint32_t nonatomic_value() const;
     inline operator uint32_t() const;
 
     inline atomic_uint32_t &operator=(uint32_t x);
@@ -64,17 +65,17 @@ class atomic_uint32_t { public:
     inline atomic_uint32_t &operator|=(uint32_t mask);
     inline atomic_uint32_t &operator&=(uint32_t mask);
 
-    inline void unatomic_inc();
+    inline void nonatomic_inc();
     inline void operator++();
     inline void operator++(int);
-    inline void unatomic_dec();
+    inline void nonatomic_dec();
     inline void operator--();
     inline void operator--(int);
 
     inline uint32_t swap(uint32_t desired);
     inline uint32_t fetch_and_add(uint32_t delta);
     inline bool dec_and_test();
-    inline bool unatomic_dec_and_test();
+    inline bool nonatomic_dec_and_test();
     inline uint32_t compare_swap(uint32_t expected, uint32_t desired);
     inline bool compare_and_swap(uint32_t expected, uint32_t desired) CLICK_DEPRECATED;
 
@@ -105,6 +106,13 @@ atomic_uint32_t::value() const
 #else
     return CLICK_ATOMIC_VAL;
 #endif
+}
+
+/** @brief  Return the value. */
+inline uint32_t
+atomic_uint32_t::nonatomic_value() const
+{
+    return *((uint32_t*)&_val);
 }
 
 /** @brief  Return the value. */
@@ -225,7 +233,7 @@ atomic_uint32_t::inc(volatile uint32_t &x)
 
 /** @brief  Increment the value. */
 inline void
-atomic_uint32_t::unatomic_inc()
+atomic_uint32_t::nonatomic_inc()
 {
     _val++;
 }
@@ -280,7 +288,7 @@ atomic_uint32_t::operator--()
 
 /** @brief  Decrement the value. */
 inline void
-atomic_uint32_t::unatomic_dec()
+atomic_uint32_t::nonatomic_dec()
 {
     _val--;
 }
@@ -537,7 +545,7 @@ atomic_uint32_t::dec_and_test()
  * return value() == 0;
  * @endcode */
 inline bool
-atomic_uint32_t::unatomic_dec_and_test()
+atomic_uint32_t::nonatomic_dec_and_test()
 {
     --_val;
     return _val == 0;

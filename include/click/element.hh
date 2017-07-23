@@ -165,7 +165,7 @@ class Element { public:
     RouterThread *home_thread() const;
 
     virtual bool get_spawning_threads(Bitvector& b, bool isoutput);
-    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, int level = 0);
+    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, bool &_is_fullpush, int level = 0);
     Bitvector get_passing_threads(Element* origin, int level = 0);
     Bitvector get_passing_threads();
 
@@ -312,7 +312,9 @@ class Element { public:
 
     Router* _router;
     int _eindex;
+#if HAVE_FULLPUSH_NONATOMIC
     bool _is_fullpush;
+#endif
 
 #if CLICK_STATS >= 2
     // STATISTICS
@@ -821,15 +823,26 @@ Element::Port::pull_batch(unsigned max) const {
 #endif
 
 /**
- * @brief Tell if the path up to this element is a full push path
+ * @brief Tell if the path up to this element is a full push path, always
+ * served by the same thread.
+ *
+ * Hence, it is not only a matter of having
+ * only a push path, as some elements like Pipeliner may be push
+ * but lead to thread switch.
  *
  * @pre get_passing_threads() have to be called on this element or any downstream element
  *
  * If this element is part of a full push path, it means that packets passing
- *  through will always be handled by the same thread and are not shared.
+ *  through will always be handled by the same thread. They may be shared, in
+ *  the sense that the usage count could be bigger than one. But then shared
+ *  only with the same thread. Therefore non-atomic operations can be involved.
  */
 inline bool Element::is_fullpush() const {
+#if HAVE_FULLPUSH_NONATOMIC
     return _is_fullpush;
+#else
+    return false;
+#endif
 }
 
 

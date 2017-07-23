@@ -84,6 +84,15 @@ AC_ARG_ENABLE([user-multithread],
     [AS_HELP_STRING([  --enable-user-multithread], [support userlevel multithreading])],
     [:], [enable_user_multithread=no])
 
+AC_ARG_ENABLE([fullpush_nonatomic],
+    [AS_HELP_STRING([  --disable-fullpush-nonatomic], [disable nonatomic access to packet when single-threaded fullpush context is detected])],
+    [:], [enable_fullpush_nonatomic=yes])
+
+if test "x$enable_fullpush_nonatomic" = "xyes"; then
+    AC_DEFINE([HAVE_FULLPUSH_NONATOMIC])
+fi
+
+
 AC_ARG_ENABLE([batch],
     [AS_HELP_STRING([  --disable-batch], [disable batching support])],
     [:], [enable_batch=yes])
@@ -2140,6 +2149,11 @@ fi
 dnl add 'batch' if compiled with --enable-batch
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
+fi
+
+dnl add 'nonatimicfp' if compiled with --enable-fullpush-nonatomic
+if test "x$enable_fullpush_nonatomic" = xyes; then
+    provisions="$provisions nonatomicfp"
 fi
 
 dnl add 'usertimestamp' if compiled with --enable-user-timestamp

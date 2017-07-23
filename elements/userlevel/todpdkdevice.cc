@@ -108,6 +108,9 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
+    //To set is_fullpush, we need to compute passing threads
+    get_passing_threads();
+
     if (all_initialized()) {
         int ret =DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
@@ -231,7 +234,7 @@ void ToDPDKDevice::push(int, Packet *p)
 
 #if !CLICK_PACKET_USE_DPDK
     if (likely(is_fullpush()))
-        p->safe_kill();
+        p->kill_nonatomic();
     else
         p->kill();
 #endif
@@ -271,7 +274,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
             }
             next = p->next();
 #if !CLICK_PACKET_USE_DPDK
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
+            BATCH_RECYCLE_PACKET_CONTEXT(p);
 #endif
             p = next;
         }
@@ -300,7 +303,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
     //If non-blocking, drop all packets that could not be sent
     while (p) {
         next = p->next();
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
+        BATCH_RECYCLE_PACKET_CONTEXT(p);
         p = next;
         add_dropped(1);
     }
