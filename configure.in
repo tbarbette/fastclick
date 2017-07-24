@@ -84,7 +84,7 @@ AC_ARG_ENABLE([user-multithread],
     [AS_HELP_STRING([  --enable-user-multithread], [support userlevel multithreading])],
     [:], [enable_user_multithread=no])
 
-AC_ARG_ENABLE([fullpush_nonatomic],
+AC_ARG_ENABLE([fullpush-nonatomic],
     [AS_HELP_STRING([  --disable-fullpush-nonatomic], [disable nonatomic access to packet when single-threaded fullpush context is detected])],
     [:], [enable_fullpush_nonatomic=yes])
 
