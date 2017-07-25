@@ -16,7 +16,7 @@ CLICK_DECLS
 //#define PS_BATCH_SIZE 1024
 
 Pipeliner::Pipeliner()
-    :   _ring_size(-1),_block(false),out_id(0),sleepiness(0),_task(NULL),last_start(0) {
+    :   _ring_size(-1),_block(false),_always_up(false),out_id(0),sleepiness(0),_task(NULL),last_start(0) {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
@@ -59,6 +59,7 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
     if (Args(conf, this, errh)
     .read_p("SIZE", _ring_size)
     .read_p("BLOCKING", _block)
+    .read_p("ALWAYS_UP", _always_up)
     .complete() < 0)
         return -1;
     return 0;
@@ -109,12 +110,12 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
     int count = head->count();
     if (storage->insert(head)) {
         stats->sent += count;
-        if (sleepiness >= 4)
+        if (!_always_up && sleepiness >= 4)
                     _task->reschedule();
     } else {
         //click_chatter("Drop!");
         if (_block) {
-            if (sleepiness >= _ring_size / 4)
+            if (!_always_up && sleepiness >= _ring_size / 4)
                 _task->reschedule();
             goto retry;
         }
@@ -130,7 +131,7 @@ void Pipeliner::push(int,Packet* p) {
         stats->sent++;
     } else {
         if (_block) {
-            if (sleepiness >= _ring_size / 4)
+            if (!_always_up && sleepiness >= _ring_size / 4)
                 _task->reschedule();
             goto retry;
         }
@@ -139,7 +140,7 @@ void Pipeliner::push(int,Packet* p) {
         if (stats->dropped < 10 || stats->dropped % 100 == 1)
             click_chatter("%s : Dropped %d packets : have %d packets in ring", name().c_str(), stats->dropped, storage->count());
     }
-    if (sleepiness >= _ring_size / 4)
+    if (!_always_up && sleepiness >= _ring_size / 4)
         _task->reschedule();
 }
 
@@ -194,14 +195,18 @@ Pipeliner::run_task(Task* t)
 #endif
 
     }
-    if (!r) {
-        sleepiness++;
-        if (sleepiness < (_ring_size / 4)) {
+    if (_always_up) {
+        t->fast_reschedule();
+    } else {
+        if (!r) {
+            sleepiness++;
+            if (sleepiness < (_ring_size / 4)) {
+                t->fast_reschedule();
+            }
+        } else {
+            sleepiness = 0;
             t->fast_reschedule();
         }
-    } else {
-        sleepiness = 0;
-        t->fast_reschedule();
     }
     return r;
 

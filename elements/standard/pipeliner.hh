@@ -79,6 +79,7 @@ public:
 
     int _ring_size;
     bool _block;
+    bool _always_up;
 
     typedef DynamicRing<Packet*> PacketRing;
 
