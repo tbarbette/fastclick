@@ -452,17 +452,6 @@ inline void PacketBatch::kill() {
             }\
         }
 
-/**
- * Use the context of the element to know if the NONATOMIC or ATOMIC version should be called
- */
-#define BATCH_RECYCLE_PACKET_CONTEXT(p) {\
-            if (likely(is_fullpush())) {\
-                BATCH_RECYCLE_PACKET_NONATOMIC(p);\
-            } else {\
-                BATCH_RECYCLE_PACKET(p);\
-            }\
-        }
-
 #if HAVE_DPDK_PACKET_POOL
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
 	if (p->data_packet() == 0 && p->buffer_destructor() == DPDKDevice::free_pkt && p->buffer() != 0) {\
@@ -492,6 +481,17 @@ inline void PacketBatch::kill() {
 #define BATCH_RECYCLE_PACKET(p) {p->kill();}
 #define BATCH_RECYCLE_PACKET_NONATOMIC(p) {p->kill_nonatomic();}
 #endif
+
+/**
+ * Use the context of the element to know if the NONATOMIC or ATOMIC version should be called
+ */
+#define BATCH_RECYCLE_PACKET_CONTEXT(p) {\
+            if (likely(is_fullpush())) {\
+                BATCH_RECYCLE_PACKET_NONATOMIC(p);\
+            } else {\
+                BATCH_RECYCLE_PACKET(p);\
+            }\
+        }
 
 /**
  * Set of functions to efficiently create a batch.
