@@ -36,7 +36,8 @@ int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
         .read_p("OFFSET", _offset)
         .complete() < 0)
         return -1;
-
+    if (_offset < 0)
+        return errh->error("Offset must be >= 0");
     return 0;
 }
 

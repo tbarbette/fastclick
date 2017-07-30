@@ -47,9 +47,9 @@ public:
 private:
     std::vector<unsigned> _delays;
     int _offset;
+    int _max_delay;
     RecordTimestamp* _rt;
     void smaction(Packet* p);
-
     RecordTimestamp* get_recordtimestamp_instance();
 };
 

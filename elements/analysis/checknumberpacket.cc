@@ -69,8 +69,9 @@ CheckNumberPacket::push(int, Packet *p) {
 
 #if HAVE_BATCH
 void
-CheckNumberPacket::push_batch(int, PacketBatch *batch) {
-    CLASSIFY_EACH_PACKET(noutputs(),smaction,batch,checked_output_push_batch);
+CheckNumberPacket::push_batch(int i, PacketBatch *batch) {
+    PacketBatch* ok = 0;
+    CLASSIFY_EACH_PACKET(2,smaction,batch,checked_output_push_batch);
 }
 #endif
 
@@ -119,7 +120,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
 }
 
 int
-CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, ErrorHandler *)
+CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, ErrorHandler *errh)
 {
     CheckNumberPacket *fd = static_cast<CheckNumberPacket *>(e);
     String s = cp_uncomment(s_in);
@@ -132,8 +133,9 @@ CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, Er
               return 0;
           }
       }
+      default:
+        return -EINVAL;
     }
-    return -EINVAL;
 }
 
 
