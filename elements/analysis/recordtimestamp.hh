@@ -59,13 +59,6 @@ inline Timestamp RecordTimestamp::get(uint64_t i) {
     return t;
 }
 
-extern RecordTimestamp *recordtimestamp_singleton_instance;
-
-inline RecordTimestamp *get_recordtimestamp_instance() {
-    return recordtimestamp_singleton_instance;
-}
-
-
 CLICK_ENDDECLS
 
 #endif

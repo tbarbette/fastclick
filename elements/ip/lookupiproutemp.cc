@@ -105,8 +105,6 @@ LookupIPRouteMP::initialize(ErrorHandler *)
 void
 LookupIPRouteMP::push_batch(int, PacketBatch *batch)
 {
-	PacketBatch* last = NULL;
-
 	int max = _t.size();
 	PacketBatch* out[max + 1]; //Array for each entry, last is for unrouted packets
 	bzero(out,sizeof(PacketBatch*) * (max+1));

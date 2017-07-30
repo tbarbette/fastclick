@@ -39,11 +39,17 @@ TimestampDiff::~TimestampDiff() {
 }
 
 int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh) {
+
+    Element* e;
     if (Args(conf, this, errh)
+            .read_mp("RECORDER", e)
             .read("OFFSET",_offset)
             .read("MAXDELAY", _max_delay)
             .complete() < 0)
         return -1;
+
+    if ((_rt = static_cast<RecordTimestamp*>(e->cast("RecordTimestamp"))) == 0)
+        return errh->error("RECORDER must be a valid RecordTimestamp element");
 
     return 0;
 }
@@ -126,6 +132,10 @@ TimestampDiff::push_batch(int, PacketBatch * batch) {
     output(0).push_batch(batch);
 }
 #endif
+
+RecordTimestamp* TimestampDiff::get_recordtimestamp_instance() {
+    return _rt;
+}
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)

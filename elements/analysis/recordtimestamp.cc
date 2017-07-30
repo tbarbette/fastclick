@@ -22,8 +22,6 @@
 #include <click/args.hh>
 #include <click/error.hh>
 
-RecordTimestamp *recordtimestamp_singleton_instance = nullptr;
-
 CLICK_DECLS
 
 RecordTimestamp::RecordTimestamp() : _count(0), _timestamps() {
@@ -40,13 +38,6 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (n == 0)
         n = 65536;
     _timestamps.reserve(n);
-
-    if (recordtimestamp_singleton_instance) {
-        errh->error("There can be only one RecordTimestamp element!");
-        return -1;
-    }
-
-    recordtimestamp_singleton_instance = this;
 
     return 0;
 }
