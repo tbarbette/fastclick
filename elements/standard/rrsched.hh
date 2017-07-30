@@ -34,6 +34,7 @@ class RRSched : public Element { public:
     const char *processing() const	{ return PULL; }
     const char *flags() const		{ return "S0"; }
 
+    int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
 
@@ -43,6 +44,7 @@ class RRSched : public Element { public:
 
     int _next;
     NotifierSignal *_signals;
+    int _max;
 
 };
 
