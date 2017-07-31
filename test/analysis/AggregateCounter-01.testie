@@ -4,7 +4,7 @@ click-buildtool provides FromIPSummaryDump
 %script
 
 click -e "
-FromIPSummaryDump(IN1, STOP true, ZERO true)
+FromIPSummaryDump(IN1, STOP true, ZERO true, BURST 1)
 	-> a::AggregateCounter
 	-> Discard;
 DriverManager(pause, write a.write_text_file -, stop)

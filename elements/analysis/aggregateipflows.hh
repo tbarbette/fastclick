@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_AGGREGATEIPFLOWS_HH
 #define CLICK_AGGREGATEIPFLOWS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ipflowid.hh>
 #include <click/hashtable.hh>
 #include "aggregatenotifier.hh"
@@ -143,7 +143,7 @@ remaining fragments.
 
 AggregateIP, AggregateIPAddrPair, AggregateCounter, DriverManager */
 
-class AggregateIPFlows : public Element, public AggregateNotifier { public:
+class AggregateIPFlows : public BatchElement, public AggregateNotifier { public:
 
     AggregateIPFlows() CLICK_COLD;
     ~AggregateIPFlows() CLICK_COLD;
@@ -164,6 +164,10 @@ class AggregateIPFlows : public Element, public AggregateNotifier { public:
 
     void push(int, Packet *);
     Packet *pull(int);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+    PacketBatch *pull_batch(int,int);
+#endif
 
     struct HostPair {
 	uint32_t a;

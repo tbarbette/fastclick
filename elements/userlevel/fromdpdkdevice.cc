@@ -46,6 +46,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     //Default parameters
     int numa_node = 0;
+    int maxqueues = 128;
     String dev;
     EtherAddress mac;
     bool has_mac = false;
@@ -54,6 +55,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
+        .read("MAXQUEUES",maxqueues)
         .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
@@ -74,7 +76,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 	if (firstqueue == -1) {
 		firstqueue = 0;
 		//With DPDK we'll take as many queues as available threads
-		 r = configure_rx(numa_node,1,128,errh);
+		 r = configure_rx(numa_node,1,maxqueues,errh);
 	} else {
 		//If a queue number is setted, user probably want only one queue
 		r = configure_rx(numa_node,1,1,errh);
@@ -138,24 +140,26 @@ bool FromDPDKDevice::run_task(Task * t)
 #endif
         unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
+            unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
+            rte_prefetch0(data);
 #if CLICK_PACKET_USE_DPDK
-            rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
             WritablePacket *p = Packet::make(pkts[i]);
 #elif HAVE_ZEROCOPY
-    rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
-    WritablePacket *p = Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
+            WritablePacket *p = Packet::make(data,
                      rte_pktmbuf_data_len(pkts[i]),
-					 DPDKDevice::free_pkt,
+                     DPDKDevice::free_pkt,
                      pkts[i],
                      rte_pktmbuf_headroom(pkts[i]),
                      rte_pktmbuf_tailroom(pkts[i])
                      );
 #else
-            WritablePacket *p = Packet::make((void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),
+            WritablePacket *p = Packet::make(data,
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
+            data = p->data();
 #endif
             p->set_packet_type_anno(Packet::HOST);
+            p->set_mac_header(data);
             if (_set_rss_aggregate)
 #if RTE_VERSION > RTE_VERSION_NUM(1,7,0,0)
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
@@ -253,6 +257,8 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
             return String(stats.ipackets);
         case h_ibytes:
             return String(stats.ibytes);
+        case h_idropped:
+            return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
     }
@@ -277,6 +283,7 @@ void FromDPDKDevice::add_handlers()
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
+    add_read_handler("hw_dropped",statistics_handler, h_idropped);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
 
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);

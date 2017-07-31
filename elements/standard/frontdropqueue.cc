@@ -130,6 +130,14 @@ FrontDropQueue::push(int, Packet *p)
 	_empty_note.wake();
 }
 
+#if HAVE_BATCH
+void FrontDropQueue::push_batch(int port, PacketBatch* batch) {
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        FrontDropQueue::push(port,p);
+    }
+}
+#endif
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(NotifierQueue)
 EXPORT_ELEMENT(FrontDropQueue)

@@ -92,9 +92,10 @@ class Packet { public:
 
     inline void kill();
 
-    inline void safe_kill();
+    inline void kill_nonatomic();
 
     inline bool shared() const;
+    inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
     inline void get() {_use_count++;};
@@ -1684,7 +1685,7 @@ Packet::kill()
  *
  * @precond Packet are only handled by this thread */
 inline void
-Packet::safe_kill()
+Packet::kill_nonatomic()
 {
 #if CLICK_LINUXMODULE
         struct sk_buff *b = skb();
@@ -1696,12 +1697,12 @@ Packet::safe_kill()
 #elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
-        if (_use_count.unatomic_dec_and_test()) {
+        if (_use_count.nonatomic_dec_and_test()) {
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
     }
 #else
-        if (_use_count.unatomic_dec_and_test()) {
+        if (_use_count.nonatomic_dec_and_test()) {
             delete this;
         }
 #endif
@@ -1804,6 +1805,23 @@ Packet::shared() const
     return (_data_packet || _use_count > 1);
 #endif
 }
+
+/** @brief Test whether this packet's data is shared.
+ *
+ * Returns true iff the packet's data is shared.  If shared() is false, then
+ * the result of uniqueify() will equal @c this. */
+inline bool
+Packet::shared_nonatomic() const
+{
+#if CLICK_LINUXMODULE
+    return skb_cloned(const_cast<struct sk_buff *>(skb()));
+#elif CLICK_PACKET_USE_DPDK
+    return rte_mbuf_refcnt_read(mb()) > 1 || RTE_MBUF_INDIRECT(mb());
+#else
+    return (_data_packet || _use_count.nonatomic_value() > 1);
+#endif
+}
+
 
 /** @brief Return an unshared packet containing this packet's data.
  * @return the unshared packet, which is writable

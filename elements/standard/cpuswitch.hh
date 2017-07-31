@@ -1,6 +1,6 @@
 #ifndef CPUSWITCH_HH
 #define CPUSWITCH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -15,7 +15,7 @@ CLICK_DECLS
  * RoundRobinSwitch, StrideSwitch, HashSwitch
  */
 
-class CPUSwitch : public Element {
+class CPUSwitch : public BatchElement {
 
  public:
 
@@ -27,6 +27,9 @@ class CPUSwitch : public Element {
   const char *processing() const		{ return PUSH; }
 
   void push(int port, Packet *);
+#if HAVE_BATCH
+  void push_batch(int port, PacketBatch *);
+#endif
 
 };
 

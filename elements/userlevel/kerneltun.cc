@@ -683,6 +683,15 @@ KernelTun::add_handlers()
     add_data_handlers("packets", Handler::OP_READ, &_packets);
 }
 
+bool 
+KernelTun::get_spawning_threads(Bitvector& bmp, bool isoutput)
+{
+    if (isoutput)
+        bmp[home_thread_id()] = 1;
+	
+    return true;
+}
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel FakePcap)
 EXPORT_ELEMENT(KernelTun)

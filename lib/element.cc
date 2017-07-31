@@ -427,6 +427,9 @@ Element::Element()
     in_batch_mode(BATCH_MODE_NO),
 #endif
     receives_batch(false),
+#if HAVE_FULLPUSH_NONATOMIC
+    _is_fullpush(false),
+#endif
     _router(0), _eindex(-1)
 {
     nelements_allocated++;
@@ -1730,7 +1733,7 @@ bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
     return true;
 }
 
-Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, int level) {
+Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, bool& is_fullpush, int level) {
     Bitvector b(master()->nthreads());
     InputThreadVisitor visitor(b, origin);
     router()->visit(this,forward,port,&visitor);
@@ -1746,22 +1749,31 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
         if (origin != 0 && level > 0)
             click_chatter("loop avoided for %s",name().c_str());
     }
+    if (!visitor.fullpush)
+        is_fullpush = false;
     return b;
 }
 
-Bitvector Element::get_passing_threads(Element* origin, int level) {
+Bitvector Element::get_passing_threads(Element*, int level) {
+    bool is_fullpush = true;
     Bitvector b(master()->nthreads());
     for (int i = 0; i < ninputs(); i++) {
         if (input_is_push(i))
-            b |= get_passing_threads(false, i, this, level);
+            b |= get_passing_threads(false, i, this, is_fullpush, level);
+        else
+            is_fullpush = false;
     }
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_pull(i))
-            b |= get_passing_threads(true, i, this, level);
+            b |= get_passing_threads(true, i, this, is_fullpush, level);
     }
-    //Add ourself
+    //Add ourself to the bitmap, but the user must know if his element
+    // should keep is_fullpush or not
     get_spawning_threads(b, false);
     get_spawning_threads(b, true);
+#if HAVE_FULLPUSH_NONATOMIC
+    this->_is_fullpush = is_fullpush;
+#endif
     return b;
 }
 
@@ -2143,6 +2155,9 @@ read_threads_handler(Element *e, void * thunk)
         return String(e->router()->home_thread_id(e));
       case 3:
         return String(e->is_mt_safe());
+      case 4:
+        e->get_passing_threads();
+        return String(e->is_fullpush());
     }
     return "";
 }
@@ -2248,6 +2263,7 @@ Element::add_default_handlers(bool allow_write_config)
   add_read_handler("spawning_threads", read_threads_handler, 1, Handler::f_calm);
   add_read_handler("home_thread", read_threads_handler, 2, Handler::f_calm);
   add_read_handler("mt_safe", read_threads_handler, 3, Handler::f_calm);
+  add_read_handler("is_fullpush", read_threads_handler, 4, Handler::f_calm);
 #if CLICK_STATS >= 1
   add_read_handler("icounts", read_icounts_handler, 0);
   add_read_handler("ocounts", read_ocounts_handler, 0);

@@ -31,7 +31,7 @@ public:
     ~TimestampDiff() CLICK_COLD;
 
     const char *class_name() const { return "TimestampDiff"; }
-    const char *port_count() const { return PORTS_1_1; }
+    const char *port_count() const { return PORTS_1_1X2; }
     const char *processing() const { return PUSH; }
     const char *flow_code() const { return "x/x"; }
 
@@ -49,8 +49,12 @@ private:
     int _offset;
     int _max_delay;
     RecordTimestamp* _rt;
-    void smaction(Packet* p);
+    inline int smaction(Packet* p);
+
     RecordTimestamp* get_recordtimestamp_instance();
+
+    void min_mean_max(std::vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max);
+    double percentile(std::vector<unsigned> &vec, double percent);
 };
 
 CLICK_ENDDECLS

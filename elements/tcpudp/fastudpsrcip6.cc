@@ -182,6 +182,16 @@ FastUDPSourceIP6::pull(int)
   return(p);
 }
 
+#if HAVE_BATCH
+PacketBatch*
+FastUDPSourceIP6::pull_batch(int port, unsigned max)
+{
+    PacketBatch *batch;
+    MAKE_BATCH(FastUDPSourceIP6::pull(port), batch, max);
+    return batch;
+}
+#endif
+
 void
 FastUDPSourceIP6::reset()
 {

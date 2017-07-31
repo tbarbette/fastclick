@@ -67,9 +67,6 @@ class CheckUDPHeader : public BatchElement { public:
 #if HAVE_BATCH
   PacketBatch *simple_action_batch(PacketBatch *);
 #endif
-  /* inline Packet *smaction(Packet *);
-     void push(int, Packet *p);
-     Packet *pull(int); */
 
  private:
 

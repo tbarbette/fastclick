@@ -1,6 +1,6 @@
 #ifndef CLICK_SETIPDSCP_HH
 #define CLICK_SETIPDSCP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -18,7 +18,7 @@ CLICK_DECLS
  * =sa SetIPECN
  */
 
-class SetIPDSCP : public Element { public:
+class SetIPDSCP : public BatchElement { public:
 
   SetIPDSCP() CLICK_COLD;
   ~SetIPDSCP() CLICK_COLD;
@@ -33,6 +33,11 @@ class SetIPDSCP : public Element { public:
   inline Packet *smaction(Packet *);
   void push(int, Packet *p);
   Packet *pull(int);
+
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+    PacketBatch *pull_batch(int port, unsigned max);
+#endif
 
   private:
 

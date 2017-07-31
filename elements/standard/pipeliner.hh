@@ -45,7 +45,7 @@ public:
         return _block;
     }
 
-    bool get_spawning_threads(Bitvector& b, bool isoutput);
+    bool get_spawning_threads(Bitvector& b, bool isoutput) override;
 
 #if HAVE_BATCH
     void push_batch(int,PacketBatch*);
@@ -104,6 +104,9 @@ public:
 
   protected:
     Task _task;
+    unsigned int _last_start;
+
+
 };
 
 CLICK_ENDDECLS

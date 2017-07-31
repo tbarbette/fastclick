@@ -55,6 +55,7 @@ class Element { public:
     virtual void selected(int fd);
 #endif
 
+    inline bool is_fullpush() const;
     enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_NEEDED, BATCH_MODE_YES};
 
     inline void checked_output_push(int port, Packet *p) const;
@@ -164,7 +165,7 @@ class Element { public:
     RouterThread *home_thread() const;
 
     virtual bool get_spawning_threads(Bitvector& b, bool isoutput);
-    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, int level = 0);
+    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, bool &_is_fullpush, int level = 0);
     Bitvector get_passing_threads(Element* origin, int level = 0);
     Bitvector get_passing_threads();
 
@@ -173,7 +174,7 @@ class Element { public:
     virtual bool do_mt_safe_check(ErrorHandler*);
     void add_remote_element(Element* e);
 
-    //Deprecated name, implement get_spawining_threads
+    //Deprecated name, implement get_spawning_threads
     virtual bool get_runnable_threads(Bitvector&) final = delete;
     virtual bool get_spawning_threads(Bitvector&) final = delete;
 
@@ -316,6 +317,9 @@ class Element { public:
     int _eindex;
 
     Vector<Element*> _remote_elements;
+#if HAVE_FULLPUSH_NONATOMIC
+    bool _is_fullpush;
+#endif
 
 #if CLICK_STATS >= 2
     // STATISTICS
@@ -774,6 +778,9 @@ void Element::Port::start_batch() {
     if (_e->in_batch_mode == BATCH_MODE_YES) { //Rebuild for the next element
         current_batch.set((PacketBatch*)-1);
     } else { //Pass the rebuild message
+#if BATCH_DEBUG
+    click_chatter("Passing start batch message in port to %p{element}",_e);
+#endif
         if (*current_batch != (PacketBatch*)-1) {
             *current_batch = (PacketBatch*)-1;
             for (int i = 0; i < _e->noutputs(); i++) {
@@ -819,6 +826,30 @@ Element::Port::pull_batch(unsigned max) const {
     return batch;
 }
 #endif
+
+/**
+ * @brief Tell if the path up to this element is a full push path, always
+ * served by the same thread.
+ *
+ * Hence, it is not only a matter of having
+ * only a push path, as some elements like Pipeliner may be push
+ * but lead to thread switch.
+ *
+ * @pre get_passing_threads() have to be called on this element or any downstream element
+ *
+ * If this element is part of a full push path, it means that packets passing
+ *  through will always be handled by the same thread. They may be shared, in
+ *  the sense that the usage count could be bigger than one. But then shared
+ *  only with the same thread. Therefore non-atomic operations can be involved.
+ */
+inline bool Element::is_fullpush() const {
+#if HAVE_FULLPUSH_NONATOMIC
+    return _is_fullpush;
+#else
+    return false;
+#endif
+}
+
 
 /** @brief Push packet @a p to output @a port, or kill it if @a port is out of
  * range.

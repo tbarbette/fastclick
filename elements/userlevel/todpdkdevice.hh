@@ -99,11 +99,11 @@ This element is only available at user level, when compiled with DPDK support.
 
   ... -> ToDPDKDevice(2, QUEUE 0, BLOCKING true)
 
-=h n_sent read-only
+=h count read-only
 
 Returns the number of packets sent by the device.
 
-=h n_dropped read-only
+=h dropped read-only
 
 Returns the number of packets dropped by the device.
 

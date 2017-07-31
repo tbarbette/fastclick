@@ -30,7 +30,7 @@ CLICK_DECLS
  *
  * @precond No packet are shared
  */
-void PacketBatch::safe_kill(bool is_data) {
+void PacketBatch::recycle_batch(bool is_data) {
     if (is_data) {
         WritablePacket::recycle_data_batch(this,tail(),count());
     } else {
@@ -39,13 +39,25 @@ void PacketBatch::safe_kill(bool is_data) {
 }
 
 /**
- * Recycle a whole batch, faster in most cases
+ * Recycle a whole batch, faster in most cases than a loop of kill
  */
 void PacketBatch::fast_kill() {
     BATCH_RECYCLE_START();
     FOR_EACH_PACKET_SAFE(this,up) {
         WritablePacket* p = static_cast<WritablePacket*>(up);
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
+        BATCH_RECYCLE_PACKET(p);
+    }
+    BATCH_RECYCLE_END();
+}
+
+/**
+ * Recycle a whole batch, faster in most cases than a loop of kill_nonatomic
+ */
+void PacketBatch::fast_kill_nonatomic() {
+    BATCH_RECYCLE_START();
+    FOR_EACH_PACKET_SAFE(this,up) {
+        WritablePacket* p = static_cast<WritablePacket*>(up);
+        BATCH_RECYCLE_PACKET_NONATOMIC(p);
     }
     BATCH_RECYCLE_END();
 }

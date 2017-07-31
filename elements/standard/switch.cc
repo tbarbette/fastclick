@@ -44,6 +44,14 @@ Switch::push(int, Packet *p)
   checked_output_push(_output, p);
 }
 
+#if HAVE_BATCH
+void
+Switch::push_batch(int, PacketBatch *batch)
+{
+  checked_output_push_batch(_output, batch);
+}
+#endif
+
 String
 Switch::read_param(Element *e, void *)
 {

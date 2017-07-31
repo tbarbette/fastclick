@@ -450,7 +450,7 @@ IPPrint::simple_action(Packet *p)
 #if HAVE_BATCH
 PacketBatch*
 IPPrint::simple_action_batch(PacketBatch *batch) {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    EXECUTE_FOR_EACH_PACKET(IPPrint::simple_action, batch);
     return batch;
 }
 #endif

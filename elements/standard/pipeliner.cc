@@ -21,7 +21,8 @@ Pipeliner::Pipeliner()
         _active(true),_nouseless(false),_always_up(false),
         _allow_direct_traversal(true), _verbose(true),
         sleepiness(0),_sleep_threshold(0),
-        _task(this)
+        _task(this),
+        _home_thread_id(0), _last_start(0)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -115,14 +116,14 @@ Pipeliner::initialize(ErrorHandler *errh)
         storage.get_value(i).initialize(_ring_size);
     }
 
+    _home_thread_id = home_thread_id();
+
     for (int i = 0; i < passing.weight(); i++) {
         if (passing[i]) {
             click_chatter("%p{element} : Pipeline from %d to %d",this, i,_home_thread_id);
             WritablePacket::pool_transfer(_home_thread_id,i);
         }
     }
-
-    _home_thread_id = home_thread_id();
 
     if (_block && !_allow_direct_traversal && passing[_home_thread_id]) {
         return errh->error("Possible deadlock ! Pipeliner is served by thread "
@@ -162,14 +163,14 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
             if (!_always_up && sleepiness >= _sleep_threshold)
                 _task.reschedule();
             stats->dropped++;
-            if (stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+            if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
                 click_chatter("%p{element} : congestion", this);
             goto retry;
         }
         int c = head->count();
         head->kill();
         stats->dropped+=c;
-        if (stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+        if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
             click_chatter("%p{element} : Dropped %lu packets : have %u packets in ring", this, stats->dropped, c);
     }
 }
@@ -207,13 +208,14 @@ retry:
         _task.reschedule();
 }
 
-
 #define HINT_THRESHOLD 32
 bool
 Pipeliner::run_task(Task* t)
 {
     bool r = false;
-    for (unsigned i = 0; i < storage.weight(); i++) {
+    _last_start++; //Used to RR the balancing of revert storage
+    for (unsigned j = 0; j < storage.weight(); j++) {
+        int i = (_last_start + j) % storage.weight();
         PacketRing& s = storage.get_value(i);
 #if HAVE_BATCH
         PacketBatch* out = NULL;
@@ -237,9 +239,11 @@ Pipeliner::run_task(Task* t)
                     out->append_batch(b);
                 }
             }
+            //WritablePacket::pool_hint(b->count(),storage.get_mapping(i));
 #else
             Packet* p = s.extract();
             output(0).push(p);
+            //WritablePacket::pool_hint(HINT_THRESHOLD,storage.get_mapping(i));
             r = true;
 #endif
         }
@@ -252,18 +256,24 @@ Pipeliner::run_task(Task* t)
 #endif
 
     }
+    if (unlikely(!_active))
+        return r;
 
-    if (!_always_up && !r) {
-        if (++sleepiness < _sleep_threshold && _active) {
+    if (_always_up) {
+        t->fast_reschedule();
+    } else {
+        if (!r) {
+            sleepiness++;
+            if (sleepiness < _sleep_threshold) {
+                t->fast_reschedule();
+            }
+        } else {
+            sleepiness = 0;
             t->fast_reschedule();
         }
-    } else {
-        sleepiness = 0;
-        t->fast_reschedule();
     }
     return r;
 }
-
 
 int
 Pipeliner::write_handler(const String &conf, Element* e, void*, ErrorHandler* errh)

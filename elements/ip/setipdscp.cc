@@ -2,7 +2,10 @@
  * setipdscp.{cc,hh} -- element sets IP header DSCP field
  * Eddie Kohler
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2017 RISE SICS AB
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -64,6 +67,15 @@ SetIPDSCP::push(int, Packet *p)
 	output(0).push(p);
 }
 
+#if HAVE_BATCH
+void
+SetIPDSCP::push_batch(int, PacketBatch *batch) {
+    FOR_EACH_PACKET(batch, p)
+        smaction(p);
+    output(0).push_batch(batch);
+}
+#endif
+
 Packet *
 SetIPDSCP::pull(int)
 {
@@ -72,6 +84,16 @@ SetIPDSCP::pull(int)
 	p = smaction(p);
     return p;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+SetIPDSCP::pull_batch(int port, unsigned max) {
+    PacketBatch *batch = input_pull_batch(0,max);
+    FOR_EACH_PACKET(batch,p)
+        smaction(p);
+    return batch;
+}
+#endif
 
 void
 SetIPDSCP::add_handlers()

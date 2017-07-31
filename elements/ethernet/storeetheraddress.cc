@@ -75,7 +75,7 @@ StoreEtherAddress::simple_action(Packet *p)
 PacketBatch *
 StoreEtherAddress::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet*){});
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(StoreEtherAddress::simple_action, batch, [](Packet*){});
     return batch;
 }
 #endif

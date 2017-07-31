@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_SETTIMESTAMP_HH
 #define CLICK_SETTIMESTAMP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -32,7 +32,7 @@ timestamp annotation.  Default is false.
 
 =a StoreTimestamp, AdjustTimestamp, SetTimestampDelta, PrintOld */
 
-class SetTimestamp : public Element { public:
+class SetTimestamp : public BatchElement { public:
 
     SetTimestamp() CLICK_COLD;
 
@@ -41,12 +41,18 @@ class SetTimestamp : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 
     enum { ACT_NOW, ACT_TIME, ACT_FIRST_NOW, ACT_FIRST_TIME }; // order matters
     int _action;
+    bool _per_batch;
     Timestamp _tv;
+
+    inline void smaction(Packet *);
 
 };
 

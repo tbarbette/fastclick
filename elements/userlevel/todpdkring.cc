@@ -24,14 +24,13 @@
 CLICK_DECLS
 
 ToDPDKRing::ToDPDKRing() :
-    _message_pool(0), _send_ring(0), _iqueue(),
-    _numa_zone(0), _internal_tx_queue_size(1024),
-    _burst_size(0), _timeout(0),
+    _iqueue(),
+    _internal_tx_queue_size(1024),
+     _timeout(0),
     _blocking(false), _congestion_warning_printed(false),
-    _n_sent(0), _n_dropped(0)
+    _dropped(0)
 {
     _ndesc = DPDKDevice::DEF_RING_NDESC;
-    _def_burst_size = DPDKDevice::DEF_BURST_SIZE;
 }
 
 ToDPDKRing::~ToDPDKRing()
@@ -41,47 +40,16 @@ ToDPDKRing::~ToDPDKRing()
 int
 ToDPDKRing::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if ( Args(conf, this, errh)
-        .read_mp("MEM_POOL",  _MEM_POOL)
-        .read_mp("FROM_PROC", _origin)
-        .read_mp("TO_PROC",   _destination)
-        .read("IQUEUE",       _internal_tx_queue_size)
-        .read("BLOCKING",     _blocking)
-        .read("BURST",        _burst_size)
-        .read("NDESC",        _ndesc)
-        .read("TIMEOUT",      _timeout)
-        .read("NUMA_ZONE",    _numa_zone)
-        .complete() < 0)
+    Args args(conf, this, errh);
+    if (DPDKRing::parse(&args) != 0)
             return -1;
 
-    if ( _MEM_POOL.empty() || (_MEM_POOL.length() == 0) ) {
-        return errh->error("[%s] Enter FROM_PROC and TO_PROC names", name().c_str());
-    }
-
-    if ( _origin.empty() || _destination.empty() ) {
-        return errh->error("[%s] Enter FROM_PROC and TO_PROC names", name().c_str());
-    }
-
-    if ( _ndesc == 0 ) {
-        _ndesc = DPDKDevice::DEF_RING_NDESC;
-        click_chatter("[%s] Default number of descriptors is set (%d)\n",
-                        name().c_str(), _ndesc);
-    }
-
-    _MEM_POOL = DPDKDevice::MEMPOOL_PREFIX + _MEM_POOL;
-
-    // If user does not specify the port number
-    // we assume that the process belongs to the
-    // memory zone of device 0.
-    // TODO: Search the Click DAG to find a FromDPDKDevice, take its' port_id
-    //       and use _numa_zone = DPDKDevice::get_port_numa_node(_port_id);
-    if ( _numa_zone < 0 ) {
-        click_chatter("[%s] Assuming NUMA zone 0\n");
-        _numa_zone = 0;
-    }
-
-    _PROC_1 = _origin+"_2_"+_destination;
-    _PROC_2 = _destination+"_2_"+_origin;
+    if (args
+        .read("IQUEUE",       _internal_tx_queue_size)
+        .read("BLOCKING",     _blocking)
+        .read("TIMEOUT",      _timeout)
+        .complete() < 0)
+            return -1;
 
     return 0;
 }
@@ -90,14 +58,14 @@ int
 ToDPDKRing::initialize(ErrorHandler *errh)
 {
 #if HAVE_BATCH
-    if (batch_mode() == BATCH_MODE_YES) {
+    if (in_batch_mode == BATCH_MODE_YES) {
         if ( _burst_size > 0 )
             errh->warning("[%s] BURST is unused with batching!", name().c_str());
     } else
 #endif
     {
         if ( _burst_size == 0 ) {
-            _burst_size = _def_burst_size;
+            _burst_size = DPDKDevice::DEF_BURST_SIZE;
             click_chatter("[%s] Non-positive BURST number. Setting default (%d) \n",
                     name().c_str(), _burst_size);
         }
@@ -108,18 +76,21 @@ ToDPDKRing::initialize(ErrorHandler *errh)
         }
     }
 
+    if (DPDKDevice::initialize(errh) != 0)
+        return -1;
+
     // If primary process, create the ring buffer and memory pool.
     // The primary process is responsible for managing the memory
     // and acting as a bridge to interconnect various secondary processes
     if ( rte_eal_process_type() == RTE_PROC_PRIMARY ){
-        _send_ring = rte_ring_create(
+        _ring = rte_ring_create(
             _PROC_1.c_str(), DPDKDevice::RING_SIZE,
-            rte_socket_id(), DPDKDevice::RING_FLAGS
+            rte_socket_id(), _flags
         );
     }
     // If secondary process, search for the appropriate memory and attach to it.
     else {
-        _send_ring    = rte_ring_lookup   (_PROC_2.c_str());
+        _ring    = rte_ring_lookup   (_PROC_2.c_str());
     }
 
     _message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
@@ -131,11 +102,11 @@ ToDPDKRing::initialize(ErrorHandler *errh)
             DPDKDevice::RING_POOL_CACHE_SIZE,
             DPDKDevice::RING_PRIV_DATA_SIZE,
             NULL, NULL, NULL, NULL,
-            rte_socket_id(), DPDKDevice::RING_FLAGS
+            rte_socket_id(), _flags
         );
     }
 
-    if ( !_send_ring )
+    if ( !_ring )
         return errh->error("[%s] Problem getting Tx ring. "
                     "Make sure that the process attached to this element has the right ring configuration\n",
                     name().c_str());
@@ -151,19 +122,6 @@ ToDPDKRing::initialize(ErrorHandler *errh)
         _iqueue.timeout.initialize (this);
         _iqueue.timeout.move_thread(click_current_cpu_id());
     }
-
-    /*
-    click_chatter("[%s] Initialized with the following options: \n", name().c_str());
-    click_chatter("|->  MEM_POOL: %s \n", _MEM_POOL.c_str());
-    click_chatter("|-> FROM_PROC: %s \n", _origin.c_str());
-    click_chatter("|->   TO_PROC: %s \n", _destination.c_str());
-    click_chatter("|-> NUMA ZONE: %d \n", _numa_zone);
-    click_chatter("|->    IQUEUE: %d \n", _internal_tx_queue_size);
-    click_chatter("|->     BURST: %d \n", _burst_size);
-    click_chatter("|-> DEF BURST: %d \n", _def_burst_size);
-    click_chatter("|->     NDESC: %d \n", _ndesc);
-    click_chatter("|->   TIMEOUT: %d \n", _timeout);
-    */
 
     return 0;
 }
@@ -219,17 +177,24 @@ ToDPDKRing::flush_internal_tx_ring(TXInternalQueue &iqueue)
     unsigned sub_burst;
 
     do {
-        sub_burst = iqueue.nr_pending > _def_burst_size ?
-            _def_burst_size : iqueue.nr_pending;
+        sub_burst = iqueue.nr_pending > DPDKDevice::DEF_BURST_SIZE ?
+                DPDKDevice::DEF_BURST_SIZE : iqueue.nr_pending;
 
         // The sub_burst wraps around the ring
         if (iqueue.index + sub_burst >= _internal_tx_queue_size)
             sub_burst = _internal_tx_queue_size - iqueue.index;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         n = rte_ring_enqueue_burst(
-            _send_ring, (void* const*)(&iqueue.pkts[iqueue.index]),
+            _ring, (void* const*)(&iqueue.pkts[iqueue.index]),
+            sub_burst, 0
+        );
+#else
+        n = rte_ring_enqueue_burst(
+            _ring, (void* const*)(&iqueue.pkts[iqueue.index]),
             sub_burst
         );
+#endif
 
         iqueue.nr_pending -= n;
         iqueue.index      += n;
@@ -241,7 +206,7 @@ ToDPDKRing::flush_internal_tx_ring(TXInternalQueue &iqueue)
         sent += n;
     } while ( (n == sub_burst) && (iqueue.nr_pending > 0) );
 
-    _n_sent += sent;
+    _count += sent;
 
     // If ring is empty, reset the index to avoid wrap ups
     if (iqueue.nr_pending == 0)
@@ -265,7 +230,7 @@ ToDPDKRing::push(int, Packet *p)
             congestioned = true;
 
             if ( !_blocking ) {
-                ++_n_dropped;
+                ++_dropped;
 
                 if ( !_congestion_warning_printed )
                     click_chatter("[%s] Packet dropped", name().c_str());
@@ -299,9 +264,9 @@ ToDPDKRing::push(int, Packet *p)
     } while ( unlikely(_blocking && congestioned) );
 
 #if !CLICK_PACKET_USE_DPDK
-//    if ( likely(is_fullpush()) )
-//        p->safe_kill();
-//    else
+    if ( likely(is_fullpush()) )
+        p->kill_nonatomic();
+    else
         p->kill();
 #endif
 
@@ -336,7 +301,7 @@ ToDPDKRing::push_batch(int, PacketBatch *head)
             next = p->next();
 
         #if !CLICK_PACKET_USE_DPDK
-            BATCH_RECYCLE_UNSAFE_PACKET(p);
+            BATCH_RECYCLE_PACKET_CONTEXT(p);
         #endif
 
             p = next;
@@ -367,9 +332,9 @@ ToDPDKRing::push_batch(int, PacketBatch *head)
     // If non-blocking, drop all packets that could not be sent
     while (p) {
         next = p->next();
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
+        BATCH_RECYCLE_PACKET_CONTEXT(p);
         p = next;
-        ++_n_dropped;
+        ++_dropped;
     }
 #endif
 
@@ -386,9 +351,9 @@ ToDPDKRing::read_handler(Element *e, void *thunk)
     ToDPDKRing *tr = static_cast<ToDPDKRing*>(e);
 
     if ( thunk == (void *) 0 )
-        return String(tr->_n_sent);
+        return String(tr->_count);
     else
-        return String(tr->_n_dropped);
+        return String(tr->_dropped);
 }
 
 void

@@ -194,9 +194,9 @@ ARPResponder::simple_action(Packet *p)
 	    q = make_response(ea->arp_sha, ea->arp_spa, ena->data(), ea->arp_tpa, p);
     }
     if (q)
-	p->kill();
+        p->kill();
     else
-	checked_output_push(1, p);
+        checked_output_push(1, p);
     return q;
 }
 

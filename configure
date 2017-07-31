@@ -798,6 +798,7 @@ ac_user_opts='
 enable_option_checking
 enable_userlevel
 enable_user_multithread
+enable_fullpush_nonatomic
 enable_batch
 enable_verbose_batch
 enable_auto_batch
@@ -1498,6 +1499,9 @@ Optional Features:
   --disable-userlevel     disable user-level driver
     --enable-user-multithread
                           support userlevel multithreading
+    --disable-fullpush-nonatomic
+                          disable nonatomic access to packet when
+                          single-threaded fullpush context is detected
     --disable-batch       disable batching support
     --disable-verbose-batch
                           disable warnings and information about batching
@@ -6411,6 +6415,20 @@ if test "${enable_user_multithread+set}" = set; then :
   enableval=$enable_user_multithread; :
 else
   enable_user_multithread=no
+fi
+
+
+# Check whether --enable-fullpush-nonatomic was given.
+if test "${enable_fullpush_nonatomic+set}" = set; then :
+  enableval=$enable_fullpush_nonatomic; :
+else
+  enable_fullpush_nonatomic=yes
+fi
+
+
+if test "x$enable_fullpush_nonatomic" = "xyes"; then
+    $as_echo "#define HAVE_FULLPUSH_NONATOMIC 1" >>confdefs.h
+
 fi
 
 
@@ -13786,6 +13804,7 @@ if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
 fi
 
+
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
@@ -13814,6 +13833,10 @@ fi
 
 if test "x$use_netmap" != xno; then
     provisions="$provisions netmap"
+fi
+
+if test "x$enable_fullpush_nonatomic" = xyes; then
+    provisions="$provisions nonatomicfp"
 fi
 
 if test "x$HAVE_NUMA" = xyes; then

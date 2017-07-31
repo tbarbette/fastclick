@@ -46,15 +46,15 @@ StaticThreadSched::configure(Vector<String> &conf, ErrorHandler *errh)
     String ename;
     int preference;
     for (int i = 0; i < conf.size(); i++) {
-	if (Args(this, errh).push_back_words(conf[i])
-	    .read_mp("ELEMENT", ename)
-	    .read_mp("THREAD", preference)
-	    .complete() < 0)
-	    return -1;
-	if (preference < -1 || preference >= master()->nthreads()) {
-	    errh->warning("thread preference %d out of range", preference);
-	    preference = (preference < 0 ? -1 : 0);
-	}
+        if (Args(this, errh).push_back_words(conf[i])
+            .read_mp("ELEMENT", ename)
+            .read_mp("THREAD", preference)
+            .complete() < 0)
+            return -1;
+        if (preference < -1 || preference >= master()->nthreads()) {
+            errh->warning("thread preference %d out of range", preference);
+            preference = (preference < 0 ? -1 : 0);
+        }
         bool set = false;
         if (Element* e = router()->find(ename, this))
             set = set_preference(e->eindex(), preference);

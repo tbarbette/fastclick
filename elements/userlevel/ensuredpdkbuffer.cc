@@ -51,6 +51,13 @@ EnsureDPDKBuffer::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+int
+EnsureDPDKBuffer::initialize(ErrorHandler *errh)
+{
+    return DPDKDevice::initialize(errh);
+}
+
+
 inline Packet*
 EnsureDPDKBuffer::smaction(Packet* p) {
     if (!_force && (DPDKDevice::is_dpdk_buffer(p))) {
