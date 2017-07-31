@@ -182,7 +182,7 @@ RecordTimestamp* TimestampDiff::get_recordtimestamp_instance() {
 }
 
 void
-TimestampDiff::min_mean_max(std::vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max)
+TimestampDiff::min_mean_max(Vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max)
 {
     double sum = 0.0;
 
@@ -200,7 +200,7 @@ TimestampDiff::min_mean_max(std::vector<unsigned> &vec, unsigned &min, double &m
 }
 
 double
-TimestampDiff::percentile(std::vector<unsigned> &vec, double percent)
+TimestampDiff::percentile(Vector<unsigned> &vec, double percent)
 {
     double perc = -1;
 

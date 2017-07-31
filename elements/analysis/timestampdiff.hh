@@ -1,8 +1,7 @@
 #ifndef CLICK_TIMESTAMPDIFF_HH
 #define CLICK_TIMESTAMPDIFF_HH
 
-#include <vector>
-
+#include <click/vector.hh>
 #include <click/batchelement.hh>
 
 CLICK_DECLS
@@ -45,14 +44,14 @@ public:
 #endif
 
 private:
-    std::vector<unsigned> _delays;
+    Vector<unsigned> _delays;
     int _offset;
     RecordTimestamp* _rt;
     inline int smaction(Packet* p);
 
     RecordTimestamp* get_recordtimestamp_instance();
-    void min_mean_max(std::vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max);
-    double percentile(std::vector<unsigned> &vec, double percent);
+    void min_mean_max(Vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max);
+    double percentile(Vector<unsigned> &vec, double percent);
 };
 
 CLICK_ENDDECLS
