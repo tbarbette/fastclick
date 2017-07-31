@@ -47,6 +47,12 @@ Argument is `I<N> I<HANDLER> [I<VALUE>]'. When the byte count reaches or
 exceeds I<N>, call the write handler I<HANDLER> with value I<VALUE> before
 emitting the packet.
 
+=item BATCH_PRECISE
+
+If true, will count packets one by one and hence call the handlers when the
+count is exactly the limit. The default is to count the whole batch at once
+and call the handlers if the limit has been reached.
+
 =back
 
 =h count read-only
@@ -155,10 +161,10 @@ class CounterBase : public BatchElement, public CounterT { public:
 
     bool _count_triggered : 1;
     bool _byte_triggered : 1;
+    bool _batch_precise;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
-
 };
 
 class Counter : public CounterBase { public:

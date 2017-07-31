@@ -23,8 +23,10 @@ class BatchTest : public BatchElement { public:
     const char *port_count() const    { return PORTS_1_1; }
     const char *processing() const    { return AGNOSTIC; }
 
-    void push(int, Packet *);
-    void push_batch(int, PacketBatch *);
+    void push(int, Packet *) override;
+    void push_batch(int, PacketBatch *) override;
+    Packet* pull(int) override;
+    PacketBatch* pull_batch(int, unsigned) override;
 };
 
 /*

@@ -26,7 +26,7 @@
 CLICK_DECLS
 
 CounterBase::CounterBase()
-  : _count_trigger_h(0), _byte_trigger_h(0)
+  : _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false)
 {
 }
 
@@ -51,7 +51,9 @@ CounterBase::configure(Vector<String> &conf, ErrorHandler *errh)
   String count_call, byte_count_call;
   if (Args(conf, this, errh)
       .read("COUNT_CALL", AnyArg(), count_call)
-      .read("BYTE_COUNT_CALL", AnyArg(), byte_count_call).complete() < 0)
+      .read("BYTE_COUNT_CALL", AnyArg(), byte_count_call)
+      .read("BATCH_PRECISE", _batch_precise)
+      .complete() < 0)
     return -1;
 
   if (count_call) {
@@ -250,30 +252,49 @@ Counter::simple_action(Packet *p)
 PacketBatch*
 Counter::simple_action_batch(PacketBatch *batch)
 {
-  counter_int_type bc = 0;
-  FOR_EACH_PACKET(batch,p) {
-      bc += p->length();
-  }
-  _count += batch->count();
-  _byte_count += bc;
-  _rate.update(batch->count());
-  _byte_rate.update(bc);
+  if (unlikely(_batch_precise)) {
+      FOR_EACH_PACKET(batch,p) {
+          _count ++;
+          _byte_count += p->length();
+          _rate.update(1);
+          _byte_rate.update(p->length());
 
-  if (_count >= _count_trigger && !_count_triggered) {
-    _count_triggered = true;
-    if (_count_trigger_h)
-      (void) _count_trigger_h->call_write();
-  }
-  if (_byte_count >= _byte_trigger && !_byte_triggered) {
-    _byte_triggered = true;
-    if (_byte_trigger_h)
-      (void) _byte_trigger_h->call_write();
+          if (_count == _count_trigger && !_count_triggered) {
+            _count_triggered = true;
+            if (_count_trigger_h)
+              (void) _count_trigger_h->call_write();
+          }
+          if (_byte_count == _byte_trigger && !_byte_triggered) {
+            _byte_triggered = true;
+            if (_byte_trigger_h)
+              (void) _byte_trigger_h->call_write();
+          }
+      }
+  } else {
+      counter_int_type bc = 0;
+      FOR_EACH_PACKET(batch,p) {
+          bc += p->length();
+      }
+
+      _count += batch->count();
+      _byte_count += bc;
+      _rate.update(batch->count());
+      _byte_rate.update(bc);
+
+      if (_count >= _count_trigger && !_count_triggered) {
+        _count_triggered = true;
+        if (_count_trigger_h)
+          (void) _count_trigger_h->call_write();
+      }
+      if (_byte_count >= _byte_trigger && !_byte_triggered) {
+        _byte_triggered = true;
+        if (_byte_trigger_h)
+          (void) _byte_trigger_h->call_write();
+      }
   }
   return batch;
 }
 #endif
-
-
 
 void
 Counter::reset()
