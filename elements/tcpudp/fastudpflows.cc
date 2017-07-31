@@ -26,6 +26,7 @@
 #include <click/etheraddress.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+#include <click/router.hh>
 #include <click/standard/alignmentinfo.hh>
 
 CLICK_DECLS
@@ -41,6 +42,7 @@ FastUDPFlows::FastUDPFlows()
   _rate_limited = true;
   _first = _last = 0;
   _count = 0;
+  _stop = false;
 }
 
 FastUDPFlows::~FastUDPFlows()
@@ -67,6 +69,7 @@ FastUDPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
       .read_mp("FLOWSIZE", _flowsize)
       .read_p("CHECKSUM", _cksum)
       .read_p("ACTIVE", _active)
+      .read_p("STOP", _stop)
       .complete() < 0)
     return -1;
   set_length(len);
@@ -203,8 +206,11 @@ FastUDPFlows::pull(int)
     _count++;
     if(_count == 1)
       _first = click_jiffies();
-    if(_limit != NO_LIMIT && _count >= _limit)
+    if(_limit != NO_LIMIT && _count >= _limit) {
       _last = click_jiffies();
+      if (_stop)
+          router()->please_stop_driver();
+    }
   }
 
   return(p);

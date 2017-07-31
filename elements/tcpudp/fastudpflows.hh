@@ -94,6 +94,7 @@ class FastUDPFlows : public BatchElement {
   unsigned _count;
   unsigned _limit;
   bool _active;
+  bool _stop;
 
   FastUDPFlows() CLICK_COLD;
   ~FastUDPFlows() CLICK_COLD;
