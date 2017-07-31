@@ -25,22 +25,19 @@
 #include <click/handlercall.hh>
 CLICK_DECLS
 
-template <typename counter_t>
-CounterBase<counter_t>::CounterBase()
+CounterBase::CounterBase()
   : _count_trigger_h(0), _byte_trigger_h(0)
 {
 }
 
-template <typename counter_t>
-CounterBase<counter_t>::~CounterBase()
+CounterBase::~CounterBase()
 {
   delete _count_trigger_h;
   delete _byte_trigger_h;
 }
 
-template <typename counter_t>
 void*
-CounterBase<counter_t>::cast(const char *name)
+CounterBase::cast(const char *name)
 {
     if (strcmp("CounterT", name) == 0)
         return (CounterT *)this;
@@ -48,18 +45,8 @@ CounterBase<counter_t>::cast(const char *name)
         return Element::cast(name);
 }
 
-template <typename counter_t>
-void
-CounterBase<counter_t>::reset()
-{
-  counter_set(_count,0);
-  counter_set(_byte_count,0);
-  _count_triggered = _byte_triggered = false;
-}
-
-template <typename counter_t>
 int
-CounterBase<counter_t>::configure(Vector<String> &conf, ErrorHandler *errh)
+CounterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 {
   String count_call, byte_count_call;
   if (Args(conf, this, errh)
@@ -94,9 +81,8 @@ CounterBase<counter_t>::configure(Vector<String> &conf, ErrorHandler *errh)
   return 0;
 }
 
-template <typename counter_t>
 int
-CounterBase<counter_t>::initialize(ErrorHandler *errh)
+CounterBase::initialize(ErrorHandler *errh)
 {
   if (_count_trigger_h && _count_trigger_h->initialize_write(this, errh) < 0)
     return -1;
@@ -110,9 +96,8 @@ enum { H_COUNT, H_BYTE_COUNT, H_RESET,
        H_COUNT_CALL, H_BYTE_COUNT_CALL,
        H_RATE = 0x100, H_BIT_RATE, H_BYTE_RATE,};
 
-template <typename counter_t>
 String
-CounterBase<counter_t>::read_handler(Element *e, void *thunk)
+CounterBase::read_handler(Element *e, void *thunk)
 {
     CounterBase *c = (CounterBase *)e;
     if (c->cast("CounterMP") != 0 && (((intptr_t)thunk) & H_RATE)) {
@@ -120,9 +105,9 @@ CounterBase<counter_t>::read_handler(Element *e, void *thunk)
     }
     switch ((intptr_t)thunk) {
       case H_COUNT:
-	return String(counter_sum(c->_count));
+	return String(c->count());
       case H_BYTE_COUNT:
-	return String(counter_sum(c->_byte_count));
+	return String(c->byte_count());
       case H_RATE:
 	c->_rate.update(0);	// drop rate after idle period
 	return c->_rate.unparse_rate();
@@ -147,9 +132,8 @@ CounterBase<counter_t>::read_handler(Element *e, void *thunk)
     }
 }
 
-template <typename counter_t>
 int
-CounterBase<counter_t>::write_handler(const String &in_str, Element *e, void *thunk, ErrorHandler *errh)
+CounterBase::write_handler(const String &in_str, Element *e, void *thunk, ErrorHandler *errh)
 {
     CounterBase *c = (CounterBase *)e;
     String str = cp_uncomment(in_str);
@@ -176,25 +160,25 @@ CounterBase<counter_t>::write_handler(const String &in_str, Element *e, void *th
     }
 }
 
-template <typename counter_t>
 void
-CounterBase<counter_t>::add_handlers()
+CounterBase::add_handlers()
 {
-    add_read_handler("count", CounterBase<counter_t>::read_handler, H_COUNT);
-    add_read_handler("byte_count", CounterBase<counter_t>::read_handler, H_BYTE_COUNT);
-    add_read_handler("rate", CounterBase<counter_t>::read_handler, H_RATE);
-    add_read_handler("bit_rate", CounterBase<counter_t>::read_handler, H_BIT_RATE);
-    add_read_handler("byte_rate", CounterBase<counter_t>::read_handler, H_BYTE_RATE);
-    add_write_handler("reset", CounterBase<counter_t>::write_handler, H_RESET, Handler::f_button);
-    add_write_handler("reset_counts", CounterBase<counter_t>::write_handler, H_RESET, Handler::f_button | Handler::f_uncommon);
-    add_read_handler("count_call", CounterBase<counter_t>::read_handler, H_COUNT_CALL);
-    add_write_handler("count_call", CounterBase<counter_t>::write_handler, H_COUNT_CALL);
-    add_write_handler("byte_count_call", CounterBase<counter_t>::write_handler, H_BYTE_COUNT_CALL);
+    add_read_handler("count", CounterBase::read_handler, H_COUNT);
+    add_read_handler("byte_count", CounterBase::read_handler, H_BYTE_COUNT);
+    if (cast("Counter") != 0) {
+        add_read_handler("rate", CounterBase::read_handler, H_RATE);
+        add_read_handler("bit_rate", CounterBase::read_handler, H_BIT_RATE);
+        add_read_handler("byte_rate", CounterBase::read_handler, H_BYTE_RATE);
+    }
+    add_write_handler("reset", CounterBase::write_handler, H_RESET, Handler::f_button);
+    add_write_handler("reset_counts", CounterBase::write_handler, H_RESET, Handler::f_button | Handler::f_uncommon);
+    add_read_handler("count_call", CounterBase::read_handler, H_COUNT_CALL);
+    add_write_handler("count_call", CounterBase::write_handler, H_COUNT_CALL);
+    add_write_handler("byte_count_call", CounterBase::write_handler, H_BYTE_COUNT_CALL);
 }
 
-template <typename counter_t>
 int
-CounterBase<counter_t>::llrpc(unsigned command, void *data)
+CounterBase::llrpc(unsigned command, void *data)
 {
   if (command == CLICK_LLRPC_GET_RATE) {
     uint32_t *val = reinterpret_cast<uint32_t *>(data);
@@ -208,7 +192,7 @@ CounterBase<counter_t>::llrpc(unsigned command, void *data)
     uint32_t *val = reinterpret_cast<uint32_t *>(data);
     if (*val != 0 && *val != 1)
       return -EINVAL;
-    *val = (*val == 0 ? counter_sum(_count) : counter_sum(_byte_count));
+    *val = (*val == 0 ? count() : byte_count());
     return 0;
 
   } else if (command == CLICK_LLRPC_GET_COUNTS) {
@@ -219,9 +203,9 @@ CounterBase<counter_t>::llrpc(unsigned command, void *data)
       return -EINVAL;
     for (unsigned i = 0; i < cs.n; i++) {
       if (cs.keys[i] == 0)
-	cs.values[i] = counter_sum(_count);
+	cs.values[i] = count();
       else if (cs.keys[i] == 1)
-	cs.values[i] = counter_sum(_byte_count);
+	cs.values[i] = byte_count();
       else
 	return -EINVAL;
     }
@@ -261,6 +245,44 @@ Counter::simple_action(Packet *p)
   return p;
 }
 
+
+#if HAVE_BATCH
+PacketBatch*
+Counter::simple_action_batch(PacketBatch *batch)
+{
+  counter_int_type bc = 0;
+  FOR_EACH_PACKET(batch,p) {
+      bc += p->length();
+  }
+  _count += batch->count();
+  _byte_count += bc;
+  _rate.update(batch->count());
+  _byte_rate.update(bc);
+
+  if (_count >= _count_trigger && !_count_triggered) {
+    _count_triggered = true;
+    if (_count_trigger_h)
+      (void) _count_trigger_h->call_write();
+  }
+  if (_byte_count >= _byte_trigger && !_byte_triggered) {
+    _byte_triggered = true;
+    if (_byte_trigger_h)
+      (void) _byte_trigger_h->call_write();
+  }
+  return batch;
+}
+#endif
+
+
+
+void
+Counter::reset()
+{
+  _count = 0;
+  _byte_count = 0;
+  _count_triggered = _byte_triggered = false;
+}
+
 CounterMP::CounterMP()
 {
 }
@@ -272,14 +294,78 @@ CounterMP::~CounterMP()
 Packet*
 CounterMP::simple_action(Packet *p)
 {
+  _stats->_count++;
+  _stats->_byte_count += p->length();
+  return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+CounterMP::simple_action_batch(PacketBatch *batch)
+{
+  counter_int_type bc = 0;
+  FOR_EACH_PACKET(batch,p) {
+      bc += p->length();
+  }
+  _stats->_count += batch->count();
+  _stats->_byte_count += bc;
+  return batch;
+}
+#endif
+
+void
+CounterMP::reset()
+{
+    for (unsigned i = 0; i < _stats.weight(); i++) { \
+        _stats.get_value(i)._count = 0;
+        _stats.get_value(i)._byte_count = 0;
+    }
+    _count_triggered = _byte_triggered = false;
+}
+
+
+CounterAtomic::CounterAtomic()
+{
+}
+
+CounterAtomic::~CounterAtomic()
+{
+}
+
+Packet*
+CounterAtomic::simple_action(Packet *p)
+{
   _count++;
   _byte_count += p->length();
   return p;
 }
 
+#if HAVE_BATCH
+PacketBatch*
+CounterAtomic::simple_action_batch(PacketBatch *batch)
+{
+  counter_int_type bc = 0;
+  FOR_EACH_PACKET(batch,p) {
+      bc += p->length();
+  }
+  _count += batch->count();
+  _byte_count += bc;
+  return batch;
+}
+#endif
+
+void
+CounterAtomic::reset()
+{
+  _count = 0;
+  _byte_count = 0;
+  _count_triggered = _byte_triggered = false;
+}
 
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(Counter)
 EXPORT_ELEMENT(CounterMP)
 ELEMENT_MT_SAFE(CounterMP)
+EXPORT_ELEMENT(CounterAtomic)
+ELEMENT_MT_SAFE(CounterAtomic)

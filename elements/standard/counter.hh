@@ -10,13 +10,11 @@ CLICK_DECLS
 class HandlerCall;
 
 #ifdef HAVE_INT64_TYPES
-#define counter_sum per_thread_arithmetic::usum_long
-#define counter_set per_thread_arithmetic::uset_long
 #define counter_int_type uint64_t
+#define counter_atomic_int_type atomic_uint64_t
 #else
-#define counter_sum per_thread_arithmetic::usum
-#define counter_set per_thread_arithmetic::uset
 #define counter_int_type uint32_t
+#define counter_atomic_int_type atomic_uint32_t
 #endif
 
 /*
@@ -115,11 +113,12 @@ components.
  * independently of the storage type
  */
 class CounterT { public :
+    CounterT() {};
+    ~CounterT() {};
     virtual counter_int_type count() = 0;
     virtual counter_int_type byte_count() = 0;
 };
 
-template <typename counter_t>
 class CounterBase : public Element, public CounterT { public:
 
 	CounterBase() CLICK_COLD;
@@ -127,7 +126,7 @@ class CounterBase : public Element, public CounterT { public:
 
     void* cast(const char *name);
 
-    void reset();
+    virtual void reset() = 0;
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
@@ -145,8 +144,6 @@ class CounterBase : public Element, public CounterT { public:
     typedef RateEWMAX<RateEWMAXParameters<4, 4> > byte_rate_t;
 #endif
 
-    counter_t _count;
-    counter_t _byte_count;
     rate_t _rate;
     byte_rate_t _byte_rate;
 
@@ -164,7 +161,7 @@ class CounterBase : public Element, public CounterT { public:
 
 };
 
-class Counter : public CounterBase<counter_int_type> { public:
+class Counter : public CounterBase { public:
 
 	Counter() CLICK_COLD;
     ~Counter() CLICK_COLD;
@@ -182,18 +179,27 @@ class Counter : public CounterBase<counter_int_type> { public:
     }
 
     Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
 
     counter_int_type count() {
-        return counter_sum(_count);
+        return _count;
     }
 
     counter_int_type byte_count() {
-        return counter_sum(_byte_count);
+        return _byte_count;
     }
+
+protected:
+    counter_int_type _count;
+    counter_int_type _byte_count;
 };
 
 
-class CounterMP : public CounterBase<per_thread<counter_int_type> > { public:
+class CounterMP : public CounterBase { public:
 
 	CounterMP() CLICK_COLD;
     ~CounterMP() CLICK_COLD;
@@ -211,15 +217,67 @@ class CounterMP : public CounterBase<per_thread<counter_int_type> > { public:
     }
 
     Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
 
     counter_int_type count() {
-        return counter_sum(_count);
+        PER_THREAD_MEMBER_SUM(counter_int_type,sum,_stats,_count);
+        return sum;
     }
 
     counter_int_type byte_count() {
-        return counter_sum(_byte_count);
+        PER_THREAD_MEMBER_SUM(counter_int_type,sum,_stats,_byte_count);
+        return sum;
     }
+protected:
+    struct stats {
+        counter_int_type _count;
+        counter_int_type _byte_count;
+    };
+    per_thread<stats> _stats;
 };
+
+
+class CounterAtomic : public CounterBase { public:
+
+    CounterAtomic() CLICK_COLD;
+    ~CounterAtomic() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterAtomic"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("CounterAtomic", name) == 0)
+            return (CounterAtomic *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
+
+    counter_int_type count() {
+        return _count;
+    }
+
+    counter_int_type byte_count() {
+        return _byte_count;
+    }
+
+protected:
+    counter_atomic_int_type _count;
+    counter_atomic_int_type _byte_count;
+};
+
 
 CLICK_ENDDECLS
 #endif
