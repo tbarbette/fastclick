@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_COUNTER_HH
 #define CLICK_COUNTER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ewma.hh>
 #include <click/llrpc.h>
 #include <click/sync.hh>
@@ -119,7 +119,7 @@ class CounterT { public :
     virtual counter_int_type byte_count() = 0;
 };
 
-class CounterBase : public Element, public CounterT { public:
+class CounterBase : public BatchElement, public CounterT { public:
 
 	CounterBase() CLICK_COLD;
     ~CounterBase() CLICK_COLD;

@@ -86,7 +86,11 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
     }
 
     //Amount of empty run of task after which it unschedule
+#if HAVE_BATCH
+    _sleep_threshold = _ring_size / 2;
+#else
     _sleep_threshold = _ring_size / 4;
+#endif
 
     return 0;
 }
@@ -99,7 +103,7 @@ Pipeliner::initialize(ErrorHandler *errh)
     Bitvector passing = get_passing_threads();
     storage.compress(passing);
     stats.compress(passing);
-    _home_thread_id = router()->home_thread_id(this);
+    _home_thread_id = home_thread_id();
 
     if (_ring_size == -1) {
     #  if HAVE_BATCH
@@ -116,7 +120,6 @@ Pipeliner::initialize(ErrorHandler *errh)
         storage.get_value(i).initialize(_ring_size);
     }
 
-    _home_thread_id = home_thread_id();
 
     for (int i = 0; i < passing.weight(); i++) {
         if (passing[i]) {
@@ -152,8 +155,8 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
         output(0).push_batch(head);
         return;
     }
-    retry:
     int count = head->count();
+    retry:
     if (storage->insert(head)) {
         stats->count += count;
         if (sleepiness >= _sleep_threshold)
