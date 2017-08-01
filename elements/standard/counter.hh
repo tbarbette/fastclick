@@ -123,6 +123,11 @@ class CounterT { public :
     ~CounterT() {};
     virtual counter_int_type count() = 0;
     virtual counter_int_type byte_count() = 0;
+    struct stats {
+        counter_int_type _count;
+        counter_int_type _byte_count;
+    };
+    virtual stats atomic_read() = 0;
 };
 
 class CounterBase : public BatchElement, public CounterT { public:
@@ -199,6 +204,10 @@ class Counter : public CounterBase { public:
         return _byte_count;
     }
 
+    stats atomic_read() {  //This is NOT atomic
+        return {_count, _byte_count};
+    }
+
 protected:
     counter_int_type _count;
     counter_int_type _byte_count;
@@ -238,12 +247,126 @@ class CounterMP : public CounterBase { public:
         PER_THREAD_MEMBER_SUM(counter_int_type,sum,_stats,_byte_count);
         return sum;
     }
+
+    stats atomic_read() { //This is NOT atomic
+        counter_int_type count = 0;
+        counter_int_type byte_count = 0;
+        for (unsigned i = 0; i < _stats.weight(); i++) { \
+            count += _stats.get_value(i)._count;
+            byte_count += _stats.get_value(i)._byte_count;
+        }
+        return {count,byte_count};
+    }
+
 protected:
-    struct stats {
-        counter_int_type _count;
-        counter_int_type _byte_count;
-    };
     per_thread<stats> _stats;
+};
+
+class CounterRCUMP : public CounterBase { public:
+
+    CounterRCUMP() CLICK_COLD;
+    ~CounterRCUMP() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterRCUMP"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("CounterRCUMP", name) == 0)
+            return (CounterRCUMP *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
+
+    counter_int_type count() {
+        int flags;
+        const per_thread<stats>& stats = _stats.read_begin(flags);
+        PER_THREAD_MEMBER_SUM(counter_int_type,sum,stats,_count);
+        _stats.read_end(flags);
+        return sum;
+    }
+
+    counter_int_type byte_count() {
+        int flags;
+        const per_thread<stats>& stats = _stats.read_begin(flags);
+        PER_THREAD_MEMBER_SUM(counter_int_type,sum,stats,_byte_count);
+        _stats.read_end(flags);
+        return sum;
+    }
+
+    stats atomic_read() {
+        int flags;
+        const per_thread<stats>& stats = _stats.read_begin(flags);
+        counter_int_type count = 0;
+        counter_int_type byte_count = 0;
+        for (unsigned i = 0; i < stats.weight(); i++) { \
+            count += stats.get_value(i)._count;
+            byte_count += stats.get_value(i)._byte_count;
+        }
+        _stats.read_end(flags);
+        return {count,byte_count};
+    }
+protected:
+    click_rcu<per_thread<stats> > _stats;
+};
+
+class CounterRCU : public CounterBase { public:
+
+    CounterRCU() CLICK_COLD;
+    ~CounterRCU() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterRCU"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("CounterRCU", name) == 0)
+            return (CounterRCU *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
+
+    counter_int_type count() {
+        int flags;
+        const stats& stats = _stats.read_begin(flags);
+        counter_int_type sum = stats._count;
+        _stats.read_end(flags);
+        return sum;
+    }
+
+    counter_int_type byte_count() {
+        int flags;
+        const stats& stats = _stats.read_begin(flags);
+        counter_int_type sum = stats._byte_count;
+        _stats.read_end(flags);
+        return sum;
+    }
+
+    stats atomic_read() {
+        int flags;
+        const stats& s = _stats.read_begin(flags);
+        stats copy = s;
+        _stats.read_end(flags);
+        return copy;
+    }
+protected:
+    click_rcu<stats> _stats;
 };
 
 
@@ -279,11 +402,61 @@ class CounterAtomic : public CounterBase { public:
         return _byte_count;
     }
 
+    stats atomic_read() {  //This is NOT atomic between the two fields
+        return {_count, _byte_count};
+    }
+
 protected:
     counter_atomic_int_type _count;
     counter_atomic_int_type _byte_count;
 };
 
+class CounterLock : public CounterBase { public:
+
+    CounterLock() CLICK_COLD;
+    ~CounterLock() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterLock"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("CounterLock", name) == 0)
+            return (CounterLock *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
+
+    counter_int_type count() {
+        return _count;
+    }
+
+    counter_int_type byte_count() {
+        return _byte_count;
+    }
+
+    stats atomic_read() {
+        stats s;
+        _lock.acquire();
+        s = {_count, _byte_count};
+        click_read_fence();
+        _lock.release();
+        return s;
+    }
+
+protected:
+    volatile counter_int_type _count;
+    volatile counter_int_type _byte_count;
+    Spinlock _lock;
+};
 
 CLICK_ENDDECLS
 #endif

@@ -173,7 +173,7 @@ public:
      * This may not the number of threads, only use this
      * to iterate with get_value()/set_value(), not get_value_for_thread()
      */
-    inline unsigned weight() {
+    inline unsigned weight() const {
         return _size;
     }
 
@@ -321,7 +321,7 @@ public:
         storage[i] = v;
     }
 
-    inline unsigned weight() {
+    inline unsigned weight() const {
         return _size;
     }
 };
@@ -466,7 +466,7 @@ class per_thread_arithmetic { public:
  * This works by having a ring of N elements. The writer updates the next
  * element of the ring, and when it has finished, it updates the current ring
  * index to the next element. For fast wrap-up computing, N must be
- * a power of 2.
+ * a power of 2 and at least 2.
  *
  * Using a ring allows for getting rid of atomic reference count, but introduces
  * the N problem.
@@ -553,11 +553,11 @@ protected:
 
 
 /**
- * unprotected_rcu works like click_rcu but can have multiple writer.
+ * unprotected_rcu works like unprotected_rcu_singlewriter but can have multiple writer.
  *
  * Usage is the same but attempt to write use a spinlock. In handlers or
  * other slow path, use this version. In other cases, double check if there could
- * be multiple writers at the same time, and if not, use click_rcu.
+ * be multiple writers at the same time, and if not, use unprotected_rcu_singlewriter.
  *
  * Failing to call write_commit() will cause a dead lock !!!
  *
@@ -1018,7 +1018,7 @@ bool __rwlock<V>::read_to_write() {
 }
 
 /**
- * click_rcu is the ultimate version of the click_rcu series, the more
+ * click_rcu is the ultimate version of the RCU series, the more
  * protected one which will always work but also the slowest one.
  *
  * The problem of unprotected_rcu* is solved by keeping
@@ -1026,7 +1026,7 @@ bool __rwlock<V>::read_to_write() {
  * bucket. The writer will wait for all readers to finish before
  * overwriting the next available slot.
  *
- * The writers exclude each other by setting the refcnt
+ * Here, the writers exclude each other by setting the refcnt
  * to -1 atomically, if the value was 0. They will spinloop around
  * the refcnt until each other writer has finished.
  *

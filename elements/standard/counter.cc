@@ -344,6 +344,97 @@ CounterMP::reset()
     _count_triggered = _byte_triggered = false;
 }
 
+CounterRCUMP::CounterRCUMP()
+{
+}
+
+CounterRCUMP::~CounterRCUMP()
+{
+}
+
+Packet*
+CounterRCUMP::simple_action(Packet *p)
+{
+    per_thread<stats>& stats = _stats.write_begin();
+    stats->_count++;
+    stats->_byte_count += p->length();
+    _stats.write_commit();
+    return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+CounterRCUMP::simple_action_batch(PacketBatch *batch)
+{
+  counter_int_type bc = 0;
+  FOR_EACH_PACKET(batch,p) {
+      bc += p->length();
+  }
+  per_thread<stats>& stats = _stats.write_begin();
+  stats->_count += batch->count();
+  stats->_byte_count += bc;
+  _stats.write_commit();
+  return batch;
+}
+#endif
+
+void
+CounterRCUMP::reset()
+{
+    per_thread<stats>& stats = _stats.write_begin();
+    for (unsigned i = 0; i < stats.weight(); i++) { \
+        stats.get_value(i)._count = 0;
+        stats.get_value(i)._byte_count = 0;
+    }
+    _stats.write_commit();
+    _count_triggered = _byte_triggered = false;
+}
+
+CounterRCU::CounterRCU()
+{
+}
+
+CounterRCU::~CounterRCU()
+{
+}
+
+Packet*
+CounterRCU::simple_action(Packet *p)
+{
+    stats& stats = _stats.write_begin();
+    stats._count++;
+    stats._byte_count += p->length();
+    _stats.write_commit();
+  return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+CounterRCU::simple_action_batch(PacketBatch *batch)
+{
+
+  counter_int_type bc = 0;
+  FOR_EACH_PACKET(batch,p) {
+      bc += p->length();
+  }
+  stats& stats = _stats.write_begin();
+  stats._count += batch->count();
+  stats._byte_count += bc;
+  _stats.write_commit();
+  return batch;
+}
+#endif
+
+void
+CounterRCU::reset()
+{
+    stats& stats = _stats.write_begin();
+    stats._count = 0;
+    stats._byte_count = 0;
+    _stats.write_commit();
+    _count_triggered = _byte_triggered = false;
+}
+
 
 CounterAtomic::CounterAtomic()
 {
@@ -383,6 +474,51 @@ CounterAtomic::reset()
   _count_triggered = _byte_triggered = false;
 }
 
+
+CounterLock::CounterLock()
+{
+}
+
+CounterLock::~CounterLock()
+{
+}
+
+Packet*
+CounterLock::simple_action(Packet *p)
+{
+   _lock.acquire();
+  _count++;
+  _byte_count += p->length();
+  _lock.release();
+  return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+CounterLock::simple_action_batch(PacketBatch *batch)
+{
+  _lock.acquire();
+  counter_int_type bc = 0;
+  FOR_EACH_PACKET(batch,p) {
+      bc += p->length();
+  }
+  _count += batch->count();
+  _byte_count += bc;
+  _lock.release();
+  return batch;
+}
+#endif
+
+void
+CounterLock::reset()
+{
+   _lock.acquire();
+  _count = 0;
+  _byte_count = 0;
+  _lock.release();
+  _count_triggered = _byte_triggered = false;
+}
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(Counter)
@@ -390,3 +526,9 @@ EXPORT_ELEMENT(CounterMP)
 ELEMENT_MT_SAFE(CounterMP)
 EXPORT_ELEMENT(CounterAtomic)
 ELEMENT_MT_SAFE(CounterAtomic)
+EXPORT_ELEMENT(CounterRCU)
+ELEMENT_MT_SAFE(CounterRCU)
+EXPORT_ELEMENT(CounterRCUMP)
+ELEMENT_MT_SAFE(CounterRCUMP)
+EXPORT_ELEMENT(CounterLock)
+ELEMENT_MT_SAFE(CounterLock)
