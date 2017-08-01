@@ -138,7 +138,11 @@ class CounterBase : public BatchElement, public CounterT { public:
     void* cast(const char *name);
 
     virtual bool can_atomic() { return false; } CLICK_COLD;
-    virtual void reset() = 0;
+    virtual void reset() {
+        if (likely(_simple))
+            return;
+        _count_triggered = _byte_triggered = false;
+    }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
@@ -169,7 +173,7 @@ class CounterBase : public BatchElement, public CounterT { public:
     bool _byte_triggered : 1;
     bool _batch_precise;
     bool _atomic;
-
+    bool _simple;
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
 };

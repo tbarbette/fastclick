@@ -26,7 +26,7 @@
 CLICK_DECLS
 
 CounterBase::CounterBase()
-: _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false), _atomic(false)
+: _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false), _atomic(false), _simple(false)
 {
 }
 
@@ -49,13 +49,24 @@ int
 CounterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String count_call, byte_count_call;
+    bool norate;
     if (Args(conf, this, errh)
+            .read("NO_RATE",norate)
             .read("COUNT_CALL", AnyArg(), count_call)
             .read("BYTE_COUNT_CALL", AnyArg(), byte_count_call)
             .read("BATCH_PRECISE", _batch_precise)
             .read("ATOMIC", _atomic)
             .complete() < 0)
         return -1;
+
+    if (!count_call && !byte_count_call) {
+        if (norate)
+            _simple = true;
+    } else {
+        if (norate)
+            errh->warning("NO_RATE cannot be set when handlers are used. It will be ignored");
+    }
+
 
     if (count_call) {
         IntArg ia;
@@ -235,6 +246,9 @@ Counter::simple_action(Packet *p)
 {
     _count++;
     _byte_count += p->length();
+
+    if (likely(_simple))
+        return p;
     _rate.update(1);
     _byte_rate.update(p->length());
 
@@ -261,6 +275,8 @@ Counter::simple_action_batch(PacketBatch *batch)
         FOR_EACH_PACKET(batch,p) {
             _count ++;
             _byte_count += p->length();
+            if (likely(_simple))
+                return batch;
             _rate.update(1);
             _byte_rate.update(p->length());
 
@@ -283,6 +299,9 @@ Counter::simple_action_batch(PacketBatch *batch)
 
         _count += batch->count();
         _byte_count += bc;
+
+        if (likely(_simple))
+            return batch;
         _rate.update(batch->count());
         _byte_rate.update(bc);
 
@@ -306,7 +325,7 @@ Counter::reset()
 {
     _count = 0;
     _byte_count = 0;
-    _count_triggered = _byte_triggered = false;
+    CounterBase::reset();
 }
 
 CounterMP::CounterMP()
@@ -356,9 +375,9 @@ CounterMP::reset()
         _stats.get_value(i)._count = 0;
         _stats.get_value(i)._byte_count = 0;
     }
+    CounterBase::reset();
     if (_atomic)
         _atomic_lock.write_end();
-    _count_triggered = _byte_triggered = false;
 }
 
 CounterRCUMP::CounterRCUMP()
@@ -403,8 +422,8 @@ CounterRCUMP::reset()
         stats.get_value(i)._count = 0;
     stats.get_value(i)._byte_count = 0;
     }
+    CounterBase::reset();
     _stats.write_commit();
-    _count_triggered = _byte_triggered = false;
 }
 
 CounterRCU::CounterRCU()
@@ -448,8 +467,8 @@ CounterRCU::reset()
     stats& stats = _stats.write_begin();
     stats._count = 0;
     stats._byte_count = 0;
+    CounterBase::reset();
     _stats.write_commit();
-    _count_triggered = _byte_triggered = false;
 }
 
 
@@ -488,7 +507,7 @@ CounterAtomic::reset()
 {
     _count = 0;
     _byte_count = 0;
-    _count_triggered = _byte_triggered = false;
+    CounterBase::reset();
 }
 
 
@@ -532,8 +551,8 @@ CounterLock::reset()
     _lock.acquire();
     _count = 0;
     _byte_count = 0;
+    CounterBase::reset();
     _lock.release();
-    _count_triggered = _byte_triggered = false;
 }
 
 CLICK_ENDDECLS
