@@ -1,5 +1,5 @@
 %info
-Tests the Pipeliner element
+Tests the Pipeliner element, in ALWAYS_UP mode
 
 %require
 click-buildtool provides umultithread
@@ -13,7 +13,7 @@ $VALGRIND click -j 8 -e '
         StaticThreadSched(rs $thid)
     }
 
-    cin :: CounterMP -> Pipeliner(BLOCKING true) -> cpu::CPUSwitch -> cout :: Counter -> Discard
+    cin :: CounterMP -> Pipeliner(BLOCKING true, ALWAYS_UP true) -> cpu::CPUSwitch -> cout :: Counter -> Discard
 
     Core(1) -> cin
     Core(2) -> cin

@@ -1,0 +1,42 @@
+%info
+Tests is_fullpush computation.
+
+%require
+click-buildtool provides umultithread nonatomicfp
+
+%script
+click --threads=2 -e '
+	StaticThreadSched(rs1 0, d1 0, rs2 1, d2 1);
+	rs1 :: RatedSource -> q1 :: Queue -> d1 :: Discard;
+	rs2 :: RatedSource -> q2 :: Pipeliner -> d2 :: Discard;
+	rs3 :: RatedSource -> d3 :: Discard;
+	rs4a :: RatedSource -> d4 :: Discard;
+	rs4b :: RatedSource -> d4;
+	rs5a :: RatedSource -> d5 :: Discard;
+	rs5b :: RatedSource -> d5;
+	StaticThreadSched(rs5a 0, rs5b 1);
+
+	Script(print rs1.is_fullpush, print d1.is_fullpush,
+	       print rs2.is_fullpush, print d2.is_fullpush,
+           print rs3.is_fullpush, print d3.is_fullpush,
+           print rs4a.is_fullpush, print rs4b.is_fullpush, print d4.is_fullpush,
+
+           print rs5a.is_fullpush, print rs5b.is_fullpush, print d5.is_fullpush,
+           stop)
+'
+
+%expect stdout
+true
+false
+true
+false
+true
+true
+true
+true
+true
+true
+true
+true
+
+

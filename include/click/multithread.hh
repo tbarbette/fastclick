@@ -91,7 +91,10 @@ public:
     }
 
     ~per_thread() {
-        delete[] storage;
+        if (_size) {
+            delete[] storage;
+            _size = 0;
+        }
     }
 
     inline T* operator->() const {
@@ -125,6 +128,17 @@ public:
     inline T& operator=(T value) const {
         storage[click_current_cpu_id()].v = value;
         return storage[click_current_cpu_id()].v;
+    }
+
+    inline void operator=(const per_thread<T>& pt) {
+        if (_size != pt._size) {
+            if (storage)
+                delete[] storage;
+            storage = new AT[_size];
+        }
+        for (int i = 0; i < pt.weight(); i++) {
+            storage[i] = pt.storage[i];
+        }
     }
 
     inline void set(T v) {
@@ -1132,6 +1146,8 @@ class click_rcu { public:
         refcnt[1] = 0;
         initialize(v);
     }
+
+    ~click_rcu() {}
 
     inline void initialize(T v) {
         storage[rcu_current] = v;
