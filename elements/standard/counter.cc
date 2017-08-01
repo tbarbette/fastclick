@@ -26,14 +26,14 @@
 CLICK_DECLS
 
 CounterBase::CounterBase()
-  : _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false)
+: _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false), _atomic(false)
 {
 }
 
 CounterBase::~CounterBase()
 {
-  delete _count_trigger_h;
-  delete _byte_trigger_h;
+    delete _count_trigger_h;
+    delete _byte_trigger_h;
 }
 
 void*
@@ -48,55 +48,60 @@ CounterBase::cast(const char *name)
 int
 CounterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  String count_call, byte_count_call;
-  if (Args(conf, this, errh)
-      .read("COUNT_CALL", AnyArg(), count_call)
-      .read("BYTE_COUNT_CALL", AnyArg(), byte_count_call)
-      .read("BATCH_PRECISE", _batch_precise)
-      .complete() < 0)
-    return -1;
+    String count_call, byte_count_call;
+    if (Args(conf, this, errh)
+            .read("COUNT_CALL", AnyArg(), count_call)
+            .read("BYTE_COUNT_CALL", AnyArg(), byte_count_call)
+            .read("BATCH_PRECISE", _batch_precise)
+            .read("ATOMIC", _atomic)
+            .complete() < 0)
+        return -1;
 
-  if (count_call) {
-    IntArg ia;
-    if (!ia.parse_saturating(cp_shift_spacevec(count_call), _count_trigger))
-      return errh->error("COUNT_CALL type mismatch");
-    else if (ia.status == IntArg::status_range)
-      errh->error("COUNT_CALL overflow, max %s", String(_count_trigger).c_str());
-    _count_trigger_h = new HandlerCall(count_call);
-  } else
-    _count_trigger = (counter_int_type)(-1);
+    if (count_call) {
+        IntArg ia;
+        if (!ia.parse_saturating(cp_shift_spacevec(count_call), _count_trigger))
+            return errh->error("COUNT_CALL type mismatch");
+        else if (ia.status == IntArg::status_range)
+            errh->error("COUNT_CALL overflow, max %s", String(_count_trigger).c_str());
+        _count_trigger_h = new HandlerCall(count_call);
+    } else
+        _count_trigger = (counter_int_type)(-1);
 
-  if (byte_count_call) {
-    IntArg ia;
-    if (!ia.parse_saturating(cp_shift_spacevec(byte_count_call), _byte_trigger))
-      return errh->error("BYTE_COUNT_CALL type mismatch");
-    else if (ia.status == IntArg::status_range)
-      errh->error("BYTE_COUNT_CALL overflow, max %s", String(_count_trigger).c_str());
-    _byte_trigger_h = new HandlerCall(byte_count_call);
-  } else
-    _byte_trigger = (counter_int_type)(-1);
+    if (byte_count_call) {
+        IntArg ia;
+        if (!ia.parse_saturating(cp_shift_spacevec(byte_count_call), _byte_trigger))
+            return errh->error("BYTE_COUNT_CALL type mismatch");
+        else if (ia.status == IntArg::status_range)
+            errh->error("BYTE_COUNT_CALL overflow, max %s", String(_count_trigger).c_str());
+        _byte_trigger_h = new HandlerCall(byte_count_call);
+    } else
+        _byte_trigger = (counter_int_type)(-1);
 
-  if ((count_call || byte_count_call) && name() == "CounterMP") {
-	  return errh->error("CounterMP cannot use handler calls");
-  }
+    if ((count_call || byte_count_call) && name() == "CounterMP") {
+        return errh->error("CounterMP cannot use handler calls");
+    }
 
-  return 0;
+    return 0;
 }
 
 int
 CounterBase::initialize(ErrorHandler *errh)
 {
-  if (_count_trigger_h && _count_trigger_h->initialize_write(this, errh) < 0)
-    return -1;
-  if (_byte_trigger_h && _byte_trigger_h->initialize_write(this, errh) < 0)
-    return -1;
-  reset();
-  return 0;
+    if (_count_trigger_h && _count_trigger_h->initialize_write(this, errh) < 0)
+        return -1;
+    if (_byte_trigger_h && _byte_trigger_h->initialize_write(this, errh) < 0)
+        return -1;
+    reset();
+
+    if (_atomic && !can_atomic()) {
+        return errh->error("Sorry, %s does not support atomic",class_name());
+    }
+    return 0;
 }
 
 enum { H_COUNT, H_BYTE_COUNT, H_RESET,
-       H_COUNT_CALL, H_BYTE_COUNT_CALL,
-       H_RATE = 0x100, H_BIT_RATE, H_BYTE_RATE,};
+    H_COUNT_CALL, H_BYTE_COUNT_CALL,
+    H_RATE = 0x100, H_BIT_RATE, H_BYTE_RATE,};
 
 String
 CounterBase::read_handler(Element *e, void *thunk)
@@ -106,31 +111,31 @@ CounterBase::read_handler(Element *e, void *thunk)
         return "CounterMP does not support rate operations";
     }
     switch ((intptr_t)thunk) {
-      case H_COUNT:
-	return String(c->count());
-      case H_BYTE_COUNT:
-	return String(c->byte_count());
-      case H_RATE:
-	c->_rate.update(0);	// drop rate after idle period
-	return c->_rate.unparse_rate();
-      case H_BIT_RATE:
-	c->_byte_rate.update(0); // drop rate after idle period
-	// avoid integer overflow by adjusting scale factor instead of
-	// multiplying
-	if (c->_byte_rate.scale() >= 3)
-	    return cp_unparse_real2(c->_byte_rate.scaled_average() * c->_byte_rate.epoch_frequency(), c->_byte_rate.scale() - 3);
-	else
-	    return cp_unparse_real2(c->_byte_rate.scaled_average() * c->_byte_rate.epoch_frequency() * 8, c->_byte_rate.scale());
-      case H_BYTE_RATE:
-	c->_byte_rate.update(0); // drop rate after idle period
-	return c->_byte_rate.unparse_rate();
-      case H_COUNT_CALL:
-	if (c->_count_trigger_h)
-	    return String(c->_count_trigger);
-	else
-	    return String();
-      default:
-	return "<error>";
+    case H_COUNT:
+        return String(c->count());
+    case H_BYTE_COUNT:
+        return String(c->byte_count());
+    case H_RATE:
+        c->_rate.update(0);	// drop rate after idle period
+        return c->_rate.unparse_rate();
+    case H_BIT_RATE:
+        c->_byte_rate.update(0); // drop rate after idle period
+        // avoid integer overflow by adjusting scale factor instead of
+        // multiplying
+        if (c->_byte_rate.scale() >= 3)
+            return cp_unparse_real2(c->_byte_rate.scaled_average() * c->_byte_rate.epoch_frequency(), c->_byte_rate.scale() - 3);
+        else
+            return cp_unparse_real2(c->_byte_rate.scaled_average() * c->_byte_rate.epoch_frequency() * 8, c->_byte_rate.scale());
+    case H_BYTE_RATE:
+        c->_byte_rate.update(0); // drop rate after idle period
+        return c->_byte_rate.unparse_rate();
+    case H_COUNT_CALL:
+        if (c->_count_trigger_h)
+            return String(c->_count_trigger);
+        else
+            return String();
+    default:
+        return "<error>";
     }
 }
 
@@ -140,25 +145,25 @@ CounterBase::write_handler(const String &in_str, Element *e, void *thunk, ErrorH
     CounterBase *c = (CounterBase *)e;
     String str = cp_uncomment(in_str);
     switch ((intptr_t)thunk) {
-      case H_COUNT_CALL:
-	  if (!IntArg().parse(cp_shift_spacevec(str), c->_count_trigger))
-	    return errh->error("'count_call' first word should be unsigned (count)");
-	if (HandlerCall::reset_write(c->_count_trigger_h, str, c, errh) < 0)
-	    return -1;
-	c->_count_triggered = false;
-	return 0;
-      case H_BYTE_COUNT_CALL:
-	  if (!IntArg().parse(cp_shift_spacevec(str), c->_byte_trigger))
-	    return errh->error("'byte_count_call' first word should be unsigned (count)");
-	if (HandlerCall::reset_write(c->_byte_trigger_h, str, c, errh) < 0)
-	    return -1;
-	c->_byte_triggered = false;
-	return 0;
-      case H_RESET:
-	c->reset();
-	return 0;
-      default:
-	return errh->error("<internal>");
+    case H_COUNT_CALL:
+        if (!IntArg().parse(cp_shift_spacevec(str), c->_count_trigger))
+            return errh->error("'count_call' first word should be unsigned (count)");
+        if (HandlerCall::reset_write(c->_count_trigger_h, str, c, errh) < 0)
+            return -1;
+        c->_count_triggered = false;
+        return 0;
+    case H_BYTE_COUNT_CALL:
+        if (!IntArg().parse(cp_shift_spacevec(str), c->_byte_trigger))
+            return errh->error("'byte_count_call' first word should be unsigned (count)");
+        if (HandlerCall::reset_write(c->_byte_trigger_h, str, c, errh) < 0)
+            return -1;
+        c->_byte_triggered = false;
+        return 0;
+    case H_RESET:
+        c->reset();
+        return 0;
+    default:
+        return errh->error("<internal>");
     }
 }
 
@@ -182,39 +187,39 @@ CounterBase::add_handlers()
 int
 CounterBase::llrpc(unsigned command, void *data)
 {
-  if (command == CLICK_LLRPC_GET_RATE) {
-    uint32_t *val = reinterpret_cast<uint32_t *>(data);
-    if (*val != 0)
-      return -EINVAL;
-    _rate.update(0);		// drop rate after idle period
-    *val = _rate.rate();
-    return 0;
+    if (command == CLICK_LLRPC_GET_RATE) {
+        uint32_t *val = reinterpret_cast<uint32_t *>(data);
+        if (*val != 0)
+            return -EINVAL;
+        _rate.update(0);		// drop rate after idle period
+        *val = _rate.rate();
+        return 0;
 
-  } else if (command == CLICK_LLRPC_GET_COUNT) {
-    uint32_t *val = reinterpret_cast<uint32_t *>(data);
-    if (*val != 0 && *val != 1)
-      return -EINVAL;
-    *val = (*val == 0 ? count() : byte_count());
-    return 0;
+    } else if (command == CLICK_LLRPC_GET_COUNT) {
+        uint32_t *val = reinterpret_cast<uint32_t *>(data);
+        if (*val != 0 && *val != 1)
+            return -EINVAL;
+        *val = (*val == 0 ? count() : byte_count());
+        return 0;
 
-  } else if (command == CLICK_LLRPC_GET_COUNTS) {
-    click_llrpc_counts_st *user_cs = (click_llrpc_counts_st *)data;
-    click_llrpc_counts_st cs;
-    if (CLICK_LLRPC_GET_DATA(&cs, data, sizeof(cs.n) + sizeof(cs.keys)) < 0
-	|| cs.n >= CLICK_LLRPC_COUNTS_SIZE)
-      return -EINVAL;
-    for (unsigned i = 0; i < cs.n; i++) {
-      if (cs.keys[i] == 0)
-	cs.values[i] = count();
-      else if (cs.keys[i] == 1)
-	cs.values[i] = byte_count();
-      else
-	return -EINVAL;
-    }
-    return CLICK_LLRPC_PUT_DATA(&user_cs->values, &cs.values, sizeof(cs.values));
+    } else if (command == CLICK_LLRPC_GET_COUNTS) {
+        click_llrpc_counts_st *user_cs = (click_llrpc_counts_st *)data;
+        click_llrpc_counts_st cs;
+        if (CLICK_LLRPC_GET_DATA(&cs, data, sizeof(cs.n) + sizeof(cs.keys)) < 0
+                || cs.n >= CLICK_LLRPC_COUNTS_SIZE)
+            return -EINVAL;
+        for (unsigned i = 0; i < cs.n; i++) {
+            if (cs.keys[i] == 0)
+                cs.values[i] = count();
+            else if (cs.keys[i] == 1)
+                cs.values[i] = byte_count();
+            else
+                return -EINVAL;
+        }
+        return CLICK_LLRPC_PUT_DATA(&user_cs->values, &cs.values, sizeof(cs.values));
 
-  } else
-    return Element::llrpc(command, data);
+    } else
+        return Element::llrpc(command, data);
 }
 
 Counter::Counter()
@@ -233,18 +238,18 @@ Counter::simple_action(Packet *p)
     _rate.update(1);
     _byte_rate.update(p->length());
 
-  if (_count == _count_trigger && !_count_triggered) {
-    _count_triggered = true;
-    if (_count_trigger_h)
-      (void) _count_trigger_h->call_write();
-  }
-  if (_byte_count >= _byte_trigger && !_byte_triggered) {
-    _byte_triggered = true;
-    if (_byte_trigger_h)
-      (void) _byte_trigger_h->call_write();
-  }
+    if (_count == _count_trigger && !_count_triggered) {
+        _count_triggered = true;
+        if (_count_trigger_h)
+            (void) _count_trigger_h->call_write();
+    }
+    if (_byte_count >= _byte_trigger && !_byte_triggered) {
+        _byte_triggered = true;
+        if (_byte_trigger_h)
+            (void) _byte_trigger_h->call_write();
+    }
 
-  return p;
+    return p;
 }
 
 
@@ -252,56 +257,56 @@ Counter::simple_action(Packet *p)
 PacketBatch*
 Counter::simple_action_batch(PacketBatch *batch)
 {
-  if (unlikely(_batch_precise)) {
-      FOR_EACH_PACKET(batch,p) {
-          _count ++;
-          _byte_count += p->length();
-          _rate.update(1);
-          _byte_rate.update(p->length());
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p) {
+            _count ++;
+            _byte_count += p->length();
+            _rate.update(1);
+            _byte_rate.update(p->length());
 
-          if (_count == _count_trigger && !_count_triggered) {
+            if (_count == _count_trigger && !_count_triggered) {
+                _count_triggered = true;
+                if (_count_trigger_h)
+                    (void) _count_trigger_h->call_write();
+            }
+            if (_byte_count == _byte_trigger && !_byte_triggered) {
+                _byte_triggered = true;
+                if (_byte_trigger_h)
+                    (void) _byte_trigger_h->call_write();
+            }
+        }
+    } else {
+        counter_int_type bc = 0;
+        FOR_EACH_PACKET(batch,p) {
+            bc += p->length();
+        }
+
+        _count += batch->count();
+        _byte_count += bc;
+        _rate.update(batch->count());
+        _byte_rate.update(bc);
+
+        if (_count >= _count_trigger && !_count_triggered) {
             _count_triggered = true;
             if (_count_trigger_h)
-              (void) _count_trigger_h->call_write();
-          }
-          if (_byte_count == _byte_trigger && !_byte_triggered) {
+                (void) _count_trigger_h->call_write();
+        }
+        if (_byte_count >= _byte_trigger && !_byte_triggered) {
             _byte_triggered = true;
             if (_byte_trigger_h)
-              (void) _byte_trigger_h->call_write();
-          }
-      }
-  } else {
-      counter_int_type bc = 0;
-      FOR_EACH_PACKET(batch,p) {
-          bc += p->length();
-      }
-
-      _count += batch->count();
-      _byte_count += bc;
-      _rate.update(batch->count());
-      _byte_rate.update(bc);
-
-      if (_count >= _count_trigger && !_count_triggered) {
-        _count_triggered = true;
-        if (_count_trigger_h)
-          (void) _count_trigger_h->call_write();
-      }
-      if (_byte_count >= _byte_trigger && !_byte_triggered) {
-        _byte_triggered = true;
-        if (_byte_trigger_h)
-          (void) _byte_trigger_h->call_write();
-      }
-  }
-  return batch;
+                (void) _byte_trigger_h->call_write();
+        }
+    }
+    return batch;
 }
 #endif
 
 void
 Counter::reset()
 {
-  _count = 0;
-  _byte_count = 0;
-  _count_triggered = _byte_triggered = false;
+    _count = 0;
+    _byte_count = 0;
+    _count_triggered = _byte_triggered = false;
 }
 
 CounterMP::CounterMP()
@@ -315,32 +320,44 @@ CounterMP::~CounterMP()
 Packet*
 CounterMP::simple_action(Packet *p)
 {
-  _stats->_count++;
-  _stats->_byte_count += p->length();
-  return p;
+    if (_atomic)
+        _atomic_lock.write_begin();
+    _stats->_count++;
+    _stats->_byte_count += p->length();
+    if (_atomic)
+        _atomic_lock.write_end();
+    return p;
 }
 
 #if HAVE_BATCH
 PacketBatch*
 CounterMP::simple_action_batch(PacketBatch *batch)
 {
-  counter_int_type bc = 0;
-  FOR_EACH_PACKET(batch,p) {
-      bc += p->length();
-  }
-  _stats->_count += batch->count();
-  _stats->_byte_count += bc;
-  return batch;
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    if (_atomic)
+        _atomic_lock.write_begin();
+    _stats->_count += batch->count();
+    _stats->_byte_count += bc;
+    if (_atomic)
+        _atomic_lock.write_end();
+    return batch;
 }
 #endif
 
 void
 CounterMP::reset()
 {
+    if (_atomic)
+        _atomic_lock.write_begin();
     for (unsigned i = 0; i < _stats.weight(); i++) { \
         _stats.get_value(i)._count = 0;
         _stats.get_value(i)._byte_count = 0;
     }
+    if (_atomic)
+        _atomic_lock.write_end();
     _count_triggered = _byte_triggered = false;
 }
 
@@ -366,15 +383,15 @@ CounterRCUMP::simple_action(Packet *p)
 PacketBatch*
 CounterRCUMP::simple_action_batch(PacketBatch *batch)
 {
-  counter_int_type bc = 0;
-  FOR_EACH_PACKET(batch,p) {
-      bc += p->length();
-  }
-  per_thread<stats>& stats = _stats.write_begin();
-  stats->_count += batch->count();
-  stats->_byte_count += bc;
-  _stats.write_commit();
-  return batch;
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    per_thread<stats>& stats = _stats.write_begin();
+    stats->_count += batch->count();
+    stats->_byte_count += bc;
+    _stats.write_commit();
+    return batch;
 }
 #endif
 
@@ -384,7 +401,7 @@ CounterRCUMP::reset()
     per_thread<stats>& stats = _stats.write_begin();
     for (unsigned i = 0; i < stats.weight(); i++) { \
         stats.get_value(i)._count = 0;
-        stats.get_value(i)._byte_count = 0;
+    stats.get_value(i)._byte_count = 0;
     }
     _stats.write_commit();
     _count_triggered = _byte_triggered = false;
@@ -405,7 +422,7 @@ CounterRCU::simple_action(Packet *p)
     stats._count++;
     stats._byte_count += p->length();
     _stats.write_commit();
-  return p;
+    return p;
 }
 
 #if HAVE_BATCH
@@ -413,15 +430,15 @@ PacketBatch*
 CounterRCU::simple_action_batch(PacketBatch *batch)
 {
 
-  counter_int_type bc = 0;
-  FOR_EACH_PACKET(batch,p) {
-      bc += p->length();
-  }
-  stats& stats = _stats.write_begin();
-  stats._count += batch->count();
-  stats._byte_count += bc;
-  _stats.write_commit();
-  return batch;
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    stats& stats = _stats.write_begin();
+    stats._count += batch->count();
+    stats._byte_count += bc;
+    _stats.write_commit();
+    return batch;
 }
 #endif
 
@@ -447,31 +464,31 @@ CounterAtomic::~CounterAtomic()
 Packet*
 CounterAtomic::simple_action(Packet *p)
 {
-  _count++;
-  _byte_count += p->length();
-  return p;
+    _count++;
+    _byte_count += p->length();
+    return p;
 }
 
 #if HAVE_BATCH
 PacketBatch*
 CounterAtomic::simple_action_batch(PacketBatch *batch)
 {
-  counter_int_type bc = 0;
-  FOR_EACH_PACKET(batch,p) {
-      bc += p->length();
-  }
-  _count += batch->count();
-  _byte_count += bc;
-  return batch;
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    _count += batch->count();
+    _byte_count += bc;
+    return batch;
 }
 #endif
 
 void
 CounterAtomic::reset()
 {
-  _count = 0;
-  _byte_count = 0;
-  _count_triggered = _byte_triggered = false;
+    _count = 0;
+    _byte_count = 0;
+    _count_triggered = _byte_triggered = false;
 }
 
 
@@ -486,37 +503,37 @@ CounterLock::~CounterLock()
 Packet*
 CounterLock::simple_action(Packet *p)
 {
-   _lock.acquire();
-  _count++;
-  _byte_count += p->length();
-  _lock.release();
-  return p;
+    _lock.acquire();
+    _count++;
+    _byte_count += p->length();
+    _lock.release();
+    return p;
 }
 
 #if HAVE_BATCH
 PacketBatch*
 CounterLock::simple_action_batch(PacketBatch *batch)
 {
-  _lock.acquire();
-  counter_int_type bc = 0;
-  FOR_EACH_PACKET(batch,p) {
-      bc += p->length();
-  }
-  _count += batch->count();
-  _byte_count += bc;
-  _lock.release();
-  return batch;
+    _lock.acquire();
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    _count += batch->count();
+    _byte_count += bc;
+    _lock.release();
+    return batch;
 }
 #endif
 
 void
 CounterLock::reset()
 {
-   _lock.acquire();
-  _count = 0;
-  _byte_count = 0;
-  _lock.release();
-  _count_triggered = _byte_triggered = false;
+    _lock.acquire();
+    _count = 0;
+    _byte_count = 0;
+    _lock.release();
+    _count_triggered = _byte_triggered = false;
 }
 
 CLICK_ENDDECLS

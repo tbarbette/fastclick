@@ -137,6 +137,7 @@ class CounterBase : public BatchElement, public CounterT { public:
 
     void* cast(const char *name);
 
+    virtual bool can_atomic() { return false; } CLICK_COLD;
     virtual void reset() = 0;
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -167,6 +168,7 @@ class CounterBase : public BatchElement, public CounterT { public:
     bool _count_triggered : 1;
     bool _byte_triggered : 1;
     bool _batch_precise;
+    bool _atomic;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
@@ -231,6 +233,8 @@ class CounterMP : public CounterBase { public:
             return CounterBase::cast(name);
     }
 
+    bool can_atomic() { return true; } CLICK_COLD;
+
     Packet *simple_action(Packet *);
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch* batch);
@@ -248,18 +252,23 @@ class CounterMP : public CounterBase { public:
         return sum;
     }
 
-    stats atomic_read() { //This is NOT atomic
+    stats atomic_read() {
+        if (_atomic)
+            _atomic_lock.read_begin();
         counter_int_type count = 0;
         counter_int_type byte_count = 0;
         for (unsigned i = 0; i < _stats.weight(); i++) { \
             count += _stats.get_value(i)._count;
             byte_count += _stats.get_value(i)._byte_count;
         }
+        if (_atomic)
+            _atomic_lock.read_end();
         return {count,byte_count};
     }
 
 protected:
     per_thread<stats> _stats;
+    rXwlock _atomic_lock;
 };
 
 class CounterRCUMP : public CounterBase { public:
@@ -278,6 +287,8 @@ class CounterRCUMP : public CounterBase { public:
         else
             return CounterBase::cast(name);
     }
+
+    bool can_atomic() { return true; } CLICK_COLD;
 
     Packet *simple_action(Packet *);
 #if HAVE_BATCH
@@ -335,6 +346,8 @@ class CounterRCU : public CounterBase { public:
             return CounterBase::cast(name);
     }
 
+    bool can_atomic() { return true; } CLICK_COLD;
+
     Packet *simple_action(Packet *);
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch* batch);
@@ -387,6 +400,9 @@ class CounterAtomic : public CounterBase { public:
             return CounterBase::cast(name);
     }
 
+    //Well, despite its name, atomic cannot return both value in one shot
+    bool can_atomic() { return false; } CLICK_COLD;
+
     Packet *simple_action(Packet *);
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch* batch);
@@ -427,6 +443,8 @@ class CounterLock : public CounterBase { public:
         else
             return CounterBase::cast(name);
     }
+
+    bool can_atomic() { return true; } CLICK_COLD;
 
     Packet *simple_action(Packet *);
 #if HAVE_BATCH
