@@ -136,6 +136,7 @@ class CounterBase : public BatchElement, public CounterT { public:
     ~CounterBase() CLICK_COLD;
 
     void* cast(const char *name);
+    bool do_mt_safe_check(ErrorHandler* errh);
 
     virtual bool can_atomic() { return false; } CLICK_COLD;
     virtual void reset() {
@@ -146,6 +147,7 @@ class CounterBase : public BatchElement, public CounterT { public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
+    inline void check_handlers(counter_int_type count, counter_int_type byte_count);
     void add_handlers() CLICK_COLD;
     int llrpc(unsigned, void *);
 
@@ -236,6 +238,7 @@ class CounterMP : public CounterBase { public:
         else
             return CounterBase::cast(name);
     }
+    int initialize(ErrorHandler *) CLICK_COLD;
 
     bool can_atomic() { return true; } CLICK_COLD;
 

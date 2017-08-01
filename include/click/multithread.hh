@@ -801,11 +801,25 @@ private:
  * has access once all writer finish.
  *
  * To stop writer from locking, the reader will CAS a very low value.
+ *
+ * If max_writer is 1, this becomes rwlock, but with a priority on the reads
  */
 
 class rXwlock { public:
-    rXwlock() {
+    rXwlock() : max_write(-65535) {
         _refcnt = 0;
+    }
+
+    rXwlock(int32_t max_writers) {
+        _refcnt = 0;
+        set_max_writers(max_writers);
+    }
+
+    void set_max_writers(int32_t max_writers) {
+        assert(max_writers < 65535);
+        read_begin();
+        max_write = - max_writers;
+        read_end();
     }
 
     inline void read_begin() {
@@ -847,13 +861,9 @@ class rXwlock { public:
         uint32_t current_refcnt;
         do {
             current_refcnt = _refcnt;
-            if (unlikely((int32_t)current_refcnt <= -65536)) {
-                //A reader is waiting, let him read
-            } else {
-                if (likely((int32_t)current_refcnt <= 0)) {
-                    if (_refcnt.compare_swap(current_refcnt,current_refcnt - 1) == current_refcnt)
-                        break;
-                }
+            if (likely((int32_t)current_refcnt <= 0 && (int32_t)current_refcnt > max_write)) {
+                if (_refcnt.compare_swap(current_refcnt,current_refcnt - 1) == current_refcnt)
+                    break;
             }
             click_relax_fence();
         } while (1);
@@ -866,6 +876,7 @@ class rXwlock { public:
 
 private:
     atomic_uint32_t _refcnt;
+    int32_t max_write;
 };
 
 template <typename V>

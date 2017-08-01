@@ -110,6 +110,18 @@ CounterBase::initialize(ErrorHandler *errh)
     return 0;
 }
 
+bool CounterBase::do_mt_safe_check(ErrorHandler* errh) {
+    Bitvector bmp = get_passing_threads();
+    int n = bmp.weight();
+    if (n <= 1)
+        return true;
+    if (!_simple && !_atomic) {
+        errh->error("Set ATOMIC to true if using handlers or rate");
+        return false;
+    }
+    return true;
+}
+
 enum { H_COUNT, H_BYTE_COUNT, H_RESET,
     H_COUNT_CALL, H_BYTE_COUNT_CALL,
     H_RATE = 0x100, H_BIT_RATE, H_BYTE_RATE,};
@@ -187,12 +199,12 @@ CounterBase::add_handlers()
         add_read_handler("rate", CounterBase::read_handler, H_RATE);
         add_read_handler("bit_rate", CounterBase::read_handler, H_BIT_RATE);
         add_read_handler("byte_rate", CounterBase::read_handler, H_BYTE_RATE);
+        add_read_handler("count_call", CounterBase::read_handler, H_COUNT_CALL);
+        add_write_handler("count_call", CounterBase::write_handler, H_COUNT_CALL);
+        add_write_handler("byte_count_call", CounterBase::write_handler, H_BYTE_COUNT_CALL);
     }
     add_write_handler("reset", CounterBase::write_handler, H_RESET, Handler::f_button);
     add_write_handler("reset_counts", CounterBase::write_handler, H_RESET, Handler::f_button | Handler::f_uncommon);
-    add_read_handler("count_call", CounterBase::read_handler, H_COUNT_CALL);
-    add_write_handler("count_call", CounterBase::write_handler, H_COUNT_CALL);
-    add_write_handler("byte_count_call", CounterBase::write_handler, H_BYTE_COUNT_CALL);
 }
 
 int
@@ -233,6 +245,20 @@ CounterBase::llrpc(unsigned command, void *data)
         return Element::llrpc(command, data);
 }
 
+inline void
+CounterBase::check_handlers(counter_int_type count, counter_int_type byte_count) {
+    if (count == _count_trigger && !_count_triggered) {
+        _count_triggered = true;
+        if (_count_trigger_h)
+            (void) _count_trigger_h->call_write();
+    }
+    if (byte_count == _byte_trigger && !_byte_triggered) {
+        _byte_triggered = true;
+        if (_byte_trigger_h)
+            (void) _byte_trigger_h->call_write();
+    }
+}
+
 Counter::Counter()
 {
 }
@@ -252,17 +278,7 @@ Counter::simple_action(Packet *p)
     _rate.update(1);
     _byte_rate.update(p->length());
 
-    if (_count == _count_trigger && !_count_triggered) {
-        _count_triggered = true;
-        if (_count_trigger_h)
-            (void) _count_trigger_h->call_write();
-    }
-    if (_byte_count >= _byte_trigger && !_byte_triggered) {
-        _byte_triggered = true;
-        if (_byte_trigger_h)
-            (void) _byte_trigger_h->call_write();
-    }
-
+    check_handlers(_count, _byte_count);
     return p;
 }
 
@@ -272,50 +288,25 @@ PacketBatch*
 Counter::simple_action_batch(PacketBatch *batch)
 {
     if (unlikely(_batch_precise)) {
-        FOR_EACH_PACKET(batch,p) {
-            _count ++;
-            _byte_count += p->length();
-            if (likely(_simple))
-                return batch;
-            _rate.update(1);
-            _byte_rate.update(p->length());
-
-            if (_count == _count_trigger && !_count_triggered) {
-                _count_triggered = true;
-                if (_count_trigger_h)
-                    (void) _count_trigger_h->call_write();
-            }
-            if (_byte_count == _byte_trigger && !_byte_triggered) {
-                _byte_triggered = true;
-                if (_byte_trigger_h)
-                    (void) _byte_trigger_h->call_write();
-            }
-        }
-    } else {
-        counter_int_type bc = 0;
-        FOR_EACH_PACKET(batch,p) {
-            bc += p->length();
-        }
-
-        _count += batch->count();
-        _byte_count += bc;
-
-        if (likely(_simple))
-            return batch;
-        _rate.update(batch->count());
-        _byte_rate.update(bc);
-
-        if (_count >= _count_trigger && !_count_triggered) {
-            _count_triggered = true;
-            if (_count_trigger_h)
-                (void) _count_trigger_h->call_write();
-        }
-        if (_byte_count >= _byte_trigger && !_byte_triggered) {
-            _byte_triggered = true;
-            if (_byte_trigger_h)
-                (void) _byte_trigger_h->call_write();
-        }
+        FOR_EACH_PACKET(batch,p)
+                                Counter::simple_action(p);
+        return batch;
     }
+
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+
+    _count += batch->count();
+    _byte_count += bc;
+
+    if (likely(_simple))
+        return batch;
+    _rate.update(batch->count());
+    _byte_rate.update(bc);
+
+    check_handlers(_count, _byte_count);
     return batch;
 }
 #endif
@@ -336,6 +327,16 @@ CounterMP::~CounterMP()
 {
 }
 
+int
+CounterMP::initialize(ErrorHandler *errh) {
+    if (CounterBase::initialize(errh) != 0)
+        return -1;
+    //If not in simple mode, we only allow one writer so we can sum up the total number of threads
+    if (!_simple)
+        _atomic_lock.set_max_writers(1);
+    return 0;
+}
+
 Packet*
 CounterMP::simple_action(Packet *p)
 {
@@ -343,6 +344,8 @@ CounterMP::simple_action(Packet *p)
         _atomic_lock.write_begin();
     _stats->_count++;
     _stats->_byte_count += p->length();
+    if (unlikely(!_simple))
+        check_handlers(CounterMP::count(), CounterMP::byte_count());
     if (_atomic)
         _atomic_lock.write_end();
     return p;
@@ -352,6 +355,12 @@ CounterMP::simple_action(Packet *p)
 PacketBatch*
 CounterMP::simple_action_batch(PacketBatch *batch)
 {
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+                                CounterMP::simple_action(p);
+        return batch;
+    }
+
     counter_int_type bc = 0;
     FOR_EACH_PACKET(batch,p) {
         bc += p->length();
@@ -360,6 +369,8 @@ CounterMP::simple_action_batch(PacketBatch *batch)
         _atomic_lock.write_begin();
     _stats->_count += batch->count();
     _stats->_byte_count += bc;
+    if (unlikely(!_simple))
+        check_handlers(CounterMP::count(), CounterMP::byte_count());
     if (_atomic)
         _atomic_lock.write_end();
     return batch;
@@ -373,14 +384,14 @@ CounterMP::reset()
         _atomic_lock.write_begin();
     for (unsigned i = 0; i < _stats.weight(); i++) { \
         _stats.get_value(i)._count = 0;
-        _stats.get_value(i)._byte_count = 0;
+    _stats.get_value(i)._byte_count = 0;
     }
     CounterBase::reset();
     if (_atomic)
         _atomic_lock.write_end();
 }
 
-CounterRCUMP::CounterRCUMP()
+CounterRCUMP::CounterRCUMP() : _stats()
 {
 }
 
@@ -394,6 +405,11 @@ CounterRCUMP::simple_action(Packet *p)
     per_thread<stats>& stats = _stats.write_begin();
     stats->_count++;
     stats->_byte_count += p->length();
+    if (unlikely(!_simple)) {
+        PER_THREAD_MEMBER_SUM(counter_int_type,count,stats,_count);
+        PER_THREAD_MEMBER_SUM(counter_int_type,byte_count,stats,_byte_count);
+        check_handlers(count,byte_count);
+    }
     _stats.write_commit();
     return p;
 }
@@ -402,6 +418,12 @@ CounterRCUMP::simple_action(Packet *p)
 PacketBatch*
 CounterRCUMP::simple_action_batch(PacketBatch *batch)
 {
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+                                CounterRCUMP::simple_action(p);
+        return batch;
+    }
+
     counter_int_type bc = 0;
     FOR_EACH_PACKET(batch,p) {
         bc += p->length();
@@ -409,6 +431,11 @@ CounterRCUMP::simple_action_batch(PacketBatch *batch)
     per_thread<stats>& stats = _stats.write_begin();
     stats->_count += batch->count();
     stats->_byte_count += bc;
+    if (unlikely(!_simple)) {
+        PER_THREAD_MEMBER_SUM(counter_int_type,count,stats,_count);
+        PER_THREAD_MEMBER_SUM(counter_int_type,byte_count,stats,_byte_count);
+        check_handlers(count,byte_count);
+    }
     _stats.write_commit();
     return batch;
 }
@@ -420,7 +447,7 @@ CounterRCUMP::reset()
     per_thread<stats>& stats = _stats.write_begin();
     for (unsigned i = 0; i < stats.weight(); i++) { \
         stats.get_value(i)._count = 0;
-    stats.get_value(i)._byte_count = 0;
+        stats.get_value(i)._byte_count = 0;
     }
     CounterBase::reset();
     _stats.write_commit();
@@ -440,6 +467,9 @@ CounterRCU::simple_action(Packet *p)
     stats& stats = _stats.write_begin();
     stats._count++;
     stats._byte_count += p->length();
+    if (unlikely(!_simple)) {
+        check_handlers(stats._count, stats._byte_count);
+    }
     _stats.write_commit();
     return p;
 }
@@ -448,6 +478,11 @@ CounterRCU::simple_action(Packet *p)
 PacketBatch*
 CounterRCU::simple_action_batch(PacketBatch *batch)
 {
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+                                CounterRCU::simple_action(p);
+        return batch;
+    }
 
     counter_int_type bc = 0;
     FOR_EACH_PACKET(batch,p) {
@@ -456,6 +491,9 @@ CounterRCU::simple_action_batch(PacketBatch *batch)
     stats& stats = _stats.write_begin();
     stats._count += batch->count();
     stats._byte_count += bc;
+    if (unlikely(!_simple)) {
+        check_handlers(stats._count, stats._byte_count);
+    }
     _stats.write_commit();
     return batch;
 }
@@ -485,6 +523,9 @@ CounterAtomic::simple_action(Packet *p)
 {
     _count++;
     _byte_count += p->length();
+    if (likely(_simple))
+        return p;
+    check_handlers(_count, _byte_count); //BUG : may run multiple times
     return p;
 }
 
@@ -492,12 +533,21 @@ CounterAtomic::simple_action(Packet *p)
 PacketBatch*
 CounterAtomic::simple_action_batch(PacketBatch *batch)
 {
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+                        CounterAtomic::simple_action(p);
+        return batch;
+    }
+
     counter_int_type bc = 0;
     FOR_EACH_PACKET(batch,p) {
         bc += p->length();
     }
     _count += batch->count();
     _byte_count += bc;
+    if (likely(_simple))
+        return batch;
+    check_handlers(_count, _byte_count); //BUG : may run multiple times
     return batch;
 }
 #endif
@@ -525,6 +575,9 @@ CounterLock::simple_action(Packet *p)
     _lock.acquire();
     _count++;
     _byte_count += p->length();
+    if (unlikely(!_simple)) {
+        check_handlers(_count, _byte_count);
+    }
     _lock.release();
     return p;
 }
@@ -533,6 +586,12 @@ CounterLock::simple_action(Packet *p)
 PacketBatch*
 CounterLock::simple_action_batch(PacketBatch *batch)
 {
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+        CounterLock::simple_action(p);
+        return batch;
+    }
+
     _lock.acquire();
     counter_int_type bc = 0;
     FOR_EACH_PACKET(batch,p) {
@@ -540,6 +599,9 @@ CounterLock::simple_action_batch(PacketBatch *batch)
     }
     _count += batch->count();
     _byte_count += bc;
+    if (unlikely(!_simple)) {
+        check_handlers(_count, _byte_count);
+    }
     _lock.release();
     return batch;
 }
