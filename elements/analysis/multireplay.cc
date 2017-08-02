@@ -45,14 +45,13 @@ MultiReplay::cast(const char *n)
 int
 MultiReplay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(conf, this, errh)
+    Args args(conf, this, errh);
+    if (ReplayBase::parse(&args) != 0)
+        return -1;
+
+    if (args
         .read_p("QUEUE", _queue)
-        .read("STOP", _stop)
-        .read("QUICK_CLONE", _quick_clone)
         .read("USE_SIGNAL",_use_signal)
-        .read("ACTIVE",_active)
-        .read("VERBOSE", _verbose)
-        .read("FREEONTERMINATE", _freeonterminate)
     .complete() < 0)
     return -1;
     return 0;
@@ -146,13 +145,13 @@ MultiReplayUnqueue::~MultiReplayUnqueue()
 int
 MultiReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(conf, this, errh)
-        .read("STOP", _stop)
+    Args args(conf, this, errh);
+    if (ReplayBase::parse(&args) != 0)
+        return -1;
+
+    if (args
         .read("QUICK_CLONE", _quick_clone)
         .read("USE_SIGNAL",_use_signal)
-        .read("ACTIVE",_active)
-        .read("VERBOSE", _verbose)
-        .read("FREEONTERMINATE", _freeonterminate)
         .complete() < 0)
     return -1;
     return 0;
