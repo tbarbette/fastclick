@@ -41,6 +41,8 @@ CounterBase::cast(const char *name)
 {
     if (strcmp("CounterT", name) == 0)
         return (CounterT *)this;
+    if (strcmp("CounterBase", name) == 0)
+        return (CounterBase *)this;
     else
         return Element::cast(name);
 }
@@ -345,7 +347,7 @@ CounterMP::simple_action(Packet *p)
     _stats->_count++;
     _stats->_byte_count += p->length();
     if (unlikely(!_simple))
-        check_handlers(CounterMP::count(), CounterMP::byte_count());
+        check_handlers(CounterMP::count(), CounterMP::byte_count()); //BUG : if not atomic, then handler may be called twice
     if (_atomic)
         _atomic_lock.write_end();
     return p;
@@ -547,7 +549,7 @@ CounterAtomic::simple_action_batch(PacketBatch *batch)
     _byte_count += bc;
     if (likely(_simple))
         return batch;
-    check_handlers(_count, _byte_count); //BUG : may run multiple times
+    check_handlers(_count, _byte_count); //BUG : may run multiple times, use a lock when run is decided maybe?
     return batch;
 }
 #endif

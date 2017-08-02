@@ -841,6 +841,7 @@ enable_ipsec
 enable_json
 enable_local
 enable_radio
+enable_research
 enable_simple
 enable_standard
 enable_tcpudp
@@ -1545,6 +1546,7 @@ Optional Features:
   --enable-json           include JSON helpers
   --enable-local          include local elements
   --enable-radio          include radio elements
+  --enable-research       include research elements
   --disable-simple        do not include simple versions of other elements
   --disable-standard      do not include standard elements
   --disable-tcpudp        do not include TCP and UDP elements
@@ -7248,6 +7250,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_radio" = xNO -o "x$enable_radio" = x \) && enable_radio=yes
 if test "x$enable_radio" = xyes; then
+    :
+
+fi
+# Check whether --enable-research was given.
+if test "${enable_research+set}" = set; then :
+  enableval=$enable_research;
+else
+  enable_research=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_research" = xNO -o "x$enable_research" = x \) && enable_research=yes
+if test "x$enable_research" = xyes; then
     :
 
 fi
