@@ -32,6 +32,7 @@ class CounterTest : public BatchElement { public:
 private:
     CounterBase* _counter;
     int _rate;
+    bool _atomic;
 
 };
 

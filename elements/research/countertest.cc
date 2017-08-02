@@ -24,7 +24,7 @@
 
 CLICK_DECLS
 
-CounterTest::CounterTest() : _counter(0), _rate(0)
+CounterTest::CounterTest() : _counter(0), _rate(0), _atomic(true)
 {
 }
 
@@ -36,6 +36,7 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
         .read_mp("COUNTER", e)
         .read_mp("RATE", _rate)
+        .read("ATOMIC", _atomic)
         .complete() < 0)
         return -1;
     _counter = (CounterBase*)e->cast("CounterBase");
@@ -47,7 +48,11 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 CounterTest::push_batch(int, PacketBatch* batch) {
     for (int i = 0; i < _rate; i++) {
-        _counter->atomic_read();
+        if (_atomic) {
+            _counter->atomic_read();
+        } else {
+            _counter->count();
+        }
     }
     output_push_batch(0, batch);
 }
