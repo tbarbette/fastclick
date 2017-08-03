@@ -594,11 +594,11 @@ CounterLock::simple_action_batch(PacketBatch *batch)
         return batch;
     }
 
-    _lock.acquire();
     counter_int_type bc = 0;
     FOR_EACH_PACKET(batch,p) {
         bc += p->length();
     }
+    _lock.acquire();
     _count += batch->count();
     _byte_count += bc;
     if (unlikely(!_simple)) {
