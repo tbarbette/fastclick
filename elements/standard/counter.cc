@@ -119,7 +119,7 @@ bool CounterBase::do_mt_safe_check(ErrorHandler* errh) {
     int n = bmp.weight();
     if (n <= 1)
         return true;
-    if (!_simple && !_atomic) {
+    if (!_simple && _atomic == 0) {
         errh->error("Set ATOMIC to true if using handlers or rate");
         return false;
     }
@@ -344,13 +344,13 @@ CounterMP::initialize(ErrorHandler *errh) {
 Packet*
 CounterMP::simple_action(Packet *p)
 {
-    if (_atomic)
+    if (_atomic > 0)
         _atomic_lock.write_begin();
     _stats->_count++;
     _stats->_byte_count += p->length();
     if (unlikely(!_simple))
         check_handlers(CounterMP::count(), CounterMP::byte_count()); //BUG : if not atomic, then handler may be called twice
-    if (_atomic)
+    if (_atomic > 0)
         _atomic_lock.write_end();
     return p;
 }
@@ -369,13 +369,13 @@ CounterMP::simple_action_batch(PacketBatch *batch)
     FOR_EACH_PACKET(batch,p) {
         bc += p->length();
     }
-    if (_atomic)
+    if (_atomic > 0)
         _atomic_lock.write_begin();
     _stats->_count += batch->count();
     _stats->_byte_count += bc;
     if (unlikely(!_simple))
         check_handlers(CounterMP::count(), CounterMP::byte_count());
-    if (_atomic)
+    if (_atomic > 0)
         _atomic_lock.write_end();
     return batch;
 }
@@ -384,14 +384,14 @@ CounterMP::simple_action_batch(PacketBatch *batch)
 void
 CounterMP::reset()
 {
-    if (_atomic)
+    if (_atomic  > 0)
         _atomic_lock.write_begin();
     for (unsigned i = 0; i < _stats.weight(); i++) { \
         _stats.get_value(i)._count = 0;
     _stats.get_value(i)._byte_count = 0;
     }
     CounterBase::reset();
-    if (_atomic)
+    if (_atomic  > 0)
         _atomic_lock.write_end();
 }
 

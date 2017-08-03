@@ -174,7 +174,7 @@ class CounterBase : public BatchElement, public CounterT { public:
     bool _count_triggered : 1;
     bool _byte_triggered : 1;
     bool _batch_precise;
-    int _atomic;
+    unsigned _atomic;
     bool _simple;
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
@@ -260,7 +260,7 @@ class CounterMP : public CounterBase { public:
     }
 
     stats atomic_read() {
-        if (_atomic)
+        if (_atomic > 0)
             _atomic_lock.read_begin();
         counter_int_type count = 0;
         counter_int_type byte_count = 0;
@@ -268,7 +268,7 @@ class CounterMP : public CounterBase { public:
             count += _stats.get_value(i)._count;
             byte_count += _stats.get_value(i)._byte_count;
         }
-        if (_atomic)
+        if (_atomic > 0)
             _atomic_lock.read_end();
         return {count,byte_count};
     }
