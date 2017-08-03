@@ -26,7 +26,7 @@
 CLICK_DECLS
 
 CounterBase::CounterBase()
-: _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false), _atomic(false), _simple(false)
+: _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false), _atomic(0), _simple(false)
 {
 }
 
@@ -57,7 +57,7 @@ CounterBase::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("COUNT_CALL", AnyArg(), count_call)
             .read("BYTE_COUNT_CALL", AnyArg(), byte_count_call)
             .read("BATCH_PRECISE", _batch_precise)
-            .read("ATOMIC", _atomic)
+            .read("ATOMIC", BoundedIntArg(0,2) ,_atomic)
             .complete() < 0)
         return -1;
 
@@ -106,8 +106,10 @@ CounterBase::initialize(ErrorHandler *errh)
         return -1;
     reset();
 
-    if (_atomic && !can_atomic()) {
+    if (_atomic > 0 && can_atomic() == 0) {
         return errh->error("Sorry, %s does not support atomic",class_name());
+    } else if (_atomic == 2 && can_atomic() < 2) {
+        return errh->error("Sorry, %s does not support full-atomic mode",class_name());
     }
     return 0;
 }
