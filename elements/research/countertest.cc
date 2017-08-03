@@ -48,6 +48,8 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 CounterTest::push_batch(int, PacketBatch* batch) {
     for (int i = 0; i < _rate; i++) {
+        if (!router()->running())
+            break;
         if (_atomic) {
             _counter->atomic_read();
         } else {
