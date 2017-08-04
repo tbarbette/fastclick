@@ -39,6 +39,14 @@ DiscardNoFree::push(int, Packet *)
   // Don't kill().
 }
 
+#if HAVE_BATCH
+void
+DiscardNoFree::push_batch(int, PacketBatch *)
+{
+  // Don't kill().
+}
+#endif
+
 bool
 DiscardNoFree::run_task(Task *)
 {
