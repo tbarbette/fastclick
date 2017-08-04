@@ -3083,17 +3083,21 @@ Element::pull(int port)
 
 #if HAVE_BATCH
 void Element::push_batch(int port, PacketBatch* batch) {
+#if HAVE_AUTO_BATCH
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_push(i))
             _ports[1][i].start_batch();
     }
+#endif
     FOR_EACH_PACKET_SAFE(batch,p) {
         push(port,p);
     }
+#if HAVE_AUTO_BATCH
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_push(i))
             _ports[1][i].end_batch();
     }
+#endif
 }
 
 PacketBatch* Element::pull_batch(int port, unsigned max) {

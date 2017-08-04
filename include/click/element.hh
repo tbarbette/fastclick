@@ -264,7 +264,9 @@ class Element { public:
 
         Element* _e;
         int _port;
+        #if HAVE_AUTO_BATCH
         per_thread<PacketBatch*> current_batch;
+        #endif
 
 #if HAVE_BOUND_PORT_TRANSFER
         union {
@@ -588,8 +590,10 @@ Element::Port::assign(bool isoutput, Element *e, int port)
 {
     _e = e;
     _port = port;
+#if HAVE_AUTO_BATCH
     for (unsigned i = 0; i < current_batch.weight() ; i++)
         current_batch.set_value(i,0);
+#endif
     (void) isoutput;
 #if HAVE_BOUND_PORT_TRANSFER
     if (e) {
@@ -690,13 +694,16 @@ Element::Port::push(Packet* p) const
     _e->_xfer_own_cycles += own_delta;
     _owner->_child_cycles += all_delta;
 #else
+# if HAVE_AUTO_BATCH
     if (_e->in_batch_mode == BATCH_MODE_YES && *current_batch != 0) {
         if (*current_batch == (PacketBatch*)-1) {
             *current_batch = PacketBatch::make_from_packet(p);
         } else {
             (*current_batch)->append_packet(p);
         }
-    } else {
+    } else
+# endif
+    {
 # if HAVE_BOUND_PORT_TRANSFER
     _bound.push(_e, _port, p);
 # else
@@ -771,6 +778,7 @@ Element::Port::push_batch(PacketBatch* batch) const {
 #endif
 }
 
+#if HAVE_AUTO_BATCH
 void Element::Port::start_batch() {
 #if BATCH_DEBUG
     click_chatter("Starting batch in port to %p{element}",_e);
@@ -813,7 +821,7 @@ void Element::Port::end_batch() {
         }
     }
 };
-
+#endif
 
 PacketBatch*
 Element::Port::pull_batch(unsigned max) const {
