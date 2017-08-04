@@ -1177,7 +1177,12 @@ class click_rcu { public:
             rcu_current_local = rcu_current;
             click_read_fence();
             current_refcnt = refcnt[rcu_current_local].value();
-        } while (current_refcnt == (uint32_t)-1 || (refcnt[rcu_current_local].compare_swap(current_refcnt,current_refcnt+1) != current_refcnt));
+            if (current_refcnt == (uint32_t)-1 || (refcnt[rcu_current_local].compare_swap(current_refcnt,current_refcnt+1) != current_refcnt)) {
+                click_relax_fence();
+            } else {
+                break;
+            }
+        } while (1);
         click_write_fence();
         //The reference is holded now, we are sure that no writer will edit this until read_end is called.
         return storage[rcu_current_local];
@@ -1243,6 +1248,105 @@ protected:
     atomic_uint32_t refcnt[2];
     T storage[2];
     volatile int rcu_current;
+};
+
+template <typename T>
+class fast_rcu { public:
+    fast_rcu() : rcu_current(0) {
+        refcnt[0] = 0;
+        refcnt[1] = 0;
+    }
+
+    fast_rcu(T v) : rcu_current(0) {
+        refcnt[0] = 0;
+        refcnt[1] = 0;
+        initialize(v);
+    }
+
+    ~fast_rcu() {}
+
+    inline void initialize(T v) {
+        storage[rcu_current] = v;
+    }
+
+    /**
+     * A loop is needed to avoid a race condition where thread A reads
+     * rcu_current, then writer B does a full write, start a second write
+     * before A update the refcnt. A would then inc the refcnt,
+     * and get a reference while B is in fact writing that bucket.
+     *
+     * The solution is the following one:
+     * When the refcnt for the next bucket is 0, the writer is writing -1 as
+     * the refcnt. This is done atomicly using a CAS instruction.
+     *
+     * In the reader, we check if the refcnt is -1 (current write), and if not we CAS
+     * refcnt+1. We loop until the CAS worked so we know that we made a "refcnt++"
+     * without any writer starting to write in the bucket.
+     *
+     * Also, the same rcu_current_local must be passed to read_end
+     * as we need to down the actual refcnt we incremented, and rcu_current
+     * may be incremented by 1 before we finish our reading.
+     */
+    inline const T& read_begin(int &rcu_current_local) {
+        rcu_current_local = rcu_current;
+        refcnt[rcu_current_local]++;
+        click_write_fence();
+        //The reference is holded now, we are sure that no writer will edit this until read_end is called.
+        return storage[rcu_current_local].v;
+    }
+
+    inline void read_end(const int &rcu_current_local) {
+        click_compiler_fence(); //No reorder of refcnt--
+        refcnt[rcu_current_local]--;
+    }
+
+    inline T read() {
+        int flags;
+        T v = read_begin(flags);
+        read_end(flags);
+        return v;
+    }
+
+    /**
+     * No need for lock of writers anymore. We atomicly set the refcnt to -1 if
+     * the value is 0, if another writer is writing, it would have done the
+     * same.
+     * If no readers are reading, the refcnt would not be 0.
+     */
+    inline T& write_begin(int& rcu_current_local) {
+
+        _write_lock.acquire();
+        rcu_current_local = rcu_current;
+        int rcu_next = (rcu_current_local + 1) & 1;
+
+        //We may still have reader left in the next case
+        while(refcnt[rcu_next] > 0) {
+            click_relax_fence();
+            click_chatter("INEFFICIENT");
+        }
+
+        storage[rcu_next].v = storage[rcu_current_local].v;
+
+        return storage[rcu_next].v;
+    }
+
+    inline void write_commit(int rcu_current_local) {
+        click_write_fence(); //Prevent write to finish after this
+        rcu_current = (rcu_current_local + 1) & 1;
+        _write_lock.release();
+    }
+
+protected:
+
+    typedef struct {
+        T v;
+    } CLICK_CACHE_ALIGN AT;
+
+    atomic_uint32_t refcnt[2];
+    AT storage[2];
+    volatile int rcu_current;
+    Spinlock _write_lock;
+
 };
 
 CLICK_ENDDECLS

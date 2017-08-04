@@ -26,7 +26,8 @@
 CLICK_DECLS
 
 CounterBase::CounterBase()
-: _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false), _atomic(0), _simple(false)
+: _count_trigger_h(0), _byte_trigger_h(0), _batch_precise(false), _atomic(0),
+  _simple(false)
 {
 }
 
@@ -51,7 +52,7 @@ int
 CounterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String count_call, byte_count_call;
-    bool norate;
+    bool norate = false;
     if (Args(conf, this, errh)
             .read("NO_RATE",norate)
             .read("COUNT_CALL", AnyArg(), count_call)
@@ -388,7 +389,7 @@ CounterMP::reset()
         _atomic_lock.write_begin();
     for (unsigned i = 0; i < _stats.weight(); i++) { \
         _stats.get_value(i)._count = 0;
-    _stats.get_value(i)._byte_count = 0;
+        _stats.get_value(i)._byte_count = 0;
     }
     CounterBase::reset();
     if (_atomic  > 0)
@@ -468,13 +469,14 @@ CounterRCU::~CounterRCU()
 Packet*
 CounterRCU::simple_action(Packet *p)
 {
-    stats& stats = _stats.write_begin();
+    int flags;
+    stats& stats = _stats.write_begin(flags);
     stats._count++;
     stats._byte_count += p->length();
     if (unlikely(!_simple)) {
         check_handlers(stats._count, stats._byte_count);
     }
-    _stats.write_commit();
+    _stats.write_commit(flags);
     return p;
 }
 
@@ -492,13 +494,14 @@ CounterRCU::simple_action_batch(PacketBatch *batch)
     FOR_EACH_PACKET(batch,p) {
         bc += p->length();
     }
-    stats& stats = _stats.write_begin();
+    int flags;
+    stats& stats = _stats.write_begin(flags);
     stats._count += batch->count();
     stats._byte_count += bc;
     if (unlikely(!_simple)) {
         check_handlers(stats._count, stats._byte_count);
     }
-    _stats.write_commit();
+    _stats.write_commit(flags);
     return batch;
 }
 #endif
@@ -506,11 +509,12 @@ CounterRCU::simple_action_batch(PacketBatch *batch)
 void
 CounterRCU::reset()
 {
-    stats& stats = _stats.write_begin();
+    int flags;
+    stats& stats = _stats.write_begin(flags);
     stats._count = 0;
     stats._byte_count = 0;
     CounterBase::reset();
-    _stats.write_commit();
+    _stats.write_commit(flags);
 }
 
 

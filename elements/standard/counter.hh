@@ -386,7 +386,7 @@ class CounterRCU : public CounterBase { public:
         return copy;
     }
 protected:
-    click_rcu<stats> _stats;
+    fast_rcu<stats> _stats;
 };
 
 
