@@ -28,7 +28,9 @@ class CounterTest : public BatchElement { public:
     int configure(Vector<String>&, ErrorHandler*) override;
     bool run_task(Task *) override;
     void push(int, Packet* p) override;
+#if HAVE_BATCH
     void push_batch(int, PacketBatch* batch) override;
+#endif
     void add_handlers() override;
 private:
     CounterBase* _counter;
