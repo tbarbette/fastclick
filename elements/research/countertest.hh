@@ -28,6 +28,7 @@ class CounterTest : public BatchElement { public:
 
     int configure(Vector<String>&, ErrorHandler*) override;
     //void run_task(Task *) override;
+    void push(int, Packet* p);
     void push_batch(int, PacketBatch* batch);
 private:
     CounterBase* _counter;

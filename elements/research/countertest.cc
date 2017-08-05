@@ -45,6 +45,7 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+#if HAVE_BATCH
 void
 CounterTest::push_batch(int, PacketBatch* batch) {
     for (int i = 0; i < _rate; i++) {
@@ -57,6 +58,21 @@ CounterTest::push_batch(int, PacketBatch* batch) {
         }
     }
     output_push_batch(0, batch);
+}
+#endif
+
+void
+CounterTest::push(int, Packet* p) {
+    for (int i = 0; i < _rate; i++) {
+        if (!router()->running())
+            break;
+        if (_atomic) {
+            _counter->atomic_read();
+        } else {
+            _counter->count();
+        }
+    }
+    output_push(0, p);
 }
 
 /*
