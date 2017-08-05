@@ -118,22 +118,40 @@ components.
  * Ancestor of all types of counter so external elements can access count and byte_count
  * independently of the storage type
  */
-class CounterT { public :
-    CounterT() {};
-    ~CounterT() {};
+
+class CounterBase : public BatchElement { public:
+
+	CounterBase() CLICK_COLD;
+    ~CounterBase() CLICK_COLD;
+
     virtual counter_int_type count() = 0;
     virtual counter_int_type byte_count() = 0;
     struct stats {
         counter_int_type _count;
         counter_int_type _byte_count;
     };
+
+    /**
+     * Read state in a non-atomic way, as fast as possible. Value of the ATOMIC
+     *   parameter does not change this. Avoid locks, etc, just give a plausible
+     *   value.
+     */
+    virtual stats read() = 0;
+    /**
+     * Atomic read. Atomicity level depends on the ATOMIC parameter.
+     */
     virtual stats atomic_read() = 0;
-};
 
-class CounterBase : public BatchElement, public CounterT { public:
+    /**
+     * Add something to the counter, non-atomic way. Calling this may break
+     *   the counter even if ATOMIC is set.
+     */
+    virtual void add(stats) = 0;
 
-	CounterBase() CLICK_COLD;
-    ~CounterBase() CLICK_COLD;
+    /**
+     * Add in an atomic way.
+     */
+    virtual void atomic_add(stats) = 0;
 
     void* cast(const char *name);
     bool do_mt_safe_check(ErrorHandler* errh);
@@ -212,8 +230,21 @@ class Counter : public CounterBase { public:
         return _byte_count;
     }
 
-    stats atomic_read() {  //This is NOT atomic
+    stats read() {
         return {_count, _byte_count};
+    }
+
+    stats atomic_read() {  //This is NOT atomic
+        return Counter::read();
+    }
+
+    void add(stats s) override {
+        _count += s._count;
+        _byte_count += s._byte_count;
+    }
+
+    void atomic_add(stats s) override { //This is NOT atomic
+        Counter::add(s);
     }
 
 protected:
@@ -259,6 +290,16 @@ class CounterMP : public CounterBase { public:
         return sum;
     }
 
+    stats read() {
+        counter_int_type count = 0;
+        counter_int_type byte_count = 0;
+        for (unsigned i = 0; i < _stats.weight(); i++) { \
+            count += _stats.get_value(i)._count;
+            byte_count += _stats.get_value(i)._byte_count;
+        }
+        return {count,byte_count};
+    }
+
     stats atomic_read() {
         if (_atomic > 0)
             _atomic_lock.read_begin();
@@ -273,11 +314,25 @@ class CounterMP : public CounterBase { public:
         return {count,byte_count};
     }
 
-protected:
-    per_thread<stats> _stats;
-    rXwlock _atomic_lock;
-};
+    void add(stats s) override {
+        _stats->_count += s._count;
+        _stats->_byte_count += s._byte_count;
+    }
 
+    void atomic_add(stats s) override {
+        if (_atomic > 0)
+            _atomic_lock.write_begin();
+        _stats->_count += s._count;
+        _stats->_byte_count += s._byte_count;
+        if (_atomic > 0)
+            _atomic_lock.write_end();
+    }
+
+protected:
+    rXwlock _atomic_lock CLICK_CACHE_ALIGN;
+    per_thread<stats> _stats CLICK_CACHE_ALIGN;
+};
+/*
 class CounterRCUMP : public CounterBase { public:
 
     CounterRCUMP() CLICK_COLD;
@@ -332,10 +387,12 @@ class CounterRCUMP : public CounterBase { public:
         _stats.read_end(flags);
         return {count,byte_count};
     }
+
+
 protected:
     click_rcu<per_thread<stats> > _stats;
 };
-
+*/
 class CounterRCU : public CounterBase { public:
 
     CounterRCU() CLICK_COLD;
@@ -378,6 +435,14 @@ class CounterRCU : public CounterBase { public:
         return sum;
     }
 
+    stats read() {
+        int flags;
+        const stats& s = _stats.read_begin(flags);
+        stats copy = s;
+        _stats.read_end(flags);
+        return copy;
+    }
+
     stats atomic_read() {
         int flags;
         const stats& s = _stats.read_begin(flags);
@@ -385,6 +450,24 @@ class CounterRCU : public CounterBase { public:
         _stats.read_end(flags);
         return copy;
     }
+
+
+    void add(stats s) override {
+        int flags;
+        stats& stats = _stats.write_begin(flags);
+        stats._count += s._count;
+        stats._byte_count += s._byte_count;
+        _stats.write_commit(flags);
+    }
+
+    void atomic_add(stats s) override {
+        int flags;
+        stats& stats = _stats.write_begin(flags);
+        stats._count += s._count;
+        stats._byte_count += s._byte_count;
+        _stats.write_commit(flags);
+    }
+
 protected:
     fast_rcu<stats> _stats;
 };
@@ -425,8 +508,23 @@ class CounterAtomic : public CounterBase { public:
         return _byte_count;
     }
 
+    stats read() {
+        return {_count, _byte_count};
+    }
+
     stats atomic_read() {  //This is NOT atomic between the two fields
         return {_count, _byte_count};
+    }
+
+
+    void add(stats s) override {
+        _count += s._count;
+        _byte_count += s._byte_count;
+    }
+
+    void atomic_add(stats s) override {
+        _count += s._count;
+        _byte_count += s._byte_count;
     }
 
 protected:
@@ -468,6 +566,15 @@ class CounterLock : public CounterBase { public:
         return _byte_count;
     }
 
+    stats read() {
+        stats s;
+        _lock.acquire();
+        s = {_count, _byte_count};
+        click_read_fence();
+        _lock.release();
+        return s;
+    }
+
     stats atomic_read() {
         stats s;
         _lock.acquire();
@@ -475,6 +582,20 @@ class CounterLock : public CounterBase { public:
         click_read_fence();
         _lock.release();
         return s;
+    }
+
+    void add(stats s) override {
+        _lock.acquire();
+        _count += s._count;
+        _byte_count += s._byte_count;
+        _lock.release();
+    }
+
+    void atomic_add(stats s) override {
+        _lock.acquire();
+        _count += s._count;
+        _byte_count += s._byte_count;
+        _lock.release();
     }
 
 protected:

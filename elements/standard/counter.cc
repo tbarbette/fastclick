@@ -40,8 +40,6 @@ CounterBase::~CounterBase()
 void*
 CounterBase::cast(const char *name)
 {
-    if (strcmp("CounterT", name) == 0)
-        return (CounterT *)this;
     if (strcmp("CounterBase", name) == 0)
         return (CounterBase *)this;
     else
@@ -395,7 +393,7 @@ CounterMP::reset()
     if (_atomic  > 0)
         _atomic_lock.write_end();
 }
-
+/*
 CounterRCUMP::CounterRCUMP() : _stats()
 {
 }
@@ -457,7 +455,7 @@ CounterRCUMP::reset()
     CounterBase::reset();
     _stats.write_commit();
 }
-
+*/
 CounterRCU::CounterRCU()
 {
 }
@@ -634,7 +632,7 @@ EXPORT_ELEMENT(CounterAtomic)
 ELEMENT_MT_SAFE(CounterAtomic)
 EXPORT_ELEMENT(CounterRCU)
 ELEMENT_MT_SAFE(CounterRCU)
-EXPORT_ELEMENT(CounterRCUMP)
-ELEMENT_MT_SAFE(CounterRCUMP)
+/*EXPORT_ELEMENT(CounterRCUMP)
+ELEMENT_MT_SAFE(CounterRCUMP)*/
 EXPORT_ELEMENT(CounterLock)
 ELEMENT_MT_SAFE(CounterLock)

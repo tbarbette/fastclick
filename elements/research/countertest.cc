@@ -20,11 +20,11 @@
 #include "countertest.hh"
 #include <click/args.hh>
 #include <click/error.hh>
-#include "../standard/counter.hh"
+#include <click/standard/scheduleinfo.hh>
 
 CLICK_DECLS
 
-CounterTest::CounterTest() : _counter(0), _rate(0), _atomic(true)
+CounterTest::CounterTest() : _counter(0), _rate(0), _atomic(true), _standalone(false), _task(this), _read(0), _write(0)
 {
 }
 
@@ -37,11 +37,25 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("COUNTER", e)
         .read_mp("RATE", _rate)
         .read("ATOMIC", _atomic)
+        .read("STANDALONE", _standalone)
         .complete() < 0)
         return -1;
     _counter = (CounterBase*)e->cast("CounterBase");
     if (!_counter)
         return errh->error("%p{element} is not a counter !",e);
+    if (_standalone)
+        ScheduleInfo::initialize_task(this, &_task, errh);
+    void (CounterBase::*aaddfnt)(CounterBase::stats) = &CounterBase::atomic_add;
+    void (CounterBase::*addfnt)(CounterBase::stats) = &CounterBase::add;
+    CounterBase::stats (CounterBase::*areadfnt)() = &CounterBase::atomic_read;
+    CounterBase::stats (CounterBase::*readfnt)() = &CounterBase::read;
+    if (_atomic) {
+        _add_fnt=(void (*)(CounterBase*,CounterBase::stats))(_counter->*aaddfnt);
+        _read_fnt=(CounterBase::stats(*)(CounterBase*))(_counter->*areadfnt);
+    } else {
+        _add_fnt=(void (*)(CounterBase*,CounterBase::stats))(_counter->*addfnt);
+        _read_fnt=(CounterBase::stats(*)(CounterBase*))(_counter->*readfnt);
+    }
     return 0;
 }
 
@@ -52,7 +66,7 @@ CounterTest::push_batch(int, PacketBatch* batch) {
         if (!router()->running())
             break;
         if (_atomic) {
-            _counter->atomic_read();
+            _read_fnt(_counter);
         } else {
             _counter->count();
         }
@@ -64,24 +78,35 @@ CounterTest::push_batch(int, PacketBatch* batch) {
 void
 CounterTest::push(int, Packet* p) {
     for (int i = 0; i < _rate; i++) {
-        if (!router()->running())
+        if (master()->paused())
             break;
-        if (_atomic) {
-            _counter->atomic_read();
-        } else {
-            _counter->count();
-        }
+        _read_fnt(_counter);
     }
     output_push(0, p);
 }
 
-/*
-void
-CounterTest::run_task(int port,Packet* p)
-{
-    c
-}*/
 
+
+bool
+CounterTest::run_task(Task* t)
+{
+    for (int i = 0; i < _rate; i++) {
+        if (master()->paused())
+            break;
+        _read_fnt(_counter);
+        _read++;
+    }
+
+    _add_fnt(_counter,{1,1});
+    _write++;
+    t->fast_reschedule();
+}
+
+void
+CounterTest::add_handlers() {
+    add_data_handlers("read", Handler::f_read, &_read);
+    add_data_handlers("write", Handler::f_read, &_write);
+}
 
 
 CLICK_ENDDECLS

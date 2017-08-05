@@ -891,7 +891,7 @@ class rXwlock { public:
 private:
     atomic_uint32_t _refcnt;
     int32_t max_write;
-};
+} CLICK_CACHE_ALIGN;
 
 template <typename V>
 class rwlock { public:

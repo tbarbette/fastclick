@@ -2,9 +2,8 @@
 #ifndef CLICK_COUNTERTEST_HH
 #define CLICK_COUNTERTEST_HH
 #include <click/batchelement.hh>
+#include "../standard/counter.hh"
 CLICK_DECLS
-
-class CounterBase;
 
 /*
 =c
@@ -23,17 +22,24 @@ class CounterTest : public BatchElement { public:
     CounterTest() CLICK_COLD;
 
     const char *class_name() const      { return "CounterTest"; }
-    const char *port_count() const    { return PORTS_1_1; }
+    const char *port_count() const    { return "0-1/1"; }
     const char *processing() const    { return PUSH; }
 
     int configure(Vector<String>&, ErrorHandler*) override;
-    //void run_task(Task *) override;
-    void push(int, Packet* p);
-    void push_batch(int, PacketBatch* batch);
+    bool run_task(Task *) override;
+    void push(int, Packet* p) override;
+    void push_batch(int, PacketBatch* batch) override;
+    void add_handlers() override;
 private:
     CounterBase* _counter;
     int _rate;
+    unsigned long _read;
+    unsigned long _write;
     bool _atomic;
+    bool _standalone;
+    Task _task;
+    void(*_add_fnt)(CounterBase*,CounterBase::stats);
+    CounterBase::stats(*_read_fnt)(CounterBase*);
 
 };
 
