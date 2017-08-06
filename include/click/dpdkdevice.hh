@@ -151,6 +151,7 @@ private:
     }
 
     friend class DPDKDeviceArg;
+    friend class DPDKInfo;
 };
 
 class DPDKRing { public:

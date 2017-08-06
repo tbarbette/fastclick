@@ -18,6 +18,7 @@
 
 #include <click/config.h>
 #include <click/args.hh>
+#include <click/straccum.hh>
 #include "dpdkinfo.hh"
 
 CLICK_DECLS
@@ -48,6 +49,25 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
         return -1;
 
     return 0;
+}
+
+String DPDKInfo::read_handler(Element *e, void * thunk)
+{
+    DPDKInfo *fd = static_cast<DPDKInfo *>(e);
+
+    switch((uintptr_t) thunk) {
+        case h_pool_count:
+            StringAccum acc;
+            for (int i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++)
+                acc << "0 " << String(rte_mempool_avail_count(DPDKDevice::_pktmbuf_pools[i])) << "\n";
+            return acc.take_string();
+    }
+
+    return "<error>";
+}
+
+void DPDKInfo::add_handlers() {
+    add_read_handler("pool_count", read_handler, h_pool_count);
 }
 
 DPDKInfo* DPDKInfo::instance = 0;
