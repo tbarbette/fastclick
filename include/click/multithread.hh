@@ -1322,7 +1322,7 @@ class fast_rcu { public:
         //We may still have reader left in the next case
         while(refcnt[rcu_next] > 0) {
             click_relax_fence();
-            click_chatter("INEFFICIENT");
+//            click_chatter("INEFFICIENT, INCREASE N");
         }
 
         storage[rcu_next].v = storage[rcu_current_local].v;
