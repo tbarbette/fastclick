@@ -28,10 +28,6 @@ CLICK_DECLS
 LinearIPLookup::LinearIPLookup()
     : _zero_route(-1)
 {
-#if HAVE_BATCH
-	// TODO: Remove this when push_batch() will actually be implemented
-	in_batch_mode = BATCH_MODE_NO;
-#endif
 }
 
 LinearIPLookup::~LinearIPLookup()
@@ -214,39 +210,54 @@ LinearIPLookup::dump_routes()
     return sa.take_string();
 }
 
-void
-LinearIPLookup::push(int, Packet *p)
-{
+inline int
+LinearIPLookup::smaction(Packet* p) {
 #define EXCHANGE(a,b,t) { t = a; a = b; b = t; }
     IPAddress a = p->dst_ip_anno();
     int ei = -1;
 
     if (a && a == _last_addr)
-	ei = _last_entry;
+    ei = _last_entry;
 #ifdef IP_RT_CACHE2
     else if (a && a == _last_addr2)
-	ei = _last_entry2;
+    ei = _last_entry2;
 #endif
     else if ((ei = lookup_entry(a)) >= 0) {
 #ifdef IP_RT_CACHE2
-	_last_addr2 = _last_addr;
-	_last_entry2 = _last_entry;
+    _last_addr2 = _last_addr;
+    _last_entry2 = _last_entry;
 #endif
-	_last_addr = a;
-	_last_entry = ei;
+    _last_addr = a;
+    _last_entry = ei;
     } else {
-	static int complained = 0;
-	if (++complained <= 5)
-	    click_chatter("LinearIPLookup: no route for %s", a.unparse().c_str());
-	p->kill();
-	return;
+    static int complained = 0;
+    if (++complained <= 5)
+        click_chatter("LinearIPLookup: no route for %s", a.unparse().c_str());
+    return -1;
     }
 
     const IPRoute &e = _t[ei];
     if (e.gw)
-	p->set_dst_ip_anno(e.gw);
-    output(e.port).push(p);
+    p->set_dst_ip_anno(e.gw);
+    return e.port;
 }
+
+void
+LinearIPLookup::push(int, Packet *p)
+{
+    int out = smaction(p);
+    if (unlikely(out == -1)) {
+        p->kill();
+        return;
+    }
+    output(out).push(p);
+}
+
+#if HAVE_BATCH
+void LinearIPLookup::push_batch(int, PacketBatch *batch) {
+    CLASSIFY_EACH_PACKET(noutputs() + 1,smaction,batch,checked_output_push_batch);
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(IPRouteTable)

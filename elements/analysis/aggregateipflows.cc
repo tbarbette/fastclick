@@ -444,7 +444,10 @@ AggregateIPFlows::emit_fragment_head(HostPairInfo *hpinfo)
 
     assert(finfo);
     packet_emit_hook(head, iph, finfo);
-    output(0).push(head);
+    if (in_batch_mode)
+        output(0).push_batch(PacketBatch::make_from_packet(head));
+    else
+        output(0).push(head);
 }
 
 int

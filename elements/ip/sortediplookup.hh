@@ -31,8 +31,11 @@ class SortedIPLookup : public LinearIPLookup { public:
     const char *class_name() const	{ return "SortedIPLookup"; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push(int port, Packet *p);
-
+    inline int smaction(Packet* p);
+    void push(int port, Packet *p) final; //If overriden, remove final and don't forget push_batch
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch* p) final;
+#endif
     int add_route(const IPRoute&, bool, IPRoute*, ErrorHandler *);
     int remove_route(const IPRoute&, IPRoute*, ErrorHandler *);
 
