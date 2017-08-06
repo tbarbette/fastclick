@@ -29,6 +29,9 @@ CLICK_DECLS
 RatedUnqueue::RatedUnqueue()
     : _task(this), _timer(&_task), _runs(0), _pushes(0), _failed_pulls(0), _empty_runs(0), _active(true)
 {
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 int
@@ -92,16 +95,34 @@ RatedUnqueue::run_task(Task *)
 	return false;
     _tb.refill();
     if (_tb.contains(1)) {
-	if (Packet *p = input(0).pull()) {
-	    _tb.remove(1);
-	    output(0).push(p);
-            _pushes++;
-	    worked = true;
-	} else { // no Packet available
-            _failed_pulls++;
-	    if (!_signal)
-		return false; // without rescheduling
-        }
+#if HAVE_BATCH
+            int burst = _tb.size();
+            if (burst > 32)
+                burst = 32;
+            PacketBatch* batch = input(0).pull_batch(burst);
+            if (batch) {
+                int c = batch->count();
+                _tb.remove(c);
+                output(0).push_batch(batch);
+                _pushes+=c;
+                worked = true;
+            } else {
+                _failed_pulls++;
+                if (!_signal)
+                return false; // without rescheduling
+            }
+#else
+            if (Packet *p = input(0).pull()) {
+                _tb.remove(1);
+                output(0).push(p);
+                _pushes++;
+                worked = true;
+            } else { // no Packet available
+                    _failed_pulls++;
+                if (!_signal)
+                return false; // without rescheduling
+            }
+#endif
     } else {
 	_timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(1)));
 	_empty_runs++;
