@@ -66,7 +66,7 @@ class IPOutputCombo : public BatchElement {
   struct in_addr _my_ip;	// IPGWOptions, FixIPSrc
   unsigned _mtu;		// Fragmenter
 
-  inline int action(Packet* &p_in, bool color);
+  inline int action(Packet* p_in, bool color = true);
 };
 
 CLICK_ENDDECLS
