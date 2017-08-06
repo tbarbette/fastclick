@@ -59,7 +59,7 @@ String DPDKInfo::read_handler(Element *e, void * thunk)
         case h_pool_count:
             StringAccum acc;
             for (int i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++)
-                acc << "0 " << String(rte_mempool_ops_get_count(DPDKDevice::_pktmbuf_pools[i])) << "\n";
+                acc << "0 " << String(rte_mempool_avail_count(DPDKDevice::_pktmbuf_pools[i])) << "\n";
             return acc.take_string();
     }
 
