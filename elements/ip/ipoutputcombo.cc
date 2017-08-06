@@ -40,7 +40,7 @@ IPOutputCombo::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_mp("MTU", _mtu).complete();
 }
 
-inline int IPOutputCombo::action(Packet* &p_in, bool color) {
+inline int IPOutputCombo::action(Packet* p_in, bool color) {
 	 int do_cksum = 0;
 	  int problem_offset = -1;
 
@@ -206,52 +206,18 @@ inline int IPOutputCombo::action(Packet* &p_in, bool color) {
 
 #if HAVE_BATCH
 void IPOutputCombo::push_batch(int, PacketBatch * head) {
-	Packet* cur = NULL;
-	Packet* next = head;
-	Packet* last = NULL;
-	int o;
-	int count = 0;
-	while (next != NULL) {
-		cur = next;
-		next = cur->next();
-
-		Packet* old_cur = cur;
-
-		o = action(cur, 1);
-
-		if (old_cur != cur) { //If packet has changed (due to expensive uniqueify)
-			click_chatter("Packet has changed");
-			if (last) {
-				last->set_next(cur);
-			}
-		}
-
-		if (o == 1) {
-			PacketBatch* clone = PacketBatch::make_from_packet(cur->clone());
-			output_push_batch(1,clone);
-			o = action(cur, false);
-		}
-		if (o != 0) {//An error occured
-			if (last == NULL) { //We are head
-
-			} else {
-				last->set_next(next);
-			}
-			output_push_batch(o,PacketBatch::make_from_packet(cur));
-
-		} else {
-			if (last == NULL) {
-				head = PacketBatch::start_head(head);
-			}
-			last = cur;
-			count++;
-		}
-	} //end while
-
-	if (last != NULL) {
-		head->make_tail(last,count);
-		output_push_batch(0,head);
-	}
+    auto on_finish = [this](int n, PacketBatch* batch) {
+        if (unlikely(n == 1)) {
+            output(1).push_batch(batch->clone_batch());
+            CLASSIFY_EACH_PACKET(6,[this](Packet* p){return action(p,false);},batch,checked_output_push_batch);
+            return;
+        } else if (unlikely(n == 5)) {
+            batch->fast_kill();
+            return;
+        }
+        output_push_batch(n,batch);
+    };
+    CLASSIFY_EACH_PACKET(6,action,head,on_finish);
 }
 #endif
 inline void
