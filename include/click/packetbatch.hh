@@ -48,7 +48,7 @@ CLICK_DECLS
 /**
  * Execute a function on each packet of a batch. The function may return
  * another packet and which case the packet of the batch will be replaced by
- * that one, or null if the packet could be dropped.
+ * that one, or null if the packet is to be dropped.
  */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
                 Packet* efepd_next = ((batch != NULL)? batch->next() : NULL );\
@@ -83,6 +83,21 @@ CLICK_DECLS
             }\
 
 /**
+ * Same as EXECUTE_FOR_EACH_PACKET_DROPPABLE but build a list of dropped packet
+ * instead of calling a function
+ */
+#define EXECUTE_FOR_EACH_PACKET_DROP_LIST(fnt,batch,drop_list) \
+        PacketBatch* drop_list = 0;\
+        auto on_drop = [&drop_list](Packet* p) {\
+            if (drop_list == 0) {\
+                drop_list = PacketBatch::make_from_packet(p);\
+            } else {\
+                drop_list->append_packet(p);\
+            }\
+        };\
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop);
+
+/**
  * Split a batch into multiple batch according to a given function which will
  * give the index of an output to choose.
  *
@@ -102,7 +117,7 @@ CLICK_DECLS
 #define CLASSIFY_EACH_PACKET(nbatches,fnt,cep_batch,on_finish)\
     {\
         PacketBatch* out[nbatches];\
-        bzero(out,sizeof(PacketBatch*)*nbatches);\
+        bzero(out,sizeof(PacketBatch*)*(nbatches));\
         PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
         PacketBatch* p = cep_batch;\
         PacketBatch* last = NULL;\
@@ -141,7 +156,7 @@ CLICK_DECLS
         }\
 \
         int i = 0;\
-        for (; i < nbatches; i++) {\
+        for (; i < (nbatches); i++) {\
             if (out[i]) {\
                 out[i]->tail()->set_next(NULL);\
                 (on_finish(i,out[i]));\

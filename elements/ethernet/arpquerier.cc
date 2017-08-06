@@ -372,12 +372,14 @@ ARPQuerier::handle_response(Packet *p)
             while (cached_packet) {
                 Packet *next = cached_packet->next();
                 Packet* to_send = handle_ip(cached_packet, true);
-                if (to_send)
+                if (to_send) {
                     BATCH_CREATE_APPEND(batch_to_send, to_send);
+                }
                 cached_packet = next;
             }
             BATCH_CREATE_FINISH(batch_to_send);
-            output(0).push_batch(batch_to_send);
+            if (batch_to_send)
+                output(0).push_batch(batch_to_send);
         }
         else
     #endif
