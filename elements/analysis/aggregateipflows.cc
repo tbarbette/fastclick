@@ -444,9 +444,11 @@ AggregateIPFlows::emit_fragment_head(HostPairInfo *hpinfo)
 
     assert(finfo);
     packet_emit_hook(head, iph, finfo);
+#if HAVE_BATCH
     if (in_batch_mode)
         output(0).push_batch(PacketBatch::make_from_packet(head));
     else
+#endif
         output(0).push(head);
 }
 
