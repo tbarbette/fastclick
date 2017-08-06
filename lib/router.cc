@@ -1204,9 +1204,7 @@ Router::initialize(ErrorHandler *errh)
                         "packets.",this);
                 all_ok = false;
                 break;
-            }
-#if !HAVE_AUTO_BATCH
-            else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
+            } else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
                 e->in_batch_mode = Element::BATCH_MODE_NO;
                 e->receives_batch = false;
 #if HAVE_VERBOSE_BATCH
@@ -1221,9 +1219,7 @@ Router::initialize(ErrorHandler *errh)
                 all_ok = false;
                 break;
             }
-
-#endif
-            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO);
+            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO); //Element must be in batch mode or not
         }
     }
 #endif

@@ -421,7 +421,7 @@ void BetterIPCounter3::push(int port, Packet *p) {
 /** @brief Construct an Element. */
 Element::Element()
     :
-#if HAVE_BATCH && HAVE_AUTO_BATCH
+#if HAVE_BATCH && (HAVE_AUTO_BATCH == AUTO_BATCH_PORT)
     in_batch_mode(BATCH_MODE_IFPOSSIBLE),
 #else
     in_batch_mode(BATCH_MODE_NO),
@@ -3083,20 +3083,26 @@ Element::pull(int port)
 
 #if HAVE_BATCH
 void Element::push_batch(int port, PacketBatch* batch) {
-#if HAVE_AUTO_BATCH
+#if HAVE_AUTO_BATCH == AUTO_BATCH_PORT || HAVE_AUTO_BATCH == AUTO_BATCH_JUMP
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_push(i))
             _ports[1][i].start_batch();
     }
+#elif HAVE_AUTO_BATCH == AUTO_BATCH_LIST
+    for each e in list
+        e->start_batch();
 #endif
     FOR_EACH_PACKET_SAFE(batch,p) {
         push(port,p);
     }
-#if HAVE_AUTO_BATCH
+#if HAVE_AUTO_BATCH == AUTO_BATCH_PORT || HAVE_AUTO_BATCH == AUTO_BATCH_JUMP
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_push(i))
             _ports[1][i].end_batch();
     }
+#elif HAVE_AUTO_BATCH == AUTO_BATCH_LIST
+    for each e in list
+        e->end_batch();
 #endif
 }
 

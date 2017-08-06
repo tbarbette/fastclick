@@ -1506,7 +1506,8 @@ Optional Features:
     --disable-batch       disable batching support
     --disable-verbose-batch
                           disable warnings and information about batching
-    --enable-auto-batch   make vanilla elements batch-compatible automatically
+    --enable-auto-batch=[list|jump|port]
+                          make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click
                           malloc'ed buffers
     --enable-select=[select|poll|kqueue]
@@ -6478,9 +6479,28 @@ else
 fi
 
 
-if test "x$enable_auto_batch" = "xyes"; then
-    $as_echo "#define HAVE_AUTO_BATCH 1" >>confdefs.h
 
+if test "x$enable_auto_batch" = "xno" ; then
+    :
+elif test "x$enable_auto_batch" = "xyes" -o "x$enable_auto_batch" = "xport"; then
+
+$as_echo "#define HAVE_AUTO_BATCH AUTO_BATCH_PORT" >>confdefs.h
+
+elif test "x$enable_auto_batch" = "xlist"; then
+
+$as_echo "#define HAVE_AUTO_BATCH AUTO_BATCH_LIST" >>confdefs.h
+
+elif test "x$enable_auto_batch" = "xjump"; then
+
+$as_echo "#define HAVE_AUTO_BATCH AUTO_BATCH_JUMP" >>confdefs.h
+
+else
+        as_fn_error $? "
+=========================================
+
+--enable-auto-batch only accepts jump, list or catch as modes
+
+=========================================" "$LINENO" 5
 fi
 
 # Check whether --enable-netmap-pool was given.
@@ -13805,8 +13825,12 @@ if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
 fi
 
-if test "x$enable_auto_batch" = xyes; then
-    provisions="$provisions autobatch"
+if test "x$enable_auto_batch" == "xjump" -o "x$enable_auto_batch" == "xlist" ; then
+    provisions="$provisions autobatch_jumplist"
+fi
+
+if test "x$enable_auto_batch" == "xport" ; then
+    provisions="$provisions autobatch_port"
 fi
 
 if test "x$enable_batch" = xyes; then
