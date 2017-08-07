@@ -25,7 +25,7 @@
 CLICK_DECLS
 
 TSCClock::TSCClock() :
-_verbose(1), _allow_offset(false),_correction_timer(this), _sync_timers(0)
+_verbose(1), _install(true),_allow_offset(false),_correction_timer(this), _sync_timers(0)
 {
 
 }
@@ -38,6 +38,7 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
     if (Args(conf, this, errh)
             .read("VERBOSE", _verbose)
+            .read("INSTALL", _install)
             .complete() < 0)
         return -1;
     return 0;
@@ -187,7 +188,8 @@ bool TSCClock::accumulate_tick(Timer* t) {
         if (nt == home_thread()->thread_id()) {
             if (_verbose)
                 click_chatter("Click tasks are too heavy and the TSC clock cannot run at least once every %dmsec, the TSC clock is deactivated.");
-            Timestamp::set_clock(0,0);
+            if (_install)
+                Timestamp::set_clock(0,0);
             return false;
         }
         t->move_thread(nt);
@@ -360,7 +362,8 @@ void TSCClock::run_timer(Timer* timer) {
                 _phase = RUNNING;
                 if (_verbose)
                     click_chatter("Switching to TSC clock");
-                Timestamp::set_clock(&now,(void*)this);
+                if (_install)
+                    Timestamp::set_clock(&now,(void*)this);
             }
         }
     }
@@ -374,6 +377,30 @@ void TSCClock::cleanup(CleanupStage) {
             delete _sync_timers[i];
         delete[] _sync_timers;
     }
+}
+
+String
+TSCClock::read_handler(Element *e, void *thunk) {
+    TSCClock *c = (TSCClock *)e;
+    switch ((intptr_t)thunk) {
+        case h_now:
+            return String(c->compute_now_wall());
+        case h_now_steady:
+            return String(c->compute_now_steady());
+        case h_cycles:
+            return String(click_get_cycles() + c->local_tsc_offset);
+        case h_cycles_hz:
+            return String(c->tsc_freq);
+        default:
+            return "<error>";
+    }
+}
+
+void TSCClock::add_handlers() {
+    add_read_handler("now", read_handler, h_now);
+    add_read_handler("now_steady", read_handler, h_now_steady);
+    add_read_handler("cycles", read_handler, h_cycles);
+    add_read_handler("cycles_hz", read_handler, h_cycles_hz);
 }
 
 __thread int64_t TSCClock::local_tsc_offset = 0;

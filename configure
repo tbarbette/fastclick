@@ -6620,6 +6620,91 @@ Can't find -lpthread and/or <pthread.h>, so I can't compile with
     LIBS="$SAVE_LIBS"
 fi
 
+save_cpp="$CPPFLAGS"
+save_libs="$LIBS"
+CPPFLAGS="$CPPFLAGS -I/usr/local/include/mbglib/"
+LIBS="$LIBS -lmbgdevio"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing mbg_open_device" >&5
+$as_echo_n "checking for library containing mbg_open_device... " >&6; }
+if ${ac_cv_search_mbg_open_device+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char mbg_open_device ();
+int
+main ()
+{
+return mbg_open_device ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' mbgdevio; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_search_mbg_open_device=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_mbg_open_device+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_mbg_open_device+:} false; then :
+
+else
+  ac_cv_search_mbg_open_device=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_mbg_open_device" >&5
+$as_echo "$ac_cv_search_mbg_open_device" >&6; }
+ac_res=$ac_cv_search_mbg_open_device
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  ac_have_libmbdevio=yes
+else
+  ac_have_libmbdevio=no
+fi
+
+for ac_header in mbgdevio.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "mbgdevio.h" "ac_cv_header_mbgdevio_h" "$ac_includes_default"
+if test "x$ac_cv_header_mbgdevio_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_MBGDEVIO_H 1
+_ACEOF
+ ac_have_mbgdevio_h=yes
+else
+  ac_have_mbgdevio_h=no
+fi
+
+done
+
+#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
+if test "$ac_have_mbgdevio_h" = yes; then
+    $as_echo "#define HAVE_MBGLIB 1" >>confdefs.h
+
+else
+    CPPFLAGS="$save_cpp"
+    LIBS="$save_libs"
+fi
+
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
   enableval=$enable_select; :
@@ -13866,6 +13951,10 @@ if test $ac_have_linux_kernel = y; then
     elif test $linux_version_code -ge 132608 -a $linux_version_code -lt 132864; then
         provisions="$provisions linux_2_6"
     fi
+fi
+
+if test "$ac_have_mbgdevio_h" = yes; then
+    provisions="$provisions mbglib"
 fi
 
 if test "x$use_netmap" != xno; then

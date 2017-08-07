@@ -36,11 +36,16 @@ class TSCClock : public Element { public:
   void run_timer(Timer*);
   static void run_sync_timer(Timer*,void*);
 
+  enum {h_now, h_now_steady, h_cycles, h_cycles_hz};
+  static String read_handler(Element *e, void *thunk);
+  void add_handlers() CLICK_COLD;
+
 
   static int64_t now(void* user, bool steady);
 
 private:
   int _verbose;
+  bool _install;
   bool _allow_offset;
 
   typedef enum {STABILIZE,SYNCHRONIZE,RUNNING} phase_t;
