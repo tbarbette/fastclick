@@ -46,6 +46,7 @@ class TSCClock : public Element { public:
 private:
   int _verbose;
   bool _install;
+  bool _nowait;
   bool _allow_offset;
 
   typedef enum {STABILIZE,SYNCHRONIZE,RUNNING} phase_t;

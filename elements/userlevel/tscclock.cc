@@ -25,7 +25,7 @@
 CLICK_DECLS
 
 TSCClock::TSCClock() :
-_verbose(1), _install(true),_allow_offset(false),_correction_timer(this), _sync_timers(0)
+_verbose(1), _install(true),_allow_offset(false),_correction_timer(this), _sync_timers(0), _nowait(false)
 {
 
 }
@@ -39,8 +39,12 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
             .read("VERBOSE", _verbose)
             .read("INSTALL", _install)
+            .read("NOWAIT", _nowait)
             .complete() < 0)
         return -1;
+
+    if (_nowait && !_install)
+        return errh->error("You want to install without waiting but do not want to install?!");
     return 0;
 }
 
@@ -108,6 +112,9 @@ TSCClock::initialize(ErrorHandler*) {
     update_period_msec = update_period_subsec / (Timestamp::subsec_per_sec / Timestamp::msec_per_sec);
     _correction_timer.initialize(this);
     _correction_timer.schedule_now();
+
+    if (_install && _nowait)
+        Timestamp::set_clock(&now,(void*)this);
 
     return 0;
 }
@@ -332,9 +339,10 @@ void TSCClock::run_timer(Timer* timer) {
             alpha = 0.5;
             _phase = SYNCHRONIZE;
         }
-    } else
+    } else {
         if (!accumulate_tick(timer))
             return;
+    }
 
     if (unlikely(_phase == SYNCHRONIZE)) {
         //Launc sync taks
@@ -362,7 +370,7 @@ void TSCClock::run_timer(Timer* timer) {
                 _phase = RUNNING;
                 if (_verbose)
                     click_chatter("Switching to TSC clock");
-                if (_install)
+                if (_install && !_nowait)
                     Timestamp::set_clock(&now,(void*)this);
             }
         }
