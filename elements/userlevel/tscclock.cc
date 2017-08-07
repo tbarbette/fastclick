@@ -391,6 +391,8 @@ TSCClock::read_handler(Element *e, void *thunk) {
             return String(click_get_cycles() + c->local_tsc_offset);
         case h_cycles_hz:
             return String(c->tsc_freq);
+        case h_phase:
+            return String(c->_phase);
         default:
             return "<error>";
     }
@@ -401,6 +403,7 @@ void TSCClock::add_handlers() {
     add_read_handler("now_steady", read_handler, h_now_steady);
     add_read_handler("cycles", read_handler, h_cycles);
     add_read_handler("cycles_hz", read_handler, h_cycles_hz);
+    add_read_handler("phase", read_handler, h_phase);
 }
 
 __thread int64_t TSCClock::local_tsc_offset = 0;
@@ -410,4 +413,3 @@ CLICK_ENDDECLS
 ELEMENT_REQUIRES(usertimestamp)
 EXPORT_ELEMENT(TSCClock)
 ELEMENT_MT_SAFE(TSCClock)
-

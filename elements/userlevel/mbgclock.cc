@@ -24,7 +24,7 @@
 CLICK_DECLS
 
 MBGClock::MBGClock() :
-_verbose(1), _install(true)
+_verbose(1), _install(true), _comp(true)
 {
 
 }
@@ -35,16 +35,21 @@ MBGClock::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
             .read("VERBOSE", _verbose)
             .read("INSTALL", _install)
+            .read("COMP", _comp)
             .complete() < 0)
         return -1;
     return 0;
 }
 
-uint64_t
+int64_t
 MBGClock::now() {
     PCPS_TIME_STAMP ts;
-    mbg_get_fast_hr_timestamp_comp(_dh, &ts, 0 );
-    return pcps_time_stamp_to_uint64(&ts);
+
+    if (!_comp)
+        mbg_get_fast_hr_timestamp(_dh, &ts);
+    else
+        mbg_get_fast_hr_timestamp_comp(_dh, &ts, 0 );
+    return ((int64_t)ts.sec * 1000000000) + (int64_t)(bin_frac_32_to_nsec(ts.frac)) ;
 }
 
 uint64_t

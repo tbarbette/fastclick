@@ -36,7 +36,7 @@ class TSCClock : public Element { public:
   void run_timer(Timer*);
   static void run_sync_timer(Timer*,void*);
 
-  enum {h_now, h_now_steady, h_cycles, h_cycles_hz};
+  enum {h_now, h_now_steady, h_cycles, h_cycles_hz, h_phase};
   static String read_handler(Element *e, void *thunk);
   void add_handlers() CLICK_COLD;
 
