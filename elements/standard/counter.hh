@@ -332,6 +332,16 @@ protected:
     rXwlock _atomic_lock CLICK_CACHE_ALIGN;
     per_thread<stats> _stats CLICK_CACHE_ALIGN;
 };
+
+class CounterRxWMP : public CounterMP { public:
+
+    CounterRxWMP() CLICK_COLD;
+    ~CounterRxWMP() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterRxWMP"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+};
 /*
 class CounterRCUMP : public CounterBase { public:
 

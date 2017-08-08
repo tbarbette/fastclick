@@ -393,6 +393,15 @@ CounterMP::reset()
     if (_atomic  > 0)
         _atomic_lock.write_end();
 }
+
+CounterRxWMP::CounterRxWMP()
+{
+    _atomic = 2;
+}
+
+CounterRxWMP::~CounterRxWMP()
+{
+}
 /*
 CounterRCUMP::CounterRCUMP() : _stats()
 {
@@ -628,6 +637,8 @@ CLICK_ENDDECLS
 EXPORT_ELEMENT(Counter)
 EXPORT_ELEMENT(CounterMP)
 ELEMENT_MT_SAFE(CounterMP)
+EXPORT_ELEMENT(CounterRxWMP)
+ELEMENT_MT_SAFE(CounterRxWMP)
 EXPORT_ELEMENT(CounterAtomic)
 ELEMENT_MT_SAFE(CounterAtomic)
 EXPORT_ELEMENT(CounterRCU)
