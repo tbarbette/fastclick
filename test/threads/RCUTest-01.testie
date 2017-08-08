@@ -1,0 +1,19 @@
+%info
+Tests RCU data structure
+
+%require
+click-buildtool provides umultithread
+
+%script
+$VALGRIND click -j 16 -e '
+
+    t :: RCUTest()
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,wait,
+                  wait 10ms,
+                  print t.rcu, print t.fast_rcu, print t.status, stop)
+'
+
+%expect stdout
+80000
+80000
+160000

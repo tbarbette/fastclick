@@ -1274,7 +1274,7 @@ class fast_rcu { public:
     ~fast_rcu() {}
 
     inline void initialize(T v) {
-        _storage[_rcu_current] = v;
+        _storage[_rcu_current].v = v;
     }
 
     inline const T& read_begin(int &) {
