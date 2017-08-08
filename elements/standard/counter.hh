@@ -390,7 +390,7 @@ class CounterRCUMP : public CounterBase { public:
 
 
 protected:
-    click_rcu<per_thread<stats> > _stats;
+    fast_rcu<per_thread<stats> > _stats;
 };
 */
 class CounterRCU : public CounterBase { public:

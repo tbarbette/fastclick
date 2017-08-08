@@ -1131,6 +1131,13 @@ bool __rwlock<V>::read_to_write() {
  * It is not as bad as a critical section/interrupt like in kernel,
  * but those lock operation still have a non-negligeable cost.
  *
+ * It may be difficult to see that writer cannot overwrite a bucket that is
+ * currently being accessed, here is a helping example :
+ *   A reads index
+ *   B write and advance
+ *   C write and advance, check refcnt[A], CAS  0 -> -1
+ *   A writes refcnt[A] -> CAS fail
+ *
  * The ring has 2 values, so one writer can update one bucket while readers
  * may still read the other bucket.
  */
@@ -1250,54 +1257,39 @@ protected:
     volatile int rcu_current;
 };
 
+
+/**
+ * Fast RCU that avoids heavy locked CAS by using a per-thread writer epoch
+ */
 template <typename T>
 class fast_rcu { public:
-    fast_rcu() : rcu_current(0) {
-        refcnt[0] = 0;
-        refcnt[1] = 0;
+#define N 2
+    fast_rcu() : _rcu_current(0), _write_epoch(1){
     }
 
-    fast_rcu(T v) : rcu_current(0) {
-        refcnt[0] = 0;
-        refcnt[1] = 0;
+    fast_rcu(T v) : _rcu_current(0), _write_epoch(1) {
         initialize(v);
     }
 
     ~fast_rcu() {}
 
     inline void initialize(T v) {
-        storage[rcu_current] = v;
+        _storage[_rcu_current] = v;
     }
 
-    /**
-     * A loop is needed to avoid a race condition where thread A reads
-     * rcu_current, then writer B does a full write, start a second write
-     * before A update the refcnt. A would then inc the refcnt,
-     * and get a reference while B is in fact writing that bucket.
-     *
-     * The solution is the following one:
-     * When the refcnt for the next bucket is 0, the writer is writing -1 as
-     * the refcnt. This is done atomicly using a CAS instruction.
-     *
-     * In the reader, we check if the refcnt is -1 (current write), and if not we CAS
-     * refcnt+1. We loop until the CAS worked so we know that we made a "refcnt++"
-     * without any writer starting to write in the bucket.
-     *
-     * Also, the same rcu_current_local must be passed to read_end
-     * as we need to down the actual refcnt we incremented, and rcu_current
-     * may be incremented by 1 before we finish our reading.
-     */
-    inline const T& read_begin(int &rcu_current_local) {
-        rcu_current_local = rcu_current;
-        refcnt[rcu_current_local]++;
-        click_write_fence();
+    inline const T& read_begin(int &) {
+        int w_epoch = _write_epoch;
+        *_epochs = w_epoch;
+        click_write_fence(); //Actually read rcu_current after storing epoch
+        int rcu_current_local = _rcu_current;
+        click_read_fence();//Do not read _rcu_current later
         //The reference is holded now, we are sure that no writer will edit this until read_end is called.
-        return storage[rcu_current_local].v;
+        return _storage[rcu_current_local].v;
     }
 
-    inline void read_end(const int &rcu_current_local) {
-        click_compiler_fence(); //No reorder of refcnt--
-        refcnt[rcu_current_local]--;
+    inline void read_end(const int &) {
+        click_compiler_fence(); //No load or store after writing the epoch bak to 0
+        *_epochs = 0;
     }
 
     inline T read() {
@@ -1307,32 +1299,36 @@ class fast_rcu { public:
         return v;
     }
 
-    /**
-     * No need for lock of writers anymore. We atomicly set the refcnt to -1 if
-     * the value is 0, if another writer is writing, it would have done the
-     * same.
-     * If no readers are reading, the refcnt would not be 0.
-     */
     inline T& write_begin(int& rcu_current_local) {
 
         _write_lock.acquire();
-        rcu_current_local = rcu_current;
-        int rcu_next = (rcu_current_local + 1) & 1;
+        rcu_current_local = _rcu_current;
 
-        //We may still have reader left in the next case
-        while(refcnt[rcu_next] > 0) {
-            click_relax_fence();
-//            click_chatter("INEFFICIENT, INCREASE N");
+        int rcu_next = (rcu_current_local + 1) & 1;
+        int bad_epoch = (_write_epoch - N) + 1;
+
+        int i = 0;
+        loop:
+        for (; i < _epochs.weight(); i ++) {
+            int te = _epochs.get_value(i);
+            if (unlikely(te != 0 && te == bad_epoch)) {
+                click_relax_fence();
+                goto loop;
+            }
+            //TODO : if allow N > 2, compute a min_epoch at the same time so next writer can avoid looping
         }
 
-        storage[rcu_next].v = storage[rcu_current_local].v;
+        //All epochs are 0 (no accessed, or at least not to the current ptr)
+        _storage[rcu_next].v = _storage[rcu_current_local].v;
 
-        return storage[rcu_next].v;
+        return _storage[rcu_next].v;
     }
 
     inline void write_commit(int rcu_current_local) {
         click_write_fence(); //Prevent write to finish after this
-        rcu_current = (rcu_current_local + 1) & 1;
+        _rcu_current = (rcu_current_local + 1) & 1;
+        click_compiler_fence(); //Write epoch must happen after rcu_current, to be sure that thr old bucket is not read and accessed with the new epoch.
+        ++_write_epoch;
         _write_lock.release();
     }
 
@@ -1342,9 +1338,10 @@ protected:
         T v;
     } CLICK_CACHE_ALIGN AT;
 
-    atomic_uint32_t refcnt[2];
-    AT storage[2];
-    volatile int rcu_current;
+    per_thread<volatile int> _epochs;
+    AT _storage[2];
+    volatile int _rcu_current;
+    volatile int _write_epoch;
     Spinlock _write_lock;
 
 };
