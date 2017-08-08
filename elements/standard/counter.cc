@@ -632,6 +632,64 @@ CounterLock::reset()
     _lock.release();
 }
 
+
+
+CounterRW::CounterRW()
+{
+}
+
+CounterRW::~CounterRW()
+{
+}
+
+Packet*
+CounterRW::simple_action(Packet *p)
+{
+    _lock.write_begin();
+    _lock->_count++;
+    _lock->_byte_count += p->length();
+    if (unlikely(!_simple)) {
+        check_handlers(_lock->_count, _lock->_byte_count);
+    }
+    _lock.write_end();
+    return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+CounterRW::simple_action_batch(PacketBatch *batch)
+{
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+        CounterRW::simple_action(p);
+        return batch;
+    }
+
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    _lock.write_begin();
+    _lock->_count += batch->count();
+    _lock->_byte_count += bc;
+    if (unlikely(!_simple)) {
+        check_handlers(_lock->_count, _lock->_byte_count);
+    }
+    _lock.write_end();
+    return batch;
+}
+#endif
+
+void
+CounterRW::reset()
+{
+    _lock.write_begin();
+    _lock->_count = 0;
+    _lock->_byte_count = 0;
+    CounterBase::reset();
+    _lock.write_end();
+}
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(Counter)

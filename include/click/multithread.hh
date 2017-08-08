@@ -893,6 +893,10 @@ private:
     int32_t max_write;
 } CLICK_CACHE_ALIGN;
 
+
+/**
+ * Shared-pointer based rwlock
+ */
 template <typename V>
 class rwlock { public:
 

@@ -143,8 +143,8 @@ class CounterBase : public BatchElement { public:
     virtual stats atomic_read() = 0;
 
     /**
-     * Add something to the counter, non-atomic way. Calling this may break
-     *   the counter even if ATOMIC is set.
+     * Add something to the counter, allowing stale and inconsistent data but
+     *   still thread safe (the final total must be good)
      */
     virtual void add(stats) = 0;
 
@@ -612,6 +612,80 @@ protected:
     volatile counter_int_type _count;
     volatile counter_int_type _byte_count;
     Spinlock _lock;
+};
+
+class CounterRW : public CounterBase { public:
+
+    CounterRW() CLICK_COLD;
+    ~CounterRW() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterRW"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("CounterRW", name) == 0)
+            return (CounterRW *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    int can_atomic() { return 2; } CLICK_COLD;
+
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
+
+    counter_int_type count() {
+        _lock.read_begin();
+        counter_int_type v = (*_lock)._count;
+        _lock.read_end();
+        return v;
+    }
+
+    counter_int_type byte_count() {
+        _lock.read_begin();
+        counter_int_type v = (*_lock)._byte_count;
+        _lock.read_end();
+        return v;
+    }
+
+    stats read() {
+        stats s;
+        _lock.read_begin();
+        s = (*_lock);
+        _lock.read_end();
+        return s;
+    }
+
+    stats atomic_read() {
+        stats s;
+        _lock.read_begin();
+        s = (*_lock);
+        _lock.read_end();
+        return s;
+    }
+
+    void add(stats s) override {
+        _lock.write_begin();
+        _lock->_count += s._count;
+        _lock->_byte_count += s._byte_count;
+        _lock.write_end();
+    }
+
+    void atomic_add(stats s) override {
+        _lock.write_begin();
+        _lock->_count += s._count;
+        _lock->_byte_count += s._byte_count;
+        _lock.write_end();
+    }
+
+protected:
+    __rwlock<stats> _lock;
 };
 
 CLICK_ENDDECLS
