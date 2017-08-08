@@ -1264,10 +1264,10 @@ protected:
 template <typename T>
 class fast_rcu { public:
 #define N 2
-    fast_rcu() : _rcu_current(0), _write_epoch(1){
+    fast_rcu() : _rcu_current(0), _write_epoch(1), _epochs(0) {
     }
 
-    fast_rcu(T v) : _rcu_current(0), _write_epoch(1) {
+    fast_rcu(T v) : _rcu_current(0), _write_epoch(1), _epochs(0) {
         initialize(v);
     }
 
