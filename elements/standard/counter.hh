@@ -518,11 +518,11 @@ class CounterAtomic : public CounterBase { public:
         return _byte_count;
     }
 
-    stats read() {
+    stats read() override {
         return {_count, _byte_count};
     }
 
-    stats atomic_read() {  //This is NOT atomic between the two fields
+    stats atomic_read() override {  //This is NOT atomic between the two fields
         return {_count, _byte_count};
     }
 
@@ -686,6 +686,81 @@ class CounterRW : public CounterBase { public:
 
 protected:
     __rwlock<stats> _lock;
+};
+
+class CounterPRW : public CounterBase { public:
+
+    CounterPRW() CLICK_COLD;
+    ~CounterPRW() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterPRW"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+
+    void* cast(const char *name)
+    {
+        if (strcmp("CounterPRW", name) == 0)
+            return (CounterPRW *)this;
+        else
+            return CounterBase::cast(name);
+    }
+
+    int can_atomic() { return 2; } CLICK_COLD;
+
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
+
+    counter_int_type count() {
+        _lock.acquire_read();
+        counter_int_type v = _s._count;
+        _lock.release_read();
+        return v;
+    }
+
+    counter_int_type byte_count() {
+        _lock.acquire_read();
+        counter_int_type v = _s._byte_count;
+        _lock.release_read();
+        return v;
+    }
+
+    stats read() {
+        stats s;
+        _lock.acquire_read();
+        s = (_s);
+        _lock.release_read();
+        return s;
+    }
+
+    stats atomic_read() {
+        stats s;
+        _lock.acquire_read();
+        s = (_s);
+        _lock.release_read();
+        return s;
+    }
+
+    void add(stats s) override {
+        _lock.acquire_write();
+        _s._count += s._count;
+        _s._byte_count += s._byte_count;
+        _lock.release_write();
+    }
+
+    void atomic_add(stats s) override {
+        _lock.acquire_write();
+        _s._count += s._count;
+        _s._byte_count += s._byte_count;
+        _lock.release_write();
+    }
+
+protected:
+    stats _s;
+    ReadWriteLock _lock;
 };
 
 CLICK_ENDDECLS

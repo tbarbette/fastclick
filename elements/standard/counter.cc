@@ -690,6 +690,62 @@ CounterRW::reset()
     _lock.write_end();
 }
 
+CounterPRW::CounterPRW()
+{
+}
+
+CounterPRW::~CounterPRW()
+{
+}
+
+Packet*
+CounterPRW::simple_action(Packet *p)
+{
+    _lock.acquire_write();
+    _s._count++;
+    _s._byte_count += p->length();
+    if (unlikely(!_simple)) {
+        check_handlers(_s._count, _s._byte_count);
+    }
+    _lock.release_write();
+    return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+CounterPRW::simple_action_batch(PacketBatch *batch)
+{
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+        CounterPRW::simple_action(p);
+        return batch;
+    }
+
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    _lock.acquire_write();
+    _s._count += batch->count();
+    _s._byte_count += bc;
+    if (unlikely(!_simple)) {
+        check_handlers(_s._count, _s._byte_count);
+    }
+    _lock.release_write();
+    return batch;
+}
+#endif
+
+void
+CounterPRW::reset()
+{
+    _lock.acquire_write();
+    _s._count = 0;
+    _s._byte_count = 0;
+    CounterBase::reset();
+    _lock.release_write();
+}
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(Counter)
@@ -699,6 +755,8 @@ EXPORT_ELEMENT(CounterRxWMP)
 ELEMENT_MT_SAFE(CounterRxWMP)
 EXPORT_ELEMENT(CounterRW)
 ELEMENT_MT_SAFE(CounterRW)
+EXPORT_ELEMENT(CounterPRW)
+ELEMENT_MT_SAFE(CounterPRW)
 EXPORT_ELEMENT(CounterAtomic)
 ELEMENT_MT_SAFE(CounterAtomic)
 EXPORT_ELEMENT(CounterRCU)
