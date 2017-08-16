@@ -4,6 +4,7 @@
 #include <click/timer.hh>
 #include <click/task.hh>
 #include <click/sync.hh>
+#include <click/timestamp.hh>
 #undef HAVE_CONFIG_H //Clash with Meinberg's same define
 #include <mbgdevio.h>
 #include <mbgpccyc.h>
@@ -20,7 +21,7 @@ CLICK_DECLS
  *
  */
 
-class MBGClock : public Element { public:
+class MBGClock : public Element,UserClock { public:
 
   MBGClock() CLICK_COLD;
 
@@ -31,7 +32,10 @@ class MBGClock : public Element { public:
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage);
 
-  int64_t now();
+  void* cast(const char *name);
+
+  int64_t now(bool steady=false) override;
+
   uint64_t cycles();
 
   enum {h_now, h_cycles, h_now_steady};

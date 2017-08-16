@@ -40,6 +40,13 @@ LinuxClock::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+void *
+LinuxClock::cast(const char *name) {
+    if (strcmp(name,"UserClock") == 0)
+        return static_cast<UserClock*>(this);
+    return Element::cast(name);
+}
+
 int64_t
 LinuxClock::now(bool steady) {
     struct timespec tsp;

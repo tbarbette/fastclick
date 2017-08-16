@@ -29,6 +29,14 @@ _verbose(1), _install(true), _comp(true)
 
 }
 
+void *
+MBGClock::cast(const char *name) {
+    if (strcmp(name,"UserClock") == 0)
+        return static_cast<UserClock*>(this);
+    return Element::cast(name);
+}
+
+
 int
 MBGClock::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -42,7 +50,7 @@ MBGClock::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int64_t
-MBGClock::now() {
+MBGClock::now(bool) {
     PCPS_TIME_STAMP ts;
 
     if (!_comp)

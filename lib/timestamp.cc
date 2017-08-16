@@ -265,6 +265,7 @@ bool Timestamp::set_clock(user_clock_fct clock, void* user) {
 	_user_clock = clock;
 }
 
+
 user_clock_fct Timestamp::_user_clock = 0;
 void* Timestamp::_user_data = 0;
 #endif

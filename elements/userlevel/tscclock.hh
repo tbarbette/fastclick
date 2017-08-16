@@ -4,6 +4,7 @@
 #include <click/timer.hh>
 #include <click/task.hh>
 #include <click/sync.hh>
+#include <click/timestamp.hh>
 CLICK_DECLS
 
 /* =c
@@ -28,6 +29,8 @@ class TSCClock : public Element { public:
 
   const char *class_name() const        { return "TSCClock"; }
   const char *port_count() const        { return PORTS_0_0; }
+
+  void *cast(const char *name);
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   int initialize(ErrorHandler *) CLICK_COLD;
@@ -91,6 +94,8 @@ private:
   atomic_uint32_t _synchronize_ok;
   Timer** _sync_timers;
 
+  UserClock* _base;
+
   inline int64_t tick_to_subsec(int64_t delta, int64_t mult);
   inline int64_t tick_to_subsec_wall(int64_t delta);
   inline int64_t tick_to_subsec_steady(int64_t delta);
@@ -112,6 +117,8 @@ private:
 
   bool stabilize_tick();
   bool accumulate_tick(Timer*);
+
+  int64_t get_real_timestamp(bool steady=false);
 };
 
 inline int64_t TSCClock::tick_to_subsec(int64_t delta, int64_t mult) {

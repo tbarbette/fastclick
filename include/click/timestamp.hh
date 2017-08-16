@@ -744,6 +744,9 @@ class Timestamp { public:
 
 };
 
+class UserClock {public:
+    virtual int64_t now(bool steady) = 0;
+};
 
 #if TIMESTAMP_WARPABLE
 /** @cond never */
