@@ -62,8 +62,11 @@ private:
   int64_t last_real[2] = {0};
   int64_t cycles_per_subsec_mult[2] = {0};
 
-  static __thread int64_t local_tsc_offset;
-  static __thread int local_synchronize_bad;
+  struct state {
+      int64_t local_tsc_offset;
+      int local_synchronize_bad;
+  };
+  per_thread<state> tstate;
 
   unsigned current_clock = 0;
 
@@ -104,11 +107,11 @@ private:
   inline double delta_to_freq(int64_t tick, int64_t time);
 
   inline int64_t compute_now_steady() {
-      return steady_timestamp[current_clock] + tick_to_subsec_steady(click_get_cycles() + local_tsc_offset - steady_cycle[current_clock]);
+      return steady_timestamp[current_clock] + tick_to_subsec_steady(click_get_cycles() + tstate->local_tsc_offset - steady_cycle[current_clock]);
   }
 
   inline int64_t compute_now_wall(int clock) {
-      return last_timestamp[clock] + tick_to_subsec_wall(click_get_cycles() + local_tsc_offset- last_cycles[clock]);
+      return last_timestamp[clock] + tick_to_subsec_wall(click_get_cycles() + tstate->local_tsc_offset- last_cycles[clock]);
   }
 
   inline int64_t compute_now_wall() {

@@ -295,8 +295,8 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
     int64_t approx_time = tc->compute_now_wall(local_current_clock);
     int64_t delta = real_time - approx_time;
     if (abs(delta) > tc->max_precision) {
-        local_tsc_offset += tc->subsec_to_tick(delta,tc->cycles_per_subsec_mult[local_current_clock]);
-        if (local_synchronize_bad++ == 10) {
+        tc->tstate->local_tsc_offset += tc->subsec_to_tick(delta,tc->cycles_per_subsec_mult[local_current_clock]);
+        if (tc->tstate->local_synchronize_bad++ == 10) {
             if (tc->_verbose > 1)
                 click_chatter("%s : TSC clock of core %d is not synchronized... It drifted by %ld subsecs.",
                                     tc->name().c_str(),
@@ -306,10 +306,10 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
             return;
         }
     } else {
-        if (local_synchronize_bad-- == -10) {
+        if (tc->tstate->local_synchronize_bad-- == -10) {
             //Do not set an offset if it is small as this is probably a computation error
-            if (local_tsc_offset < 50 && local_tsc_offset > -50)
-                local_tsc_offset = 0;
+            if (tc->tstate->local_tsc_offset < 50 && tc->tstate->local_tsc_offset > -50)
+                tc->tstate->local_tsc_offset = 0;
             else {
                 if (!tc->_allow_offset) {
                     tc->_synchronize_bad++;
@@ -318,7 +318,7 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
                                       "but ALLOW_OFFSET is not true.",
                                             tc->name().c_str(),
                                             click_current_cpu_id(),
-                                            local_tsc_offset);
+                                            tc->tstate->local_tsc_offset);
                     return;
                 }
             }
@@ -327,7 +327,7 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
                 click_chatter("%s : TSC clock of core %d IS synchronized : local offset is %ld",
                                     tc->name().c_str(),
                                     click_current_cpu_id(),
-                                    local_tsc_offset);
+                                    tc->tstate->local_tsc_offset);
             return;
         }
     }
@@ -411,7 +411,7 @@ TSCClock::read_handler(Element *e, void *thunk) {
         case h_now_steady:
             return String(c->compute_now_steady());
         case h_cycles:
-            return String(click_get_cycles() + c->local_tsc_offset);
+            return String(click_get_cycles() + c->tstate->local_tsc_offset);
         case h_cycles_hz:
             return String(c->tsc_freq);
         case h_phase:
@@ -429,8 +429,6 @@ void TSCClock::add_handlers() {
     add_read_handler("phase", read_handler, h_phase);
 }
 
-__thread int64_t TSCClock::local_tsc_offset = 0;
-__thread int TSCClock::local_synchronize_bad = 0;
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(usertiming)
