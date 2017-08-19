@@ -668,6 +668,9 @@ FlowNode* FlowNode::optimize() {
             newnode->check();
 			return newnode;
 		} else if (getNum() == 2) {
+#if DEBUG_CLASSIFIER
+            click_chatter("Optimize : node has 2 childs");
+#endif
 			FlowNode* newnode;
 			NodeIterator* cit = iterator();
 			FlowNodePtr* childA = (cit->next());
@@ -682,10 +685,12 @@ FlowNode* FlowNode::optimize() {
 #if DEBUG_CLASSIFIER
 				click_chatter("Optimize : 2 child and no default value : only 2 possible case (value %lu or value %lu)!",childA->data().data_64,childB->data().data_64);
 #endif
-				FlowNodeTwoCase* fl = new FlowNodeTwoCase(childA->optimize());
+				FlowNodePtr newA = childA->optimize();
+				FlowNodeTwoCase* fl = new FlowNodeTwoCase(newA);
 				fl->inc_num();
 				fl->assign(this);
-				fl->set_default(childB->optimize());
+				FlowNodePtr newB = childB->optimize();
+				fl->set_default(newB);
 				newnode = fl;
 			} else {
 #if DEBUG_CLASSIFIER
@@ -693,8 +698,12 @@ FlowNode* FlowNode::optimize() {
 #endif
 				FlowNodePtr ncA = childA->optimize();
 				FlowNodePtr ncB = childB->optimize();
+#if DEBUG_CLASSIFIER
+				click_chatter("The 2 cases are :");
 				ncA.print();
+				click_chatter("And :");
 				ncB.print();
+#endif
 				FlowNodeThreeCase* fl = new FlowNodeThreeCase(ncA,ncB);
 				fl->inc_num();
 				fl->inc_num();
@@ -738,6 +747,7 @@ FlowNodePtr FlowNodePtr::optimize() {
         FlowNodeData data = node->node_data;
         ptr.node = node->optimize();
         ptr.node->node_data = data;
+        ptr.node->check();
         return ptr;
     }
 }
