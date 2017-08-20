@@ -54,6 +54,8 @@ Discard::initialize(ErrorHandler *errh)
 	ScheduleInfo::initialize_task(this, &_task, _active, errh);
 	_signal = Notifier::upstream_empty_signal(this, 0, &_task);
     }
+
+    get_passing_threads(); //We use kill_nonatomic if we can
     return 0;
 }
 
@@ -62,7 +64,11 @@ void
 Discard::push_batch(int, PacketBatch *head)
 {
     _count+=head->count();
-    head->fast_kill();
+    if (is_fullpush()) {
+        head->fast_kill_nonatomic();
+    } else {
+        head->fast_kill();
+    }
 }
 #endif
 void

@@ -567,7 +567,6 @@ WritablePacket::recycle(WritablePacket *p)
 
 /**
  * @Precond : _use_count == 1 for all packets
- * @Precod : ~WritablePacket has been called for each packets
  */
 void
 WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
@@ -582,6 +581,12 @@ WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigne
     }
 #endif
     PacketPool& packet_pool = *make_local_packet_pool();
+
+    Packet* next = ((head != 0)? head->next() : 0 );
+    Packet* p = head;
+    for (;p != 0;p=next,next=(p==0?0:p->next())) {
+        ((WritablePacket*)p)->~WritablePacket();
+    }
     check_packet_pool_size(packet_pool);
     packet_pool.pcount += count;
     tail->set_next(packet_pool.p);
