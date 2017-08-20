@@ -162,7 +162,6 @@ FlowNode* FlowDispatcher::get_table(int) {
 		    rules[i].root->check();
 			if (_verbose)
 				click_chatter("Merging this rule of %s :",name().c_str());
-			rules[i].root->print(_flow_data_offset);
 			if (rules[i].output >= 0 && rules[i].output < noutputs()) { //If it's a real output, merge with children
                 FlowNode* child_table = FlowElementVisitor::get_downward_table(this, rules[i].output);
                 if (child_table) {
@@ -233,14 +232,14 @@ FlowNode* FlowDispatcher::get_table(int) {
 		assert(merged);
 		//Insert a "- drop" rule
 		if (merged->default_ptr()->ptr == 0) {
-			click_chatter("ADDING ! %s to %s",merged->name().c_str(),merged->level()->print().c_str());
+			//click_chatter("ADDING ! %s to %s",merged->name().c_str(),merged->level()->print().c_str());
 			FlowNodePtr* parent_ptr = merged->default_ptr();
 			parent_ptr->set_leaf(FCBPool::biggest_pool->allocate_empty());
 			parent_ptr->set_data({0});
 			parent_ptr->leaf->parent = merged;
 			parent_ptr->leaf->acquire(1);
 			parent_ptr->leaf->data[_flow_data_offset] = -1;
-			parent_ptr->leaf->print("");
+			//parent_ptr->leaf->print("");
 		}
 		merged->check();
 		if (_verbose) {
@@ -259,7 +258,6 @@ FlowNode* FlowDispatcher::get_table(int) {
         });
 #endif
 		_table = merged;
-        _table->print(_flow_data_offset);
         _table->check();
 #if DEBUG_CLASSIFIER
         /**
@@ -313,14 +311,11 @@ FlowNode* FlowDispatcher::get_table(int) {
         }
 #endif
 	} else {
-        _table->print();
         _table->check();
     }
 	//click_chatter("Table before duplicate : ");
 
 	FlowNode* tmp = _table->duplicate(true,1);
-	//click_chatter("Table after duplicate :");
-	tmp->print();
 	tmp->check();
 	assert(tmp->has_no_default());
 	return tmp;

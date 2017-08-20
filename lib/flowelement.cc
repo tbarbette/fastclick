@@ -31,19 +31,21 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
     FlowElementVisitor v(e);
 
     e->router()->visit(e,true,output,&v);
+#if DEBUG_CLASSIFIER
     if (v.dispatchers.size() > 0)
         click_chatter("Children of %p{element}[%d] : ",e,output);
     else
         click_chatter("%p{element}[%d] has no children",e,output);
+#endif
     //TODO : Do not catch all bugs
     for (int i = 0; i < v.dispatchers.size(); i++) {
-        click_chatter("%p{element}",v.dispatchers[i].elem);
+        //click_chatter("%p{element}",v.dispatchers[i].elem);
 		if (v.dispatchers[i].elem == (FlowElement*)e) {
 			click_chatter("Classification loops are unsupported, place another FlowClassifier before reinjection of the packets.");
 			e->router()->please_stop_driver();
 			return 0;
 		}
-        click_chatter("%p{element} %d",v.dispatchers[i].elem,v.dispatchers[i].iport);
+		//click_chatter("%p{element} %d",v.dispatchers[i].elem,v.dispatchers[i].iport);
 		if (merged)
 			merged = merged->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport), true); //TODO: allow reorder to be more efficient
 		else
