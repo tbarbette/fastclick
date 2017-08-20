@@ -41,7 +41,7 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
 #if HAVE_DPDK
     _allow_offset = true;
 #endif
-    Element* basee;
+    Element* basee = 0;
     if (Args(conf, this, errh)
             .read("VERBOSE", _verbose)
             .read("INSTALL", _install)
