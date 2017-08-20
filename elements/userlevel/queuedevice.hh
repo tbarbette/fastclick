@@ -210,7 +210,10 @@ protected:
     }
 
     inline int id_for_thread(int tid) {
-        return (_thread_to_firstqueue[tid] - firstqueue) / queue_per_threads;
+        if (likely(queue_per_threads == 1))
+            return _thread_to_firstqueue[tid] - firstqueue;
+        else
+            return (_thread_to_firstqueue[tid] - firstqueue) / queue_per_threads;
     }
 
     inline int id_for_thread() {
