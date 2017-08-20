@@ -18,15 +18,14 @@
 #include <click/config.h> // Doc says this should come first
 
 #include "recordtimestamp.hh"
+#include "numberpacket.hh"
 
 #include <click/args.hh>
 #include <click/error.hh>
 
-RecordTimestamp *recordtimestamp_singleton_instance = nullptr;
-
 CLICK_DECLS
 
-RecordTimestamp::RecordTimestamp() : _count(0), _timestamps() {
+RecordTimestamp::RecordTimestamp() : _offset(-1), _timestamps() {
 }
 
 RecordTimestamp::~RecordTimestamp() {
@@ -34,32 +33,45 @@ RecordTimestamp::~RecordTimestamp() {
 
 int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     unsigned n = 0;
-    if (Args(conf, this, errh).read("N", n).complete() < 0)
+    if (Args(conf, this, errh)
+            .read("N", n)
+            .read("OFFSET", _offset)
+            .complete() < 0)
         return -1;
 
     if (n == 0)
         n = 65536;
     _timestamps.reserve(n);
 
-    if (recordtimestamp_singleton_instance) {
-        errh->error("There can be only one RecordTimestamp element!");
-        return -1;
-    }
-
-    recordtimestamp_singleton_instance = this;
-
     return 0;
 }
 
+inline void
+RecordTimestamp::smaction(Packet* p) {
+    uint64_t i;
+    if (_offset >= 0) {
+        i = NumberPacket::read_number_of_packet(p, _offset);
+        assert(i < INT_MAX);
+        while (i >= _timestamps.size()) {
+            _timestamps.resize(_timestamps.size() == 0? _timestamps.capacity():_timestamps.size() * 2, Timestamp::uninitialized_t());
+        }
+        _timestamps.unchecked_at(i) = Timestamp::now_steady();
+    } else {
+        _timestamps.push_back(Timestamp::now_steady());
+    }
+
+}
+
 void RecordTimestamp::push(int, Packet *p) {
-    _timestamps.push_back(Timestamp::now_steady());
+    smaction(p);
     output(0).push(p);
 }
 
 #if HAVE_BATCH
 void RecordTimestamp::push_batch(int, PacketBatch *batch) {
-    FOR_EACH_PACKET(batch, p)
-            _timestamps.push_back(Timestamp::now_steady());
+    FOR_EACH_PACKET(batch, p) {
+        smaction(p);
+    }
     output(0).push_batch(batch);
 }
 #endif

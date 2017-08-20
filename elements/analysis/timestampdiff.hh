@@ -1,11 +1,12 @@
 #ifndef CLICK_TIMESTAMPDIFF_HH
 #define CLICK_TIMESTAMPDIFF_HH
 
-#include <vector>
-
+#include <click/vector.hh>
 #include <click/batchelement.hh>
 
 CLICK_DECLS
+
+class RecordTimestamp;
 
 /*
 =c
@@ -29,7 +30,7 @@ public:
     ~TimestampDiff() CLICK_COLD;
 
     const char *class_name() const { return "TimestampDiff"; }
-    const char *port_count() const { return PORTS_1_1; }
+    const char *port_count() const { return PORTS_1_1X2; }
     const char *processing() const { return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -42,9 +43,16 @@ public:
 #endif
 
 private:
-    std::vector<unsigned> _delays;
+    Vector<unsigned> _delays;
     int _offset;
-    void smaction(Packet* p);
+    int _max_delay;
+    RecordTimestamp* _rt;
+    inline int smaction(Packet* p);
+
+    RecordTimestamp* get_recordtimestamp_instance();
+
+    void min_mean_max(Vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max);
+    double percentile(Vector<unsigned> &vec, double percent);
 };
 
 CLICK_ENDDECLS

@@ -479,12 +479,22 @@ typedef int click_jiffies_difference_t;
 #else
 CLICK_DECLS
 void click_gettimeofday(timeval *tvp) CLICK_DEPRECATED;
-typedef unsigned click_jiffies_t;
-typedef int click_jiffies_difference_t;
-click_jiffies_t click_jiffies();
+typedef long unsigned click_jiffies_t;
+typedef long int click_jiffies_difference_t;
+click_jiffies_t click_timestamp_jiffies(void*);
+# if HAVE_USER_TIMING
+typedef click_jiffies_t (*click_jiffies_fct_t)(void*);
+extern click_jiffies_fct_t click_jiffies_fct;
+extern void* click_jiffies_fct_data;
+#  define click_jiffies()      (click_jiffies_fct(click_jiffies_fct_data))
+#  define CLICK_HZ           1000
+# else
+#  define click_jiffies()      (click_timestamp_jiffies(0))
+#  define CLICK_HZ           1000
+# endif
+# define HAS_LONG_CLICK_JIFFIES_T  1
 # define click_jiffies_less(a, b)	((click_jiffies_difference_t) ((a) - (b)) < 0)
 CLICK_ENDDECLS
-# define CLICK_HZ			1000
 #endif
 
 #if SIZEOF_CLICK_JIFFIES_T != (HAS_LONG_CLICK_JIFFIES_T ? SIZEOF_LONG : SIZEOF_INT)

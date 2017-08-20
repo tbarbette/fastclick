@@ -18,9 +18,17 @@
 
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
+#include <click/element.hh>
 #include <rte_errno.h>
 
 CLICK_DECLS
+
+DPDKDevice::DPDKDevice() : port_id(-1), info() {
+}
+
+DPDKDevice::DPDKDevice(unsigned port_id) : port_id(port_id) {
+};
+
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
@@ -80,7 +88,7 @@ bool DPDKDevice::alloc_pktmbufs()
 
 
     if (max_socket == -1)
-        return false;
+        max_socket = 0;
 
     _nr_pktmbuf_pools = max_socket + 1;
 
@@ -113,8 +121,8 @@ bool DPDKDevice::alloc_pktmbufs()
                 }
         }
     } else {
-        int i = 0;
-        rte_mempool_walk(add_pool,(void*)&i);
+                int i = 0;
+                rte_mempool_walk(add_pool,(void*)&i);
         if (i == 0) {
                 click_chatter("Could not get pools from the primary DPDK process");
                 return false;
@@ -138,7 +146,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-    dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_TCP | ETH_RSS_UDP;
+    dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
 
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
@@ -150,11 +158,19 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         info.n_tx_descs = 64;
     }
 
-    if (rte_eth_dev_configure(port_id, info.rx_queues.size(), info.tx_queues.size(),
-                              &dev_conf) < 0)
+    if (info.rx_queues.size() > dev_info.max_rx_queues) {
+        return errh->error("Port %d can only use %d RX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+    }
+    if (info.tx_queues.size() > dev_info.max_tx_queues) {
+        return errh->error("Port %d can only use %d TX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+    }
+
+    int ret;
+    if ((ret = rte_eth_dev_configure(port_id, info.rx_queues.size(), info.tx_queues.size(),
+                              &dev_conf)) < 0)
         return errh->error(
-            "Cannot initialize DPDK port %u with %u RX and %u TX queues",
-            port_id, info.rx_queues.size(), info.tx_queues.size());
+            "Cannot initialize DPDK port %u with %u RX and %u TX queues.\nError %d : %s",
+            port_id, info.rx_queues.size(), info.tx_queues.size(), ret,strerror(ret));
     struct rte_eth_rxconf rx_conf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&rx_conf, &dev_info.default_rxconf, sizeof rx_conf);
@@ -201,7 +217,18 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     if (info.promisc)
         rte_eth_promiscuous_enable(port_id);
 
+    if (info.mac != EtherAddress()) {
+        struct ether_addr addr;
+        memcpy(&addr,info.mac.data(),sizeof(struct ether_addr));
+        rte_eth_dev_default_mac_addr_set(port_id, &addr);
+    }
+
     return 0;
+}
+
+void DPDKDevice::set_mac(EtherAddress mac) {
+    assert(!_is_initialized);
+    info.mac = mac;
 }
 
 /**
@@ -299,7 +326,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 #endif
 
     const unsigned n_ports = rte_eth_dev_count();
-    if (n_ports == 0)
+    if (n_ports == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
     for (HashTable<unsigned, DPDKDevice>::const_iterator it = _devs.begin();
@@ -308,7 +335,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
             return errh->error("Cannot find DPDK port %u", it.key());
 
     if (!alloc_pktmbufs())
-        return errh->error("Could not allocate packet MBuf pools");
+        return errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         for (HashTable<unsigned, DPDKDevice>::iterator it = _devs.begin();
@@ -382,6 +409,75 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
     return true;
 }
 
+DPDKRing::DPDKRing() :
+    _message_pool(0),
+       _numa_zone(0), _burst_size(0), _flags(0), _ring(0),
+       _count(0), _MEM_POOL("") {
+}
+
+DPDKRing::~DPDKRing() {
+
+}
+
+int
+DPDKRing::parse(Args* args) {
+    bool spenq = false;
+    bool spdeq = false;
+    String origin;
+    String destination;
+    _flags = 0;
+    const Element* e = args->context();
+    ErrorHandler* errh = args->errh();
+
+    if (args ->  read_p("MEM_POOL",  _MEM_POOL)
+            .read_p("FROM_PROC", origin)
+            .read_p("TO_PROC",   destination)
+            .read("BURST",        _burst_size)
+            .read("NDESC",        _ndesc)
+            .read("NUMA_ZONE",    _numa_zone)
+            .read("SP_ENQ", spenq)
+            .read("SC_DEQ", spdeq)
+            .execute() < 0)
+        return -1;
+
+    if (spenq)
+        _flags |= RING_F_SP_ENQ;
+    if (spdeq)
+        _flags |= RING_F_SC_DEQ;
+
+    if ( _MEM_POOL.empty() || (_MEM_POOL.length() == 0) ) {
+        _MEM_POOL = "0";
+    }
+
+    if (origin.empty() || destination.empty() ) {
+        errh->error("Enter FROM_PROC and TO_PROC names");
+        return -1;
+    }
+
+    if ( _ndesc == 0 ) {
+        _ndesc = DPDKDevice::DEF_RING_NDESC;
+        click_chatter("Default number of descriptors is set (%d)\n",
+                        e->name().c_str(), _ndesc);
+    }
+
+    _MEM_POOL = DPDKDevice::MEMPOOL_PREFIX + _MEM_POOL;
+
+    // If user does not specify the port number
+    // we assume that the process belongs to the
+    // memory zone of device 0.
+    // TODO: Search the Click DAG to find a FromDPDKDevice, take its' port_id
+    //       and use _numa_zone = DPDKDevice::get_port_numa_node(_port_id);
+    if ( _numa_zone < 0 ) {
+        click_chatter("[%s] Assuming NUMA zone 0\n", e->name().c_str());
+        _numa_zone = 0;
+    }
+
+    _PROC_1 = origin+"_2_"+destination;
+    _PROC_2 = destination+"_2_"+origin;
+
+    return 0;
+}
+
 #if HAVE_DPDK_PACKET_POOL
 int DPDKDevice::NB_MBUF = 32*4096*2; //Must be able to fill the packet data pool, and then have some packets for IO
 #else
@@ -402,7 +498,6 @@ String DPDKDevice::MEMPOOL_PREFIX = "click_mempool_";
 unsigned DPDKDevice::DEF_RING_NDESC = 1024;
 unsigned DPDKDevice::DEF_BURST_SIZE = 32;
 
-unsigned DPDKDevice::RING_FLAGS = 0;
 unsigned DPDKDevice::RING_SIZE  = 64;
 unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;

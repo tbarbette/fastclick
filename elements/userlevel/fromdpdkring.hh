@@ -77,7 +77,7 @@ Returns the number of bytes read from the ring.
 
 =a DPDKInfo, ToDPDKRing */
 
-class FromDPDKRing : public BatchElement {
+class FromDPDKRing : public BatchElement, DPDKRing {
 
     public:
         FromDPDKRing () CLICK_COLD;
@@ -86,7 +86,7 @@ class FromDPDKRing : public BatchElement {
         const char    *class_name() const { return "FromDPDKRing"; }
         const char    *port_count() const { return PORTS_0_1; }
         const char    *processing() const { return PUSH; }
-        int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED - 5; }
+        int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 1; }
         bool can_live_reconfigure() const { return false; }
 
         int  configure   (Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -100,23 +100,7 @@ class FromDPDKRing : public BatchElement {
     private:
         Task _task;
 
-        struct rte_mempool *_message_pool;
-        struct rte_ring    *_recv_ring;
-
-        String _MEM_POOL;
-        String _PROC_1;
-        String _PROC_2;
-        String _origin;
-        String _destination;
-
-        unsigned     _ndesc;
-        unsigned     _burst_size;
-        unsigned     _def_burst_size;
         unsigned int _iqueue_size;
-        short        _numa_zone;
-
-        counter_t    _pkts_recv;
-        counter_t    _bytes_recv;
 
         static String read_handler(Element*, void*) CLICK_COLD;
 };

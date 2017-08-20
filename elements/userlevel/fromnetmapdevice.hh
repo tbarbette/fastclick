@@ -61,12 +61,6 @@ CLICK_DECLS
  *  and not assigned to other elements using StaticThreadSched. Default is
  *  to share the threads available on the device's NUMA node equally.
  *
- * =item MAXQUEUES
- *
- * Maximum number of hardware queue to use. Default is to use all available
- * 	queue. If you use RSS, do not set this below the number of queues receiving
- * 	packets hashed by RSS or you won't serve packets.
- *
  * =item VERBOSE
  *
  * Amount of verbosity. If 1, display warnings about potential misconfigurations. If 2, display some informations. Default to 1.

@@ -157,7 +157,7 @@ protected:
         thread_state->_dropped += n;
     }
 
-    bool get_spawning_threads(Bitvector& bmk, bool isoutput)
+    bool get_spawning_threads(Bitvector& bmk, bool)
     {
     	if (noutputs()) { //RX
 		for (int i = 0; i < n_queues; i++) {
@@ -210,7 +210,10 @@ protected:
     }
 
     inline int id_for_thread(int tid) {
-        return (_thread_to_firstqueue[tid] - firstqueue) / queue_per_threads;
+        if (likely(queue_per_threads == 1))
+            return _thread_to_firstqueue[tid] - firstqueue;
+        else
+            return (_thread_to_firstqueue[tid] - firstqueue) / queue_per_threads;
     }
 
     inline int id_for_thread() {

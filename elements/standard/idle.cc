@@ -2,7 +2,10 @@
  * idle.{cc,hh} -- element just sits there and kills packets
  * Robert Morris, Eddie Kohler
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,7 +25,7 @@ CLICK_DECLS
 Idle::Idle()
     : _notifier(NotifierSignal::idle_signal())
 {
-    in_batch_mode=BATCH_MODE_YES;
+    in_batch_mode = BATCH_MODE_YES;
 }
 
 void *
@@ -39,6 +42,14 @@ Idle::push(int, Packet *p)
 {
   p->kill();
 }
+
+#if HAVE_BATCH
+void
+Idle::push_batch(int, PacketBatch *batch)
+{
+  batch->fast_kill();
+}
+#endif
 
 Packet *
 Idle::pull(int)

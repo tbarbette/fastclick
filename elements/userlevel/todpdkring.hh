@@ -98,17 +98,17 @@ This element is only available at user level, when compiled with DPDK support.
 
   ... -> ToDPDKRing(MEM_POOL 2, FROM_PROC nf1_tx, TO_PROC nf2_rx, IQUEUE 1024, BURST 32)
 
-=h n_sent read-only
+=h count read-only
 
 Returns the number of packets sent by the device.
 
-=h n_dropped read-only
+=h dropped read-only
 
 Returns the number of packets dropped by the device.
 
 =a DPDKInfo, FromDPDKRing */
 
-class ToDPDKRing : public BatchElement {
+class ToDPDKRing : public BatchElement, DPDKRing {
 
     public:
         ToDPDKRing () CLICK_COLD;
@@ -117,7 +117,7 @@ class ToDPDKRing : public BatchElement {
         const char    *class_name() const { return "ToDPDKRing"; }
         const char    *port_count() const { return PORTS_1_0; }
         const char    *processing() const { return PUSH; }
-        int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED; }
+        int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 2; }
         bool can_live_reconfigure() const { return false; }
 
         int  configure   (Vector<String> &, ErrorHandler *)     CLICK_COLD;
@@ -160,28 +160,15 @@ class ToDPDKRing : public BatchElement {
         inline void set_flush_timer(TXInternalQueue &iqueue);
         void flush_internal_tx_ring(TXInternalQueue &iqueue);
 
-        struct rte_mempool *_message_pool;
-        struct rte_ring    *_send_ring;
         TXInternalQueue     _iqueue;
 
-        String _MEM_POOL;
-        String _PROC_1;
-        String _PROC_2;
-        String _origin;
-        String _destination;
-
-        unsigned     _ndesc;
-        unsigned     _burst_size;
-        unsigned     _def_burst_size;
         unsigned int _internal_tx_queue_size;
-        short        _numa_zone;
 
         short        _timeout;
         bool         _blocking;
         bool         _congestion_warning_printed;
 
-        counter_t    _n_sent;
-        counter_t    _n_dropped;
+        counter_t _dropped;
 
         static String read_handler(Element*, void*) CLICK_COLD;
 };

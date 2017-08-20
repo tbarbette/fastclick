@@ -7,12 +7,21 @@
 #include <click/packet.hh>
 CLICK_DECLS
 
+/**
+ * Iterate over all packets of a batch. The batch cannot be modified during
+ *   iteration. Use _SAFE version if you want to modify it on the fly.
+ */
 #define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != NULL;p=p->next())
 
+/**
+ * Iterate over all packets of a batch. The current packet can be modified
+ *  during iteration as the "next" pointer is read before going in the core of
+ *  the loop.
+ */
 #define FOR_EACH_PACKET_SAFE(batch,p) \
-                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* fep_next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
-                for (;p != NULL;p=next,next=(p==0?0:p->next()))
+                for (;p != NULL;p=fep_next,fep_next=(p==0?0:p->next()))
 
 /**
  * Execute a function on each packets of a batch. The function may return
@@ -20,39 +29,40 @@ CLICK_DECLS
  * Use _DROPPABLE version if the function could return null.
  */
 #define EXECUTE_FOR_EACH_PACKET(fnt,batch) \
-                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* efep_next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
                 Packet* last = NULL;\
-                for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
-            Packet* q = (fnt)(p);\
+                for (;p != NULL;p=efep_next,efep_next=(p==0?0:p->next())) {\
+            Packet* q = fnt(p);\
                     if (q != p) {\
                         if (last) {\
                             last->set_next(q);\
                         } else {\
                             batch = static_cast<PacketBatch*>(q);\
                         }\
-                        q->set_next(next);\
+                        q->set_next(efep_next);\
                     }\
                     last = q;\
                 }
 
 /**
  * Execute a function on each packet of a batch. The function may return
- * another packet, or null if the packet was dropped.
+ * another packet and which case the packet of the batch will be replaced by
+ * that one, or null if the packet is to be dropped.
  */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
-                Packet* next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* efepd_next = ((batch != NULL)? batch->next() : NULL );\
                 Packet* p = batch;\
                 Packet* last = NULL;\
                 int count = batch->count();\
-                for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
+                for (;p != NULL;p=efepd_next,efepd_next=(p==0?0:p->next())) {\
             Packet* q = fnt(p);\
             if (q == 0) {\
                 on_drop(p);\
                 if (last) {\
-                    last->set_next(next);\
+                    last->set_next(efepd_next);\
                 } else {\
-                    batch = PacketBatch::start_head(next);\
+                    batch = PacketBatch::start_head(efepd_next);\
                 }\
                         count--;\
                         continue;\
@@ -62,7 +72,7 @@ CLICK_DECLS
                         } else {\
                             batch = static_cast<PacketBatch*>(q);\
                         }\
-                        q->set_next(next);\
+                        q->set_next(efepd_next);\
                     }\
                     last = q;\
                 }\
@@ -70,24 +80,50 @@ CLICK_DECLS
                     batch->set_count(count);\
                     batch->set_tail(last);\
                 }\
-            }
+            }\
+
+/**
+ * Same as EXECUTE_FOR_EACH_PACKET_DROPPABLE but build a list of dropped packet
+ * instead of calling a function
+ */
+#define EXECUTE_FOR_EACH_PACKET_DROP_LIST(fnt,batch,drop_list) \
+        PacketBatch* drop_list = 0;\
+        auto on_drop = [&drop_list](Packet* p) {\
+            if (drop_list == 0) {\
+                drop_list = PacketBatch::make_from_packet(p);\
+            } else {\
+                drop_list->append_packet(p);\
+            }\
+        };\
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop);
 
 /**
  * Split a batch into multiple batch according to a given function which will
  * give the index of an output to choose.
- * @fnt Function to call which will return a value between 0 and nbatches
- * #on_finish function which take an output index and the batch when classification is finished
+ *
+ * The main use case is the classification element like Classifier, Switch, etc
+ *   where you split a batch checking which output each packets should take.
+ *
+ * @args nbatches Number of output batches. In many case you want noutputs() + 1
+ *      , keeping the last one for drops.
+ * @args fnt Function to call which will return a value between 0 and nbatches.
+ *  If the function returns a values < 0 or bigger than nbatches, th last batch
+ *  of nbatches will be used.
+ * @args batch The batch to be split
+ * @args on_finish function which take an output index and the batch when
+ *  classification is finished, usually you want that to be
+ *  checked_output_push_batch.
  */
-#define CLASSIFY_EACH_PACKET(nbatches,fnt,batch,on_finish)\
+#define CLASSIFY_EACH_PACKET(nbatches,fnt,cep_batch,on_finish)\
     {\
         PacketBatch* out[nbatches];\
-        bzero(out,sizeof(PacketBatch*)*nbatches);\
-        PacketBatch* next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );\
-        PacketBatch* p = batch;\
+        bzero(out,sizeof(PacketBatch*)*(nbatches));\
+        PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
+        PacketBatch* p = cep_batch;\
         PacketBatch* last = NULL;\
         int last_o = -1;\
         int passed = 0;\
-        for (;p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
+        for (;p != NULL;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
             if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
             if (o == last_o) {\
@@ -120,7 +156,7 @@ CLICK_DECLS
         }\
 \
         int i = 0;\
-        for (; i < nbatches; i++) {\
+        for (; i < (nbatches); i++) {\
             if (out[i]) {\
                 out[i]->tail()->set_next(NULL);\
                 (on_finish(i,out[i]));\
@@ -129,7 +165,17 @@ CLICK_DECLS
     }
 
 /**
- * Create a batch by calling multiple times (up to max) a given function
+ * Create a batch by calling multiple times (up to max) a given function and
+ *   linking them together in respect to the PacketBatch semantic.
+ *
+ * In most case this function should not be used. Because if you get packets
+ * per packets it means you don't get them upstream as a batch. You may prefer
+ * to somehow fetch a whole batch and then iterate through it. One bad
+ * use case is MAKE_BATCH(pull ...) in a x/x element which will create a batch
+ * by calling multiple times pull() until it returns no packets.
+ * This will break batching as it will call pull on the previous element
+ * instead of pull_batch. However this is fine in a source element where
+ * anyway the batch must be created packet per packet.
  */
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
@@ -275,7 +321,7 @@ public :
     }
 
     /**
-     * Build a batch from a linked list of packet with prev already set to the tail
+     * Build a batch from a linked list of packet
      *
      * @param head The first packet of the batch
      * @param size Number of packets in the linkedlist
@@ -360,9 +406,10 @@ public :
     /**
      * Kill all packets of batch of unshared packets. Using this on unshared packets is very dangerous !
      */
-    void safe_kill(bool is_data);
+    void recycle_batch(bool is_data);
 
     void fast_kill();
+    void fast_kill_nonatomic();
 #endif
 };
 
@@ -371,7 +418,7 @@ public :
  */
 inline void PacketBatch::kill() {
     FOR_EACH_PACKET_SAFE(this,p) {
-	p->kill();
+        p->kill();
     }
 }
 
@@ -384,7 +431,7 @@ inline void PacketBatch::kill() {
 	unsigned int n_packet = 0;\
 	unsigned int n_data = 0;
 
-#define BATCH_RECYCLE_PACKET(p) {\
+#define BATCH_RECYCLE_ADD_PACKET(p) {\
 	if (head_packet == NULL) {\
 		head_packet = static_cast<WritablePacket*>(p);\
 		last_packet = static_cast<WritablePacket*>(p);\
@@ -392,10 +439,9 @@ inline void PacketBatch::kill() {
 		last_packet->set_next(p);\
 		last_packet = static_cast<WritablePacket*>(p);\
 	}\
-	last_packet->~WritablePacket();\
 	n_packet++;}
 
-#define BATCH_RECYCLE_DATA_PACKET(p) {\
+#define BATCH_RECYCLE_ADD_DATA_PACKET(p) {\
 	if (head_data == NULL) {\
 		head_data = static_cast<WritablePacket*>(p);\
 		last_data = static_cast<WritablePacket*>(p);\
@@ -405,7 +451,7 @@ inline void PacketBatch::kill() {
 	}\
 	n_data++;}
 
-#define BATCH_RECYCLE_UNSAFE_PACKET(p) {\
+#define BATCH_RECYCLE_PACKET(p) {\
 			if (p->shared()) {\
 				p->kill();\
 			} else {\
@@ -413,34 +459,73 @@ inline void PacketBatch::kill() {
 			}\
 		}
 
+#define BATCH_RECYCLE_PACKET_NONATOMIC(p) {\
+            if (p->shared_nonatomic()) {\
+                p->kill_nonatomic();\
+            } else {\
+                BATCH_RECYCLE_UNKNOWN_PACKET(p);\
+            }\
+        }
+
 #if HAVE_DPDK_PACKET_POOL
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
 	if (p->data_packet() == 0 && p->buffer_destructor() == DPDKDevice::free_pkt && p->buffer() != 0) {\
-		BATCH_RECYCLE_DATA_PACKET(p);\
+		BATCH_RECYCLE_ADD_DATA_PACKET(p);\
 	} else {\
-		BATCH_RECYCLE_PACKET(p);}}
+		BATCH_RECYCLE_ADD_PACKET(p);}}
 #else
 #define BATCH_RECYCLE_UNKNOWN_PACKET(p) {\
 	if (p->data_packet() == 0 && p->buffer_destructor() == 0 && p->buffer() != 0) {\
-		BATCH_RECYCLE_DATA_PACKET(p);\
+		BATCH_RECYCLE_ADD_DATA_PACKET(p);\
 	} else {\
-		BATCH_RECYCLE_PACKET(p);}}
+	    BATCH_RECYCLE_ADD_PACKET(p);}}
 #endif
 
 #define BATCH_RECYCLE_END() \
 	if (last_packet) {\
 		last_packet->set_next(0);\
-		PacketBatch::make_from_simple_list(head_packet,last_packet,n_packet)->safe_kill(false);\
+		PacketBatch::make_from_simple_list(head_packet,last_packet,n_packet)->recycle_batch(false);\
 	}\
 	if (last_data) {\
 		last_data->set_next(0);\
-		PacketBatch::make_from_simple_list(head_data,last_data,n_data)->safe_kill(true);\
+		PacketBatch::make_from_simple_list(head_data,last_data,n_data)->recycle_batch(true);\
 	}
 #else
 #define BATCH_RECYCLE_START() {}
 #define BATCH_RECYCLE_END() {}
-#define BATCH_RECYCLE_UNSAFE_PACKET(p) {p->kill();}
+#define BATCH_RECYCLE_PACKET(p) {p->kill();}
+#define BATCH_RECYCLE_PACKET_NONATOMIC(p) {p->kill_nonatomic();}
 #endif
+
+/**
+ * Use the context of the element to know if the NONATOMIC or ATOMIC version should be called
+ */
+#define BATCH_RECYCLE_PACKET_CONTEXT(p) {\
+            if (likely(is_fullpush())) {\
+                BATCH_RECYCLE_PACKET_NONATOMIC(p);\
+            } else {\
+                BATCH_RECYCLE_PACKET(p);\
+            }\
+        }
+
+/**
+ * Set of functions to efficiently create a batch.
+ */
+#define BATCH_CREATE_INIT(batch) \
+        PacketBatch* batch = 0; \
+        int batch ## count = 0; \
+        Packet* batch ## last = 0;
+#define BATCH_CREATE_APPEND(batch,p) \
+        if (batch) { \
+            batch ## last->set_next(p); \
+        } else {\
+            batch = PacketBatch::start_head(p); \
+        }\
+        batch ## last = p;\
+        batch ## count++;
+#define BATCH_CREATE_FINISH(batch) \
+        if (batch) \
+            batch->make_tail(batch ## last, batch ## count)
 
 typedef Packet::PacketType PacketType;
 

@@ -1,6 +1,6 @@
 #ifndef CLICK_RRSWITCH_HH
 #define CLICK_RRSWITCH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -18,10 +18,11 @@ CLICK_DECLS
  * =a StrideSwitch, Switch, HashSwitch, RandomSwitch, RoundRobinSched
  */
 
-class RoundRobinSwitch : public Element {
+class RoundRobinSwitch : public BatchElement {
 
   atomic_uint32_t _next;
-
+  unsigned _max;
+  bool _split_batch;
  public:
 
   RoundRobinSwitch() CLICK_COLD;
@@ -30,8 +31,16 @@ class RoundRobinSwitch : public Element {
   const char *port_count() const	{ return "1/1-"; }
   const char *processing() const	{ return PUSH; }
 
-  void push(int, Packet *);
+  int configure(Vector<String> &conf, ErrorHandler *errh);
 
+  void push(int, Packet *);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+#endif
+  void add_handlers();
+
+ private:
+  inline int next(Packet*);
 };
 
 CLICK_ENDDECLS

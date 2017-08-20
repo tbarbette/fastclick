@@ -61,6 +61,14 @@ QuickNoteQueue::pull(int)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch* QuickNoteQueue::pull_batch(int port, unsigned max) {
+    PacketBatch* batch;
+    MAKE_BATCH(QuickNoteQueue::pull(port),batch,max);
+    return batch;
+}
+#endif
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(FullNoteQueue)
 EXPORT_ELEMENT(QuickNoteQueue)

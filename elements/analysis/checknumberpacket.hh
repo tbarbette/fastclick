@@ -38,7 +38,7 @@ public:
     void push_batch(int,PacketBatch *) override;
 #endif
 
-    static inline uint64_t read_number_of_packet(const Packet *p,int offset) {
+    static inline uint64_t read_number_of_packet(const Packet *p, int offset) {
         return *(reinterpret_cast<const uint64_t *>(p->data() + offset));
     }
 

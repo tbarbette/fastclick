@@ -79,6 +79,10 @@ class FullNoteQueue : public NotifierQueue { public:
 #endif
     void push(int port, Packet *p);
     Packet *pull(int port);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *);
+    PacketBatch* pull_batch(int port, unsigned max);
+#endif
 
   protected:
 

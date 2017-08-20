@@ -8,7 +8,7 @@ click-buildtool provides umultithread
 $VALGRIND click -j 8 -e '
     elementclass Core {
         $thid |
-        rs :: RatedSource(LENGTH 40, RATE 40, LIMIT 40)
+        rs :: RatedSource(LENGTH 4, RATE 40, LIMIT 40)
         -> output
         StaticThreadSched(rs $thid)
     }

@@ -14,7 +14,7 @@ CLICK_DECLS
  */
 class MinBatch: public BatchElement { public:
 
-	MinBatch() CLICK_COLD;
+    MinBatch() CLICK_COLD;
 
     const char *class_name() const		{ return "MinBatch"; }
     const char *port_count() const		{ return "1/1"; }

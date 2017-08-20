@@ -41,6 +41,26 @@ BatchTest::push_batch(int port,PacketBatch* batch)
     output_push_batch(port, batch);
 }
 
+Packet*
+BatchTest::pull(int port)
+{
+    click_chatter("%p{element}: Packet pull",this);
+    return input(port).pull();
+}
+
+PacketBatch*
+BatchTest::pull_batch(int port,unsigned max)
+{
+    PacketBatch* batch = input(port).pull_batch(max);
+    if (batch)
+        click_chatter("%p{element}: Batch pull of %d packets",this,batch->count());
+    else
+        click_chatter("%p{element}: Batch pull of 0 packets",this);
+    return batch;
+}
+
+
+
 BatchElementTest::BatchElementTest()
 {
 }

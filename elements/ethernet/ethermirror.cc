@@ -2,7 +2,11 @@
  * ethermirror.{cc,hh} -- rewrites Ethernet packet a->b to b->a
  * Eddie Kohler
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2000 Massachusetts Institute of Technology
+ * Copyright (c) 2017 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -31,16 +35,27 @@ EtherMirror::~EtherMirror()
 Packet *
 EtherMirror::simple_action(Packet *p)
 {
-  if (WritablePacket *q = p->uniqueify()) {
-    click_ether *ethh = reinterpret_cast<click_ether *>(q->data());
-    uint8_t tmpa[6];
-    memcpy(tmpa, ethh->ether_dhost, 6);
-    memcpy(ethh->ether_dhost, ethh->ether_shost, 6);
-    memcpy(ethh->ether_shost, tmpa, 6);
-    return q;
-  } else
+    if (WritablePacket *q = p->uniqueify()) {
+        click_ether *ethh = reinterpret_cast<click_ether *>(q->data());
+        uint8_t tmpa[6];
+        memcpy(tmpa, ethh->ether_dhost, 6);
+        memcpy(ethh->ether_dhost, ethh->ether_shost, 6);
+        memcpy(ethh->ether_shost, tmpa, 6);
+
+        return q;
+    }
+
     return 0;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+EtherMirror::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(EtherMirror::simple_action, batch, [](Packet*){});
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(EtherMirror)

@@ -2,8 +2,11 @@
  * ipaddrrewriter.{cc,hh} -- rewrites packet source and destination
  * Eddie Kohler
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2009-2010 Meraki, Inc.
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -69,10 +72,19 @@ IPAddrRewriter::IPAddrFlow::unparse(StringAccum &sa, bool direction,
 
 IPAddrRewriter::IPAddrRewriter()
 {
+#if HAVE_USER_MULTITHREAD
+    _maps_no = ( click_max_cpu_ids() == 0 )? 1 : click_max_cpu_ids();
+    _allocator = new SizedHashAllocator<sizeof(IPAddrFlow)>[_maps_no];
+    //click_chatter("[%s]: Allocated %d flow maps", class_name(), _maps_no);
+#endif
 }
 
 IPAddrRewriter::~IPAddrRewriter()
 {
+#if HAVE_USER_MULTITHREAD
+    if ( _allocator )
+        delete [] _allocator;
+#endif
 }
 
 void *
@@ -91,7 +103,9 @@ IPAddrRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool has_reply_anno = false;
     int reply_anno;
-    _timeouts[0] = 60 * 120;	// 2 hours
+    for (unsigned i=0; i<_mem_units_no; i++) {
+        _timeouts[i][0] = 60 * 120;     // 2 hours
+    }
 
     if (Args(this, errh).bind(conf)
 	.read("REPLY_ANNO", has_reply_anno, AnnoArg(1), reply_anno)
@@ -106,10 +120,10 @@ IPRewriterEntry *
 IPAddrRewriter::get_entry(int, const IPFlowID &xflowid, int input)
 {
     IPFlowID flowid(xflowid.saddr(), 0, IPAddress(), 0);
-    IPRewriterEntry *m = _map.get(flowid);
+    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
     if (!m) {
 	IPFlowID rflowid(IPAddress(), 0, xflowid.daddr(), 0);
-	m = _map.get(rflowid);
+	m = _map[click_current_cpu_id()].get(rflowid);
     }
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
 	IPRewriterInput &is = _input_specs[input];
@@ -128,28 +142,33 @@ IPAddrRewriter::add_flow(int, const IPFlowID &flowid,
     if (rewritten_flowid.sport()
 	|| rewritten_flowid.dport()
 	|| rewritten_flowid.daddr()
-	|| !(data = _allocator.allocate()))
+	|| !(data = _allocator[click_current_cpu_id()].allocate()))
 	return 0;
 
     IPAddrFlow *flow = new(data) IPAddrFlow
 	(&_input_specs[input], flowid, rewritten_flowid,
-	 !!_timeouts[1], click_jiffies() + relevant_timeout(_timeouts));
+	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
+         relevant_timeout(_timeouts[click_current_cpu_id()]));
 
-    return store_flow(flow, input, _map);
+    return store_flow(flow, input, _map[click_current_cpu_id()]);
 }
 
-void
-IPAddrRewriter::push(int port, Packet *p_in)
+int
+IPAddrRewriter::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
+    if (!p) {
+        return -1;
+    }
+
     click_ip *iph = p->ip_header();
 
     IPFlowID flowid(iph->ip_src, 0, IPAddress(), 0);
-    IPRewriterEntry *m = _map.get(flowid);
+    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
 
     if (!m) {
 	IPFlowID rflowid = IPFlowID(IPAddress(), 0, iph->ip_dst, 0);
-	m = _map.get(rflowid);
+	m = _map[click_current_cpu_id()].get(rflowid);
     }
 
     if (!m) {			// create new mapping
@@ -159,18 +178,96 @@ IPAddrRewriter::push(int port, Packet *p_in)
 	if (result == rw_addmap)
 	    m = IPAddrRewriter::add_flow(0, flowid, rewritten_flowid, port);
 	if (!m) {
-	    checked_output_push(result, p);
-	    return;
+	    return result;
 	} else if (_annos & 2)
 	    m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
     }
 
     IPAddrFlow *mf = static_cast<IPAddrFlow *>(m->flow());
     mf->apply(p, m->direction(), _annos);
-    mf->change_expiry_by_timeout(_heap, click_jiffies(), _timeouts);
-    output(m->output()).push(p);
+    mf->change_expiry_by_timeout(
+        _heap[click_current_cpu_id()],
+        click_jiffies(),
+        _timeouts[click_current_cpu_id()]
+    );
+
+    return m->output();
 }
 
+void
+IPAddrRewriter::push(int port, Packet *p)
+{
+    int output_port = process(port, p);
+    if ( output_port < 0 ) {
+        p->kill();
+        return;
+    }
+
+    output(output_port).push(p);
+}
+
+#if HAVE_BATCH
+void
+IPAddrRewriter::push_batch(int port, PacketBatch *batch)
+{
+    unsigned short outports = noutputs();
+    PacketBatch* out[outports];
+    bzero(out,sizeof(PacketBatch*)*outports);
+    PacketBatch *next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );
+    PacketBatch *p = batch;
+    PacketBatch *last = NULL;
+    int last_o = -1;
+    int passed = 0;
+    int count  = 0;
+    for (; p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {
+        // The actual job of this element
+        int o = process(port, p);
+
+        if (o < 0 || o>=(outports))
+            o = (outports - 1);
+
+        if (o == last_o) {
+            passed ++;
+        }
+        else {
+            if (!last) {
+                out[o] = p;
+                p->set_count(1);
+                p->set_tail(p);
+            }
+            else {
+                out[last_o]->set_tail(last);
+                out[last_o]->set_count(out[last_o]->count() + passed);
+                if (!out[o]) {
+                    out[o] = p;
+                    out[o]->set_count(1);
+                    out[o]->set_tail(p);
+                }
+                else {
+                    out[o]->append_packet(p);
+                }
+                passed = 0;
+            }
+        }
+        last = p;
+        last_o = o;
+        count++;
+    }
+
+    if (passed) {
+        out[last_o]->set_tail(last);
+        out[last_o]->set_count(out[last_o]->count() + passed);
+    }
+
+    int i = 0;
+    for (; i < outports; i++) {
+        if (out[i]) {
+            out[i]->tail()->set_next(NULL);
+            checked_output_push_batch(i, out[i]);
+        }
+    }
+}
+#endif
 
 String
 IPAddrRewriter::dump_mappings_handler(Element *e, void *)
@@ -178,7 +275,7 @@ IPAddrRewriter::dump_mappings_handler(Element *e, void *)
     IPAddrRewriter *rw = (IPAddrRewriter *)e;
     StringAccum sa;
     click_jiffies_t now = click_jiffies();
-    for (Map::iterator iter = rw->_map.begin(); iter.live(); iter++) {
+    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); iter++) {
 	IPAddrFlow *f = static_cast<IPAddrFlow *>(iter->flow());
 	f->unparse(sa, iter->direction(), now);
 	sa << '\n';

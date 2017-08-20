@@ -2,8 +2,11 @@
  * setipchecksum.{cc,hh} -- element sets IP header checksum
  * Robert Morris
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2012 Eddie Kohler
+ * Copyright (c) 2017 RISE SICS AB
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -53,6 +56,15 @@ SetIPChecksum::simple_action(Packet *p_in)
     }
     return 0;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+SetIPChecksum::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(SetIPChecksum::simple_action, batch, [](Packet *){});
+    return batch;
+}
+#endif
 
 void
 SetIPChecksum::add_handlers()

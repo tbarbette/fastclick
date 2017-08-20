@@ -3,8 +3,11 @@
  * packet
  * Robert Morris
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
  * Copyright (c) 2007 Regents of the University of California
+ * Copyright (c) 2017 RISE SICS AB
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -100,6 +103,15 @@ StoreIPAddress::simple_action(Packet *p)
 	return 0;
     }
 }
+
+#if HAVE_BATCH
+PacketBatch *
+StoreIPAddress::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(StoreIPAddress::simple_action, batch, [](Packet *){});
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StoreIPAddress)

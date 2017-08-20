@@ -1,6 +1,6 @@
 #ifndef CLICK_SIMPLESPINLOCK_HH
 #define CLICK_SIMPLESPINLOCK_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/sync.hh>
 CLICK_DECLS
 
@@ -24,7 +24,7 @@ CLICK_DECLS
  * =a SpinlockInfo, SpinlockAcquire, SpinlockRelease
  */
 
-class PathSpinlock : public Element { public:
+class PathSpinlock : public BatchElement { public:
 
     PathSpinlock()			: _lock(0) {}
     ~PathSpinlock()			{}
@@ -36,6 +36,9 @@ class PathSpinlock : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     void push(int,Packet *p);
+#if HAVE_BATCH
+    void push_batch(int,PacketBatch *p);
+#endif
     Packet* pull(int);
 
   private:

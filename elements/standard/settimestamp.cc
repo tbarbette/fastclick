@@ -32,33 +32,73 @@ SetTimestamp::SetTimestamp()
 int
 SetTimestamp::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    bool first = false, delta = false;
+    bool first = false, delta = false, per_batch = false,has_per_batch = false;
     _tv.set_sec(-1);
     _action = ACT_NOW;
     if (Args(conf, this, errh)
-	.read_p("TIMESTAMP", _tv)
-	.read("FIRST", first)
-	.read("DELTA", delta).complete() < 0)
+        .read_p("TIMESTAMP", _tv)
+        .read("FIRST", first)
+        .read("DELTA", delta)
+        .read("PER_BATCH", per_batch).read_status(has_per_batch)
+        .complete() < 0)
 	return -1;
     if (delta)
 	return errh->error("SetTimestamp(DELTA) is deprecated, use SetTimestampDelta(TYPE FIRST)");
+#ifndef HAVE_BATCH
+    if (has_per_batch)
+        errh->warning("PER_BATCH is defined but batching is not enabled. Value will be ignored.");
+#endif
     _action = (_tv.sec() < 0 ? ACT_NOW : ACT_TIME) + (first ? ACT_FIRST_NOW : ACT_NOW);
+    _per_batch = per_batch;
     return 0;
+}
+
+inline void
+SetTimestamp::smaction(Packet *p)
+{
+    if (_action == ACT_NOW)
+    p->timestamp_anno().assign_now();
+    else if (_action == ACT_TIME)
+    p->timestamp_anno() = _tv;
+    else if (_action == ACT_FIRST_NOW)
+    FIRST_TIMESTAMP_ANNO(p).assign_now();
+    else
+    FIRST_TIMESTAMP_ANNO(p) = _tv;
 }
 
 Packet *
 SetTimestamp::simple_action(Packet *p)
 {
-    if (_action == ACT_NOW)
-	p->timestamp_anno().assign_now();
-    else if (_action == ACT_TIME)
-	p->timestamp_anno() = _tv;
-    else if (_action == ACT_FIRST_NOW)
-	FIRST_TIMESTAMP_ANNO(p).assign_now();
-    else
-	FIRST_TIMESTAMP_ANNO(p) = _tv;
+    smaction(p);
     return p;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+SetTimestamp::simple_action_batch(PacketBatch *batch)
+{
+    if (_per_batch) {
+        Timestamp t;
+        if (likely(_action == ACT_NOW || _action == ACT_FIRST_NOW)) {
+            t = Timestamp::now();
+        } else {
+            t = _tv;
+        }
+        FOR_EACH_PACKET(batch, p) {
+            if (likely(_action == ACT_NOW || _action == ACT_TIME)) {
+                p->timestamp_anno() = t;
+            } else {
+                FIRST_TIMESTAMP_ANNO(p) = t;
+            }
+        }
+    } else {
+        FOR_EACH_PACKET(batch, p)
+            smaction(p);
+    }
+
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(SetTimestamp)

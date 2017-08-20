@@ -250,12 +250,12 @@ ARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
     SET_VLAN_TCI_ANNO(q, VLAN_TCI_ANNO(p));
 
     _arp_queries++;
-
-    if (in_batch_mode) {
+#if HAVE_BATCH
+    if (in_batch_mode == BATCH_MODE_YES) {
         output(noutputs() - 1).push_batch(PacketBatch::make_from_packet(q));
-    } else {
+    } else
+#endif
         output(noutputs() - 1).push(q);
-    }
 }
 
 /*
@@ -345,11 +345,11 @@ ARPQuerier::handle_ip(Packet *p, bool response)
  * Update our ARP table.
  * If there was a packet waiting to be sent, return it.
  */
-PacketBatch*
+void
 ARPQuerier::handle_response(Packet *p)
 {
     if (p->length() < sizeof(click_ether) + sizeof(click_ether_arp))
-	return 0;
+	return;
 
     ++_arp_responses;
 
@@ -362,24 +362,37 @@ ARPQuerier::handle_response(Packet *p)
 	&& ntohs(arph->ea_hdr.ar_pro) == ETHERTYPE_IP
 	&& ntohs(arph->ea_hdr.ar_op) == ARPOP_REPLY
 	&& !ena.is_group()) {
-	Packet *cached_packet;
-	_arpt->insert(ipa, ena, &cached_packet);
+        Packet *cached_packet;
+        _arpt->insert(ipa, ena, &cached_packet);
 
-	// Send out packets in the order in which they arrived
-	PacketBatch* head = 0;
-	while (cached_packet) {
-	    Packet *next = cached_packet->next();
-	    Packet* q = handle_ip(cached_packet, true);
-	    if (q) {
-	        if (head) {
-	            head->append_packet(q);
-	        } else {
-	            head = PacketBatch::make_from_packet(q);
-	        }
-	    }
-	    cached_packet = next;
-	}
-    return head;
+        // Send out packets in the order in which they arrived
+    #if HAVE_BATCH
+        if (in_batch_mode == BATCH_MODE_YES) {
+            BATCH_CREATE_INIT(batch_to_send);
+            while (cached_packet) {
+                Packet *next = cached_packet->next();
+                Packet* to_send = handle_ip(cached_packet, true);
+                if (to_send) {
+                    BATCH_CREATE_APPEND(batch_to_send, to_send);
+                }
+                cached_packet = next;
+            }
+            BATCH_CREATE_FINISH(batch_to_send);
+            if (batch_to_send)
+                output(0).push_batch(batch_to_send);
+        }
+        else
+    #endif
+        {
+            while (cached_packet) {
+                Packet *next = cached_packet->next();
+                Packet* to_send = handle_ip(cached_packet, true);
+                if (to_send) {
+                    output(0).push(to_send);
+                }
+                cached_packet = next;
+            }
+        }
     }
 }
 
@@ -387,18 +400,12 @@ void
 ARPQuerier::push(int port, Packet *p)
 {
     if (port == 0) {
-        Packet* q = handle_ip(p, false);
-        if (q) {
-            output(0).push(q);
-        }
+        p = handle_ip(p, false);
+        if (p)
+            output(0).push(p);
     } else {
-        PacketBatch* buffered = handle_response(p);
+        handle_response(p);
         p->kill();
-        if (buffered) {
-            FOR_EACH_PACKET(buffered,p) {
-                output(0).push(p);
-            }
-        }
     }
 }
 
@@ -406,32 +413,15 @@ ARPQuerier::push(int port, Packet *p)
 void
 ARPQuerier::push_batch(int port, PacketBatch *batch)
 {
-    PacketBatch* head = 0;
-    FOR_EACH_PACKET_SAFE(batch,p) {
-        if (port == 0) {
-            Packet*q = handle_ip(p, false);
-            if (q) {
-                if (head) {
-                    head->append_packet(q);
-                } else {
-                    head = PacketBatch::make_from_packet(q);
-                }
-            }
-        } else {
-            PacketBatch* resphead = handle_response(p);
-            if (resphead) {
-                if (head) {
-                    head->append_batch(resphead);
-                } else {
-                    head = resphead;
-                }
-            }
+    if (port == 0) {
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(handle_ip,batch,[](Packet*p){});
+        if (batch)
+            output(0).push_batch(batch);
+    } else {
+        FOR_EACH_PACKET_SAFE(batch,p) {
+            handle_response(p);
             p->kill();
         }
-    };
-
-    if (head) {
-        output(0).push_batch(head);
     }
 }
 #endif

@@ -97,9 +97,9 @@ public:
 FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
-    _verbose = true;
+    _verbose = 2;
 #else
-    _verbose = false;
+    _verbose = 0;
 #endif
 }
 

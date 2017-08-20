@@ -4,7 +4,7 @@ click CONFIG
 %file CONFIG
 FastUDPFlows(RATE 0, LIMIT 100, LENGTH 60, SRCETH 90:e2:ba:c3:77:70, DSTETH 90:e2:ba:c3:77:d2, SRCIP 10.0.0.101, DSTIP 10.0.0.100, FLOWS 10, FLOWSIZE 10, ACTIVE true)
 	-> n::NumberPacket
-	-> MultiReplayUnqueue(10)
+	-> MultiReplayUnqueue(STOP 10)
 	-> c::CheckNumberPacket(COUNT 100)
 	-> Discard
 

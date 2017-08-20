@@ -1,6 +1,6 @@
 #ifndef CLICK_IDLE_HH
 #define CLICK_IDLE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
 
@@ -26,7 +26,9 @@ CLICK_DECLS
  * =sa SimpleIdle
  */
 
-class Idle : public Element { public:
+class Idle : public BatchElement {
+
+  public:
 
   Idle() CLICK_COLD;
 
@@ -39,6 +41,9 @@ class Idle : public Element { public:
 
   void push(int, Packet *);
   Packet *pull(int);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+#endif
 
   private:
 

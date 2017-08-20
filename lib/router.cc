@@ -1222,7 +1222,22 @@ Router::initialize(ErrorHandler *errh)
                         "packets.",this);
                 all_ok = false;
                 break;
+            } else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
+                e->in_batch_mode = Element::BATCH_MODE_NO;
+                e->receives_batch = false;
+#if HAVE_VERBOSE_BATCH
+                click_chatter("%s won't be in batch mode because no element produces or sends batches to it.",e->name().c_str());
+#endif
+                continue;
+            } else if (e->in_batch_mode == Element::BATCH_MODE_NEEDED) {
+                click_chatter("%p{element} is a batch-only element ! Please "
+                        "check that all elements sending packets to it are "
+                        "producing batches of packets instead of single "
+                        "packets.",this);
+                all_ok = false;
+                break;
             }
+            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO); //Element must be in batch mode or not
         }
     }
 #endif

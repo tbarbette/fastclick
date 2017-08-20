@@ -77,14 +77,14 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int r;
     if (n_queues == -1) {
-	if (firstqueue == -1) {
-		firstqueue = 0;
-		//By default with Netmap, use all available queues (RSS is enabled by default)
-		 r = configure_rx(thisnode,_device->n_queues,_device->n_queues,errh);
-	} else {
-		//If a queue number is setted, user probably want only one queue
-		r = configure_rx(thisnode,1,1,errh);
-	}
+        if (firstqueue == -1) {
+            firstqueue = 0;
+            //By default with Netmap, use all available queues (RSS is enabled by default)
+             r = configure_rx(thisnode,_device->n_queues,_device->n_queues,errh);
+        } else {
+            //If a queue number is setted, user probably want only one queue
+            r = configure_rx(thisnode,1,1,errh);
+        }
     } else {
         if (firstqueue == -1)
             firstqueue = 0;
@@ -123,7 +123,7 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 						" %s will loop through %d hardware queues. Having "
 						"more than 3 queues per thread is useless. Consider limiting the "
 						"number of hardware queue of %s (via ethtool -L %s combined X "
-						"on Linux), or use MAXQUEUES N argument to only use the first N queues and "
+						"on Linux), or use N_QUEUES N argument to only use the first N queues and "
 						"prevent traffic from going to the last queues by limiting RSS "
 						"on %s (via ethtool -X %s equal N).")).c_str(),name().c_str(), queue_per_threads,_device->nmds[0]->nifp->ni_name,_device->nmds[0]->nifp->ni_name,_device->nmds[0]->nifp->ni_name,_device->nmds[0]->nifp->ni_name);
 	}

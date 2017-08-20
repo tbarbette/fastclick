@@ -186,7 +186,6 @@ class ARPQuerier : public FlowElement { public:
     FLOW_ELEMENT_DEFINE_PORT_CONTEXT(1,"12/0806 20/0002");
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-
     int live_reconfigure(Vector<String> &, ErrorHandler *);
     bool can_live_reconfigure() const		{ return true; }
     int initialize(ErrorHandler *errh) CLICK_COLD;
@@ -194,9 +193,9 @@ class ARPQuerier : public FlowElement { public:
     void cleanup(CleanupStage stage) CLICK_COLD;
     void take_state(Element *e, ErrorHandler *errh);
 
-    void push(int port, Packet *p);
+    void push(int port, Packet *p) override;
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch *p);
+    void push_batch(int port, PacketBatch *batch) override;
 #endif
 
   private:
@@ -218,8 +217,8 @@ class ARPQuerier : public FlowElement { public:
 
     void send_query_for(const Packet *p, bool ether_dhost_valid);
 
-    Packet* handle_ip(Packet *p, bool response);
-    PacketBatch* handle_response(Packet *p);
+    Packet* handle_ip(Packet *p, bool response = false);
+    void handle_response(Packet *p);
 
     static void expire_hook(Timer *, void *);
     static String read_table(Element *, void *);

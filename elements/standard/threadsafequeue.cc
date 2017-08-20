@@ -46,6 +46,18 @@ ThreadSafeQueue::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
+ThreadSafeQueue::take_state(Element *e, ErrorHandler *errh)
+{
+    SimpleQueue *q = (SimpleQueue *)e->cast("SimpleQueue");
+    if (!q)
+        return;
+
+    SimpleQueue::take_state(e, errh);
+    _xhead = head();
+    _xtail = tail();
+}
+
+void
 ThreadSafeQueue::push(int, Packet *p)
 {
     // Code taken from SimpleQueue::push().
@@ -88,6 +100,20 @@ ThreadSafeQueue::pull(int)
 	return pull_failure();
     }
 }
+
+#if HAVE_BATCH
+void ThreadSafeQueue::push_batch(int port, PacketBatch* batch) {
+    FOR_EACH_PACKET_SAFE(batch,p) {
+        ThreadSafeQueue::push(port,p);
+    }
+}
+
+PacketBatch* ThreadSafeQueue::pull_batch(int port, unsigned max) {
+    PacketBatch* batch;
+    MAKE_BATCH(ThreadSafeQueue::pull(port),batch,max);
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(FullNoteQueue)

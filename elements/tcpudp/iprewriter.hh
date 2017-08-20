@@ -231,9 +231,9 @@ class IPRewriter : public TCPRewriter { public:
     IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
     HashContainer<IPRewriterEntry> *get_map(int mapid) {
 	if (mapid == IPRewriterInput::mapid_default)
-	    return &_map;
+	    return &_map[click_current_cpu_id()];
 	else if (mapid == IPRewriterInput::mapid_iprewriter_udp)
-	    return &_udp_map;
+	    return &_state->_udp_map;
 	else
 	    return 0;
     }
@@ -244,30 +244,41 @@ class IPRewriter : public TCPRewriter { public:
 	if (flow->ip_p() == IP_PROTO_TCP)
 	    return TCPRewriter::best_effort_expiry(flow);
 	else
-	    return flow->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>(flow)) - _udp_timeouts[1];
+	    return flow->expiry() +
+                  udp_flow_timeout(static_cast<const UDPFlow *>(flow), _state.get()) - _state->_udp_timeouts[1];
     }
 
     void push(int, Packet *);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *batch);
+#endif
 
     void add_handlers() CLICK_COLD;
 
   private:
+    class IPState { public:
+        IPState() : _udp_map(0) {
+        }
+        Map                                 _udp_map;
+        SizedHashAllocator<sizeof(UDPFlow)> _udp_allocator;
+        uint32_t                            _udp_timeouts[2];
+        uint32_t                            _udp_streaming_timeout;
+    };
 
-    Map _udp_map;
-    SizedHashAllocator<sizeof(UDPFlow)> _udp_allocator;
-    uint32_t _udp_timeouts[2];
-    uint32_t _udp_streaming_timeout;
+    per_thread<IPState> _state;
 
-    int udp_flow_timeout(const UDPFlow *mf) const {
+    int process(int port, Packet *p_in);
+
+    int udp_flow_timeout(const UDPFlow *mf, IPState& state) const {
 	if (mf->streaming())
-	    return _udp_streaming_timeout;
+	    return state._udp_streaming_timeout;
 	else
-	    return _udp_timeouts[0];
+	    return state._udp_timeouts[0];
     }
 
     static inline Map &reply_udp_map(IPRewriterInput *rwinput) {
 	IPRewriter *x = static_cast<IPRewriter *>(rwinput->reply_element);
-	return x->_udp_map;
+	return x->_state->_udp_map;
     }
     static String udp_mappings_handler(Element *e, void *user_data);
 
@@ -280,9 +291,9 @@ IPRewriter::destroy_flow(IPRewriterFlow *flow)
     if (flow->ip_p() == IP_PROTO_TCP)
 	TCPRewriter::destroy_flow(flow);
     else {
-	unmap_flow(flow, _udp_map, &reply_udp_map(flow->owner()));
+	unmap_flow(flow, _state->_udp_map, &reply_udp_map(flow->owner()));
 	flow->~IPRewriterFlow();
-	_udp_allocator.deallocate(flow);
+	_state->_udp_allocator.deallocate(flow);
     }
 }
 

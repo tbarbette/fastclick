@@ -1,6 +1,6 @@
 #ifndef CLICK_ETHERMIRROR_HH
 #define CLICK_ETHERMIRROR_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -14,16 +14,19 @@ CLICK_DECLS
  * addresses are swapped before they are output.
  * */
 
-class EtherMirror : public Element { public:
+class EtherMirror : public BatchElement {
+    public:
 
-  EtherMirror() CLICK_COLD;
-  ~EtherMirror() CLICK_COLD;
+        EtherMirror() CLICK_COLD;
+        ~EtherMirror() CLICK_COLD;
 
-  const char *class_name() const	{ return "EtherMirror"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+        const char *class_name() const    { return "EtherMirror"; }
+        const char *port_count() const    { return PORTS_1_1; }
 
-  Packet *simple_action(Packet *);
-
+        Packet      *simple_action      (Packet *);
+    #if HAVE_BATCH
+        PacketBatch *simple_action_batch(PacketBatch *);
+    #endif
 };
 
 CLICK_ENDDECLS

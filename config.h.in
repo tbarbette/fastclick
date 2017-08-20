@@ -68,12 +68,6 @@
 /* Define if right shift of signed integers acts by sign extension. */
 #undef HAVE_ARITHMETIC_RIGHT_SHIFT
 
-/* Define if make vanilla elements batch-compatible automatically */
-#undef HAVE_AUTO_BATCH
-
-/* Define if Batching support is enabled. */
-#undef HAVE_BATCH
-
 /* Define if Port::push/Port::pull should use bound function pointers. */
 #undef HAVE_BOUND_PORT_TRANSFER
 
@@ -104,6 +98,22 @@
 /* Define if 64-bit integer types are enabled. */
 #undef HAVE_INT64_TYPES
 
+/* Define if Batching support is enabled. */
+#undef HAVE_BATCH
+
+/* Define if Nonatomic access to packets when single-threaded fullpush is detected is enabled. */
+#undef HAVE_FULLPUSH_NONATOMIC
+
+/* Define if warnings and information about batching are enabled. */
+#undef HAVE_VERBOSE_BATCH
+
+#define AUTO_BATCH_PORT 1
+#define AUTO_BATCH_LIST 2
+#define AUTO_BATCH_JUMP 3
+
+/* Define if make vanilla elements batch-compatible automatically */
+#undef HAVE_AUTO_BATCH
+
 /* Define if IPv6 support is enabled. */
 #undef HAVE_IP6
 
@@ -115,6 +125,9 @@
 
 /* Define if nanosecond-granularity timestamps are enabled. */
 #undef HAVE_NANOTIMESTAMP_ENABLED
+
+/* Define if user-provided clock system is supported. */
+#undef HAVE_USER_TIMING
 
 /* Define if you want to use the stride scheduler. */
 #undef HAVE_STRIDE_SCHED
@@ -129,12 +142,6 @@
 /* Define if you want task scheduling to use a heap, not a linked list. */
 #undef HAVE_TASK_HEAP
 #endif
-
-/* Define if user-provided clock system is supported. */
-#undef HAVE_USER_TIMESTAMP
-
-/* Define if warnings and information about batching are enabled. */
-#undef HAVE_VERBOSE_BATCH
 
 /* The size of a `int', as computed by sizeof. */
 #undef SIZEOF_INT
@@ -161,7 +168,7 @@
 #undef SIZEOF_VOID_P
 
 /* Define if you want to run multithreaded Click. */
-#undef __MTCLICK__
+#undef __MTCLICKx__
 
 /* Define inline, if necessary. C only. */
 #ifndef __cplusplus

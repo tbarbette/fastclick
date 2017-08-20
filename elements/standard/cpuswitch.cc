@@ -33,6 +33,15 @@ CPUSwitch::push(int, Packet *p)
   output(n).push(p);
 }
 
+#if HAVE_BATCH
+void
+CPUSwitch::push_batch(int, PacketBatch *batch)
+{
+  int n = click_current_cpu_id() % noutputs();
+  output(n).push_batch(batch);
+}
+#endif
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CPUSwitch)
 ELEMENT_MT_SAFE(CPUSwitch)

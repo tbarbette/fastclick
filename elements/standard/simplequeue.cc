@@ -81,15 +81,16 @@ SimpleQueue::initialize(ErrorHandler *errh)
 bool
 SimpleQueue::do_mt_safe_check(ErrorHandler* errh) {
     Bitvector b(master()->nthreads());
+    bool fp;
     for (int i = 0; i < ninputs(); i++) {
         if (input_is_push(i))
-            b |= get_passing_threads(false, i, this, 0);
+            b |= get_passing_threads(false, i, this, fp, 0);
     }
     int ninput = b.weight();
     b.zero();
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_pull(i))
-            b |= get_passing_threads(true, i, this, 0);
+            b |= get_passing_threads(true, i, this, fp, 0);
     }
     int noutput = b.weight();
 
@@ -106,7 +107,7 @@ SimpleQueue::do_mt_safe_check(ErrorHandler* errh) {
 }
 
 bool
-SimpleQueue::get_spawning_threads(Bitvector& b, bool isoutput) {
+SimpleQueue::get_spawning_threads(Bitvector& b, bool) {
     unsigned int thisthread = router()->home_thread_id(this);
     b[thisthread] = 1;
     return false;
@@ -192,7 +193,7 @@ void SimpleQueue::push_batch(int port, PacketBatch* batch) {
 	}
 }
 
-PacketBatch* SimpleQueue::pull_batch(int port,unsigned max) {
+PacketBatch* SimpleQueue::pull_batch(int port, unsigned max) {
 	PacketBatch* batch;
 	MAKE_BATCH(pull(port),batch,max);
 	return batch;

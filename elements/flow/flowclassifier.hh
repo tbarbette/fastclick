@@ -28,7 +28,7 @@ class FlowClassifier: public BatchElement {
     int _cache_mask;
     bool _aggcache;
     int _pull_burst;
-    bool _verbose;
+    int _verbose;
     int _builder;
     int _builder_mask;
     bool _collision_is_life;

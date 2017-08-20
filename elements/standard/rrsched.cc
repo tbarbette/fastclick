@@ -18,12 +18,26 @@
 
 #include <click/config.h>
 #include <click/error.hh>
+#include <click/args.hh>
 #include "rrsched.hh"
 CLICK_DECLS
 
 RRSched::RRSched()
-    : _next(0), _signals(0)
+    : _next(0), _signals(0), _max(0)
 {
+}
+
+
+
+int RRSched::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    _max = ninputs();
+    if (Args(conf, this, errh)
+        .read_p("MAX", _max)
+        .complete() < 0)
+        return -1;
+
+    return 0;
 }
 
 int
@@ -45,12 +59,11 @@ RRSched::cleanup(CleanupStage)
 Packet *
 RRSched::pull(int)
 {
-    int n = ninputs();
     int i = _next;
-    for (int j = 0; j < n; j++) {
+    for (int j = 0; j < _max; j++) {
 	Packet *p = (_signals[i] ? input(i).pull() : 0);
 	i++;
-	if (i >= n)
+	if (i >= _max)
 	    i = 0;
 	if (p) {
 	    _next = i;

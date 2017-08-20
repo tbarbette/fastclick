@@ -104,11 +104,7 @@ class FastTCPFlows : public BatchElement {
   Packet *pull(int);
 
 #if HAVE_BATCH
-  PacketBatch *pull_batch(int port, unsigned max) {
-      PacketBatch *batch;
-      MAKE_BATCH(pull(port), batch, max);
-      return batch;
-  }
+  PacketBatch *pull_batch(int, unsigned);
 #endif
 
   void add_handlers() CLICK_COLD;

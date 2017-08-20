@@ -1,0 +1,142 @@
+%info
+Tests all the MP Counter elements
+
+With rate enabled
+
+%require
+click-buildtool provides umultithread
+
+%script
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 1000000, LIMIT 10000, STOP true)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterMP(NO_RATE false) -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait 100ms,
+                  print "$(cin.count)", stop)
+'
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 1000000, LIMIT 10000, STOP true)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterAtomic(NO_RATE false) -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait 100ms,
+                  print "$(cin.count)", stop)
+'
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 1000000, LIMIT 10000, STOP true)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterRCU(NO_RATE false) -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait 100ms,
+                  print "$(cin.count)", stop)
+'
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 1000000, LIMIT 10000, STOP true)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterLock(NO_RATE false) -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait 100ms,
+                  print "$(cin.count)", stop)
+'
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 1000000, LIMIT 10000, STOP true)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterRW(NO_RATE false) -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait 100ms,
+                  print "$(cin.count)", stop)
+'
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 1000000, LIMIT 10000, STOP true)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterPRW(NO_RATE false) -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait 100ms,
+                  print "$(cin.count)", stop)
+'
+%expect stdout
+70000
+70000
+70000
+70000
+70000
+70000

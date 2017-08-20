@@ -31,7 +31,6 @@ ToDPDKDevice::ToDPDKDevice() :
      _blocking = false;
      _burst = -1;
      _internal_tx_queue_size = 1024;
-     _vlan = true;
      ndesc = 256;
 }
 
@@ -48,7 +47,6 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("PORT", dev), errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
-        .read("SET_VLAN",_vlan)
         .complete() < 0)
             return -1;
     if (!DPDKDeviceArg::parse(dev, _dev)) {
@@ -108,6 +106,9 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     }
 
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
+
+    //To set is_fullpush, we need to compute passing threads
+    get_passing_threads();
 
     if (all_initialized()) {
         int ret =DPDKDevice::initialize(errh);
@@ -231,6 +232,9 @@ void ToDPDKDevice::push(int, Packet *p)
     } while (unlikely(_blocking && congestioned));
 
 #if !CLICK_PACKET_USE_DPDK
+    if (likely(is_fullpush()))
+        p->kill_nonatomic();
+    else
         p->kill();
 #endif
 }
@@ -269,7 +273,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
             }
             next = p->next();
 #if !CLICK_PACKET_USE_DPDK
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
+            BATCH_RECYCLE_PACKET_CONTEXT(p);
 #endif
             p = next;
         }
@@ -298,7 +302,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
     //If non-blocking, drop all packets that could not be sent
     while (p) {
         next = p->next();
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
+        BATCH_RECYCLE_PACKET_CONTEXT(p);
         p = next;
         add_dropped(1);
     }
