@@ -163,29 +163,24 @@ FlowNode* FlowDispatcher::get_table(int) {
 			if (_verbose)
 				click_chatter("Merging this rule of %s :",name().c_str());
 			rules[i].root->print(_flow_data_offset);
-			if (rules[i].output > -1 && rules[i].output < noutputs()) {
-				FlowNode* child_table = FlowElementVisitor::get_downward_table(this, rules[i].output);
-				if (child_table) {
-					child_table->check();
-					assert(child_table->has_no_default());
-					if (dynamic_cast<FlowLevelDummy*>(rules[i].root->level()) != 0 && rules[i].root->get_default().is_leaf()) {
-					    delete rules[i].root;
-					    rules[i].root = child_table;
-					} else {
-					    //We must replace all childs per the child, but not the default path
-					    rules[i].root = rules[i].root->combine(child_table,true);
-					}
-					if (_verbose) {
-						click_chatter("Print rule merged with child of %p :",rules[i].root);
-						rules[i].root->print(_flow_data_offset);
-					}
-				}
-			} else {
-			    //TODO : Handle this better
-			    click_chatter("Unkown output number");
-			    assert(false);
+			if (rules[i].output >= 0 && rules[i].output < noutputs()) { //If it's a real output, merge with children
+                FlowNode* child_table = FlowElementVisitor::get_downward_table(this, rules[i].output);
+                if (child_table) {
+                    child_table->check();
+                    assert(child_table->has_no_default());
+                    if (dynamic_cast<FlowLevelDummy*>(rules[i].root->level()) != 0 && rules[i].root->get_default().is_leaf()) {
+                        delete rules[i].root;
+                        rules[i].root = child_table;
+                    } else {
+                        //We must replace all childs per the child, but not the default path
+                        rules[i].root = rules[i].root->combine(child_table,true);
+                    }
+                    if (_verbose) {
+                        click_chatter("Print rule merged with child of %p :",rules[i].root);
+                        rules[i].root->print(_flow_data_offset);
+                    }
+                }
 			}
-
 			rules[i].root->check();
 
 #if DEBUG_CLASSIFIER
@@ -196,13 +191,9 @@ FlowNode* FlowDispatcher::get_table(int) {
                 *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)rules[i].output;
             };
 			rules[i].root->traverse_all_leaves(fnt, true, true);
-            if (_verbose) {
-                click_chatter("Print rule merged with child of %p and with number written :",rules[i].root);
-                rules[i].root->print(_flow_data_offset);
-            }
 
 			if (_verbose)
-				click_chatter("Merging rule %d of %p{element}",i,this);
+				click_chatter("Merging rule %d of %p{element} (output %d)",i,this,rules[i].output);
 
 			if (merged == 0) {
 				merged = rules[i].root;

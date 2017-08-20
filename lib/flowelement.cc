@@ -49,8 +49,7 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 		else
 			merged = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
 		if (merged)
-		    merged->print();
-		click_chatter("End get down %p",merged);
+		    merged->debug_print();
 	}
 	return merged;
 }

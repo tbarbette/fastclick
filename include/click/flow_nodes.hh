@@ -323,9 +323,6 @@ public:
             assert(ptr.ptr != this);
             _default = ptr;
             _default.set_parent(this);
-            click_chatter("Changing default of %p to %p",_default.ptr);
-        } else {
-            click_chatter("No default");
         }
         assert(_default.ptr == ptr.ptr);
     }
@@ -572,6 +569,13 @@ public:
         print(this,"", data_offset);
         click_chatter("---");
     }
+#if DEBUG_CLASSIFIER
+    void debug_print(int data_offset = -1) const {
+        print(data_offset);
+    }
+#else
+    void debug_print(int = -1) const {}
+#endif
 private:
     void leaf_combine_data(FlowControlBlock* leaf, bool do_final, bool do_default);
     void leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, bool do_default);

@@ -36,7 +36,7 @@ const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {257,521,1031,
 #if DEBUG_CLASSIFIER
     #define debug_flow(...) click_chatter(__VA_ARGS__);
 #else
-    #define debug_flow(...) ();
+    #define debug_flow(...)
 #endif
 
 /*******************************
@@ -372,40 +372,10 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child) {
     other->check();
     this->check();
 
-   //Swapping would cause priority loss
-	/*if (other->parent()) {
-#if DEBUG_CLASSIFIER
-		click_chatter("COMBINE : swapping parent");
-#endif
-		assert(parent() == 0);
-		set_parent(other->parent());
-		other->set_parent(0);
-	}*/
-
 	assert(other->parent() == 0);
 
 	if (dynamic_cast<FlowLevelDummy*>(this->level()) != 0) {
 	        debug_flow("COMBINE : I am dummy")
-	        //If this is a dummy, we can directly set our leaf as the child, fine with child mode and else mode
-	        /*assert(this->default_ptr()->is_leaf());
-
-	            click_chatter("This is a dummy, and other has a default already");
-	            if (other->is_node()) {
-	                FlowNode* other_default_node = other->node;
-	                other->ptr = 0;
-	                other->set_default(other_default_node->combine(this, as_child));
-	            } else {
-	                click_chatter("BUG : Combining a leaf with dummy?");
-	                click_chatter("merging leaf :");
-	                this->default_ptr()->print();
-	                click_chatter("from :");
-	                this->print();
-	                click_chatter("with :");
-	                other->print();
-	                assert(false);
-	            }
-	        }
-	        other->check();*/
 	        if (_default.is_leaf()) {
 	            other->leaf_combine_data(_default.leaf, as_child, !as_child);
 	            //TODO delete this;
@@ -424,7 +394,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child) {
 	    //If other is a dummy (and we're not)
 	    if (other->_default.is_leaf()) {
 	        debug_flow("COMBINE : Other is a leaf :")
-	        other->_default.leaf->print("");
+	        //other->_default.leaf->print("");
 	        if (as_child) {
 	            this->leaf_combine_data(other->_default.leaf, true, true);
 
@@ -538,8 +508,10 @@ void FlowNode::__combine_child(FlowNode* other) {
                 true);
             debug_flow("Adding other as child of all children leaf");
             //In other terms, if the packet does not match any of the rules, it will go through "other"
+#if DEBUG_CLASSIFIER
             this->print();
             other->print();
+#endif
             this->replace_leaves(other, true, false);
             //Well, it's not that complicated finally.
             this->check();
@@ -598,9 +570,7 @@ void FlowNode::__combine_else(FlowNode* other) {
 */
 
     if (level()->equals(other->level())) { //Same level
-#if DEBUG_CLASSIFIER
-        click_chatter("COMBINE-ELSE : same level");
-#endif
+        debug_flow("COMBINE-ELSE : same level");
         FlowNode::NodeIterator* other_childs = other->iterator();
 
         /**
@@ -610,9 +580,7 @@ void FlowNode::__combine_else(FlowNode* other) {
          */
         FlowNodePtr* other_child_ptr;
         while ((other_child_ptr = other_childs->next()) != 0) { //For each child of the other node
-#if DEBUG_CLASSIFIER
-            click_chatter("COMBINE : taking child %lu",other_child_ptr->data().data_64);
-#endif
+            debug_flow("COMBINE : taking child %lu",other_child_ptr->data().data_64);
 
             FlowNodePtr* child_ptr = find(other_child_ptr->data());
             if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us
@@ -620,19 +588,16 @@ void FlowNode::__combine_else(FlowNode* other) {
                 child_ptr->set_parent(this);
                 inc_num();
             } else { //There is some data in our child that is the same as the other child
-                if (child_ptr->is_leaf() || other_child_ptr->is_leaf()) {
-#if DEBUG_CLASSIFIER
-                    click_chatter("Combining leaf??? This error usually happens when rules overlap.");
-                    child_ptr->print();
-                    other_child_ptr->print();
-                    assert(false);
-
-#endif
-                } else { //So we combine our child node with the other child node
+                if (child_ptr->is_leaf() && other_child_ptr->is_leaf()) {
+                    //DO nothing, this is a else rule, mine take precedence
+                } else if (child_ptr->is_node() && other_child_ptr->is_node()) {
+                    //So we combine our child node with the other child node
                     //We must set the parent to null, so the combiner nows he can play with that node
                     other_child_ptr->node->set_parent(0);
                     child_ptr->node = child_ptr->node->combine(other_child_ptr->node,false);
                     child_ptr->node->set_parent(this);
+                } else {
+                    assert(false);
                 }
             }
 
@@ -654,8 +619,8 @@ void FlowNode::__combine_else(FlowNode* other) {
 
     debug_flow("Mhh... No easy combine. Combining other to all children and default");
     //In other terms, if the packet does not match any of the rules, it will go through "other"
-    this->print();
-    other->print();
+    this->debug_print();
+    other->debug_print();
 
     NodeIterator* it = iterator();
     FlowNodePtr* cur;
@@ -806,7 +771,6 @@ void FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
     FlowNodeData old_data = data();
     FlowNode* old_parent = parent();
     FlowControlBlock* old_leaf = leaf;
-    leaf->print("");
     FlowNodePtr no(other->duplicate(true, 1));
 
     //Prune the downward tree with all values of the future new parent
@@ -832,8 +796,10 @@ void FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
     set_data(old_data);
     set_parent(old_parent);
 
-    click_chatter("Pruned other : ");
+    debug_flow("Pruned other : ");
+#if DEBUG_CLASSIFIER
     no.print();
+#endif
     //Combine FCB data
     if (no.is_leaf())
         no.leaf->combine_data(old_leaf->data);
@@ -856,7 +822,6 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
         auto fnt = [other](FlowNodePtr* ptr) -> bool {
             assert(ptr != 0);
             assert(ptr->ptr != 0);
-            click_chatter("Replacing child leaf");
             ptr->replace_leaf_with_node(other);
             return true;
         };
