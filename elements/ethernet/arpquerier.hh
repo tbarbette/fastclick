@@ -183,12 +183,8 @@ class ARPQuerier : public FlowElement { public:
     const char *flags() const			{ return "L2"; }
     void *cast(const char *name);
 
-    FlowNode* get_table(int iport) override {
-        if (iport == 1) {
-            return upstream_classifier_table()->parse("12/0806 20/0002").root->replace_leaves(FlowElement::get_table(iport));
-        }
-        return FlowElement::get_table(iport);
-    }
+    FLOW_ELEMENT_DEFINE_PORT_CONTEXT(1,"12/0806 20/0002");
+
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     int live_reconfigure(Vector<String> &, ErrorHandler *);

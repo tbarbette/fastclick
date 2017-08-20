@@ -22,6 +22,7 @@ CLICK_DECLS
 Idle::Idle()
     : _notifier(NotifierSignal::idle_signal())
 {
+    in_batch_mode=BATCH_MODE_YES;
 }
 
 void *

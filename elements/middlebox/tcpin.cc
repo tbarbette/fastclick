@@ -93,10 +93,6 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-FlowNode* TCPIn::get_table(int iport) {
-    return upstream_classifier_table()->parse("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff").root->replace_leaves(FlowElement::get_table(iport));
-}
-
 void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 {
     // Assign the tcp_common structure if not already done

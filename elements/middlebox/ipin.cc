@@ -23,10 +23,6 @@ int IPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-FlowNode* IPIn::get_table(int iport) {
-    return upstream_classifier_table()->parse("-2/0800!").root->replace_leaves(FlowElement::get_table(iport));
-}
-
 void IPIn::push_batch(int port, PacketBatch* flow)
 {
     EXECUTE_FOR_EACH_PACKET([this](Packet* packet){

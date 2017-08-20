@@ -45,7 +45,7 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    FlowNode* get_table(int iport);
+    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff,9/11! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
@@ -72,7 +72,7 @@ public:
     const char *port_count() const      { return "1/1"; }
     const char *processing() const      { return PUSH; }
 
-    FlowNode* get_table(int iport);
+    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff,9/11! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);

@@ -45,7 +45,7 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 		}
         click_chatter("%p{element} %d",v.dispatchers[i].elem,v.dispatchers[i].iport);
 		if (merged)
-			merged = merged->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport),false);
+			merged = merged->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport), true); //TODO: allow reorder to be more efficient
 		else
 			merged = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
 		if (merged)

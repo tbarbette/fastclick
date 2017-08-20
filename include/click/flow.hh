@@ -37,8 +37,9 @@ public:
     typedef struct {
         FlowNode* root;
         int output;
+        bool is_default;
     } Rule;
-    Rule parse(String s, bool verbose = false);
+    static Rule parse(String s, bool verbose = false);
 protected:
     FlowNode* _root;
 };
@@ -185,7 +186,7 @@ inline FlowNodeData FlowNodePtr::data() {
         return node->node_data;
 }
 
-inline FlowNode* FlowNodePtr::parent() {
+inline FlowNode* FlowNodePtr::parent() const {
     if (is_leaf())
         return (FlowNode*)leaf->parent;
     else

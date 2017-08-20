@@ -94,8 +94,13 @@ public:
     }
 };
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0), _verbose(false),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0) {
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0) {
     in_batch_mode = BATCH_MODE_NEEDED;
+#if DEBUG_CLASSIFIER
+    _verbose = true;
+#else
+    _verbose = false;
+#endif
 }
 
 FlowClassifier::~FlowClassifier() {
@@ -123,7 +128,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 #if DEBUG_CLASSIFIER
     click_chatter("%s : pool size %d",name().c_str(),v.data_size);
 #endif
-    _table.get_pool()->initialize(v.data_size);
+    _table.get_pool()->initialize(v.data_size, &_table);
     _cache_mask = _cache_size - 1;
     if ((_cache_size & _cache_mask) != 0)
         return errh->error("Chache size must be a power of 2 !");
@@ -162,9 +167,6 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     }
     _table.get_pool()->compress(get_passing_threads());
 
-#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
-    fcb_table = &_table;
-#endif
     FlowNode* table = FlowElementVisitor::get_downward_table(this, 0);
 
     if (!table)
@@ -191,9 +193,6 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     }
 #endif
 
-#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
-    fcb_table = 0;
-#endif
     return 0;
 }
 
@@ -470,7 +469,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
 
 
-    click_chatter("Builder have %d packets.",batch->count());
+    //click_chatter("Builder have %d packets.",batch->count());
 
     while (p != NULL) {
 #if DEBUG_CLASSIFIER > 1
@@ -616,11 +615,6 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
     fcb_table = 0;
 #endif
 
-}
-
-
-FlowClassificationTable* FlowElement::upstream_classifier_table() {
-    return &upstream_classifier()->table();
 }
 
 int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};

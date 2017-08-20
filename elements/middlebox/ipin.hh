@@ -34,7 +34,7 @@ public:
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
-    FlowNode* get_table(int iport) override;
+    FLOW_ELEMENT_DEFINE_CONTEXT("-2/0800!");
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

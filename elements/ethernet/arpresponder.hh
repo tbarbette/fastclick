@@ -84,9 +84,8 @@ class ARPResponder : public FlowElement { public:
     const char *port_count() const		{ return PORTS_1_1X2; }
     const char *processing() const		{ return PROCESSING_A_AH; }
 
-    FlowNode* get_table(int) override {
-        return upstream_classifier_table()->parse("12/0806 20/0001").root->replace_leaves(FlowElement::get_table(-1));
-    }
+    FLOW_ELEMENT_DEFINE_CONTEXT("12/0806 20/0001");
+
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }

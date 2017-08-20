@@ -539,7 +539,7 @@ WritablePacket::recycle(WritablePacket *p)
         fcb_stack->release(1);
     } else {
 #if DEBUG_CLASSIFIER_RELEASE > 1
-        click_chatter("Warning : kill in recycle  without FCB");
+        click_chatter("Warning : kill in recycle without FCB");
 #endif
     }
 #endif

@@ -76,6 +76,7 @@ private:
         };
         //No data after this
 
+        void combine_data(uint8_t* data);
 		inline void initialize() {
 			use_count = 0;
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
@@ -94,19 +95,33 @@ private:
 			return use_count == 0;
 		}*/
 
-		inline int count() {
+		inline int count() const {
 			return use_count;
 		}
 
 		inline FlowControlBlock* duplicate(int use_count);
         inline FCBPool* get_pool() const;
 
-		void print(String prefix);
+		void print(String prefix, int data_offset =-1) const;
+
+		bool empty();
+
+		/**
+		 * Check consistency
+		 */
+		void check() {
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+            assert(cur->leaf->release_pool);
+#endif
+		}
 
 };
 
+class FlowTableHolder;
 
 extern __thread FlowControlBlock* fcb_stack;
+extern __thread FlowTableHolder* fcb_table;
+
 
 
 #define SFCB_STACK(fnt) \
@@ -151,7 +166,6 @@ private:
 		fcb->release_pool = this;
 #endif
 		fcb->initialize();
-		bzero(&fcb->data,_data_size);
 		return fcb;
 	}
 
@@ -159,9 +173,13 @@ private:
 
 	SFCBListRing global_fcb_list_ring;
 
+
 	size_t _data_size;
 	per_thread_oread<SFCBList> lists;
 public:
+    static FCBPool* biggest_pool;
+
+
 	FCBPool() : _data_size(0), lists() {
 
 	}
@@ -189,8 +207,12 @@ public:
 	}
 
 
-	void initialize(size_t data_size) {
+	void initialize(size_t data_size, FlowTableHolder* table) {
 		_data_size = data_size;
+		if (!biggest_pool || biggest_pool->data_size() < data_size) {
+		    biggest_pool = this;
+		    fcb_table = table;
+		}
 	}
 
 	void compress(Bitvector threads) {
@@ -221,6 +243,12 @@ public:
 			return fcb;
 		}
 	}
+
+    inline FlowControlBlock* allocate_empty() {
+        FlowControlBlock* fcb = allocate();
+        bzero(fcb->data + sizeof(FlowNodeData), data_size() - sizeof(FlowNodeData));
+        return fcb;
+    }
 
 	inline void release(FlowControlBlock* fcb) {
 		if (lists->count >= SFCB_POOL_SIZE) {
@@ -400,6 +428,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 
 	}
 }
+
 
 #else
 #define SFCB_STACK(fnt) \

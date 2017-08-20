@@ -160,7 +160,8 @@ public:
     const char *processing() const        { return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    FlowNode* get_table(int iport) override;
+
+    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
 
     void push_batch(int port, fcb_tcpin* fcb, PacketBatch* flow);
 

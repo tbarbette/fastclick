@@ -24,10 +24,10 @@ public:
 	virtual FlowNode* get_table(int iport);
 
     FlowClassifier* _classifier;
-    FlowClassifier* upstream_classifier() {
+    FlowClassifier* one_upstream_classifier() {
         return _classifier;
     }
-    FlowClassificationTable* upstream_classifier_table();
+
 };
 
 
@@ -194,6 +194,24 @@ public:
 
 	static FlowNode* get_downward_table(Element* e, int output);
 };
+
+/**
+ * Macro to define context
+ *
+ * In practice it will overwrite
+ */
+#define FLOW_ELEMENT_DEFINE_CONTEXT(rule) \
+FlowNode* get_table(int iport) override CLICK_COLD {\
+    return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true);\
+}
+
+#define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port_num,rule) \
+FlowNode* get_table(int iport) override {\
+    if (iport == port_num) {\
+        return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true);\
+    }\
+    return FlowElement::get_table(iport);\
+}
 
 #endif
 CLICK_ENDDECLS
