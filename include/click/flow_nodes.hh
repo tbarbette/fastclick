@@ -1,6 +1,11 @@
 #ifndef CLICK_FLOW_NODES_HH
 #define CLICK_FLOW_NODES_HH 1
 
+#define FLOW_LEVEL_DEFINE(T,fnt) \
+        static FlowNodeData get_data_ptr(void* thunk, Packet* p) {\
+            return static_cast<T*>(thunk)->fnt(p);\
+        }
+
 class FlowLevel {
 private:
     bool deletable;
@@ -10,17 +15,21 @@ protected:
 public:
     FlowLevel() : deletable(true),_dynamic(false) {};
 
-
+    typedef FlowNodeData (*GetDataFn)(void*, Packet* packet);
+    GetDataFn _get_data;
 
     virtual ~FlowLevel() {};
     virtual long unsigned get_max_value() = 0;
-    virtual FlowNodeData get_data(Packet* packet) = 0;
+
     virtual void add_offset(int offset) {};
 
     virtual bool equals(FlowLevel* level) {
         return typeid(*this) == typeid(*level);
     }
 
+    inline FlowNodeData get_data(Packet* p) {
+        return _get_data(this,p);
+    }
 
 
 
@@ -132,6 +141,12 @@ public :
 
 };
 
+#define FLOW_NODE_DEFINE(T,fnt) \
+        static FlowNodePtr* find_ptr(void* thunk, FlowNodeData data) {\
+            return static_cast<T*>(thunk)->fnt(data);\
+        }
+
+
 class FlowNode {
 private:
     static void print(const FlowNode* node,String prefix,int data_offset = -1);
@@ -144,6 +159,15 @@ protected:
 
     bool _child_deletable;
     bool _released;
+    //FlowNodePtr*(_find)(FlowNode*,FlowNodeData data);
+
+    typedef FlowNodePtr* (*FindFn)(void*,FlowNodeData data);
+
+    FindFn _find;
+
+    inline FlowNodePtr* find(FlowNodeData data) {
+        return _find((void*)this,data);
+    }
 
     void duplicate_internal(FlowNode* node, bool recursive, int use_count) {
         assign(node);
@@ -231,7 +255,7 @@ public:
     }
 
     inline void add_node(FlowNodeData data, FlowNode* node) {
-        FlowNodePtr* ptr = find(data);
+        FlowNodePtr* ptr = _find(this,data);
         if (ptr->ptr == 0)
             inc_num();
         ptr->set_node(node);
@@ -239,7 +263,7 @@ public:
     }
 
     inline void add_leaf(FlowNodeData data, FlowControlBlock* leaf) {
-        FlowNodePtr* ptr = find(data);
+        FlowNodePtr* ptr = _find(this,data);
         if (ptr->ptr == 0)
             inc_num();
         ptr->set_leaf(leaf);
@@ -285,13 +309,8 @@ public:
         return _child_deletable;
     }
 
-    /**
-     * Find the child node corresponding to the given data but do not create it
-     */
-    virtual FlowNodePtr* find(const FlowNodeData data) = 0;
-
     FlowNodePtr* find_or_default(const FlowNodeData data) {
-        FlowNodePtr* ptr = find(data);
+        FlowNodePtr* ptr = _find(this,data);
         if (ptr->ptr == 0)
             return default_ptr();
         return ptr;
@@ -593,14 +612,15 @@ class FlowLevelDummy  : public FlowLevel {
 public:
 
     FlowLevelDummy() {
-
+        _get_data = &get_data_ptr;
     }
+    FLOW_LEVEL_DEFINE(FlowLevelDummy,get_data_dummy);
 
     inline long unsigned get_max_value() {
         return 0;
     }
 
-    inline FlowNodeData get_data(Packet* packet) {
+    inline FlowNodeData get_data_dummy(Packet* packet) {
         click_chatter("FlowLevelDummy should be stripped !");
         abort();
     }
@@ -621,11 +641,13 @@ class FlowLevelAggregate  : public FlowLevel {
 public:
 
     FlowLevelAggregate(int offset, uint32_t mask) : offset(offset), mask(mask) {
+        _get_data = &get_data_ptr;
     }
 
     FlowLevelAggregate() : FlowLevelAggregate(0,-1) {
-
+        _get_data = &get_data_ptr;
     }
+    FLOW_LEVEL_DEFINE(FlowLevelAggregate,get_data_agg);
 
 
     int offset;
@@ -635,7 +657,7 @@ public:
         return mask;
     }
 
-    inline FlowNodeData get_data(Packet* packet) {
+    inline FlowNodeData get_data_agg(Packet* packet) {
         FlowNodeData data;
         data.data_32 = (AGGREGATE_ANNO(packet) >> offset) & mask;
         return data;
@@ -658,14 +680,15 @@ class FlowLevelThread  : public FlowLevel {
 
 public:
     FlowLevelThread(int nthreads) : _numthreads(nthreads) {
-
+        _get_data = &get_data_ptr;
     }
+    FLOW_LEVEL_DEFINE(FlowLevelThread,get_data_thread);
 
     inline long unsigned get_max_value() {
         return _numthreads;
     }
 
-    inline FlowNodeData get_data(Packet*) {
+    inline FlowNodeData get_data_thread(Packet*) {
         return (FlowNodeData){.data_8 = (uint8_t)click_current_cpu_id()};
     }
 
@@ -688,7 +711,6 @@ public:
 
     }
     FlowLevelOffset() :  FlowLevelOffset(0) {
-
     }
 
 
@@ -716,8 +738,10 @@ private:
 public:
 
     FlowLevelGeneric8(uint8_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
-
+        _get_data = &get_data_ptr;
     }
+    FLOW_LEVEL_DEFINE(FlowLevelGeneric8,get_data);
+
     FlowLevelGeneric8() : FlowLevelGeneric8(0,0) {
 
     }
@@ -756,9 +780,9 @@ private:
     uint16_t _mask;
 public:
     FlowLevelGeneric16(uint16_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
-
+        _get_data = &get_data_ptr;
     }
-
+    FLOW_LEVEL_DEFINE(FlowLevelGeneric16,get_data);
     FlowLevelGeneric16() : FlowLevelGeneric16(0,0) {
 
     }
@@ -801,8 +825,9 @@ public:
 
 
     FlowLevelGeneric32(uint32_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
-
+        _get_data = &get_data_ptr;
     }
+    FLOW_LEVEL_DEFINE(FlowLevelGeneric32,get_data);
 
     FlowLevelGeneric32() : FlowLevelGeneric32(0,0) {
 
@@ -843,8 +868,9 @@ class FlowLevelGeneric64 : public FlowLevelOffset {
 public:
 
     FlowLevelGeneric64(uint64_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
-
+        _get_data = &get_data_ptr;
     }
+    FLOW_LEVEL_DEFINE(FlowLevelGeneric64,get_data);
 
     FlowLevelGeneric64() : _mask(0) {
         _islong = true;
@@ -943,7 +969,9 @@ class FlowNodeArray : public FlowNode  {
 public:
     FlowNodeArray(unsigned int max_size) {
         childs.resize(max_size);
+        _find = &find_ptr;
     }
+    FLOW_NODE_DEFINE(FlowNodeArray,find_array);
 
     FlowNode* duplicate(bool recursive,int use_count) override {
         FlowNodeArray* fa = new FlowNodeArray(childs.size());
@@ -951,9 +979,11 @@ public:
         return fa;
     }
 
-    FlowNodePtr* find(FlowNodeData data) {
+    inline FlowNodePtr* find_array(FlowNodeData data) {
         return &childs[data.data_32];
     }
+
+
 
     void inc_num() {
         num++;
@@ -1163,12 +1193,13 @@ class FlowNodeHash : public FlowNode  {
         for (int i = 0; i < hash_size; i++) {
             childs[i].ptr= NULL;
         }
+        _find = &find_ptr;
     }
+    FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
 
 
 
-
-    FlowNodePtr* find(FlowNodeData data) {
+    FlowNodePtr* find_hash(FlowNodeData data) {
         //click_chatter("Searching for %d in hash table leaf %d",data,leaf);
 
         unsigned idx = get_idx(data);
@@ -1262,13 +1293,15 @@ class FlowNodeDummy : public FlowNode {
     }
 
     FlowNodeDummy() {
+        _find = &find_ptr;
     }
+    FLOW_NODE_DEFINE(FlowNodeDummy,find_dummy);
 
     void release_child(FlowNodePtr child) {
         click_chatter("TODO : release child of flow node dummy");
     }
 
-    FlowNodePtr* find(FlowNodeData data) {
+    FlowNodePtr* find_dummy(FlowNodeData data) {
         return &_default;
     }
 
@@ -1315,9 +1348,11 @@ class FlowNodeTwoCase : public FlowNode  {
 
     FlowNodeTwoCase(FlowNodePtr c) : child(c) {
         c.set_parent(this);
+        _find = &find_ptr;
     }
+    FLOW_NODE_DEFINE(FlowNodeTwoCase,find_two);
 
-    FlowNodePtr* find(FlowNodeData data) {
+    FlowNodePtr* find_two(FlowNodeData data) {
         if (data.data_64 == child.data().data_64)
             return &child;
         else
@@ -1403,9 +1438,11 @@ class FlowNodeThreeCase : public FlowNode  {
     FlowNodeThreeCase(FlowNodePtr a,FlowNodePtr b) : childA(a),childB(b) {
         a.set_parent(this);
         b.set_parent(this);
+        _find = &find_ptr;
     }
+    FLOW_NODE_DEFINE(FlowNodeThreeCase,find_three);
 
-    FlowNodePtr* find(FlowNodeData data) {
+    FlowNodePtr* find_three(FlowNodeData data) {
         if (data.data_64 == childA.data().data_64)
             return &childA;
         else if (data.data_64 == childB.data().data_64)
