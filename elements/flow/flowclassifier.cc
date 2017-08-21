@@ -494,7 +494,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
             continue;
         }
         check_fcb_still_valid(fcb, now);
-        if (_verbose)
+        if (unlikely(_verbose > 1))
             _table.get_root()->print();
         //click_chatter("p %p fcb %p - tail %d / curbatch %d / head %d",p,fcb,tail,curbatch,head);
         if (lastfcb == fcb) {

@@ -105,7 +105,7 @@ void FlowIPNATReverse::push_batch(int port, IPPair* flowdata, PacketBatch* batch
 #endif
             //assert(false);
             //checked_output_push_batch(0, batch);
-            batch->kill();
+            batch->fast_kill();
             return;
         } else{
 #if DEBUG_NAT
