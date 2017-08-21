@@ -467,8 +467,6 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
     process:
 
 
-
-
     //click_chatter("Builder have %d packets.",batch->count());
 
     while (p != NULL) {
