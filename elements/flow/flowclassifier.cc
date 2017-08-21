@@ -405,21 +405,17 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
         if (unlikely(fcb->is_early_drop())) {
             if (last) {
                 last->set_next(next);
-                if (!next) {
-                    awaiting_batch->set_tail(last);
-                    awaiting_batch->set_count(count);
-                }
             }
-            p->kill();
+            SFCB_STACK(p->kill(););
             p = next;
             continue;
         }
         if (awaiting_batch == NULL) {
 #if DEBUG_CLASSIFIER > 1
-        click_chatter("New fcb %p",fcb);
+            click_chatter("New fcb %p",fcb);
 #endif
             fcb_stack = fcb;
-            awaiting_batch = batch;
+            awaiting_batch = PacketBatch::start_head(p);
         } else {
             if (fcb == fcb_stack) {
 #if DEBUG_CLASSIFIER > 1
@@ -431,11 +427,12 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
         click_chatter("Different fcb %p, last was %p",fcb,fcb_stack);
 #endif
                 fcb_stack->acquire(count);
-                PacketBatch* new_batch = NULL;
-                awaiting_batch->cut(last,count,new_batch);
+                last->set_next(0);
+                awaiting_batch->set_tail(last);
+                awaiting_batch->set_count(count);
                 fcb_stack->lastseen = now;
                 output_push_batch(port,awaiting_batch);
-                awaiting_batch = new_batch;
+                awaiting_batch = PacketBatch::start_head(p);
                 fcb_stack = fcb;
                 count = 0;
             }
@@ -450,6 +447,9 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
     if (awaiting_batch) {
         fcb_stack->acquire(count);
         fcb_stack->lastseen = now;
+        last->set_next(0);
+        awaiting_batch->set_tail(last);
+        awaiting_batch->set_count(count);
         output_push_batch(port,awaiting_batch);
         fcb_stack = 0;
     }
@@ -490,8 +490,8 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
         if (_aggcache) {
             uint32_t agg = AGGREGATE_ANNO(p);
-                        if (!(lastagg == agg && fcb && likely(_table.reverse_match(fcb,p))))
-                            fcb = get_cache_fcb(p,agg);
+            if (!(lastagg == agg && fcb && likely(_table.reverse_match(fcb,p))))
+                fcb = get_cache_fcb(p,agg);
         }
         else
         {
@@ -502,14 +502,8 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         if (unlikely(fcb->is_early_drop())) {
             if (last) {
                 last->set_next(next);
-                if (curbatch >= 0) {
-                    if (next == 0) {
-                        batches[curbatch].batch->set_tail(last);
-                        batches[curbatch].batch->set_count(count);
-                    }
-                }
             }
-            p->kill();
+            SFCB_STACK(p->kill(););
             p = next;
             continue;
         }
@@ -518,11 +512,10 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         } else {
 
                 //Break the last flow
-                if (curbatch >= 0) {
-                    PacketBatch* new_batch = NULL;
-                    batches[curbatch].batch->cut(last,count,new_batch);
-                    batch = new_batch;
-                    count = 0;
+                if (last) {
+                    last->set_next(0);
+                    batches[curbatch].batch->set_count(count);
+                    batches[curbatch].batch->set_tail(last);
                 }
 
                 //Find a potential match
@@ -530,16 +523,15 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
                     if (batches[i % RING_SIZE].fcb == fcb) { //Flow already in list, append
                         //click_chatter("Flow already in list");
                         curbatch = i % RING_SIZE;
-                        batches[curbatch].batch->tail()->set_next(batch);
                         count = batches[curbatch].batch->count();
+                        last = batches[curbatch].batch->tail();
+                        last->set_next(p);
                         goto attach;
                     }
                 }
                 //click_chatter("Unknown fcb %p, curbatch = %d",fcb,head);
                 curbatch = head % RING_SIZE;
                 head++;
-
-
 
                 if (tail % RING_SIZE == head % RING_SIZE) {
                     auto &b = batches[tail % RING_SIZE];
@@ -554,8 +546,9 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
                 }
                 //click_chatter("batches[%d].batch = %p",curbatch,batch);
                 //click_chatter("batches[%d].fcb = %p",curbatch,fcb);
-                batches[curbatch].batch = batch;
+                batches[curbatch].batch = PacketBatch::start_head(p);
                 batches[curbatch].fcb = fcb;
+                count = 0;
         }
         attach:
         count ++;
@@ -565,7 +558,8 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
     }
 
 
-    if (curbatch >= 0 && batches[curbatch].batch != 0) {
+    if (last) {
+        last->set_next(0);
         batches[curbatch].batch->set_tail(last);
         batches[curbatch].batch->set_count(count);
     }
@@ -575,7 +569,6 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         //click_chatter("[%d] %d packets for fcb %p",i,batches[i%RING_SIZE].batch->count(),batches[i%RING_SIZE].fcb);
     }
     for (;tail < head;) {
-        //click_chatter("%d: batch %p of %d packets with fcb %p",i,batches[i].batch,batches[i].batch->count(),batches[i].fcb);
         auto &b = batches[tail % RING_SIZE];
         fcb_stack = b.fcb;
         fcb_stack->acquire(b.batch->count());
