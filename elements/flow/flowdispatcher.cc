@@ -42,13 +42,26 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 			click_chatter("Line : %s",s.c_str());
 
 		rules[i] = FlowClassificationTable::parse(s, _verbose);
-		if (rules[i].output == INT_MAX)
+		if (rules[i].output == INT_MAX) {
 		    rules[i].output = defaultOutput++;
+		    if (rules[i].output >= noutputs()) {
+		        if (rules[i].is_default)
+		            rules[i].output = -1;
+		        else
+		            rules[i].output = noutputs() - 1;
+		    }
+		} else if (rules[i].output < 0) {
+		    rules[i].output = -1;
+		} else {
+		    if (rules[i].output >= defaultOutput)
+		        defaultOutput = rules[i].output + 1;
+		}
 		if (rules[i].root == 0) {
 			return errh->error("argument %d is not a valid defined subflow (%s)", i+1,s.c_str());
 		}
 		if (_verbose)
 			click_chatter("Rule %d to output %d",rules.size(),rules[rules.size() - 1].output);
+
 		//rules[rules.size() - 1].root->print();
 		/*using namespace std;
 					istringstream iss(conf[i]);
@@ -116,7 +129,9 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 						}*/
 
 	}
-
+	if (!rules[rules.size() -1].is_default) {
+	    rules.push_back(FlowClassificationTable::make_drop_rule());
+	}
 
 	/*if (subflow) {
 					FlowLevelSubflow* sbf = new FlowLevelSubflow();
@@ -162,32 +177,18 @@ FlowNode* FlowDispatcher::get_table(int) {
 		    rules[i].root->check();
 			if (_verbose)
 				click_chatter("Merging this rule of %s :",name().c_str());
-			if (rules[i].output >= 0 && rules[i].output < noutputs()) { //If it's a real output, merge with children
-                FlowNode* child_table = FlowElementVisitor::get_downward_table(this, rules[i].output);
-                if (child_table) {
-                    child_table->check();
-                    assert(child_table->has_no_default());
-                    if (dynamic_cast<FlowLevelDummy*>(rules[i].root->level()) != 0 && rules[i].root->get_default().is_leaf()) {
-                        delete rules[i].root;
-                        rules[i].root = child_table;
-                    } else {
-                        //We must replace all childs per the child, but not the default path
-                        rules[i].root = rules[i].root->combine(child_table,true);
-                    }
-                    if (_verbose) {
-                        click_chatter("Print rule merged with child of %p :",rules[i].root);
-                        rules[i].root->print(_flow_data_offset);
-                    }
-                }
-			}
+
 			rules[i].root->check();
 
 #if DEBUG_CLASSIFIER
             click_chatter("Writing output number %d", rules[i].output);
 #endif
-			//Now set data for all leaf of the rule (now appended with all leafs of the child)
+			//Now set data for all leaf of the rule
             auto fnt = [this,i](FlowNodePtr* ptr) {
                 *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)rules[i].output;
+                if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's a real output, merge with children
+                    ptr->leaf->set_early_drop();
+                }
             };
 			rules[i].root->traverse_all_leaves(fnt, true, true);
 
@@ -198,11 +199,12 @@ FlowNode* FlowDispatcher::get_table(int) {
 				merged = rules[i].root;
 			} else {
 			    //We must replace all default path per the new rule
-				merged = merged->combine(rules[i].root, false);
+				merged = merged->combine(rules[i].root, false, i > 0 && rules[i - 1].output != rules[i].output);
 			}
+			merged->check();
 
 #if DEBUG_CLASSIFIER
-			click_chatter("Result of merging rule to the graph : ",i,this);
+	/*		click_chatter("Result of merging rule to the graph : ",i,this);
 			merged->print(_flow_data_offset);
 			if (rules[i].is_default) {
 			    uint32_t o = rules[i].output;
@@ -226,22 +228,26 @@ FlowNode* FlowDispatcher::get_table(int) {
                 });
                 return true;
             });
-    #endif
+    #endif*/
 #endif
 		}
 		assert(merged);
-		//Insert a "- drop" rule
-		if (merged->default_ptr()->ptr == 0) {
-			//click_chatter("ADDING ! %s to %s",merged->name().c_str(),merged->level()->print().c_str());
-			FlowNodePtr* parent_ptr = merged->default_ptr();
-			parent_ptr->set_leaf(FCBPool::biggest_pool->allocate_empty());
-			parent_ptr->set_data({0});
-			parent_ptr->leaf->parent = merged;
-			parent_ptr->leaf->acquire(1);
-			parent_ptr->leaf->data[_flow_data_offset] = -1;
-			//parent_ptr->leaf->print("");
-		}
-		merged->check();
+
+        auto fnt = [this](FlowNodePtr* ptr) {
+            int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
+            if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
+                   FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output);
+                   if (child_table) {
+                       child_table->check();
+                       assert(child_table->has_no_default());
+                       //Replace_leaf_with_node takes care of prunning using parent to go up to merged, ensuring no classification on the same field is done twice
+                       ptr->replace_leaf_with_node(child_table);
+                   }
+               }
+        };
+        merged->traverse_all_leaves(fnt, true, true);
+        merged->check();
+
 		if (_verbose) {
 			click_chatter("Table for %s :",name().c_str());
 			merged->print(_flow_data_offset);

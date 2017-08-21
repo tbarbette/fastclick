@@ -367,7 +367,8 @@ void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_
 /**
  * Combine this rule with rule of lower priority if its level is not equal
  */
-FlowNode* FlowNode::combine(FlowNode* other, bool as_child) {
+FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
+    //TODO : priority is not used as of now, it is always assumed true. We could relax some things.
 	if (other == 0) return this;
     other->check();
     this->check();
@@ -385,7 +386,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child) {
 	            _default.ptr = 0;
 	            //TODO delete this;
 	            node->set_parent(0);
-	            return node->combine(other, as_child);
+	            return node->combine(other, as_child, priority);
 	        }
 	}
 
@@ -421,7 +422,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child) {
 	        other->_default.node = 0;
 	        node->set_parent(0);
 	        //TODO delete other;
-	        return this->combine(node,as_child);
+	        return this->combine(node,as_child,priority);
 	    }
 	}
 
@@ -478,9 +479,17 @@ void FlowNode::__combine_child(FlowNode* other) {
 			other_child_ptr->node = 0;
 			other->dec_num();
 		}
-		//Unsupported cases
-		assert(!_default.ptr);
-		assert(!other->_default.ptr);
+        assert(other->getNum() == 0);
+
+        //Unsupported as of now
+        assert(this->default_ptr()->ptr == 0);
+        assert(other->default_ptr()->ptr == 0);
+        /*
+        //If other had a default, we need to merge it
+        if (other->default_ptr()->ptr != 0) { //Other had default
+            this->default_ptr()->default_combine(this, other->default_ptr(), true);
+            other->default_ptr()->ptr = 0;
+        } //ELse nothing to do as we can keep our default as it, if any*/
 		//TODO delete other;
         this->check();
 		return;
@@ -644,8 +653,6 @@ void FlowNode::__combine_else(FlowNode* other) {
  * Correct iif this FLowNodePtr is a default ptr
  */
 void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child) {
-    assert(as_child == false); //No thinked for children
-
     if (this->ptr == 0) { //We don't have default
         debug_flow("No node, attaching other");
         *this = (*other);
@@ -1063,28 +1070,36 @@ void FlowNode::check() {
 }
 #endif
 
-void FlowNode::print(const FlowNode* node,String prefix,int data_offset) {
-	click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr) {
+    if (show_ptr)
+        click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+    else
+        click_chatter("%s%s (%s, %d childs)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
 
 	NodeIterator* it = const_cast<FlowNode*>(node)->iterator();
 	FlowNodePtr* cur = 0;
 	while ((cur = it->next()) != 0) {
-
 		if (!cur->is_leaf()) {
-			click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().data_64,cur->parent());
-			print(cur->node,prefix + "|  ",data_offset);
+		    if (show_ptr)
+		        click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().data_64,cur->parent());
+		    else
+		        click_chatter("%s|-> %lu",prefix.c_str(),cur->data().data_64);
+			print(cur->node,prefix + "|  ",data_offset, show_ptr);
 		} else {
-			cur->leaf->print(prefix + "|->",data_offset);
+			cur->leaf->print(prefix + "|->",data_offset, show_ptr);
 		}
 	}
 
 	if (node->_default.ptr != 0) {
 		if (node->_default.is_node()) {
-			click_chatter("%s|-> DEFAULT %p Parent:%p",prefix.c_str(),node->_default.ptr,node->_default.parent());
+		    if (show_ptr)
+		        click_chatter("%s|-> DEFAULT %p Parent:%p",prefix.c_str(),node->_default.ptr,node->_default.parent());
+		    else
+		        click_chatter("%s|-> DEFAULT",prefix.c_str());
 			assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
-			print(node->_default.node,prefix + "|  ",data_offset);
+			print(node->_default.node,prefix + "|  ",data_offset, show_ptr);
 		} else {
-			node->_default.leaf->print(prefix + "|-> DEFAULT",data_offset);
+			node->_default.leaf->print(prefix + "|-> DEFAULT",data_offset, show_ptr);
 		}
 	}
 }
@@ -1102,7 +1117,7 @@ bool FlowControlBlock::empty() {
     return true;
 }
 
-void FlowControlBlock::print(String prefix, int data_offset) const {
+void FlowControlBlock::print(String prefix, int data_offset, bool show_ptr) const {
 	char data_str[64];
 	int j = 0;
 
@@ -1114,7 +1129,10 @@ void FlowControlBlock::print(String prefix, int data_offset) const {
 	} else {
 	    sprintf(&data_str[j],"%02x",data[data_offset]);
 	}
-	click_chatter("%s %lu Parent:%p UC:%d (%p data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),this,data_str);
+	if (show_ptr)
+	    click_chatter("%s %lu Parent:%p UC:%d (%p data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),this,data_str);
+	else
+	    click_chatter("%s %lu UC:%d (data %s)",prefix.c_str(),node_data[0].data_64,count(),data_str);
 }
 
 void FlowNodePtr::print() const{

@@ -177,7 +177,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     _table.get_root()->check();
     if (_verbose) {
         click_chatter("Table of %s after optimization :",name().c_str());
-        _table.get_root()->print();
+        _table.get_root()->print(-1,false);
     }
 
     if (_aggcache) {
@@ -197,9 +197,9 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
 }
 
 void FlowClassifier::cleanup(CleanupStage stage) {
-    click_chatter("%p{element} Hit : %d",this,cache_hit);
+    /*click_chatter("%p{element} Hit : %d",this,cache_hit);
     click_chatter("%p{element}  Shared : %d",this,cache_sharing);
-    click_chatter("%p{element} Miss : %d",this,cache_miss);
+    click_chatter("%p{element} Miss : %d",this,cache_miss);*/
 }
 
 #define USE_CACHE_RING 1
@@ -307,6 +307,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
 
         } while (ic < _cache_ring_size);
 
+        //TODO : reunderstand what I did here.
         c = bucket;
         FlowCache* oldest = c;
         c++;
@@ -346,24 +347,24 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
 static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
             if (fcb->count() == 0 && fcb->hasTimeout()) {
-#if DEBUG_CLASSIFIER_TIMEOUT > 0
+# if DEBUG_CLASSIFIER_TIMEOUT > 0
                 assert(fcb->flags & FLOW_TIMEOUT_INLIST);
-#endif
+# endif
                 if (fcb->timeoutPassed(now)) {
-#if DEBUG_CLASSIFIER_TIMEOUT > 1
+# if DEBUG_CLASSIFIER_TIMEOUT > 1
                     click_chatter("Timeout of %p passed or released, reinitializing",fcb);
-#endif
+# endif
                     //Do not call initialize as everything is still set, just reinit timeout
                     fcb->flags = FLOW_TIMEOUT | FLOW_TIMEOUT_INLIST;
                 } else {
-#if DEBUG_CLASSIFIER_TIMEOUT > 1
+# if DEBUG_CLASSIFIER_TIMEOUT > 1
                     click_chatter("Timeout recovered %p",fcb);
-#endif
+# endif
                 }
             } else {
-#if DEBUG_CLASSIFIER_TIMEOUT > 1
+# if DEBUG_CLASSIFIER_TIMEOUT > 1
                 click_chatter("Fcb %p Still valid : Fcb count is %d and hasTimeout %d",fcb, fcb->count(),fcb->hasTimeout());
-#endif
+# endif
             }
 #endif
 }
@@ -401,6 +402,18 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
         }
 
         check_fcb_still_valid(fcb, now);
+        if (unlikely(fcb->is_early_drop())) {
+            if (last) {
+                last->set_next(next);
+                if (!next) {
+                    awaiting_batch->set_tail(last);
+                    awaiting_batch->set_count(count);
+                }
+            }
+            p->kill();
+            p = next;
+            continue;
+        }
         if (awaiting_batch == NULL) {
 #if DEBUG_CLASSIFIER > 1
         click_chatter("New fcb %p",fcb);
@@ -484,17 +497,22 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         {
             fcb = _table.match(p,_aggcache);
         }
-        if (!fcb) {
-            if (last) //TODO : early drop still cause some bug
+
+        check_fcb_still_valid(fcb, now);
+        if (unlikely(fcb->is_early_drop())) {
+            if (last) {
                 last->set_next(next);
+                if (curbatch >= 0) {
+                    if (next == 0) {
+                        batches[curbatch].batch->set_tail(last);
+                        batches[curbatch].batch->set_count(count);
+                    }
+                }
+            }
             p->kill();
             p = next;
             continue;
         }
-        check_fcb_still_valid(fcb, now);
-        if (unlikely(_verbose > 1))
-            _table.get_root()->print();
-        //click_chatter("p %p fcb %p - tail %d / curbatch %d / head %d",p,fcb,tail,curbatch,head);
         if (lastfcb == fcb) {
             //Just continue as they are still linked
         } else {
@@ -525,7 +543,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
                 if (tail % RING_SIZE == head % RING_SIZE) {
                     auto &b = batches[tail % RING_SIZE];
-                    click_chatter("Ring full with %d, processing now !", b.batch->count());
+                    click_chatter("WARNING (unoptimized) Ring full with %d, processing now !", b.batch->count());
                     //Ring full, process batch NOW
                     fcb_stack = b.fcb;
                     fcb_stack->acquire(b.batch->count());
@@ -547,7 +565,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
     }
 
 
-    if (batches[curbatch].batch != 0) {
+    if (curbatch >= 0 && batches[curbatch].batch != 0) {
         batches[curbatch].batch->set_tail(last);
         batches[curbatch].batch->set_count(count);
     }

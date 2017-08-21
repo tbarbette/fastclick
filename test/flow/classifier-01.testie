@@ -1,0 +1,48 @@
+%script
+click C
+
+%file C
+Idle -> a :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10) -> Discard; //Accept  0/10, else drop
+Idle -> b :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10,-) -> Discard; //Accept 0/10, else drop
+Idle -> c :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10,-)[0-1] => {[0] -> Discard; [1] -> Discard;}
+
+Idle -> d1 :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 0, 0/20 0, -) -> Discard;
+Idle -> d2 :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 0, 0/20 0, - drop) -> Discard;
+
+Script(TYPE ACTIVE, stop);
+
+%expect stderr
+
+Table of b after optimization :
+---
+0/255 (TWOCASE, 1 childs)
+|-> 16 UC:1 (data 100000000000000000000000)
+|-> DEFAULT 0 UC:1 (data 0000000000000000ffffffff)
+---
+Table of d1 after optimization :
+---
+0/255 (THREECASE, 2 childs)
+|-> 32 UC:1 (data 200000000000000000000000)
+|-> 16 UC:1 (data 100000000000000000000000)
+|-> DEFAULT 0 UC:1 (data 0000000000000000ffffffff)
+---
+Table of a after optimization :
+---
+0/255 (TWOCASE, 1 childs)
+|-> 16 UC:1 (data 100000000000000000000000)
+|-> DEFAULT 0 UC:1 (data 0000000000000000ffffffff)
+---
+Table of d2 after optimization :
+---
+0/255 (THREECASE, 2 childs)
+|-> 32 UC:1 (data 200000000000000000000000)
+|-> 16 UC:1 (data 100000000000000000000000)
+|-> DEFAULT 0 UC:1 (data 0000000000000000ffffffff)
+---
+Table of c after optimization :
+---
+0/255 (TWOCASE, 1 childs)
+|-> 16 UC:1 (data 100000000000000000000000)
+|-> DEFAULT 0 UC:1 (data 000000000000000001000000)
+---
+

@@ -41,12 +41,11 @@ private:
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 		//#define FLOW_RELEASE			  0x01 //Release me when you got free time, my packets will never arrive again
 		//#define FLOW_PERMANENT 			  0x02 //Never release
+        //0x20 is reserved, see below
         #define FLOW_TIMEOUT_INLIST       0x40 //Timeout is already in list
 		#define FLOW_TIMEOUT              0x80 //Timeout set
         #define FLOW_TIMEOUT_SHIFT           8
 		#define FLOW_TIMEOUT_MASK   0x000000ff //Delta + lastseen timestamp in msec
-
-		uint32_t flags;
 
 		FlowControlBlock* next;
 
@@ -59,6 +58,19 @@ private:
 		    return t == 0 || (now - lastseen).msecval() > t;
 		}
 #endif
+
+        #define FLOW_EARLY_DROP     0x20
+        uint32_t flags;
+
+        inline void set_early_drop() {
+            flags |= FLOW_EARLY_DROP;
+        }
+
+        inline bool is_early_drop() const {
+            return flags & FLOW_EARLY_DROP;
+        }
+
+
 
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		SubFlowRealeaseFnt release_fnt ;
@@ -79,8 +91,8 @@ private:
         void combine_data(uint8_t* data);
 		inline void initialize() {
 			use_count = 0;
+            flags = 0;
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-			flags = 0;
 			next = 0; //TODO : only once?
 #endif
 		}
@@ -102,7 +114,7 @@ private:
 		inline FlowControlBlock* duplicate(int use_count);
         inline FCBPool* get_pool() const;
 
-		void print(String prefix, int data_offset =-1) const;
+		void print(String prefix, int data_offset =-1, bool show_ptr=false) const;
 
 		bool empty();
 

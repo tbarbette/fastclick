@@ -149,7 +149,7 @@ public :
 
 class FlowNode {
 private:
-    static void print(const FlowNode* node,String prefix,int data_offset = -1);
+    static void print(const FlowNode* node,String prefix,int data_offset = -1, bool show_ptr = true);
 
 protected:
     int num;
@@ -279,7 +279,7 @@ public:
      */
     template<typename F> void apply_default(F fnt);
 
-    FlowNode* combine(FlowNode* other, bool as_child) CLICK_WARN_UNUSED_RESULT;
+    FlowNode* combine(FlowNode* other, bool as_child, bool priority = true) CLICK_WARN_UNUSED_RESULT;
     void __combine_child(FlowNode* other);
     void __combine_else(FlowNode* other);
     FlowNodePtr prune(FlowLevel* level,FlowNodeData data, bool inverted = false) CLICK_WARN_UNUSED_RESULT;
@@ -496,8 +496,7 @@ public:
      * Call fnt on all nodes having an empty default or a leaf default.
      * Semantically, this is traversing all "else", undefined cases
      */
-    template<typename F>
-    bool traverse_all_default_leaf(F fnt) {
+    bool traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt) {
         NodeIterator* it = this->iterator();
         FlowNodePtr* cur;
         while ((cur = it->next()) != 0) {
@@ -583,14 +582,14 @@ public:
         traverse_all_leaf([fnt](FlowNodePtr* ptr) -> bool {fnt(ptr->leaf);return true;},true,true,false);
     }*/
 
-    void print(int data_offset = -1) const {
+    void print(int data_offset = -1, bool show_ptr = true) const {
         click_chatter("---");
-        print(this,"", data_offset);
+        print(this,"", data_offset, show_ptr);
         click_chatter("---");
     }
 #if DEBUG_CLASSIFIER
     void debug_print(int data_offset = -1) const {
-        print(data_offset);
+        print(data_offset,true);
     }
 #else
     void debug_print(int = -1) const {}

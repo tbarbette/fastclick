@@ -1,0 +1,29 @@
+%script
+click C
+
+%file C
+InfiniteSource(DATA \<10>, LIMIT 2, STOP true) -> a :: FlowClassifier(BUILDER 0) -> Print(A1) -> FlowDispatcher(0/10) -> Print(A2) -> Discard;
+
+InfiniteSource(DATA \<20>, LIMIT 2, STOP true) -> b :: FlowClassifier(BUILDER 0) -> Print(B1) -> FlowDispatcher(0/10) -> Print(B2) -> Discard;
+
+InfiniteSource(DATA \<10>, LIMIT 2, STOP true) -> c :: FlowClassifier(BUILDER 0) -> Print(C1) -> FlowDispatcher(0/10 0, 0/20 1) 
+    [0-1]=>{ [0] -> Print(CO1) -> Discard; [1] -> Print(CO2) -> Discard; };
+
+InfiniteSource(DATA \<20>, LIMIT 2, STOP true) -> c;
+
+DriverManager(wait,wait,wait,wait);
+
+%expect stderr
+A1:    1 | 10
+A2:    1 | 10
+C1:    1 | 10
+CO1:    1 | 10
+C1:    1 | 20
+CO2:    1 | 20
+A1:    1 | 10
+A2:    1 | 10
+C1:    1 | 10
+CO1:    1 | 10
+C1:    1 | 20
+CO2:    1 | 20
+

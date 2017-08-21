@@ -40,6 +40,9 @@ public:
         bool is_default;
     } Rule;
     static Rule parse(String s, bool verbose = false);
+    static Rule make_drop_rule() {
+        return parse("- drop");
+    }
 protected:
     FlowNode* _root;
 };
