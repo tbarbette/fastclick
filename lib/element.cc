@@ -790,12 +790,17 @@ Element::initialize_ports(const int *in_v, const int *out_v)
     for (int i = 0; i < ninputs(); i++) {
 	// allowed iff in_v[i] == VPULL
 	int port = (in_v[i] == VPULL || in_v[i] == VDOUBLE ? 0 : -1);
+    if (in_v[i] == VDOUBLE)
+        click_chatter("%p{element} has vdouble pull",this);
+
 	_ports[0][i].assign(false, this, 0, port,false);
     }
 
     for (int o = 0; o < noutputs(); o++) {
 	// allowed iff out_v[o] != VPULL
 	int port = (out_v[o] == VPULL && out_v[o] != VDOUBLE ? -1 : 0);
+    if (out_v[o] == VDOUBLE)
+        click_chatter("%p{element} has vdouble push",this);
 	_ports[1][o].assign(true, this, 0, port, false);
     }
 }

@@ -115,7 +115,7 @@ public:
 
     const char *class_name() const { return "FromDPDKDevice"; }
     const char *port_count() const { return PORTS_0_1; }
-    const char *processing() const { return PUSH; }
+    const char *processing() const { return DOUBLE; }
     int configure_phase() const {
         return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
@@ -126,6 +126,10 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
+    Packet* pull(int);
+#if HAVE_BATCH
+    PacketBatch* pull_batch(int,int);
+#endif
     
 private:
 

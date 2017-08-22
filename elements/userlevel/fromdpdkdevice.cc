@@ -194,6 +194,69 @@ bool FromDPDKDevice::run_task(Task * t)
     return (ret);
 }
 
+Packet* FromDPDKDevice::pull(int port) {
+    return FromDPDKDevice::pull_batch(port,1);
+}
+
+#if HAVE_BATCH
+PacketBatch* FromDPDKDevice::pull_batch(int, int max) {
+    PacketBatch* head = 0;
+    WritablePacket *last;
+    int tot = 0;
+    if (max > _burst)
+        max = _burst;
+    struct rte_mbuf *pkts[max];
+    for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
+        unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, max);
+        for (unsigned i = 0; i < n; ++i) {
+            unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
+            rte_prefetch0(data);
+#if CLICK_PACKET_USE_DPDK
+            WritablePacket *p = Packet::make(pkts[i]);
+#elif HAVE_ZEROCOPY
+            WritablePacket *p = Packet::make(data,
+                     rte_pktmbuf_data_len(pkts[i]),
+                     DPDKDevice::free_pkt,
+                     pkts[i],
+                     rte_pktmbuf_headroom(pkts[i]),
+                     rte_pktmbuf_tailroom(pkts[i])
+                     );
+#else
+            WritablePacket *p = Packet::make(data,
+                                     (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
+            rte_pktmbuf_free(pkts[i]);
+            data = p->data();
+#endif
+            p->set_packet_type_anno(Packet::HOST);
+            p->set_mac_header(data);
+            if (_set_rss_aggregate)
+#if RTE_VERSION > RTE_VERSION_NUM(1,7,0,0)
+                SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
+#else
+                SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
+#endif
+            if (head == NULL)
+                head = PacketBatch::start_head(p);
+            else
+                last->set_next(p);
+            last = p;
+
+        }
+        if (n) {
+            tot += n;
+            if (tot == max)
+                break;
+        }
+    }
+    if (head) {
+        head->make_tail(last,tot);
+        add_count(tot);
+    }
+    return head;
+
+}
+#endif
+
 String FromDPDKDevice::read_handler(Element *e, void * thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
