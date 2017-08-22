@@ -26,6 +26,10 @@ If offset is setted, the slot in the vector will be read from packet, assumed
 to previously been marked with NumberPacket. If unset or < 0, the vector
 will be filled in order.
 
+=item DYNAMIC
+If true, allows to grow the vector on runtime. This is disabled by default because it is not multi thread safe a,d creates a spike in latency that is due to the long time taken to resize. If
+the number of packets reaches a non dynamic TimestampDiff, it will crash.
+
 =a
 
 NumberPacket, TimestampDiff
@@ -52,6 +56,7 @@ public:
 
 private:
     int _offset;
+    bool _dynamic;
     Vector<Timestamp> _timestamps;
 };
 

@@ -25,7 +25,7 @@
 
 CLICK_DECLS
 
-RecordTimestamp::RecordTimestamp() : _offset(-1), _timestamps() {
+RecordTimestamp::RecordTimestamp() : _offset(-1), _timestamps(), _dynamic(false) {
 }
 
 RecordTimestamp::~RecordTimestamp() {
@@ -36,6 +36,7 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(conf, this, errh)
             .read("N", n)
             .read("OFFSET", _offset)
+            .read("DYNAMIC", _dynamic)
             .complete() < 0)
         return -1;
 
@@ -53,6 +54,10 @@ RecordTimestamp::smaction(Packet* p) {
         i = NumberPacket::read_number_of_packet(p, _offset);
         assert(i < INT_MAX);
         while (i >= _timestamps.size()) {
+            if (!_dynamic && i >= _timestamps.capacity()) {
+                click_chatter("fatal error : DYNAMIC is not set and record timestamp reserved capacity is too small. Use N to augment the capacity.");
+                assert(false);
+            }
             _timestamps.resize(_timestamps.size() == 0? _timestamps.capacity():_timestamps.size() * 2, Timestamp::uninitialized_t());
         }
         _timestamps.unchecked_at(i) = Timestamp::now_steady();
