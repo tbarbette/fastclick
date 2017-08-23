@@ -1696,12 +1696,12 @@ Packet::safe_kill()
 #elif CLICK_PACKET_USE_DPDK
         rte_pktmbuf_free(mb());
 #elif HAVE_CLICK_PACKET_POOL
-        if (_use_count.unatomic_dec_and_test()) {
+        if (_use_count.nonatomic_dec_and_test()) {
             WritablePacket::recycle(static_cast<WritablePacket *>(this));
 
     }
 #else
-        if (_use_count.unatomic_dec_and_test()) {
+        if (_use_count.nonatomic_dec_and_test()) {
             delete this;
         }
 #endif

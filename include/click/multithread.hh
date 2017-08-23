@@ -11,180 +11,6 @@
 
 CLICK_DECLS
 
-/**
- * Duplicate a variable per-thread, allowing all threads to have their own
- * version of a variable. As opposed to __thread, any thread can also access
- * other thread's values using get/set_value_for_thread(), allowing proper
- * initialization and cleaning from the only thread calling elements
- * initialize and cleanup functions using a for loop from 0 to size().
- *
- * The class provides convenient functions, eg :
- * per_thread<int> my_int;
- *
- * my_int++;
- * my_int = my_int + 1;
- * int &a = *my_int; //Return a reference
- * a++; //Affect the per-thread variable
- *
- * per_thread<struct foo> my_foo;
- * my_foo->bar++;
- *
- * IMPORTANT:
- * The variable will be cached-align to avoid false sharing. This means that
- * the amount of bytes for each thread will be rounded up to 64 bytes. That
- * means that you should make per_thread of big structure of variables instead
- * of multiple per_threads.
- *
- * In other term, prefer to do :
- * struct state {
- *     int count;
- *     int drop;
- *     ...
- * }
- * per_thread<struct state> _state;
- *
- * Instead of : //this is the bad version
- * per_thread<int> _count; //do not copy-cut
- * per_thread<int> _drop; //do not do this
- * ...
- */
-template <typename T>
-class per_thread
-{
-private:
-    typedef struct {
-        T v;
-    } CLICK_CACHE_ALIGN AT;
-
-    void initialize(unsigned int n, T v) {
-        _size = n;
-        storage = new AT[_size];
-        for (unsigned i = 0; i < n; i++) {
-            storage[i].v = v;
-        }
-    }
-
-    //Disable copy constructor. It will always be a user error
-    per_thread (const per_thread<T> &);
-public:
-    explicit per_thread() {
-        _size = click_max_cpu_ids();
-        storage = new AT[_size];
-    }
-
-    explicit per_thread(T v) {
-        initialize(click_max_cpu_ids(),v);
-    }
-
-    explicit per_thread(T v, int n) {
-        initialize(n,v);
-    }
-
-    /**
-     * Resize must be called if per_thread was initialized before
-     * click_max_cpu_ids() is set (such as in static functions)
-     * This will destroy all data
-     */
-    void resize(unsigned int max_cpu_id, T v) {
-        delete[] storage;
-        initialize(max_cpu_id,v);
-    }
-
-    ~per_thread() {
-        delete[] storage;
-    }
-
-    inline T* operator->() const {
-        return &(storage[click_current_cpu_id()].v);
-    }
-    inline T& operator*() const {
-        return storage[click_current_cpu_id()].v;
-    }
-
-    inline T& operator+=(const T& add) const {
-        storage[click_current_cpu_id()].v += add;
-        return storage[click_current_cpu_id()].v;
-    }
-
-    inline T& operator++() const { // prefix ++
-        return ++(storage[click_current_cpu_id()].v);
-    }
-
-    inline T operator++(int) const { // postfix ++
-        return storage[click_current_cpu_id()].v++;
-    }
-
-    inline T& operator--() const {
-        return --(storage[click_current_cpu_id()].v);
-    }
-
-    inline T operator--(int) const {
-        return storage[click_current_cpu_id()].v--;
-    }
-
-    inline T& operator=(T value) const {
-        storage[click_current_cpu_id()].v = value;
-        return storage[click_current_cpu_id()].v;
-    }
-
-    inline void set(T v) {
-        storage[click_current_cpu_id()].v = v;
-    }
-
-    inline void setAll(T v) {
-        for (int i = 0; i < click_max_cpu_ids(); i++)
-            storage[i].v = v;
-    }
-
-    inline T& get() const{
-        return storage[click_current_cpu_id()].v;
-    }
-
-    /**
-     * get_value_for_thread get the value for a given thread id
-     * Do not do for (int i = 0; i < size(); i++) get_value_for_thread
-     * as in omem and oread version, not all threads are represented,
-     * this would lead to a bug !
-     */
-    inline T& get_value_for_thread(int thread_id) const{
-        return storage[thread_id].v;
-    }
-
-    inline void set_value_for_thread(int thread_id, T v) {
-        storage[thread_id].v = v;
-    }
-
-    /**
-     * get_value can be used to iterate around all per-thread variables.
-     * On the normal version it is the same as get_value_for_thread, but on
-     * omem and oread version of per_thread, this iterate only over thread
-     * that will really be used.
-     */
-    inline T& get_value(int i) const {
-        return get_value_for_thread(i);
-    }
-
-    inline void set_value(int i, T v) {
-        set_value_for_thread(i, v);
-    }
-
-    /**
-     * Number of elements inside the vector.
-     * This may not the number of threads, only use this
-     * to iterate with get_value()/set_value(), not get_value_for_thread()
-     */
-    inline unsigned weight() {
-        return _size;
-    }
-
-    inline unsigned int get_mapping(int i) {
-        return i;
-    }
-protected:
-    AT* storage;
-    unsigned _size;
-};
-
 /*
  * Read efficient version of per thread, by giving a bitvector telling
  * which threads will be used, a mapping can be used to only read from
@@ -321,7 +147,7 @@ public:
         storage[i] = v;
     }
 
-    inline unsigned weight() {
+    inline unsigned weight() const {
         return _size;
     }
 };
@@ -466,7 +292,7 @@ class per_thread_arithmetic { public:
  * This works by having a ring of N elements. The writer updates the next
  * element of the ring, and when it has finished, it updates the current ring
  * index to the next element. For fast wrap-up computing, N must be
- * a power of 2.
+ * a power of 2 and at least 2.
  *
  * Using a ring allows for getting rid of atomic reference count, but introduces
  * the N problem.
@@ -553,11 +379,11 @@ protected:
 
 
 /**
- * unprotected_rcu works like click_rcu but can have multiple writer.
+ * unprotected_rcu works like unprotected_rcu_singlewriter but can have multiple writer.
  *
  * Usage is the same but attempt to write use a spinlock. In handlers or
  * other slow path, use this version. In other cases, double check if there could
- * be multiple writers at the same time, and if not, use click_rcu.
+ * be multiple writers at the same time, and if not, use unprotected_rcu_singlewriter.
  *
  * Failing to call write_commit() will cause a dead lock !!!
  *
@@ -795,6 +621,94 @@ private:
     atomic_uint32_t _refcnt;
 };
 
+/**
+ * Read XOR Write lock. Allow either multiple reader or multiple
+ * writer. When a reader arrives, writers stop taking the usecount. The reader
+ * has access once all writer finish.
+ *
+ * To stop writer from locking, the reader will CAS a very low value.
+ *
+ * If max_writer is 1, this becomes rwlock, but with a priority on the reads
+ */
+
+class rXwlock { public:
+    rXwlock() : max_write(-65535) {
+        _refcnt = 0;
+    }
+
+    rXwlock(int32_t max_writers) {
+        _refcnt = 0;
+        set_max_writers(max_writers);
+    }
+
+    void set_max_writers(int32_t max_writers) {
+        assert(max_writers < 65535);
+        read_begin();
+        max_write = - max_writers;
+        read_end();
+    }
+
+    inline void read_begin() {
+        uint32_t current_refcnt;
+        do {
+            current_refcnt = _refcnt;
+            if (unlikely((int32_t)current_refcnt < 0)) {
+                if ((int32_t)current_refcnt <= -65536) {
+                    //Just wait for the other reader out there to win
+                } else {
+                    if (_refcnt.compare_swap(current_refcnt,current_refcnt - 65536) == current_refcnt) {
+                        //We could lower the value, so wait for it to reach -65536 (0 writer but one reader waiting) and continue
+                        do {
+                            click_relax_fence();
+                        } while((int32_t)_refcnt != -65536);
+                        //When it is -65536, driver cannot take it and reader are waiting, so we can set it directly
+                        _refcnt = 1;
+                        break;
+                    }
+                }
+            } else { // >= 0, just grab another reader (>0)
+                if (likely(_refcnt.compare_swap(current_refcnt,current_refcnt+1) == current_refcnt))
+                    break;
+            }
+            click_relax_fence();
+        } while (1);
+    }
+
+    inline void read_end() {
+        click_read_fence();
+        _refcnt--;
+    }
+
+    inline void read_get() {
+        _refcnt++;
+    }
+
+    inline void write_begin() {
+        uint32_t current_refcnt;
+        do {
+            current_refcnt = _refcnt;
+            if (likely((int32_t)current_refcnt <= 0 && (int32_t)current_refcnt > max_write)) {
+                if (_refcnt.compare_swap(current_refcnt,current_refcnt - 1) == current_refcnt)
+                    break;
+            }
+            click_relax_fence();
+        } while (1);
+    }
+
+    inline void write_end() {
+        click_write_fence();
+        _refcnt++;
+    }
+
+private:
+    atomic_uint32_t _refcnt;
+    int32_t max_write;
+} CLICK_CACHE_ALIGN;
+
+
+/**
+ * Shared-pointer based rwlock
+ */
 template <typename V>
 class rwlock { public:
 
@@ -1018,7 +932,7 @@ bool __rwlock<V>::read_to_write() {
 }
 
 /**
- * click_rcu is the ultimate version of the click_rcu series, the more
+ * click_rcu is the ultimate version of the RCU series, the more
  * protected one which will always work but also the slowest one.
  *
  * The problem of unprotected_rcu* is solved by keeping
@@ -1026,12 +940,19 @@ bool __rwlock<V>::read_to_write() {
  * bucket. The writer will wait for all readers to finish before
  * overwriting the next available slot.
  *
- * The writers exclude each other by setting the refcnt
+ * Here, the writers exclude each other by setting the refcnt
  * to -1 atomically, if the value was 0. They will spinloop around
  * the refcnt until each other writer has finished.
  *
  * It is not as bad as a critical section/interrupt like in kernel,
  * but those lock operation still have a non-negligeable cost.
+ *
+ * It may be difficult to see that writer cannot overwrite a bucket that is
+ * currently being accessed, here is a helping example :
+ *   A reads index
+ *   B write and advance
+ *   C write and advance, check refcnt[A], CAS  0 -> -1
+ *   A writes refcnt[A] -> CAS fail
  *
  * The ring has 2 values, so one writer can update one bucket while readers
  * may still read the other bucket.
@@ -1048,6 +969,8 @@ class click_rcu { public:
         refcnt[1] = 0;
         initialize(v);
     }
+
+    ~click_rcu() {}
 
     inline void initialize(T v) {
         storage[rcu_current] = v;
@@ -1077,7 +1000,12 @@ class click_rcu { public:
             rcu_current_local = rcu_current;
             click_read_fence();
             current_refcnt = refcnt[rcu_current_local].value();
-        } while (current_refcnt == (uint32_t)-1 || (refcnt[rcu_current_local].compare_swap(current_refcnt,current_refcnt+1) != current_refcnt));
+            if (current_refcnt == (uint32_t)-1 || (refcnt[rcu_current_local].compare_swap(current_refcnt,current_refcnt+1) != current_refcnt)) {
+                click_relax_fence();
+            } else {
+                break;
+            }
+        } while (1);
         click_write_fence();
         //The reference is holded now, we are sure that no writer will edit this until read_end is called.
         return storage[rcu_current_local];
@@ -1143,6 +1071,95 @@ protected:
     atomic_uint32_t refcnt[2];
     T storage[2];
     volatile int rcu_current;
+};
+
+
+/**
+ * Fast RCU that avoids heavy locked CAS by using a per-thread writer epoch
+ */
+template <typename T>
+class fast_rcu { public:
+#define N 2
+    fast_rcu() : _rcu_current(0), _write_epoch(1), _epochs(0) {
+    }
+
+    fast_rcu(T v) : _rcu_current(0), _write_epoch(1), _epochs(0) {
+        initialize(v);
+    }
+
+    ~fast_rcu() {}
+
+    inline void initialize(T v) {
+        _storage[_rcu_current].v = v;
+    }
+
+    inline const T& read_begin(int &) {
+        int w_epoch = _write_epoch;
+        *_epochs = w_epoch;
+        click_write_fence(); //Actually read rcu_current after storing epoch
+        int rcu_current_local = _rcu_current;
+        click_read_fence();//Do not read _rcu_current later
+        //The reference is holded now, we are sure that no writer will edit this until read_end is called.
+        return _storage[rcu_current_local].v;
+    }
+
+    inline void read_end(const int &) {
+        click_compiler_fence(); //No load or store after writing the epoch bak to 0
+        *_epochs = 0;
+    }
+
+    inline T read() {
+        int flags;
+        T v = read_begin(flags);
+        read_end(flags);
+        return v;
+    }
+
+    inline T& write_begin(int& rcu_current_local) {
+
+        _write_lock.acquire();
+        rcu_current_local = _rcu_current;
+
+        int rcu_next = (rcu_current_local + 1) & 1;
+        int bad_epoch = (_write_epoch - N) + 1;
+
+        int i = 0;
+        loop:
+        for (; i < _epochs.weight(); i ++) {
+            int te = _epochs.get_value(i);
+            if (unlikely(te != 0 && te == bad_epoch)) {
+                click_relax_fence();
+                goto loop;
+            }
+            //TODO : if allow N > 2, compute a min_epoch at the same time so next writer can avoid looping
+        }
+
+        //All epochs are 0 (no accessed, or at least not to the current ptr)
+        _storage[rcu_next].v = _storage[rcu_current_local].v;
+
+        return _storage[rcu_next].v;
+    }
+
+    inline void write_commit(int rcu_current_local) {
+        click_write_fence(); //Prevent write to finish after this
+        _rcu_current = (rcu_current_local + 1) & 1;
+        click_compiler_fence(); //Write epoch must happen after rcu_current, to be sure that thr old bucket is not read and accessed with the new epoch.
+        ++_write_epoch;
+        _write_lock.release();
+    }
+
+protected:
+
+    typedef struct {
+        T v;
+    } CLICK_CACHE_ALIGN AT;
+
+    per_thread<volatile int> _epochs;
+    AT _storage[2];
+    volatile int _rcu_current;
+    volatile int _write_epoch;
+    Spinlock _write_lock;
+
 };
 
 CLICK_ENDDECLS

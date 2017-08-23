@@ -14,6 +14,196 @@
 #endif
 CLICK_DECLS
 
+
+/**
+ * Duplicate a variable per-thread, allowing all threads to have their own
+ * version of a variable. As opposed to __thread, any thread can also access
+ * other thread's values using get/set_value_for_thread(), allowing proper
+ * initialization and cleaning from the only thread calling elements
+ * initialize and cleanup functions using a for loop from 0 to size().
+ *
+ * The class provides convenient functions, eg :
+ * per_thread<int> my_int;
+ *
+ * my_int++;
+ * my_int = my_int + 1;
+ * int &a = *my_int; //Return a reference
+ * a++; //Affect the per-thread variable
+ *
+ * per_thread<struct foo> my_foo;
+ * my_foo->bar++;
+ *
+ * IMPORTANT:
+ * The variable will be cached-align to avoid false sharing. This means that
+ * the amount of bytes for each thread will be rounded up to 64 bytes. That
+ * means that you should make per_thread of big structure of variables instead
+ * of multiple per_threads.
+ *
+ * In other term, prefer to do :
+ * struct state {
+ *     int count;
+ *     int drop;
+ *     ...
+ * }
+ * per_thread<struct state> _state;
+ *
+ * Instead of : //this is the bad version
+ * per_thread<int> _count; //do not copy-cut
+ * per_thread<int> _drop; //do not do this
+ * ...
+ */
+template <typename T>
+class per_thread
+{
+private:
+    typedef struct {
+        T v;
+    } CLICK_CACHE_ALIGN AT;
+
+    void initialize(unsigned int n, T v) {
+        _size = n;
+        storage = new AT[_size];
+        for (unsigned i = 0; i < n; i++) {
+            storage[i].v = v;
+        }
+    }
+
+    //Disable copy constructor. It will always be a user error
+    per_thread (const per_thread<T> &);
+public:
+    explicit per_thread() {
+        _size = click_max_cpu_ids();
+        storage = new AT[_size];
+    }
+
+    explicit per_thread(T v) {
+        initialize(click_max_cpu_ids(),v);
+    }
+
+    explicit per_thread(T v, int n) {
+        initialize(n,v);
+    }
+
+    /**
+     * Resize must be called if per_thread was initialized before
+     * click_max_cpu_ids() is set (such as in static functions)
+     * This will destroy all data
+     */
+    void resize(unsigned int max_cpu_id, T v) {
+        delete[] storage;
+        initialize(max_cpu_id,v);
+    }
+
+    ~per_thread() {
+        if (_size) {
+            delete[] storage;
+            _size = 0;
+        }
+    }
+
+    inline T* operator->() const {
+        return &(storage[click_current_cpu_id()].v);
+    }
+    inline T& operator*() const {
+        return storage[click_current_cpu_id()].v;
+    }
+
+    inline T& operator+=(const T& add) const {
+        storage[click_current_cpu_id()].v += add;
+        return storage[click_current_cpu_id()].v;
+    }
+
+    inline T& operator++() const { // prefix ++
+        return ++(storage[click_current_cpu_id()].v);
+    }
+
+    inline T operator++(int) const { // postfix ++
+        return storage[click_current_cpu_id()].v++;
+    }
+
+    inline T& operator--() const {
+        return --(storage[click_current_cpu_id()].v);
+    }
+
+    inline T operator--(int) const {
+        return storage[click_current_cpu_id()].v--;
+    }
+
+    inline T& operator=(T value) const {
+        storage[click_current_cpu_id()].v = value;
+        return storage[click_current_cpu_id()].v;
+    }
+
+    inline void operator=(const per_thread<T>& pt) {
+        if (_size != pt._size) {
+            if (storage)
+                delete[] storage;
+            storage = new AT[_size];
+        }
+        for (int i = 0; i < pt.weight(); i++) {
+            storage[i] = pt.storage[i];
+        }
+    }
+
+    inline void set(T v) {
+        storage[click_current_cpu_id()].v = v;
+    }
+
+    inline void setAll(T v) {
+        for (int i = 0; i < click_max_cpu_ids(); i++)
+            storage[i].v = v;
+    }
+
+    inline T& get() const{
+        return storage[click_current_cpu_id()].v;
+    }
+
+    /**
+     * get_value_for_thread get the value for a given thread id
+     * Do not do for (int i = 0; i < size(); i++) get_value_for_thread
+     * as in omem and oread version, not all threads are represented,
+     * this would lead to a bug !
+     */
+    inline T& get_value_for_thread(int thread_id) const{
+        return storage[thread_id].v;
+    }
+
+    inline void set_value_for_thread(int thread_id, T v) {
+        storage[thread_id].v = v;
+    }
+
+    /**
+     * get_value can be used to iterate around all per-thread variables.
+     * On the normal version it is the same as get_value_for_thread, but on
+     * omem and oread version of per_thread, this iterate only over thread
+     * that will really be used.
+     */
+    inline T& get_value(int i) const {
+        return get_value_for_thread(i);
+    }
+
+    inline void set_value(int i, T v) {
+        set_value_for_thread(i, v);
+    }
+
+    /**
+     * Number of elements inside the vector.
+     * This may not the number of threads, only use this
+     * to iterate with get_value()/set_value(), not get_value_for_thread()
+     */
+    inline unsigned weight() const {
+        return _size;
+    }
+
+    inline unsigned int get_mapping(int i) {
+        return i;
+    }
+protected:
+    AT* storage;
+    unsigned _size;
+};
+
+
 /** @file <click/sync.hh>
  * @brief Classes for synchronizing among multiple CPUs, particularly in the
  * Linux kernel.
@@ -406,9 +596,7 @@ SpinlockIRQ::release(flags_t flags)
 class ReadWriteLock { public:
 
     inline ReadWriteLock();
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
     inline ~ReadWriteLock();
-#endif
 
     inline void acquire_read();
     inline bool attempt_read();
@@ -417,14 +605,9 @@ class ReadWriteLock { public:
     inline bool attempt_write();
     inline void release_write();
 
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
   private:
     // allocate a cache line for every member
-    struct lock_t {
-	Spinlock _lock;
-	unsigned char reserved[L1_CACHE_BYTES - sizeof(Spinlock)];
-    } *_l;
-#endif
+    per_thread<Spinlock> _l;
 
 };
 
@@ -432,18 +615,12 @@ class ReadWriteLock { public:
 inline
 ReadWriteLock::ReadWriteLock()
 {
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
-    _l = new lock_t[num_possible_cpus()];
-#endif
 }
 
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
 inline
 ReadWriteLock::~ReadWriteLock()
 {
-    delete[] _l;
 }
-#endif
 
 /** @brief Acquires the ReadWriteLock for reading.
  *
@@ -457,9 +634,8 @@ ReadWriteLock::~ReadWriteLock()
 inline void
 ReadWriteLock::acquire_read()
 {
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
-    click_processor_t my_cpu = click_get_processor();
-    _l[my_cpu]._lock.acquire();
+#if HAVE_MULTITHREAD
+    _l->acquire();
 #endif
 }
 
@@ -472,9 +648,8 @@ ReadWriteLock::acquire_read()
 inline bool
 ReadWriteLock::attempt_read()
 {
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
-    click_processor_t my_cpu = click_get_processor();
-    bool result = _l[my_cpu]._lock.attempt();
+#if HAVE_MULTITHREAD
+    bool result = _l->attempt();
     if (!result)
 	click_put_processor();
     return result;
@@ -492,8 +667,8 @@ ReadWriteLock::attempt_read()
 inline void
 ReadWriteLock::release_read()
 {
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
-    _l[click_current_processor()]._lock.release();
+#if HAVE_MULTITHREAD
+    _l->release();
     click_put_processor();
 #endif
 }
@@ -510,9 +685,9 @@ ReadWriteLock::release_read()
 inline void
 ReadWriteLock::acquire_write()
 {
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
-    for (unsigned i = 0; i < (unsigned) num_possible_cpus(); i++)
-	_l[i]._lock.acquire();
+#if HAVE_MULTITHREAD
+    for (unsigned i = 0; i < _l.weight(); i++)
+        _l.get_value(i).acquire();
 #endif
 }
 
@@ -529,17 +704,19 @@ ReadWriteLock::acquire_write()
 inline bool
 ReadWriteLock::attempt_write()
 {
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
+#if HAVE_MULTITHREAD
     bool all = true;
     unsigned i;
-    for (i = 0; i < (unsigned) num_possible_cpus(); i++)
-	if (!(_l[i]._lock.attempt())) {
-	    all = false;
-	    break;
-	}
-    if (!all)
-	for (unsigned j = 0; j < i; j++)
-	    _l[j]._lock.release();
+    for (unsigned i = 0; i < _l.weight(); i++) {
+        if (!(_l.get_value(i).attempt())) {
+            all = false;
+            break;
+        }
+    }
+    if (!all) {
+        for (unsigned j = 0; j < i; j++)
+            _l.get_value(j).release();
+    }
     return all;
 #else
     return true;
@@ -557,9 +734,9 @@ ReadWriteLock::attempt_write()
 inline void
 ReadWriteLock::release_write()
 {
-#if CLICK_LINUXMODULE && defined(CONFIG_SMP)
-    for (unsigned i = 0; i < (unsigned) num_possible_cpus(); i++)
-	_l[i]._lock.release();
+#if HAVE_MULTITHREAD
+    for (unsigned i = 0; i < _l.weight(); i++)
+        _l.get_value(i).release();
 #endif
 }
 
