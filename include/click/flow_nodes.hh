@@ -520,9 +520,9 @@ public:
         return true;
     }
 
-    bool has_no_default() {
-        return traverse_all_default_leaf([](FlowNode* parent) -> bool {
-            if (parent->default_ptr()->ptr == 0) {
+    bool has_no_default(bool allow_dynamic = false) {
+        return traverse_all_default_leaf([allow_dynamic](FlowNode* parent) -> bool {
+            if (parent->default_ptr()->ptr == 0 && (!allow_dynamic || !parent->level()->is_dynamic())) {
                 return false;
             }
             return true;

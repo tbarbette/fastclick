@@ -18,10 +18,6 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-
-
-//typedef void (*sfcb_combiner)(FlowControlBlock* old_sfcb, FlowControlBlock* new_sfcb);
-
 #include "flow_nodes.hh"
 
 class FlowClassificationTable : public FlowTableHolder {

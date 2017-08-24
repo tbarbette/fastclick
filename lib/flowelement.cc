@@ -47,11 +47,15 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 		}
 		//click_chatter("%p{element} %d",v.dispatchers[i].elem,v.dispatchers[i].iport);
 		if (merged)
-			merged = merged->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport), false); //TODO: allow reorder to be more efficient
+			merged = merged->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport), false, false);
 		else
 			merged = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
-		if (merged)
+		if (merged) {
+		    click_chatter("Merged traversal with %p{element}",v.dispatchers[i].elem);
 		    merged->debug_print();
+		    merged->check();
+		    //assert(merged->has_no_default());
+		}
 	}
 	return merged;
 }

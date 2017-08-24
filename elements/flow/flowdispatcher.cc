@@ -175,13 +175,9 @@ FlowNode* FlowDispatcher::get_table(int) {
 		for (int i = 0; i < rules.size() ; ++i) {
 			//First merge the table after the output to the final node of this rule
 		    rules[i].root->check();
-			if (_verbose)
-				click_chatter("Merging this rule of %s :",name().c_str());
-
-			rules[i].root->check();
 
 #if DEBUG_CLASSIFIER
-            click_chatter("Writing output number %d", rules[i].output);
+            click_chatter("%p{element} : Writing output number %d to rules %d", this, rules[i].output, i);
 #endif
 			//Now set data for all leaf of the rule
             auto fnt = [this,i](FlowNodePtr* ptr) {
@@ -233,13 +229,21 @@ FlowNode* FlowDispatcher::get_table(int) {
 		}
 		assert(merged);
 
+        if (_verbose) {
+            click_chatter("Table for %s before merging children :",name().c_str());
+            merged->print(_flow_data_offset);
+        }
         auto fnt = [this](FlowNodePtr* ptr) {
             int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
             if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
                    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output);
                    if (child_table) {
                        child_table->check();
-                       assert(child_table->has_no_default());
+                       if (!child_table->has_no_default()) {
+                          if (_verbose > 1)
+                              click_chatter("Child has default values : appending drop rule");
+                           child_table = child_table->combine(FlowClassificationTable::parse("- drop").root, false, true);
+                       }
                        //Replace_leaf_with_node takes care of prunning using parent to go up to merged, ensuring no classification on the same field is done twice
                        ptr->replace_leaf_with_node(child_table);
                    }
@@ -249,7 +253,7 @@ FlowNode* FlowDispatcher::get_table(int) {
         merged->check();
 
 		if (_verbose) {
-			click_chatter("Table for %s :",name().c_str());
+			click_chatter("Table for %s after merging children:",name().c_str());
 			merged->print(_flow_data_offset);
 		}
 #if DEBUG_CLASSIFIER
@@ -272,17 +276,17 @@ FlowNode* FlowDispatcher::get_table(int) {
         //Anyt is used to check for the else rule
         FlowNodePtr anynt = FlowNodePtr(_table->duplicate(true, 1));
         for (int i = 0; i < rules_copy.size() ; ++i) {
-            click_chatter("Rule (id default %d):",rules_copy[i].is_default);
+            click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
             rules_copy[i].root->traverse_all_leaves([this,rules_copy,i,&anynt](FlowNodePtr* node){
                 if (anynt.is_leaf()) {
                     if (!anynt.leaf->data[_flow_data_offset] == rules_copy[i].output) {
-                        click_chatter("Final leaf does not lead to output %d :",rules_copy[i].output);
+                        click_chatter("VERIF Final leaf does not lead to output %d :",rules_copy[i].output);
                         anynt.print();
-                        click_chatter("Rule (id default %d):",rules_copy[i].is_default);
+                        click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
                         rules_copy[i].root->print();
                         assert(false);
                     } else {
-                        click_chatter("Rule is ok !");
+                        click_chatter("VERIF Rule is ok !");
                         return;
                     }
                 }
@@ -290,7 +294,7 @@ FlowNode* FlowDispatcher::get_table(int) {
                 //Remove all data up from the child
                 FlowNodeData child_data = node->data();
                 node->parent()->traverse_parents([&nt,&child_data,&anynt](FlowNode* parent) {
-                    click_chatter("Prunt %s %lu",parent->level()->print().c_str(),child_data);
+                    click_chatter("VERIF Pruning %s %lu",parent->level()->print().c_str(),child_data);
                     if (nt.is_node())
                         nt = nt.node->prune(parent->level(), child_data);
                     if (anynt.is_node())
@@ -301,15 +305,15 @@ FlowNode* FlowDispatcher::get_table(int) {
 
                 (rules_copy[i].is_default?anynt:nt).traverse_all_leaves([this,rules_copy,i,nt,anynt](FlowNodePtr* cur){
                     if (!cur->leaf->data[_flow_data_offset] == rules_copy[i].output) {
-                        click_chatter("Leaf does not lead to output %d :",rules_copy[i].output);
+                        click_chatter("VERIF Leaf does not lead to output %d :",rules_copy[i].output);
                         cur->leaf->print("",_flow_data_offset);
-                        click_chatter("Pruned tree : ");
+                        click_chatter("VERIF Pruned tree : ");
                         (rules_copy[i].is_default?anynt:nt).print();
-                        click_chatter("Rule (id default %d):",rules_copy[i].is_default);
+                        click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
                         rules_copy[i].root->print(_flow_data_offset);
                         assert(false);
                     } else {
-                        click_chatter("Rule is ok !");
+                        click_chatter("VERIF Rule is ok !");
                         return;
                     }
                 });

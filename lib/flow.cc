@@ -247,6 +247,13 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
 
         root->check();
     }
+
+#if DEBUG_CLASSIFIER
+    click_chatter("Parse result of %s : ",s.c_str());
+    root->print();
+#endif
+    if (!s.empty())
+        assert(root);
     return FlowClassificationTable::Rule{.root = root, .output = output, .is_default = is_default};
 }
 
@@ -394,7 +401,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 	    debug_flow("COMBINE : Other is dummy")
 	    //If other is a dummy (and we're not)
 	    if (other->_default.is_leaf()) {
-	        debug_flow("COMBINE : Other is a leaf :")
+	        debug_flow("COMBINE : Other is a leaf (as child %d):",as_child)
 	        //other->_default.leaf->print("");
 	        if (as_child) {
 	            this->leaf_combine_data(other->_default.leaf, true, true);
@@ -692,9 +699,15 @@ void FlowNode::apply_default(F fnt) {
 
 /**
  * Prune the tree by adding the knowledge that the given level will or will not (inverted) be of the given value
- * if inverted, it means the value will NOT be data
+ * if inverted, it means the level will NOT be data
  */
 FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted)  {
+    if (level->is_dynamic()) {
+#if DEBUG_CLASSIFIER
+        click_chatter("Not pruning a dynamic level");
+#endif
+        return FlowNodePtr(this);
+    }
     if (level->equals(this->level())) { //Same level
         if (inverted) {
             //Remove data from level if it exists
@@ -733,7 +746,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted)  
         cur->set_parent(this);
     });
     if (inverted) {
-        if (getNum() == 0) {
+        if (getNum() == 0 && !this->level()->is_dynamic()) {
             //All child values were removed, return the default
             FlowNodePtr def = *default_ptr();
             default_ptr()->ptr = 0;
@@ -780,6 +793,10 @@ void FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
     FlowControlBlock* old_leaf = leaf;
     FlowNodePtr no(other->duplicate(true, 1));
 
+#if DEBUG_CLASSIFIER
+    click_chatter("Pruning:");
+    this->print();
+#endif
     //Prune the downward tree with all values of the future new parent
     FlowNode* gparent = old_parent;
     FlowNodeData gdata = old_data;
