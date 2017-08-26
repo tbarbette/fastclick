@@ -45,6 +45,7 @@ private:
   IPAddress _dst;
 	int _limit;
     bool _active;
+    String _url;
     bool _verbose;
   atomic_uint32_t _id;
 
@@ -76,7 +77,7 @@ private:
     char sndbuf[64];
     unsigned sndlen;
 
-    void reset (IPAddress src);
+    void reset (IPAddress src, String url);
 
     void remove_from_list ();
     void add_to_list (CB **phead);

@@ -39,6 +39,8 @@ WebGen::WebGen()
   rexmit_head = NULL;
   rexmit_tail = NULL;
 
+  _url = "";
+
   memset (cbhash, 0, sizeof (cbhash));
   memset (&perfcnt, 0, sizeof (perfcnt));
 }
@@ -59,6 +61,7 @@ WebGen::configure (Vector<String> &conf, ErrorHandler *errh)
           .read_mp("RATE", cps)
           .read("LIMIT", _limit)
           .read("ACTIVE", _active)
+          .read("URL", _url)
           .read("VERBOSE", _verbose)
       .complete();
 
@@ -181,7 +184,7 @@ WebGen::run_timer (Timer *)
 
     if (cb) {
       cb->remove_from_list ();
-      cb->reset (pick_src ());
+      cb->reset (pick_src (), _url);
 
       int hv = connhash (cb->_src, cb->_sport);
       cb->add_to_list (&cbhash[hv]);
@@ -522,7 +525,7 @@ WebGen::CB::CB ()
 }
 
 void
-WebGen::CB::reset (IPAddress src)
+WebGen::CB::reset (IPAddress src, String url)
 {
   _src = src;
   _dport = htons (80);
@@ -538,11 +541,15 @@ WebGen::CB::reset (IPAddress src)
   _closed = 0;
   _resends = 0;
 
-  int dir = click_random(0, 9);
-  int file = click_random(0, 8);	// 0 .. 8 exist
-  int c = click_random(0, 2);		// 0 .. 3 exist
-  sprintf (sndbuf, "GET /spec/%d/%d-%d-%d HTTP/1.0\r\n\r\n",
-           dir, dir, c, file);
+  if (url) {
+      sprintf (sndbuf, "GET %s HTTP/1.0\r\n\r\n",url.c_str());
+  } else {
+      int dir = click_random(0, 9);
+      int file = click_random(0, 8);    // 0 .. 8 exist
+      int c = click_random(0, 2);       // 0 .. 3 exist
+      sprintf (sndbuf, "GET /spec/%d/%d-%d-%d HTTP/1.0\r\n\r\n",
+               dir, dir, c, file);
+  }
   sndlen = strlen (sndbuf);
 }
 
