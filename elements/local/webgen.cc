@@ -190,7 +190,7 @@ WebGen::run_timer (Timer *)
       cb->add_to_list (&cbhash[hv]);
       tcp_send(cb, 0);
       perfcnt.initiated++;
-        if (perfcnt.initiated >= _limit) {
+        if (_limit > 0 && perfcnt.initiated >= _limit) {
             set_active(false);
             return;
         }
