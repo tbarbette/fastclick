@@ -1,7 +1,8 @@
 #ifndef CLICK_WEBGEN_HH
 #define CLICK_WEBGEN_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
+#include <click/task.hh>
 #include <click/timer.hh>
 #include <click/ipaddress.hh>
 CLICK_DECLS
@@ -22,7 +23,7 @@ CLICK_DECLS
  *    -> kt;
  */
 
-class WebGen : public Element {
+class WebGen : public BatchElement {
  public:
 
   WebGen() CLICK_COLD;
@@ -36,7 +37,11 @@ class WebGen : public Element {
   int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
   Packet *simple_action(Packet *);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#endif
   void run_timer(Timer *);
+  bool run_task(Task *);
 
 private:
   Timer _timer;
@@ -47,6 +52,8 @@ private:
     bool _active;
     String _url;
     bool _verbose;
+    Task _task;
+    int _parallel;
   atomic_uint32_t _id;
 
   // TCP Control Block
