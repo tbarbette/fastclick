@@ -73,6 +73,9 @@ KernelTun::KernelTun()
       _printed_write_err(false), _printed_read_err(false),
       _selected_calls(0), _packets(0)
 {
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 KernelTun::~KernelTun()
@@ -113,6 +116,8 @@ KernelTun::configure(Vector<String> &conf, ErrorHandler *errh)
 	.complete() < 0)
 	return -1;
 
+    if (receives_batch && input_is_pull(0))
+        errh->error("Pull not supported with batching");
     if (_gw && !_gw.matches_prefix(_near, _mask))
 	return errh->error("bad GATEWAY");
     if (_burst < 1)
@@ -531,7 +536,10 @@ KernelTun::one_selected(const Timestamp &now)
 	    uint16_t etype = *(uint16_t *)(p->data() + 2);
 	    p->pull(4);
 	    if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6))
-		checked_output_push(1, p->clone());
+	    if (in_batch_mode)
+	        checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+	    else
+	        checked_output_push(1, p->clone());
 	    else
 		ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
 	} else if (_type == BSD_TUN) {
@@ -540,7 +548,10 @@ KernelTun::one_selected(const Timestamp &now)
 	    p->pull(4);
 	    if (af != AF_INET && af != AF_INET6) {
 		click_chatter("KernelTun(%s): don't know AF %d", _dev_name.c_str(), af);
-		checked_output_push(1, p->clone());
+        if (in_batch_mode)
+            checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+        else
+            checked_output_push(1, p->clone());
 	    } else
 		ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
 	} else if (_type == OSX_TUN || _type == NETBSD_TUN) {
@@ -550,16 +561,26 @@ KernelTun::one_selected(const Timestamp &now)
 	    uint16_t etype = *(uint16_t *)(p->data() + 14);
 	    p->pull(16);
 	    if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6))
-		checked_output_push(1, p->clone());
+	        if (in_batch_mode)
+	            checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+	        else
+	            checked_output_push(1, p->clone());
 	    else
 		ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
 	}
 
 	if (ok) {
 	    p->set_timestamp_anno(now);
-	    output(0).push(p);
-	} else
-	    checked_output_push(1, p);
+        if (in_batch_mode)
+            output_push_batch(0, PacketBatch::make_from_packet(p));
+        else
+            output_push(0, p);
+	} else {
+        if (in_batch_mode)
+            checked_output_push_batch(1, PacketBatch::make_from_packet(p));
+        else
+            checked_output_push(1, p);
+	}
 	return true;
     } else {
 	p->kill();
@@ -587,8 +608,12 @@ bool
 KernelTun::run_task(Task *)
 {
     Packet *p = input(0).pull();
-    if (p)
-	push(0, p);
+    if (p) {
+        if (in_batch_mode)
+            output_push_batch(0, PacketBatch::make_from_packet(p));
+        else
+            output_push(0, p);
+    }
     else if (!_signal)
 	return false;
     _task.fast_reschedule();
