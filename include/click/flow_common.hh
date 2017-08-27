@@ -395,7 +395,7 @@ inline void FlowControlBlock::_do_release() {
 }
 
 inline void FlowControlBlock::release(int packets_nr) {
-	if (use_count <= 0) {
+	if (use_count - packets_nr  < 0) {
 		click_chatter("ERROR : negative release : release %p, use_count = %d",this,use_count);
 		assert(use_count > 0);
 	}
@@ -405,7 +405,8 @@ inline void FlowControlBlock::release(int packets_nr) {
             click_chatter("Release %d to %p, total is %d",packets_nr,this,use_count);
 #endif
 
-	if (use_count <= 0) {
+
+	if (use_count == 0) {
 		//click_chatter("Release fcb %p",this);
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 	    if (this->hasTimeout()) {
