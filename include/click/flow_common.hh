@@ -385,6 +385,7 @@ inline void FlowControlBlock::acquire(int packets_nr) {
 inline void FlowControlBlock::_do_release() {
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK && HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     assert(!(flags & FLOW_TIMEOUT_INLIST));
+    click_chatter("Release fnt is %p",release_fnt);
 #endif
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
        if (release_fnt)
@@ -410,7 +411,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 	    if (this->hasTimeout()) {
 	        if (this->flags & FLOW_TIMEOUT_INLIST) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 2
-                click_chatter("Not releasing %p because timeout is in list",this);
+                click_chatter("Not releasing %p because timeout is in list, uc %d",this,use_count);
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 1
                 assert(fcb_table->old_flows.get().find(this));
 #endif

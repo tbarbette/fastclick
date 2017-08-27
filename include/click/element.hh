@@ -809,7 +809,7 @@ void
 Element::Port::push_batch(PacketBatch* batch) const {
 #if HAVE_FLOW
     FlowControlBlock* tmp_stack = 0;
-    if (unlikely(_unstack)) {
+    if (unlikely(_unstack && fcb_stack)) {
         tmp_stack = fcb_stack;
         fcb_stack->release(batch->count());
         fcb_stack = 0;
