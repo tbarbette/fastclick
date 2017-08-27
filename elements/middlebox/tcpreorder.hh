@@ -8,8 +8,6 @@
 #include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include "batchfcb.hh"
-#include "tcpreordernode.hh"
-#include <click/memorypool.hh>
 #include "tcpelement.hh"
 
 #define TCPREORDER_POOL_SIZE 100
@@ -20,10 +18,9 @@
  */
 struct fcb_tcpreorder
 {
-    struct TCPPacketListNode* packetList;
+    Packet* packetList;
     tcp_seq_t expectedPacketSeq;
     tcp_seq_t lastSent;
-    MemoryPool<struct TCPPacketListNode> *pool;
 
     fcb_tcpreorder()
     {
@@ -36,24 +33,17 @@ struct fcb_tcpreorder
     ~fcb_tcpreorder()
     {
         //TODO : call this on release
-        // Clean the list and free memory
-        struct TCPPacketListNode* node = packetList;
-        struct TCPPacketListNode* toDelete = NULL;
+        Packet* next = NULL;
 
-        if(pool != NULL)
+        while(packetList != NULL)
         {
-            while(node != NULL)
-            {
-                toDelete = node;
-                node = node->next;
+            next = packetList->next();
 
-                // Kill packet
-                toDelete->packet->kill();
+            // Kill packet
+            packetList->kill();
 
-                // Put back node in memory pool
-                pool->releaseMemory(toDelete);
-            }
-            packetList = NULL;
+            // Put back node in memory pool
+            packetList = next;
         }
     }
 };
@@ -113,6 +103,8 @@ public:
     const char *port_count() const        { return PORTS_1_1X2; }
     const char *processing() const        { return PUSH; }
 
+    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
+
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
 
     void push_batch(int, fcb_tcpreorder* fcb, PacketBatch *batch) override;
@@ -152,8 +144,8 @@ private:
      * @param toKeep Pointer to the last element that will be kept in the list
      * @param toRemove Pointer to the first element that will be removed
      */
-    void flushListFrom(struct fcb_tcpreorder *fcb, struct TCPPacketListNode *toKeep,
-        struct TCPPacketListNode *toRemove);
+    void flushListFrom(struct fcb_tcpreorder *fcb, Packet *toKeep,
+        Packet *toRemove);
 
     /**
      * @brief Check if a given packet is a retransmission
@@ -176,12 +168,10 @@ private:
      * @param list A pointer to the head of the list of waiting packets
      * @return A pointer to the new head of the list of waiting packets
      */
-    TCPPacketListNode* sortList(TCPPacketListNode *list);
+    Packet* sortList(Packet *list);
 
     unsigned int flowDirection;
     bool mergeSort;
-
-    per_thread<MemoryPool<struct TCPPacketListNode>> pool;
 };
 
 CLICK_ENDDECLS

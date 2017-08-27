@@ -84,9 +84,10 @@ struct fcb_tcpin
 
     ~fcb_tcpin() //Remember this function has to be called manually
     {
+        //TODO : clean
         // Put back in the corresponding memory pool all the modification lists
         // in use (in the hashtable)
-        for(HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.begin();
+        /*for(HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.begin();
             it != modificationLists.end(); ++it)
         {
             // Call the destructor to release the object's own memory
@@ -105,7 +106,7 @@ struct fcb_tcpin
             poolTcpCommon->releaseMemory(commonToDelete);
             lock->release();
             commonToDelete = NULL;
-        }
+        }*/
     }
 };
 

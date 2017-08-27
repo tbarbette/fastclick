@@ -1078,7 +1078,7 @@ protected:
  */
 template <typename T>
 class fast_rcu { public:
-#define N 2
+#define N 2 //Must be pow 2
     fast_rcu() : _rcu_current(0), _write_epoch(1), _epochs(0) {
     }
 
@@ -1097,7 +1097,7 @@ class fast_rcu { public:
         *_epochs = w_epoch;
         click_write_fence(); //Actually read rcu_current after storing epoch
         int rcu_current_local = _rcu_current;
-        click_read_fence();//Do not read _rcu_current later
+        click_compiler_fence();//Do not read _rcu_current later
         //The reference is holded now, we are sure that no writer will edit this until read_end is called.
         return _storage[rcu_current_local].v;
     }
@@ -1119,12 +1119,11 @@ class fast_rcu { public:
         _write_lock.acquire();
         rcu_current_local = _rcu_current;
 
-        int rcu_next = (rcu_current_local + 1) & 1;
+        int rcu_next = (rcu_current_local + 1) & (N - 1);
         int bad_epoch = (_write_epoch - N) + 1;
 
-        int i = 0;
-        loop:
-        for (; i < _epochs.weight(); i ++) {
+        for (int i = 0; i < _epochs.weight(); i ++) {
+            loop:
             int te = _epochs.get_value(i);
             if (unlikely(te != 0 && te == bad_epoch)) {
                 click_relax_fence();

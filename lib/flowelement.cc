@@ -51,7 +51,9 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 		else
 			merged = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
 		if (merged) {
+#if DEBUG_CLASSIFIER
 		    click_chatter("Merged traversal with %p{element}",v.dispatchers[i].elem);
+#endif
 		    merged->debug_print();
 		    merged->check();
 		    //assert(merged->has_no_default());

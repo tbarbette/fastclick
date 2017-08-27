@@ -8,15 +8,8 @@
 
 CLICK_DECLS
 
-TCPReorder::TCPReorder() : pool(TCPREORDER_POOL_SIZE)
+TCPReorder::TCPReorder() : flowDirection(0)
 {
-    #if HAVE_BATCH
-        in_batch_mode = BATCH_MODE_YES;
-    #endif
-
-    for(unsigned int i = 0; i < pool.weight(); ++i)
-        pool.get_value(i).initialize(TCPREORDER_POOL_SIZE);
-
     mergeSort = true;
 }
 
@@ -41,18 +34,19 @@ int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void TCPReorder::flushList(fcb_tcpreorder *tcpreorder)
 {
-    struct TCPPacketListNode* head = tcpreorder->packetList;
+    Packet* head = tcpreorder->packetList;
 
     // Flush the entire list
     flushListFrom(tcpreorder, NULL, head);
+    tcpreorder->packetList = 0;
 }
 
-void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, struct TCPPacketListNode *toKeep,
-    struct TCPPacketListNode *toRemove)
+void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, Packet* toKeep,
+    Packet *toRemove)
 {
     // toKeep will be the last packet in the list
     if(toKeep != NULL)
-        toKeep->next = NULL;
+        toKeep->set_next(NULL);
 
     if(toRemove == NULL)
         return;
@@ -61,26 +55,20 @@ void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, struct TCPPacketListN
     if(tcpreorder->packetList == toRemove)
         tcpreorder->packetList = NULL;
 
-    struct TCPPacketListNode* toFree = NULL;
+    Packet* next = NULL;
 
     while(toRemove != NULL)
     {
-        toFree = toRemove;
-        toRemove = toRemove->next;
+        next = toRemove->next();
 
         // Kill packet
-        if(toFree->packet != NULL)
-            toFree->packet->kill();
-
-        tcpreorder->pool->releaseMemory(toFree);
+        toRemove->kill();
     }
 }
 
 void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *batch)
 {
     // Ensure that the pointer in the FCB is set
-    if(tcpreorder->pool == NULL)
-        tcpreorder->pool = &(*pool);
 
     // Complexity: O(k) (k elements in the batch)
     FOR_EACH_PACKET_SAFE(batch, packet)
@@ -93,11 +81,8 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
         if(mergeSort)
         {
             // Add the packet at the beginning of the list (unsorted) (O(1))
-            struct TCPPacketListNode* toAdd = tcpreorder->pool->getMemory();
-
-            toAdd->packet = packet;
-            toAdd->next = tcpreorder->packetList;
-            tcpreorder->packetList = toAdd;
+            packet->set_next(tcpreorder->packetList);
+            tcpreorder->packetList = packet;
         }
         else
             putPacketInList(tcpreorder, packet); // Put the packet directly at the right position O(n + k)
@@ -145,15 +130,14 @@ bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* 
 
 void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
 {
-    struct TCPPacketListNode* packetNode = tcpreorder->packetList;
+    Packet* packet = tcpreorder->packetList;
+    Packet* last = 0;
+    PacketBatch* batch = NULL;
+    int count = 0;
 
-    #if HAVE_BATCH
-        PacketBatch* batch = NULL;
-    #endif
-
-    while(packetNode != NULL)
+    while(packet != NULL)
     {
-        tcp_seq_t currentSeq = getSequenceNumber(packetNode->packet);
+        tcp_seq_t currentSeq = getSequenceNumber(packet);
 
         // Check if the previous packet overlaps with the current one
         // (the expected sequence number is greater than the one of the packet
@@ -172,56 +156,46 @@ void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
             // Warning if the system is used outside middleclick
             click_chatter("This may be the sign that a second flow is interfering, this can cause bugs.");
             #endif
-            flushListFrom(tcpreorder, NULL, packetNode);
-            #if HAVE_BATCH
-                // Check before exiting that we did not have a batch to send
-                if(batch != NULL)
-                    output_push_batch(0, batch);
-            #endif
-            return;
+            tcpreorder->packetList = packet;
+            flushListFrom(tcpreorder, NULL, packet); //Paket is in the list, so we can cut its next packets
+            // Check before exiting that we did not have a batch to send
+            goto send_batch;
         }
 
         // We check if the current packet is the expected one (if not, there is a gap)
         if(currentSeq != tcpreorder->expectedPacketSeq)
         {
-            #if HAVE_BATCH
-                // Check before exiting that we did not have a batch to send
-                if(batch != NULL)
-                    output_push_batch(0, batch);
-            #endif
-            return;
+            tcpreorder->packetList = packet;
+            // Check before exiting that we did not have a batch to send
+            goto send_batch;
         }
 
         // Compute the sequence number of the next packet
-        tcpreorder->expectedPacketSeq = getNextSequenceNumber(packetNode->packet);
+        tcpreorder->expectedPacketSeq = getNextSequenceNumber(packet);
 
         // Store the sequence number of the last packet sent
         tcpreorder->lastSent = currentSeq;
 
         // Send packet
-        #if HAVE_BATCH
-            // If we use batching, we build the batch while browsing the list
-            if(batch == NULL)
-                batch = PacketBatch::make_from_packet(packetNode->packet);
-            else
-                batch->append_packet(packetNode->packet);
-        #else
-            // If we don't use batching, push the packet immediately
-            output(0).push(packetNode->packet);
-        #endif
+        if(batch == NULL)
+            batch = PacketBatch::start_head(packet);
+        count++;
 
         // Free memory and remove node from the list
-        struct TCPPacketListNode* toFree = packetNode;
-        packetNode = packetNode->next;
-        tcpreorder->packetList = packetNode;
-        tcpreorder->pool->releaseMemory(toFree);
+        last = packet;
+        packet = packet->next();
     }
-
-    #if HAVE_BATCH
-        // We now send the batch we just built
-        if(batch != NULL)
-            output_push_batch(0, batch);
-    #endif
+    return;
+  send_batch:
+  tcpreorder->packetList = packet;
+    // We now send the batch we just built
+    if(batch != NULL) {
+        batch->set_count(count);
+        batch->set_tail(last);
+        last->set_next(0);
+        output_push_batch(0, batch);
+    }
+    return;
 }
 
 tcp_seq_t TCPReorder::getNextSequenceNumber(Packet* packet)
@@ -238,33 +212,30 @@ tcp_seq_t TCPReorder::getNextSequenceNumber(Packet* packet)
     return nextSeq;
 }
 
-void TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* packet)
+void TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* packetToAdd)
 {
-    struct TCPPacketListNode* prevNode = NULL;
-    struct TCPPacketListNode* packetNode = tcpreorder->packetList;
-    struct TCPPacketListNode* toAdd = tcpreorder->pool->getMemory();
-    toAdd->packet = packet;
-    toAdd->next = NULL;
-
+    Packet* last = NULL;
+    Packet* packetNode = tcpreorder->packetList;
+    auto pSeq = getSequenceNumber(packetToAdd);
     // Browse the list until we find a packet with a greater sequence number than the
     // packet to add in the list
     while(packetNode != NULL
-        && (SEQ_LT(getSequenceNumber(packetNode->packet), getSequenceNumber(packet))
-            || (getSequenceNumber(packetNode->packet) == getSequenceNumber(packet)
-                && SEQ_LT(getAckNumber(packetNode->packet), getAckNumber(packet)))))
+        && (SEQ_LT(getSequenceNumber(packetNode), pSeq)
+            || (getSequenceNumber(packetNode) == pSeq
+                && SEQ_LT(getAckNumber(packetNode), getAckNumber(packetToAdd)))))
     {
-        prevNode = packetNode;
-        packetNode = packetNode->next;
+        last = packetNode;
+        packetNode = packetNode->next();
     }
 
     // Check if we need to add the node as the head of the list
-    if(prevNode == NULL)
-        tcpreorder->packetList = toAdd; // If so, the list points to the node to add
+    if(last == NULL)
+        tcpreorder->packetList = packetToAdd; // If so, the list points to the node to add
     else
-        prevNode->next = toAdd; // If not, the previous node in the list now points to the node to add
+        last->set_next(packetToAdd); // If not, the previous node in the list now points to the node to add
 
      // The node to add points to the first node with a greater sequence number
-    toAdd->next = packetNode;
+    packetToAdd->set_next(packetNode);
 }
 
 void TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, Packet* packet)
@@ -312,9 +283,9 @@ void TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, Packet* pac
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
+Packet* TCPReorder::sortList(Packet *list)
 {
-    TCPPacketListNode *p, *q, *e, *tail;
+    Packet *p, *q, *e, *tail;
     int insize, nmerges, psize, qsize, i;
 
     /*
@@ -343,7 +314,7 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
             for(i = 0; i < insize; i++)
             {
                 psize++;
-                q = q->next;
+                q = q->next();
                 if(!q)
                     break;
             }
@@ -359,37 +330,37 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
                 {
                     /* p is empty; e must come from q. */
                     e = q;
-                    q = q->next;
+                    q = q->next();
                     qsize--;
                 }
                 else if(qsize == 0 || !q)
                 {
                     /* q is empty; e must come from p. */
                     e = p;
-                    p = p->next;
+                    p = p->next();
                     psize--;
                 }
-                else if(SEQ_LT(getSequenceNumber(p->packet), getSequenceNumber(q->packet))
-                    || ((getSequenceNumber(p->packet) == getSequenceNumber(q->packet))
-                        && SEQ_LT(getAckNumber(p->packet), getAckNumber(q->packet))))
+                else if(SEQ_LT(getSequenceNumber(p), getSequenceNumber(q))
+                    || ((getSequenceNumber(p) == getSequenceNumber(q))
+                        && SEQ_LT(getAckNumber(p), getAckNumber(q))))
                 {
                     /* First element of p is lower (or same);
                      * e must come from p. */
                     e = p;
-                    p = p->next;
+                    p = p->next();
                     psize--;
                 }
                 else
                 {
                     /* First element of q is lower; e must come from q. */
                     e = q;
-                    q = q->next;
+                    q = q->next();
                     qsize--;
                 }
 
                 /* add the next element to the merged list */
                 if(tail)
-                    tail->next = e;
+                    tail->set_next(e);
                 else
                     list = e;
 
@@ -400,7 +371,7 @@ TCPPacketListNode* TCPReorder::sortList(TCPPacketListNode *list)
             p = q;
         }
 
-        tail->next = NULL;
+        tail->set_next(NULL);
 
         /* If we have done only one merge, we're finished. */
         if(nmerges <= 1)   /* allow for nmerges==0, the empty list case */

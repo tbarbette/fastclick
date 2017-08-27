@@ -193,8 +193,8 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                 node->_child_deletable = f->is_deletable();
                 node->_parent = parent;
                 if (important == "!") {
-                    click_chatter("Important !");
-                    node->_else_drop = true;
+                    //click_chatter("Important !");
+                    node->_else_drop = true; //TODO : this is not really used anymore, all rules are "else drop" as all FlowDispatcher will add an else drop
                 }
 
                 if (root == 0) {

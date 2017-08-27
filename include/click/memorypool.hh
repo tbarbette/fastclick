@@ -11,7 +11,9 @@
   * @brief Template for memory pools
   *
   * This template is used to create memory pools that can be used to achieve
-  * fast memory allocation
+  * fast memory allocation. It is not multi-thread safe, but can be duplicated
+  * per-thread iif objects are always released on the same core they
+  * were allocated.
   */
 template <typename T>
 class MemoryPool
