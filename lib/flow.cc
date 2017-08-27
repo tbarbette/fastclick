@@ -50,10 +50,12 @@ void FlowClassificationTable::set_root(FlowNode* node) {
     assert(node);
     assert(_pool_release_fnt);
     _root = node;
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
-    auto fnt = [this](FlowControlBlock* fcb){fcb->release_fnt = _pool_release_fnt;};
+/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    auto fnt = [this](FlowControlBlock* fcb){
+        fcb->release_fnt = _pool_release_fnt;
+    };
     node->traverse<decltype(fnt)>(fnt);
-#endif
+#endif*/
 }
 
 FlowNode* FlowClassificationTable::get_root() {

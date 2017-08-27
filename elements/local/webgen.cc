@@ -3,6 +3,7 @@
  * Robert Morris
  *
  * Copyright (c) 1999-2001 Massachusetts Institute of Technology
+ * Copyright (c) 2007 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -166,7 +167,8 @@ WebGen::recycle (CB *cb)
   cb->rexmit_unlink ();
   cb->remove_from_list ();
   cb->add_to_list (&cbfree);
-  _task.reschedule();
+  if (start_interval == 0)
+    _task.reschedule();
 }
 
 void
@@ -193,7 +195,7 @@ WebGen::run_timer (Timer *)
 {
   CB *cb;
   Timestamp now = Timestamp::now();
-    if (start_interval) {
+  if (start_interval) {
   while (timestamp_diff(now, start_tv) > start_interval) {
     start_tv += Timestamp::make_usec(start_interval);
     cb = cbfree;
@@ -214,7 +216,7 @@ WebGen::run_timer (Timer *)
       click_chatter ("out of available CBs\n");
     }
   }
-    }
+  }
 
   CB *lrxcb = rexmit_tail->rexmit_prev;
   do {
@@ -328,13 +330,12 @@ WebGen::tcp_input (Packet *p)
     unsigned plen = sizeof (click_ip) + sizeof (click_tcp);
 
     WritablePacket *wp = fixup_packet (p, plen);
-      click_chatter("Received packet for unknown cb? Sending RST");
+    click_chatter("Received packet for unknown cb? Sending RST");
     tcp_output (wp,
 		ip->ip_dst, th->th_dport,
 		ip->ip_src, th->th_sport,
 		th->th_ack, th->th_seq, TH_RST,
 		NULL, 0);
-
     return;
   }
 

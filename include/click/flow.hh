@@ -114,9 +114,9 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                         child_ptr->set_leaf(_pool.allocate());
                         child_ptr->leaf->initialize();
                         child_ptr->leaf->parent = parent;
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
                         child_ptr->leaf->release_fnt = _pool_release_fnt;
-#endif
+#endif*/
                         child_ptr->set_data(data);
                         memcpy(&child_ptr->leaf->node_data[1], &parent->default_ptr()->leaf->node_data[1] ,_pool.data_size() - sizeof(FlowNodeData));
 #if DEBUG_CLASSIFIER_MATCH > 3

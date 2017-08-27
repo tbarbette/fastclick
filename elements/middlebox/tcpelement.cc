@@ -248,4 +248,3 @@ bool TCPElement::isJustAnAck(Packet* packet) const
 
 CLICK_ENDDECLS
 ELEMENT_PROVIDES(TCPElement)
-ELEMENT_REQUIRES(IPElement)

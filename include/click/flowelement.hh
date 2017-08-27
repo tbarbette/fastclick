@@ -113,10 +113,41 @@ public :
     }
 
     inline void fcb_release_timeout() {
-
+        fcb_release();
     }
 #endif
 
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+    inline void fcb_set_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
+        fcb_chain->previous_fnt = fcb_stack->release_fnt;
+        fcb_chain->previous_thunk = fcb_stack->thunk;
+        fcb_stack->release_fnt = fnt;
+        fcb_stack->thunk = this;
+        click_chatter("Release fnt set");
+    }
+    inline void fcb_remove_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
+        click_chatter("Release fnt remove");
+        if (likely(fcb_stack->release_fnt == fnt)) { //Normally it will call the chain in the same order
+            fcb_stack->release_fnt = fcb_chain->previous_fnt;
+            fcb_stack->thunk = fcb_chain->previous_thunk;
+        } else {
+            click_chatter("Unordered release remove");
+            assert(false);
+            /*SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
+            VirtualFlowBufferElement* fe;
+            do {
+                fe = static_cast<VirtualFlowBufferElement*>(fcb_chain->previous_thunk);
+                chain_fnt = static_cast<FlowReleaseChain*>(fcb_stack->data[fe->_flow_data_offset])->previous_fnt;
+            } while (chain_fnt != fnt);
+            */
+        }
+    }
+#else
+    inline void fcb_set_release_fnt(struct FlowReleaseChain* fcb, SubFlowRealeaseFnt fnt) {
+        click_chatter("ERROR: YOU MUST HAVE DYNAMIC FLOW RELEASE FNT fct setted !");
+        assert(false);
+    }
+#endif
 
 	inline T* fcb_data() {
 	    T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);

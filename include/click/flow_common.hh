@@ -13,7 +13,7 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
 #define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
-#define HAVE_DYNAMIC_FLOW_RELEASE_FNT 0
+#define HAVE_DYNAMIC_FLOW_RELEASE_FNT 1
 
 class FlowControlBlock;
 class FCBPool;
@@ -27,7 +27,11 @@ typedef union {
 	void* data_ptr;
 } FlowNodeData;
 
-typedef void (*SubFlowRealeaseFnt)(FlowControlBlock* fcb);
+typedef void (*SubFlowRealeaseFnt)(FlowControlBlock* fcb, void* thunk);
+struct FlowReleaseChain {
+    SubFlowRealeaseFnt previous_fnt;
+    void* previous_thunk;
+};
 
 class FlowControlBlock {
 
@@ -74,7 +78,7 @@ private:
 
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		SubFlowRealeaseFnt release_fnt ;
-		FCBPool* release_pool;
+		void* thunk;
 #endif
 
 		FlowNode* parent;
@@ -122,9 +126,6 @@ private:
 		 * Check consistency
 		 */
 		void check() {
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
-            assert(cur->leaf->release_pool);
-#endif
 		}
 
 };
@@ -173,10 +174,10 @@ private:
 
 	inline FlowControlBlock* alloc_new() {
 		FlowControlBlock* fcb = (FlowControlBlock*)CLICK_LALLOC(sizeof(FlowControlBlock) + _data_size);
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
-		fcb->release_fnt = 0;
-		fcb->release_pool = this;
-#endif
+/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+		fcb->release_fnt = &pool_release_fnt;
+		fcb->thunk = this;
+#endif*/
 		fcb->initialize();
 		return fcb;
 	}
@@ -271,6 +272,10 @@ public:
 		lists->add(fcb);
 	}
 
+	static void pool_release_fnt(FlowControlBlock* fcb, void* thunk) {
+	    static_cast<FCBPool*>(thunk)->release(fcb);
+	}
+
 	size_t data_size() {
 		return _data_size;
 	}
@@ -312,7 +317,7 @@ _pool(), _pool_release_fnt(0)
 
     inline void release(FlowControlBlock* fcb) {
         if (likely(_pool_release_fnt))
-            _pool_release_fnt(fcb);
+            _pool_release_fnt(fcb, fcb->thunk);
         _pool.release(fcb);
     }
 
@@ -356,19 +361,19 @@ protected:
 };
 
 
-#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
 extern __thread FlowTableHolder* fcb_table;
-#endif
+//#endif
 
-#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
-        inline FCBPool* FlowControlBlock::get_pool() const {
-            return release_pool;
+/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+        inline FCBPool* FlowControlBlock::get_pool() const { //Only works at initialisation
+            return static_cast<FCBPool*>(thunk);
         }
-#else
+#else*/
         inline FCBPool* FlowControlBlock::get_pool() const {
             return fcb_table->get_pool();
         }
-#endif
+//#endif
 
 inline void FlowControlBlock::acquire(int packets_nr) {
             use_count+=packets_nr;
@@ -383,13 +388,9 @@ inline void FlowControlBlock::_do_release() {
 #endif
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
        if (release_fnt)
-           release_fnt(this);
-       else
-           click_chatter("No release fnt? Should not happen in practice...");
-       get_pool()->release(this);
-#else
-       fcb_table->release(this);
+           release_fnt(this, thunk);
 #endif
+    fcb_table->release(this);
 }
 
 inline void FlowControlBlock::release(int packets_nr) {

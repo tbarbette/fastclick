@@ -137,7 +137,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 
-void release_subflow(FlowControlBlock* fcb) {
+void release_subflow(FlowControlBlock* fcb, void* thunk) {
 #if DEBUG_CLASSIFIER_RELEASE > 0
     click_chatter("Release fcb %p idx %d",fcb,fcb->data_64[0]);
 #endif
@@ -206,16 +206,16 @@ void FlowClassifier::cleanup(CleanupStage stage) {
 
 bool FlowClassifier::run_idle_task(IdleTask*) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = &_table;
-#endif
+//#endif
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
     click_chatter("%p{element} Idle release",this);
 #endif
     bool work_done = _table.check_release();
-#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = 0;
-#endif
+//#endif
     //return work_done;
 #endif
     return false; //No reschedule
@@ -400,7 +400,10 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
         {
             fcb = _table.match(p,_aggcache);
         }
-
+        if (_verbose > 1) {
+            click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
+            _table.get_root()->print(-1,false);
+        }
         check_fcb_still_valid(fcb, now);
         if (unlikely(fcb->is_early_drop())) {
             if (last) {
@@ -497,7 +500,10 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         {
             fcb = _table.match(p,_aggcache);
         }
-
+        if (_verbose > 1) {
+            click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
+            _table.get_root()->print(-1,false);
+        }
         check_fcb_still_valid(fcb, now);
         if (unlikely(fcb->is_early_drop())) {
             if (last) {
@@ -597,9 +603,9 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
 
 void FlowClassifier::push_batch(int port, PacketBatch* batch) {
-#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = &_table;
-#endif
+//#endif
     if (_builder)
         push_batch_builder(port,batch);
     else
@@ -620,9 +626,9 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
 #endif
     }
 #endif
-#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
+//#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = 0;
-#endif
+//#endif
 
 }
 

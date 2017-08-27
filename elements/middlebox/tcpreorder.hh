@@ -16,7 +16,7 @@
 /**
  * Structure used by the TCPReorder element
  */
-struct fcb_tcpreorder
+struct fcb_tcpreorder : public FlowReleaseChain
 {
     Packet* packetList;
     tcp_seq_t expectedPacketSeq;
@@ -109,6 +109,7 @@ public:
 
     void push_batch(int, fcb_tcpreorder* fcb, PacketBatch *batch) override;
 
+    static void fcb_release_fnt(FlowControlBlock* fcb, void* thunk);
 private:
     /**
      * @brief Put a packet in the list of waiting packets

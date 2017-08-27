@@ -14,7 +14,7 @@ CLICK_DECLS
 #define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != NULL;p=p->next())
 
 /**
- * Iterate over all packets of a batch. The current packet can be modified
+ * Iterate over a simply linked packet a batch. The current packet can be modified
  *  during iteration as the "next" pointer is read before going in the core of
  *  the loop.
  */
