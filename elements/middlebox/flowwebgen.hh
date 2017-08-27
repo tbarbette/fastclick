@@ -51,7 +51,8 @@ private:
 	int _limit;
     bool _active;
     String _url;
-    bool _verbose;
+    int _verbose;
+
     Task _task;
     int _parallel;
   atomic_uint32_t _id;

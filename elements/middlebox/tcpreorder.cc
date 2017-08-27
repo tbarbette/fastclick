@@ -148,8 +148,14 @@ void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
             // Warning if the system is used outside middleclick
             click_chatter("This may be the sign that a second flow is interfering, this can cause bugs.");
             #endif
-            tcpreorder->packetList = packet;
-            flushListFrom(tcpreorder, NULL, packet); //Paket is in the list, so we can cut its next packets
+            Packet* to_delete = packet;
+            while(to_delete) {
+                packet = to_delete->next();
+                to_delete->kill();
+                to_delete = packet;
+            }
+            packet = 0;
+
             // Check before exiting that we did not have a batch to send
             goto send_batch;
         }

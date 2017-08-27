@@ -240,7 +240,10 @@ FlowWebGen::run_timer (Timer *)
 
     if (timestamp_diff(now, cb->last_send) > resend_dt) {
       if (cb->_resends++ > resend_max) {
-	perfcnt.timeout++;
+	    perfcnt.timeout++;
+        if (_verbose > 1) {
+            click_chatter("Resend dt passed");
+        }
 	recycle (cb);
       } else {
 	tcp_send (cb, 0);
@@ -392,7 +395,7 @@ FlowWebGen::tcp_input (Packet *p)
 
   if (th->th_flags & TH_RST) {
       if (_verbose > 0)
-     click_chatter("%p{element} RST %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
+         click_chatter("%p{element} RST %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
     p->kill ();
     recycle (cb);
     perfcnt.reset++;
@@ -401,8 +404,12 @@ FlowWebGen::tcp_input (Packet *p)
 
   p = tcp_send (cb, p);
 
-  if (cb->_closed)
+  if (cb->_closed) {
+      if (_verbose > 1) {
+          click_chatter("Connection closed, recycling");
+      }
     recycle (cb);
+  }
   return p;
 }
 

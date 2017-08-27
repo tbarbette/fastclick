@@ -348,8 +348,9 @@ bool FlowTableHolder::check_release() {
 #endif
 
 void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_child) {
-    assert(!as_child);
     if (other.is_leaf()) {
+        assert(!as_child);
+
         auto fnt = [other](FlowNode* parent) -> bool {
             if (parent->default_ptr()->ptr == 0) {
                 parent->default_ptr()->set_leaf(other.leaf->duplicate(1));
@@ -491,14 +492,15 @@ void FlowNode::__combine_child(FlowNode* other) {
         assert(other->getNum() == 0);
 
         //Unsupported as of now
-        if (this->default_ptr()->ptr != 0 || other->default_ptr()->ptr == 0) {
+/*        if (this->default_ptr()->ptr != 0 || other->default_ptr()->ptr == 0) {
             click_chatter("Unsupported operation, combine as_child :");
             this->print();
             other->print();
-        }
-        /*
+        }*/
+
         //If other had a default, we need to merge it
         if (other->default_ptr()->ptr != 0) { //Other had default
+            other->default_ptr()->set_parent(0);
             this->default_ptr()->default_combine(this, other->default_ptr(), true);
             other->default_ptr()->ptr = 0;
         } //ELse nothing to do as we can keep our default as it, if any*/

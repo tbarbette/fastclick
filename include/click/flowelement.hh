@@ -123,13 +123,14 @@ public :
         fcb_chain->previous_thunk = fcb_stack->thunk;
         fcb_stack->release_fnt = fnt;
         fcb_stack->thunk = this;
-        click_chatter("Release fnt set");
+        click_chatter("Release fnt set to %p, was %p",fcb_stack->release_fnt,fcb_chain->previous_fnt);
     }
     inline void fcb_remove_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
         click_chatter("Release fnt remove");
         if (likely(fcb_stack->release_fnt == fnt)) { //Normally it will call the chain in the same order
             fcb_stack->release_fnt = fcb_chain->previous_fnt;
             fcb_stack->thunk = fcb_chain->previous_thunk;
+            click_chatter("Release removed to %p",fcb_stack->release_fnt);
         } else {
             click_chatter("Unordered release remove");
             assert(false);

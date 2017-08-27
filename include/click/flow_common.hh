@@ -96,6 +96,8 @@ private:
 		inline void initialize() {
 			use_count = 0;
             flags = 0;
+            release_fnt = 0;
+            thunk = 0;
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 			next = 0; //TODO : only once?
 #endif
@@ -391,6 +393,7 @@ inline void FlowControlBlock::_do_release() {
        if (release_fnt)
            release_fnt(this, thunk);
 #endif
+    click_chatter("Releasing from table");
     fcb_table->release(this);
 }
 
