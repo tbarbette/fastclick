@@ -491,8 +491,11 @@ void FlowNode::__combine_child(FlowNode* other) {
         assert(other->getNum() == 0);
 
         //Unsupported as of now
-        assert(this->default_ptr()->ptr == 0);
-        assert(other->default_ptr()->ptr == 0);
+        if (this->default_ptr()->ptr != 0 || other->default_ptr()->ptr == 0) {
+            click_chatter("Unsupported operation, combine as_child :");
+            this->print();
+            other->print();
+        }
         /*
         //If other had a default, we need to merge it
         if (other->default_ptr()->ptr != 0) { //Other had default

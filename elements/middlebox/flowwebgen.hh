@@ -1,11 +1,13 @@
 #ifndef CLICK_FlowWebGen_HH
 #define CLICK_FlowWebGen_HH
-#include <click/element.hh>
+#include <click/flowelement.hh>
 #include <click/glue.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
 #include <click/ipaddress.hh>
 CLICK_DECLS
+
+class TCPClientAck;
 
 /*
  * =c
@@ -23,7 +25,7 @@ CLICK_DECLS
  *    -> kt;
  */
 
-class FlowWebGen : public Element {
+class FlowWebGen : public FlowElement {
  public:
 
   FlowWebGen() CLICK_COLD;
@@ -36,10 +38,8 @@ class FlowWebGen : public Element {
   void cleanup(CleanupStage) CLICK_COLD;
   int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
-  Packet *simple_action(Packet *);
-#if HAVE_BATCH
   PacketBatch *simple_action_batch(PacketBatch *);
-#endif
+
   void run_timer(Timer *);
   bool run_task(Task *);
 
@@ -55,6 +55,7 @@ private:
     Task _task;
     int _parallel;
   atomic_uint32_t _id;
+  TCPClientAck* _tcp_client_ack;
 
   // TCP Control Block
   class CB {
@@ -133,9 +134,9 @@ private:
 
   WritablePacket *fixup_packet (Packet *p, unsigned plen);
 
-  void tcp_input(Packet *);
-  void tcp_send(CB *, Packet *);
-  void tcp_output(WritablePacket *p,
+  Packet* tcp_input(Packet *);
+  Packet* tcp_send(CB *, Packet *);
+  WritablePacket* tcp_output(WritablePacket *p,
 	IPAddress src, unsigned short sport,
 	IPAddress dst, unsigned short dport,
 	int seq, int ack, char tcpflags,

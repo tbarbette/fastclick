@@ -29,6 +29,7 @@
 #include <click/router.hh>
 #include <click/standard/scheduleinfo.hh>
 #include "flowwebgen.hh"
+#include "tcpclientack.hh"
 CLICK_DECLS
 
 static int
@@ -77,11 +78,13 @@ FlowWebGen::configure (Vector<String> &conf, ErrorHandler *errh)
   if (tr.size() != 1) {
       return errh->error("FlowWebGen must be preceded by one TCPClientAck");
   }
-if (cps == 0) {
-  start_interval = 0;
-} else {
-  start_interval = 1000000 / cps;
-}
+  _tcp_client_ack = static_cast<TCPClientAck*>(tr[0]);
+
+  if (cps == 0) {
+    start_interval = 0;
+  } else {
+    start_interval = 1000000 / cps;
+  }
   return ret;
 }
 
@@ -215,7 +218,8 @@ FlowWebGen::run_timer (Timer *)
 
       int hv = connhash (cb->_src, cb->_sport);
       cb->add_to_list (&cbhash[hv]);
-      tcp_send(cb, 0);
+      Packet* np = tcp_send(cb, 0);
+      output_push_batch(0,PacketBatch::make_from_packet(np));
       perfcnt.initiated++;
         if (_limit > 0 && perfcnt.initiated >= _limit) {
             set_active(false);
@@ -264,11 +268,12 @@ FlowWebGen::run_task(Task *)
       cb->reset (pick_src (), _url);
 
       int hv = connhash (cb->_src, cb->_sport);
-    if (_verbose > 0)
-     click_chatter("%p{element} CREATE %d %d",this, cb->_sport, cb->_dport);
-
+      if (_verbose > 0)
+          click_chatter("%p{element} CREATE %d %d",this, cb->_sport, cb->_dport);
       cb->add_to_list (&cbhash[hv]);
-      tcp_send(cb, 0);
+
+      Packet* np = tcp_send(cb, 0);
+      output_push_batch(0,PacketBatch::make_from_packet(np));
       perfcnt.initiated++;
         if (_limit > 0 && perfcnt.initiated >= _limit) {
             set_active(false);
@@ -296,39 +301,31 @@ FlowWebGen::find_cb (unsigned src, unsigned short sport, unsigned short dport)
   return NULL;
 }
 
-Packet *
-FlowWebGen::simple_action (Packet *p)
-{
-  tcp_input (p);
-  return NULL;
-}
-
-#if HAVE_BATCH
 PacketBatch *
 FlowWebGen::simple_action_batch (PacketBatch *batch)
 {
-    FOR_EACH_PACKET_SAFE(batch,p)
-      tcp_input (p);
-  return NULL;
+  EXECUTE_FOR_EACH_PACKET_DROPPABLE(tcp_input, batch,[](Packet* p){});
+  return batch;
 }
-#endif
 
 
-void
+Packet*
 FlowWebGen::tcp_input (Packet *p)
 {
   unsigned seq, ack;
   unsigned plen = p->length ();
 
-  if (plen < sizeof(click_ip) + sizeof(click_tcp))
-    return;
+  if (plen < sizeof(click_ip) + sizeof(click_tcp)) {
+    p->kill();
+    return 0;
+  }
 
   click_ip *ip = (click_ip *) p->data();
   unsigned iplen = ntohs(ip->ip_len);
   unsigned hlen = ip->ip_hl << 2;
   if (hlen < sizeof(click_ip) || hlen > iplen || iplen > plen) {
     p->kill();
-    return;
+    return 0;
   }
 
   click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
@@ -341,12 +338,11 @@ FlowWebGen::tcp_input (Packet *p)
 
     WritablePacket *wp = fixup_packet (p, plen);
     click_chatter("Received packet for unknown cb? Sending RST");
-    tcp_output (wp,
+    return tcp_output (wp,
 		ip->ip_dst, th->th_dport,
 		ip->ip_src, th->th_sport,
 		th->th_ack, th->th_seq, TH_RST,
 		NULL, 0);
-    return;
   }
 
   seq = ntohl(th->th_seq);
@@ -400,13 +396,14 @@ FlowWebGen::tcp_input (Packet *p)
     p->kill ();
     recycle (cb);
     perfcnt.reset++;
-    return;
+    return 0;
   }
 
-  tcp_send (cb, p);
+  p = tcp_send (cb, p);
 
   if (cb->_closed)
     recycle (cb);
+  return p;
 }
 
 WritablePacket *
@@ -435,7 +432,7 @@ FlowWebGen::fixup_packet (Packet *xp, unsigned plen)
 
 // Send a suitable TCP packet.
 // xp is a candidate packet buffer, to be re-used or freed.
-void
+Packet*
 FlowWebGen::tcp_send (CB *cb, Packet *xp)
 {
   int paylen;
@@ -460,7 +457,7 @@ FlowWebGen::tcp_send (CB *cb, Packet *xp)
   if (cb->_connected == 1 && paylen == 0) {
     if (xp)
       xp->kill ();
-    return;
+    return 0;
   }
   cb->_do_send = 0;
 
@@ -489,12 +486,14 @@ FlowWebGen::tcp_send (CB *cb, Packet *xp)
     perfcnt.completed++;
   }
 
-  tcp_output (p, cb->_src, cb->_sport, _dst, cb->_dport,
+  if (fcb_stack)
+      _tcp_client_ack->setSeqAcked(ack,seq + paylen + (flags & TH_FIN? 1 : 0));
+  return tcp_output (p, cb->_src, cb->_sport, _dst, cb->_dport,
 	      htonl (seq), htonl (ack), flags,
 	      cb->sndbuf, paylen);
 }
 
-void
+WritablePacket*
 FlowWebGen::tcp_output (WritablePacket *p,
 	IPAddress src, unsigned short sport,
 	IPAddress dst, unsigned short dport,
@@ -546,7 +545,7 @@ FlowWebGen::tcp_output (WritablePacket *p,
   ip->ip_sum = 0;
   ip->ip_sum = click_in_cksum ((unsigned char *) ip, sizeof (click_ip));
 
-  output (0).push (p);
+  return p;
 }
 void
 FlowWebGen::set_active(bool active) {

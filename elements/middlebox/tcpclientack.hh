@@ -16,7 +16,8 @@
  */
 struct fcb_clientack
 {
-    tcp_seq_t last_seq;
+    tcp_seq_t last_ack; //Last ack sent
+    tcp_seq_t current_seq; //Current seq with data sent
 };
 
 
@@ -56,11 +57,24 @@ public:
 
     void push_batch(int, fcb_clientack* fcb, PacketBatch *batch) override;
 
+    /**
+     * Set the last data acked while sending packet
+     */
+    inline void setSeqAcked(tcp_seq_t,tcp_seq_t);
+
     //static void fcb_release_fnt(FlowControlBlock* fcb, void* thunk);
 private:
     int _msec_delayed;
 
 };
+
+
+inline void TCPClientAck::setSeqAcked(tcp_seq_t acked, tcp_seq_t current) {
+    fcb_data()->last_ack = acked;
+    fcb_data()->current_seq = current;
+}
+
+
 
 CLICK_ENDDECLS
 
