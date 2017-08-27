@@ -10,7 +10,7 @@
 
 CLICK_DECLS
 
-TCPElement::TCPElement()
+TCPElement::TCPElement() : _tcp_context(NULL)
 {
 
 }

@@ -8,7 +8,7 @@
 
 CLICK_DECLS
 
-TCPReorder::TCPReorder() : flowDirection(0)
+TCPReorder::TCPReorder()
 {
     mergeSort = true;
 }
@@ -19,15 +19,10 @@ TCPReorder::~TCPReorder()
 
 int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    int flowDirectionParam = -1;
-
     if(Args(conf, this, errh)
-    .read_mp("FLOWDIRECTION", flowDirectionParam)
     .read_p("MERGESORT", mergeSort)
     .complete() < 0)
         return -1;
-
-    flowDirection = (unsigned int)flowDirectionParam;
 
     return 0;
 }
@@ -69,14 +64,20 @@ void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, Packet* toKeep,
 void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *batch)
 {
     // Ensure that the pointer in the FCB is set
+    if (!checkFirstPacket(tcpreorder, batch->first())) {
+        batch->fast_kill();
+        return;
+    }
 
     // Complexity: O(k) (k elements in the batch)
     FOR_EACH_PACKET_SAFE(batch, packet)
     {
-        checkFirstPacket(tcpreorder, packet);
+        //click_chatter("Packet %p seq %d flow %p",packet,getSequenceNumber(packet),tcpreorder);
 
-        if(!checkRetransmission(tcpreorder, packet))
+        if(!checkRetransmission(tcpreorder, packet)) {
+            //click_chatter("Packet is retransmit!");
             continue;
+        }
 
         if(mergeSort)
         {
@@ -87,13 +88,11 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
         else
             putPacketInList(tcpreorder, packet); // Put the packet directly at the right position O(n + k)
     }
-
     if(mergeSort)
     {
         // Sort the list of waiting packets (O((n + k) * log(n + k)))
         tcpreorder->packetList = sortList(tcpreorder->packetList);
     }
-
     sendEligiblePackets(tcpreorder);
 }
 
@@ -134,7 +133,6 @@ void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
     Packet* last = 0;
     PacketBatch* batch = NULL;
     int count = 0;
-
     while(packet != NULL)
     {
         tcp_seq_t currentSeq = getSequenceNumber(packet);
@@ -165,6 +163,7 @@ void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
         // We check if the current packet is the expected one (if not, there is a gap)
         if(currentSeq != tcpreorder->expectedPacketSeq)
         {
+            //click_chatter("Not the expected packet, have %d expected %d",currentSeq,tcpreorder->expectedPacketSeq);
             tcpreorder->packetList = packet;
             // Check before exiting that we did not have a batch to send
             goto send_batch;
@@ -185,9 +184,18 @@ void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
         last = packet;
         packet = packet->next();
     }
-    return;
+    if (last ) {
+        click_ip *ip = (click_ip *) last->data();
+        unsigned hlen = ip->ip_hl << 2;
+        click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
+        if (th->th_flags & (TH_FIN | TH_RST)) {
+            if (!_tcp_context)
+                fcb_release_timeout();
+        }
+    }
   send_batch:
-  tcpreorder->packetList = packet;
+    assert(tcpreorder->expectedPacketSeq);
+    tcpreorder->packetList = packet;
     // We now send the batch we just built
     if(batch != NULL) {
         batch->set_count(count);
@@ -238,7 +246,7 @@ void TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* pack
     packetToAdd->set_next(packetNode);
 }
 
-void TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, Packet* packet)
+bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
@@ -248,13 +256,19 @@ void TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, Packet* pac
     {
         // Update the expected sequence number
         tcpreorder->expectedPacketSeq = getSequenceNumber(packet);
-        click_chatter("First packet received (%u) for flow %u", tcpreorder->expectedPacketSeq,
-            flowDirection);
-
+        //click_chatter("First packet received (%u) for flow", tcpreorder->expectedPacketSeq);
+        if (!_tcp_context)
+            fcb_acquire_timeout(60000);
         // Ensure that the list of waiting packets is free
         // (SYN should always be the first packet)
         flushList(tcpreorder);
+    } else {
+        if (!tcpreorder->expectedPacketSeq) {
+            click_chatter("The flow does not start with a syn! Sending RST !");
+            return false;
+        }
     }
+    return true;
 }
 
 /*

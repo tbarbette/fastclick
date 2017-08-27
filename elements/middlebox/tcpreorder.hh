@@ -130,7 +130,7 @@ private:
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet to check
      */
-    void checkFirstPacket(struct fcb_tcpreorder *fcb, Packet* packet);
+    bool checkFirstPacket(struct fcb_tcpreorder *fcb, Packet* packet);
 
     /**
      * @brief Flush the list of waiting packets
@@ -170,7 +170,6 @@ private:
      */
     Packet* sortList(Packet *list);
 
-    unsigned int flowDirection;
     bool mergeSort;
 };
 

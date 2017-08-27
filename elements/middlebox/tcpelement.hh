@@ -12,6 +12,7 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include <click/element.hh>
+#include <click/flowelement.hh>
 #include "ipelement.hh"
 
 CLICK_DECLS
@@ -192,6 +193,13 @@ public:
      * @param packet The packet
      */
     void computeTCPChecksum(WritablePacket* packet) const;
+
+    /*Element responsible of the timeout management.
+     * to allow for a unique per-flow acquire/release and timeout management
+     * elements that can be used without a real tcp context (such as TCPReorder)
+     * can check if some TCP context is managed by a more tailored element
+     */
+    FlowElement* _tcp_context;
 };
 
 CLICK_ENDDECLS

@@ -214,6 +214,9 @@ class PacketBatch : public WritablePacket {
 #define MAX_BATCH_SIZE 8192
 
 public :
+    inline Packet* first() {
+        return this;
+    }
 
     inline void set_tail(Packet* p) {
         set_prev(p);
