@@ -268,7 +268,7 @@ ToNetmapDevice::push(int, Packet* p) {
 		}
 	}
 
-	if (s.q_size >= _burst) { //TODO "or if timeout", not implemented yet because batching +- solves this problem
+	if (s.q_size >= _burst) { //TODO "or if timeout", not implemented yet because batching solves this problem, and batching should always be used. ToDPDKDevice does it, if needed, import it from there
 do_send:
 		Packet* last = s.q->prev();
 
@@ -390,7 +390,7 @@ static inline int _send_packet(WritablePacket* p, struct netmap_ring* txring, st
 }
 
 /**
- * Send a linked list of packet, return the number of packet sent and the head
+ * Send a linked list of packet, return the number of packet sent and make the head
  * 	points toward the packets following the last sent packet (could be null)
  * @arg head First packet of the list
  * @arg ask_sync If true, will force to flush packets (call netmap NIOCTXSYNC) after adding them in the ring

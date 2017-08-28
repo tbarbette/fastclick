@@ -352,7 +352,7 @@ static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
 # endif
                 if (fcb->timeoutPassed(now)) {
 # if DEBUG_CLASSIFIER_TIMEOUT > 1
-                    click_chatter("Timeout of %p passed or released, reinitializing",fcb);
+                    click_chatter("Timeout of %p passed or released and is now seen again, reinitializing timer",fcb);
 # endif
                     //Do not call initialize as everything is still set, just reinit timeout
                     fcb->flags = FLOW_TIMEOUT | FLOW_TIMEOUT_INLIST;
