@@ -122,7 +122,7 @@ private:
      * @brief Send the in-order packets from the list of waiting packets
      * @param fcb A pointer to the FCB of the flow
      */
-    void sendEligiblePackets(struct fcb_tcpreorder *fcb);
+    void sendEligiblePackets(struct fcb_tcpreorder *fcb, bool had_awaiting);
 
     /**
      * @brief Check if the packet is the first one of the flow and acts consequently.
@@ -131,7 +131,7 @@ private:
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet to check
      */
-    bool checkFirstPacket(struct fcb_tcpreorder *fcb, Packet* packet);
+    bool checkFirstPacket(struct fcb_tcpreorder *fcb, PacketBatch* batch);
 
     /**
      * @brief Flush the list of waiting packets
@@ -154,7 +154,7 @@ private:
      * @param packet The packet to check
      * @return True if the given packet is a retransmission
      */
-    bool checkRetransmission(struct fcb_tcpreorder *fcb, Packet* packet);
+    bool checkRetransmission(struct fcb_tcpreorder *fcb, Packet* packet, bool always_retransmit);
 
     /**
      * @brief Return the sequence number of the packet that will be received after the given one

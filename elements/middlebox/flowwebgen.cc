@@ -43,8 +43,8 @@ FlowWebGen::FlowWebGen()
 {
   _parallel = 16;
   cbfree = NULL;
-  rexmit_head = NULL;
-  rexmit_tail = NULL;
+/*  rexmit_head = NULL;
+  rexmit_tail = NULL;*/
 
   _url = "";
 
@@ -108,19 +108,20 @@ FlowWebGen::connhash (unsigned src, unsigned short sport)
 int
 FlowWebGen::initialize (ErrorHandler *errh)
 {
-  _timer.initialize (this);
 
 
-  if (_active)
-    _timer.schedule_now ();
 
  int ncbs;
  if (start_interval) {
      ncbs = 2 * (resend_dt / start_interval) * resend_max;
+  _timer.initialize (this);
+  if (_active)
+    _timer.schedule_now ();
+
+
  } else {
   ScheduleInfo::initialize_task(this, &_task, _active, errh);
     ncbs = _parallel;
-
  }
   for (int i = 0; i < ncbs; i++) {
     CB *cb = new CB;
@@ -136,7 +137,7 @@ FlowWebGen::initialize (ErrorHandler *errh)
   perf_tv = now;
   start_tv = now;
 
-  rexmit_head = new CB;
+/*  rexmit_head = new CB;
   rexmit_tail = new CB;
   if (!rexmit_head || !rexmit_tail) {
     click_chatter ("Not enough memory for dummy elements\n");
@@ -145,7 +146,7 @@ FlowWebGen::initialize (ErrorHandler *errh)
   rexmit_head->rexmit_next = rexmit_tail;
   rexmit_head->rexmit_prev = NULL;
   rexmit_tail->rexmit_next = NULL;
-  rexmit_tail->rexmit_prev = rexmit_head;
+  rexmit_tail->rexmit_prev = rexmit_head;*/
 
   return 0;
 }
@@ -166,8 +167,8 @@ FlowWebGen::cleanup (CleanupStage stage)
     c = cbhash[i++];
   } while (i <= htsize);
 
-  delete rexmit_head;
-  delete rexmit_tail;
+/*  delete rexmit_head;
+  delete rexmit_tail;*/
 
   if (stage >= CLEANUP_INITIALIZED)
     do_perf_stats ();
@@ -176,7 +177,7 @@ FlowWebGen::cleanup (CleanupStage stage)
 void
 FlowWebGen::recycle (CB *cb)
 {
-  cb->rexmit_unlink ();
+/*  cb->rexmit_unlink ();*/
   cb->remove_from_list ();
   cb->add_to_list (&cbfree);
   if (start_interval == 0)
@@ -231,7 +232,7 @@ FlowWebGen::run_timer (Timer *)
   }
   }
 
-  CB *lrxcb = rexmit_tail->rexmit_prev;
+/*  CB *lrxcb = rexmit_tail->rexmit_prev;
   do {
     cb = rexmit_head->rexmit_next;
 
@@ -252,7 +253,7 @@ FlowWebGen::run_timer (Timer *)
       break;
     }
   } while (cb != lrxcb);
-
+*/
   if (timestamp_diff(now, perf_tv) > perf_dt)
     do_perf_stats ();
 
@@ -386,7 +387,7 @@ FlowWebGen::tcp_input (Packet *p)
       seq + dlen == cb->_rcv_nxt &&
       cb->_got_fin == 0) {
     if (_verbose > 0)
-     click_chatter("%p{element} FIN %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
+         click_chatter("%p{element} FIN %d %d",this, ntohs (th->th_sport), ntohs (th->th_dport));
 
     cb->_got_fin = 1;
     cb->_rcv_nxt += 1;
@@ -459,8 +460,14 @@ FlowWebGen::tcp_send (CB *cb, Packet *xp)
   }
   plen = sizeof(click_ip) + sizeof(click_tcp) + paylen;
 
-  cb->rexmit_update (rexmit_tail);
+//  cb->rexmit_update (rexmit_tail);
 //click_chatter ("dosend %d paylen %d snd_nxt %d seq %d sfin %d\n", cb->_do_send, paylen, plen, cb->_snd_nxt, seq, cb->_sent_fin);
+  if (cb->_got_fin) {
+    // Other side has sent the FIN too -- we ack and close.
+    cb->_closed = 1;
+    perfcnt.completed++;
+  }
+
   if (cb->_connected == 1 && paylen == 0) {
     if (xp)
       xp->kill ();
@@ -487,11 +494,6 @@ FlowWebGen::tcp_send (CB *cb, Packet *xp)
   if (flags & TH_FIN)
     cb->_sent_fin = 1;
 
-  if (cb->_sent_fin && cb->_got_fin) {
-    // Other side has sent the FIN too -- we ack and close.
-    cb->_closed = 1;
-    perfcnt.completed++;
-  }
 
   if (fcb_stack)
       _tcp_client_ack->setSeqAcked(ack,seq + paylen + (flags & TH_FIN? 1 : 0));
@@ -557,10 +559,17 @@ FlowWebGen::tcp_output (WritablePacket *p,
 void
 FlowWebGen::set_active(bool active) {
     _active = active;
-    if (active)
-        _timer.schedule_now();
-    else
-        _timer.unschedule();
+    if (start_interval) {
+        if (active)
+            _timer.schedule_now();
+        else
+            _timer.unschedule();
+    } else {
+        if (active)
+            _task.reschedule();
+        else
+            _task.unschedule();
+    }
 }
 
 int
@@ -597,8 +606,8 @@ FlowWebGen::CB::CB ()
   next = NULL;
   pprev = NULL;
 
-  rexmit_next = NULL;
-  rexmit_prev = NULL;
+/*  rexmit_next = NULL;
+  rexmit_prev = NULL;*/
 
   last_send.assign_now();
 }
@@ -656,7 +665,7 @@ FlowWebGen::CB::add_to_list (CB **phead)
   pprev = phead;
   *phead = this;
 }
-
+/*
 void
 FlowWebGen::CB::rexmit_unlink ()
 {
@@ -682,6 +691,6 @@ FlowWebGen::CB::rexmit_update (CB *tail)
   rexmit_prev->rexmit_next = this;
   rexmit_next->rexmit_prev = this;
 }
-
+*/
 CLICK_ENDDECLS
 EXPORT_ELEMENT(FlowWebGen)

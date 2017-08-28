@@ -54,19 +54,20 @@ void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, Packet* toKeep,
 
 void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *batch)
 {
-    click_chatter("flow %p",tcpreorder);
+//    click_chatter("flow %p, uc %d",tcpreorder,fcb_stack->count());
     // Ensure that the pointer in the FCB is set
-    if (!checkFirstPacket(tcpreorder, batch->first())) {
-        batch->fast_kill();
+    if (!checkFirstPacket(tcpreorder, batch)) {
         return;
     }
+
+    bool had_awaiting = tcpreorder->packetList != 0;
 
     // Complexity: O(k) (k elements in the batch)
     FOR_EACH_PACKET_SAFE(batch, packet)
     {
-        click_chatter("Packet %p seq %d flow %p",packet,getSequenceNumber(packet),tcpreorder);
+        //click_chatter("TCPReorder : processing Packet %p seq %d flow %p",packet,getSequenceNumber(packet),tcpreorder);
 
-        if(!checkRetransmission(tcpreorder, packet)) {
+        if(!checkRetransmission(tcpreorder, packet, false)) {
             //click_chatter("Packet is retransmit!");
             continue;
         }
@@ -85,25 +86,27 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
         // Sort the list of waiting packets (O((n + k) * log(n + k)))
         tcpreorder->packetList = sortList(tcpreorder->packetList);
     }
-    click_chatter("flow %p uc %d",tcpreorder, fcb_stack->count());
-    sendEligiblePackets(tcpreorder);
-    click_chatter("a flow %p uc %d",tcpreorder, fcb_stack->count());
+    //click_chatter("flow %p uc %d",tcpreorder, fcb_stack->count());
+    sendEligiblePackets(tcpreorder,had_awaiting);
+    //click_chatter("a flow %p uc %d",tcpreorder, fcb_stack->count());
 }
 
 
 
-bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* packet)
+bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* packet, bool always_retransmit)
 {
     // If we receive a packet with a sequence number lower than the expected one
     // (taking into account the wrapping sequence numbers), we consider to have a
     // retransmission
     if(SEQ_LT(getSequenceNumber(packet), tcpreorder->expectedPacketSeq))
     {
+        // If always_retransmit is not set:
         // We do not send the packet to the second output if the retransmission is a packet
         // that has not already been sent to the next element. In this case, this is a
         // retransmission for a packet we already have in the waiting list so we can discard
         // the retransmission
-        if(noutputs() == 2 && SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent))
+        // Always retransmit will be set for SYN, as the whole list will be flushed
+        if(noutputs() == 2 && (always_retransmit || SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
         {
             #if HAVE_BATCH
                 PacketBatch *batch = PacketBatch::make_from_packet(packet);
@@ -121,7 +124,7 @@ bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* 
     return true;
 }
 
-void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
+void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, bool had_awaiting)
 {
     Packet* packet = tcpreorder->packetList;
     Packet* last = 0;
@@ -163,7 +166,7 @@ void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
         // We check if the current packet is the expected one (if not, there is a gap)
         if(currentSeq != tcpreorder->expectedPacketSeq)
         {
-            click_chatter("Not the expected packet, have %d expected %d",currentSeq,tcpreorder->expectedPacketSeq);
+            //click_chatter("Not the expected packet, have %d expected %d. Count is %d",currentSeq,tcpreorder->expectedPacketSeq,count);
             tcpreorder->packetList = packet;
             // Check before exiting that we did not have a batch to send
             goto send_batch;
@@ -184,22 +187,29 @@ void TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder)
         last = packet;
         packet = packet->next();
     }
-    if (last ) {
+    if (!packet && had_awaiting) {
+        //We don't have awaiting packets anymore, remove the fct
+        //click_chatter("We are now in order, removing release fct");
+        fcb_remove_release_fnt(tcpreorder,&fcb_release_fnt);
+    } else if (packet && !had_awaiting) {
+        //Set release fnt
+        //click_chatter("Out of order, setting release fct");
+        fcb_set_release_fnt(static_cast<FlowReleaseChain*>(tcpreorder), &fcb_release_fnt);
+    }
+    if (last && !_tcp_context) { //End of flow and we manage the flow ourself, remove timeout
         click_ip *ip = (click_ip *) last->data();
         unsigned hlen = ip->ip_hl << 2;
         click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
-        if (th->th_flags & (TH_FIN | TH_RST)) {
-            if (!_tcp_context) {
+        //click_chatter("Last packet, releasing timeout");
+        if (th->th_flags & (TH_FIN | TH_RST))
                 fcb_release_timeout();
-            }
-            fcb_remove_release_fnt(tcpreorder,&fcb_release_fnt);
-        }
     }
   send_batch:
     assert(tcpreorder->expectedPacketSeq);
     tcpreorder->packetList = packet;
     // We now send the batch we just built
     if(batch != NULL) {
+        assert(count > 0);
         batch->set_count(count);
         batch->set_tail(last);
         last->set_next(0);
@@ -248,28 +258,49 @@ void TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* pack
     packetToAdd->set_next(packetNode);
 }
 
-bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, Packet* packet)
+bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch* batch)
 {
+    Packet* packet = batch->first();
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
+
 
     // Check if the packet is a SYN packet
     if(flags & TH_SYN)
     {
+        if (tcpreorder->expectedPacketSeq) {
+            Packet* next = packet->next();
+
+            //click_chatter("Potential duplicate syn received (%u), fcb uc %d", tcpreorder->expectedPacketSeq,fcb_stack->count());
+            if (!checkRetransmission(tcpreorder, packet, true)) { //SYN retransmission
+                //click_chatter("Syn retransmission ! Deleting !");
+                while(next) {
+                    packet = next;
+                    next = packet->next();
+                    packet->kill();
+                }
+                return false;
+            } else {
+                //click_chatter("But seems good...");
+            }
+        }
         // Update the expected sequence number
         tcpreorder->expectedPacketSeq = getSequenceNumber(packet);
-        click_chatter("First packet received (%u) for flow", tcpreorder->expectedPacketSeq);
+        //click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
+        //If there is no better TCP manager, we must ensure the flow stays alive
         if (!_tcp_context)
             fcb_acquire_timeout(60000);
-        fcb_set_release_fnt(static_cast<FlowReleaseChain*>(tcpreorder), &fcb_release_fnt);
         // Ensure that the list of waiting packets is free
         // (SYN should always be the first packet)
-        FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p)
+        FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
+            //click_chatter("WARNING : Non-free TCPReorder flow bucket");
             p->kill();
+        }
         tcpreorder->packetList = 0;
     } else {
         if (!tcpreorder->expectedPacketSeq) {
-            click_chatter("The flow does not start with a syn! Sending RST !");
+            //click_chatter("The flow does not start with a syn! We should send a RST sometime !"); //TODO : This is the role of the tcp ctx
+            batch->fast_kill();
             return false;
         }
     }
@@ -402,9 +433,15 @@ Packet* TCPReorder::sortList(Packet *list)
 }
 
 void TCPReorder::fcb_release_fnt(FlowControlBlock* fcb, void* thunk) {
-    fcb_tcpreorder* tcpreorder = reinterpret_cast<fcb_tcpreorder*>(fcb->data[static_cast<TCPReorder*>(thunk)->_flow_data_offset]);
-    FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
-        p->kill();
+    TCPReorder* tr = static_cast<TCPReorder*>(thunk);
+    //click_chatter("Flushing %p{element}",tr);
+    fcb_tcpreorder* tcpreorder = reinterpret_cast<fcb_tcpreorder*>(fcb->data[tr->_flow_data_offset]);
+
+    //click_chatter("List %p",tcpreorder->packetList);
+    if (tcpreorder->packetList) {
+        FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
+            p->kill();
+        }
     }
     tcpreorder->packetList = 0;
     tcpreorder->previous_fnt(fcb, tcpreorder->previous_thunk);

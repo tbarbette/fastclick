@@ -287,10 +287,10 @@ void FlowTableHolder::release_later(FlowControlBlock* fcb) {
 
 bool FlowTableHolder::check_release() {
     fcb_list& head = old_flows.get();
-
     FlowControlBlock* b = head.next;
     FlowControlBlock** prev = &head.next;
     Timestamp now = Timestamp::recent_steady();
+
     bool released_something = false;
 
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK
@@ -337,6 +337,8 @@ bool FlowTableHolder::check_release() {
         }
         b = b->next;
     }
+
+    click_chatter("finish");
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
     click_chatter("Released  %d->%d==%d",orig_count,head.count,check_count);
 #endif

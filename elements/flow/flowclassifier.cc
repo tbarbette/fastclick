@@ -358,7 +358,7 @@ static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
                     fcb->flags = FLOW_TIMEOUT | FLOW_TIMEOUT_INLIST;
                 } else {
 # if DEBUG_CLASSIFIER_TIMEOUT > 1
-                    click_chatter("Timeout recovered %p",fcb);
+                    click_chatter("Timeout recovered, keeping the flow %p",fcb);
 # endif
                 }
             } else {

@@ -948,8 +948,8 @@ Packet::clone(bool fast)
 		origin->_use_count++;
     }
 #if HAVE_FLOW
-//    if (fcb_stack)
-//        fcb_stack->acquire(1);
+    if (fcb_stack)
+        fcb_stack->acquire(1);
 #endif
     return p;
 

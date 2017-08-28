@@ -132,7 +132,7 @@ public :
             fcb_stack->thunk = fcb_chain->previous_thunk;
             click_chatter("Release removed to %p",fcb_stack->release_fnt);
         } else {
-            click_chatter("Unordered release remove");
+            click_chatter("Unordered release remove, it was %p and not %p",fcb_stack->release_fnt,fnt);
             assert(false);
             /*SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
             VirtualFlowBufferElement* fe;

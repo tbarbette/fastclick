@@ -426,7 +426,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 	        //Timeout is not in list yet
 	        if (!this->timeoutPassed(Timestamp::recent_steady())) {
 #if DEBUG_CLASSIFIER_TIMEOUT  > 2
-	            click_chatter("Not releasing %p because timeout is not passed",this);
+	            click_chatter("Not releasing %p because timeout is not passed. Adding to the list",this);
 #endif
 	            fcb_table->release_later(this);
 	            return;

@@ -63,14 +63,13 @@ void TCPClientAck::push_batch(int port, fcb_clientack* fcb, PacketBatch *batch)
 
     //If we did not ACKED while sending data as response to our packets, we must ACK now
     if (lastSeq > fcb->last_ack) {
-        click_chatter("Acking %u",ack);
+//        click_chatter("Acking %u",ack);
         // Craft and send the ack
         tcp_seq_t seq = fcb->current_seq;
         WritablePacket* p = forgePacket(saddr, daddr,
             sport, dport, seq, ack, 60*1024, flags);
         output_push_batch(1,PacketBatch::make_from_packet(p));
     }
-
 }
 
 CLICK_ENDDECLS

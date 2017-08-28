@@ -97,8 +97,8 @@ private:
     CB *next;
     CB **pprev;
 
-    CB *rexmit_next;
-    CB *rexmit_prev;
+/*    CB *rexmit_next;
+    CB *rexmit_prev;*/
   };
 
   static const int htbits = 10;
@@ -106,7 +106,7 @@ private:
   static const int htmask = htsize - 1;
   CB *cbhash[htsize];
   CB *cbfree;
-  CB *rexmit_head, *rexmit_tail;
+//  CB *rexmit_head, *rexmit_tail;
 
   // Retransmission
   static const int resend_dt = 1000000;	// rexmit after 1 sec
