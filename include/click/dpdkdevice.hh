@@ -90,6 +90,9 @@ public:
     static int TX_WTHRESH;
     static String MEMPOOL_PREFIX;
 
+    static unsigned DEF_DEV_RXDESC;
+    static unsigned DEF_DEV_TXDESC;
+
     static unsigned DEF_RING_NDESC;
     static unsigned DEF_BURST_SIZE;
 

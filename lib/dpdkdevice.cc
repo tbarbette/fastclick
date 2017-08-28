@@ -151,11 +151,11 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
         info.rx_queues.resize(1);
-        info.n_rx_descs = 64;
+        info.n_rx_descs = DEF_DEV_RXDESC;
     }
     if (info.tx_queues.size() == 0) {
         info.tx_queues.resize(1);
-        info.n_tx_descs = 64;
+        info.n_tx_descs = DEF_DEV_TXDESC;
     }
 
     if (info.rx_queues.size() > dev_info.max_rx_queues) {
@@ -163,6 +163,14 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
     if (info.tx_queues.size() > dev_info.max_tx_queues) {
         return errh->error("Port %d can only use %d TX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+    }
+
+    if (info.n_rx_descs < dev_info.rx_desc_lim.nb_min || info.n_rx_descs > dev_info.rx_desc_lim.nb_max) {
+        return errh->error("The number of receive descriptors is %d but needs to be between %d and %d",info.n_rx_descs, dev_info.rx_desc_lim.nb_min, dev_info.rx_desc_lim.nb_max);
+    }
+
+    if (info.n_tx_descs < dev_info.tx_desc_lim.nb_min || info.n_tx_descs > dev_info.tx_desc_lim.nb_max) {
+        return errh->error("The number of transmit descriptors is %d but needs to be between %d and %d",info.n_tx_descs, dev_info.tx_desc_lim.nb_min, dev_info.tx_desc_lim.nb_max);
     }
 
     int ret;
@@ -494,6 +502,9 @@ int DPDKDevice::TX_PTHRESH = 36;
 int DPDKDevice::TX_HTHRESH = 0;
 int DPDKDevice::TX_WTHRESH = 0;
 String DPDKDevice::MEMPOOL_PREFIX = "click_mempool_";
+
+unsigned DPDKDevice::DEF_DEV_RXDESC = 256;
+unsigned DPDKDevice::DEF_DEV_TXDESC = 256;
 
 unsigned DPDKDevice::DEF_RING_NDESC = 1024;
 unsigned DPDKDevice::DEF_BURST_SIZE = 32;

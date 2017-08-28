@@ -31,7 +31,7 @@ ToDPDKDevice::ToDPDKDevice() :
      _blocking = false;
      _burst = -1;
      _internal_tx_queue_size = 1024;
-     ndesc = 256;
+     ndesc = DPDKDevice::DEF_DEV_TXDESC;
 }
 
 ToDPDKDevice::~ToDPDKDevice()
