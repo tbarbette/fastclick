@@ -97,7 +97,7 @@ public:
 FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
-    _verbose = 2;
+    _verbose = 3;
 #else
     _verbose = 0;
 #endif
@@ -498,7 +498,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
         {
             fcb = _table.match(p,_aggcache);
         }
-        if (_verbose > 1) {
+        if (_verbose > 2) {
             click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
             _table.get_root()->print(-1,false);
         }
@@ -639,7 +639,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
                 if (tail % RING_SIZE == head % RING_SIZE) {
                     auto &b = batches[tail % RING_SIZE];
-                    if (_verbose)
+                    if (_verbose > 1)
                         click_chatter("WARNING (unoptimized) Ring full with batch of %d packets, processing now !", b.batch->count());
                     //Ring full, process batch NOW
                     fcb_stack = b.fcb;
