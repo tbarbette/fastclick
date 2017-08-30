@@ -150,7 +150,7 @@ void FlowClassifier::run_timer(Timer*) {
 
 void release_subflow(FlowControlBlock* fcb, void*) {
 #if DEBUG_CLASSIFIER_RELEASE
-    click_chatter("Release fcb %p data %d, parent %p",fcb,fcb->data_64[0],fcb->parent);
+    click_chatter("Release from tree fcb %p data %d, parent %p",fcb,fcb->data_64[0],fcb->parent);
 #endif
     if (fcb->parent == NULL) return;
 
@@ -160,8 +160,12 @@ void release_subflow(FlowControlBlock* fcb, void*) {
 
     FlowNode* child = static_cast<FlowNode*>(fcb->parent); //Child is B
     flow_assert(child->getNum() == child->findGetNum());
+    flow_assert(fcb->parent);
     FlowNodeData data = *fcb->node_data;
     child->release_child(FlowNodePtr(fcb), data); //B->release(F)
+#if DEBUG_CLASSIFIER_RELEASE
+    fcb->parent = 0;
+#endif
     flow_assert(child->getNum() == child->findGetNum());
     data = child->node_data; //Data is B data inside A
 

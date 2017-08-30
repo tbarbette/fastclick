@@ -76,7 +76,7 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
 #endif
     }
 
-    auto fnt = [flowdata,this](Packet*p) -> Packet*{
+    auto fnt = [flowdata,this](Packet*p) -> Packet* {
         WritablePacket* q=p->uniqueify();
         q->rewrite_ips(*flowdata);
         q->set_dst_ip_anno(flowdata->dst);
