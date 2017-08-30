@@ -1080,6 +1080,42 @@ void FlowControlBlock::combine_data(uint8_t* data) {
 }
 
 
+FlowNode* FlowLevel::create_better_node(FlowNode* parent) {
+    int l;
+    if (dynamic_cast<FlowNodeHash<0>*>(parent) != 0) {
+        l = 0;
+    } else if (dynamic_cast<FlowNodeHash<1>*>(parent) != 0) {
+        l = 1;
+    } else if (dynamic_cast<FlowNodeHash<2>*>(parent) != 0) {
+        l = 2;
+    } else if (dynamic_cast<FlowNodeHash<3>*>(parent) != 0) {
+        l = 3;
+    } else if (dynamic_cast<FlowNodeHash<4>*>(parent) != 0) {
+        l = 4;
+    } else if (dynamic_cast<FlowNodeHash<5>*>(parent) != 0) {
+        l = 5;
+    } else if (dynamic_cast<FlowNodeHash<6>*>(parent) != 0) {
+        l = 6;
+    } else if (dynamic_cast<FlowNodeHash<7>*>(parent) != 0) {
+        l = 7;
+    } else if (dynamic_cast<FlowNodeHash<8>*>(parent) != 0) {
+        l = 8;
+    } else if (dynamic_cast<FlowNodeHash<9>*>(parent) != 0) {
+        l = 9;
+    } else {
+        l = -1;
+    }
+
+    if (l == 9) {
+        return 0;
+    }
+    ++l;
+    if (l > current_level)
+        current_level = l;
+
+    return FlowNode::create_hash(current_level);
+}
+
 FCBPool* FCBPool::biggest_pool = 0;
 int NR_SHARED_FLOW = 0;
 

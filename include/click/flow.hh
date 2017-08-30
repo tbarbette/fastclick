@@ -129,30 +129,10 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
 #else
                             click_chatter("Table starting growing, deleting");
                             parent->set_growing(true);
-                            FlowNode* newNode;
-                            if (dynamic_cast<FlowNodeHash<0>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<1>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<1>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<2>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<2>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<3>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<3>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<4>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<4>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<5>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<5>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<6>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<6>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<7>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<7>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<8>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<8>*>(parent) != 0) {
-                                newNode = FlowAllocator<FlowNodeHash<9>>::allocate();
-                            } else if (dynamic_cast<FlowNodeHash<9>*>(parent) != 0) {
-                                click_chatter("OVERSIZED NODE, DROPPING");
+                            FlowNode* newNode = parent->level()->create_better_node(parent);
+                            if (newNode == 0) {
+                                //TODO : better to release old flows
                                 return 0;
-                            } else {
-                                newNode = FlowAllocator<FlowNodeHash<0>>::allocate();
                             }
                             newNode->_default = parent->_default;
                             newNode->_level = parent->_level;

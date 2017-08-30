@@ -37,7 +37,9 @@ public:
         return _get_data(this,p);
     }
 
+    int current_level = 0;
 
+    FlowNode* create_better_node(FlowNode* parent);
 
     bool is_dynamic() {
         return _dynamic;
@@ -269,6 +271,7 @@ public:
         node_data.data_64 = 0;
     }
 
+    static FlowNode* create_hash(int l);
     FlowLevel* level() const {
         return _level;
     }
@@ -971,7 +974,7 @@ class FlowNodeHash : public FlowNode  {
         return capacity_n / 3;
     }*/
     inline uint32_t max_highwater() const {
-        return 2 * (capacity() / 3);
+        return 3 * (capacity() / 5);
     }
 
     virtual int max_size() const override {

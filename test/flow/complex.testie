@@ -16,11 +16,11 @@ Table of r1/FlowClassifier@4 after optimization :
 |  |-> 6
 |  |  36/65535 (TWOCASE, 1 childs)
 |  |  |-> 20480
-|  |  |  26/4294967295 (HASH-257, 0 childs)
+|  |  |  26/4294967295 (HASH-{{[0-9]+}}, 0 childs)
 |  |  |  |-> DEFAULT
-|  |  |  |  30/4294967295 (HASH-257, 0 childs)
+|  |  |  |  30/4294967295 (HASH-{{[0-9]+}}, 0 childs)
 |  |  |  |  |-> DEFAULT
-|  |  |  |  |  34/65535 (HASH-257, 0 childs)
+|  |  |  |  |  34/65535 (HASH-{{[0-9]+}}, 0 childs)
 |  |  |  |  |  |-> DEFAULT 0 UC:1 (data 000000000000000000000000000000000100000000000000000000000000)
 |  |  |-> DEFAULT 0 UC:1 (data 00000000000000000000000000000000010000000000000000000000ffff)
 |  |-> 1
@@ -43,13 +43,13 @@ Table of r2/FlowClassifier@4 after optimization :
 |  |-> 6
 |  |  34/4294905600 (TWOCASE, 1 childs)
 |  |  |-> 1342177280
-|  |  |  26/4294967295 (HASH-257, 0 childs)
+|  |  |  26/4294967295 (HASH-{{[0-9]+}}, 0 childs)
 |  |  |  |-> DEFAULT
-|  |  |  |  30/4294967295 (HASH-257, 0 childs)
+|  |  |  |  30/4294967295 (HASH-{{[0-9]+}}, 0 childs)
 |  |  |  |  |-> DEFAULT
-|  |  |  |  |  34/65535 (HASH-257, 0 childs)
+|  |  |  |  |  34/65535 (HASH-{{[0-9]+}}, 0 childs)
 |  |  |  |  |  |-> DEFAULT
-|  |  |  |  |  |  36/65535 (HASH-257, 0 childs)
+|  |  |  |  |  |  36/65535 (HASH-{{[0-9]+}}, 0 childs)
 |  |  |  |  |  |  |-> DEFAULT 18446744073709551615 UC:1 (data ffffffffffffffff00000000000000000100000000000000000000000000)
 |  |  |-> DEFAULT 0 UC:1 (data 00000000000000000000000000000000010000000000000000000000ffff)
 |  |-> 1
@@ -60,8 +60,7 @@ Table of r2/FlowClassifier@4 after optimization :
 |-> DEFAULT 0 UC:1 (data 000000000000000002000000000000000000000000000000000000000000)
 ---
 {{LookupIPRouteMP alignment: .*}}
-{{Allocator : .*}}
-{{Allocator : .*}}
+
 
 %file COMPLEX
 define($IP1 10.200.0.1)

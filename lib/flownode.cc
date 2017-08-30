@@ -264,6 +264,43 @@ void FlowNode::traverse_parents(std::function<void(FlowNode*)> fnt) {
     return;
 }
 
+FlowNode* FlowNode::create_hash(int l) {
+    FlowNode* fl;
+    switch(l) {
+     case 0:
+         fl = FlowAllocator<FlowNodeHash<0>>::allocate();
+         break;
+     case 1:
+         fl = FlowAllocator<FlowNodeHash<1>>::allocate();
+         break;
+     case 2:
+         fl = FlowAllocator<FlowNodeHash<2>>::allocate();
+         break;
+     case 3:
+         fl = FlowAllocator<FlowNodeHash<3>>::allocate();
+         break;
+     case 4:
+         fl = FlowAllocator<FlowNodeHash<4>>::allocate();
+         break;
+     case 5:
+         fl = FlowAllocator<FlowNodeHash<5>>::allocate();
+         break;
+     case 6:
+         fl = FlowAllocator<FlowNodeHash<6>>::allocate();
+         break;
+     case 7:
+         fl = FlowAllocator<FlowNodeHash<7>>::allocate();
+         break;
+     case 8:
+         fl = FlowAllocator<FlowNodeHash<8>>::allocate();
+         break;
+     default:
+         fl = FlowAllocator<FlowNodeHash<9>>::allocate();
+         break;
+    }
+    return fl;
+}
+
 
 /***************************************
  * FlowNodeDefinition
@@ -285,47 +322,16 @@ FlowNode*
 FlowNodeDefinition::create_final() {
     FlowNode * fl;
     //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
-    click_chatter("Hint is %s",_hint.c_str());
     if (_hint) {
         assert(_hint.starts_with("HASH-"));
         _hint = _hint.substring(_hint.find_left('-') + 1);
-        switch (atoi(_hint.c_str())) {
-            case 0:
-                fl = FlowAllocator<FlowNodeHash<0>>::allocate();
-                break;
-            case 1:
-                fl = FlowAllocator<FlowNodeHash<1>>::allocate();
-                break;
-            case 2:
-                fl = FlowAllocator<FlowNodeHash<2>>::allocate();
-                break;
-            case 3:
-                fl = FlowAllocator<FlowNodeHash<3>>::allocate();
-                break;
-            case 4:
-                fl = FlowAllocator<FlowNodeHash<4>>::allocate();
-                break;
-            case 5:
-                fl = FlowAllocator<FlowNodeHash<5>>::allocate();
-                break;
-            case 6:
-                fl = FlowAllocator<FlowNodeHash<6>>::allocate();
-                break;
-            case 7:
-                fl = FlowAllocator<FlowNodeHash<7>>::allocate();
-                break;
-            case 8:
-                fl = FlowAllocator<FlowNodeHash<8>>::allocate();
-                break;
-            default:
-                fl = FlowAllocator<FlowNodeHash<9>>::allocate();
-                break;
-        }
+        int l = atoi(_hint.c_str());
+        fl = FlowNode::create_hash(l);
     } else {
         if (_level->get_max_value() == 0)
             fl = new FlowNodeDummy();
         else if (_level->get_max_value() > 256) {
-            FlowNodeHash<0>* fh0 = FlowAllocator<FlowNodeHash<0>>::allocate();
+            FlowNode* fh0 = FlowNode::create_hash(0);
     #if DEBUG_CLASSIFIER
             assert(fh0->getNum() == 0);
             fh0->check();
@@ -354,6 +360,8 @@ FlowNodeDefinition::create_final() {
     fl->set_default(_default);
     return fl;
 }
+
+
 
 /***************************************
  * FlowNodeArray
