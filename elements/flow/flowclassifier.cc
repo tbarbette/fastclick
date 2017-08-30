@@ -124,7 +124,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             .complete() < 0)
         return -1;
 
-    FlowBufferVisitor v(this, sizeof(FlowNodeData) + reserve);
+    FlowBufferVisitor v(this, sizeof(FlowNodeData) + (_aggcache?sizeof(uint32_t):0) + reserve);
     router()->visit_ports(this,true,-1,&v);
 #if DEBUG_CLASSIFIER
     click_chatter("%s : pool size %d",name().c_str(),v.data_size);
@@ -148,7 +148,7 @@ void FlowClassifier::run_timer(Timer*) {
 }
 
 
-void release_subflow(FlowControlBlock* fcb, void*) {
+void release_subflow(FlowControlBlock* fcb, void* thunk) {
 #if DEBUG_CLASSIFIER_RELEASE
     click_chatter("Release from tree fcb %p data %d, parent %p",fcb,fcb->data_64[0],fcb->parent);
 #endif
@@ -158,6 +158,7 @@ void release_subflow(FlowControlBlock* fcb, void*) {
 
     //Parent of the fcb is release_ptr
 
+    static_cast<FlowClassifier*>(thunk)->remove_cache_fcb(fcb);
     FlowNode* child = static_cast<FlowNode*>(fcb->parent); //Child is B
     flow_assert(child->getNum() == child->findGetNum());
     flow_assert(fcb->parent);
@@ -243,7 +244,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     if (!table)
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
 
-    _table.set_release_fnt(release_subflow);
+    _table.set_release_fnt(release_subflow,this);
     _table.set_root(table->optimize());
     _table.get_root()->check();
     if (_verbose) {
@@ -294,6 +295,26 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
     return false; //No reschedule
 }
 
+inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
+    uint32_t agg = *((uint32_t*)&fcb->node_data[1]);
+    uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
+#if USE_CACHE_RING
+        FlowCache* bucket = _cache.get() + hash * _cache_ring_size;
+        FlowCache* c = bucket;
+        int ic = 0;
+        do {
+            if (c->agg == agg && c->fcb == fcb) {
+                c->agg = 0;
+            }
+        } while (ic < _cache_ring_size);
+#else
+        FlowCache* bucket = _cache.get() + hash;
+        if (bucket->agg == agg) {
+            bucket->agg = 0;
+        }
+#endif
+
+}
 inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) {
 
     if (unlikely(agg == 0)) {
@@ -304,7 +325,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
     click_chatter("Aggregate %d",agg);
 #endif
         FlowControlBlock* fcb = 0;
-        int hash = (agg ^ (agg >> 16)) & _cache_mask;
+        uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
 #if USE_CACHE_RING
         FlowCache* bucket = _cache.get() + hash * _cache_ring_size;
 #else
@@ -322,6 +343,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
                 if (c->agg == 0) {
                     c->fcb = fcb;
                     c->agg = agg;
+                    *((uint32_t*)&fcb->node_data[1]) = agg;
                 }
                 return fcb;
             } else { //Non empty slot
@@ -341,7 +363,6 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
 #if DEBUG_CLASSIFIER > 1
                         assert(fcb != c->fcb);
                         click_chatter("Cache %d shared for agg %d : fcb %p %p!",hash,agg,fcb,c->fcb);
-                        c->fcb = fcb;
                         //for (int i = 0; i < 10; i++)
                             //click_chatter("%x",*(((uint32_t*)p->data()) + i));
 
@@ -378,9 +399,9 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
         return fcb;
 #else
 
-        } while (ic < _cache_ring_size);
+        } while (ic < _cache_ring_size); //Try to put in the ring of the bucket
 
-        //TODO : reunderstand what I did here.
+        //Remove the oldest from the bucket
         c = bucket;
         FlowCache* oldest = c;
         c++;
@@ -409,13 +430,12 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
         fcb = _table.match(p,_aggcache);
         c->agg = agg;
         c->fcb = fcb;
+        *((uint32_t*)&fcb->node_data[1]) = agg;
         return fcb;
 #endif
-
-
-
-
 }
+
+
 
 static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT

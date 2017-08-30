@@ -163,7 +163,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                             child_ptr->leaf->initialize();
                             child_ptr->leaf->parent = parent;
     /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
-                            child_ptr->leaf->release_fnt = _pool_release_fnt;
+                            child_ptr->leaf->release_fnt = _classifier_release_fnt;
     #endif*/
                             child_ptr->set_data(data);
                             memcpy(&child_ptr->leaf->node_data[1], &parent->default_ptr()->leaf->node_data[1] ,_pool.data_size() - sizeof(FlowNodeData));

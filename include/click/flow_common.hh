@@ -315,7 +315,7 @@ public:
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 old_flows(fcb_list()),
 #endif
-_pool(), _pool_release_fnt(0)
+_pool(), _classifier_release_fnt(0), _classifier_thunk(0)
     {
 
     }
@@ -328,12 +328,12 @@ _pool(), _pool_release_fnt(0)
     }
 
 
-    void set_release_fnt(SubFlowRealeaseFnt pool_release_fnt);
+    void set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void* thunk);
 
 
     inline void release(FlowControlBlock* fcb) {
-        if (likely(_pool_release_fnt)) //Release the FCB from the tree
-            _pool_release_fnt(fcb, fcb->thunk);
+        if (likely(_classifier_release_fnt)) //Release the FCB from the tree
+            _classifier_release_fnt(fcb, _classifier_thunk);
         _pool.release(fcb); //Release the FCB itself inside the pool
     }
 
@@ -387,7 +387,8 @@ _pool(), _pool_release_fnt(0)
 
 protected:
     FCBPool _pool;
-    SubFlowRealeaseFnt _pool_release_fnt;
+    SubFlowRealeaseFnt _classifier_release_fnt;
+    void* _classifier_thunk;
 
 };
 

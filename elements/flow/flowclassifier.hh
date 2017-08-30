@@ -54,7 +54,8 @@ public:
     int initialize(ErrorHandler *errh) CLICK_COLD;
     void cleanup(CleanupStage stage);
 
-    FlowControlBlock* get_cache_fcb(Packet* p, uint32_t agg);
+    inline void remove_cache_fcb(FlowControlBlock* fcb);
+    inline FlowControlBlock* get_cache_fcb(Packet* p, uint32_t agg);
     void push_batch_simple(int port, PacketBatch*);
     void push_batch_builder(int port, PacketBatch*);
     void push_batch(int port, PacketBatch*);

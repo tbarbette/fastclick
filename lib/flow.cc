@@ -39,11 +39,11 @@ FlowClassificationTable::FlowClassificationTable() : _root(0)
 }
 void FlowClassificationTable::set_root(FlowNode* node) {
     assert(node);
-    assert(_pool_release_fnt);
+    assert(_classifier_release_fnt);
     _root = node;
 /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
     auto fnt = [this](FlowControlBlock* fcb){
-        fcb->release_fnt = _pool_release_fnt;
+        fcb->release_fnt = _classifier_release_fnt;
     };
     node->traverse<decltype(fnt)>(fnt);
 #endif*/
@@ -53,8 +53,9 @@ FlowNode* FlowClassificationTable::get_root() {
     return _root;
 }
 
-void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt) {
-	_pool_release_fnt = pool_release_fnt;
+void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void* thunk) {
+	_classifier_release_fnt = pool_release_fnt;
+	_classifier_thunk = thunk;
 }
 
 FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verbose) {
