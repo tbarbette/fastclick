@@ -929,9 +929,13 @@ Packet::clone(bool fast)
         } else
 #endif
         {
-        p->_destructor = empty_destructor;
+            p->_destructor = empty_destructor;
         }
         p->_data_packet = 0;
+#if HAVE_FLOW
+        if (fcb_stack)
+            fcb_stack->acquire(1);
+#endif
     } else {
         Packet* origin = this;
         if (origin->_data_packet)
@@ -946,11 +950,12 @@ Packet::clone(bool fast)
 	# endif
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
-    }
 #if HAVE_FLOW
-    if (fcb_stack)
-        fcb_stack->acquire(1);
+    //DO not acuire clone, as we only release when use_count is 0
+    /*if (fcb_stack)
+        fcb_stack->acquire(1);*/
 #endif
+    }
     return p;
 
 #endif /* CLICK_LINUXMODULE */

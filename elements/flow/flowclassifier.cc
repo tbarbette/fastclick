@@ -37,7 +37,7 @@ public:
         if (fbe != NULL) { //The visited element is an element that need FCB space
 
             //Resize the map if needed
-            if (fbe->flow_data_offset() + fbe->flow_data_size() > map.size()) map.resize(map.size() * 2);
+            if (fbe->flow_data_offset() + fbe->flow_data_size() >= map.size()) map.resize(map.size() * 2);
 
             if (fbe->flow_data_offset() != -1) { //If flow already have some classifier
                 if (fbe->flow_data_offset() >= data_size) {

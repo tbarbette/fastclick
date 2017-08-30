@@ -285,7 +285,7 @@ Bitvector::swap(Bitvector &x)
 
 void
 Bitvector::set_range(int start, int length, bool value) {
-	assert(start + length < _max);
+	assert(start + length <= size());
 	for (int i = start; i < start + length; i++) {
 		((*this)[i]) = value;
 	}
