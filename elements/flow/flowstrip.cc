@@ -49,9 +49,9 @@ FlowStrip::simple_action_batch(PacketBatch *head)
 void FlowStrip::apply_offset(FlowNode* node) {
 	node->level()->add_offset(_nbytes);
 
-	FlowNode::NodeIterator* it = node->iterator();
+	FlowNode::NodeIterator it = node->iterator();
 	FlowNodePtr* child;
-	while ((child = it->next()) != 0) {
+	while ((child = it.next()) != 0) {
 		if (child->ptr && child->is_node())
 			apply_offset(child->node);
 	}

@@ -18,6 +18,7 @@
 template <typename T>
 class MemoryPool
 {
+    int const DEFAULT_ALLOC = 1024;
 public:
     /** @brief Construct an empty MemoryPool
      */
@@ -78,7 +79,7 @@ public:
 
         if(first == NULL)
         {
-            allocateMoreMemory(1);
+            allocateMoreMemory(DEFAULT_ALLOC);
             node = first;
         }
 

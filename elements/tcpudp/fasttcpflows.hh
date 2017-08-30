@@ -89,6 +89,7 @@ class FastTCPFlows : public BatchElement {
   GapRate _rate;
   unsigned _count;
   unsigned _limit;
+  bool _sequence;
   bool _active;
 
   FastTCPFlows() CLICK_COLD;

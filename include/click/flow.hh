@@ -23,6 +23,12 @@ CLICK_DECLS
 class FlowClassificationTable : public FlowTableHolder {
 public:
     FlowClassificationTable();
+    ~FlowClassificationTable() {
+        click_chatter("Cleaning up root node");
+        if (_root)
+            _root->destroy();
+        _root = 0;
+    }
 
     void set_root(FlowNode* node);
     FlowNode* get_root();
@@ -101,40 +107,116 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
 #if DEBUG_CLASSIFIER_MATCH > 1
         click_chatter("->Ptr is %p, is_leaf : %d",child_ptr->ptr, child_ptr->is_leaf());
 #endif
-        if (child_ptr->ptr == NULL) {
+        flow_assert(child_ptr->ptr != (void*)-1);
+        if (unlikely(child_ptr->ptr == NULL || (child_ptr->is_node() && child_ptr->node->released()))) { //Unlikely to create a new node.
             if (parent->get_default().ptr) {
                 if (parent->level()->is_dynamic() || always_dup) {
-                    parent->inc_num();
-                    if (parent->get_default().is_leaf()) { //Leaf are not duplicated, we need to do it ourself
-#if DEBUG_CLASSIFIER_MATCH > 1
-                        click_chatter("DUPLICATE leaf");
+                    if (unlikely(parent->growing())) {
+                        //Table is growing, look at the child for new element
+                        if (parent->num == 0) {
+                            click_chatter("Table finished growing, deleting %p",parent);
+                            assert(false); //The release took care of this
+                        } else {
+#if DEBUG_CLASSIFIER
+                            click_chatter("Growing table, %d/%d",parent->num, parent->max_size());
 #endif
-                        //click_chatter("New leaf with data '%x'",data.data_64);
-                        //click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
-                        child_ptr->set_leaf(_pool.allocate());
-                        child_ptr->leaf->initialize();
-                        child_ptr->leaf->parent = parent;
-/*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
-                        child_ptr->leaf->release_fnt = _pool_release_fnt;
-#endif*/
-                        child_ptr->set_data(data);
-                        memcpy(&child_ptr->leaf->node_data[1], &parent->default_ptr()->leaf->node_data[1] ,_pool.data_size() - sizeof(FlowNodeData));
-#if DEBUG_CLASSIFIER_MATCH > 3
-                        _root->print();
+                        }
+                        parent = parent->default_ptr()->node;
+                        continue;
+                    } else if (unlikely(parent->num >= parent->max_size())) { //Parent is not growing, but we should start growing
+#if HAVE_STATIC_CLASSIFICATION
+                        click_chatter("MAX CAPACITY ACHIEVED, DROPPING");
+                        return 0;
+#else
+                            click_chatter("Table starting growing, deleting");
+                            parent->set_growing(true);
+                            FlowNode* newNode;
+                            if (dynamic_cast<FlowNodeHash<0>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<1>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<1>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<2>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<2>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<3>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<3>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<4>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<4>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<5>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<5>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<6>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<6>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<7>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<7>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<8>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<8>*>(parent) != 0) {
+                                newNode = FlowAllocator<FlowNodeHash<9>>::allocate();
+                            } else if (dynamic_cast<FlowNodeHash<9>*>(parent) != 0) {
+                                click_chatter("OVERSIZED NODE, DROPPING");
+                                return 0;
+                            } else {
+                                newNode = FlowAllocator<FlowNodeHash<0>>::allocate();
+                            }
+                            newNode->_default = parent->_default;
+                            newNode->_level = parent->_level;
+                            newNode->_parent = parent;
+                            parent->_default.set_node(newNode);
+
+                            parent = newNode;
+                            continue;
 #endif
-                        return child_ptr->leaf;
-                    } else {
-#if DEBUG_CLASSIFIER_MATCH > 1
-                        click_chatter("DUPLICATE node");
+                    } else { //Parent is not growing, and we don't need to start growing (likely)
+#if DEBUG_CLASSIFIER_CHECK
+                        if(parent->getNum() != parent->findGetNum()) {
+                            click_chatter("%d %d",parent->getNum(), parent->findGetNum());
+                            abort();
+                        }
+                        assert(parent->getNum() < parent->max_size());
 #endif
-                        child_ptr->set_node(parent->default_ptr()->node->duplicate(false, 0));
-                        child_ptr->set_data(data);
-                        child_ptr->set_parent(parent);
+                        parent->inc_num();
+                        if (parent->get_default().is_leaf()) { //Leaf are not duplicated, we need to do it ourself
+    #if DEBUG_CLASSIFIER_MATCH > 1
+                            click_chatter("DUPLICATE leaf");
+    #endif
+                            //click_chatter("New leaf with data '%x'",data.data_64);
+                            //click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
+                            child_ptr->set_leaf(_pool.allocate());
+                            assert(child_ptr->leaf);
+                            assert(child_ptr->is_leaf());
+                            child_ptr->leaf->initialize();
+                            child_ptr->leaf->parent = parent;
+    /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
+                            child_ptr->leaf->release_fnt = _pool_release_fnt;
+    #endif*/
+                            child_ptr->set_data(data);
+                            memcpy(&child_ptr->leaf->node_data[1], &parent->default_ptr()->leaf->node_data[1] ,_pool.data_size() - sizeof(FlowNodeData));
+    #if DEBUG_CLASSIFIER_MATCH > 3
+                            _root->print();
+    #endif
+                            _root->check(true);
+                            return child_ptr->leaf;
+                        } else {
+                            if (child_ptr->ptr && child_ptr->node->released()) { //Childptr is a released node, just renew it
+                                child_ptr->node->renew();
+                                child_ptr->set_data(data);
+                                flow_assert(parent->find(data)->ptr == child_ptr->ptr);
+                            } else {
+                                child_ptr->set_node(parent->default_ptr()->node->duplicate(false, 0));
+        #if DEBUG_CLASSIFIER_MATCH > 1
+                                click_chatter("DUPLICATE node, new is %p",child_ptr->node);
+        #endif
+
+                                child_ptr->set_data(data);
+                                child_ptr->set_parent(parent);
+                                flow_assert(parent->find(data)->ptr == child_ptr->ptr);
+                            }
+                        }
+                        flow_assert(parent->getNum() == parent->findGetNum());
                     }
-                } else {
+                } else { //There is a default but it is not a dynamic level, nor always_dup is set
                     child_ptr = parent->default_ptr();
-                    if (child_ptr->is_leaf())
+                    if (child_ptr->is_leaf()) {
+                        _root->check(true);
                         return child_ptr->leaf;
+                    }
                 }
             } else {
                 click_chatter("ERROR : no classification node and no default path !");// allowed with the "!" symbol
@@ -142,11 +224,8 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
             }
         } else if (child_ptr->is_leaf()) {
             return child_ptr->leaf;
-        } else { // is an existing node
-            if (child_ptr->node->released()) {
-                child_ptr->node->renew();
-                child_ptr->set_data(data);
-            }
+        } else { // is an existing node, and not released. Just descend
+
         }
         parent = child_ptr->node;
 

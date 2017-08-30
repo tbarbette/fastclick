@@ -72,26 +72,31 @@ public :
 
 	virtual const size_t flow_data_size()  const { return sizeof(T); }
 
-	inline void fcb_acquire() {
-	    fcb_stack->acquire();
+	inline void fcb_acquire(int count = 1) {
+	    fcb_stack->acquire(count);
 	}
+	inline void fcb_update(int count) {
+	    if (count > 0)
+	        fcb_stack->acquire(count);
+	    else if (count < 0)
+	        fcb_stack->release(-count);
+    }
 
-	inline void fcb_release() {
-	    fcb_stack->release();
+	inline void fcb_release(int count = 1) {
+	    fcb_stack->release(count);
 	}
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 	inline void fcb_acquire_timeout(int nmsec) {
 	    //Do not set a smaller timeout
-	    if ((fcb_stack->flags & FLOW_TIMEOUT) &&
-	            nmsec < (fcb_stack->flags >> FLOW_TIMEOUT_SHIFT)) {
+	    if ((fcb_stack->flags & FLOW_TIMEOUT) && (nmsec <= (fcb_stack->flags >> FLOW_TIMEOUT_SHIFT))) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
-        click_chatter("Acquiring timeout of %p, not changing it",this);
+        click_chatter("Acquiring timeout of %p, not changing it, flag %d",this,fcb_stack->flags);
 #endif
-	        return;
+	            return;
 	    }
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
-        click_chatter("Acquiring timeout of %p to %d",this,nmsec);
+        click_chatter("Acquiring timeout of %p to %d, flag %d",this,nmsec,fcb_stack->flags);
 #endif
         fcb_stack->flags = (nmsec << FLOW_TIMEOUT_SHIFT) | FLOW_TIMEOUT;
 	}
@@ -101,7 +106,9 @@ public :
         click_chatter("Releasing timeout of %p",this);
 #endif
         //If the timeout is in list, we must not put it back in the pool
-        if ((fcb_stack->flags & FLOW_TIMEOUT) and (fcb_stack->flags & FLOW_TIMEOUT_INLIST))
+        if (fcb_stack->flags & FLOW_TIMEOUT_INLIST)
+            assert(fcb_stack->flags & FLOW_TIMEOUT);
+        if ((fcb_stack->flags & FLOW_TIMEOUT) && (fcb_stack->flags & FLOW_TIMEOUT_INLIST))
             fcb_stack->flags = 0 | FLOW_TIMEOUT | FLOW_TIMEOUT_INLIST;
         else
             fcb_stack->flags = 0;
@@ -123,16 +130,24 @@ public :
         fcb_chain->previous_thunk = fcb_stack->thunk;
         fcb_stack->release_fnt = fnt;
         fcb_stack->thunk = this;
+#if DEBUG_CLASSIFIER_RELEASE
         click_chatter("Release fnt set to %p, was %p",fcb_stack->release_fnt,fcb_chain->previous_fnt);
+#endif
     }
     inline void fcb_remove_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
+#if DEBUG_CLASSIFIER_RELEASE
         click_chatter("Release fnt remove");
+#endif
         if (likely(fcb_stack->release_fnt == fnt)) { //Normally it will call the chain in the same order
             fcb_stack->release_fnt = fcb_chain->previous_fnt;
             fcb_stack->thunk = fcb_chain->previous_thunk;
+#if DEBUG_CLASSIFIER_RELEASE
             click_chatter("Release removed to %p",fcb_stack->release_fnt);
+#endif
         } else {
+#if DEBUG_CLASSIFIER_RELEASE
             click_chatter("Unordered release remove, it was %p and not %p",fcb_stack->release_fnt,fnt);
+#endif
             assert(false);
             /*SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
             VirtualFlowBufferElement* fe;

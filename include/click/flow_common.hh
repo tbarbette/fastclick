@@ -13,6 +13,20 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
 #define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
+#define DEBUG_CLASSIFIER_CHECK 0
+
+#if DEBUG_CLASSIFIER
+    #define debug_flow(...) click_chatter(__VA_ARGS__);
+#else
+    #define debug_flow(...)
+#endif
+
+#if DEBUG_CLASSIFIER_CHECK
+    #define flow_assert(...) assert(__VA_ARGS__);
+#else
+    #define flow_assert(...)
+#endif
+
 #define HAVE_DYNAMIC_FLOW_RELEASE_FNT 1
 
 class FlowControlBlock;
@@ -53,11 +67,11 @@ private:
 
 		FlowControlBlock* next;
 
-        inline bool hasTimeout() {
+        inline bool hasTimeout() const {
             return flags & FLOW_TIMEOUT;
         }
 
-		inline bool timeoutPassed(Timestamp now) {
+		inline bool timeoutPassed(Timestamp now) const {
 		    unsigned t = (flags >> FLOW_TIMEOUT_SHIFT);
 		    return t == 0 || (now - lastseen).msecval() > t;
 		}
@@ -318,9 +332,9 @@ _pool(), _pool_release_fnt(0)
 
 
     inline void release(FlowControlBlock* fcb) {
-        if (likely(_pool_release_fnt))
+        if (likely(_pool_release_fnt)) //Release the FCB from the tree
             _pool_release_fnt(fcb, fcb->thunk);
-        _pool.release(fcb);
+        _pool.release(fcb); //Release the FCB itself inside the pool
     }
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
@@ -328,15 +342,19 @@ _pool(), _pool_release_fnt(0)
     bool check_release();
     struct fcb_list {
         static const unsigned DEFAULT_THRESH = 64;
-        fcb_list() : next(0), count(0), count_thresh(DEFAULT_THRESH) {
+        fcb_list() : _next(0), _count(0), _count_thresh(DEFAULT_THRESH) {
 
         }
-        FlowControlBlock* next;
-        unsigned count;
-        unsigned count_thresh;
+        FlowControlBlock* _next;
+        unsigned _count;
+        unsigned _count_thresh;
+
+        unsigned count() const {
+            return _count;
+        }
 
         inline FlowControlBlock* find(FlowControlBlock* fcb) {
-            FlowControlBlock* head = next;
+            FlowControlBlock* head = _next;
         #if DEBUG_CLASSIFIER_TIMEOUT > 3
             click_chatter("FIND head %p",head);
         #endif
@@ -346,12 +364,23 @@ _pool(), _pool_release_fnt(0)
 
                 assert(head != head->next);
                 head = head->next;
-        #if DEBUG_CLASSIFIER_TIMEOUT > 3
+        #if DEBUG_CLASSIFIER_TIMEOUT > 5
                 click_chatter("FIND next %p",head);
         #endif
             }
             return 0;
         }
+
+        inline int find_count() {
+            FlowControlBlock* head = _next;
+            int i = 0;
+            while (head != 0) {
+                i++;
+                head = head->next;
+            }
+            return i;
+        }
+
     };
     per_thread<fcb_list> old_flows;
 #endif
@@ -377,7 +406,7 @@ extern __thread FlowTableHolder* fcb_table;
         }
 //#endif
 
-inline void FlowControlBlock::acquire(int packets_nr) {
+ void FlowControlBlock::acquire(int packets_nr) {
             use_count+=packets_nr;
 #if DEBUG_CLASSIFIER_RELEASE > 1
             click_chatter("Acquire %d to %p, total is %d",packets_nr,this,use_count);
@@ -385,16 +414,18 @@ inline void FlowControlBlock::acquire(int packets_nr) {
         }
 
 inline void FlowControlBlock::_do_release() {
-#if DEBUG_CLASSIFIER_TIMEOUT_CHECK && HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+#if DEBUG_CLASSIFIER
     assert(!(flags & FLOW_TIMEOUT_INLIST));
-    click_chatter("Release fnt is %p",release_fnt);
+    //click_chatter("Release fnt is %p",release_fnt);
 #endif
+    SFCB_STACK(
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
        if (release_fnt)
            release_fnt(this, thunk);
 #endif
-    click_chatter("Releasing from table");
+    //click_chatter("Releasing from table");
     fcb_table->release(this);
+    );
 }
 
 inline void FlowControlBlock::release(int packets_nr) {
@@ -408,21 +439,23 @@ inline void FlowControlBlock::release(int packets_nr) {
             click_chatter("Release %d to %p, total is %d",packets_nr,this,use_count);
 #endif
 
-
 	if (use_count == 0) {
-		//click_chatter("Release fcb %p",this);
+	    debug_flow("Release fcb %p, uc 0, hc %d",this,hasTimeout());
+		//assert(this->hasTimeout());
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 	    if (this->hasTimeout()) {
 	        if (this->flags & FLOW_TIMEOUT_INLIST) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 2
                 click_chatter("Not releasing %p because timeout is in list, uc %d",this,use_count);
+#endif
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 1
                 assert(fcb_table->old_flows.get().find(this));
 #endif
-#endif
 	            return;
 	        }
-
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 1
+            assert(!fcb_table->old_flows.get().find(this));
+#endif
 	        //Timeout is not in list yet
 	        if (!this->timeoutPassed(Timestamp::recent_steady())) {
 #if DEBUG_CLASSIFIER_TIMEOUT  > 2
@@ -445,6 +478,11 @@ inline void FlowControlBlock::release(int packets_nr) {
 	    this->_do_release();
 
 	}
+#if DEBUG_CLASSIFIER_RELEASE
+	else {
+	    click_chatter("NO RELEASE, fcb %p, uc %d",this,this->use_count);
+	}
+#endif
 }
 
 

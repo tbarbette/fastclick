@@ -1,6 +1,8 @@
 #ifndef CLICK_FLOW_NODES_HH
 #define CLICK_FLOW_NODES_HH 1
 
+#include <click/allocator.hh>
+
 #define FLOW_LEVEL_DEFINE(T,fnt) \
         static FlowNodeData get_data_ptr(void* thunk, Packet* p) {\
             return static_cast<T*>(thunk)->fnt(p);\
@@ -8,12 +10,16 @@
 
 class FlowLevel {
 private:
-    bool deletable;
+    //bool deletable;
 protected:
     bool _dynamic;
     bool _islong = false;
 public:
-    FlowLevel() : deletable(true),_dynamic(false) {};
+    FlowLevel() :
+        //deletable(true),
+        _dynamic(false) {
+
+    };
 
     typedef FlowNodeData (*GetDataFn)(void*, Packet* packet);
     GetDataFn _get_data;
@@ -41,9 +47,9 @@ public:
         _dynamic = true;
     }
 
-    bool is_deletable() {
+    /*bool is_deletable() {
         return deletable;
-    }
+    }*/
 
     virtual String print() = 0;
 
@@ -53,7 +59,7 @@ public:
 
     FlowLevel* assign(FlowLevel* l) {
         _dynamic = l->_dynamic;
-        deletable = l->deletable;
+        //deletable = l->deletable;
         _islong = l->_islong;
         return this;
     }
@@ -157,17 +163,14 @@ protected:
     FlowNodePtr _default;
     FlowNode* _parent;
 
-    bool _child_deletable;
+    //bool _child_deletable;
     bool _released;
+    bool _growing;
     //FlowNodePtr*(_find)(FlowNode*,FlowNodeData data);
 
     typedef FlowNodePtr* (*FindFn)(void*,FlowNodeData data);
 
     FindFn _find;
-
-    inline FlowNodePtr* find(FlowNodeData data) {
-        return _find((void*)this,data);
-    }
 
     void duplicate_internal(FlowNode* node, bool recursive, int use_count) {
         assign(node);
@@ -182,9 +185,9 @@ protected:
                 _default.set_parent(this);
             }
 
-            NodeIterator* it = node->iterator();
+            NodeIterator it = node->iterator();
             FlowNodePtr* child;
-            while ((child = it->next()) != 0) {
+            while ((child = it.next()) != 0) {
                 if (child->is_leaf()) {
                     FlowControlBlock* new_leaf = child->leaf->duplicate(use_count);
                     new_leaf->parent = this;
@@ -227,12 +230,12 @@ protected:
      */
     void assert_diff(FlowNode* node) {
         assert(node->level() != this->level());
-        FlowNode::NodeIterator* it = this->iterator();
-        FlowNode::NodeIterator* ito = node->iterator();
+        FlowNode::NodeIterator it = this->iterator();
+        FlowNode::NodeIterator ito = node->iterator();
         FlowNodePtr* child;
         FlowNodePtr* childo;
-        while ((child = it->next()) != 0) {
-            childo = ito->next();
+        while ((child = it.next()) != 0) {
+            childo = ito.next();
             assert(child != childo);
             assert(child->is_leaf() == childo->is_leaf());
             if (child->is_leaf()) {
@@ -246,26 +249,41 @@ protected:
 public:
     FlowNodeData node_data;
 
-    FlowNode() :  num(0),_level(0),_default(),_parent(0),_child_deletable(true),_released(false) {
+
+    virtual void destroy() {
+        delete this;
+    }
+
+    bool growing() const {
+        return _growing;
+    }
+
+    void set_growing(bool g) {
+        assert(g); //There is no stopping of growing, when it stops, the table should be deleted
+        _growing = g;
+    }
+
+    FlowNode() :  num(0),_level(0),_default(),_parent(0), _growing(false),
+//            _child_deletable(true),
+            _released(false) {
         node_data.data_64 = 0;
     }
 
     FlowLevel* level() const {
         return _level;
     }
-
     inline void add_node(FlowNodeData data, FlowNode* node) {
         FlowNodePtr* ptr = _find(this,data);
-        if (ptr->ptr == 0)
-            inc_num();
+        assert(ptr->ptr == 0);
+        inc_num();
         ptr->set_node(node);
         ptr->set_data(data);
     }
 
     inline void add_leaf(FlowNodeData data, FlowControlBlock* leaf) {
         FlowNodePtr* ptr = _find(this,data);
-        if (ptr->ptr == 0)
-            inc_num();
+        assert(ptr->ptr == 0);
+        inc_num();
         ptr->set_leaf(leaf);
         ptr->set_data(data);
     }
@@ -273,11 +291,11 @@ public:
     /**
      * Run FNT on all children (leaf or nodes, but not empties)
      */
-    template<typename F> void apply(F fnt);
+    void apply(std::function<void(FlowNodePtr*)> fnt);
     /**
      * Run FNT on all children and the default if it's not empty,
      */
-    template<typename F> void apply_default(F fnt);
+    void apply_default(std::function<void(FlowNodePtr*)> fnt);
 
     FlowNode* combine(FlowNode* other, bool as_child, bool priority = true) CLICK_WARN_UNUSED_RESULT;
     void __combine_child(FlowNode* other);
@@ -285,6 +303,9 @@ public:
     FlowNodePtr prune(FlowLevel* level,FlowNodeData data, bool inverted = false) CLICK_WARN_UNUSED_RESULT;
 
 
+    virtual int max_size() const {
+        return INT_MAX;
+    }
     virtual FlowNode* duplicate(bool recursive,int use_count) = 0;
 
     void assign(FlowNode* node) {
@@ -295,23 +316,30 @@ public:
 
     int getNum() const { return num; };
 
+    //To use for testing purposes only
+    int findGetNum();
+
     virtual ~FlowNode() {};
 
     inline bool released() const {
         return _released;
     }
 
-    inline void release() {
-        _released = true;
+    void release();
+    inline bool child_deletable() const {
+        //return _child_deletable;
+        return true;
     }
 
-    inline bool child_deletable() {
-        return _child_deletable;
+
+    inline FlowNodePtr* find(FlowNodeData data) {
+        return _find((void*)this,data);
     }
+
 
     FlowNodePtr* find_or_default(const FlowNodeData data) {
         FlowNodePtr* ptr = _find(this,data);
-        if (ptr->ptr == 0)
+        if (ptr->ptr == 0 || (ptr->is_node() && ptr->node->released()))
             return default_ptr();
         return ptr;
     }
@@ -354,7 +382,7 @@ public:
         node->set_parent(this);
     }
 
-    virtual void release_child(FlowNodePtr fl) = 0;
+    virtual void release_child(FlowNodePtr fl, FlowNodeData data) = 0;
 
     virtual void renew() {
         _released = false;
@@ -362,25 +390,45 @@ public:
 
     virtual String name() const = 0;
 
-    class NodeIterator {
+    class NodeIteratorBase {
     public:
         virtual FlowNodePtr* next() = 0;
     };
 
-    virtual NodeIterator* iterator() = 0;
+    class NodeIterator {
+    private:
+        NodeIteratorBase* _base;
+    public:
+        NodeIterator(NodeIteratorBase* b) {
+            _base = b;
+        }
+        ~NodeIterator(){
+            delete _base;
+        }
+        FlowNodePtr* next() {
+            return _base->next();
+        }
+        NodeIterator operator=(const NodeIterator& it) {
+            NodeIterator nit(it._base);
+            _base = 0;
+            return nit;
+        }
+    };
+
+    virtual NodeIterator iterator() = 0;
 
     inline void set_parent(FlowNode* parent) {
         _parent = parent;
     }
     FlowNode* create_final();
-#if DEBUG_CLASSIFIER
-    void check();
+#if DEBUG_CLASSIFIER || DEBUG_CLASSIFIER_CHECK
+    void check(bool allow_parent = false);
 #else
-    inline void check() {};
+    inline void check(bool allow_parent = false) {};
 #endif
 
     virtual FlowNode* optimize() CLICK_WARN_UNUSED_RESULT;
-
+/*
     FlowNodePtr* get_first_leaf_ptr();
 
     class LeafIterator {
@@ -434,20 +482,20 @@ public:
             sfcbs = next;
             return leaf;
         }
-    };
+    };*/
 
 
-    LeafIterator* leaf_iterator() {
+    /*LeafIterator* leaf_iterator() {
         return new LeafIterator(this);
-    }
+    }*/
 
     /**
      * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
      */
     void traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool do_final, bool do_default) {
-        NodeIterator* it = this->iterator();
+        NodeIterator it = this->iterator();
         FlowNodePtr* cur;
-        while ((cur = it->next()) != 0) {
+        while ((cur = it.next()) != 0) {
             if (cur->is_leaf()) {
                 if (do_final)
                     fnt(cur);
@@ -470,9 +518,9 @@ public:
      * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
      */
     void traverse_all_leaves_and_empty_default(std::function<void(FlowNodePtr*,FlowNode*)> fnt, bool do_final, bool do_default) {
-        NodeIterator* it = this->iterator();
+        NodeIterator it = this->iterator();
         FlowNodePtr* cur;
-        while ((cur = it->next()) != 0) {
+        while ((cur = it.next()) != 0) {
             if (cur->is_leaf()) {
                 if (do_final)
                     fnt(cur, this);
@@ -497,9 +545,9 @@ public:
      * Semantically, this is traversing all "else", undefined cases
      */
     bool traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt) {
-        NodeIterator* it = this->iterator();
+        NodeIterator it = this->iterator();
         FlowNodePtr* cur;
-        while ((cur = it->next()) != 0) {
+        while ((cur = it.next()) != 0) {
             if (!cur->is_leaf()) {
                 if (!cur->node->traverse_all_default_leaf(fnt))
                     return false;
@@ -533,9 +581,9 @@ public:
      * Call fnt on all children nodes of the tree, including default ones, but not self. If FNT return false, traversal is stopped
      */
     bool traverse_all_nodes(std::function<bool(FlowNode*)> fnt) {
-        NodeIterator* it = this->iterator();
+        NodeIterator it = this->iterator();
         FlowNodePtr* cur;
-        while ((cur = it->next()) != 0) {
+        while ((cur = it.next()) != 0) {
             if (!cur->is_leaf()) {
                 if (!fnt(cur->node))
                     return false;
@@ -949,7 +997,7 @@ public:
 		_released = false;
 	}
 
-	virtual void release_child(FlowNode* child) {
+	virtual void release_child(FlowNode* child, FlowNodeData data) {
 		_remove(child);
 	}
 
@@ -965,24 +1013,23 @@ public:
  */
 class FlowNodeArray : public FlowNode  {
     Vector<FlowNodePtr> childs;
+
 public:
-    FlowNodeArray(unsigned int max_size) {
-        childs.resize(max_size);
+    void destroy() override;
+
+    FlowNodeArray() {
         _find = &find_ptr;
     }
-    FLOW_NODE_DEFINE(FlowNodeArray,find_array);
 
-    FlowNode* duplicate(bool recursive,int use_count) override {
-        FlowNodeArray* fa = new FlowNodeArray(childs.size());
-        fa->duplicate_internal(this,recursive,use_count);
-        return fa;
+    void initialize(unsigned int max_size) {
+        childs.resize(max_size);
     }
+
+    FLOW_NODE_DEFINE(FlowNodeArray,find_array);
 
     inline FlowNodePtr* find_array(FlowNodeData data) {
         return &childs[data.data_32];
     }
-
-
 
     void inc_num() {
         num++;
@@ -1000,24 +1047,32 @@ public:
 
     virtual void renew() {
         _released = false;
+        //TODO : disable check
         for (int i = 0; i < childs.size(); i++) {
             if (childs[i].ptr) {
-                if (childs[i].is_leaf())
-                    childs[i].leaf = 0;
-                else
-                    childs[i].node->release();
+                if (childs[i].is_leaf()) {
+                    assert(!childs[i].ptr);
+                    //childs[i].leaf = 0;
+                } else {
+                    assert(childs[i].node->released());
+                }
             }
         }
-        num = 0;
+        assert(num == 0);
+        //num = 0;
 
     }
 
-    void release_child(FlowNodePtr child) {
-        if (_child_deletable) {
+    void release_child(FlowNodePtr child, FlowNodeData data) {
+        if (child_deletable()) {
             if (child.is_leaf()) {
-                childs[child.data().data_32].ptr = 0;
+                childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
             } else {
-                child.node->release();
+                if (growing()) {
+                    child.node->destroy();
+                    child.node = 0;
+                } else
+                    child.node->release();
             }
             num--;
         }
@@ -1032,7 +1087,9 @@ public:
         }
     }
 
-    class ArrayNodeIterator : public NodeIterator{
+    FlowNode* duplicate(bool recursive,int use_count) override;
+
+    class ArrayNodeIterator : public NodeIteratorBase {
         FlowNodeArray* _node;
         int cur;
     public:
@@ -1052,47 +1109,75 @@ public:
         }
     };
 
-    NodeIterator* iterator() {
-        return new ArrayNodeIterator(this);
+    NodeIterator iterator() override {
+        return NodeIterator(new ArrayNodeIterator(this));
     }
 };
 
+static const uint8_t HASH_SIZES_NR = 10;
+
+//const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {256,512,1024,2048,4096,8192};
+
 
 /**
- * Node implemented using a hash table
+ * Node implemented using a linear hash table
  */
+template<int capacity_n>
 class FlowNodeHash : public FlowNode  {
-    Vector<FlowNodePtr> childs;
 
-    const static int HASH_SIZES_NR;
-    const static int hash_sizes[];
-    int size_n;
-    int hash_size;
-    uint32_t mask;
-    int highwater;
-    int max_highwater;
-    unsigned int hash32(uint32_t d) {
-        return (d + (d >> 8) + (d >> 16) + (d >> 24)) & mask;
-        //return d % hash_size;
+    static constexpr void* DESTRUCTED_NODE = (void*)-1;
+
+    static constexpr uint32_t hash_sizes[HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
+    inline static constexpr uint32_t capacity() {
+        return hash_sizes[capacity_n];
     }
 
-    unsigned int hash64(uint64_t ld) {
+    FlowNodePtr childs[capacity()];
+
+    //uint8_t capacity_n; //Index into the hash_sizes array
+//    uint32_t hash_size;
+//    uint32_t mask;
+//    uint32_t highwater;
+//    uint32_t max_highwater;
+    /*inline uint32_t highwater() const {
+        return capacity_n / 3;
+    }*/
+    inline uint32_t max_highwater() const {
+        return 2 * (capacity() / 3);
+    }
+
+    virtual int max_size() const override {
+        return max_highwater();
+    }
+    unsigned int hash32(uint32_t d) const {
+        //return (d + (d >> 8) + (d >> 16) + (d >> 24)) & mask;
+        //return d % hash_size;
+        return (d + (d >> 8) + (d >> 16) + (d >> 24)) % capacity();
+    }
+
+    unsigned int hash64(uint64_t ld) const {
         uint32_t d = (uint32_t)ld ^ (ld >> 32);
-        return (d + (d >> 8) + (d >> 16) + (d >> 24)) & mask;
+        //return (d + (d >> 8) + (d >> 16) + (d >> 24)) & mask;
         //return d % hash_size;
+        return (d + (d >> 8) + (d >> 16) + (d >> 24)) % capacity();
     }
 
 
-    inline int next_idx(int idx) {
-        return (idx + 1) % hash_size;
+    inline int next_idx(int idx) const {
+        idx = (idx + 1);
+        if (idx == hash_sizes[capacity_n])
+            return 0;
+        return idx;
 
     }
 
     String name() const {
-        return "HASH-" + String(hash_size);
+        return "HASH-" + String(capacity());
     }
 
+
     inline unsigned get_idx(FlowNodeData data) {
+        flow_assert(getNum() <= max_highwater());
         int i = 0;
 
         unsigned int idx;
@@ -1102,25 +1187,89 @@ class FlowNodeHash : public FlowNode  {
         else
             idx = hash32(data.data_32);
 
+        unsigned int insert_idx = UINT_MAX;
+        int ri = 0;
 #if DEBUG_CLASSIFIER > 1
-        click_chatter("Idx is %d, table v = %p",idx,childs[idx]);
+        click_chatter("Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
 #endif
-        while (childs[idx].ptr && childs[idx].data().data_64 != data.data_64) {
-            //click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].data().data_64, data.data_64);
-            idx = next_idx(idx);
-            i++;
+        if (unlikely(growing())) { //Growing means the table is currently in destructions, so we check for -1 pointers also, and no insert_idx trick
+            while (childs[idx].ptr) {
+                if (childs[idx].ptr != DESTRUCTED_NODE && childs[idx].data().data_64 == data.data_64)
+                    break;
+                idx = next_idx(idx);
+                i++;
+    #if DEBUG_CLASSIFIER > 1
+                assert(i <= capacity());
+    #endif
+            }
+        } else {
+            while (childs[idx].ptr) {
+                flow_assert(childs[idx].ptr != DESTRUCTED_NODE);
+                if (childs[idx].data().data_64 != data.data_64) {
+                    if (insert_idx == UINT_MAX &&  childs[idx].is_node() && childs[idx].node->released()) {
+                        insert_idx = idx;
+                        ri ++;
+                    }
+                } else {
+                    if (insert_idx != UINT_MAX) {
+                        click_chatter("Swap IDX %d<->%d",insert_idx,idx);
+                        FlowNodePtr tmp = childs[insert_idx];
+                        childs[insert_idx] = childs[idx];
+                        childs[idx] = tmp;
+                        idx = insert_idx;
+                    }
+                    goto found;
+                }
+    #if DEBUG_CLASSIFIER > 1
+                click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].data().data_64, data.data_64);
+    #endif
+                idx = next_idx(idx);
+                i++;
+    #if DEBUG_CLASSIFIER > 2
+                    for (int j = 0; j < capacity(); j++) {
+                        if (!childs[idx].ptr)
+                            click_chatter("[%d] = 0", j);
+                        else if (childs[idx].is_node())
+                            click_chatter("[%d] released = %d", j,childs[idx].node->released());
+                        else
+                            click_chatter("[%d] leaf", j);
+                    }
+    #endif
+    #if DEBUG_CLASSIFIER
+                    assert(i <= capacity());
+    #endif
+            }
+            if (insert_idx != UINT_MAX) {
+                click_chatter("Recovered IDX %d",insert_idx);
+                /*idx = next_idx(idx);
+                int j = 0;
+                //If we merge a hole, delete the rest
+                THIS IS WRONG
+                while (j < 16 && childs[idx].ptr && childs[idx].is_node() && childs[idx].node->released()) {
+                    childs[idx].node->destroy();
+                    childs[idx].node = 0;
+                    idx = next_idx(idx);
+                    j ++;
+                }*/
+
+                idx = insert_idx;
+            }
         }
+        found:
 
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("Final Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
+#endif
 
-        if (i > 50) {
-            click_chatter("%d collisions !",i);
-            //resize();
+        if (i > (capacity() / 10)) {
+            click_chatter("%d collisions! Hint for a better hash table size !",i);
+            click_chatter("%d released in collision !",ri);
         }
 
         return idx;
     }
 
-    class HashNodeIterator : public NodeIterator{
+    class HashNodeIterator : public virtual NodeIteratorBase {
         FlowNodeHash* _node;
         int cur;
     public:
@@ -1128,13 +1277,15 @@ class FlowNodeHash : public FlowNode  {
             _node = n;
         }
 
-        FlowNodePtr* next() {
-            while ( cur < _node->childs.size() && !_node->childs[cur].ptr) cur++;
-            if (cur >= _node->childs.size())
+        virtual FlowNodePtr* next() override {
+            while (cur < _node->capacity() && (_node->childs[cur].ptr == 0 || _node->childs[cur].ptr == DESTRUCTED_NODE)) cur++;
+            if (cur >= _node->capacity())
                 return 0;
             return &_node->childs[cur++];
         }
     };
+
+    void destroy() override;
 
     void resize() {
         /*
@@ -1161,6 +1312,7 @@ class FlowNodeHash : public FlowNode  {
 		for (int i = 0; i < current_size; i++) {
 			if (childs_old[i].ptr) {
 				if (childs_old[i].is_leaf()) {
+				GET IDX CANNOT BE USED FOR OLD
 					childs[get_idx(childs_old[i].data())] = childs_old[i];
 				} else {
 					if (childs_old[i].node->released()) {
@@ -1171,31 +1323,25 @@ class FlowNodeHash : public FlowNode  {
 				}
 			}
 		}*/
-
-
     }
 
     public:
-
-    FlowNode* duplicate(bool recursive,int use_count) override {
-        FlowNodeHash* fh = new FlowNodeHash();
-        fh->duplicate_internal(this,recursive,use_count);
-        return fh;
-    }
-
-    FlowNodeHash() :size_n(FlowNodeHash::HASH_SIZES_NR){
-        hash_size = hash_sizes[size_n -1];
-        mask = hash_size - 1;
-        highwater = hash_size / 3;
-        max_highwater = hash_size / 2;
-        childs.resize(hash_size);
-        for (int i = 0; i < hash_size; i++) {
-            childs[i].ptr= NULL;
-        }
+    FlowNodeHash() {
+        //hash_size = hash_sizes[size_n];
+        //mask = hash_size - 1;
+        //highwater = hash_size / 3;
+        //max_highwater = hash_size / 2;
+        //childs.resize(hash_size);
         _find = &find_ptr;
-    }
-    FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
+#if DEBUG_CLASSIFIER
+        for (int i = 0; i < capacity(); i++) {
+            assert(childs[i].ptr == NULL);
+        }
+#endif
+    };
+    FlowNode* duplicate(bool recursive,int use_count) override;
 
+    FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
 
 
     FlowNodePtr* find_hash(FlowNodeData data) {
@@ -1203,58 +1349,32 @@ class FlowNodeHash : public FlowNode  {
 
         unsigned idx = get_idx(data);
 
-        //If it's a released node
-        if (childs[idx].ptr && childs[idx].is_node() && _child_deletable && childs[idx].node->released()) {
-            num++;
-            /*if (num > max_highwater)
-				resize();*/
-        }
-        //TODO : should not it be the contrary?
-
         return &childs[idx];
     }
 
     void inc_num() {
         num++;
-        if (num > max_highwater)
-            resize();
+        /*if (num > max_highwater())
+            resize();*/
 
     }
 
-    virtual void renew() {
-        _released = false;
-        for (int i = 0; i < hash_size; i++) {
-            if (childs[i].ptr) {
-                if (childs[i].is_leaf()) //TODO : should we release here?
-                    childs[i].leaf = NULL;
-                else
-                    childs[i].node->release();;
-            }
-        }
-        num = 0;
-    }
+    virtual void renew() override;
 
-    void release_child(FlowNodePtr child) {
-        if (_child_deletable) {
-            if (child.is_leaf()) {
-                childs[get_idx(child.data())].ptr = NULL;
-                num--;
-            } else {
-                child.node->release();;
-                num--;
-            }
-        }
-    }
+    void release_child(FlowNodePtr child, FlowNodeData data);
 
     virtual ~FlowNodeHash() {
-        for (int i = 0; i < hash_size; i++) {
-            if (childs[i].ptr && !childs[i].is_leaf())
-                delete childs[i].node;
+        //Same than destroy but don't release ourselves at the end
+        for (int i = 0; i < capacity(); i++) {
+            if (childs[i].ptr && childs[i].ptr != DESTRUCTED_NODE && !childs[i].is_leaf()) {
+                childs[i].node->destroy();
+                childs[i].node = 0;
+            }
         }
     }
 
-    NodeIterator* iterator() {
-        return new HashNodeIterator(this);
+    NodeIterator iterator() override {
+        return NodeIterator(new HashNodeIterator(this));
     }
 };
 
@@ -1266,7 +1386,7 @@ class FlowNodeHash : public FlowNode  {
  */
 class FlowNodeDummy : public FlowNode {
 
-    class DummyIterator : public NodeIterator{
+    class DummyIterator : public NodeIteratorBase{
         FlowNode* _node;
         int cur;
     public:
@@ -1285,6 +1405,10 @@ class FlowNodeDummy : public FlowNode {
         return "DUMMY";
     }
 
+    int max_size() const {
+        return 0;
+    }
+
     FlowNode* duplicate(bool recursive,int use_count) override {
         FlowNodeDummy* fh = new FlowNodeDummy();
         fh->duplicate_internal(this,recursive,use_count);
@@ -1296,8 +1420,9 @@ class FlowNodeDummy : public FlowNode {
     }
     FLOW_NODE_DEFINE(FlowNodeDummy,find_dummy);
 
-    void release_child(FlowNodePtr child) {
+    void release_child(FlowNodePtr child, FlowNodeData data) override {
         click_chatter("TODO : release child of flow node dummy");
+        assert(false);
     }
 
     FlowNodePtr* find_dummy(FlowNodeData data) {
@@ -1307,8 +1432,8 @@ class FlowNodeDummy : public FlowNode {
     virtual ~FlowNodeDummy() {
     }
 
-    NodeIterator* iterator() {
-        return new DummyIterator(this);
+    NodeIterator iterator() override {
+        return NodeIterator(new DummyIterator(this));
     }
 };
 
@@ -1318,7 +1443,7 @@ class FlowNodeDummy : public FlowNode {
 class FlowNodeTwoCase : public FlowNode  {
     FlowNodePtr child;
 
-    class TwoCaseIterator : public NodeIterator{
+    class TwoCaseIterator : public NodeIteratorBase{
         FlowNodeTwoCase* _node;
         int cur;
     public:
@@ -1343,6 +1468,10 @@ class FlowNodeTwoCase : public FlowNode  {
         FlowNodeTwoCase* fh = new FlowNodeTwoCase(child);
         fh->duplicate_internal(this,recursive,use_count);
         return fh;
+    }
+
+    int max_size() const {
+        return 1;
     }
 
     FlowNodeTwoCase(FlowNodePtr c) : child(c) {
@@ -1371,9 +1500,9 @@ class FlowNodeTwoCase : public FlowNode  {
 		num = 0;*/
     }
 
-    void release_child(FlowNodePtr child) {
+    void release_child(FlowNodePtr child, FlowNodeData data) override {
         click_chatter("TODO : release two case");
-        /*if (_child_deletable) {
+        /*if (child_deletable()) {
 			if (is_leaf()) {
 				childs[get_idx(child.data())].ptr = NULL;
 				num--;
@@ -1382,6 +1511,7 @@ class FlowNodeTwoCase : public FlowNode  {
 				num--;
 			}
 		}*/
+        assert(false);
     }
 
     virtual ~FlowNodeTwoCase() {
@@ -1389,8 +1519,8 @@ class FlowNodeTwoCase : public FlowNode  {
             delete child.node;
     }
 
-    NodeIterator* iterator() {
-        return new TwoCaseIterator(this);
+    NodeIterator iterator() override {
+        return NodeIterator(new TwoCaseIterator(this));
     }
 };
 
@@ -1401,7 +1531,7 @@ class FlowNodeThreeCase : public FlowNode  {
     FlowNodePtr childA;
     FlowNodePtr childB;
 
-    class ThreeCaseIterator : public NodeIterator{
+    class ThreeCaseIterator : public NodeIteratorBase {
         FlowNodeThreeCase* _node;
         int cur;
     public:
@@ -1426,6 +1556,9 @@ class FlowNodeThreeCase : public FlowNode  {
     public:
     String name() const {
         return "THREECASE";
+    }
+    int max_size() const {
+        return 2;
     }
 
     FlowNode* duplicate(bool recursive,int use_count) override {
@@ -1463,9 +1596,9 @@ class FlowNodeThreeCase : public FlowNode  {
 		num = 0;*/
     }
 
-    void release_child(FlowNodePtr child) {
+    void release_child(FlowNodePtr child, FlowNodeData data) {
         click_chatter("TODO renew release threecase");
-        /*if (_child_deletable) {
+        /*if (child_deletable()) {
 			if (is_leaf()) {
 				childs[get_idx(child.data())].ptr = NULL;
 				num--;
@@ -1474,14 +1607,15 @@ class FlowNodeThreeCase : public FlowNode  {
 				num--;
 			}
 		}*/
+        assert(false);
     }
 
     virtual ~FlowNodeThreeCase() {
 
     }
 
-    NodeIterator* iterator() {
-        return new ThreeCaseIterator(this);
+    NodeIterator iterator() override {
+        return NodeIterator(new ThreeCaseIterator(this));
     }
 };
 
@@ -1489,7 +1623,7 @@ class FlowNodeThreeCase : public FlowNode  {
  * Flow to be replaced by optimizer containing multiple supplementary informations
  *  not to be used at runtime !
  */
-class FlowNodeDefinition : public FlowNodeHash { public:
+class FlowNodeDefinition : public FlowNodeHash<HASH_SIZES_NR - 1> { public:
     bool _else_drop;
 
     FlowNodeDefinition() : _else_drop(false) {
@@ -1520,5 +1654,26 @@ inline void FlowNodePtr::check() {
     if (!is_leaf())
         node->check();
 }
+
+/**
+ * FlowAllocator
+ */
+template<class T>
+class FlowAllocator { public:
+    static per_thread<pool_allocator_mt<T,true,1024> >& instance() {
+        static per_thread<pool_allocator_mt<T,true,1024> > instance;
+        return instance;
+    }
+    static T* allocate() {
+        return instance()->allocate();
+    }
+    static void release(T* e) {
+        instance()->release(e);
+    }
+};
+
+//template<int capacity> class FlowAllocator<FlowNodeHash<capacity> > : public FlowAllocator {};
+
+
 
 #endif

@@ -19,6 +19,7 @@
 struct fcb_tcpreorder : public FlowReleaseChain
 {
     Packet* packetList;
+    uint16_t packetListLength;
     tcp_seq_t expectedPacketSeq;
     tcp_seq_t lastSent;
 
@@ -122,7 +123,7 @@ private:
      * @brief Send the in-order packets from the list of waiting packets
      * @param fcb A pointer to the FCB of the flow
      */
-    void sendEligiblePackets(struct fcb_tcpreorder *fcb, bool had_awaiting);
+    PacketBatch* sendEligiblePackets(struct fcb_tcpreorder *fcb, bool had_awaiting);
 
     /**
      * @brief Check if the packet is the first one of the flow and acts consequently.
@@ -156,13 +157,6 @@ private:
      */
     bool checkRetransmission(struct fcb_tcpreorder *fcb, Packet* packet, bool always_retransmit);
 
-    /**
-     * @brief Return the sequence number of the packet that will be received after the given one
-     * @param fcb A pointer to the FCB of the flow
-     * @param packet The packet to check
-     * @return The sequence number of the packet after the given one
-     */
-    tcp_seq_t getNextSequenceNumber(Packet* packet);
 
     /**
      * @brief Sort the list of waiting packets using merge sort
@@ -171,7 +165,9 @@ private:
      */
     Packet* sortList(Packet *list);
 
-    bool mergeSort;
+    bool _mergeSort;
+    bool _notimeout;
+    bool _verbose;
 };
 
 CLICK_ENDDECLS

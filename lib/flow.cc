@@ -29,15 +29,6 @@ CLICK_DECLS
 __thread FlowControlBlock* fcb_stack = 0;
 __thread FlowTableHolder* fcb_table = 0;
 
-const int FlowNodeHash::HASH_SIZES_NR = 10;
-const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
-//const int FlowNodeHash::hash_sizes[FlowNodeHash::HASH_SIZES_NR] = {256,512,1024,2048,4096,8192};
-
-#if DEBUG_CLASSIFIER
-    #define debug_flow(...) click_chatter(__VA_ARGS__);
-#else
-    #define debug_flow(...)
-#endif
 
 /*******************************
  * FlowClassificationTable
@@ -192,7 +183,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
 
                 FlowNodeDefinition* node = new FlowNodeDefinition();
                 node->_level = f;
-                node->_child_deletable = f->is_deletable();
+                //node->_child_deletable = f->is_deletable();
                 node->_parent = parent;
                 if (important == "!") {
                     //click_chatter("Important !");
@@ -231,7 +222,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
             FlowLevel*  f = new FlowLevelDummy();
             FlowNodeDefinition* fl = new FlowNodeDefinition();
             fl->_level = f;
-            fl->_child_deletable = f->is_deletable();
+            //fl->_child_deletable = f->is_deletable();
             fl->_parent = root;
             root = fl;
             parent = root;
@@ -270,44 +261,33 @@ void FlowTableHolder::release_later(FlowControlBlock* fcb) {
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 1
     assert(!(fcb->flags & FLOW_TIMEOUT_INLIST));
     assert(!head.find(fcb));
-    unsigned count = 0;
-    FlowControlBlock* b = head.next;
-    while (b!= 0) {
-        count++;
-        b = b->next;
-    }
-    assert(count == head.count);
+    assert(head.count() == head.find_count());
 #endif
-    fcb->next = head.next;
-    head.next = fcb;
-    head.count++;
+    fcb->next = head._next;
+    head._next = fcb;
+    ++head._count;
     fcb->flags |= FLOW_TIMEOUT_INLIST;
+#if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 1
+    assert(head.count() == head.find_count());
+#endif
 
 }
 
 bool FlowTableHolder::check_release() {
     fcb_list& head = old_flows.get();
-    FlowControlBlock* b = head.next;
-    FlowControlBlock** prev = &head.next;
+    FlowControlBlock* next = 0;
+    FlowControlBlock* b = head._next;
+    FlowControlBlock** prev = &head._next;
     Timestamp now = Timestamp::recent_steady();
 
     bool released_something = false;
 
-#if DEBUG_CLASSIFIER_TIMEOUT_CHECK
-    unsigned count = 0;
-    FlowControlBlock* bc = head.next;
-    while (bc!= 0) {
-        count++;
-        bc = bc->next;
-    }
-    assert(count == head.count);
-#endif
 
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK || DEBUG_CLASSIFIER_TIMEOUT
-    unsigned orig_count = head.count;
-    unsigned check_count = 0;
+    assert(head.count() == head.find_count());
 #endif
     while (b != 0) {
+        next = b->next;
         if (b->count() > 0) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 2
             click_chatter("FCB %p not releasable anymore as UC is %d",b,b->count());
@@ -315,35 +295,32 @@ bool FlowTableHolder::check_release() {
             released_something = true;
             b->flags &= ~FLOW_TIMEOUT_INLIST;
             *prev = b->next;
-            head.count--;
+            head._count--;
         }  else if (b->timeoutPassed(now)) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 2
             click_chatter("FCB %p has passed timeout",b);
 #endif
             released_something = true;
             b->flags = 0;
-            b->_do_release();
             *prev = b->next;
-            head.count--;
+            head._count--;
+            b->_do_release();
         } else {
             unsigned t = (b->flags >> FLOW_TIMEOUT_SHIFT);
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
             click_chatter("Time passed : %d/%d",(now - b->lastseen).msecval(),t);
 #endif
             prev = &b->next;
-#if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 0
-            check_count++;
-#endif
         }
-        b = b->next;
+        b = next;
     }
-
     click_chatter("finish");
+
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
-    click_chatter("Released  %d->%d==%d",orig_count,head.count,check_count);
+    click_chatter("Released  %d",head.count());
 #endif
 #if DEBUG_CLASSIFIER_TIMEOUT_CHECK > 0
-    assert(check_count == head.count);
+    assert(head.find_count() == head.count());
 #endif
     return released_something;
 }
@@ -451,7 +428,7 @@ void FlowNode::__combine_child(FlowNode* other) {
 		click_chatter("COMBINE : same level");
 #endif
 
-		FlowNode::NodeIterator* other_childs = other->iterator();
+		FlowNode::NodeIterator other_childs = other->iterator();
 
         /**
          * We add each of the other child to us.
@@ -459,7 +436,7 @@ void FlowNode::__combine_child(FlowNode* other) {
          * - If the child exist, we combine the item with the child
          */
 		FlowNodePtr* other_child_ptr;
-		while ((other_child_ptr = other_childs->next()) != 0) { //For each child of the other node
+		while ((other_child_ptr = other_childs.next()) != 0) { //For each child of the other node
 #if DEBUG_CLASSIFIER
 			click_chatter("COMBINE : taking child %lu",other_child_ptr->data().data_64);
 #endif
@@ -596,7 +573,7 @@ void FlowNode::__combine_else(FlowNode* other) {
 
     if (level()->equals(other->level())) { //Same level
         debug_flow("COMBINE-ELSE : same level");
-        FlowNode::NodeIterator* other_childs = other->iterator();
+        FlowNode::NodeIterator other_childs = other->iterator();
 
         /**
          * We add each of the other child to us.
@@ -604,7 +581,7 @@ void FlowNode::__combine_else(FlowNode* other) {
          * - If the child exist, we combine the item with the child
          */
         FlowNodePtr* other_child_ptr;
-        while ((other_child_ptr = other_childs->next()) != 0) { //For each child of the other node
+        while ((other_child_ptr = other_childs.next()) != 0) { //For each child of the other node
             debug_flow("COMBINE : taking child %lu",other_child_ptr->data().data_64);
 
             FlowNodePtr* child_ptr = find(other_child_ptr->data());
@@ -647,10 +624,10 @@ void FlowNode::__combine_else(FlowNode* other) {
     this->debug_print();
     other->debug_print();
 
-    NodeIterator* it = iterator();
+    NodeIterator it = iterator();
     FlowNodePtr* cur;
     FlowNodePtr Vpruned_default(other->duplicate(true, 1));
-    while ((cur = it->next()) != 0) {
+    while ((cur = it.next()) != 0) {
         if (!cur->is_leaf()) {
             cur->node_combine_ptr(this, other->duplicate(true, 1)->prune(level(), cur->data()),false);
         } else {
@@ -689,17 +666,15 @@ void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child
 
 }
 
-template<typename F>
-void FlowNode::apply(F fnt) {
-    NodeIterator* it = iterator();
+void FlowNode::apply(std::function<void(FlowNodePtr*)>fnt) {
+    NodeIterator it = iterator();
     FlowNodePtr* cur = 0;
-    while ((cur = it->next()) != 0) {
+    while ((cur = it.next()) != 0) {
         fnt(cur);
     }
 }
 
-template<typename F>
-void FlowNode::apply_default(F fnt) {
+void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
     apply(fnt);
     if (_default.ptr) {
         fnt(&_default);
@@ -864,7 +839,6 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
 }
 
 FlowNode* FlowNode::optimize() {
-	NodeIterator* it = iterator();
 	FlowNodePtr* ptr;
 
 	//Optimize default
@@ -896,7 +870,7 @@ FlowNode* FlowNode::optimize() {
 		} else if (getNum() == 1) {
 			FlowNode* newnode;
 
-			FlowNodePtr* child = (iterator()->next());
+			FlowNodePtr* child = (iterator().next());
 
 			if (_default.ptr == 0) {
 				if (child->is_leaf()) {
@@ -948,9 +922,9 @@ FlowNode* FlowNode::optimize() {
             click_chatter("Optimize : node has 2 childs");
 #endif
 			FlowNode* newnode;
-			NodeIterator* cit = iterator();
-			FlowNodePtr* childA = (cit->next());
-			FlowNodePtr* childB = (cit->next());
+			NodeIterator cit = iterator();
+			FlowNodePtr* childA = (cit.next());
+			FlowNodePtr* childB = (cit.next());
 			if (childB->else_drop() || !childA->else_drop()) {
 			    FlowNodePtr* childTmp = childB;
 			    childB = childA;
@@ -1036,100 +1010,6 @@ bool FlowNodePtr::else_drop() {
         return dynamic_cast<FlowNodeDefinition*>(node)->_else_drop;
 }
 
-FlowNodePtr* FlowNode::get_first_leaf_ptr() {
-	FlowNode* parent = this;
-	FlowNodePtr* current_ptr = 0;
-
-	do {
-		if (parent->getNum() > 0)
-			current_ptr = parent->iterator()->next();
-		else
-			current_ptr = parent->default_ptr();
-	} while(!current_ptr->is_leaf() && (parent = current_ptr->node));
-
-	return current_ptr;
-
-}
-
-#if DEBUG_CLASSIFIER
-/**
- * Ensure consistency of the tree
- * @param node
- */
-void FlowNode::check() {
-    FlowNode* node = this;
-    NodeIterator* it = node->iterator();
-    FlowNodePtr* cur = 0;
-    int num = 0;
-    while ((cur = it->next()) != 0) {
-        num++;
-        if (cur->is_node()) {
-            if (cur->node->parent() != node)
-                goto error;
-            cur->node->check();
-        } else {
-            cur->leaf->check();
-        }
-    }
-
-    if (num != getNum()) {
-        click_chatter("Number of child error (live count %d != theorical count %d) in :",num,getNum());
-        print();
-        assert(num == getNum());
-    }
-
-    if (node->default_ptr()->ptr != 0) {
-        if (node->default_ptr()->parent() != node)
-            goto error;
-        if (node->default_ptr()->is_node()) {
-            assert(node->level()->is_dynamic() || node->get_default().node->parent() == node);
-            node->get_default().node->check();
-        } else {
-            node->default_ptr()->leaf->check();
-        }
-    }
-    return;
-    error:
-    click_chatter("Parent concistancy error in :");
-    print();
-    assert(false);
-}
-#endif
-
-void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr) {
-    if (show_ptr)
-        click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
-    else
-        click_chatter("%s%s (%s, %d childs)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
-
-	NodeIterator* it = const_cast<FlowNode*>(node)->iterator();
-	FlowNodePtr* cur = 0;
-	while ((cur = it->next()) != 0) {
-		if (!cur->is_leaf()) {
-		    if (show_ptr)
-		        click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().data_64,cur->parent());
-		    else
-		        click_chatter("%s|-> %lu",prefix.c_str(),cur->data().data_64);
-			print(cur->node,prefix + "|  ",data_offset, show_ptr);
-		} else {
-			cur->leaf->print(prefix + "|->",data_offset, show_ptr);
-		}
-	}
-
-	if (node->_default.ptr != 0) {
-		if (node->_default.is_node()) {
-		    if (show_ptr)
-		        click_chatter("%s|-> DEFAULT %p Parent:%p",prefix.c_str(),node->_default.ptr,node->_default.parent());
-		    else
-		        click_chatter("%s|-> DEFAULT",prefix.c_str());
-			assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
-			print(node->_default.node,prefix + "|  ",data_offset, show_ptr);
-		} else {
-			node->_default.leaf->print(prefix + "|-> DEFAULT",data_offset, show_ptr);
-		}
-	}
-}
-
 /**
  * True if no data is set in the FCB.
  */
@@ -1168,35 +1048,6 @@ void FlowNodePtr::print() const{
 		node->print();
 }
 
-/**
- * Create best structure for this node, and optimize all childs
- */
-FlowNode* FlowNode::create_final() {
-    FlowNode * fl;
-    //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
-    if (_level->get_max_value() == 0)
-        fl = new FlowNodeDummy();
-    else if (_level->get_max_value() > 256)
-        fl = new FlowNodeHash();
-    else
-        fl = new FlowNodeArray(_level->get_max_value());
-    fl->_level = _level;
-    fl->_child_deletable = _level->is_deletable();
-    fl->_parent = parent();
-
-    NodeIterator* it = iterator();
-    FlowNodePtr* cur = 0;
-    while ((cur = it->next()) != 0) {
-        cur->set_parent(fl);
-        if (cur->is_node()) {
-            fl->add_node(cur->data(),cur->node->optimize());
-        } else {
-            fl->add_leaf(cur->data(),cur->leaf);
-        }
-    }
-    fl->set_default(_default);
-    return fl;
-}
 
 void FlowControlBlock::combine_data(uint8_t* data) {
     /*debug_flow("Combine data for :");
@@ -1219,6 +1070,7 @@ void FlowControlBlock::combine_data(uint8_t* data) {
        }
     }
 }
+
 
 FCBPool* FCBPool::biggest_pool = 0;
 int NR_SHARED_FLOW = 0;

@@ -6,7 +6,7 @@
 #include <click/glue.hh>
 #include <click/multithread.hh>
 #include <click/sync.hh>
-
+#define CLICK_DEBUG_ALLOCATOR 1
 CLICK_DECLS
 
 /**
@@ -21,9 +21,9 @@ CLICK_DECLS
  * If the global list limit is reached, the objects will be directly
  *  released.
  *
- * Works mostly like the packet allocator.
+ * Works mostly like the Click packet allocator.
  */
-template <typename T, int POOL_SIZE = 64, int POOL_COUNT = 32>
+template <typename T, bool zero = false, int POOL_SIZE = 64, int POOL_COUNT = 32>
 class pool_allocator_mt { public:
 
     typedef struct item_t{
@@ -37,6 +37,16 @@ class pool_allocator_mt { public:
         }
         item* first;
         int count;
+
+        int find_count() {
+            int i = 0;
+            auto p = first;
+            while (p != 0) {
+                p = p->next;
+                i++;
+            }
+            return i;
+        }
     } Pool;
 
     typedef struct GlobalPool_t {
@@ -47,12 +57,17 @@ class pool_allocator_mt { public:
     pool_allocator_mt();
     ~pool_allocator_mt();
 
-    T* allocate(const T &t) {
+
+    T* allocate_uninitialized() {
 #if CLICK_DEBUG_ALLOCATOR
         _allocated++;
+        assert(_allocated >= _released);
 #endif
         T* e;
         Pool& p = _pool.get();
+#if CLICK_DEBUG_ALLOCATOR
+        assert(p.count == p.find_count());
+#endif
         if (p.count == 0) {
             _global_lock.acquire();
             if (_global_count > 0) {
@@ -67,6 +82,9 @@ class pool_allocator_mt { public:
             _global_lock.release();
             if (!p.first) {
                 p.first = (item*)(CLICK_LALLOC(sizeof(T)));
+                if (zero) {
+                    bzero(p.first,sizeof(T));
+                }
 #if CLICK_DEBUG_ALLOCATOR
                 _newed++;
 #endif
@@ -77,17 +95,32 @@ class pool_allocator_mt { public:
         e = (T*)p.first;
         p.first = p.first->next;
         p.count--;
+#if CLICK_DEBUG_ALLOCATOR
+        assert(p.count == p.find_count());
+#endif
+        return e;
+    }
+
+    T* allocate(const T &t) {
+        T* e = allocate_uninitialized();
         new(e) T(t);
         return e;
     }
 
-    void release(T* e) {
+    T* allocate() {
+        T* e = allocate_uninitialized();
+        new(e) T();
+        return e;
+    }
+
+    void release_unitialized(T* e) {
 #if CLICK_DEBUG_ALLOCATOR
         _released++;
+        assert(_released <= _allocated);
 #endif
-        e->~T();
         Pool& p = _pool.get();
-        if (unlikely(p.count++ == POOL_SIZE)) {
+        ++p.count;
+        if (unlikely(p.count == POOL_SIZE + 1)) {
             _global_lock.acquire();
             if (_global_count == POOL_COUNT-1) {
                 _global_lock.release();
@@ -95,6 +128,8 @@ class pool_allocator_mt { public:
 #if CLICK_DEBUG_ALLOCATOR
                 click_chatter("Global pool is full, freeing item");
 #endif
+                click_chatter("Extremly inefficient pool_allocator_mt ! Change parameters !");
+                p.count --;
             } else {
                 //Move current pool to global pool
 #if CLICK_DEBUG_ALLOCATOR
@@ -113,6 +148,14 @@ class pool_allocator_mt { public:
             ((item*)e)->next = p.first;
             p.first = (item*)e;
         }
+#if CLICK_DEBUG_ALLOCATOR
+        assert(p.count == p.find_count());
+#endif
+    }
+
+    void release(T* e) {
+        e->~T();
+        release_unitialized(e);
     }
 private:
 
@@ -130,8 +173,8 @@ private:
 };
 
 
-template <typename T, int POOL_SIZE, int POOL_COUNT>
-pool_allocator_mt<T,POOL_SIZE,POOL_COUNT>::pool_allocator_mt() :_global_count(0),_global_pool(0),_pool(Pool()) {
+template <typename T, bool ZERO, int POOL_SIZE, int POOL_COUNT>
+pool_allocator_mt<T,ZERO,POOL_SIZE,POOL_COUNT>::pool_allocator_mt() :_global_count(0),_global_pool(0),_pool(Pool()) {
 #if CLICK_DEBUG_ALLOCATOR
     _released = 0;
     _allocated = 0;
@@ -139,8 +182,8 @@ pool_allocator_mt<T,POOL_SIZE,POOL_COUNT>::pool_allocator_mt() :_global_count(0)
 #endif
 }
 
-template <typename T, int POOL_SIZE, int POOL_COUNT>
-pool_allocator_mt<T,POOL_SIZE,POOL_COUNT>::~pool_allocator_mt() {
+template <typename T, bool ZERO, int POOL_SIZE, int POOL_COUNT>
+pool_allocator_mt<T,ZERO,POOL_SIZE,POOL_COUNT>::~pool_allocator_mt() {
         static_assert(sizeof(T) >= sizeof(Pool), "Allocator object is too small");
         int n_release = 0;
         while (_global_pool) {

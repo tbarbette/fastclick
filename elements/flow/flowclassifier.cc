@@ -94,7 +94,7 @@ public:
     }
 };
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0) {
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 2;
@@ -104,7 +104,7 @@ FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), 
 }
 
 FlowClassifier::~FlowClassifier() {
-
+    _table;
 }
 
 int
@@ -120,6 +120,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("BUILDER",_builder)
             .read("AGGTRUST",_collision_is_life)
             .read("VERBOSE",_verbose)
+            .read("CLEAN_TIMER",_clean_timer)
             .complete() < 0)
         return -1;
 
@@ -136,23 +137,90 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+void FlowClassifier::run_timer(Timer*) {
+#if DEBUG_CLASSIFIER_RELEASE
+    click_chatter("Force run check-release");
+#endif
+    fcb_table = &_table;
+    _table.check_release();
+    fcb_table = 0;
+    _timer.reschedule_after_msec(_clean_timer);
+}
 
-void release_subflow(FlowControlBlock* fcb, void* thunk) {
-#if DEBUG_CLASSIFIER_RELEASE > 0
-    click_chatter("Release fcb %p idx %d",fcb,fcb->data_64[0]);
+
+void release_subflow(FlowControlBlock* fcb, void*) {
+#if DEBUG_CLASSIFIER_RELEASE
+    click_chatter("Release fcb %p data %d, parent %p",fcb,fcb->data_64[0],fcb->parent);
 #endif
     if (fcb->parent == NULL) return;
 
-    //Parent of the fcb is release_ptr
-    FlowNode* child = static_cast<FlowNode*>(fcb->parent);
-    child->release_child(FlowNodePtr(fcb));
+    //A -> B -> F
 
-    FlowNode* parent = child->parent();
-    //click_chatter("Parent is %p, child num = %d",parent,child->getNum());
-    while (parent && parent->child_deletable() && parent->getNum() == 1 && parent->default_ptr()->ptr == 0) {
-        child = parent;
-        parent = child->parent();
-        parent->release_child(FlowNodePtr(child));
+    //Parent of the fcb is release_ptr
+
+    FlowNode* child = static_cast<FlowNode*>(fcb->parent); //Child is B
+    flow_assert(child->getNum() == child->findGetNum());
+    FlowNodeData data = *fcb->node_data;
+    child->release_child(FlowNodePtr(fcb), data); //B->release(F)
+    flow_assert(child->getNum() == child->findGetNum());
+    data = child->node_data; //Data is B data inside A
+
+    FlowNode* parent = child->parent(); //Parent is A
+    //If parent is dynamic, we cannot be the child of a default
+    //Release nodes up to the root
+    int up = 0;
+    while (parent && parent->level()->is_dynamic() && child->getNum() == 0) { //A && B is empty and A is dynamic (so B was a duplicate as it comes from a FCB)
+
+#if DEBUG_CLASSIFIER_RELEASE
+        click_chatter("[%d] Releasing parent %s's child %p, growing %d, num %d, child is type %s num %d",up,parent->name().c_str(), child, parent->growing(), parent->getNum(),child->name().c_str(),child->getNum());
+#endif
+        parent->check(true);
+        assert(child->level()->is_dynamic());
+        if (parent->growing() && !child->growing() && child == parent->default_ptr()->ptr) { //If child is default root, it is the default child table of a growing table and must not be deleted
+            click_chatter("Non growing child of its growing original, not deleting");
+            //parent->release_child(FlowNodePtr(child), data);
+            flow_assert(parent->getNum() == parent->findGetNum());
+            break;
+        }
+        if (child->growing()) {
+            click_chatter("Releasing a growing child, we can remove it from the tree. Parent num is %d",parent->getNum());
+            flow_assert(parent->getNum() == parent->findGetNum());
+            FlowNode* subchild = child->default_ptr()->node;
+            child->default_ptr()->ptr = 0; //Remove the default to prevent deletion
+            if (child == parent->default_ptr()->ptr) { //Growing child of growing
+                click_chatter("Default");
+                child->set_parent(0);
+                child->destroy();
+                parent->default_ptr()->ptr = subchild;
+            } else { //Growing child of normal, we cannot swap pointer because find could give a different bucket
+                click_chatter("Child");
+                parent->release_child(FlowNodePtr(child), data); //A->release(B)
+                flow_assert(parent->getNum() == parent->findGetNum());
+                parent->find(data)->set_node(subchild);
+                subchild->node_data = data;
+                parent->inc_num();
+            }
+            subchild->set_parent(parent);
+            flow_assert(parent->getNum() == parent->findGetNum());
+            parent->check(true);
+            break;
+        }
+
+        flow_assert(parent->getNum() == parent->findGetNum());
+        parent->release_child(FlowNodePtr(child), data); //A->release(B)
+#if DEBUG_CLASSIFIER_CHECK
+        if (parent->getNum() != parent->findGetNum()) {
+            click_chatter("Parent has %d != %d counted childs",parent->getNum(),parent->findGetNum());
+            assert(parent->getNum() == parent->findGetNum());
+        }
+#endif
+        parent->check(true);
+        //parent->print();
+        //click_chatter("Releasing parent");
+        child = parent; //Child is A
+        data = child->node_data;
+        parent = child->parent(); //Parent is 0
+        up++;
     };
 }
 
@@ -186,6 +254,8 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
             bzero(_cache.get_value(i), sizeof(FlowCache) * _cache_size * _cache_ring_size);
         }
     }
+
+
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
         IdleTask* idletask = new IdleTask(this);
@@ -217,6 +287,7 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
     fcb_table = 0;
 //#endif
     //return work_done;
+            _table.get_root()->print();
 #endif
     return false; //No reschedule
 }
@@ -346,7 +417,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
 
 static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-            if (fcb->count() == 0 && fcb->hasTimeout()) {
+            if (unlikely(fcb->count() == 0 && fcb->hasTimeout())) {
 # if DEBUG_CLASSIFIER_TIMEOUT > 0
                 assert(fcb->flags & FLOW_TIMEOUT_INLIST);
 # endif
@@ -404,8 +475,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
             _table.get_root()->print(-1,false);
         }
-        check_fcb_still_valid(fcb, now);
-        if (unlikely(fcb->is_early_drop())) {
+        if (unlikely(!fcb || fcb->is_early_drop())) {
             if (last) {
                 last->set_next(next);
             }
@@ -413,6 +483,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             p = next;
             continue;
         }
+        check_fcb_still_valid(fcb, now);
         if (awaiting_batch == NULL) {
 #if DEBUG_CLASSIFIER > 1
             click_chatter("New fcb %p",fcb);
@@ -504,8 +575,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
             click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
             _table.get_root()->print(-1,false);
         }
-        check_fcb_still_valid(fcb, now);
-        if (unlikely(fcb->is_early_drop())) {
+        if (unlikely(!fcb || fcb->is_early_drop())) {
             if (last) {
                 last->set_next(next);
             }
@@ -513,6 +583,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
             p = next;
             continue;
         }
+        check_fcb_still_valid(fcb, now);
         if (lastfcb == fcb) {
             //Just continue as they are still linked
         } else {
@@ -612,17 +683,17 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
         push_batch_simple(port,batch);
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     auto &head = _table.old_flows.get();
-    if (head.count > head.count_thresh) {
+    if (head.count() > head._count_thresh) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
-        click_chatter("%p{element} Forced release",this);
+        click_chatter("%p{element} Forced release because %d is > than %d",this,head.count(), head._count_thresh);
 #endif
         _table.check_release();
-        if (unlikely(head.count < (head.count_thresh / 8) && head.count_thresh > FlowTableHolder::fcb_list::DEFAULT_THRESH)) {
-            head.count_thresh /= 2;
+        if (unlikely(head.count() < (head._count_thresh / 8) && head._count_thresh > FlowTableHolder::fcb_list::DEFAULT_THRESH)) {
+            head._count_thresh /= 2;
         } else
-            head.count_thresh *= 2;
+            head._count_thresh *= 2;
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
-        click_chatter("%p{element} Forced release count %d thresh %d",this,head.count, head.count_thresh);
+        click_chatter("%p{element} Forced release count %d thresh %d",this,head.count(), head._count_thresh);
 #endif
     }
 #endif

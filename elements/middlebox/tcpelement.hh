@@ -74,6 +74,14 @@ public:
     tcp_seq_t getAckNumber(Packet* packet) const;
 
     /**
+     * @brief Return the sequence number of the packet that will be received after the given one
+     * @param fcb A pointer to the FCB of the flow
+     * @param packet The packet to check
+     * @return The sequence number of the packet after the given one
+     */
+    inline tcp_seq_t getNextSequenceNumber(Packet* packet) const;
+
+    /**
      * @brief Return the window size set in the header of a packet
      * @param packet The packet
      * @return The window size set in the header of the packet
@@ -201,6 +209,21 @@ public:
      */
     FlowElement* _tcp_context;
 };
+
+inline tcp_seq_t
+TCPElement::getNextSequenceNumber(Packet* packet) const
+{
+    tcp_seq_t currentSeq = getSequenceNumber(packet);
+
+    // Compute the size of the current payload
+    tcp_seq_t nextSeq = currentSeq + getPayloadLength(packet);
+
+    // FIN and SYN packets count for one in the sequence number
+    if(isFin(packet) || isSyn(packet))
+        nextSeq++;
+
+    return nextSeq;
+}
 
 CLICK_ENDDECLS
 

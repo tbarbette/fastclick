@@ -35,6 +35,8 @@ class FlowClassifier: public BatchElement {
     int cache_hit;
     int cache_sharing;
     int cache_miss;
+    int _clean_timer;
+    Timer _timer;
 
     per_thread<FlowBatch*> _builder_batch;
 public:
@@ -58,6 +60,7 @@ public:
     void push_batch(int port, PacketBatch*);
 
 
+    void run_timer(Timer*) override;
     bool run_idle_task(IdleTask*) override;
 public:
 	FlowClassificationTable& table() {
