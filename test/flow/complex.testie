@@ -1,0 +1,215 @@
+%script
+click COMPLEX
+
+%expect stderr
+lb :: FlowIPLoadBalancer has 4 routes and 4 sources
+Table of r1/FlowClassifier@4 after optimization :
+---
+12/65535 (THREECASE, 2 childs)
+|-> 1544
+|  20/65535 (THREECASE, 2 childs)
+|  |-> 512 UC:1 (data 000200000000000001000000010000000000000000000000000000000000)
+|  |-> 256 UC:1 (data 000100000000000001000000000000000000000000000000000000000000)
+|  |-> DEFAULT 0 UC:1 (data 000000000000000001000000020000000000000000000000000000000000)
+|-> 8
+|  23/255 (THREECASE, 2 childs)
+|  |-> 6
+|  |  36/65535 (TWOCASE, 1 childs)
+|  |  |-> 20480
+|  |  |  26/4294967295 (HASH-257, 0 childs)
+|  |  |  |-> DEFAULT
+|  |  |  |  30/4294967295 (HASH-257, 0 childs)
+|  |  |  |  |-> DEFAULT
+|  |  |  |  |  34/65535 (HASH-257, 0 childs)
+|  |  |  |  |  |-> DEFAULT 0 UC:1 (data 000000000000000000000000000000000100000000000000000000000000)
+|  |  |-> DEFAULT 0 UC:1 (data 00000000000000000000000000000000010000000000000000000000ffff)
+|  |-> 1
+|  |  34/255 (TWOCASE, 1 childs)
+|  |  |-> 8 UC:1 (data 080000000000000000000000000000000000000000000000000000000000)
+|  |  |-> DEFAULT 0 UC:1 (data 000000000000000000000000000000000000000001000000000000000000)
+|  |-> DEFAULT 0 UC:1 (data 000000000000000000000000000000000200000000000000000000000000)
+|-> DEFAULT 0 UC:1 (data 000000000000000002000000000000000000000000000000000000000000)
+---
+Table of r2/FlowClassifier@4 after optimization :
+---
+12/65535 (THREECASE, 2 childs)
+|-> 1544
+|  20/65535 (THREECASE, 2 childs)
+|  |-> 512 UC:1 (data 000200000000000001000000010000000000000000000000000000000000)
+|  |-> 256 UC:1 (data 000100000000000001000000000000000000000000000000000000000000)
+|  |-> DEFAULT 0 UC:1 (data 000000000000000001000000020000000000000000000000000000000000)
+|-> 8
+|  23/255 (THREECASE, 2 childs)
+|  |-> 6
+|  |  34/4294905600 (TWOCASE, 1 childs)
+|  |  |-> 1342177280
+|  |  |  26/4294967295 (HASH-257, 0 childs)
+|  |  |  |-> DEFAULT
+|  |  |  |  30/4294967295 (HASH-257, 0 childs)
+|  |  |  |  |-> DEFAULT
+|  |  |  |  |  34/65535 (HASH-257, 0 childs)
+|  |  |  |  |  |-> DEFAULT
+|  |  |  |  |  |  36/65535 (HASH-257, 0 childs)
+|  |  |  |  |  |  |-> DEFAULT 18446744073709551615 UC:1 (data ffffffffffffffff00000000000000000100000000000000000000000000)
+|  |  |-> DEFAULT 0 UC:1 (data 00000000000000000000000000000000010000000000000000000000ffff)
+|  |-> 1
+|  |  34/255 (TWOCASE, 1 childs)
+|  |  |-> 8 UC:1 (data 080000000000000000000000000000000000000000000000000000000000)
+|  |  |-> DEFAULT 0 UC:1 (data 000000000000000000000000000000000000000000000000010000000000)
+|  |-> DEFAULT 0 UC:1 (data 000000000000000000000000000000000200000000000000000000000000)
+|-> DEFAULT 0 UC:1 (data 000000000000000002000000000000000000000000000000000000000000)
+---
+{{LookupIPRouteMP alignment: .*}}
+{{Allocator : .*}}
+{{Allocator : .*}}
+
+%file COMPLEX
+define($IP1 10.200.0.1)
+define($MAC1 3c:fd:fe:9e:5c:40)
+define($NET1  10.200.0.0/16)
+define($RANGE1  10.200.0.0/30)
+define($HOST $RANGE1)
+
+define($IP2 10.100.0.1)
+define($MAC2 3c:fd:fe:9e:5c:41)
+define($NET2  10.100.0.0/16)
+
+define($SERVERIP1 10.100.1.1)
+define($SERVERIP2 10.100.2.1)
+define($SERVERIP3 10.100.3.1)
+define($SERVERIP4 10.100.4.1)
+
+define($SIP1 10.100.1.2)
+define($SIP2 10.100.2.2)
+define($SIP3 10.100.3.2)
+define($SIP4 10.100.4.2)
+
+//Parameters
+define($rxverbose 99)
+define($txverbose 99)
+define($bout 32)
+define($ignore 0)
+
+elementclass ARPDispatcher {
+        input[0]->
+		iparp :: FlowDispatcher(
+                        12/0800,
+                        12/0806,
+                        -)
+		iparp[0] -> [0]output
+		iparp[1] -> arptype ::FlowDispatcher(20/0001, 20/0002, -)
+		iparp[2] -> [3]output
+		
+		arptype[0] -> [1]output
+		arptype[1] -> [2]output
+		arptype[2] -> [3]output
+}
+
+
+elementclass Receiver { $port, $mac, $ip, $range |
+
+    input[0]
+//    -> Print("ARP QUERIER FROM $mac",-1)
+    -> arpq :: ARPQuerier($ip, $mac)
+//    -> Print("$mac OUT", -1)
+    -> etherOUT :: Null
+
+    f::Idle
+//    -> Print("FROM $mac",-1)
+    -> FlowClassifier(BUILDER 0, AGGCACHE 1, CACHESIZE 65536,VERBOSE 1)
+//    -> stats :: BatchStats()
+    -> arpr :: ARPDispatcher()
+
+    arpr[0]
+    -> FlowStrip(14)
+//    -> Print("IP")
+    -> receivercheck :: CheckIPHeader(CHECKSUM false)
+    -> inc :: FlowDispatcher(9/01, 9/06, -)
+
+    inc[0]
+    -> Print("ICMP")
+    -> icmptype :: FlowDispatcher(20/08, -)
+//    -> Print("ICMP echo")
+    -> ICMPPingResponder
+    -> arpq
+    
+    
+    icmptype[1] -> Print("Unhandled ICMP", -1) -> Discard
+
+    inc[1]
+//    -> Print("TCP", -1)
+    -> [0]output;
+
+
+	inc[2]
+    -> Unstrip(14)
+//	-> Print("NON TCP or ICMP",-1)
+	-> Discard
+
+    arpr[1]
+    -> Print("RX ARP Request $mac", -1)
+    -> arpRespIN :: ARPResponder($range $mac)
+    -> Print("TX ARP Responding", -1)
+    -> etherOUT;
+
+    arpRespIN[1] -> Print("ARP Packet not for $mac") -> Discard
+
+    arpr[2]
+    -> Print("RX ARP Response $mac", -1)
+    -> [1]arpq;
+
+    arpr[3] -> Print("Unknown packet type IN???",-1) -> Discard();
+
+
+    etherOUT
+//    -> avgIN :: AverageCounter(IGNORE $ignore)
+    -> t ::  Discard;
+    
+}
+
+ipOUT :: LookupIPRouteMP($NET1 0,
+                    $NET2 1,
+                    $HOST 2)
+
+lb :: FlowIPLoadBalancer($SERVERIP1,$SERVERIP2,$SERVERIP3,$SERVERIP4, SIP $SIP1 $SIP2 $SIP3 $SIP4 )
+
+r1 :: Receiver(0000:02:00.0,$MAC1,$IP1,$RANGE1) [0] -> ipOUT
+//r1[1] -> ipOUT
+
+r2 :: Receiver(0000:02:00.1,$MAC2,$IP2,$IP2 $SIP1 $SIP2 $SIP3 $SIP4) [0]
+  -> tcpfd :: FlowDispatcher(9/06)
+//  -> dynafd :: FlowDispatcher(20/0050 12/0/ffffffff 16/0/ffffffff 22/0/ffff)
+    -> tcphttp :: FlowDispatcher(20/00050)
+//  -> IPPrint(REVERSELB)
+  -> FlowIPLoadBalancerReverse(lb)
+//  -> IPPrint(REVERSELBOUT)
+//  -> CheckIPHeader(CHECKSUM false)
+  -> [0]r1
+
+//r2[1] -> ipOUT
+
+ipOUT[0]
+//-> Print("CLIENTS")
+-> [0]r1
+
+ipOUT[1]
+//-> Print("SERVER")
+-> [0]r2
+
+ipOUT[2]
+//-> Print("HOST", -1)
+-> istcp :: FlowDispatcher(9/06, -)
+-> ipoutfd ::  FlowDispatcher(22/0050)
+//-> ipoutfd :: FlowDispatcher(22/0050 12/0/ffffffff 16/0/ffffffff 20/0/ffff)
+//-> IPPrint("LB")
+-> lb
+//-> IPPrint("LBOUT")
+//->CheckIPHeader(CHECKSUM false)
+-> [0]r2
+
+istcp[1] -> Print("NON TCP packet to LB !") -> Discard
+
+DriverManager(
+                stop);
+
+//#############################
