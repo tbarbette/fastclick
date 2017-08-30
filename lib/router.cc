@@ -1219,7 +1219,7 @@ Router::initialize(ErrorHandler *errh)
                 click_chatter("%p{element} is a batch-only element ! Please "
                         "check that all elements sending packets to it are "
                         "producing batches of packets instead of single "
-                        "packets.",this);
+                        "packets.",e);
                 all_ok = false;
                 break;
             } else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {

@@ -1,6 +1,6 @@
 #ifndef CLICK_SETIPADDRESS_HH
 #define CLICK_SETIPADDRESS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/ipaddress.hh>
 CLICK_DECLS
 
@@ -20,7 +20,7 @@ CLICK_DECLS
  * =a StoreIPAddress, GetIPAddress
  */
 
-class SetIPAddress : public Element {
+class SetIPAddress : public BatchElement {
 
     IPAddress _ip;
     int _anno;
@@ -30,6 +30,7 @@ class SetIPAddress : public Element {
     SetIPAddress() CLICK_COLD;
     ~SetIPAddress() CLICK_COLD;
 
+
     const char *class_name() const		{ return "SetIPAddress"; }
     const char *port_count() const		{ return PORTS_1_1; }
 
@@ -38,6 +39,8 @@ class SetIPAddress : public Element {
     void add_handlers() CLICK_COLD;
 
     Packet *simple_action(Packet *);
+
+    BATCH_ELEMENT_DEFINE_SIMPLE_ACTION_BATCH(SetIPAddress);
 
 };
 
