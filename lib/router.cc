@@ -910,7 +910,7 @@ Router::set_flow_code_override(int eindex, const String &flow_code)
  */
 int
 Router::visit(Element *first_element, bool forward, int first_port,
-              RouterVisitor *visitor) const
+              RouterVisitor *visitor, bool all_ports) const
 {
     if (!_have_connections || first_element->router() != this)
         return -1;
@@ -918,6 +918,7 @@ Router::visit(Element *first_element, bool forward, int first_port,
     sort_connections();
 
     Bitvector result_bv(ngports(!forward), false), scratch;
+    Bitvector result_e(nelements(),false);
 
     Vector<Port> sources;
     if (first_port < 0) {
@@ -940,12 +941,21 @@ Router::visit(Element *first_element, bool forward, int first_port,
                     break;
                 Port connpt = _conn[ci][!forward];
                 int conng = gport(!forward, connpt);
-                if (result_bv[conng])
-                    continue;
-                result_bv[conng] = true;
+                if (!all_ports) {
+                    if (result_bv[conng])
+                        continue;
+                    result_bv[conng] = true;
+                }
+
                 if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
                                     _elements[sp->idx], sp->port, distance))
                     continue;
+                if (all_ports) {
+                    if (result_e[connpt.idx])
+                        continue;
+
+                    result_e[connpt.idx] = true;
+                }
                 _elements[connpt.idx]->port_flow(!forward, connpt.port, &scratch);
                 for (int port = 0; port < scratch.size(); ++port)
                     if (scratch[port])

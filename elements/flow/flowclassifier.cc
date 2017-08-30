@@ -125,7 +125,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     FlowBufferVisitor v(this, sizeof(FlowNodeData) + reserve);
-    router()->visit(this,true,-1,&v);
+    router()->visit(this,true,-1,&v,true);
 #if DEBUG_CLASSIFIER
     click_chatter("%s : pool size %d",name().c_str(),v.data_size);
 #endif

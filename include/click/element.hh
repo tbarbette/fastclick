@@ -260,7 +260,7 @@ class Element { public:
         inline void set_unstack(bool unstack) {
             _unstack = unstack;
         }
-        inline bool unstack() {
+        inline bool unstack() const {
             return _unstack;
         }
 #endif
