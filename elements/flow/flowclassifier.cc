@@ -33,7 +33,7 @@ public:
             fe->_classifier = _classifier;
         }
 
-        VirtualFlowBufferElement* fbe = dynamic_cast<VirtualFlowBufferElement*>(e);
+        VirtualFlowSpaceElement* fbe = dynamic_cast<VirtualFlowSpaceElement*>(e);
         if (fbe != NULL) { //The visited element is an element that need FCB space
 
             //Resize the map if needed
@@ -125,7 +125,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     FlowBufferVisitor v(this, sizeof(FlowNodeData) + reserve);
-    router()->visit(this,true,-1,&v,true);
+    router()->visit_ports(this,true,-1,&v);
 #if DEBUG_CLASSIFIER
     click_chatter("%s : pool size %d",name().c_str(),v.data_size);
 #endif

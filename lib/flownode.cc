@@ -136,43 +136,6 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
     }
 }
 
-/**
- * Create best structure for this node, and optimize all childs
- */
-FlowNode* FlowNode::create_final() {
-    FlowNode * fl;
-    //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
-    if (_level->get_max_value() == 0)
-        fl = new FlowNodeDummy();
-    else if (_level->get_max_value() > 256) {
-        FlowNodeHash<0>* fh0 = FlowAllocator<FlowNodeHash<0>>::allocate();
-#if DEBUG_CLASSIFIER
-        assert(fh0->getNum() == 0);
-        fh0->check();
-#endif
-        fl = fh0;
-    } else {
-        FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
-        fa->initialize(_level->get_max_value());
-        fl = fa;
-    }
-    fl->_level = _level;
-    //fl->_child_deletable = _level->is_deletable();
-    fl->_parent = parent();
-
-    NodeIterator it = iterator();
-    FlowNodePtr* cur = 0;
-    while ((cur = it.next()) != 0) {
-        cur->set_parent(fl);
-        if (cur->is_node()) {
-            fl->add_node(cur->data(),cur->node->optimize());
-        } else {
-            fl->add_leaf(cur->data(),cur->leaf);
-        }
-    }
-    fl->set_default(_default);
-    return fl;
-}
 
 /**
  * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
@@ -299,6 +262,97 @@ void FlowNode::traverse_parents(std::function<void(FlowNode*)> fnt) {
     if (parent())
         parent()->traverse_parents(fnt);
     return;
+}
+
+
+/***************************************
+ * FlowNodeDefinition
+ *************************************/
+
+FlowNodeDefinition*
+FlowNodeDefinition::duplicate(bool recursive,int use_count) {
+    FlowNodeDefinition* fh = new FlowNodeDefinition();
+    fh->_else_drop = _else_drop;
+    fh->_hint = _hint;
+    fh->duplicate_internal(this,recursive,use_count);
+    return fh;
+}
+
+/**
+ * Create best structure for this node, and optimize all childs
+ */
+FlowNode*
+FlowNodeDefinition::create_final() {
+    FlowNode * fl;
+    //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
+    click_chatter("Hint is %s",_hint.c_str());
+    if (_hint) {
+        assert(_hint.starts_with("HASH-"));
+        _hint = _hint.substring(_hint.find_left('-') + 1);
+        switch (atoi(_hint.c_str())) {
+            case 0:
+                fl = FlowAllocator<FlowNodeHash<0>>::allocate();
+                break;
+            case 1:
+                fl = FlowAllocator<FlowNodeHash<1>>::allocate();
+                break;
+            case 2:
+                fl = FlowAllocator<FlowNodeHash<2>>::allocate();
+                break;
+            case 3:
+                fl = FlowAllocator<FlowNodeHash<3>>::allocate();
+                break;
+            case 4:
+                fl = FlowAllocator<FlowNodeHash<4>>::allocate();
+                break;
+            case 5:
+                fl = FlowAllocator<FlowNodeHash<5>>::allocate();
+                break;
+            case 6:
+                fl = FlowAllocator<FlowNodeHash<6>>::allocate();
+                break;
+            case 7:
+                fl = FlowAllocator<FlowNodeHash<7>>::allocate();
+                break;
+            case 8:
+                fl = FlowAllocator<FlowNodeHash<8>>::allocate();
+                break;
+            default:
+                fl = FlowAllocator<FlowNodeHash<9>>::allocate();
+                break;
+        }
+    } else {
+        if (_level->get_max_value() == 0)
+            fl = new FlowNodeDummy();
+        else if (_level->get_max_value() > 256) {
+            FlowNodeHash<0>* fh0 = FlowAllocator<FlowNodeHash<0>>::allocate();
+    #if DEBUG_CLASSIFIER
+            assert(fh0->getNum() == 0);
+            fh0->check();
+    #endif
+            fl = fh0;
+        } else {
+            FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+            fa->initialize(_level->get_max_value());
+            fl = fa;
+        }
+    }
+    fl->_level = _level;
+    //fl->_child_deletable = _level->is_deletable();
+    fl->_parent = parent();
+
+    NodeIterator it = iterator();
+    FlowNodePtr* cur = 0;
+    while ((cur = it.next()) != 0) {
+        cur->set_parent(fl);
+        if (cur->is_node()) {
+            fl->add_node(cur->data(),cur->node->optimize());
+        } else {
+            fl->add_leaf(cur->data(),cur->leaf);
+        }
+    }
+    fl->set_default(_default);
+    return fl;
 }
 
 /***************************************

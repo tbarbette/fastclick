@@ -435,7 +435,7 @@ public:
     inline void set_parent(FlowNode* parent) {
         _parent = parent;
     }
-    FlowNode* create_final();
+
 #if DEBUG_CLASSIFIER || DEBUG_CLASSIFIER_CHECK
     void check(bool allow_parent = false);
 #else
@@ -487,6 +487,7 @@ private:
     FlowNode* replace_leaves(FlowNode* other, bool do_final, bool do_default);
     friend class FlowClassificationTable;
     friend class FlowNodePtr;
+    friend class FlowNodeDefinition;
 };
 
 /**
@@ -1166,7 +1167,7 @@ class FlowNodeHash : public FlowNode  {
         }
 #endif
     };
-    FlowNode* duplicate(bool recursive,int use_count) override;
+    virtual FlowNode* duplicate(bool recursive,int use_count) override;
 
     FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
 
@@ -1449,8 +1450,9 @@ class FlowNodeThreeCase : public FlowNode  {
  */
 class FlowNodeDefinition : public FlowNodeHash<HASH_SIZES_NR - 1> { public:
     bool _else_drop;
+    String _hint;
 
-    FlowNodeDefinition() : _else_drop(false) {
+    FlowNodeDefinition() : _else_drop(false), _hint(String::make_empty()) {
 
     }
 
@@ -1458,12 +1460,9 @@ class FlowNodeDefinition : public FlowNodeHash<HASH_SIZES_NR - 1> { public:
         return String("DEFINITION") + (_else_drop?"!":"");
     }
 
-    FlowNodeDefinition* duplicate(bool recursive,int use_count) override {
-        FlowNodeDefinition* fh = new FlowNodeDefinition();
-        fh->_else_drop = _else_drop;
-        fh->duplicate_internal(this,recursive,use_count);
-        return fh;
-    }
+    FlowNodeDefinition* duplicate(bool recursive,int use_count) override;
+
+    FlowNode* create_final();
 };
 
 inline void FlowNodePtr::traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt) {

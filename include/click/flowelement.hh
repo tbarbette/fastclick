@@ -34,9 +34,9 @@ public:
 /**
  * Element that needs FCB space
  */
-class VirtualFlowBufferElement : public FlowElement {
+class VirtualFlowSpaceElement : public FlowElement {
 public:
-	VirtualFlowBufferElement() :_flow_data_offset(-1) {
+	VirtualFlowSpaceElement() :_flow_data_offset(-1) {
 	}
 	virtual const size_t flow_data_size() const = 0;
 	virtual const int flow_data_index() const {
@@ -55,11 +55,11 @@ protected:
 
 };
 
-template<typename T> class FlowBufferElement : public VirtualFlowBufferElement {
+template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
 
 public :
 
-	FlowBufferElement() : VirtualFlowBufferElement() {
+	FlowSpaceElement() : VirtualFlowSpaceElement() {
 
 	}
 
@@ -150,9 +150,9 @@ public :
 #endif
             assert(false);
             /*SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
-            VirtualFlowBufferElement* fe;
+            VirtualFlowSpaceElement* fe;
             do {
-                fe = static_cast<VirtualFlowBufferElement*>(fcb_chain->previous_thunk);
+                fe = static_cast<VirtualFlowSpaceElement*>(fcb_chain->previous_thunk);
                 chain_fnt = static_cast<FlowReleaseChain*>(fcb_stack->data[fe->_flow_data_offset])->previous_fnt;
             } while (chain_fnt != fnt);
             */
@@ -187,11 +187,11 @@ public :
 
 };
 
-template<typename T, int index> class FlowSharedBufferElement : public FlowBufferElement<T> {
+template<typename T, int index> class FlowSharedBufferElement : public FlowSpaceElement<T> {
 
 public :
 
-	FlowSharedBufferElement() : FlowBufferElement<T>() {
+	FlowSharedBufferElement() : FlowSpaceElement<T>() {
 
 	}
 
@@ -247,6 +247,10 @@ public:
  *
  * In practice it will overwrite get_table
  */
+
+#define TCP_MIDDLEBOX "9/06! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
+#define UDP_MIDDLEBOX "9/11! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
+
 #define FLOW_ELEMENT_DEFINE_CONTEXT(rule) \
 FlowNode* get_table(int iport) override CLICK_COLD {\
     return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true);\

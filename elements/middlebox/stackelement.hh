@@ -34,7 +34,7 @@ behaviour.
 
 */
 
-class StackElement : public VirtualFlowBufferElement
+class StackElement : public VirtualFlowSpaceElement
 {
 public:
     friend class PathMerger;

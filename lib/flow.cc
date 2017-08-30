@@ -61,9 +61,9 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
     bool subflow = false;
     bool thread = false;
 
-    std::regex reg("((agg )?((?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?[!]? ?)+)|-)( keep| [0-9]+| drop)?",
+    std::regex reg("((agg )?((?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?(?:[:]HASH-[0-9]+)?[!]? ?)+)|-)( keep)?( [0-9]+| drop)?",
              std::regex_constants::icase);
-    std::regex classreg("(ip)?[+]?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?([!])?",
+    std::regex classreg("(ip)?[+]?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?([:]HASH-[0-9]+)?([!])?",
                  std::regex_constants::icase);
 
     FlowNode* root = 0;
@@ -86,9 +86,10 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
 
         std::string other = result.str(1);
         std::string aggregate = result.str(2);
-        std::string deletable = result.str(4);
+        std::string keep = result.str(4);
+        std::string deletable = result.str(5);
 
-        if (deletable == " keep")
+        if (keep == " keep")
             deletable_value = true;
         else if (deletable == " drop")
             output = -1;
@@ -97,6 +98,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
         } else {
             output = INT_MAX;
         }
+
 
         FlowNode* parent = 0;
         if (other != "-") {
@@ -113,7 +115,8 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                 std::string offset = it->str(2);
                 std::string value = it->str(3);
                 std::string mask = it->str(4);
-                std::string important = it->str(5);
+                std::string important = it->str(6);
+                std::string hint = it->str(5);
 
                 if (verbose)
                     click_chatter("o : %s, v : %s, m : %s",offset.c_str(),value.c_str(), mask.c_str());
@@ -182,6 +185,12 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                 }
 
                 FlowNodeDefinition* node = new FlowNodeDefinition();
+
+                if (hint != "") {
+                    node->_hint = String(hint.substr(1).c_str());
+
+                }
+
                 node->_level = f;
                 //node->_child_deletable = f->is_deletable();
                 node->_parent = parent;

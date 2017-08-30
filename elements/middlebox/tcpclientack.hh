@@ -33,7 +33,7 @@ TCPClientAck()
 TCPClient ack must be used after TCPReorder
  */
 
-class TCPClientAck : public FlowBufferElement<fcb_clientack>, public TCPElement
+class TCPClientAck : public FlowSpaceElement<fcb_clientack>, public TCPElement
 {
 public:
     /**

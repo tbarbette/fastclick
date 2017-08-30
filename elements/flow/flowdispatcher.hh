@@ -8,7 +8,7 @@
 
 CLICK_DECLS
 
-class FlowDispatcher: public FlowBufferElement<int> {
+class FlowDispatcher: public FlowSpaceElement<int> {
 
 public:
 

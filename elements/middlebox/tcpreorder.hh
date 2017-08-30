@@ -86,7 +86,7 @@ Default value: true.
 
 =a TCPIn, TCPOut, TCPRetransmitter */
 
-class TCPReorder : public FlowBufferElement<fcb_tcpreorder>, public TCPElement
+class TCPReorder : public FlowSpaceElement<fcb_tcpreorder>, public TCPElement
 {
 public:
     /**

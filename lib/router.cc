@@ -887,7 +887,7 @@ Router::set_flow_code_override(int eindex, const String &flow_code)
     _flow_code_override.push_back(flow_code);
 }
 
-/** @brief Traverse the router configuration from one of @a e's ports.
+/** @brief Traverse the router configuration from one of @a e's ports, maximum once per port.
  * @param e element to start search
  * @param forward true to search down from outputs, false to search up from
  *   inputs
@@ -910,7 +910,7 @@ Router::set_flow_code_override(int eindex, const String &flow_code)
  */
 int
 Router::visit(Element *first_element, bool forward, int first_port,
-              RouterVisitor *visitor, bool all_ports) const
+              RouterVisitor *visitor) const
 {
     if (!_have_connections || first_element->router() != this)
         return -1;
@@ -918,7 +918,6 @@ Router::visit(Element *first_element, bool forward, int first_port,
     sort_connections();
 
     Bitvector result_bv(ngports(!forward), false), scratch;
-    Bitvector result_e(nelements(),false);
 
     Vector<Port> sources;
     if (first_port < 0) {
@@ -941,21 +940,13 @@ Router::visit(Element *first_element, bool forward, int first_port,
                     break;
                 Port connpt = _conn[ci][!forward];
                 int conng = gport(!forward, connpt);
-                if (!all_ports) {
-                    if (result_bv[conng])
-                        continue;
-                    result_bv[conng] = true;
-                }
+                if (result_bv[conng])
+                    continue;
+                result_bv[conng] = true;
 
                 if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
                                     _elements[sp->idx], sp->port, distance))
                     continue;
-                if (all_ports) {
-                    if (result_e[connpt.idx])
-                        continue;
-
-                    result_e[connpt.idx] = true;
-                }
                 _elements[connpt.idx]->port_flow(!forward, connpt.port, &scratch);
                 for (int port = 0; port < scratch.size(); ++port)
                     if (scratch[port])
@@ -968,6 +959,80 @@ Router::visit(Element *first_element, bool forward, int first_port,
 
     return 0;
 }
+
+/** @brief Traverse the router configuration from one of @a e's ports, passing per each ports
+ * @param e element to start search
+ * @param forward true to search down from outputs, false to search up from
+ *   inputs
+ * @param port port (or -1 to search all ports)
+ * @param visitor RouterVisitor traversal object
+ * @return 0 on success, -1 in early router configuration stages
+ *
+ * Calls @a visitor ->@link RouterVisitor::visit visit() @endlink on each
+ * reachable port starting from a port on @a e.  Follows connections and
+ * traverses inside elements from port to port by Element::flow_code().  The
+ * visitor can stop a traversal path by returning false from visit().
+ *
+ * @a visitor ->@link RouterVisitor::visit visit() is called on input
+ * ports if @a forward is true and output ports if @a forward is false.
+ *
+ * Equivalent to either visit_downstream() or visit_upstream(), depending on
+ * @a forward.
+ *
+ * @sa visit_downstream(), visit_upstream()
+ */
+int
+Router::visit_ports(Element *first_element, bool forward, int first_port,
+              RouterVisitor *visitor) const
+{
+    if (!_have_connections || first_element->router() != this)
+        return -1;
+
+    sort_connections();
+
+    Bitvector result_e(nelements(),false),scratch;
+
+    Vector<Port> sources;
+    if (first_port < 0) {
+        for (int port = 0; port < first_element->nports(forward); ++port)
+            sources.push_back(Port(first_element->eindex(), port));
+    } else if (first_port < first_element->nports(forward))
+        sources.push_back(Port(first_element->eindex(), first_port));
+
+    Vector<Port> next_sources;
+    int distance = 1;
+
+    while (sources.size()) {
+        next_sources.clear();
+
+        for (Port *sp = sources.begin(); sp != sources.end(); ++sp)
+            for (int cix = connindex_lower_bound(forward, *sp);
+                 cix < _conn.size(); ++cix) {
+                int ci = (forward ? _conn_output_sorter[cix] : cix);
+                if (_conn[ci][forward] != *sp)
+                    break;
+                Port connpt = _conn[ci][!forward];
+                int conng = gport(!forward, connpt);
+
+                if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
+                                    _elements[sp->idx], sp->port, distance))
+                    continue;
+                if (result_e[connpt.idx])
+                    continue;
+                result_e[connpt.idx] = true;
+                _elements[connpt.idx]->port_flow(!forward, connpt.port, &scratch);
+                for (int port = 0; port < scratch.size(); ++port)
+                    if (scratch[port])
+                        next_sources.push_back(Port(connpt.idx, port));
+            }
+
+        sources.swap(next_sources);
+        ++distance;
+    }
+
+    return 0;
+}
+
 
 namespace {
 class ElementFilterRouterVisitor : public RouterVisitor { public:

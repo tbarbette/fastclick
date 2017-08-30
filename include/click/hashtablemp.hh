@@ -3,7 +3,6 @@
 #include <click/glue.hh>
 #include <click/hashcode.hh>
 #define CLICK_DEBUG_HASHMAP 1
-#define CLICK_DEBUG_ALLOCATOR 1
 #include <click/allocator.hh>
 #include <click/multithread.hh>
 #if CLICK_DEBUG_HASHMAP

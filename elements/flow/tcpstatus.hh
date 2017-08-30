@@ -15,7 +15,7 @@ class TCPStatusFlowData {
 
 };
 
-class TCPStatus: public FlowBufferElement<TCPStatusFlowData> {
+class TCPStatus: public FlowSpaceElement<TCPStatusFlowData> {
 	int _timeout;
 
 public:

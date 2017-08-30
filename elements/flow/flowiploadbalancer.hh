@@ -34,7 +34,7 @@ typedef HashTableMP<LBEntry,IPPair> LBHashtable;
 #else
 typedef HashTable<LBEntry,IPPair> LBHashtable;
 #endif
-class FlowIPLoadBalancer : public FlowBufferElement<IPPair> {
+class FlowIPLoadBalancer : public FlowSpaceElement<IPPair> {
 
 public:
 
@@ -45,7 +45,7 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff","9/11! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
+    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
@@ -61,7 +61,7 @@ private:
     friend class FlowIPLoadBalancerReverse;
 };
 
-class FlowIPLoadBalancerReverse : public FlowBufferElement<IPPair> {
+class FlowIPLoadBalancerReverse : public FlowSpaceElement<IPPair> {
 
 public:
 
@@ -72,7 +72,7 @@ public:
     const char *port_count() const      { return "1/1"; }
     const char *processing() const      { return PUSH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff","9/11! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
+    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);

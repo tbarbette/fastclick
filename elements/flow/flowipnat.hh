@@ -36,7 +36,7 @@ typedef HashTableMP<NATEntry,IPPair> NATHashtable;
 typedef HashTable<NATEntry,IPPair> NATHashtable;
 #endif
 
-class FlowIPNAT : public FlowBufferElement<IPPair> {
+class FlowIPNAT : public FlowSpaceElement<IPPair> {
 
 public:
 
@@ -57,7 +57,7 @@ private:
     IPAddress _sip;
 };
 
-class FlowIPNATReverse : public FlowBufferElement<IPPair> {
+class FlowIPNATReverse : public FlowSpaceElement<IPPair> {
 
 public:
 
