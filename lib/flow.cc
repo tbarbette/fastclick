@@ -314,7 +314,6 @@ bool FlowTableHolder::check_release() {
         }
         b = next;
     }
-    click_chatter("finish");
 
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
     click_chatter("Released  %d",head.count());

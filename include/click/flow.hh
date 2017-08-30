@@ -24,7 +24,6 @@ class FlowClassificationTable : public FlowTableHolder {
 public:
     FlowClassificationTable();
     ~FlowClassificationTable() {
-        click_chatter("Cleaning up root node");
         if (_root)
             _root->destroy();
         _root = 0;

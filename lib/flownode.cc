@@ -20,50 +20,9 @@
 #include <click/flow.hh>
 #include <stdlib.h>
 
-/**
+/********************************
  * FlowNode functions
- */
-template<int capacity_n>
-FlowNode*
-FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count) {
-    FlowNodeHash* fh = FlowAllocator<FlowNodeHash<capacity_n>>::allocate();
-#if DEBUG_CLASSIFIER_CHECK
-    assert(fh->getNum() == 0);
-    fh->check();
-#endif
-    fh->duplicate_internal(this,recursive,use_count);
-    return fh;
-}
-
-
-FlowNode* FlowNodeArray::duplicate(bool recursive,int use_count) {
-    FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
-    fa->initialize(childs.size());
-    fa->duplicate_internal(this,recursive,use_count);
-    return fa;
-}
-template<int capacity_n>
-void FlowNodeHash<capacity_n>::destroy() {
-    flow_assert(num == 0);
-    /*for (int i = 0; i < capacity(); i++) {
-        if (childs[i].ptr && childs[i].ptr != (void*)-1 && childs[i].is_node()) {
-            childs[i].node->destroy();
-            childs[i].node = 0;
-        }
-    }*/
-    FlowAllocator<FlowNodeHash<capacity_n>>::release(this);
-}
-void FlowNodeArray::destroy() {
-#if DEBUG_CLASSIFIER_CHECK
-    apply([](FlowNodePtr* p) {
-        if (p->ptr) {
-            assert(p->is_node());
-            assert(p->node->released());
-        }
-    });
-#endif
-    FlowAllocator<FlowNodeArray>::release(this);
-}
+ *********************************/
 
 int FlowNode::findGetNum() {
     int count = 0;
@@ -177,18 +136,6 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
     }
 }
 
-//TODO :inline
-void FlowNode::release() {
-    assert(!growing());
-    _released = true;
-    apply([](FlowNodePtr* p) {
-        if (p->ptr) {
-            assert(p->is_node());
-            assert(p->node->released());
-        }
-    });
-};
-
 /**
  * Create best structure for this node, and optimize all childs
  */
@@ -226,6 +173,187 @@ FlowNode* FlowNode::create_final() {
     fl->set_default(_default);
     return fl;
 }
+
+/**
+ * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
+ */
+void  FlowNode::traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool do_final, bool do_default) {
+    NodeIterator it = this->iterator();
+    FlowNodePtr* cur;
+    while ((cur = it.next()) != 0) {
+        if (cur->is_leaf()) {
+            if (do_final)
+                fnt(cur);
+        } else {
+            cur->node->traverse_all_leaves(fnt, do_final, do_default);
+        }
+    }
+
+    if (this->default_ptr()->ptr != 0) {
+        cur = this->default_ptr();
+        if (cur->is_leaf()) {
+            if (do_default)
+                fnt(cur);
+        } else {
+            cur->node->traverse_all_leaves(fnt, do_final, do_default);
+        }
+    }
+}
+
+/**
+ * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
+ */
+void  FlowNode::traverse_all_leaves_and_empty_default(std::function<void(FlowNodePtr*,FlowNode*)> fnt, bool do_final, bool do_default) {
+    NodeIterator it = this->iterator();
+    FlowNodePtr* cur;
+    while ((cur = it.next()) != 0) {
+        if (cur->is_leaf()) {
+            if (do_final)
+                fnt(cur, this);
+        } else {
+            cur->node->traverse_all_leaves_and_empty_default(fnt, do_final, do_default);
+        }
+    }
+
+    if (this->default_ptr()->ptr != 0) {
+        if (cur->is_leaf()) {
+            if (do_default)
+                fnt(this->default_ptr(), this);
+        } else {
+            cur->node->traverse_all_leaves_and_empty_default(fnt, do_final, do_default);
+        }
+    } else {
+        fnt(this->default_ptr(), this);
+    }
+}
+
+/**
+ * Call fnt on all nodes having an empty default or a leaf default.
+ * Semantically, this is traversing all "else", undefined cases
+ */
+bool  FlowNode::traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt) {
+    NodeIterator it = this->iterator();
+    FlowNodePtr* cur;
+    while ((cur = it.next()) != 0) {
+        if (!cur->is_leaf()) {
+            if (!cur->node->traverse_all_default_leaf(fnt))
+                return false;
+        }
+    }
+    if (this->default_ptr()->ptr == 0) {
+        if (!fnt(this))
+            return false;
+    } else {
+        if (this->default_ptr()->is_leaf()) {
+            if (!fnt(this))
+                return false;
+        } else {
+            if (!this->default_ptr()->node->traverse_all_default_leaf(fnt))
+                return false;
+        }
+    }
+    return true;
+}
+
+
+/**
+ * Call fnt on all children nodes of the tree, including default ones, but not self. If FNT return false, traversal is stopped
+ */
+bool  FlowNode::traverse_all_nodes(std::function<bool(FlowNode*)> fnt) {
+    NodeIterator it = this->iterator();
+    FlowNodePtr* cur;
+    while ((cur = it.next()) != 0) {
+        if (!cur->is_leaf()) {
+            if (!fnt(cur->node))
+                return false;
+            if (!cur->node->traverse_all_nodes(fnt))
+                return false;
+        }
+    }
+    if (this->default_ptr()->ptr != 0) {
+        if (this->default_ptr()->is_node()) {
+            if (!fnt(this->default_ptr()->node))
+                return false;
+            if (!this->default_ptr()->node->traverse_all_nodes(fnt))
+                return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Call fnt on all parent of the node, including the node itself
+ */
+void  FlowNode::traverse_parents(std::function<bool(FlowNode*)> fnt) {
+    if (!fnt(this))
+        return;
+    if (parent())
+        parent()->traverse_parents(fnt);
+    return;
+}
+/**
+ * Call fnt on all parent of the node, including the node itself
+ */
+void FlowNode::traverse_parents(std::function<void(FlowNode*)> fnt) {
+    fnt(this);
+    if (parent())
+        parent()->traverse_parents(fnt);
+    return;
+}
+
+/***************************************
+ * FlowNodeArray
+ *************************************/
+void FlowNodeArray::destroy() {
+#if DEBUG_CLASSIFIER_CHECK
+    //This will break final destruction
+    apply([](FlowNodePtr* p) {
+        if (p->ptr) {
+            assert(p->is_node());
+            assert(p->node->released());
+        }
+    });
+#endif
+    FlowAllocator<FlowNodeArray>::release(this);
+}
+FlowNodeArray::~FlowNodeArray() {
+    for (int i = 0; i < childs.size(); i++) {
+        if (childs[i].ptr != NULL && childs[i].is_node()) {
+               childs[i].node->destroy();
+        }
+    }
+}
+FlowNode* FlowNodeArray::duplicate(bool recursive,int use_count) {
+    FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+    fa->initialize(childs.size());
+    fa->duplicate_internal(this,recursive,use_count);
+    return fa;
+}
+
+
+
+/******************************
+ * FlowNodeHash
+ ******************************/
+template<int capacity_n>
+void FlowNodeHash<capacity_n>::destroy() {
+    flow_assert(num == 0); //Not true on final destroy
+    FlowAllocator<FlowNodeHash<capacity_n>>::release(this);
+}
+
+
+template<int capacity_n>
+FlowNode*
+FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count) {
+    FlowNodeHash* fh = FlowAllocator<FlowNodeHash<capacity_n>>::allocate();
+#if DEBUG_CLASSIFIER_CHECK
+    assert(fh->getNum() == 0);
+    fh->check();
+#endif
+    fh->duplicate_internal(this,recursive,use_count);
+    return fh;
+}
+
 
 template<int capacity_n>
 void FlowNodeHash<capacity_n>::renew() {

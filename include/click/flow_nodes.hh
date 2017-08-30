@@ -319,13 +319,28 @@ public:
     //To use for testing purposes only
     int findGetNum();
 
-    virtual ~FlowNode() {};
+    virtual ~FlowNode() {
+        if (_default.ptr && _default.is_node())
+            _default.node->release();
+    };
 
     inline bool released() const {
         return _released;
     }
 
-    void release();
+    inline void release() {
+        flow_assert(!growing());
+        _released = true;
+#if DEBUG_CLASSIFIER
+        apply([](FlowNodePtr* p) {
+            if (p->ptr) {
+                assert(p->is_node());
+                assert(p->node->released());
+            }
+        });
+#endif
+    };
+
     inline bool child_deletable() const {
         //return _child_deletable;
         return true;
@@ -337,18 +352,18 @@ public:
     }
 
 
-    FlowNodePtr* find_or_default(const FlowNodeData data) {
+    inline FlowNodePtr* find_or_default(const FlowNodeData data) {
         FlowNodePtr* ptr = _find(this,data);
         if (ptr->ptr == 0 || (ptr->is_node() && ptr->node->released()))
             return default_ptr();
         return ptr;
     }
 
-    virtual void inc_num() {
+    void inc_num() {
         num++;
     }
 
-    virtual void dec_num() {
+    void dec_num() {
         num--;
     }
 
@@ -428,147 +443,21 @@ public:
 #endif
 
     virtual FlowNode* optimize() CLICK_WARN_UNUSED_RESULT;
-/*
-    FlowNodePtr* get_first_leaf_ptr();
 
-    class LeafIterator {
-    private:
-        typedef struct SfcbItem_t {
-            FlowControlBlock* sfcb;
-            struct SfcbItem_t* next;
-        } SfcbItem;
+    void traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool do_final, bool do_default);
 
-        SfcbItem* sfcbs;
+    void traverse_all_leaves_and_empty_default(std::function<void(FlowNodePtr*,FlowNode*)> fnt, bool do_final, bool do_default);
 
-        void find_leaf(FlowNode* node) {
-            NodeIterator* it = node->iterator();
-            FlowNodePtr* cur;
-            while ((cur = it->next()) != 0) {
-                if (cur->is_leaf()) {
-                    SfcbItem* item = new SfcbItem();
-                    item->next = sfcbs;
-                    item->sfcb = cur->leaf;
-                    sfcbs = item;
-                } else {
-                    find_leaf(cur->node);
-                }
-            }
-            if (node->default_ptr()->ptr != 0) {
-                cur = node->default_ptr();
-                if (cur->is_leaf()) {
-                    SfcbItem* item = new SfcbItem();
-                    item->next = sfcbs;
-                    item->sfcb = cur->leaf;
-                    sfcbs = item;
-                } else {
-                    find_leaf(cur->node);
-                }
-            }
-        }
+    bool traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt);
 
-    public:
+    bool traverse_all_nodes(std::function<bool(FlowNode*)> fnt);
 
-        LeafIterator(FlowNode* node) {
-            sfcbs = 0;
-            find_leaf(node);
-        }
+    void traverse_parents(std::function<bool(FlowNode*)> fnt);
 
-        FlowControlBlock* next() {
-            if (!sfcbs)
-                return 0;
-            FlowControlBlock* leaf = sfcbs->sfcb;
-            SfcbItem* next = sfcbs->next;
-            delete sfcbs;
-            sfcbs = next;
-            return leaf;
-        }
-    };*/
+    void traverse_parents(std::function<void(FlowNode*)> fnt);
 
 
-    /*LeafIterator* leaf_iterator() {
-        return new LeafIterator(this);
-    }*/
-
-    /**
-     * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
-     */
-    void traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool do_final, bool do_default) {
-        NodeIterator it = this->iterator();
-        FlowNodePtr* cur;
-        while ((cur = it.next()) != 0) {
-            if (cur->is_leaf()) {
-                if (do_final)
-                    fnt(cur);
-            } else {
-                cur->node->traverse_all_leaves(fnt, do_final, do_default);
-            }
-        }
-
-        if (this->default_ptr()->ptr != 0) {
-            cur = this->default_ptr();
-            if (cur->is_leaf()) {
-                if (do_default)
-                    fnt(cur);
-            } else {
-                cur->node->traverse_all_leaves(fnt, do_final, do_default);
-            }
-        }
-    }
-    /**
-     * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
-     */
-    void traverse_all_leaves_and_empty_default(std::function<void(FlowNodePtr*,FlowNode*)> fnt, bool do_final, bool do_default) {
-        NodeIterator it = this->iterator();
-        FlowNodePtr* cur;
-        while ((cur = it.next()) != 0) {
-            if (cur->is_leaf()) {
-                if (do_final)
-                    fnt(cur, this);
-            } else {
-                cur->node->traverse_all_leaves_and_empty_default(fnt, do_final, do_default);
-            }
-        }
-
-        if (this->default_ptr()->ptr != 0) {
-            if (cur->is_leaf()) {
-                if (do_default)
-                    fnt(this->default_ptr(), this);
-            } else {
-                cur->node->traverse_all_leaves_and_empty_default(fnt, do_final, do_default);
-            }
-        } else {
-            fnt(this->default_ptr(), this);
-        }
-    }
-    /**
-     * Call fnt on all nodes having an empty default or a leaf default.
-     * Semantically, this is traversing all "else", undefined cases
-     */
-    bool traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt) {
-        NodeIterator it = this->iterator();
-        FlowNodePtr* cur;
-        while ((cur = it.next()) != 0) {
-            if (!cur->is_leaf()) {
-                if (!cur->node->traverse_all_default_leaf(fnt))
-                    return false;
-            }
-        }
-        if (this->default_ptr()->ptr == 0) {
-            if (!fnt(this))
-                return false;
-        } else {
-            if (this->default_ptr()->is_leaf()) {
-                if (!fnt(this))
-                    return false;
-            } else {
-                if (!this->default_ptr()->node->traverse_all_default_leaf(fnt))
-                    return false;
-            }
-        }
-        return true;
-    }
-
-    bool has_no_default(bool allow_dynamic = false) {
+    inline bool has_no_default(bool allow_dynamic = false) {
         return traverse_all_default_leaf([allow_dynamic](FlowNode* parent) -> bool {
             if (parent->default_ptr()->ptr == 0 && (!allow_dynamic || !parent->level()->is_dynamic())) {
                 return false;
@@ -577,60 +466,8 @@ public:
         });
     }
 
-    /**
-     * Call fnt on all children nodes of the tree, including default ones, but not self. If FNT return false, traversal is stopped
-     */
-    bool traverse_all_nodes(std::function<bool(FlowNode*)> fnt) {
-        NodeIterator it = this->iterator();
-        FlowNodePtr* cur;
-        while ((cur = it.next()) != 0) {
-            if (!cur->is_leaf()) {
-                if (!fnt(cur->node))
-                    return false;
-                if (!cur->node->traverse_all_nodes(fnt))
-                    return false;
-            }
-        }
-        if (this->default_ptr()->ptr != 0) {
-            if (this->default_ptr()->is_node()) {
-                if (!fnt(this->default_ptr()->node))
-                    return false;
-                if (!this->default_ptr()->node->traverse_all_nodes(fnt))
-                    return false;
-            }
-        }
-        return true;
-    }
 
-    /**
-     * Call fnt on all parent of the node, including the node itself
-     */
-    void traverse_parents(std::function<bool(FlowNode*)> fnt) {
-        if (!fnt(this))
-            return;
-        if (parent())
-            parent()->traverse_parents(fnt);
-        return;
-    }
-    /**
-     * Call fnt on all parent of the node, including the node itself
-     */
-    void traverse_parents(std::function<void(FlowNode*)> fnt) {
-        fnt(this);
-        if (parent())
-            parent()->traverse_parents(fnt);
-        return;
-    }
-
-    /**
-     * Call F on all leaf of the tree
-     */
-    /*template<typename F>
-    void traverse(F fnt) {
-        traverse_all_leaf([fnt](FlowNodePtr* ptr) -> bool {fnt(ptr->leaf);return true;},true,true,false);
-    }*/
-
-    void print(int data_offset = -1, bool show_ptr = true) const {
+    inline void print(int data_offset = -1, bool show_ptr = true) const {
         click_chatter("---");
         print(this,"", data_offset, show_ptr);
         click_chatter("---");
@@ -1031,9 +868,6 @@ public:
         return &childs[data.data_32];
     }
 
-    void inc_num() {
-        num++;
-    }
 
     String name() const {
         return "ARRAY";
@@ -1078,14 +912,7 @@ public:
         }
     }
 
-    ~FlowNodeArray() {
-        for (int i = 0; i < childs.size(); i++) {
-            if (childs[i].ptr != NULL) {
-                //if (!leaf)
-                delete childs[i].node;
-            }
-        }
-    }
+    ~FlowNodeArray();
 
     FlowNode* duplicate(bool recursive,int use_count) override;
 
@@ -1352,12 +1179,6 @@ class FlowNodeHash : public FlowNode  {
         return &childs[idx];
     }
 
-    void inc_num() {
-        num++;
-        /*if (num > max_highwater())
-            resize();*/
-
-    }
 
     virtual void renew() override;
 
@@ -1515,8 +1336,8 @@ class FlowNodeTwoCase : public FlowNode  {
     }
 
     virtual ~FlowNodeTwoCase() {
-        if (child.ptr) //&& !leaf)
-            delete child.node;
+        if (child.ptr && child.is_node())
+            child.node->destroy();
     }
 
     NodeIterator iterator() override {
@@ -1611,7 +1432,10 @@ class FlowNodeThreeCase : public FlowNode  {
     }
 
     virtual ~FlowNodeThreeCase() {
-
+        if (childA.ptr && childA.is_node())
+            childA.node->destroy();
+        if (childB.ptr && childB.is_node())
+            childB.node->destroy();
     }
 
     NodeIterator iterator() override {

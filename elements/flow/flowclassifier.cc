@@ -104,7 +104,7 @@ FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), 
 }
 
 FlowClassifier::~FlowClassifier() {
-    _table;
+
 }
 
 int
@@ -170,7 +170,6 @@ void release_subflow(FlowControlBlock* fcb, void*) {
     //Release nodes up to the root
     int up = 0;
     while (parent && parent->level()->is_dynamic() && child->getNum() == 0) { //A && B is empty and A is dynamic (so B was a duplicate as it comes from a FCB)
-
 #if DEBUG_CLASSIFIER_RELEASE
         click_chatter("[%d] Releasing parent %s's child %p, growing %d, num %d, child is type %s num %d",up,parent->name().c_str(), child, parent->growing(), parent->getNum(),child->name().c_str(),child->getNum());
 #endif
@@ -287,7 +286,6 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
     fcb_table = 0;
 //#endif
     //return work_done;
-            _table.get_root()->print();
 #endif
     return false; //No reschedule
 }

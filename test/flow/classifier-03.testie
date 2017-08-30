@@ -84,5 +84,5 @@ Table of d after optimization :
 |  |  |-> DEFAULT 0 UC:1 (data 00000000000000000100000000000000ffffffff)
 |  |-> DEFAULT 0 UC:1 (data 0000000000000000ffffffff0000000000000000)
 ---
-
+{{Allocator : .*}}
 
