@@ -31,7 +31,7 @@
 CLICK_DECLS
 
 ARPTable::ARPTable()
-    : _entry_capacity(0), _packet_capacity(2048), _entry_packet_capacity(0), _capacity_slim_factor(2), _expire_timer(this)
+    : _entry_capacity(0), _packet_capacity(2048), _entry_packet_capacity(0), _capacity_slim_factor(2), _expire_timer(this), _need_lock(true)
 {
     _entry_count = _packet_count = _drops = 0;
 }
@@ -59,6 +59,13 @@ ARPTable::configure(Vector<String> &conf, ErrorHandler *errh)
 	_expire_timer.initialize(this);
 	_expire_timer.schedule_after_sec(_timeout_j / CLICK_HZ);
     }
+    return 0;
+}
+
+int
+ARPTable::initialize(ErrorHandler *errh) {
+    if (get_passing_threads().weight() <= 1)
+        _need_lock = false;
     return 0;
 }
 

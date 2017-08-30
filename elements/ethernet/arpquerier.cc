@@ -89,6 +89,7 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	_arpt->configure(subconf, errh);
 	_my_arpt = true;
     }
+    _arpt->add_remote_element(this);
 
     IPAddress my_mask;
     if (conf.size() == 1)
@@ -180,11 +181,13 @@ ARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-ARPQuerier::initialize(ErrorHandler *)
+ARPQuerier::initialize(ErrorHandler *errh)
 {
     _arp_queries = 0;
     _drops = 0;
     _arp_responses = 0;
+    if (_my_arpt)
+        return _arpt->initialize(errh);
     return 0;
 }
 
