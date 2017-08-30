@@ -157,7 +157,7 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
     //A -> B -> F
 
     //Parent of the fcb is release_ptr
-
+    flow_assert(thunk);
     static_cast<FlowClassifier*>(thunk)->remove_cache_fcb(fcb);
     FlowNode* child = static_cast<FlowNode*>(fcb->parent); //Child is B
     flow_assert(child->getNum() == child->findGetNum());
@@ -296,16 +296,21 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
 }
 
 inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
+    if (!_aggcache)
+        return;
     uint32_t agg = *((uint32_t*)&fcb->node_data[1]);
     uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
 #if USE_CACHE_RING
-        FlowCache* bucket = _cache.get() + hash * _cache_ring_size;
+        FlowCache* bucket = _cache.get() + (hash * _cache_ring_size);
         FlowCache* c = bucket;
         int ic = 0;
         do {
             if (c->agg == agg && c->fcb == fcb) {
                 c->agg = 0;
+                return;
             }
+            ic++;
+            c++;
         } while (ic < _cache_ring_size);
 #else
         FlowCache* bucket = _cache.get() + hash;
