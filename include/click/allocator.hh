@@ -9,6 +9,21 @@
 #define CLICK_DEBUG_ALLOCATOR 0
 CLICK_DECLS
 
+class pool_allocator_mt_base {
+public:
+        /**
+         * Avoid warnings when final releasing which frees a lot of objects
+         */
+        static void set_dying(bool v) {
+            _dying = v;
+        }
+        static bool dying() {
+            return _dying;
+        }
+private:
+        static bool _dying;
+};
+
 /**
  * Multithread-safe pool allocator.
  *
@@ -24,7 +39,7 @@ CLICK_DECLS
  * Works mostly like the Click packet allocator.
  */
 template <typename T, bool zero = false, int POOL_SIZE = 64, int POOL_COUNT = 32>
-class pool_allocator_mt { public:
+class pool_allocator_mt : pool_allocator_mt_base { public:
 
     typedef struct item_t{
         struct item_t* next;
@@ -122,13 +137,15 @@ class pool_allocator_mt { public:
         ++p.count;
         if (unlikely(p.count == POOL_SIZE + 1)) {
             _global_lock.acquire();
-            if (_global_count == POOL_COUNT-1) {
+            if (_global_count == POOL_COUNT-1 || _dying) {
                 _global_lock.release();
                 CLICK_LFREE(e,sizeof(T));
+                if (!_dying) {
 #if CLICK_DEBUG_ALLOCATOR
-                click_chatter("Global pool is full, freeing item");
+                    click_chatter("Global pool is full, freeing item");
 #endif
-                click_chatter("Extremly inefficient pool_allocator_mt ! Change parameters !");
+                    click_chatter("Extremly inefficient pool_allocator_mt ! Change parameters !");
+                }
                 p.count --;
             } else {
                 //Move current pool to global pool
@@ -157,6 +174,7 @@ class pool_allocator_mt { public:
         e->~T();
         release_unitialized(e);
     }
+
 private:
 
     per_thread<Pool> _pool;

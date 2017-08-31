@@ -29,6 +29,7 @@
 #include <click/package.hh>
 #include <click/error.hh>
 #include <click/confparse.hh>
+#include <click/allocator.hh>
 
 #if !CLICK_LINUXMODULE && !CLICK_BSDMODULE
 # include <click/userutils.hh>
@@ -457,6 +458,8 @@ click_static_initialize()
 void
 click_static_cleanup()
 {
+    pool_allocator_mt_base::set_dying(true);
+
     delete _click_lexer;
     _click_lexer = 0;
 

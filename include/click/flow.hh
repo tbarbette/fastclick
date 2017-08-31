@@ -10,6 +10,7 @@
 #include <click/bitvector.hh>
 #include <click/vector.hh>
 #include <click/list.hh>
+#include <click/allocator.hh>
 //#include <openflow/openflow.h>
 #include <thread>
 #include <assert.h>
@@ -24,8 +25,11 @@ class FlowClassificationTable : public FlowTableHolder {
 public:
     FlowClassificationTable();
     ~FlowClassificationTable() {
+        bool previous = pool_allocator_mt_base::dying();
+        pool_allocator_mt_base::set_dying(true);
         if (_root)
             _root->destroy();
+        pool_allocator_mt_base::set_dying(previous);
         _root = 0;
     }
 
