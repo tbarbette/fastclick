@@ -35,6 +35,7 @@
 #include <click/notifier.hh>
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
+#include <click/allocator.hh>
 #if HAVE_NETMAP_PACKET_POOL
 #include <click/netmapdevice.hh>
 #endif
@@ -105,6 +106,8 @@ Router::~Router()
 {
     if (_refcount != 0)
         click_chatter("deleting router while ref count = %d", _refcount.value());
+
+    pool_allocator_mt_base::set_dying(true);
 
     // unuse the hotswap router
     if (_hotswap_router)
