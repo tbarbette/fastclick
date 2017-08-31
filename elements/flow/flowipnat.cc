@@ -93,7 +93,7 @@ void FlowIPNATReverse::push_batch(int port, IPPair* flowdata, PacketBatch* batch
         auto ip = batch->ip_header();
         auto th = batch->tcp_header();
         NATEntry entry = NATEntry(ip->ip_src, th->th_dport);
-#if IPLOADBALANCER_MP
+#if IPNATR_MP
         NATHashtable::ptr ptr = _in->_map.find(entry);
 #else
         NATHashtable::iterator ptr = _in->_map.find(entry);
@@ -112,7 +112,7 @@ void FlowIPNATReverse::push_batch(int port, IPPair* flowdata, PacketBatch* batch
             click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->src.unparse().c_str(),ptr->dst.unparse().c_str());
 #endif
         }
-#if IPLOADBALANCER_MP
+#if IPNATR_MP
         *flowdata = *ptr;
 #else
         *flowdata = ptr.value();

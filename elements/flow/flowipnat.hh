@@ -7,8 +7,8 @@
 #include <click/glue.hh>
 #include <click/vector.hh>
 CLICK_DECLS
-#define IPLOADBALANCER_MP 1
-#if IPLOADBALANCER_MP
+#define IPNATR_MP 1
+#if IPNATR_MP
 #include <click/hashtablemp.hh>
 #else
 #include <click/hashtable.hh>
@@ -30,7 +30,7 @@ struct NATEntry {
    }
 
 };
-#if IPLOADBALANCER_MP
+#if IPNATR_MP
 typedef HashTableMP<NATEntry,IPPair> NATHashtable;
 #else
 typedef HashTable<NATEntry,IPPair> NATHashtable;
