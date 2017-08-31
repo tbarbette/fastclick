@@ -40,7 +40,9 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int FlowIPLoadBalancer::initialize(ErrorHandler *errh) {
-
+    if (get_passing_threads().weight() <= 1) {
+        _map.disable_mt();
+    }
     return 0;
 }
 
