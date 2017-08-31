@@ -110,6 +110,7 @@ FlowIPLoadBalancerReverse::configure(Vector<String> &conf, ErrorHandler *errh)
                .complete() < 0)
         return -1;
     _lb = reinterpret_cast<FlowIPLoadBalancer*>(e);
+    _lb->add_remote_element(this);
     return 0;
 }
 

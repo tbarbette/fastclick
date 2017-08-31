@@ -73,9 +73,11 @@ class HashContainerMP { public:
         ~iterator() {
             if (_h) {
                 if (_b < _h->_table->_nbuckets) {
-                    _h->_table->buckets[_b].list.read_end();
+                    if (likely(_mt))
+                        _h->_table->buckets[_b].list.read_end();
                 }
-                _h->_table.read_end();
+                if (likely(_mt))
+                    _h->_table.read_end();
             }
         }
 
@@ -88,9 +90,11 @@ class HashContainerMP { public:
             }
             while (!_item) {
                 //click_chatter("Bucket %d : %p",_b,_h->_table->buckets[_b]);
-                _h->_table->buckets[_b].list.read_end();
+                if (likely(_mt))
+                    _h->_table->buckets[_b].list.read_end();
                 if (++_b == _h->_table->_nbuckets) return;
-                _h->_table->buckets[_b].list.read_begin();
+                if (likely(_mt))
+                    _h->_table->buckets[_b].list.read_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
             }
@@ -130,7 +134,8 @@ class HashContainerMP { public:
         //global read lock must be held!
         iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
             _b = 0;
-            _h->_table->buckets[_b].list.read_begin();
+            if (likely(_mt))
+                _h->_table->buckets[_b].list.read_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
                 (*this)++;
@@ -148,9 +153,11 @@ class HashContainerMP { public:
         ~write_iterator() {
             if (_h) {
                 if (_b < _h->_table->_nbuckets) {
-                    _h->_table->buckets[_b].list.write_end();
+                    if (likely(_mt))
+                        _h->_table->buckets[_b].list.write_end();
                 }
-                _h->_table.read_end();
+                if (likely(_mt))
+                    _h->_table.read_end();
             }
             _h = 0; //Prevent read destruction
         }
@@ -163,9 +170,11 @@ class HashContainerMP { public:
                 _prev = _item;
             }
             while (!_item) {
-                _h->_table->buckets[_b].list.write_end();
+                if (likely(_mt))
+                    _h->_table->buckets[_b].list.write_end();
                 if (++_b == _h->_table->_nbuckets) return;
-                _h->_table->buckets[_b].list.write_begin();
+                if (likely(_mt))
+                    _h->_table->buckets[_b].list.write_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
             }
@@ -209,7 +218,8 @@ class HashContainerMP { public:
         //global read lock must be held!
         write_iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
             _b = 0;
-            _h->_table->buckets[_b].list.write_begin();
+            if (likely(_mt))
+                _h->_table->buckets[_b].list.write_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
                 (*this)++;
@@ -252,9 +262,11 @@ class HashContainerMP { public:
     /** @brief Return the number of elements stored. */
     inline size_type size() {
         size_type s;
-        _table.read_begin();
+        if (likely(_mt))
+            _table.read_begin();
         s = _table->_size;
-        _table.read_end();
+        if (likely(_mt))
+            _table.read_end();
         return s;
     }
 
@@ -267,9 +279,11 @@ class HashContainerMP { public:
     /** @brief Return true if this HashContainer should be rebalanced. */
     inline bool unbalanced() {
         bool r;
-        _table.read_begin();
+        if (likely(_mt))
+            _table.read_begin();
         r = _table->_size > 2 * _table->_nbuckets && _table->_nbuckets < max_bucket_count;
-        _table.read_end();
+        if (likely(_mt))
+            _table.read_end();
         return r;
     }
 
@@ -302,7 +316,12 @@ class HashContainerMP { public:
         return _table.refcnt();
     }
 
+    inline void disable_mt() {
+        _mt = false;
+    }
   protected:
+    bool _mt;
+
     __rwlock<Table> _table;
     per_thread<ListItem*> _pending_release;
 
@@ -369,7 +388,7 @@ void HashContainerMP<K,V,Item>::deinitialize()
 
 template <typename K, typename V, typename Item>
 HashContainerMP<K,V,Item>::HashContainerMP() :
-    _table(), _pending_release(0)
+    _table(), _pending_release(0), _mt(true)
 {
     initialize(initial_bucket_count);
 }
@@ -397,11 +416,14 @@ template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::ptr
 HashContainerMP<K,V,Item>::find(const K &key)
 {
-    _table.read_begin();
+    if (likely(_mt))
+        _table.read_begin();
     size_type b = bucket(key);
     Bucket& bucket = _table->buckets[b];
-    bucket.list.read_begin();
-    _table.read_end();
+    if (likely(_mt))
+        bucket.list.read_begin();
+    if (likely(_mt))
+        _table.read_end();
     ListItem *pprev;
     ptr p;
     for (pprev = bucket.list->head; pprev; pprev = hashnext(pprev))
@@ -409,17 +431,20 @@ HashContainerMP<K,V,Item>::find(const K &key)
         p.assign(&pprev->item);
         break;
     }
-    bucket.list.read_end();
+    if (likely(_mt))
+        bucket.list.read_end();
     return p;
 }
 
 #define MAKE_FIND_INSERT(ptr_type) \
-    _table.read_begin();\
+    if (likely(_mt))\
+        _table.read_begin();\
     size_type b = bucket(key);\
     Bucket& bucket = _table->buckets[b];\
 \
 retry:\
-    bucket.list.read_begin();\
+    if (likely(_mt))\
+        bucket.list.read_begin();\
     \
     ListItem *pprev;\
     ptr_type p;\
@@ -430,7 +455,8 @@ retry:\
         }\
     }\
     if (p) {\
-        bucket.list.read_end();\
+        if (likely(_mt))\
+            bucket.list.read_end();\
     } else {\
         if (!bucket.list.read_to_write()) {\
             goto retry;\
@@ -445,9 +471,11 @@ retry:\
         p.assign(&e->item);\
 \
         _table->_size++;\
-        bucket.list.write_end();\
+        if (likely(_mt))\
+            bucket.list.write_end();\
     }\
-    _table.read_end();\
+    if (likely(_mt))\
+        _table.read_end();\
 
 template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::ptr
@@ -470,7 +498,8 @@ template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::iterator
 HashContainerMP<K,V,Item>::begin()
 {
-    _table.read_begin();
+    if (likely(_mt))
+        _table.read_begin();
     return iterator(this);
 }
 
@@ -478,7 +507,8 @@ template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::write_iterator
 HashContainerMP<K,V,Item>::write_begin()
 {
-    _table.read_begin();
+    if (likely(_mt))
+        _table.read_begin();
     return write_iterator(this);
 }
 
@@ -487,10 +517,12 @@ inline bool
 HashContainerMP<K,V,Item>::alone(bool atomic)
 {
     if (_table.refcnt() != 0) return false;
+    if (likely(_mt)) {
     if (atomic)
         _table.write_begin();
     else
         _table.read_begin();
+    }
     bool alone = true;
     for (int i = 0; i < _table->_nbuckets;i++) {
         Bucket& b = _table->buckets[i];
@@ -498,10 +530,12 @@ HashContainerMP<K,V,Item>::alone(bool atomic)
             alone = false;
             break;
         }
-        if (atomic)
-            b.list.write_begin();
-        else
-            b.list.read_begin();
+        if (likely(_mt)) {
+            if (atomic)
+                b.list.write_begin();
+            else
+                b.list.read_begin();
+        }
         ListItem* item = b.list->head;
         while (item) {
             if (item->item.refcnt() != 0) {
@@ -510,17 +544,21 @@ HashContainerMP<K,V,Item>::alone(bool atomic)
             }
             item = item->_hashnext;
         }
-        if (atomic)
-            b.list.write_end();
-        else
-            b.list.read_end();
+        if (likely(_mt)) {
+            if (atomic) {
+                b.list.write_end();
+            } else
+                b.list.read_end();
+        }
         if (!alone)
             break;
     }
-    if (atomic)
-        _table.write_end();
-    else
-        _table.read_end();
+    if (likely(_mt)) {
+        if (atomic)
+            _table.write_end();
+        else
+            _table.read_end();
+    }
     return alone;
 }
 
@@ -537,10 +575,12 @@ HashContainerMP<K,V,Item>::bucket(const K &key)
 template <typename K, typename V, typename Item>
 inline void HashContainerMP<K,V,Item>::clear()
 {
-    _table.write_begin();
+    if (likely(_mt))
+        _table.write_begin();
     for (size_type i = 0; i < _table->_nbuckets; ++i) {
          Bucket& b = _table->buckets[i];
-        b.list.write_begin();
+         if (likely(_mt))
+             b.list.write_begin();
         ListItem* item = b.list->head;
         ListItem* next;
         while (item) {
@@ -549,9 +589,11 @@ inline void HashContainerMP<K,V,Item>::clear()
             item = next;
         }
         b.list->head = 0;
-        b.list.write_end();
+        if (likely(_mt))
+            b.list.write_end();
     }
-    _table.write_end();
+    if (likely(_mt))
+        _table.write_end();
     _table->_size = 0;
 }
 
@@ -559,17 +601,22 @@ inline void HashContainerMP<K,V,Item>::clear()
 template <typename K, typename V, typename Item>
 inline bool HashContainerMP<K,V,Item>::contains(const K& key)
 {
-    _table.read_begin();
+    if (likely(_mt))
+        _table.read_begin();
     Bucket &b = _table->buckets[bucket(key)];
-    b.list.read_begin();
-    _table.read_end();
+    if (likely(_mt))
+        b.list.read_begin();
+    if (likely(_mt))
+        _table.read_end();
     for (ListItem* list = b.list->head; list; list = list->_hashnext) {
         if (hashkeyeq(hashkey(list), key)) {
-            b.list.read_end();
+            if (likely(_mt))
+                b.list.read_end();
             return true;
         }
     }
-    _table.read_end();
+    if (likely(_mt))
+        _table.read_end();
 
     return false;
 }
