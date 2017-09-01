@@ -458,7 +458,7 @@ retry:\
         if (likely(_mt))\
             bucket.list.read_end();\
     } else {\
-        if (!bucket.list.read_to_write()) {\
+        if (likely(_mt) && !bucket.list.read_to_write()) {\
             goto retry;\
         }\
         ListItem* e = allocate(ListItem(key,value));\
