@@ -60,8 +60,9 @@ public:
     void push_batch_builder(int port, PacketBatch*);
     void push_batch(int port, PacketBatch*);
 
-
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     void run_timer(Timer*) override;
+#endif
     bool run_idle_task(IdleTask*) override;
 public:
 	FlowClassificationTable& table() {

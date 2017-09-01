@@ -120,7 +120,9 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("BUILDER",_builder)
             .read("AGGTRUST",_collision_is_life)
             .read("VERBOSE",_verbose)
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
             .read("CLEAN_TIMER",_clean_timer)
+#endif
             .complete() < 0)
         return -1;
 
@@ -137,6 +139,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 void FlowClassifier::run_timer(Timer*) {
 #if DEBUG_CLASSIFIER_RELEASE
     click_chatter("Force run check-release");
@@ -146,6 +149,7 @@ void FlowClassifier::run_timer(Timer*) {
     fcb_table = 0;
     _timer.reschedule_after_msec(_clean_timer);
 }
+#endif
 
 
 void release_subflow(FlowControlBlock* fcb, void* thunk) {
@@ -265,6 +269,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         IdleTask* idletask = new IdleTask(this);
         idletask->initialize(this, i, 100);
     }
+    //todo : INIT timer if needed? The current solution seems ok
 #endif
 
     return 0;
