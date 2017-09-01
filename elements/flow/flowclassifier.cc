@@ -603,7 +603,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
         {
             fcb = _table.match(p,_aggcache);
         }
-        if (_verbose > 1) {
+        if (_verbose > 2) {
             click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
             _table.get_root()->print(-1,false);
         }
@@ -644,8 +644,9 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
                 if (tail % RING_SIZE == head % RING_SIZE) {
                     auto &b = batches[tail % RING_SIZE];
-                    if (_verbose > 1)
+                    if (_verbose > 1) {
                         click_chatter("WARNING (unoptimized) Ring full with batch of %d packets, processing now !", b.batch->count());
+                    }
                     //Ring full, process batch NOW
                     fcb_stack = b.fcb;
                     fcb_stack->acquire(b.batch->count());
