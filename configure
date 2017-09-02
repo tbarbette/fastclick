@@ -662,6 +662,7 @@ XML2CLICK
 PROPER_LIBS
 PROPER_INCLUDES
 HAVE_NETMAP_PACKET_POOL
+USE_FLOW
 NETMAP_INCLUDES
 NUMA_INCLUDES
 PCAP_LIBS
@@ -837,6 +838,7 @@ enable_etherswitch
 enable_flow
 enable_grid
 enable_icmp
+enable_ids
 enable_ip
 enable_ip6
 enable_ipsec
@@ -850,7 +852,6 @@ enable_tcpudp
 enable_test
 enable_threads
 enable_wifi
-enable_middlebox
 enable_experimental
 enable_skip_elements
 with_freebsd
@@ -1546,6 +1547,7 @@ Optional Features:
   --enable-flow           include Enable flow system and elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
+  --disable-ids           do not include IDS elements from OpenBox
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
   --enable-ipsec          include IP security elements
@@ -1559,7 +1561,6 @@ Optional Features:
   --disable-test          do not include regression test elements
   --disable-threads       do not include thread management elements
   --enable-wifi           include wifi elements and support
-  --disable-middlebox     do not include middlebox elements
   --enable-experimental   enable experimental elements in normal groups
   --enable-skip-elements=ELTS
                           disable comma-separated elements
@@ -7320,6 +7321,17 @@ if test "x$enable_icmp" = xyes; then
     :
 
 fi
+# Check whether --enable-ids was given.
+if test "${enable_ids+set}" = set; then :
+  enableval=$enable_ids;
+else
+  enable_ids=yes
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_ids" = xNO -o "x$enable_ids" = x \) && enable_ids=yes
+if test "x$enable_ids" = xyes; then
+    :
+
+fi
 # Check whether --enable-ip was given.
 if test "${enable_ip+set}" = set; then :
   enableval=$enable_ip;
@@ -7462,17 +7474,6 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_wifi" = xNO -o "x$enable_wifi" = x \) && enable_wifi=yes
 if test "x$enable_wifi" = xyes; then
-    :
-
-fi
-# Check whether --enable-middlebox was given.
-if test "${enable_middlebox+set}" = set; then :
-  enableval=$enable_middlebox;
-else
-  enable_middlebox=yes
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_middlebox" = xNO -o "x$enable_middlebox" = x \) && enable_middlebox=yes
-if test "x$enable_middlebox" = xyes; then
     :
 
 fi
@@ -11230,6 +11231,11 @@ pcap.h and/or -lpcap not found; user-level driver can't steal packets.
     $as_echo "#define HAVE_USERLEVEL_DRIVER 1" >>confdefs.h
 
     HAVE_USERLEVEL_DRIVER=1
+fi
+
+if test "x$enable_flow" = "xyes"; then
+    USE_FLOW=yes
+
 fi
 
 if test "x$enable_netmap_pool" = "xyes"; then
