@@ -44,5 +44,4 @@ void IPOut::push_batch(int port, PacketBatch* flow)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPOut)
-ELEMENT_REQUIRES(IPElement)
 ELEMENT_MT_SAFE(IPOut)
