@@ -268,7 +268,11 @@ FlowNode* get_table(int iport) override {\
     }\
     return FlowElement::get_table(iport);\
 }
-
+#else
+#define FLOW_ELEMENT_DEFINE_CONTEXT(rule)
+#define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port,rule)
+#define FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(ruleA,ruleB)
+typedef BatchElement FlowElement;
 #endif
 CLICK_ENDDECLS
 

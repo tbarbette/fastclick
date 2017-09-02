@@ -4,6 +4,7 @@
 #include <click/element.hh>
 #include <click/flowelement.hh>
 #include <click/router.hh>
+#include <click/flowbuffer.hh>
 #include <click/routervisitor.hh>
 
 CLICK_DECLS
@@ -107,7 +108,7 @@ protected:
      * @param packet The packet
      * @return The current offset of the content
      */
-    uint16_t getContentOffset(Packet* packet) const;
+    inline static uint16_t getContentOffset(Packet* packet);
 
     /**
      * @brief Get the current useful content of the packet
@@ -117,7 +118,7 @@ protected:
      * @param packet The packet
      * @return A pointer to the constant current useful content of the packet
      */
-    const unsigned char* getPacketContentConst(Packet* packet) const;
+    inline static const unsigned char* getPacketContentConst(Packet* packet);
 
     /**
      * @brief Get the current useful content of the packet
@@ -127,7 +128,7 @@ protected:
      * @param packet The packet
      * @return A pointer to the current useful content of the packet
      */
-    unsigned char* getPacketContent(WritablePacket* packet) const;
+    inline static unsigned char* getPacketContent(WritablePacket* packet);
 
     /**
      * @brief Get the current useful content of the packet
@@ -137,7 +138,7 @@ protected:
      * @param packet The packet
      * @return A pointer to the current useful content of the packet
      */
-    const unsigned char* getPacketContent(Packet* packet) const;
+    inline static const unsigned char* getPacketContent(Packet* packet);
 
     /**
      * @brief Search a given pattern in the given content. The content does not have
@@ -154,7 +155,7 @@ protected:
      * @param packet The packet
      * @param offset The new offset
      */
-    void setContentOffset(Packet* packet, uint16_t offset) const;
+    inline static void setContentOffset(Packet* packet, uint16_t offset) ;
 
     /**
      * @brief Set the INITIAL_ACK annotation of the packet. This annotation stores the initial
@@ -177,14 +178,14 @@ protected:
      * @param The packet
      * @return A boolean indicating if the useful content of the packet is empty
      */
-    bool isPacketContentEmpty(Packet* packet) const;
+    inline bool isPacketContentEmpty(Packet* packet) const;
 
     /**
      * @brief Return the size of the useful content of the packet
      * @param The packet
      * @return The size of the useful content of the packet
      */
-    uint16_t getPacketContentSize(Packet *packet) const;
+    inline static uint16_t getPacketContentSize(Packet *packet);
 
     /**
      * @brief Used to create the function stack. It will run a StackVisitor
@@ -297,13 +298,63 @@ private:
 
 };
 
+inline const unsigned char* StackElement::getPacketContentConst(Packet* p)
+{
+    uint16_t offset = getContentOffset(p);
+
+    return (p->data() + offset);
+}
+
+inline unsigned char* StackElement::getPacketContent(WritablePacket* p)
+{
+    uint16_t offset = getContentOffset(p);
+
+    return (p->data() + offset);
+}
+
+
+inline const unsigned char* StackElement::getPacketContent(Packet* p)
+{
+    uint16_t offset = getContentOffset(p);
+
+    return (p->data() + offset);
+}
+
+inline bool StackElement::isPacketContentEmpty(Packet* packet) const
+{
+    uint16_t offset = getContentOffset(packet);
+
+    if(offset >= packet->length())
+        return true;
+    else
+        return false;
+}
+
+inline uint16_t StackElement::getPacketContentSize(Packet *packet)
+{
+    uint16_t offset = getContentOffset(packet);
+
+    return packet->length() - offset;
+}
+
+inline void StackElement::setContentOffset(Packet* p, uint16_t offset)
+{
+    p->set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
+}
+
+inline uint16_t StackElement::getContentOffset(Packet* p)
+{
+    return p->anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
+}
+
+
 
 template<typename T>
-class StackBufferElement : public StackElement {
+class StackSpaceElement : public StackElement {
 public :
-    StackBufferElement();
+    StackSpaceElement();
 
-    ~StackBufferElement();
+    ~StackSpaceElement();
 
 
     virtual int initialize(ErrorHandler *errh) {
@@ -390,14 +441,47 @@ private:
 };
 
 template<typename T>
-StackBufferElement<T>::StackBufferElement() : StackElement() {
+StackSpaceElement<T>::StackSpaceElement() : StackElement() {
 
 }
 
 template<typename T>
-StackBufferElement<T>::~StackBufferElement() {
+StackSpaceElement<T>::~StackSpaceElement() {
 
 }
+
+template <typename T>
+struct BufferData {
+    T userdata;
+    FlowBuffer flowBuffer;
+    int lastPos;
+};
+
+template <class Derived, typename T>
+class StackBufferElement : public StackSpaceElement<BufferData<T>>
+{
+
+    const char *processing() const final    { return Element::PUSH; }
+
+    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
+    {
+        fcb_data->flowBuffer.enqueueAll(flow);
+        auto it = fcb_data->flowBuffer.contentBegin(fcb_data->lastPos);
+        int action = static_cast<Derived*>(this)->process_data(&fcb_data->userdata,it);
+        if (action < 0) {
+            this->closeConnection((it.current() ? it.current() : flow->first()), true, true);
+            fcb_data->flowBuffer.dequeueAll()->fast_kill();
+            return;
+        }
+        PacketBatch* passed = it.flush();
+        if (it.current()) {
+            this->requestMorePackets(it.current(), false);
+        } else {
+            fcb_data->lastPos = 0;
+        }
+        StackSpaceElement<BufferData<T>>::checked_output_push_batch(action,passed);
+    }
+};
 
 CLICK_ENDDECLS
 

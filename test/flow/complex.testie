@@ -115,7 +115,7 @@ elementclass Receiver { $port, $mac, $ip, $range |
 
     f::Idle
 //    -> Print("FROM $mac",-1)
-    -> FlowClassifier(BUILDER 0, AGGCACHE 1, CACHESIZE 65536,VERBOSE 1)
+    -> FlowClassifier(BUILDER 0, AGGCACHE 0, CACHESIZE 65536,VERBOSE 1)
 //    -> stats :: BatchStats()
     -> arpr :: ARPDispatcher()
 

@@ -143,7 +143,7 @@ Name of the TCPIn element on the other path of the connection.
 
 =a TCPOut */
 
-class TCPIn : public StackBufferElement<fcb_tcpin>, public TCPElement
+class TCPIn : public StackSpaceElement<fcb_tcpin>, public TCPElement
 {
 public:
     /**

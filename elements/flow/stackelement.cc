@@ -18,16 +18,36 @@ StackElement::~StackElement()
 
 }
 
-
-void StackElement::setContentOffset(Packet* p, uint16_t offset) const
+bool StackElement::isStackElement(Element* element)
 {
-    p->set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
+    if(element->cast("StackElement") != NULL)
+        return true;
+    else
+        return false;
 }
 
-uint16_t StackElement::getContentOffset(Packet* p) const
+void* StackElement::cast(const char *name)
 {
-    return p->anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
+    if(strcmp(name, "StackElement") == 0)
+        return (StackElement*)this;
+    else
+        return Element::cast(name);
+ }
+
+ void StackElement::buildFunctionStack()
+ {
+     StackVisitor visitor(this);
+     this->router()->visit_downstream(this, -1, &visitor);
+ }
+
+
+int StackElement::initialize(ErrorHandler*  errh)
+{
+    buildFunctionStack();
+
+    return Element::initialize(errh);
 }
+
 
 void StackElement::setAnnotationBit(Packet* p, int bit, bool value) const
 {
@@ -162,74 +182,6 @@ bool StackElement::isLastUsefulPacket(Packet *packet)
     return previousStackElement->isLastUsefulPacket(packet);
 }
 
-bool StackElement::isStackElement(Element* element)
-{
-    if(element->cast("StackElement") != NULL)
-        return true;
-    else
-        return false;
-}
-
-void* StackElement::cast(const char *name)
-{
-    if(strcmp(name, "StackElement") == 0)
-        return (StackElement*)this;
-    else
-        return Element::cast(name);
- }
-
- void StackElement::buildFunctionStack()
- {
-     StackVisitor visitor(this);
-     this->router()->visit_downstream(this, -1, &visitor);
- }
-
-
-int StackElement::initialize(ErrorHandler*  errh)
-{
-    buildFunctionStack();
-
-    return Element::initialize(errh);
-}
-
-const unsigned char* StackElement::getPacketContentConst(Packet* p) const
-{
-    uint16_t offset = getContentOffset(p);
-
-    return (p->data() + offset);
-}
-
-unsigned char* StackElement::getPacketContent(WritablePacket* p) const
-{
-    uint16_t offset = getContentOffset(p);
-
-    return (p->data() + offset);
-}
-
-
-const unsigned char* StackElement::getPacketContent(Packet* p) const
-{
-    uint16_t offset = getContentOffset(p);
-
-    return (p->data() + offset);
-}
-
-bool StackElement::isPacketContentEmpty(Packet* packet) const
-{
-    uint16_t offset = getContentOffset(packet);
-
-    if(offset >= packet->length())
-        return true;
-    else
-        return false;
-}
-
-uint16_t StackElement::getPacketContentSize(Packet *packet) const
-{
-    uint16_t offset = getContentOffset(packet);
-
-    return packet->length() - offset;
-}
 
 unsigned int StackElement::determineFlowDirection()
 {

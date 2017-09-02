@@ -9,29 +9,28 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/flowbuffer.hh>
-#include "../elements/middlebox/stackelement.hh"
+#include "../elements/flow/stackelement.hh"
 
 CLICK_DECLS
 
 FlowBuffer::FlowBuffer()
 {
+    /*
+     * This class is to be used in FCB, so any field should be assumed 0 and the constructor not to have run
+     */
     head = NULL;
-    owner = NULL;
 }
 
 FlowBuffer::~FlowBuffer()
 {
-    if(!isInitialized())
-        return;
-
-    head->kill();
+    /**
+     * Don't forget to call this operator when the FCB is released
+     */
+    if (head)
+        head->kill();
 }
 
 
-bool FlowBuffer::isInitialized()
-{
-    return owner != 0;
-}
 
 void FlowBuffer::enqueueAll(PacketBatch* batch) {
     if (head != 0) {
@@ -58,9 +57,9 @@ void FlowBuffer::enqueue(Packet *packet)
     }
 }
 
-FlowBufferContentIter FlowBuffer::contentBegin()
+FlowBufferContentIter FlowBuffer::contentBegin(int posInFirstPacket)
 {
-    return FlowBufferContentIter(this, head);
+    return FlowBufferContentIter(this, head,posInFirstPacket);
 }
 
 FlowBufferContentIter FlowBuffer::contentEnd()
@@ -166,15 +165,6 @@ FlowBufferIter FlowBuffer::end()
     return FlowBufferIter(this, NULL);
 }
 
-void FlowBuffer::initialize(StackElement *owner)
-{
-    this->owner = owner;
-}
-
-StackElement* FlowBuffer::getOwner()
-{
-    return owner;
-}
 
 FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char* pattern,
     int *feedback)
@@ -223,7 +213,7 @@ FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char
 }
 
 
-int FlowBuffer::removeInFlow(const char* pattern)
+int FlowBuffer::removeInFlow(const char* pattern, StackElement* owner)
 {
     int feedback = -1;
     FlowBufferContentIter iter = search(contentBegin(), pattern, &feedback);
@@ -231,12 +221,12 @@ int FlowBuffer::removeInFlow(const char* pattern)
     if(iter == contentEnd())
         return feedback;
 
-    remove(iter, strlen(pattern));
+    remove(iter, strlen(pattern), owner);
 
     return 1;
 }
 
-void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length)
+void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length, StackElement* owner)
 {
     uint32_t toRemove = length;
     uint32_t offsetInPacket = start.offsetInPacket;
@@ -248,7 +238,7 @@ void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length)
         assert(packet != NULL);
 
         // Check how much data we have to remove in this packet
-        uint32_t inThisPacket = packet->length() - offsetInPacket - owner->getContentOffset(packet);
+        uint32_t inThisPacket = packet->length() - offsetInPacket - StackElement::getContentOffset(packet);
 
         // Update the counter of remaining data to remove
         if(inThisPacket > toRemove)
@@ -268,7 +258,7 @@ void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length)
     }
 }
 
-int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement)
+int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement, StackElement* owner)
 {
     int feedback = -1;
     FlowBufferContentIter iter = search(contentBegin(), pattern, &feedback);
@@ -317,7 +307,7 @@ int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement)
     else
     {
             // We remove the next "-offset" (offset is negative) bytes in the flow
-            remove(iter, -offset);
+            remove(iter, -offset, owner);
     }
 
     return 1;
@@ -370,7 +360,7 @@ bool FlowBufferIter::operator!=(const FlowBufferIter& other) const
 
 // FlowBufferContent Iterator
 FlowBufferContentIter::FlowBufferContentIter(FlowBuffer *_flowBuffer,
-    Packet* _entry) : flowBuffer(_flowBuffer), entry(_entry), offsetInPacket(0)
+    Packet* _entry, int posInFirstPacket) : flowBuffer(_flowBuffer), entry(_entry), offsetInPacket(posInFirstPacket)
 {
 
 }
@@ -401,7 +391,7 @@ unsigned char& FlowBufferContentIter::operator*()
 {
     assert(entry != NULL);
 
-    unsigned char* content = flowBuffer->getOwner()->getPacketContent(static_cast<WritablePacket*>(entry));
+    unsigned char* content = StackElement::getPacketContent(static_cast<WritablePacket*>(entry));
 
     return *(content + offsetInPacket);
 }
@@ -416,10 +406,10 @@ void FlowBufferContentIter::repair()
     WritablePacket* wPacket = static_cast<WritablePacket*>(entry);
 
     // Check if we are pointing after the content of the current packet
-    if(offsetInPacket >= flowBuffer->getOwner()->getPacketContentSize(wPacket))
+    if(offsetInPacket >= StackElement::getPacketContentSize(wPacket))
     {
         // If so, we move to the next packet
-        uint16_t contentSize = flowBuffer->getOwner()->getPacketContentSize(wPacket);
+        uint16_t contentSize = StackElement::getPacketContentSize(wPacket);
         uint16_t overflow = offsetInPacket - contentSize;
         offsetInPacket = overflow;
         entry = entry->next();
@@ -442,7 +432,7 @@ FlowBufferContentIter& FlowBufferContentIter::operator++()
 
     // Check if we are at the end of the packet and must therefore switch to
     // the next one
-    if(flowBuffer->getOwner()->getContentOffset(entry) + offsetInPacket >=
+    if(StackElement::getContentOffset(entry) + offsetInPacket >=
         entry->length())
     {
         offsetInPacket = 0;
@@ -453,7 +443,7 @@ FlowBufferContentIter& FlowBufferContentIter::operator++()
 }
 
 PacketBatch* FlowBufferContentIter::flush() {
-    click_chatter("FLush %p",entry);
+    click_chatter("Flush %p",entry);
     if (entry == 0) {
         return this->flowBuffer->dequeueAll();
     } else {

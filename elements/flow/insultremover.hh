@@ -46,7 +46,7 @@ Default value: false.
 
 #define POOL_BUFFER_ENTRIES_SIZE 300
 
-class InsultRemover : public StackBufferElement<fcb_insultremover>
+class InsultRemover : public StackSpaceElement<fcb_insultremover>
 {
 public:
     /** @brief Construct an InsultRemover element

@@ -15,11 +15,13 @@
 
 CLICK_DECLS
 
+class StackElement;
+
 struct flowBufferEntry
 {
         WritablePacket *packet;
-            struct flowBufferEntry *prev;
-                struct flowBufferEntry *next;
+        struct flowBufferEntry *prev;
+        struct flowBufferEntry *next;
 };
 
 class FlowBufferContentIter;
@@ -46,22 +48,6 @@ public:
     /** @brief Destruct a FlowBuffer
      */
     ~FlowBuffer();
-
-    /** @brief Initialize the FlowBuffer (required in order to be used)
-     * @param owner StackElement that owns this FlowBuffer
-     * @param poolEntries MemoryPool from which the buffer entries will be retrieved
-     */
-    void initialize(StackElement *owner);
-
-    /** @brief Indicate whether the FlowBuffer is initialized
-     * @return True if the FlowBuffer is initialized
-     */
-    bool isInitialized();
-
-    /** @brief Return a pointer to the StackElement that owns this FlowBuffer
-     * @return A pointer to the StackElement that owns this FlowBuffer
-     */
-    StackElement* getOwner();
 
     /** @brief Return a pointer to the MemoryPool used by this FlowBuffer
      * @return A pointer to the MemoryPool used by this FlowBuffer
@@ -120,7 +106,7 @@ public:
      * 0 if the pattern has not been found but the pattern could start at the end of the last
      * packet in the buffer and thus enqueuing the next packet could result in a match.
      */
-    int removeInFlow(const char* pattern);
+    int removeInFlow(const char* pattern, StackElement* remove);
 
     /** @brief Replace a pattern in the buffer
      * @param fcb A pointer to the FCB of this flow
@@ -131,12 +117,12 @@ public:
      * 0 if the pattern has not been found but the pattern could start at the end of the last
      * packet in the buffer and thus enqueuing the next packet could result in a match.
      */
-    int replaceInFlow(const char* pattern, const char *replacement);
+    int replaceInFlow(const char* pattern, const char *replacement, StackElement* owner);
 
     /** @brief Return a content iterator pointing to the first byte of content in the buffer
      * @return A content iterator pointing to the first byte of content in the buffer
      */
-    FlowBufferContentIter contentBegin();
+    FlowBufferContentIter contentBegin(int posInFirstPacket = 0);
 
     /** @brief Return a content iterator pointing after the end of the content in the buffer
      * @return A content iterator pointing after the end of the content in the buffer
@@ -145,10 +131,13 @@ public:
 
 
     /**
-     * @brief Essure a flow buffer is initialized and enqueue all packets
+     * @brief Ensure a flow buffer is initialized and enqueue all packets
      */
     void enqueueAll(PacketBatch* batch);
 private:
+    inline bool isInitialized() {
+        return head != 0;
+    }
 
     /** @brief Search a pattern in the buffer
      * @param start Content iterator indicating where to start the search
@@ -165,10 +154,9 @@ private:
      * @param start A content iterator pointing to the first byte to remove
      * @param length The number of bytes to remove
      */
-    void remove(FlowBufferContentIter start, uint32_t length);
+    void remove(FlowBufferContentIter start, uint32_t length, StackElement* owner);
 
     PacketBatch *head;
-    StackElement *owner;
 };
 
 /** @class FlowBufferIter
@@ -222,7 +210,7 @@ public:
      * @param _flowBuffer The FlowBuffer to which this iterator is linked
      * @param _entry The entry in the buffer to which this iterator points
      */
-    FlowBufferContentIter(FlowBuffer *_flowBuffer, Packet* packet);
+    FlowBufferContentIter(FlowBuffer *_flowBuffer, Packet* packet, int posInFirstPacket=0);
 
     /** @brief Compare two FlowBufferContentIter
      * @param other The FlowBufferContentIter to be compared to
@@ -246,6 +234,13 @@ public:
      */
     FlowBufferContentIter& operator++();
 
+    inline operator bool() const {
+        return entry;
+    }
+
+    /**
+     * Return all packets up to the current position, not included
+     */
     PacketBatch* flush();
 
     inline Packet* current() {

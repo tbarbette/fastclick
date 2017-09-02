@@ -44,9 +44,6 @@ int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, PacketBatch* flow)
 {
-    if(!insultremover->flowBuffer.isInitialized())
-        insultremover->flowBuffer.initialize(this);
-
     insultremover->flowBuffer.enqueueAll(flow);
 
     for(int i = 0; i < insults.size(); ++i)
@@ -57,7 +54,7 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
             auto end = insultremover->flowBuffer.contentEnd();
 
             while (iter != end) {
-                click_chatter("Letter %c",*iter);
+                //click_chatter("Letter %c",*iter);
                 if (*iter ==  insult[0]) {
                     int pos = 0;
                     typeof(iter) start_pos = iter;
@@ -74,7 +71,7 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
                             }
                             goto needMore;
                         }
-                        click_chatter("Letter %c",*iter);
+                        //click_chatter("Letter %c",*iter);
                         if (insult[pos] == '\0') {
                             insultremover->counterRemoved += 1;
                             if (closeAfterInsults)
@@ -93,6 +90,7 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
                 ++iter;
             }
         } else {
+            assert(false);
             //TODO : Probably not working anymore
             /*result = insultremover->flowBuffer.removeInFlow(insult);
 

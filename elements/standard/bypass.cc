@@ -82,7 +82,8 @@ Bypass::pull(int port)
 }
 
 Bypass::Locator::Locator(int from_port)
-    : _e(0), _port(0), _from_port(from_port), _unstack(false) {
+    : _e(0), _port(0), _from_port(from_port), _unstack(false)
+{
 }
 
 bool
@@ -99,12 +100,15 @@ Bypass::Locator::visit(Element* e, bool isoutput, int port,
         }
     _e = e;
     _port = port;
+#if HAVE_FLOW
     _unstack = const_cast<Element::Port&>(from_e->port(isoutput,port)).unstack();
+#endif
     return false;
 }
 
 Bypass::Assigner::Assigner(Element* e, int port, bool unstack)
-    : _e(e), _port(port), _unstack(unstack) {
+    : _e(e), _port(port), _unstack(unstack)
+{
 }
 
 bool
@@ -131,7 +135,7 @@ Bypass::Assigner::visit(Element* e, bool isoutput, int port,
     // Just cheat.
     //click_chatter("Bypass: Assigning %p{element}:%d to %p{element}:%d\n", _e, _port, e, port);
     //TODO : Support batching
-    const_cast<Element::Port&>(e->port(isoutput, port)).assign(isoutput, _e, _port, _unstack);
+    const_cast<Element::Port&>(e->port(isoutput, port)).assign(isoutput, _e, _port, _unstack); //FLOW is still not supproted, we just avoid compilation problems here
     return false;
 }
 

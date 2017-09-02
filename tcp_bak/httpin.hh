@@ -45,7 +45,7 @@ must also contain an HTTPOut element
 
 =a HTTPOut */
 
-class HTTPIn : public StackBufferElement<fcb_httpin>
+class HTTPIn : public StackSpaceElement<fcb_httpin>
 {
 public:
     HTTPIn() CLICK_COLD;

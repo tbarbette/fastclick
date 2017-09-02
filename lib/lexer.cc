@@ -2275,6 +2275,7 @@ Lexer::create_router(Master *master)
     (*cp)[1].idx = router_id[(*cp)[1].idx];
   }
 
+#if HAVE_FLOW
   // expand context connections
   bool change_made = false;
   if ( _c->_conn.size()) {
@@ -2335,6 +2336,7 @@ Lexer::create_router(Master *master)
           }
       }
   }
+#endif
 
   // sort and add connections to router
   click_qsort(_c->_conn.begin(), _c->_conn.size());
