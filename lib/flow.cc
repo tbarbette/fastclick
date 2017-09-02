@@ -59,12 +59,9 @@ void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void*
 }
 
 FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verbose) {
-    bool subflow = false;
-    bool thread = false;
-
-    std::regex reg("((agg )?((?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?(?:[:]HASH-[0-9]+)?[!]? ?)+)|-)( keep)?( [0-9]+| drop)?",
+    std::regex reg("((?:(?:(?:agg|thread|(?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?))(?:[:]HASH-[0-9]+)?[!]? ?)+)|-)( keep)?( [0-9]+| drop)?",
              std::regex_constants::icase);
-    std::regex classreg("(ip)?[+]?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?([:]HASH-[0-9]+)?([!])?",
+    std::regex classreg("thread|agg|(ip[+])?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?([:]HASH-[0-9]+)?([!])?",
                  std::regex_constants::icase);
 
     FlowNode* root = 0;
@@ -78,18 +75,12 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
     std::smatch result;
     std::string stdstr = std::string(s.c_str());
 
-    if (s == "thread") {
-        thread = true;
-        /*      } else if (conf[i] == "subflow") {
-                            subflow = true;*/
-    } else if (std::regex_match(stdstr, result, reg)){
+    if (std::regex_match(stdstr, result, reg)){
         FlowNodeData lastvalue = (FlowNodeData){.data_64 = 0};
 
-        std::string other = result.str(1);
-        std::string aggregate = result.str(2);
-        std::string keep = result.str(4);
-        std::string deletable = result.str(5);
-
+        std::string classs = result.str(1);
+        std::string keep = result.str(2);
+        std::string deletable = result.str(3);
         if (keep == " keep")
             deletable_value = true;
         else if (deletable == " drop")
@@ -102,8 +93,8 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
 
 
         FlowNode* parent = 0;
-        if (other != "-") {
-            std::string classs = result.str(3);
+        if (classs != "-") {
+
 
             std::regex_iterator<std::string::iterator> it (classs.begin(), classs.end(), classreg);
             std::regex_iterator<std::string::iterator> end;
@@ -116,75 +107,85 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                 std::string offset = it->str(2);
                 std::string value = it->str(3);
                 std::string mask = it->str(4);
-                std::string important = it->str(6);
                 std::string hint = it->str(5);
+                std::string important = it->str(6);
+
 
                 if (verbose)
                     click_chatter("o : %s, v : %s, m : %s",offset.c_str(),value.c_str(), mask.c_str());
-
-                unsigned long valuev = 0xffffffff;
-                unsigned long maskv = 0xffffffff;
-
                 FlowLevel* f;
-
-                if (value != "" && value != "-") {
-                    valuev = std::stoul(value,nullptr,16);
-                    if (value.length() <= 2) {
-
-                    } else if (value.length() <= 4) {
-                        valuev = htons(valuev);
-                    } else if (value.length() <= 8) {
-                        valuev = htonl(valuev);
-                    } else {
-                        valuev = __bswap_64(valuev);
-                    }
-                }
-                if (verbose)
-                    click_chatter("Mask is '%s'",mask.c_str());
-                if (mask != "")
-                    maskv = std::stoul(mask,nullptr,16);
-                else
-                    maskv = (1 << value.length() * 4) - 1;
-
-                //TODO error for > 64
-
-                if (aggregate == "agg ") {
+                bool dynamic = false;
+                unsigned long valuev = 0;
+                if (classs == "agg" || classs=="AGG") {
                     FlowLevelAggregate* fl = new FlowLevelAggregate();
-                    if (offset == "") {
+                    /*if (offset == "") {
                         fl->offset = 0;
                     } else {
                         fl->offset = std::stoul(offset);
                     }
-                    fl->mask = maskv;
-                    if (verbose)
-                        click_chatter("AGG Offset : %d, mask : 0x%lx",fl->offset,fl->mask);
+                    fl->mask = maskv;*/
                     f = fl;
-                } else if (maskv <= UINT8_MAX){
-                    FlowLevelGeneric8* fl = new FlowLevelGeneric8();
-                    fl->set_match(std::stoul(offset),maskv);
                     if (verbose)
-                        click_chatter("HASH8 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
+                        click_chatter("AGG");
+                    dynamic = true;
+                } else if (classs == "thread" || classs == "THREAD") {
+                    FlowLevelThread* fl = new FlowLevelThread(click_max_cpu_ids());
                     f = fl;
-                } else if (maskv <= UINT16_MAX){
-                    FlowLevelGeneric16* fl = new FlowLevelGeneric16();
-                    fl->set_match(std::stoul(offset),maskv);
-                    if (verbose)
-                        click_chatter("HASH16 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
-                    f = fl;
-                } else if (maskv <= UINT32_MAX){
-                    FlowLevelGeneric32* fl = new FlowLevelGeneric32();
-                    fl->set_match(std::stoul(offset),maskv);
-                    if (verbose)
-                        click_chatter("HASH32 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
-                    f = fl;
-                } else {
-                    FlowLevelGeneric64* fl = new FlowLevelGeneric64();
-                    fl->set_match(std::stoul(offset),maskv);
-                    if (verbose)
-                        click_chatter("HASH64 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
-                    f = fl;
-                }
+                    click_chatter("THREAD");
+                    dynamic = true;
+                } else  {
 
+                    unsigned long maskv = 0xffffffff;
+                    valuev = 0xffffffff;
+                    if (value != "" && value != "-") {
+                        valuev = std::stoul(value,nullptr,16);
+                        if (value.length() <= 2) {
+
+                        } else if (value.length() <= 4) {
+                            valuev = htons(valuev);
+                        } else if (value.length() <= 8) {
+                            valuev = htonl(valuev);
+                        } else {
+                            valuev = __bswap_64(valuev);
+                        }
+                    }
+                    if (verbose)
+                        click_chatter("Mask is '%s'",mask.c_str());
+                    if (mask != "")
+                        maskv = std::stoul(mask,nullptr,16);
+                    else
+                        maskv = (1 << value.length() * 4) - 1;
+
+                    //TODO error for > 64
+
+                    if (maskv <= UINT8_MAX){
+                        FlowLevelGeneric8* fl = new FlowLevelGeneric8();
+                        fl->set_match(std::stoul(offset),maskv);
+                        if (verbose)
+                            click_chatter("HASH8 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
+                        f = fl;
+                    } else if (maskv <= UINT16_MAX){
+                        FlowLevelGeneric16* fl = new FlowLevelGeneric16();
+                        fl->set_match(std::stoul(offset),maskv);
+                        if (verbose)
+                            click_chatter("HASH16 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
+                        f = fl;
+                    } else if (maskv <= UINT32_MAX){
+                        FlowLevelGeneric32* fl = new FlowLevelGeneric32();
+                        fl->set_match(std::stoul(offset),maskv);
+                        if (verbose)
+                            click_chatter("HASH32 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
+                        f = fl;
+                    } else {
+                        FlowLevelGeneric64* fl = new FlowLevelGeneric64();
+                        fl->set_match(std::stoul(offset),maskv);
+                        if (verbose)
+                            click_chatter("HASH64 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
+                        f = fl;
+                    }
+                    if (maskv & valuev == 0)
+                        dynamic = true;
+                }
                 FlowNodeDefinition* node = new FlowNodeDefinition();
 
                 if (hint != "") {
@@ -211,7 +212,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
 
                 parent = node;
 
-                if (maskv & valuev == 0) { //If a mask is provided, value is dynamic
+                if (dynamic) { //If a mask is provided, value is dynamic
                     //click_chatter("Dynamic node to output %d",output);
                     parent_ptr = node->default_ptr();
                     node->level()->set_dynamic();
@@ -249,6 +250,9 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
 
 
         root->check();
+    } else {
+        click_chatter("%s is not a valid rule",s.c_str());
+        abort();
     }
 
 #if DEBUG_CLASSIFIER
@@ -847,12 +851,25 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
         return this;
 }
 
-FlowNode* FlowNode::optimize() {
+FlowNode* FlowNode::optimize(bool mt_safe) {
 	FlowNodePtr* ptr;
+
+	if (level()->is_mt_safe()) {
+	    mt_safe = true;
+	}
+	if (level()->is_dynamic() && !mt_safe) {
+	    FlowLevel* thread = new FlowLevelThread(click_max_cpu_ids());
+	    FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+        fa->initialize(thread->get_max_value());
+        fa->_level = thread;
+        fa->_parent = parent();
+	    fa->set_default(this->optimize(true));
+	    return fa;
+	}
 
 	//Optimize default
 	if (_default.ptr && _default.is_node())
-		_default.node = _default.node->optimize();
+		_default.node = _default.node->optimize(mt_safe);
 
 	if (!level()->is_dynamic()) {
 		if (getNum() == 0) {
@@ -889,13 +906,13 @@ FlowNode* FlowNode::optimize() {
 #endif
 					FlowNodeDummy* fl = new FlowNodeDummy();
 					fl->assign(this);
-					fl->set_default(child->optimize());
+					fl->set_default(child->optimize(mt_safe));
 
 					newnode = fl;
 				} else { //Child is node
 				    FlowNodeDefinition* defnode = dynamic_cast<FlowNodeDefinition*>(this);
 				    if (defnode->_else_drop) {
-				        FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize());
+				        FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize(mt_safe));
                         fl->assign(this);
                         fl->inc_num();
                         fl->set_default(_default);
@@ -912,7 +929,7 @@ FlowNode* FlowNode::optimize() {
 #if DEBUG_CLASSIFIER
 				click_chatter("Optimize : only 2 possible case (value %lu or default %lu)",child->data().data_64,_default.data().data_64);
 #endif
-				FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize());
+				FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize(mt_safe));
 				fl->assign(this);
 				fl->inc_num();
 				fl->set_default(_default);
@@ -944,19 +961,19 @@ FlowNode* FlowNode::optimize() {
 #if DEBUG_CLASSIFIER
 				click_chatter("Optimize : 2 child and no default value : only 2 possible case (value %lu or value %lu)!",childA->data().data_64,childB->data().data_64);
 #endif
-				FlowNodePtr newA = childA->optimize();
+				FlowNodePtr newA = childA->optimize(mt_safe);
 				FlowNodeTwoCase* fl = new FlowNodeTwoCase(newA);
 				fl->inc_num();
 				fl->assign(this);
-				FlowNodePtr newB = childB->optimize();
+				FlowNodePtr newB = childB->optimize(mt_safe);
 				fl->set_default(newB);
 				newnode = fl;
 			} else {
 #if DEBUG_CLASSIFIER
 				click_chatter("Optimize : only 3 possible cases (value %lu, value %lu or default %lu)",childA->data().data_64,childB->data().data_64,_default.data().data_64);
 #endif
-				FlowNodePtr ncA = childA->optimize();
-				FlowNodePtr ncB = childB->optimize();
+				FlowNodePtr ncA = childA->optimize(mt_safe);
+				FlowNodePtr ncB = childB->optimize(mt_safe);
 #if DEBUG_CLASSIFIER
 				click_chatter("The 2 cases are :");
 				ncA.print();
@@ -985,13 +1002,13 @@ FlowNode* FlowNode::optimize() {
 #if DEBUG_CLASSIFIER
 			click_chatter("No optimization for level with %d childs",getNum());
 #endif
-			return dynamic_cast<FlowNodeDefinition*>(this)->create_final();
+			return dynamic_cast<FlowNodeDefinition*>(this)->create_final(mt_safe);
 		}
 	} else {
 #if DEBUG_CLASSIFIER
 		click_chatter("Dynamic level won't be optimized");
 #endif
-		return dynamic_cast<FlowNodeDefinition*>(this)->create_final();
+		return dynamic_cast<FlowNodeDefinition*>(this)->create_final(mt_safe);
 	}
 
 	//Unhandled case?
@@ -999,13 +1016,13 @@ FlowNode* FlowNode::optimize() {
 	return this;
 }
 
-FlowNodePtr FlowNodePtr::optimize() {
+FlowNodePtr FlowNodePtr::optimize(bool mt_safe) {
     if (is_leaf()) {
         return *this;
     } else {
         FlowNodePtr ptr = *this;
         FlowNodeData data = node->node_data;
-        ptr.node = node->optimize();
+        ptr.node = node->optimize(mt_safe);
         ptr.node->node_data = data;
         ptr.node->check();
         return ptr;

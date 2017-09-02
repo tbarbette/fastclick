@@ -29,6 +29,8 @@ public:
 
     virtual void add_offset(int offset) {};
 
+    virtual bool is_mt_safe() const { return false;};
+
     virtual bool equals(FlowLevel* level) {
         return typeid(*this) == typeid(*level);
     }
@@ -134,7 +136,7 @@ public :
     //Compile time functions
     //---
 
-    FlowNodePtr optimize();
+    FlowNodePtr optimize(bool mt_safe);
 
     bool else_drop();
 
@@ -445,7 +447,7 @@ public:
     inline void check(bool allow_parent = false) {};
 #endif
 
-    virtual FlowNode* optimize() CLICK_WARN_UNUSED_RESULT;
+    virtual FlowNode* optimize(bool mt_safe) CLICK_WARN_UNUSED_RESULT;
 
     void traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool do_final, bool do_default);
 
@@ -572,6 +574,7 @@ public:
     }
     FLOW_LEVEL_DEFINE(FlowLevelThread,get_data_thread);
 
+    virtual bool is_mt_safe() const override { return true;};
     inline long unsigned get_max_value() {
         return _numthreads;
     }
@@ -1465,7 +1468,7 @@ class FlowNodeDefinition : public FlowNodeHash<HASH_SIZES_NR - 1> { public:
 
     FlowNodeDefinition* duplicate(bool recursive,int use_count) override;
 
-    FlowNode* create_final();
+    FlowNode* create_final(bool mt_safe);
 };
 
 inline void FlowNodePtr::traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt) {

@@ -47,8 +47,6 @@ int FlowIPLoadBalancer::initialize(ErrorHandler *errh) {
 }
 
 
-
-
 void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
 
     if ((*flowdata).src == IPAddress(0)) {

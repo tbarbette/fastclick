@@ -319,7 +319,7 @@ FlowNodeDefinition::duplicate(bool recursive,int use_count) {
  * Create best structure for this node, and optimize all childs
  */
 FlowNode*
-FlowNodeDefinition::create_final() {
+FlowNodeDefinition::create_final(bool mt_safe) {
     FlowNode * fl;
     //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
     if (_hint) {
@@ -352,7 +352,7 @@ FlowNodeDefinition::create_final() {
     while ((cur = it.next()) != 0) {
         cur->set_parent(fl);
         if (cur->is_node()) {
-            fl->add_node(cur->data(),cur->node->optimize());
+            fl->add_node(cur->data(),cur->node->optimize(mt_safe));
         } else {
             fl->add_leaf(cur->data(),cur->leaf);
         }

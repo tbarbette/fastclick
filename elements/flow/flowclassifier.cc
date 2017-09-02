@@ -241,7 +241,8 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     if (input_is_pull(0)) {
         assert(input(0).element());
     }
-    _table.get_pool()->compress(get_passing_threads());
+    auto passing = get_passing_threads();
+    _table.get_pool()->compress(passing);
 
     FlowNode* table = FlowElementVisitor::get_downward_table(this, 0);
 
@@ -249,7 +250,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
 
     _table.set_release_fnt(release_subflow,this);
-    _table.set_root(table->optimize());
+    _table.set_root(table->optimize(passing.weight() <= 1));
     _table.get_root()->check();
     if (_verbose) {
         click_chatter("Table of %s after optimization :",name().c_str());
