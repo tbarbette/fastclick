@@ -129,7 +129,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 						}*/
 
 	}
-	if (!rules[rules.size() -1].is_default) {
+	if (rules.size() == 0 || !rules[rules.size() -1].is_default) {
 	    rules.push_back(FlowClassificationTable::make_drop_rule());
 	}
 
