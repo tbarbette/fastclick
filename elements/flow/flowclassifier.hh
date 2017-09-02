@@ -48,7 +48,7 @@ public:
     const char *class_name() const		{ return "FlowClassifier"; }
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return DOUBLE; }
-    int configure_phase() const     { return CONFIGURE_PHASE_FIRST; }
+    int configure_phase() const     { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;

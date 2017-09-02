@@ -56,7 +56,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
         .read("MAXQUEUES",maxqueues)
-        .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
 

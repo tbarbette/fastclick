@@ -29,7 +29,7 @@ Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 QueueDevice::QueueDevice() : _minqueues(0),_maxqueues(128), usable_threads(),
 	queue_per_threads(1), queue_share(1), ndesc(0), allow_nonexistent(false), _maxthreads(-1),firstqueue(-1),n_queues(-1),thread_share(1),
-	_this_node(0){
+	_this_node(0), _active(true) {
 	_verbose = 1;
 }
 void QueueDevice::static_initialize() {
@@ -52,6 +52,7 @@ Args& QueueDevice::parse(Args &args) {
 		.read("MAXTHREADS", _maxthreads)
 		.read("BURST", _burst)
 		.read("VERBOSE", _verbose)
+        .read("ACTIVE", _active)
 	    .read("ALLOW_NONEXISTENT", allow_nonexistent);
 
 	n_elements ++;
