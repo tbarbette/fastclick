@@ -642,10 +642,12 @@ void FlowNode::__combine_else(FlowNode* other) {
     FlowNodePtr Vpruned_default(other->duplicate(true, 1));
     while ((cur = it.next()) != 0) {
         if (!cur->is_leaf()) {
-            cur->node_combine_ptr(this, other->duplicate(true, 1)->prune(level(), cur->data()),false);
+            bool changed;
+            cur->node_combine_ptr(this, other->duplicate(true, 1)->prune(level(), cur->data(), false, changed),false);
         } else {
             if (Vpruned_default.is_node()) { //Other is guaranteed to be not null here
-                Vpruned_default = Vpruned_default.node->prune(level(), cur->data(), true);
+                bool changed;
+                Vpruned_default = Vpruned_default.node->prune(level(), cur->data(), true, changed);
             }
         }
     }
@@ -698,7 +700,7 @@ void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
  * Prune the tree by adding the knowledge that the given level will or will not (inverted) be of the given value
  * if inverted, it means the level will NOT be data
  */
-FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted)  {
+FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed)  {
     if (level->is_dynamic()) {
 #if DEBUG_CLASSIFIER
         click_chatter("Not pruning a dynamic level");
@@ -713,6 +715,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted)  
             FlowNodePtr child = *ptr;
             ptr->ptr = 0;
             dec_num();
+            changed = true;
             //TODO delete child
 
         } else {
@@ -722,18 +725,20 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted)  
             dec_num();
             ptr->ptr = 0;
             //TODO delete this;
+            changed = true;
             return child;
         }
     }
 
-    apply_default([this,level,data,inverted](FlowNodePtr* cur){
+    apply_default([this,level,data,inverted,&changed](FlowNodePtr* cur){
         if (cur->is_leaf()) {
             return;
         }
         FlowNodeData old_data = cur->data();
-        FlowNodePtr newcur = cur->node->prune(level, data, inverted);
+        FlowNodePtr newcur = cur->node->prune(level, data, inverted, changed);
         if (cur->ptr == newcur.ptr) //CHild did not change
             return;
+        changed = true;
         assert(newcur.ptr != 0);
         if (newcur.is_node()) {
             newcur.node->check();
@@ -747,6 +752,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted)  
             //All child values were removed, return the default
             FlowNodePtr def = *default_ptr();
             default_ptr()->ptr = 0;
+            changed = true;
             delete this;
             return def;
         }
@@ -780,11 +786,15 @@ void FlowNode::leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, b
 }
 
 /**
- * Replace a leaf with a node
+ * Replace a leaf with a node. Return true if
+ * data from the parent allowed to prune the child (eg, the child contained a match for
+ * tcp port 80, but our parent already had it, or already cassify in a tcp port other than 80, in which case
+ * other is completely killed.
  */
-void FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
+bool FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
     assert(is_leaf());
     assert(ptr);
+    bool changed = false;
     FlowNodeData old_data = data();
     FlowNode* old_parent = parent();
     FlowControlBlock* old_leaf = leaf;
@@ -799,9 +809,9 @@ void FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
     FlowNodeData gdata = old_data;
     bool was_default = old_parent->default_ptr()->ptr == leaf;
     while (gparent != NULL) {
-        no = no.node->prune(gparent->level(),gdata);
+        no = no.node->prune(gparent->level(),gdata, false, changed);
         if (!no.ptr) { //Completely pruned, keep the FCB as it.
-            return;
+            return true;
         }
         if (no.is_leaf()) {
             break;
@@ -827,6 +837,7 @@ void FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
     else
         no.node->leaf_combine_data(old_leaf,true,true); //We do all here as the downward must be completely updated with our data
 
+    return changed;
     //Release original leaf
     //TODO old_leaf->release(1);
 }

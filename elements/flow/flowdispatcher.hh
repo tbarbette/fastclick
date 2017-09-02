@@ -23,7 +23,6 @@ public:
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
     void push_batch(int, int* flowdata, PacketBatch* batch) override;
-
     FlowNode* get_table(int) override;
 
 private :
@@ -33,8 +32,28 @@ private :
     FlowNode* _table;
 
     bool _verbose;
+    bool attach_children(FlowNodePtr* ptr, int output, bool mark_output);
+protected:
+    bool _children_merge;
+};
+
+
+class FlowContextDispatcher: public FlowDispatcher {
+
+public:
+
+    FlowContextDispatcher() CLICK_COLD {
+        _children_merge = true;
+    };
+    ~FlowContextDispatcher() CLICK_COLD {};
+
+    const char *class_name() const      { return "FlowContextDispatcher"; }
+    const char *port_count() const      { return "1/-"; }
+    const char *processing() const      { return PUSH; }
+
 
 };
+
 
 
 CLICK_ENDDECLS

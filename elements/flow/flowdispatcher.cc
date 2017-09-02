@@ -23,6 +23,7 @@ FlowDispatcher::FlowDispatcher() : _table(0)  {
 #else
 	_verbose = false;
 #endif
+	_children_merge = false;
 
 };
 
@@ -61,97 +62,42 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 		}
 		if (_verbose)
 			click_chatter("Rule %d to output %d",rules.size(),rules[rules.size() - 1].output);
-
-		//rules[rules.size() - 1].root->print();
-		/*using namespace std;
-					istringstream iss(conf[i]);
-					vector<string> tokens{istream_iterator<string>{iss},
-					         istream_iterator<string>{}};
-
-					vector<FlowLevel> network;
-
-					int j = 0;
-
-						string word = tokens[j];
-						if (word == "type") {
-							type = true;
-						} else if (word == "src") {
-							j++;
-							word = tokens[j];
-							if (word == "port") {
-								srcport = true;
-							} else if (word == "host") {
-								srchost = true;
-							} else {
-								errh->error("\"%s\" is not a valid defined subflow",conf[i]);
-								return -EINVAL;
-							}
-						} else if (word == "dst") {
-							j++;
-							word = tokens[j];
-							if (word == "port") {
-								dstport = true;
-							} else if (word == "host") {
-								dsthost = true;
-							} else {
-								errh->error("\"%s\" is not a valid defined subflow",conf[i]);
-								return -EINVAL;
-							}
-						} else if (word == "thread") {
-							_thread = true;
-						} else if (word == "subflow") {
-							subflow = true;
-						} else if (word == "assume") {
-							j++;
-							word = tokens[j];
-							if (word == "proto") {
-								proto_known = true;
-								j++;
-								word = tokens[j];
-								proto = word;
-
-							} else if (word == "ip4") {
-								ip = true;
-								check_ip_v = false;
-								ip_v_set = true;
-							}
-						} else {
-							errh->error("keyword '%s' in argument %d is unknown", word , i+1);
-								return -EINVAL;
-						}
-
-						if (proto == "tcp" || proto == "udp")
-							ip = true;
-
-						if (j < tokens.size() - 1) {
-							errh->error("argument %d is not a valid defined subflow (%s)", i+1,conf[i]);
-								return -EINVAL;
-						}*/
-
 	}
-	if (rules.size() == 0 || !rules[rules.size() -1].is_default) {
+	if (rules.size() == 0) {
+	    if (noutputs() == 1)
+	        rules.push_back(FlowClassificationTable::parse("- 0"));
+	    else
+	        return errh->error("Invalid rule set. There is no rule and not a single output.");
+	} else if (!rules[rules.size() -1].is_default) {
 	    rules.push_back(FlowClassificationTable::make_drop_rule());
 	}
-
-	/*if (subflow) {
-					FlowLevelSubflow* sbf = new FlowLevelSubflow();
-					sbf->deletable = false;
-					flow_levels.push_back(sbf);
-					subflow_level = 1;
-				} else {
-					subflow_level = 0;
-				}
-	 */
-	/*if (thread) {
-		FlowLevelThread* sbt = new FlowLevelThread(master()->nthreads());
-		sbt->deletable = false;
-
-	}*/
 
 	return 0;
 }
 
 
+bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool set_output) {
+    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output);
+    if (child_table) {
+        child_table->check();
+        if (!child_table->has_no_default() && !set_output) {
+           if (_verbose > 1)
+               click_chatter("Child has default values : appending drop rule");
+            child_table = child_table->combine(FlowClassificationTable::parse("- drop").root, false, true);
+        }
+        //Replace_leaf_with_node takes care of prunning using parent to go up to merged, ensuring no classification on the same field is done twice
+        if (set_output) {
+            auto fnt = [this,output](FlowNodePtr* ptr) {
+                *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)output;
+            };
+            child_table->traverse_all_leaves(fnt, true, true);
+        }
+        return ptr->replace_leaf_with_node(child_table);
+    } else {
+        *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)output;
+    }
+    return false;
+}
 
 
 FlowNode* FlowDispatcher::get_table(int) {
@@ -181,15 +127,26 @@ FlowNode* FlowDispatcher::get_table(int) {
 #endif
 			//Now set data for all leaf of the rule
             auto fnt = [this,i](FlowNodePtr* ptr) {
-                *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)rules[i].output;
-                if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's a real output, merge with children
-                    ptr->leaf->set_early_drop();
+                if (_children_merge && (rules[i].output >= 0 || rules[i].output < noutputs())) {
+                    if (attach_children(ptr,rules[i].output,true)) {
+                        click_chatter("ERROR in %{element}: Two path lead to rules with opposite value. You must insert a new FlowClassifier instead of a context link !",this);
+                        abort();
+                    }
+                } else {
+                    *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)rules[i].output;
+                    if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's not a real output, set drop flag
+                        ptr->leaf->set_early_drop();
+                    }
                 }
             };
 			rules[i].root->traverse_all_leaves(fnt, true, true);
 
-			if (_verbose)
+			if (_verbose) {
 				click_chatter("Merging rule %d of %p{element} (output %d)",i,this,rules[i].output);
+				rules[i].root->print();
+				if (merged)
+				    merged->print();
+			}
 
 			if (merged == 0) {
 				merged = rules[i].root;
@@ -233,23 +190,16 @@ FlowNode* FlowDispatcher::get_table(int) {
             click_chatter("Table for %s before merging children :",name().c_str());
             merged->print(_flow_data_offset);
         }
-        auto fnt = [this](FlowNodePtr* ptr) {
-            int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
-            if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
-                   FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output);
-                   if (child_table) {
-                       child_table->check();
-                       if (!child_table->has_no_default()) {
-                          if (_verbose > 1)
-                              click_chatter("Child has default values : appending drop rule");
-                           child_table = child_table->combine(FlowClassificationTable::parse("- drop").root, false, true);
-                       }
-                       //Replace_leaf_with_node takes care of prunning using parent to go up to merged, ensuring no classification on the same field is done twice
-                       ptr->replace_leaf_with_node(child_table);
+        if (!_children_merge) {
+            auto fnt = [this](FlowNodePtr* ptr) {
+                int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
+                if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
+                        attach_children(ptr,output,false);
                    }
-               }
+            };
+
+            merged->traverse_all_leaves(fnt, true, true);
         };
-        merged->traverse_all_leaves(fnt, true, true);
         merged->check();
 
 		if (_verbose) {
@@ -274,50 +224,53 @@ FlowNode* FlowDispatcher::get_table(int) {
          * Verification that all rule leads to the right output
          */
         //Anyt is used to check for the else rule
-        FlowNodePtr anynt = FlowNodePtr(_table->duplicate(true, 1));
-        for (int i = 0; i < rules_copy.size() ; ++i) {
-            click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
-            rules_copy[i].root->traverse_all_leaves([this,rules_copy,i,&anynt](FlowNodePtr* node){
-                if (anynt.is_leaf()) {
-                    if (!anynt.leaf->data[_flow_data_offset] == rules_copy[i].output) {
-                        click_chatter("VERIF Final leaf does not lead to output %d :",rules_copy[i].output);
-                        anynt.print();
-                        click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
-                        rules_copy[i].root->print();
-                        assert(false);
-                    } else {
-                        click_chatter("VERIF Rule is ok !");
-                        return;
+        if (!_children_merge) {
+            FlowNodePtr anynt = FlowNodePtr(_table->duplicate(true, 1));
+            for (int i = 0; i < rules_copy.size() ; ++i) {
+                click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
+                rules_copy[i].root->traverse_all_leaves([this,rules_copy,i,&anynt](FlowNodePtr* node){
+                    if (anynt.is_leaf()) {
+                        if (!anynt.leaf->data[_flow_data_offset] == rules_copy[i].output) {
+                            click_chatter("VERIF Final leaf does not lead to output %d :",rules_copy[i].output);
+                            anynt.print();
+                            click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
+                            rules_copy[i].root->print();
+                            assert(false);
+                        } else {
+                            click_chatter("VERIF Rule is ok !");
+                            return;
+                        }
                     }
-                }
-                FlowNodePtr nt = FlowNodePtr(anynt.node->duplicate(true, 1)); //We check in the tree excluded from the previous rule
-                //Remove all data up from the child
-                FlowNodeData child_data = node->data();
-                node->parent()->traverse_parents([&nt,&child_data,&anynt](FlowNode* parent) {
-                    click_chatter("VERIF Pruning %s %lu",parent->level()->print().c_str(),child_data);
-                    if (nt.is_node())
-                        nt = nt.node->prune(parent->level(), child_data);
-                    if (anynt.is_node())
-                        anynt = anynt.node->prune(parent->level(), child_data,true);
-                    child_data = parent->node_data;
-                });
+                    FlowNodePtr nt = FlowNodePtr(anynt.node->duplicate(true, 1)); //We check in the tree excluded from the previous rule
+                    //Remove all data up from the child
+                    FlowNodeData child_data = node->data();
+                    node->parent()->traverse_parents([&nt,&child_data,&anynt](FlowNode* parent) {
+                        click_chatter("VERIF Pruning %s %lu",parent->level()->print().c_str(),child_data);
+                        bool changed;
+                        if (nt.is_node())
+                            nt = nt.node->prune(parent->level(), child_data,false, changed);
+                        if (anynt.is_node())
+                            anynt = anynt.node->prune(parent->level(), child_data,true, changed);
+                        child_data = parent->node_data;
+                    });
 
 
-                (rules_copy[i].is_default?anynt:nt).traverse_all_leaves([this,rules_copy,i,nt,anynt](FlowNodePtr* cur){
-                    if (!cur->leaf->data[_flow_data_offset] == rules_copy[i].output) {
-                        click_chatter("VERIF Leaf does not lead to output %d :",rules_copy[i].output);
-                        cur->leaf->print("",_flow_data_offset);
-                        click_chatter("VERIF Pruned tree : ");
-                        (rules_copy[i].is_default?anynt:nt).print();
-                        click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
-                        rules_copy[i].root->print(_flow_data_offset);
-                        assert(false);
-                    } else {
-                        click_chatter("VERIF Rule is ok !");
-                        return;
-                    }
-                });
-            },true,true);
+                    (rules_copy[i].is_default?anynt:nt).traverse_all_leaves([this,rules_copy,i,nt,anynt](FlowNodePtr* cur){
+                        if (!cur->leaf->data[_flow_data_offset] == rules_copy[i].output) {
+                            click_chatter("VERIF Leaf does not lead to output %d :",rules_copy[i].output);
+                            cur->leaf->print("",_flow_data_offset);
+                            click_chatter("VERIF Pruned tree : ");
+                            (rules_copy[i].is_default?anynt:nt).print();
+                            click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
+                            rules_copy[i].root->print(_flow_data_offset);
+                            assert(false);
+                        } else {
+                            click_chatter("VERIF Rule is ok !");
+                            return;
+                        }
+                    });
+                },true,true);
+            }
         }
 #endif
 	} else {
@@ -348,3 +301,4 @@ void FlowDispatcher::push_batch(int, int* flowdata, PacketBatch* batch) {
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)
 EXPORT_ELEMENT(FlowDispatcher)
+EXPORT_ELEMENT(FlowContextDispatcher)

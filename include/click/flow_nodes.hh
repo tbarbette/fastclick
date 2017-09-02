@@ -144,7 +144,7 @@ public :
 
     inline void check();
 
-    void replace_leaf_with_node(FlowNode*);
+    bool replace_leaf_with_node(FlowNode*);
 
     void node_combine_ptr(FlowNode* parent, FlowNodePtr, bool as_child);
     void default_combine(FlowNode* parent, FlowNodePtr*, bool as_child);
@@ -305,7 +305,7 @@ public:
     FlowNode* combine(FlowNode* other, bool as_child, bool priority = true) CLICK_WARN_UNUSED_RESULT;
     void __combine_child(FlowNode* other);
     void __combine_else(FlowNode* other);
-    FlowNodePtr prune(FlowLevel* level,FlowNodeData data, bool inverted = false) CLICK_WARN_UNUSED_RESULT;
+    FlowNodePtr prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed) CLICK_WARN_UNUSED_RESULT;
 
 
     virtual int max_size() const {

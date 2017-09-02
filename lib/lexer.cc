@@ -815,7 +815,7 @@ Lexer::FileState::next_lexeme(Lexer *lexer)
   //Check for context link
   if (*s == '~') {
       s++;
-      while (s < _end && (isalnum((unsigned char) *s)))
+      while (s < _end && (isalnum((unsigned char) *s) || *s == '/'))
             s++;
       //TODO : more click-like
       assert(*s == '>');
@@ -2285,23 +2285,23 @@ Lexer::create_router(Master *master)
               int ci = cix; //_conn_output_sorter[cix];
               if (_c->_conn[cix][1].idx == eidx && _c->_conn[cix]._is_context) {
                   connections.push_back(&_c->_conn[cix]);
-                  click_chatter("%d has conn %d %d as context / %d",eidx,_c->_conn[ci][0].idx,_c->_conn[cix][1].idx,router->_elements.size());
-                  if (_c->_conn[ci][0].idx >= 0 && _c->_conn[cix][1].idx >= 0)
-                      click_chatter("%p{element} %p{element}",router->_elements[_c->_conn[ci][0].idx], router->_elements[_c->_conn[cix][1].idx]);
-                  click_chatter("%s",_c->_conn[cix]._context.c_str());
+                  //click_chatter("%d has conn %d %d as context / %d",eidx,_c->_conn[ci][0].idx,_c->_conn[cix][1].idx,router->_elements.size());
+                  /*if (_c->_conn[ci][0].idx >= 0 && _c->_conn[cix][1].idx >= 0)
+                      click_chatter("%p{element} %p{element}",router->_elements[_c->_conn[ci][0].idx], router->_elements[_c->_conn[cix][1].idx]);*/
+                  //click_chatter("%s",_c->_conn[cix]._context.c_str());
               }
           }
           if (connections.size() > 0) {
               change_made = true;
-              FlowDispatcher* fd = new FlowDispatcher();
               int fdidx = router->_elements.size();
+              FlowContextDispatcher* fd = new FlowContextDispatcher();
               String conf = "";
               for (int cid = 0; cid < connections.size(); cid++) {
                   conf +="- "+String(cid);
                   if (cid < connections.size() - 1)
                       conf +=",";
               }
-              if (!router->add_element(fd, "context_flowdispatcher_"+String(eidx), conf, "click", 0)) {
+              if (!router->add_element(fd, "context_flowcontextdispatcher_"+String(eidx), conf, "click", 0)) {
                   _errh->lerror(_c->element_landmark(eidx), "Could not dynamically add context resolver");
               }
               router->add_connection(eidx, 0, fdidx, 0, false, false, "");
@@ -2309,12 +2309,14 @@ Lexer::create_router(Master *master)
               for (int cid = 0; cid < connections.size(); cid++) {
                   connections[cid]->_is_context = false;
                   if (connections[cid]->_context != "~>") {
-                      click_chatter("Specific context %s",connections[cid]->_context.c_str());
+                      //click_chatter("Specific context %s",connections[cid]->_context.c_str());
                       String ename;
-                      if (connections[cid]->_context == "~ip>") {
-                          ename = "IPIn";
-                      } else if (connections[cid]->_context == "~tcp>") {
-                          ename = "TCPIn";
+                      if (connections[cid]->_context.length() > 2) {
+                          if (connections[cid]->_context[1]=='/') {
+                              ename = connections[cid]->_context.substring(2, connections[cid]->_context.length()-3).upper() + "Out";
+                          } else {
+                              ename = connections[cid]->_context.substring(1, connections[cid]->_context.length()-2).upper() + "In";
+                          }
                       } else {
                           _errh->lerror(_c->element_landmark(eidx), "Unknown context link %s",connections[cid]->_context .c_str());
                           return router;
