@@ -24,13 +24,12 @@ class CPU {
 
         Json toJSON();
 
+        static const int MEGA_HZ = 1000000;
+
     private:
         int _id;
         String _vendor;
         long _frequency;
-
-    public:
-        static const int MEGA_HZ = 1000000;
 };
 
 class NIC {
@@ -59,48 +58,54 @@ class NIC {
 
 class ServiceChain {
     public:
-        class RxFilter { public:
 
-            RxFilter(ServiceChain *sc) : _sc(sc) {
+        class RxFilter {
+            public:
 
-            }
+                RxFilter(ServiceChain *sc) : _sc(sc) {
 
-            ~RxFilter() {
+                }
 
-            }
+                ~RxFilter() {
 
-            String method;
-            ServiceChain* _sc;
+                }
 
-            static RxFilter* fromJSON(Json j, ServiceChain *sc, ErrorHandler *errh);
-            Json toJSON();
+                String method;
+                ServiceChain* _sc;
 
-            int cpuToQueue(NIC *nic, int cpuid) {
-                return nic->cpuToQueue(cpuid);
-            }
+                static RxFilter* fromJSON(Json j, ServiceChain *sc, ErrorHandler *errh);
+                Json toJSON();
 
-            virtual int apply(NIC* nic, ErrorHandler *errh);
+                int cpuToQueue(NIC *nic, int cpuid) {
+                    return nic->cpuToQueue(cpuid);
+                }
 
-            Vector<Vector<String>> values;
+                virtual int apply(NIC *nic, ErrorHandler *errh);
+
+                Vector<Vector<String>> values;
         };
 
-        enum ScStatus{SC_FAILED,SC_OK=1};
+        enum ScStatus{
+            SC_FAILED,
+            SC_OK=1
+        };
+
         String id;
-        RxFilter* rxFilter;
+        RxFilter *rxFilter;
         String config;
 
         enum ScStatus status;
 
-
         class Stat {
-        public:
-            long long useless;
-            long long useful;
-            long long count;
-            float load;
-            Stat() : useless(0), useful(0), count(0), load(0) {
+            public:
+                long long useless;
+                long long useful;
+                long long count;
+                float load;
 
-            }
+                Stat() : useless(0), useful(0), count(0), load(0) {
+
+                }
         };
         Vector<Stat> nic_stats;
 
@@ -139,6 +144,7 @@ class ServiceChain {
                 if (nic->getId() == id)
                     return nic;
             }
+
             return 0;
         }
 
@@ -147,6 +153,7 @@ class ServiceChain {
                 if (_nics[i] == nic)
                     return i;
             }
+
             return -1;
         }
 
@@ -158,7 +165,7 @@ class ServiceChain {
 
         String generateConfig();
         String generateConfigSlaveFDName(int nic_index, int cpu_index) {
-            return "slaveFD"+String(nic_index)+ "C"+String(cpu_index);
+            return "slaveFD" + String(nic_index) + "C" + String(cpu_index);
         }
 
         Vector<String> buildCmdLine(int socketfd);
@@ -178,108 +185,122 @@ class ServiceChain {
         int callRead(String handler, String &response, String params="");
         int callWrite(String handler, String &response, String params="");
 
-        Vector<int>& getCpuMapRef() {
+        Vector<int> &getCpuMapRef() {
             return _cpus;
         }
 
         struct timing_stats {
-            Timestamp start,parse,launch;
+            Timestamp start, parse, launch;
             Json toJSON();
         };
         void setTimingStats(struct timing_stats ts) {
             _timing_stats = ts;
         }
 
+        struct autoscale_timing_stats {
+            Timestamp autoscale_start, autoscale_end;
+        };
+        void setAutoscaleTimingStats(struct autoscale_timing_stats ts) {
+            _as_timing_stats = ts;
+        }
+
         void doAutoscale(int nCpuChange);
+
     private:
 
         Metron *_metron;
         Vector<int> _cpus;
         Vector<NIC *> _nics;
         Vector<float> _cpuload;
-        float total_cpuload;
+        float _total_cpuload;
         int _socket;
         int _pid;
         struct timing_stats _timing_stats;
+        struct autoscale_timing_stats _as_timing_stats;
         int _used_cpu_nr;
         int _max_cpu_nr;
         bool _autoscale;
         Timestamp _last_autoscale;
 
-
         friend class Metron;
-    };
+};
 
 /*
 =c
 
 Metron */
-class Metron : public Element { public:
+class Metron : public Element {
+    public:
 
-    Metron() CLICK_COLD;
-    ~Metron() CLICK_COLD;
+        Metron() CLICK_COLD;
+        ~Metron() CLICK_COLD;
 
-    const char *class_name() const  { return "Metron"; }
-    const char *port_count() const  { return PORTS_0_0; }
+        const char *class_name() const  { return "Metron"; }
+        const char *port_count() const  { return PORTS_0_0; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *) CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
 
-    void run_timer(Timer* t) override;
+        void run_timer(Timer *t) override;
 
-    void add_handlers() CLICK_COLD;
-    static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
-    static String read_handler(Element *e, void *user_data) CLICK_COLD;
-    static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler *errh) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
+        static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
+        static String read_handler(Element *e, void *user_data) CLICK_COLD;
+        static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler *errh) CLICK_COLD;
 
-    Json toJSON();
-    Json statsToJSON();
+        Json toJSON();
+        Json statsToJSON();
 
-    enum {
-        h_resources,h_stats,
-        h_chains, h_delete_chains,h_put_chains,h_chains_stats,h_chains_proxy
-    };
+        enum {
+            h_resources, h_stats, h_chains,
+            h_delete_chains, h_put_chains,
+            h_chains_stats, h_chains_proxy
+        };
 
-    ServiceChain* findChainById(String id);
+        ServiceChain *findChainById(String id);
 
-    int removeChain(ServiceChain *sc, ErrorHandler *errh);
-    int instanciateChain(ServiceChain *sc, ErrorHandler *errh);
+        int instantiateChain(ServiceChain *sc, ErrorHandler *errh);
+        int removeChain(ServiceChain *sc, ErrorHandler *errh);
 
-    int getCpuNr() {
-        return click_max_cpu_ids();
-    }
+        int getCpuNr() {
+            return click_max_cpu_ids();
+        }
 
-    int getNbChains() {
-        return _scs.size();
-    }
+        int getNbChains() {
+            return _scs.size();
+        }
 
-    int getAssignedCpuNr();
+        int getAssignedCpuNr();
 
-    bool assignCpus(ServiceChain *sc, Vector<int> &map);
-    void unassignCpus(ServiceChain *sc);
+        bool assignCpus(ServiceChain *sc, Vector<int> &map);
+        void unassignCpus(ServiceChain *sc);
 
-private:
-    String _id;
-    Vector<String> _args;
-    Vector<String> _dpdk_args;
+        const float CPU_OVERLOAD_LIMIT = (float) 0.7;
+        const float CPU_UNERLOAD_LIMIT = (float) 0.4;
 
-    HashMap<String,NIC> _nics;
-    HashMap<String,ServiceChain *> _scs;
+    private:
+        String _id;
+        Vector<String> _args;
+        Vector<String> _dpdk_args;
 
-    Vector<ServiceChain *> _cpu_map;
+        HashMap<String,NIC> _nics;
+        HashMap<String,ServiceChain *> _scs;
 
-    String _vendor;
-    String _hw;
-    String _sw;
-    String _serial;
+        Vector<ServiceChain *> _cpu_map;
 
-    bool _timing_stats;
+        String _vendor;
+        String _hw;
+        String _sw;
+        String _serial;
 
-    int runChain(ServiceChain *sc, ErrorHandler *errh);
+        bool _timing_stats;
 
-    Timer _timer;
-    friend class ServiceChain;
+        int runChain(ServiceChain *sc, ErrorHandler *errh);
+
+        Timer _timer;
+
+        friend class ServiceChain;
 };
 
 CLICK_ENDDECLS
