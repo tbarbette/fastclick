@@ -68,7 +68,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 	        rules.push_back(FlowClassificationTable::parse("- 0"));
 	    else
 	        return errh->error("Invalid rule set. There is no rule and not a single output.");
-	} else if (!rules[rules.size() -1].is_default) {
+	} else if (!rules[rules.size() -1].is_default || _children_merge) {
 	    rules.push_back(FlowClassificationTable::make_drop_rule());
 	}
 
@@ -127,7 +127,7 @@ FlowNode* FlowDispatcher::get_table(int) {
 #endif
 			//Now set data for all leaf of the rule
             auto fnt = [this,i](FlowNodePtr* ptr) {
-                if (_children_merge && (rules[i].output >= 0 || rules[i].output < noutputs())) {
+                if (_children_merge && (rules[i].output >= 0 && rules[i].output < noutputs())) {
                     if (attach_children(ptr,rules[i].output,true)) {
                         click_chatter("ERROR in %{element}: Two path lead to rules with opposite value. You must insert a new FlowClassifier instead of a context link !",this);
                         abort();

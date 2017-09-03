@@ -904,7 +904,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 			    //TODO
                 click_chatter("Non dynamic level, without child that has a leaf as ptr");
                 this->print();
-                return this;
+			    assert(false);
 			}
 		} else if (getNum() == 1) {
 			FlowNode* newnode;

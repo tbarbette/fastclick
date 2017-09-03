@@ -179,11 +179,11 @@ void  FlowNode::traverse_all_leaves_and_empty_default(std::function<void(FlowNod
     }
 
     if (this->default_ptr()->ptr != 0) {
-        if (cur->is_leaf()) {
+        if (this->default_ptr()->is_leaf()) {
             if (do_default)
                 fnt(this->default_ptr(), this);
         } else {
-            cur->node->traverse_all_leaves_and_empty_default(fnt, do_final, do_default);
+            this->default_ptr()->node->traverse_all_leaves_and_empty_default(fnt, do_final, do_default);
         }
     } else {
         fnt(this->default_ptr(), this);
