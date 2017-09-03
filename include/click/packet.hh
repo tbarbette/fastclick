@@ -902,6 +902,7 @@ class WritablePacket : public Packet { public:
     inline click_udp *udp_header() const;
 
     inline void rewrite_ips(IPPair pair, bool is_tcp = true);
+    inline void rewrite_ips_ports(IPPair pair, uint16_t sport, uint16_t dport, bool is_tcp = true);
 
     inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
 
@@ -2864,7 +2865,42 @@ WritablePacket::rewrite_ips(IPPair pair, bool is_tcp) {
         click_update_in_cksum(&this->tcp_header()->th_sum, old_hw, new_hw);
     else
         click_update_in_cksum(&this->udp_header()->uh_sum, old_hw, new_hw);
+}
 
+inline void
+WritablePacket::rewrite_ips_ports(IPPair pair, uint16_t sport, uint16_t dport, bool is_tcp) {
+    assert(this->network_header());
+    assert(this->transport_header());
+    uint32_t old_hw, t_old_hw;
+    uint32_t new_hw, t_new_hw;
+
+    uint16_t *xip = reinterpret_cast<uint16_t *>(&this->ip_header()->ip_src);
+    old_hw = (uint32_t) xip[0] + xip[1] + xip[2] + xip[3];
+    t_old_hw = old_hw;
+    old_hw += (old_hw >> 16);
+
+    memcpy(xip, &pair, 8);
+
+    new_hw = (uint32_t) xip[0] + xip[1] + xip[2] + xip[3];
+    t_new_hw = new_hw;
+    new_hw += (new_hw >> 16);
+    click_ip *iph = this->ip_header();
+    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
+
+    uint16_t *xport = reinterpret_cast<uint16_t *>(&this->tcp_header()->th_sport);
+    t_old_hw += (uint32_t) xport[0] + xport[1];
+    t_old_hw += (t_old_hw >> 16);
+    if (sport)
+        xport[0] = sport;
+    if (dport)
+        xport[1] = dport;
+    t_new_hw += (uint32_t) xport[0] + xport[1];
+    t_new_hw += (t_new_hw >> 16);
+
+    if (is_tcp)
+        click_update_in_cksum(&this->tcp_header()->th_sum, t_old_hw, t_new_hw);
+    else
+        click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
 
 typedef Packet::PacketType PacketType;
