@@ -2,7 +2,7 @@
  * checknumberpacket.{cc,hh} -- Check number inside packet
  * Tom Barbette
  *
- * Copyright (c) 2015-2016 University of Liège
+ * Copyright (c) 2015-2017 University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -63,7 +63,7 @@ inline int CheckNumberPacket::smaction(Packet* p) {
 }
 
 void
-CheckNumberPacket::push(int i, Packet *p) {
+CheckNumberPacket::push(int, Packet *p) {
     checked_output_push(smaction(p), p);
 }
 
@@ -84,7 +84,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
         StringAccum s;
         int max = -1;
         int imax = -1;
-        for (unsigned j = 0; j < fd->_numbers.size(); j++) {
+        for (unsigned j = 0; j < (unsigned)fd->_numbers.size(); j++) {
             if (fd->_numbers[j] > max) {
                 imax=j;
                 max = fd->_numbers[j];
@@ -96,7 +96,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
           StringAccum s;
           int min = INT_MAX;
           int imin = -1;
-          for (unsigned j = 0; j < fd->_numbers.size(); j++) {
+          for (unsigned j = 0; j < (unsigned)fd->_numbers.size(); j++) {
               if (fd->_numbers[j] < min) {
                   imin=j;
                   min = fd->_numbers[j];
@@ -109,7 +109,7 @@ CheckNumberPacket::read_handler(Element *e, void *thunk)
       }
       case H_DUMP: {
           StringAccum s;
-          for (unsigned j = 0; j < fd->_numbers.size(); j++) {
+          for (unsigned j = 0; j < (unsigned)fd->_numbers.size(); j++) {
                   s << j << ": " << fd->_numbers[j] << "\n";
           }
           return s.take_string();
@@ -130,11 +130,11 @@ CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, Er
           if (IntArg().parse(s, n)) {
               fd->_count = n;
               fd->_numbers.resize(n,0);
-              break;
+              return 0;
           }
       }
       default:
-    return -EINVAL;
+        return -EINVAL;
     }
 }
 
