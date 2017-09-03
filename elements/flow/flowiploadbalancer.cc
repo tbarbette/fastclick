@@ -16,7 +16,7 @@ CLICK_DECLS
 
 #define LOADBALANCER_FLOW_TIMEOUT 60 * 1000
 
-FlowIPLoadBalancer::FlowIPLoadBalancer() : _last(0){
+FlowIPLoadBalancer::FlowIPLoadBalancer() {
 
 };
 
@@ -40,33 +40,60 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int FlowIPLoadBalancer::initialize(ErrorHandler *errh) {
-    if (get_passing_threads().weight() <= 1) {
+    Bitvector passing = get_passing_threads();
+
+    if (passing.weight() <= 1) {
         _map.disable_mt();
+    }
+    if (passing.weight() == 0) {
+        return errh->warning("No thread passing by, element will not work if it's not indeed idle");
+    }
+
+    int total_ports = 65536 - 1024;
+    int ports_per_thread = total_ports / passing.weight();
+    int n = 0;
+    for (int i = 0; i < passing.size(); i++) {
+        if (!passing[i])
+            continue;
+        state &s = _state.get_value_for_thread(i);
+        s.last = 0;
+        s.min_port = 1024 + (n*ports_per_thread);
+        s.max_port = s.min_port + ports_per_thread;
+        s.ports.resize(_sips.size());
+        for(int j = 0; j < _sips.size(); j++) {
+            s.ports[j] = s.min_port;
+        }
+        n++;
     }
     return 0;
 }
 
 
-void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
+void FlowIPLoadBalancer::push_batch(int, TTuple* flowdata, PacketBatch* batch) {
 
-    if ((*flowdata).src == IPAddress(0)) {
-        int server = _last++;
-        if (*_last >= _dsts.size())
-            *_last = 0;
-        flowdata->src = _sips[server];
-        flowdata->dst = _dsts[server];
+    state &s = *_state;
+    if (flowdata->pair.src == IPAddress(0)) {
+        int server = s.last++;
+        if (s.last >= _dsts.size())
+            s.last = 0;
+        flowdata->pair.src = _sips[server];
+        flowdata->pair.dst = _dsts[server];
+        flowdata->port = htons(s.ports[server]++);
+        if (s.ports[server] == s.max_port)
+            s.ports[server] = s.min_port;
 #if DEBUG_LB
-        click_chatter("New output %d, next is %d",server,*_last);
+        click_chatter("New output %d, next is %d. New port is %d",server,s.last,ntohs(flowdata->port));
 #endif
         auto ip = batch->ip_header();
         IPAddress osip = IPAddress(ip->ip_src);
         IPAddress odip = IPAddress(ip->ip_dst);
         auto th = batch->tcp_header();
         assert(th);
-        LBEntry entry = LBEntry(flowdata->dst, th->th_sport);
-        _map.find_insert(entry, IPPair(odip,osip));
+        uint16_t osport = th->th_sport;
+        LBEntry entry = LBEntry(flowdata->pair.dst, flowdata->port);
+        _map.find_insert(entry, TTuple(IPPair(odip,osip),osport));
 #if DEBUG_LB
-        click_chatter("Adding entry %s %d [%d]",entry.chosen_server.unparse().c_str(),entry.port,*_last);
+        click_chatter("Adding entry %s %d [%d]",entry.chosen_server.unparse().c_str(),entry.port,s.last);
 #endif
         fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
     } else {
@@ -76,10 +103,10 @@ void FlowIPLoadBalancer::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
 #endif
     }
 
-    auto fnt = [flowdata,this](Packet*p) -> Packet* {
+    auto fnt = [this,flowdata](Packet*p) -> Packet* {
         WritablePacket* q=p->uniqueify();
-        q->rewrite_ips(*flowdata);
-        q->set_dst_ip_anno(flowdata->dst);
+        q->rewrite_ips_ports(flowdata->pair, flowdata->port, 0);
+        q->set_dst_ip_anno(flowdata->pair.dst);
         if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
 #if DEBUG_LB || DEBUG_CLASSIFIER_TIMEOUT > 1
             click_chatter("Forward Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
@@ -123,8 +150,8 @@ int FlowIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
 
 
 
-void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* batch) {
-    if (flowdata->src == IPAddress(0)) {
+void FlowIPLoadBalancerReverse::push_batch(int, TTuple* flowdata, PacketBatch* batch) {
+    if (flowdata->pair.src == IPAddress(0)) {
         auto ip = batch->ip_header();
         auto th = batch->tcp_header();
         LBEntry entry = LBEntry(ip->ip_src, th->th_dport);
@@ -142,9 +169,10 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
             //checked_output_push_batch(0, batch);
             batch->kill();
             return;
-        } else{
+        } else {
+            //TODO : Delete?
 #if DEBUG_LB
-            click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->src.unparse().c_str(),ptr->dst.unparse().c_str());
+            click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->pair.src.unparse().c_str(),ptr->pair.dst.unparse().c_str());
 #endif
         }
 #if IPLOADBALANCER_MP
@@ -155,7 +183,7 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
         fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
     } else {
 #if DEBUG_LB
-        click_chatter("Saved entry %s -> %s",flowdata->src.unparse().c_str(),flowdata->dst.unparse().c_str());
+        click_chatter("Saved entry %s -> %s",flowdata->pair.src.unparse().c_str(),flowdata->pair.dst.unparse().c_str());
 #endif
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         if (!fcb_stack->hasTimeout()) {
@@ -167,8 +195,8 @@ void FlowIPLoadBalancerReverse::push_batch(int, IPPair* flowdata, PacketBatch* b
 
     auto fnt = [this,flowdata](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
-        q->rewrite_ips(*flowdata);
-        q->set_dst_ip_anno(flowdata->dst);
+        q->rewrite_ips_ports(flowdata->pair, 0, flowdata->port);
+        q->set_dst_ip_anno(flowdata->pair.dst);
         if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
 #if DEBUG_LB || DEBUG_CLASSIFIER_TIMEOUT > 1
             click_chatter("Reverse Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));

@@ -14,6 +14,16 @@
 #endif
 CLICK_DECLS
 
+/**
+ * 3-tuple, IP pair and original or new port
+ */
+struct TTuple {
+    IPPair pair;
+    uint16_t port;
+    TTuple(IPPair _pair, uint16_t _port) : pair(_pair),port(_port) {
+    }
+};
+
 struct LBEntry {
     IPAddress chosen_server;
     uint16_t port;
@@ -30,11 +40,11 @@ struct LBEntry {
 
 };
 #if IPLOADBALANCER_MP
-typedef HashTableMP<LBEntry,IPPair> LBHashtable;
+typedef HashTableMP<LBEntry,TTuple> LBHashtable;
 #else
-typedef HashTable<LBEntry,IPPair> LBHashtable;
+typedef HashTable<LBEntry,TTuple> LBHashtable;
 #endif
-class FlowIPLoadBalancer : public FlowSpaceElement<IPPair> {
+class FlowIPLoadBalancer : public FlowSpaceElement<TTuple> {
 
 public:
 
@@ -50,9 +60,15 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
 
-    void push_batch(int, IPPair*, PacketBatch *);
+    void push_batch(int, TTuple*, PacketBatch *);
 private:
-    per_thread<int> _last;
+    struct state {
+        int last;
+        int min_port;
+        int max_port;
+        Vector<uint16_t> ports;
+    };
+    per_thread<state> _state;
     Vector<IPAddress> _dsts;
     Vector<IPAddress> _sips;
     //IPAddress _sip;
@@ -61,7 +77,7 @@ private:
     friend class FlowIPLoadBalancerReverse;
 };
 
-class FlowIPLoadBalancerReverse : public FlowSpaceElement<IPPair> {
+class FlowIPLoadBalancerReverse : public FlowSpaceElement<TTuple> {
 
 public:
 
@@ -77,7 +93,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
 
-    void push_batch(int, IPPair*, PacketBatch *);
+    void push_batch(int, TTuple*, PacketBatch *);
 private:
     FlowIPLoadBalancer* _lb;
 };
