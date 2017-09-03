@@ -1,7 +1,6 @@
-#ifndef CLICK_FlowIDSMatcher_HH
-#define CLICK_FlowIDSMatcher_HH
+#ifndef CLICK_FLOWIDSMATCHER_HH
+#define CLICK_FLOWIDSMATCHER_HH
 #include <click/batchelement.hh>
-#include "../ids/regexset.hh"
 #include "stackelement.hh"
 #include <click/flowbuffer.hh>
 #include <click/simpledfa.hh>
