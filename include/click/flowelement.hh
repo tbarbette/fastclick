@@ -253,18 +253,18 @@ public:
 
 #define FLOW_ELEMENT_DEFINE_CONTEXT(rule) \
 FlowNode* get_table(int iport) override CLICK_COLD {\
-    return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true);\
+    return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true, true);\
 }
 
 #define FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(ruleA,ruleB) \
 FlowNode* get_table(int iport) override CLICK_COLD {\
-    return FlowClassificationTable::parse(ruleA).root->combine(FlowClassificationTable::parse(ruleB).root,false,false)->combine(FlowElement::get_table(iport), true);\
+    return FlowClassificationTable::parse(ruleA).root->combine(FlowClassificationTable::parse(ruleB).root,false,false)->combine(FlowElement::get_table(iport), true,true);\
 }
 
 #define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port_num,rule) \
 FlowNode* get_table(int iport) override {\
     if (iport == port_num) {\
-        return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true);\
+        return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true, true);\
     }\
     return FlowElement::get_table(iport);\
 }

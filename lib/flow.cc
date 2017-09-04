@@ -339,7 +339,7 @@ bool FlowTableHolder::check_release() {
 }
 #endif
 
-void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_child) {
+void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_child, bool priority) {
     if (other.is_leaf()) {
         assert(!as_child);
 
@@ -354,7 +354,7 @@ void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_
         };
         this->node->traverse_all_default_leaf(fnt);
     } else {
-        FlowNode* new_node = node->combine(other.node, as_child);
+        FlowNode* new_node = node->combine(other.node, as_child, priority);
         if (new_node != node) {
             node = new_node;
             node->set_parent(parent);
@@ -380,7 +380,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 	if (dynamic_cast<FlowLevelDummy*>(this->level()) != 0) {
 	        debug_flow("COMBINE : I am dummy")
 	        if (_default.is_leaf()) {
-	            other->leaf_combine_data(_default.leaf, as_child, !as_child);
+	            other->leaf_combine_data(_default.leaf, as_child, !as_child && priority);
 	            //TODO delete this;
 	            return other;
 	        } else {
@@ -428,14 +428,30 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 	    }
 	}
 
+
+    if (this->level()->is_dynamic() && !other->level()->is_dynamic()) {
+        if (priority) {
+            click_chatter("Trying to attach a non-dynamic child to a dynamic node. This generally means you need a new FlowClassifier after a dynamic node, such as TCPIn elements or flow-based one");
+            this->print();
+            other->print();
+            abort();
+        } else {
+            this->set_parent(0);
+            debug_flow("Combining a dynamic parent with a non dynamic node. As Priority is false, we invert the child and the parent");
+            this->debug_print();
+            other->debug_print();
+            return other->combine(this, as_child, false); //Priority is false in this path
+        }
+    }
+
 	if (as_child)
-	    __combine_child(other);
+	    __combine_child(other, priority);
 	else
-	    __combine_else(other);
+	    __combine_else(other, priority);
 	return this;
 }
 
-void FlowNode::__combine_child(FlowNode* other) {
+void FlowNode::__combine_child(FlowNode* other, bool priority) {
 	if (level()->equals(other->level())) { //Same level
 #if DEBUG_CLASSIFIER
 		click_chatter("COMBINE : same level");
@@ -471,7 +487,7 @@ void FlowNode::__combine_child(FlowNode* other) {
 				} else { //So we combine our child node with the other child node
 				    //We must set the parent to null, so the combiner nows he can play with that node
 				    other_child_ptr->node->set_parent(0);
-					child_ptr->node = child_ptr->node->combine(other_child_ptr->node,true);
+					child_ptr->node = child_ptr->node->combine(other_child_ptr->node,true,priority);
 					child_ptr->node->set_parent(this);
 
 				}
@@ -493,7 +509,7 @@ void FlowNode::__combine_child(FlowNode* other) {
         //If other had a default, we need to merge it
         if (other->default_ptr()->ptr != 0) { //Other had default
             other->default_ptr()->set_parent(0);
-            this->default_ptr()->default_combine(this, other->default_ptr(), true);
+            this->default_ptr()->default_combine(this, other->default_ptr(), true, priority);
             other->default_ptr()->ptr = 0;
         } //ELse nothing to do as we can keep our default as it, if any*/
 		//TODO delete other;
@@ -527,7 +543,7 @@ void FlowNode::__combine_child(FlowNode* other) {
             this->print();
             other->print();
 #endif
-            this->replace_leaves(other, true, false);
+            this->replace_leaves(other, true, false, !priority);
             //Well, it's not that complicated finally.
             this->check();
             return;
@@ -539,7 +555,7 @@ void FlowNode::__combine_child(FlowNode* other) {
 /**
  * Add a rule to all default path
  */
-void FlowNode::__combine_else(FlowNode* other) {
+void FlowNode::__combine_else(FlowNode* other, bool priority) {
 
     /**
      * Function replacing all default leaf and empty default per other
@@ -585,6 +601,9 @@ void FlowNode::__combine_else(FlowNode* other) {
 */
 
     if (level()->equals(other->level())) { //Same level
+        if (other->level()->is_dynamic()) {
+            level()->set_dynamic();
+        }
         debug_flow("COMBINE-ELSE : same level");
         FlowNode::NodeIterator other_childs = other->iterator();
 
@@ -609,7 +628,7 @@ void FlowNode::__combine_else(FlowNode* other) {
                     //So we combine our child node with the other child node
                     //We must set the parent to null, so the combiner nows he can play with that node
                     other_child_ptr->node->set_parent(0);
-                    child_ptr->node = child_ptr->node->combine(other_child_ptr->node,false);
+                    child_ptr->node = child_ptr->node->combine(other_child_ptr->node,false,priority);
                     child_ptr->node->set_parent(this);
                 } else {
                     assert(false);
@@ -624,7 +643,7 @@ void FlowNode::__combine_else(FlowNode* other) {
         assert(other->getNum() == 0);
         //If other had a default, we need to merge it
         if (other->default_ptr()->ptr != 0) { //Other had default
-            this->default_ptr()->default_combine(this, other->default_ptr(), true);
+            this->default_ptr()->default_combine(this, other->default_ptr(), true, priority);
             other->default_ptr()->ptr = 0;
         } //ELse nothing to do as we can keep our default as it, if any
         //TODO : delete other;
@@ -643,7 +662,7 @@ void FlowNode::__combine_else(FlowNode* other) {
     while ((cur = it.next()) != 0) {
         if (!cur->is_leaf()) {
             bool changed;
-            cur->node_combine_ptr(this, other->duplicate(true, 1)->prune(level(), cur->data(), false, changed),false);
+            cur->node_combine_ptr(this, other->duplicate(true, 1)->prune(level(), cur->data(), false, changed),false, priority);
         } else {
             if (Vpruned_default.is_node()) { //Other is guaranteed to be not null here
                 bool changed;
@@ -651,7 +670,7 @@ void FlowNode::__combine_else(FlowNode* other) {
             }
         }
     }
-    this->default_ptr()->default_combine(this, &Vpruned_default, false);
+    this->default_ptr()->default_combine(this, &Vpruned_default, false, priority);
     //TODO : delete other
     this->check();
     return;
@@ -660,19 +679,23 @@ void FlowNode::__combine_else(FlowNode* other) {
 /**
  * Correct iif this FLowNodePtr is a default ptr
  */
-void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child) {
+void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child, bool priority) {
     if (this->ptr == 0) { //We don't have default
         debug_flow("No node, attaching other");
         *this = (*other);
     } else { //We have default, other have default
         debug_flow("There is a node");
         if (this->is_leaf() && other->is_leaf()) { //Our default is a leaf and other default is a leaf
-            this->leaf->combine_data(other->leaf->data);
+            if (!priority) {
+                this->leaf->release();
+                this->leaf = other->leaf;
+            } else
+                this->leaf->combine_data(other->leaf->data);
         } else if (this->is_node()) { //Our default is a node
-            this->node_combine_ptr(p, *other, as_child);
+            this->node_combine_ptr(p, *other, as_child, priority);
         } else { //other default is node, our is leaf
             //We replace all other leaf with our data
-            other->node->leaf_combine_data_create(this->leaf, true, true);
+            other->node->leaf_combine_data_create(this->leaf, true, true, !priority);
             assert(other->node->has_no_default());
             this->set_node(other->node);
         }
@@ -761,7 +784,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
 }
 
 /**
- * Replace data in all leaf, without creating new ones
+ * Replace data in all leaf, without creating new ones.
  */
 void FlowNode::leaf_combine_data(FlowControlBlock* leaf, bool do_final, bool do_default) {
     traverse_all_leaves([leaf](FlowNodePtr* ptr) -> bool {
@@ -773,13 +796,14 @@ void FlowNode::leaf_combine_data(FlowControlBlock* leaf, bool do_final, bool do_
 /**
  * Replace data in all leaf, creating new ones
  */
-void FlowNode::leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, bool do_default) {
-    traverse_all_leaves_and_empty_default([leaf](FlowNodePtr* ptr,FlowNode* parent) -> bool {
+void FlowNode::leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, bool do_default, bool discard_my_fcb_data) {
+    traverse_all_leaves_and_empty_default([leaf,discard_my_fcb_data](FlowNodePtr* ptr,FlowNode* parent) -> bool {
         if (ptr->leaf == 0) {
             ptr->set_leaf(leaf->duplicate(1));
             ptr->set_parent(parent);
         } else {
-            ptr->leaf->combine_data(leaf->data);
+            if (!discard_my_fcb_data)
+                ptr->leaf->combine_data(leaf->data);
         }
         return true;
     }, do_final, do_default);
@@ -791,7 +815,7 @@ void FlowNode::leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, b
  * tcp port 80, but our parent already had it, or already cassify in a tcp port other than 80, in which case
  * other is completely killed.
  */
-bool FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
+bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
     assert(is_leaf());
     assert(ptr);
     bool changed = false;
@@ -832,10 +856,13 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
     no.print();
 #endif
     //Combine FCB data
-    if (no.is_leaf())
-        no.leaf->combine_data(old_leaf->data);
-    else
-        no.node->leaf_combine_data(old_leaf,true,true); //We do all here as the downward must be completely updated with our data
+    if (!discard) {
+        if (no.is_leaf()) {
+            no.leaf->combine_data(old_leaf->data);
+        } else {
+            no.node->leaf_combine_data(old_leaf,true,true); //We do all here as the downward must be completely updated with our data
+        }
+    }
 
     return changed;
     //Release original leaf
@@ -847,14 +874,14 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other) {
  * Combines FCB values, asserting that they are equals or one is unset
  *
  */
-FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_default)  {
+FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_default, bool discard_my_fcb_data)  {
     assert(do_final); //Protect against legacy
     assert(!do_default); //Protect against legacy
         if (other == 0) return this;
-        auto fnt = [other](FlowNodePtr* ptr) -> bool {
+        auto fnt = [other,discard_my_fcb_data](FlowNodePtr* ptr) -> bool {
             assert(ptr != 0);
             assert(ptr->ptr != 0);
-            ptr->replace_leaf_with_node(other);
+            ptr->replace_leaf_with_node(other, discard_my_fcb_data);
             return true;
         };
         this->traverse_all_leaves(fnt, do_final, do_default);
@@ -1075,9 +1102,9 @@ void FlowControlBlock::print(String prefix, int data_offset, bool show_ptr) cons
 	    sprintf(&data_str[j],"%02x",data[data_offset]);
 	}
 	if (show_ptr)
-	    click_chatter("%s %lu Parent:%p UC:%d (%p data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),this,data_str);
+	    click_chatter("%s %lu Parent:%p UC:%d ED:%d (%p data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),is_early_drop(),this,data_str);
 	else
-	    click_chatter("%s %lu UC:%d (data %s)",prefix.c_str(),node_data[0].data_64,count(),data_str);
+	    click_chatter("%s %lu UC:%d ED:%d (data %s)",prefix.c_str(),node_data[0].data_64,count(),is_early_drop(),data_str);
 }
 
 void FlowNodePtr::print() const{

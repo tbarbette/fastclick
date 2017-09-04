@@ -40,11 +40,17 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int FlowIPLoadBalancer::initialize(ErrorHandler *errh) {
-    Bitvector passing = get_passing_threads();
+    Bitvector touching = get_passing_threads();
 
-    if (passing.weight() <= 1) {
+    /*LoadBalancerReverse takes care of telling that it will touch our hashtable
+     * therefore touching is actually the passing threads for both directions
+     */
+
+    if (touching.weight() <= 1) {
         _map.disable_mt();
     }
+
+    Bitvector passing = get_passing_threads(false);
     if (passing.weight() == 0) {
         return errh->warning("No thread passing by, element will not work if it's not indeed idle");
     }

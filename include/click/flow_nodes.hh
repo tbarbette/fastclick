@@ -31,8 +31,13 @@ public:
 
     virtual bool is_mt_safe() const { return false;};
 
+    /**
+     * Tell if two node are of the same type, and on the same field/value/mask if applicable
+     *
+     * However this is not checking if runtime data and dynamic are equals
+     */
     virtual bool equals(FlowLevel* level) {
-        return typeid(*this) == typeid(*level);
+        return typeid(*this) == typeid(*level) && _islong == level->_islong;
     }
 
     inline FlowNodeData get_data(Packet* p) {
@@ -144,10 +149,10 @@ public :
 
     inline void check();
 
-    bool replace_leaf_with_node(FlowNode*);
+    bool replace_leaf_with_node(FlowNode*, bool discard);
 
-    void node_combine_ptr(FlowNode* parent, FlowNodePtr, bool as_child);
-    void default_combine(FlowNode* parent, FlowNodePtr*, bool as_child);
+    void node_combine_ptr(FlowNode* parent, FlowNodePtr, bool as_child, bool priority);
+    void default_combine(FlowNode* parent, FlowNodePtr*, bool as_child, bool priority);
 
 };
 
@@ -302,9 +307,9 @@ public:
      */
     void apply_default(std::function<void(FlowNodePtr*)> fnt);
 
-    FlowNode* combine(FlowNode* other, bool as_child, bool priority = true) CLICK_WARN_UNUSED_RESULT;
-    void __combine_child(FlowNode* other);
-    void __combine_else(FlowNode* other);
+    FlowNode* combine(FlowNode* other, bool as_child, bool priority) CLICK_WARN_UNUSED_RESULT;
+    void __combine_child(FlowNode* other, bool priority);
+    void __combine_else(FlowNode* other, bool priority);
     FlowNodePtr prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed) CLICK_WARN_UNUSED_RESULT;
 
 
@@ -338,8 +343,7 @@ public:
         _released = true;
 #if DEBUG_CLASSIFIER
         apply([](FlowNodePtr* p) {
-            if (p->ptr) {
-                assert(p->is_node());
+            if (p->ptr && p->is_node()) {
                 assert(p->node->released());
             }
         });
@@ -435,6 +439,13 @@ public:
         }
     };
 
+    FlowNode* root() {
+        FlowNode* p = _parent;
+        while (p->parent() != 0) {
+            p = p->parent();
+        }
+        return p;
+    }
     virtual NodeIterator iterator() = 0;
 
     inline void set_parent(FlowNode* parent) {
@@ -486,10 +497,10 @@ public:
 #endif
 private:
     void leaf_combine_data(FlowControlBlock* leaf, bool do_final, bool do_default);
-    void leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, bool do_default);
+    void leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, bool do_default, bool discard_my_data);
     FlowNodePtr prune(FlowNode* parent, FlowNodeData data);
     FlowNodePtr prune_with_parent(FlowNode* parent, FlowNodeData data, bool was_default);
-    FlowNode* replace_leaves(FlowNode* other, bool do_final, bool do_default);
+    FlowNode* replace_leaves(FlowNode* other, bool do_final, bool do_default, bool discard_my_fcb_data);
     friend class FlowClassificationTable;
     friend class FlowNodePtr;
     friend class FlowNodeDefinition;

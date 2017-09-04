@@ -32,7 +32,7 @@ private :
     FlowNode* _table;
 
     bool _verbose;
-    bool attach_children(FlowNodePtr* ptr, int output, bool mark_output);
+    bool attach_children(FlowNodePtr* ptr, int output, bool append_drop);
 protected:
     bool _children_merge;
 };

@@ -103,10 +103,17 @@ void FlowNode::check(bool allow_parent) {
 #endif
 
 void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr) {
-    if (show_ptr)
-        click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
-    else
-        click_chatter("%s%s (%s, %d childs)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
+    if (show_ptr) {
+        if (node->level()->is_dynamic())
+            click_chatter("%s%s (%s, %d childs, dynamic) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+        else
+            click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+    } else {
+        if (node->level()->is_dynamic())
+            click_chatter("%s%s (%s, %d childs, dynamic)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
+        else
+            click_chatter("%s%s (%s, %d childs)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
+    }
 
     NodeIterator it = const_cast<FlowNode*>(node)->iterator();
     FlowNodePtr* cur = 0;
@@ -128,7 +135,7 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
                 click_chatter("%s|-> DEFAULT %p Parent:%p",prefix.c_str(),node->_default.ptr,node->_default.parent());
             else
                 click_chatter("%s|-> DEFAULT",prefix.c_str());
-            assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
+            flow_assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
             print(node->_default.node,prefix + "|  ",data_offset, show_ptr);
         } else {
             node->_default.leaf->print(prefix + "|-> DEFAULT",data_offset, show_ptr);

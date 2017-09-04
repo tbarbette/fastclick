@@ -1743,7 +1743,7 @@ bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
     return true;
 }
 
-Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, bool& is_fullpush, int level) {
+Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, bool& is_fullpush, int level, bool touching) {
     Bitvector b(master()->nthreads());
     InputThreadVisitor visitor(b, origin);
     router()->visit(this,forward,port,&visitor);
@@ -1753,7 +1753,7 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
             origin = this;
         for (int i = 0; i < _remote_elements.size() ; i++) {
             click_chatter("%s has remote %s!",name().c_str(),_remote_elements[i]->name().c_str());
-            b |= _remote_elements[i]->get_passing_threads(origin, level + 1);
+            b |= _remote_elements[i]->get_passing_threads(origin, level + 1, touching);
         }
     } else {
         if (origin != 0 && level > 0)
@@ -1764,31 +1764,38 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
     return b;
 }
 
-Bitvector Element::get_passing_threads(Element*, int level) {
+Bitvector Element::get_passing_threads(Element*, int level, bool touching) {
     bool is_fullpush = true;
     Bitvector b(master()->nthreads());
     for (int i = 0; i < ninputs(); i++) {
         if (input_is_push(i))
-            b |= get_passing_threads(false, i, this, is_fullpush, level);
+            b |= get_passing_threads(false, i, this, is_fullpush, level, touching);
         else
             is_fullpush = false;
     }
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_pull(i))
-            b |= get_passing_threads(true, i, this, is_fullpush, level);
+            b |= get_passing_threads(true, i, this, is_fullpush, level, touching);
     }
     //Add ourself to the bitmap, but the user must know if his element
     // should keep is_fullpush or not
     get_spawning_threads(b, false);
     get_spawning_threads(b, true);
+
 #if HAVE_FULLPUSH_NONATOMIC
     this->_is_fullpush = is_fullpush;
 #endif
     return b;
 }
 
-Bitvector Element::get_passing_threads() {
-	return get_passing_threads(this, 0);
+/**
+ * Return the list of threads passing by this element
+ * if touching is true (default) it will also return
+ * the threads touching the element, such as remote tables,
+ * multiple directions elements, handlers etc.
+ */
+Bitvector Element::get_passing_threads(bool touching) {
+	return get_passing_threads(this, 0, touching);
 }
 
 bool Element::is_mt_safe() {

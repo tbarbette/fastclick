@@ -509,6 +509,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             _table.get_root()->print(-1,false);
         }
         if (unlikely(!fcb || fcb->is_early_drop())) {
+            debug_flow("Early drop !");
             if (last) {
                 last->set_next(next);
             }
@@ -609,6 +610,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
             _table.get_root()->print(-1,false);
         }
         if (unlikely(!fcb || fcb->is_early_drop())) {
+            debug_flow("Early drop !");
             if (last) {
                 last->set_next(next);
             }
