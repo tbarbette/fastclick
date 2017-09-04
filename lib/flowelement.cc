@@ -59,6 +59,9 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 		    //assert(merged->has_no_default());
 		}
 	}
+#if DEBUG_CLASSIFIER
+    click_chatter("Traversal finished");
+#endif
 	return merged;
 }
 

@@ -343,12 +343,20 @@ void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_
     if (other.is_leaf()) {
         assert(!as_child);
 
-        auto fnt = [other](FlowNode* parent) -> bool {
+        auto fnt = [other,as_child,priority](FlowNode* parent) -> bool {
             if (parent->default_ptr()->ptr == 0) {
                 parent->default_ptr()->set_leaf(other.leaf->duplicate(1));
                 parent->default_ptr()->set_parent(parent);
             } else {
-                parent->default_ptr()->leaf->combine_data(other.leaf->data);
+                if (as_child || !priority) {
+                    FlowNodeData data = parent->default_ptr()->data();
+                    parent->default_ptr()->leaf->release();
+                    parent->default_ptr()->set_leaf(other.leaf->duplicate(1));
+                    parent->default_ptr()->leaf->parent = parent;
+                    parent->default_ptr()->set_data(data);
+                } else {
+                    parent->default_ptr()->leaf->combine_data(other.leaf->data);
+                }
             }
             return true;
         };
@@ -367,7 +375,15 @@ void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_
  *******************************/
 
 /**
- * Combine this rule with rule of lower priority if its level is not equal
+ * Combine this rule with another rule
+ * @arg other A node to merge
+ * @arg as_child
+ *   - If true :merge the rule as a child of this one, ie REMOVING all child
+ *    leaves (data is lost) and changing them by other.
+ *   - If false : merge as the "else" path, ie appending other to all default path.
+ * @arg priority : Should this be considered as with priority than other. If not, rule
+ *  may be exchanged for optimization
+ *
  */
 FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
     //TODO : priority is not used as of now, it is always assumed true. We could relax some things.
@@ -440,7 +456,10 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
             debug_flow("Combining a dynamic parent with a non dynamic node. As Priority is false, we invert the child and the parent");
             this->debug_print();
             other->debug_print();
-            return other->combine(this, as_child, false); //Priority is false in this path
+            FlowNodeData d = this->node_data;
+            FlowNode* o = other->combine(this, as_child, false); //Priority is false in this path
+            o->node_data = d;
+            return o;
         }
     }
 
@@ -543,7 +562,7 @@ void FlowNode::__combine_child(FlowNode* other, bool priority) {
             this->print();
             other->print();
 #endif
-            this->replace_leaves(other, true, false, !priority);
+            this->replace_leaves(other, true, false, true);//Discard child FCB always as we are in the as_child path
             //Well, it's not that complicated finally.
             this->check();
             return;
@@ -686,9 +705,11 @@ void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child
     } else { //We have default, other have default
         debug_flow("There is a node");
         if (this->is_leaf() && other->is_leaf()) { //Our default is a leaf and other default is a leaf
-            if (!priority) {
+            if (as_child || !priority) {
+                FlowNodeData d = data();
                 this->leaf->release();
                 this->leaf = other->leaf;
+                this->set_data(d);
             } else
                 this->leaf->combine_data(other->leaf->data);
         } else if (this->is_node()) { //Our default is a node
@@ -730,6 +751,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
 #endif
         return FlowNodePtr(this);
     }
+    debug_flow("Prune level %s, i %d, data %llu",level->print().c_str(),inverted,data.data_64);
     if (level->equals(this->level())) { //Same level
         if (inverted) {
             //Remove data from level if it exists
@@ -753,6 +775,9 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
         }
     }
 
+    /**
+     * Prune all child node including default
+     */
     apply_default([this,level,data,inverted,&changed](FlowNodePtr* cur){
         if (cur->is_leaf()) {
             return;
@@ -770,6 +795,9 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
         cur->set_data(old_data);
         cur->set_parent(this);
     });
+    /**
+     * If inverted and there is no more children, remove the node
+     */
     if (inverted) {
         if (getNum() == 0 && !this->level()->is_dynamic()) {
             //All child values were removed, return the default
@@ -826,7 +854,14 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
 
 #if DEBUG_CLASSIFIER
     click_chatter("Pruning:");
-    this->print();
+    if (this->parent() and this->parent()->parent())
+        this->parent()->root()->print();
+    else if (this->parent())
+        this->parent()->print();
+    else
+        this->print();
+    click_chatter("With other :");
+    other->print();
 #endif
     //Prune the downward tree with all values of the future new parent
     FlowNode* gparent = old_parent;
@@ -857,10 +892,10 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
 #endif
     //Combine FCB data
     if (!discard) {
-        if (no.is_leaf()) {
-            no.leaf->combine_data(old_leaf->data);
+        if (is_leaf()) {
+            leaf->combine_data(old_leaf->data);
         } else {
-            no.node->leaf_combine_data(old_leaf,true,true); //We do all here as the downward must be completely updated with our data
+            node->leaf_combine_data(old_leaf,true,true); //We do all here as the downward must be completely updated with our data
         }
     }
 
