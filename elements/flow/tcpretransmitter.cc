@@ -52,6 +52,13 @@ int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+
+int TCPRetransmitter::initialize(ErrorHandler *errh) {
+    if (!_in)
+        return errh->error("Could not find TCPIn element !");
+    return 0;
+}
+
 void TCPRetransmitter::push_batch(int port, PacketBatch *batch)
 {
     unsigned int flowDirection = determineFlowDirection();

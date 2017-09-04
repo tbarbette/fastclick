@@ -11,7 +11,7 @@
 #include <click/vector.hh>
 #include <click/list.hh>
 #include <click/allocator.hh>
-//#include <openflow/openflow.h>
+
 #include <thread>
 #include <assert.h>
 
@@ -63,7 +63,7 @@ protected:
  */
 bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
     FlowNode* parent = (FlowNode*)sfcb->parent;
-    //assert(parent->default_ptr()->ptr != sfcb);
+
     if (unlikely(!parent->_leaf_reverse_match(sfcb,p))) {
 #if DEBUG_CLASSIFIER_MATCH > 2
         click_chatter("DIF is_default %d Leaf %x %x level %s",parent->default_ptr()->ptr == sfcb,parent->level()->get_data(p).data_64, sfcb->node_data[0].data_64,parent->level()->print().c_str());

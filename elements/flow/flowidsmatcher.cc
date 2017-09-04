@@ -73,6 +73,7 @@ int FlowIDSMatcher::process_data(fcb_FlowIDSMatcher* fcb_data, FlowBufferContent
     if (state != 0) {
         iterator = good_packets;
     }
+    return 0;
 }
 
 

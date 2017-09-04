@@ -5,6 +5,7 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include "tcpreorder.hh"
+#include "tcpin.hh"
 
 CLICK_DECLS
 
@@ -16,7 +17,8 @@ TCPReorder::~TCPReorder()
 {
 }
 
-int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
+int
+TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
     .read_p("MERGESORT", _mergeSort)
@@ -26,6 +28,30 @@ int TCPReorder::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     return 0;
+}
+
+
+int
+TCPReorder::initialize(ErrorHandler *errh) {
+    ElementCastTracker track(router(), "TCPIn");
+    router()->visit_downstream(this,0,&track);
+    if (track.size() == 0) {
+        errh->warning("Found no downward TCPIn. This element will work in standalone mode, having its own recycling. This is usually not desirable.");
+    } else if (track.size() == 1) {
+        _tcp_context = static_cast<TCPIn*>(track[0]);
+        click_chatter("Found one TCPIn element !");
+    } else {
+        errh->warning("Found multiple downward TCPIn. This element will work in standalone mode, having its own recycling. This is usually not desirable.");
+    }
+    return 0;
+}
+
+void*
+TCPReorder::cast(const char *n) {
+   if (strcmp("TCPElement", n) == 0) {
+       return static_cast<TCPElement*>(this);
+   }
+   return Element::cast(n);
 }
 
 void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, Packet* toKeep,
@@ -335,8 +361,9 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
         //click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
 
         //If there is no better TCP manager, we must ensure the flow stays alive
-        if (!_tcp_context && !_notimeout)
+        if (!_tcp_context && !_notimeout) {
             fcb_acquire_timeout(2000);
+        }
         // Ensure that the list of waiting packets is free
         // (SYN should always be the first packet)
         SFCB_STACK( //Packet in the list have no reference
