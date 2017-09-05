@@ -121,6 +121,7 @@ void PathMerger::requestMorePackets(struct fcb *fcb, Packet *packet, bool force)
         previousElem->requestMorePackets(fcb, packet, force);
 }
 
+TODO packetSent has been removed. Find another way
 void PathMerger::packetSent(struct fcb *fcb, Packet* packet)
 {
     StackElement *previousElem = getElementForPacket(fcb, packet);

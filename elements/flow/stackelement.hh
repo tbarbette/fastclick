@@ -236,13 +236,6 @@ protected:
     virtual void requestMorePackets(Packet *packet, bool force = false);
 
     /**
-     * @brief Indicate that a given packet has exited the middlebox
-     * @param fcb A pointer to the FCB of the flow
-     * @param packet The packet
-     */
-    virtual void packetSent(Packet* packet);
-
-    /**
      * @brief Close the connection
      * @param fcb A pointer to the FCB of the flow
      * @param packet A packet from the connection, used for initialization

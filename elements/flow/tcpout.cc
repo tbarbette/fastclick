@@ -176,9 +176,6 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             }
         }
 
-        // Notify the stack function that this packet has been sent
-        packetSent(p);
-
         return p;
     };
     EXECUTE_FOR_EACH_PACKET(fnt, flow);
@@ -279,7 +276,6 @@ int TCPOut::setInElement(TCPIn* inElement, ErrorHandler* errh)
 bool TCPOut::checkConnectionClosed(Packet *packet)
 {
     auto fcb_in = inElement->fcb_data();
-    fcb_in->common->lock.acquire();
 
     TCPClosingState::Value closingState = fcb_in->common->closingStates[getFlowDirection()];
 
@@ -290,9 +286,14 @@ bool TCPOut::checkConnectionClosed(Packet *packet)
         return true;
     }
 
+
+    fcb_in->common->lock.acquire();
+    closingState = fcb_in->common->closingStates[getFlowDirection()];
+
     // If the connection is being closed and we have received the last packet, close it completely
     if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL)
     {
+        click_chatter("Connection is being closed gracefully");
         if(isFin(packet))
             fcb_in->common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_GRACEFUL;
 
@@ -301,6 +302,7 @@ bool TCPOut::checkConnectionClosed(Packet *packet)
     }
     else if(closingState == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
     {
+        click_chatter("Connection is being closed ungracefully");
         if(isRst(packet))
             fcb_in->common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_UNGRACEFUL;
 

@@ -115,15 +115,6 @@ uint32_t StackElement::getInitialAck(Packet *p) const
     return (uint32_t)p->anno_u32(MIDDLEBOX_INIT_ACK_OFFSET);
 }
 
-void StackElement::packetSent(Packet* packet)
-{
-    // Call the "packetSent" method on every element in the stack
-    if(previousStackElement == NULL)
-        return;
-
-    previousStackElement->packetSent(packet);
-}
-
 void StackElement::closeConnection(Packet *packet, bool graceful,
      bool bothSides)
 {
