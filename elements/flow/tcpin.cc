@@ -9,9 +9,11 @@
 
 CLICK_DECLS
 
+#define TCP_TIMEOUT 30000
+
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
-    poolFcbTcpCommon(TCPCOMMON_POOL_SIZE),
-    tableFcbTcpCommon(NULL),
+    poolFcbTcpCommon(),
+    tableFcbTcpCommon(),
     _allow_resize(false)
 {
     // Initialize the memory pools of each thread
@@ -84,6 +86,8 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     {
         this->returnElement = (TCPIn*)returnElement;
         this->outElement = (TCPOut*)outElement;
+        this->returnElement->add_remote_element(this);
+        this->outElement->add_remote_element(this);
         if (this->outElement->setInElement(this, errh) != 0)
             return -1;
         setFlowDirection((unsigned int)flowDirectionParam);
@@ -97,19 +101,6 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 {
     // Assign the tcp_common structure if not already done
     click_chatter("Fcb in : %p, Common : %p, Batch : %p", fcb_in, fcb_in->common,flow);
-
-    if (_allow_resize) {
-        // Ensure that the pointers in the FCB are set
-        if(fcb_in->poolModificationNodes == NULL)
-            fcb_in->poolModificationNodes = &(*poolModificationNodes);
-
-        if(fcb_in->poolModificationLists == NULL)
-            fcb_in->poolModificationLists = &(*poolModificationLists);
-    }
-
-    if(fcb_in->lock == NULL) //TODO : Does not seem really needed
-        fcb_in->lock = &lock;
-
 
     auto fnt = [this,fcb_in](Packet* p) -> Packet* {
         if(fcb_in->common == NULL)
@@ -127,7 +118,7 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
             }
 
             //If not syn, drop the flow
-            if(!isSyn(p)) {
+            if(!isSyn(p)) { //TODO : move to top block?
                 WritablePacket* packet = p->uniqueify();
                 closeConnection(packet, false, true);
                 packet->kill();
@@ -306,6 +297,13 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
         output(0).push_batch(flow);
 }
 
+int TCPIn::initialize(ErrorHandler *errh) {
+    if (get_passing_threads(true).weight() <= 1) {
+        tableFcbTcpCommon.disable_mt();
+    }
+    return 0;
+}
+
 TCPOut* TCPIn::getOutElement()
 {
     return outElement;
@@ -316,9 +314,48 @@ TCPIn* TCPIn::getReturnElement()
     return returnElement;
 }
 
+
+void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
+    TCPIn* tin = static_cast<TCPIn*>(thunk);
+    auto fcb_in = tin->fcb_data_for(fcb);
+
+    //TODO : clean
+    // Put back in the corresponding memory pool all the modification lists
+    // in use (in the hashtable)
+    /*for(HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.begin();
+        it != modificationLists.end(); ++it)
+    {
+        // Call the destructor to release the object's own memory
+        (it.value())->~ModificationList();
+        // Put it back in the pool
+        poolModificationLists->releaseMemory(it.value());
+    }
+
+*/
+    auto common = fcb_in->common;
+     common->lock.acquire();
+    //The last one release common
+    if (--common->use_count == 0) {
+        common->lock.release();
+        common->~tcp_common();
+        //lock->acquire();
+        //tin->tableTcpCommon->erase(flowID);
+        tin->poolFcbTcpCommon.release(common);
+        //lock->release();
+    }
+    else
+        common->lock.release();
+
+}
+
+void TCPIn::releaseFCBState() {
+    fcb_release_timeout();
+    fcb_remove_release_fnt(fcb_data(), &release_tcp);
+}
+
 void TCPIn::closeConnection(Packet *packet, bool graceful, bool bothSides)
 {
-    auto fcb_in = fcb();
+    auto fcb_in = fcb_data();
     uint8_t newFlag = 0;
 
     if(graceful)
@@ -378,26 +415,26 @@ void TCPIn::closeConnection(Packet *packet, bool graceful, bool bothSides)
 
 ModificationList* TCPIn::getModificationList(WritablePacket* packet)
 {
-    auto fcb_in = fcb();
-    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb_in->modificationLists;
+    auto fcb_in = fcb_data();
+    auto modificationLists = fcb_in->modificationLists;
 
     ModificationList* list = NULL;
 
     // Search the modification list in the hashtable
     HashTable<tcp_seq_t, ModificationList*>::iterator it =
-        modificationLists.find(getSequenceNumber(packet));
+        modificationLists->find(getSequenceNumber(packet));
 
     // If we could find the element
-    if(it != modificationLists.end())
+    if(it != modificationLists->end())
         list = it.value();
 
     // If no list was assigned to this packet, create a new one
     if(list == NULL)
     {
-        ModificationList* listPtr = fcb_in->poolModificationLists->getMemory();
+        ModificationList* listPtr = poolModificationLists->getMemory();
         // Call the constructor manually to have a clean object
         list = new(listPtr) ModificationList(&(*poolModificationNodes));
-        modificationLists.set(getSequenceNumber(packet), list);
+        modificationLists->set(getSequenceNumber(packet), list);
     }
 
     return list;
@@ -405,12 +442,12 @@ ModificationList* TCPIn::getModificationList(WritablePacket* packet)
 
 bool TCPIn::hasModificationList(Packet* packet)
 {
-    auto fcb_in = fcb();
-    HashTable<tcp_seq_t, ModificationList*> &modificationLists = fcb_in->modificationLists;
+    auto fcb_in = fcb_data();
+    auto modificationLists = fcb_in->modificationLists;
     HashTable<tcp_seq_t, ModificationList*>::iterator it =
-        modificationLists.find(getSequenceNumber(packet));
+        modificationLists->find(getSequenceNumber(packet));
 
-    return (it != modificationLists.end());
+    return (it != modificationLists->end());
 }
 
 bool TCPIn::allowResize() {
@@ -486,7 +523,7 @@ void TCPIn::requestMorePackets(Packet *packet, bool force)
 
 void TCPIn::ackPacket(Packet* packet, bool force)
 {
-    auto fcb_in = fcb();
+    auto fcb_in = fcb_data();
     // Get the information needed to ack the given packet
     uint32_t saddr = getDestinationAddress(packet);
     uint32_t daddr = getSourceAddress(packet);
@@ -517,10 +554,9 @@ void TCPIn::ackPacket(Packet* packet, bool force)
 
 bool TCPIn::checkConnectionClosed(Packet *packet)
 {
-    auto fcb_in = fcb();
-    fcb_in->common->lock.acquire();
+    auto fcb_in = fcb_data();
 
-    TCPClosingState::Value closingState = fcb_in->common->closingStates[getFlowDirection()];
+    TCPClosingState::Value closingState = fcb_in->common->closingStates[getFlowDirection()]; //Read-only access, no need to lock
     if(closingState != TCPClosingState::OPEN)
     {
         if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL
@@ -532,13 +568,12 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
                 setInitialAck(packet, getAckNumber(packet));
                 ackPacket(packet);
             }
+            //TODO : releaseFCBState();? If no TIMEWAIT
         }
 
-        fcb_in->common->lock.release();
         return false;
     }
 
-    fcb_in->common->lock.release();
     return true;
 }
 
@@ -547,9 +582,10 @@ unsigned int TCPIn::determineFlowDirection()
     return getFlowDirection();
 }
 
+
 bool TCPIn::assignTCPCommon(Packet *packet)
 {
-    auto fcb_in = fcb();
+    auto fcb_in = fcb_data();
 
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
@@ -572,33 +608,30 @@ bool TCPIn::assignTCPCommon(Packet *packet)
 
         // Get the struct allocated by the initiator
         fcb_in->common = returnElement->getTCPCommon(flowID);
+
         if (fcb_in->common == 0)
             return false;
+
+        fcb_in->common->use_count++;
 
         if (_allow_resize) {
             // Initialize the RBT with the RBTManager
             fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
         }
-        fcb_in->inChargeOfTcpCommon = false;
         click_chatter("RE Common is %p",fcb_in->common);
     }
     else
     {
-        // Acquire the lock for the pool of tcp_common structures
-        lock.acquire();
-
         IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
         // We are the initiator, so we need to allocate memory
-        struct fcb_tcp_common *allocated = poolFcbTcpCommon.getMemory();
-        // Call the constructor with some parameters that will be used
-        // to free the memory of the structure when not needed anymore
-        allocated = new(allocated) struct fcb_tcp_common();
+        struct tcp_common *allocated = poolFcbTcpCommon.allocate();
 
         // Add an entry if the hashtable
-        tableFcbTcpCommon.set(flowID, allocated);
+        tableFcbTcpCommon.find_insert(flowID, allocated);
 
         // Set the pointer in the structure
         fcb_in->common = allocated;
+        fcb_in->common->use_count++;
         if (_allow_resize) {
             // Initialize the RBT with the RBTManager
             fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
@@ -606,15 +639,13 @@ bool TCPIn::assignTCPCommon(Packet *packet)
 
         // Store in our structure the information needed to free the memory
         // of the common structure
-        fcb_in->inChargeOfTcpCommon = true;
-        fcb_in->flowID = flowID;
-        fcb_in->tableTcpCommon = &tableFcbTcpCommon;
-        fcb_in->poolTcpCommon = &poolFcbTcpCommon;
+        //fcb_in->flowID = flowID;
 
         click_chatter("AL Common is %p",fcb_in->common);
-
-        lock.release();
     }
+
+    fcb_acquire_timeout(TCP_TIMEOUT);
+    fcb_set_release_fnt(fcb_in, release_tcp);
 
     // Set information about the flow
     fcb_in->common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));
@@ -634,27 +665,24 @@ bool TCPIn::isLastUsefulPacket(Packet *packet)
 }
 
 
-struct fcb_tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
+struct tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
-    lock.acquire();
 
-    HashTable<IPFlowID, struct fcb_tcp_common*>::iterator it = tableFcbTcpCommon.find(flowID);
+    auto it = tableFcbTcpCommon.find(flowID);
 
-    if(it == tableFcbTcpCommon.end())
+    if(!it)
     {
-        lock.release();
         return NULL; // Not in the table
     }
     else
     {
-        lock.release();
-        return it.value();
+        return *it;
     }
 }
 
 void TCPIn::manageOptions(WritablePacket *packet)
 {
-    auto fcb_in = fcb();
+    auto fcb_in = fcb_data();
 
     click_tcp *tcph = packet->tcp_header();
 

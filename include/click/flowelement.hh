@@ -48,52 +48,34 @@ public:
 
 	int configure_phase() const		{ return CONFIGURE_PHASE_DEFAULT + 5; }
 
-protected:
-	int _flow_data_offset;
-	friend class FlowBufferVisitor;
-
-
-
-};
-
-template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
-
-public :
-
-	FlowSpaceElement() CLICK_COLD;
-	virtual int initialize(ErrorHandler *errh) CLICK_COLD;
-    void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
-
-	virtual const size_t flow_data_size()  const { return sizeof(T); }
-
-	inline void fcb_acquire(int count = 1) {
-	    fcb_stack->acquire(count);
-	}
-	inline void fcb_update(int count) {
-	    if (count > 0)
-	        fcb_stack->acquire(count);
-	    else if (count < 0)
-	        fcb_stack->release(-count);
+    inline void fcb_acquire(int count = 1) {
+        fcb_stack->acquire(count);
+    }
+    inline void fcb_update(int count) {
+        if (count > 0)
+            fcb_stack->acquire(count);
+        else if (count < 0)
+            fcb_stack->release(-count);
     }
 
-	inline void fcb_release(int count = 1) {
-	    fcb_stack->release(count);
-	}
+    inline void fcb_release(int count = 1) {
+        fcb_stack->release(count);
+    }
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-	inline void fcb_acquire_timeout(int nmsec) {
-	    //Do not set a smaller timeout
-	    if ((fcb_stack->flags & FLOW_TIMEOUT) && (nmsec <= (fcb_stack->flags >> FLOW_TIMEOUT_SHIFT))) {
+    inline void fcb_acquire_timeout(int nmsec) {
+        //Do not set a smaller timeout
+        if ((fcb_stack->flags & FLOW_TIMEOUT) && (nmsec <= (fcb_stack->flags >> FLOW_TIMEOUT_SHIFT))) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         click_chatter("Acquiring timeout of %p, not changing it, flag %d",this,fcb_stack->flags);
 #endif
-	            return;
-	    }
+                return;
+        }
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         click_chatter("Acquiring timeout of %p to %d, flag %d",this,nmsec,fcb_stack->flags);
 #endif
         fcb_stack->flags = (nmsec << FLOW_TIMEOUT_SHIFT) | FLOW_TIMEOUT;
-	}
+    }
 
     inline void fcb_release_timeout() {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
@@ -159,10 +141,39 @@ public :
     }
 #endif
 
-	inline T* fcb_data() {
-	    T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);
+protected:
+	int _flow_data_offset;
+	friend class FlowBufferVisitor;
+
+
+
+};
+
+template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
+
+public :
+
+	FlowSpaceElement() CLICK_COLD;
+	virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+    void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
+
+	virtual const size_t flow_data_size()  const { return sizeof(T); }
+
+
+	/**
+	 * Return the T type for a given FCB
+	 */
+	inline T* fcb_data_for(FlowControlBlock* fcb) {
+	    T* flowdata = static_cast<T*>((void*)&fcb->data[_flow_data_offset]);
 	    return flowdata;
 	}
+
+	/**
+	 * Return the T type in the current FCB on the stack
+	 */
+	inline T* fcb_data() {
+        return fcb_data_for(fcb_stack);
+    }
 
 	void push_batch(int port,PacketBatch* head) final {
 			push_batch(port, fcb_data(), head);

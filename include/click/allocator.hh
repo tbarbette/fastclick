@@ -37,6 +37,12 @@ private:
  *  released.
  *
  * Works mostly like the Click packet allocator.
+ *
+ * Template arguments :
+ * @arg zero : Zero-initialize elements, do not set this to true if T is a class that will be constructed. Use this only if calling allocate_unitialized
+ * @arg pool_size
+ * @arg pool_count
+ *
  */
 template <typename T, bool zero = false, int POOL_SIZE = 64, int POOL_COUNT = 32>
 class pool_allocator_mt : pool_allocator_mt_base { public:

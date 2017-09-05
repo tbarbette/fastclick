@@ -26,7 +26,7 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void TCPOut::push_batch(int port, PacketBatch* flow)
 {
-    auto fcb_in = inElement->fcb();
+    auto fcb_in = inElement->fcb_data();
     auto fnt = [this,fcb_in](Packet* p) -> Packet* {
         if(!checkConnectionClosed(p))
         {
@@ -268,6 +268,7 @@ void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr,
 int TCPOut::setInElement(TCPIn* inElement, ErrorHandler* errh)
 {
     this->inElement = inElement;
+    inElement->add_remote_element(this);
     this->_allow_resize = inElement->allow_resize();
     if (_allow_resize && _readonly) {
         return errh->error("Cannot modify packets in read-only mode !");
@@ -277,7 +278,7 @@ int TCPOut::setInElement(TCPIn* inElement, ErrorHandler* errh)
 
 bool TCPOut::checkConnectionClosed(Packet *packet)
 {
-    auto fcb_in = inElement->fcb();
+    auto fcb_in = inElement->fcb_data();
     fcb_in->common->lock.acquire();
 
     TCPClosingState::Value closingState = fcb_in->common->closingStates[getFlowDirection()];

@@ -61,6 +61,7 @@ public:
     void* cast(const char*);
     int initialize(ErrorHandler*)   CLICK_COLD;
 
+
     // Custom methods
 
     /**
@@ -367,15 +368,24 @@ public :
 
     virtual const size_t flow_data_size()  const { return sizeof(T); }
 
-//Todo : rename as fcb data
-    inline T* fcb() {
-        T* flowdata = static_cast<T*>((void*)&fcb_stack->data[_flow_data_offset]);
+    /**
+     * Return the T type for a given FCB
+     */
+    inline T* fcb_data_for(FlowControlBlock* fcb) {
+        T* flowdata = static_cast<T*>((void*)&fcb->data[_flow_data_offset]);
         return flowdata;
     }
 
+    /**
+     * Return the T type in the current FCB on the stack
+     */
+    inline T* fcb_data() {
+        return fcb_data_for(fcb_stack);
+    }
+
     void push_batch(int port,PacketBatch* head) final {
-        click_chatter("Pushing packet batch %p with fcb %p",head,fcb());
-        push_batch(port, fcb(), head);
+        click_chatter("Pushing packet batch %p with fcb %p",head,fcb_data());
+        push_batch(port, fcb_data(), head);
     }
 
     virtual void push_batch(int port, T* flowdata, PacketBatch* head) = 0;

@@ -3,6 +3,7 @@
 #include <click/element.hh>
 #include <click/ipflowid.hh>
 #include <click/hashtable.hh>
+#include <click/hashtablemp.hh>
 #include <click/sync.hh>
 #include <click/multithread.hh>
 #include <click/memorypool.hh>
@@ -26,7 +27,7 @@
  * Common structure accessed by both sides of a TCP connection.
  * The lock must be acquired before accessing the members of the structure
  */
-struct fcb_tcp_common
+struct tcp_common
 {
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
@@ -37,14 +38,16 @@ struct fcb_tcp_common
     // Lock to ensure that only one side of the flow (one thread) at a time
     // accesses the common structure
     Spinlock lock;
+    int use_count;
 
-    fcb_tcp_common()
+    tcp_common() //This is indeed called as it is not part of the FCBs
     {
         closingStates[0] = TCPClosingState::OPEN;
         closingStates[1] = TCPClosingState::OPEN;
+        use_count = 0;
     }
 
-    ~fcb_tcp_common()
+    ~tcp_common()
     {
     }
 };
@@ -53,61 +56,10 @@ struct fcb_tcp_common
 /**
  * Structure used by the TCPIn element
  */
-struct fcb_tcpin
+struct fcb_tcpin : public FlowReleaseChain
 {
-    HashTable<tcp_seq_t, ModificationList*> modificationLists;
-    MemoryPool<struct ModificationList>* poolModificationLists;
-    MemoryPool<struct ModificationNode>* poolModificationNodes;
-
-    struct fcb_tcp_common *common;
-
-    // Members used to be able to free memory for the tcp_common structure when destructed
-    MemoryPool<struct fcb_tcp_common>* poolTcpCommon;
-    HashTable<IPFlowID, struct fcb_tcp_common*> *tableTcpCommon;
-    Spinlock *lock; // Lock for the 2 structures above
-    bool inChargeOfTcpCommon;
-    struct fcb_tcp_common *commonToDelete;
-    IPFlowID flowID;
-
-    fcb_tcpin()
-    {
-        //FCB are zero-initialized, setting anything here is pointless
-        /*poolModificationLists = NULL;
-        poolModificationNodes = NULL;
-        lock = NULL;
-
-        poolTcpCommon = NULL;
-        commonToDelete = NULL;
-        inChargeOfTcpCommon = false;
-        tableTcpCommon = NULL;*/
-    }
-
-    ~fcb_tcpin() //Remember this function has to be called manually
-    {
-        //TODO : clean
-        // Put back in the corresponding memory pool all the modification lists
-        // in use (in the hashtable)
-        /*for(HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.begin();
-            it != modificationLists.end(); ++it)
-        {
-            // Call the destructor to release the object's own memory
-            (it.value())->~ModificationList();
-            // Put it back in the pool
-            poolModificationLists->releaseMemory(it.value());
-        }
-
-        // Because tcp_common has been allocated manually by TCPIn
-        // we need, to free its memory manually if we are the creator
-        if(inChargeOfTcpCommon && commonToDelete != NULL)
-        {
-            commonToDelete->~fcb_tcp_common();
-            lock->acquire();
-            tableTcpCommon->erase(flowID);
-            poolTcpCommon->releaseMemory(commonToDelete);
-            lock->release();
-            commonToDelete = NULL;
-        }*/
-    }
+    struct tcp_common *common;
+    HashTable<tcp_seq_t, ModificationList*>* modificationLists;
 };
 
 
@@ -161,6 +113,7 @@ public:
     const char *processing() const        { return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
 
     FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
 
@@ -195,11 +148,11 @@ public:
     bool hasModificationList(Packet* packet);
 
     /**
-     * @brief Return the fcb_tcp_common structure stored in the HashTable for this flow
+     * @brief Return the tcp_common structure stored in the HashTable for this flow
      * @param flowID The IPFlowID corresponding to this flow
-     * @return A pointer to the fcb_tcp_common structure stored in the HashTable for this flow
+     * @return A pointer to the tcp_common structure stored in the HashTable for this flow
      */
-    struct fcb_tcp_common* getTCPCommon(IPFlowID flowID);
+    struct tcp_common* getTCPCommon(IPFlowID flowID);
 
     inline bool allow_resize() {
         return _allow_resize;
@@ -215,6 +168,11 @@ protected:
          bool bothSides) override;
     virtual bool isLastUsefulPacket(Packet *packet) override;
     virtual unsigned int determineFlowDirection() override;
+
+    /**
+     * Remove timeout and clean function
+     */
+    void releaseFCBState();
 
     /**
      * @brief Set the flow direction
@@ -235,6 +193,13 @@ protected:
     unsigned int getOppositeFlowDirection();
 
 private:
+
+    /**
+     * @brief Function called when the timeout expire or when all packets are
+     * released
+     */
+    static void release_tcp(FlowControlBlock* fcb, void* thunk);
+
     /**
      * @brief Assign a tcp_common structure in the FCB of this flow. If the given packet
      * is a SYN packet, it will allocate a structure and set the pointer in the fcb.
@@ -275,9 +240,8 @@ private:
     per_thread<MemoryPool<struct ModificationList>> poolModificationLists;
     per_thread<RBTMemoryPoolStreamManager> rbtManager;
 
-    Spinlock lock; // Lock to access to the two elements below
-    HashTable<IPFlowID, struct fcb_tcp_common*> tableFcbTcpCommon;
-    MemoryPool<struct fcb_tcp_common> poolFcbTcpCommon;
+    HashTableMP<IPFlowID, struct tcp_common*> tableFcbTcpCommon;
+    pool_allocator_mt<struct tcp_common,false,TCPCOMMON_POOL_SIZE> poolFcbTcpCommon;
 
     TCPOut* outElement; // TCPOut element of this path
     TCPIn* returnElement; // TCPIn element of the return path

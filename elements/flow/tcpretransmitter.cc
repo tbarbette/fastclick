@@ -76,7 +76,7 @@ void TCPRetransmitter::push_batch(int port, PacketBatch *batch)
 
 void TCPRetransmitter::checkInitialization()
 {
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     unsigned int flowDirection = determineFlowDirection();
 
     fcb->common->lock.acquire();
@@ -102,7 +102,7 @@ void TCPRetransmitter::checkInitialization()
 
 Packet* TCPRetransmitter::processPacketNormal(Packet *packet)
 {
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
@@ -179,7 +179,7 @@ Packet* TCPRetransmitter::processPacketNormal(Packet *packet)
 
 Packet* TCPRetransmitter::processPacketRetransmission(Packet *packet)
 {
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
@@ -321,7 +321,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(Packet *packet)
 
 void TCPRetransmitter::prune()
 {
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     unsigned flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
@@ -350,7 +350,7 @@ void TCPRetransmitter::prune()
 bool TCPRetransmitter::dataToRetransmit()
 {
     unsigned flowDirection = determineFlowDirection();
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
     fcb->common->lock.acquire();
 
@@ -398,7 +398,7 @@ void TCPRetransmitter::retransmissionTimerFired()
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
 
     fcb->common->lock.acquire();
 
@@ -429,7 +429,7 @@ void TCPRetransmitter::retransmissionTimerFired()
 void TCPRetransmitter::transmitMoreData()
 {
     unsigned int flowDirection = determineFlowDirection();
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
 
     if(!fcb->common->lock.attempt())
     {
@@ -457,7 +457,7 @@ bool TCPRetransmitter::manualTransmission(bool retransmission)
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     fcb->common->lock.acquire();
 
     // Check if the connection is closed before continuing
@@ -596,7 +596,7 @@ bool TCPRetransmitter::manualTransmission(bool retransmission)
 
 uint32_t TCPRetransmitter::getMaxAmountData(uint32_t expected, bool canCut)
 {
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
@@ -656,7 +656,7 @@ void TCPRetransmitter::signalAck(uint32_t ack)
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
-    auto fcb = _in->fcb();
+    auto fcb = _in->fcb_data();
     fcb->common->lock.acquire();
 
     if(fcb->common->retransmissionTimings[flowDirection].getCircularBuffer() == NULL)
