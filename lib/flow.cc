@@ -694,9 +694,11 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
     }
     this->default_ptr()->default_combine(this, &Vpruned_default, false, priority);
     //TODO : delete other
+#if DEBUG_CLASSIFIER
     debug_flow("Result of no easy combine :");
     this->print();
     this->check();
+#endif
     return;
 }
 
