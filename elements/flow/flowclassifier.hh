@@ -37,6 +37,7 @@ class FlowClassifier: public BatchElement {
     int cache_miss;
     int _clean_timer;
     Timer _timer;
+    bool _early_drop;
 
     per_thread<FlowBatch*> _builder_batch;
 public:

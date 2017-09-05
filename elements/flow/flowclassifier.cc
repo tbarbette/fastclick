@@ -94,7 +94,7 @@ public:
     }
 };
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this) {
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
@@ -123,6 +123,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
             .read("CLEAN_TIMER",_clean_timer)
 #endif
+            .read("EARLYDROP",_early_drop)
             .complete() < 0)
         return -1;
 
@@ -528,7 +529,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
             _table.get_root()->print(-1,false);
         }
-        if (unlikely(!fcb || fcb->is_early_drop())) {
+        if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {
             debug_flow("Early drop !");
             if (last) {
                 last->set_next(next);
@@ -629,7 +630,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
             click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
             _table.get_root()->print(-1,false);
         }
-        if (unlikely(!fcb || fcb->is_early_drop())) {
+        if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {
             debug_flow("Early drop !");
             if (last) {
                 last->set_next(next);
