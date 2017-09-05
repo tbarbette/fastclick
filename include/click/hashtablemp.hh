@@ -297,6 +297,9 @@ class HashContainerMP { public:
     /** @brief Return a pointer for the element with @a key, if any. */
     inline ptr find(const K &key);
 
+    /** @brief Copy the value of V for K in storage if K is found, delete it from the table and return true. If nonfound, nothing is deleted and return false. */
+    inline bool find_remove(const K &key, V &storage);
+
     inline ptr find_insert(const K &key, const V &value);
 
     inline write_ptr find_insert_write(const K &key, const V &value);
@@ -434,6 +437,42 @@ HashContainerMP<K,V,Item>::find(const K &key)
     if (likely(_mt))
         bucket.list.read_end();
     return p;
+}
+
+template <typename K, typename V, typename Item>
+inline bool
+HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
+{
+    if (likely(_mt))
+        _table.read_begin();
+    size_type b = bucket(key);
+    Bucket& bucket = _table->buckets[b];
+    if (likely(_mt))
+        bucket.list.write_begin();
+    if (likely(_mt))
+        _table.read_end();
+    ListItem *pprev = bucket.list->head;
+    ListItem* *pprev_ptr = &bucket.list->head;
+    ptr p;
+    while (pprev) {
+        if (hashkeyeq(hashkey(pprev), key)) {
+            storage = *pprev->item.unprotected_ptr();
+            *pprev_ptr = pprev->_hashnext;
+            erase_item(pprev);
+            goto found;
+        }
+        pprev_ptr = &pprev->_hashnext;
+        pprev = pprev->_hashnext;
+
+    }
+    if (likely(_mt))
+        bucket.list.read_end();
+    return false;
+    found:
+    _table->_size--;
+    if (likely(_mt))
+        bucket.list.read_end();
+    return true;
 }
 
 #define MAKE_FIND_INSERT(ptr_type) \

@@ -162,10 +162,24 @@ void FlowIPLoadBalancerReverse::push_batch(int, TTuple* flowdata, PacketBatch* b
         auto th = batch->tcp_header();
         LBEntry entry = LBEntry(ip->ip_src, th->th_dport);
 #if IPLOADBALANCER_MP
-        LBHashtable::ptr ptr = _lb->_map.find(entry);
+        bool found = _lb->_map.find_remove(entry,*flowdata);
+        if (!found) {
+#if DEBUG_LB
+            click_chatter("Could not find %s %d",IPAddress(ip->ip_src).unparse().c_str(),th->th_dport);
+#endif
+            //assert(false);
+            //checked_output_push_batch(0, batch);
+            batch->kill();
+            return;
+        } else {
+#if DEBUG_LB
+            click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->pair.src.unparse().c_str(),ptr->pair.dst.unparse().c_str());
+#endif
+        }
+
 #else
         LBHashtable::iterator ptr = _lb->_map.find(entry);
-#endif
+
         if (!ptr) {
 
 #if DEBUG_LB
@@ -181,11 +195,9 @@ void FlowIPLoadBalancerReverse::push_batch(int, TTuple* flowdata, PacketBatch* b
             click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->pair.src.unparse().c_str(),ptr->pair.dst.unparse().c_str());
 #endif
         }
-#if IPLOADBALANCER_MP
-        *flowdata = *ptr;
-#else
         *flowdata = ptr.value();
 #endif
+
         fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
     } else {
 #if DEBUG_LB

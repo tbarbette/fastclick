@@ -416,7 +416,7 @@ private:
 /**
  * Wrap a pointer to V with a reference count. Call get() and put()
  *  to get and put reference. When created, it has a reference count of 1
- *  when the call to put() goes to 0, it calls delete on the pointer.
+ *  when the call to put() goes to 0, nothing is done.
  */
 template <typename T>
 class shared { public:

@@ -667,8 +667,8 @@ bool TCPIn::isLastUsefulPacket(Packet *packet)
 
 struct tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
-
-    auto it = tableFcbTcpCommon.find(flowID);
+    tcp_common* p;
+    bool it = tableFcbTcpCommon.find_remove(flowID,p);
 
     if(!it)
     {
@@ -676,7 +676,7 @@ struct tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
     }
     else
     {
-        return *it;
+        return p;
     }
 }
 
