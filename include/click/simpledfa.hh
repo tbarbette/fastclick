@@ -9,13 +9,14 @@ CLICK_DECLS
  * Greedy DFA, creates as many patterns as there are letters in the patterns. Limited to 65536 characters.
  */
 class SimpleDFA {
+
+public:
     typedef uint16_t state_t;
+
     struct NextState {
         state_t next[256];
     };
-    Vector<NextState> vector;
 
-public:
     static const uint16_t MATCHED = (uint16_t)-1;
 
     SimpleDFA() : vector() {
@@ -122,8 +123,8 @@ public:
         }
     }
 
-    inline uint16_t next(char c, int status) {
-        return vector[status].next[c];
+    inline void next(unsigned char c, state_t &state) {
+        state = vector[state].next[c];
     }
 
     void print(Vector<NextState> v) {
@@ -153,7 +154,8 @@ public:
      * M                9
      *
      */
-
+private:
+    Vector<NextState> vector;
 
 };
 

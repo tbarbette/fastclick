@@ -37,8 +37,6 @@ public:
         VirtualFlowSpaceElement* fbe = dynamic_cast<VirtualFlowSpaceElement*>(e);
         if (fbe != NULL) { //The visited element is an element that need FCB space
 
-            //Resize the map if needed
-            if (fbe->flow_data_offset() + fbe->flow_data_size() >= map.size()) map.resize(map.size() * 2);
 
             if (fbe->flow_data_offset() != -1) { //If flow already have some classifier
                 if (fbe->flow_data_offset() >= data_size) {
@@ -73,6 +71,8 @@ public:
                 }
                 fbe->_classifier = _classifier;
             }
+            //Resize the map if needed
+            if (fbe->flow_data_offset() + fbe->flow_data_size() >= map.size()) map.resize(map.size() * 2);
             map.set_range(fbe->flow_data_offset(),fbe->flow_data_size(),true);
             if (display_assignation)
                 click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());

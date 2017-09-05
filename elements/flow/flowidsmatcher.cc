@@ -57,15 +57,14 @@ FlowIDSMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int FlowIDSMatcher::process_data(fcb_FlowIDSMatcher* fcb_data, FlowBufferContentIter& iterator) {
-    int state = fcb_data->state;
+    SimpleDFA::state_t state = fcb_data->state;
     if (state == SimpleDFA::MATCHED)
         return -1;
-
     FlowBufferContentIter good_packets(iterator);
 
     while (++iterator) {
         char c = *iterator;
-        state = _program.next(c,state);
+        _program.next(c,state);
         if (state == SimpleDFA::MATCHED) {
             return -1;
         } else if (state == 0) {
