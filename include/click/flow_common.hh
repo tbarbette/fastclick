@@ -131,7 +131,7 @@ private:
 			return use_count;
 		}
 
-		inline FlowControlBlock* duplicate(int use_count);
+		FlowControlBlock* duplicate(int use_count);
         inline FCBPool* get_pool() const;
 
 		void print(String prefix, int data_offset =-1, bool show_ptr=false) const;
@@ -207,10 +207,14 @@ private:
 	per_thread_oread<SFCBList> lists;
 public:
     static FCBPool* biggest_pool;
+    static int initialized;
+    static int init_data_size() {
+        return biggest_pool->data_size();
+    }
 
+    static FlowControlBlock* init_allocate();
 
 	FCBPool() : _data_size(0), lists() {
-
 	}
 
 	~FCBPool() {
@@ -242,6 +246,7 @@ public:
 		    biggest_pool = this;
 		    fcb_table = table;
 		}
+		FCBPool::initialized++;
 	}
 
 	void compress(Bitvector threads) {
@@ -296,17 +301,6 @@ public:
 		return _data_size;
 	}
 };
-
-inline FlowControlBlock* FlowControlBlock::duplicate(int use_count) {
-    FlowControlBlock* fcb;
-    fcb = get_pool()->allocate();
-	//fcb->release_ptr = release_ptr;
-	//fcb->release_fnt = release_fnt;
-	memcpy(fcb, this ,sizeof(FlowControlBlock) + get_pool()->data_size());
-	fcb->use_count = use_count;
-	return fcb;
-}
-
 
 class FlowTableHolder {
 public:

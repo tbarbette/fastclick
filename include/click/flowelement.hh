@@ -53,22 +53,16 @@ protected:
 	friend class FlowBufferVisitor;
 
 
+
 };
 
 template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
 
 public :
 
-	FlowSpaceElement() : VirtualFlowSpaceElement() {
-
-	}
-
-	virtual int initialize(ErrorHandler *errh) {
-		if (_flow_data_offset == -1) {
-			return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
-		}
-		return 0;
-	}
+	FlowSpaceElement() CLICK_COLD;
+	virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+    void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
 
 	virtual const size_t flow_data_size()  const { return sizeof(T); }
 
@@ -242,6 +236,30 @@ public:
 	static FlowNode* get_downward_table(Element* e, int output);
 };
 
+
+template<typename T>
+FlowSpaceElement<T>::FlowSpaceElement() : VirtualFlowSpaceElement() {
+}
+
+template<typename T>
+int FlowSpaceElement<T>::initialize(ErrorHandler *errh) {
+    if (_flow_data_offset == -1) {
+        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+    }
+    return 0;
+}
+
+template<typename T>
+void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data) {
+    for (int i = 0; i < sizeof(T); i++) {
+        assert(!fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] || fcb->data[_flow_data_offset + i] == ((uint8_t*)&data)[i]);
+        fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] = 0xff;
+    }
+    *((T*)(&fcb->data[_flow_data_offset])) = data;
+
+}
+
+
 /**
  * Macro to define context
  *
@@ -253,7 +271,9 @@ public:
 
 #define FLOW_ELEMENT_DEFINE_CONTEXT(rule) \
 FlowNode* get_table(int iport) override CLICK_COLD {\
-    return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true, true);\
+    FlowNode* down = FlowElement::get_table(iport); \
+    FlowNode* my = FlowClassificationTable::parse(rule).root;\
+    return my->combine(down, true, true);\
 }
 
 #define FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(ruleA,ruleB) \

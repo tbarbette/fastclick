@@ -91,11 +91,11 @@ bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_d
     }
     if (ptr->is_node()) {
         auto fnt = [this,output](FlowNodePtr* ptr) {
-            *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)output;
+            fcb_set_init_data(ptr->leaf, output);
         };
         ptr->node->traverse_all_leaves(fnt, true, true);
     } else {
-        *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)output;
+        fcb_set_init_data(ptr->leaf, output);
     }
     return changed;
 }
@@ -134,7 +134,7 @@ FlowNode* FlowDispatcher::get_table(int) {
                         abort();
                     }
                 } else {
-                    *((uint32_t*)(&ptr->leaf->data[_flow_data_offset])) = (uint32_t)rules[i].output;
+                    fcb_set_init_data(ptr->leaf, rules[i].output);
                     if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's not a real output, set drop flag
                         ptr->leaf->set_early_drop();
                     }
@@ -200,8 +200,8 @@ FlowNode* FlowDispatcher::get_table(int) {
             auto fnt = [this](FlowNodePtr* ptr) {
                 int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
                 if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
-                        attach_children(ptr,output,true);
-                   }
+                    attach_children(ptr,output,true);
+                }
             };
 
             merged->traverse_all_leaves(fnt, true, true);

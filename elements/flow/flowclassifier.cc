@@ -256,6 +256,19 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         click_chatter("Table of %s after optimization :",name().c_str());
         _table.get_root()->print(-1,false);
     }
+    FCBPool::initialized --;
+
+    _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
+        FlowControlBlock* nfcb = _table.get_pool()->allocate();
+        FlowNode* p = ptr->parent();
+        memcpy(nfcb->data, ptr->leaf->data, _table.get_pool()->data_size());
+        nfcb->parent = ptr->leaf->parent;
+        nfcb->flags = ptr->leaf->flags;
+        nfcb->acquire(1);
+        nfcb->release_fnt = 0;
+        delete ptr->leaf;
+        ptr->leaf = nfcb;
+    }, true, true);
 
     if (_aggcache) {
         for (unsigned i = 0; i < _cache.weight(); i++) {
@@ -277,6 +290,12 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
 }
 
 void FlowClassifier::cleanup(CleanupStage stage) {
+    fcb_table = &_table;
+    _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
+        _table.get_pool()->release(ptr->leaf);
+        ptr->leaf = 0;
+    }, true, true);
+    fcb_table = 0;
     /*click_chatter("%p{element} Hit : %d",this,cache_hit);
     click_chatter("%p{element}  Shared : %d",this,cache_sharing);
     click_chatter("%p{element} Miss : %d",this,cache_miss);*/

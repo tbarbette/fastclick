@@ -242,7 +242,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
             is_default = true;
         }
 
-        FlowControlBlock* fcb = FCBPool::biggest_pool->allocate_empty();
+        FlowControlBlock* fcb = FCBPool::init_allocate();
         parent_ptr->set_leaf(fcb);
         parent_ptr->set_data(lastvalue);
         parent_ptr->leaf->parent = parent;
@@ -670,7 +670,7 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
         return;
     }
 
-    debug_flow("Mhh... No easy combine. Combining other to all children and default");
+    debug_flow("Mhh... No easy combine. Combining other to all children and default (priority %d, as_child 0)",priority);
     //In other terms, if the packet does not match any of the rules, it will go through "other"
     this->debug_print();
     other->debug_print();
@@ -685,12 +685,17 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
         } else {
             if (Vpruned_default.is_node()) { //Other is guaranteed to be not null here
                 bool changed;
+                FlowNodeData d = Vpruned_default.data();
                 Vpruned_default = Vpruned_default.node->prune(level(), cur->data(), true, changed);
+                Vpruned_default.set_data(d);
+                Vpruned_default.set_parent(this);
             }
         }
     }
     this->default_ptr()->default_combine(this, &Vpruned_default, false, priority);
     //TODO : delete other
+    debug_flow("Result of no easy combine :");
+    this->print();
     this->check();
     return;
 }
@@ -703,20 +708,20 @@ void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child
         debug_flow("No node, attaching other");
         *this = (*other);
     } else { //We have default, other have default
-        debug_flow("There is a node");
+        debug_flow("There is a node or a leaf");
         if (this->is_leaf() && other->is_leaf()) { //Our default is a leaf and other default is a leaf
-            if (as_child || !priority) {
+            if (as_child && !priority) {
                 FlowNodeData d = data();
                 this->leaf->release();
                 this->leaf = other->leaf;
                 this->set_data(d);
             } else
                 this->leaf->combine_data(other->leaf->data);
-        } else if (this->is_node()) { //Our default is a node
+        } else if (this->is_node()) { //Our default is a node, other is a leaf or a node
             this->node_combine_ptr(p, *other, as_child, priority);
         } else { //other default is node, our is leaf
             //We replace all other leaf with our data
-            other->node->leaf_combine_data_create(this->leaf, true, true, !priority);
+            other->node->leaf_combine_data_create(this->leaf, true, true, !priority && as_child);
             assert(other->node->has_no_default());
             this->set_node(other->node);
         }
@@ -930,6 +935,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 	if (level()->is_mt_safe()) {
 	    mt_safe = true;
 	}
+
 	if (level()->is_dynamic() && !mt_safe) {
 	    FlowLevel* thread = new FlowLevelThread(click_max_cpu_ids());
 	    FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
@@ -1151,13 +1157,12 @@ void FlowNodePtr::print() const{
 
 
 void FlowControlBlock::combine_data(uint8_t* data) {
-    /*debug_flow("Combine data for :");
-    print("");*/
     for (unsigned i = sizeof(FlowNodeData); i < get_pool()->data_size();i++) {
-       if (data[i] == 0)
+       if (data[i + FCBPool::init_data_size()] == 0)
            continue;
-       if (this->data[i] == 0) {
+       if (this->data[i + FCBPool::init_data_size()] == 0) {
            this->data[i] = data[i];
+           this->data[i + FCBPool::init_data_size()] = 0xff;
        } else {
           if (this->data[i] != data[i]) {
               click_chatter("!!!");
@@ -1209,7 +1214,34 @@ FlowNode* FlowLevel::create_better_node(FlowNode* parent) {
     return FlowNode::create_hash(current_level);
 }
 
+/**
+ * Function not to be called at runtime ! Directly allocate
+ * the FCB using the right pool.
+ */
+FlowControlBlock* FlowControlBlock::duplicate(int use_count) {
+    FlowControlBlock* fcb;
+    assert(FCBPool::initialized > 0);
+    //fcb = get_pool()->allocate();
+    fcb = FCBPool::init_allocate();
+    //fcb->release_ptr = release_ptr;
+    //fcb->release_fnt = release_fnt;
+    memcpy(fcb, this ,sizeof(FlowControlBlock) + (get_pool()->data_size() * 2));
+    fcb->use_count = use_count;
+    return fcb;
+}
+
+
+FlowControlBlock*
+FCBPool::init_allocate() {
+       FlowControlBlock* initfcb = (FlowControlBlock*)CLICK_LALLOC(sizeof(FlowControlBlock) + (init_data_size() * 2));
+       initfcb->initialize();
+       bzero(initfcb->data, (init_data_size() * 2));
+       return initfcb;
+   }
+
+
 FCBPool* FCBPool::biggest_pool = 0;
+int FCBPool::initialized = 0;
 int NR_SHARED_FLOW = 0;
 
 #endif
