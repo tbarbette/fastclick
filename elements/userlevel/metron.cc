@@ -803,6 +803,7 @@ Json ServiceChain::statsToJSON() {
     jsc.set("nics", jnics);
     if (_metron->_timing_stats) {
         jsc.set("timing_stats", _timing_stats.toJSON());
+        jsc.set("autoscale_timing_stats", _as_timing_stats.toJSON());
     }
 
     return jsc;
@@ -813,6 +814,12 @@ Json ServiceChain::timing_stats::toJSON() {
     j.set("parse", (parse - start).nsecval());
     j.set("launch", (launch - parse).nsecval());
     j.set("total", (launch - start).nsecval());
+    return j;
+}
+
+Json ServiceChain::autoscale_timing_stats::toJSON() {
+    Json j = Json::make_object();
+    j.set("autoscale", (autoscale_end - autoscale_start).nsecval());
     return j;
 }
 

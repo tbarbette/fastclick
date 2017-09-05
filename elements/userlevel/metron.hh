@@ -199,6 +199,7 @@ class ServiceChain {
 
         struct autoscale_timing_stats {
             Timestamp autoscale_start, autoscale_end;
+            Json toJSON();
         };
         void setAutoscaleTimingStats(struct autoscale_timing_stats ts) {
             _as_timing_stats = ts;
