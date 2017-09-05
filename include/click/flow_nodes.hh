@@ -1058,7 +1058,7 @@ class FlowNodeHash : public FlowNode  {
                     }
                 } else {
                     if (insert_idx != UINT_MAX) {
-                        click_chatter("Swap IDX %d<->%d",insert_idx,idx);
+                        debug_flow("Swap IDX %d<->%d",insert_idx,idx);
                         FlowNodePtr tmp = childs[insert_idx];
                         childs[insert_idx] = childs[idx];
                         childs[idx] = tmp;
@@ -1086,7 +1086,7 @@ class FlowNodeHash : public FlowNode  {
     #endif
             }
             if (insert_idx != UINT_MAX) {
-                click_chatter("Recovered IDX %d",insert_idx);
+                debug_flow("Recovered IDX %d",insert_idx);
                 /*idx = next_idx(idx);
                 int j = 0;
                 //If we merge a hole, delete the rest

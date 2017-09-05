@@ -35,9 +35,9 @@ fc3 :: FlowClassifier(VERBOSE 1)
 fcd3[0] ->  FlowDispatcher(0/02 1/00/ff) -> Print(0) -> Discard;
 fcd3[1] ->  FlowDispatcher(2/05) -> Print(1) -> Discard;
 
-InfiniteSource(\<000300>, LIMIT 1, STOP true) -> fc3;
-InfiniteSource(\<000305>, LIMIT 1, STOP true) -> fc3;
-InfiniteSource(\<000005>, LIMIT 1, STOP true) -> fc3;
+InfiniteSource(\<020300>, LIMIT 1, STOP true) -> fc3;
+InfiniteSource(\<020305>, LIMIT 1, STOP true) -> fc3;
+InfiniteSource(\<020005>, LIMIT 1, STOP true) -> fc3;
 InfiniteSource(\<010000>, LIMIT 1, STOP true) -> fc3;
 InfiniteSource(\<010005>, LIMIT 1, STOP true) -> fc3;
 %expect stderr
@@ -56,7 +56,7 @@ M1:    1 | 05
 Table of fc2 after optimization :
 ---
 0/255 (TWOCASE, 1 childs)
-|-> 0
+|-> 2
 |  1/255 (ARRAY, 1 childs, dynamic)
 |  |-> 5 UC:1 ED:0 (data 0500000000000000010000000000000000000000)
 |  |-> DEFAULT 18446744073709551615 UC:1 ED:0 (data ffffffffffffffff000000000000000000000000)
@@ -64,9 +64,10 @@ Table of fc2 after optimization :
 |  1/255 (TWOCASE, 1 childs)
 |  |-> 5 UC:1 ED:0 (data 0500000000000000010000000000000000000000)
 |  |-> DEFAULT 0 UC:1 ED:1 (data 00000000000000000100000000000000ffffffff)
+
 ---
-M0:    2 | 0003
-0:    2 | 0003
+M0:    2 | 0203
+0:    2 | 0203
 M1:    2 | 0205
 1:    2 | 0205
 M1:    2 | 0005
@@ -75,7 +76,7 @@ M1:    2 | 0005
 Table of fc3 after optimization :
 ---
 0/255 (TWOCASE, 1 childs)
-|-> 0
+|-> 2
 |  2/255 (TWOCASE, 1 childs)
 |  |-> 5 UC:1 ED:0 (data 0500000000000000010000000000000000000000)
 |  |-> DEFAULT
@@ -87,6 +88,6 @@ Table of fc3 after optimization :
 |  |-> DEFAULT 0 UC:1 ED:1 (data 00000000000000000100000000000000ffffffff)
 ---
 1:    3 | 010005
-1:    3 | 000305
-1:    3 | 000005
-0:    3 | 000300
+1:    3 | 020305
+1:    3 | 020005
+0:    3 | 020300

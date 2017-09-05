@@ -486,15 +486,17 @@ void FlowNode::__combine_child(FlowNode* other, bool priority) {
 		FlowNodePtr* other_child_ptr;
 		while ((other_child_ptr = other_childs.next()) != 0) { //For each child of the other node
 #if DEBUG_CLASSIFIER
-			click_chatter("COMBINE : taking child %lu",other_child_ptr->data().data_64);
+			click_chatter("COMBINE-CHILD : taking child %lu",other_child_ptr->data().data_64);
 #endif
 
-			FlowNodePtr* child_ptr = find(other_child_ptr->data());
-			if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us
-				*child_ptr = *other_child_ptr;
-				child_ptr->set_parent(this);
-				inc_num();
-			} else { //There is some data in our child that is the same as the other child
+            FlowNodePtr* child_ptr = find(other_child_ptr->data());
+            if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us
+                *child_ptr = *other_child_ptr;
+                child_ptr->set_parent(this);
+                inc_num();
+            } else {
+
+			    //There is some data in our child that is the same as the other child
 				if (child_ptr->is_leaf() || other_child_ptr->is_leaf()) {
 #if DEBUG_CLASSIFIER
 					click_chatter("Combining leaf??? This error usually happens when rules overlap.");
@@ -510,7 +512,7 @@ void FlowNode::__combine_child(FlowNode* other, bool priority) {
 					child_ptr->node->set_parent(this);
 
 				}
-			}
+            }
 
 			//Delete the child of the combined rule
 			other_child_ptr->node = 0;
@@ -633,14 +635,31 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
          */
         FlowNodePtr* other_child_ptr;
         while ((other_child_ptr = other_childs.next()) != 0) { //For each child of the other node
-            debug_flow("COMBINE : taking child %lu",other_child_ptr->data().data_64);
+            debug_flow("COMBINE-ELSE : taking child %lu",other_child_ptr->data().data_64);
 
             FlowNodePtr* child_ptr = find(other_child_ptr->data());
-            if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us
-                *child_ptr = *other_child_ptr;
-                child_ptr->set_parent(this);
-                inc_num();
-            } else { //There is some data in our child that is the same as the other child
+            if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us, merging it with a dup of our default
+                if (_default.ptr) {
+                    debug_flow("Our child is empty, duplicating default (is_leaf : %d)",_default.is_leaf());
+                    if (_default.is_leaf()) {
+                        child_ptr->set_leaf(_default.leaf->duplicate(1));
+                        child_ptr->set_data(other_child_ptr->data());
+                    } else {
+                        child_ptr->set_node(_default.node->duplicate(true,1));
+                        child_ptr->set_data(other_child_ptr->data());
+                    }
+                    child_ptr->set_parent(this);
+                    inc_num();
+
+                    goto attach;
+                } else {
+                    *child_ptr = *other_child_ptr;
+                    child_ptr->set_parent(this);
+                    inc_num();
+                }
+            } else {
+                attach:
+                //There is some data in our child that is the same as the other child
                 if (child_ptr->is_leaf() && other_child_ptr->is_leaf()) {
                     //DO nothing, this is a else rule, mine take precedence
                 } else if (child_ptr->is_node() && other_child_ptr->is_node()) {
@@ -648,6 +667,10 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
                     //We must set the parent to null, so the combiner nows he can play with that node
                     other_child_ptr->node->set_parent(0);
                     child_ptr->node = child_ptr->node->combine(other_child_ptr->node,false,priority);
+                    child_ptr->node->set_parent(this);
+                } else if (child_ptr->is_leaf() && other_child_ptr->is_node()) {
+                    other_child_ptr->node->leaf_combine_data_create(child_ptr->leaf, true, true, false);
+                    child_ptr->set_node(other_child_ptr->node);
                     child_ptr->node->set_parent(this);
                 } else {
                     assert(false);
@@ -662,7 +685,7 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
         assert(other->getNum() == 0);
         //If other had a default, we need to merge it
         if (other->default_ptr()->ptr != 0) { //Other had default
-            this->default_ptr()->default_combine(this, other->default_ptr(), true, priority);
+            this->default_ptr()->default_combine(this, other->default_ptr(), false, priority);
             other->default_ptr()->ptr = 0;
         } //ELse nothing to do as we can keep our default as it, if any
         //TODO : delete other;
@@ -687,11 +710,15 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
                 bool changed;
                 FlowNodeData d = Vpruned_default.data();
                 Vpruned_default = Vpruned_default.node->prune(level(), cur->data(), true, changed);
-                Vpruned_default.set_data(d);
-                Vpruned_default.set_parent(this);
             }
         }
     }
+#if DEBUG_CLASSIFIER
+    debug_flow("Pruned other default :");
+    Vpruned_default.print();
+    debug_flow("my default:");
+    this->default_ptr()->print();
+#endif
     this->default_ptr()->default_combine(this, &Vpruned_default, false, priority);
     //TODO : delete other
 #if DEBUG_CLASSIFIER
@@ -703,28 +730,30 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
 }
 
 /**
- * Correct iif this FLowNodePtr is a default ptr
+ * Correct iif this FLowNodePtr is a default ptr.
+ *
+ * Will combine this default pointer with whatever other is.
+ * - No need to set the data of the child as we are default
+ * - Parent is corrected at the end of the function
  */
 void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child, bool priority) {
     if (this->ptr == 0) { //We don't have default
         debug_flow("No node, attaching other");
         *this = (*other);
     } else { //We have default, other have default
-        debug_flow("There is a node or a leaf");
+        debug_flow("We have a node or a leaf %d %d , p %d",this->is_leaf(),other->is_leaf(),priority);
         if (this->is_leaf() && other->is_leaf()) { //Our default is a leaf and other default is a leaf
-            if (as_child && !priority) {
-                FlowNodeData d = data();
+            if (!priority) {
                 this->leaf->release();
                 this->leaf = other->leaf;
-                this->set_data(d);
             } else
                 this->leaf->combine_data(other->leaf->data);
         } else if (this->is_node()) { //Our default is a node, other is a leaf or a node
             this->node_combine_ptr(p, *other, as_child, priority);
         } else { //other default is node, our is leaf
             //We replace all other leaf with our data
-            other->node->leaf_combine_data_create(this->leaf, true, true, !priority && as_child);
-            assert(other->node->has_no_default());
+            other->node->leaf_combine_data_create(this->leaf, true, true, !priority || other->node->level()->is_dynamic());
+            flow_assert(other->node->has_no_default());
             this->set_node(other->node);
         }
     }
@@ -1169,7 +1198,7 @@ void FlowControlBlock::combine_data(uint8_t* data) {
           if (this->data[i] != data[i]) {
               click_chatter("!!!");
               click_chatter("WARNING : OVERWRITTEN CLASSIFICATION !");
-              click_chatter("Impossible classification ! Some path merge with different FCB values (%x, %x), hence different decisions!",this->data[i], data[i]);
+              click_chatter("Impossible classification ! Some path merge with different FCB values (%x, %x at offset %d), hence different decisions!",this->data[i], data[i],i);
               click_chatter("WARNING : OVERWRITTEN CLASSIFICATION !");
               click_chatter("!!!");
               print("");

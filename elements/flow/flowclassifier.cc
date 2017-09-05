@@ -20,9 +20,10 @@ public:
     FlowClassifier* _classifier;
     static int shared_position[NR_SHARED_FLOW];
     Bitvector map;
+    bool display_assignation;
 
     FlowBufferVisitor(FlowClassifier* classifier,size_t myoffset) : data_size(myoffset), _classifier(classifier), map(64,false) {
-        map.set_range(0,myoffset,1);
+        map.set_range(0, myoffset, 1);
     }
 
 
@@ -73,9 +74,8 @@ public:
                 fbe->_classifier = _classifier;
             }
             map.set_range(fbe->flow_data_offset(),fbe->flow_data_size(),true);
-#if DEBUG_CLASSIFIER
-            click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
-#endif
+            if (display_assignation)
+                click_chatter("Adding %d bytes for %s at %d",fbe->flow_data_size(),e->name().c_str(),fbe->flow_data_offset());
         } else {
             /*Bitvector b;
             e->port_flow(false,port,&b);*/
@@ -127,6 +127,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     FlowBufferVisitor v(this, sizeof(FlowNodeData) + (_aggcache?sizeof(uint32_t):0) + reserve);
+    v.display_assignation = _verbose > 1;
     router()->visit_ports(this,true,-1,&v);
 #if DEBUG_CLASSIFIER
     click_chatter("%s : pool size %d",name().c_str(),v.data_size);
