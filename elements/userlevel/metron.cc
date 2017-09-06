@@ -58,7 +58,7 @@ int Metron::initialize(ErrorHandler *errh) {
     _cpu_map.resize(getCpuNr(), 0);
 
     String hwInfo = file_string("/proc/cpuinfo");
-    _vendor = parseVendorInfo(hwInfo, "vendor_id");
+    _cpu_vendor = parseVendorInfo(hwInfo, "vendor_id");
     _hw = parseVendorInfo(hwInfo, "model name");
     _sw = CLICK_VERSION;
 
@@ -521,7 +521,7 @@ Json Metron::toJSON() {
     jroot.set("id", Json(_id));
 
     // Info
-    jroot.set("manufacturer", Json(_vendor));
+    jroot.set("manufacturer", Json(_cpu_vendor));
     jroot.set("hwVersion", Json(_hw));
     jroot.set("swVersion", Json("Click " + _sw));
     jroot.set("serial", Json(_serial));
@@ -531,8 +531,7 @@ Json Metron::toJSON() {
     for (int i = 0; i < getCpuNr(); i++) {
         Json jcpu = Json::make_object();
         jcpu.set("id", i);
-        // TODO: Retrieve `Intel` more gently :p
-        jcpu.set("vendor", "Intel");
+        jcpu.set("vendor", _cpu_vendor);
         jcpu.set("frequency", cycles_hz() / CPU::MEGA_HZ);  // In MHz
         jcpus.push_back(jcpu);
     }

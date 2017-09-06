@@ -290,7 +290,7 @@ class Metron : public Element {
 
         Vector<ServiceChain *> _cpu_map;
 
-        String _vendor;
+        String _cpu_vendor;
         String _hw;
         String _sw;
         String _serial;
