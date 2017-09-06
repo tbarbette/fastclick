@@ -64,14 +64,14 @@ public:
 private:
     struct state {
         int last;
-        int min_port;
-        int max_port;
+        uint16_t min_port;
+        uint16_t max_port;
         Vector<uint16_t> ports;
     };
     per_thread<state> _state;
     Vector<IPAddress> _dsts;
     Vector<IPAddress> _sips;
-    //IPAddress _sip;
+
 
     LBHashtable _map;
     friend class FlowIPLoadBalancerReverse;

@@ -6,37 +6,31 @@
 #include <click/hashtablemp.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
-CLICK_DECLS
-#define IPNATR_MP 1
-#if IPNATR_MP
-#include <click/hashtablemp.hh>
-#else
-#include <click/hashtable.hh>
-#endif
+#include <click/deque.hh>
 CLICK_DECLS
 
-struct NATEntry {
-    IPAddress dest;
+#include <click/hashtablemp.hh>
+
+CLICK_DECLS
+
+struct IPPort {
+    IPAddress ip;
     uint16_t port;
-    NATEntry(IPAddress addr, uint16_t port) : dest(addr), port(port) {
+    IPPort(IPAddress addr, uint16_t port) : ip(addr), port(port) {
 
     }
     inline hashcode_t hashcode() const {
-       return CLICK_NAME(hashcode)(dest) + CLICK_NAME(hashcode)(port);
+       return CLICK_NAME(hashcode)(ip) + CLICK_NAME(hashcode)(port);
    }
 
-   inline bool operator==(NATEntry other) const {
-       return (other.dest == dest && other.port == port);
+   inline bool operator==(IPPort other) const {
+       return (other.ip == ip && other.port == port);
    }
-
 };
-#if IPNATR_MP
-typedef HashTableMP<NATEntry,IPPair> NATHashtable;
-#else
-typedef HashTable<NATEntry,IPPair> NATHashtable;
-#endif
 
-class FlowIPNAT : public FlowSpaceElement<IPPair> {
+typedef HashTableMP<uint16_t,IPPort> NATHashtable;
+
+class FlowIPNAT : public FlowSpaceElement<uint16_t> {
 
 public:
 
@@ -47,17 +41,25 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
+    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
+
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
 
-    void push_batch(int, IPPair*, PacketBatch *);
+    void push_batch(int, uint16_t*, PacketBatch *);
+private:
+    struct state {
+        Deque<uint16_t> available_ports;
+    };
+    per_thread<state> _state;
 
-    NATHashtable _map;
 private:
     IPAddress _sip;
+    NATHashtable _map;
+    friend class FlowIPNATReverse;
 };
 
-class FlowIPNATReverse : public FlowSpaceElement<IPPair> {
+class FlowIPNATReverse : public FlowSpaceElement<IPPort> {
 
 public:
 
@@ -68,13 +70,11 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
+    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
+
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    //int initialize(ErrorHandler *errh);
 
-    void push_batch(int, IPPair*, PacketBatch *);
-
-    friend class FlowIPLoadBalancerReverse;
-
+    void push_batch(int, IPPort*, PacketBatch *);
 private:
 
     FlowIPNAT* _in;

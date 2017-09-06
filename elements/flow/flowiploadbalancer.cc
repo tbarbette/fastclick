@@ -167,9 +167,7 @@ void FlowIPLoadBalancerReverse::push_batch(int, TTuple* flowdata, PacketBatch* b
 #if DEBUG_LB
             click_chatter("Could not find %s %d",IPAddress(ip->ip_src).unparse().c_str(),th->th_dport);
 #endif
-            //assert(false);
-            //checked_output_push_batch(0, batch);
-            batch->kill();
+            batch->fast_kill();
             return;
         } else {
 #if DEBUG_LB
@@ -187,7 +185,7 @@ void FlowIPLoadBalancerReverse::push_batch(int, TTuple* flowdata, PacketBatch* b
 #endif
             //assert(false);
             //checked_output_push_batch(0, batch);
-            batch->kill();
+            batch->fast_kill();
             return;
         } else {
             //TODO : Delete?
