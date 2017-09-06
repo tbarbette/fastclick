@@ -115,14 +115,13 @@ uint32_t StackElement::getInitialAck(Packet *p) const
     return (uint32_t)p->anno_u32(MIDDLEBOX_INIT_ACK_OFFSET);
 }
 
-void StackElement::closeConnection(Packet *packet, bool graceful,
-     bool bothSides)
+void StackElement::closeConnection(Packet *packet, bool graceful)
 {
     // Call the "closeConnection" method on every element in the stack
     if(previousStackElement == NULL)
         return;
 
-    previousStackElement->closeConnection(packet, graceful, bothSides);
+    previousStackElement->closeConnection(packet, graceful);
 }
 
 bool StackElement::allowResize() {

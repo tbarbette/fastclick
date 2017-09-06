@@ -240,11 +240,8 @@ protected:
      * @param fcb A pointer to the FCB of the flow
      * @param packet A packet from the connection, used for initialization
      * @param grafecul A boolean indicating whether the connection must be closed gracefully or not
-     * @param bothSides A boolean indicating if the connection must be closed for both sides or
-     * just this one.
      */
-    virtual void closeConnection(Packet *packet, bool graceful,
-        bool bothSides);
+    virtual void closeConnection(Packet *packet, bool graceful);
 
     /**
      * @brief Indicate whether a given packet is the last useful one for this side of the flow
@@ -377,7 +374,7 @@ public :
     }
 
     void push_batch(int port,PacketBatch* head) final {
-        click_chatter("Pushing packet batch %p with fcb %p",head,fcb_data());
+        //click_chatter("Pushing packet batch %p with fcb %p in %p{element}",head,fcb_data(),this);
         push_batch(port, fcb_data(), head);
     }
 
@@ -457,7 +454,6 @@ template <typename T>
 struct BufferData {
     T userdata;
     FlowBuffer flowBuffer;
-    int lastPos;
 };
 
 template <class Derived, typename T>
@@ -468,21 +464,25 @@ class StackBufferElement : public StackSpaceElement<BufferData<T>>
 
     void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
     {
-        fcb_data->flowBuffer.enqueueAll(flow);
-        auto it = fcb_data->flowBuffer.contentBegin(fcb_data->lastPos);
+        auto it = fcb_data->flowBuffer.enqueueAllIter(flow);
         int action = static_cast<Derived*>(this)->process_data(&fcb_data->userdata,it);
         if (action < 0) {
-            this->closeConnection((it.current() ? it.current() : flow->first()), true, true);
+            this->closeConnection((it.current() ? it.current() : flow->first()), true);
             fcb_data->flowBuffer.dequeueAll()->fast_kill();
             return;
+        } else if (action > 0) {
+            this->closeConnection((it.current() ? it.current() : flow->first()), true);
+            this->checked_output_push_batch(action,fcb_data->flowBuffer.dequeueAll());
+            return;
         }
+
         PacketBatch* passed = it.flush();
+//        click_chatter("Passed %d",passed);
         if (it.current()) {
+//            click_chatter("Pending %p",it.current());
             this->requestMorePackets(it.current(), false);
-        } else {
-            fcb_data->lastPos = 0;
         }
-        StackSpaceElement<BufferData<T>>::checked_output_push_batch(action,passed);
+        this->checked_output_push_batch(action,passed);
     }
 };
 

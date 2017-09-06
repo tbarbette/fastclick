@@ -122,8 +122,9 @@ public:
 #endif
         } else {
 #if DEBUG_CLASSIFIER_RELEASE
-            click_chatter("Unordered release remove, it was %p and not %p",fcb_stack->release_fnt,fnt);
 #endif
+            click_chatter("Unordered release remove, it was %p and not %p",fcb_stack->release_fnt,fnt);
+
             assert(false);
             /*SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
             VirtualFlowSpaceElement* fe;

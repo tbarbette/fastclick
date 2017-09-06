@@ -109,7 +109,7 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
 
     closeconn:
 
-    closeConnection(flow, true, true);
+    closeConnection(flow, true);
     insultremover->flowBuffer.dequeueAll()->kill();
     /*
     removeBytes(packet, 0, getPacketContentSize(packet));

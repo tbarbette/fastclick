@@ -41,6 +41,16 @@ void FlowBuffer::enqueueAll(PacketBatch* batch) {
     return;
 }
 
+FlowBufferContentIter FlowBuffer::enqueueAllIter(PacketBatch* batch) {
+    if (head != 0) {
+        head->append_batch(batch);
+    } else {
+        head = batch;
+    }
+    return FlowBufferContentIter(this,batch,0);
+}
+
+
 void FlowBuffer::enqueue(Packet *packet)
 {
     if(unlikely(!isInitialized()))
@@ -362,6 +372,13 @@ bool FlowBufferIter::operator!=(const FlowBufferIter& other) const
 FlowBufferContentIter::FlowBufferContentIter(FlowBuffer *_flowBuffer,
     Packet* _entry, int posInFirstPacket) : flowBuffer(_flowBuffer), entry(_entry), offsetInPacket(posInFirstPacket)
 {
+    //The offset at first start must be valid
+    while (entry && StackElement::getContentOffset(entry) + offsetInPacket >=
+        entry->length())
+    {
+        entry = entry->next();
+    }
+
 
 }
 
@@ -431,8 +448,8 @@ FlowBufferContentIter& FlowBufferContentIter::operator++()
     offsetInPacket++;
 
     // Check if we are at the end of the packet and must therefore switch to
-    // the next one
-    if(StackElement::getContentOffset(entry) + offsetInPacket >=
+    // the next one. We may have multiple empty packet
+    while (entry && StackElement::getContentOffset(entry) + offsetInPacket >=
         entry->length())
     {
         offsetInPacket = 0;
@@ -443,7 +460,6 @@ FlowBufferContentIter& FlowBufferContentIter::operator++()
 }
 
 PacketBatch* FlowBufferContentIter::flush() {
-    click_chatter("Flush %p",entry);
     if (entry == 0) {
         return this->flowBuffer->dequeueAll();
     } else {

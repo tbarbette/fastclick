@@ -18,6 +18,7 @@
 #define MODIFICATIONNODES_POOL_SIZE 5000
 #define TCPCOMMON_POOL_SIZE 50
 
+#define DEBUG_TCP 0
 
 /**
  * This file is used to simulate the FCB provided by Middleclick
@@ -34,7 +35,7 @@ struct tcp_common
     // One retransmission manager for each direction of the connection
     RetransmissionTiming retransmissionTimings[2];
     // State of the connection
-    TCPClosingState::Value closingStates[2];
+    TCPClosingState::Value closingState;
     // Lock to ensure that only one side of the flow (one thread) at a time
     // accesses the common structure
     Spinlock lock;
@@ -42,8 +43,7 @@ struct tcp_common
 
     tcp_common() //This is indeed called as it is not part of the FCBs
     {
-        closingStates[0] = TCPClosingState::OPEN;
-        closingStates[1] = TCPClosingState::OPEN;
+        closingState = TCPClosingState::OPEN;
         use_count = 0;
     }
 
@@ -164,8 +164,7 @@ protected:
     virtual WritablePacket* insertBytes(WritablePacket*, uint32_t,
          uint32_t) override CLICK_WARN_UNUSED_RESULT;
     virtual void requestMorePackets(Packet *packet, bool force = false) override;
-    virtual void closeConnection(Packet *packet, bool graceful,
-         bool bothSides) override;
+    virtual void closeConnection(Packet *packet, bool graceful) override;
     virtual bool isLastUsefulPacket(Packet *packet) override;
     virtual unsigned int determineFlowDirection() override;
 
@@ -248,6 +247,7 @@ private:
     unsigned int flowDirection;
 
     bool _allow_resize;
+    friend class TCPOut;
 };
 
 CLICK_ENDDECLS

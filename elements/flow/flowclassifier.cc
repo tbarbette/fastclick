@@ -293,10 +293,13 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
 
 void FlowClassifier::cleanup(CleanupStage stage) {
     fcb_table = &_table;
-    _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
-        _table.get_pool()->release(ptr->leaf);
-        ptr->leaf = 0;
-    }, true, true);
+    if (_table.get_root()) {
+
+        _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
+            _table.get_pool()->release(ptr->leaf);
+            ptr->leaf = 0;
+        }, true, true);
+    }
     fcb_table = 0;
     /*click_chatter("%p{element} Hit : %d",this,cache_hit);
     click_chatter("%p{element}  Shared : %d",this,cache_sharing);

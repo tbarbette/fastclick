@@ -377,8 +377,18 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
     } else {
         if (!tcpreorder->expectedPacketSeq) {
             //click_chatter("The flow does not start with a syn! We should send a RST sometime !"); //TODO : This is the role of the tcp ctx
-            batch->fast_kill();
-            return false;
+            if (isRst(batch->first())) { //Let the RST pass for a bad SYN
+                if (batch->count() == 1) {
+                    checked_output_push_batch(0,batch);
+                    return false;
+                } else { //A RST and something else smells the attack... Discard
+                    batch->fast_kill();
+                    return false;
+                }
+            } else {
+                batch->fast_kill();
+                return false;
+            }
         }
     }
     return true;

@@ -108,8 +108,7 @@ Packet* TCPRetransmitter::processPacketNormal(Packet *packet)
 
     if(fcb->common == NULL)
     {
-        packet->kill();
-        return NULL;
+        return packet;
     }
 
     fcb->common->lock.acquire();
@@ -185,6 +184,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(Packet *packet)
 
     if(fcb->common == NULL)
     {
+        //Do not retransmit packets of closed connection (TCPOut freed the common, or it was never properlu established)
         packet->kill();
         return NULL;
     }
@@ -205,7 +205,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(Packet *packet)
     // are unmodified. Thus, we need to perform the right mappings to
     // have the link with the packets in the tree
 
-    if(fcb->common->closingStates[flowDirection] != TCPClosingState::OPEN)
+    if(fcb->common->closingState != TCPClosingState::OPEN)
     {
         packet->kill();
         fcb->common->lock.release();
@@ -461,7 +461,7 @@ bool TCPRetransmitter::manualTransmission(bool retransmission)
     fcb->common->lock.acquire();
 
     // Check if the connection is closed before continuing
-    if(fcb->common->closingStates[flowDirection] != TCPClosingState::OPEN)
+    if(fcb->common->closingState != TCPClosingState::OPEN)
     {
         fcb->common->lock.release();
         return false;
@@ -657,15 +657,16 @@ void TCPRetransmitter::signalAck(uint32_t ack)
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
     auto fcb = _in->fcb_data();
-    fcb->common->lock.acquire();
-
-    if(fcb->common->retransmissionTimings[flowDirection].getCircularBuffer() == NULL)
+    if(!fcb->common || fcb->common->closingState != TCPClosingState::OPEN)
     {
         fcb->common->lock.release();
         return;
     }
 
-    if(fcb->common->closingStates[flowDirection] != TCPClosingState::OPEN)
+
+    fcb->common->lock.acquire();
+
+    if(fcb->common->retransmissionTimings[flowDirection].getCircularBuffer() == NULL)
     {
         fcb->common->lock.release();
         return;

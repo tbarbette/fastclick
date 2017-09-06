@@ -28,11 +28,11 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
 {
     auto fcb_in = inElement->fcb_data();
     auto fnt = [this,fcb_in](Packet* p) -> Packet* {
-        if(!checkConnectionClosed(p))
+/*        if(!checkConnectionClosed(p))
         {
             p->kill();
             return NULL;
-        }
+        }*/
 
         if (_allow_resize) {
             WritablePacket *packet = p->uniqueify();
@@ -179,6 +179,15 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
         return p;
     };
     EXECUTE_FOR_EACH_PACKET(fnt, flow);
+
+    //Release FCB if we are now closing
+    TCPClosingState::Value closingState = fcb_in->common->closingState; //Read-only for fast path
+    if ((closingState == TCPClosingState::BEING_CLOSED_GRACEFUL_2 ||
+            closingState == TCPClosingState::CLOSED)) {
+            click_chatter("RELEASING FCB STATE");
+            inElement->releaseFCBState();
+    }
+
     output(0).push_batch(flow);
 }
 
@@ -277,42 +286,10 @@ bool TCPOut::checkConnectionClosed(Packet *packet)
 {
     auto fcb_in = inElement->fcb_data();
 
-    TCPClosingState::Value closingState = fcb_in->common->closingStates[getFlowDirection()];
+    TCPClosingState::Value closingState = fcb_in->common->closingState; //Read-only for fast path
 
-    // If the connection is open, we do nothing
-    if(closingState == TCPClosingState::OPEN)
-    {
-        fcb_in->common->lock.release();
-        return true;
-    }
+    return closingState == TCPClosingState::CLOSED;
 
-
-    fcb_in->common->lock.acquire();
-    closingState = fcb_in->common->closingStates[getFlowDirection()];
-
-    // If the connection is being closed and we have received the last packet, close it completely
-    if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL)
-    {
-        click_chatter("Connection is being closed gracefully");
-        if(isFin(packet))
-            fcb_in->common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_GRACEFUL;
-
-        fcb_in->common->lock.release();
-        return true;
-    }
-    else if(closingState == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
-    {
-        click_chatter("Connection is being closed ungracefully");
-        if(isRst(packet))
-            fcb_in->common->closingStates[getFlowDirection()] = TCPClosingState::CLOSED_UNGRACEFUL;
-
-        fcb_in->common->lock.release();
-        return true;
-    }
-
-    fcb_in->common->lock.release();
-    // Otherwise, the connection is closed and we will not transmit any further packet
-    return false;
 }
 
 void TCPOut::setFlowDirection(unsigned int flowDirection)

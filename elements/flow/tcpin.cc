@@ -100,19 +100,29 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
 void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 {
     // Assign the tcp_common structure if not already done
+#if DEBUG_TCP
     click_chatter("Fcb in : %p, Common : %p, Batch : %p", fcb_in, fcb_in->common,flow);
-
+#endif
     auto fnt = [this,fcb_in](Packet* p) -> Packet* {
         if(fcb_in->common == NULL)
         {
+eagain:
             if(!assignTCPCommon(p))
             {
+                if (isRst(p)) {
+                    //click_chatter("RST received");
+                    //First packet was a RST
+                    outElement->output_push_batch(0, PacketBatch::make_from_packet(p)); //Elements never knew about this flow, we bypass
+
+                    //TCPReorder will ensure the RST is alone, so we don't need to bother about dropping the rest of the batch, there is none
+                } else {
                 // The allocation failed, meaning that the packet is not a SYN
                 // packet. This is not supposed to happen and it means that
                 // the first two packets of the connection are not SYN packets
-                click_chatter("Warning: Trying to assign a common tcp memory area"
-                    " for a non-SYN packet or a non-matching tupple");
-                p->kill();
+                    click_chatter("Warning: Trying to assign a common tcp memory area"
+                        " for a non-SYN packet or a non-matching tupple");
+                    p->kill();
+                }
 
                 return NULL;
             }
@@ -120,7 +130,8 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
             //If not syn, drop the flow
             if(!isSyn(p)) { //TODO : move to top block?
                 WritablePacket* packet = p->uniqueify();
-                closeConnection(packet, false, true);
+                closeConnection(packet, false);
+//                click_chatter("Packet is not syn, closing connection");
                 packet->kill();
                 return NULL;
             }
@@ -139,15 +150,23 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
             // Check that the packet is not a SYN packet
             if(isSyn(p))
             {
-                click_chatter("Warning: Unexpected SYN packet. Dropping it");
-                p->kill();
-                return NULL;
+                if (fcb_in->common->closingState == TCPClosingState::CLOSED) {
+                    click_chatter("Renewing !");
+                    release_tcp(fcb_stack,this);
+                    fcb_in->common = 0;
+                    goto eagain;
+                } else {
+                    click_chatter("Warning: Unexpected SYN packet. Dropping it");
+                    p->kill();
+                    return NULL;
+                }
             }
         }
 
 
-        if(!checkConnectionClosed(p))
+        if(checkConnectionClosed(p))
         {
+            //click_chatter("Connection is already closed");
             p->kill();
             return NULL;
         }
@@ -318,7 +337,7 @@ TCPIn* TCPIn::getReturnElement()
 void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
     TCPIn* tin = static_cast<TCPIn*>(thunk);
     auto fcb_in = tin->fcb_data_for(fcb);
-
+    //click_chatter("Releasing TCP flow");
     //TODO : clean
     // Put back in the corresponding memory pool all the modification lists
     // in use (in the hashtable)
@@ -332,15 +351,17 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
     }
 
 */
-    auto common = fcb_in->common;
+    auto &common = fcb_in->common;
      common->lock.acquire();
     //The last one release common
     if (--common->use_count == 0) {
         common->lock.release();
+        //click_chatter("Ok, I'm releasing common ;)");
         common->~tcp_common();
         //lock->acquire();
-        //tin->tableTcpCommon->erase(flowID);
+        //tin->tableTcpCommon->erase(flowID); //TODO : consume if it was not taken by the other side
         tin->poolFcbTcpCommon.release(common);
+        fcb_in->common = 0;
         //lock->release();
     }
     else
@@ -348,12 +369,19 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
 
 }
 
+/**
+ * Remove timeout and release fct. Common is destroyed but
+ *  the FCB stays up until all packets are freed.
+ */
 void TCPIn::releaseFCBState() {
+    //click_chatter("TCP is closing, killing state");
     fcb_release_timeout();
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
+    assert(fcb_data()->common);
+    release_tcp(fcb_stack,this);
 }
 
-void TCPIn::closeConnection(Packet *packet, bool graceful, bool bothSides)
+void TCPIn::closeConnection(Packet *packet, bool graceful)
 {
     auto fcb_in = fcb_data();
     uint8_t newFlag = 0;
@@ -363,27 +391,25 @@ void TCPIn::closeConnection(Packet *packet, bool graceful, bool bothSides)
     else
         newFlag = TH_RST;
 
-    fcb_in->common->lock.acquire();
+
 
     click_tcp tcph = *packet->tcp_header();
 
     // Change the flags of the packet
     tcph.th_flags = tcph.th_flags | newFlag;
 
-    TCPClosingState::Value newStateSelf = TCPClosingState::BEING_CLOSED_GRACEFUL;
-    TCPClosingState::Value newStateOther = TCPClosingState::CLOSED_GRACEFUL;
+    TCPClosingState::Value newState;
 
+    fcb_in->common->lock.acquire();
     if(!graceful)
     {
-        newStateSelf = TCPClosingState::BEING_CLOSED_UNGRACEFUL;
-        newStateOther = TCPClosingState::CLOSED_UNGRACEFUL;
+        newState = TCPClosingState::CLOSED;
+    } else {
+        newState = TCPClosingState::BEING_CLOSED_GRACEFUL_1;
     }
-    fcb_in->common->closingStates[getFlowDirection()] = newStateSelf;
+    fcb_in->common->closingState = newState;
 
-    if(bothSides)
-    {
-        fcb_in->common->closingStates[getOppositeFlowDirection()] = newStateOther;
-
+    //Send FIN or RST to other side
         // Get the information needed to ack the given packet
         uint32_t saddr = getDestinationAddress(packet);
         uint32_t daddr = getSourceAddress(packet);
@@ -403,14 +429,16 @@ void TCPIn::closeConnection(Packet *packet, bool graceful, bool bothSides)
         // Craft and send the ack
         outElement->sendClosingPacket(fcb_in->common->maintainers[getOppositeFlowDirection()],
             saddr, daddr, sport, dport, seq, ack, graceful);
-    }
 
-    click_chatter("Closing connection on flow %u (graceful: %u, both sides: %u)",
-        getFlowDirection(), graceful, bothSides);
+    //click_chatter("Closing connection on flow %u (graceful: %u)",        getFlowDirection(), graceful);
 
     fcb_in->common->lock.release();
 
-    StackElement::closeConnection(packet, graceful, bothSides);
+    if (!graceful) { //This is the last time this side will see a packet, release
+        releaseFCBState();
+    }
+
+    StackElement::closeConnection(packet, graceful);
 }
 
 ModificationList* TCPIn::getModificationList(WritablePacket* packet)
@@ -556,24 +584,62 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
 {
     auto fcb_in = fcb_data();
 
-    TCPClosingState::Value closingState = fcb_in->common->closingStates[getFlowDirection()]; //Read-only access, no need to lock
-    if(closingState != TCPClosingState::OPEN)
-    {
-        if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL
-            || closingState == TCPClosingState::CLOSED_GRACEFUL)
-        {
-            // We ACK every packet and we discard it
-            if(isFin(packet) || isSyn(packet) || getPayloadLength(packet) > 0)
-            {
-                setInitialAck(packet, getAckNumber(packet));
-                ackPacket(packet);
-            }
-            //TODO : releaseFCBState();? If no TIMEWAIT
-        }
+    TCPClosingState::Value closingState = fcb_in->common->closingState; //Read-only access, no need to lock
 
+    //click_chatter("Connection state is %d", closingState);
+    // If the connection is open, we just check if the packet is a FIN. If it is we go to the hard sequence.
+    if (closingState == TCPClosingState::OPEN)
+    {
+        if (isFin(packet) || isRst(packet)) {
+            //click_chatter("Connection is closing, we received a FIN or RST in open state");
+            goto do_check;
+        }
+        return false; //Let the FIN through
+    }
+
+    do_check:
+    fcb_in->common->lock.acquire(); //Re read with lock if not in fast path
+    closingState = fcb_in->common->closingState;
+
+    if (isRst(packet)) {
+        fcb_in->common->closingState = TCPClosingState::CLOSED;
+        fcb_in->common->lock.release();
         return false;
     }
 
+    if(closingState == TCPClosingState::OPEN) {
+        //click_chatter("TCP is now closing with the first FIN");
+        fcb_in->common->closingState = TCPClosingState::BEING_CLOSED_GRACEFUL_1;
+        fcb_in->common->lock.release();
+        return false; //Let the FIN through. We cannot release now as there is an ACK that needs to come
+    // If the connection is being closed and we have received the last packet, close it completely
+    } else if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL_1)
+    {
+        if(isFin(packet)) {
+            //click_chatter("Connection is being closed gracefully, this is the second FIN");
+            fcb_in->common->closingState = TCPClosingState::BEING_CLOSED_GRACEFUL_2;
+        }
+        fcb_in->common->lock.release();
+        return false; //Let the packet through anyway
+    }
+    else if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL_2)
+    {
+        //click_chatter("Connection is being closed gracefully, this is the last ACK");
+        fcb_in->common->closingState = TCPClosingState::CLOSED;
+        fcb_in->common->lock.release();
+        return false; //We need the out element to eventually correct the ACK number
+    }
+/*    else if(closingState == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
+    {
+        if(isRst(packet)) { //RST to a RST, should not happen but handle anyway
+            click_chatter("Connection is being closed ungracefully, due to one of our RST on the other side");
+            fcb_in->common->closingState = TCPClosingState::CLOSED;
+            fcb_in->common->lock.release();
+            return false; //Let the RST go through so next elements can fast-clean
+        }
+    }*/
+
+    fcb_in->common->lock.release();
     return true;
 }
 
@@ -591,26 +657,31 @@ bool TCPIn::assignTCPCommon(Packet *packet)
     uint8_t flags = tcph->th_flags;
     const click_ip *iph = packet->ip_header();
 
-    // Check if we are in the first two steps of the three-way handshake
-    // (SYN packet)
-    if(!(flags & TH_SYN))
-        return false;
-
     // The data in the flow will start at current sequence number
     uint32_t flowStart = getSequenceNumber(packet);
 
     // Check if we are the side initiating the connection or not
     // (if ACK flag, we are not the initiator)
-    if(flags & TH_ACK)
+    if(((flags & TH_ACK && flags & TH_SYN)) || flags & TH_RST)
     {
+        //click_chatter("SynAck or RST"); //For both we need the matching connection, for RST to close it if any
+
         // Get the flow ID for the opposite side of the connection
         IPFlowID flowID(iph->ip_dst, tcph->th_dport, iph->ip_src, tcph->th_sport);
 
-        // Get the struct allocated by the initiator
+        // Get the struct allocated by the initiator, and remove it if found
         fcb_in->common = returnElement->getTCPCommon(flowID);
 
-        if (fcb_in->common == 0)
+        if (fcb_in->common == 0) //No matching connection
             return false;
+
+        if (flags & TH_RST) {
+            fcb_in->common->closingState = TCPClosingState::CLOSED;
+            fcb_in->common = 0;
+            //We have no choice here but to rely on the other side timing out, this is better than traversing the tree of the other side. When waking up,
+            //it will see that the state is being closed ungracefull and need to cleans
+            return false; //Note that RST will be catched on return and will still go through, as the dest needs to know the flow is rst
+        }
 
         fcb_in->common->use_count++;
 
@@ -618,10 +689,15 @@ bool TCPIn::assignTCPCommon(Packet *packet)
             // Initialize the RBT with the RBTManager
             fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
         }
-        click_chatter("RE Common is %p",fcb_in->common);
+        //click_chatter("RE Common is %p",fcb_in->common);
     }
     else
     {
+        if(!(flags & TH_SYN)) {//First packet, not rst and not syn... Discard
+            //click_chatter("Not syn !");
+            return false;
+        }
+
         IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
         // We are the initiator, so we need to allocate memory
         struct tcp_common *allocated = poolFcbTcpCommon.allocate();
@@ -641,7 +717,7 @@ bool TCPIn::assignTCPCommon(Packet *packet)
         // of the common structure
         //fcb_in->flowID = flowID;
 
-        click_chatter("AL Common is %p",fcb_in->common);
+        //click_chatter("AL Common is %p",fcb_in->common);
     }
 
     fcb_acquire_timeout(TCP_TIMEOUT);
@@ -663,7 +739,6 @@ bool TCPIn::isLastUsefulPacket(Packet *packet)
     else
         return false;
 }
-
 
 struct tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
@@ -706,7 +781,7 @@ void TCPIn::manageOptions(WritablePacket *packet)
             for(int i = 0; i < TCPOLEN_SACK_PERMITTED; ++i)
                 optStart[i] = TCPOPT_NOP; // Replace the option with NOP
 
-            click_chatter("SACK Permitted removed from options");
+            //click_chatter("SACK Permitted removed from options");
 
             optStart += optStart[1];
         }
@@ -721,7 +796,7 @@ void TCPIn::manageOptions(WritablePacket *packet)
                 fcb_in->common->maintainers[flowDirection].setWindowScale(winScale);
                 fcb_in->common->maintainers[flowDirection].setUseWindowScale(true);
 
-                click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
+                //click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
 
                 if(isAck(packet))
                 {
@@ -732,7 +807,7 @@ void TCPIn::manageOptions(WritablePacket *packet)
                     if(!fcb_in->common->maintainers[getOppositeFlowDirection()].getUseWindowScale())
                     {
                         fcb_in->common->maintainers[flowDirection].setUseWindowScale(false);
-                        click_chatter("Window scaling disabled");
+                        //click_chatter("Window scaling disabled");
                     }
                 }
             }
@@ -745,7 +820,7 @@ void TCPIn::manageOptions(WritablePacket *packet)
                 uint16_t mss = (optStart[2] << 8) | optStart[3];
                 fcb_in->common->maintainers[flowDirection].setMSS(mss);
 
-                click_chatter("MSS for flow %u: %u", flowDirection, mss);
+                //click_chatter("MSS for flow %u: %u", flowDirection, mss);
                 fcb_in->common->maintainers[flowDirection].setCongestionWindowSize(mss);
             }
 

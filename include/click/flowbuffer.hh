@@ -134,6 +134,9 @@ public:
      * @brief Ensure a flow buffer is initialized and enqueue all packets
      */
     void enqueueAll(PacketBatch* batch);
+
+
+    FlowBufferContentIter enqueueAllIter(PacketBatch* batch);
 private:
     inline bool isInitialized() {
         return head != 0;
@@ -235,7 +238,7 @@ public:
     FlowBufferContentIter& operator++();
 
     inline operator bool() const {
-        return entry;
+        return entry != 0;
     }
 
     /**
