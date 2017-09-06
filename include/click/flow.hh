@@ -182,7 +182,10 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                                 child_ptr->set_data(data);
                                 flow_assert(parent->find(data)->ptr == child_ptr->ptr);
                             } else {
-                                child_ptr->set_node(parent->default_ptr()->node->duplicate(false, 0));
+                                flow_assert(parent->default_ptr()->node->getNum() == 0);
+                                FlowNode* newNode = parent->level()->create_better_node(parent->default_ptr()->node);
+                                *newNode->default_ptr() = *parent->default_ptr()->node->default_ptr();
+                                child_ptr->set_node(newNode);
         #if DEBUG_CLASSIFIER_MATCH > 1
                                 click_chatter("DUPLICATE node, new is %p",child_ptr->node);
         #endif
