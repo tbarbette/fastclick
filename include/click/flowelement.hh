@@ -74,7 +74,7 @@ public:
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         click_chatter("Acquiring timeout of %p to %d, flag %d",this,nmsec,fcb_stack->flags);
 #endif
-        fcb_stack->flags = (nmsec << FLOW_TIMEOUT_SHIFT) | FLOW_TIMEOUT;
+        fcb_stack->flags = (nmsec << FLOW_TIMEOUT_SHIFT) | FLOW_TIMEOUT | ((fcb_stack->flags & FLOW_TIMEOUT_INLIST) ? FLOW_TIMEOUT_INLIST : 0);
     }
 
     inline void fcb_release_timeout() {
@@ -121,18 +121,20 @@ public:
             click_chatter("Release removed to %p",fcb_stack->release_fnt);
 #endif
         } else {
-#if DEBUG_CLASSIFIER_RELEASE
-#endif
-            click_chatter("Unordered release remove, it was %p and not %p",fcb_stack->release_fnt,fnt);
-
-            assert(false);
-            /*SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
+            SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
             VirtualFlowSpaceElement* fe;
+            FlowReleaseChain* frc;
             do {
                 fe = static_cast<VirtualFlowSpaceElement*>(fcb_chain->previous_thunk);
-                chain_fnt = static_cast<FlowReleaseChain*>(fcb_stack->data[fe->_flow_data_offset])->previous_fnt;
+                frc = reinterpret_cast<FlowReleaseChain*>(&fcb_stack->data[fe->_flow_data_offset]);
+                chain_fnt = frc->previous_fnt;
+                if (chain_fnt == 0) {
+                    click_chatter("BAD ERROR : Trying to remove a timeout flow function that is not set...");
+                    return;
+                }
             } while (chain_fnt != fnt);
-            */
+            frc->previous_fnt = fcb_chain->previous_fnt;
+            frc->previous_thunk = fcb_chain->previous_thunk;
         }
     }
 #else

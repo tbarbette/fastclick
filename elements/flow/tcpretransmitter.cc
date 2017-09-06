@@ -49,13 +49,18 @@ int TCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
     for(unsigned int i = 0; i < rawBufferPool.weight(); ++i)
         rawBufferPool.get_value(i) = new BufferPool(TCPRETRANSMITTER_BUFFER_NUMBER, initialBufferSize);
 
+    ElementCastTracker visitor(router(), "TCPIn");
+    router()->visit_upstream(this,0,&visitor);
+    if (visitor.size() != 1) {
+        return errh->error("Could not find TCPIn element !");
+    } else {
+        _in = static_cast<TCPIn*>(visitor[0]);
+    }
     return 0;
 }
 
 
 int TCPRetransmitter::initialize(ErrorHandler *errh) {
-    if (!_in)
-        return errh->error("Could not find TCPIn element !");
     return 0;
 }
 
