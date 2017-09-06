@@ -184,6 +184,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                             } else {
                                 flow_assert(parent->default_ptr()->node->getNum() == 0);
                                 FlowNode* newNode = parent->level()->create_better_node(parent->default_ptr()->node);
+                                newNode->_level = parent->level();
                                 *newNode->default_ptr() = *parent->default_ptr()->node->default_ptr();
                                 child_ptr->set_node(newNode);
         #if DEBUG_CLASSIFIER_MATCH > 1

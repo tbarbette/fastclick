@@ -142,12 +142,11 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
             tcpreorder->packetList = packet;
         }
         else
+        {
             putPacketInList(tcpreorder, packet); // Put the packet directly at the right position O(n + k)
+        }
     }
-    if (num == 0) {
-        assert(tcpreorder->packetListLength == 0);
-        assert(tcpreorder->packetList == 0);
-    }
+
 
     tcpreorder->packetListLength += num;
     if(_mergeSort)
