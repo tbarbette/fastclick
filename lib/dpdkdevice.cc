@@ -29,6 +29,15 @@ DPDKDevice::DPDKDevice() : port_id(-1), info() {
 DPDKDevice::DPDKDevice(unsigned port_id) : port_id(port_id) {
 };
 
+uint16_t DPDKDevice::get_device_vendor_id()
+{
+    return info.vendor_id;
+}
+
+const char *DPDKDevice::get_device_driver()
+{
+    return info.driver;
+}
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
@@ -147,6 +156,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_IP;
+
+    // Obtain general device information
+    info.vendor_id = dev_info.pci_dev->id.vendor_id;
+    info.driver = dev_info.driver_name; // also in dev_info.pci_dev->driver->driver.name;
+
+    click_chatter("Vendor ID: %x - Driver: %s", info.vendor_id, info.driver);
 
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {

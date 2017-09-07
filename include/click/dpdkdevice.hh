@@ -58,6 +58,10 @@ public:
 
     unsigned int get_nb_txdesc();
 
+    uint16_t get_device_vendor_id();
+
+    const char *get_device_driver();
+
     static struct rte_mempool *get_mpool(unsigned int);
 
     static int get_port_numa_node(unsigned port_id);
@@ -112,12 +116,15 @@ private:
 
     struct DevInfo {
         inline DevInfo() :
+            vendor_id(PCI_ANY_ID), driver(0),
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
             n_tx_descs(0), mac() {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
 
+        uint16_t vendor_id;
+        const char *driver;
         Vector<bool> rx_queues;
         Vector<bool> tx_queues;
         bool promisc;
