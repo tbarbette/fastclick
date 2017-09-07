@@ -161,8 +161,6 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     info.vendor_id = dev_info.pci_dev->id.vendor_id;
     info.driver = dev_info.driver_name; // also in dev_info.pci_dev->driver->driver.name;
 
-    click_chatter("Vendor ID: %x - Driver: %s", info.vendor_id, info.driver);
-
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
         info.rx_queues.resize(1);
