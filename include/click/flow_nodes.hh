@@ -189,7 +189,7 @@ protected:
                 if ( _default.is_node()) {
                     _default.set_node(node->_default.node->duplicate(recursive, use_count));
                 } else {
-                    _default.set_leaf(_default.leaf->duplicate(1));
+                    _default.set_leaf(_default.leaf->duplicate(use_count));
                 }
                 _default.set_parent(this);
             }
@@ -631,24 +631,23 @@ public:
 
 };
 /**
- * Flow level for any offset/mask of 8 bits
+ * Flow level for any offset/mask of T bits
  */
-class FlowLevelGeneric8 : public FlowLevelOffset {
+template <typename T>
+class FlowLevelGeneric : public FlowLevelOffset {
 private:
-
-
-    uint8_t _mask;
+    T _mask;
 public:
 
-    FlowLevelGeneric8(uint8_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
+    FlowLevelGeneric(T mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
         _get_data = &get_data_ptr;
     }
-    FLOW_LEVEL_DEFINE(FlowLevelGeneric8,get_data);
+    FLOW_LEVEL_DEFINE(FlowLevelGeneric<T>,get_data);
 
-    FlowLevelGeneric8() : FlowLevelGeneric8(0,0) {
+    FlowLevelGeneric() : FlowLevelGeneric(0,0) {
 
     }
-    void set_match(int offset, uint8_t mask) {
+    void set_match(int offset, T mask) {
         _mask = mask;
         _offset = offset;
     }
@@ -662,150 +661,27 @@ public:
     }
 
     inline FlowNodeData get_data(Packet* packet) {
-        return (FlowNodeData){.data_8 = (uint8_t)(*(packet->data() + _offset) & _mask)};
+        return FlowNodeData((T)(*((T*)(packet->data() + _offset)) & _mask));
     }
 
     String print() {
-        return String(_offset) + "/" + String((uint32_t)_mask) ;
+        return String(_offset) + "/" + String((unsigned long long)_mask) ;
     }
 
 
     FlowLevel* duplicate() override {
-        return (new FlowLevelGeneric8(_mask,_offset))->assign(this);
+        return (new FlowLevelGeneric<T>(_mask,_offset))->assign(this);
+    }
+
+    bool equals(FlowLevel* level) {
+        return ((FlowLevelOffset::equals(level)) && (_mask == dynamic_cast<FlowLevelGeneric<T>*>(level)->_mask));
     }
 };
 
-/**
- * Flow level for any offset/mask of 16 bits
- */
-class FlowLevelGeneric16 : public FlowLevelOffset {
-private:
-    uint16_t _mask;
-public:
-    FlowLevelGeneric16(uint16_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
-        _get_data = &get_data_ptr;
-    }
-    FLOW_LEVEL_DEFINE(FlowLevelGeneric16,get_data);
-    FlowLevelGeneric16() : FlowLevelGeneric16(0,0) {
-
-    }
-
-    void set_match(int offset, uint16_t mask) {
-        _mask = htons(mask);
-        _offset = offset;
-    }
-
-    uint16_t mask() const {
-        return _mask;
-    }
-
-    inline long unsigned get_max_value() {
-        return _mask;
-    }
-
-    inline FlowNodeData get_data(Packet* packet) {
-        FlowNodeData data;
-        data.data_16 = (uint16_t)(*((uint16_t*)(packet->data() + _offset)) & _mask);
-        return data;
-    }
-
-    String print() {
-        return String(_offset) + "/" + String(_mask) ;
-    }
-
-    FlowLevel* duplicate() override {
-        return (new FlowLevelGeneric16(_mask,_offset))->assign(this);
-    }
-};
-
-/**
- * Flow level for any offset/mask of 32 bits
- */
-class FlowLevelGeneric32 : public FlowLevelOffset {
-private:
-    uint32_t _mask;
-public:
-
-
-    FlowLevelGeneric32(uint32_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
-        _get_data = &get_data_ptr;
-    }
-    FLOW_LEVEL_DEFINE(FlowLevelGeneric32,get_data);
-
-    FlowLevelGeneric32() : FlowLevelGeneric32(0,0) {
-
-    }
-    void set_match(int offset, uint32_t mask) {
-        _mask = htonl(mask);
-        _offset = offset;
-    }
-
-    uint32_t mask() const {
-        return _mask;
-    }
-
-    inline long unsigned get_max_value() {
-        return _mask;
-    }
-
-    inline FlowNodeData get_data(Packet* packet) {
-        FlowNodeData data;
-        data.data_32 = (uint32_t)(*((uint32_t*) (packet->data() + _offset)) & _mask);
-        return data;
-    }
-
-    String print() {
-        return String(_offset) + "/" + String(_mask) ;
-    }
-
-    FlowLevel* duplicate() override {
-        return (new FlowLevelGeneric32(_mask,_offset))->assign(this);
-    }
-};
-
-/**
- * FlowLevel for any offset/mask of 64bits
- */
-class FlowLevelGeneric64 : public FlowLevelOffset {
-    uint64_t _mask;
-public:
-
-    FlowLevelGeneric64(uint64_t mask, int offset) : _mask(mask), FlowLevelOffset(offset) {
-        _get_data = &get_data_ptr;
-    }
-    FLOW_LEVEL_DEFINE(FlowLevelGeneric64,get_data);
-
-    FlowLevelGeneric64() : _mask(0) {
-        _islong = true;
-    }
-
-    void set_match(int offset, uint64_t mask) {
-        _mask = __bswap_64(mask);
-        _offset = offset;
-    }
-
-    uint64_t mask() const {
-        return _mask;
-    }
-
-    inline long unsigned get_max_value() {
-        return _mask;
-    }
-
-    inline FlowNodeData get_data(Packet* packet) {
-        FlowNodeData data;
-        data.data_64 = (uint64_t)(*((uint64_t*) (packet->data() + _offset)) & _mask);
-        return data;
-    }
-
-    String print() {
-        return String(_offset) + "/" + String(_mask) ;
-    }
-
-    FlowLevel* duplicate() override {
-        return (new FlowLevelGeneric64(_mask,_offset))->assign(this);
-    }
-};
+using FlowLevelGeneric8 = FlowLevelGeneric<uint8_t>;
+using FlowLevelGeneric16 = FlowLevelGeneric<uint16_t>;
+using FlowLevelGeneric32 = FlowLevelGeneric<uint32_t>;
+using FlowLevelGeneric64 = FlowLevelGeneric<uint64_t>;
 
 /**
  * Node implemented using a linkedlist

@@ -142,6 +142,12 @@ public:
     }
 #endif
 
+
+    virtual PacketBatch* pull_batch(int port, unsigned max) override final {
+        click_chatter("ERROR : Flow Elements do not support pull");
+        return 0;
+    }
+
 protected:
 	int _flow_data_offset;
 	friend class FlowBufferVisitor;
@@ -179,19 +185,80 @@ public :
 	void push_batch(int port,PacketBatch* head) final {
 			push_batch(port, fcb_data(), head);
 	};
-
-	virtual PacketBatch* pull_batch(int port) final {
-		click_chatter("ERROR : Flow Elements do not support pull");
-		return 0;
-	}
-
 	virtual void push_batch(int port, T* flowdata, PacketBatch* head) = 0;
 
+};
 
+/**
+ * FlowStateElement is like FlowSpaceElement but handle a timeout and a release functions
+ *
+ * The child must implement :
+ * static const int timeout; //Timeout in msec for a flow
+ * bool new_flow(T*, Packet*);
+ * void push_batch(int port, T*, Packet*);
+ * void release_flow(T*);
+ *
+ * close_flow() can be called to release the flow now, remove timer etc It will not call your release_flow();.
+ */
+template<class Derived, typename T> class FlowStateElement : public VirtualFlowSpaceElement {
+    struct AT : public FlowReleaseChain {
+        T v;
+        bool seen;
+    };
+public :
 
+    FlowStateElement() CLICK_COLD;
+    virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+    virtual const size_t flow_data_size()  const { return sizeof(AT); }
 
+    /**
+     * Return the T type for a given FCB
+     */
+    inline T* fcb_data_for(FlowControlBlock* fcb) {
+        AT* flowdata = static_cast<AT*>((void*)&fcb->data[_flow_data_offset]);
+        return &flowdata->v;
+    }
+
+    /**
+     * Return the T type in the current FCB on the stack
+     */
+    inline T* fcb_data() {
+        return fcb_data_for(fcb_stack);
+    }
+
+    static void release_fnt(FlowControlBlock* fcb, void* thunk ) {
+        Derived* derived = static_cast<Derived*>(thunk);
+        AT* my_fcb = reinterpret_cast<AT*>(&fcb->data[derived->_flow_data_offset]);
+        derived->release_flow(&my_fcb->v);
+        if (my_fcb->previous_fnt)
+            my_fcb->previous_fnt(fcb, my_fcb->previous_thunk);
+    }
+
+    void push_batch(int port,PacketBatch* head) final {
+         auto my_fcb = my_fcb_data();
+         if (!my_fcb->seen) {
+             if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
+                 my_fcb->seen = true;
+                 this->fcb_acquire_timeout(Derived::timeout);
+                 this->fcb_set_release_fnt(my_fcb, &release_fnt);
+             }
+         }
+         static_cast<Derived*>(this)->push_batch(port, &my_fcb->v, head);
+    };
+
+    void close_flow() {
+        this->fcb_release_timeout();
+        this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);
+    }
+
+private:
+    inline AT* my_fcb_data() {
+        return static_cast<AT*>((void*)&fcb_stack->data[_flow_data_offset]);
+    }
 
 };
+
+
 
 template<typename T, int index> class FlowSharedBufferElement : public FlowSpaceElement<T> {
 
@@ -249,6 +316,10 @@ public:
 };
 
 
+/**
+ * FlowSpaceElement
+ */
+
 template<typename T>
 FlowSpaceElement<T>::FlowSpaceElement() : VirtualFlowSpaceElement() {
 }
@@ -268,9 +339,24 @@ void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data)
         fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] = 0xff;
     }
     *((T*)(&fcb->data[_flow_data_offset])) = data;
-
 }
 
+/**
+ * FlowSpaceElement
+ */
+
+template<class Derived, typename T>
+FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
+}
+
+
+template<class Derived, typename T>
+int FlowStateElement<Derived, T>::initialize(ErrorHandler *errh) {
+    if (_flow_data_offset == -1) {
+        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+    }
+    return 0;
+}
 
 /**
  * Macro to define context

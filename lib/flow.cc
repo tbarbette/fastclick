@@ -58,6 +58,24 @@ void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void*
 	_classifier_thunk = thunk;
 }
 
+FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress dst, IPAddress mask) {
+    FlowLevelGeneric32* fl = new FlowLevelGeneric32();
+    fl->set_match(offsetof(click_ip,ip_dst),mask.addr());
+    FlowNodeDefinition* node = new FlowNodeDefinition();
+    node->_level = fl;
+    node->_parent = 0;
+    FlowControlBlock* fcb = FCBPool::init_allocate();
+    FlowNodeData ip = FlowNodeData(dst.addr());
+    FlowNodePtr* parent_ptr = node->find(ip);
+    parent_ptr->set_leaf(fcb);
+    parent_ptr->set_data(ip);
+    parent_ptr->leaf->parent = node;
+    parent_ptr->leaf->acquire(1);
+    node->inc_num();
+    return Rule{.root=node};
+
+}
+
 FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verbose) {
     std::regex reg("((?:(?:(?:agg|thread|(?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?))(?:[:]HASH-[0-9]+)?[!]? ?)+)|-)( keep)?( [0-9]+| drop)?",
              std::regex_constants::icase);
@@ -76,7 +94,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
     std::string stdstr = std::string(s.c_str());
 
     if (std::regex_match(stdstr, result, reg)){
-        FlowNodeData lastvalue = (FlowNodeData){.data_64 = 0};
+        FlowNodeData lastvalue = FlowNodeData((uint64_t)0);
 
         std::string classs = result.str(1);
         std::string keep = result.str(2);
@@ -356,6 +374,8 @@ void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_
                     parent->default_ptr()->set_data(data);
                 } else {
                     parent->default_ptr()->leaf->combine_data(other.leaf->data);
+                    if (parent->default_ptr()->leaf->is_early_drop() && !other.leaf->is_early_drop())
+                        parent->default_ptr()->leaf->set_early_drop(false);
                 }
             }
             return true;
@@ -394,7 +414,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 	assert(other->parent() == 0);
 
 	if (dynamic_cast<FlowLevelDummy*>(this->level()) != 0) {
-	        debug_flow("COMBINE : I am dummy")
+	        debug_flow("COMBINE (as child : %d, default is leaf : %d) : I am dummy",as_child,_default.is_leaf());
 	        if (_default.is_leaf()) {
 	            other->leaf_combine_data(_default.leaf, as_child, !as_child && priority);
 	            //TODO delete this;
@@ -414,15 +434,18 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 	    if (other->_default.is_leaf()) {
 	        debug_flow("COMBINE : Other is a leaf (as child %d):",as_child)
 	        //other->_default.leaf->print("");
-	        if (as_child) {
+	        if (as_child) { //Combine a leaf as child of all our leaf
 	            this->leaf_combine_data(other->_default.leaf, true, true);
-
-	        } else {
+	        } else { //Combine a leaf as "else" of all our default routes
 	            /*
-	             * Duplicate the leaf for all default routes
+	             * Duplicate the leaf for all null default routes and ED routes if priority is false (and as_child is false)
 	             */
-                auto fnt = [other](FlowNode* parent) -> bool {
+                auto fnt = [other,priority](FlowNode* parent) -> bool {
                     if (parent->default_ptr()->ptr == 0) {
+                        parent->default_ptr()->set_leaf(other->_default.leaf->duplicate(1));
+                        parent->default_ptr()->set_parent(parent);
+                    } else if (!priority && parent->default_ptr()->leaf->is_early_drop()) {
+                        FCBPool::init_release(parent->default_ptr()->leaf);
                         parent->default_ptr()->set_leaf(other->_default.leaf->duplicate(1));
                         parent->default_ptr()->set_parent(parent);
                     }
@@ -717,7 +740,8 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
     debug_flow("Pruned other default :");
     Vpruned_default.print();
     debug_flow("my default:");
-    this->default_ptr()->print();
+    if (this->default_ptr()->ptr != 0)
+        this->default_ptr()->print();
 #endif
     this->default_ptr()->default_combine(this, &Vpruned_default, false, priority);
     //TODO : delete other
@@ -746,8 +770,11 @@ void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child
             if (!priority) {
                 this->leaf->release();
                 this->leaf = other->leaf;
-            } else
+            } else {
                 this->leaf->combine_data(other->leaf->data);
+                if (this->leaf->is_early_drop() && !other->leaf->is_early_drop())
+                    this->leaf->set_early_drop(false);
+            }
         } else if (this->is_node()) { //Our default is a node, other is a leaf or a node
             this->node_combine_ptr(p, *other, as_child, priority);
         } else { //other default is node, our is leaf
@@ -781,6 +808,10 @@ void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
  * if inverted, it means the level will NOT be data
  */
 FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed)  {
+    if (dynamic_cast<FlowLevelDummy*>(level) != 0) {
+        changed = false;
+        return FlowNodePtr(this);
+    }
     if (level->is_dynamic()) {
 #if DEBUG_CLASSIFIER
         click_chatter("Not pruning a dynamic level");
@@ -853,6 +884,8 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
 void FlowNode::leaf_combine_data(FlowControlBlock* leaf, bool do_final, bool do_default) {
     traverse_all_leaves([leaf](FlowNodePtr* ptr) -> bool {
         ptr->leaf->combine_data(leaf->data);
+        if (ptr->leaf->is_early_drop() && !leaf->is_early_drop())
+            ptr->leaf->set_early_drop(false);
         return true;
     }, do_final, do_default);
 }
@@ -866,8 +899,11 @@ void FlowNode::leaf_combine_data_create(FlowControlBlock* leaf, bool do_final, b
             ptr->set_leaf(leaf->duplicate(1));
             ptr->set_parent(parent);
         } else {
-            if (!discard_my_fcb_data)
+            if (!discard_my_fcb_data) {
                 ptr->leaf->combine_data(leaf->data);
+                if (ptr->leaf->is_early_drop() && !leaf->is_early_drop())
+                    ptr->leaf->set_early_drop(false);
+            }
         }
         return true;
     }, do_final, do_default);
@@ -922,14 +958,20 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
     set_data(old_data);
     set_parent(old_parent);
 
-    debug_flow("Pruned other : ");
 #if DEBUG_CLASSIFIER
-    no.print();
+    if (changed) {
+        debug_flow("Pruned other : ");
+        no.print();
+    } else {
+        debug_flow("Pruning did not change the node.");
+    }
 #endif
     //Combine FCB data
     if (!discard) {
         if (is_leaf()) {
             leaf->combine_data(old_leaf->data);
+            if (leaf->is_early_drop() && !old_leaf->is_early_drop())
+                leaf->set_early_drop(false);
         } else {
             node->leaf_combine_data(old_leaf,true,true); //We do all here as the downward must be completely updated with our data
         }
@@ -1162,7 +1204,7 @@ bool FlowControlBlock::empty() {
 }
 
 void FlowControlBlock::print(String prefix, int data_offset, bool show_ptr) const {
-	char data_str[64];
+	char data_str[(get_pool()->data_size()*2)+1];
 	int j = 0;
 
 	if (data_offset == -1) {
@@ -1268,7 +1310,13 @@ FCBPool::init_allocate() {
        initfcb->initialize();
        bzero(initfcb->data, (init_data_size() * 2));
        return initfcb;
+}
+
+void
+FCBPool::init_release(FlowControlBlock* fcb) {
+       CLICK_LFREE(fcb,sizeof(FlowControlBlock) + (init_data_size() * 2));
    }
+
 
 
 FCBPool* FCBPool::biggest_pool = 0;

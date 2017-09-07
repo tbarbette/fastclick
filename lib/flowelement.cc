@@ -45,14 +45,29 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 			e->router()->please_stop_driver();
 			return 0;
 		}
-		//click_chatter("%p{element} %d",v.dispatchers[i].elem,v.dispatchers[i].iport);
+		//
+		FlowNode* child_table = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
+#if DEBUG_CLASSIFIER
+		click_chatter("Traversal merging of %p{element} [%d] : ",v.dispatchers[i].elem,v.dispatchers[i].iport);
+		if (child_table) {
+		    child_table->print();
+		} else {
+		    click_chatter("--> No table !");
+		}
+		if (merged) {
+		    click_chatter("With :");
+		    merged->print();
+		} else {
+		    click_chatter("With NONE");
+		}
+#endif
 		if (merged)
-			merged = merged->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport), false, false);
+			merged = merged->combine(child_table, false, false);
 		else
-			merged = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
+			merged = child_table;
 		if (merged) {
 #if DEBUG_CLASSIFIER
-		    click_chatter("Merged traversal with %p{element}",v.dispatchers[i].elem);
+		    click_chatter("Merged traversal[%d] with %p{element}",i,v.dispatchers[i].elem);
 #endif
 		    merged->debug_print();
 		    merged->check();

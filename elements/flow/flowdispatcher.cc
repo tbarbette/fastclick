@@ -208,10 +208,10 @@ FlowNode* FlowDispatcher::get_table(int) {
         };
         merged->check();
 
-		if (_verbose) {
-			click_chatter("Table for %s after merging children:",name().c_str());
-			merged->print(_flow_data_offset);
-		}
+        if (_verbose) {
+            click_chatter("Table for %s after merging children:",name().c_str());
+            merged->print(_flow_data_offset);
+        }
 #if DEBUG_CLASSIFIER
 		//This is exponential
         //Check that there is no multiple classification on the same node

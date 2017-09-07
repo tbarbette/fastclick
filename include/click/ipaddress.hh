@@ -440,6 +440,22 @@ class IPPair {
    }
 };
 
+class IPPort {
+public:
+    IPAddress ip;
+    uint16_t port;
+    IPPort(IPAddress addr, uint16_t port) : ip(addr), port(port) {
+
+    }
+    inline hashcode_t hashcode() const {
+       return CLICK_NAME(hashcode)(ip) + CLICK_NAME(hashcode)(port);
+   }
+
+   inline bool operator==(IPPort other) const {
+       return (other.ip == ip && other.port == port);
+   }
+};
+
 
 CLICK_ENDDECLS
 #endif

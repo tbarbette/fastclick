@@ -33,13 +33,19 @@ class FlowControlBlock;
 class FCBPool;
 class FlowNode;
 
-typedef union {
+union FlowNodeData{
 	uint8_t data_8;
 	uint16_t data_16;
 	uint32_t data_32;
 	uint64_t data_64;
 	void* data_ptr;
-} FlowNodeData;
+
+	FlowNodeData() : data_64(0) {};
+	FlowNodeData(uint8_t d) : data_8(d) {};
+	FlowNodeData(uint16_t d) : data_16(d) {};
+	FlowNodeData(uint32_t d) : data_32(d) {};
+	FlowNodeData(uint64_t d) : data_64(d) {};
+};
 
 typedef void (*SubFlowRealeaseFnt)(FlowControlBlock* fcb, void* thunk);
 struct FlowReleaseChain {
@@ -80,8 +86,11 @@ private:
         #define FLOW_EARLY_DROP     0x20
         uint32_t flags;
 
-        inline void set_early_drop() {
-            flags |= FLOW_EARLY_DROP;
+        inline void set_early_drop(bool set=true) {
+            if (set)
+                flags |= FLOW_EARLY_DROP;
+            else
+                flags &= ~FLOW_EARLY_DROP;
         }
 
         inline bool is_early_drop() const {
@@ -213,6 +222,7 @@ public:
     }
 
     static FlowControlBlock* init_allocate();
+    static void init_release(FlowControlBlock*);
 
 	FCBPool() : _data_size(0), lists() {
 	}

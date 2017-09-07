@@ -27,13 +27,14 @@ public:
 
 private :
 
-    Vector<FlowClassificationTable::Rule> rules;
 
     FlowNode* _table;
 
     bool _verbose;
     bool attach_children(FlowNodePtr* ptr, int output, bool append_drop);
 protected:
+
+    Vector<FlowClassificationTable::Rule> rules;
     bool _children_merge;
 };
 

@@ -48,6 +48,7 @@ public:
     static Rule make_drop_rule() {
         return parse("- drop");
     }
+    static Rule make_ip_mask(IPAddress dst, IPAddress mask);
 protected:
     FlowNode* _root;
 };
@@ -98,7 +99,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
     always_dup = false;
     FlowNode* parent = _root;
     FlowNodePtr* child_ptr = 0;
-#if DEBUG_CLASSIFIER
+#if DEBUG_CLASSIFIER_MATCH > 1
     int level_nr = 0;
 #endif
     do {
