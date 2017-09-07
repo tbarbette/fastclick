@@ -15,7 +15,7 @@ CLICK_DECLS
 
 #define DEBUG_NAT 0
 
-#define NAT_FLOW_TIMEOUT 60 * 1000
+
 
 FlowIPNAT::FlowIPNAT() : _sip(){
 
@@ -38,22 +38,34 @@ FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int FlowIPNAT::initialize(ErrorHandler *errh) {
-    Bitvector touching = get_passing_threads();
 
-    /*NATReverse takes care of telling that it will touch our hashtable
+    /*
+     * Get "touching" threads. That is threads passing by us and touching
+     * our state.
+     * NATReverse takes care of telling that it will touch our hashtable
      * therefore touching is actually the passing threads for both directions
      */
+    Bitvector touching = get_passing_threads();
 
+    /**
+     * If only one thread touch this element, disable MT-safeness.
+     */
     if (touching.weight() <= 1) {
         _map.disable_mt();
     }
 
+    /**
+     * Get passing threads, that is the threads that will call push_batch
+     */
     Bitvector passing = get_passing_threads(false);
     if (passing.weight() == 0) {
         return errh->warning("No thread passing by, element will not work if it's not indeed idle");
     }
 
-    int total_ports = 65536 - 1024;
+    /**
+     * Now allocate ports for each thread
+     */
+    int total_ports = 65535 - 1024;
     int ports_per_thread = total_ports / passing.weight();
     int n = 0;
     for (int i = 0; i < passing.size(); i++) {
@@ -64,29 +76,52 @@ int FlowIPNAT::initialize(ErrorHandler *errh) {
         int max_port = min_port + ports_per_thread;
         s.available_ports.resize(ports_per_thread);
         for (int port = min_port; port < max_port; port++) {
-            s.available_ports.push_back(port);
+            s.available_ports.push_back(new PortRef(port));
         }
         n++;
     }
     return 0;
 }
 
-void FlowIPNAT::push_batch(int port, uint16_t* flowdata, PacketBatch* batch) {
-    if (*flowdata == 0) {
-        IPAddress osip = IPAddress(batch->first()->ip_header()->ip_src);
-        uint16_t oport = batch->tcp_header()->th_sport;
-        uint16_t port = _state->available_ports.front();
+bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
+    IPAddress osip = IPAddress(p->ip_header()->ip_src);
+    uint16_t oport = p->tcp_header()->th_sport;
+    PortRef* ref = 0;
+    if (_state->available_ports.empty()) {
+        for (int i = 0; i < _state->to_release.size(); i++) {
+            if (_state->to_release[i]->ref.value() == 0) {
+                ref = _state->to_release[i];
+            }
+        }
+        if (!ref) {
+            click_chatter("ERROR %p{element} : no more ports available !",this);
+            return false;
+        }
+    } else {
+        ref = _state->available_ports.front();
         _state->available_ports.pop_front();
-        _map.find_insert(port, IPPort(osip,oport));
-        fcb_acquire_timeout(NAT_FLOW_TIMEOUT);
     }
+    fcb->ref = ref;
+    NATEntryOUT out = {IPPort(osip,oport),ref};
+    _map.find_insert(ref->port, out);
+    return true;
+}
 
-    //_state->port_epoch[*flowdata] = epoch;
+void FlowIPNAT::release_flow(NATEntryIN* fcb) {
+    if (fcb->ref->ref.dec_and_test()) {
+        _state->available_ports.push_back(fcb->ref);
+    } else {
+        _state->to_release.push_back(fcb->ref);
+    }
+}
+
+void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
     auto fnt = [this,flowdata](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
-        q->rewrite_ipport(_sip, *flowdata, true);
+        q->rewrite_ipport(_sip, flowdata->ref->port, true);
         if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
-            fcb_release_timeout();
+            close_flow();
+            release_flow(flowdata);
         }
         return q;
     };
@@ -116,31 +151,27 @@ FlowIPNATReverse::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void FlowIPNATReverse::push_batch(int port, IPPort* flowdata, PacketBatch* batch) {
-    if (flowdata->ip == IPAddress(0)) {
-        auto ip = batch->ip_header();
-        auto th = batch->tcp_header();
+bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
+    auto th = p->tcp_header();
 
-        bool found = _in->_map.find_remove(th->th_dport,*flowdata);
-        if (!found) {
-            batch->fast_kill();
-            return;
-        } else {
-#if DEBUG_LB
-            click_chatter("Found entry %s %d : %s -> %s",entry.chosen_server.unparse().c_str(),entry.port,ptr->pair.src.unparse().c_str(),ptr->pair.dst.unparse().c_str());
-#endif
-            fcb_acquire_timeout(NAT_FLOW_TIMEOUT);
-	}
-    }
+    bool found = _in->_map.find_remove(th->th_dport,*fcb);
+    return found;
+}
 
+void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
+    --fcb->ref->ref;
+}
+
+void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* batch) {
     //_state->port_epoch[*flowdata] = epoch;
     auto fnt = [this,flowdata](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
-        q->rewrite_ipport(flowdata->ip, flowdata->port, 1);
-        q->set_dst_ip_anno(flowdata->ip);
+        q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1);
+        q->set_dst_ip_anno(flowdata->map.ip);
         return q;
         if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
-            fcb_release_timeout();
+            close_flow();
+            release_flow(flowdata);
         }
     };
     EXECUTE_FOR_EACH_PACKET(fnt, batch);

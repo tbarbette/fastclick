@@ -13,24 +13,29 @@ CLICK_DECLS
 
 CLICK_DECLS
 
-struct IPPort {
-    IPAddress ip;
-    uint16_t port;
-    IPPort(IPAddress addr, uint16_t port) : ip(addr), port(port) {
-
+struct PortRef {
+    PortRef(uint16_t _port) : port(_port) {
+        ref = 0;
     }
-    inline hashcode_t hashcode() const {
-       return CLICK_NAME(hashcode)(ip) + CLICK_NAME(hashcode)(port);
-   }
-
-   inline bool operator==(IPPort other) const {
-       return (other.ip == ip && other.port == port);
-   }
+    uint16_t port;
+    atomic_uint32_t ref;
 };
 
-typedef HashTableMP<uint16_t,IPPort> NATHashtable;
 
-class FlowIPNAT : public FlowSpaceElement<uint16_t> {
+struct NATEntryOUT {
+    IPPort map;
+    PortRef* ref;
+};
+
+struct NATEntryIN {
+    PortRef* ref;
+};
+
+typedef HashTableMP<uint16_t,NATEntryOUT> NATHashtable;
+
+#define NAT_FLOW_TIMEOUT 60 * 1000
+
+class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> {
 
 public:
 
@@ -46,10 +51,15 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
 
-    void push_batch(int, uint16_t*, PacketBatch *);
+    static const int timeout = NAT_FLOW_TIMEOUT;
+    bool new_flow(NATEntryIN*, Packet*);
+    void release_flow(NATEntryIN*);
+
+    void push_batch(int, NATEntryIN*, PacketBatch *);
 private:
     struct state {
-        Deque<uint16_t> available_ports;
+        Deque<PortRef*> available_ports;
+        Deque<PortRef*> to_release;
     };
     per_thread<state> _state;
 
@@ -59,7 +69,9 @@ private:
     friend class FlowIPNATReverse;
 };
 
-class FlowIPNATReverse : public FlowSpaceElement<IPPort> {
+
+
+class FlowIPNATReverse : public FlowStateElement<FlowIPNATReverse,NATEntryOUT> {
 
 public:
 
@@ -74,7 +86,11 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push_batch(int, IPPort*, PacketBatch *);
+    static const int timeout = NAT_FLOW_TIMEOUT;
+    bool new_flow(NATEntryOUT*, Packet*);
+    void release_flow(NATEntryOUT*);
+
+    void push_batch(int, NATEntryOUT*, PacketBatch *);
 private:
 
     FlowIPNAT* _in;
