@@ -41,16 +41,14 @@ Table of r2/FlowClassifier@4 after optimization :
 |-> 8
 |  23/255 (THREECASE, 2 childs)
 |  |-> 6
-|  |  34/4294905600 (TWOCASE, 1 childs)
-|  |  |-> 1342177280
-|  |  |  26/4294967295 (HASH-{{[0-9]+}}, 0 childs, dynamic)
+|  |  34/65535 (TWOCASE, 1 childs)
+|  |  |-> 20480
+|  |  |  26/4294967295 (HASH-32771, 0 childs, dynamic)
 |  |  |  |-> DEFAULT
-|  |  |  |  30/4294967295 (HASH-{{[0-9]+}}, 0 childs, dynamic)
+|  |  |  |  30/4294967295 (HASH-32771, 0 childs, dynamic)
 |  |  |  |  |-> DEFAULT
-|  |  |  |  |  34/65535 (HASH-{{[0-9]+}}, 0 childs, dynamic)
-|  |  |  |  |  |-> DEFAULT
-|  |  |  |  |  |  36/65535 (HASH-{{[0-9]+}}, 0 childs, dynamic)
-|  |  |  |  |  |  |-> DEFAULT 18446744073709551615 UC:1 ED:0 (data ffffffffffffffff00000000000000000100000000000000000000000000)
+|  |  |  |  |  36/65535 (HASH-16411, 0 childs, dynamic)
+|  |  |  |  |  |-> DEFAULT 18446744073709551615 UC:1 ED:0 (data ffffffffffffffff00000000000000000100000000000000000000000000)
 |  |  |-> DEFAULT 0 UC:1 ED:1 (data 00000000000000000000000000000000010000000000000000000000ffff)
 |  |-> 1
 |  |  34/255 (TWOCASE, 1 childs)
@@ -178,7 +176,7 @@ r1 :: Receiver(0000:02:00.0,$MAC1,$IP1,$RANGE1) [0] -> ipOUT
 r2 :: Receiver(0000:02:00.1,$MAC2,$IP2,$IP2 $SIP1 $SIP2 $SIP3 $SIP4) [0]
   -> tcpfd :: FlowDispatcher(9/06)
 //  -> dynafd :: FlowDispatcher(20/0050 12/0/ffffffff 16/0/ffffffff 22/0/ffff)
-    -> tcphttp :: FlowDispatcher(20/00050)
+    -> tcphttp :: FlowDispatcher(20/0050)
 //  -> IPPrint(REVERSELB)
   -> FlowIPLoadBalancerReverse(lb)
 //  -> IPPrint(REVERSELBOUT)
