@@ -317,6 +317,8 @@ eagain:
 }
 
 int TCPIn::initialize(ErrorHandler *errh) {
+    if (StackSpaceElement<fcb_tcpin>::initialize(errh) != 0)
+        return -1;
     if (get_passing_threads(true).weight() <= 1) {
         tableFcbTcpCommon.disable_mt();
     }
@@ -542,7 +544,7 @@ WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
 
 void TCPIn::requestMorePackets(Packet *packet, bool force)
 {
-    click_chatter("requestMorePackets");
+    click_chatter("TCP requestMorePackets");
     ackPacket(packet, force);
 
     // Continue in the stack function
@@ -777,10 +779,14 @@ void TCPIn::manageOptions(WritablePacket *packet)
             break; // Avoid malformed options
         else if(optStart[0] == TCPOPT_SACK_PERMITTED && optStart[1] == TCPOLEN_SACK_PERMITTED)
         {
+            uint32_t old_hw = *((uint16_t*)optStart);
             // If we find the SACK permitted option, we remove it
-            for(int i = 0; i < TCPOLEN_SACK_PERMITTED; ++i)
+            for(int i = 0; i < TCPOLEN_SACK_PERMITTED; ++i) {
                 optStart[i] = TCPOPT_NOP; // Replace the option with NOP
+            }
+            uint32_t new_hw = (TCPOPT_NOP << 8) + TCPOPT_NOP;
 
+            click_update_in_cksum(&tcph->th_sum, old_hw, new_hw);
             //click_chatter("SACK Permitted removed from options");
 
             optStart += optStart[1];

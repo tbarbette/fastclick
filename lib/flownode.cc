@@ -25,7 +25,7 @@
  *********************************/
 
 FlowNode* FlowNode::start_growing() {
-            click_chatter("Table starting to grow");
+            click_chatter("Table starting to grow (was %s)",level()->print().c_str());
             set_growing(true);
             FlowNode* newNode = level()->create_better_node(this);
             if (newNode == 0) {

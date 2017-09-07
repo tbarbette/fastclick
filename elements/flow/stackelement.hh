@@ -482,7 +482,8 @@ class StackBufferElement : public StackSpaceElement<BufferData<T>>
 //            click_chatter("Pending %p",it.current());
             this->requestMorePackets(it.current(), false);
         }
-        this->checked_output_push_batch(action,passed);
+        if (passed)
+            this->checked_output_push_batch(action,passed);
     }
 };
 
