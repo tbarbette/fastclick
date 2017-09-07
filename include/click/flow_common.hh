@@ -436,7 +436,7 @@ inline void FlowControlBlock::_do_release() {
 inline void FlowControlBlock::release(int packets_nr) {
 	if (use_count - packets_nr  < 0) {
 		click_chatter("ERROR : negative release : release %p, use_count = %d",this,use_count);
-		assert(use_count > 0);
+		assert(use_count - packets_nr >= 0);
 	}
 	use_count -= packets_nr;
 

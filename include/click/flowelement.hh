@@ -111,30 +111,28 @@ public:
 #endif
     }
     inline void fcb_remove_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
-#if DEBUG_CLASSIFIER_RELEASE
-        click_chatter("Release fnt remove");
-#endif
+        click_chatter("Release fnt remove %p",fnt);
         if (likely(fcb_stack->release_fnt == fnt)) { //Normally it will call the chain in the same order
             fcb_stack->release_fnt = fcb_chain->previous_fnt;
             fcb_stack->thunk = fcb_chain->previous_thunk;
-#if DEBUG_CLASSIFIER_RELEASE
-            click_chatter("Release removed to %p",fcb_stack->release_fnt);
-#endif
+            click_chatter("Release removed is now to %p",fcb_stack->release_fnt);
         } else {
             SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
-            VirtualFlowSpaceElement* fe;
+            VirtualFlowSpaceElement* fe = static_cast<VirtualFlowSpaceElement*>(fcb_stack->thunk);
             FlowReleaseChain* frc;
             do {
-                fe = static_cast<VirtualFlowSpaceElement*>(fcb_chain->previous_thunk);
                 if (fe == 0) {
-                    click_chatter("BAD ERROR : Trying to remove a timeout flow function that is not set...");
-                }
-                frc = reinterpret_cast<FlowReleaseChain*>(&fcb_stack->data[fe->_flow_data_offset]);
-                chain_fnt = frc->previous_fnt;
-                if (chain_fnt == 0) {
                     click_chatter("BAD ERROR : Trying to remove a timeout flow function that is not set...");
                     return;
                 }
+
+                frc = reinterpret_cast<FlowReleaseChain*>(&fcb_stack->data[fe->_flow_data_offset]);
+                chain_fnt = frc->previous_fnt;
+                if (chain_fnt == 0) {
+                    click_chatter("ERROR : Trying to remove a timeout flow function that is not set...");
+                    return;
+                }
+                fe = static_cast<VirtualFlowSpaceElement*>(frc->previous_thunk);
             } while (chain_fnt != fnt);
             frc->previous_fnt = fcb_chain->previous_fnt;
             frc->previous_thunk = fcb_chain->previous_thunk;

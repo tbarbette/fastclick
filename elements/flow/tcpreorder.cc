@@ -149,28 +149,26 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
 
 
     tcpreorder->packetListLength += num;
+    int before = tcpreorder->packetListLength;
     if(_mergeSort)
     {
         // Sort the list of waiting packets (O((n + k) * log(n + k)))
         tcpreorder->packetList = sortList(tcpreorder->packetList);
     }
     //click_chatter("flow %p uc %d, num %d",tcpreorder, fcb_stack->count(),num);
+
     PacketBatch* inorderBatch = sendEligiblePackets(tcpreorder,had_awaiting);
+
 
     if (tcpreorder->packetList) {
         assert(tcpreorder->packetListLength);
         assert(fcb_stack->release_fnt);
     }
 
-    if (inorderBatch) { //Have 7new, had 5, send 12 --> 12-7= 5 (uc was 7, uc is now 12)
-        //click_chatter("Updating %d, have UC %d",inorderBatch->count() - num,fcb_stack->count());
-        fcb_update(inorderBatch->count() - num);
+    fcb_update((before - tcpreorder->packetListLength) - num);
+    if (inorderBatch) {
         output_push_batch(0,inorderBatch);
-    } else { //Have 7new, had 5, send 0 --> 0-7= -7
-        //click_chatter("Releasing %d, have UC %d",num,fcb_stack->count());
-        fcb_release(num);
     }
-    //click_chatter("a flow %p uc %d",tcpreorder, fcb_stack->count());
 }
 
 
@@ -201,6 +199,11 @@ bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* 
     return true;
 }
 
+
+/**
+ * @pre packetListLength is correct
+ * @post it is still correct
+ */
 PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, bool had_awaiting)
 {
     Packet* packet = tcpreorder->packetList;
@@ -223,19 +226,23 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         // them with the new alignment.
         if(SEQ_LT(currentSeq, tcpreorder->expectedPacketSeq))
         {
-            click_chatter("Warning: received a retransmission with a different split");
+            click_chatter("Warning: received a retransmission with a different split (current %lu, expected %lu)",currentSeq, tcpreorder->expectedPacketSeq);
             #ifndef HAVE_FLOW
             // Warning if the system is used outside middleclick
             click_chatter("This may be the sign that a second flow is interfering, this can cause bugs.");
             #endif
             Packet* to_delete = packet;
+            int num = 0;
             SFCB_STACK( //Do not drop reference as they are from the waiting list packets that are unreferenced
             while(to_delete) {
                 packet = to_delete->next();
                 to_delete->kill();
                 to_delete = packet;
+                num++;
             });
             packet = 0;
+            fcb_acquire(num); //Compensate for the future update
+            tcpreorder->packetListLength -= num;
 
             // Check before exiting that we did not have a batch to send
             goto send_batch;
@@ -267,7 +274,6 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         packet = packet->next();
     }
     tcpreorder->packetList = 0;
-    tcpreorder->packetListLength = 0;
 
     if (unlikely(last && !_tcp_context && !_notimeout)) { //End of flow, everything will be sent and we manage the flow ourself, remove timeout
         click_ip *ip = (click_ip *) last->data();
@@ -291,12 +297,14 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
   }
     assert(tcpreorder->expectedPacketSeq);
     tcpreorder->packetList = packet;
+    tcpreorder->packetListLength -= count;
     // We now send the batch we just built
     if(batch != NULL) {
         assert(count > 0);
         batch->set_count(count);
         batch->set_tail(last);
         last->set_next(0);
+        flow_assert(batch->find_count() == count());
 
         return batch;
     }
