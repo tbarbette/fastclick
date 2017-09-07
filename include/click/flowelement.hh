@@ -126,6 +126,9 @@ public:
             FlowReleaseChain* frc;
             do {
                 fe = static_cast<VirtualFlowSpaceElement*>(fcb_chain->previous_thunk);
+                if (fe == 0) {
+                    click_chatter("BAD ERROR : Trying to remove a timeout flow function that is not set...");
+                }
                 frc = reinterpret_cast<FlowReleaseChain*>(&fcb_stack->data[fe->_flow_data_offset]);
                 chain_fnt = frc->previous_fnt;
                 if (chain_fnt == 0) {

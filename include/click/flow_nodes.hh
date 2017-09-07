@@ -37,7 +37,7 @@ public:
      * However this is not checking if runtime data and dynamic are equals
      */
     virtual bool equals(FlowLevel* level) {
-        return typeid(*this) == typeid(*level) && _islong == level->_islong;
+        return typeid(*this) == typeid(*level) && _islong == level->_islong && _dynamic == level->_dynamic;
     }
 
     inline FlowNodeData get_data(Packet* p) {
