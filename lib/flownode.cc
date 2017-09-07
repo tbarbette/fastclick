@@ -24,6 +24,23 @@
  * FlowNode functions
  *********************************/
 
+FlowNode* FlowNode::start_growing() {
+            click_chatter("Table starting to grow");
+            set_growing(true);
+            FlowNode* newNode = level()->create_better_node(this);
+            if (newNode == 0) {
+                //TODO : better to release old flows
+                return 0;
+            }
+            newNode->_default = _default;
+            newNode->_level = _level;
+            newNode->_parent = this;
+            _default.set_node(newNode);
+
+            return newNode;
+}
+
+
 int FlowNode::findGetNum() {
     int count = 0;
     apply([&count](FlowNodePtr* p) {

@@ -111,11 +111,11 @@ public:
 #endif
     }
     inline void fcb_remove_release_fnt(struct FlowReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt) {
-        click_chatter("Release fnt remove %p",fnt);
+        debug_flow("Release fnt remove %p",fnt);
         if (likely(fcb_stack->release_fnt == fnt)) { //Normally it will call the chain in the same order
             fcb_stack->release_fnt = fcb_chain->previous_fnt;
             fcb_stack->thunk = fcb_chain->previous_thunk;
-            click_chatter("Release removed is now to %p",fcb_stack->release_fnt);
+            debug_flow("Release removed is now to %p",fcb_stack->release_fnt);
         } else {
             SubFlowRealeaseFnt chain_fnt = fcb_stack->release_fnt;
             VirtualFlowSpaceElement* fe = static_cast<VirtualFlowSpaceElement*>(fcb_stack->thunk);

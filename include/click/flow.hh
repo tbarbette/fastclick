@@ -113,6 +113,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
 #endif
         flow_assert(child_ptr->ptr != (void*)-1);
         if (unlikely(child_ptr->ptr == NULL || (child_ptr->is_node() && child_ptr->node->released()))) { //Unlikely to create a new node.
+
             if (parent->get_default().ptr) {
                 if (parent->level()->is_dynamic() || always_dup) {
                     if (unlikely(parent->growing())) {
@@ -132,20 +133,14 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                         click_chatter("MAX CAPACITY ACHIEVED, DROPPING");
                         return 0;
 #else
-                            click_chatter("Table starting growing, deleting");
-                            parent->set_growing(true);
-                            FlowNode* newNode = parent->level()->create_better_node(parent);
-                            if (newNode == 0) {
-                                //TODO : better to release old flows
-                                return 0;
-                            }
-                            newNode->_default = parent->_default;
-                            newNode->_level = parent->_level;
-                            newNode->_parent = parent;
-                            parent->_default.set_node(newNode);
+                        parent = parent->start_growing();
+                        if (!parent) {
+                            click_chatter("Could not grow !? Dropping flow !");
+                            //TODO : release some children
+                            return 0;
+                        }
+                        continue;
 
-                            parent = newNode;
-                            continue;
 #endif
                     } else { //Parent is not growing, and we don't need to start growing (likely)
 #if DEBUG_CLASSIFIER_CHECK

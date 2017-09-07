@@ -153,7 +153,6 @@ public :
 
     void node_combine_ptr(FlowNode* parent, FlowNodePtr, bool as_child, bool priority);
     void default_combine(FlowNode* parent, FlowNodePtr*, bool as_child, bool priority);
-
 };
 
 #define FLOW_NODE_DEFINE(T,fnt) \
@@ -263,14 +262,6 @@ public:
         delete this;
     }
 
-    bool growing() const {
-        return _growing;
-    }
-
-    void set_growing(bool g) {
-        assert(g); //There is no stopping of growing, when it stops, the table should be deleted
-        _growing = g;
-    }
 
     FlowNode() :  num(0),_level(0),_default(),_parent(0), _growing(false),
 //            _child_deletable(true),
@@ -451,6 +442,17 @@ public:
     inline void set_parent(FlowNode* parent) {
         _parent = parent;
     }
+
+
+    bool growing() const {
+        return _growing;
+    }
+
+    void set_growing(bool g) {
+        assert(g); //There is no stopping of growing, when it stops, the table should be deleted
+        _growing = g;
+    }
+    FlowNode* start_growing();
 
 #if DEBUG_CLASSIFIER || DEBUG_CLASSIFIER_CHECK
     void check(bool allow_parent = false);
@@ -898,7 +900,86 @@ class FlowNodeHash : public FlowNode  {
     }
 
 
-    inline unsigned get_idx(FlowNodeData data) {
+
+    class HashNodeIterator : public virtual NodeIteratorBase {
+        FlowNodeHash* _node;
+        int cur;
+    public:
+        HashNodeIterator(FlowNodeHash* n) : cur(0) {
+            _node = n;
+        }
+
+        virtual FlowNodePtr* next() override {
+            while (cur < _node->capacity() && (_node->childs[cur].ptr == 0 || _node->childs[cur].ptr == DESTRUCTED_NODE)) cur++;
+            if (cur >= _node->capacity())
+                return 0;
+            return &_node->childs[cur++];
+        }
+    };
+
+    void destroy() override;
+
+    void resize() {
+        /*
+		int current_size = hash_size;
+		if (size_n < HASH_SIZES_NR)
+			hash_size = hash_sizes[size_n];
+		else {
+			hash_size *= 2;
+		}
+		mask = hash_size - 1;
+
+		highwater = hash_size / 3;
+		max_highwater = hash_size / 2;
+		click_chatter("New hash table size %d",hash_size);
+
+		Vector<FlowNodePtr> childs_old = childs;
+		childs.resize(hash_size);
+		num = 0;
+
+		for (int i = 0; i < current_size; i++) {
+			childs[i].ptr= NULL;
+		}
+		size_n++;
+		for (int i = 0; i < current_size; i++) {
+			if (childs_old[i].ptr) {
+				if (childs_old[i].is_leaf()) {
+				GET IDX CANNOT BE USED FOR OLD
+					childs[get_idx(childs_old[i].data())] = childs_old[i];
+				} else {
+					if (childs_old[i].node->released()) {
+						delete childs_old[i].node;
+					} else {
+						childs[get_idx(childs_old[i].data())] = childs_old[i];
+					}
+				}
+			}
+		}*/
+    }
+
+    public:
+    FlowNodeHash() {
+        //hash_size = hash_sizes[size_n];
+        //mask = hash_size - 1;
+        //highwater = hash_size / 3;
+        //max_highwater = hash_size / 2;
+        //childs.resize(hash_size);
+        _find = &find_ptr;
+#if DEBUG_CLASSIFIER
+        for (int i = 0; i < capacity(); i++) {
+            assert(childs[i].ptr == NULL);
+        }
+#endif
+    };
+    virtual FlowNode* duplicate(bool recursive,int use_count) override;
+
+    FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
+
+
+    FlowNodePtr* find_hash(FlowNodeData data) {
+        //click_chatter("Searching for %d in hash table leaf %d",data,leaf);
+
+
         flow_assert(getNum() <= max_highwater());
         int i = 0;
 
@@ -984,92 +1065,15 @@ class FlowNodeHash : public FlowNode  {
 #endif
 
         if (i > (capacity() / 10)) {
-            click_chatter("%d collisions! Hint for a better hash table size !",i);
-            click_chatter("%d released in collision !",ri);
+            if (!growing()) {
+                click_chatter("%d collisions! Hint for a better hash table size (current is %d)!",i);
+                click_chatter("%d released in collision !",ri);
+                if (childs[idx].ptr == 0) {
+                    FlowNode* n = this->start_growing();
+                    return n->find(data);
+                }
+            }
         }
-
-        return idx;
-    }
-
-    class HashNodeIterator : public virtual NodeIteratorBase {
-        FlowNodeHash* _node;
-        int cur;
-    public:
-        HashNodeIterator(FlowNodeHash* n) : cur(0) {
-            _node = n;
-        }
-
-        virtual FlowNodePtr* next() override {
-            while (cur < _node->capacity() && (_node->childs[cur].ptr == 0 || _node->childs[cur].ptr == DESTRUCTED_NODE)) cur++;
-            if (cur >= _node->capacity())
-                return 0;
-            return &_node->childs[cur++];
-        }
-    };
-
-    void destroy() override;
-
-    void resize() {
-        /*
-		int current_size = hash_size;
-		if (size_n < HASH_SIZES_NR)
-			hash_size = hash_sizes[size_n];
-		else {
-			hash_size *= 2;
-		}
-		mask = hash_size - 1;
-
-		highwater = hash_size / 3;
-		max_highwater = hash_size / 2;
-		click_chatter("New hash table size %d",hash_size);
-
-		Vector<FlowNodePtr> childs_old = childs;
-		childs.resize(hash_size);
-		num = 0;
-
-		for (int i = 0; i < current_size; i++) {
-			childs[i].ptr= NULL;
-		}
-		size_n++;
-		for (int i = 0; i < current_size; i++) {
-			if (childs_old[i].ptr) {
-				if (childs_old[i].is_leaf()) {
-				GET IDX CANNOT BE USED FOR OLD
-					childs[get_idx(childs_old[i].data())] = childs_old[i];
-				} else {
-					if (childs_old[i].node->released()) {
-						delete childs_old[i].node;
-					} else {
-						childs[get_idx(childs_old[i].data())] = childs_old[i];
-					}
-				}
-			}
-		}*/
-    }
-
-    public:
-    FlowNodeHash() {
-        //hash_size = hash_sizes[size_n];
-        //mask = hash_size - 1;
-        //highwater = hash_size / 3;
-        //max_highwater = hash_size / 2;
-        //childs.resize(hash_size);
-        _find = &find_ptr;
-#if DEBUG_CLASSIFIER
-        for (int i = 0; i < capacity(); i++) {
-            assert(childs[i].ptr == NULL);
-        }
-#endif
-    };
-    virtual FlowNode* duplicate(bool recursive,int use_count) override;
-
-    FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
-
-
-    FlowNodePtr* find_hash(FlowNodeData data) {
-        //click_chatter("Searching for %d in hash table leaf %d",data,leaf);
-
-        unsigned idx = get_idx(data);
 
         return &childs[idx];
     }
@@ -1372,13 +1376,17 @@ inline void FlowNodePtr::check() {
         node->check();
 }
 
+
+#define POOL_SZ 4096
+#define EXCH_MAX 1024
+
 /**
  * FlowAllocator
  */
 template<class T>
 class FlowAllocator { public:
-    static per_thread<pool_allocator_mt<T,true,1024> >& instance() {
-        static per_thread<pool_allocator_mt<T,true,1024> > instance;
+    static per_thread<pool_allocator_mt<T,true,POOL_SZ, EXCH_MAX> >& instance() {
+        static per_thread<pool_allocator_mt<T,true,POOL_SZ, EXCH_MAX> > instance;
         return instance;
     }
     static T* allocate() {
