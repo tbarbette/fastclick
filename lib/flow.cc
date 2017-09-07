@@ -708,6 +708,7 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
         assert(other->getNum() == 0);
         //If other had a default, we need to merge it
         if (other->default_ptr()->ptr != 0) { //Other had default
+            other->default_ptr()->set_parent(0);
             this->default_ptr()->default_combine(this, other->default_ptr(), false, priority);
             other->default_ptr()->ptr = 0;
         } //ELse nothing to do as we can keep our default as it, if any
@@ -768,7 +769,7 @@ void FlowNodePtr::default_combine(FlowNode* p, FlowNodePtr* other, bool as_child
         debug_flow("We have a node or a leaf %d %d , p %d",this->is_leaf(),other->is_leaf(),priority);
         if (this->is_leaf() && other->is_leaf()) { //Our default is a leaf and other default is a leaf
             if (!priority) {
-                this->leaf->release();
+                FCBPool::init_release(this->leaf);
                 this->leaf = other->leaf;
             } else {
                 this->leaf->combine_data(other->leaf->data);
