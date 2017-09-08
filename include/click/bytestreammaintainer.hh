@@ -193,20 +193,6 @@ class ByteStreamMaintainer
          */
         bool isLastSeqSentSet();
 
-        /** @brief Set the value of the "last ack received" by this side of the connection
-         * @param ackNumber Value of the "last ack received" by this side of the connection
-         */
-        void setLastAckReceived(uint32_t ackNumber);
-
-        /** @brief Return the value of the "last ack received" by this side of the connection
-         * @return Value of the "last ack received" by this side of the connection
-         */
-        uint32_t getLastAckReceived();
-
-        /** @brief Indicate whether the "last ack received" value has been set.
-         * @return True if the "last ack received" value has been set
-         */
-        bool isLastAckReceivedSet();
 
         /** @brief Return the number of consecutive duplicate ACKs currently observed
          * @return The number of consecutive duplicate ACKs currently observed

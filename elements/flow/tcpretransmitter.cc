@@ -210,7 +210,7 @@ Packet* TCPRetransmitter::processPacketRetransmission(Packet *packet)
     // are unmodified. Thus, we need to perform the right mappings to
     // have the link with the packets in the tree
 
-    if(fcb->common->closingState != TCPClosingState::OPEN)
+    if(fcb->common->state > TCPState::OPEN)
     {
         packet->kill();
         fcb->common->lock.release();
@@ -241,8 +241,8 @@ Packet* TCPRetransmitter::processPacketRetransmission(Packet *packet)
 
     // Ensure that the sequence number is at least equal to the last ack received to avoid
     // sending useless data
-    if(SEQ_LT(mappedSeq, fcb->common->maintainers[oppositeFlowDirection].getLastAckReceived()))
-        mappedSeq = fcb->common->maintainers[oppositeFlowDirection].getLastAckReceived();
+    if(SEQ_LT(mappedSeq, fcb->common->getLastAckReceived(oppositeFlowDirection)))
+        mappedSeq = fcb->common->getLastAckReceived(oppositeFlowDirection);
 
     uint32_t payloadSize = getPayloadLength(packet);
     uint32_t mappedSeqEnd = maintainer.mapSeq(seq + payloadSize);
@@ -340,14 +340,14 @@ void TCPRetransmitter::prune()
         return;
     }
 
-    if(!maintainer.isLastAckReceivedSet())
+    if(!fcb->common->lastAckReceivedSet())
     {
         fcb->common->lock.release();
         return;
     }
 
     // We remove ACKed data from the buffer
-    buffer->removeDataAtBeginning(maintainer.getLastAckReceived());
+    buffer->removeDataAtBeginning(fcb->common->getLastAckReceived(oppositeFlowDirection));
 
     fcb->common->lock.release();
 }
@@ -361,7 +361,7 @@ bool TCPRetransmitter::dataToRetransmit()
 
     ByteStreamMaintainer &maintainer = fcb->common->maintainers[oppositeFlowDirection];
 
-    if(!maintainer.isLastAckSentSet() || !maintainer.isLastAckReceivedSet())
+    if(!maintainer.isLastAckSentSet() || !fcb->common->lastAckReceivedSet())
     {
         fcb->common->lock.release();
         return false;
@@ -418,7 +418,7 @@ void TCPRetransmitter::retransmissionTimerFired()
     fcb->common->maintainers[flowDirection].setCongestionWindowSize(mss);
 
     fcb->common->retransmissionTimings[flowDirection].setLastManualTransmission(
-        fcb->common->maintainers[oppositeFlowDirection].getLastAckReceived());
+        fcb->common->getLastAckReceived(oppositeFlowDirection));
 
     // Check if there are data to retransmit and do so if needed
     if(manualTransmission(true))
@@ -466,7 +466,7 @@ bool TCPRetransmitter::manualTransmission(bool retransmission)
     fcb->common->lock.acquire();
 
     // Check if the connection is closed before continuing
-    if(fcb->common->closingState != TCPClosingState::OPEN)
+    if(fcb->common->state > TCPState::OPEN)
     {
         fcb->common->lock.release();
         return false;
@@ -490,7 +490,7 @@ bool TCPRetransmitter::manualTransmission(bool retransmission)
     ByteStreamMaintainer &otherMaintainer = fcb->common->maintainers[oppositeFlowDirection];
     if(!maintainer.isLastAckSentSet()
         || !otherMaintainer.isLastAckSentSet()
-        || !otherMaintainer.isLastAckReceivedSet())
+        || !fcb->common->lastAckReceivedSet())
     {
         fcb->common->lock.release();
         return false;
@@ -502,12 +502,12 @@ bool TCPRetransmitter::manualTransmission(bool retransmission)
     // or if we send new data put in the buffer waiting to be transmitted, we get the data
     // from a different point in the buffer
     if(retransmission)
-        start = otherMaintainer.getLastAckReceived();
+        start = fcb->common->getLastAckReceived(oppositeFlowDirection);
     else
     {
         start = fcb->common->retransmissionTimings[flowDirection].getLastManualTransmission();
-        if(SEQ_LT(start, otherMaintainer.getLastAckReceived()))
-            start = otherMaintainer.getLastAckReceived();
+        if(SEQ_LT(start, fcb->common->getLastAckReceived(oppositeFlowDirection)))
+            start = fcb->common->getLastAckReceived(oppositeFlowDirection);
     }
 
     uint32_t end = otherMaintainer.getLastAckSent();
@@ -618,10 +618,10 @@ uint32_t TCPRetransmitter::getMaxAmountData(uint32_t expected, bool canCut)
         // Check if the data we manually transmitted before are ACKed
         uint32_t lastManualTransmission =
             fcb->common->retransmissionTimings[flowDirection].getLastManualTransmission();
-        if(SEQ_GT(otherMaintainer.getLastAckReceived(), lastManualTransmission))
+        if(SEQ_GT(fcb->common->getLastAckReceived(oppositeFlowDirection)    , lastManualTransmission))
             inFlight = 0;
         else
-            inFlight = lastManualTransmission - otherMaintainer.getLastAckReceived();
+            inFlight = lastManualTransmission - fcb->common->getLastAckReceived(oppositeFlowDirection);
     }
 
     // Check that we do not exceed the congestion window's size
@@ -662,7 +662,7 @@ void TCPRetransmitter::signalAck(uint32_t ack)
     unsigned int oppositeFlowDirection = 1 - flowDirection;
 
     auto fcb = _in->fcb_data();
-    if(!fcb->common || fcb->common->closingState != TCPClosingState::OPEN)
+    if(!fcb->common || fcb->common->state > TCPState::OPEN)
     {
         fcb->common->lock.release();
         return;

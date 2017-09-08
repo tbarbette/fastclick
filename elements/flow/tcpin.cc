@@ -150,7 +150,7 @@ eagain:
             // Check that the packet is not a SYN packet
             if(isSyn(p))
             {
-                if (fcb_in->common->closingState == TCPClosingState::CLOSED) {
+                if (fcb_in->common->state == TCPState::CLOSED) {
                     click_chatter("Renewing !");
                     release_tcp(fcb_stack,this);
                     fcb_in->common = 0;
@@ -160,9 +160,10 @@ eagain:
                     p->kill();
                     return NULL;
                 }
+            } else if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
+                fcb_in->common->state = TCPState::OPEN; //No need to lock, only us can write this
             }
         }
-
 
         if(checkConnectionClosed(p))
         {
@@ -170,6 +171,7 @@ eagain:
             p->kill();
             return NULL;
         }
+
 
         if (_allow_resize) {
             //TODO : fine-grain this lock
@@ -222,10 +224,10 @@ eagain:
                 newAckNumber = otherMaintainer.mapAck(ackNumber);
 
                 // Check the value of the previous ack received if it exists
-                bool lastAckReceivedSet = maintainer.isLastAckReceivedSet();
+                bool lastAckReceivedSet = fcb_in->common->lastAckReceivedSet();
                 uint32_t prevLastAckReceived = 0;
                 if(lastAckReceivedSet)
-                    prevLastAckReceived = maintainer.getLastAckReceived();
+                    prevLastAckReceived = fcb_in->common->getLastAckReceived(getFlowDirection());
 
 
                 // Check if we acknowledged new data
@@ -250,7 +252,7 @@ eagain:
                 }
 
                 // Update the value of the last ACK received
-                maintainer.setLastAckReceived(ackNumber);
+                fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
 
                 // Prune the ByteStreamMaintainer of the other side
                 otherMaintainer.prune(ackNumber);
@@ -305,8 +307,14 @@ eagain:
             return packet;
         } else { //Resize not allowed
             // Compute the offset of the TCP payload
+
+            if (isAck(p)) {
+                fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
+            }
+
             uint16_t offset = getPayloadOffset(p);
             setContentOffset(p, offset);
+
             return p;
         }
     };
@@ -400,16 +408,16 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
     // Change the flags of the packet
     tcph.th_flags = tcph.th_flags | newFlag;
 
-    TCPClosingState::Value newState;
+    TCPState::Value newState;
 
     fcb_in->common->lock.acquire();
     if(!graceful)
     {
-        newState = TCPClosingState::CLOSED;
+        newState = TCPState::CLOSED;
     } else {
-        newState = TCPClosingState::BEING_CLOSED_GRACEFUL_1;
+        newState = TCPState::BEING_CLOSED_GRACEFUL_1;
     }
-    fcb_in->common->closingState = newState;
+    fcb_in->common->state = newState;
 
     //Send FIN or RST to other side
         // Get the information needed to ack the given packet
@@ -586,11 +594,11 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
 {
     auto fcb_in = fcb_data();
 
-    TCPClosingState::Value closingState = fcb_in->common->closingState; //Read-only access, no need to lock
+    TCPState::Value state = fcb_in->common->state; //Read-only access, no need to lock
 
-    //click_chatter("Connection state is %d", closingState);
+    //click_chatter("Connection state is %d", state);
     // If the connection is open, we just check if the packet is a FIN. If it is we go to the hard sequence.
-    if (closingState == TCPClosingState::OPEN)
+    if (state == TCPState::OPEN)
     {
         if (isFin(packet) || isRst(packet)) {
             //click_chatter("Connection is closing, we received a FIN or RST in open state");
@@ -601,41 +609,41 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
 
     do_check:
     fcb_in->common->lock.acquire(); //Re read with lock if not in fast path
-    closingState = fcb_in->common->closingState;
+    state = fcb_in->common->state;
 
     if (isRst(packet)) {
-        fcb_in->common->closingState = TCPClosingState::CLOSED;
+        fcb_in->common->state = TCPState::CLOSED;
         fcb_in->common->lock.release();
         return false;
     }
 
-    if(closingState == TCPClosingState::OPEN) {
+    if(state == TCPState::OPEN) {
         //click_chatter("TCP is now closing with the first FIN");
-        fcb_in->common->closingState = TCPClosingState::BEING_CLOSED_GRACEFUL_1;
+        fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_1;
         fcb_in->common->lock.release();
         return false; //Let the FIN through. We cannot release now as there is an ACK that needs to come
     // If the connection is being closed and we have received the last packet, close it completely
-    } else if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL_1)
+    } else if(state == TCPState::BEING_CLOSED_GRACEFUL_1)
     {
         if(isFin(packet)) {
             //click_chatter("Connection is being closed gracefully, this is the second FIN");
-            fcb_in->common->closingState = TCPClosingState::BEING_CLOSED_GRACEFUL_2;
+            fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_2;
         }
         fcb_in->common->lock.release();
         return false; //Let the packet through anyway
     }
-    else if(closingState == TCPClosingState::BEING_CLOSED_GRACEFUL_2)
+    else if(state == TCPState::BEING_CLOSED_GRACEFUL_2)
     {
         //click_chatter("Connection is being closed gracefully, this is the last ACK");
-        fcb_in->common->closingState = TCPClosingState::CLOSED;
+        fcb_in->common->state = TCPState::CLOSED;
         fcb_in->common->lock.release();
         return false; //We need the out element to eventually correct the ACK number
     }
-/*    else if(closingState == TCPClosingState::BEING_CLOSED_UNGRACEFUL)
+/*    else if(state == TCPState::BEING_CLOSED_UNGRACEFUL)
     {
         if(isRst(packet)) { //RST to a RST, should not happen but handle anyway
             click_chatter("Connection is being closed ungracefully, due to one of our RST on the other side");
-            fcb_in->common->closingState = TCPClosingState::CLOSED;
+            fcb_in->common->state = TCPState::CLOSED;
             fcb_in->common->lock.release();
             return false; //Let the RST go through so next elements can fast-clean
         }
@@ -678,7 +686,7 @@ bool TCPIn::assignTCPCommon(Packet *packet)
             return false;
 
         if (flags & TH_RST) {
-            fcb_in->common->closingState = TCPClosingState::CLOSED;
+            fcb_in->common->state = TCPState::CLOSED;
             fcb_in->common = 0;
             //We have no choice here but to rely on the other side timing out, this is better than traversing the tree of the other side. When waking up,
             //it will see that the state is being closed ungracefull and need to cleans
@@ -702,7 +710,7 @@ bool TCPIn::assignTCPCommon(Packet *packet)
 
         IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
         // We are the initiator, so we need to allocate memory
-        struct tcp_common *allocated = poolFcbTcpCommon.allocate();
+        tcp_common *allocated = poolFcbTcpCommon.allocate();
 
         // Add an entry if the hashtable
         tableFcbTcpCommon.find_insert(flowID, allocated);
@@ -742,7 +750,7 @@ bool TCPIn::isLastUsefulPacket(Packet *packet)
         return false;
 }
 
-struct tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
+tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
     tcp_common* p;
     bool it = tableFcbTcpCommon.find_remove(flowID,p);
@@ -840,16 +848,6 @@ void TCPIn::manageOptions(WritablePacket *packet)
 void TCPIn::setFlowDirection(unsigned int flowDirection)
 {
     this->flowDirection = flowDirection;
-}
-
-unsigned int TCPIn::getFlowDirection()
-{
-    return flowDirection;
-}
-
-unsigned int TCPIn::getOppositeFlowDirection()
-{
-    return (1 - flowDirection);
 }
 
 

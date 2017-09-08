@@ -181,10 +181,10 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
     EXECUTE_FOR_EACH_PACKET(fnt, flow);
 
     //Release FCB if we are now closing
-    TCPClosingState::Value closingState = fcb_in->common->closingState; //Read-only for fast path
-    if ((closingState == TCPClosingState::BEING_CLOSED_GRACEFUL_2 ||
-            closingState == TCPClosingState::CLOSED)) {
-//            click_chatter("RELEASING FCB STATE");
+    TCPState::Value state = fcb_in->common->state; //Read-only for fast path
+    if ((state == TCPState::BEING_CLOSED_GRACEFUL_2 ||
+            state == TCPState::CLOSED)) {
+            click_chatter("RELEASING FCB STATE");
             inElement->releaseFCBState();
     }
 
@@ -286,9 +286,9 @@ bool TCPOut::checkConnectionClosed(Packet *packet)
 {
     auto fcb_in = inElement->fcb_data();
 
-    TCPClosingState::Value closingState = fcb_in->common->closingState; //Read-only for fast path
+    TCPState::Value state = fcb_in->common->state; //Read-only for fast path
 
-    return closingState == TCPClosingState::CLOSED;
+    return state == TCPState::CLOSED;
 
 }
 

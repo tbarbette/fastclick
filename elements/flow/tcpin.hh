@@ -8,7 +8,7 @@
 #include <click/multithread.hh>
 #include <click/memorypool.hh>
 #include <click/modificationlist.hh>
-#include <click/tcpclosingstate.hh>
+#include <click/tcpstate.hh>
 #include "retransmissiontiming.hh"
 #include "stackelement.hh"
 #include "tcpelement.hh"
@@ -28,28 +28,48 @@
  * Common structure accessed by both sides of a TCP connection.
  * The lock must be acquired before accessing the members of the structure
  */
-struct tcp_common
+class tcp_common
 {
+public:
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
     // One retransmission manager for each direction of the connection
     RetransmissionTiming retransmissionTimings[2];
     // State of the connection
-    TCPClosingState::Value closingState;
+    TCPState::Value state;
     // Lock to ensure that only one side of the flow (one thread) at a time
     // accesses the common structure
     Spinlock lock;
     int use_count;
+    tcp_seq_t lastAckReceived[2] = {0,0};
 
-    tcp_common() //This is indeed called as it is not part of the FCBs
+    tcp_common() : lastAckReceived() //This is indeed called as it is not part of the FCBs
     {
-        closingState = TCPClosingState::OPEN;
+        state = TCPState::ESTABLISHING;
         use_count = 0;
+
     }
 
     ~tcp_common()
     {
     }
+
+    inline bool lastAckReceivedSet() {
+        return state == TCPState::OPEN;
+    }
+
+    inline void setLastAckReceived(int direction, tcp_seq_t ackNumber)
+    {
+        if(!lastAckReceivedSet() || SEQ_GT(ackNumber, lastAckReceived[direction]))
+            lastAckReceived[direction] = ackNumber;
+    }
+
+
+    tcp_seq_t getLastAckReceived(int direction)
+    {
+        return lastAckReceived[direction];
+    }
+
 };
 
 
@@ -58,7 +78,7 @@ struct tcp_common
  */
 struct fcb_tcpin : public FlowReleaseChain
 {
-    struct tcp_common *common;
+    tcp_common *common;
     HashTable<tcp_seq_t, ModificationList*>* modificationLists;
 };
 
@@ -152,11 +172,34 @@ public:
      * @param flowID The IPFlowID corresponding to this flow
      * @return A pointer to the tcp_common structure stored in the HashTable for this flow
      */
-    struct tcp_common* getTCPCommon(IPFlowID flowID);
+    tcp_common* getTCPCommon(IPFlowID flowID);
 
     inline bool allow_resize() {
         return _allow_resize;
     }
+
+    /**
+     * @brief Return the flow direction
+     * @return The flow direction
+     */
+    inline unsigned int getFlowDirection();
+
+    /**
+     * @brief Return the flow direction of the other path
+     * @return The flow direction of the other path
+     */
+    inline unsigned int getOppositeFlowDirection();
+
+
+    /**
+     * @brief Send an ACK for a packet to its source
+     * @param fcb A pointer to the FCB of this flow
+     * @param packet The packet
+     * @param force A boolean indicating if the ack must be resent even though a similar ack
+     * has been sent previously
+     */
+    void ackPacket(Packet* packet, bool force = false);
+
 
 protected:
     virtual bool allowResize() override;
@@ -179,17 +222,7 @@ protected:
      */
     void setFlowDirection(unsigned int flowDirection);
 
-    /**
-     * @brief Return the flow direction
-     * @return The flow direction
-     */
-    unsigned int getFlowDirection();
 
-    /**
-     * @brief Return the flow direction of the other path
-     * @return The flow direction of the other path
-     */
-    unsigned int getOppositeFlowDirection();
 
 private:
 
@@ -211,15 +244,6 @@ private:
     bool assignTCPCommon(Packet *packet);
 
     /**
-     * @brief Send an ACK for a packet to its source
-     * @param fcb A pointer to the FCB of this flow
-     * @param packet The packet
-     * @param force A boolean indicating if the ack must be resent even though a similar ack
-     * has been sent previously
-     */
-    void ackPacket(Packet* packet, bool force = false);
-
-    /**
      * @brief Check whether the connection has been closed or not
      * @param fcb A pointer to the FCB of this flow
      * @param packet The packet
@@ -239,8 +263,8 @@ private:
     per_thread<MemoryPool<struct ModificationList>> poolModificationLists;
     per_thread<RBTMemoryPoolStreamManager> rbtManager;
 
-    HashTableMP<IPFlowID, struct tcp_common*> tableFcbTcpCommon;
-    pool_allocator_mt<struct tcp_common,false,TCPCOMMON_POOL_SIZE> poolFcbTcpCommon;
+    HashTableMP<IPFlowID, tcp_common*> tableFcbTcpCommon;
+    pool_allocator_mt<tcp_common,false,TCPCOMMON_POOL_SIZE> poolFcbTcpCommon;
 
     TCPOut* outElement; // TCPOut element of this path
     TCPIn* returnElement; // TCPIn element of the return path
@@ -249,6 +273,18 @@ private:
     bool _allow_resize;
     friend class TCPOut;
 };
+
+inline unsigned int TCPIn::getFlowDirection()
+{
+    return flowDirection;
+}
+
+
+inline unsigned int TCPIn::getOppositeFlowDirection()
+{
+    return (1 - flowDirection);
+}
+
 
 CLICK_ENDDECLS
 #endif

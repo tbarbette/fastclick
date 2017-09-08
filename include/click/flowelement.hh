@@ -210,9 +210,19 @@ template<class Derived, typename T> class FlowStateElement : public VirtualFlowS
     };
 public :
 
+
     FlowStateElement() CLICK_COLD;
     virtual int initialize(ErrorHandler *errh) CLICK_COLD;
     virtual const size_t flow_data_size()  const { return sizeof(AT); }
+
+    /**
+     * CRTP virtual
+     */
+    inline bool new_flow(T*, Packet*) {
+        return true;
+    }
+
+
 
     /**
      * Return the T type for a given FCB
@@ -242,7 +252,8 @@ public :
          if (!my_fcb->seen) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
                  my_fcb->seen = true;
-                 this->fcb_acquire_timeout(Derived::timeout);
+                 if (Derived::timeout > 0)
+                     this->fcb_acquire_timeout(Derived::timeout);
                  this->fcb_set_release_fnt(my_fcb, &release_fnt);
              }
          }
@@ -250,7 +261,9 @@ public :
     };
 
     void close_flow() {
-        this->fcb_release_timeout();
+        if (Derived::timeout > 0) {
+            this->fcb_release_timeout();
+        }
         this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);
     }
 

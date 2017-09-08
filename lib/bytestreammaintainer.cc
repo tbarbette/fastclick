@@ -272,32 +272,10 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
     }
 }
 
-void ByteStreamMaintainer::setLastAckReceived(uint32_t ackNumber)
-{
-    // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
-    // 0) for them and check that the given one is greater as we could have false negatives
-    if(!lastAckReceivedSet || SEQ_GT(ackNumber, lastAckReceived))
-        lastAckReceived = ackNumber;
-
-    lastAckReceivedSet = true;
-}
-
-uint32_t ByteStreamMaintainer::getLastAckReceived()
-{
-    if(!lastAckReceivedSet)
-        click_chatter("Error: Last ack received not defined");
-
-    return lastAckReceived;
-}
 
 bool ByteStreamMaintainer::isLastAckSentSet()
 {
     return lastAckSentSet;
-}
-
-bool ByteStreamMaintainer::isLastAckReceivedSet()
-{
-    return lastAckReceivedSet;
 }
 
 bool ByteStreamMaintainer::isLastSeqSentSet()

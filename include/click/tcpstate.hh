@@ -1,21 +1,22 @@
 /*
- * tcpclosingstate.hh - Enumeration used to store the closing state of a side of a TCP connection.
+ * TCPState.hh - Enumeration used to store the closing state of a side of a TCP connection.
  * Each side of the connection must have its own state as one may be closed while the other is
  * still open
  *
  * Romain Gaillard.
  */
 
-#ifndef MIDDLEBOX_TCPCLOSINGSTATE_HH
-#define MIDDLEBOX_TCPCLOSINGSTATE_HH
+#ifndef MIDDLEBOX_TCPState_HH
+#define MIDDLEBOX_TCPState_HH
 
 // Using a structure to avoid polluting the namespace
-// We must therefore use for instance TCPClosingState::OPEN
-struct TCPClosingState
+// We must therefore use for instance TCPState::OPEN
+struct TCPState
 {
     enum Value
     {
-        OPEN = 0, // The connection is open and nothing has been made to close it
+        ESTABLISHING = 0,
+        OPEN, // The connection is open and nothing has been made to close it
         BEING_CLOSED_GRACEFUL_1, // The connection is being closed gracefully (via first FIN packets)
         BEING_CLOSED_GRACEFUL_2, // The connection is being closed gracefully (via second FIN packets, second should free after this)
 //        BEING_CLOSED_UNGRACEFUL, // The connection is being closed ungracefully (via RST packets by one of the side which has now freed its state) -> NO NEED
