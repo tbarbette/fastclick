@@ -6,6 +6,7 @@
 #include <click/glue.hh>
 #include <click/multithread.hh>
 #include <click/sync.hh>
+#include <typeinfo>
 #define CLICK_DEBUG_ALLOCATOR 0
 CLICK_DECLS
 
@@ -150,7 +151,7 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
 #if CLICK_DEBUG_ALLOCATOR
                     click_chatter("Global pool is full, freeing item");
 #endif
-                    click_chatter("Extremly inefficient pool_allocator_mt ! Change parameters !");
+                    click_chatter("Extremly inefficient pool_allocator_mt for %s ! Change parameters !",typeid(T).name());
                 }
                 p.count --;
             } else {
