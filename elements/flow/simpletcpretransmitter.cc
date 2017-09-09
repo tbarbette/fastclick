@@ -42,7 +42,7 @@ int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int SimpleTCPRetransmitter::initialize(ErrorHandler *errh) {
-    if (FlowStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>::initialize(errh) != 0)
+    if (StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>::initialize(errh) != 0)
         return -1;
     if (_in->allow_resize()) {
         return errh->error("SimpleTCPRetransmitter does not work when resizing the flow ! Use the non simple one.");
@@ -52,20 +52,23 @@ int SimpleTCPRetransmitter::initialize(ErrorHandler *errh) {
 
 void
 SimpleTCPRetransmitter::release_flow(fcb_transmit_buffer* fcb) {
+
     if (fcb->first_unacked) {
-        click_chatter("SimpleTCPRetransmitter :: Releasing %d transmit buffers", fcb->first_unacked->count());
+        //click_chatter("SimpleTCPRetransmitter :: Releasing %d transmit buffers", fcb->first_unacked->count());
         fcb->first_unacked->fast_kill();
+        fcb->first_unacked = 0;
     }
     return;
 }
 
 void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBatch *batch)
 {
+    if (unlikely(!_in->fcb_data()->common || _in->fcb_data()->common->state == TCPState::CLOSED)) {
+        output_push_batch(0, batch);
+        return;
+    }
+
     if(port == 0) {
-        if (unlikely(!_in->fcb_data()->common || _in->fcb_data()->common->state == TCPState::CLOSED)) {
-            output_push_batch(0, batch);
-            return;
-        }
         /**
          * Just prune the buffer and put this packet in the list.
          */
@@ -73,10 +76,17 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
         FOR_EACH_PACKET_SAFE(batch,packet) {
             if (getPayloadLength(packet) == 0)
                 continue;
+            Packet* clone = packet->clone(true);
+            clone->set_next(0);
+            clone->set_mac_header(packet->mac_header());
+            clone->set_network_header(packet->network_header());
+            clone->set_transport_header(packet->transport_header());
+
+
             if (fcb->first_unacked) {
-                fcb->first_unacked->append_packet(packet->clone()->uniqueify());
+                fcb->first_unacked->append_packet(clone);
             } else {
-                fcb->first_unacked = PacketBatch::make_from_packet(packet->clone()->uniqueify());
+                fcb->first_unacked = PacketBatch::make_from_packet(clone);
             }
         }
 
@@ -88,7 +98,7 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
     } else {
         auto fcb_in = _in->fcb_data();
         if (fcb_in->common->state == TCPState::ESTABLISHING && isSyn(batch->first())) {
-            click_chatter("Unestablished connection, letting the rt packet go through");
+            //click_chatter("Unestablished connection, letting the rt packet go through");
             if (batch->count() > 1) {
                 Packet* packet = batch->first();
                 batch = batch->pop_front();
@@ -124,14 +134,15 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
                     if (lastretransmit == pr) { //Avoid double retransmission
                     } else {
                         lastretransmit = pr;
-                        click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
+                        //click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
                         fcb_acquire(1);
                         output_push_batch(0,PacketBatch::make_from_packet(packet->clone()));
                     }
                     goto found;
                 }
             }
-            click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu)", seq);
+            click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu, last ack %lu, is_syn %d, is_ack %d)", seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),isSyn(packet),isAck(packet));
+
             found:
             continue;
         }
@@ -155,7 +166,7 @@ void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
     while (next && (SEQ_LT(getSequenceNumber(next),seq))) {
         if (lastSeq) {
         if (!SEQ_GT(getSequenceNumber(next), lastSeq)) {
-            click_chatter("%lu %lu",getSequenceNumber(next), lastSeq);
+            click_chatter("new %lu <= %lu",getSequenceNumber(next), lastSeq);
             assert(false);
         }
         }
@@ -163,15 +174,14 @@ void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
         last = next;
         count++;
         next = next->next();
-
     }
     if (count) {
         PacketBatch* second = 0;
-        click_chatter("Pruning %d (last received %lu, last was %lu)",count,_in->fcb_data()->common->getLastAckReceived(_in->getOppositeFlowDirection()),getSequenceNumber(last));
+//        click_chatter("Pruning %d (last received %lu, last was %lu)",count,_in->fcb_data()->common->getLastAckReceived(_in->getOppositeFlowDirection()),getSequenceNumber(last));
         if (next)
             fcb->first_unacked->cut(last, count, second);
         SFCB_STACK(
-        fcb->first_unacked->fast_kill();
+            fcb->first_unacked->fast_kill();
         );
         fcb->first_unacked = second;
     }

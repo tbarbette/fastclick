@@ -172,29 +172,29 @@ public:
      * @param _flowBuffer The FlowBuffer to which this iterator is linked
      * @param _entry The entry in the buffer to which this iterator points
      */
-    FlowBufferIter(FlowBuffer *_flowBuffer, Packet* _entry);
+    inline FlowBufferIter(FlowBuffer *_flowBuffer, Packet* _entry);
 
     /** @brief Compare two FlowBufferIter
      * @param other The FlowBufferIter to be compared to
      * @return True if the two iterators point to the same packet
      */
-    bool operator==(const FlowBufferIter& other) const;
+    inline bool operator==(const FlowBufferIter& other) const;
 
     /** @brief Compare two FlowBufferIter
      * @param other The FlowBufferIter to be compared to
      * @return False if the two iterators point to the same packet
      */
-    bool operator!=(const FlowBufferIter& other) const;
+    inline bool operator!=(const FlowBufferIter& other) const;
 
     /** @brief Return the packet to which this iterator points
      * @return The packet to which this iterator points
      */
-    WritablePacket*& operator*();
+    inline WritablePacket*& operator*();
 
     /** @brief Move the iterator to the next packet in the buffer
      * @return The iterator moved
      */
-    FlowBufferIter& operator++();
+    inline FlowBufferIter& operator++();
 
 private:
     FlowBuffer *flowBuffer;
@@ -213,29 +213,29 @@ public:
      * @param _flowBuffer The FlowBuffer to which this iterator is linked
      * @param _entry The entry in the buffer to which this iterator points
      */
-    FlowBufferContentIter(FlowBuffer *_flowBuffer, Packet* packet, int posInFirstPacket=0);
+    inline FlowBufferContentIter(FlowBuffer *_flowBuffer, Packet* packet, int posInFirstPacket=0);
 
     /** @brief Compare two FlowBufferContentIter
      * @param other The FlowBufferContentIter to be compared to
      * @return True if the two iterators point to the same data in the flow
      */
-    bool operator==(const FlowBufferContentIter& other) const;
+    inline bool operator==(const FlowBufferContentIter& other) const;
 
     /** @brief Compare two FlowBufferContentIter
      * @param other The FlowBufferContentIter to be compared to
      * @return False if the two iterators point to the same data in the flow
      */
-    bool operator!=(const FlowBufferContentIter& other) const;
+    inline bool operator!=(const FlowBufferContentIter& other) const;
 
     /** @brief Return the byte to which this iterator points
      * @return The byte to which this iterator points
      */
-    unsigned char& operator*();
+    inline unsigned char& operator*();
 
     /** @brief Move the iterator to the next byte in the buffer
      * @return The iterator moved
      */
-    FlowBufferContentIter& operator++();
+    inline FlowBufferContentIter& operator++();
 
     inline operator bool() const {
         return entry != 0;
@@ -244,7 +244,7 @@ public:
     /**
      * Return all packets up to the current position, not included
      */
-    PacketBatch* flush();
+    inline PacketBatch* flush();
 
     inline Packet* current() {
         return entry;
@@ -261,6 +261,125 @@ private:
     Packet* entry;
     uint32_t offsetInPacket; // Current offset in the current packet
 };
+
+
+
+// FlowBuffer Iterator
+inline FlowBufferIter::FlowBufferIter(FlowBuffer *_flowBuffer,
+    Packet* _entry) : flowBuffer(_flowBuffer)
+{
+    entry = static_cast<WritablePacket*>(_entry);
+}
+
+inline WritablePacket*& FlowBufferIter::operator*()
+{
+    assert(entry != NULL);
+
+    return entry;
+}
+
+inline FlowBufferIter& FlowBufferIter::operator++()
+{
+    assert(entry != NULL);
+
+    entry = static_cast<WritablePacket*>(entry->next());
+
+    return *this;
+}
+
+
+inline bool FlowBufferIter::operator==(const FlowBufferIter& other) const
+{
+    if(this->flowBuffer != other.flowBuffer)
+        return false;
+
+    if(this->entry == NULL && other.entry == NULL)
+        return true;
+
+    if(this->entry != other.entry)
+        return false;
+
+    return true;
+}
+
+inline bool FlowBufferIter::operator!=(const FlowBufferIter& other) const
+{
+    return !(*this == other);
+}
+
+// FlowBufferContent Iterator
+inline FlowBufferContentIter::FlowBufferContentIter(FlowBuffer *_flowBuffer,
+    Packet* _entry, int posInFirstPacket) : flowBuffer(_flowBuffer), entry(_entry), offsetInPacket(posInFirstPacket)
+{
+    //The offset at first start must be valid
+    while (entry && entry->getContentOffset() + offsetInPacket >=
+        entry->length())
+    {
+        offsetInPacket = 0;
+        entry = entry->next();
+    }
+}
+
+inline bool FlowBufferContentIter::operator==(const FlowBufferContentIter& other) const
+{
+    if(this->flowBuffer != other.flowBuffer)
+        return false;
+
+    if(this->entry == NULL && other.entry == NULL)
+        return true;
+
+    if(this->entry != other.entry)
+        return false;
+
+    if(this->offsetInPacket != other.offsetInPacket)
+        return false;
+
+    return true;
+}
+
+inline bool FlowBufferContentIter::operator!=(const FlowBufferContentIter& other) const
+{
+    return !(*this == other);
+}
+
+inline unsigned char& FlowBufferContentIter::operator*()
+{
+    assert(entry != NULL);
+
+    unsigned char* content = static_cast<WritablePacket*>(entry)->getPacketContent();
+
+    return *(content + offsetInPacket);
+}
+
+
+inline FlowBufferContentIter& FlowBufferContentIter::operator++()
+{
+    assert(entry != NULL);
+
+    offsetInPacket++;
+
+    // Check if we are at the end of the packet and must therefore switch to
+    // the next one. We may have multiple empty packet
+    while (entry && entry->getContentOffset() + offsetInPacket >=
+        entry->length())
+    {
+        offsetInPacket = 0;
+        entry = entry->next();
+    }
+
+    return *this;
+}
+
+
+inline PacketBatch* FlowBufferContentIter::flush() {
+    if (entry == 0) {
+        return this->flowBuffer->dequeueAll();
+    } else {
+
+        return this->flowBuffer->dequeueUpTo(entry);
+    }
+}
+
 
 CLICK_ENDDECLS
 

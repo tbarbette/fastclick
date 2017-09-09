@@ -1059,7 +1059,7 @@ class FlowNodeHash : public FlowNode  {
             if (!growing()) {
                 click_chatter("%d collisions! Hint for a better hash table size (current is %d)!",i);
                 click_chatter("%d released in collision !",ri);
-                if (childs[idx].ptr == 0) {
+                if (childs[idx].ptr == 0 || (childs[idx].is_node() && childs[idx].node->released())) {
                     FlowNode* n = this->start_growing();
                     return n->find(data);
                 }

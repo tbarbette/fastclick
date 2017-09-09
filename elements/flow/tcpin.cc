@@ -156,7 +156,9 @@ eagain:
             {
                 if (fcb_in->common->state == TCPState::CLOSED) {
                     click_chatter("Renewing !");
-                    release_tcp_internal(fcb_stack);
+                    SFCB_STACK(
+                    release_tcp_internal(fcb_save);
+                    );
                     fcb_in->common = 0;
                     goto eagain;
                 } else {
@@ -354,6 +356,7 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
     auto &common = fcb_in->common;
     if (fcb_in->conn_release_fnt) {
         fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
+        fcb_in->conn_release_fnt = 0;
     }
      common->lock.acquire();
     //The last one release common
@@ -406,7 +409,9 @@ void TCPIn::releaseFCBState() {
     fcb_release_timeout();
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
     assert(fcb_data()->common);
-    release_tcp_internal(fcb_stack);
+    SFCB_STACK(
+    release_tcp_internal(fcb_save);
+    );
 }
 
 void TCPIn::closeConnection(Packet *packet, bool graceful)

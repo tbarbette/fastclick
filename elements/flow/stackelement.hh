@@ -108,46 +108,6 @@ protected:
     bool getAnnotationLastUseful(Packet* packet) const;
 
     /**
-     * @brief Get the offset at which the current useful content starts.
-     * It depends on the elements by which the packet went through. For instance, after TCPIn,
-     * the offset points to the TCP payload. After HTTPIn, the offset points to the body
-     * of the HTTP request/response.
-     * @param packet The packet
-     * @return The current offset of the content
-     */
-    inline static uint16_t getContentOffset(Packet* packet);
-
-    /**
-     * @brief Get the current useful content of the packet
-     * It depends on the elements by which the packet went through. For instance, after TCPIn,
-     * it points to the TCP payload. After HTTPIn, it points to the body
-     * of the HTTP request/response.
-     * @param packet The packet
-     * @return A pointer to the constant current useful content of the packet
-     */
-    inline static const unsigned char* getPacketContentConst(Packet* packet);
-
-    /**
-     * @brief Get the current useful content of the packet
-     * It depends on the elements by which the packet went through. For instance, after TCPIn,
-     * it points to the TCP payload. After HTTPIn, it points to the body
-     * of the HTTP request/response.
-     * @param packet The packet
-     * @return A pointer to the current useful content of the packet
-     */
-    inline static unsigned char* getPacketContent(WritablePacket* packet);
-
-    /**
-     * @brief Get the current useful content of the packet
-     * It depends on the elements by which the packet went through. For instance, after TCPIn,
-     * it points to the TCP payload. After HTTPIn, it points to the body
-     * of the HTTP request/response.
-     * @param packet The packet
-     * @return A pointer to the current useful content of the packet
-     */
-    inline static const unsigned char* getPacketContent(Packet* packet);
-
-    /**
      * @brief Search a given pattern in the given content. The content does not have
      * to be NULL-terminated.
      * @param content The content in which the pattern will be searched
@@ -300,57 +260,6 @@ private:
 
 };
 
-inline const unsigned char* StackElement::getPacketContentConst(Packet* p)
-{
-    uint16_t offset = getContentOffset(p);
-
-    return (p->data() + offset);
-}
-
-inline unsigned char* StackElement::getPacketContent(WritablePacket* p)
-{
-    uint16_t offset = getContentOffset(p);
-
-    return (p->data() + offset);
-}
-
-
-inline const unsigned char* StackElement::getPacketContent(Packet* p)
-{
-    uint16_t offset = getContentOffset(p);
-
-    return (p->data() + offset);
-}
-
-inline bool StackElement::isPacketContentEmpty(Packet* packet) const
-{
-    uint16_t offset = getContentOffset(packet);
-
-    if(offset >= packet->length())
-        return true;
-    else
-        return false;
-}
-
-inline uint16_t StackElement::getPacketContentSize(Packet *packet)
-{
-    uint16_t offset = getContentOffset(packet);
-
-    return packet->length() - offset;
-}
-
-inline void StackElement::setContentOffset(Packet* p, uint16_t offset)
-{
-    p->set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
-}
-
-inline uint16_t StackElement::getContentOffset(Packet* p)
-{
-    return p->anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
-}
-
-
-
 template<typename T>
 class StackSpaceElement : public StackElement {
 public :
@@ -482,15 +391,14 @@ struct BufferData {
  * about a closing state
  */
 template<class Derived, typename T> class StackStateElement : public StackElement {
-    struct AT : public FlowReleaseChain {
+    struct AT : public StackReleaseChain {
         T v;
         bool seen;
     };
 public :
 
 
-    StackStateElement() CLICK_COLD;
-    virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+    StackStateElement() CLICK_COLD {};
     virtual const size_t flow_data_size()  const { return sizeof(AT); }
 
     /**
@@ -528,8 +436,9 @@ public :
          if (!my_fcb->seen) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
                  my_fcb->seen = true;
-                 if (!this->registerConnectionClose(my_fcb, &release_fnt, this)) {
-                     click_chatter("ERROR : No element handle the connection");
+                 if (!this->registerConnectionClose(my_fcb, &release_fnt, (void*)this)) {
+                     click_chatter("ERROR in %p{element}: No element handle the connection",this);
+                     abort();
                  }
              }
          }
@@ -545,12 +454,13 @@ private:
 };
 
 template <class Derived, typename T>
-class StackBufferElement : public StackStateElement<StackStateElement<Derived, BufferData<T>>, BufferData<T>>
+class StackBufferElement : public StackStateElement<Derived, BufferData<T>>
 {
+    public:
 
     const char *processing() const final    { return Element::PUSH; }
 
-    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow) final
+    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
     {
         auto it = fcb_data->flowBuffer.enqueueAllIter(flow);
         int action = static_cast<Derived*>(this)->process_data(&fcb_data->userdata,it);

@@ -97,12 +97,6 @@ int FlowBuffer::searchInFlow(const char *pattern)
 
 Packet* FlowBuffer::dequeue()
 {
-    if(!isInitialized())
-    {
-        click_chatter("Error: FlowBuffer not initialized");
-        return NULL;
-    }
-
     // Remove the node from the beginning of the list
     if(head == NULL)
         return NULL;
@@ -119,12 +113,6 @@ Packet* FlowBuffer::dequeue()
 
 PacketBatch* FlowBuffer::dequeueAll()
 {
-    if(!isInitialized())
-    {
-        click_chatter("Error: FlowBuffer not initialized");
-        return NULL;
-    }
-
     // Remove the node from the beginning of the list
     if(head == NULL)
         return NULL;
@@ -248,7 +236,7 @@ void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length, StackEleme
         assert(packet != NULL);
 
         // Check how much data we have to remove in this packet
-        uint32_t inThisPacket = packet->length() - offsetInPacket - StackElement::getContentOffset(packet);
+        uint32_t inThisPacket = packet->length() - offsetInPacket - packet->getContentOffset();
 
         // Update the counter of remaining data to remove
         if(inThisPacket > toRemove)
@@ -310,7 +298,7 @@ int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement, Stac
 
             // Copy the rest of the replacement where we added bytes
             for(int i = 0; i < lenReplacement - toReplace; ++i)
-                owner->getPacketContent(entry)[offsetInPacket + i] = replacement[toReplace + i];
+                entry->getPacketContent()[offsetInPacket + i] = replacement[toReplace + i];
 
             return 1;
     }
@@ -323,96 +311,6 @@ int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement, Stac
     return 1;
 }
 
-
-
-// FlowBuffer Iterator
-FlowBufferIter::FlowBufferIter(FlowBuffer *_flowBuffer,
-    Packet* _entry) : flowBuffer(_flowBuffer)
-{
-    entry = static_cast<WritablePacket*>(_entry);
-}
-
-WritablePacket*& FlowBufferIter::operator*()
-{
-    assert(entry != NULL);
-
-    return entry;
-}
-
-FlowBufferIter& FlowBufferIter::operator++()
-{
-    assert(entry != NULL);
-
-    entry = static_cast<WritablePacket*>(entry->next());
-
-    return *this;
-}
-
-
-bool FlowBufferIter::operator==(const FlowBufferIter& other) const
-{
-    if(this->flowBuffer != other.flowBuffer)
-        return false;
-
-    if(this->entry == NULL && other.entry == NULL)
-        return true;
-
-    if(this->entry != other.entry)
-        return false;
-
-    return true;
-}
-
-bool FlowBufferIter::operator!=(const FlowBufferIter& other) const
-{
-    return !(*this == other);
-}
-
-// FlowBufferContent Iterator
-FlowBufferContentIter::FlowBufferContentIter(FlowBuffer *_flowBuffer,
-    Packet* _entry, int posInFirstPacket) : flowBuffer(_flowBuffer), entry(_entry), offsetInPacket(posInFirstPacket)
-{
-    //The offset at first start must be valid
-    while (entry && StackElement::getContentOffset(entry) + offsetInPacket >=
-        entry->length())
-    {
-        entry = entry->next();
-    }
-
-
-}
-
-bool FlowBufferContentIter::operator==(const FlowBufferContentIter& other) const
-{
-    if(this->flowBuffer != other.flowBuffer)
-        return false;
-
-    if(this->entry == NULL && other.entry == NULL)
-        return true;
-
-    if(this->entry != other.entry)
-        return false;
-
-    if(this->offsetInPacket != other.offsetInPacket)
-        return false;
-
-    return true;
-}
-
-bool FlowBufferContentIter::operator!=(const FlowBufferContentIter& other) const
-{
-    return !(*this == other);
-}
-
-unsigned char& FlowBufferContentIter::operator*()
-{
-    assert(entry != NULL);
-
-    unsigned char* content = StackElement::getPacketContent(static_cast<WritablePacket*>(entry));
-
-    return *(content + offsetInPacket);
-}
-
 void FlowBufferContentIter::repair()
 {
     // This method must be called after a deletion at the end of a packet
@@ -423,10 +321,10 @@ void FlowBufferContentIter::repair()
     WritablePacket* wPacket = static_cast<WritablePacket*>(entry);
 
     // Check if we are pointing after the content of the current packet
-    if(offsetInPacket >= StackElement::getPacketContentSize(wPacket))
+    if(offsetInPacket >= wPacket->getPacketContentSize())
     {
         // If so, we move to the next packet
-        uint16_t contentSize = StackElement::getPacketContentSize(wPacket);
+        uint16_t contentSize = wPacket->getPacketContentSize();
         uint16_t overflow = offsetInPacket - contentSize;
         offsetInPacket = overflow;
         entry = entry->next();
@@ -439,34 +337,6 @@ void FlowBufferContentIter::repair()
         else
             offsetInPacket = 0;
     }
-}
-
-FlowBufferContentIter& FlowBufferContentIter::operator++()
-{
-    assert(entry != NULL);
-
-    offsetInPacket++;
-
-    // Check if we are at the end of the packet and must therefore switch to
-    // the next one. We may have multiple empty packet
-    while (entry && StackElement::getContentOffset(entry) + offsetInPacket >=
-        entry->length())
-    {
-        offsetInPacket = 0;
-        entry = entry->next();
-    }
-
-    return *this;
-}
-
-PacketBatch* FlowBufferContentIter::flush() {
-    if (entry == 0) {
-        return this->flowBuffer->dequeueAll();
-    } else {
-
-        return this->flowBuffer->dequeueUpTo(entry);
-    }
-
 }
 
 CLICK_ENDDECLS

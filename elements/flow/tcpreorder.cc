@@ -112,9 +112,11 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
 
             // Compute the sequence number of the next packet
             tcpreorder->expectedPacketSeq = getNextSequenceNumber(packet);
+            tcpreorder->lastSent = currentSeq;
             ++count;
             last = packet;
         }
+
         //If we are here, everything is in order
         output_push_batch(0,batch);
         //click_chatter("Pushed ordered batch flow %p uc %d",tcpreorder, fcb_stack->count());
@@ -200,7 +202,7 @@ bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* 
         // retransmission for a packet we already have in the waiting list so we can discard
         // the retransmission
         // Always retransmit will be set for SYN, as the whole list will be flushed
-        if(noutputs() == 2) // && (always_retransmit || SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
+        if(noutputs() == 2 && (always_retransmit || SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
         {
             PacketBatch *batch = PacketBatch::make_from_packet(packet);
             output_push_batch(1, batch);

@@ -235,6 +235,7 @@ public :
     inline void append_packet(Packet* p) {
         tail()->set_next(p);
         set_tail(p);
+        p->set_next(0);
         set_count(count() + 1);
     }
 

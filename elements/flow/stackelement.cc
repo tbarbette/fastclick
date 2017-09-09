@@ -45,7 +45,7 @@ int StackElement::initialize(ErrorHandler*  errh)
 {
     buildFunctionStack();
 
-    return Element::initialize(errh);
+    return 0;
 }
 
 
@@ -127,8 +127,10 @@ void StackElement::closeConnection(Packet *packet, bool graceful)
 bool StackElement::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk)
 {
     // Call the "closeConnection" method on every element in the stack
-    if(previousStackElement == NULL)
+    if(previousStackElement == NULL) {
+        click_chatter("No previous stack in %p{element}", this);
         return false;
+    }
 
     return previousStackElement->registerConnectionClose(fcb_chain, fnt, thunk);
 }

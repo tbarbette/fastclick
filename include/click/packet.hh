@@ -160,6 +160,11 @@ class Packet { public:
     }
 #endif
 
+    inline uint16_t getContentOffset() const;
+    inline void setContentOffset(uint16_t offset);
+    inline const unsigned char* getPacketContent();
+    inline bool isPacketContentEmpty() const;
+    inline uint16_t getPacketContentSize() const;
 
     /** @brief Add space for a header before the packet.
      * @param len amount of space to add
@@ -900,6 +905,7 @@ class WritablePacket : public Packet { public:
     inline click_icmp *icmp_header() const;
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
+    inline unsigned char* getPacketContent();
 
     inline void rewrite_ips(IPPair pair, bool is_tcp = true);
 
@@ -2939,6 +2945,51 @@ WritablePacket::rewrite_ipport(IPAddress ip, uint16_t port,const int shift, bool
         click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
 typedef Packet::PacketType PacketType;
+
+
+inline unsigned char* WritablePacket::getPacketContent()
+{
+    uint16_t offset = getContentOffset();
+
+    return (data() + offset);
+}
+
+
+inline const unsigned char* Packet::getPacketContent()
+{
+    uint16_t offset = getContentOffset();
+
+    return (data() + offset);
+}
+
+inline bool Packet::isPacketContentEmpty() const
+{
+    uint16_t offset = getContentOffset();
+
+    if(offset >= length())
+        return true;
+    else
+        return false;
+}
+
+inline uint16_t Packet::getPacketContentSize() const
+{
+    uint16_t offset = getContentOffset();
+
+    return length() - offset;
+}
+
+inline void Packet::setContentOffset(uint16_t offset)
+{
+    set_anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET, offset);
+}
+
+inline uint16_t Packet::getContentOffset() const
+{
+    return anno_u16(MIDDLEBOX_CONTENTOFFSET_OFFSET);
+}
+
+
 
 CLICK_ENDDECLS
 #endif

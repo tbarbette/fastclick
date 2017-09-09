@@ -31,7 +31,7 @@ SimpleTCPRetransmitter([INITIALBUFFERSIZE])
 
 
 
-class SimpleTCPRetransmitter : public FlowStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>, public TCPElement
+class SimpleTCPRetransmitter : public StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>, public TCPElement
 {
 public:
     /**
@@ -58,6 +58,13 @@ public:
     static const int timeout = 0; //Timeout will be managed by TCP
 
     void release_flow(fcb_transmit_buffer*);
+
+
+    virtual void addStackElementInList(StackElement* element, int port) {
+        if (port != 0)
+            return;
+        StackElement::addStackElementInList(element,port);
+    }
 private:
 
     /**
