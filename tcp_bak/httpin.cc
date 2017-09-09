@@ -55,7 +55,7 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 	    if(source != NULL)
 	    {
 		uint32_t offset = (int)(source - (char*)packet->data() + 4);
-		setContentOffset(packet, offset);
+		packet->setContentOffset(, offset);
 		fcb->httpin.headerFound = true;
 	    }
 

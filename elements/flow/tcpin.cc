@@ -193,7 +193,7 @@ eagain:
 
             // Compute the offset of the TCP payload
             uint16_t offset = getPayloadOffset(packet);
-            setContentOffset(packet, offset);
+            packet->setContentOffset(offset);
 
             ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
             ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
@@ -321,7 +321,7 @@ eagain:
                 fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
             }
             uint16_t offset = getPayloadOffset(p);
-            setContentOffset(p, offset);
+            p->setContentOffset(offset);
 
             return p;
         }
@@ -528,7 +528,7 @@ void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t leng
     // Used to have the position in the TCP flow and not in the packet
     uint16_t tcpOffset = getPayloadOffset(packet);
 
-    uint16_t contentOffset = getContentOffset(packet);
+    uint16_t contentOffset = packet->getContentOffset();
     position += contentOffset;
     list->addModification(seqNumber, seqNumber + position - tcpOffset, -((int)length));
 
@@ -558,7 +558,7 @@ WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
     uint16_t tcpOffset = getPayloadOffset(packet);
-    uint16_t contentOffset = getContentOffset(packet);
+    uint16_t contentOffset = packet->getContentOffset();
     position += contentOffset;
     getModificationList(packet)->addModification(seqNumber, seqNumber + position - tcpOffset,
          (int)length);

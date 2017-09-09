@@ -118,13 +118,6 @@ protected:
     char* searchInContent(char *content, const char *pattern, uint32_t length);
 
     /**
-     * @brief Set the offset at which the current useful content starts.
-     * @param packet The packet
-     * @param offset The new offset
-     */
-    inline static void setContentOffset(Packet* packet, uint16_t offset) ;
-
-    /**
      * @brief Set the INITIAL_ACK annotation of the packet. This annotation stores the initial
      * ACK number that the packet had before modification.
      * @param packet The packet

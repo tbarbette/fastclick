@@ -160,12 +160,6 @@ class Packet { public:
     }
 #endif
 
-    inline uint16_t getContentOffset() const;
-    inline void setContentOffset(uint16_t offset);
-    inline const unsigned char* getPacketContent();
-    inline bool isPacketContentEmpty() const;
-    inline uint16_t getPacketContentSize() const;
-
     /** @brief Add space for a header before the packet.
      * @param len amount of space to add
      * @return packet with added header space, or null on failure
@@ -373,7 +367,14 @@ class Packet { public:
     inline const click_icmp *icmp_header() const;
     inline const click_tcp *tcp_header() const;
     inline const click_udp *udp_header() const;
+
+    inline uint16_t getContentOffset() const;
+    inline void setContentOffset(uint16_t offset);
+    inline const unsigned char* getPacketContent();
+    inline bool isPacketContentEmpty() const;
+    inline uint16_t getPacketContentSize() const;
     //@}
+
 
 #if CLICK_LINUXMODULE
 # if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24) && NET_SKBUFF_DATA_USES_OFFSET) || \

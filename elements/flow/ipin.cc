@@ -30,7 +30,7 @@ void IPIn::push_batch(int port, PacketBatch* flow)
         const click_ip *iph = packet->ip_header();
         unsigned iph_len = iph->ip_hl << 2;
         uint16_t offset = (uint16_t)(packet->network_header() + iph_len - packet->data());
-        setContentOffset(packet, offset);
+        packet->setContentOffset(offset);
         return packet;
     }, flow);
     output(0).push_batch(flow);
