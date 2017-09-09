@@ -9,6 +9,12 @@
 
 CLICK_DECLS
 
+
+struct StackReleaseChain {
+    SubFlowRealeaseFnt previous_fnt;
+    void* previous_thunk;
+};
+
 /*
 =c
 
@@ -244,6 +250,11 @@ protected:
     virtual void closeConnection(Packet *packet, bool graceful);
 
     /**
+     * @return true if event was handled
+     */
+    virtual bool registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk);
+
+    /**
      * @brief Indicate whether a given packet is the last useful one for this side of the flow
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet
@@ -456,19 +467,96 @@ struct BufferData {
     FlowBuffer flowBuffer;
 };
 
+
+
+/**
+ * StackStateElement is like StackSpaceElement but subscribe to the stack for connection open and close events
+ *
+ * The child must implement :
+ * bool new_flow(T*, Packet*);
+ * void push_batch(int port, T*, Packet*);
+ * void release_flow(T*);
+ *
+ * This is the equivalent to FlowStateElement but use the last Stack element to
+ * manage the state instead of relying on timeout/looking at the packet to learn
+ * about a closing state
+ */
+template<class Derived, typename T> class StackStateElement : public StackElement {
+    struct AT : public FlowReleaseChain {
+        T v;
+        bool seen;
+    };
+public :
+
+
+    StackStateElement() CLICK_COLD;
+    virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+    virtual const size_t flow_data_size()  const { return sizeof(AT); }
+
+    /**
+     * CRTP virtual
+     */
+    inline bool new_flow(T*, Packet*) {
+        return true;
+    }
+
+    /**
+     * Return the T type for a given FCB
+     */
+    inline T* fcb_data_for(FlowControlBlock* fcb) {
+        AT* flowdata = static_cast<AT*>((void*)&fcb->data[_flow_data_offset]);
+        return &flowdata->v;
+    }
+
+    /**
+     * Return the T type in the current FCB on the stack
+     */
+    inline T* fcb_data() {
+        return fcb_data_for(fcb_stack);
+    }
+
+    static void release_fnt(FlowControlBlock* fcb, void* thunk ) {
+        Derived* derived = static_cast<Derived*>(thunk);
+        AT* my_fcb = reinterpret_cast<AT*>(&fcb->data[derived->_flow_data_offset]);
+        derived->release_flow(&my_fcb->v);
+        if (my_fcb->previous_fnt)
+            my_fcb->previous_fnt(fcb, my_fcb->previous_thunk);
+    }
+
+    void push_batch(int port,PacketBatch* head) final {
+         auto my_fcb = my_fcb_data();
+         if (!my_fcb->seen) {
+             if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
+                 my_fcb->seen = true;
+                 if (!this->registerConnectionClose(my_fcb, &release_fnt, this)) {
+                     click_chatter("ERROR : No element handle the connection");
+                 }
+             }
+         }
+         static_cast<Derived*>(this)->push_batch(port, &my_fcb->v, head);
+    };
+
+
+private:
+    inline AT* my_fcb_data() {
+        return static_cast<AT*>((void*)&fcb_stack->data[_flow_data_offset]);
+    }
+
+};
+
 template <class Derived, typename T>
-class StackBufferElement : public StackSpaceElement<BufferData<T>>
+class StackBufferElement : public StackStateElement<StackStateElement<Derived, BufferData<T>>, BufferData<T>>
 {
 
     const char *processing() const final    { return Element::PUSH; }
 
-    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
+    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow) final
     {
         auto it = fcb_data->flowBuffer.enqueueAllIter(flow);
         int action = static_cast<Derived*>(this)->process_data(&fcb_data->userdata,it);
         if (action < 0) {
             this->closeConnection((it.current() ? it.current() : flow->first()), true);
-            fcb_data->flowBuffer.dequeueAll()->fast_kill();
+            release_flow(fcb_data);
             return;
         } else if (action > 0) {
             this->closeConnection((it.current() ? it.current() : flow->first()), true);
@@ -485,7 +573,16 @@ class StackBufferElement : public StackSpaceElement<BufferData<T>>
         if (passed)
             this->checked_output_push_batch(action,passed);
     }
+
+    void release_flow(BufferData<T>* fcb) {
+        PacketBatch* batch = fcb->flowBuffer.dequeueAll();
+        if (batch) {
+            batch->fast_kill();
+        }
+    }
 };
+
+
 
 CLICK_ENDDECLS
 

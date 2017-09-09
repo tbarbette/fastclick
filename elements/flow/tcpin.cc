@@ -156,7 +156,7 @@ eagain:
             {
                 if (fcb_in->common->state == TCPState::CLOSED) {
                     click_chatter("Renewing !");
-                    release_tcp(fcb_stack,this);
+                    release_tcp_internal(fcb_stack);
                     fcb_in->common = 0;
                     goto eagain;
                 } else {
@@ -349,6 +349,28 @@ TCPIn* TCPIn::getReturnElement()
     return returnElement;
 }
 
+void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
+    auto fcb_in = fcb_data_for(fcb);
+    auto &common = fcb_in->common;
+    if (fcb_in->conn_release_fnt) {
+        fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
+    }
+     common->lock.acquire();
+    //The last one release common
+    if (--common->use_count == 0) {
+        common->lock.release();
+        //click_chatter("Ok, I'm releasing common ;)");
+        common->~tcp_common();
+        //lock->acquire();
+        //tin->tableTcpCommon->erase(flowID); //TODO : consume if it was not taken by the other side
+        poolFcbTcpCommon.release(common);
+        fcb_in->common = 0;
+        //lock->release();
+    }
+    else
+        common->lock.release();
+
+}
 
 void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
     TCPIn* tin = static_cast<TCPIn*>(thunk);
@@ -367,21 +389,11 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
     }
 
 */
-    auto &common = fcb_in->common;
-     common->lock.acquire();
-    //The last one release common
-    if (--common->use_count == 0) {
-        common->lock.release();
-        //click_chatter("Ok, I'm releasing common ;)");
-        common->~tcp_common();
-        //lock->acquire();
-        //tin->tableTcpCommon->erase(flowID); //TODO : consume if it was not taken by the other side
-        tin->poolFcbTcpCommon.release(common);
-        fcb_in->common = 0;
-        //lock->release();
-    }
-    else
-        common->lock.release();
+    tin->release_tcp_internal(fcb);
+
+    //TODO CALL  chain
+    if (fcb_in->previous_fnt)
+        fcb_in->previous_fnt(fcb, fcb_in->previous_thunk);
 
 }
 
@@ -394,7 +406,7 @@ void TCPIn::releaseFCBState() {
     fcb_release_timeout();
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
     assert(fcb_data()->common);
-    release_tcp(fcb_stack,this);
+    release_tcp_internal(fcb_stack);
 }
 
 void TCPIn::closeConnection(Packet *packet, bool graceful)
@@ -664,6 +676,15 @@ unsigned int TCPIn::determineFlowDirection()
     return getFlowDirection();
 }
 
+bool TCPIn::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk)
+{
+    auto fcb_in = fcb_data();
+    fcb_chain->previous_fnt = fcb_in->conn_release_fnt;
+    fcb_chain->previous_thunk = fcb_in->conn_release_thunk;
+    fcb_in->conn_release_fnt = fnt;
+    fcb_in->conn_release_thunk = thunk;
+    return true;
+}
 
 bool TCPIn::assignTCPCommon(Packet *packet)
 {

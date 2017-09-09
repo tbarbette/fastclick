@@ -124,6 +124,15 @@ void StackElement::closeConnection(Packet *packet, bool graceful)
     previousStackElement->closeConnection(packet, graceful);
 }
 
+bool StackElement::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk)
+{
+    // Call the "closeConnection" method on every element in the stack
+    if(previousStackElement == NULL)
+        return false;
+
+    return previousStackElement->registerConnectionClose(fcb_chain, fnt, thunk);
+}
+
 bool StackElement::allowResize() {
     // Call the "removeBytes" method on every element in the stack
     if(previousStackElement == NULL)

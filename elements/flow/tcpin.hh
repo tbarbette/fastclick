@@ -79,6 +79,8 @@ public:
 struct fcb_tcpin : public FlowReleaseChain
 {
     tcp_common *common;
+    SubFlowRealeaseFnt conn_release_fnt;
+    void* conn_release_thunk;
     HashTable<tcp_seq_t, ModificationList*>* modificationLists;
 };
 
@@ -228,9 +230,16 @@ private:
 
     /**
      * @brief Function called when the timeout expire or when all packets are
-     * released
+     * released. Will call the release chain.
      */
     static void release_tcp(FlowControlBlock* fcb, void* thunk);
+
+    /**
+     * Function to release internal flow state, called by release_tcp but do not call the FCB release chain. But do call the Stack release chain
+     */
+    void release_tcp_internal(FlowControlBlock* fcb);
+
+    bool registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk) override;
 
     /**
      * @brief Assign a tcp_common structure in the FCB of this flow. If the given packet
