@@ -160,7 +160,7 @@ eagain:
                     fcb_in->common = 0;
                     goto eagain;
                 } else {
-                    click_chatter("Warning: Unexpected SYN packet. Dropping it");
+                    click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d). Dropping it",fcb_in->common->state, isAck(p));
                     p->kill();
                     return NULL;
                 }
