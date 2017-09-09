@@ -143,8 +143,12 @@ eagain:
             WritablePacket* packet = p->uniqueify();
             manageOptions(packet);
             p = packet;
+
+            if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
+                fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
+            }
         }
-        else // At least one packet of the flow has been seen
+        else // At least one packet of this side of the flow has been seen
         {
             // The structure has been assigned so the three-way handshake is over
             // Check that the packet is not a SYN packet
@@ -161,9 +165,12 @@ eagain:
                     return NULL;
                 }
             } else if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
+                fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN; //No need to lock, only us can write this
             }
+
         }
+
 
         if(checkConnectionClosed(p))
         {
@@ -311,7 +318,7 @@ eagain:
             if (isAck(p)) {
                 fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
             }
-
+            assert(fcb_in->common->getLastAckReceived(getFlowDirection()));
             uint16_t offset = getPayloadOffset(p);
             setContentOffset(p, offset);
 

@@ -324,6 +324,17 @@ public :
     }
 
     /**
+     * Remove the first packet
+     */
+    PacketBatch* pop_front() {
+        if (count() == 1)
+            return 0;
+        PacketBatch* poped = PacketBatch::start_head(next());
+        poped->set_count(count() -1 );
+        poped->set_tail(tail());
+    }
+
+    /**
      * Build a batch from a linked list of packet
      *
      * @param head The first packet of the batch

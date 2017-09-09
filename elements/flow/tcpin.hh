@@ -55,12 +55,12 @@ public:
     }
 
     inline bool lastAckReceivedSet() {
-        return state == TCPState::OPEN;
+        return state >= TCPState::OPEN && state < TCPState::CLOSED;
     }
 
     inline void setLastAckReceived(int direction, tcp_seq_t ackNumber)
     {
-        if(!lastAckReceivedSet() || SEQ_GT(ackNumber, lastAckReceived[direction]))
+        if (SEQ_GT(ackNumber, lastAckReceived[direction]))
             lastAckReceived[direction] = ackNumber;
     }
 

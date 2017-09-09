@@ -933,8 +933,8 @@ Packet::clone(bool fast)
         }
         p->_data_packet = 0;
 #if HAVE_FLOW
-        if (fcb_stack)
-            fcb_stack->acquire(1);
+ //       if (fcb_stack)
+ //           fcb_stack->acquire(1);
 #endif
     } else {
         Packet* origin = this;

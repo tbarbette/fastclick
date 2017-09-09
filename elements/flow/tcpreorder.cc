@@ -9,7 +9,7 @@
 
 CLICK_DECLS
 
-TCPReorder::TCPReorder() : _mergeSort(true),_notimeout(false),_verbose(false)
+TCPReorder::TCPReorder() : _mergeSort(false),_notimeout(false),_verbose(false)
 {
 }
 
@@ -100,6 +100,7 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
             // We check if the current packet is the expected one (if not, there is a gap)
             if(currentSeq != tcpreorder->expectedPacketSeq)
             {
+
                 if (count != 0) {
                     PacketBatch* second;
                     batch->cut(last, count, second);
@@ -121,7 +122,7 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
 
     }
     unordered:
-    //click_chatter("Unordered...");
+    //click_chatter("Flow is now unordered... Awaiting %lu, have %lu", tcpreorder->expectedPacketSeq, getSequenceNumber(batch->first()));
 
     int num = batch->count();
     // Complexity: O(k) (k elements in the batch)
@@ -143,7 +144,10 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
         }
         else
         {
-            putPacketInList(tcpreorder, packet); // Put the packet directly at the right position O(n + k)
+            if (!putPacketInList(tcpreorder, packet)) {
+                num--;
+                continue;
+            }
         }
     }
 
@@ -164,9 +168,19 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
         assert(tcpreorder->packetListLength);
         assert(fcb_stack->release_fnt);
     }
-
+    /*
+    Packet* p = tcpreorder->packetList;
+    int c = 0;
+    while (p != 0) {
+        c++;
+        p = p->next();
+    }
+    assert(tcpreorder->packetListLength == c);
+    click_chatter("reorder acquire, %d in list, awaiting %lu",tcpreorder->packetListLength,tcpreorder->expectedPacketSeq);
+    */
     fcb_update((before - tcpreorder->packetListLength) - num);
     if (inorderBatch) {
+        //click_chatter("Hole is filled, flushing %d", inorderBatch->count() );
         output_push_batch(0,inorderBatch);
     }
 }
@@ -186,7 +200,7 @@ bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* 
         // retransmission for a packet we already have in the waiting list so we can discard
         // the retransmission
         // Always retransmit will be set for SYN, as the whole list will be flushed
-        if(noutputs() == 2 && (always_retransmit || SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
+        if(noutputs() == 2) // && (always_retransmit || SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
         {
             PacketBatch *batch = PacketBatch::make_from_packet(packet);
             output_push_batch(1, batch);
@@ -226,7 +240,7 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         // them with the new alignment.
         if(SEQ_LT(currentSeq, tcpreorder->expectedPacketSeq))
         {
-            click_chatter("Warning: received a retransmission with a different split (current %lu, expected %lu)",currentSeq, tcpreorder->expectedPacketSeq);
+            click_chatter("Warning: received a retransmission with a different split (current %lu, expected %lu, last %lu)",currentSeq, tcpreorder->expectedPacketSeq, (last?getSequenceNumber(last):0));
             #ifndef HAVE_FLOW
             // Warning if the system is used outside middleclick
             click_chatter("This may be the sign that a second flow is interfering, this can cause bugs.");
@@ -304,14 +318,14 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         batch->set_count(count);
         batch->set_tail(last);
         last->set_next(0);
-        flow_assert(batch->find_count() == count());
+        flow_assert(batch->find_count() == count);
 
         return batch;
     }
     return 0;
 }
 
-void TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* packetToAdd)
+bool TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* packetToAdd)
 {
     Packet* last = NULL;
     Packet* packetNode = tcpreorder->packetList;
@@ -319,13 +333,18 @@ void TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* pack
     // Browse the list until we find a packet with a greater sequence number than the
     // packet to add in the list
     while(packetNode != NULL
-        && (SEQ_LT(getSequenceNumber(packetNode), pSeq)
-            || (getSequenceNumber(packetNode) == pSeq
-                && SEQ_LT(getAckNumber(packetNode), getAckNumber(packetToAdd)))))
+        && (SEQ_LT(getSequenceNumber(packetNode), pSeq)))
     {
         last = packetNode;
         packetNode = packetNode->next();
     }
+
+    if (packetNode && (getSequenceNumber(packetNode) == pSeq)) {
+        packetToAdd -> kill();
+        return false;
+    }
+
+    //SEQ_LT(getAckNumber(packetNode), getAckNumber(packetToAdd)))
 
     // Check if we need to add the node as the head of the list
     if(last == NULL)
@@ -335,6 +354,7 @@ void TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* pack
 
      // The node to add points to the first node with a greater sequence number
     packetToAdd->set_next(packetNode);
+    return true;
 }
 
 bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch* batch)
@@ -365,7 +385,7 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
         }
         // Update the expected sequence number
         tcpreorder->expectedPacketSeq = getSequenceNumber(packet);
-        //click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
+        click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
 
         //If there is no better TCP manager, we must ensure the flow stays alive
         if (!_tcp_context && !_notimeout) {
@@ -484,15 +504,18 @@ Packet* TCPReorder::sortList(Packet *list)
                     p = p->next();
                     psize--;
                 }
-                else if(SEQ_LT(getSequenceNumber(p), getSequenceNumber(q))
-                    || ((getSequenceNumber(p) == getSequenceNumber(q))
-                        && SEQ_LT(getAckNumber(p), getAckNumber(q))))
+                else if(SEQ_LT(getSequenceNumber(p), getSequenceNumber(q)))
                 {
                     /* First element of p is lower (or same);
                      * e must come from p. */
                     e = p;
                     p = p->next();
                     psize--;
+                } else if (getSequenceNumber(p) == getSequenceNumber(q)
+                        && SEQ_LT(getAckNumber(p), getAckNumber(q))) {
+                    //TODO
+                    assert(false);
+                    p->kill();
                 }
                 else
                 {

@@ -120,7 +120,7 @@ private:
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet to add
      */
-    void putPacketInList(struct fcb_tcpreorder *fcb, Packet* packet);
+    bool putPacketInList(struct fcb_tcpreorder *fcb, Packet* packet);
 
     /**
      * @brief Send the in-order packets from the list of waiting packets

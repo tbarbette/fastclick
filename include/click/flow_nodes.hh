@@ -1028,16 +1028,7 @@ class FlowNodeHash : public FlowNode  {
     #endif
                 idx = next_idx(idx);
                 i++;
-    #if DEBUG_CLASSIFIER > 2
-                    for (int j = 0; j < capacity(); j++) {
-                        if (!childs[idx].ptr)
-                            click_chatter("[%d] = 0", j);
-                        else if (childs[idx].is_node())
-                            click_chatter("[%d] released = %d", j,childs[idx].node->released());
-                        else
-                            click_chatter("[%d] leaf", j);
-                    }
-    #endif
+
     #if DEBUG_CLASSIFIER
                     assert(i <= capacity());
     #endif
