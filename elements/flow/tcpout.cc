@@ -184,7 +184,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
     TCPState::Value state = fcb_in->common->state; //Read-only for fast path
     if ((state == TCPState::BEING_CLOSED_GRACEFUL_2 ||
             state == TCPState::CLOSED)) {
-            click_chatter("RELEASING FCB STATE");
+//            click_chatter("RELEASING FCB STATE");
             inElement->releaseFCBState();
     }
 

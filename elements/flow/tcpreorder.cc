@@ -385,7 +385,7 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
         }
         // Update the expected sequence number
         tcpreorder->expectedPacketSeq = getSequenceNumber(packet);
-        click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
+        //click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
 
         //If there is no better TCP manager, we must ensure the flow stays alive
         if (!_tcp_context && !_notimeout) {

@@ -318,7 +318,6 @@ eagain:
             if (isAck(p)) {
                 fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
             }
-            assert(fcb_in->common->getLastAckReceived(getFlowDirection()));
             uint16_t offset = getPayloadOffset(p);
             setContentOffset(p, offset);
 
