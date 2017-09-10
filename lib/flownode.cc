@@ -440,26 +440,102 @@ FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count) {
     return fh;
 }
 
-
 template<int capacity_n>
-void FlowNodeHash<capacity_n>::renew() {
-    _released = false;
-#if DEBUG_CLASSIFIER_CHECK
-    assert(num == 0);
-    assert(!growing());
-    for (int i = 0; i < capacity(); i++) {
-        if (childs[i].ptr) {
-            assert(childs[i].ptr != DESTRUCTED_NODE);
-            if (childs[i].is_leaf()) {
-                assert(childs[i].leaf == NULL);
-            } else {
-                assert(childs[i].node->released());
+FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
+        //click_chatter("Searching for %d in hash table leaf %d",data,leaf);
+
+        flow_assert(getNum() <= max_highwater());
+        int i = 0;
+
+        unsigned int idx;
+
+        if (level()->is_long())
+            idx = hash64(data.data_32);
+        else
+            idx = hash32(data.data_32);
+
+        unsigned int insert_idx = UINT_MAX;
+        int ri = 0;
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
+#endif
+        if (unlikely(growing())) { //Growing means the table is currently in destructions, so we check for DESTRUCTED_NODE pointers also, and no insert_idx trick
+            while (childs[idx].ptr) {
+                if (childs[idx].ptr != DESTRUCTED_NODE && childs[idx].data().data_64 == data.data_64)
+                    break;
+                idx = next_idx(idx);
+                i++;
+    #if DEBUG_CLASSIFIER > 1
+                assert(i <= capacity());
+    #endif
+            }
+        } else {
+            while (childs[idx].ptr) {
+                if (childs[idx].ptr == DESTRUCTED_NODE || childs[idx].data().data_64 != data.data_64) {
+                    if (insert_idx == UINT_MAX &&  childs[idx].is_node() && childs[idx].node->released()) {
+                        insert_idx = idx;
+                        ri ++;
+                    }
+                } else {
+                    if (insert_idx != UINT_MAX) {
+                        debug_flow("Swap IDX %d<->%d",insert_idx,idx);
+                        FlowNodePtr tmp = childs[insert_idx];
+                        childs[insert_idx] = childs[idx];
+                        childs[idx] = tmp;
+                        idx = insert_idx;
+                    }
+                    goto found;
+                }
+    #if DEBUG_CLASSIFIER > 1
+                click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].data().data_64, data.data_64);
+    #endif
+                idx = next_idx(idx);
+                i++;
+
+    #if DEBUG_CLASSIFIER
+                    assert(i <= capacity());
+    #endif
+            }
+            if (insert_idx != UINT_MAX) {
+                debug_flow("Recovered IDX %d",insert_idx);
+                /*idx = next_idx(idx);
+                int j = 0;
+                //If we merge a hole, delete the rest
+                THIS IS WRONG
+                while (j < 16 && childs[idx].ptr && childs[idx].is_node() && childs[idx].node->released()) {
+                    childs[idx].node->destroy();
+                    childs[idx].node = 0;
+                    idx = next_idx(idx);
+                    j ++;
+                }*/
+
+                idx = insert_idx;
             }
         }
-    }
-#endif
-}
+        found:
 
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("Final Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
+#endif
+
+        if (i > (capacity() / 10)) {
+            if (!growing()) {
+                click_chatter("%d collisions! Hint for a better hash table size (current is %d)!",i);
+                click_chatter("%d released in collision !",ri);
+                if (childs[idx].ptr == 0 || (childs[idx].is_node() && childs[idx].node->released())) {
+                    FlowNode* n = this->start_growing();
+                    return n->find(data);
+                }
+            }
+        }
+
+        return &childs[idx];
+    }
+/*template<int capacity_n>
+void FlowNodeHash<capacity_n>::renew() {
+    _released = false;
+
+}*/
 
 template<int capacity_n>
 void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData data) {
@@ -469,18 +545,17 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
         idx = hash64(data.data_32);
     else
         idx = hash32(data.data_32);
-#if DEBUG_CLASSIFIER_CHECK
-    int i = 0;
-#endif
+    int i = 0; //Collision number
     while (childs[idx].ptr != child.ptr) {
         idx = next_idx(idx);
+        ++i;
 #if DEBUG_CLASSIFIER_CHECK
-        assert(i++ < capacity());
+        assert(i < capacity());
 #endif
     }
 
     if (child.is_leaf()) {
-        childs[idx].ptr = NULL; //FCB deletion is handled by the caller which goes bottom up
+        childs[idx].ptr = DESTRUCTED_NODE; //FCB deletion is handled by the caller which goes bottom up
     } else {
         if (unlikely(growing())) { //If we are growing, or the child is growing, we want to destroy the child definitively
             childs[idx].ptr = DESTRUCTED_NODE;
@@ -489,7 +564,22 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
             childs[idx].ptr = 0;
             child.node->destroy();
         } else {
-            child.node->release();
+            if (i > (capacity() / 20) && childs[next_idx(idx)].ptr == 0) { // Keep holes if there are quite a lot of collisions
+                childs[idx].ptr = 0;
+                child.node->destroy();
+                i--;
+                while (i > capacity() / 30 && idx > 0) {
+                    --idx;
+                    if (childs[idx].ptr == DESTRUCTED_NODE || (childs[idx].is_node() && childs[idx].node->released())) {
+                        childs[idx].node->destroy();
+                        childs[idx].ptr = 0;
+                    } else
+                        break;
+                    --i;
+                }
+            } else {
+                child.node->release();
+            }
         }
     }
     num--;

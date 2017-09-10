@@ -335,7 +335,7 @@ public:
 #if DEBUG_CLASSIFIER
         apply([](FlowNodePtr* p) {
             if (p->ptr && p->is_node()) {
-                assert(p->node->released());
+                flow_assert(p->node->released());
             }
         });
 #endif
@@ -399,7 +399,7 @@ public:
 
     virtual void release_child(FlowNodePtr fl, FlowNodeData data) = 0;
 
-    virtual void renew() {
+    inline void renew() {
         _released = false;
     }
 
@@ -727,10 +727,6 @@ public:
 		num--;
 	}
 
-	virtual void renew() {
-		_released = false;
-	}
-
 	virtual void release_child(FlowNode* child, FlowNodeData data) {
 		_remove(child);
 	}
@@ -775,26 +771,6 @@ public:
 		childs[child->data] = NULL;
 		num--;
 	}*/
-
-    virtual void renew() {
-        _released = false;
-        //TODO : disable check
-#if DEBUG_CLASSIFIER_CHECK
-        for (int i = 0; i < childs.size(); i++) {
-            if (childs[i].ptr) {
-                if (childs[i].is_leaf()) {
-                    assert(!childs[i].ptr);
-                    //childs[i].leaf = 0;
-                } else {
-                    assert(childs[i].node->released());
-                }
-            }
-        }
-#endif
-        assert(num == 0);
-        //num = 0;
-
-    }
 
     void release_child(FlowNodePtr child, FlowNodeData data) {
         if (child_deletable()) {
@@ -978,101 +954,8 @@ class FlowNodeHash : public FlowNode  {
     FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
 
 
-    FlowNodePtr* find_hash(FlowNodeData data) {
-        //click_chatter("Searching for %d in hash table leaf %d",data,leaf);
-
-
-        flow_assert(getNum() <= max_highwater());
-        int i = 0;
-
-        unsigned int idx;
-
-        if (level()->is_long())
-            idx = hash64(data.data_32);
-        else
-            idx = hash32(data.data_32);
-
-        unsigned int insert_idx = UINT_MAX;
-        int ri = 0;
-#if DEBUG_CLASSIFIER > 1
-        click_chatter("Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
-#endif
-        if (unlikely(growing())) { //Growing means the table is currently in destructions, so we check for -1 pointers also, and no insert_idx trick
-            while (childs[idx].ptr) {
-                if (childs[idx].ptr != DESTRUCTED_NODE && childs[idx].data().data_64 == data.data_64)
-                    break;
-                idx = next_idx(idx);
-                i++;
-    #if DEBUG_CLASSIFIER > 1
-                assert(i <= capacity());
-    #endif
-            }
-        } else {
-            while (childs[idx].ptr) {
-                flow_assert(childs[idx].ptr != DESTRUCTED_NODE);
-                if (childs[idx].data().data_64 != data.data_64) {
-                    if (insert_idx == UINT_MAX &&  childs[idx].is_node() && childs[idx].node->released()) {
-                        insert_idx = idx;
-                        ri ++;
-                    }
-                } else {
-                    if (insert_idx != UINT_MAX) {
-                        debug_flow("Swap IDX %d<->%d",insert_idx,idx);
-                        FlowNodePtr tmp = childs[insert_idx];
-                        childs[insert_idx] = childs[idx];
-                        childs[idx] = tmp;
-                        idx = insert_idx;
-                    }
-                    goto found;
-                }
-    #if DEBUG_CLASSIFIER > 1
-                click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].data().data_64, data.data_64);
-    #endif
-                idx = next_idx(idx);
-                i++;
-
-    #if DEBUG_CLASSIFIER
-                    assert(i <= capacity());
-    #endif
-            }
-            if (insert_idx != UINT_MAX) {
-                debug_flow("Recovered IDX %d",insert_idx);
-                /*idx = next_idx(idx);
-                int j = 0;
-                //If we merge a hole, delete the rest
-                THIS IS WRONG
-                while (j < 16 && childs[idx].ptr && childs[idx].is_node() && childs[idx].node->released()) {
-                    childs[idx].node->destroy();
-                    childs[idx].node = 0;
-                    idx = next_idx(idx);
-                    j ++;
-                }*/
-
-                idx = insert_idx;
-            }
-        }
-        found:
-
-#if DEBUG_CLASSIFIER > 1
-        click_chatter("Final Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
-#endif
-
-        if (i > (capacity() / 10)) {
-            if (!growing()) {
-                click_chatter("%d collisions! Hint for a better hash table size (current is %d)!",i);
-                click_chatter("%d released in collision !",ri);
-                if (childs[idx].ptr == 0 || (childs[idx].is_node() && childs[idx].node->released())) {
-                    FlowNode* n = this->start_growing();
-                    return n->find(data);
-                }
-            }
-        }
-
-        return &childs[idx];
-    }
-
-
-    virtual void renew() override;
+    //virtual void renew() override;
+    FlowNodePtr* find_hash(FlowNodeData data);
 
     void release_child(FlowNodePtr child, FlowNodeData data);
 
@@ -1200,20 +1083,6 @@ class FlowNodeTwoCase : public FlowNode  {
             return &_default;
     }
 
-    virtual void renew() {
-        click_chatter("TODO : renew two case");
-
-		_released = false;
-		/*
-		if (child.ptr) {
-			if (is_leaf())
-				child.leaf = NULL;
-			else
-				child.node->release();;
-		}
-		num = 0;*/
-    }
-
     void release_child(FlowNodePtr child, FlowNodeData data) override {
         click_chatter("TODO : release two case");
         /*if (child_deletable()) {
@@ -1295,19 +1164,6 @@ class FlowNodeThreeCase : public FlowNode  {
             return &childB;
         else
             return &_default;
-    }
-
-    virtual void renew() {
-        click_chatter("TODO renew threecase");
-		_released = false;
-		/*
-		if (child.ptr) {
-			if (is_leaf())
-				child.leaf = NULL;
-			else
-				child.node->release();;
-		}
-		num = 0;*/
     }
 
     void release_child(FlowNodePtr child, FlowNodeData data) {
