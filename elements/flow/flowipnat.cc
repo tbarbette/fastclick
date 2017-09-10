@@ -74,45 +74,47 @@ int FlowIPNAT::initialize(ErrorHandler *errh) {
         state &s = _state.get_value_for_thread(i);
         int min_port = 1024 + (n*ports_per_thread);
         int max_port = min_port + ports_per_thread;
-        s.available_ports.resize(ports_per_thread);
+        s.available_ports.initialize(ports_per_thread);
         for (int port = min_port; port < max_port; port++) {
-            s.available_ports.push_back(new PortRef(port));
+            s.available_ports.insert(new PortRef(port));
         }
         n++;
     }
     return 0;
 }
 
+PortRef* FlowIPNAT::pick_port() {
+    int i = 0;
+    PortRef* ref = 0;
+    if (_state->available_ports.is_empty()) {
+        return 0;
+    } else {
+        ref = _state->available_ports.extract();
+        while (ref->ref.value() > 0) {
+            _state->available_ports.insert(ref);
+            if (++i > _state->available_ports.count()) { //Full loop, stop here
+                return 0;
+            }
+        }
+    }
+    return ref;
+}
+
 bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
     IPAddress osip = IPAddress(p->ip_header()->ip_src);
     uint16_t oport = p->tcp_header()->th_sport;
-    PortRef* ref = 0;
-    if (_state->available_ports.empty()) {
-        for (int i = 0; i < _state->to_release.size(); i++) {
-            if (_state->to_release[i]->ref.value() == 0) {
-                ref = _state->to_release[i];
-            }
-        }
-        if (!ref) {
-            click_chatter("ERROR %p{element} : no more ports available !",this);
-            return false;
-        }
-    } else {
-        ref = _state->available_ports.front();
-        _state->available_ports.pop_front();
+    fcb->ref = pick_port();
+    if (!fcb->ref) {
+        click_chatter("ERROR %p{element} : no more ports available !",this);
     }
-    fcb->ref = ref;
-    NATEntryOUT out = {IPPort(osip,oport),ref};
-    _map.find_insert(ref->port, out);
+    NATEntryOUT out = {IPPort(osip,oport),fcb->ref};
+    _map.find_insert(fcb->ref->port, out);
     return true;
 }
 
 void FlowIPNAT::release_flow(NATEntryIN* fcb) {
-    if (fcb->ref->ref.dec_and_test()) {
-        _state->available_ports.push_back(fcb->ref);
-    } else {
-        _state->to_release.push_back(fcb->ref);
-    }
+    --fcb->ref->ref;
+    _state->available_ports.insert(fcb->ref);
 }
 
 void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {

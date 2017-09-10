@@ -52,14 +52,14 @@ public:
     int initialize(ErrorHandler *errh);
 
     static const int timeout = NAT_FLOW_TIMEOUT;
+    PortRef* pick_port();
     bool new_flow(NATEntryIN*, Packet*);
     void release_flow(NATEntryIN*);
 
     void push_batch(int, NATEntryIN*, PacketBatch *);
 private:
     struct state {
-        Deque<PortRef*> available_ports;
-        Deque<PortRef*> to_release;
+        DynamicRing<PortRef*> available_ports;
     };
     per_thread<state> _state;
 
