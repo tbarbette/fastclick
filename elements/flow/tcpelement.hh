@@ -225,6 +225,182 @@ TCPElement::getNextSequenceNumber(Packet* packet) const
     return nextSeq;
 }
 
+inline void TCPElement::computeTCPChecksum(WritablePacket *packet) const
+{
+    click_ip *iph = packet->ip_header();
+    click_tcp *tcph = packet->tcp_header();
+
+    unsigned plen = ntohs(iph->ip_len) - (iph->ip_hl << 2);
+    tcph->th_sum = 0;
+    unsigned csum = click_in_cksum((unsigned char *)tcph, plen);
+    tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
+}
+
+inline void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq) const
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    tcph->th_seq = htonl(seq);
+}
+
+inline tcp_seq_t TCPElement::getSequenceNumber(Packet* packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    return ntohl(tcph->th_seq);
+}
+
+inline tcp_seq_t TCPElement::getAckNumber(Packet* packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    return ntohl(tcph->th_ack);
+}
+
+inline void TCPElement::setAckNumber(WritablePacket* packet, tcp_seq_t ack) const
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    tcph->th_ack = htonl(ack);
+}
+
+inline uint16_t TCPElement::getWindowSize(Packet *packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    return ntohs(tcph->th_win);
+}
+
+inline void TCPElement::setWindowSize(WritablePacket *packet, uint16_t winSize) const
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    tcph->th_win = htons(winSize);
+}
+
+inline unsigned TCPElement::getPayloadLength(Packet* packet) const
+{
+    const click_ip *iph = packet->ip_header();
+    unsigned iph_len = iph->ip_hl << 2;
+    uint16_t ip_len = ntohs(iph->ip_len);
+
+    const click_tcp *tcph = packet->tcp_header();
+    unsigned tcp_offset = tcph->th_off << 2;
+
+    return ip_len - iph_len - tcp_offset;
+}
+
+inline unsigned char* TCPElement::getPayload(WritablePacket* packet) const
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+    return (unsigned char*)packet->transport_header() + tcph_len;
+}
+
+inline const unsigned char* TCPElement::getPayloadConst(Packet* packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+    return (const unsigned char*)packet->transport_header() + tcph_len;
+}
+
+inline void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload,
+    uint32_t length) const
+{
+    click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+
+    unsigned char* payloadPtr = (unsigned char*)packet->transport_header() + tcph_len;
+    memcpy(payloadPtr, payload, length);
+}
+
+inline uint16_t TCPElement::getPayloadOffset(Packet* packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    // Compute the offset of the TCP payload
+    unsigned tcph_len = tcph->th_off << 2;
+    uint16_t offset = (uint16_t)(packet->transport_header() + tcph_len - packet->data());
+
+    return offset;
+}
+
+
+inline uint16_t TCPElement::getSourcePort(Packet* packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    return ntohs(tcph->th_sport);
+}
+
+inline uint16_t TCPElement::getDestinationPort(Packet* packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+
+    return ntohs(tcph->th_dport);
+}
+
+inline bool TCPElement::isSyn(Packet* packet) const
+{
+    return checkFlag(packet, TH_SYN);
+}
+
+inline bool TCPElement::isFin(Packet* packet) const
+{
+    return checkFlag(packet, TH_FIN);
+}
+
+inline bool TCPElement::isRst(Packet* packet) const
+{
+    return checkFlag(packet, TH_RST);
+}
+
+inline bool TCPElement::isAck(Packet* packet) const
+{
+    return checkFlag(packet, TH_ACK);
+}
+
+inline bool TCPElement::checkFlag(Packet *packet, uint8_t flag) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+    uint8_t flags = tcph->th_flags;
+
+    // Check if the packet has the given flag
+    if(flags & flag)
+        return true;
+    else
+        return false;
+}
+
+inline uint8_t TCPElement::getFlags(Packet *packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+    return tcph->th_flags;
+}
+
+inline bool TCPElement::isJustAnAck(Packet* packet) const
+{
+    const click_tcp *tcph = packet->tcp_header();
+    uint8_t flags = tcph->th_flags;
+
+    // If we have a payload, we are more than just an ACK
+    if(getPayloadLength(packet) > 0)
+        return false;
+
+    //  If we have other flags, we are more than just an ACK
+    if(flags == TH_ACK)
+        return true;
+    else
+        return false;
+}
+
+
 CLICK_ENDDECLS
 
 #endif

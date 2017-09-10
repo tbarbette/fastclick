@@ -82,14 +82,12 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
             clone->set_network_header(packet->network_header());
             clone->set_transport_header(packet->transport_header());
 
-
             if (fcb->first_unacked) {
                 fcb->first_unacked->append_packet(clone);
             } else {
                 fcb->first_unacked = PacketBatch::make_from_packet(clone);
             }
         }
-
 
         if(batch != NULL)
             output_push_batch(0, batch);
@@ -162,15 +160,15 @@ void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
     Packet* next = fcb->first_unacked;
     Packet* last = 0;
     int count = 0;
-    tcp_seq_t lastSeq = 0;
+//    tcp_seq_t lastSeq = 0;
     while (next && (SEQ_LT(getSequenceNumber(next),seq))) {
-        if (lastSeq) {
+/*        if (lastSeq) {
         if (!SEQ_GT(getSequenceNumber(next), lastSeq)) {
             click_chatter("new %lu <= %lu",getSequenceNumber(next), lastSeq);
             assert(false);
         }
         }
-        lastSeq=getSequenceNumber(next);
+        lastSeq=getSequenceNumber(next);*/
         last = next;
         count++;
         next = next->next();
