@@ -444,6 +444,7 @@ FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count) {
 template<int capacity_n>
 void FlowNodeHash<capacity_n>::renew() {
     _released = false;
+#if DEBUG_CLASSIFIER_CHECK
     assert(num == 0);
     assert(!growing());
     for (int i = 0; i < capacity(); i++) {
@@ -456,6 +457,7 @@ void FlowNodeHash<capacity_n>::renew() {
             }
         }
     }
+#endif
 }
 
 

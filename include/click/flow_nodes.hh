@@ -779,6 +779,7 @@ public:
     virtual void renew() {
         _released = false;
         //TODO : disable check
+#if DEBUG_CLASSIFIER_CHECK
         for (int i = 0; i < childs.size(); i++) {
             if (childs[i].ptr) {
                 if (childs[i].is_leaf()) {
@@ -789,6 +790,7 @@ public:
                 }
             }
         }
+#endif
         assert(num == 0);
         //num = 0;
 
@@ -1200,8 +1202,9 @@ class FlowNodeTwoCase : public FlowNode  {
 
     virtual void renew() {
         click_chatter("TODO : renew two case");
-        /*
+
 		_released = false;
+		/*
 		if (child.ptr) {
 			if (is_leaf())
 				child.leaf = NULL;
@@ -1296,8 +1299,8 @@ class FlowNodeThreeCase : public FlowNode  {
 
     virtual void renew() {
         click_chatter("TODO renew threecase");
-        /*
 		_released = false;
+		/*
 		if (child.ptr) {
 			if (is_leaf())
 				child.leaf = NULL;
