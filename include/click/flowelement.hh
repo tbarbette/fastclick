@@ -268,6 +268,7 @@ public :
             this->fcb_release_timeout();
         }
         this->fcb_remove_release_fnt(my_fcb_data(), &release_fnt);
+        my_fcb_data()->seen = false;
     }
 
 private:

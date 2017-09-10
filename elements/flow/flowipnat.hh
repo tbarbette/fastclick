@@ -14,21 +14,24 @@ CLICK_DECLS
 CLICK_DECLS
 
 struct PortRef {
-    PortRef(uint16_t _port) : port(_port) {
+    PortRef(uint16_t _port) : port(_port), closing(false) {
         ref = 0;
     }
     uint16_t port;
     atomic_uint32_t ref;
+    bool closing;
 };
 
 
 struct NATEntryOUT {
     IPPort map;
     PortRef* ref;
+    bool fin_seen;
 };
 
 struct NATEntryIN {
     PortRef* ref;
+    bool fin_seen;
 };
 
 typedef HashTableMP<uint16_t,NATEntryOUT> NATHashtable;
