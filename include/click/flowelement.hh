@@ -255,6 +255,9 @@ public :
                  if (Derived::timeout > 0)
                      this->fcb_acquire_timeout(Derived::timeout);
                  this->fcb_set_release_fnt(my_fcb, &release_fnt);
+             } else { //TODO set early drop?
+                 head->fast_kill();
+                 return;
              }
          }
          static_cast<Derived*>(this)->push_batch(port, &my_fcb->v, head);

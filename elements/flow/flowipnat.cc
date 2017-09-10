@@ -29,7 +29,7 @@ int
 FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-               .read("SIP",_sip)
+               .read_mp("SIP",_sip)
                .complete() < 0)
         return -1;
 
@@ -65,7 +65,7 @@ int FlowIPNAT::initialize(ErrorHandler *errh) {
     /**
      * Now allocate ports for each thread
      */
-    int total_ports = 65535 - 1024;
+    int total_ports = 65536 - 1024;
     int ports_per_thread = total_ports / passing.weight();
     int n = 0;
     for (int i = 0; i < passing.size(); i++) {
@@ -76,7 +76,7 @@ int FlowIPNAT::initialize(ErrorHandler *errh) {
         int max_port = min_port + ports_per_thread;
         s.available_ports.initialize(ports_per_thread);
         for (int port = min_port; port < max_port; port++) {
-            s.available_ports.insert(new PortRef(port));
+            s.available_ports.insert(new PortRef(htons(port)));
         }
         n++;
     }
@@ -95,6 +95,7 @@ PortRef* FlowIPNAT::pick_port() {
             if (++i > _state->available_ports.count()) { //Full loop, stop here
                 return 0;
             }
+            ref = _state->available_ports.extract();
         }
     }
     return ref;
@@ -106,7 +107,9 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
     fcb->ref = pick_port();
     if (!fcb->ref) {
         click_chatter("ERROR %p{element} : no more ports available !",this);
+        return false;
     }
+    //click_chatter("osip %s osport %d",osip.unparse().c_str(),htons(oport));
     NATEntryOUT out = {IPPort(osip,oport),fcb->ref};
     _map.find_insert(fcb->ref->port, out);
     return true;
@@ -120,7 +123,8 @@ void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
     auto fnt = [this,flowdata](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
-        q->rewrite_ipport(_sip, flowdata->ref->port, true);
+        //click_chatter("Rewrite to %s %d",_sip.unparse().c_str(),htons(flowdata->ref->port));
+        q->rewrite_ipport(_sip, flowdata->ref->port, 0, true);
         if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
             close_flow();
             release_flow(flowdata);
@@ -157,6 +161,7 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
     auto th = p->tcp_header();
 
     bool found = _in->_map.find_remove(th->th_dport,*fcb);
+    //click_chatter("FOUND %d, port %d, osip %s osport %d",found,ntohs(th->th_dport),fcb->map.ip.unparse().c_str(),ntohs(fcb->map.port));
     return found;
 }
 
@@ -168,7 +173,8 @@ void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* 
     //_state->port_epoch[*flowdata] = epoch;
     auto fnt = [this,flowdata](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
-        q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1);
+        //click_chatter("Rewrite to %s %d",flowdata->map.ip.unparse().c_str(),ntohs(flowdata->map.port));
+        q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1, true);
         q->set_dst_ip_anno(flowdata->map.ip);
         return q;
         if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {

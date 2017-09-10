@@ -433,6 +433,8 @@ public :
                      click_chatter("ERROR in %p{element}: No element handle the connection",this);
                      abort();
                  }
+             } else {
+                 head->fast_kill();
              }
          }
          static_cast<Derived*>(this)->push_batch(port, &my_fcb->v, head);
