@@ -46,7 +46,7 @@ public:
 
     int current_level = 0;
 
-    FlowNode* create_better_node(FlowNode* parent);
+    FlowNode* create_better_node(FlowNode* parent, bool impl);
 
     bool is_dynamic() {
         return _dynamic;
@@ -452,7 +452,7 @@ public:
         assert(g); //There is no stopping of growing, when it stops, the table should be deleted
         _growing = g;
     }
-    FlowNode* start_growing();
+    FlowNode* start_growing(bool impl);
 
 #if DEBUG_CLASSIFIER || DEBUG_CLASSIFIER_CHECK
     void check(bool allow_parent = false);

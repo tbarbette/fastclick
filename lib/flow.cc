@@ -1252,7 +1252,7 @@ void FlowControlBlock::combine_data(uint8_t* data) {
 }
 
 
-FlowNode* FlowLevel::create_better_node(FlowNode* parent) {
+FlowNode* FlowLevel::create_better_node(FlowNode* parent, bool impl) {
     int l;
     if (dynamic_cast<FlowNodeHash<0>*>(parent) != 0) {
         l = 0;

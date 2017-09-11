@@ -24,10 +24,10 @@
  * FlowNode functions
  *********************************/
 
-FlowNode* FlowNode::start_growing() {
-            click_chatter("Table starting to grow (was level %s, node %s)",level()->print().c_str(),name().c_str());
+FlowNode* FlowNode::start_growing(bool impl) {
+                        click_chatter("Table starting to grow (was level %s, node %s)",level()->print().c_str(),name().c_str());
             set_growing(true);
-            FlowNode* newNode = level()->create_better_node(this);
+            FlowNode* newNode = level()->create_better_node(this, impl);
             if (newNode == 0) {
                 //TODO : better to release old flows
                 return 0;
@@ -525,7 +525,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
         click_chatter("Final Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
 #endif
 
-        if (i > ((capacity() / 20) > 32 ? 32 : capacity()/20)) {
+        if (i > collision_threshold()) {
             if (!growing()) {
                 click_chatter("%d collisions! Hint for a better hash table size (current capacity is %d, size is %d, data is %lu)!",i,capacity(),getNum(),data.data_32);
                 click_chatter("%d released in collision !",ri);
