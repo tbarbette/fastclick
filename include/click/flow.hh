@@ -179,7 +179,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                                 flow_assert(parent->find(data)->ptr == child_ptr->ptr);
                             } else {
                                 flow_assert(parent->default_ptr()->node->getNum() == 0);
-                                FlowNode* newNode = parent->level()->create_better_node(parent->default_ptr()->node, false);
+                                FlowNode* newNode = parent->level()->create_node(parent->default_ptr()->node, false, false);
                                 newNode->_level = parent->default_ptr()->node->level();
                                 *newNode->default_ptr() = *parent->default_ptr()->node->default_ptr();
                                 child_ptr->set_node(newNode);

@@ -27,7 +27,7 @@
 FlowNode* FlowNode::start_growing(bool impl) {
                         click_chatter("Table starting to grow (was level %s, node %s)",level()->print().c_str(),name().c_str());
             set_growing(true);
-            FlowNode* newNode = level()->create_better_node(this, impl);
+            FlowNode* newNode = level()->create_node(this, true, impl);
             if (newNode == 0) {
                 //TODO : better to release old flows
                 return 0;
@@ -349,10 +349,12 @@ FlowNodeDefinition::create_final(bool mt_safe) {
         if (_hint.starts_with("HASH-")) {
             String hint = _hint.substring(_hint.find_left('-') + 1);
             int l = atoi(hint.c_str());
+            _level->current_level = l;
             fl = FlowNode::create_hash(l);
         } else if (_hint == "ARRAY") {
             FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
             fa->initialize(_level->get_max_value());
+            _level->current_level = 100;
             fl = fa;
         } else {
             click_chatter("Unknown hint %s", _hint.c_str());
@@ -363,6 +365,7 @@ FlowNodeDefinition::create_final(bool mt_safe) {
             fl = new FlowNodeDummy();
         else if (_level->get_max_value() > 256) {
             FlowNode* fh0 = FlowNode::create_hash(0);
+            _level->current_level = 0;
     #if DEBUG_CLASSIFIER
             assert(fh0->getNum() == 0);
             fh0->check();
@@ -370,6 +373,7 @@ FlowNodeDefinition::create_final(bool mt_safe) {
             fl = fh0;
         } else {
             FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+            _level->current_level = 100;
             fa->initialize(_level->get_max_value());
             fl = fa;
         }
@@ -576,10 +580,11 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
             child.node->destroy();
         } else {
             if (i > hole_threshold() && childs[next_idx(idx)].ptr == 0) { // Keep holes if there are quite a lot of collisions
+                click_chatter("Keep hole in %s",level()->print().c_str());
                 childs[idx].ptr = 0;
                 child.node->destroy();
                 i--;
-                while (i > (2 * (hole_threshold() / 3)) && idx > 0) {
+                while (i > (2 * (hole_threshold() / 3))) {
                     idx = prev_idx(idx);
                     if (childs[idx].ptr == DESTRUCTED_NODE) {
                         childs[idx].ptr = 0;

@@ -36,7 +36,7 @@ struct NATEntryIN {
 
 typedef HashTableMP<uint16_t,NATEntryOUT> NATHashtable;
 
-#define NAT_FLOW_TIMEOUT 60 * 1000
+#define NAT_FLOW_TIMEOUT 2 * 1000
 
 class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> {
 
@@ -49,7 +49,7 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffff:ARRAY 22/0/ffff");
+    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY");
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);

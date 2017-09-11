@@ -1252,50 +1252,55 @@ void FlowControlBlock::combine_data(uint8_t* data) {
 }
 
 
-FlowNode* FlowLevel::create_better_node(FlowNode* parent, bool impl) {
+FlowNode* FlowLevel::create_node(FlowNode* parent, bool better, bool better_impl) {
     int l;
-    if (dynamic_cast<FlowNodeHash<0>*>(parent) != 0) {
-        l = 0;
-    } else if (dynamic_cast<FlowNodeHash<1>*>(parent) != 0) {
-        l = 1;
-    } else if (dynamic_cast<FlowNodeHash<2>*>(parent) != 0) {
-        l = 2;
-    } else if (dynamic_cast<FlowNodeHash<3>*>(parent) != 0) {
-        l = 3;
-    } else if (dynamic_cast<FlowNodeHash<4>*>(parent) != 0) {
-        l = 4;
-    } else if (dynamic_cast<FlowNodeHash<5>*>(parent) != 0) {
-        l = 5;
-    } else if (dynamic_cast<FlowNodeHash<6>*>(parent) != 0) {
-        l = 6;
-    } else if (dynamic_cast<FlowNodeHash<7>*>(parent) != 0) {
-        l = 7;
-    } else if (dynamic_cast<FlowNodeHash<8>*>(parent) != 0) {
-        l = 8;
-    } else if (dynamic_cast<FlowNodeHash<9>*>(parent) != 0) {
-        l = 9;
-    } else {
-        //Not a hash
-        click_chatter("I don't know how to grow non-hash yet.");
-        abort();
-    }
+    if (better) {
+        if (dynamic_cast<FlowNodeHash<0>*>(parent) != 0) {
+            l = 0;
+        } else if (dynamic_cast<FlowNodeHash<1>*>(parent) != 0) {
+            l = 1;
+        } else if (dynamic_cast<FlowNodeHash<2>*>(parent) != 0) {
+            l = 2;
+        } else if (dynamic_cast<FlowNodeHash<3>*>(parent) != 0) {
+            l = 3;
+        } else if (dynamic_cast<FlowNodeHash<4>*>(parent) != 0) {
+            l = 4;
+        } else if (dynamic_cast<FlowNodeHash<5>*>(parent) != 0) {
+            l = 5;
+        } else if (dynamic_cast<FlowNodeHash<6>*>(parent) != 0) {
+            l = 6;
+        } else if (dynamic_cast<FlowNodeHash<7>*>(parent) != 0) {
+            l = 7;
+        } else if (dynamic_cast<FlowNodeHash<8>*>(parent) != 0) {
+            l = 8;
+        } else if (dynamic_cast<FlowNodeHash<9>*>(parent) != 0) {
+            l = 9;
+        } else {
+            //Not a hash
+            click_chatter("I don't know how to grow non-hash yet.");
+            abort();
+        }
 
-    if (l >= 0 && l < current_level) {
+        if (l == 9) {
+            return 0;
+        }
+        ++l;
+        if (l < current_level) { //TODO keep this as an aggressive mode
+            l = current_level;
+        }
+    }
+    else
+    {
         l = current_level;
     }
 
-    if (l >= 0 && l < 9) {
-        if (FlowNodeHash<0>::capacity_for(l + 1) >= this->get_max_value()) {
-            FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
-            fa->initialize(get_max_value());
-            return fa;
-        }
+    if (l >= 100 || FlowNodeHash<0>::capacity_for(l) >= this->get_max_value()) {
+        FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+        fa->initialize(get_max_value());
+        l = 100;
+        return fa;
     }
 
-    if (l == 9) {
-        return 0;
-    }
-    ++l;
     if (l > current_level)
         current_level = l;
 

@@ -14,7 +14,7 @@ CLICK_DECLS
 
 
 #define DEBUG_NAT 0
-
+#define NAT_COLLIDE 1  //Avoid port collisions
 
 
 FlowIPNAT::FlowIPNAT() : _sip() {
@@ -91,7 +91,6 @@ PortRef* FlowIPNAT::pick_port() {
         return 0;
     } else {
         ref = _state->available_ports.extract();
-
 #if NAT_COLLIDE
         while (ref->ref.value() > 0)
         {
@@ -134,14 +133,24 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
 }
 
 void FlowIPNAT::release_flow(NATEntryIN* fcb) {
-//    click_chatter("Release");
+//    click_chatter("Release %d",ntohs(fcb->ref->port));
 
 #if NAT_COLLIDE
-    --fcb->ref->ref;
-    fcb->ref = 0;
     if (fcb->ref)
+    {
+        --fcb->ref->ref;
+//        click_chatter("fcb->ref is now %d",fcb->ref->ref);
+//        assert((int32_t)fcb->ref->ref >= 0);
+        if (!_state->available_ports.insert(fcb->ref)) {
+            click_chatter("Double free");
+            abort();
+        }
+    }
+#else
+    _state->available_ports.insert(fcb->ref);
 #endif
-        _state->available_ports.insert(fcb->ref);
+
+    fcb->ref = 0;
 }
 
 void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
@@ -203,19 +212,28 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
     auto th = p->tcp_header();
 
     bool found = _in->_map.find_remove(th->th_dport,*fcb);
-    fcb->fin_seen = false;
-    if (!found) {
+
+    if (unlikely(!found)) {
         //click_chatter("FOUND %d, port %d, osip %s osport %d, RST %d, FIN %d, SYN %d",found,ntohs(th->th_dport),fcb->map.ip.unparse().c_str(),ntohs(fcb->map.port), th->th_flags & TH_RST, th->th_flags & TH_FIN, th->th_flags & TH_SYN);
+        return false;
     }
-    return found;
+    fcb->fin_seen = false;
+    ++fcb->ref->ref;
+    if (fcb->ref->ref == 1) { //Connection was reset
+        --fcb->ref->ref;
+        return false;
+    }
+    return true;
 }
 
 void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
+//    click_chatter("Release reverse %d",ntohs(fcb->ref->port));
 #if NAT_COLLIDE
     --fcb->ref->ref;
+//    click_chatter("fcb->ref is now %d",fcb->ref->ref);
+//    assert((int32_t)fcb->ref->ref >= 0);
     fcb->ref = 0;
 #endif
-//    click_chatter("Release reverse");
 }
 
 void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* batch) {

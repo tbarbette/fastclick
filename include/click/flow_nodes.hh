@@ -46,7 +46,7 @@ public:
 
     int current_level = 0;
 
-    FlowNode* create_better_node(FlowNode* parent, bool impl);
+    FlowNode* create_node(FlowNode* parent, bool better, bool better_impl);
 
     bool is_dynamic() {
         return _dynamic;
