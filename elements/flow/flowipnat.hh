@@ -49,7 +49,7 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
+    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffff:ARRAY 22/0/ffff");
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
@@ -85,7 +85,7 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
+    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffff 22/0/ffff:ARRAY");
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 

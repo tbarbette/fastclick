@@ -25,7 +25,7 @@
  *********************************/
 
 FlowNode* FlowNode::start_growing() {
-            click_chatter("Table starting to grow (was %s)",level()->print().c_str());
+            click_chatter("Table starting to grow (was level %s, node %s)",level()->print().c_str(),name().c_str());
             set_growing(true);
             FlowNode* newNode = level()->create_better_node(this);
             if (newNode == 0) {
@@ -51,7 +51,6 @@ int FlowNode::findGetNum() {
     });
     return count;
 }
-
 
 /*FlowNodePtr* FlowNode::get_first_leaf_ptr() {
     FlowNode* parent = this;
@@ -347,10 +346,18 @@ FlowNodeDefinition::create_final(bool mt_safe) {
     FlowNode * fl;
     //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
     if (_hint) {
-        assert(_hint.starts_with("HASH-"));
-        _hint = _hint.substring(_hint.find_left('-') + 1);
-        int l = atoi(_hint.c_str());
-        fl = FlowNode::create_hash(l);
+        if (_hint.starts_with("HASH-")) {
+            String hint = _hint.substring(_hint.find_left('-') + 1);
+            int l = atoi(hint.c_str());
+            fl = FlowNode::create_hash(l);
+        } else if (_hint == "ARRAY") {
+            FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+            fa->initialize(_level->get_max_value());
+            fl = fa;
+        } else {
+            click_chatter("Unknown hint %s", _hint.c_str());
+            abort();
+        }
     } else {
         if (_level->get_max_value() == 0)
             fl = new FlowNodeDummy();
@@ -518,12 +525,16 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
         click_chatter("Final Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
 #endif
 
-        if (i > (capacity() / 10)) {
+        if (i > ((capacity() / 20) > 32 ? 32 : capacity()/20)) {
             if (!growing()) {
-                click_chatter("%d collisions! Hint for a better hash table size (current is %d)!",i);
+                click_chatter("%d collisions! Hint for a better hash table size (current capacity is %d, size is %d, data is %lu)!",i,capacity(),getNum(),data.data_32);
                 click_chatter("%d released in collision !",ri);
                 if (childs[idx].ptr == 0 || (childs[idx].is_node() && childs[idx].node->released())) {
                     FlowNode* n = this->start_growing();
+                    if (n == 0) {
+                        click_chatter("ERROR : CANNOT GROW, I'M ALREADY TOO FAT");
+                        return &childs[idx];
+                    }
                     return n->find(data);
                 }
             }
@@ -564,13 +575,15 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
             childs[idx].ptr = 0;
             child.node->destroy();
         } else {
-            if (i > (capacity() / 20) && childs[next_idx(idx)].ptr == 0) { // Keep holes if there are quite a lot of collisions
+            if (i > hole_threshold() && childs[next_idx(idx)].ptr == 0) { // Keep holes if there are quite a lot of collisions
                 childs[idx].ptr = 0;
                 child.node->destroy();
                 i--;
-                while (i > capacity() / 30 && idx > 0) {
-                    --idx;
-                    if (childs[idx].ptr == DESTRUCTED_NODE || (childs[idx].is_node() && childs[idx].node->released())) {
+                while (i > (2 * (hole_threshold() / 3)) && idx > 0) {
+                    idx = prev_idx(idx);
+                    if (childs[idx].ptr == DESTRUCTED_NODE) {
+                        childs[idx].ptr = 0;
+                    } else if (childs[idx].is_node() && childs[idx].node->released()) {
                         childs[idx].node->destroy();
                         childs[idx].ptr = 0;
                     } else

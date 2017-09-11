@@ -91,7 +91,10 @@ PortRef* FlowIPNAT::pick_port() {
         return 0;
     } else {
         ref = _state->available_ports.extract();
-        while (ref->ref.value() > 0) {
+
+#if NAT_COLLIDE
+        while (ref->ref.value() > 0)
+        {
             _state->available_ports.insert(ref);
             if (++i > _state->available_ports.count()) { //Full loop, stop here
                 click_chatter("All ports are referenced...");
@@ -99,6 +102,10 @@ PortRef* FlowIPNAT::pick_port() {
             }
             ref = _state->available_ports.extract();
         }
+#else
+
+            _state->available_ports.insert(ref);
+#endif
     }
     return ref;
 }
@@ -115,9 +122,11 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
         click_chatter("ERROR %p{element} : no more ports available !",this);
         return false;
     }
+#if NAT_COLLIDE
     fcb->ref->ref = 1;
     fcb->ref->closing = false;
     fcb->fin_seen = false;
+#endif
     //click_chatter("NEW osip %s osport %d",osip.unparse().c_str(),htons(oport));
     NATEntryOUT out = {IPPort(osip,oport),fcb->ref};
     _map.find_insert(fcb->ref->port, out);
@@ -126,9 +135,12 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
 
 void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 //    click_chatter("Release");
+
+#if NAT_COLLIDE
     --fcb->ref->ref;
     fcb->ref = 0;
     if (fcb->ref)
+#endif
         _state->available_ports.insert(fcb->ref);
 }
 
@@ -140,6 +152,8 @@ void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
         WritablePacket* q=p->uniqueify();
         //click_chatter("Rewrite to %s %d",_sip.unparse().c_str(),htons(flowdata->ref->port));
         q->rewrite_ipport(_sip, flowdata->ref->port, 0, true);
+
+#if NAT_COLLIDE
         if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
             close_flow();
             release_flow(flowdata);
@@ -156,6 +170,7 @@ void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
             close_flow();
             release_flow(flowdata);
         }
+#endif
         return q;
     };
     EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, [](Packet*p){p->kill();});
@@ -196,8 +211,10 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
 }
 
 void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
+#if NAT_COLLIDE
     --fcb->ref->ref;
     fcb->ref = 0;
+#endif
 //    click_chatter("Release reverse");
 }
 
@@ -211,6 +228,7 @@ void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* 
         WritablePacket* q=p->uniqueify();
         q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1, true);
         q->set_dst_ip_anno(flowdata->map.ip);
+#if NAT_COLLIDE
         if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
             close_flow();
             release_flow(flowdata);
@@ -227,6 +245,7 @@ void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* 
             close_flow();
             release_flow(flowdata);
         }
+#endif
         return q;
     };
     EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, [](Packet* p){p->kill();});

@@ -830,8 +830,20 @@ class FlowNodeHash : public FlowNode  {
     static constexpr void* DESTRUCTED_NODE = (void*)-1;
 
     static constexpr uint32_t hash_sizes[HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
+    static constexpr uint32_t step_sizes[HASH_SIZES_NR] = { 37, 67, 131, 257, 521,1031, 2053, 4099, 8209, 16411}; //Prime for less collisions, after the last we double
+
+    /**
+     * @invariant capacity() < INT_MAX/2
+     */
     inline static constexpr uint32_t capacity() {
         return hash_sizes[capacity_n];
+    }
+
+    /**
+     * @invariant step() < capacity()
+     */
+    inline static constexpr uint32_t step() {
+        return step_sizes[capacity_n];
     }
 
     FlowNodePtr childs[capacity()];
@@ -844,39 +856,50 @@ class FlowNodeHash : public FlowNode  {
     /*inline uint32_t highwater() const {
         return capacity_n / 3;
     }*/
-    inline uint32_t max_highwater() const {
+    inline constexpr uint32_t max_highwater() {
         return 3 * (capacity() / 5);
+    }
+
+    inline constexpr uint32_t collision_threshold() {
+        return ((capacity() / 20) > 32 ? 32 : capacity()/20);
+    }
+
+    inline constexpr uint32_t hole_threshold() {
+        return ((capacity() / 30) > 24 ? 24 : capacity()/30);
     }
 
     virtual int max_size() const override {
         return max_highwater();
     }
     unsigned int hash32(uint32_t d) const {
-        //return (d + (d >> 8) + (d >> 16) + (d >> 24)) & mask;
-        //return d % hash_size;
-        return (d + (d >> 8) + (d >> 16) + (d >> 24)) % capacity();
+        return ((d << 3) + (d >> 9) + (d >> 12) + (d >> 25)) % capacity();
     }
 
     unsigned int hash64(uint64_t ld) const {
         uint32_t d = (uint32_t)ld ^ (ld >> 32);
-        //return (d + (d >> 8) + (d >> 16) + (d >> 24)) & mask;
-        //return d % hash_size;
-        return (d + (d >> 8) + (d >> 16) + (d >> 24)) % capacity();
+        return ((d << 3) + (d >> 9) + (d >> 12) + (d >> 25)) % capacity();
     }
 
 
     inline int next_idx(int idx) const {
-        idx = (idx + 1);
-        if (idx == hash_sizes[capacity_n])
-            return 0;
+        idx = (idx + step());
+        if (idx >= capacity()) //This is permitied per step() and capacity() invariants
+            return idx - capacity();
+        return idx;
+    }
+
+    inline int prev_idx(int idx) const {
+        idx = (idx - step());
+        if (idx < 0)
+            return idx + capacity();
         return idx;
 
     }
 
+
     String name() const {
         return "HASH-" + String(capacity());
     }
-
 
 
     class HashNodeIterator : public virtual NodeIteratorBase {
@@ -897,6 +920,7 @@ class FlowNodeHash : public FlowNode  {
 
     void destroy() override;
 
+    //Resizing is now done by the growing system
     void resize() {
         /*
 		int current_size = hash_size;
@@ -967,6 +991,8 @@ class FlowNodeHash : public FlowNode  {
                 childs[i].node = 0;
             }
         }
+        static_assert(capacity() < INT_MAX / 2);
+        static_assert(step() < capacity() / 2);
     }
 
     NodeIterator iterator() override {
