@@ -25,7 +25,7 @@
 CLICK_DECLS
 
 TSCClock::TSCClock() :
-_verbose(1), _install(true),_allow_offset(false),_correction_timer(this), _sync_timers(0), _nowait(false), _base(0)
+_verbose(1), _install(true),_allow_offset(false),_correction_timer(this), _sync_timers(0), _nowait(false), _base(0),_installed(false)
 {
 
 }
@@ -105,10 +105,10 @@ TSCClock::initialize(ErrorHandler*) {
         /*We have 64 bit to represent a nanosecond time, the bigger the mult
          * is, the better it is. We update the time about every tenth of
          * seconds, so
-         * let it be 2 just to be sure. So the delta could be as high as
+         * let it be 20 just to be sure. So the delta could be as high as
          * 0.2*10^9, that being 2^32, so we want a mult below 2^(63-32)=2^31.
          */
-        if (mult < INT_MAX / 2) {
+        if (mult < INT_MAX / 20) {
             cycles_per_subsec_shift += 1;
         } else {
             break;
@@ -127,9 +127,6 @@ TSCClock::initialize(ErrorHandler*) {
     update_period_msec = update_period_subsec / (Timestamp::subsec_per_sec / Timestamp::msec_per_sec);
     _correction_timer.initialize(this);
     _correction_timer.schedule_now();
-
-    if (_install && _nowait)
-        Timestamp::set_clock(&now,(void*)this);
 
     return 0;
 }
@@ -168,6 +165,9 @@ bool TSCClock::stabilize_tick() {
             if (alpha * (double)tsc_freq < 1) {
                 return true;
             }
+            if (_install && _nowait && !_installed && alpha * (double)tsc_freq < 10000000) { //Ok if 10ms
+                return true;
+            }
         }
     } else {
         alpha_stable = 0;
@@ -203,15 +203,16 @@ bool TSCClock::accumulate_tick(Timer* t) {
     steady_cycle[next_clock] = click_get_cycles();
     steady_timestamp[next_clock] = steady_timestamp[current_clock] + tick_to_subsec_steady(steady_cycle[next_clock] - steady_cycle[current_clock]);
     //Check that the timer period was not too high, as this could cause TSC computation overflow in tick_to_subsec
-    if ((steady_timestamp[next_clock] - steady_timestamp[current_clock]) > (update_period_subsec * 2)) {
+    if ((steady_timestamp[next_clock] - steady_timestamp[current_clock]) > (update_period_subsec * 10)) {
         //We try all the click threads
         int nt = (t->home_thread_id() + 1) % master()->nthreads();
         //If we did a full loop, we disable the clock...
         if (nt == home_thread()->thread_id()) {
             if (_verbose)
-                click_chatter("Click tasks are too heavy and the TSC clock cannot run at least once every %dmsec, the TSC clock is deactivated.");
-            if (_install)
+                click_chatter("Click tasks are too heavy and the TSC clock cannot run at least once every %dmsec, the TSC clock is deactivated.",update_period_msec * 10);
+            if (_installed) {
                 Timestamp::set_clock(0,0);
+            }
             return false;
         }
         t->move_thread(nt);
@@ -353,6 +354,17 @@ void TSCClock::run_timer(Timer* timer) {
 
             alpha = 0.5;
             _phase = SYNCHRONIZE;
+
+            if (_nowait) {
+                _phase = RUNNING;
+                click_chatter("Installing TSC Clock without waiting further");
+                steady_timestamp[current_clock] = get_real_timestamp(true);
+                steady_cycle[current_clock] = click_get_cycles();
+                steady_cycles_per_subsec_mult = cycles_per_subsec_mult[current_clock];
+                Timestamp::set_clock(&now,(void*)this);
+                _installed = true;
+
+            }
         }
     } else {
         if (unlikely(!accumulate_tick(timer)))
@@ -385,8 +397,10 @@ void TSCClock::run_timer(Timer* timer) {
                 _phase = RUNNING;
                 if (_verbose)
                     click_chatter("Switching to TSC clock");
-                if (_install && !_nowait)
+                if (_install && !_installed) {
                     Timestamp::set_clock(&now,(void*)this);
+                    _installed = true;
+                }
             }
         }
     }
