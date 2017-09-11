@@ -294,7 +294,6 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
 void FlowClassifier::cleanup(CleanupStage stage) {
     fcb_table = &_table;
     if (_table.get_root()) {
-
         _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
             _table.get_pool()->release(ptr->leaf);
             ptr->leaf = 0;

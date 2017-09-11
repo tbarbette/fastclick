@@ -118,8 +118,9 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                 if (parent->level()->is_dynamic() || always_dup) {
                     if (unlikely(parent->growing())) {
                         //Table is growing, look at the child for new element
-                        if (parent->num == 0) {
+                        if (parent->getNum() == 0) {
                             click_chatter("Table %s finished growing, deleting %p, type %s",parent->level()->print().c_str(), parent, parent->name().c_str());
+                            assert(parent->getNum() == parent->findGetNum());
                             assert(false); //The release took care of this
                         } else {
 #if DEBUG_CLASSIFIER
