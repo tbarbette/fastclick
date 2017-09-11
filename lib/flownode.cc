@@ -530,7 +530,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
                 click_chatter("%d collisions! Hint for a better hash table size (current capacity is %d, size is %d, data is %lu)!",i,capacity(),getNum(),data.data_32);
                 click_chatter("%d released in collision !",ri);
                 if (childs[idx].ptr == 0 || (childs[idx].is_node() && childs[idx].node->released())) {
-                    FlowNode* n = this->start_growing();
+                    FlowNode* n = this->start_growing(true);
                     if (n == 0) {
                         click_chatter("ERROR : CANNOT GROW, I'M ALREADY TOO FAT");
                         return &childs[idx];

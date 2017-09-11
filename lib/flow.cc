@@ -1275,7 +1275,21 @@ FlowNode* FlowLevel::create_better_node(FlowNode* parent, bool impl) {
     } else if (dynamic_cast<FlowNodeHash<9>*>(parent) != 0) {
         l = 9;
     } else {
-        l = -1;
+        //Not a hash
+        click_chatter("I don't know how to grow non-hash yet.");
+        abort();
+    }
+
+    if (l >= 0 && l < current_level) {
+        l = current_level;
+    }
+
+    if (l >= 0 && l < 9) {
+        if (FlowNodeHash<0>::capacity_for(l + 1) >= this->get_max_value()) {
+            FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+            fa->initialize(get_max_value());
+            return fa;
+        }
     }
 
     if (l == 9) {

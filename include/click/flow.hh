@@ -133,7 +133,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                         click_chatter("MAX CAPACITY ACHIEVED, DROPPING");
                         return 0;
 #else
-                        parent = parent->start_growing();
+                        parent = parent->start_growing(false);
                         if (!parent) {
                             click_chatter("Could not grow !? Dropping flow !");
                             //TODO : release some children
@@ -179,7 +179,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                                 flow_assert(parent->find(data)->ptr == child_ptr->ptr);
                             } else {
                                 flow_assert(parent->default_ptr()->node->getNum() == 0);
-                                FlowNode* newNode = parent->level()->create_better_node(parent->default_ptr()->node);
+                                FlowNode* newNode = parent->level()->create_better_node(parent->default_ptr()->node, false);
                                 newNode->_level = parent->default_ptr()->node->level();
                                 *newNode->default_ptr() = *parent->default_ptr()->node->default_ptr();
                                 child_ptr->set_node(newNode);

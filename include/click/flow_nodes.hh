@@ -832,6 +832,7 @@ class FlowNodeHash : public FlowNode  {
     static constexpr uint32_t hash_sizes[HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
     static constexpr uint32_t step_sizes[HASH_SIZES_NR] = { 37, 67, 131, 257, 521,1031, 2053, 4099, 8209, 16411}; //Prime for less collisions, after the last we double
 
+
     /**
      * @invariant capacity() < INT_MAX/2
      */
@@ -977,6 +978,9 @@ class FlowNodeHash : public FlowNode  {
 
     FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
 
+    static uint32_t capacity_for(int level) {
+        return level << (8+level);
+    }
 
     //virtual void renew() override;
     FlowNodePtr* find_hash(FlowNodeData data);
