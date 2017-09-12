@@ -146,6 +146,10 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
         return errh->error("No threads end up in this queuedevice...? Aborting.");
     }
 
+    if (n_threads > _maxqueues) {
+        queue_share = n_threads / _maxqueues;
+    }
+
     if (n_threads >= _maxqueues)
         n_queues = _maxqueues;
     else
