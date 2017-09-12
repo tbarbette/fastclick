@@ -211,7 +211,7 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             rte_eth_macaddr_get(fd->_dev->port_id, &mac_addr);
             return EtherAddress((unsigned char*)&mac_addr).unparse();
         case h_vendor:
-            return String(fd->_dev->get_device_vendor_id());
+            return fd->_dev->get_device_vendor_name();
         case h_driver:
             return String(fd->_dev->get_device_driver());
         }

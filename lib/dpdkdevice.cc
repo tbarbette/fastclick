@@ -19,6 +19,7 @@
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
 #include <click/element.hh>
+#include <click/userutils.hh>
 #include <rte_errno.h>
 
 CLICK_DECLS
@@ -32,6 +33,11 @@ DPDKDevice::DPDKDevice(unsigned port_id) : port_id(port_id) {
 uint16_t DPDKDevice::get_device_vendor_id()
 {
     return info.vendor_id;
+}
+
+String DPDKDevice::get_device_vendor_name()
+{
+    return info.vendor_name;
 }
 
 const char *DPDKDevice::get_device_driver()
@@ -145,6 +151,37 @@ struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
 
+/**
+ * Extracts from 'info' what is after the 'key'.
+ *
+ * @param info string to parse
+ * @param key substring to indicate the new index
+ * @return substring of info that succeeds the key
+ */
+static String parse_pci_info(String info, String key)
+{
+    String s;
+
+    s = info.substring(info.find_left(key) + key.length());
+    int pos = s.find_left(':') + 2;
+    s = s.substring(pos, s.find_left("\n") - pos);
+
+    return s;
+}
+
+/**
+ * Keeps the left-most substring of 'str'
+ * until the first occurence of the delimiter.
+ *
+ * @param str string to parse
+ * @param delimiter character that indicates where to stop
+ * @return substring of str that preceds the delimiter
+ */
+static String keep_token_left(String str, char delimiter)
+{
+    return str.substring(0, str.find_left(delimiter));
+}
+
 int DPDKDevice::initialize_device(ErrorHandler *errh)
 {
     struct rte_eth_conf dev_conf;
@@ -159,7 +196,19 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     // Obtain general device information
     info.vendor_id = dev_info.pci_dev->id.vendor_id;
-    info.driver = dev_info.driver_name; // also in dev_info.pci_dev->driver->driver.name;
+    info.device_id = dev_info.pci_dev->id.device_id;
+    info.driver = dev_info.driver_name;
+
+    // Combine vendor and device IDs
+    char vendor_and_dev[10];
+    sprintf(vendor_and_dev, "%x:%x", info.vendor_id, info.device_id);
+
+    // Retrieve more information about the vendor of this NIC
+    String dev_pci = shell_command_output_string("lspci -d " + String(vendor_and_dev), "", errh);
+    info.vendor_name = keep_token_left(
+        parse_pci_info(dev_pci, "Ethernet controller"),
+        ' '
+    );
 
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {

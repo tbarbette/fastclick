@@ -60,6 +60,8 @@ public:
 
     uint16_t get_device_vendor_id();
 
+    String get_device_vendor_name();
+
     const char *get_device_driver();
 
     static struct rte_mempool *get_mpool(unsigned int);
@@ -116,7 +118,7 @@ private:
 
     struct DevInfo {
         inline DevInfo() :
-            vendor_id(PCI_ANY_ID), driver(0),
+            vendor_id(PCI_ANY_ID), vendor_name(), driver(0),
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
             n_tx_descs(0), mac() {
             rx_queues.reserve(128);
@@ -124,6 +126,8 @@ private:
         }
 
         uint16_t vendor_id;
+        String vendor_name;
+        uint16_t device_id;
         const char *driver;
         Vector<bool> rx_queues;
         Vector<bool> tx_queues;
