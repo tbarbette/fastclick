@@ -40,10 +40,8 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("W",_w) //Amount of work (x100 xor on the data just read)
         .complete() < 0)
         return -1;
-    return 0;
-
     _array.resize(s * 1024 * 1024 / sizeof(uint32_t));
-
+    return 0;
 }
 
 void
