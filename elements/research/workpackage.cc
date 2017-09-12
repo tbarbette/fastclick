@@ -31,10 +31,9 @@ WorkPackage::WorkPackage()
 int
 WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    Element* e;
-
+    int s;
     if (Args(conf, this, errh)
-        .read_mp("S", _s) //Array size in MB
+        .read_mp("S", s) //Array size in MB
         .read_mp("N", _n) //Number of array access (4bytes)
         .read_mp("R", _r) //Percentage of access that are packet read (vs Array access) between 0 and 100
         .read_mp("PAYLOAD", _payload) //Access payload or only header
@@ -43,7 +42,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
     return 0;
 
-    _array.resize(_s * 1024 * 1024 / sizeof(uint32_t));
+    _array.resize(s * 1024 * 1024 / sizeof(uint32_t));
 
 }
 
@@ -68,17 +67,17 @@ WorkPackage::smaction(Packet* p) {
 
 #if HAVE_BATCH
 void
-WorkPackage::push_batch(int, PacketBatch* batch) {
+WorkPackage::push_batch(int port, PacketBatch* batch) {
     FOR_EACH_PACKET(batch, p)
             smaction(p);
-    output_push_batch(0, batch);
+    output_push_batch(port, batch);
 }
 #endif
 
 void
-WorkPackage::push(int, Packet* p) {
+WorkPackage::push(int port, Packet* p) {
     smaction(p);
-    output_push(0, p);
+    output_push(port, p);
 }
 
 

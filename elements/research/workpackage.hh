@@ -33,7 +33,6 @@ class WorkPackage : public BatchElement { public:
 #endif
 private:
     int _r;
-    int _s;
     int _n;
     int _w;
     bool _payload;
