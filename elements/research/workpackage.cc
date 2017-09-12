@@ -58,12 +58,12 @@ WorkPackage::smaction(Packet* p) {
     uint32_t sum = 0;
     for (int i = 0; i < _n; i++) {
         uint32_t data;
-        int r = frand() / (FRAND_MAX / 101 + 1);
-        if (r < _r) {
-            int pos = frand() / (FRAND_MAX / ((_payload?p->length():54) + 1) + 1);
+        int r = frand();
+        if (r / (FRAND_MAX / 101 + 1)  < _r) {
+            int pos = r / (FRAND_MAX / ((_payload?p->length():54) + 1) + 1);
             data = *(uint32_t*)(p->data() + pos);
         } else {
-            int pos = frand() / ((FRAND_MAX / _array.size()) + 1);
+            int pos = r / ((FRAND_MAX / _array.size()) + 1);
             data = _array[pos];
         }
         for (int j = 0; j < _w * 100; j ++) {
