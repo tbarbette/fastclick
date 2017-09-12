@@ -21,8 +21,17 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
+#include <random>
 
 CLICK_DECLS
+
+std::random_device rd;
+
+#define FRAND_MAX rd.max()
+
+int frand() {
+    return rd();
+}
 
 WorkPackage::WorkPackage()
 {
@@ -49,12 +58,12 @@ WorkPackage::smaction(Packet* p) {
     uint32_t sum = 0;
     for (int i = 0; i < _n; i++) {
         uint32_t data;
-        int rand = click_random(0,100);
-        if (rand < _r) {
-            int pos = click_random(1,_payload?p->length():54) - 1;
+        int r = frand() / (FRAND_MAX / 101 + 1);
+        if (r < _r) {
+            int pos = frand() / (FRAND_MAX / ((_payload?p->length():54) + 1) + 1);
             data = *(uint32_t*)(p->data() + pos);
         } else {
-            int pos = click_random(0,_array.size() - 1);
+            int pos = frand() / ((FRAND_MAX / _array.size()) + 1);
             data = _array[pos];
         }
         for (int j = 0; j < _w * 100; j ++) {
