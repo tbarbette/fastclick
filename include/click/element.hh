@@ -165,7 +165,7 @@ class Element { public:
     RouterThread *home_thread() const;
 
     virtual bool get_spawning_threads(Bitvector& b, bool isoutput);
-    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, bool &_is_fullpush, int level = 0);
+    Bitvector get_passing_threads(bool forward, int port, Element* origin, bool &_is_fullpush, int level = 0);
     Bitvector get_passing_threads(Element* origin, int level = 0);
     Bitvector get_passing_threads();
 
