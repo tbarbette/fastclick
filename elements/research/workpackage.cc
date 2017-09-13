@@ -29,7 +29,7 @@ std::random_device rd;
 
 #define FRAND_MAX rd.max()
 
-int frand() {
+inline int frand() {
     return rd();
 }
 
@@ -50,16 +50,19 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
     _array.resize(s * 1024 * 1024 / sizeof(uint32_t));
+    for (int i = 0; i < _array.size(); i++) {
+        _array[i] = frand();
+    }
     return 0;
 }
 
 void
 WorkPackage::smaction(Packet* p) {
     uint32_t sum = 0;
+    int r = frand();
     for (int i = 0; i < _n; i++) {
         uint32_t data;
-        int r = frand();
-        if (r / (FRAND_MAX / 101 + 1)  < _r) {
+        if (r / (FRAND_MAX / 101 + 1) < _r) {
             int pos = r / (FRAND_MAX / ((_payload?p->length():54) + 1) + 1);
             data = *(uint32_t*)(p->data() + pos);
         } else {
@@ -69,6 +72,7 @@ WorkPackage::smaction(Packet* p) {
         for (int j = 0; j < _w * 100; j ++) {
             sum ^= data;
         }
+        r = data ^ (r << 24 ^ r << 16  ^ r << 8 ^ r >> 16);
     }
 }
 
