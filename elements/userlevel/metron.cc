@@ -54,6 +54,7 @@ static String parseVendorInfo(String hwInfo, String key) {
 
     return s;
 }
+
 int Metron::initialize(ErrorHandler *errh) {
     _cpu_map.resize(getCpuNr(), 0);
 
@@ -1108,6 +1109,8 @@ Json NIC::toJSON(bool stats) {
     Json nic = Json::make_object();
     nic.set("id",getId());
     if (!stats) {
+        nic.set("vendor", callRead("vendor"));
+        nic.set("driver", callRead("driver"));
         nic.set("speed", callRead("speed"));
         nic.set("status", callRead("carrier"));
         nic.set("portType", callRead("type"));
