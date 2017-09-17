@@ -59,7 +59,10 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 WorkPackage::smaction(Packet* p) {
     uint32_t sum = 0;
-    int r = frand();
+    int r;
+    if (_n > 0) {
+        r = frand();
+    }
     for (int i = 0; i < _n; i++) {
         uint32_t data;
         if (r / (FRAND_MAX / 101 + 1) < _r) {
