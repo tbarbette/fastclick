@@ -21,15 +21,18 @@
 #include <click/args.hh>
 CLICK_DECLS
 
-StoreData::StoreData()
+StoreData::StoreData() : _grow(false)
 {
 }
 
 int
 StoreData::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    return Args(conf, this, errh).read_mp("OFFSET", _offset)
-        .read_mp("DATA", _data).complete();
+    return Args(conf, this, errh)
+        .read_mp("OFFSET", _offset)
+        .read_mp("DATA", _data)
+        .read("GROW", _grow)
+        .complete();
 }
 
 Packet *
@@ -39,6 +42,8 @@ StoreData::simple_action(Packet *p)
         return p;
     else if (WritablePacket *q = p->uniqueify()) {
         int len = q->length() - _offset;
+        if (_grow && _data.length() < len)
+            q = q->put(_data.length() - len);
         memcpy(q->data() + _offset, _data.data(), (_data.length() < len ? _data.length() : len));
         return q;
     } else
