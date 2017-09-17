@@ -52,21 +52,26 @@ void PathSpinlock::push(int i,Packet *p)	{
 	_lock->release();
 }
 
+Packet* PathSpinlock::pull(int i)	{
+	_lock->acquire();
+	Packet* p = input(i).pull();
+	_lock->release();
+	return p;
+}
+
 #if HAVE_BATCH
 void PathSpinlock::push_batch(int i,PacketBatch *batch)	{
 	_lock->acquire();
 	output(i).push_batch(batch);
 	_lock->release();
 }
-#endif
-
-
-Packet* PathSpinlock::pull(int i)	{
+PacketBatch* PathSpinlock::pull_batch(int i,unsigned max)	{
 	_lock->acquire();
-	Packet* p = input(i).pull();
+	PacketBatch* p = input(i).pull_batch(max);
 	_lock->release(); 
 	return p;
 }
- 
+#endif
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(PathSpinlock)
