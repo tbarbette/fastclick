@@ -97,6 +97,60 @@ class atomic_uint32_t { public:
 
 };
 
+/** @class atomic_uint64_t
+ * @brief A 64-bit integer with support for atomic operations.
+ *
+ * The atomic_uint64_t class represents a 64-bit integer, with support for
+ * atomic operations.  The +=, -=, &=, |=, ++, and -- operations are
+ * implemented using atomic instructions.  There are also atomic swap(),
+ * fetch_and_add(), dec_and_test(), and compare_swap() operations.
+ *
+ * Because of some issues with compiler implementations, atomic_uint64_t has
+ * no explicit constructor; to set an atomic_uint64_t to a value, use
+ * operator=.
+ *
+ * The atomic_uint64_t only provides true atomic semantics when that has been
+ * implemented.  It has been implemented in the Linux kernel, and at userlevel
+ * (when --enable-multithread has been defined) for x86 machines.  In other
+ * situations, it's not truly atomic (because it doesn't need to be).
+ */
+class atomic_uint64_t { public:
+
+    // No constructors because, unfortunately, GCC generates worse code. Use
+    // operator= instead.
+
+    inline uint64_t value() const;
+    inline uint64_t nonatomic_value() const;
+    inline operator uint64_t() const;
+
+    inline atomic_uint64_t &operator=(uint64_t x);
+
+    inline atomic_uint64_t &operator+=(int64_t delta);
+    inline atomic_uint64_t &operator-=(int64_t delta);
+
+    inline void nonatomic_inc();
+    inline void operator++();
+    inline void operator++(int);
+    inline void nonatomic_dec();
+    inline void operator--();
+    inline void operator--(int);
+
+    inline uint64_t compare_swap(uint64_t expected, uint64_t desired);
+
+    inline static void add(volatile uint64_t &x, uint64_t delta);
+    inline static uint64_t compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired);
+  private:
+
+#if CLICK_LINUXMODULE
+    atomic64_t _val;
+#elif HAVE_MULTITHREAD
+    volatile uint64_t _val __attribute__((aligned));
+#else
+    uint64_t _val;
+#endif
+
+};
+
 /** @brief  Return the value. */
 inline uint32_t
 atomic_uint32_t::value() const
@@ -687,6 +741,223 @@ operator<=(const atomic_uint32_t &a, const atomic_uint32_t &b)
 }
 
 typedef atomic_uint32_t uatomic32_t;
+
+//Atomic 64
+
+/** @brief  Return the value. */
+inline uint64_t
+atomic_uint64_t::value() const
+{
+#if CLICK_LINUXMODULE
+    return atomic_read(&_val);
+#else
+    return CLICK_ATOMIC_VAL;
+#endif
+}
+
+/** @brief  Return the value. */
+inline uint64_t
+atomic_uint64_t::nonatomic_value() const
+{
+    return *((uint64_t*)&_val);
+}
+
+/** @brief  Return the value. */
+inline
+atomic_uint64_t::operator uint64_t() const
+{
+    return value();
+}
+
+/** @brief  Set the value to @a x. */
+inline atomic_uint64_t &
+atomic_uint64_t::operator=(uint64_t x)
+{
+#if CLICK_LINUXMODULE
+    atomic64_set(&_val, x);
+#else
+    CLICK_ATOMIC_VAL = x;
+#endif
+    return *this;
+}
+
+/** @brief  Atomically add @a delta to the value. */
+inline atomic_uint64_t &
+atomic_uint64_t::operator+=(int64_t delta)
+{
+#if CLICK_LINUXMODULE
+    atomic64_add(delta, &_val);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
+          : "=m" (CLICK_ATOMIC_VAL)
+          : "r" (delta), "m" (CLICK_ATOMIC_VAL)
+          : "cc");
+#else
+    CLICK_ATOMIC_VAL += delta;
+#endif
+    return *this;
+}
+
+/** @brief  Atomically increment value @a x. */
+inline void
+atomic_uint64_t::add(volatile uint64_t &x, uint64_t delta)
+{
+#if CLICK_LINUXMODULE
+    atomic64_add(delta, x);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
+          : "=m" (x)
+          : "r" (delta), "m" (x)
+          : "cc");
+#else
+    CLICK_ATOMIC_VAL += delta;
+#endif
+}
+
+/** @brief  Atomically subtract @a delta from the value. */
+inline atomic_uint64_t &
+atomic_uint64_t::operator-=(int64_t delta)
+{
+#if CLICK_LINUXMODULE
+    atomic64_sub(delta, &_val);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "subq %1,%0"
+          : "=m" (CLICK_ATOMIC_VAL)
+          : "r" (delta), "m" (CLICK_ATOMIC_VAL)
+          : "cc");
+#else
+    CLICK_ATOMIC_VAL -= delta;
+#endif
+    return *this;
+}
+
+
+/** @brief  Increment the value. */
+inline void
+atomic_uint64_t::nonatomic_inc()
+{
+    _val++;
+}
+
+/** @brief  Atomically increment the value. */
+inline void
+atomic_uint64_t::operator++()
+{
+#if CLICK_LINUXMODULE
+    atomic64_inc(&_val);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "incq %0"
+          : "=m" (CLICK_ATOMIC_VAL)
+          : "m" (CLICK_ATOMIC_VAL)
+          : "cc");
+#else
+    CLICK_ATOMIC_VAL++;
+#endif
+}
+
+/** @brief  Atomically increment the value. */
+inline void
+atomic_uint64_t::operator++(int)
+{
+#if CLICK_LINUXMODULE
+    atomic64_inc(&_val);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "incq %0"
+          : "=m" (CLICK_ATOMIC_VAL)
+          : "m" (CLICK_ATOMIC_VAL)
+          : "cc");
+#else
+    CLICK_ATOMIC_VAL++;
+#endif
+}
+
+/** @brief  Atomically decrement the value. */
+inline void
+atomic_uint64_t::operator--()
+{
+#if CLICK_LINUXMODULE
+    atomic64_dec(&_val);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "decq %0"
+          : "=m" (CLICK_ATOMIC_VAL)
+          : "m" (CLICK_ATOMIC_VAL)
+          : "cc");
+#else
+    CLICK_ATOMIC_VAL--;
+#endif
+}
+
+/** @brief  Decrement the value. */
+inline void
+atomic_uint64_t::nonatomic_dec()
+{
+    _val--;
+}
+
+/** @brief  Atomically decrement the value. */
+inline void
+atomic_uint64_t::operator--(int)
+{
+#if CLICK_LINUXMODULE
+    atomic64_dec(&_val);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "decq %0"
+          : "=m" (CLICK_ATOMIC_VAL)
+          : "m" (CLICK_ATOMIC_VAL)
+          : "cc");
+#else
+    CLICK_ATOMIC_VAL--;
+#endif
+}
+
+/** @brief  Perform a compare-and-swap operation.
+ *  @param  x         value
+ *  @param  expected  test value
+ *  @param  desired   new value
+ *  @return The actual old value.  If it equaled @a expected, @a x has been
+ *	    set to @a desired.
+ *
+ * Behaves like this, but in one atomic step:
+ * @code
+ * uint62_t actual = x;
+ * if (x == expected)
+ *     x = desired;
+ * return actual;
+ * @endcode
+ *
+ * Also acts as a memory barrier. */
+inline uint64_t
+atomic_uint64_t::compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired)
+{
+#if CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
+		  : "=a" (expected), "=m" (x)
+		  : "r" (desired), "0" (expected), "m" (x)
+		  : "cc", "memory");
+    return expected;
+#elif CLICK_LINUXMODULE && defined(cmpxchg)
+    return cmpxchg(&x, expected, desired);
+#elif CLICK_LINUXMODULE
+# warning "using nonatomic approximation for atomic_uint§2_t::compare_and_swap"
+    unsigned long flags;
+    local_irq_save(flags);
+    uint64_t actual = x;
+    if (actual == expected)
+	x = desired;
+    local_irq_restore(flags);
+    return actual;
+#else
+    uint64_t actual = x;
+    if (actual == expected)
+	x = desired;
+    return actual;
+#endif
+}
+
+inline uint64_t
+atomic_uint64_t::compare_swap(uint64_t expected, uint64_t desired) {
+    return compare_swap(CLICK_ATOMIC_VAL, expected, desired);
+}
 
 CLICK_ENDDECLS
 #endif

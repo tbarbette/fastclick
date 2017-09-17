@@ -58,6 +58,8 @@ class AverageCounter : public BatchElement { public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
+    inline void add_count(uint64_t,uint64_t);
+
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch *batch);
 #endif
@@ -67,10 +69,30 @@ class AverageCounter : public BatchElement { public:
 
     volatile uint64_t _count;
     volatile uint64_t _byte_count;
-    volatile uint64_t _first;
+    atomic_uint64_t _first;
     volatile uint64_t _last;
     uint64_t _ignore;
+  protected:
+    bool _mp;
+};
 
+
+inline void
+AverageCounter::add_count(uint64_t c,uint64_t b) {
+    if (_mp) {
+        atomic_uint64_t::add(_count,c);
+        atomic_uint64_t::add(_byte_count,b);
+    } else {
+        _count += c;
+        _byte_count += b;
+    }
+}
+
+
+class AverageCounterMP : public AverageCounter { public:
+    AverageCounterMP() CLICK_COLD;
+
+    const char *class_name() const		{ return "AverageCounterMP"; }
 };
 
 CLICK_ENDDECLS
