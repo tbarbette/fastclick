@@ -35,12 +35,12 @@ class PathSpinlock : public BatchElement { public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push(int,Packet *p);
+    void push(int,Packet *p) override;
+    Packet* pull(int) override;
 #if HAVE_BATCH
-    void push_batch(int,PacketBatch *p);
+    void push_batch(int,PacketBatch *p) override;
+    PacketBatch* pull_batch(int,unsigned) override;
 #endif
-    Packet* pull(int);
-
   private:
     bool _lock_release;
     Spinlock *_lock;
