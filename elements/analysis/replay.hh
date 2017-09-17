@@ -35,6 +35,7 @@ protected:
     int _stop;
     bool _quick_clone;
     Task _task;
+    int _limit;
 
     Packet* _queue_head;
     Packet* _queue_current;
@@ -154,7 +155,7 @@ inline bool ReplayBase::load_packets() {
             count++;
             if (!router()->running())
                 return false;
-        } while(dry < 0);
+        } while(dry < 0 && (_limit < 0 || count < _limit));
 
         click_chatter("%s : Successfully loaded %d packets. Input %d dried out.",name().c_str(),count,dry);
 
