@@ -3,6 +3,8 @@
 #define CLICK_WorkPackage_HH
 #include <click/batchelement.hh>
 #include "../standard/counter.hh"
+#include <random>
+
 CLICK_DECLS
 
 /*
@@ -37,6 +39,7 @@ private:
     int _w;
     bool _payload;
     Vector<uint32_t> _array;
+    per_thread<std::mt19937> _gens;
 };
 
 CLICK_ENDDECLS

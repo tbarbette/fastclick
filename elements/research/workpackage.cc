@@ -21,13 +21,13 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
-#include <random>
 
 CLICK_DECLS
 
 std::random_device rd;
 
-#define FRAND_MAX rd.max()
+
+#define FRAND_MAX _gens->max()
 
 inline int frand() {
     return rd();
@@ -53,6 +53,9 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
     for (int i = 0; i < _array.size(); i++) {
         _array[i] = frand();
     }
+    for (int i = 0; i < _gens.weight(); i ++) {
+        _gens.set_value_for_thread(i, std::mt19937{rd()});
+    }
     return 0;
 }
 
@@ -61,7 +64,7 @@ WorkPackage::smaction(Packet* p) {
     uint32_t sum = 0;
     int r = 0;
     for (int i = 0; i < _w; i ++) {
-        r = frand();
+        r = (*_gens)();
     }
     for (int i = 0; i < _n; i++) {
         uint32_t data;
