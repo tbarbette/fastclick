@@ -46,7 +46,9 @@ public:
 private:
     Vector<unsigned> _delays;
     int _offset;
+    int _limit;
     RecordTimestamp* _rt;
+    atomic_uint32_t nd;
     inline int smaction(Packet* p);
 
     RecordTimestamp* get_recordtimestamp_instance();

@@ -36,7 +36,8 @@
 
 CLICK_DECLS
 
-TimestampDiff::TimestampDiff() : _delays(), _offset(40) {
+TimestampDiff::TimestampDiff() : _delays(), _offset(40), _limit(0) {
+    nd = 0;
 }
 
 TimestampDiff::~TimestampDiff() {
@@ -48,11 +49,20 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(conf, this, errh)
             .read_mp("RECORDER", e)
             .read("OFFSET",_offset)
+            .read("N", _limit)
             .complete() < 0)
         return -1;
 
+    if (get_passing_threads().weight() > 1 && !_limit) {
+        return errh->error("TimestampDiff is only thread safe if N is set");
+    }
+
     if ((_rt = static_cast<RecordTimestamp*>(e->cast("RecordTimestamp"))) == 0)
         return errh->error("RECORDER must be a valid RecordTimestamp element");
+
+    if (_limit) {
+        _delays.resize(_limit, 0);
+    }
 
     return 0;
 }
@@ -96,7 +106,7 @@ String TimestampDiff::read_handler(Element *e, void *arg) {
             double var = 0.0;
             for (auto delay : tsd->_delays)
                 var += pow(delay - mean, 2);
-            return String(sqrt(var / tsd->_delays.size()));
+            return String(sqrt(var / tsd->nd));
         }
         case TSD_PERC_00_HANDLER:
             return String(min);
@@ -122,7 +132,7 @@ String TimestampDiff::read_handler(Element *e, void *arg) {
             return String(max);
         case TSD_DUMP_HANDLER: {
             StringAccum s;
-            for (size_t i = 0; i < tsd->_delays.size(); ++i)
+            for (size_t i = 0; i < tsd->nd; ++i)
                 s << i << ": " << String(tsd->_delays[i]) << "\n";
             return s.take_string();
         }
@@ -160,8 +170,15 @@ inline int TimestampDiff::smaction(Packet* p) {
     if (diff.sec() > 0)
         click_chatter("delay over 1s for packet %llu: %uµs",
                       i, diff.sec() * 1000000 + diff.usec());
-    else
-        _delays.push_back(diff.usec());
+    else {
+        if (_limit) {
+            unsigned long my = nd.fetch_and_add(1);
+            _delays[my] = diff.usec();
+        } else {
+            _delays.push_back(diff.usec());
+            nd++;
+        }
+    }
     return 0;
 }
 
@@ -196,7 +213,7 @@ TimestampDiff::min_mean_max(Vector<unsigned> &vec, unsigned &min, double &mean, 
         }
     }
 
-    mean = sum / vec.size();
+    mean = sum / nd;
 }
 
 double
@@ -205,7 +222,7 @@ TimestampDiff::percentile(Vector<unsigned> &vec, double percent)
     double perc = -1;
 
     // The size of the vector of latencies
-    size_t vec_size = vec.size();
+    size_t vec_size = nd;
 
     // The desired percentile
     size_t idx = (percent * vec_size) / 100;
@@ -227,7 +244,7 @@ TimestampDiff::percentile(Vector<unsigned> &vec, double percent)
     }
 
     auto nth = vec.begin() + idx;
-    std::nth_element(vec.begin(), nth, vec.end());
+    std::nth_element(vec.begin(), nth, vec.begin() + nd);
     perc = static_cast<double>(*nth);
 
     return perc;
