@@ -33,7 +33,7 @@ inline int frand() {
     return rd();
 }
 
-WorkPackage::WorkPackage()
+WorkPackage::WorkPackage() : _w(1)
 {
 }
 
@@ -46,7 +46,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("N", _n) //Number of array access (4bytes)
         .read_mp("R", _r) //Percentage of access that are packet read (vs Array access) between 0 and 100
         .read_mp("PAYLOAD", _payload) //Access payload or only header
-        .read("W",_w) //Amount of work (x100 xor on the data just read)
+        .read("W",_w) //Amount of call to random, purely CPU intensive fct
         .complete() < 0)
         return -1;
     _array.resize(s * 1024 * 1024 / sizeof(uint32_t));
@@ -59,8 +59,8 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 WorkPackage::smaction(Packet* p) {
     uint32_t sum = 0;
-    int r;
-    if (_n > 0) {
+    int r = 0;
+    for (int i = 0; i < _w; i ++) {
         r = frand();
     }
     for (int i = 0; i < _n; i++) {
@@ -71,9 +71,6 @@ WorkPackage::smaction(Packet* p) {
         } else {
             int pos = r / ((FRAND_MAX / _array.size()) + 1);
             data = _array[pos];
-        }
-        for (int j = 0; j < _w * 100; j ++) {
-            sum ^= data;
         }
         r = data ^ (r << 24 ^ r << 16  ^ r << 8 ^ r >> 16);
     }
