@@ -30,6 +30,7 @@ class StoreData : public BatchElement { public:
 
     unsigned _offset;
     String _data;
+    bool _grow;
 
 };
 
