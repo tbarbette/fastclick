@@ -29,10 +29,6 @@ std::random_device rd;
 
 #define FRAND_MAX _gens->max()
 
-inline int frand() {
-    return rd();
-}
-
 WorkPackage::WorkPackage() : _w(1)
 {
 }
@@ -51,7 +47,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
     _array.resize(s * 1024 * 1024 / sizeof(uint32_t));
     for (int i = 0; i < _array.size(); i++) {
-        _array[i] = frand();
+        _array[i] = rd();
     }
     for (int i = 0; i < _gens.weight(); i ++) {
         _gens.set_value_for_thread(i, std::mt19937{rd()});
@@ -62,7 +58,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 WorkPackage::smaction(Packet* p) {
     uint32_t sum = 0;
-    int r = 0;
+    unsigned r = 0;
     for (int i = 0; i < _w; i ++) {
         r = (*_gens)();
     }
@@ -72,7 +68,7 @@ WorkPackage::smaction(Packet* p) {
             int pos = r / (FRAND_MAX / ((_payload?p->length():54) + 1) + 1);
             data = *(uint32_t*)(p->data() + pos);
         } else {
-            int pos = r / ((FRAND_MAX / _array.size()) + 1);
+            unsigned pos = r / ((FRAND_MAX / (_array.size() + 1)) + 1);
             data = _array[pos];
         }
         r = data ^ (r << 24 ^ r << 16  ^ r << 8 ^ r >> 16);
