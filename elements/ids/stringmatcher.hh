@@ -57,13 +57,33 @@ class StringMatcher : public BatchElement {
 		PacketBatch *simple_action_batch(PacketBatch *);
 	#endif
 
-	private:
+	protected:
+
+        inline int smaction(Packet *p);
 		bool is_valid_patterns(Vector<String> &, ErrorHandler *);
 		static int write_handler(const String &, Element *e, void *thunk, ErrorHandler *errh) CLICK_COLD;
 		AhoCorasick _matcher;
 		Vector<String> _patterns;
 		int _matches;
 };
+
+class StringMatcherMP : public StringMatcher {
+	public:
+		const char *class_name() const		{ return "StringMatcherMP"; }
+
+		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+		Packet      *simple_action      (Packet *);
+	#if HAVE_BATCH
+		PacketBatch *simple_action_batch(PacketBatch *);
+	#endif
+
+	private:
+
+        inline int smaction(Packet *p);
+		per_thread<AhoCorasick> _matchers;
+};
+
+
 
 
 CLICK_ENDDECLS
