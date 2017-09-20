@@ -819,6 +819,16 @@ String::trim_space() const
     return String();
 }
 
+/** @brief Return a substring with spaces trimmed from the start. */
+String
+String::trim_space_left() const
+{
+    for (int i = 0 ; i <= _r.length - 1; i++)
+        if (!isspace((unsigned char) _r.data[i]))
+            return substring(i);
+    return String();
+}
+
 /** @brief Return a string with from replaced by to */
 String
 String::replace(char from, char to) const
