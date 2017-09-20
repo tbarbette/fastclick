@@ -51,7 +51,7 @@ Will match any packet with the word "xnet" or "he.*o" and will output it to port
 Returns or sets the element's pattern 0. There are as many C<pattern>
 handlers as there are output ports.
 
-=a RegexClassifier */
+=a RegexMatcher */
 class RegexMatcher : public BatchElement {
 	public:
 
@@ -72,12 +72,35 @@ class RegexMatcher : public BatchElement {
 #endif
 
 	private:
+        RegexSet _program;
+	protected:
 		bool is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) const;
 		static String read_handler(Element *, void *) CLICK_COLD;
 		static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
-		RegexSet _program;
 		bool _payload_only;
 		bool _match_all;
+};
+
+
+
+/**
+ * Stupid per-thread duplication of regexmatcher
+ * But only because re2 is stupid about multithreading...
+ */
+class RegexMatcherMP : public RegexMatcher {
+    public:
+        const char *class_name() const      { return "RegexMatcherMP"; }
+
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        void push(int port, Packet* p);
+#if HAVE_BATCH
+        void push_batch(int port, PacketBatch* p);
+#endif
+
+    private:
+
+        int find_output(Packet *p);
+        per_thread<RegexSet> _programs;
 };
 
 CLICK_ENDDECLS

@@ -2,9 +2,11 @@
  * stringmatcher.{cc,hh} -- element matches a packet based on a set of strings
  *
  * Computational batching support
- * by Georgios Katsikas
+ * by Georgios Katsikas and Tom Barbette
  *
  * Copyright (c) 2017 KTH Royal Institute of Technology
+ * Copyright (c) 2017 University of Liege
+ *
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -64,6 +66,42 @@ StringMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 }
 
+int
+StringMatcherMP::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    // This check will prevent us from doing any changes to the state if there is an error
+    if (!is_valid_patterns(conf, errh)) {
+        return -1;
+    }
+
+    // if we are reconfiguring we need to reset the patterns and the matcher
+    if ((!_matcher.is_open()) || _patterns.size()) {
+        _matcher.reset();
+        _patterns.clear();
+    }
+
+    for (int i = 0; i < _matchers.weight(); i ++) {
+        auto &m =_matchers.get_value(i);
+        for (int i=0; i < conf.size(); ++i) {
+            // All patterns should be OK so we can only have duplicates
+            if (m.add_pattern(conf[i], i)) {
+                errh->warning("Pattern #d is a duplicate");
+            } else {
+                _patterns.push_back(conf[i]);
+            }
+        }
+        m.finalize();
+    }
+
+    if (!errh->nerrors()) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
+
+
 bool
 StringMatcher::is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) {
     bool valid = true;
@@ -91,30 +129,53 @@ StringMatcher::is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) {
     return valid;
 }
 
-Packet *
-StringMatcher::simple_action(Packet *p) {
+inline int
+StringMatcher::smaction(Packet *p) {
     if (_matcher.match_any(p, false)) {
         _matches++;
-
-        // push to port 1 if anything is connected
-        if (noutputs() == 2) {
-            output(1).push(p);
-        } else {
-            p->kill();
-        }
-        return 0;
+        return 1;
     } else {
         // push to port 0
-        return p;
+        return 0;
     }
 }
+
+
+Packet *
+StringMatcher::simple_action(Packet *p) {
+    checked_output_push(smaction(p),p);
+}
+
 
 #if HAVE_BATCH
 PacketBatch *
 StringMatcher::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
-    return batch;
+    CLASSIFY_EACH_PACKET(2, smaction, batch, checked_output_push_batch);
+}
+#endif
+
+inline int
+StringMatcherMP::smaction(Packet *p) {
+    if (_matchers->match_any(p, false)) {
+        _matches++;
+        return 1;
+    } else {
+        // push to port 0
+        return 0;
+    }
+}
+
+Packet *
+StringMatcherMP::simple_action(Packet *p) {
+    checked_output_push(smaction(p),p);
+}
+
+#if HAVE_BATCH
+PacketBatch *
+StringMatcherMP::simple_action_batch(PacketBatch *batch)
+{
+    CLASSIFY_EACH_PACKET(2, smaction, batch, checked_output_push_batch);
 }
 #endif
 
@@ -134,4 +195,5 @@ StringMatcher::add_handlers() {
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel AhoCorasick)
 EXPORT_ELEMENT(StringMatcher)
-ELEMENT_MT_SAFE(StringMatcher)
+EXPORT_ELEMENT(StringMatcherMP)
+ELEMENT_MT_SAFE(StringMatcherMP)
