@@ -64,7 +64,7 @@ WorkPackage::smaction(Packet* p) {
     }
     for (int i = 0; i < _n; i++) {
         uint32_t data;
-        if (r / (FRAND_MAX / 101 + 1) < _r) {
+        if (r / (FRAND_MAX / 101 + 1) <= _r) {
             int pos = r / (FRAND_MAX / ((_payload?p->length():54) + 1) + 1);
             data = *(uint32_t*)(p->data() + pos);
         } else {
