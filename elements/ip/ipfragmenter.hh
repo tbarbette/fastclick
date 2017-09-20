@@ -1,6 +1,6 @@
 #ifndef CLICK_IPFRAGMENTER_HH
 #define CLICK_IPFRAGMENTER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
@@ -55,7 +55,7 @@ CLICK_DECLS
  * =a ICMPError, CheckLength
  */
 
-class IPFragmenter : public Element { public:
+class IPFragmenter : public BatchElement { public:
 
   IPFragmenter() CLICK_COLD;
   ~IPFragmenter() CLICK_COLD;
@@ -71,6 +71,9 @@ class IPFragmenter : public Element { public:
   void add_handlers() CLICK_COLD;
 
   void push(int, Packet *);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+#endif
 
  private:
 
