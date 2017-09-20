@@ -1,6 +1,10 @@
+// -*- c-basic-offset: 4; related-file-name: "generateipfilter.hh" -*-
 /*
  * GenerateIPFilter.{cc,hh} -- element prints packet contents to system log
+ * Tom Barbette, (extended by) Georgios Katsikas
  *
+ * Copyright (c) 2017 Tom Barbette, University of Liège
+ * Copyright (c) 2017 Georgios Katsikas, RISE SICS AB
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,9 +26,48 @@
 
 CLICK_DECLS
 
-GenerateIPFilter::GenerateIPFilter() : _nrules(8000),_keep_sport(false),_keep_dport(true)
+/**
+ * Base class for pattern generation out of incoming traffic.
+ */
+GenerateIPPacket::GenerateIPPacket() : _nrules(8000), _keep_sport(false), _keep_dport(true)
 {
+}
 
+GenerateIPPacket::~GenerateIPPacket()
+{
+}
+
+int
+GenerateIPPacket::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (Args(conf, this, errh)
+            .read_p("NB_RULES",_nrules)
+            .read("KEEP_SPORT",_keep_sport)
+            .read("KEEP_DPORT",_keep_dport)
+    .complete() < 0)
+    return -1;
+
+    _mask = IPFlowID(0xffffffff,(_keep_sport?0xffff:0),0xffffffff,(_keep_dport?0xffff:0));
+
+  return 0;
+}
+
+int
+GenerateIPPacket::initialize(ErrorHandler *errh)
+{
+    return 0;
+}
+
+void
+GenerateIPPacket::cleanup(CleanupStage)
+{
+}
+
+/**
+ * IP FIlter rules' generator out of incoming traffic.
+ */
+GenerateIPFilter::GenerateIPFilter() : GenerateIPPacket()
+{
 }
 
 GenerateIPFilter::~GenerateIPFilter()
@@ -34,29 +77,19 @@ GenerateIPFilter::~GenerateIPFilter()
 int
 GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-
-    if (Args(conf, this, errh)
-            .read_p("NB_RULES",_nrules)
-            .read("KEEP_SPORT",_keep_sport)
-            .read("KEEP_DPORT",_keep_dport)
-	.complete() < 0)
-	return -1;
-
-    _mask = IPFlowID(0xffffffff,(_keep_sport?0xffff:0),0xffffffff,(_keep_dport?0xffff:0));
-
-  return 0;
+    return GenerateIPPacket::configure(conf, errh);
 }
 
 int
 GenerateIPFilter::initialize(ErrorHandler *errh)
 {
-  return 0;
+    return GenerateIPPacket::initialize(errh);
 }
 
 void
 GenerateIPFilter::cleanup(CleanupStage)
 {
-
+    GenerateIPPacket::cleanup();
 }
 
 Packet *
@@ -66,27 +99,33 @@ GenerateIPFilter::simple_action(Packet *p)
     IPFlow flow = IPFlow();
     flow.initialize(flowid & _mask);
     _map.find_insert(flow);
+
     return p;
 }
 
 #if HAVE_BATCH
 PacketBatch*
-GenerateIPFilter::simple_action_batch(PacketBatch *batch) {
+GenerateIPFilter::simple_action_batch(PacketBatch *batch)
+{
     EXECUTE_FOR_EACH_PACKET(simple_action, batch);
     return batch;
 }
 #endif
 
 String
-GenerateIPFilter::read_handler(Element *e, void *user_data) {
-    GenerateIPFilter* g = static_cast<GenerateIPFilter*>(e);
+GenerateIPFilter::read_handler(Element *e, void *user_data)
+{
+    GenerateIPFilter *g = static_cast<GenerateIPFilter *>(e);
     StringAccum acc;
 
     int n = 0;
     while (g->_map.size() > g->_nrules) {
         HashTable<IPFlow> newmap;
         ++n;
-        g->_mask = IPFlowID(IPAddress::make_prefix(32 - n),g->_mask.sport(),IPAddress::make_prefix(32 - n),g->_mask.dport());
+        g->_mask = IPFlowID(
+            IPAddress::make_prefix(32 - n), g->_mask.sport(),
+            IPAddress::make_prefix(32 - n),g->_mask.dport()
+        );
         for (auto flow : g->_map) {
             flow.setMask(g->_mask);
             newmap.find_insert(flow);
@@ -117,4 +156,5 @@ GenerateIPFilter::add_handlers()
 }
 
 CLICK_ENDDECLS
+ELEMENT_REQUIRES(GenerateIPPacket)
 EXPORT_ELEMENT(GenerateIPFilter)

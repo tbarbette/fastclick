@@ -98,61 +98,91 @@ Boolean.  If false, then don't print messages.  Default is true.
 
 =a Print, CheckIPHeader */
 
-class GenerateIPFilter : public BatchElement { public:
+/**
+ *
+ */
+class GenerateIPPacket : public BatchElement {
 
-  GenerateIPFilter() CLICK_COLD;
-  ~GenerateIPFilter() CLICK_COLD;
+    public:
 
-  const char *class_name() const		{ return "GenerateIPFilter"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+        GenerateIPPacket() CLICK_COLD;
+        virtual ~GenerateIPPacket() CLICK_COLD;
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  int initialize(ErrorHandler *) CLICK_COLD;
-  void cleanup(CleanupStage) CLICK_COLD;
-  void add_handlers() CLICK_COLD;
+        const char *class_name() const { return "GenerateIPPacket"; }
+        const char *port_count() const { return PORTS_1_1; }
 
-  static String read_handler(Element *handler, void *user_data);
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *) CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
 
-  Packet      *simple_action      (Packet      *p);
-#if HAVE_BATCH
-  PacketBatch *simple_action_batch(PacketBatch *batch);
-#endif
+        // Make this base class abstract
+        virtual Packet *simple_action(Packet *p) = 0;
+    #if HAVE_BATCH
+        virtual PacketBatch *simple_action_batch(PacketBatch *batch) = 0;
+    #endif
 
- private:
-  class IPFlow { public:
+    protected:
 
-      typedef IPFlowID key_type;
-      typedef const IPFlowID &key_const_reference;
+        class IPFlow {
 
-      IPFlow() {
-      }
+            public:
 
-      void initialize(const IPFlowID &flowid) {
-          _flowid = flowid;
-      }
+                typedef IPFlowID key_type;
+                typedef const IPFlowID &key_const_reference;
 
-      const IPFlowID &flowid() const {
-          return _flowid;
-      }
+                IPFlow() {};
+
+                void initialize(const IPFlowID &flowid) {
+                    _flowid = flowid;
+                }
+
+                const IPFlowID &flowid() const {
+                    return _flowid;
+                }
 
 
-      void setMask(IPFlowID mask) {
-          _flowid = _flowid & mask;
-      }
+                void setMask(IPFlowID mask) {
+                    _flowid = _flowid & mask;
+                }
 
-      key_const_reference hashkey() const {
-          return _flowid;
-      }
+                key_const_reference hashkey() const {
+                    return _flowid;
+                }
 
-    private:
+            private:
 
-      IPFlowID _flowid;
-  };
-  HashTable<IPFlow> _map;
-  int _nrules;
-  bool _keep_sport;
-  bool _keep_dport;
-  IPFlowID _mask;
+                IPFlowID _flowid;
+        };
+
+        HashTable<IPFlow> _map;
+        int  _nrules;
+        bool _keep_sport;
+        bool _keep_dport;
+        IPFlowID _mask;
+
+};
+
+class GenerateIPFilter : public GenerateIPPacket {
+
+    public:
+
+        GenerateIPFilter() CLICK_COLD;
+        ~GenerateIPFilter() CLICK_COLD;
+
+        const char *class_name() const { return "GenerateIPFilter"; }
+        const char *port_count() const { return PORTS_1_1; }
+
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *) CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
+
+        static String read_handler(Element *handler, void *user_data);
+
+        Packet *simple_action(Packet *p);
+    #if HAVE_BATCH
+        PacketBatch *simple_action_batch(PacketBatch *batch);
+    #endif
 
 };
 
