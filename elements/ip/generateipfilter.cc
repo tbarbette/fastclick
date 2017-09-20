@@ -29,7 +29,7 @@ CLICK_DECLS
 /**
  * Base class for pattern generation out of incoming traffic.
  */
-GenerateIPPacket::GenerateIPPacket() : _nrules(8000), _keep_sport(false), _keep_dport(true)
+GenerateIPPacket::GenerateIPPacket() : _nrules(8000)
 {
 }
 
@@ -40,14 +40,10 @@ GenerateIPPacket::~GenerateIPPacket()
 int
 GenerateIPPacket::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(conf, this, errh)
-            .read_p("NB_RULES",_nrules)
-            .read("KEEP_SPORT",_keep_sport)
-            .read("KEEP_DPORT",_keep_dport)
-    .complete() < 0)
-    return -1;
-
-    _mask = IPFlowID(0xffffffff,(_keep_sport?0xffff:0),0xffffffff,(_keep_dport?0xffff:0));
+    if (Args(this, errh)
+            .read_p("NB_RULES", _nrules)
+            .complete() < 0)
+        return -1;
 
   return 0;
 }
@@ -61,12 +57,13 @@ GenerateIPPacket::initialize(ErrorHandler *errh)
 void
 GenerateIPPacket::cleanup(CleanupStage)
 {
+    return;
 }
 
 /**
  * IP FIlter rules' generator out of incoming traffic.
  */
-GenerateIPFilter::GenerateIPFilter() : GenerateIPPacket()
+GenerateIPFilter::GenerateIPFilter() : GenerateIPPacket(), _keep_sport(false), _keep_dport(true)
 {
 }
 
@@ -77,6 +74,14 @@ GenerateIPFilter::~GenerateIPFilter()
 int
 GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    if (Args(this, errh)
+            .read("KEEP_SPORT", _keep_sport)
+            .read("KEEP_DPORT", _keep_dport)
+            .complete() < 0)
+        return -1;
+
+    _mask = IPFlowID(0xffffffff, (_keep_sport?0xffff:0), 0xffffffff, (_keep_dport?0xffff:0));
+
     return GenerateIPPacket::configure(conf, errh);
 }
 
@@ -89,7 +94,6 @@ GenerateIPFilter::initialize(ErrorHandler *errh)
 void
 GenerateIPFilter::cleanup(CleanupStage)
 {
-    GenerateIPPacket::cleanup();
 }
 
 Packet *
@@ -156,5 +160,4 @@ GenerateIPFilter::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(GenerateIPPacket)
 EXPORT_ELEMENT(GenerateIPFilter)

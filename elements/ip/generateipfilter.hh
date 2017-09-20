@@ -22,7 +22,7 @@ CheckIPHeader or equivalent element.
 
 Keyword arguments are:
 
-=over 8
+=3
 
 =item NB_RULES
 
@@ -40,7 +40,7 @@ Default is true.
 
 =back
 
-=a Print, GenerateIPLookup */
+=a IPFilter, GenerateIPLookup, Print */
 
 /**
  * Abstract, base class that offers IPFlow representation & storage.
@@ -100,8 +100,6 @@ class GenerateIPPacket : public BatchElement {
 
         HashTable<IPFlow> _map;
         int  _nrules;
-        bool _keep_sport;
-        bool _keep_dport;
         IPFlowID _mask;
 
 };
@@ -130,6 +128,11 @@ class GenerateIPFilter : public GenerateIPPacket {
     #if HAVE_BATCH
         PacketBatch *simple_action_batch(PacketBatch *batch);
     #endif
+
+    private:
+
+        bool _keep_sport;
+        bool _keep_dport;
 
 };
 
