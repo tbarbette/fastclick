@@ -39,7 +39,7 @@ extern bool dpdk_enabled;
 /**
  * DPDK's Flow Director API.
  */
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
 class DPDKDevice;
 
@@ -215,13 +215,13 @@ public:
     uint8_t port_id;
 
     DPDKDevice() : port_id(-1) {
-    #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         initialize_flow_director(port_id, ErrorHandler::default_handler());
     #endif
     }
 
     DPDKDevice(uint8_t port_id) : port_id(port_id) {
-    #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         initialize_flow_director(port_id, ErrorHandler::default_handler());
     #endif
     } CLICK_COLD;

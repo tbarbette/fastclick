@@ -25,7 +25,7 @@ extern "C" {
 }
 #endif
 
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 extern "C" {
 #include <rte_flow.h>
 }
@@ -36,7 +36,7 @@ CLICK_DECLS
 /**
  * Flow Director Implementation.
  */
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
 #define MASK_FROM_PREFIX(p) ~((1 << (32 - p)) - 1)
 
@@ -1070,7 +1070,7 @@ int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorH
 
     }
 
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     if (mode == FlowDirector::FLOW_DIR_FLAG) {
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
         click_chatter("Flow Director (port %u): Active", port_id);
@@ -1376,7 +1376,7 @@ int DPDKDevice::initialize(const String &mode, ErrorHandler *errh)
     _is_initialized = true;
 
     // Configure Flow Director
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     for (HashTable<uint8_t, FlowDirector *>::iterator it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
 
@@ -1390,7 +1390,7 @@ int DPDKDevice::initialize(const String &mode, ErrorHandler *errh)
     return 0;
 }
 
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 void DPDKDevice::configure_nic(const uint8_t &port_id)
 {
     if (_is_initialized) {
@@ -1409,7 +1409,7 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     errh->message("\n");
 
     for (HashTable<uint8_t, FlowDirector *>::const_iterator it = FlowDirector::_dev_flow_dir.begin();

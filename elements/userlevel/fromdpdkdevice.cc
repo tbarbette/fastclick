@@ -41,7 +41,7 @@ FromDPDKDevice::FromDPDKDevice() :
     _burst = 32;
     ndesc = 256;
 
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     _rule_id = 0;
 #endif
 }
@@ -395,7 +395,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
-    #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         case h_count_rules:
             return String(FlowDirector::flow_rules_count(fd->_dev->port_id));
     #endif
@@ -459,7 +459,7 @@ int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, 
     return -1;
 }
 
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 int FromDPDKDevice::flow_handler(const String &input, Element *e, void *thunk, ErrorHandler *errh)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
@@ -597,7 +597,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
 
-#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     add_read_handler (FlowDirector::FLOW_RULE_LIST, statistics_handler, h_count_rules);
     add_write_handler(FlowDirector::FLOW_RULE_ADD,   flow_handler, h_add_rule,    0);
     add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_del_rule,    0);
