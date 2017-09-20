@@ -67,6 +67,11 @@ class StringMatcher : public BatchElement {
 		int _matches;
 };
 
+/**
+ * Stupid per-thread duplication of StringMatcher
+ * I'm not sure why but AhoCorasick is loosing a lot of performance
+ * when traversed per multiple thread. I'm actually not sure at all it is thread safe.
+ */
 class StringMatcherMP : public StringMatcher {
 	public:
 		const char *class_name() const		{ return "StringMatcherMP"; }

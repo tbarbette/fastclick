@@ -78,6 +78,54 @@ RegexMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 	}
 }
 
+
+int
+RegexMatcherMP::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    bool payload_only = false;
+    bool match_all = false;
+    if (Args(this, errh).bind(conf)
+      .read("PAYLOAD_ONLY", payload_only)
+      .read("MATCH_ALL", match_all)
+      .consume() < 0)
+      return -1;
+    _payload_only = payload_only;
+    _match_all = match_all;
+
+    if (!is_valid_patterns(conf, errh)) {
+        return -1;
+    }
+
+    for (int i = 0; i < _programs.weight(); i ++) {
+        auto &p =_programs.get_value(i);
+
+        if (!p.is_open()) {
+            p.reset();
+        }
+
+        for (int i=0; i < conf.size(); ++i) {
+            String pattern = cp_unquote(conf[i]);
+            int result = p.add_pattern(pattern);
+            if (result < 0) {
+                // This should not happen
+                return errh->error("Error (%d) adding pattern %d: %s", result, i, pattern.c_str());
+            }
+        }
+
+        if (!p.compile()) {
+            // This should not happen
+            return errh->error("Unable to compile patterns");
+        }
+    }
+
+
+    if (!errh->nerrors()) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
 bool
 RegexMatcher::is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh) const{
 	RegexSet test_set;
@@ -140,6 +188,49 @@ RegexMatcher::push_batch(int, PacketBatch* batch) {
 }
 #endif
 
+int
+RegexMatcherMP::find_output(Packet* p) {
+    char* data = (char *) p->data();
+    int length = p->length();
+    if (_payload_only) {
+        if (p->has_network_header()) {
+            data = (char *) p->network_header();
+            length = p->network_length();
+        }
+        if (p->has_transport_header()) {
+            data = (char *) p->transport_header();
+            length = p->transport_length();
+        }
+    }
+
+    if (_match_all) {
+        if (_programs->match_all(data, length)) {
+            return 0;
+        } else {
+            return 1;
+        }
+    } else {
+        if (_programs->match_any(data, length)) {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+}
+
+
+void
+RegexMatcherMP::push(int, Packet* p) {
+    checked_output_push(find_output(p), p);
+}
+
+#if HAVE_BATCH
+void
+RegexMatcherMP::push_batch(int, PacketBatch* batch) {
+    CLASSIFY_EACH_PACKET(2,find_output,batch,checked_output_push_batch);
+}
+#endif
+
 enum { H_PAYLOAD_ONLY, H_MATCH_ALL};
 
 String
@@ -190,4 +281,5 @@ RegexMatcher::add_handlers() {
 CLICK_ENDDECLS
 EXPORT_ELEMENT(RegexMatcher)
 ELEMENT_REQUIRES(userlevel RegexSet)
-ELEMENT_MT_SAFE(RegexMatcher)
+EXPORT_ELEMENT(RegexMatcherMP)
+ELEMENT_MT_SAFE(RegexMatcherMP)
