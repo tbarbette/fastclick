@@ -28,7 +28,7 @@
 CLICK_DECLS
 
 /**
- * IP FIlter rules' generator out of incoming traffic.
+ * IPRouteTable rules' generator out of incoming traffic.
  */
 GenerateIPLookup::GenerateIPLookup() : GenerateIPPacket()
 {

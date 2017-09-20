@@ -130,7 +130,7 @@ class GenerateIPFilter : public GenerateIPPacket {
         PacketBatch *simple_action_batch(PacketBatch *batch);
     #endif
 
-    private:
+    protected:
 
         bool _keep_sport;
         bool _keep_dport;

@@ -41,9 +41,9 @@ GenerateIPPacket::~GenerateIPPacket()
 int
 GenerateIPPacket::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(this, errh)
+    if (Args(conf, this, errh)
             .read_p("NB_RULES", _nrules)
-            .complete() < 0)
+            .consume() < 0)
         return -1;
 
   return 0;
@@ -75,10 +75,10 @@ GenerateIPFilter::~GenerateIPFilter()
 int
 GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(this, errh)
+    if (Args(conf, this, errh)
             .read("KEEP_SPORT", _keep_sport)
             .read("KEEP_DPORT", _keep_dport)
-            .complete() < 0)
+            .consume() < 0)
         return -1;
 
     _mask = IPFlowID(0xffffffff, (_keep_sport?0xffff:0), 0xffffffff, (_keep_dport?0xffff:0));
@@ -129,7 +129,7 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
         ++n;
         g->_mask = IPFlowID(
             IPAddress::make_prefix(32 - n), g->_mask.sport(),
-            IPAddress::make_prefix(32 - n),g->_mask.dport()
+            IPAddress::make_prefix(32 - n), g->_mask.dport()
         );
         for (auto flow : g->_map) {
             flow.setMask(g->_mask);
