@@ -36,22 +36,229 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
+/**
+ * DPDK's Flow Director API.
+ */
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+
+class DPDKDevice;
+
+class FlowDirector {
+
+public:
+    FlowDirector();
+    FlowDirector(uint8_t port_id, ErrorHandler *errh);
+    ~FlowDirector();
+
+    /**
+     * Descriptor for a single flow.
+     */
+    struct port_flow {
+        port_flow() :
+            rule_id(0), flow(0), attr(0),
+            pattern(0), actions(0) {};
+
+        port_flow(
+            uint32_t                id,
+            struct rte_flow        *flow,
+            struct rte_flow_attr   *attr,
+            struct rte_flow_item   *pattern,
+            struct rte_flow_action *actions
+        ) : rule_id(id), flow(flow), attr(attr),
+            pattern(pattern), actions(actions) {};
+
+        uint32_t                rule_id;
+        struct rte_flow        *flow;
+        struct rte_flow_attr   *attr;
+        struct rte_flow_item   *pattern;
+        struct rte_flow_action *actions;
+    };
+
+    // Current list of flow rules
+    Vector<struct port_flow *> _rule_list;
+
+    // DPDKDevice mode
+    static String FLOW_DIR_FLAG;
+
+    // Supported flow director handlers (called from FromDPDKDevice)
+    static String FLOW_RULE_ADD;
+    static String FLOW_RULE_DEL;
+    static String FLOW_RULE_LIST;
+    static String FLOW_RULE_FLUSH;
+
+    // Rule structure constants
+    static String FLOW_RULE_PATTERN;
+    static String FLOW_RULE_ACTION;
+
+    // Supported patterns
+    static const Vector<String> FLOW_RULE_PATTERNS_VEC;
+
+    // Supported actions
+    static const Vector<String> FLOW_RULE_ACTIONS_VEC;
+
+    // TODO: Remove Static list of rules
+    static const Vector<String> FLOW_RULES_VEC;
+
+    // Global table of ports mapped to their Flow Director objects
+    static HashTable<uint8_t, FlowDirector *> _dev_flow_dir;
+
+    // Manages the Flow Director instances
+    static FlowDirector *get_flow_director(
+        const uint8_t &port_id,
+        ErrorHandler *errh
+    );
+
+    inline static void delete_error_handler() { delete _errh; };
+
+    // Port ID handlers
+    inline void    set_port_id(const uint8_t &port_id) { _port_id = port_id; };
+    inline uint8_t get_port_id() { return _port_id; };
+
+    // Activation/deactivation handlers
+    inline void set_active(const bool &active) { _active = active; };
+    inline bool get_active() { return _active; };
+
+    // Verbosity handlers
+    inline void set_verbose(const bool &verbose) { _verbose = verbose; };
+    inline bool get_verbose() { return _verbose; };
+
+    // Add a set of statically-defined rules
+    static bool add_rules_static(
+        const uint8_t &port_id,
+        const Vector<String> rules
+    );
+    // Add rules from a file
+    static bool add_rules_file(
+        const uint8_t &port_id,
+        const String &filename
+    );
+
+    // Count the rules
+    static uint32_t flow_rules_count(const uint8_t &port_id);
+
+    // Flush the rules
+    static uint32_t flow_rules_flush(const uint8_t &port_id);
+
+    // Parse a string-based rule and translate it into a flow rule object
+    static bool flow_rule_install(
+        const uint8_t  &port_id,
+        const uint32_t &rule_id,
+        const String   &rule
+    );
+
+    // Delete a flow rule
+    static bool flow_rule_delete(
+        const uint8_t  &port_id,
+        const uint32_t &rule_id
+    );
+
+    // Return a flow rule object with a specific ID
+    static struct port_flow *flow_rule_get(
+        const uint8_t  &port_id,
+        const uint32_t &rule_id
+    );
+
+private:
+
+    // Device ID
+    uint8_t _port_id;
+
+    // Indicates whether Flow Director is active for the given device
+    bool _active;
+
+    // Set stdout verbosity
+    bool _verbose;
+
+    // A unique error handler
+    static ErrorVeneer *_errh;
+
+    // Clean up the rules of a particular NIC
+    static uint32_t memory_clean(const uint8_t &port_id);
+
+    // Reports whether a flow rule would be accepted by the device
+    static bool flow_rule_validate(
+        const uint8_t                &port_id,
+        const uint32_t               &rule_id,
+        const struct rte_flow_attr   *attr,
+        const struct rte_flow_item   *patterns,
+        const struct rte_flow_action *actions
+    );
+
+    // Adds a newly-created flow rule to the NIC and to our memory
+    static bool flow_rule_add(
+        const uint8_t                &port_id,
+        const uint32_t               &rule_id,
+        const struct rte_flow_attr   *attr,
+        const struct rte_flow_item   *patterns,
+        const struct rte_flow_action *actions
+    );
+
+    // Reports problems that occur during the NIC configuration
+    static int flow_rule_complain(
+        const uint8_t &port_id,
+        struct rte_flow_error *error
+    );
+
+    // Reports the correct usage of a Flow Director rule along with a message
+    static void flow_rule_usage(
+        const uint8_t &port_id,
+        const char *message
+    );
+};
+
+#endif
+
 class DPDKDevice {
 public:
 
-    unsigned port_id;
+    uint8_t port_id;
 
-    DPDKDevice() : port_id(-1), info() {
+    DPDKDevice() : port_id(-1) {
+    #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+        initialize_flow_director(port_id, ErrorHandler::default_handler());
+    #endif
     }
 
-    DPDKDevice(unsigned port_id) : port_id(port_id) {
+    DPDKDevice(uint8_t port_id) : port_id(port_id) {
+    #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+        initialize_flow_director(port_id, ErrorHandler::default_handler());
+    #endif
     } CLICK_COLD;
 
-    int add_rx_queue(int &queue_id, bool promisc,
-                             unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
+    struct DevInfo {
+        inline DevInfo() :
+            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
+            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
+            num_pools(0), vf_vlan(), mac() {
+            rx_queues.reserve(128);
+            tx_queues.reserve(128);
+        }
 
-    int add_tx_queue(int &queue_id, unsigned n_desc,
-                             ErrorHandler *errh) CLICK_COLD;
+        String get_mq_mode() { return mq_mode_str; }
+
+        Vector<bool> rx_queues;
+        Vector<bool> tx_queues;
+        bool promisc;
+        unsigned n_rx_descs;
+        unsigned n_tx_descs;
+        enum rte_eth_rx_mq_mode mq_mode;
+        String mq_mode_str;
+        int num_pools;
+        Vector<int> vf_vlan;
+        EtherAddress mac;
+    };
+
+    void initialize_flow_director(const uint8_t &port_id, ErrorHandler *errh);
+
+    int add_rx_queue(
+        unsigned &queue_id, bool promisc,
+        unsigned n_desc, ErrorHandler *errh
+    ) CLICK_COLD;
+
+    int add_tx_queue(
+        unsigned &queue_id, unsigned n_desc,
+        ErrorHandler *errh
+    ) CLICK_COLD;
 
     void set_mac(EtherAddress mac);
 
@@ -59,13 +266,13 @@ public:
 
     static struct rte_mempool *get_mpool(unsigned int);
 
-    static int get_port_numa_node(unsigned port_id);
+    static int get_port_numa_node(uint8_t port_id);
 
     int set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorHandler *errh);
 
-    static int initialize(ErrorHandler *errh);
+    static int initialize(const String &mode, ErrorHandler *errh);
 
-    static int static_cleanup();
+    int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {
         return p->buffer_destructor() == DPDKDevice::free_pkt;
@@ -81,7 +288,11 @@ public:
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 
-    static unsigned int get_nb_txdesc(unsigned port_id);
+    static unsigned int get_nb_txdesc(uint8_t port_id);
+
+    static void configure_nic(const uint8_t &port_id);
+
+    static void cleanup(ErrorHandler *errh);
 
     static int NB_MBUF;
     static int MBUF_DATA_SIZE;
@@ -105,6 +316,7 @@ public:
 
     static struct rte_mempool** _pktmbuf_pools;
 
+    inline struct DevInfo getInfo() { return info; };
     inline int nbRXQueues();
     inline int nbTXQueues();
     inline int nbVFPools();
@@ -115,40 +327,21 @@ private:
 
     enum Dir { RX, TX };
 
-    struct DevInfo {
-        inline DevInfo() :
-            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), num_pools(0), vf_vlan(), mac() {
-            rx_queues.reserve(128);
-            tx_queues.reserve(128);
-        }
-
-        Vector<bool> rx_queues;
-        Vector<bool> tx_queues;
-        bool promisc;
-        unsigned n_rx_descs;
-        unsigned n_tx_descs;
-        enum rte_eth_rx_mq_mode mq_mode;
-        int num_pools;
-        Vector<int> vf_vlan;
-        EtherAddress mac;
-    };
-
     struct DevInfo info;
 
     static bool _is_initialized;
-    static HashTable<unsigned, DPDKDevice> _devs;
-    static int _nr_pktmbuf_pools;
+    static HashTable<uint8_t, DPDKDevice> _devs;
+    static unsigned _nr_pktmbuf_pools;
     static bool no_more_buffer_msg_printed;
 
     int initialize_device(ErrorHandler *errh) CLICK_COLD;
-    int add_queue(Dir dir, int &queue_id, bool promisc,
+    int add_queue(Dir dir, unsigned &queue_id, bool promisc,
                    unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
     static int alloc_pktmbufs() CLICK_COLD;
 
-    static DPDKDevice* get_device(unsigned port_id) {
-       return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
+    static DPDKDevice* get_device(const uint8_t &port_id) {
+        return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
     }
 
     static int get_port_from_pci(uint16_t domain, uint8_t bus, uint8_t dev_id, uint8_t function) {

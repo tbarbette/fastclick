@@ -106,6 +106,7 @@ Returns the number of packets read by the device.
 Resets "count" to zero.
 
 =a DPDKInfo, ToDPDKDevice */
+
 class ToDPDKDevice;
 
 class FromDPDKDevice : public RXQueueDevice {
@@ -132,22 +133,39 @@ public:
     
     ToDPDKDevice* findOutputElement();
 
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    String flow_director_read(const String &h);
+    int flow_director_write(const String &h, const String &flow);
+#endif
+
 private:
 
-    static String read_handler(Element*, void*) CLICK_COLD;
-    static int write_handler(const String&, Element*, void*, ErrorHandler*)
-        CLICK_COLD;
-    static String status_handler(Element *e, void * thunk) CLICK_COLD;
-    static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
-    static int xstats_handler(int operation, String& input, Element* e, const Handler *handler, ErrorHandler* errh);
-    enum {h_carrier,h_duplex,h_autoneg,h_speed,h_type,
-        h_ipackets,h_ibytes,h_imissed,h_ierrors,
+    static String read_handler(Element *, void *) CLICK_COLD;
+    static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    static int flow_handler (const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
+#endif
+    static String status_handler(Element *e, void *thunk) CLICK_COLD;
+    static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
+    static int xstats_handler(int operation, String &input, Element *e,
+                              const Handler *handler, ErrorHandler *errh);
+    enum {
+        h_carrier, h_duplex, h_autoneg, h_speed, h_type,
+        h_ipackets, h_ibytes, h_imissed, h_ierrors,
         h_active,
         h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
-        h_mac,h_add_mac,h_remove_mac,h_vf_mac,
-        h_device};
+        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+        h_device,
+    #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+        h_add_rule, h_del_rule, h_flush_rules, h_count_rules
+    #endif
+    };
 
     DPDKDevice* _dev;
+
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    uint32_t _rule_id;
+#endif
 
     int _rx_intr;
     class FDState { public:

@@ -35,11 +35,15 @@ CLICK_DECLS
 FromDPDKDevice::FromDPDKDevice() :
     _dev(0), _rx_intr(-1)
 {
-	#if HAVE_BATCH
-		in_batch_mode = BATCH_MODE_YES;
-	#endif
-	_burst = 32;
-	ndesc = 256;
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
+    _burst = 32;
+    ndesc = 256;
+
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    _rule_id = 0;
+#endif
 }
 
 FromDPDKDevice::~FromDPDKDevice()
@@ -73,7 +77,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         if (allow_nonexistent)
             return 0;
         else
-            return errh->error("%s : Unknown or invalid PORT", dev.c_str());
+            return errh->error("%s: Unknown or invalid PORT", dev.c_str());
     }
 
     if (_use_numa) {
@@ -82,18 +86,18 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int r;
     if (n_queues == -1) {
-	if (firstqueue == -1) {
-		firstqueue = 0;
-		//With DPDK we'll take as many queues as available threads
-		 r = configure_rx(numa_node,1,128,errh);
-	} else {
-		//If a queue number is setted, user probably want only one queue
-		r = configure_rx(numa_node,1,1,errh);
-	}
+        if (firstqueue == -1) {
+            firstqueue = 0;
+            //With DPDK we'll take as many queues as available threads
+             r = configure_rx(numa_node, 1, 128, errh);
+        } else {
+            //If a queue number is setted, user probably want only one queue
+            r = configure_rx(numa_node, 1, 1, errh);
+        }
     } else {
         if (firstqueue == -1)
             firstqueue = 0;
-        r = configure_rx(numa_node,n_queues,n_queues,errh);
+        r = configure_rx(numa_node, n_queues, n_queues, errh);
     }
     if (r != 0)
         return r;
@@ -101,7 +105,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (has_mac)
         _dev->set_mac(mac);
 
-    r = _dev->set_mode(mode,num_pools,vf_vlan,errh);
+    r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
 
     return r;
 }
@@ -116,7 +120,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     ret = initialize_rx(errh);
     if (ret != 0) return ret;
 
-    for (int i = firstqueue; i <= lastqueue; i++) {
+    for (unsigned i = firstqueue; i <= lastqueue; i++) {
         ret = _dev->add_rx_queue(i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }
@@ -128,7 +132,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
         return errh->error("Sharing queue between multiple threads is not yet supported by FromDPDKDevice. Raise the number using N_QUEUES of queues or limit the number of threads using MAXTHREADS");
 
     if (all_initialized()) {
-        ret = DPDKDevice::initialize(errh);
+        ret = DPDKDevice::initialize(_dev->getInfo().get_mq_mode(), errh);
         if (ret != 0) return ret;
     }
 
@@ -161,7 +165,8 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
 
 void FromDPDKDevice::cleanup(CleanupStage)
 {
-	cleanup_tasks();
+    DPDKDevice::cleanup(ErrorHandler::default_handler());
+    cleanup_tasks();
 }
 
 bool FromDPDKDevice::run_task(Task * t)
@@ -344,8 +349,9 @@ String FromDPDKDevice::status_handler(Element *e, void * thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     struct rte_eth_link link;
-    if (!fd->_dev)
+    if (!fd->_dev) {
         return "0";
+    }
 
     rte_eth_link_get_nowait(fd->_dev->port_id, &link);
 #ifndef ETH_LINK_UP
@@ -373,8 +379,9 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     struct rte_eth_stats stats;
-    if (!fd->_dev)
+    if (!fd->_dev) {
         return "0";
+    }
 
     if (rte_eth_stats_get(fd->_dev->port_id, &stats))
         return String::make_empty();
@@ -388,15 +395,20 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
+    #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+        case h_count_rules:
+            return String(FlowDirector::flow_rules_count(fd->_dev->port_id));
+    #endif
     }
 
-    return 0;
+    return "0";
 }
 
 int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, ErrorHandler* errh) {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
-    if (!fd->_dev)
+    if (!fd->_dev) {
         return -1;
+    }
 
     switch((uintptr_t) thunk) {
         case h_add_mac: {
@@ -447,6 +459,73 @@ int FromDPDKDevice::write_handler(const String& input, Element* e, void* thunk, 
     return -1;
 }
 
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+int FromDPDKDevice::flow_handler(const String &input, Element *e, void *thunk, ErrorHandler *errh)
+{
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    if (!fd->_dev) {
+        return -1;
+    }
+
+    switch((uintptr_t) thunk) {
+        case h_add_rule: {
+            if (!FlowDirector::flow_rule_install(fd->_dev->port_id, fd->_rule_id, input)) {
+                errh->message("Flow Director: Failed to add rule '%s' to port %d", input.c_str(), fd->_dev->port_id);
+                return -1;
+            }
+            errh->message("Flow Director: %s added to port %d", input.c_str(), fd->_dev->port_id);
+            fd->_rule_id++;
+            return 0;
+        }
+        case h_del_rule: {
+            uint32_t rule_id = atoi(input.c_str());
+            if (!FlowDirector::flow_rule_delete(fd->_dev->port_id, rule_id)) {
+                errh->message("Flow Director: Failed to delete rule '%d' from port %d", rule_id, fd->_dev->port_id);
+                return -1;
+            }
+            errh->message("Flow Director: %s deleted from port %d", input.c_str(), fd->_dev->port_id);
+            return 0;
+        }
+        case h_flush_rules: {
+            uint32_t flows_flushed = FlowDirector::flow_rules_flush(fd->_dev->port_id);
+            errh->message("\nFlow Director: %d rules are deleted from port %d", flows_flushed, fd->_dev->port_id);
+            fd->_rule_id = 0;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+/**
+ * Interact with flow director by calling its write handlers.
+ */
+int FromDPDKDevice::flow_director_write(const String &h, const String &flow) {
+    const Handler *hC = Router::handler(this, h);
+
+    if (hC && hC->visible()) {
+        return hC->call_write(flow, this, ErrorHandler::default_handler());
+    }
+
+    click_chatter("Handler '%s' is unavailable for flow: %s", h.c_str(), flow.c_str());
+
+    return -1;
+}
+
+/**
+ * Interact with flow director by calling its read handlers.
+ */
+String FromDPDKDevice::flow_director_read(const String &h) {
+    const Handler *hC = Router::handler(this, h);
+
+    if (hC && hC->visible()) {
+        return hC->call_read(this, ErrorHandler::default_handler());
+    }
+
+    return String::make_empty();
+}
+#endif
+
 int FromDPDKDevice::xstats_handler(int operation, String& input, Element* e, const Handler *handler, ErrorHandler* errh) {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     if (!fd->_dev)
@@ -483,7 +562,6 @@ int FromDPDKDevice::xstats_handler(int operation, String& input, Element* e, con
     return 0;
 }
 
-
 void FromDPDKDevice::add_handlers()
 {
     add_read_handler("device",read_handler, h_device);
@@ -519,6 +597,12 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
 
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    add_read_handler (FlowDirector::FLOW_RULE_LIST, statistics_handler, h_count_rules);
+    add_write_handler(FlowDirector::FLOW_RULE_ADD,   flow_handler, h_add_rule,    0);
+    add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_del_rule,    0);
+    add_write_handler(FlowDirector::FLOW_RULE_FLUSH, flow_handler, h_flush_rules, 0);
+#endif
 
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }

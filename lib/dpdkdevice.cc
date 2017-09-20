@@ -24,11 +24,867 @@ extern "C" {
 #include <rte_pmd_ixgbe.h>
 }
 #endif
+
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+extern "C" {
+#include <rte_flow.h>
+}
+#endif
+
 CLICK_DECLS
+
+/**
+ * Flow Director Implementation.
+ */
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+
+// Unifies TCP and UDP parsing
+union L4_RULE {
+    enum rte_flow_item_type type;
+    struct rte_flow_item_udp udp;
+    struct rte_flow_item_tcp tcp;
+    struct rte_flow_item_any any;
+} L4_RULE;
+// DPDKDevice mode
+String FlowDirector::FLOW_DIR_FLAG = "flow_dir";
+
+// Supported flow director handlers (called from FromDPDKDevice)
+String FlowDirector::FLOW_RULE_ADD   = "add_rule";
+String FlowDirector::FLOW_RULE_DEL   = "del_rule";
+String FlowDirector::FLOW_RULE_LIST  = "count_rules";
+String FlowDirector::FLOW_RULE_FLUSH = "flush_rules";
+
+// Rule structure constants
+String FlowDirector::FLOW_RULE_PATTERN = "pattern";
+String FlowDirector::FLOW_RULE_ACTION  = "action";
+
+// Supported patterns
+const Vector<String> FlowDirector::FLOW_RULE_PATTERNS_VEC = [] {
+    Vector<String> v;
+    v.push_back("ip src");
+    v.push_back("ip dst");
+    v.push_back("tcp port src");
+    v.push_back("tcp port dst");
+    v.push_back("udp port src");
+    v.push_back("udp port dst");
+    return v;
+}();
+
+// Supported actions
+const Vector<String> FlowDirector::FLOW_RULE_ACTIONS_VEC = [] {
+    Vector<String> v;
+    v.push_back("queue index");
+    return v;
+}();
+
+// Static list of rules
+const Vector<String> FlowDirector::FLOW_RULES_VEC = [] {
+    Vector<String> v;
+    v.push_back("pattern ip src 10.0.0.1/16 and ip dst 192.168.0.1 and tcp port dst 80 action queue index 0");
+    v.push_back("pattern ip src 11.0.0.1 and ip dst 192.168.0.2 and udp port src 12678 action queue index 15");
+    return v;
+}();
+
+// Global table of DPDK ports mapped to their Flow Director objects
+HashTable<uint8_t, FlowDirector *> FlowDirector::_dev_flow_dir;
+
+// A unique error handler
+ErrorVeneer *FlowDirector::_errh;
+
+FlowDirector::FlowDirector() :
+        _port_id(-1), _active(false), _verbose(false)
+{
+    _errh = new ErrorVeneer(ErrorHandler::default_handler());
+    // _errh = static_cast<ErrorVeneer *>(ErrorHandler::static_initialize(ErrorHandler::default_handler()));
+}
+
+FlowDirector::FlowDirector(uint8_t port_id, ErrorHandler *errh) :
+        _port_id(port_id), _active(false), _verbose(false)
+{
+    _errh = new ErrorVeneer(errh);
+
+    if (_verbose) {
+        _errh->message("Flow Director (port %u): Created", port_id);
+    }
+}
+
+FlowDirector::~FlowDirector()
+{
+    if (_verbose) {
+        _errh->message("Flow Director (port %u): Destroyed", _port_id);
+    }
+
+    // delete _errh;
+    click_chatter("Flow Director (port %u): Destroyed", _port_id);
+}
+
+/**
+ * Manages the Flow Director instances.
+ *
+ * @param port_id the ID of the NIC
+ * @return a Flow Director object for this NIC
+ */
+FlowDirector *FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandler *errh)
+{
+    // Invalid port ID
+    if (port_id >= rte_eth_dev_count()) {
+        click_chatter("Flow Director (port %u): Denied to create instance for invalid port", port_id);
+        return 0;
+    }
+
+    // Get the Flow Director of the desired port
+    FlowDirector *flow_dir = _dev_flow_dir.get(port_id);
+
+    // Not there, let's created it
+    if (!flow_dir) {
+        flow_dir = new FlowDirector(port_id, errh);
+        _dev_flow_dir[port_id] = flow_dir;
+    }
+
+    // Ship it back
+    return flow_dir;
+}
+
+/**
+ * Installs a set of string-based rules read from a static vector.
+ *
+ * @param port_id the ID of the NIC
+ * @param rules the vector that contains the rules
+ * @return status
+ */
+bool FlowDirector::add_rules_static(const uint8_t &port_id, const Vector<String> rules)
+{
+    for (uint32_t i=0 ; i<rules.size() ; i++) {
+        // Add flow handler
+        FlowDirector::flow_rule_install(port_id, i, rules[i]);
+    }
+
+    _errh->message(
+        "Flow Director (port %u): %u/%u rules are installed",
+        port_id, _dev_flow_dir[port_id]->_rule_list.size(), rules.size()
+    );
+
+    return true;
+}
+
+/**
+ * Installs a set of string-based rules read from a file.
+ *
+ * @param port_id the ID of the NIC
+ * @param filename the file that contains the rules
+ * @return status
+ */
+bool FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
+{
+    // _errh->error("Flow Director (port %u): Add rules from file is not currently supported", port_id);
+
+    // ifstream myfile(filename);
+    // if (myfile.is_open()) {
+    //     String line;
+    //     while ( getline(myfile, line) ) {
+    //         click_chatter();
+    //     }
+    //     myfile.close();
+    // }
+
+    return false;
+}
+
+/**
+ * Translate a string-based rule into a flow rule object
+ * and install it to the NIC.
+ *
+ * @param port_id the ID of the NIC
+ * @param rule_id a flow rule's ID
+ * @param rule a flow rule as a string
+ * @return a flow rule object
+ */
+bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rule_id, const String &rule)
+{
+    // Only active instances can configure a NIC
+    if (!_dev_flow_dir[port_id]->get_active()) {
+        return false;
+    }
+
+    //////////////////////////////////////////////////////////////////////
+    // Flow Attributes: Only ingress rules are currently supported
+    //////////////////////////////////////////////////////////////////////
+    struct rte_flow_attr attr = {
+        .group    = 0,
+        .priority = 0,
+        .ingress  = 1,
+        .egress   = 0,
+        .reserved = 0,
+    };
+    //////////////////////////////////////////////////////////////////////
+
+
+    //////////////////////////////////////////////////////////////////////
+    // Flow Patterns
+    //////////////////////////////////////////////////////////////////////
+    // L2 - Ethernet type is always IPv4
+    struct rte_flow_item_eth flow_item_eth_type_ipv4 = {
+        .dst = {
+            .addr_bytes = { 0 }
+        },
+        .src = {
+            .addr_bytes = { 0 }
+        },
+        .type = RTE_BE16(ETHER_TYPE_IPv4)
+    };
+
+    struct rte_flow_item_eth flow_item_eth_mask_type_ipv4 = {
+        .dst = {
+            .addr_bytes = { 0 }
+        },
+        .src = {
+            .addr_bytes = { 0 }
+        },
+        .type = RTE_BE16(0xFFFF)
+    };
+    //////////////////////////////////////////////////////////////////////
+
+
+    //////////////////////////////////////////////////////////////////////
+    // Flow Actions
+    //////////////////////////////////////////////////////////////////////
+    // Only queue -> core dispatching is currently supported
+    struct rte_flow_action_queue queue_conf;
+    //////////////////////////////////////////////////////////////////////
+
+
+    // Every rule must start with 'pattern'
+    if (!rule.starts_with(FlowDirector::FLOW_RULE_PATTERN)) {
+        flow_rule_usage(port_id, "Rule must begin with pattern keyword");
+        return false;
+    }
+
+    // Useful indices
+    int pattern_start = FlowDirector::FLOW_RULE_PATTERN.length() + 1;
+    int action_pos = rule.find_left(FlowDirector::FLOW_RULE_ACTION, pattern_start);
+    if (action_pos < 0) {
+        flow_rule_usage(port_id, "Rule without action keyword is invalid");
+        return false;
+    }
+    int action_start = action_pos + FlowDirector::FLOW_RULE_ACTION.length() + 1;
+    int pattern_end = action_pos - 1;
+
+    // Patterns and actions are separated
+    String pattern_str = rule.substring(pattern_start, pattern_end - pattern_start + 1).trim_space();
+    String action_str  = rule.substring(action_start).trim_space();
+
+    // Split a pattern into multiple sub-patterns
+    Vector<String> sub_patterns;
+    int pattern_index = 0;
+    while (pattern_index >= 0) {
+        int until = pattern_str.find_left("and", pattern_index);
+        if (until < 0) {
+            // Keep this last part until the end
+            sub_patterns.push_back(pattern_str.substring(pattern_index + 1).trim_space_left().trim_space());
+            break;
+        }
+        // Keep this sub-pattern
+        sub_patterns.push_back(pattern_str.substring(pattern_index, until - pattern_index - 1).trim_space_left().trim_space());
+
+        // Move to the next, after 'and '
+        pattern_index = until + 3;
+    }
+
+    if (sub_patterns.size() == 0) {
+        flow_rule_usage(port_id, "Rule begins with pattern but has no patterns");
+        return false;
+    }
+
+    // Fill the pattern's data
+    bool valid_pattern = true;
+    uint8_t ip_proto = 0x00;
+    uint8_t ip_proto_mask = 0x00;
+    uint8_t ip_src[4];
+    uint8_t ip_dst[4];
+    uint16_t port_src = rte_cpu_to_be_16(0x0000);
+    uint16_t port_dst = rte_cpu_to_be_16(0x0000);
+    uint16_t port_src_mask = rte_cpu_to_be_16(0x0000);
+    uint16_t port_dst_mask = rte_cpu_to_be_16(0x0000);
+    String proto = "";
+    for (String pat : sub_patterns) {
+        // Valid patterns
+        for (String p : FLOW_RULE_PATTERNS_VEC) {
+            // This is a valid pattern
+            if (pat.starts_with(p)) {
+                String ip_str = pat.substring(p.length() + 1);
+
+                // IPv4 address match
+                if ((p == "ip src") || (p == "ip dst")) {
+                    unsigned prev = 0;
+                    unsigned curr = 0;
+                    unsigned j = 0;
+                    while(curr < ip_str.length()) {
+                        if ((ip_str.at(curr) == '.') || (curr == (ip_str.length()-1))) {
+                            unsigned offset = (curr-prev > 0) ? (curr-prev) : 1;
+                            String ip_byte = ip_str.substring(prev, offset);
+
+                            if (_dev_flow_dir[port_id]->get_verbose()) {
+                                _errh->message("Prev: %2d, Curr: %2d, Offset:%d --> Byte: %s", prev, curr, offset, ip_byte.c_str());
+                            }
+
+                            if (p == "ip src") {
+                                ip_src[j] = atoi(ip_byte.c_str());
+                            } else if (p == "ip dst") {
+                                ip_dst[j] = atoi(ip_byte.c_str());
+                            } else {
+                                continue;
+                            }
+                            prev = curr + 1;
+                            curr++;
+                            j++;
+                        } else {
+                            curr++;
+                        }
+                    }
+
+                    if (curr == (ip_str.length()) && _dev_flow_dir[port_id]->get_verbose()) {
+                        if (p == "ip src") {
+                            _errh->message("Sub-pattern: %s with IP: %u.%u.%u.%u", pat.c_str(), ip_src[0], ip_src[1], ip_src[2], ip_src[3]);
+                        } else if (p == "ip dst") {
+                            _errh->message("Sub-pattern: %s with IP: %u.%u.%u.%u", pat.c_str(), ip_dst[0], ip_dst[1], ip_dst[2], ip_dst[3]);
+                        }
+                    }
+
+                    continue;
+                }
+
+                // TCP match
+                if (pat.starts_with("tcp")) {
+                    proto = "tcp";
+                    ip_proto = 0x06;
+                // UDP match
+                } else if (pat.starts_with("udp")) {
+                    proto = "udp";
+                    ip_proto = 0x11;
+                } else {
+                    valid_pattern = false;
+                    continue;
+                }
+                ip_proto_mask = 0xFF;
+
+                // Get src or dst type
+                String port_type = pat.substring(9, 3);
+                // Get port number
+                String port_str = pat.substring(p.length() + 1);
+
+                if (port_type == "src") {
+                    port_src = atoi(port_str.c_str());
+                    port_src_mask = rte_cpu_to_be_16(0xFFFF);
+                } else {
+                    port_dst = atoi(port_str.c_str());
+                    port_dst_mask = rte_cpu_to_be_16(0xFFFF);
+                }
+
+                if (_dev_flow_dir[port_id]->get_verbose()) {
+                    _errh->message("Proto: %s (%u), Type: %s, Num: %s", proto.c_str(), ip_proto, port_type.c_str(), port_str.c_str());
+                }
+            }
+        }
+    }
+
+    if (!valid_pattern) {
+        flow_rule_usage(port_id, String("Unsupported pattern " + pattern_str).c_str());
+        return false;
+    }
+
+    // Compose the IP pattern
+    struct rte_flow_item_ipv4 ip_rule = {
+        .hdr = {
+            .version_ihl     = 0x00,
+            .type_of_service = 0x00,
+            .total_length    = rte_cpu_to_be_16(0x0000),
+            .packet_id       = rte_cpu_to_be_16(0x0000),
+            .fragment_offset = rte_cpu_to_be_16(0x0000),
+            .time_to_live    = 0x00,
+            .next_proto_id   = ip_proto,
+            .hdr_checksum    = rte_cpu_to_be_16(0x0000),
+            .src_addr        = rte_cpu_to_be_32(IPv4(ip_src[0], ip_src[1], ip_src[2], ip_src[3])),
+            .dst_addr        = rte_cpu_to_be_32(IPv4(ip_dst[0], ip_dst[1], ip_dst[2], ip_dst[3])),
+        },
+    };
+
+    struct rte_flow_item_ipv4 ip_rule_mask = {
+        .hdr = {
+            .version_ihl     = 0x00,
+            .type_of_service = 0x00,
+            .total_length    = rte_cpu_to_be_16(0x0000),
+            .packet_id       = rte_cpu_to_be_16(0x0000),
+            .fragment_offset = rte_cpu_to_be_16(0x0000),
+            .time_to_live    = 0x00,
+            .next_proto_id   = ip_proto_mask,
+            .hdr_checksum    = rte_cpu_to_be_16(0x0000),
+            .src_addr        = rte_cpu_to_be_32(0xFFFFFFFF),
+            .dst_addr        = rte_cpu_to_be_32(0xFFFFFFFF),
+        },
+    };
+
+    // Compose the transport layer pattern
+    union L4_RULE l4_rule;
+    union L4_RULE l4_rule_mask;
+    void *l4_rule_spec = NULL;
+    void *l4_rule_mask_spec = NULL;
+    // TCP matching
+    if (proto == "tcp") {
+        l4_rule.type = RTE_FLOW_ITEM_TYPE_TCP;
+
+        l4_rule.tcp.hdr.src_port = rte_cpu_to_be_16(port_src);
+        l4_rule.tcp.hdr.dst_port = rte_cpu_to_be_16(port_dst);
+        l4_rule_spec = (void *) &l4_rule.tcp;
+
+        l4_rule_mask.tcp.hdr.src_port = rte_cpu_to_be_16(port_src_mask);
+        l4_rule_mask.tcp.hdr.dst_port = rte_cpu_to_be_16(port_dst_mask);
+        l4_rule_mask_spec = (void *) &l4_rule_mask.tcp;
+    // UDP matching
+    } else if (proto == "udp") {
+        l4_rule.type = RTE_FLOW_ITEM_TYPE_UDP;
+
+        l4_rule.udp.hdr.src_port = rte_cpu_to_be_16(port_src);
+        l4_rule.udp.hdr.dst_port = rte_cpu_to_be_16(port_dst);
+        l4_rule_spec = (struct rte_flow_item_udp *) &l4_rule.udp;
+
+        l4_rule_mask.udp.hdr.src_port = rte_cpu_to_be_16(port_src_mask);
+        l4_rule_mask.udp.hdr.dst_port = rte_cpu_to_be_16(port_dst_mask);
+        l4_rule_mask_spec = (struct rte_flow_item_udp *) &l4_rule_mask.udp;
+    // No L4 matching
+    } else {
+        l4_rule.type = RTE_FLOW_ITEM_TYPE_ANY;
+        l4_rule.any.num = rte_cpu_to_be_32(1);
+        l4_rule_spec = (void *) &l4_rule.any;
+        l4_rule_mask.any.num = rte_cpu_to_be_32(0xFFFFFFFF);
+        l4_rule_mask_spec = (void *) &l4_rule_mask.any;
+    }
+
+    // struct rte_flow_item_udp udp_rule;
+    // udp_rule.hdr.src_port = rte_cpu_to_be_16(port_src);
+
+    // struct rte_flow_item_udp udp_rule_mask;
+    // udp_rule.hdr.src_port = rte_cpu_to_be_16(port_src_mask);
+
+    // Compose the pattern
+    struct rte_flow_item patterns[] = {
+        {
+            .type = RTE_FLOW_ITEM_TYPE_ETH,
+            .spec = (void *) &flow_item_eth_type_ipv4,
+            .last = NULL,
+            .mask = (void *) &flow_item_eth_mask_type_ipv4,
+        },
+        {
+            .type = RTE_FLOW_ITEM_TYPE_IPV4,
+            .spec = &ip_rule,
+            .last = NULL,
+            .mask = &ip_rule_mask,
+        },
+        // TODO: When I assign my own void* it does not work. Works with direct assignment of structs (see udp_rule[_mask] above)
+        // {
+        //     .type = l4_rule.type,
+        //     .spec = l4_rule_spec,
+        //     .last = NULL,
+        //     .mask = l4_rule_mask_spec,
+        // },
+        {
+            .type = RTE_FLOW_ITEM_TYPE_END,
+            .spec = NULL,
+            .last = NULL,
+            .mask = NULL,
+        }
+    };
+
+    // Compose a DPDK action
+    bool valid_action = false;
+    for (String act : FLOW_RULE_ACTIONS_VEC) {
+        if (action_str.starts_with(act) > 0) {
+            String act_str = action_str.substring(act.length() + 1);
+            uint16_t queue_index = atoi(act_str.c_str());
+
+            // TODO: Ensure that there are enough queues
+            // if (queue_index >= rx_queues_nb) {
+            //     _errh->error("Flow Director (port %u): Not enough queues for action: %s", action_str.c_str());
+            //     return false;
+            // }
+
+            queue_conf.index = queue_index;
+            valid_action = true;
+
+            if (_dev_flow_dir[port_id]->get_verbose()) {
+                _errh->message("Action with queue index: %d", queue_index);
+            }
+        }
+    }
+
+    if (!valid_action) {
+        flow_rule_usage(port_id, String("Unsupported action " + action_str).c_str());
+        return false;
+    }
+
+    struct rte_flow_action actions[] =
+    {
+        {
+            .type = RTE_FLOW_ACTION_TYPE_QUEUE,
+            .conf = &queue_conf
+        },
+        {
+            .type = RTE_FLOW_ACTION_TYPE_END,
+            .conf = NULL
+        }
+    };
+
+    // Validate the rule
+    if (!flow_rule_validate(port_id, rule_id, &attr, patterns, actions)) {
+        return false;
+    }
+
+    // Add the rule to the NIC and to our memory
+    return flow_rule_add(port_id, rule_id, &attr, patterns, actions);
+}
+
+/**
+ * Reports whether a flow rule would be accepted by the underlying
+ * device in its current state.
+ *
+ * @param port_id  the ID of the NIC
+ * @param rule_id  a flow rule's ID
+ * @param attr     a flow rule's attributes
+ * @param patterns a flow rule's patterns
+ * @param actions  a flow rule's actions
+ * @return status
+ */
+bool FlowDirector::flow_rule_validate(
+        const uint8_t                &port_id,
+        const uint32_t               &rule_id,
+        const struct rte_flow_attr   *attr,
+        const struct rte_flow_item   *patterns,
+        const struct rte_flow_action *actions
+)
+{
+    struct rte_flow_error error;
+
+    /* Poisoning to make sure PMDs update it in case of error. */
+    memset(&error, 0x11, sizeof(error));
+
+    int ret = rte_flow_validate(port_id, attr, patterns, actions, &error);
+    if (ret < 0) {
+        flow_rule_complain(port_id, &error);
+        return false;
+    }
+
+    _errh->message("Flow Director (port %u): Flow rule #%4u validated", port_id, rule_id);
+
+    return true;
+}
+
+/**
+ * Adds a flow rule object to the NIC and to our memory.
+ *
+ * @param port_id  the ID of the NIC
+ * @param rule_id  a flow rule's ID
+ * @param attr     a flow rule's attributes
+ * @param patterns a flow rule's patterns
+ * @param actions  a flow rule's actions
+ * @return status
+ */
+bool FlowDirector::flow_rule_add(
+        const uint8_t                &port_id,
+        const uint32_t               &rule_id,
+        const struct rte_flow_attr   *attr,
+        const struct rte_flow_item   *patterns,
+        const struct rte_flow_action *actions
+)
+{
+    struct rte_flow  *flow = NULL;
+    struct rte_flow_error error;
+
+    /* Poisoning to make sure PMDs update it in case of error. */
+    memset(&error, 0x22, sizeof(error));
+
+    // Create a DPDK flow
+    flow = rte_flow_create(port_id, attr, patterns, actions, &error);
+    if (flow == NULL) {
+        flow_rule_complain(port_id, &error);
+        return false;
+    }
+
+    // Create the rule out of this flow
+    struct port_flow *flow_rule = new struct port_flow(
+        rule_id,
+        (struct rte_flow *)        flow,
+        (struct rte_flow_attr *)   attr,
+        (struct rte_flow_item *)   patterns,
+        (struct rte_flow_action *) actions
+    );
+
+    // Add it to the list
+    _dev_flow_dir[port_id]->_rule_list.push_back(flow_rule);
+
+    _errh->message("Flow Director (port %u): Flow rule #%4u created", port_id, rule_id);
+
+    return true;
+}
+
+/**
+ * Returns a flow rule object of a specific port with a specific ID.
+ *
+ * @param port_id the device ID
+ * @param rule_id a rule ID
+ * @return a flow rule object
+ */
+struct FlowDirector::port_flow *FlowDirector::flow_rule_get(const uint8_t &port_id, const uint32_t &rule_id)
+{
+    // Get the list of rules of this port
+    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
+    if (!port_rules.empty()) {
+        return 0;
+    }
+
+    for (unsigned i=0 ; i<port_rules.size() ; i++) {
+        if (rule_id == port_rules[i]->rule_id) {
+            return port_rules[i];
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * Removes a flow rule object from the NIC and from our memory.
+ *
+ * @param port_id the ID of the NIC
+ * @param rule_id a flow rule's ID
+ * @return status
+ */
+bool FlowDirector::flow_rule_delete(const uint8_t &port_id, const uint32_t &rule_id)
+{
+    // Only active instances can configure a NIC
+    if (!_dev_flow_dir[port_id]->get_active()) {
+        return false;
+    }
+
+    struct port_flow *flow_rule = FlowDirector::flow_rule_get(port_id, rule_id);
+    if (!flow_rule) {
+        _errh->error("Flow Director (port %u): Flow rule #%4u not found", port_id, rule_id);
+        return false;
+    }
+
+    struct rte_flow_error error;
+    memset(&error, 0x33, sizeof(error));
+
+    if (rte_flow_destroy(port_id, flow_rule->flow, &error) < 0) {
+        flow_rule_complain(port_id, &error);
+        return false;
+    }
+    _errh->message("Flow Director (port %u): Flow rule #%4u destroyed\n", port_id, flow_rule->rule_id);
+
+    // Delete also from the vector
+    // TODO: Check
+    delete flow_rule;
+    // for (HashTable<uint8_t, Vector<struct port_flow *>>::const_iterator it = _rule_list.begin();
+    //         it != _rule_list.end(); ++it) {
+    //     if (it.key() != port_id) {
+    //         continue;
+    //     }
+
+    //     // Port found
+    //     if (it.value()->rule_id == rule_id) {
+    //         delete it.value();
+    //         break;
+    //     }
+    // }
+
+    return true;
+}
+
+/**
+ * Flushes all the rules from the NIC.
+ *
+ * @param port_id the ID of the NIC
+ * @return the number of rules being flushed
+ */
+uint32_t FlowDirector::flow_rules_flush(const uint8_t &port_id)
+{
+    // Only active instances can configure a NIC
+    if (!_dev_flow_dir[port_id]->get_active()) {
+        if (_dev_flow_dir[port_id]->get_verbose()) {
+            _errh->message("Flow Director (port %u): Nothing to flush", port_id);
+        }
+        return 0;
+    }
+
+    // Get the list of rules of this port
+    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
+    if (port_rules.empty()) {
+        if (_dev_flow_dir[port_id]->get_verbose()) {
+            _errh->message("Flow Director (port %u): Nothing to flush", port_id);
+        }
+        return 0;
+    }
+
+    struct rte_flow_error error;
+    memset(&error, 0x44, sizeof(error));
+
+    // First remove the rules from the NIC
+    if (rte_flow_flush(port_id, &error)) {
+        return flow_rule_complain(port_id, &error);
+    }
+
+    if (_dev_flow_dir[port_id]->get_verbose()) {
+        _errh->message("Flow Director (port %u): NIC is flushed", port_id);
+    }
+
+    // And then clean up our memory
+    return memory_clean(port_id);
+}
+
+/**
+ * Clean up the rules of a particular NIC.
+ *
+ * @param port_id the ID of the NIC
+ * @return the number of rules being flushed
+ */
+uint32_t FlowDirector::memory_clean(const uint8_t &port_id)
+{
+    // Get the list of rules of this port
+    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
+    if (port_rules.empty()) {
+        if (_dev_flow_dir[port_id]->get_verbose()) {
+            _errh->message("Flow Director (port %u): Nothing to clean", port_id);
+        }
+        return 0;
+    }
+
+    // And then clean up our memory
+    uint32_t rules_flushed = 0;
+    for (unsigned i=0; i<port_rules.size(); i++) {
+        if (port_rules[i] != NULL) {
+            delete (port_rules[i]);
+            rules_flushed++;
+        }
+    }
+    port_rules.clear();
+
+    if (_dev_flow_dir[port_id]->get_verbose()) {
+        _errh->message("Flow Director (port %u): Flushed %u rules from memory", port_id, rules_flushed);
+    }
+
+    return rules_flushed;
+}
+
+/**
+ * Reports the correct usage of a Flow Director
+ * rule along with a message.
+ *
+ * @param port_id the ID of the NIC
+ * @param message the message to be printed
+ */
+void FlowDirector::flow_rule_usage(const uint8_t &port_id, const char *message)
+{
+    _errh->error("Flow Director (port %u): %s", port_id, message);
+    _errh->error("Flow Director (port %u): Usage: pattern [p1] and .. and [p2] action queue index [queue no]", port_id);
+}
+
+/**
+ * Count all the rules installed to the NIC.
+ *
+ * @param port_id the ID of the NIC
+ * @return the number of rules being installed
+ */
+uint32_t FlowDirector::flow_rules_count(const uint8_t &port_id)
+{
+    // Only active instances might have some rules
+    if (!_dev_flow_dir[port_id]->get_active()) {
+        return 0;
+    }
+
+    // Get the list of rules of this port
+    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
+
+    // The size of the list is the number of current flow rules
+    return (uint32_t) port_rules.size();
+}
+
+/**
+ * Print a message out of a flow error.
+ * (Copied from DPDK).
+ *
+ * @param port_id the ID of the NIC
+ * @param error an instance of DPDK's error structure
+ */
+int FlowDirector::flow_rule_complain(const uint8_t &port_id, struct rte_flow_error *error)
+{
+    static const char *const errstrlist[] = {
+        [RTE_FLOW_ERROR_TYPE_NONE] = "no error",
+        [RTE_FLOW_ERROR_TYPE_UNSPECIFIED] = "cause unspecified",
+        [RTE_FLOW_ERROR_TYPE_HANDLE] = "flow rule (handle)",
+        [RTE_FLOW_ERROR_TYPE_ATTR_GROUP] = "group field",
+        [RTE_FLOW_ERROR_TYPE_ATTR_PRIORITY] = "priority field",
+        [RTE_FLOW_ERROR_TYPE_ATTR_INGRESS] = "ingress field",
+        [RTE_FLOW_ERROR_TYPE_ATTR_EGRESS] = "egress field",
+        [RTE_FLOW_ERROR_TYPE_ATTR] = "attributes structure",
+        [RTE_FLOW_ERROR_TYPE_ITEM_NUM] = "pattern length",
+        [RTE_FLOW_ERROR_TYPE_ITEM] = "specific pattern item",
+        [RTE_FLOW_ERROR_TYPE_ACTION_NUM] = "number of actions",
+        [RTE_FLOW_ERROR_TYPE_ACTION] = "specific action",
+    };
+    const char *errstr;
+    char buf[32];
+    int err = rte_errno;
+
+    if ((unsigned int)error->type >= RTE_DIM(errstrlist) ||
+        !errstrlist[error->type]) {
+        errstr = "unknown type";
+    }
+    else {
+        errstr = errstrlist[error->type];
+    }
+
+    _errh->error("Flow Director (port %u): Caught error type %d (%s): %s%s\n",
+        port_id,
+        error->type,
+        errstr,
+        error->cause ? (snprintf(buf, sizeof(buf), "cause: %p, ",
+        error->cause), buf) : "",
+        error->message ? error->message : "(no stated reason)"
+    );
+
+    return -err;
+}
+
+#endif
+
+/* End of Flow Director */
+
+/**
+ * Called by the constructor of DPDKDevice.
+ * Flow Director must be strictly invoked once for each port.
+ *
+ * @param port_id the ID of the device where Flow Director is invoked
+ */
+void DPDKDevice::initialize_flow_director(const uint8_t &port_id, ErrorHandler *errh)
+{
+    FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
+    if (!flow_dir) {
+        return;
+    }
+
+    // Already initialized
+    if (flow_dir->get_port_id() >= 0) {
+        return;
+    }
+
+    flow_dir->set_port_id(port_id);
+    flow_dir->set_active(false);
+
+    if (FlowDirector::_dev_flow_dir[port_id]->get_verbose()) {
+        click_chatter("Flow Director (port %u): Port is set", port_id);
+    }
+}
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
-int DPDKDevice::get_port_numa_node(unsigned port_id)
+int DPDKDevice::get_port_numa_node(uint8_t port_id)
 {
     if (port_id >= rte_eth_dev_count())
         return -1;
@@ -69,7 +925,7 @@ int DPDKDevice::alloc_pktmbufs()
      * allocate a unused pool
      */
     int max_socket = -1;
-    for (HashTable<unsigned, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<uint8_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int numa_node = DPDKDevice::get_port_numa_node(it.key());
         if (numa_node > max_socket)
@@ -121,8 +977,8 @@ int DPDKDevice::alloc_pktmbufs()
         int i = 0;
         rte_mempool_walk(add_pool,(void*)&i);
         if (i == 0) {
-                click_chatter("Could not get pools from the primary DPDK process");
-                return -1;
+            click_chatter("Could not get pools from the primary DPDK process");
+            return -1;
         }
     }
 
@@ -138,10 +994,9 @@ int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorH
 
     enum rte_eth_rx_mq_mode m;
 
-
     if (mode == "") {
         return 0;
-    } else if (mode == "none") {
+    } else if ((mode == "none") || (mode == "flow_dir")) {
             m = ETH_MQ_RX_NONE;
     } else if (mode == "rss") {
             m = ETH_MQ_RX_RSS;
@@ -180,7 +1035,16 @@ int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorH
 
     }
 
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    if (mode == FlowDirector::FLOW_DIR_FLAG) {
+        FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
+        click_chatter("Flow Director (port %u): Active", port_id);
+        flow_dir->set_active(true);
+    }
+#endif
+
     info.mq_mode = m;
+    info.mq_mode_str = mode;
 
     return 0;
 }
@@ -295,7 +1159,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
-    for (int i = 0; i < info.rx_queues.size(); ++i) {
+    for (unsigned i = 0; i < info.rx_queues.size(); ++i) {
         if (rte_eth_rx_queue_setup(
                 port_id, i, info.n_rx_descs, numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
@@ -304,7 +1168,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 i, port_id, numa_node, rte_strerror(rte_errno));
     }
 
-    for (int i = 0; i < info.tx_queues.size(); ++i)
+    for (unsigned i = 0; i < info.tx_queues.size(); ++i)
         if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
                                    &tx_conf) != 0)
             return errh->error(
@@ -329,7 +1193,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         /*
          * Set mac for each pool and parameters
          */
-        for (int q = 0; q < info.num_pools; q++) {
+        for (unsigned q = 0; q < info.num_pools; q++) {
                 struct ether_addr mac;
                 mac = gen_mac(port_id, q);
                 printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
@@ -360,7 +1224,7 @@ void DPDKDevice::set_mac(EtherAddress mac) {
  * If v[id] is already true, this function return false. True if it is a
  *   new slot or if the existing slot was false.
  */
-bool set_slot(Vector<bool> &v, int &id) {
+bool set_slot(Vector<bool> &v, unsigned &id) {
     if (id <= 0) {
         int i;
         for (i = 0; i < v.size(); i ++) {
@@ -380,7 +1244,7 @@ bool set_slot(Vector<bool> &v, int &id) {
 }
 
 int DPDKDevice::add_queue(DPDKDevice::Dir dir,
-                           int &queue_id, bool promisc, unsigned n_desc,
+                           unsigned &queue_id, bool promisc, unsigned n_desc,
                            ErrorHandler *errh)
 {
     if (_is_initialized) {
@@ -401,7 +1265,7 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
                         "for device %u", port_id);
             info.n_rx_descs = n_desc;
         }
-        if (!set_slot(info.rx_queues,queue_id))
+        if (!set_slot(info.rx_queues, queue_id))
             return errh->error(
                         "Some elements are assigned to the same RX queue "
                         "for device %u", port_id);
@@ -422,19 +1286,19 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
     return 0;
 }
 
-int DPDKDevice::add_rx_queue(int &queue_id, bool promisc,
+int DPDKDevice::add_rx_queue(unsigned &queue_id, bool promisc,
                               unsigned n_desc, ErrorHandler *errh)
 {
     return add_queue(DPDKDevice::RX, queue_id, promisc, n_desc, errh);
 }
 
-int DPDKDevice::add_tx_queue(int &queue_id, unsigned n_desc,
+int DPDKDevice::add_tx_queue(unsigned &queue_id, unsigned n_desc,
                               ErrorHandler *errh)
 {
     return add_queue(DPDKDevice::TX, queue_id, false, n_desc, errh);
 }
 
-int DPDKDevice::initialize(ErrorHandler *errh)
+int DPDKDevice::initialize(const String &mode, ErrorHandler *errh)
 {
     int ret;
 
@@ -457,7 +1321,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (n_ports == 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
-    for (HashTable<unsigned, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<uint8_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
         if (it.key() >= n_ports)
             return errh->error("Cannot find DPDK port %u", it.key());
@@ -466,7 +1330,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return errh->error("Could not allocate packet MBuf pools, error %d : %s",ret,rte_strerror(ret));
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        for (HashTable<unsigned, DPDKDevice>::iterator it = _devs.begin();
+        for (HashTable<uint8_t, DPDKDevice>::iterator it = _devs.begin();
             it != _devs.end(); ++it) {
             int ret = it.value().initialize_device(errh);
             if (ret < 0)
@@ -475,19 +1339,71 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     }
 
     _is_initialized = true;
+
+    // Configure Flow Director
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    for (HashTable<uint8_t, FlowDirector *>::iterator it = FlowDirector::_dev_flow_dir.begin();
+            it != FlowDirector::_dev_flow_dir.end(); ++it) {
+
+        // Only if the device is registered and has the correct mode
+        if (it.value() && (mode == FlowDirector::FLOW_DIR_FLAG)) {
+            DPDKDevice::configure_nic(it.key());
+        }
+    }
+#endif
+
     return 0;
 }
+
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+void DPDKDevice::configure_nic(const uint8_t &port_id)
+{
+    if (_is_initialized) {
+        // Invoke Flow Director only if active
+        if (FlowDirector::_dev_flow_dir[port_id]->get_active()) {
+            FlowDirector::add_rules_static(port_id, FlowDirector::FLOW_RULES_VEC);
+        }
+    }
+}
+#endif
 
 void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 {
     rte_pktmbuf_free((struct rte_mbuf *) pktmbuf);
 }
 
+void DPDKDevice::cleanup(ErrorHandler *errh)
+{
+#if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
+    errh->message("\n");
+
+    for (HashTable<uint8_t, FlowDirector *>::const_iterator it = FlowDirector::_dev_flow_dir.begin();
+            it != FlowDirector::_dev_flow_dir.end(); ++it) {
+        if (it == NULL) {
+            continue;
+        }
+
+        // Flush
+        uint32_t rules_flushed = FlowDirector::flow_rules_flush(it.key());
+
+        // Delete this instance
+        delete it.value();
+
+        // Report
+        if (rules_flushed > 0) {
+            errh->message("Flow Director (port %u): Flushed %d rules from the NIC", it.key(), rules_flushed);
+        }
+    }
+
+    // Clean up the table
+    FlowDirector::_dev_flow_dir.clear();
+#endif
+}
 
 bool
 DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &ctx)
 {
-    int port_id;
+    uint8_t port_id;
 
     if (!IntArg().parse(str, port_id)) {
        //Try parsing a ffff:ff:ff.f format. Code adapted from EtherAddressArg::parse
@@ -527,8 +1443,9 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
         port_id = DPDKDevice::get_port_from_pci(data[0],data[1],data[2],data[3]);
     }
 
-    if (port_id >= 0 && port_id < rte_eth_dev_count())
+    if (port_id >= 0 && port_id < rte_eth_dev_count()){
         result = DPDKDevice::get_device(port_id);
+    }
     else {
         ctx.error("Cannot resolve PCI address to DPDK device");
         return false;
@@ -567,9 +1484,9 @@ unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
 
 bool DPDKDevice::_is_initialized = false;
-HashTable<unsigned, DPDKDevice> DPDKDevice::_devs;
+HashTable<uint8_t, DPDKDevice> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;
-int DPDKDevice::_nr_pktmbuf_pools;
+unsigned DPDKDevice::_nr_pktmbuf_pools;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
 
 CLICK_ENDDECLS

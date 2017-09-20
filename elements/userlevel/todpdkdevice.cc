@@ -86,7 +86,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (int i = 0; i < n_queues; i++) {
+    for (unsigned i = 0; i < n_queues; i++) {
         ret = _dev->add_tx_queue(i, ndesc , errh);
         if (ret != 0) return ret;    }
 
@@ -113,7 +113,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (unsigned i = 0; i < _iqueues.weight();i++) {
+    for (unsigned i = 0; i < _iqueues.weight(); i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
         _iqueues.get_value(i).timeout.assign(this);
         _iqueues.get_value(i).timeout.initialize(this);
@@ -123,7 +123,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
     if (all_initialized()) {
-        int ret =DPDKDevice::initialize(errh);
+        int ret =DPDKDevice::initialize(_dev->getInfo().get_mq_mode() , errh);
         if (ret != 0) return ret;
     }
     return 0;
@@ -132,8 +132,8 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 void ToDPDKDevice::cleanup(CleanupStage)
 {
     cleanup_tasks();
-    for (unsigned i = 0; i < _iqueues.weight();i++) {
-            delete[] _iqueues.get_value(i).pkts;
+    for (unsigned i = 0; i < _iqueues.weight(); i++) {
+        delete[] _iqueues.get_value(i).pkts;
     }
 }
 
