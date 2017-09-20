@@ -110,7 +110,10 @@ class ICMPPingRewriter : public IPRewriterBase { public:
 			      const IPFlowID &rewritten_flowid, int input);
     void destroy_flow(IPRewriterFlow *flow);
 
-    void push(int, Packet *);
+    void push(int, Packet *) override;
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *) override;
+#endif
 
     void add_handlers() CLICK_COLD;
 
@@ -125,6 +128,7 @@ class ICMPPingRewriter : public IPRewriterBase { public:
     unsigned _annos;
 
     static String dump_mappings_handler(Element *, void *);
+    int smaction(int, Packet *);
 
 };
 

@@ -164,7 +164,7 @@ CLICK_DECLS
  */
 #define CLASSIFY_EACH_PACKET(nbatches,fnt,cep_batch,on_finish)\
     {\
-        PacketBatch* out[nbatches];\
+        PacketBatch* out[(nbatches)];\
         bzero(out,sizeof(PacketBatch*)*(nbatches));\
         PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
         PacketBatch* p = cep_batch;\
