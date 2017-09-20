@@ -89,6 +89,7 @@ public:
     // Rule structure constants
     static String FLOW_RULE_PATTERN;
     static String FLOW_RULE_ACTION;
+    static String FLOW_RULE_IP4_PREFIX;
 
     // Supported patterns
     static const Vector<String> FLOW_RULE_PATTERNS_VEC;

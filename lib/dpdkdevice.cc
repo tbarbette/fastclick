@@ -38,6 +38,8 @@ CLICK_DECLS
  */
 #if RTE_VERSION > RTE_VERSION_NUM(17,02,0,0)
 
+#define MASK_FROM_PREFIX(p) ~((1 << (32 - p)) - 1)
+
 // Unifies TCP and UDP parsing
 union L4_RULE {
     enum rte_flow_item_type type;
@@ -57,6 +59,7 @@ String FlowDirector::FLOW_RULE_FLUSH = "flush_rules";
 // Rule structure constants
 String FlowDirector::FLOW_RULE_PATTERN = "pattern";
 String FlowDirector::FLOW_RULE_ACTION  = "action";
+String FlowDirector::FLOW_RULE_IP4_PREFIX = "/";
 
 // Supported patterns
 const Vector<String> FlowDirector::FLOW_RULE_PATTERNS_VEC = [] {
@@ -80,8 +83,8 @@ const Vector<String> FlowDirector::FLOW_RULE_ACTIONS_VEC = [] {
 // Static list of rules
 const Vector<String> FlowDirector::FLOW_RULES_VEC = [] {
     Vector<String> v;
-    v.push_back("pattern ip src 10.0.0.1/16 and ip dst 192.168.0.1 and tcp port dst 80 action queue index 0");
-    v.push_back("pattern ip src 11.0.0.1 and ip dst 192.168.0.2 and udp port src 12678 action queue index 15");
+    v.push_back("pattern ip src 10.0.0.1/16 and ip dst 192.168.0.1/24 and tcp port dst 80 action queue index 0");
+    v.push_back("pattern ip src 11.0.0.1/32 and ip dst 192.168.0.2 and udp port src 12678 action queue index 15");
     return v;
 }();
 
@@ -95,7 +98,6 @@ FlowDirector::FlowDirector() :
         _port_id(-1), _active(false), _verbose(false)
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
-    // _errh = static_cast<ErrorVeneer *>(ErrorHandler::static_initialize(ErrorHandler::default_handler()));
 }
 
 FlowDirector::FlowDirector(uint8_t port_id, ErrorHandler *errh) :
@@ -113,9 +115,6 @@ FlowDirector::~FlowDirector()
     if (_verbose) {
         _errh->message("Flow Director (port %u): Destroyed", _port_id);
     }
-
-    // delete _errh;
-    click_chatter("Flow Director (port %u): Destroyed", _port_id);
 }
 
 /**
@@ -230,7 +229,7 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
         .src = {
             .addr_bytes = { 0 }
         },
-        .type = RTE_BE16(ETHER_TYPE_IPv4)
+        .type = rte_cpu_to_be_16(ETHER_TYPE_IPv4)
     };
 
     struct rte_flow_item_eth flow_item_eth_mask_type_ipv4 = {
@@ -240,7 +239,7 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
         .src = {
             .addr_bytes = { 0 }
         },
-        .type = RTE_BE16(0xFFFF)
+        .type = rte_cpu_to_be_16(0xFFFF)
     };
     //////////////////////////////////////////////////////////////////////
 
@@ -295,12 +294,18 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
         return false;
     }
 
+    if (_dev_flow_dir[port_id]->get_verbose()) {
+        _errh->message("Flow Director (port %u): Parsing flow rule #%4u", port_id, rule_id);
+    }
+
     // Fill the pattern's data
     bool valid_pattern = true;
-    uint8_t ip_proto = 0x00;
-    uint8_t ip_proto_mask = 0x00;
-    uint8_t ip_src[4];
-    uint8_t ip_dst[4];
+    uint8_t  ip_proto = 0x00;
+    uint8_t  ip_proto_mask = 0x00;
+    uint8_t  ip_src[4];
+    uint8_t  ip_dst[4];
+    uint32_t ip_src_mask = rte_cpu_to_be_32(0xFFFFFFFF);
+    uint32_t ip_dst_mask = rte_cpu_to_be_32(0xFFFFFFFF);
     uint16_t port_src = rte_cpu_to_be_16(0x0000);
     uint16_t port_dst = rte_cpu_to_be_16(0x0000);
     uint16_t port_src_mask = rte_cpu_to_be_16(0x0000);
@@ -315,17 +320,30 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
 
                 // IPv4 address match
                 if ((p == "ip src") || (p == "ip dst")) {
+                    String ip_prefix_str;
+                    String ip_rule_str;
+
+                    // Check whether a prefix is given
+                    int prefix_pos = ip_str.find_left(FlowDirector::FLOW_RULE_IP4_PREFIX, 0);
+                    uint32_t ip_prefix = 0;
+
+                    // There is a prefix after the IP
+                    if (prefix_pos >= 0) {
+                        int first_space_pos = ip_str.find_left(' ', prefix_pos);
+                        ip_prefix_str = ip_str.substring(prefix_pos + 1);
+                        ip_prefix = atoi(ip_prefix_str.c_str());
+                        ip_rule_str = ip_str.substring(0, prefix_pos);
+                    } else {
+                        ip_rule_str = ip_str;
+                    }
+
                     unsigned prev = 0;
                     unsigned curr = 0;
                     unsigned j = 0;
-                    while(curr < ip_str.length()) {
-                        if ((ip_str.at(curr) == '.') || (curr == (ip_str.length()-1))) {
+                    while(curr < ip_rule_str.length()) {
+                        if ((ip_rule_str.at(curr) == '.') || (curr == (ip_rule_str.length()-1))) {
                             unsigned offset = (curr-prev > 0) ? (curr-prev) : 1;
-                            String ip_byte = ip_str.substring(prev, offset);
-
-                            if (_dev_flow_dir[port_id]->get_verbose()) {
-                                _errh->message("Prev: %2d, Curr: %2d, Offset:%d --> Byte: %s", prev, curr, offset, ip_byte.c_str());
-                            }
+                            String ip_byte = ip_rule_str.substring(prev, offset);
 
                             if (p == "ip src") {
                                 ip_src[j] = atoi(ip_byte.c_str());
@@ -334,6 +352,7 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
                             } else {
                                 continue;
                             }
+
                             prev = curr + 1;
                             curr++;
                             j++;
@@ -342,12 +361,25 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
                         }
                     }
 
-                    if (curr == (ip_str.length()) && _dev_flow_dir[port_id]->get_verbose()) {
-                        if (p == "ip src") {
-                            _errh->message("Sub-pattern: %s with IP: %u.%u.%u.%u", pat.c_str(), ip_src[0], ip_src[1], ip_src[2], ip_src[3]);
-                        } else if (p == "ip dst") {
-                            _errh->message("Sub-pattern: %s with IP: %u.%u.%u.%u", pat.c_str(), ip_dst[0], ip_dst[1], ip_dst[2], ip_dst[3]);
-                        }
+                    // Set the mask based on the prefix
+                    if (ip_prefix > 0) {
+                        (p == "ip src") ? ip_src_mask = rte_cpu_to_be_32(MASK_FROM_PREFIX(ip_prefix)):
+                                          ip_dst_mask = rte_cpu_to_be_32(MASK_FROM_PREFIX(ip_prefix));
+                    }
+
+                    if (curr == (ip_rule_str.length()) && _dev_flow_dir[port_id]->get_verbose()) {
+                        (p == "ip src") ?
+                            _errh->message(
+                                "\tL3 pattern: %s with IP: %u.%u.%u.%u and mask %s",
+                                pat.c_str(), ip_src[0], ip_src[1], ip_src[2], ip_src[3],
+                                IPAddress(ip_src_mask).unparse().c_str()
+                            )
+                            :
+                            _errh->message(
+                                "\tL3 pattern: %s with IP: %u.%u.%u.%u and mask %s",
+                                pat.c_str(), ip_dst[0], ip_dst[1], ip_dst[2], ip_dst[3],
+                                IPAddress(ip_dst_mask).unparse().c_str()
+                            );
                     }
 
                     continue;
@@ -381,7 +413,10 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
                 }
 
                 if (_dev_flow_dir[port_id]->get_verbose()) {
-                    _errh->message("Proto: %s (%u), Type: %s, Num: %s", proto.c_str(), ip_proto, port_type.c_str(), port_str.c_str());
+                    _errh->message(
+                        "\tL4 pattern: Proto %s (%u), Port type: %s, Port No: %s",
+                        proto.c_str(), ip_proto, port_type.c_str(), port_str.c_str()
+                    );
                 }
             }
         }
@@ -418,8 +453,8 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
             .time_to_live    = 0x00,
             .next_proto_id   = ip_proto_mask,
             .hdr_checksum    = rte_cpu_to_be_16(0x0000),
-            .src_addr        = rte_cpu_to_be_32(0xFFFFFFFF),
-            .dst_addr        = rte_cpu_to_be_32(0xFFFFFFFF),
+            .src_addr        = ip_src_mask,
+            .dst_addr        = ip_dst_mask,
         },
     };
 
@@ -511,7 +546,7 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
             valid_action = true;
 
             if (_dev_flow_dir[port_id]->get_verbose()) {
-                _errh->message("Action with queue index: %d", queue_index);
+                _errh->message("\tAction with queue index: %d", queue_index);
             }
         }
     }
