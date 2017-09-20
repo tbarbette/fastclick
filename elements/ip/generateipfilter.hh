@@ -8,98 +8,42 @@ CLICK_DECLS
 /*
 =c
 
-GenerateIPFilter([LABEL, I<KEYWORDS>])
+GenerateIPFilter(NB_RULES [, KEEP_SPORT, KEEP_DPORT])
 
 =s ip
 
-pretty-prints IP packets
+generates IPFilter patterns out of input traffic
 
 =d
 
-Expects IP packets as input.  Should be placed downstream of a
+Expects IP packets as input. Should be placed downstream of a
 CheckIPHeader or equivalent element.
 
-Prints out IP packets in a human-readable tcpdump-like format, preceded by
-the LABEL text.
 
 Keyword arguments are:
 
 =over 8
 
-=item CONTENTS
+=item NB_RULES
 
-Determines whether the packet data is printed. It may be `NONE' (do not print
-packet data), `HEX' (print packet data in hexadecimal), or `ASCII' (print
-packet data in plaintext). Default is `NONE'.
+Integer. Number of rules to be generated.
 
-=item PAYLOAD
+=item KEEP_SPORT
 
-Like CONTENTS, but prints only the packet payload, rather than the entire
-packet. Specify at most one of CONTENTS and PAYLOAD.
-
-=item MAXLENGTH
-
-If CONTENTS or PAYLOAD printing is on, then MAXLENGTH determines the maximum
-number of bytes to print. -1 means print the entire packet or payload. Default
-is 1500.
-
-=item ID
-
-Boolean. Determines whether to print each packet's IP ID field. Default is
-false.
-
-=item TTL
-
-Boolean. Determines whether to print each packet's IP TOS field. Default is
-false.
-
-=item TOS
-
-Boolean. Determines whether to print each packet's IP TOS field. Default is
-false.
-
-=item LENGTH
-
-Boolean. Determines whether to print each packet's IP length field. Default is
-false.
-
-=item TIMESTAMP
-
-Boolean. Determines whether to print each packet's timestamp in seconds since
-1970. Default is true.
-
-=item AGGREGATE
-
-Boolean. Determines whether to print each packet's aggregate annotation.
+Boolean. Encodes the source port value of each packet into the rule.
 Default is false.
 
-=item PAINT
+=item KEEP_DPORT
 
-Boolean. Determines whether to print each packet's paint annotation. Default is false.
-
-=item SWAP
-
-Boolean. Determines whether to print ICMP sequence and ID numbers in
-network order. Default is true. The RFC does not require these
-two-byte values to be sent in any particular byte order. When Click
-was originally designed, Linux/i386 wrote ping sequence numbers in
-host byte order (often little endian), but it uses network order now.
-
-=item OUTFILE
-
-String. Only available at user level. PrintV<> information to the file specified
-by OUTFILE instead of standard error.
-
-=item ACTIVE
-
-Boolean.  If false, then don't print messages.  Default is true.
+Boolean. Encodes the destination port value of each packet into the rule.
+Default is true.
 
 =back
 
-=a Print, CheckIPHeader */
+=a Print, GenerateIPLookup */
 
 /**
- *
+ * Abstract, base class that offers IPFlow representation & storage.
  */
 class GenerateIPPacket : public BatchElement {
 
@@ -162,6 +106,9 @@ class GenerateIPPacket : public BatchElement {
 
 };
 
+/**
+ * Uses the base class to generate IPFilter patterns out of the traffic.
+ */
 class GenerateIPFilter : public GenerateIPPacket {
 
     public:

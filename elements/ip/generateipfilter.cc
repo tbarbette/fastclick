@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4; related-file-name: "generateipfilter.hh" -*-
 /*
- * GenerateIPFilter.{cc,hh} -- element prints packet contents to system log
+ * GenerateIPFilter.{cc,hh} -- element generates IPFilter patterns out of input traffic
  * Tom Barbette, (extended by) Georgios Katsikas
  *
  * Copyright (c) 2017 Tom Barbette, University of Liège
