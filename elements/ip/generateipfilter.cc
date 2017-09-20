@@ -18,11 +18,12 @@
  */
 
 #include <click/config.h>
-#include "generateipfilter.hh"
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/straccum.hh>
+
+#include "generateipfilter.hh"
 
 CLICK_DECLS
 
