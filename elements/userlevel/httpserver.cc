@@ -237,7 +237,7 @@ int HTTPServer::ahc_echo(
                   body = "This request is not writable";
                   status = MHD_HTTP_BAD_REQUEST;
               }
-              delete *con_cls;
+              delete static_cast<String*>(*con_cls);
           }
           goto send;
         } else {

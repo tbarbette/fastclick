@@ -16,7 +16,6 @@
 
 CLICK_DECLS
 
-
 Metron::Metron() : _timing_stats(true), _timer(this) {
 
 }
@@ -24,7 +23,6 @@ Metron::Metron() : _timing_stats(true), _timer(this) {
 Metron::~Metron() {
 
 }
-
 
 int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
     Vector<Element *> nics;
