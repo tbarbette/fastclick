@@ -25,9 +25,14 @@
 CLICK_DECLS
 
 TSCClock::TSCClock() :
-_verbose(1), _allow_offset(false),_correction_timer(this), _sync_timers(0)
+_verbose(1), _install(true),_allow_offset(false),_correction_timer(this), _sync_timers(0), _nowait(false), _base(0)
 {
 
+}
+
+void *
+TSCClock::cast(const char *name) {
+    return Element::cast(name);
 }
 
 int
@@ -36,10 +41,21 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
 #if HAVE_DPDK
     _allow_offset = true;
 #endif
+    Element* basee = 0;
     if (Args(conf, this, errh)
             .read("VERBOSE", _verbose)
+            .read("INSTALL", _install)
+            .read("NOWAIT", _nowait)
+            .read("BASE",basee)
             .complete() < 0)
         return -1;
+
+    if (basee)
+        if (!(_base = static_cast<UserClock*>(basee->cast("UserClock"))))
+            return errh->error("%p{element} is not a UserClock",basee);
+
+    if (_nowait && !_install)
+        return errh->error("You want to install without waiting but do not want to install?!");
     return 0;
 }
 
@@ -53,10 +69,14 @@ int64_t TSCClock::now(void* user, bool steady) {
 /**
  * Return real current time
  */
-inline int64_t get_real_timestamp(bool steady = false) {
+inline int64_t TSCClock::get_real_timestamp(bool steady) {
     Timestamp t;
-    t.assign_now_nouser(steady);
-    return t.longval();
+    if (_base) {
+        return _base->now(steady);
+    } else {
+        t.assign_now_nouser(steady);
+        return t.longval();
+    }
 }
 
 /*
@@ -107,6 +127,9 @@ TSCClock::initialize(ErrorHandler*) {
     update_period_msec = update_period_subsec / (Timestamp::subsec_per_sec / Timestamp::msec_per_sec);
     _correction_timer.initialize(this);
     _correction_timer.schedule_now();
+
+    if (_install && _nowait)
+        Timestamp::set_clock(&now,(void*)this);
 
     return 0;
 }
@@ -187,12 +210,13 @@ bool TSCClock::accumulate_tick(Timer* t) {
         if (nt == home_thread()->thread_id()) {
             if (_verbose)
                 click_chatter("Click tasks are too heavy and the TSC clock cannot run at least once every %dmsec, the TSC clock is deactivated.");
-            Timestamp::set_clock(0,0);
+            if (_install)
+                Timestamp::set_clock(0,0);
             return false;
         }
         t->move_thread(nt);
         if (_verbose > 1)
-            click_chatter("Thread %d is doing to much work and prevent having a good clock, trying the next one");
+            click_chatter("Thread %d is doing too much work and prevent having a good clock, trying the next one");
     }
 
     //We want to always take current cycle as close as possible to real timestamp, so we read it again just before get real timestamp
@@ -267,12 +291,12 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
     int64_t local_current_clock = tc->current_clock;
     click_read_fence();
 
-    int64_t real_time = get_real_timestamp();
+    int64_t real_time = tc->get_real_timestamp();
     int64_t approx_time = tc->compute_now_wall(local_current_clock);
     int64_t delta = real_time - approx_time;
     if (abs(delta) > tc->max_precision) {
-        local_tsc_offset += tc->subsec_to_tick(delta,tc->cycles_per_subsec_mult[local_current_clock]);
-        if (local_synchronize_bad++ == 10) {
+        tc->tstate->local_tsc_offset += tc->subsec_to_tick(delta,tc->cycles_per_subsec_mult[local_current_clock]);
+        if (tc->tstate->local_synchronize_bad++ == 10) {
             if (tc->_verbose > 1)
                 click_chatter("%s : TSC clock of core %d is not synchronized... It drifted by %ld subsecs.",
                                     tc->name().c_str(),
@@ -282,10 +306,10 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
             return;
         }
     } else {
-        if (local_synchronize_bad-- == -10) {
+        if (tc->tstate->local_synchronize_bad-- == -10) {
             //Do not set an offset if it is small as this is probably a computation error
-            if (local_tsc_offset < 50 && local_tsc_offset > -50)
-                local_tsc_offset = 0;
+            if (tc->tstate->local_tsc_offset < 50 && tc->tstate->local_tsc_offset > -50)
+                tc->tstate->local_tsc_offset = 0;
             else {
                 if (!tc->_allow_offset) {
                     tc->_synchronize_bad++;
@@ -294,7 +318,7 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
                                       "but ALLOW_OFFSET is not true.",
                                             tc->name().c_str(),
                                             click_current_cpu_id(),
-                                            local_tsc_offset);
+                                            tc->tstate->local_tsc_offset);
                     return;
                 }
             }
@@ -303,7 +327,7 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
                 click_chatter("%s : TSC clock of core %d IS synchronized : local offset is %ld",
                                     tc->name().c_str(),
                                     click_current_cpu_id(),
-                                    local_tsc_offset);
+                                    tc->tstate->local_tsc_offset);
             return;
         }
     }
@@ -330,12 +354,13 @@ void TSCClock::run_timer(Timer* timer) {
             alpha = 0.5;
             _phase = SYNCHRONIZE;
         }
-    } else
-        if (!accumulate_tick(timer))
+    } else {
+        if (unlikely(!accumulate_tick(timer)))
             return;
+    }
 
     if (unlikely(_phase == SYNCHRONIZE)) {
-        //Launc sync taks
+        //Launch sync taks
         if (_sync_timers == 0 && n_ticks == 10) {
             _sync_timers = new Timer*[master()->nthreads()];
              _synchronize_bad = 0;
@@ -360,7 +385,8 @@ void TSCClock::run_timer(Timer* timer) {
                 _phase = RUNNING;
                 if (_verbose)
                     click_chatter("Switching to TSC clock");
-                Timestamp::set_clock(&now,(void*)this);
+                if (_install && !_nowait)
+                    Timestamp::set_clock(&now,(void*)this);
             }
         }
     }
@@ -376,11 +402,35 @@ void TSCClock::cleanup(CleanupStage) {
     }
 }
 
-__thread int64_t TSCClock::local_tsc_offset = 0;
-__thread int TSCClock::local_synchronize_bad = 0;
+String
+TSCClock::read_handler(Element *e, void *thunk) {
+    TSCClock *c = (TSCClock *)e;
+    switch ((intptr_t)thunk) {
+        case h_now:
+            return String(c->compute_now_wall());
+        case h_now_steady:
+            return String(c->compute_now_steady());
+        case h_cycles:
+            return String(click_get_cycles() + c->tstate->local_tsc_offset);
+        case h_cycles_hz:
+            return String(c->tsc_freq);
+        case h_phase:
+            return String(c->_phase);
+        default:
+            return "<error>";
+    }
+}
+
+void TSCClock::add_handlers() {
+    add_read_handler("now", read_handler, h_now);
+    add_read_handler("now_steady", read_handler, h_now_steady);
+    add_read_handler("cycles", read_handler, h_cycles);
+    add_read_handler("cycles_hz", read_handler, h_cycles_hz);
+    add_read_handler("phase", read_handler, h_phase);
+}
+
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(usertimestamp)
+ELEMENT_REQUIRES(usertiming)
 EXPORT_ELEMENT(TSCClock)
 ELEMENT_MT_SAFE(TSCClock)
-

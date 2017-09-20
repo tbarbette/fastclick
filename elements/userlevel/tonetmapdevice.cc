@@ -433,7 +433,7 @@ inline unsigned int ToNetmapDevice::send_packets(Packet* &head, bool ask_sync, b
 				slot->flags |= NS_REPORT;
 			}
 
-			BATCH_RECYCLE_UNSAFE_PACKET(p);
+			BATCH_RECYCLE_UNKNOWN_PACKET(p);
 
 			sent++;
 			cur = nm_ring_next(txring,cur);
@@ -592,8 +592,8 @@ ToNetmapDevice::cleanup(CleanupStage)
 void
 ToNetmapDevice::add_handlers()
 {
-    add_read_handler("n_sent", count_handler, 0);
-    add_read_handler("n_dropped", dropped_handler, 0);
+    add_read_handler("count", count_handler, 0);
+    add_read_handler("dropped", dropped_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
 

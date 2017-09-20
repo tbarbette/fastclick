@@ -39,6 +39,11 @@ Discard::configure(Vector<String> &conf, ErrorHandler *errh)
 	return errh->error("ACTIVE is meaningless in push context");
     if (_burst == 0)
 	_burst = ~(unsigned) 0;
+#if HAVE_BATCH
+    if (input_is_pull(0)) {
+        in_batch_mode = BATCH_MODE_YES;
+    }
+#endif
     return 0;
 }
 
@@ -73,7 +78,7 @@ Discard::run_task(Task *)
     int x = _burst;
 #if HAVE_BATCH
     PacketBatch* batch;
-    while (x && (batch = input_pull_batch(0,0))) {
+    while (x && (batch = input_pull_batch(0,x))) {
         x -= batch->count();
         batch->fast_kill();
     }

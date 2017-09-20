@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_FROMIPSUMDUMP_HH
 #define CLICK_FROMIPSUMDUMP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
 #include <click/notifier.hh>
@@ -155,7 +155,7 @@ When written, sets 'active' to false and stops the driver.
 
 ToIPSummaryDump */
 
-class FromIPSummaryDump : public Element, public IPSummaryDumpInfo { public:
+class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public:
 
     FromIPSummaryDump() CLICK_COLD;
     ~FromIPSummaryDump() CLICK_COLD;
@@ -170,7 +170,12 @@ class FromIPSummaryDump : public Element, public IPSummaryDumpInfo { public:
     void add_handlers() CLICK_COLD;
 
     bool run_task(Task *);
+
+    inline Packet *get_packet(bool push=false);
     Packet *pull(int);
+#if HAVE_BATCH
+    PacketBatch *pull_batch(int,int);
+#endif
     void run_timer(Timer *timer);
 
   private:
@@ -210,6 +215,8 @@ class FromIPSummaryDump : public Element, public IPSummaryDumpInfo { public:
 
     int _minor_version;
     IPFlowID _given_flowid;
+
+    int _burst;
 
     int read_binary(String &, ErrorHandler *);
 

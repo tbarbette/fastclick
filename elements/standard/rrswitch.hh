@@ -22,6 +22,7 @@ class RoundRobinSwitch : public BatchElement {
 
   atomic_uint32_t _next;
   unsigned _max;
+  bool _split_batch;
  public:
 
   RoundRobinSwitch() CLICK_COLD;
@@ -38,6 +39,8 @@ class RoundRobinSwitch : public BatchElement {
 #endif
   void add_handlers();
 
+ private:
+  inline int next(Packet*);
 };
 
 CLICK_ENDDECLS

@@ -1,0 +1,26 @@
+%info
+RecordTimestamp ecosystem
+
+Test the RecordTimestamp ecosystem (TimestampDiff, NumberPacket, ...)
+
+%script
+click -j 1 CONFIG
+
+%file CONFIG
+
+InfiniteSource(LENGTH 64, LIMIT 10000, STOP true)
+-> MarkMACHeader
+-> NumberPacket
+-> record:: RecordTimestamp()
+-> counter :: AverageCounter()
+-> CheckNumberPacket(OFFSET 40, COUNT 10000)
+-> diff :: TimestampDiff(RECORDER record)
+-> Discard
+
+DriverManager(wait,read diff.average, read counter.count)
+
+%expect stderr
+diff.average:
+{{[0-9]{1,2}[.][0-9]+}}
+counter.count:
+10000

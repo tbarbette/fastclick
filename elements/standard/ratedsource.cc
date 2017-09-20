@@ -237,6 +237,15 @@ RatedSource::pull(int)
     return 0;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+RatedSource::pull_batch(int port, unsigned max) {
+    PacketBatch *batch;
+    MAKE_BATCH(RatedSource::pull(port), batch, max);
+    return batch;
+}
+#endif
+
 void
 RatedSource::setup_packet()
 {

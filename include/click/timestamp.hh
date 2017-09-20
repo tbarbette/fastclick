@@ -118,7 +118,7 @@ Timestamp operator+(Timestamp, const Timestamp &);
 # define TIMESTAMP_WARPABLE 1
 #endif
 
-#if HAVE_USER_TIMESTAMP
+#if HAVE_USER_TIMING
 typedef int64_t (*user_clock_fct)(void* user, bool steady);
 #endif
 
@@ -680,7 +680,7 @@ class Timestamp { public:
     //@}
 #endif
 
-#if HAVE_USER_TIMESTAMP
+#if HAVE_USER_TIMING
     static bool set_clock(user_clock_fct clock, void* user);
 #endif
 
@@ -688,7 +688,7 @@ class Timestamp { public:
 
     rep_t _t;
 
-#if HAVE_USER_TIMESTAMP
+#if HAVE_USER_TIMING
     static void* _user_data;
     static user_clock_fct _user_clock;
 #endif
@@ -744,6 +744,9 @@ class Timestamp { public:
 
 };
 
+class UserClock {public:
+    virtual int64_t now(bool steady) = 0;
+};
 
 #if TIMESTAMP_WARPABLE
 /** @cond never */
@@ -826,7 +829,7 @@ Timestamp::assign_now(bool recent, bool steady, bool unwarped, bool nouser)
 # define TIMESTAMP_RESOLVE_TVP assign(tvp.tv_sec, usec_to_subsec(tvp.tv_usec))
 #endif
 
-#if HAVE_USER_TIMESTAMP
+#if HAVE_USER_TIMING
     if (!nouser && _user_clock != 0) {
         int64_t current = _user_clock(_user_data,steady);
         assignlong(current);

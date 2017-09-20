@@ -2,7 +2,10 @@
  * setipecn.{cc,hh} -- element sets IP header ECN field
  * Eddie Kohler
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 2009 Intel Corporation
+ * Copyright (c) 2017 RISE SICS AB
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -64,6 +67,15 @@ SetIPECN::simple_action(Packet *p)
     click_update_in_cksum(&ip->ip_sum, old_hw, reinterpret_cast<uint16_t *>(ip)[0]);
     return q;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+SetIPECN::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(SetIPECN::simple_action, batch, [](Packet *){});
+    return batch;
+}
+#endif
 
 void
 SetIPECN::add_handlers()

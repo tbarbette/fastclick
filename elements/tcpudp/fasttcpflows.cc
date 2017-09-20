@@ -323,6 +323,15 @@ FastTCPFlows::pull(int)
   return(p);
 }
 
+#if HAVE_BATCH
+PacketBatch *
+FastTCPFlows::pull_batch(int port, unsigned max) {
+      PacketBatch *batch;
+      MAKE_BATCH(FastTCPFlows::pull(port), batch, max);
+      return batch;
+}
+#endif
+
 void
 FastTCPFlows::reset()
 {

@@ -124,6 +124,8 @@ class ARPResponder : public BatchElement { public:
     };
     Vector<Entry> _v;
 
+    inline Packet* smaction(Packet* p);
+
     static int entry_compare(const void *a, const void *b, void *user_data);
     int add(Vector<Entry> &v, const String &arg, ErrorHandler *errh) const;
     static void normalize(Vector<Entry> &v, bool warn, ErrorHandler *errh);

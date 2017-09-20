@@ -34,6 +34,23 @@ ReplayBase::~ReplayBase()
 {
 }
 
+/**
+ * Common parsing for all replay
+ */
+int ReplayBase::parse(Args* args) {
+    if (args->read("STOP", _stop)
+             .read("QUICK_CLONE", _quick_clone)
+             .read("BURST", _burst)
+             .read("VERBOSE", _verbose)
+             .read("FREEONTERMINATE", _freeonterminate)
+             .read("ACTIVE",_active)
+             .execute() < 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
 void ReplayBase::cleanup_packets() {
     while (_queue_head) {
         Packet* next = _queue_head->next();
@@ -85,6 +102,7 @@ ReplayBase::add_handlers()
 {
     add_write_handler("active", write_handler, 0, Handler::BUTTON);
     add_write_handler("reset", write_handler, 1, Handler::BUTTON);
+    add_data_handlers("loaded", Handler::OP_READ, &_loaded);
     add_data_handlers("active", Handler::OP_READ, &_active);
     add_data_handlers("stop", Handler::OP_READ | Handler::OP_WRITE, &_stop);
 }
@@ -111,16 +129,16 @@ Replay::cast(const char *n)
 int
 Replay::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(conf, this, errh)
-        .read_p("QUEUE", _queue)
-        .read("STOP", _stop)
-        .read("QUICK_CLONE", _quick_clone)
+    Args args(conf, this, errh);
+    if (ReplayBase::parse(&args) != 0)
+        return -1;
+
+    if (args
+        .read("QUEUE", _queue)
         .read("USE_SIGNAL",_use_signal)
-        .read("ACTIVE",_active)
-        .read("VERBOSE", _verbose)
-        .read("FREEONTERMINATE", _freeonterminate)
     .complete() < 0)
-    return -1;
+        return -1;
+
     return 0;
 }
 
@@ -207,15 +225,13 @@ ReplayUnqueue::~ReplayUnqueue()
 int
 ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(conf, this, errh)
-        .read("STOP", _stop)
-        .read("QUICK_CLONE", _quick_clone)
+    Args args(conf, this, errh);
+    if (ReplayBase::parse(&args) != 0)
+        return -1;
+    if (args
         .read("USE_SIGNAL",_use_signal)
-        .read("ACTIVE",_active)
-        .read("VERBOSE", _verbose)
-        .read("FREEONTERMINATE", _freeonterminate)
         .complete() < 0)
-    return -1;
+        return -1;
     return 0;
 }
 

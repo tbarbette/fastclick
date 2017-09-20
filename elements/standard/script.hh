@@ -518,7 +518,7 @@ class Script : public Element { public:
         ar_neg, ar_abs,
         AR_LT, AR_EQ, AR_GT, AR_GE, AR_NE, AR_LE, // order is important
         AR_FIRST, AR_NOT, AR_SPRINTF, ar_random, ar_cat, ar_catq,
-        ar_and, ar_or, ar_nand, ar_nor, ar_now, ar_if, ar_in,
+        ar_and, ar_or, ar_nand, ar_nor, ar_now, ar_now_steady, ar_if, ar_in,
         ar_readable, ar_writable, ar_length, ar_unquote, ar_kill,
         ar_htons, ar_htonl, ar_ntohs, ar_ntohl,
         vh_get, vh_set, vh_shift

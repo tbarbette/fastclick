@@ -26,6 +26,7 @@ CLICK_DECLS
 
 AverageBatchCounter::AverageBatchCounter() : _interval(1000), _timer(this)
 {
+    in_batch_mode = BATCH_MODE_NEEDED;
 }
 
 AverageBatchCounter::~AverageBatchCounter()
@@ -138,5 +139,6 @@ AverageBatchCounter::add_handlers()
 
 
 CLICK_ENDDECLS
+ELEMENT_REQUIRES(batch)
 EXPORT_ELEMENT(AverageBatchCounter)
 ELEMENT_MT_SAFE(AverageBatchCounter)

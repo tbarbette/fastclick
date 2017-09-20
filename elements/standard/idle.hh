@@ -41,9 +41,9 @@ class Idle : public BatchElement {
 
   void push(int, Packet *);
   Packet *pull(int);
-  #if HAVE_BATCH
-    void push_batch(int, PacketBatch *);
-  #endif
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+#endif
 
   private:
 

@@ -3,7 +3,7 @@ Tests the batch rebuilding batch facility
 
 %require
 click-buildtool provides batch
-click-buildtool provides autobatch
+click-buildtool provides autobatch_port
 
 %script
 $VALGRIND click -e '

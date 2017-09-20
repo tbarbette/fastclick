@@ -179,6 +179,15 @@ InfiniteSource::pull(int)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch*
+InfiniteSource::pull_batch(int port,unsigned max) {
+    PacketBatch* batch;
+    MAKE_BATCH(InfiniteSource::pull(port),batch,(max > _burstsize? _burstsize : max));
+    return batch;
+}
+#endif
+
 void
 InfiniteSource::setup_packet()
 {

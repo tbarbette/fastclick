@@ -43,7 +43,7 @@ StripIPHeader::simple_action(Packet *p)
 PacketBatch*
 StripIPHeader::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    EXECUTE_FOR_EACH_PACKET(StripIPHeader::simple_action, batch);
     return batch;
 }
 #endif

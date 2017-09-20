@@ -21,7 +21,8 @@ Pipeliner::Pipeliner()
         _active(true),_nouseless(false),_always_up(false),
         _allow_direct_traversal(true), _verbose(true),
         sleepiness(0),_sleep_threshold(0),
-        _task(this)
+        _task(this),
+        _home_thread_id(0), _last_start(0)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -85,7 +86,11 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
     }
 
     //Amount of empty run of task after which it unschedule
+#if HAVE_BATCH
+    _sleep_threshold = _ring_size / 2;
+#else
     _sleep_threshold = _ring_size / 4;
+#endif
 
     return 0;
 }
@@ -98,7 +103,7 @@ Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh
     Bitvector passing = get_passing_threads();
     storage.compress(passing);
     stats.compress(passing);
-    _home_thread_id = router()->home_thread_id(this);
+    _home_thread_id = home_thread_id();
     for (unsigned i = 0; i < storage.weight(); i++) {
         if (!storage.get_value(i).initialized()) {
             storage.get_value(i).initialize(_ring_size);
@@ -111,8 +116,6 @@ Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh
             WritablePacket::pool_transfer(_home_thread_id,i);
         }
     }
-
-    _home_thread_id = home_thread_id();
 
     if (_block && !_allow_direct_traversal && passing[_home_thread_id]) {
         return errh->error("Possible deadlock ! Pipeliner is served by thread "
@@ -158,8 +161,8 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
         output(0).push_batch(head);
         return;
     }
-    retry:
     int count = head->count();
+    retry:
     if (storage->insert(head)) {
         stats->count += count;
         if (sleepiness >= _sleep_threshold)
@@ -169,14 +172,14 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
             if (!_always_up && sleepiness >= _sleep_threshold)
                 _task.reschedule();
             stats->dropped++;
-            if (stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+            if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
                 click_chatter("%p{element} : congestion", this);
             goto retry;
         }
         int c = head->count();
         head->kill();
         stats->dropped+=c;
-        if (stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+        if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
             click_chatter("%p{element} : Dropped %lu packets : have %u packets in ring", this, stats->dropped, c);
     }
 }
@@ -213,7 +216,6 @@ retry:
     if (!_always_up && sleepiness >= _sleep_threshold && _active)
         _task.reschedule();
 }
-
 
 #define HINT_THRESHOLD 32
 bool
@@ -259,18 +261,24 @@ Pipeliner::run_task(Task* t)
 #endif
 
     }
+    if (unlikely(!_active))
+        return r;
 
-    if (!_always_up && !r) {
-        if (++sleepiness < _sleep_threshold && _active) {
+    if (_always_up) {
+        t->fast_reschedule();
+    } else {
+        if (!r) {
+            sleepiness++;
+            if (sleepiness < _sleep_threshold) {
+                t->fast_reschedule();
+            }
+        } else {
+            sleepiness = 0;
             t->fast_reschedule();
         }
-    } else {
-        sleepiness = 0;
-        t->fast_reschedule();
     }
     return r;
 }
-
 
 int
 Pipeliner::write_handler(const String &conf, Element* e, void*, ErrorHandler* errh)

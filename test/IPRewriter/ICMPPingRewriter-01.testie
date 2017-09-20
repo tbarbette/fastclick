@@ -9,7 +9,7 @@ elementclass TPrint { \$x |
 		-> Discard;
 	t[1] -> IPPrint(\$x, TIMESTAMP false) -> output;
 }
-FromIPSummaryDump(IN1, STOP true, ZERO true, CHECKSUM true)
+FromIPSummaryDump(IN1, STOP true, ZERO true, CHECKSUM true, BURST 1)
 	-> TPrint(a)
 	-> icmp :: ICMPPingRewriter(pattern 2.0.0.2 - 0-65535 0 1, drop)
 	-> TPrint(b)

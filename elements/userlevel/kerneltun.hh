@@ -121,6 +121,8 @@ class KernelTun : public Element { public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     void add_handlers() CLICK_COLD;
+    
+    bool get_spawning_threads(Bitvector &, bool) override;
 
     void selected(int fd, int mask);
 

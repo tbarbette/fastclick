@@ -444,16 +444,21 @@ AggregateIPFlows::emit_fragment_head(HostPairInfo *hpinfo)
 
     assert(finfo);
     packet_emit_hook(head, iph, finfo);
-    output(0).push(head);
+#if HAVE_BATCH
+    if (in_batch_mode)
+        output(0).push_batch(PacketBatch::make_from_packet(head));
+    else
+#endif
+        output(0).push(head);
 }
 
 int
 AggregateIPFlows::handle_fragment(Packet *p, HostPairInfo *hpinfo)
 {
     if (hpinfo->_fragment_head)
-	hpinfo->_fragment_tail->set_next(p);
+        hpinfo->_fragment_tail->set_next(p);
     else
-	hpinfo->_fragment_head = p;
+        hpinfo->_fragment_head = p;
     hpinfo->_fragment_tail = p;
     p->set_next(0);
     _active_sec = p->timestamp_anno().sec();
@@ -462,10 +467,9 @@ AggregateIPFlows::handle_fragment(Packet *p, HostPairInfo *hpinfo)
     int frag_timeout = _active_sec - _fragment_timeout;
     Packet *head;
     while ((head = hpinfo->_fragment_head)
-	   && (head->timestamp_anno().sec() < frag_timeout
-	       || !IP_ISFRAG(good_ip_header(head))))
-	emit_fragment_head(hpinfo);
-
+            && (head->timestamp_anno().sec() < frag_timeout
+                    || !IP_ISFRAG(good_ip_header(head))))
+        emit_fragment_head(hpinfo);
     return ACT_NONE;
 }
 
@@ -477,76 +481,78 @@ AggregateIPFlows::handle_packet(Packet *p)
 
     // assign timestamp if no timestamp given
     if (!p->timestamp_anno()) {
-	if (!_timestamp_warning) {
-	    click_chatter("%p{element}: warning: packet received without timestamp", this);
-	    _timestamp_warning = true;
-	}
-	p->timestamp_anno().assign_now();
+        if (!_timestamp_warning) {
+            click_chatter("%p{element}: warning: packet received without timestamp", this);
+            _timestamp_warning = true;
+        }
+        p->timestamp_anno().assign_now();
     }
 
     // extract encapsulated ICMP header if appropriate
     if (p->has_network_header() && iph->ip_p == IP_PROTO_ICMP
-	&& IP_FIRSTFRAG(iph) && _handle_icmp_errors) {
-	iph = icmp_encapsulated_header(p);
-	paint = 2;
+        && IP_FIRSTFRAG(iph) && _handle_icmp_errors) {
+        iph = icmp_encapsulated_header(p);
+        paint = 2;
     }
 
     // return if not a proper TCP/UDP packet
     if (!p->has_network_header()
-	|| (iph->ip_p != IP_PROTO_TCP && iph->ip_p != IP_PROTO_UDP)
-	|| (iph->ip_src.s_addr == 0 && iph->ip_dst.s_addr == 0))
-	return ACT_DROP;
+        || (iph->ip_p != IP_PROTO_TCP && iph->ip_p != IP_PROTO_UDP)
+        || (iph->ip_src.s_addr == 0 && iph->ip_dst.s_addr == 0)) {
+        return ACT_DROP;
+    }
 
     // find relevant HostPairInfo
     Map &m = (iph->ip_p == IP_PROTO_TCP ? _tcp_map : _udp_map);
     HostPair hosts(iph->ip_src.s_addr, iph->ip_dst.s_addr);
     if (hosts.a != iph->ip_src.s_addr)
-	paint ^= 1;
+        paint ^= 1;
     HostPairInfo *hpinfo = &m[hosts];
 
     // find relevant FlowInfo, if any
     FlowInfo *finfo;
     if (IP_FIRSTFRAG(iph)) {
-	const uint8_t *udp_ptr = reinterpret_cast<const uint8_t *>(iph) + (iph->ip_hl << 2);
-	if (udp_ptr + 4 > p->end_data())
-	    // packet not big enough
-	    return ACT_DROP;
+    const uint8_t *udp_ptr = reinterpret_cast<const uint8_t *>(iph) + (iph->ip_hl << 2);
+    if (udp_ptr + 4 > p->end_data()) {
+        // packet not big enough
+        return ACT_DROP;
+    }
 
-	uint32_t ports = *reinterpret_cast<const uint32_t *>(udp_ptr);
-	// 1.Jan.08: handle connections where IP addresses are the same (John
-	// Russell Lane)
-	if (hosts.a == hosts.b && ports_reverse_order(ports))
-	    paint ^= 1;
-	if (paint & 1)
-	    ports = flip_ports(ports);
+    uint32_t ports = *reinterpret_cast<const uint32_t *>(udp_ptr);
+    // 1.Jan.08: handle connections where IP addresses are the same (John
+    // Russell Lane)
+    if (hosts.a == hosts.b && ports_reverse_order(ports))
+        paint ^= 1;
+    if (paint & 1)
+        ports = flip_ports(ports);
 
-	finfo = find_flow_info(m, hpinfo, ports, paint & 1, p);
-	if (!finfo) {
-	    click_chatter("out of memory!");
-	    return ACT_DROP;
-	}
-	if (finfo->reverse())
-	    paint ^= 1;
+    finfo = find_flow_info(m, hpinfo, ports, paint & 1, p);
+    if (!finfo) {
+        click_chatter("out of memory!");
+        return ACT_DROP;
+    }
+    if (finfo->reverse())
+        paint ^= 1;
 
-	// set aggregate annotations
-	SET_AGGREGATE_ANNO(p, finfo->aggregate());
-	SET_PAINT_ANNO(p, paint);
+    // set aggregate annotations
+    SET_AGGREGATE_ANNO(p, finfo->aggregate());
+    SET_PAINT_ANNO(p, paint);
     } else {
-	finfo = 0;
-	SET_AGGREGATE_ANNO(p, 0);
-	SET_PAINT_ANNO(p, paint);
+        finfo = 0;
+        SET_AGGREGATE_ANNO(p, 0);
+        SET_PAINT_ANNO(p, paint);
     }
 
     // check for fragment
     if ((_fragments && IP_ISFRAG(iph)) || hpinfo->_fragment_head)
-	return handle_fragment(p, hpinfo);
-    else if (!finfo)
-	return ACT_DROP;
+        return handle_fragment(p, hpinfo);
+    else if (!finfo) {
+        return ACT_DROP;
+    }
 
     // packet emit hook
     _active_sec = p->timestamp_anno().sec();
     packet_emit_hook(p, iph, finfo);
-
     return ACT_EMIT;
 }
 
@@ -581,6 +587,41 @@ AggregateIPFlows::pull(int)
 	checked_output_push(1, p);
     return 0;
 }
+
+#if HAVE_BATCH
+void
+AggregateIPFlows::push_batch(int, PacketBatch *batch)
+{
+    CLASSIFY_EACH_PACKET(3,handle_packet,batch,[this](int action,PacketBatch* batch){
+        if (likely(action != ACT_NONE)) {
+            checked_output_push_batch(action, batch);
+        }
+    });
+    if (_active_sec >= _gc_sec)
+    reap();
+}
+
+PacketBatch *
+AggregateIPFlows::pull_batch(int, int max)
+{
+    PacketBatch *batch = input(0).pull_batch(max);
+    if (batch) {
+        auto on_finish = [this,&batch](int action,PacketBatch* subbatch){
+            if (likely(action == 0))
+                batch = subbatch;
+            else if (action == 1)
+                checked_output_push_batch(1,subbatch);
+        };
+        CLASSIFY_EACH_PACKET(3,handle_packet,batch,on_finish);
+    }
+
+    // GC if necessary
+    if (_active_sec >= _gc_sec)
+    reap();
+
+    return batch;
+}
+#endif
 
 enum { H_CLEAR };
 

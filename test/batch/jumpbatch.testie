@@ -3,7 +3,7 @@ Tests the batch jumping facility
 
 %require
 click-buildtool provides batch
-click-buildtool provides -i autobatch
+click-buildtool provides autobatch_jumplist
 
 %script
 $VALGRIND click -e '

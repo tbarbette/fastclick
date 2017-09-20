@@ -155,6 +155,7 @@ class ProgressBar : public Element { public:
 
     enum { ST_FIRST, ST_MIDDLE, ST_DONE, ST_FIRSTDONE, ST_DEAD };
 
+    bool _invert_pos;;
     bool _have_size;
     int _status;
     double _size;

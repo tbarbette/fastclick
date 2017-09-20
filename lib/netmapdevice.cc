@@ -304,8 +304,8 @@ int NetmapDevice::initialize() {
 			base_nmd->req.nr_arg3 = ((base_nmd->req.nr_arg3 / NETMAP_PACKET_POOL_SIZE) + 1) * NETMAP_PACKET_POOL_SIZE;
 #if HAVE_ZEROCOPY
 		//Ensure we have at least a batch per thread + 1
-		if (NETMAP_PACKET_POOL_SIZE * ((unsigned)click_nthreads + 1) > base_nmd->req.nr_arg3)
-			base_nmd->req.nr_arg3 = NETMAP_PACKET_POOL_SIZE * (click_nthreads + 1);
+		if (NETMAP_PACKET_POOL_SIZE * ((unsigned)click_max_cpu_ids() + 1) > base_nmd->req.nr_arg3)
+			base_nmd->req.nr_arg3 = NETMAP_PACKET_POOL_SIZE * (click_max_cpu_ids() + 1);
 #endif
 		nmd = nm_open(ifname.c_str(), NULL, NM_OPEN_ARG3, base_nmd);
 	}

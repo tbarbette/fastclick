@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_RATEDUNQUEUE_HH
 #define CLICK_RATEDUNQUEUE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/tokenbucket.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
@@ -42,7 +42,7 @@ CLICK_DECLS
  *
  * =a BandwidthRatedUnqueue, Unqueue, Shaper, RatedSplitter */
 
-class RatedUnqueue : public Element { public:
+class RatedUnqueue : public BatchElement { public:
 
     RatedUnqueue() CLICK_COLD;
 

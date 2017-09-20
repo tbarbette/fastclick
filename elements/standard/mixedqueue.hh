@@ -80,7 +80,7 @@ class MixedQueue : public NotifierQueue { public:
     const char *port_count() const	{ return "2/1-2"; }
     void *cast(const char *);
 
-    void push(int port, Packet *);
+    void push(int port, Packet *) final;
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch *);
 #endif

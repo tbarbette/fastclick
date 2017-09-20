@@ -1155,7 +1155,9 @@ Script::basic_handler(int, String &str, Element *e, const Handler *h, ErrorHandl
     case ar_now:
         str = Timestamp::now().unparse();
         return 0;
-
+    case ar_now_steady:
+            str = Timestamp::now_steady().unparse();
+            return 0;
     case ar_random: {
         if (!str)
             str = String(click_random());
@@ -1339,6 +1341,7 @@ Script::add_handlers()
     set_handler("if", Handler::f_read | Handler::f_read_param, basic_handler, ar_if, 0);
     set_handler("in", Handler::f_read | Handler::f_read_param, basic_handler, ar_in, 0);
     set_handler("now", Handler::f_read, basic_handler, ar_now, 0);
+    set_handler("now_steady", Handler::f_read, basic_handler, ar_now_steady, 0);
     set_handler("readable", Handler::f_read | Handler::f_read_param, basic_handler, ar_readable, 0);
     set_handler("writable", Handler::f_read | Handler::f_read_param, basic_handler, ar_writable, 0);
     set_handler("length", Handler::f_read | Handler::f_read_param, basic_handler, ar_length, 0);

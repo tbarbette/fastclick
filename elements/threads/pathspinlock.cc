@@ -52,6 +52,15 @@ void PathSpinlock::push(int i,Packet *p)	{
 	_lock->release();
 }
 
+#if HAVE_BATCH
+void PathSpinlock::push_batch(int i,PacketBatch *batch)	{
+	_lock->acquire();
+	output(i).push_batch(batch);
+	_lock->release();
+}
+#endif
+
+
 Packet* PathSpinlock::pull(int i)	{
 	_lock->acquire();
 	Packet* p = input(i).pull();

@@ -1,6 +1,6 @@
 #ifndef CLICK_SETIPCHECKSUM_HH
 #define CLICK_SETIPCHECKSUM_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -19,7 +19,7 @@ CLICK_DECLS
  *
  * =a CheckIPHeader, DecIPTTL, SetIPDSCP, IPRewriter */
 
-class SetIPChecksum : public Element { public:
+class SetIPChecksum : public BatchElement { public:
 
     SetIPChecksum() CLICK_COLD;
     ~SetIPChecksum() CLICK_COLD;
@@ -29,6 +29,9 @@ class SetIPChecksum : public Element { public:
     void add_handlers() CLICK_COLD;
 
     Packet *simple_action(Packet *p);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 

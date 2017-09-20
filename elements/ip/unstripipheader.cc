@@ -46,7 +46,7 @@ UnstripIPHeader::simple_action(Packet *p)
 PacketBatch*
 UnstripIPHeader::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    EXECUTE_FOR_EACH_PACKET(UnstripIPHeader::simple_action, batch);
     return batch;
 }
 #endif

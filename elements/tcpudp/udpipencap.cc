@@ -142,7 +142,7 @@ UDPIPEncap::simple_action(Packet *p_in)
 #if HAVE_BATCH
 PacketBatch*
 UDPIPEncap::simple_action_batch(PacketBatch* batch) {
-	EXECUTE_FOR_EACH_PACKET(simple_action,batch);
+	EXECUTE_FOR_EACH_PACKET(UDPIPEncap::simple_action,batch);
 	return batch;
 }
 #endif

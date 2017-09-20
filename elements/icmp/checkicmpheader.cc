@@ -148,7 +148,7 @@ CheckICMPHeader::simple_action(Packet *p)
 PacketBatch*
 CheckICMPHeader::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet*){});
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(CheckICMPHeader::simple_action, batch, [](Packet*){});
     return batch;
 }
 #endif
