@@ -343,7 +343,7 @@ ToDPDKRing::push_batch(int, PacketBatch *head)
             next = p->next();
 
         #if !CLICK_PACKET_USE_DPDK
-            BATCH_RECYCLE_UNSAFE_PACKET(p);
+            BATCH_RECYCLE_UNKNOWN_PACKET(p);
         #endif
 
             p = next;
@@ -374,7 +374,7 @@ ToDPDKRing::push_batch(int, PacketBatch *head)
     // If non-blocking, drop all packets that could not be sent
     while (p) {
         next = p->next();
-        BATCH_RECYCLE_UNSAFE_PACKET(p);
+        BATCH_RECYCLE_UNKNOWN_PACKET(p);
         p = next;
         ++_n_dropped;
     }

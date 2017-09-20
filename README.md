@@ -37,7 +37,7 @@ The `--enable-netmap-pool` option allows to use Netmap buffers instead of Click 
 
 DPDK
 ----
-Setup your DPDK 1.6 to 2.2 environment, then configure with :
+Setup your DPDK environment (version 1.6 to 17.05 are supported), then configure with :
 ```bash
 ./configure --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-g -O3" CXXFLAGS="-g -std=gnu++11 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --enable-dpdk-pool --disable-dpdk-packet
 ```

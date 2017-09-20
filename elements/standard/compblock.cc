@@ -143,5 +143,6 @@ CompareBlock::add_handlers()
 }
 
 CLICK_ENDDECLS
+ELEMENT_REQUIRES(!batch)
 EXPORT_ELEMENT(CompareBlock)
 ELEMENT_MT_SAFE(CompareBlock)

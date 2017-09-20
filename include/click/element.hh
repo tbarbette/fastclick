@@ -55,6 +55,7 @@ class Element { public:
     virtual void selected(int fd);
 #endif
 
+    inline bool is_fullpush() const;
     enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_NEEDED, BATCH_MODE_YES};
 
     inline void checked_output_push(int port, Packet *p) const;
@@ -166,7 +167,7 @@ class Element { public:
     RouterThread *home_thread() const;
 
     virtual bool get_spawning_threads(Bitvector& b, bool isoutput);
-    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, int level = 0);
+    Bitvector get_passing_threads(bool is_pull, int port, Element* origin, bool &_is_fullpush, int level = 0);
     Bitvector get_passing_threads(Element* origin, int level = 0);
     Bitvector get_passing_threads();
 
@@ -274,7 +275,9 @@ class Element { public:
 
         Element* _e;
         int _port;
+        #ifdef HAVE_AUTO_BATCH
         per_thread<PacketBatch*> current_batch;
+        #endif
 
 #if HAVE_BOUND_PORT_TRANSFER
         union {
@@ -327,6 +330,9 @@ class Element { public:
     int _eindex;
 
     Vector<Element*> _remote_elements;
+#if HAVE_FULLPUSH_NONATOMIC
+    bool _is_fullpush;
+#endif
 
 #if CLICK_STATS >= 2
     // STATISTICS
@@ -595,8 +601,10 @@ Element::Port::assign(bool isoutput, Element *e, int port)
 {
     _e = e;
     _port = port;
+#ifdef HAVE_AUTO_BATCH
     for (unsigned i = 0; i < current_batch.weight() ; i++)
         current_batch.set_value(i,0);
+#endif
     (void) isoutput;
 #if HAVE_BOUND_PORT_TRANSFER
     if (e) {
@@ -679,6 +687,22 @@ inline void
 Element::Port::push(Packet* p) const
 {
     assert(_e && p);
+#ifdef HAVE_AUTO_BATCH
+    if (likely(_e->in_batch_mode == BATCH_MODE_YES)) {
+        if (*current_batch != 0) {
+            if (*current_batch == (PacketBatch*)-1) {
+                *current_batch = PacketBatch::make_from_packet(p);
+            } else {
+                (*current_batch)->append_packet(p);
+            }
+        } else {
+            push_batch(PacketBatch::make_from_packet(p));
+        }
+    } else {
+        assert(!_e->receives_batch);
+#else
+    {
+#endif
 #if CLICK_STATS >= 1
     ++_packets;
 #endif
@@ -697,13 +721,6 @@ Element::Port::push(Packet* p) const
     _e->_xfer_own_cycles += own_delta;
     _owner->_child_cycles += all_delta;
 #else
-    if (_e->in_batch_mode == BATCH_MODE_YES && *current_batch != 0) {
-        if (*current_batch == (PacketBatch*)-1) {
-            *current_batch = PacketBatch::make_from_packet(p);
-        } else {
-            (*current_batch)->append_packet(p);
-        }
-    } else {
 # if HAVE_BOUND_PORT_TRANSFER
     _bound.push(_e, _port, p);
 # else
@@ -778,46 +795,84 @@ Element::Port::push_batch(PacketBatch* batch) const {
 #endif
 }
 
-void Element::Port::start_batch() {
-#if BATCH_DEBUG
-    click_chatter("Starting batch in port to %p{element}",_e);
-#endif
-    if (_e->in_batch_mode == BATCH_MODE_YES) { //Rebuild for the next element
-        current_batch.set((PacketBatch*)-1);
-    } else { //Pass the rebuild message
-        if (*current_batch != (PacketBatch*)-1) {
-            *current_batch = (PacketBatch*)-1;
-            for (int i = 0; i < _e->noutputs(); i++) {
-                if (_e->output_is_push(i))
-                    _e->_ports[1][i].start_batch();
-            }
+#ifdef HAVE_AUTO_BATCH
+inline void
+Element::Port::start_batch() {
+    /**
+     * Port mode : start batching if e is BATCH_MODE_YES
+     * List mode : start batching (if e is not BATCH_MODE_YES, we would not be calling this)
+     * Jump mode : pass the message through all ports if not BATCH_MODE_YES, if it is, set to -1 to start batching
+     */
+#if HAVE_AUTO_BATCH == AUTO_BATCH_JUMP
+# if BATCH_DEBUG
+    click_chatter("Passing start batch message in port to %p{element}",_e);
+# endif
+    if (_e->in_batch_mode == BATCH_MODE_YES)  {
+        if (*current_batch == 0)
+            current_batch.set((PacketBatch*)-1);
+    } else {
+        for (int i = 0; i < _e->noutputs(); i++) {
+            if (_e->output_is_push(i))
+                _e->_ports[1][i].start_batch();
         }
     }
+#elif HAVE_AUTO_BATCH == AUTO_BATCH_PORT
+# if BATCH_DEBUG
+    click_chatter("Starting batch in port to %p{element}",_e);
+# endif
+    if (_e->in_batch_mode == BATCH_MODE_YES) { //Rebuild for the next element
+        if (*current_batch == 0)
+            current_batch.set((PacketBatch*)-1);
+    }
+#elif HAVE_AUTO_BATCH == AUTO_BATCH_LIST
+# if BATCH_DEBUG
+    click_chatter("Starting batch in port to %p{element}",_e);
+# endif
+    assert(*current_batch == 0);
+    current_batch.set((PacketBatch*)-1);
+#else
+    #error "Unknown batch auto mode"
+#endif
 }
 
-void Element::Port::end_batch() {
-    PacketBatch* &cur = *current_batch;
+inline void
+Element::Port::end_batch() {
+    PacketBatch* cur = *current_batch;
 #if BATCH_DEBUG
     click_chatter("Ending batch in port to %p{element}",_e);
 #endif
-    if (_e->in_batch_mode == BATCH_MODE_YES) { //Send the buffered batch to the next element
-        if (cur != 0) {
-           if (cur != (PacketBatch*)-1) {
-               _e->push_batch(_port,current_batch.get());
+    /**
+     * Auto mode : if 0 bug, if -1 nothing, else push the batch
+     * List mode : if 0 bug, if -1 nothing, else push the batch
+     * Jump mode : if BATCH_MODE_YES push the batch, else pass the message (and assert cur was 0)
+     */
+#if HAVE_AUTO_BATCH == AUTO_BATCH_JUMP
+    if (_e->in_batch_mode == BATCH_MODE_YES)
+#endif
+    { //Send the buffered batch to the next element
+       if (cur != 0) {
+           current_batch.set((PacketBatch*)0);
+           if (cur != (PacketBatch*)-1)
+           {
+               #if BATCH_DEBUG
+               assert(cur->find_count() == cur->count());
+               #endif
+               _e->push_batch(_port,cur);
            }
-           cur = 0;
-        }
-    } else { //Pass the message
-        if (*current_batch == (PacketBatch*)-1) {
-            *current_batch = 0;
-            for (int i = 0; i < _e->noutputs(); i++) {
-                if (_e->output_is_push(i))
-                    _e->_ports[1][i].end_batch();
-            }
+       }
+
+    }
+#if HAVE_AUTO_BATCH == AUTO_BATCH_JUMP
+    else { //Pass the message
+        assert(cur == 0);
+        for (int i = 0; i < _e->noutputs(); i++) {
+            if (_e->output_is_push(i))
+                _e->_ports[1][i].end_batch();
         }
     }
+#endif
 };
-
+#endif
 
 PacketBatch*
 Element::Port::pull_batch(unsigned max) const {
@@ -830,6 +885,30 @@ Element::Port::pull_batch(unsigned max) const {
     return batch;
 }
 #endif
+
+/**
+ * @brief Tell if the path up to this element is a full push path, always
+ * served by the same thread.
+ *
+ * Hence, it is not only a matter of having
+ * only a push path, as some elements like Pipeliner may be push
+ * but lead to thread switch.
+ *
+ * @pre get_passing_threads() have to be called on this element or any downstream element
+ *
+ * If this element is part of a full push path, it means that packets passing
+ *  through will always be handled by the same thread. They may be shared, in
+ *  the sense that the usage count could be bigger than one. But then shared
+ *  only with the same thread. Therefore non-atomic operations can be involved.
+ */
+inline bool Element::is_fullpush() const {
+#if HAVE_FULLPUSH_NONATOMIC
+    return _is_fullpush;
+#else
+    return false;
+#endif
+}
+
 
 /** @brief Push packet @a p to output @a port, or kill it if @a port is out of
  * range.

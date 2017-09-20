@@ -107,12 +107,7 @@ class RatedSource : public BatchElement, public ActiveNotifier {
 
         Packet      *pull(int);
     #if HAVE_BATCH
-        PacketBatch *pull_batch(int port, unsigned max) {
-            PacketBatch *batch;
-            click_chatter("Pull batch\n");
-            MAKE_BATCH(pull(port), batch, max);
-            return batch;
-        }
+        PacketBatch *pull_batch(int, unsigned);
     #endif
 
     protected:

@@ -73,8 +73,10 @@ class QuickNoteQueue : public FullNoteQueue { public:
     // FullNoteQueue's configure() suffices
 
     // FullNoteQueue's push() suffices
-    Packet *pull(int port);
-
+    Packet *pull(int port) final;
+#if HAVE_BATCH
+    PacketBatch* pull_batch(int port, unsigned max);
+#endif
 };
 
 CLICK_ENDDECLS

@@ -62,7 +62,6 @@ bool BatchElement::BatchModePropagate::visit(Element *e, bool, int,
 /**
  * RouterVisitor finding all reachable batch-enabled element. Used to re-batch before those
  */
-
 BatchElement::PushToPushBatchVisitor::PushToPushBatchVisitor(Element* origin) :_origin(origin) {
 
 }
@@ -74,6 +73,9 @@ BatchElement::PushToPushBatchVisitor::visit(Element *e, bool, int,
         e->in_batch_mode = BATCH_MODE_YES;
 #if BATCH_DEBUG
         click_chatter("%s is now in batch mode",e->name().c_str());
+#endif
+#if HAVE_AUTO_BATCH == AUTO_BATCH_LIST
+        list->append(e);
 #endif
         e->receives_batch = true;
         return false;

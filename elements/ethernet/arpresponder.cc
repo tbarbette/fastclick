@@ -178,9 +178,11 @@ ARPResponder::make_response(const uint8_t target_eth[6], /* them */
     return q;
 }
 
-Packet *
-ARPResponder::simple_action(Packet *p)
-{
+/**
+ * @return 0 of if p is to be trashed, a packet if this packet is to be forwarded
+ */
+inline Packet*
+ARPResponder::smaction(Packet* p) {
     const click_ether *e = (const click_ether *) p->data();
     const click_ether_arp *ea = (const click_ether_arp *) (e + 1);
     Packet *q = 0;
@@ -193,18 +195,32 @@ ARPResponder::simple_action(Packet *p)
 	if (const EtherAddress *ena = lookup(ipa))
 	    q = make_response(ea->arp_sha, ea->arp_spa, ena->data(), ea->arp_tpa, p);
     }
-    if (q)
-	p->kill();
-    else
-	checked_output_push(1, p);
-    return q;
+    if (q) {
+        p->kill();
+        return q;
+    } else
+        return 0;
+
+}
+
+Packet *
+ARPResponder::simple_action(Packet *p)
+{
+    Packet* q = smaction(p);
+    if (q == 0) {
+        checked_output_push(1, p);
+        return 0;
+    } else
+        return q;
 }
 
 #if HAVE_BATCH
 PacketBatch *
 ARPResponder::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(simple_action, batch, [](Packet*){});
+    EXECUTE_FOR_EACH_PACKET_DROP_LIST(smaction,batch,drop_batch);
+    if (drop_batch != 0)
+        checked_output_push_batch(1, drop_batch);
     return batch;
 }
 #endif

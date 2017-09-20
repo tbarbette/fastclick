@@ -74,7 +74,7 @@ class Bitvector {
 
     void swap(Bitvector &x);
 
-    inline int weight();
+    inline int weight() const;
 
     bool parse(const String &str, int min_val, int max_val, int offset = 0);
     String unparse(int read_offset = 0, int output_offset = 0) const;
@@ -384,7 +384,7 @@ inline Bitvector::Bit &Bitvector::Bit::operator-=(bool x) {
 }
 
 /** @brief Return the number of true bits */
-inline int Bitvector::weight() {
+inline int Bitvector::weight() const {
     int w = 0;
     for (int i = 0; i < size(); i++)
         if ((*this)[i])

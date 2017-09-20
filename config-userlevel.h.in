@@ -242,7 +242,7 @@
 #undef HAVE_VSNPRINTF
 
 /* The size of a `click_jiffies_t', as computed by sizeof. */
-#define SIZEOF_CLICK_JIFFIES_T SIZEOF_INT
+#define SIZEOF_CLICK_JIFFIES_T SIZEOF_LONG
 
 /* The size of a `off_t', as computed by sizeof. */
 #undef SIZEOF_OFF_T
@@ -262,6 +262,7 @@
 
 /* Include integer type definitions. */
 #ifdef HAVE_INTTYPES_H
+#define __STDC_FORMAT_MACROS
 # include <inttypes.h>
 #endif
 #include <sys/types.h>

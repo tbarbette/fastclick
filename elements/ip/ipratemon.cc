@@ -60,6 +60,11 @@ IPRateMonitor::configure(Vector<String> &conf, ErrorHandler *errh)
   else
     return errh->error("monitor type should be \"PACKETS\" or \"BYTES\"");
 
+#if HAVE_BATCH
+  if (_anno_packets)
+      return errh->error("Disable ANNO as the REV_RATE_ANNO is in conflict with batching");
+#endif
+
   if (_memmax && _memmax < MEMMAX_MIN)
     _memmax = MEMMAX_MIN;
   _memmax *= 1024;      // now bytes

@@ -53,6 +53,7 @@ ProgressBar::initialize(ErrorHandler *errh)
     _delay_ms = 0;
     _active = true;
     _size = -1;
+    _invert_pos = false;
     String position_str, size_str;
     bool check_stdout = false, have_size = false;
 
@@ -67,6 +68,7 @@ ProgressBar::initialize(ErrorHandler *errh)
 	.read("DELAY", SecondsArg(3), _delay_ms)
 	.read("CHECK_STDOUT", check_stdout)
 	.read("FIXED_SIZE", _size).read_status(have_size)
+	.read("INVERT",_invert_pos)
 	.complete() < 0)
 	return -1;
 
@@ -214,7 +216,10 @@ ProgressBar::run_timer(Timer *)
 	thermpos = ((int)(pos / 100000)) % 200;
 	if (thermpos > 100) thermpos = 200 - thermpos;
     } else if (_size > 0) {
-	thermpos = (int)(100 * pos / _size);
+        if (_invert_pos)
+            thermpos = (int)(100 * (_size - pos) / _size);
+        else
+            thermpos = (int)(100 * pos / _size);
 	if (thermpos < 0) thermpos = 0;
 	else if (thermpos > 100) thermpos = 100;
     } else

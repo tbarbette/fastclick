@@ -250,7 +250,12 @@ ARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
     SET_VLAN_TCI_ANNO(q, VLAN_TCI_ANNO(p));
 
     _arp_queries++;
-    output(noutputs() - 1).push(q);
+#if HAVE_BATCH
+    if (in_batch_mode == BATCH_MODE_YES) {
+        output(noutputs() - 1).push_batch(PacketBatch::make_from_packet(q));
+    } else
+#endif
+        output(noutputs() - 1).push(q);
 }
 
 /*
@@ -260,14 +265,14 @@ ARPQuerier::send_query_for(const Packet *p, bool ether_dhost_valid)
  * May save the packet in the ARP table for later sending.
  * May call p->kill().
  */
-void
+Packet*
 ARPQuerier::handle_ip(Packet *p, bool response)
 {
     // delete packet if we are not configured
     if (!_my_ip) {
 	p->kill();
 	++_drops;
-	return;
+	return 0;
     }
 
     // make room for Ethernet header
@@ -277,7 +282,7 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 	q = p->uniqueify();
     } else if (!(q = p->push_mac_header(sizeof(click_ether)))) {
 	++_drops;
-	return;
+	return 0;
     } else
 	q->ether_header()->ether_type = htons(ETHERTYPE_IP);
 
@@ -325,14 +330,14 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 		send_query_for(q, false); // q is on the ARP entry's queue
 	    // if r >= 0, do not q->kill() since it is stored in some ARP entry.
 	}
-	return;
+	return 0;
     }
 
     // It's time to emit the packet with our Ethernet address as source.  (Set
     // the source address immediately before send in case the user changes the
     // source address while packets are enqueued.)
     memcpy(&q->ether_header()->ether_shost, _my_en.data(), 6);
-    output(0).push(q);
+    return q;
 }
 
 /*
@@ -357,28 +362,69 @@ ARPQuerier::handle_response(Packet *p)
 	&& ntohs(arph->ea_hdr.ar_pro) == ETHERTYPE_IP
 	&& ntohs(arph->ea_hdr.ar_op) == ARPOP_REPLY
 	&& !ena.is_group()) {
-	Packet *cached_packet;
-	_arpt->insert(ipa, ena, &cached_packet);
+        Packet *cached_packet;
+        _arpt->insert(ipa, ena, &cached_packet);
 
-	// Send out packets in the order in which they arrived
-	while (cached_packet) {
-	    Packet *next = cached_packet->next();
-	    handle_ip(cached_packet, true);
-	    cached_packet = next;
-	}
+        // Send out packets in the order in which they arrived
+    #if HAVE_BATCH
+        if (in_batch_mode == BATCH_MODE_YES) {
+            BATCH_CREATE_INIT(batch_to_send);
+            while (cached_packet) {
+                Packet *next = cached_packet->next();
+                Packet* to_send = handle_ip(cached_packet, true);
+                if (to_send) {
+                    BATCH_CREATE_APPEND(batch_to_send, to_send);
+                }
+                cached_packet = next;
+            }
+            BATCH_CREATE_FINISH(batch_to_send);
+            if (batch_to_send)
+                output(0).push_batch(batch_to_send);
+        }
+        else
+    #endif
+        {
+            while (cached_packet) {
+                Packet *next = cached_packet->next();
+                Packet* to_send = handle_ip(cached_packet, true);
+                if (to_send) {
+                    output(0).push(to_send);
+                }
+                cached_packet = next;
+            }
+        }
     }
 }
 
 void
 ARPQuerier::push(int port, Packet *p)
 {
-    if (port == 0)
-	handle_ip(p, false);
-    else {
-	handle_response(p);
-	p->kill();
+    if (port == 0) {
+        p = handle_ip(p, false);
+        if (p)
+            output(0).push(p);
+    } else {
+        handle_response(p);
+        p->kill();
     }
 }
+
+#if HAVE_BATCH
+void
+ARPQuerier::push_batch(int port, PacketBatch *batch)
+{
+    if (port == 0) {
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(handle_ip,batch,[](Packet*p){});
+        if (batch)
+            output(0).push_batch(batch);
+    } else {
+        FOR_EACH_PACKET_SAFE(batch,p) {
+            handle_response(p);
+            p->kill();
+        }
+    }
+}
+#endif
 
 String
 ARPQuerier::read_handler(Element *e, void *thunk)

@@ -259,11 +259,12 @@ Timestamp::unparse_interval() const
     return sa.take_string();
 }
 
-#if HAVE_USER_TIMESTAMP
+#if HAVE_USER_TIMING
 bool Timestamp::set_clock(user_clock_fct clock, void* user) {
 	_user_data = user;
 	_user_clock = clock;
 }
+
 
 user_clock_fct Timestamp::_user_clock = 0;
 void* Timestamp::_user_data = 0;

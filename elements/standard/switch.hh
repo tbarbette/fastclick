@@ -1,6 +1,6 @@
 #ifndef CLICK_SWITCH_HH
 #define CLICK_SWITCH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -35,7 +35,7 @@ Argument is a pointer to an integer. Sets the K parameter to that integer.
 =a StaticSwitch, PullSwitch, RoundRobinSwitch, StrideSwitch, HashSwitch,
 RandomSwitch */
 
-class Switch : public Element { public:
+class Switch : public BatchElement { public:
 
   Switch() CLICK_COLD;
 
@@ -47,7 +47,10 @@ class Switch : public Element { public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   bool can_live_reconfigure() const		{ return true; }
 
-  void push(int, Packet *);
+  void push(int, Packet *) override;
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *) override;
+#endif
 
   int llrpc(unsigned, void *);
 

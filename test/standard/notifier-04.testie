@@ -25,8 +25,8 @@ i :: InfiniteSource(LIMIT 15)
   -> c :: Counter
   -> q :: FullNoteQueue(5)
   -> s :: PullSwitch(1)
-  -> Counter(COUNT_CALL 2 s.switch 1)
-  -> Discard;
+  -> c2 :: Counter(COUNT_CALL 2 s.switch 1, BATCH_PRECISE true)
+  -> Discard(BURST 1);
 Idle -> [1]s;
 DriverManager(wait 0.1s, print i.scheduled, print c.count, write s.switch 0, wait 0.1s, print i.scheduled, stop)
 
