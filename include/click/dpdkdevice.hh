@@ -97,9 +97,6 @@ public:
     // Supported actions
     static const Vector<String> FLOW_RULE_ACTIONS_VEC;
 
-    // TODO: Remove Static list of rules
-    static const Vector<String> FLOW_RULES_VEC;
-
     // Global table of ports mapped to their Flow Director objects
     static HashTable<uint8_t, FlowDirector *> _dev_flow_dir;
 
@@ -123,13 +120,12 @@ public:
     inline void set_verbose(const bool &verbose) { _verbose = verbose; };
     inline bool get_verbose() { return _verbose; };
 
-    // Add a set of statically-defined rules
-    static bool add_rules_static(
-        const uint8_t &port_id,
-        const Vector<String> rules
-    );
+    // Rules' file handlers
+    inline void   set_rules_filename(const String &file) { _rules_filename = file; };
+    inline String get_rules_filename() { return _rules_filename; };
+
     // Add rules from a file
-    static bool add_rules_file(
+    static void add_rules_file(
         const uint8_t &port_id,
         const String &filename
     );
@@ -169,6 +165,9 @@ private:
 
     // Set stdout verbosity
     bool _verbose;
+
+    // Filename that contains the rules to be installed
+    String _rules_filename;
 
     // A unique error handler
     static ErrorVeneer *_errh;
@@ -249,7 +248,9 @@ public:
         EtherAddress mac;
     };
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     void initialize_flow_director(const uint8_t &port_id, ErrorHandler *errh);
+#endif
 
     int add_rx_queue(
         unsigned &queue_id, bool promisc,
@@ -269,9 +270,19 @@ public:
 
     static int get_port_numa_node(uint8_t port_id);
 
-    int set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorHandler *errh);
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    int set_mode(
+        String mode, int num_pools, Vector<int> vf_vlan,
+        const String &rules_path, ErrorHandler *errh
+    );
+#else
+    int set_mode(
+        String mode, int num_pools, Vector<int> vf_vlan,
+        ErrorHandler *errh
+    );
+#endif
 
-    static int initialize(const String &mode, ErrorHandler *errh);
+    static int initialize(ErrorHandler *errh);
 
     int static_cleanup();
 
@@ -291,7 +302,9 @@ public:
 
     static unsigned int get_nb_txdesc(uint8_t port_id);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     static void configure_nic(const uint8_t &port_id);
+#endif
 
     static void cleanup(ErrorHandler *errh);
 

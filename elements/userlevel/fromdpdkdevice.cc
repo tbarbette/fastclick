@@ -60,12 +60,18 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     String mode = "";
     int num_pools = 0;
     Vector<int> vf_vlan;
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    String rules_filename = "";
+#endif
 
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
         .read("MODE", mode)
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        .read("FLOW_DIR_RULES_FILE", rules_filename)
+    #endif
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
         .read("ACTIVE", _active)
@@ -105,7 +111,19 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (has_mac)
         _dev->set_mac(mac);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    // No file with rules is given, hence the only way to configure the NIC is via the hanldlers.
+    if ((mode == FlowDirector::FLOW_DIR_FLAG) && (rules_filename.empty())) {
+        errh->warning(
+            "Flow Director (port %s): FLOW_DIR_RULES_FILE is not set, hence this NIC can only be configured via the handlers",
+            dev.c_str()
+        );
+    }
+
+    r = _dev->set_mode(mode, num_pools, vf_vlan, rules_filename, errh);
+#else
     r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
+#endif
 
     return r;
 }
@@ -132,7 +150,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
         return errh->error("Sharing queue between multiple threads is not yet supported by FromDPDKDevice. Raise the number using N_QUEUES of queues or limit the number of threads using MAXTHREADS");
 
     if (all_initialized()) {
-        ret = DPDKDevice::initialize(_dev->getInfo().get_mq_mode(), errh);
+        ret = DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
     }
 

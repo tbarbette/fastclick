@@ -80,14 +80,6 @@ const Vector<String> FlowDirector::FLOW_RULE_ACTIONS_VEC = [] {
     return v;
 }();
 
-// Static list of rules
-const Vector<String> FlowDirector::FLOW_RULES_VEC = [] {
-    Vector<String> v;
-    v.push_back("pattern ip src 10.0.0.1/16 and ip dst 192.168.0.1/24 and tcp port dst 80 action queue index 0");
-    v.push_back("pattern ip src 11.0.0.1/32 and ip dst 192.168.0.2 and udp port src 12678 action queue index 15");
-    return v;
-}();
-
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<uint8_t, FlowDirector *> FlowDirector::_dev_flow_dir;
 
@@ -145,48 +137,43 @@ FlowDirector *FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandl
 }
 
 /**
- * Installs a set of string-based rules read from a static vector.
- *
- * @param port_id the ID of the NIC
- * @param rules the vector that contains the rules
- * @return status
- */
-bool FlowDirector::add_rules_static(const uint8_t &port_id, const Vector<String> rules)
-{
-    for (uint32_t i=0 ; i<rules.size() ; i++) {
-        // Add flow handler
-        FlowDirector::flow_rule_install(port_id, i, rules[i]);
-    }
-
-    _errh->message(
-        "Flow Director (port %u): %u/%u rules are installed",
-        port_id, _dev_flow_dir[port_id]->_rule_list.size(), rules.size()
-    );
-
-    return true;
-}
-
-/**
  * Installs a set of string-based rules read from a file.
  *
  * @param port_id the ID of the NIC
  * @param filename the file that contains the rules
- * @return status
  */
-bool FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
+void FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
 {
-    // _errh->error("Flow Director (port %u): Add rules from file is not currently supported", port_id);
+    uint32_t rule_no = 0;
 
-    // ifstream myfile(filename);
-    // if (myfile.is_open()) {
-    //     String line;
-    //     while ( getline(myfile, line) ) {
-    //         click_chatter();
-    //     }
-    //     myfile.close();
-    // }
+    FILE *fp = NULL;
+    fp = fopen(filename.c_str(), "r");
+    if (fp == NULL) {
+        _errh->error(
+            "Flow Director (port %u): Failed to open file '%s'", port_id, filename.c_str());
+    }
 
-    return false;
+    char  *line = NULL;
+    size_t  len = 0;
+    ssize_t read_chars;
+
+    // Read file line-by-line (or rule-by-rule)
+    while ((read_chars = getline(&line, &len, fp)) != -1) {
+        FlowDirector::flow_rule_install(port_id, rule_no++, String(line));
+    }
+
+    // Close the file
+    fclose(fp);
+
+    // Free memory
+    if (line) {
+        free(line);
+    }
+
+    _errh->message(
+        "Flow Director (port %u): %u/%u rules are installed",
+        port_id, _dev_flow_dir[port_id]->_rule_list.size(), rule_no
+    );
 }
 
 /**
@@ -891,6 +878,8 @@ int FlowDirector::flow_rule_complain(const uint8_t &port_id, struct rte_flow_err
 
 /* End of Flow Director */
 
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
  * Called by the constructor of DPDKDevice.
  * Flow Director must be strictly invoked once for each port.
@@ -916,6 +905,7 @@ void DPDKDevice::initialize_flow_director(const uint8_t &port_id, ErrorHandler *
         click_chatter("Flow Director (port %u): Port is set", port_id);
     }
 }
+#endif
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
@@ -1024,7 +1014,11 @@ struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, const String &rules_path, ErrorHandler *errh) {
+#else
 int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorHandler *errh) {
+#endif
     mode = mode.lower();
 
     enum rte_eth_rx_mq_mode m;
@@ -1073,8 +1067,12 @@ int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorH
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     if (mode == FlowDirector::FLOW_DIR_FLAG) {
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
-        click_chatter("Flow Director (port %u): Active", port_id);
+        click_chatter(
+            "Flow Director (port %u): Active with source '%s'",
+            port_id, rules_path.empty() ? "None" : rules_path.c_str()
+        );
         flow_dir->set_active(true);
+        flow_dir->set_rules_filename(rules_path);
     }
 #endif
 
@@ -1333,7 +1331,7 @@ int DPDKDevice::add_tx_queue(unsigned &queue_id, unsigned n_desc,
     return add_queue(DPDKDevice::TX, queue_id, false, n_desc, errh);
 }
 
-int DPDKDevice::initialize(const String &mode, ErrorHandler *errh)
+int DPDKDevice::initialize(ErrorHandler *errh)
 {
     int ret;
 
@@ -1379,10 +1377,11 @@ int DPDKDevice::initialize(const String &mode, ErrorHandler *errh)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     for (HashTable<uint8_t, FlowDirector *>::iterator it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
+        uint8_t port_id = it.key();
 
         // Only if the device is registered and has the correct mode
-        if (it.value() && (mode == FlowDirector::FLOW_DIR_FLAG)) {
-            DPDKDevice::configure_nic(it.key());
+        if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_FLAG) {
+            DPDKDevice::configure_nic(port_id);
         }
     }
 #endif
@@ -1396,7 +1395,13 @@ void DPDKDevice::configure_nic(const uint8_t &port_id)
     if (_is_initialized) {
         // Invoke Flow Director only if active
         if (FlowDirector::_dev_flow_dir[port_id]->get_active()) {
-            FlowDirector::add_rules_static(port_id, FlowDirector::FLOW_RULES_VEC);
+            // Retrieve the file that contains the rules (if any)
+            String rules_file = FlowDirector::_dev_flow_dir[port_id]->get_rules_filename();
+
+            // There is a file with rules (user-defined)
+            if (!rules_file.empty()) {
+                FlowDirector::add_rules_file(port_id, rules_file);
+            }
         }
     }
 }
@@ -1418,15 +1423,17 @@ void DPDKDevice::cleanup(ErrorHandler *errh)
             continue;
         }
 
+        uint8_t port_id = it.key();
+
         // Flush
-        uint32_t rules_flushed = FlowDirector::flow_rules_flush(it.key());
+        uint32_t rules_flushed = FlowDirector::flow_rules_flush(port_id);
 
         // Delete this instance
         delete it.value();
 
         // Report
         if (rules_flushed > 0) {
-            errh->message("Flow Director (port %u): Flushed %d rules from the NIC", it.key(), rules_flushed);
+            errh->message("Flow Director (port %u): Flushed %d rules from the NIC", port_id, rules_flushed);
         }
     }
 
