@@ -19,7 +19,7 @@
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
 #include <rte_errno.h>
-#if RTE_VERSION >= RTE_VERSION_NUM(17,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,2,0,0)
 extern "C" {
 #include <rte_pmd_ixgbe.h>
 }
@@ -899,6 +899,7 @@ int FlowDirector::flow_rule_complain(const uint8_t &port_id, struct rte_flow_err
  */
 void DPDKDevice::initialize_flow_director(const uint8_t &port_id, ErrorHandler *errh)
 {
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
     if (!flow_dir) {
         return;
@@ -915,6 +916,7 @@ void DPDKDevice::initialize_flow_director(const uint8_t &port_id, ErrorHandler *
     if (FlowDirector::_dev_flow_dir[port_id]->get_verbose()) {
         click_chatter("Flow Director (port %u): Port is set", port_id);
     }
+#endif
 }
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
