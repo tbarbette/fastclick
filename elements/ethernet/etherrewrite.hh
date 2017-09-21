@@ -57,12 +57,12 @@ class EtherRewrite : public BatchElement { public:
     void add_handlers() CLICK_COLD;
 
     inline Packet *smaction(Packet *);
-    Packet *pull(int);
-    void push(int, Packet *);
+    Packet *pull(int) override;
+    void push(int, Packet *) override;
 
 #if HAVE_BATCH
-    void push_batch(int, PacketBatch *);
-    PacketBatch *pull_batch(int, unsigned);
+    void push_batch(int, PacketBatch *) override;
+    PacketBatch *pull_batch(int, unsigned) override;
 #endif
 
   private:
