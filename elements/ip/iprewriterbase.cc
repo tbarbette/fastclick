@@ -103,6 +103,9 @@ IPRewriterBase::~IPRewriterBase()
     }
 
     if (_timeouts) {
+        for (unsigned i=0; i<_mem_units_no; i++) {
+            delete _timeouts[i];
+        }
         delete [] _timeouts;
     }
 }
