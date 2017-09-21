@@ -56,7 +56,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-WorkPackage::smaction(Packet* p) {
+WorkPackage::smaction(Packet* p, int &n_data) {
     uint32_t sum = 0;
     unsigned r = 0;
     for (int i = 0; i < _w; i ++) {
@@ -64,9 +64,10 @@ WorkPackage::smaction(Packet* p) {
     }
     for (int i = 0; i < _n; i++) {
         uint32_t data;
-        if (r / (FRAND_MAX / 101 + 1) <= _r) {
+        if (r / (FRAND_MAX / 100 + 1) < _r) {
             int pos = r / (FRAND_MAX / ((_payload?p->length():54) + 1) + 1);
             data = *(uint32_t*)(p->data() + pos);
+            //n_data++;
         } else {
             unsigned pos = r / ((FRAND_MAX / (_array.size() + 1)) + 1);
             data = _array[pos];
@@ -78,15 +79,17 @@ WorkPackage::smaction(Packet* p) {
 #if HAVE_BATCH
 void
 WorkPackage::push_batch(int port, PacketBatch* batch) {
+    int n_data = 0;
     FOR_EACH_PACKET(batch, p)
-            smaction(p);
+            smaction(p,n_data);
     output_push_batch(port, batch);
 }
 #endif
 
 void
 WorkPackage::push(int port, Packet* p) {
-    smaction(p);
+    int n_data = 0;
+    smaction(p,n_data);
     output_push(port, p);
 }
 
