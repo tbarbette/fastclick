@@ -52,14 +52,6 @@ EtherRewrite::smaction(Packet *p)
     return q;
 }
 
-
-#if HAVE_BATCH
-    PacketBatch* EtherRewrite::simple_action_batch(PacketBatch * batch) {
-        EXECUTE_FOR_EACH_PACKET(smaction,batch);
-        return batch;
-    }
-#endif
-
 inline void
 EtherRewrite::push(int, Packet *p)
 {
@@ -71,10 +63,37 @@ Packet *
 EtherRewrite::pull(int)
 {
     if (Packet *p = input(0).pull())
-	return smaction(p);
+       return smaction(p);
     else
-	return 0;
+       return 0;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+EtherRewrite::simple_action_batch(PacketBatch * batch)
+{
+    EXECUTE_FOR_EACH_PACKET(smaction, batch);
+    return batch;
+}
+
+void
+EtherRewrite::push_batch(int p, PacketBatch *batch)
+{
+    FOR_EACH_PACKET(batch, p) {
+        smaction(p);
+    }
+    output(0).push_batch(batch);
+}
+
+PacketBatch *
+EtherRewrite::pull_batch(int p, unsigned max)
+{
+    PacketBatch *batch = input_pull_batch(0, max);
+    FOR_EACH_PACKET(batch, p)
+        smaction(p);
+    return batch;
+}
+#endif
 
 void
 EtherRewrite::add_handlers()
