@@ -3,11 +3,12 @@
  * Max Poletto, Eddie Kohler
  *
  * Per-core, thread safe data structures and computational batching
- * by Georgios Katsikas
+ * by Georgios Katsikas and Tom Barbette
  *
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2008-2010 Meraki, Inc.
  * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2017 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -135,12 +136,11 @@ IPRewriter::process(int port, Packet *p_in)
     if ((iph->ip_p != IP_PROTO_TCP && iph->ip_p != IP_PROTO_UDP)
 	|| !IP_FIRSTFRAG(iph)
 	|| p->transport_length() < 8) {
-	const IPRewriterInput &is = _input_specs[port];
-	if (is.kind == IPRewriterInput::i_nochange)
-	    output(is.foutput).push(p);
-	else
-	    p->kill();
-	return -1;
+        const IPRewriterInput &is = _input_specs[port];
+        if (is.kind == IPRewriterInput::i_nochange)
+            return is.foutput;
+        else
+            return -1;
     }
 
     IPFlowID flowid(p);
@@ -201,62 +201,8 @@ IPRewriter::push(int port, Packet *p)
 void
 IPRewriter::push_batch(int port, PacketBatch *batch)
 {
-    unsigned short outports = noutputs();
-    PacketBatch* out[outports];
-    bzero(out,sizeof(PacketBatch*)*outports);
-    PacketBatch *next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );
-    PacketBatch *p = batch;
-    PacketBatch *last = NULL;
-    int last_o = -1;
-    int passed = 0;
-    int count  = 0;
-    for ( ; p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next())) ) {
-        // The actual job of this element
-        int o = process(port, p);
-
-        if (o < 0 || o>=(outports))
-            o = (outports - 1);
-
-        if (o == last_o) {
-            passed ++;
-        }
-        else {
-            if ( !last ) {
-                out[o] = p;
-                p->set_count(1);
-                p->set_tail(p);
-            }
-            else {
-                out[last_o]->set_tail(last);
-                out[last_o]->set_count(out[last_o]->count() + passed);
-                if (!out[o]) {
-                    out[o] = p;
-                    out[o]->set_count(1);
-                    out[o]->set_tail(p);
-                }
-                else {
-                    out[o]->append_packet(p);
-                }
-                passed = 0;
-            }
-        }
-        last = p;
-        last_o = o;
-        count++;
-    }
-
-    if (passed) {
-        out[last_o]->set_tail(last);
-        out[last_o]->set_count(out[last_o]->count() + passed);
-    }
-
-    int i = 0;
-    for (; i < outports; i++) {
-        if (out[i]) {
-            out[i]->tail()->set_next(NULL);
-            checked_output_push_batch(i, out[i]);
-        }
-    }
+    auto fnt = [this,port](Packet*p){return process(port,p);};
+    CLASSIFY_EACH_PACKET(noutputs() + 1,fnt,batch,checked_output_push_batch);
 }
 #endif
 

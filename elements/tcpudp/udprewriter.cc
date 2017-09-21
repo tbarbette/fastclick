@@ -2,11 +2,12 @@
  * udprewriter.{cc,hh} -- rewrites packet source and destination
  * Max Poletto, Eddie Kohler
  *
- * Per-core, thread safe data structures and batching by Georgios Katsikas
+ * Per-core, thread safe data structures and batching by Georgios Katsikas and Tom Barbette
  *
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2008-2010 Meraki, Inc.
  * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2017 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -157,11 +158,10 @@ UDPRewriter::process(int port, Packet *p_in)
 	|| !IP_FIRSTFRAG(iph)
 	|| p->transport_length() < 8) {
         const IPRewriterInput &is = _input_specs[port];
-        if (is.kind == IPRewriterInput::i_nochange) {
+        if (is.kind == IPRewriterInput::i_nochange)
             return is.foutput;
-        } else {
+        else
             return -1;
-        }
     }
 
     IPFlowID flowid(p);
@@ -212,16 +212,8 @@ UDPRewriter::push(int port, Packet *p)
 void
 UDPRewriter::push_batch(int port, PacketBatch *batch)
 {
-    auto fnt = [this,port](Packet* p){return process(port,p);};
-    auto drop_fnt = [this](int i, PacketBatch* b) {
-        if (i >= 0) {
-            this->checked_output_push_batch(i, b);
-        } else {
-            b->kill();
-        }
-    };
-
-    CLASSIFY_EACH_PACKET(noutputs(),fnt,batch,drop_fnt);
+    auto fnt = [this,port](Packet*p){return process(port,p);};
+    CLASSIFY_EACH_PACKET(noutputs() + 1,fnt,batch,checked_output_push_batch);
 }
 #endif
 
