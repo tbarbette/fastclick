@@ -124,8 +124,11 @@ public:
     inline void   set_rules_filename(const String &file) { _rules_filename = file; };
     inline String get_rules_filename() { return _rules_filename; };
 
-    // Add rules from a file
-    static void add_rules_file(
+    /*
+     * Add rules from a file
+     * @return 0 if success
+     */
+    static int add_rules_file(
         const uint8_t &port_id,
         const String &filename
     );
@@ -303,7 +306,7 @@ public:
     static unsigned int get_nb_txdesc(uint8_t port_id);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    static void configure_nic(const uint8_t &port_id);
+    static int configure_nic(const uint8_t &port_id);
 #endif
 
     static void cleanup(ErrorHandler *errh);

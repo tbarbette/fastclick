@@ -142,14 +142,14 @@ FlowDirector *FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandl
  * @param port_id the ID of the NIC
  * @param filename the file that contains the rules
  */
-void FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
+int FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
 {
     uint32_t rule_no = 0;
 
     FILE *fp = NULL;
     fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
-        _errh->error(
+        return _errh->error(
             "Flow Director (port %u): Failed to open file '%s'", port_id, filename.c_str());
     }
 
@@ -1381,7 +1381,8 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
         // Only if the device is registered and has the correct mode
         if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_FLAG) {
-            DPDKDevice::configure_nic(port_id);
+            if (!DPDKDevice::configure_nic(port_id))
+                return -1;
         }
     }
 #endif
@@ -1390,7 +1391,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-void DPDKDevice::configure_nic(const uint8_t &port_id)
+int DPDKDevice::configure_nic(const uint8_t &port_id)
 {
     if (_is_initialized) {
         // Invoke Flow Director only if active
@@ -1400,10 +1401,11 @@ void DPDKDevice::configure_nic(const uint8_t &port_id)
 
             // There is a file with rules (user-defined)
             if (!rules_file.empty()) {
-                FlowDirector::add_rules_file(port_id, rules_file);
+                return FlowDirector::add_rules_file(port_id, rules_file);
             }
         }
     }
+    return 0;
 }
 #endif
 
