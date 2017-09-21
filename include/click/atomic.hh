@@ -810,7 +810,7 @@ atomic_uint64_t::add(volatile uint64_t &x, uint64_t delta)
           : "r" (delta), "m" (x)
           : "cc");
 #else
-    CLICK_ATOMIC_VAL += delta;
+    x += delta;
 #endif
 }
 
