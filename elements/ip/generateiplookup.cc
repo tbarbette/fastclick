@@ -54,7 +54,8 @@ GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
         errh->warning("OUT_PORT is set to default value: %d", _out_port);
     }
 
-    _mask = IPFlowID(0xffffffff, 0, 0xffffffff, 0);
+    // Routers care about destination IP addresses
+    _mask = IPFlowID(0, 0, 0xffffffff, 0);
 
     return GenerateIPPacket::configure(conf, errh);
 }
@@ -94,13 +95,17 @@ String
 GenerateIPLookup::read_handler(Element *e, void *user_data)
 {
     GenerateIPLookup *g = static_cast<GenerateIPLookup *>(e);
+    if (!g) {
+        return "GenerateIPLookup element not found";
+    }
+
     StringAccum acc;
 
     int n = 0;
     while (g->_map.size() > g->_nrules) {
         HashTable<IPFlow> newmap;
         ++n;
-        g->_mask = IPFlowID(IPAddress::make_prefix(32 - n), 0, IPAddress::make_prefix(32 - n), 0);
+        g->_mask = IPFlowID(0, 0, IPAddress::make_prefix(32 - n), 0);
 
         for (auto flow : g->_map) {
             flow.setMask(g->_mask);

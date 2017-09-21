@@ -123,6 +123,10 @@ String
 GenerateIPFilter::read_handler(Element *e, void *user_data)
 {
     GenerateIPFilter *g = static_cast<GenerateIPFilter *>(e);
+    if (!g) {
+        return "GenerateIPFilter element not found";
+    }
+
     StringAccum acc;
 
     int n = 0;
