@@ -75,7 +75,7 @@ EtherRewrite::pull(int)
 void
 EtherRewrite::push_batch(int, PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(EtherRewrite::smaction, batch);
+    EXECUTE_FOR_EACH_PACKET(smaction, batch);
     output(0).push_batch(batch);
 }
 
@@ -83,7 +83,7 @@ PacketBatch *
 EtherRewrite::pull_batch(int, unsigned max)
 {
     PacketBatch *batch = input_pull_batch(0, max);
-    EXECUTE_FOR_EACH_PACKET(EtherRewrite::smaction, batch);
+    EXECUTE_FOR_EACH_PACKET(smaction, batch);
     return batch;
 }
 #endif
