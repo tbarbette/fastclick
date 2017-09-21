@@ -27,10 +27,12 @@ Keyword arguments are:
 =item NB_RULES
 
 Integer. Number of rules to be generated.
+Default is 8000.
 
 =item NB_CORES
 
 Integer. Number of cores to redirect the different rules from the NIC.
+Default is 16.
 
 =back
 
@@ -68,7 +70,12 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
 
     private:
 
+        /**
+         * When the dump handler is called, each rule is assigned
+         * to a CPU core in a round-robin fashion.
+         */
         static int _nb_cores;
+        static const int DEF_NB_CORES;
 
 };
 

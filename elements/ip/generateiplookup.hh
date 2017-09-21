@@ -7,7 +7,7 @@ CLICK_DECLS
 /*
 =c
 
-GenerateIPLookup(NB_RULES)
+GenerateIPLookup(NB_RULES, OUT_PORT)
 
 =s ip
 
@@ -21,11 +21,17 @@ CheckIPHeader or equivalent element.
 
 Keyword arguments are:
 
-=1
+=2
 
 =item NB_RULES
 
 Integer. Number of rules to be generated.
+Default is 8000.
+
+=item OUT_PORT
+
+Integer. Output port where the generated routing entries will be sent to.
+Default is 1.
 
 =back
 
@@ -60,6 +66,15 @@ class GenerateIPLookup : public GenerateIPPacket {
     #if HAVE_BATCH
         PacketBatch *simple_action_batch(PacketBatch *batch);
     #endif
+
+    private:
+
+        /**
+         * When the dump handler is called, each rule is assigned
+         * to this output port in order to fill the routing table.
+         */
+        static int _out_port;
+        static const int DEF_OUT_PORT;
 
 };
 

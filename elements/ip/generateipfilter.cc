@@ -27,10 +27,12 @@
 
 CLICK_DECLS
 
+const int GenerateIPPacket::DEF_NB_RULES = 8000;
+
 /**
  * Base class for pattern generation out of incoming traffic.
  */
-GenerateIPPacket::GenerateIPPacket() : _nrules(8000)
+GenerateIPPacket::GenerateIPPacket() : _nrules(DEF_NB_RULES)
 {
 }
 

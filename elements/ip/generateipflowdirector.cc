@@ -27,7 +27,8 @@
 
 CLICK_DECLS
 
-int GenerateIPFlowDirector::_nb_cores = 16;
+const int GenerateIPFlowDirector::DEF_NB_CORES = 16;
+int GenerateIPFlowDirector::_nb_cores = DEF_NB_CORES;
 
 /**
  * Flow Director rules' generator out of incoming traffic.
@@ -43,18 +44,14 @@ GenerateIPFlowDirector::~GenerateIPFlowDirector()
 int
 GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    int nb_cores;
-
     if (Args(conf, this, errh)
-            .read_p("NB_CORES", nb_cores)
+            .read_p("NB_CORES", _nb_cores)
             .consume() < 0)
         return -1;
 
-    if (nb_cores <= 0) {
-        errh->error("NB_CORES must be positive");
-        return -1;
-    } else {
-        _nb_cores = nb_cores;
+    if (_nb_cores <= 0) {
+        _nb_cores = DEF_NB_CORES;
+        errh->warning("NB_CORES is set to default value: %d", _nb_cores);
     }
 
     _mask = IPFlowID(0xffffffff, (_keep_sport?0xffff:0), 0xffffffff, (_keep_dport?0xffff:0));
@@ -91,6 +88,10 @@ String
 GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
 {
     GenerateIPFlowDirector *g = static_cast<GenerateIPFlowDirector *>(e);
+    if (!g) {
+        return "GenerateIPFlowDirector element not found";
+    }
+
     StringAccum acc;
 
     int n = 0;
@@ -114,7 +115,7 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
     int i = 0;
     for (auto flow : g->_map) {
         acc << "pattern ip src " << flow.flowid().saddr() << '/' << String(32 - n) << " and "
-            << " ip dst "        << flow.flowid().daddr() << '/' << String(32 - n);
+            << "ip dst "         << flow.flowid().daddr() << '/' << String(32 - n);
 
         // TODO: Read ip proto and discriminate between TCP and UDP
         // if (g->_keep_sport)
@@ -124,7 +125,7 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
         // }
 
         // Send flows to cores in a circular fashion
-        acc << " action queue index " << i % _nb_cores << "\n";
+        acc << " action queue index " << (i % _nb_cores) << "\n";
 
         i++;
     }

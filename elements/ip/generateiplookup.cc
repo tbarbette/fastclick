@@ -27,6 +27,9 @@
 
 CLICK_DECLS
 
+const int GenerateIPLookup::DEF_OUT_PORT = 1;
+int GenerateIPLookup::_out_port = DEF_OUT_PORT;
+
 /**
  * IPRouteTable rules' generator out of incoming traffic.
  */
@@ -41,6 +44,16 @@ GenerateIPLookup::~GenerateIPLookup()
 int
 GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    if (Args(conf, this, errh)
+            .read_p("OUT_PORT", _out_port)
+            .consume() < 0)
+        return -1;
+
+    if (_out_port < 0) {
+        _out_port = DEF_OUT_PORT;
+        errh->warning("OUT_PORT is set to default value: %d", _out_port);
+    }
+
     _mask = IPFlowID(0xffffffff, 0, 0xffffffff, 0);
 
     return GenerateIPPacket::configure(conf, errh);
@@ -101,7 +114,7 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
     }
 
     for (auto flow : g->_map) {
-        acc << flow.flowid().daddr() << '/' << String(32 - n) << ",\n";
+        acc << flow.flowid().daddr() << '/' << String(32 - n) << " " << _out_port << ",\n";
     }
 
     return acc.take_string();

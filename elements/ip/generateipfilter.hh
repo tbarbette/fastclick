@@ -28,6 +28,7 @@ Keyword arguments are:
 =item NB_RULES
 
 Integer. Number of rules to be generated.
+Default is 8000.
 
 =item KEEP_SPORT
 
@@ -99,9 +100,11 @@ class GenerateIPPacket : public BatchElement {
                 IPFlowID _flowid;
         };
 
+        int _nrules;
         HashTable<IPFlow> _map;
-        int  _nrules;
         IPFlowID _mask;
+
+        static const int DEF_NB_RULES;
 
 };
 
