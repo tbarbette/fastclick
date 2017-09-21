@@ -2,7 +2,10 @@
  * EtherRewrite.{cc,hh} -- encapsulates packet in Ethernet header
  * Tom Barbette
  *
+ * Batching support from Georgios Katsikas
+ *
  * Copyright (c) 2015 University of Liege
+ * Copyright (c) 2017 Georgios Katsikas, RISE SICS AB
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -35,10 +38,10 @@ int
 EtherRewrite::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	.read_mp("SRC", EtherAddressArg(), _ethh.ether_shost)
-	.read_mp("DST", EtherAddressArg(), _ethh.ether_dhost)
-	.complete() < 0)
-	return -1;
+        .read_mp("SRC", EtherAddressArg(), _ethh.ether_shost)
+        .read_mp("DST", EtherAddressArg(), _ethh.ether_dhost)
+        .complete() < 0)
+       return -1;
     return 0;
 }
 
@@ -56,7 +59,7 @@ inline void
 EtherRewrite::push(int, Packet *p)
 {
     if (Packet *q = smaction(p))
-    output(0).push(q);
+        output(0).push(q);
 }
 
 Packet *
@@ -69,28 +72,18 @@ EtherRewrite::pull(int)
 }
 
 #if HAVE_BATCH
-PacketBatch *
-EtherRewrite::simple_action_batch(PacketBatch * batch)
-{
-    EXECUTE_FOR_EACH_PACKET(smaction, batch);
-    return batch;
-}
-
 void
-EtherRewrite::push_batch(int p, PacketBatch *batch)
+EtherRewrite::push_batch(int, PacketBatch *batch)
 {
-    FOR_EACH_PACKET(batch, p) {
-        smaction(p);
-    }
+    EXECUTE_FOR_EACH_PACKET(EtherRewrite::smaction, batch);
     output(0).push_batch(batch);
 }
 
 PacketBatch *
-EtherRewrite::pull_batch(int p, unsigned max)
+EtherRewrite::pull_batch(int, unsigned max)
 {
     PacketBatch *batch = input_pull_batch(0, max);
-    FOR_EACH_PACKET(batch, p)
-        smaction(p);
+    EXECUTE_FOR_EACH_PACKET(EtherRewrite::smaction, batch);
     return batch;
 }
 #endif
