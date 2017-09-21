@@ -117,6 +117,9 @@ averagecounter_read_rate_handler(Element *e, void *thunk)
   d -= c->ignore();
   if (d < 1) d = 1;
   uint64_t count = get_count(c, user_data);
+  if (user_data == 4) {
+      return String((double)d / CLICK_HZ);
+  }
 
 #if CLICK_USERLEVEL
   return String(((double) count * CLICK_HZ) / d);
@@ -150,6 +153,7 @@ AverageCounter::add_handlers()
   add_read_handler("byte_rate", averagecounter_read_rate_handler, 1);
   add_read_handler("bit_rate", averagecounter_read_rate_handler, 2);
   add_read_handler("link_rate", averagecounter_read_rate_handler, 3);
+  add_read_handler("time", averagecounter_read_rate_handler, 4);
   add_write_handler("reset", averagecounter_reset_write_handler, 0, Handler::BUTTON);
 }
 
