@@ -1,6 +1,6 @@
 #ifndef CLICK_AGGCOUNTER_HH
 #define CLICK_AGGCOUNTER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 class HandlerCall;
 
@@ -189,7 +189,7 @@ form.
 
 AggregateIP, AggregatePacketCounter, FromIPSummaryDump, FromDump */
 
-class AggregateCounter : public Element { public:
+class AggregateCounter : public BatchElement { public:
 
     AggregateCounter() CLICK_COLD;
     ~AggregateCounter() CLICK_COLD;
@@ -205,6 +205,10 @@ class AggregateCounter : public Element { public:
     inline bool update(Packet *, bool frozen = false);
     void push(int, Packet *);
     Packet *pull(int);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *) override;
+    PacketBatch *pull_batch(int, unsigned) override;
+#endif
 
     bool empty() const			{ return _num_nonzero == 0; }
     int clear(ErrorHandler * = 0);

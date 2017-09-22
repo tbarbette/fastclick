@@ -269,6 +269,27 @@ AggregateCounter::pull(int port)
     return p;
 }
 
+#if HAVE_BATCH
+void
+AggregateCounter::push_batch(int port, PacketBatch *batch)
+{
+    auto fnt = [this,port](Packet*p){return !update(p, _frozen || (port == 1));};
+    CLASSIFY_EACH_PACKET(2,fnt,batch,[this](int port, PacketBatch* batch){ output(noutputs() == 1 ? 0 : port).push_batch(batch);});
+}
+
+PacketBatch *
+AggregateCounter::pull_batch(int port,unsigned max)
+{
+    PacketBatch *batch = input(ninputs() == 1 ? 0 : port).pull_batch(max);
+    if (batch && _active) {
+        FOR_EACH_PACKET(batch,p) {
+        update(p, _frozen || (port == 1));
+        }
+    }
+    return batch;
+}
+#endif
+
 
 // CLEAR, REAGGREGATE
 
