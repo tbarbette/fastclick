@@ -1381,8 +1381,11 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
         // Only if the device is registered and has the correct mode
         if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_FLAG) {
-            if (!DPDKDevice::configure_nic(port_id))
+            int err = DPDKDevice::configure_nic(port_id);
+            if (err != 0) {
+                errh->error("Error %d while configuring FLowDirector", err);
                 return -1;
+            }
         }
     }
 #endif
