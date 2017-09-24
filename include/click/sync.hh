@@ -198,9 +198,147 @@ public:
     inline unsigned int get_mapping(int i) {
         return i;
     }
+
+    class const_iterator {public:
+        const_iterator(const per_thread<T>* t,unsigned pos) {
+            _t = t;
+            _pos = pos;
+        }
+        const per_thread<T>* _t;
+        unsigned _pos;
+        T& operator*() const {
+            return _t->get_value(_pos);
+        }
+        bool operator!=(const const_iterator &o) const {
+            return _pos != o._pos;
+        }
+        void operator++() {
+            _pos++;
+        }
+    };
+
+    const_iterator begin() const {
+        return const_iterator(this,0);
+    }
+
+    const_iterator end() const {
+        return const_iterator(this,_size);
+    }
+
+    class iterator {public:
+        iterator(per_thread<T>* t,unsigned pos) {
+            _t = t;
+            _pos = pos;
+        }
+        const per_thread<T>* _t;
+        unsigned _pos;
+        T& operator*() const {
+            return _t->get_value(_pos);
+        }
+        bool operator!=(const iterator &o) const {
+            return _pos != o._pos;
+        }
+        void operator++() {
+            _pos++;
+        }
+    };
+
+    iterator begin() {
+        return iterator(this,0);
+    }
+
+    iterator end() {
+        return iterator(this,_size);
+    }
 protected:
     AT* storage;
     unsigned _size;
+};
+
+/**
+ * A not per_thread per_thread, usefull to use as replacement in template
+ * for non-thread safe of some elements
+ */
+template <typename T>
+class not_per_thread
+{
+public:
+    explicit not_per_thread() {
+    }
+
+    explicit not_per_thread(T _v) {
+        v = _v;
+    }
+
+    inline T* operator->() {
+        return &(v);
+    }
+
+    inline T& operator*() {
+        return v;
+    }
+
+    inline constexpr int weight() const {
+        return 1;
+    }
+
+    inline T& get_value(int) {
+        return v;
+    }
+
+    class const_iterator {public:
+        const_iterator(const not_per_thread<T>* t,unsigned pos) {
+            _t = t;
+            _pos = pos;
+        }
+        const not_per_thread<T>* _t;
+        unsigned _pos;
+        const T& operator*() const {
+            return _t->v;
+        }
+        bool operator!=(const const_iterator &o) const {
+            return _pos != o._pos;
+        }
+        void operator++() {
+            _pos++;
+        }
+    };
+
+    const_iterator begin() const {
+        return const_iterator(this,0);
+    }
+
+    const_iterator end() const {
+        return const_iterator(this, 1);
+    }
+
+    class iterator {public:
+        iterator(not_per_thread<T>* t,unsigned pos) {
+            _t = t;
+            _pos = pos;
+        }
+        not_per_thread<T>* _t;
+        unsigned _pos;
+        T& operator*() const {
+            return _t->v;
+        }
+        bool operator!=(const iterator &o) const {
+            return _pos != o._pos;
+        }
+        void operator++() {
+            _pos++;
+        }
+    };
+
+    iterator begin() {
+        return iterator(this,0);
+    }
+
+    iterator end() {
+        return iterator(this, 1);
+    }
+private:
+    T v;
 };
 
 

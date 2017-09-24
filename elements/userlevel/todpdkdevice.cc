@@ -123,7 +123,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
     if (all_initialized()) {
-        int ret =DPDKDevice::initialize(errh);
+        int ret = DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
     }
     return 0;
