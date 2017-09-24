@@ -121,6 +121,10 @@ class IPRewriterFlow { public:
 	return _ip_p;
     }
 
+    inline uint32_t agg() const {
+    return _agg;
+    }
+
     IPRewriterInput *owner() const {
 	return _owner;
     }
@@ -163,6 +167,7 @@ class IPRewriterFlow { public:
     bool _guaranteed;
     uint8_t _reply_anno;
     IPRewriterInput *_owner;
+    uint32_t _agg;
 
     friend class IPRewriterBase;
     friend class IPRewriterEntry;

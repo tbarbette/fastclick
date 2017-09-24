@@ -146,6 +146,8 @@ class IPRewriterBase : public BatchElement { public:
     uint32_t _gc_interval_sec;
     per_thread<Timer> _gc_timer;
 
+    bool _set_aggregate;
+
     enum {
 	default_timeout = 300,	   // 5 minutes
 	default_guarantee = 5,	   // 5 seconds

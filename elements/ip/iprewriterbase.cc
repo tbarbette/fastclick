@@ -71,7 +71,7 @@ IPMapper::rewrite_flowid(IPRewriterInput *, const IPFlowID &, IPFlowID &,
 //
 
 IPRewriterBase::IPRewriterBase()
-    : _gc_timer()
+    : _gc_timer(), _set_aggregate(false)
 {
     _gc_interval_sec = default_gc_interval;
 
@@ -190,6 +190,7 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("GUARANTEE", SecondsArg(), timeouts[1]).read_status(has_timeout[1])
 	.read("REAP_INTERVAL", SecondsArg(), _gc_interval_sec)
 	.read("REAP_TIME", Args::deprecated, SecondsArg(), _gc_interval_sec)
+	.read("SET_AGGREGATE", _set_aggregate)
 	.consume() < 0)
 	return -1;
 

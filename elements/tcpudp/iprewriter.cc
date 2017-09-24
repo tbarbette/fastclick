@@ -181,6 +181,9 @@ IPRewriter::process(int port, Packet *p_in)
 	else
 	    udpmf->change_expiry(_heap[click_current_cpu_id()], false, now_j + udp_flow_timeout(udpmf, state));
     }
+    if (_set_aggregate) {
+        SET_AGGREGATE_ANNO(p,mf->agg());
+    }
 
     return m->output();
 }
