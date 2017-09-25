@@ -52,7 +52,8 @@ class Replay : public ReplayBase { public:
     ~Replay() CLICK_COLD;
 
     const char *class_name() const	{ return "Replay"; }
-    const char *flow_code() const	{ return "1/1"; }
+    const char *port_count() const  { return "1-/="; }
+    const char *flow_code() const   { return "#/#"; }
     const char *processing() const	{ return PULL; }
 
     bool get_spawning_threads(Bitvector&, bool) override {
