@@ -2,8 +2,11 @@
  * udprewriter.{cc,hh} -- rewrites packet source and destination
  * Max Poletto, Eddie Kohler
  *
+ * Per-core, thread safe data structures and batching by Georgios Katsikas
+ *
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2008-2010 Meraki, Inc.
+ * Copyright (c) 2016 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -68,10 +71,19 @@ UDPRewriter::UDPFlow::apply(WritablePacket *p, bool direction, unsigned annos)
 
 UDPRewriter::UDPRewriter()
 {
+#if HAVE_USER_MULTITHREAD
+    _maps_no = ( click_max_cpu_ids() == 0 )? 1 : click_max_cpu_ids();
+    _allocator = new SizedHashAllocator<sizeof(UDPFlow)>[_maps_no];
+    //click_chatter("[%s]: Allocated %d UDP maps", class_name(), _maps_no);
+#endif
 }
 
 UDPRewriter::~UDPRewriter()
 {
+#if HAVE_USER_MULTITHREAD
+    if ( _allocator )
+        delete [] _allocator;
+#endif
 }
 
 void *
@@ -91,22 +103,27 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     bool dst_anno = true, has_reply_anno = false,
 	has_udp_streaming_timeout, has_streaming_timeout;
     int reply_anno;
-    _timeouts[0] = 300;		// 5 minutes
+    uint32_t timeouts[2];
+    timeouts[0] = 300;		// 5 minutes
 
     if (Args(this, errh).bind(conf)
 	.read("DST_ANNO", dst_anno)
 	.read("REPLY_ANNO", AnnoArg(1), reply_anno).read_status(has_reply_anno)
-	.read("UDP_TIMEOUT", SecondsArg(), _timeouts[0])
-	.read("TIMEOUT", SecondsArg(), _timeouts[0])
+	.read("UDP_TIMEOUT", SecondsArg(), timeouts[0])
+	.read("TIMEOUT", SecondsArg(), timeouts[0])
 	.read("UDP_STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_udp_streaming_timeout)
 	.read("STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_streaming_timeout)
-	.read("UDP_GUARANTEE", SecondsArg(), _timeouts[1])
+	.read("UDP_GUARANTEE", SecondsArg(), timeouts[1])
 	.consume() < 0)
 	return -1;
 
+    for (unsigned i=0; i<_mem_units_no; i++) {
+        _timeouts[i] = timeouts;
+    }
+
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
     if (!has_udp_streaming_timeout && !has_streaming_timeout)
-	_udp_streaming_timeout = _timeouts[0];
+	_udp_streaming_timeout = _timeouts[click_current_cpu_id()][0];
     _udp_streaming_timeout *= CLICK_HZ; // IPRewriterBase handles the others
 
     return IPRewriterBase::configure(conf, errh);
@@ -116,23 +133,26 @@ IPRewriterEntry *
 UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
 		      const IPFlowID &rewritten_flowid, int input)
 {
-    void *data;
-    if (!(data = _allocator.allocate()))
+    void *data = _allocator[click_current_cpu_id()].allocate();
+    if (!data)
 	return 0;
 
     UDPFlow *flow = new(data) UDPFlow
 	(&_input_specs[input], flowid, rewritten_flowid, ip_p,
-	 !!_timeouts[1], click_jiffies() + relevant_timeout(_timeouts));
+	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
+         relevant_timeout(_timeouts[click_current_cpu_id()]));
 
-    return store_flow(flow, input, _map);
+    return store_flow(flow, input, _map[click_current_cpu_id()]);
 }
 
-void
-UDPRewriter::push(int port, Packet *p_in)
+int
+UDPRewriter::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
-    if (!p)
-	return;
+    if (!p) {
+	return -1;
+    }
+
     click_ip *iph = p->ip_header();
 
     // handle non-TCP and non-first fragments
@@ -141,41 +161,118 @@ UDPRewriter::push(int port, Packet *p_in)
 	|| !IP_FIRSTFRAG(iph)
 	|| p->transport_length() < 8) {
 	const IPRewriterInput &is = _input_specs[port];
-	if (is.kind == IPRewriterInput::i_nochange)
-	    output(is.foutput).push(p);
-	else
-	    p->kill();
-	return;
+	if (is.kind == IPRewriterInput::i_nochange) {
+            return is.foutput;
+        }
+	return -1;
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m = _map.get(flowid);
+    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
 
     if (!m) {			// create new mapping
 	IPRewriterInput &is = _input_specs.unchecked_at(port);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
+
 	int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
-	if (result == rw_addmap)
+	if (result == rw_addmap) {
 	    m = UDPRewriter::add_flow(ip_p, flowid, rewritten_flowid, port);
+        }
+
 	if (!m) {
-	    checked_output_push(result, p);
-	    return;
-	} else if (_annos & 2)
+	    return result;
+	} else if (_annos & 2) {
 	    m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
+        }
     }
 
     UDPFlow *mf = static_cast<UDPFlow *>(m->flow());
     mf->apply(p, m->direction(), _annos);
 
     click_jiffies_t now_j = click_jiffies();
-    if (_timeouts[1])
-	mf->change_expiry(_heap, true, now_j + _timeouts[1]);
+    if (_timeouts[click_current_cpu_id()][1])
+	mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
     else
-	mf->change_expiry(_heap, false, now_j + udp_flow_timeout(mf));
+	mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + udp_flow_timeout(mf));
 
-    output(m->output()).push(p);
+    return m->output();
 }
 
+void
+UDPRewriter::push(int port, Packet *p)
+{
+    int output_port = process(port, p);
+    if ( output_port < 0 ) {
+        p->kill();
+        return;
+    }
+
+    output(output_port).push(p);
+}
+
+#if HAVE_BATCH
+void
+UDPRewriter::push_batch(int port, PacketBatch *batch)
+{
+    unsigned short outports = noutputs();
+    PacketBatch* out[outports];
+    bzero(out,sizeof(PacketBatch*)*outports);
+    PacketBatch *next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );
+    PacketBatch *p = batch;
+    PacketBatch *last = NULL;
+    int last_o = -1;
+    int passed = 0;
+    int count  = 0;
+    for (; p != NULL;p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {
+        // The actual job of this element
+        int o = process(port, p);
+
+        if (o < 0 || o>=(outports)) {
+            o = (outports - 1);
+        }
+
+        if (o == last_o) {
+            passed ++;
+        }
+        else {
+            if (!last) {
+                out[o] = p;
+                p->set_count(1);
+                p->set_tail(p);
+            }
+            else {
+                out[last_o]->set_tail(last);
+                out[last_o]->set_count(out[last_o]->count() + passed);
+                if (!out[o]) {
+                    out[o] = p;
+                    out[o]->set_count(1);
+                    out[o]->set_tail(p);
+                }
+                else {
+                    out[o]->append_packet(p);
+                }
+                passed = 0;
+            }
+        }
+        last = p;
+        last_o = o;
+        count++;
+    }
+
+    if (passed) {
+        out[last_o]->set_tail(last);
+        out[last_o]->set_count(out[last_o]->count() + passed);
+    }
+
+    int i = 0;
+    for (; i < outports; i++) {
+        if (out[i]) {
+            out[i]->tail()->set_next(NULL);
+            checked_output_push_batch(i, out[i]);
+        }
+    }
+}
+#endif
 
 String
 UDPRewriter::dump_mappings_handler(Element *e, void *)
@@ -183,7 +280,7 @@ UDPRewriter::dump_mappings_handler(Element *e, void *)
     UDPRewriter *rw = (UDPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (Map::iterator iter = rw->_map.begin(); iter.live(); ++iter) {
+    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); ++iter) {
 	iter->flow()->unparse(sa, iter->direction(), now);
 	sa << '\n';
     }

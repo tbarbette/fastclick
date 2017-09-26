@@ -145,13 +145,24 @@ class IPAddrRewriter : public IPRewriterBase { public:
     void destroy_flow(IPRewriterFlow *flow);
 
     void push(int, Packet *);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *batch);
+#endif
 
     void add_handlers() CLICK_COLD;
 
   protected:
 
-    SizedHashAllocator<sizeof(IPAddrFlow)> _allocator;
+#if HAVE_USER_MULTITHREAD
+    unsigned _maps_no;
+    SizedHashAllocator<sizeof(IPAddrFlow)> *_allocator;
+#else
+    SizedHashAllocator<sizeof(IPAddrFlow)> _allocator[CLICK_CPU_MAX];
+#endif
+
     unsigned _annos;
+
+    int process(int port, Packet *p_in);
 
     static String dump_mappings_handler(Element *, void *);
 
@@ -161,9 +172,9 @@ class IPAddrRewriter : public IPRewriterBase { public:
 inline void
 IPAddrRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map);
+    unmap_flow(flow, _map[click_current_cpu_id()]);
     static_cast<IPAddrFlow *>(flow)->~IPAddrFlow();
-    _allocator.deallocate(flow);
+    _allocator[click_current_cpu_id()].deallocate(flow);
 }
 
 CLICK_ENDDECLS
