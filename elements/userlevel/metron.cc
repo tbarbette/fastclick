@@ -292,7 +292,7 @@ int Metron::runChain(ServiceChain *sc, ErrorHandler *errh) {
         }
         */
         String conf = sc->generateConfig();
-        click_chatter("Writing config %s",conf.c_str());
+        click_chatter("Writing configuration %s", conf.c_str());
 
         int pos = 0;
         while (pos != conf.length()) {
@@ -481,14 +481,14 @@ Metron::param_handler(int operation, String &param, Element *e, const Handler *h
                     }
                     if (m->findChainById(sc->id) != 0) {
                         delete sc;
-                        return errh->error("A service chain with ID %s already exists. Delete it first.", sc->id);
+                        return errh->error("A service chain with ID %s already exists. Delete it first.", sc->id.c_str());
                     }
 
                     // Instantiate
                     int ret = m->instantiateChain(sc, errh);
                     if (ret != 0) {
                         delete sc;
-                        return errh->error("Could not start the service chain with ID %s", sc->id);
+                        return errh->error("Could not start the service chain with ID %s", sc->id.c_str());
                     }
                     if (m->_timing_stats) {
                         ts.launch = Timestamp::now_steady();
@@ -909,7 +909,9 @@ String ServiceChain::generateConfig()
         newconf += "ps :: PaintSwitch();\n\n";
 
         for (int i = 0 ; i < getMaxCpuNr(); i++) {
-            newconf += "rrs[" + String(i) + "] -> slavep" + String(i) + " :: Pipeliner(CAPACITY 8, BLOCKING false) -> [0]ps; StaticThreadSched(slavep" + String(i) + " " + String(getCpuMap(i)) + ");\n";
+            newconf += "rrs[" + String(i) + "] -> slavep" + String(i) +
+                       " :: Pipeliner(CAPACITY 8, BLOCKING false) -> [0]ps; StaticThreadSched(slavep" +
+                       String(i) + " " + String(getCpuMap(i)) + ");\n";
         }
         newconf+="\n";
 
@@ -919,7 +921,9 @@ String ServiceChain::generateConfig()
         }
         newconf+="\n";
 
-        newconf += "ps => [0-" + String(getNICNr()-1) + "]real_slave :: MetronSlave() => [0-" + String(getNICNr()-1) + "]output }\n\n";
+        newconf += "ps => [0-" + String(getNICNr()-1) +
+                   "]real_slave :: MetronSlave() => [0-" +
+                   String(getNICNr()-1) + "]output }\n\n";
     } else {
         newconf += "slave :: MetronSlave();\n\n";
     }
@@ -932,8 +936,9 @@ String ServiceChain::generateConfig()
            String active = (j < getUsedCpuNr() ? "1":"0");
            int cpuid = getCpuMap(j);
            int queue_no = rxFilter->cpuToQueue(nic, cpuid);
-           String ename = generateConfigSlaveFDName(i,j);
-           newconf += ename + " :: " + nic->element->class_name() + "(" + nic->getDeviceId() + ",QUEUE " + String(queue_no) + ", N_QUEUES 1, MAXTHREADS 1, BURST 32, NUMA false, ACTIVE " + active + ", VERBOSE 99);\n";
+           String ename = generateConfigSlaveFDName(i, j);
+           newconf += ename + " :: " + nic->element->class_name() + "(" + nic->getDeviceId() + ", QUEUE " + String(queue_no) +
+                      ", N_QUEUES 1, MAXTHREADS 1, BURST 32, NUMA false, ACTIVE " + active + ", VERBOSE 99);\n";
            newconf += "StaticThreadSched(" + ename + " " + String(cpuid) + ");";
            newconf += ename + " " +
                    //" -> batchAvg" + is + "C" + js + " :: AverageBatchCounter() " +
