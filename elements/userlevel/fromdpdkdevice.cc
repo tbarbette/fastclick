@@ -336,7 +336,7 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
               if (!fd->_dev)
                   return "undefined";
               else
-                  return String(fd->_dev->port_id);
+                  return String((int) fd->_dev->port_id);
         case h_nb_rx_queues:
             return String(fd->_dev->nbRXQueues());
         case h_nb_tx_queues:
