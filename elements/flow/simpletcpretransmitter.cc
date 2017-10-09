@@ -63,25 +63,28 @@ SimpleTCPRetransmitter::release_flow(fcb_transmit_buffer* fcb) {
 
 void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBatch *batch)
 {
+    //If the flow is killed, just push the batch to port 0 (let RST go through)
     if (unlikely(!_in->fcb_data()->common || _in->fcb_data()->common->state == TCPState::CLOSED)) {
         output_push_batch(0, batch);
         return;
     }
 
-    if(port == 0) {
+
+    if(port == 0) { //Normal packet to buffer
         /**
-         * Just prune the buffer and put this packet in the list.
+         * Just prune the buffer and put the packet with payload in the list (don't buffer ACKs)
          */
         prune(fcb);
         FOR_EACH_PACKET_SAFE(batch,packet) {
             if (getPayloadLength(packet) == 0)
                 continue;
-            Packet* clone = packet->clone(true);
+            Packet* clone = packet->clone(true); //Fast clone. If using DPDK, we only hold a buffer reference
             clone->set_next(0);
             clone->set_mac_header(packet->mac_header());
             clone->set_network_header(packet->network_header());
             clone->set_transport_header(packet->transport_header());
 
+            //Actually add the packet in the FCB
             if (fcb->first_unacked) {
                 fcb->first_unacked->append_packet(clone);
             } else {
@@ -89,12 +92,15 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
             }
         }
 
+        //Send the original batch
         if(batch != NULL)
             output_push_batch(0, batch);
 
         return;
-    } else {
-        auto fcb_in = _in->fcb_data();
+    } else { /* port == 1 */ //Retransmission
+        auto fcb_in = _in->fcb_data(); //Scratchpad for TCPIn
+
+        //Retransmission of a SYN -> Let it go through
         if (fcb_in->common->state == TCPState::ESTABLISHING && isSyn(batch->first())) {
             //click_chatter("Unestablished connection, letting the rt packet go through");
             if (batch->count() > 1) {
@@ -110,8 +116,9 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
         /**
          * The retransmission happens because the ack was never received.
          * There are two cases :
-         * - The ack was sent by the dest but did not achive the source, we may
-         *   have it in which case we drop the packet and re-ack.
+         * - The ack was sent by the dest but did not reach the source. If this
+         *   is the case we know the other's side last ACK. I
+         *   In which case we drop the packet and re-ack ourselves.
          * - This packet never reached the end host. We retransmit the
          * equivalent packet in the buffer. We cannot retransmit the same packet
          * because it could be a retransmit attack.

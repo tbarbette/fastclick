@@ -13,7 +13,7 @@
 CLICK_DECLS
 
 
-#define DEBUG_NAT 0
+#define DEBUG_NAT 0 //Do not debug
 #define NAT_COLLIDE 1  //Avoid port collisions
 
 
@@ -45,7 +45,7 @@ int FlowIPNAT::initialize(ErrorHandler *errh) {
      * NATReverse takes care of telling that it will touch our hashtable
      * therefore touching is actually the passing threads for both directions
      */
-    Bitvector touching = get_passing_threads();
+    Bitvector touching = get_passing_threads(true);
 
     /**
      * If only one thread touch this element, disable MT-safeness.
@@ -87,7 +87,7 @@ PortRef* FlowIPNAT::pick_port() {
     int i = 0;
     PortRef* ref = 0;
     if (_state->available_ports.is_empty()) {
-        click_chatter("Not even a used port available");
+        click_chatter("%p{element} : Not even a used port available", this);
         return 0;
     } else {
         ref = _state->available_ports.extract();
@@ -102,8 +102,8 @@ PortRef* FlowIPNAT::pick_port() {
             ref = _state->available_ports.extract();
         }
 #else
-
-            _state->available_ports.insert(ref);
+        //Reinsert the reference at the back
+        _state->available_ports.insert(ref);
 #endif
     }
     return ref;

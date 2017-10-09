@@ -63,13 +63,10 @@ int FlowIDSMatcher::process_data(fcb_FlowIDSMatcher* fcb_data, FlowBufferContent
 
     FlowBufferContentIter good_packets(iterator);
 
-//    click_chatter("Prev stat is %d",state);
     while (iterator) {
         unsigned char c = *iterator;
- //       click_chatter("%c",c);
         _program.next(c,state);
         if (state == SimpleDFA::MATCHED) {
-//            click_chatter("MATCHED");
             return 1;
         } else if (state == 0) {
             good_packets = iterator;
@@ -79,7 +76,6 @@ int FlowIDSMatcher::process_data(fcb_FlowIDSMatcher* fcb_data, FlowBufferContent
     if (state != 0) {
         iterator = ++good_packets;
         if (good_packets.current()) {
-//            click_chatter("Returning in a middle of a potential attack (%d)!",state);
         }
     }
     fcb_data->state = state;

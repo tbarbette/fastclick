@@ -5,6 +5,8 @@
 #include <click/string.hh>
 CLICK_DECLS
 
+#define _verbose 0
+
 /**
  * Greedy DFA, creates as many patterns as there are letters in the patterns. Limited to 65536 characters.
  */
@@ -63,10 +65,13 @@ public:
     int add_pattern(String pattern) {
         int prevsz = vector.size();
 
-        click_chatter("Adding pattern %s",pattern.c_str());
+        if (_verbose)
+            click_chatter("Adding pattern %s",pattern.c_str());
         Vector<StateSet> c_pattern = compile(pattern);
-        click_chatter("Compiled :");
-        print(c_pattern);
+        if (_verbose) {
+            click_chatter("Compiled :");
+            print(c_pattern);
+        }
         int next_state;
         if (c_pattern.size() > 1) {
             create_states(c_pattern,prevsz); // Will add all the states at the end of the vector
@@ -77,8 +82,10 @@ public:
         for (int j = 0; j < prevsz; j++) { //We now attach the first letter to each possible state
             attach(c_pattern,j, c_pattern[0], next_state);
         }
-        click_chatter("Final:");
-        print(vector);
+        if (_verbose) {
+            click_chatter("Final:");
+            print(vector);
+        }
         return 0;
     }
 
