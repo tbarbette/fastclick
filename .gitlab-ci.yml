@@ -43,6 +43,7 @@ before_script:
     - export RTE_SDK=`pwd`/dpdk-$DPDK_VERSION;
       export RTE_TARGET=x86_64-native-linuxapp-gcc;
       if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" ]; then
+        sudo yum install numactl-devel || sudo apt-get install libnuma-dev
         wget http://dpdk.org/browse/dpdk/snapshot/dpdk-$DPDK_VERSION.tar.gz &&
             tar -zxf dpdk-$DPDK_VERSION.tar.gz &&
             cd dpdk-$DPDK_VERSION ;
