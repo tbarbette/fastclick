@@ -2,11 +2,12 @@
  * icmppingrewriter.{cc,hh} -- rewrites ICMP echoes and replies
  * Eddie Kohler
  *
- * Per-core, thread safe data structures by Georgios Katsikas
+ * Per-core, thread safe data structures by Georgios Katsikas and batching by Tom Barbette
  *
  * Copyright (c) 2000-2001 Mazu Networks, Inc.
  * Copyright (c) 2009-2010 Meraki, Inc.
  * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2017 University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -159,8 +160,8 @@ ICMPPingRewriter::add_flow(int, const IPFlowID &flowid,
     return store_flow(flow, input, _map[click_current_cpu_id()]);
 }
 
-void
-ICMPPingRewriter::push(int port, Packet *p_in)
+int
+ICMPPingRewriter::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     click_ip *iph = p->ip_header();
@@ -172,12 +173,12 @@ ICMPPingRewriter::push(int port, Packet *p_in)
 	|| p->transport_length() < 6
 	|| (icmph->icmp_type != ICMP_ECHO && icmph->icmp_type != ICMP_ECHOREPLY)) {
     mapping_fail:
-	const IPRewriterInput &is = _input_specs[port];
-	if (is.kind == IPRewriterInput::i_nochange)
-	    output(is.foutput).push(p);
-	else
-	    p->kill();
-	return;
+        const IPRewriterInput &is = _input_specs[port];
+        if (is.kind == IPRewriterInput::i_nochange) {
+            return is.foutput;
+        } else {
+            return -1;
+        }
     }
 
     bool echo = icmph->icmp_type == ICMP_ECHO;
@@ -197,8 +198,7 @@ ICMPPingRewriter::push(int port, Packet *p_in)
 	    m = ICMPPingRewriter::add_flow(IP_PROTO_ICMP, flowid, rewritten_flowid, port);
 	}
 	if (!m) {
-	    checked_output_push(result, p);
-	    return;
+	    return result;
 	} else if (_annos & 2)
 	    m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
     }
@@ -210,9 +210,29 @@ ICMPPingRewriter::push(int port, Packet *p_in)
         click_jiffies(),
         _timeouts[click_current_cpu_id()]
     );
-
-    output(m->output()).push(p);
+    return m->output();
 }
+
+void
+ICMPPingRewriter::push(int port, Packet *p)
+{
+    int output_port = process(port, p);
+    if (output_port < 0) {
+        p->kill();
+        return;
+    }
+
+    output(output_port).push(p);
+}
+
+#if HAVE_BATCH
+void
+ICMPPingRewriter::push_batch(int port, PacketBatch *batch)
+{
+    auto fnt = [this,port](Packet*p){return process(port,p);};
+    CLASSIFY_EACH_PACKET(noutputs() + 1,fnt,batch,checked_output_push_batch);
+}
+#endif
 
 
 String
