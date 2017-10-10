@@ -33,6 +33,7 @@
 #include <click/etheraddress.hh>
 #include <click/bitvector.hh>
 #include <click/routervisitor.hh>
+#include <click/lexer.hh>
 #if CLICK_DEBUG_SCHEDULING
 # include <click/notifier.hh>
 #endif
@@ -420,7 +421,7 @@ void BetterIPCounter3::push(int port, Packet *p) {
 /** @brief Construct an Element. */
 Element::Element()
     :
-#if HAVE_BATCH && HAVE_AUTO_BATCH
+#if HAVE_BATCH && (HAVE_AUTO_BATCH == AUTO_BATCH_PORT)
     in_batch_mode(BATCH_MODE_IFPOSSIBLE),
 #else
     in_batch_mode(BATCH_MODE_NO),
@@ -1713,7 +1714,7 @@ public:
  *  for example as an element after the queue will only be traversed by the
  *  threads of the queue, not the one before.
  */
-bool Element::get_spawning_threads(Bitvector& bmp, bool) {
+bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
     unsigned int thisthread = home_thread_id();
 
     if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) {
@@ -1740,6 +1741,10 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
     if (origin != this) {//Prevent loop if we get passing thread of this, and it is not the first call
         if (origin == 0)
             origin = this;
+        for (int i = 0; i < _remote_elements.size() ; i++) {
+            click_chatter("%s has remote %s!",name().c_str(),_remote_elements[i]->name().c_str());
+            b |= _remote_elements[i]->get_passing_threads(origin, level + 1);
+        }
     } else {
         if (origin != 0 && level > 0)
             click_chatter("loop avoided for %s",name().c_str());
@@ -1774,6 +1779,27 @@ Bitvector Element::get_passing_threads(Element*, int level) {
 
 Bitvector Element::get_passing_threads() {
 	return get_passing_threads(this, 0);
+}
+
+bool Element::is_mt_safe() {
+    return Lexer::get_lexer()->is_mt_safe(class_name());
+}
+
+bool Element::do_mt_safe_check(ErrorHandler* errh) {
+    Bitvector bmp = get_passing_threads();
+    int n = bmp.weight();
+	if (n == 0) {
+		/*This makes a lot of testie fails because this message is added in a lot of case where it is normal in
+		test conditions where we use Idle to test only handlers. Before-reenabling this, add ignore line to all
+		failing testies*/
+		//errh->warning("%s seems to be traversed by no threads...",name().c_str());
+		return true;
+	}
+    return n <= 1 || is_mt_safe();
+}
+
+void Element::add_remote_element(Element* e) {
+	_remote_elements.push_back(e);
 }
 
 // SELECT
@@ -2128,6 +2154,8 @@ read_threads_handler(Element *e, void * thunk)
       case 2:
         return String(e->router()->home_thread_id(e));
       case 3:
+        return String(e->is_mt_safe());
+      case 4:
         e->get_passing_threads();
         return String(e->is_fullpush());
     }
@@ -2234,7 +2262,8 @@ Element::add_default_handlers(bool allow_write_config)
   add_read_handler("passing_threads", read_threads_handler, 0, Handler::f_expensive);
   add_read_handler("spawning_threads", read_threads_handler, 1, Handler::f_calm);
   add_read_handler("home_thread", read_threads_handler, 2, Handler::f_calm);
-  add_read_handler("is_fullpush", read_threads_handler, 3, Handler::f_calm);
+  add_read_handler("mt_safe", read_threads_handler, 3, Handler::f_calm);
+  add_read_handler("is_fullpush", read_threads_handler, 4, Handler::f_calm);
 #if CLICK_STATS >= 1
   add_read_handler("icounts", read_icounts_handler, 0);
   add_read_handler("ocounts", read_ocounts_handler, 0);
@@ -3054,17 +3083,27 @@ Element::pull(int port)
 
 #if HAVE_BATCH
 void Element::push_batch(int port, PacketBatch* batch) {
+#if HAVE_AUTO_BATCH == AUTO_BATCH_PORT || HAVE_AUTO_BATCH == AUTO_BATCH_JUMP
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_push(i))
             _ports[1][i].start_batch();
     }
+#elif HAVE_AUTO_BATCH == AUTO_BATCH_LIST
+    for each e in list
+        e->start_batch();
+#endif
     FOR_EACH_PACKET_SAFE(batch,p) {
         push(port,p);
     }
+#if HAVE_AUTO_BATCH == AUTO_BATCH_PORT || HAVE_AUTO_BATCH == AUTO_BATCH_JUMP
     for (int i = 0; i < noutputs(); i++) {
         if (output_is_push(i))
             _ports[1][i].end_batch();
     }
+#elif HAVE_AUTO_BATCH == AUTO_BATCH_LIST
+    for each e in list
+        e->end_batch();
+#endif
 }
 
 PacketBatch* Element::pull_batch(int port, unsigned max) {

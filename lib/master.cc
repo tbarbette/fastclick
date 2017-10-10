@@ -46,8 +46,9 @@ Master::Master(int nthreads)
 
     _nthreads = nthreads + 1;
     _threads = new RouterThread *[_nthreads];
-    for (int tid = -1; tid < nthreads; tid++)
+    for (int tid = -1; tid < nthreads; tid++) {
         _threads[tid + 1] = new RouterThread(this, tid);
+    }
 
 #if CLICK_USERLEVEL
     // signal information

@@ -171,6 +171,7 @@ private:
     DPDKDevice* _dev;
     int _timeout;
     bool _congestion_warning_printed;
+    bool _vlan;
 };
 
 CLICK_ENDDECLS

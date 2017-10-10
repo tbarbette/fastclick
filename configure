@@ -841,6 +841,7 @@ enable_ipsec
 enable_json
 enable_local
 enable_radio
+enable_research
 enable_simple
 enable_standard
 enable_tcpudp
@@ -1505,7 +1506,8 @@ Optional Features:
     --disable-batch       disable batching support
     --disable-verbose-batch
                           disable warnings and information about batching
-    --enable-auto-batch   make vanilla elements batch-compatible automatically
+    --enable-auto-batch=[list|jump|port]
+                          make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click
                           malloc'ed buffers
     --enable-select=[select|poll|kqueue]
@@ -1545,6 +1547,7 @@ Optional Features:
   --enable-json           include JSON helpers
   --enable-local          include local elements
   --enable-radio          include radio elements
+  --enable-research       include research elements
   --disable-simple        do not include simple versions of other elements
   --disable-standard      do not include standard elements
   --disable-tcpudp        do not include TCP and UDP elements
@@ -6476,9 +6479,28 @@ else
 fi
 
 
-if test "x$enable_auto_batch" = "xyes"; then
-    $as_echo "#define HAVE_AUTO_BATCH 1" >>confdefs.h
 
+if test "x$enable_auto_batch" = "xno" ; then
+    :
+elif test "x$enable_auto_batch" = "xyes" -o "x$enable_auto_batch" = "xport"; then
+
+$as_echo "#define HAVE_AUTO_BATCH AUTO_BATCH_PORT" >>confdefs.h
+
+elif test "x$enable_auto_batch" = "xlist"; then
+
+$as_echo "#define HAVE_AUTO_BATCH AUTO_BATCH_LIST" >>confdefs.h
+
+elif test "x$enable_auto_batch" = "xjump"; then
+
+$as_echo "#define HAVE_AUTO_BATCH AUTO_BATCH_JUMP" >>confdefs.h
+
+else
+        as_fn_error $? "
+=========================================
+
+--enable-auto-batch only accepts jump, list or catch as modes
+
+=========================================" "$LINENO" 5
 fi
 
 # Check whether --enable-netmap-pool was given.
@@ -6596,6 +6618,91 @@ Can't find -lpthread and/or <pthread.h>, so I can't compile with
 =========================================" "$LINENO" 5
     fi
     LIBS="$SAVE_LIBS"
+fi
+
+save_cpp="$CPPFLAGS"
+save_libs="$LIBS"
+CPPFLAGS="$CPPFLAGS -I/usr/local/include/mbglib/"
+LIBS="$LIBS -lmbgdevio"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing mbg_open_device" >&5
+$as_echo_n "checking for library containing mbg_open_device... " >&6; }
+if ${ac_cv_search_mbg_open_device+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char mbg_open_device ();
+int
+main ()
+{
+return mbg_open_device ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' mbgdevio; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_search_mbg_open_device=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_mbg_open_device+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_mbg_open_device+:} false; then :
+
+else
+  ac_cv_search_mbg_open_device=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_mbg_open_device" >&5
+$as_echo "$ac_cv_search_mbg_open_device" >&6; }
+ac_res=$ac_cv_search_mbg_open_device
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  ac_have_libmbdevio=yes
+else
+  ac_have_libmbdevio=no
+fi
+
+for ac_header in mbgdevio.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "mbgdevio.h" "ac_cv_header_mbgdevio_h" "$ac_includes_default"
+if test "x$ac_cv_header_mbgdevio_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_MBGDEVIO_H 1
+_ACEOF
+ ac_have_mbgdevio_h=yes
+else
+  ac_have_mbgdevio_h=no
+fi
+
+done
+
+#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
+if test "$ac_have_mbgdevio_h" = yes; then
+    $as_echo "#define HAVE_MBGLIB 1" >>confdefs.h
+
+else
+    CPPFLAGS="$save_cpp"
+    LIBS="$save_libs"
 fi
 
 # Check whether --enable-select was given.
@@ -7248,6 +7355,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_radio" = xNO -o "x$enable_radio" = x \) && enable_radio=yes
 if test "x$enable_radio" = xyes; then
+    :
+
+fi
+# Check whether --enable-research was given.
+if test "${enable_research+set}" = set; then :
+  enableval=$enable_research;
+else
+  enable_research=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_research" = xNO -o "x$enable_research" = x \) && enable_research=yes
+if test "x$enable_research" = xyes; then
     :
 
 fi
@@ -8851,7 +8969,7 @@ User-based timestamp needs 64bits types !
 =========================================" "$LINENO" 5
 fi
 
-$as_echo "#define HAVE_USER_TIMESTAMP 1" >>confdefs.h
+$as_echo "#define HAVE_USER_TIMING 1" >>confdefs.h
 
 fi
 
@@ -13792,20 +13910,20 @@ if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
 fi
 
-if test "x$enable_dpdk" = xyes; then
-    provisions="$provisions dpdk"
+if test "x$enable_auto_batch" == "xjump" -o "x$enable_auto_batch" == "xlist" ; then
+    provisions="$provisions autobatch_jumplist"
+fi
+
+if test "x$enable_auto_batch" == "xport" ; then
+    provisions="$provisions autobatch_port"
 fi
 
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 fi
 
-if test "x$enable_fullpush_nonatomic" = xyes; then
-    provisions="$provisions nonatomicfp"
-fi
-
-if test "x$enable_user_timestamp" = xyes; then
-    provisions="$provisions usertimestamp"
+if test "x$enable_dpdk" = xyes; then
+    provisions="$provisions dpdk"
 fi
 
 
@@ -13835,8 +13953,16 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
+if test "$ac_have_mbgdevio_h" = yes; then
+    provisions="$provisions mbglib"
+fi
+
 if test "x$use_netmap" != xno; then
     provisions="$provisions netmap"
+fi
+
+if test "x$enable_fullpush_nonatomic" = xyes; then
+    provisions="$provisions nonatomicfp"
 fi
 
 if test "x$HAVE_NUMA" = xyes; then
@@ -13853,6 +13979,10 @@ fi
 
 if test "x$enable_user_multithread" = xyes; then
     provisions="$provisions umultithread"
+fi
+
+if test "x$enable_user_timestamp" = xyes; then
+    provisions="$provisions usertiming"
 fi
 
 if test "x$enable_wifi" = xyes; then

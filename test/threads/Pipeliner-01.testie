@@ -1,0 +1,33 @@
+%info
+Tests the Pipeliner element
+
+%require
+click-buildtool provides umultithread
+
+%script
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 1000000, LIMIT 10000, STOP true)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterMP -> Pipeliner(BLOCKING true) -> cpu::CPUSwitch -> cout :: Counter -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    cpu[1,2,3,4,5,6,7] => [0] Print(BUG) -> Discard
+
+    DriverManager(wait,wait,wait,wait,wait,wait,wait,wait 100ms,
+                  print "$(cin.count)/$(cout.count)", stop)
+'
+
+%expect stdout
+70000/70000

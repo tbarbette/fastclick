@@ -8,11 +8,15 @@
 #include <click/notifier.hh>
 CLICK_DECLS
 
+class Args;
+
 class ReplayBase : public BatchElement { public:
 	ReplayBase() CLICK_COLD;
     ~ReplayBase() CLICK_COLD;
 
     const char *port_count() const	{ return "1-/="; }
+
+    int parse(Args*);
 
     void cleanup(CleanupStage);
 protected:

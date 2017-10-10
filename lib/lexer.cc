@@ -543,6 +543,24 @@ Lexer::~Lexer()
     }
 }
 
+Lexer*
+Lexer::get_lexer() {
+    if (!_lexer)
+        _lexer = new Lexer();
+    return _lexer;
+}
+
+bool
+Lexer::lexer_initialized() {
+    return _lexer;
+}
+
+void
+Lexer::static_cleanup() {
+    if (_lexer)
+        delete _lexer;
+}
+
 int
 Lexer::begin_parse(const String &data, const String &filename,
                    LexerExtra *lextra, ErrorHandler *errh)
@@ -973,6 +991,11 @@ Lexer::force_element_type(String name, bool report_error)
   return ADD_ELEMENT_TYPE(name, error_element_factory, 0, true);
 }
 
+void
+Lexer::add_element_mtsafe(const String & name) {
+    _element_mtsafe_map[name] = true;
+}
+
 int
 Lexer::lexical_scoping_in() const
 {
@@ -1043,6 +1066,11 @@ Lexer::element_type_names(Vector<String> &v) const
   for (HashTable<String, int>::const_iterator i = _element_type_map.begin(); i.live(); i++)
     if (i.value() >= 0 && i.key() != "<tunnel>")
       v.push_back(i.key());
+}
+
+bool
+Lexer::is_mt_safe(String element) const {
+    return _element_mtsafe_map[element];
 }
 
 
@@ -2357,5 +2385,7 @@ Lexer::expand_connection(const Port &this_end, bool is_out, Vector<Port> &into)
         _errh->lerror(_c->element_landmark(this_end.idx), "%<%s%> used as %s",
                       element_name(this_end.idx).c_str(), port_names[is_out]);
 }
+
+Lexer* Lexer::_lexer = 0;
 
 CLICK_ENDDECLS

@@ -123,18 +123,6 @@ ToDPDKRing::initialize(ErrorHandler *errh)
         _iqueue.timeout.move_thread(click_current_cpu_id());
     }
 
-    /*
-    click_chatter("[%s] Initialized with the following options: \n", name().c_str());
-    click_chatter("|->  MEM_POOL: %s \n", _MEM_POOL.c_str());
-    click_chatter("|-> FROM_PROC: %s \n", _origin.c_str());
-    click_chatter("|->   TO_PROC: %s \n", _destination.c_str());
-    click_chatter("|-> NUMA ZONE: %d \n", _numa_zone);
-    click_chatter("|->    IQUEUE: %d \n", _internal_tx_queue_size);
-    click_chatter("|->     BURST: %d \n", _burst_size);
-    click_chatter("|->     NDESC: %d \n", _ndesc);
-    click_chatter("|->   TIMEOUT: %d \n", _timeout);
-    */
-
     return 0;
 }
 

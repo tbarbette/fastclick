@@ -6,7 +6,6 @@
 #include <click/task.hh>
 #include <click/ring.hh>
 #include <click/multithread.hh>
-#include <vector>
 
 CLICK_DECLS
 
@@ -15,6 +14,10 @@ CLICK_DECLS
 
 Pipeliner
 
+Fast version of ThreadSafeQueue->Unqueue, allowing to offload processing
+of packets pushed to this element to another one, without the inherent
+scheduling cost of normal queues. Multiple thread can push packets to
+this queue, and the home thread of this element will push packet out.
 */
 
 
@@ -28,7 +31,6 @@ public:
     Pipeliner();
     ~Pipeliner();
 
-
     const char *class_name() const      { return "Pipeliner"; }
     const char *port_count() const      { return "1-/1"; }
     const char *processing() const      { return PUSH; }
@@ -39,6 +41,9 @@ public:
 
     void cleanup(CleanupStage);
 
+    bool blocking() const {
+        return _block;
+    }
 
     bool get_spawning_threads(Bitvector& b, bool isoutput) override;
 
@@ -49,17 +54,13 @@ public:
 
     bool run_task(Task *);
 
-    unsigned long int n_dropped() {
-        unsigned long int total = 0;
-        for (unsigned i = 0; i < stats.weight(); i++)
-            total += stats.get_value(i).dropped;
+    unsigned long n_dropped() {
+        PER_THREAD_MEMBER_SUM(unsigned long,total,stats,dropped);
         return total;
     }
 
-    unsigned long int n_sent() {
-        unsigned long int total = 0;
-        for (unsigned i = 0; i < stats.weight(); i++)
-            total += stats.get_value(i).sent;
+    unsigned long n_count() {
+        PER_THREAD_MEMBER_SUM(unsigned long,total,stats,count);
         return total;
     }
 
@@ -69,35 +70,41 @@ public:
         return String(p->n_dropped());
     }
 
-    static String sent_handler(Element *e, void *)
+    static String count_handler(Element *e, void *)
     {
         Pipeliner *p = static_cast<Pipeliner *>(e);
-        return String(p->n_sent());
+        return String(p->n_count());
     }
 
+    static int write_handler(const String &conf, Element* e, void*, ErrorHandler*);
     void add_handlers() CLICK_COLD;
 
     int _ring_size;
+    int _burst;
+    int _home_thread_id;
     bool _block;
+    bool _active;
+    bool _nouseless;
     bool _always_up;
-
+    bool _allow_direct_traversal;
+    bool _verbose;
     typedef DynamicRing<Packet*> PacketRing;
 
     per_thread_oread<PacketRing> storage;
     struct stats {
-        stats() : dropped(0), sent(0) {
+        stats() : dropped(0), count(0) {
 
         }
-        unsigned long int dropped;
-        unsigned long int sent;
+        unsigned long dropped;
+        unsigned long count;
     };
     per_thread_oread<struct stats> stats;
-    int out_id;
     volatile int sleepiness;
+    int _sleep_threshold;
 
   protected:
-    Task* _task;
-    unsigned int last_start;
+    Task _task;
+    unsigned int _last_start;
 
 
 };

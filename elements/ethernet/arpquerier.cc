@@ -387,8 +387,9 @@ ARPQuerier::handle_response(Packet *p)
             while (cached_packet) {
                 Packet *next = cached_packet->next();
                 Packet* to_send = handle_ip(cached_packet, true);
-                if (to_send)
+                if (to_send) {
                     output(0).push(to_send);
+                }
                 cached_packet = next;
             }
         }

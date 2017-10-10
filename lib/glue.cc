@@ -686,12 +686,7 @@ __thread int click_current_thread_id;
 // TIMEVALS AND JIFFIES
 
 #if CLICK_USERLEVEL
-
-# if CLICK_HZ != 1000
-#  error "CLICK_HZ must be 1000"
-# endif
 CLICK_DECLS
-
 void
 click_gettimeofday(timeval *tvp)
 {
@@ -699,10 +694,16 @@ click_gettimeofday(timeval *tvp)
 }
 
 click_jiffies_t
-click_jiffies()
+click_timestamp_jiffies(void*)
 {
-    return Timestamp::now().msecval();
+    return Timestamp::now_steady().msecval() / (1000 / CLICK_HZ);
 }
+
+#if HAVE_USER_TIMING
+void* click_jiffies_fct_data = 0;
+click_jiffies_fct_t click_jiffies_fct = click_timestamp_jiffies;
+#endif
+
 
 CLICK_ENDDECLS
 #endif

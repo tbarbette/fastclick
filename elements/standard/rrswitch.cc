@@ -85,7 +85,6 @@ void RoundRobinSwitch::add_handlers() {
     add_data_handlers("max", Handler::f_read | Handler::f_write, &_max);
 }
 
-
 CLICK_ENDDECLS
 EXPORT_ELEMENT(RoundRobinSwitch)
 ELEMENT_MT_SAFE(RoundRobinSwitch)

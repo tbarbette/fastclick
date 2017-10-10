@@ -1171,7 +1171,7 @@ Router::initialize(ErrorHandler *errh)
 
 #if HAVE_BATCH
     if (all_ok) {
-        //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instanciating batches
+        //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instantiating batches
         for (int ord = 0; ord < _elements.size(); ord++) {
             int i = _element_configure_order[ord];
             Element* e = _elements[i];
@@ -1197,9 +1197,14 @@ Router::initialize(ErrorHandler *errh)
             if (e->in_batch_mode == Element::BATCH_MODE_NO) {
                 e->receives_batch = false;
                 continue; //This element is traversed by packets... nothing to do.
-            }
-#if !HAVE_AUTO_BATCH
-            else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
+            } else if (e->in_batch_mode == Element::BATCH_MODE_NEEDED) {
+                click_chatter("%p{element} is a batch-only element ! Please "
+                        "check that all elements sending packets to it are "
+                        "producing batches of packets instead of single "
+                        "packets.",this);
+                all_ok = false;
+                break;
+            } else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
                 e->in_batch_mode = Element::BATCH_MODE_NO;
                 e->receives_batch = false;
 #if HAVE_VERBOSE_BATCH
@@ -1214,9 +1219,7 @@ Router::initialize(ErrorHandler *errh)
                 all_ok = false;
                 break;
             }
-
-#endif
-            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO);
+            assert(e->in_batch_mode == Element::BATCH_MODE_YES || e->in_batch_mode == Element::BATCH_MODE_NO); //Element must be in batch mode or not
         }
     }
 #endif

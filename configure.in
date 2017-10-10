@@ -119,11 +119,25 @@ if test "x$enable_verbose_batch" = "xyes"; then
 fi
 
 AC_ARG_ENABLE([auto-batch],
-    [AS_HELP_STRING([  --enable-auto-batch], [make vanilla elements batch-compatible automatically])],
+    [AS_HELP_STRING([  --enable-auto-batch=[[list|jump|port]]], [make vanilla elements batch-compatible automatically])],
     [:], [enable_auto_batch=no])
 
-if test "x$enable_auto_batch" = "xyes"; then
-    AC_DEFINE([HAVE_AUTO_BATCH])
+
+if test "x$enable_auto_batch" = "xno" ; then
+    :
+elif test "x$enable_auto_batch" = "xyes" -o "x$enable_auto_batch" = "xport"; then
+    AC_DEFINE([HAVE_AUTO_BATCH],[AUTO_BATCH_PORT], [Define if make vanilla elements batch-compatible automatically])
+elif test "x$enable_auto_batch" = "xlist"; then
+    AC_DEFINE([HAVE_AUTO_BATCH],[AUTO_BATCH_LIST], [Define if make vanilla elements batch-compatible automatically])
+elif test "x$enable_auto_batch" = "xjump"; then
+    AC_DEFINE([HAVE_AUTO_BATCH],[AUTO_BATCH_JUMP], [Define if make vanilla elements batch-compatible automatically])
+else
+        AC_MSG_ERROR([
+=========================================
+
+--enable-auto-batch only accepts jump, list or catch as modes
+
+=========================================])
 fi
 
 AC_ARG_ENABLE([netmap-pool],
@@ -154,6 +168,20 @@ Can't find -lpthread and/or <pthread.h>, so I can't compile with
 =========================================])
     fi
     LIBS="$SAVE_LIBS"
+fi
+
+save_cpp="$CPPFLAGS"
+save_libs="$LIBS"
+CPPFLAGS="$CPPFLAGS -I/usr/local/include/mbglib/"
+LIBS="$LIBS -lmbgdevio"
+AC_SEARCH_LIBS([mbg_open_device], [mbgdevio], [ac_have_libmbdevio=yes], [ac_have_libmbdevio=no])
+AC_CHECK_HEADERS([mbgdevio.h], [ac_have_mbgdevio_h=yes], [ac_have_mbgdevio_h=no])
+#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
+if test "$ac_have_mbgdevio_h" = yes; then
+    AC_DEFINE([HAVE_MBGLIB])
+else
+    CPPFLAGS="$save_cpp"
+    LIBS="$save_libs"
 fi
 
 AC_ARG_ENABLE([select],
@@ -568,6 +596,7 @@ ELEMENTS_ARG_ENABLE(ipsec, [include IP security elements], NO, AC_DEFINE(HAVE_IP
 ELEMENTS_ARG_ENABLE(json, [include JSON helpers], NO)
 ELEMENTS_ARG_ENABLE(local, [include local elements], NO)
 ELEMENTS_ARG_ENABLE(radio, [include radio elements], NO)
+ELEMENTS_ARG_ENABLE(research, [include research elements], NO)
 ELEMENTS_ARG_ENABLE(simple, [include simple versions of other elements], yes)
 dnl ELEMENTS_ARG_ENABLE(snmp, [include SNMP elements], NO)
 ELEMENTS_ARG_ENABLE(standard, [include standard elements], yes)
@@ -739,7 +768,7 @@ User-based timestamp needs 64bits types !
 
 =========================================])
 fi
-    AC_DEFINE([HAVE_USER_TIMESTAMP], [1], [Define if user-provided clock system is supported.])
+    AC_DEFINE([HAVE_USER_TIMING], [1], [Define if user-provided clock system is supported.])
 fi
 
 dnl
@@ -2141,9 +2170,14 @@ if test "x$enable_analysis" = xyes; then
     provisions="$provisions analysis"
 fi
 
-dnl add 'dpdk' if compiled with --enable-dpdk
-if test "x$enable_dpdk" = xyes; then
-    provisions="$provisions dpdk"
+dnl add 'autobatch_jumplist' if autobatch is jump or list
+if test "x$enable_auto_batch" == "xjump" -o "x$enable_auto_batch" == "xlist" ; then
+    provisions="$provisions autobatch_jumplist"
+fi
+
+dnl add 'autobatch_port' if autobatch is port
+if test "x$enable_auto_batch" == "xport" ; then
+    provisions="$provisions autobatch_port"
 fi
 
 dnl add 'batch' if compiled with --enable-batch
@@ -2151,14 +2185,9 @@ if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 fi
 
-dnl add 'nonatimicfp' if compiled with --enable-fullpush-nonatomic
-if test "x$enable_fullpush_nonatomic" = xyes; then
-    provisions="$provisions nonatomicfp"
-fi
-
-dnl add 'usertimestamp' if compiled with --enable-user-timestamp
-if test "x$enable_user_timestamp" = xyes; then
-    provisions="$provisions usertimestamp"
+dnl add 'dpdk' if compiled with --enable-dpdk
+if test "x$enable_dpdk" = xyes; then
+    provisions="$provisions dpdk"
 fi
 
 
@@ -2193,9 +2222,19 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
+dnl add 'mbglib' if mbglib support is available
+if test "$ac_have_mbgdevio_h" = yes; then
+    provisions="$provisions mbglib"
+fi
+
 dnl add 'netmap' if netmap support is available
 if test "x$use_netmap" != xno; then
     provisions="$provisions netmap"
+fi
+
+dnl add 'nonatimicfp' if compiled with --enable-fullpush-nonatomic
+if test "x$enable_fullpush_nonatomic" = xyes; then
+    provisions="$provisions nonatomicfp"
 fi
 
 dnl add 'numa' if numa support is available
@@ -2216,6 +2255,11 @@ fi
 dnl add 'umultithread' if compiled with --enable-user-multithread
 if test "x$enable_user_multithread" = xyes; then
     provisions="$provisions umultithread"
+fi
+
+dnl add 'usertiming' if compiled with --enable-user-timestamp
+if test "x$enable_user_timestamp" = xyes; then
+    provisions="$provisions usertiming"
 fi
 
 dnl add 'wifi' if wifi elements are available

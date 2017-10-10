@@ -4,6 +4,10 @@ variables:
 batch:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule --disable-verbose-batch && make && make check
+autobatch:
+    script:
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule --disable-verbose-batch --enable-auto-batch=port && make && make check
+
 ip6:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json --disable-linuxmodule --disable-batch && make && make check

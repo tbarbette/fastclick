@@ -1,6 +1,6 @@
 #ifndef CLICK_DISCARDNOFREE_HH
 #define CLICK_DISCARDNOFREE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/task.hh>
 CLICK_DECLS
 
@@ -14,7 +14,7 @@ CLICK_DECLS
  * them. Only useful for benchmarking.
  */
 
-class DiscardNoFree : public Element { public:
+class DiscardNoFree : public BatchElement { public:
 
   DiscardNoFree() CLICK_COLD;
 
@@ -25,6 +25,9 @@ class DiscardNoFree : public Element { public:
   void add_handlers() CLICK_COLD;
 
   void push(int, Packet *);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *);
+#endif
   bool run_task(Task *);
 
  private:

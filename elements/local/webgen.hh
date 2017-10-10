@@ -43,6 +43,9 @@ private:
   IPAddress _src_prefix;
   IPAddress _mask;
   IPAddress _dst;
+	int _limit;
+    bool _active;
+    bool _verbose;
   atomic_uint32_t _id;
 
   // TCP Control Block
@@ -129,6 +132,12 @@ private:
 	IPAddress dst, unsigned short dport,
 	int seq, int ack, char tcpflags,
 	char *payload, int paylen);
+
+    void set_active(bool active);
+    static int write_handler(const String & s_in, Element *e, void *thunk, ErrorHandler *errh);
+    void add_handlers();
+
+
 };
 
 CLICK_ENDDECLS

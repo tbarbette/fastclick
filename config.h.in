@@ -104,6 +104,10 @@
 /* Define if warnings and information about batching are enabled. */
 #undef HAVE_VERBOSE_BATCH
 
+#define AUTO_BATCH_PORT 1
+#define AUTO_BATCH_LIST 2
+#define AUTO_BATCH_JUMP 3
+
 /* Define if make vanilla elements batch-compatible automatically */
 #undef HAVE_AUTO_BATCH
 
@@ -120,7 +124,7 @@
 #undef HAVE_NANOTIMESTAMP_ENABLED
 
 /* Define if user-provided clock system is supported. */
-#undef HAVE_USER_TIMESTAMP
+#undef HAVE_USER_TIMING
 
 /* Define if you want to use the stride scheduler. */
 #undef HAVE_STRIDE_SCHED

@@ -1,5 +1,7 @@
 *.dSYM
 +*
+.dotest
+.idea
 .*.cmd
 .dotest
 Makefile

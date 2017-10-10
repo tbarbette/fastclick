@@ -41,10 +41,10 @@ AverageCounter::reset()
 int
 AverageCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  _ignore = 0;
-  if (Args(conf, this, errh).read_p("IGNORE", _ignore).complete() < 0)
+  double ignore = 0;
+  if (Args(conf, this, errh).read_p("IGNORE", ignore).complete() < 0)
     return -1;
-  _ignore *= CLICK_HZ;
+  _ignore = ignore * CLICK_HZ;
   return 0;
 }
 

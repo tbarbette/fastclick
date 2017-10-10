@@ -1,0 +1,33 @@
+%info
+Tests the Pipeliner element in non-blocking mode
+
+%require
+click-buildtool provides umultithread
+
+%script
+$VALGRIND click -j 8 -e '
+    elementclass Core {
+        $thid |
+        rs :: RatedSource(LENGTH 4, RATE 40, LIMIT 40)
+        -> output
+        StaticThreadSched(rs $thid)
+    }
+
+    cin :: CounterMP -> Pipeliner(BLOCKING false, CAPACITY 4) -> cpu::CPUSwitch -> cout :: Counter -> Discard
+
+    Core(1) -> cin
+    Core(2) -> cin
+    Core(3) -> cin
+    Core(4) -> cin
+    Core(5) -> cin
+    Core(6) -> cin
+    Core(7) -> cin
+
+    cpu[1,2,3,4,5,6,7] => [0] Print(BUG) -> Discard
+
+    Script(wait 1.1s, print cin.count, print cout.count, stop)
+'
+
+%expect stdout
+280
+280

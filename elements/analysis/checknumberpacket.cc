@@ -128,8 +128,9 @@ CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, Er
               return 0;
           }
       }
+      default:
+        return -EINVAL;
     }
-    return -EINVAL;
 }
 
 

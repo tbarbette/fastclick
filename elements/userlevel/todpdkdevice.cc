@@ -47,7 +47,6 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("PORT", dev), errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
-        .read("MAXQUEUES",maxqueues)
         .complete() < 0)
             return -1;
     if (!DPDKDeviceArg::parse(dev, _dev)) {
@@ -77,7 +76,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         if (ret != 0) return ret;    }
 
 #if HAVE_BATCH
-    if (in_batch_mode == BATCH_MODE_YES) {
+    if (batch_mode() == BATCH_MODE_YES) {
         if (_burst < 0)
             _burst = 1;
     } else

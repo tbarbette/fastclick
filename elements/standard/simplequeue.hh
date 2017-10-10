@@ -70,7 +70,7 @@ class SimpleQueue : public BatchElement, public Storage { public:
     int highwater_length() const		{ return _highwater_length; }
 
 
-    bool get_spawning_threads(Bitvector& b, bool isoutput) override;
+    bool get_spawning_threads(Bitvector& b, bool);
 
     inline bool enq(Packet*);
     inline void lifo_enq(Packet*);
@@ -94,6 +94,7 @@ class SimpleQueue : public BatchElement, public Storage { public:
     void cleanup(CleanupStage) CLICK_COLD;
     bool can_live_reconfigure() const		{ return true; }
     int live_reconfigure(Vector<String>&, ErrorHandler*);
+    virtual bool do_mt_safe_check(ErrorHandler*);
     void take_state(Element*, ErrorHandler*);
     void add_handlers() CLICK_COLD;
 

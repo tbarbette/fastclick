@@ -1,0 +1,67 @@
+%info
+Tests the batch jumping facility
+
+%require
+click-buildtool provides batch
+click-buildtool provides autobatch_jumplist
+
+%script
+$VALGRIND click -e '
+    is1 :: InfiniteSource(DATA \<AAAAAAAA>, LIMIT 5, BURST 2, STOP true)
+    -> be1 :: BatchElementTest
+    -> be2 :: BatchElementTest
+    -> bt :: BatchTest
+    -> c :: Counter
+    -> Print
+    -> Discard;
+    is2 :: InfiniteSource(DATA \<BBBBBBBB>, LIMIT 5, BURST 2, STOP true)
+    -> be1
+    DriverManager(wait, wait, print c.count)
+'
+
+%expect stdout
+10
+
+%expect stderr
+be1 :: BatchElementTest: Batch push of 2 packets
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+bt :: BatchTest: Batch push of 2 packets
+   4 | aaaaaaaa
+   4 | aaaaaaaa
+be1 :: BatchElementTest: Batch push of 2 packets
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+bt :: BatchTest: Batch push of 2 packets
+   4 | bbbbbbbb
+   4 | bbbbbbbb
+be1 :: BatchElementTest: Batch push of 2 packets
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+bt :: BatchTest: Batch push of 2 packets
+   4 | aaaaaaaa
+   4 | aaaaaaaa
+be1 :: BatchElementTest: Batch push of 2 packets
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+bt :: BatchTest: Batch push of 2 packets
+   4 | bbbbbbbb
+   4 | bbbbbbbb
+be1 :: BatchElementTest: Batch push of 1 packets
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+bt :: BatchTest: Batch push of 1 packets
+   4 | aaaaaaaa
+be1 :: BatchElementTest: Batch push of 1 packets
+be1 :: BatchElementTest: Packet push
+be2 :: BatchElementTest: Packet push
+bt :: BatchTest: Batch push of 1 packets
+   4 | bbbbbbbb

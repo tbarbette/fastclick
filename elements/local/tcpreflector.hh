@@ -36,8 +36,12 @@ class TCPReflector : public Element {
   const char *class_name() const		{ return "TCPReflector"; }
   const char *port_count() const		{ return PORTS_1_1; }
 
+    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
+
   Packet *simple_action(Packet *);
   Packet *tcp_input(Packet *xp);
+protected:
+    String _data;
 };
 
 CLICK_ENDDECLS
