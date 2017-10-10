@@ -5,14 +5,13 @@
 #include <click/string.hh>
 CLICK_DECLS
 
-#define _verbose 0
-
 /**
  * Greedy DFA, creates as many patterns as there are letters in the patterns. Limited to 65536 characters.
  */
 class SimpleDFA {
 
 public:
+    const static int _verbose = 0;
     typedef uint16_t state_t;
 
     struct NextState {
