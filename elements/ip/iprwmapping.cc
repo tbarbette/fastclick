@@ -52,6 +52,8 @@ IPRewriterFlow::IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
     _udp_csum_delta = _ip_csum_delta;
     for (int i = 4; i < 6; ++i)
 	click_update_in_cksum(&_udp_csum_delta, swords[i], dwords[i]);
+    static uint32_t id;
+    _agg = id++;
 }
 
 void

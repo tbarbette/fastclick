@@ -97,6 +97,54 @@ CLICK_DECLS
         };\
         EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop);
 
+
+/**
+ * Execute a function on each packet of a batch. The function may return
+ * the same packet if nothing is to change,
+ * another packet in which case it will repair the batch,
+ * or null. If it returns null, the batch
+ * is flushed using on_flush and processing continue on a new batch starting
+ * at the next packet. on_drop is called on the packet that was returned
+ * as null after flushing.
+ * On_flush is always called on the batch after the last packet.
+ */
+#define EXECUTE_FOR_EACH_PACKET_SPLITTABLE(fnt,batch,on_drop,on_flush) {\
+            Packet* next = ((batch != NULL)? batch->next() : NULL );\
+            Packet* p = batch;\
+            Packet* last = NULL;\
+            int count = 0;\
+            for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
+                Packet* q = (fnt(p));\
+                if (q == 0) {\
+                    if (last) {\
+                        batch->set_count(count);\
+                        batch->set_tail(last);\
+                        on_flush(batch);\
+                    }\
+                    on_drop(p);\
+                    count = 0;\
+                    last = 0;\
+                    batch = PacketBatch::start_head(next);\
+                    continue;\
+                } else if (q != p) {\
+                    if (last) {\
+                        last->set_next(q);\
+                    } else {\
+                        batch = static_cast<PacketBatch*>(q);\
+                    }\
+                    q->set_next(next);\
+                }\
+                last = q;\
+                count++;\
+            }\
+            if (last) {\
+                batch->set_count(count);\
+                batch->set_tail(last);\
+                on_flush(batch);\
+            }\
+        }\
+
+
 /**
  * Split a batch into multiple batch according to a given function which will
  * give the index of an output to choose.
@@ -116,7 +164,7 @@ CLICK_DECLS
  */
 #define CLASSIFY_EACH_PACKET(nbatches,fnt,cep_batch,on_finish)\
     {\
-        PacketBatch* out[nbatches];\
+        PacketBatch* out[(nbatches)];\
         bzero(out,sizeof(PacketBatch*)*(nbatches));\
         PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
         PacketBatch* p = cep_batch;\
