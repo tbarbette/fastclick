@@ -2223,7 +2223,7 @@ if test $ac_have_linux_kernel = y; then
 fi
 
 dnl add 'mbglib' if mbglib support is available
-if test "$ac_have_mbgdevio_h" = yes; then
+if test "$ac_have_libmbdevio$ac_have_mbgdevio_h" = yesyes; then
     provisions="$provisions mbglib"
 fi
 
