@@ -252,6 +252,9 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
 
     _table.set_release_fnt(release_subflow,this);
+    if (table->is_dummy()) {
+        return errh->error("%p{element} : FlowClassifier without classification !");
+    }
     _table.set_root(table->optimize(passing.weight() <= 1));
     _table.get_root()->check();
     if (_verbose) {

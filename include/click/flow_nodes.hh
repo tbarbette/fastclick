@@ -474,6 +474,7 @@ public:
 
     void traverse_parents(std::function<void(FlowNode*)> fnt);
 
+    bool is_dummy();
 
     inline bool has_no_default(bool allow_dynamic = false) {
         return traverse_all_default_leaf([allow_dynamic](FlowNode* parent) -> bool {

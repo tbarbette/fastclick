@@ -277,6 +277,11 @@ void  FlowNode::traverse_parents(std::function<bool(FlowNode*)> fnt) {
         parent()->traverse_parents(fnt);
     return;
 }
+
+bool FlowNode::is_dummy() {
+    return max_size() == 0 && _default.is_leaf();
+}
+
 /**
  * Call fnt on all parent of the node, including the node itself
  */
