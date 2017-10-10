@@ -13,7 +13,7 @@ classifies packets by contents
 
 =d
 
-Classifies packets according to exect string.
+Classifies packets according to exact string.
 The StringClassifier has N outputs, each associated with the corresponding string
 from the configuration string. The pattern match will be done based on all the Packet's
 content.

@@ -113,14 +113,14 @@ StringClassifier::push_batch(int port, PacketBatch *batch)
 	unsigned short outports = noutputs();
 	PacketBatch *out[outports];
 	bzero(out,sizeof(PacketBatch*)*outports);
-	Packet* next = ((batch != NULL)? batch->first()->next() : NULL );
-	Packet* p = batch->first();
-	Packet* last = NULL;
+	PacketBatch *next = ((batch != NULL)? static_cast<PacketBatch*>(batch->next()) : NULL );
+	PacketBatch *p = batch;
+	PacketBatch *last = NULL;
 	int last_o = -1;
 	int passed = 0;
 	int count  = 0;
 
-	for ( ;p != NULL; p=next,next=(p==0?0:p->next()) ) {
+	for ( ;p != NULL; p=next,next=(p==0?0:static_cast<PacketBatch*>(p->next())) ) {
 		// The actual job of this element
 		int o = find_output(p);
 
@@ -131,13 +131,17 @@ StringClassifier::push_batch(int port, PacketBatch *batch)
 		}
 		else {
 			if ( !last ) {
-				out[o] = PacketBatch::make_from_packet(p);
+				out[o] = p;
+				p->set_count(1);
+				p->set_tail(p);
 			}
 			else {
 				out[last_o]->set_tail(last);
 				out[last_o]->set_count(out[last_o]->count() + passed);
 				if (!out[o]) {
-					out[o] = PacketBatch::make_from_packet(p);
+					out[o] = p;
+					out[o]->set_count(1);
+					out[o]->set_tail(p);
 				}
 				else {
 					out[o]->append_packet(p);
