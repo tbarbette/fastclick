@@ -123,9 +123,11 @@ IPFragmenter::fragment(Packet *p_in)
     ip->ip_sum = click_in_cksum((const unsigned char *)ip, hlen);
     Packet *first_fragment = p->clone();
     first_fragment->take(p->length() - p->network_header_offset() - hlen - first_dlen);
+#if HAVE_BATCH
     if (receives_batch)
         output_push_batch(0, PacketBatch::make_from_packet(first_fragment));
     else
+#endif
         output(0).push(first_fragment);
     _fragments++;
 
@@ -156,10 +158,11 @@ IPFragmenter::fragment(Packet *p_in)
 	    qip->ip_sum = click_in_cksum((const unsigned char *)qip, out_hlen);
 
 	    q->copy_annotations(p);
-
+#if HAVE_BATCH
 	    if (receives_batch)
 	        output_push_batch(0, PacketBatch::make_from_packet(q));
 	    else
+#endif
 	        output(0).push(q);
 	    _fragments++;
 	}
