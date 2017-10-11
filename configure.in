@@ -2206,6 +2206,11 @@ if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
+dnl add 'gtp' if gtp elements are available
+if test "x$enable_gtp" = xyes; then
+    provisions="$provisions gtp"
+fi
+
 dnl add 'int64' if 64-bit integers are available
 if test "x$have_int64_types" = xyes; then
     provisions="$provisions int64"
