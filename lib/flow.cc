@@ -467,7 +467,8 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 	    }
 	}
 
-
+    flow_assert(!is_dummy());
+    flow_assert(!other->is_dummy());
     if (this->level()->is_dynamic() && !other->level()->is_dynamic()) {
         if (priority) {
             click_chatter("Trying to attach a non-dynamic child to a dynamic node. This generally means you need a new FlowClassifier after a dynamic node, such as TCPIn elements or flow-based one");
@@ -809,7 +810,7 @@ void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
  * if inverted, it means the level will NOT be data
  */
 FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed)  {
-    if (dynamic_cast<FlowLevelDummy*>(level) != 0) {
+    if (is_dummy()) { //If we are dummy, we cannot prune TODO: Still prune parent?
         changed = false;
         return FlowNodePtr(this);
     }
@@ -925,6 +926,7 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
     FlowControlBlock* old_leaf = leaf;
     FlowNodePtr no(other->duplicate(true, 1));
 
+    flow_assert(other->is_full_dummy() || !other->is_dummy());
 #if DEBUG_CLASSIFIER
     click_chatter("Pruning:");
     if (this->parent() and this->parent()->parent())
@@ -992,6 +994,7 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
     assert(do_final); //Protect against legacy
     assert(!do_default); //Protect against legacy
         if (other == 0) return this;
+        flow_assert(!other->is_dummy());
         auto fnt = [other,discard_my_fcb_data](FlowNodePtr* ptr) -> bool {
             assert(ptr != 0);
             assert(ptr->ptr != 0);
@@ -1046,6 +1049,8 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 			    //TODO
                 click_chatter("Non dynamic level, without child that has a leaf as ptr");
                 this->print();
+                click_chatter("Parent:");
+                this->parent()->print();
 			    assert(false);
 			}
 		} else if (getNum() == 1) {

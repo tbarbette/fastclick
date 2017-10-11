@@ -32,10 +32,13 @@ private :
 
     bool _verbose;
     bool attach_children(FlowNodePtr* ptr, int output, bool append_drop);
+    FlowNode* get_child(int output, bool append_drop);
+
 protected:
 
     Vector<FlowClassificationTable::Rule> rules;
     bool _children_merge;
+
 };
 
 

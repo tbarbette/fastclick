@@ -71,6 +71,7 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 #endif
 		    merged->debug_print();
 		    merged->check();
+            flow_assert(merged->is_full_dummy() || !merged->is_dummy());
 		    //assert(merged->has_no_default());
 		}
 	}

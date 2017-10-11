@@ -75,17 +75,23 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 	return 0;
 }
 
+FlowNode* FlowDispatcher::get_child(int output, bool append_drop) {
+    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output);
+    if (!child_table)
+        return 0;
+    child_table->check();
+    if (!child_table->has_no_default() && append_drop) {
+        if (_verbose > 1)
+           click_chatter("Child has default values : appending drop rule");
+        child_table = child_table->combine(FlowClassificationTable::parse("- drop").root, false, true);
+    }
+    return child_table;
+}
 
 bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_drop) {
-    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output);
+    FlowNode* child_table = get_child(output, append_drop);
     bool changed = false;
     if (child_table) {
-        child_table->check();
-        if (!child_table->has_no_default() && append_drop) {
-           if (_verbose > 1)
-               click_chatter("Child has default values : appending drop rule");
-            child_table = child_table->combine(FlowClassificationTable::parse("- drop").root, false, true);
-        }
         changed = ptr->replace_leaf_with_node(child_table, true);
         //Replace_leaf_with_node takes care of prunning using parent to go up to merged, ensuring no classification on the same field is done twice
     }
@@ -126,21 +132,34 @@ FlowNode* FlowDispatcher::get_table(int) {
 #if DEBUG_CLASSIFIER
             click_chatter("%p{element} : Writing output number %d to rules %d", this, rules[i].output, i);
 #endif
-			//Now set data for all leaf of the rule
-            auto fnt = [this,i](FlowNodePtr* ptr) {
-                if (_children_merge && (rules[i].output >= 0 && rules[i].output < noutputs())) {
-                    if (attach_children(ptr,rules[i].output,false)) {
-                        click_chatter("ERROR in %{element}: Two path lead to rules with opposite value. You must insert a new FlowClassifier instead of a context link !",this);
-                        abort();
-                    }
+            if (_children_merge && (rules[i].output >= 0 && rules[i].output < noutputs())) {
+                FlowNode* child_table = get_child(rules[i].output,false);
+                bool changed = false;
+                if (child_table) {
+                    child_table->check();
+                    rules[i].root = rules[i].root->combine(child_table, true, true);
                 } else {
-                    fcb_set_init_data(ptr->leaf, rules[i].output);
-                    if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's not a real output, set drop flag
-                        ptr->leaf->set_early_drop();
-                    }
+                    //Just keep the root
+                }
+            }
+
+            //Now set data for all leaf of the rule
+            auto fnt = [this,i](FlowNodePtr* ptr) {
+                fcb_set_init_data(ptr->leaf, rules[i].output);
+                if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's not a real output, set drop flag
+                    ptr->leaf->set_early_drop();
                 }
             };
-			rules[i].root->traverse_all_leaves(fnt, true, true);
+            rules[i].root->traverse_all_leaves(fnt, true, true);
+
+            if (rules[i].root->is_dummy() && rules[i].root->default_ptr()->is_node()) {
+                FlowNode* tmp = rules[i].root;
+                rules[i].root = rules[i].root->default_ptr()->node;
+                rules[i].root->set_parent(0);
+                tmp->default_ptr()->ptr = 0;
+                delete tmp;
+            }
+
 
 			if (_verbose) {
 				click_chatter("Merging rule %d of %p{element} (output %d)",i,this,rules[i].output);
@@ -196,18 +215,38 @@ FlowNode* FlowDispatcher::get_table(int) {
             click_chatter("Table for %s before merging children :",name().c_str());
             merged->print(_flow_data_offset);
         }
-        if (!_children_merge) {
-            auto fnt = [this](FlowNodePtr* ptr) {
-                int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
-                if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
-                    attach_children(ptr,output,true);
-                }
-            };
 
-            merged->traverse_all_leaves(fnt, true, true);
+        flow_assert(merged->is_full_dummy() || !merged->is_dummy());
+        if (!_children_merge) {
+            if (merged->is_full_dummy()) {
+                int output = *((uint32_t*)(&merged->default_ptr()->leaf->data[_flow_data_offset]));
+                FlowNode* child_table = get_child(output,true);
+
+                if (child_table) {
+                    merged = merged->combine(child_table, true, true);
+                }
+
+                auto fnt = [this,output](FlowNodePtr* ptr) {
+                    if (ptr->is_node()) {
+                        assert(false);
+                    } else {
+                        fcb_set_init_data(ptr->leaf, output);
+                    }
+                };
+                merged->traverse_all_leaves(fnt, true, true);
+            } else {
+                auto fnt = [this](FlowNodePtr* ptr) {
+                    int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
+                    if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
+                        attach_children(ptr,output,true);
+                    }
+                };
+                merged->traverse_all_leaves(fnt, true, true);
+                flow_assert(merged->has_no_default());
+            }
         };
         merged->check();
-
+        flow_assert(merged->is_full_dummy() || !merged->is_dummy());
         if (_verbose) {
             click_chatter("Table for %s after merging children:",name().c_str());
             merged->print(_flow_data_offset);

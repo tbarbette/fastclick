@@ -21,7 +21,7 @@ CLICK_DECLS
     #define debug_flow(...)
 #endif
 
-#if DEBUG_CLASSIFIER_CHECK
+#if DEBUG_CLASSIFIER_CHECK || DEBUG_CLASSIFIER
     #define flow_assert(...) assert(__VA_ARGS__);
 #else
     #define flow_assert(...)

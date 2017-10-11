@@ -279,7 +279,24 @@ void  FlowNode::traverse_parents(std::function<bool(FlowNode*)> fnt) {
 }
 
 bool FlowNode::is_dummy() {
-    return max_size() == 0 && _default.is_leaf();
+    return dynamic_cast<FlowLevelDummy*>(level()) != 0;
+}
+
+bool FlowNode::is_full_dummy() {
+    return is_dummy() && default_ptr()->is_leaf();
+}
+
+/**
+ * Ensure that the node has no empty default
+ * @return true if the node has all default set
+ */
+bool FlowNode::has_no_default(bool allow_dynamic) {
+    return traverse_all_default_leaf([allow_dynamic](FlowNode* parent) -> bool {
+        if (parent->default_ptr()->ptr == 0 && (!allow_dynamic || !parent->level()->is_dynamic())) {
+            return false;
+        }
+        return true;
+    });
 }
 
 /**
