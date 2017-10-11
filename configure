@@ -834,6 +834,7 @@ enable_aqm
 enable_ethernet
 enable_etherswitch
 enable_grid
+enable_gtp
 enable_icmp
 enable_ip
 enable_ip6
@@ -1540,6 +1541,7 @@ Optional Features:
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
   --enable-grid           include Grid elements (see FAQ)
+  --enable-gtp            include GTP elements
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
@@ -7276,6 +7278,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_grid" = xNO -o "x$enable_grid" = x \) && enable_grid=yes
 if test "x$enable_grid" = xyes; then
+    :
+
+fi
+# Check whether --enable-gtp was given.
+if test "${enable_gtp+set}" = set; then :
+  enableval=$enable_gtp;
+else
+  enable_gtp=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_gtp" = xNO -o "x$enable_gtp" = x \) && enable_gtp=yes
+if test "x$enable_gtp" = xyes; then
     :
 
 fi
