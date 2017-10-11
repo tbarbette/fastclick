@@ -17,11 +17,11 @@ matrix:
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
     - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.07 CONFIG="--enable-batch --disable-verbose-batch"
+      env: FRAMEWORK=dpdk VERSION=17.08 CONFIG="--enable-batch --disable-verbose-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
     - compiler: clang
-      env: FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
+      env: FRAMEWORK=dpdk VERSION=17.08 CONFIG="--disable-batch"
     - compiler: clang
       env: FRAMEWORK=dpdk VERSION=16.07 CONFIG="--disable-batch"
 
@@ -37,13 +37,13 @@ env:
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=16.07 CONFIG="--enable-batch --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=vanilla CONFIG="--disable-batch"
     - FRAMEWORK=umultithread CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=16.07 CONFIG="--disable-batch"
+    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--disable-batch"
 
 script:
   - if [ $FRAMEWORK = "netmap" ]; then

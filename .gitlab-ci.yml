@@ -2,6 +2,7 @@ variables:
     DPDK_VERSION: "17.08"
     NETMAP_VERSION: "11.1"
     CONFIG: "--enable-gtp --enable-json $CONFIG"
+
 batch:
     script:
         - ./configure CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch && make && make check
