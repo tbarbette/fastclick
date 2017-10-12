@@ -129,7 +129,7 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
         FOR_EACH_PACKET_SAFE(batch, packet) {
             uint32_t seq = getSequenceNumber(packet);
             if (fcb_in->common->lastAckReceivedSet() && SEQ_LT(seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()))) {
-                click_chatter("Client just did not receive the ack, let's ACK him (seq %lu, last ack %lu)",seq,fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()));
+                //click_chatter("Client just did not receive the ack, let's ACK him (seq %lu, last ack %lu)",seq,fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()));
                 _in->ackPacket(packet,true);
                 continue;
             }

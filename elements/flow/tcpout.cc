@@ -194,7 +194,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
 void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
     uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force)
 {
-    click_chatter("Gen ack");
+    //click_chatter("Gen ack");
     if(noutputs() < 2)
     {
         click_chatter("Warning: trying to send an ack on a TCPOut with only 1 output");
