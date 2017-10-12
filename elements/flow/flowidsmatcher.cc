@@ -28,7 +28,7 @@
 
 CLICK_DECLS
 
-FlowIDSMatcher::FlowIDSMatcher() : _program()
+FlowIDSMatcher::FlowIDSMatcher() : _program(),_stall(false)
 {
 }
 
@@ -40,7 +40,8 @@ FlowIDSMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	bool payload_only = false;
 	if (Args(this, errh).bind(conf)
-	  .consume() < 0)
+	        .read_p("STALL",_stall)
+	        .consume() < 0)
 	  return -1;
 
 	for (int i=0; i < conf.size(); ++i) {
@@ -73,7 +74,7 @@ int FlowIDSMatcher::process_data(fcb_FlowIDSMatcher* fcb_data, FlowBufferContent
         }
         ++iterator;
     }
-    if (state != 0) {
+    if (_stall && state != 0) {
         iterator = ++good_packets;
         if (good_packets.current()) {
         }
