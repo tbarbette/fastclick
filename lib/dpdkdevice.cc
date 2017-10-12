@@ -153,6 +153,9 @@ struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
 
 /**
  * Extracts from 'info' what is after the 'key'.
+ * E.g. an expected input is:
+ * XX:YY.Z Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4]
+ * and we want to keep what is after our key 'Ethernet controller: '.
  *
  * @param info string to parse
  * @param key substring to indicate the new index
@@ -162,9 +165,23 @@ static String parse_pci_info(String info, String key)
 {
     String s;
 
+    // Extract what is after the keyword
     s = info.substring(info.find_left(key) + key.length());
+    if (s.empty()) {
+        return String();
+    }
+
+    // Find the position of the delimiter
     int pos = s.find_left(':') + 2;
+    if (pos < 0) {
+        return String();
+    }
+
+    // Extract what comes after the delimiter
     s = s.substring(pos, s.find_left("\n") - pos);
+    if (s.empty()) {
+        return String();
+    }
 
     return s;
 }
@@ -198,6 +215,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     info.vendor_id = dev_info.pci_dev->id.vendor_id;
     info.device_id = dev_info.pci_dev->id.device_id;
     info.driver = dev_info.driver_name;
+    info.vendor_name = "Unknown";
 
     // Combine vendor and device IDs
     char vendor_and_dev[10];
@@ -205,10 +223,10 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     // Retrieve more information about the vendor of this NIC
     String dev_pci = shell_command_output_string("lspci -d " + String(vendor_and_dev), "", errh);
-    info.vendor_name = keep_token_left(
-        parse_pci_info(dev_pci, "Ethernet controller"),
-        ' '
-    );
+    String long_vendor_name = parse_pci_info(dev_pci, "Ethernet controller");
+    if (!long_vendor_name.empty()) {
+        info.vendor_name = keep_token_left(long_vendor_name, ' ');
+    }
 
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
