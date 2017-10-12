@@ -520,7 +520,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
                     goto found;
                 }
     #if DEBUG_CLASSIFIER > 1
-                click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].data().data_64, data.data_64);
+                click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].ptr == DESTRUCTED_NODE ? -1 : childs[idx].data().data_64, data.data_64);
     #endif
                 idx = next_idx(idx);
                 i++;

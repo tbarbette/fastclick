@@ -40,7 +40,7 @@ FlowIDSMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	bool payload_only = false;
 	if (Args(this, errh).bind(conf)
-	        .read_p("STALL",_stall)
+	        .read("STALL",_stall)
 	        .consume() < 0)
 	  return -1;
 
