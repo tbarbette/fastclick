@@ -146,7 +146,7 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
                     goto found;
                 }
             }
-            click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu, last ack %lu, is_syn %d, is_ack %d)", seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),isSyn(packet),isAck(packet));
+            click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu, last ack %lu, is_syn %d, is_ack %d, pay_len %d)", seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),isSyn(packet),isAck(packet), getPayloadLength(packet));
 
             found:
             continue;
