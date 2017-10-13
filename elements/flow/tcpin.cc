@@ -623,7 +623,8 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
 
     TCPState::Value state = fcb_in->common->state; //Read-only access, no need to lock
 
-    //click_chatter("Connection state is %d", state);
+    if (unlikely(_verbose))
+        click_chatter("Connection state is %d", state);
     // If the connection is open, we just check if the packet is a FIN. If it is we go to the hard sequence.
     if (likely(state == TCPState::OPEN))
     {
@@ -631,12 +632,12 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
             //click_chatter("Connection is closing, we received a FIN or RST in open state");
             goto do_check;
         }
-        return false; //Let the FIN through
+        return false;
     } else if (state == TCPState::ESTABLISHING) {
         if (isRst(packet)) {
             goto do_check;
         }
-        return true;
+        return false;
     }
 
     do_check:
