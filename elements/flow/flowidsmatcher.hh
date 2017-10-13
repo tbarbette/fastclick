@@ -41,6 +41,8 @@ class FlowIDSMatcher : public StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatch
 		static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
 		SimpleDFA _program;
 		bool _stall;
+		atomic_uint32_t _stalled;
+		atomic_uint32_t _matched;
 };
 
 CLICK_ENDDECLS

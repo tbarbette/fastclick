@@ -280,6 +280,7 @@ private:
     unsigned int flowDirection;
 
     bool _allow_resize;
+    bool _verbose;
     friend class TCPOut;
 };
 

@@ -30,7 +30,11 @@ TCPClientAck()
 
 =s middlebox
 
-TCPClient ack must be used after TCPReorder
+ACKs packets as they are received. It has two outputs, the first one
+let the packet pass through and the second one is used to generate the acks.
+The second port should be piped to the return side.
+
+TCPClientAck must be used after TCPReorder
  */
 
 class TCPClientAck : public FlowSpaceElement<fcb_clientack>, public TCPElement

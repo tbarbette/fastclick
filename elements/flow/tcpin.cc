@@ -47,6 +47,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     .read_mp("OUTNAME", outName)
     .read_mp("RETURNNAME", returnName)
     .read("ALLOW_RESIZE", _allow_resize)
+    .read("VERBOSE", _verbose)
     .complete() < 0)
         return -1;
 
@@ -131,7 +132,8 @@ eagain:
             if(!isSyn(p)) { //TODO : move to top block?
                 WritablePacket* packet = p->uniqueify();
                 closeConnection(packet, false);
-//                click_chatter("Packet is not syn, closing connection");
+                if (unlikely(_verbose))
+                    click_chatter("Packet is not syn, closing connection");
                 packet->kill();
                 return NULL;
             }
@@ -176,7 +178,8 @@ eagain:
 
         if(checkConnectionClosed(p))
         {
-            //click_chatter("Connection is already closed");
+            if (unlikely(_verbose))
+                click_chatter("Connection is already closed");
             p->kill();
             return NULL;
         }

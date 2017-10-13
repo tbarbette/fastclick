@@ -30,6 +30,8 @@ CLICK_DECLS
 
 FlowIDSMatcher::FlowIDSMatcher() : _program(),_stall(false)
 {
+    _stalled = 0;
+    _matched = 0;
 }
 
 FlowIDSMatcher::~FlowIDSMatcher() {
@@ -67,16 +69,19 @@ int FlowIDSMatcher::process_data(fcb_FlowIDSMatcher* fcb_data, FlowBufferContent
     while (iterator) {
         unsigned char c = *iterator;
         _program.next(c,state);
-        if (state == SimpleDFA::MATCHED) {
+        if (unlikely(state == SimpleDFA::MATCHED)) {
+            _matched ++;
             return 1;
-        } else if (state == 0) {
+        } else if (_stall && state == 0) {
             good_packets = iterator;
         }
         ++iterator;
     }
     if (_stall && state != 0) {
+        _stalled++;
         iterator = ++good_packets;
         if (good_packets.current()) {
+            //TODO
         }
     }
     fcb_data->state = state;
@@ -106,10 +111,8 @@ FlowIDSMatcher::write_handler(const String &in_str, Element *e, void *thunk, Err
 
 void
 FlowIDSMatcher::add_handlers() {
-	for (uintptr_t i = 0; i != (uintptr_t) noutputs(); ++i) {
-		add_read_handler("pattern" + String(i), read_positional_handler, (void*) i);
-		add_write_handler("pattern" + String(i), reconfigure_positional_handler, (void*) i);
-	}
+	add_data_handlers("stalled", Handler::h_read, &_stalled);
+	add_data_handlers("matched", Handler::h_read, &_matched);
 }
 
 

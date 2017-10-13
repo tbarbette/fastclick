@@ -43,8 +43,6 @@ FlowWebGen::FlowWebGen()
 {
   _parallel = 16;
   cbfree = NULL;
-/*  rexmit_head = NULL;
-  rexmit_tail = NULL;*/
 
   _url = "";
 
