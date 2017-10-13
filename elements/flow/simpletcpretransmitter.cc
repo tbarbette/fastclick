@@ -133,20 +133,29 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
                 _in->ackPacket(packet,true);
                 continue;
             }
-            //Seq is bigger than last ack, (the original of) this packet was lost before the dest reached it (or we never received the ack)
-            FOR_EACH_PACKET(fcb->first_unacked, pr) {
-                if (getSequenceNumber(pr) == seq) {
-                    if (lastretransmit == pr) { //Avoid double retransmission
-                    } else {
-                        lastretransmit = pr;
-                        //click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
-                        fcb_acquire(1);
-                        output_push_batch(0,PacketBatch::make_from_packet(packet->clone()));
+            if (getPayloadLength(packet) == 0) {
+                if (batch->count() == 1) {
+                    output_push_batch(0,batch);
+                    return;
+                } else
+                    output_push_batch(0,PacketBatch::make_from_packet(packet->clone()));
+            } else {
+                //Seq is bigger than last ack, (the original of) this packet was lost before the dest reached it (or we never received the ack)
+                FOR_EACH_PACKET(fcb->first_unacked, pr) {
+                    if (getSequenceNumber(pr) == seq) {
+                        if (lastretransmit == pr) { //Avoid double retransmission
+                        } else {
+                            lastretransmit = pr;
+                            //click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
+                            fcb_acquire(1);
+                            output_push_batch(0,PacketBatch::make_from_packet(packet->clone()));
+                        }
+                        goto found;
                     }
-                    goto found;
                 }
+                click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu, last ack %lu, is_syn %d, is_ack %d, pay_len %d)", seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),isSyn(packet),isAck(packet), getPayloadLength(packet));
             }
-            click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu, last ack %lu, is_syn %d, is_ack %d, pay_len %d)", seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),isSyn(packet),isAck(packet), getPayloadLength(packet));
+
 
             found:
             continue;
