@@ -148,6 +148,7 @@ eagain:
 
             if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
+                fcb_in->common->state = TCPState::OPEN;
             }
         }
         else // At least one packet of this side of the flow has been seen
@@ -170,7 +171,7 @@ eagain:
                 }
             } else if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
-                fcb_in->common->state = TCPState::OPEN; //No need to lock, only us can write this
+                fcb_in->common->state = TCPState::OPEN;
             }
 
         }
@@ -624,13 +625,18 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
 
     //click_chatter("Connection state is %d", state);
     // If the connection is open, we just check if the packet is a FIN. If it is we go to the hard sequence.
-    if (state == TCPState::OPEN)
+    if (likely(state == TCPState::OPEN))
     {
         if (isFin(packet) || isRst(packet)) {
             //click_chatter("Connection is closing, we received a FIN or RST in open state");
             goto do_check;
         }
         return false; //Let the FIN through
+    } else if (state == TCPState::ESTABLISHING) {
+        if (isRst(packet)) {
+            goto do_check;
+        }
+        return true;
     }
 
     do_check:
