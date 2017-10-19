@@ -16,7 +16,7 @@
 
 SimpleTCPRetransmitter::SimpleTCPRetransmitter()
 {
-
+    _verbose = false;
 }
 
 SimpleTCPRetransmitter::~SimpleTCPRetransmitter()
@@ -101,8 +101,9 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
         auto fcb_in = _in->fcb_data(); //Scratchpad for TCPIn
 
         //Retransmission of a SYN -> Let it go through
-        if (fcb_in->common->state == TCPState::ESTABLISHING && isSyn(batch->first())) {
-            //click_chatter("Unestablished connection, letting the rt packet go through");
+        if (fcb_in->common->state == TCPState::ESTABLISHING && isSyn(batch->first()) || isRst(batch->first())) {
+            if (_verbose)
+                click_chatter("Unestablished connection, letting the rt packet go through");
             if (batch->count() > 1) {
                 Packet* packet = batch->first();
                 batch = batch->pop_front();
@@ -129,7 +130,8 @@ void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, Pack
         FOR_EACH_PACKET_SAFE(batch, packet) {
             uint32_t seq = getSequenceNumber(packet);
             if (fcb_in->common->lastAckReceivedSet() && SEQ_LT(seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()))) {
-                //click_chatter("Client just did not receive the ack, let's ACK him (seq %lu, last ack %lu)",seq,fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()));
+                if (_verbose)
+                    click_chatter("Client just did not receive the ack, let's ACK him (seq %lu, last ack %lu, state %d)",seq,fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),fcb_in->common->state);
                 _in->ackPacket(packet,true);
                 continue;
             }

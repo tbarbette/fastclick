@@ -94,7 +94,7 @@ private:
      */
     Packet* processPacketRetransmission(Packet *packet);
 
-
+    bool _verbose;
     TCPIn* _in;
 };
 
