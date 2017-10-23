@@ -1,6 +1,6 @@
 #ifndef CLICK_TCPREFLECTOR_HH
 #define CLICK_TCPREFLECTOR_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/timer.hh>
 #include <click/ipaddress.hh>
@@ -27,7 +27,7 @@ CLICK_DECLS
  *   -> ToDevice(eth1);
  */
 
-class TCPReflector : public Element {
+class TCPReflector : public BatchElement {
  public:
 
   TCPReflector() CLICK_COLD;
@@ -38,10 +38,16 @@ class TCPReflector : public Element {
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
+
   Packet *simple_action(Packet *);
+#if HAVE_BATCH
+  PacketBatch *simple_action_batch(PacketBatch *);
+#endif
   Packet *tcp_input(Packet *xp);
 protected:
     String _data;
+    bool _nodata;
+    bool _rand_seq;
 };
 
 CLICK_ENDDECLS

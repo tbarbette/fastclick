@@ -25,7 +25,7 @@ CLICK_DECLS
 #ifdef HAVE_FLOW
 
 FlowNode*
-FlowElementVisitor::get_downward_table(Element* e,int output) {
+FlowElementVisitor::get_downward_table(Element* e,int output,FlowElement* context) {
 	FlowNode* merged = 0;
 
     FlowElementVisitor v(e);
@@ -46,7 +46,7 @@ FlowElementVisitor::get_downward_table(Element* e,int output) {
 			return 0;
 		}
 		//
-		FlowNode* child_table = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport);
+		FlowNode* child_table = context->resolveContext(v.dispatchers[i].elem->getContext())->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport, context),true,true);
 #if DEBUG_CLASSIFIER
 		click_chatter("Traversal merging of %p{element} [%d] : ",v.dispatchers[i].elem,v.dispatchers[i].iport);
 		if (child_table) {
@@ -95,12 +95,19 @@ FlowElement::~FlowElement() {
 };
 
 FlowNode*
-FlowElement::get_table(int iport) {
+FlowElement::get_table(int iport, FlowElement* context) {
 
-    return FlowElementVisitor::get_downward_table(this,-1);
+    return FlowElementVisitor::get_downward_table(this,-1,context);
 }
 
+FlowNode*
+FlowElement::resolveContext(FlowType) {
+    return FlowClassificationTable::make_drop_rule().root;
+}
 
+FlowType  FlowElement::getContext() {
+    return FLOW_NONE;
+}
 
 #endif
 CLICK_ENDDECLS

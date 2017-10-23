@@ -1,0 +1,76 @@
+%script
+click CONFIG
+
+%file CONFIG
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> fs :: FlowClassifier(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> InsultRemover(WORD is, MODE MASK)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(MASK, FIELDS wire_len src dst proto payload);
+
+fs ~> Print("NON UDP") -> Discard;
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> FlowClassifier(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> InsultRemover(WORD is, MODE REMOVE)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(REMOVE, FIELDS wire_len src dst proto payload);
+
+FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
+-> Print("IN",-1)
+-> FlowClassifier(VERBOSE 0, CONTEXT NONE)
+~> IPIn
+-> UDPIn
+-> InsultRemover(WORD is, MODE REPLACE)
+-> IPOut
+-> Print("OUT",-2)
+-> ToIPSummaryDump(REPLACE, FIELDS wire_len src dst proto payload);
+
+%file IN1
+!data src dst proto payload
+18.26.4.44 18.26.4.44 U thisisan
+18.26.4.44 18.26.4.44 U at
+18.26.4.44 18.26.4.44 U tack
+18.26.4.44 18.26.4.45 U thi
+18.26.4.44 18.26.4.45 U sca
+18.26.4.44 18.26.4.45 U t
+
+%expect MASK
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+36 18.26.4.44 18.26.4.44 U "th****an"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "th*"
+31 18.26.4.44 18.26.4.45 U "*ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect REMOVE
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+32 18.26.4.44 18.26.4.44 U "than"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+30 18.26.4.44 18.26.4.45 U "th"
+30 18.26.4.44 18.26.4.45 U "ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+%expect REPLACE
+!IPSummaryDump 1.3
+!data wire_len ip_src ip_dst ip_proto payload
+128 18.26.4.44 18.26.4.44 U "th<font color='red'>Blocked content !</font><br /><font color='red'>Blocked content !</font><br />an"
+30 18.26.4.44 18.26.4.44 U "at"
+32 18.26.4.44 18.26.4.44 U "tack"
+31 18.26.4.44 18.26.4.45 U "th<"
+77 18.26.4.44 18.26.4.45 U "font color='red'>Blocked content !</font><br />ca"
+29 18.26.4.44 18.26.4.45 U "t"
+
+

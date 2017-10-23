@@ -55,7 +55,7 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
+    FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
@@ -88,7 +88,7 @@ public:
     const char *port_count() const      { return "1/1"; }
     const char *processing() const      { return PUSH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(TCP_MIDDLEBOX,UDP_MIDDLEBOX);
+    FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);

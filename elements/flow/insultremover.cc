@@ -21,18 +21,40 @@ InsultRemover::InsultRemover() : insults()
 
     closeAfterInsults = false;
     _replace = true;
+    _insert = false;
+    _full = false;
 }
 
 int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     //TODO : use a proper automaton for insults
-
+    _insert_msg = "<font color='red'>Blocked content !</font><br />";
+    String mode = "MASK";
     if(Args(conf, this, errh)
             .read_all("WORD", insults)
-            .read_p("REPLACE", _replace)
+            .read_p("MODE", mode)
+            .read_p("MSG", _insert_msg)
             .read_p("CLOSECONNECTION", closeAfterInsults)
     .complete() < 0)
         return -1;
+
+    if (mode == "MASK") {
+        _replace = true;
+        _insert = false;
+    } else if (mode == "REMOVE") {
+        _replace = false;
+        _insert = false;
+    } else if (mode == "REPLACE") {
+        _replace = false;
+        _insert = true;
+    } else if (mode == "FULL") {
+        _replace = false;
+        _insert = false;
+        _full = true;
+    } else {
+        return errh->error("Mode must be MASK, REMOVE, REPLACE or FULL");
+    }
+
 
     if (insults.size() == 0) {
         return errh->error("No words given");
@@ -41,11 +63,27 @@ int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+int
+InsultRemover::maxModificationLevel() {
+    int mod = StackSpaceElement<fcb_insultremover>::maxModificationLevel() | MODIFICATION_WRITABLE;
+    if (!_replace) {
+        mod |= MODIFICATION_RESIZE | MODIFICATION_STALL;
+    } else {
+        mod |= MODIFICATION_REPLACE;
+    }
+    return mod;
+}
+
 
 void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, PacketBatch* flow)
 {
     insultremover->flowBuffer.enqueueAll(flow);
 
+    /**
+     * This is mostly an example element, so we have two modes :
+     * - Replacement, done inline using the iterator directly in this element
+     * - Removing, done calling iterator.remove
+     */
     for(int i = 0; i < insults.size(); ++i)
     {
         const char* insult = insults[i].c_str();
@@ -54,7 +92,6 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
             auto end = insultremover->flowBuffer.contentEnd();
 
             while (iter != end) {
-                //click_chatter("Letter %c",*iter);
                 if (*iter ==  insult[0]) {
                     int pos = 0;
                     typeof(iter) start_pos = iter;
@@ -66,12 +103,11 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
                             flow = start_pos.flush();
                             if(!isLastUsefulPacket(start_pos.current())) {
                                 requestMorePackets(start_pos.current(), false);
+                                goto needMore;
                             } else {
                                 goto finished;
                             }
-                            goto needMore;
                         }
-                        //click_chatter("Letter %c",*iter);
                         if (insult[pos] == '\0') {
                             insultremover->counterRemoved += 1;
                             if (closeAfterInsults)
@@ -82,7 +118,6 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
                                 ++start_pos;
                                 ++pos;
                             }
-                            break;
                             pos = 0;
                         }
                     } while (*iter == insult[pos]);
@@ -90,16 +125,37 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
                 ++iter;
             }
         } else {
-            assert(false);
-            //TODO : Probably not working anymore
-            /*result = insultremover->flowBuffer.removeInFlow(insult);
+            int result;
+            do {
+                if (!_insert) { //If not insert, just remove
+                    result = insultremover->flowBuffer.removeInFlow(insult, this);
+                } else if (!_full){ //Insert but not full, replace pattern per message
+                    result = insultremover->flowBuffer.replaceInFlow(insult, _insert_msg.c_str(), this);
+                } else { //Full, repalce the whole flow per message
+                    result = insultremover->flowBuffer.searchInFlow(insult);
+                }
+                if (result == 1) {
+                    if (closeAfterInsults)
+                        goto closeconn;
+                    if (_full) {
+                        //TODO
+                        //Remove all bytes
+                        //Add msg
+                    }
+                    insultremover->counterRemoved += 1;
+                }
+            } while (result == 1);
 
             // While we keep finding complete insults in the packet
-            while(result == 1)
-            {
-                insultremover->counterRemoved += 1;
-                result = insultremover->flowBuffer.removeInFlow(insult);
-            }*/
+            if (result == 0) { //Finished in the middle of a potential match
+                if(!isLastUsefulPacket(flow->tail())) {
+                    requestMorePackets(flow->tail(), false);
+                    flow = 0; // We will re-match the whole buffer, not that much efficient. See FlowIDSMatcher for better implementation
+                    goto needMore;
+                } else {
+                    goto finished;
+                }
+            }
         }
     }
     finished:
@@ -110,13 +166,8 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
     closeconn:
 
     closeConnection(flow, true);
-    insultremover->flowBuffer.dequeueAll()->kill();
-    /*
-    removeBytes(packet, 0, getPacketContentSize(packet));
-    const char *message = "<font color='red'>The web page contains insults and has been "
-        "blocked</font><br />";
-    packet = insertBytes(fcb, packet, 0, strlen(message) + 1);
-    strcpy((char*)getPacketContent(packet), message);*/
+    insultremover->flowBuffer.dequeueAll()->fast_kill();
+
     return;
 
     needMore:

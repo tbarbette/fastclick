@@ -20,7 +20,7 @@ typedef struct FlowCache_t{
     FlowControlBlock* fcb;
 } FlowCache;
 
-class FlowClassifier: public BatchElement {
+class FlowClassifier: public FlowElement {
     FlowClassificationTable _table;
     per_thread<FlowCache*> _cache;
     int _cache_size;
@@ -38,6 +38,7 @@ class FlowClassifier: public BatchElement {
     int _clean_timer;
     Timer _timer;
     bool _early_drop;
+    FlowType _context;
 
     per_thread<FlowBatch*> _builder_batch;
 public:
@@ -53,7 +54,9 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
-    void cleanup(CleanupStage stage);
+    void cleanup(CleanupStage stage) CLICK_COLD;
+
+    bool stopClassifier() override CLICK_COLD { return true; };
 
     inline void remove_cache_fcb(FlowControlBlock* fcb);
     inline FlowControlBlock* get_cache_fcb(Packet* p, uint32_t agg);
@@ -61,11 +64,18 @@ public:
     void push_batch_builder(int port, PacketBatch*);
     void push_batch(int port, PacketBatch*);
 
+    virtual FlowNode* get_table(int iport, FlowElement* lastContext) {
+        click_chatter("Warning : Sub-table optimization not supported as of now.");
+        return 0;
+    }
+
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     void run_timer(Timer*) override;
 #endif
     bool run_idle_task(IdleTask*) override;
-public:
+
+    virtual FlowNode* resolveContext(FlowType t) override;
+
 	FlowClassificationTable& table() {
 		return _table;
 	}

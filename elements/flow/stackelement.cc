@@ -8,6 +8,31 @@
 
 CLICK_DECLS
 
+bool StackVisitor::visit(Element *e, bool, int port, Element*, int, int)
+{
+    // Check that the element is a stack element
+    // If this is not the case, we skip it and continue the traversing
+    if(!StackElement::isStackElement(e)) {
+        click_chatter("%p{element} is not stack",e);
+        return true;
+    }
+
+    // We now know that we have a stack element so we can cast it
+    StackElement *element = reinterpret_cast<StackElement*>(e);
+
+    // Add the starting element in the list of the current element
+    click_chatter("Adding element %p{element} as predecessor of %p{element}", startElement,
+        element);
+    element->addStackElementInList(startElement, port);
+
+    // Stop search when we encounter the IPOut Element
+    if(strcmp(element->class_name(), "IPOut") == 0)
+        return false;
+
+    // Stop the traversing
+    return false;
+}
+
 StackElement::StackElement()
 {
     previousStackElement = NULL;
@@ -34,18 +59,26 @@ void* StackElement::cast(const char *name)
         return Element::cast(name);
  }
 
- void StackElement::buildFunctionStack()
- {
-     StackVisitor visitor(this);
-     this->router()->visit_downstream(this, -1, &visitor);
- }
-
-
-int StackElement::initialize(ErrorHandler*  errh)
+void StackElement::buildFunctionStack()
 {
-    buildFunctionStack();
+    StackVisitor visitor(this);
+    this->router()->visit_downstream(this, -1, &visitor);
+}
 
-    return 0;
+
+int StackElement::event(ErrorHandler*  errh, EventType phase)
+{
+    int e = BatchElement::event(errh, phase);
+    if (e != 0)
+        return e;
+
+    switch (phase) {
+        case INIT_PLATFORM:
+                buildFunctionStack();
+            return 0;
+    }
+
+    return e;
 }
 
 
@@ -135,20 +168,28 @@ bool StackElement::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlow
     return previousStackElement->registerConnectionClose(fcb_chain, fnt, thunk);
 }
 
-bool StackElement::allowResize() {
-    // Call the "removeBytes" method on every element in the stack
+int StackElement::maxModificationLevel() {
+    assert(router()->handlers_ready());
     if(previousStackElement == NULL)
-        return true;
+        return 0;
 
-    previousStackElement->allowResize();
+    return previousStackElement->maxModificationLevel();
 }
 
 void StackElement::removeBytes(WritablePacket* packet, uint32_t position,
     uint32_t length)
 {
     // Call the "removeBytes" method on every element in the stack
-    if(previousStackElement == NULL)
+    if(previousStackElement == NULL) {
+        click_chatter("No previous elem before %p{element}",this);
+        unsigned char *source = packet->data();
+        position += packet->getContentOffset();
+        uint32_t bytesAfter = packet->length() - position;
+        if (bytesAfter > 0)
+            memmove(&source[position], &source[position + length], bytesAfter);
+        packet->take(length);
         return;
+    }
 
     previousStackElement->removeBytes(packet, position, length);
 }
@@ -157,8 +198,15 @@ WritablePacket* StackElement::insertBytes(WritablePacket* packet,
     uint32_t position, uint32_t length)
 {
     // Call the "insertBytes" method on every element in the stack
-    if(previousStackElement == NULL)
-        return NULL;
+    if(previousStackElement == NULL) {
+        uint32_t bytesAfter = packet->length() - position;
+        WritablePacket *newPacket = packet->put(length);
+        assert(newPacket != NULL);
+        unsigned char *source = newPacket->data();
+        if (bytesAfter > 0)
+            memmove(&source[position + length], &source[position], bytesAfter);
+        return newPacket;
+    }
 
     return previousStackElement->insertBytes(packet, position, length);
 }

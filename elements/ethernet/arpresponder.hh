@@ -84,7 +84,7 @@ class ARPResponder : public FlowElement { public:
     const char *port_count() const		{ return PORTS_1_1X2; }
     const char *processing() const		{ return PROCESSING_A_AH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT("12/0806 20/0001");
+    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("20/0001", FLOW_ARP);
 
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

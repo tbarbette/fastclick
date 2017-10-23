@@ -62,6 +62,7 @@ uint32_t ByteStreamMaintainer::mapAck(uint32_t position)
     if(!initialized)
     {
         click_chatter("Error: ByteStreamMaintainer is not initialized");
+        assert(false);
         return 0;
     }
 
@@ -109,6 +110,7 @@ uint32_t ByteStreamMaintainer::mapSeq(uint32_t position)
     if(!initialized)
     {
         click_chatter("Error: ByteStreamMaintainer is not initialized");
+        assert(false);
         return 0;
     }
 
@@ -179,6 +181,7 @@ void ByteStreamMaintainer::prune(uint32_t position)
     if(!initialized)
     {
         click_chatter("Error: ByteStreamMaintainer is not initialized");
+        assert(false);
         return;
     }
 
@@ -251,6 +254,7 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
     if(!initialized)
     {
         click_chatter("Error: ByteStreamMaintainer is not initialized");
+        assert(false);
         return;
     }
 

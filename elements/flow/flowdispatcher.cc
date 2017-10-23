@@ -75,8 +75,8 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 	return 0;
 }
 
-FlowNode* FlowDispatcher::get_child(int output, bool append_drop) {
-    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output);
+FlowNode* FlowDispatcher::get_child(int output, bool append_drop,FlowElement* context) {
+    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output, context);
     if (!child_table)
         return 0;
     child_table->check();
@@ -88,8 +88,8 @@ FlowNode* FlowDispatcher::get_child(int output, bool append_drop) {
     return child_table;
 }
 
-bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_drop) {
-    FlowNode* child_table = get_child(output, append_drop);
+bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_drop, FlowElement* context) {
+    FlowNode* child_table = get_child(output, append_drop, context);
     bool changed = false;
     if (child_table) {
         changed = ptr->replace_leaf_with_node(child_table, true);
@@ -107,7 +107,7 @@ bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_d
 }
 
 
-FlowNode* FlowDispatcher::get_table(int) {
+FlowNode* FlowDispatcher::get_table(int, FlowElement* context) {
 	if (!_table) {
 		if (_verbose) {
 			click_chatter("%s : Computing table with %d rules :",name().c_str(),rules.size());
@@ -133,7 +133,7 @@ FlowNode* FlowDispatcher::get_table(int) {
             click_chatter("%p{element} : Writing output number %d to rules %d", this, rules[i].output, i);
 #endif
             if (_children_merge && (rules[i].output >= 0 && rules[i].output < noutputs())) {
-                FlowNode* child_table = get_child(rules[i].output,false);
+                FlowNode* child_table = get_child(rules[i].output,false,context);
                 bool changed = false;
                 if (child_table) {
                     child_table->check();
@@ -220,7 +220,7 @@ FlowNode* FlowDispatcher::get_table(int) {
         if (!_children_merge) {
             if (merged->is_full_dummy()) {
                 int output = *((uint32_t*)(&merged->default_ptr()->leaf->data[_flow_data_offset]));
-                FlowNode* child_table = get_child(output,true);
+                FlowNode* child_table = get_child(output,true,context);
 
                 if (child_table) {
                     merged = merged->combine(child_table, true, true);
@@ -235,10 +235,10 @@ FlowNode* FlowDispatcher::get_table(int) {
                 };
                 merged->traverse_all_leaves(fnt, true, true);
             } else {
-                auto fnt = [this](FlowNodePtr* ptr) {
+                auto fnt = [this,context](FlowNodePtr* ptr) {
                     int output = *((uint32_t*)(&ptr->leaf->data[_flow_data_offset]));
                     if (output >= 0 && output < noutputs()) { //If it's a real output, merge with children
-                        attach_children(ptr,output,true);
+                        attach_children(ptr,output,true,context);
                     }
                 };
                 merged->traverse_all_leaves(fnt, true, true);

@@ -44,7 +44,7 @@ int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 int SimpleTCPRetransmitter::initialize(ErrorHandler *errh) {
     if (StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>::initialize(errh) != 0)
         return -1;
-    if (_in->allow_resize()) {
+    if (_in->allowResize()) {
         return errh->error("SimpleTCPRetransmitter does not work when resizing the flow ! Use the non simple one.");
     }
     return 0;

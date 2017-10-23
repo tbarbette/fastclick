@@ -39,7 +39,6 @@ TCPReorder::initialize(ErrorHandler *errh) {
         errh->warning("Found no downward TCPIn. This element will work in standalone mode, having its own recycling. This is usually not desirable.");
     } else if (track.size() == 1) {
         _tcp_context = static_cast<TCPIn*>(track[0]);
-        click_chatter("Found one TCPIn element !");
     } else {
         errh->warning("Found multiple downward TCPIn. This element will work in standalone mode, having its own recycling. This is usually not desirable.");
     }
@@ -268,7 +267,7 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         if(currentSeq != tcpreorder->expectedPacketSeq)
         {
             if (_verbose)
-                click_chatter("Not the expected packet, have %d expected %d. Count is %d. Uc %d",currentSeq,tcpreorder->expectedPacketSeq,count,fcb_stack->count());
+                click_chatter("Not the expected packet, have %lu expected %lu. Count is %d. Uc %d",currentSeq,tcpreorder->expectedPacketSeq,count,fcb_stack->count());
             tcpreorder->packetList = packet;
             // Check before exiting that we did not have a batch to send
             goto send_batch;

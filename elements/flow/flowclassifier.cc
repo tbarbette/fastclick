@@ -34,9 +34,12 @@ public:
             fe->_classifier = _classifier;
         }
 
+        if (fe && fe->stopClassifier()) {
+            return false;
+        }
+
         VirtualFlowSpaceElement* fbe = dynamic_cast<VirtualFlowSpaceElement*>(e);
         if (fbe != NULL) { //The visited element is an element that need FCB space
-
 
             if (fbe->flow_data_offset() != -1) { //If flow already have some classifier
                 if (fbe->flow_data_offset() >= data_size) {
@@ -79,12 +82,13 @@ public:
         } else {
             /*Bitvector b;
             e->port_flow(false,port,&b);*/
+
             const char *f = e->router()->flow_code_override(e->eindex());
             if (!f)
                 f = e->flow_code();
             if (strcmp(f,Element::COMPLETE_FLOW) != 0) {
 #if DEBUG_CLASSIFIER > 0
-                click_chatter("%p{element}: Unstacking flows from port %d",e,port);
+                click_chatter("%p{element}: Unstacking flows from port %d", e, port);
 #endif
                 const_cast<Element::Port&>(from_e->port(true,from_port)).set_unstack(true);
                 return false;
@@ -111,6 +115,7 @@ int
 FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     int reserve = 0;
+    String context = "ETHER";
 
     if (Args(conf, this, errh)
             .read_p("AGGCACHE",_aggcache)
@@ -120,6 +125,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("BUILDER",_builder)
             .read("AGGTRUST",_collision_is_life)
             .read("VERBOSE",_verbose)
+            .read("CONTEXT",context)
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
             .read("CLEAN_TIMER",_clean_timer)
 #endif
@@ -138,7 +144,34 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
     if ((_cache_size & _cache_mask) != 0)
         return errh->error("Chache size must be a power of 2 !");
 
+    if (context == "ETHER") {
+        _context = FLOW_ETHER;
+    } else if (context == "NONE") {
+        _context = FLOW_NONE;
+    } else
+        return errh->error("Invalid context %s !",context.c_str());
+
     return 0;
+}
+
+FlowNode* FlowClassifier::resolveContext(FlowType t) {
+    String prot;
+    if (_context == FLOW_ETHER) {
+        switch (t) {
+            case FLOW_IP:
+                prot = "12/0800";
+                break;
+            case FLOW_ARP:
+                prot = "12/0806";
+                break;
+            default:
+                return FlowElement::resolveContext(t);
+        }
+    } else {
+        return FlowElement::resolveContext(t);
+    }
+    return FlowClassificationTable::parse(prot).root;
+
 }
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
@@ -246,7 +279,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     auto passing = get_passing_threads();
     _table.get_pool()->compress(passing);
 
-    FlowNode* table = FlowElementVisitor::get_downward_table(this, 0);
+    FlowNode* table = FlowElementVisitor::get_downward_table(this, 0, this);
 
     if (!table)
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
@@ -291,6 +324,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     //todo : INIT timer if needed? The current solution seems ok
 #endif
 
+    assert(one_upstream_classifier() != this);
     return 0;
 }
 
@@ -737,6 +771,8 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
 
 void FlowClassifier::push_batch(int port, PacketBatch* batch) {
+    FlowControlBlock* tmp_stack = fcb_stack;
+    FlowTableHolder* tmp_table = fcb_table;
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = &_table;
 //#endif
@@ -760,8 +796,9 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
 #endif
     }
 #endif
+    fcb_stack = tmp_stack;
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
-    fcb_table = 0;
+    fcb_table = tmp_table;
 //#endif
 
 }

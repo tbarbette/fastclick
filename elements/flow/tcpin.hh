@@ -20,6 +20,8 @@
 
 #define DEBUG_TCP 0
 
+typedef HashTable<tcp_seq_t, ModificationList*> ModificationTracker;
+
 /**
  * This file is used to simulate the FCB provided by Middleclick
  */
@@ -47,7 +49,6 @@ public:
     {
         state = TCPState::ESTABLISHING;
         use_count = 0;
-
     }
 
     ~tcp_common()
@@ -81,7 +82,7 @@ struct fcb_tcpin : public FlowReleaseChain
     tcp_common *common;
     SubFlowRealeaseFnt conn_release_fnt;
     void* conn_release_thunk;
-    HashTable<tcp_seq_t, ModificationList*>* modificationLists;
+    ModificationTracker* modificationLists;
 };
 
 
@@ -137,7 +138,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
 
-    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
+    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff",FLOW_TCP);
 
     void push_batch(int port, fcb_tcpin* fcb, PacketBatch* flow);
 
@@ -176,8 +177,8 @@ public:
      */
     tcp_common* getTCPCommon(IPFlowID flowID);
 
-    inline bool allow_resize() {
-        return _allow_resize;
+    inline bool allowResize() {
+        return _modification_level >= MODIFICATION_RESIZE;
     }
 
     /**
@@ -204,7 +205,6 @@ public:
 
 
 protected:
-    virtual bool allowResize() override;
     virtual void removeBytes(WritablePacket*, uint32_t, uint32_t) override;
     virtual WritablePacket* insertBytes(WritablePacket*, uint32_t,
          uint32_t) override CLICK_WARN_UNUSED_RESULT;
@@ -274,12 +274,13 @@ private:
 
     HashTableMP<IPFlowID, tcp_common*> tableFcbTcpCommon;
     pool_allocator_mt<tcp_common,false,TCPCOMMON_POOL_SIZE> poolFcbTcpCommon;
+    pool_allocator_mt<ModificationTracker,false> poolModificationTracker;
 
     TCPOut* outElement; // TCPOut element of this path
     TCPIn* returnElement; // TCPIn element of the return path
     unsigned int flowDirection;
 
-    bool _allow_resize;
+    int _modification_level;
     bool _verbose;
     friend class TCPOut;
 };

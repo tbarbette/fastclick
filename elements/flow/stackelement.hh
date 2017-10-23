@@ -65,8 +65,8 @@ public:
     const char *processing() const        { return "h/hh"; }
     virtual const size_t flow_data_size() const { return 0; };
     void* cast(const char*);
-    int initialize(ErrorHandler*)   CLICK_COLD;
 
+    virtual int event(ErrorHandler*  errh, EventType phase) override;
 
     // Custom methods
 
@@ -90,6 +90,13 @@ public:
      * @return A boolean indicating whether an element is a stack element
      */
     static bool isStackElement(Element* element);
+
+    /**
+     * @brief Tells the maximum level of modification up to this element.
+     * E.g tell if removeBytes and insertBytes are allowed by the current stack
+     */
+    virtual int maxModificationLevel();
+
 
 protected:
 
@@ -156,10 +163,11 @@ protected:
 
     // Methods using the function stack mechanism
 
-    /**
-     * @brief Tell if removeBytes and insertBytes are allowed by the current stack
-     */
-    virtual bool allowResize();
+    const int MODIFICATION_NONE = 0;
+    const int MODIFICATION_WRITABLE = 1;
+    const int MODIFICATION_STALL = 2;
+    const int MODIFICATION_REPLACE = 4;
+    const int MODIFICATION_RESIZE = 8;
 
     /**
      * @brief Remove bytes in a packet
@@ -326,28 +334,7 @@ public:
      * element that we are the next element in the function stack so that it will propagate
      * the calls to us. See the Click documentation for the description of the parameters
      */
-    bool visit(Element *e, bool, int port, Element*, int, int)
-    {
-        // Check that the element is a stack element
-        // If this is not the case, we skip it and continue the traversing
-        if(!StackElement::isStackElement(e))
-            return true;
-
-        // We now know that we have a stack element so we can cast it
-        StackElement *element = reinterpret_cast<StackElement*>(e);
-
-        // Add the starting element in the list of the current element
-        click_chatter("Adding element %p{element} as predecessor of %p{element}", startElement,
-            element);
-        element->addStackElementInList(startElement, port);
-
-        // Stop search when we encounter the IPOut Element
-        if(strcmp(element->class_name(), "IPOut") == 0)
-            return false;
-
-        // Stop the traversing
-        return false;
-    }
+    bool visit(Element *e, bool, int port, Element*, int, int);
 
 private:
     StackElement* startElement; // Element that started the visit

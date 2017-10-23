@@ -106,7 +106,8 @@ public:
 
     void* cast(const char *n) override;
 
-    FLOW_ELEMENT_DEFINE_CONTEXT("9/06! 12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff");
+    //TCPReorder has the same needs than TCPReorder
+    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff",FLOW_TCP);
 
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
     int initialize(ErrorHandler *errh);

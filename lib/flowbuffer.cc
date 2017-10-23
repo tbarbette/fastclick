@@ -173,6 +173,7 @@ FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char
     // Search until we reach the end of the buffer
     while(start != contentEnd())
     {
+        //click_chatter("%d %d %c",start.offsetInPacket,contentEnd().offsetInPacket,*start);
         currentPattern = pattern;
         FlowBufferContentIter currentContent = start;
         nbFound = 0;
@@ -264,8 +265,6 @@ int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement, Stac
     if(iter == contentEnd())
         return feedback;
 
-    click_chatter("FOUND PATTERN");
-
     uint32_t lenPattern = strlen(pattern);
     uint32_t lenReplacement = strlen(replacement);
 
@@ -294,11 +293,15 @@ int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement, Stac
     {
             // Insert a number of bytes equal to the difference between the lengths of
             // the replacement and the pattern
+            click_chatter("Insert at %d, offset %d", offsetInPacket, offset);
             entry = owner->insertBytes(entry, offsetInPacket, offset);
 
+            assert(entry);
+
             // Copy the rest of the replacement where we added bytes
-            for(int i = 0; i < lenReplacement - toReplace; ++i)
+            for(int i = 0; i < lenReplacement - toReplace; ++i) {
                 entry->getPacketContent()[offsetInPacket + i] = replacement[toReplace + i];
+            }
 
             return 1;
     }

@@ -23,7 +23,7 @@ public:
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
     void push_batch(int, int* flowdata, PacketBatch* batch) override;
-    FlowNode* get_table(int) override;
+    FlowNode* get_table(int,FlowElement*) override;
 
 private :
 
@@ -31,8 +31,8 @@ private :
     FlowNode* _table;
 
     bool _verbose;
-    bool attach_children(FlowNodePtr* ptr, int output, bool append_drop);
-    FlowNode* get_child(int output, bool append_drop);
+    bool attach_children(FlowNodePtr* ptr, int output, bool append_drop,FlowElement* context);
+    FlowNode* get_child(int output, bool append_drop,FlowElement* context);
 
 protected:
 

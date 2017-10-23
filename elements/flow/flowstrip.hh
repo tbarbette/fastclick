@@ -32,7 +32,7 @@ class FlowStrip : public FlowElement { public:
 
     void apply_offset(FlowNode* node);
 
-    FlowNode* get_table(int) override;
+    FlowNode* get_table(int,FlowElement* context) override;
   private:
 
     unsigned _nbytes;

@@ -16,18 +16,31 @@ CLICK_DECLS
 class FlowClassifier;
 
 
+enum FlowType {
+    FLOW_NONE = 0,
+    FLOW_ETHER,
+    FLOW_ARP,
+    FLOW_IP,
+    FLOW_TCP,
+    FLOW_UDP,
+    FLOW_HTTP
+};
 
 class FlowElement : public BatchElement {
 public:
 	FlowElement();
 	~FlowElement();
-	virtual FlowNode* get_table(int iport);
+	virtual FlowNode* get_table(int iport, FlowElement* lastContext);
 
     FlowClassifier* _classifier;
     FlowClassifier* one_upstream_classifier() {
         return _classifier;
     }
 
+    virtual FlowNode* resolveContext(FlowType);
+    virtual FlowType getContext();
+
+    virtual bool stopClassifier() { return false; };
 };
 
 
@@ -332,7 +345,7 @@ public:
 		return true;
 	}
 
-	static FlowNode* get_downward_table(Element* e, int output);
+	static FlowNode* get_downward_table(Element* e, int output, FlowElement* context);
 };
 
 
@@ -384,32 +397,68 @@ int FlowStateElement<Derived, T>::initialize(ErrorHandler *errh) {
  * In practice it will overwrite get_table
  */
 
-#define TCP_MIDDLEBOX "9/06! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
-#define UDP_MIDDLEBOX "9/11! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
 
-#define FLOW_ELEMENT_DEFINE_CONTEXT(rule) \
-FlowNode* get_table(int iport) override CLICK_COLD {\
-    FlowNode* down = FlowElement::get_table(iport); \
+#define TCP_SESSION "9/06! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
+#define UDP_SESSION "9/11! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
+
+//Use only one of the 3 following macros
+
+/**
+ * Define a context (such as FLOW_IP) but no rule/session
+ */
+#define FLOW_ELEMENT_DEFINE_CONTEXT(ft) \
+FlowNode* get_table(int iport, FlowElement* context) override CLICK_COLD {\
+    return FlowElement::get_table(iport, this);\
+}\
+virtual FlowType getContext() override {\
+    return ft;\
+}\
+
+/**
+ * Define a context (such as FLOW_TCP) and a rule/session definition
+ */
+#define FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(rule,ft) \
+FlowNode* get_table(int iport, FlowElement* context) override CLICK_COLD {\
+    FlowNode* down = FlowElement::get_table(iport,ft == FLOW_NONE ? context : this); \
     FlowNode* my = FlowClassificationTable::parse(rule).root;\
     return my->combine(down, true, true);\
+}\
+virtual FlowType getContext() override {\
+    return ft;\
+}\
+
+/**
+ * Define only a rule/session definition but no context
+ */
+#define FLOW_ELEMENT_DEFINE_SESSION(rule) \
+        FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(rule,FLOW_NONE)
+
+/**
+ * Defin two rules/sessions but no context
+ */
+#define FLOW_ELEMENT_DEFINE_SESSION_DUAL(ruleA,ruleB) \
+FlowNode* get_table(int iport, FlowElement* context) override CLICK_COLD {\
+    return FlowClassificationTable::parse(ruleA).root->combine(FlowClassificationTable::parse(ruleB).root,false,false)->combine(FlowElement::get_table(iport,context), true,true);\
 }
 
-#define FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(ruleA,ruleB) \
-FlowNode* get_table(int iport) override CLICK_COLD {\
-    return FlowClassificationTable::parse(ruleA).root->combine(FlowClassificationTable::parse(ruleB).root,false,false)->combine(FlowElement::get_table(iport), true,true);\
-}
-
-#define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port_num,rule) \
-FlowNode* get_table(int iport) override {\
+/**
+ * Define the context and a rule but only for one specific port
+ */
+#define FLOW_ELEMENT_DEFINE_PORT_SESSION_CONTEXT(port_num,rule,ft) \
+FlowNode* get_table(int iport, FlowElement* context) override {\
     if (iport == port_num) {\
-        return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport), true, true);\
+        return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport,context), true, true);\
     }\
-    return FlowElement::get_table(iport);\
-}
+    return FlowElement::get_table(iport,(ft == 0)?context:this);\
+}\
+virtual FlowType getContext() override {\
+    return ft;\
+}\
+
 #else
-#define FLOW_ELEMENT_DEFINE_CONTEXT(rule)
-#define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port,rule)
-#define FLOW_ELEMENT_DEFINE_CONTEXT_DUAL(ruleA,ruleB)
+#define FLOW_ELEMENT_DEFINE_SESSION(rule,context)
+#define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port,rule,context)
+#define FLOW_ELEMENT_DEFINE_SESSION_DUAL(ruleA,ruleB,context)
 typedef BatchElement FlowElement;
 #endif
 CLICK_ENDDECLS

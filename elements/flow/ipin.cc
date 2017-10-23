@@ -18,12 +18,17 @@ IPIn::IPIn()
 
 }
 
-int IPIn::configure(Vector<String> &conf, ErrorHandler *errh)
+int
+IPIn::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    if(Args(conf, this, errh)
+            .complete() < 0)
+        return -1;
     return 0;
 }
 
-void IPIn::push_batch(int port, PacketBatch* flow)
+void
+IPIn::push_batch(int port, PacketBatch* flow)
 {
     EXECUTE_FOR_EACH_PACKET([this](Packet* packet){
         // Compute the offset of the IP payload
@@ -36,6 +41,29 @@ void IPIn::push_batch(int port, PacketBatch* flow)
     output(0).push_batch(flow);
 }
 
+FlowNode*
+IPIn::resolveContext(FlowType t) {
+    String prot;
+    switch (t) {
+        case FLOW_UDP:
+            prot = "9/11";
+            break;
+        case FLOW_TCP:
+            prot = "9/06";
+            break;
+        default:
+            return FlowElement::resolveContext(t);
+    }
+    return FlowClassificationTable::parse(prot).root;
+}
+
+/*
+virtual void IPIn::removeBytes(WritablePacket* packet, uint32_t position,
+        uint32_t length)
+{
+    StackElement::removeBytes(packet, position, length);
+}
+*/
 CLICK_ENDDECLS
 EXPORT_ELEMENT(IPIn)
 ELEMENT_MT_SAFE(IPIn)

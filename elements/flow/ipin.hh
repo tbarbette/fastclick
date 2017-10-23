@@ -34,11 +34,18 @@ public:
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
-    FLOW_ELEMENT_DEFINE_CONTEXT("-2/0800!");
+    FLOW_ELEMENT_DEFINE_CONTEXT(FLOW_IP);
 
+
+    virtual FlowNode* resolveContext(FlowType t);
+/*
+    virtual void removeBytes(WritablePacket* packet, uint32_t position,
+        uint32_t length) override;
+*/
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     void push_batch(int, PacketBatch*) override;
+
 };
 
 CLICK_ENDDECLS

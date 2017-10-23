@@ -24,6 +24,17 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+int
+TCPOut::initialize(ErrorHandler *errh) {
+    if (maxModificationLevel() & MODIFICATION_RESIZE) {
+        _allow_resize = true;
+        if (_readonly) {
+            return errh->error("Cannot modify packets in read-only mode !");
+        }
+    }
+    return 0;
+}
+
 void TCPOut::push_batch(int port, PacketBatch* flow)
 {
     auto fcb_in = inElement->fcb_data();
@@ -34,11 +45,14 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             return NULL;
         }*/
 
+        click_chatter("_allow_resize %d",_allow_resize);
         if (_allow_resize) {
             WritablePacket *packet = p->uniqueify();
             fcb_in->common->lock.acquire();
 
             bool hasModificationList = inElement->hasModificationList(packet);
+
+            click_chatter("Has mod %d",hasModificationList);
             ByteStreamMaintainer &byteStreamMaintainer = fcb_in->common->maintainers[getFlowDirection()];
             ModificationList *modList = NULL;
 
@@ -275,10 +289,6 @@ int TCPOut::setInElement(TCPIn* inElement, ErrorHandler* errh)
 {
     this->inElement = inElement;
     inElement->add_remote_element(this);
-    this->_allow_resize = inElement->allow_resize();
-    if (_allow_resize && _readonly) {
-        return errh->error("Cannot modify packets in read-only mode !");
-    }
     return 0;
 }
 

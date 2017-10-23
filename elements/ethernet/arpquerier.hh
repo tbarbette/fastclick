@@ -183,7 +183,7 @@ class ARPQuerier : public FlowElement { public:
     const char *flags() const			{ return "L2"; }
     void *cast(const char *name);
 
-    FLOW_ELEMENT_DEFINE_PORT_CONTEXT(1,"12/0806 20/0002");
+    FLOW_ELEMENT_DEFINE_PORT_SESSION_CONTEXT(1,"20/0002", FLOW_ARP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int live_reconfigure(Vector<String> &, ErrorHandler *);

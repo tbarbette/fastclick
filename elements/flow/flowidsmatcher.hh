@@ -35,7 +35,16 @@ class FlowIDSMatcher : public StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatch
 
 		int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 		void add_handlers() CLICK_COLD;
-        int process_data(fcb_FlowIDSMatcher*, FlowBufferContentIter&);
+		int process_data(fcb_FlowIDSMatcher*, FlowBufferContentIter&);
+
+        virtual int maxModificationLevel() override {
+            int r = StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatcher>::maxModificationLevel();
+            if (_stall) {
+                return r | MODIFICATION_STALL;
+            } else {
+                return r;
+            }
+        }
 	private:
 		static String read_handler(Element *, void *) CLICK_COLD;
 		static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;

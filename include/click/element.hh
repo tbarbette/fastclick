@@ -105,6 +105,13 @@ class Element { public:
 
     virtual void add_handlers();
 
+    enum EventType {
+            INIT_PLATFORM, //End elements should never overwrite this event
+            INIT_INITIALIZE, //Call ::initialize(), used for legacy. If overriden, initialize() will not be called
+            __NEVER_OVERRIDE, //Never implement this event, it is used to check that all children call the parent
+    };
+    virtual int event(ErrorHandler *errh, EventType event);
+
     virtual int initialize(ErrorHandler *errh);
 
     virtual void take_state(Element *old_element, ErrorHandler *errh);

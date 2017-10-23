@@ -13,8 +13,7 @@ CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
     poolFcbTcpCommon(),
-    tableFcbTcpCommon(),
-    _allow_resize(false)
+    tableFcbTcpCommon()
 {
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
@@ -43,16 +42,25 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     int flowDirectionParam = -1;
 
     if(Args(conf, this, errh)
-    .read_mp("FLOWDIRECTION", flowDirectionParam)
-    .read_mp("OUTNAME", outName)
     .read_mp("RETURNNAME", returnName)
-    .read("ALLOW_RESIZE", _allow_resize)
+    .read("FLOWDIRECTION", flowDirectionParam)
+    .read("OUTNAME", outName)
     .read("VERBOSE", _verbose)
     .complete() < 0)
         return -1;
 
     Element* returnElement = this->router()->find(returnName, errh);
-    Element* outElement = this->router()->find(outName, errh);
+    Element* outElement;
+    if (!outName) {
+        ElementCastTracker visitor(router(),"TCPOut");
+        router()->visit_downstream(this, -1, &visitor);
+        if (visitor.size() != 1) {
+            return errh->error("Found no or more than 1 TCPOut element. Specify which one to use with OUTNAME");
+        }
+        outElement = visitor[0];
+    } else {
+        outElement = this->router()->find(outName, errh);
+    }
 
     if(returnElement == NULL)
     {
@@ -78,7 +86,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
             "but a %s element.", outName.c_str(), outElement->class_name());
         return -1;
     }
-    else if(flowDirectionParam != 0 && flowDirectionParam != 1)
+    else if(flowDirectionParam != 0 && flowDirectionParam != 1 && flowDirectionParam != -1)
     {
         click_chatter("Error: FLOWDIRECTION %u is not valid.", flowDirectionParam);
         return -1;
@@ -91,6 +99,13 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
         this->outElement->add_remote_element(this);
         if (this->outElement->setInElement(this, errh) != 0)
             return -1;
+        if (flowDirectionParam == -1) {
+            if (this->returnElement->getFlowDirection() == 0 || this->returnElement->getFlowDirection() == -1) {
+                flowDirectionParam = this->returnElement->getOppositeFlowDirection();
+            } else {
+                flowDirectionParam = 0;
+            }
+        }
         setFlowDirection((unsigned int)flowDirectionParam);
         this->outElement->setFlowDirection(getFlowDirection());
     }
@@ -186,7 +201,7 @@ eagain:
         }
 
 
-        if (_allow_resize) {
+        if (allowResize()) {
             //TODO : fine-grain this lock
             fcb_in->common->lock.acquire();
 
@@ -215,6 +230,9 @@ eagain:
 
                 if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
                 {
+                    if (unlikely(_verbose)) {
+                        click_chatter("Lost ACK, re-acking. Seq is %lu, other is %lu",seqNumber, lastAckSentOtherSide);
+                    }
                     // We receive content that has already been ACKed.
                     // This case occurs when the ACK is lost between the middlebox and
                     // the destination.
@@ -342,6 +360,7 @@ int TCPIn::initialize(ErrorHandler *errh) {
     if (get_passing_threads(true).weight() <= 1) {
         tableFcbTcpCommon.disable_mt();
     }
+    _modification_level = outElement->maxModificationLevel();
     return 0;
 }
 
@@ -361,6 +380,17 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
     if (fcb_in->conn_release_fnt) {
         fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
         fcb_in->conn_release_fnt = 0;
+    }
+    if (fcb_in->modificationLists) {
+        for(HashTable<tcp_seq_t, ModificationList*>::iterator it = fcb_in->modificationLists->begin();
+            it != fcb_in->modificationLists->end(); ++it)
+        {
+            // Call the destructor to release the object's own memory
+            (it.value())->~ModificationList();
+            // Put it back in the pool
+            poolModificationLists->releaseMemory(it.value());
+        }
+        poolModificationTracker.release(fcb_in->modificationLists);
     }
      common->lock.acquire();
     //The last one release common
@@ -382,23 +412,9 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
 void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
     TCPIn* tin = static_cast<TCPIn*>(thunk);
     auto fcb_in = tin->fcb_data_for(fcb);
-    //click_chatter("Releasing TCP flow");
-    //TODO : clean
-    // Put back in the corresponding memory pool all the modification lists
-    // in use (in the hashtable)
-    /*for(HashTable<tcp_seq_t, ModificationList*>::iterator it = modificationLists.begin();
-        it != modificationLists.end(); ++it)
-    {
-        // Call the destructor to release the object's own memory
-        (it.value())->~ModificationList();
-        // Put it back in the pool
-        poolModificationLists->releaseMemory(it.value());
-    }
 
-*/
     tin->release_tcp_internal(fcb);
 
-    //TODO CALL  chain
     if (fcb_in->previous_fnt)
         fcb_in->previous_fnt(fcb, fcb_in->previous_thunk);
 
@@ -482,11 +498,16 @@ ModificationList* TCPIn::getModificationList(WritablePacket* packet)
 {
     auto fcb_in = fcb_data();
     auto modificationLists = fcb_in->modificationLists;
+    if (modificationLists == 0) {
+        modificationLists = poolModificationTracker.allocate();
+        fcb_in->modificationLists = modificationLists;
+    }
+
 
     ModificationList* list = NULL;
 
     // Search the modification list in the hashtable
-    HashTable<tcp_seq_t, ModificationList*>::iterator it =
+    ModificationTracker::iterator it =
         modificationLists->find(getSequenceNumber(packet));
 
     // If we could find the element
@@ -509,22 +530,16 @@ bool TCPIn::hasModificationList(Packet* packet)
 {
     auto fcb_in = fcb_data();
     auto modificationLists = fcb_in->modificationLists;
-    HashTable<tcp_seq_t, ModificationList*>::iterator it =
+    if (!fcb_in->modificationLists)
+        return false;
+    ModificationTracker::iterator it =
         modificationLists->find(getSequenceNumber(packet));
 
     return (it != modificationLists->end());
 }
 
-bool TCPIn::allowResize() {
-    return _allow_resize;
-}
-
 void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t length)
 {
-    if (unlikely(!_allow_resize)) {
-        click_chatter("ERROR : An element is trying to insert bytes while TCPIn was configured without allowing modifications. Insertion ignored.");
-        return;
-    }
     ModificationList* list = getModificationList(packet);
 
     tcp_seq_t seqNumber = getSequenceNumber(packet);
@@ -533,20 +548,16 @@ void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t leng
     uint16_t tcpOffset = getPayloadOffset(packet);
 
     uint16_t contentOffset = packet->getContentOffset();
-    position += contentOffset;
-    list->addModification(seqNumber, seqNumber + position - tcpOffset, -((int)length));
+        click_chatter("Adding modification at seq %d, seq+pos %d, removing %d bytes",seqNumber, seqNumber + (position + contentOffset) - tcpOffset, length);
+    list->addModification(seqNumber, seqNumber + (position + contentOffset) - tcpOffset, -((int)length));
 
-    unsigned char *source = packet->data();
-    if(position > packet->length())
+    if(position + contentOffset > packet->length())
     {
         click_chatter("Error: Invalid removeBytes call (packet length: %u, position: %u)",
             packet->length(), position);
         return;
     }
-    uint32_t bytesAfter = packet->length() - position;
 
-    memmove(&source[position], &source[position + length], bytesAfter);
-    packet->take(length);
 
     // Continue in the stack function
     StackElement::removeBytes(packet, position, length);
@@ -555,26 +566,15 @@ void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t leng
 WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
      uint32_t length)
 {
-    if (unlikely(!_allow_resize)) {
-        click_chatter("ERROR : An element is trying to insert bytes while TCPIn was configured without allowing modifications. Insertion ignored.");
-        return packet;
-    }
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
     uint16_t tcpOffset = getPayloadOffset(packet);
     uint16_t contentOffset = packet->getContentOffset();
-    position += contentOffset;
-    getModificationList(packet)->addModification(seqNumber, seqNumber + position - tcpOffset,
+
+    getModificationList(packet)->addModification(seqNumber, seqNumber + position + contentOffset - tcpOffset,
          (int)length);
 
-    uint32_t bytesAfter = packet->length() - position;
-    WritablePacket *newPacket = packet->put(length);
-    assert(newPacket != NULL);
-    unsigned char *source = newPacket->data();
-
-    memmove(&source[position + length], &source[position], bytesAfter);
-
-    return newPacket;
+    return StackElement::insertBytes(packet, position, length);
 }
 
 void TCPIn::requestMorePackets(Packet *packet, bool force)
@@ -597,7 +597,7 @@ void TCPIn::ackPacket(Packet* packet, bool force)
     // The SEQ value is the initial ACK value in the packet sent
     // by the source.
     tcp_seq_t seq;
-    if (_allow_resize) {
+    if (allowResize()) {
         seq = getInitialAck(packet);
     } else {
         seq = getAckNumber(packet);
@@ -737,7 +737,7 @@ bool TCPIn::assignTCPCommon(Packet *packet)
 
         fcb_in->common->use_count++;
 
-        if (_allow_resize) {
+        if (allowResize() || returnElement->allowResize()) {
             // Initialize the RBT with the RBTManager
             fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
         }
@@ -760,7 +760,7 @@ bool TCPIn::assignTCPCommon(Packet *packet)
         // Set the pointer in the structure
         fcb_in->common = allocated;
         fcb_in->common->use_count++;
-        if (_allow_resize) {
+        if (allowResize() || returnElement->allowResize()) {
             // Initialize the RBT with the RBTManager
             fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
         }
@@ -776,6 +776,7 @@ bool TCPIn::assignTCPCommon(Packet *packet)
     fcb_set_release_fnt(fcb_in, release_tcp);
 
     // Set information about the flow
+    click_chatter("Dir %d",getFlowDirection());
     fcb_in->common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));
     fcb_in->common->maintainers[getFlowDirection()].setIpDst(getDestinationAddress(packet));
     fcb_in->common->maintainers[getFlowDirection()].setPortSrc(getSourcePort(packet));
@@ -843,7 +844,7 @@ void TCPIn::manageOptions(WritablePacket *packet)
         }
         else if(optStart[0] == TCPOPT_WSCALE && optStart[1] == TCPOLEN_WSCALE)
         {
-            if (_allow_resize) {
+            if (allowResize()) {
                 uint16_t winScale = optStart[2];
 
                 if(winScale >= 1)
@@ -872,7 +873,7 @@ void TCPIn::manageOptions(WritablePacket *packet)
         else if(optStart[0] == TCPOPT_MAXSEG && optStart[1] == TCPOLEN_MAXSEG)
         {
 
-            if (_allow_resize) {
+            if (allowResize()) {
                 uint16_t mss = (optStart[2] << 8) | optStart[3];
                 fcb_in->common->maintainers[flowDirection].setMSS(mss);
 

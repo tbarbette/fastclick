@@ -46,6 +46,8 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+    int initialize(ErrorHandler* errh) override CLICK_COLD;
+
     void push_batch(int port, PacketBatch* flow);
 
     /**
@@ -120,7 +122,7 @@ private:
 
     unsigned int flowDirection;
     bool _readonly;
-    bool _allow_resize; //Setted by the inElement
+    bool _allow_resize;
 };
 
 CLICK_ENDDECLS

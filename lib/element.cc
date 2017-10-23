@@ -1411,6 +1411,33 @@ Element::add_handlers()
 {
 }
 
+/**
+ * @brief Platform event handler
+ *
+ * This is the evolution of the initialize phase, allowing to launch multiple
+ *  kind of initialization events and decouple them in different phase.
+ * Event may also send back a positive integer to re-start
+ */
+int
+Element::event(ErrorHandler *errh, EventType phase)
+{
+    switch(phase) {
+        case __NEVER_OVERRIDE: //NEVER COPY THIS, NEVER OVERRIDE
+            return 982732; //Magic to check the function is not overwritten
+        case INIT_INITIALIZE: {
+            int e = initialize(errh);
+            if (e >= 0) {
+                return 0;
+            } else {
+                return e;
+            }
+            break;
+        }
+        default:
+            return 0;
+    }
+}
+
 /** @brief Initialize the element.
  *
  * @param errh error handler

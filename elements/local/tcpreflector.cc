@@ -24,7 +24,7 @@
 #include <click/args.hh>
 CLICK_DECLS
 
-TCPReflector::TCPReflector() : _data("")
+TCPReflector::TCPReflector() : _data(""),_nodata(false),_rand_seq(true)
 {
 }
 
@@ -40,6 +40,8 @@ TCPReflector::configure (Vector<String> &conf, ErrorHandler *errh)
 
     ret = Args(conf, this, errh)
             .read("DATA", _data)
+            .read("STRIP_PAYLOAD",_nodata)
+            .read("RAND_SEQ",_rand_seq)
             .complete();
     return ret;
 }
@@ -83,7 +85,11 @@ TCPReflector::tcp_input(Packet *xp) {
 
   if(th->th_flags == TH_SYN){
     th->th_flags = TH_SYN | TH_ACK;
-    th->th_seq = click_random(0, 0xFFFFFFFFU);
+    if (_rand_seq) {
+        th->th_seq = click_random(0, 0xFFFFFFFFU);
+    } else {
+        th->th_seq = htonl(seq + 1000000);
+    }
     th->th_ack = htonl(seq + 1);
   } else if(th->th_flags & TH_SYN){
     goto ignore;
@@ -112,24 +118,30 @@ TCPReflector::tcp_input(Packet *xp) {
   th->th_dport = sport;
   th->th_win = htons(60 * 1024);
 
-    if(dlen > 0 and _data) {
+    if(dlen > 0) {
+        if (_data) {
 
-        int diff = _data.length() + off + hlen - plen ;
-        if (diff > 0) {
-            p = p->put(diff);
-        } else {
-            p->take(-diff);
+            int diff = _data.length() + off + hlen - plen ;
+            if (diff > 0) {
+                p = p->put(diff);
+            } else {
+                p->take(-diff);
+            }
+
+            dlen = _data.length();
+            unsigned char* data = ((unsigned char *)th) + off;
+            memcpy(data,_data.data(),_data.length());
+
+            plen = p->length();
+            ip->ip_len = htons(plen - 20);
+            th->th_flags |= TH_FIN;
+
+
+        } else if (_nodata) {
+            p->take(dlen);
+            plen -= dlen;
+            dlen = 0;
         }
-
-        dlen = _data.length();
-        unsigned char* data = ((unsigned char *)th) + off;
-        memcpy(data,_data.data(),_data.length());
-
-        plen = p->length();
-        ip->ip_len = htons(plen - 20);
-        th->th_flags |= TH_FIN;
-
-
     }
 
   memcpy(itmp, ip, 9);
@@ -160,6 +172,15 @@ TCPReflector::simple_action(Packet *p)
 {
   return(tcp_input(p));
 }
+
+#if HAVE_BATCH
+PacketBatch *
+TCPReflector::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(tcp_input,batch,(void));
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(TCPReflector)
