@@ -45,7 +45,6 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             return NULL;
         }*/
 
-        click_chatter("_allow_resize %d",_allow_resize);
         if (_allow_resize) {
             WritablePacket *packet = p->uniqueify();
             fcb_in->common->lock.acquire();
