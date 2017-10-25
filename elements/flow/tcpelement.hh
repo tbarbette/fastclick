@@ -207,7 +207,7 @@ public:
      * elements that can be used without a real tcp context (such as TCPReorder)
      * can check if some TCP context is managed by a more tailored element
      */
-    FlowElement* _tcp_context;
+    //FlowElement* _tcp_context;
 };
 
 inline tcp_seq_t

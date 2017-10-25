@@ -7,8 +7,6 @@ FromIPSummaryDump(RX, STOP true, CHECKSUM true, TIMING true)
 -> FlowClassifier(VERBOSE 2, CONTEXT NONE)
 ~> IPIn
 -> IPPrint(RX)
--> TCPReorder(VERBOSE 1)
--> IPPrint(RXORDER)
 -> tcpin_rx2 :: TCPIn(RETURNNAME tcpin_tx2, VERBOSE true)
 -> IPPrint(RXTCP)
 -> InsultRemover(WORD is, MODE REMOVE)
@@ -29,7 +27,6 @@ tee[1]
 -> Print("TX",-1)
 ~> IPIn
 -> IPPrint(TX)
--> TCPReorder(VERBOSE 1)
 -> tcpin_tx2 :: TCPIn(RETURNNAME tcpin_rx2, VERBOSE true)
 -> to_tx :: TCPOut
 -> IPOut
@@ -41,9 +38,11 @@ tee[1]
 !data timestamp src sport dst dport proto tcp_seq tcp_ack tcp_flags payload
 1 18.26.4.44 2222 18.26.4.44 22 T 1000    0 S
 3 18.26.4.44 2222 18.26.4.44 22 T 1001 1001001 A
-4 18.26.4.44 2222 18.26.4.44 22 T 1001 1001001 . thisisan
-6 18.26.4.44 2222 18.26.4.44 22 T 1009 1001001 . at
-7 18.26.4.44 2222 18.26.4.44 22 T 1011 1001001 . tack
+#Unordered on purpose
+4 18.26.4.44 2222 18.26.4.44 22 T 1009 1001001 . at
+5 18.26.4.44 2222 18.26.4.44 22 T 1001 1001001 . thisisan
+5 18.26.4.44 2222 18.26.4.44 22 T 1001 1001001 . thisisan
+6 18.26.4.44 2222 18.26.4.44 22 T 1011 1001001 . tack
 7 18.26.4.44 2222 18.26.4.44 22 T 1015 1001001 F
 
 8 18.26.4.44 2322 18.26.4.45 22 T 1000    0 S

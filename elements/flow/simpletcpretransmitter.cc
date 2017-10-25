@@ -23,6 +23,13 @@ SimpleTCPRetransmitter::~SimpleTCPRetransmitter()
 {
 
 }
+void*
+SimpleTCPRetransmitter::cast(const char * name) {
+    if (strcmp("TCPRetransmitter", name)) {
+        return this;
+    }
+    return StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>::cast(name);
+}
 
 int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 {

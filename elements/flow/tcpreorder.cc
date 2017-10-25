@@ -5,7 +5,6 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include "tcpreorder.hh"
-#include "tcpin.hh"
 
 CLICK_DECLS
 
@@ -35,12 +34,15 @@ int
 TCPReorder::initialize(ErrorHandler *errh) {
     ElementCastTracker track(router(), "TCPIn");
     router()->visit_downstream(this,0,&track);
-    if (track.size() == 0) {
+    /*if (track.size() == 0) {
         errh->warning("Found no downward TCPIn. This element will work in standalone mode, having its own recycling. This is usually not desirable.");
     } else if (track.size() == 1) {
         _tcp_context = static_cast<TCPIn*>(track[0]);
     } else {
         errh->warning("Found multiple downward TCPIn. This element will work in standalone mode, having its own recycling. This is usually not desirable.");
+    }*/
+    if (track.size() > 0) {
+        return errh->error("TCPIn now includes support for reordering. Use TCPReorder alone if you only want TCP Reordering");
     }
     return 0;
 }
@@ -130,7 +132,7 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
     // Complexity: O(k) (k elements in the batch)
     FOR_EACH_PACKET_SAFE(batch, packet)
     {
-        if (isRst(packet)) {
+        if (unlikely(isRst(packet))) {
             if (_verbose)
                 click_chatter("Resetting the flow (have %d packets)!");
             killList(tcpreorder);
@@ -314,7 +316,7 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
     }
     tcpreorder->packetList = 0;
 
-    if (unlikely(last && !_tcp_context && !_notimeout)) { //End of flow, everything will be sent and we manage the flow ourself, remove timeout
+    if (unlikely(last && !_notimeout)) { //End of flow, everything will be sent and we manage the flow ourself, remove timeout
         click_ip *ip = (click_ip *) last->data();
         unsigned hlen = ip->ip_hl << 2;
         click_tcp *th = (click_tcp *) (((char *)ip) + hlen);
@@ -424,7 +426,7 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
         //click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
 
         //If there is no better TCP manager, we must ensure the flow stays alive
-        if (!_tcp_context && !_notimeout) {
+        if (!_notimeout) {
             fcb_acquire_timeout(2000);
         }
 

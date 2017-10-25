@@ -83,6 +83,12 @@ struct fcb_tcpin : public FlowReleaseChain
     SubFlowRealeaseFnt conn_release_fnt;
     void* conn_release_thunk;
     ModificationTracker* modificationLists;
+
+    //For reordering
+    Packet* packetList;
+    uint16_t packetListLength;
+    tcp_seq_t expectedPacketSeq;
+    tcp_seq_t lastSent;
 };
 
 
@@ -132,7 +138,7 @@ public:
     ~TCPIn() CLICK_COLD;
 
     const char *class_name() const        { return "TCPIn"; }
-    const char *port_count() const        { return PORTS_1_1; }
+    const char *port_count() const        { return PORTS_1_1X2; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -228,12 +234,19 @@ protected:
 
 private:
 
+    bool checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bool always_retransmit);
+
+    Packet* processOrderedTCP(struct fcb_tcpin *, Packet* p);
+    bool putPacketInList(struct fcb_tcpin* tcpreorder, Packet* packetToAdd);
+
     /**
      * @brief Function called when the timeout expire or when all packets are
      * released. Will call the release chain.
      */
     static void release_tcp(FlowControlBlock* fcb, void* thunk);
 
+
+    void resetReorderer(struct fcb_tcpin* tcpreorder);
     /**
      * Function to release internal flow state, called by release_tcp but do not call the FCB release chain. But do call the Stack release chain
      */
@@ -278,6 +291,7 @@ private:
 
     TCPOut* outElement; // TCPOut element of this path
     TCPIn* returnElement; // TCPIn element of the return path
+    Element::Port* _retransmit;
     unsigned int flowDirection;
 
     int _modification_level;

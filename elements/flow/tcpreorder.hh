@@ -34,7 +34,7 @@ struct fcb_tcpreorder : public FlowReleaseChain
     ~fcb_tcpreorder()
     {
         //TODO : call this on release
-        Packet* next = NULL;
+        /*Packet* next = NULL;
 
         while(packetList != NULL)
         {
@@ -45,7 +45,7 @@ struct fcb_tcpreorder : public FlowReleaseChain
 
             // Put back node in memory pool
             packetList = next;
-        }
+        }*/
     }
 };
 

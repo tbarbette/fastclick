@@ -11,7 +11,7 @@ CLICK_DECLS
 
 #define TCP_TIMEOUT 30000
 
-TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),
+TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
     poolFcbTcpCommon(),
     tableFcbTcpCommon()
 {
@@ -60,6 +60,16 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
         outElement = visitor[0];
     } else {
         outElement = this->router()->find(outName, errh);
+    }
+
+    if (noutputs() == 1) {
+        ElementCastTracker visitor(router(),"TCPRetransmitter");
+        router()->visit_downstream(this, -1, &visitor);
+        if (visitor.size() != 1) {
+            errh->warning("TCPIn has only one output and I could not find a TCPRetransmitter. TCP retransmissions will be lost and not forwarded");
+        } else {
+            _retransmit[0].assign(true, visitor[0], 1, false);
+        }
     }
 
     if(returnElement == NULL)
@@ -113,6 +123,252 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+bool TCPIn::checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bool always_retransmit)
+{
+    // If we receive a packet with a sequence number lower than the expected one
+    // (taking into account the wrapping sequence numbers), we consider to have a
+    // retransmission
+    if(SEQ_LT(getSequenceNumber(packet), tcpreorder->expectedPacketSeq))
+    {
+        if (unlikely(_verbose)) {
+            click_chatter("Retransmission ! Sequence is %lu, expected %lu", getSequenceNumber(packet), tcpreorder->expectedPacketSeq);
+        }
+        if (SEQ_GT(getNextSequenceNumber(packet), tcpreorder->expectedPacketSeq)) {
+            //If the packets overlap expectedPacketSeq, this is a split retransmission and we need to keep the good part of the packet
+            if (_verbose) {
+                click_chatter("Split retransmission !");
+                return true;
+            }
+        }
+        // If always_retransmit is not set:
+        // We do not send the packet to the second output if the retransmission is a packet
+        // that has not already been sent to the next element. In this case, this is a
+        // retransmission for a packet we already have in the waiting list so we can discard
+        // the retransmission
+        // Always retransmit will be set for SYN, as the whole list will be flushed
+        if(noutputs() == 2 && (always_retransmit || SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
+        {
+            PacketBatch *batch = PacketBatch::make_from_packet(packet);
+            output_push_batch(1, batch);
+        }
+        else
+        {
+            if (_retransmit) {
+                _retransmit->push_batch(PacketBatch::make_from_packet(packet));
+            } else
+                packet->kill();
+        }
+        return false;
+    }
+
+    return true;
+}
+
+
+bool TCPIn::putPacketInList(struct fcb_tcpin* tcpreorder, Packet* packetToAdd)
+{
+    Packet* last = NULL;
+    Packet* packetNode = tcpreorder->packetList;
+    auto pSeq = getSequenceNumber(packetToAdd);
+    // Browse the list until we find a packet with a greater sequence number than the
+    // packet to add in the list
+    while(packetNode != NULL
+        && (SEQ_LT(getSequenceNumber(packetNode), pSeq)))
+    {
+        last = packetNode;
+        packetNode = packetNode->next();
+    }
+
+    if (packetNode && (getSequenceNumber(packetNode) == pSeq)) {
+        if (_verbose)
+            click_chatter("BAD ERROR : A retransmit passed through");
+        packetToAdd -> kill();
+        return false;
+    }
+
+    //SEQ_LT(getAckNumber(packetNode), getAckNumber(packetToAdd)))
+
+    // Check if we need to add the node as the head of the list
+    if(last == NULL)
+        tcpreorder->packetList = packetToAdd; // If so, the list points to the node to add
+    else
+        last->set_next(packetToAdd); // If not, the previous node in the list now points to the node to add
+
+     // The node to add points to the first node with a greater sequence number
+    packetToAdd->set_next(packetNode);
+
+    //Packet in list have no FCB reference
+    fcb_release(1);
+    return true;
+}
+
+Packet*
+TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
+    tcp_seq_t currentSeq = getSequenceNumber(p);
+    fcb_in->lastSent = currentSeq;
+    fcb_in->expectedPacketSeq = getNextSequenceNumber(p);
+
+
+    if (allowResize()) {
+        //TODO : fine-grain this lock
+        fcb_in->common->lock.acquire();
+
+        WritablePacket *packet = p->uniqueify();
+
+        // Set the annotation indicating the initial ACK value
+        setInitialAck(packet, getAckNumber(packet));
+
+        // Compute the offset of the TCP payload
+        uint16_t offset = getPayloadOffset(packet);
+        packet->setContentOffset(offset);
+
+        ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
+        ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
+
+        // Update the window size
+        uint16_t prevWindowSize = maintainer.getWindowSize();
+        uint16_t newWindowSize = getWindowSize(packet);
+        maintainer.setWindowSize(newWindowSize);
+
+
+        if(otherMaintainer.isLastAckSentSet())
+        {
+            tcp_seq_t lastAckSentOtherSide = otherMaintainer.getLastAckSent();
+
+            if(!isSyn(packet) && SEQ_LT(currentSeq, lastAckSentOtherSide))
+            {
+                if (unlikely(_verbose)) {
+                    click_chatter("Lost ACK, re-acking. Seq is %lu, other is %lu",currentSeq, lastAckSentOtherSide);
+                }
+                // We receive content that has already been ACKed.
+                // This case occurs when the ACK is lost between the middlebox and
+                // the destination.
+                // In this case, we re-ACK the content and we discard it
+                ackPacket(packet);
+                packet->kill();
+                fcb_in->common->lock.release();
+                return NULL;
+            }
+        }
+
+        // Take care of the ACK value in the packet
+        bool isAnAck = isAck(packet);
+        tcp_seq_t ackNumber = 0;
+        tcp_seq_t newAckNumber = 0;
+        if(isAnAck)
+        {
+            // Map the ack number according to the ByteStreamMaintainer of the other direction
+            ackNumber = getAckNumber(packet);
+            newAckNumber = otherMaintainer.mapAck(ackNumber);
+
+            // Check the value of the previous ack received if it exists
+            bool lastAckReceivedSet = fcb_in->common->lastAckReceivedSet();
+            uint32_t prevLastAckReceived = 0;
+            if(lastAckReceivedSet)
+                prevLastAckReceived = fcb_in->common->getLastAckReceived(getFlowDirection());
+
+
+            // Check if we acknowledged new data
+            if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
+            {
+                // Increase congestion window
+                uint64_t cwnd = otherMaintainer.getCongestionWindowSize();
+                uint64_t ssthresh = otherMaintainer.getSsthresh();
+                // Sender segment size
+                uint16_t mss = otherMaintainer.getMSS();
+                uint64_t increase = 0;
+
+                // Check if we are in slow start mode
+                if(cwnd <= ssthresh)
+                    increase = mss;
+                else
+                    increase = mss * mss / cwnd;
+
+                otherMaintainer.setCongestionWindowSize(cwnd + increase);
+
+                maintainer.setDupAcks(0);
+            }
+
+            // Update the value of the last ACK received
+            fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
+
+            // Prune the ByteStreamMaintainer of the other side
+            otherMaintainer.prune(ackNumber);
+
+            // Update the statistics about the RTT
+            // And potentially update the retransmission timer
+            fcb_in->common->lock.release();
+            fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
+            fcb_in->common->lock.acquire();
+
+            // Check if the current packet is just an ACK without additional information
+            if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
+            {
+                bool isDup = false;
+                // Check duplicate acks
+                if(prevLastAckReceived == ackNumber)
+                {
+                    if (unlikely(_verbose)) {
+                        click_chatter("DUP Ack !");
+                    }
+                    isDup = true;
+                    uint8_t dupAcks = maintainer.getDupAcks();
+                    dupAcks++;
+                    maintainer.setDupAcks(dupAcks);
+
+                    // Fast retransmit
+                    if(dupAcks >= 3)
+                    {
+                        fcb_in->common->lock.release();
+                        fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
+                        fcb_in->common->lock.acquire();
+                        maintainer.setDupAcks(0);
+                    }
+                }
+
+                // Check that the ACK value is greater than what we have already
+                // sent to the destination.
+                // If this is a duplicate ACK, we don't discard it so that the mechanism
+                // of fast retransmission is preserved
+                if(maintainer.isLastAckSentSet() && SEQ_LEQ(newAckNumber, maintainer.getLastAckSent()) && !isDup)
+                {
+                    // If this is not the case, the packet does not bring any additional information
+                    // We can drop it
+                    packet->kill();
+                    fcb_in->common->lock.release();
+                    return NULL;
+                }
+            }
+
+            // If needed, update the ACK value in the packet with the mapped one
+            if(ackNumber != newAckNumber)
+                setAckNumber(packet, newAckNumber);
+        }
+        fcb_in->common->lock.release();
+
+        return packet;
+    } else { //Resize not allowed
+        // Compute the offset of the TCP payload
+
+        if (isAck(p)) {
+            fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
+        }
+        uint16_t offset = getPayloadOffset(p);
+        p->setContentOffset(offset);
+
+        return p;
+    }
+
+
+    if(checkConnectionClosed(p))
+    {
+        if (unlikely(_verbose))
+            click_chatter("Connection is already closed");
+        p->kill();
+        return 0;
+    }
+}
+
 void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 {
     // Assign the tcp_common structure if not already done
@@ -129,7 +385,7 @@ eagain:
                     //click_chatter("RST received");
                     //First packet was a RST
                     outElement->output_push_batch(0, PacketBatch::make_from_packet(p)); //Elements never knew about this flow, we bypass
-
+                    resetReorderer(fcb_in);
                     //TCPReorder will ensure the RST is alone, so we don't need to bother about dropping the rest of the batch, there is none
                 } else {
                 // The allocation failed, meaning that the packet is not a SYN
@@ -166,7 +422,7 @@ eagain:
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN;
             }
-        }
+        } /* fcb_in->common != NULL */
         else // At least one packet of this side of the flow has been seen
         {
             // The structure has been assigned so the three-way handshake is over
@@ -189,168 +445,50 @@ eagain:
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN;
             }
-
         }
 
-
-        if(checkConnectionClosed(p))
-        {
+        tcp_seq_t currentSeq = getSequenceNumber(p);
+        if (currentSeq != fcb_in->expectedPacketSeq) {
             if (unlikely(_verbose))
-                click_chatter("Connection is already closed");
-            p->kill();
-            return NULL;
+                    click_chatter("Flow is unordered... Awaiting %lu, have %lu", fcb_in->expectedPacketSeq, currentSeq);
+
+            //If packet is retransmission, we send it to the retransmitter
+            if(!checkRetransmission(fcb_in, p, false)) {
+                if (isRst(p)) { //If it's a RST, we process it even ooo
+                    checkConnectionClosed(p);
+                    p->kill();
+                    return 0;
+                }
+                return 0;
+            }
+
+            putPacketInList(fcb_in, p);
+            return 0;
         }
 
-
-        if (allowResize()) {
-            //TODO : fine-grain this lock
-            fcb_in->common->lock.acquire();
-
-            WritablePacket *packet = p->uniqueify();
-
-            // Set the annotation indicating the initial ACK value
-            setInitialAck(packet, getAckNumber(packet));
-
-            // Compute the offset of the TCP payload
-            uint16_t offset = getPayloadOffset(packet);
-            packet->setContentOffset(offset);
-
-            ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
-            ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
-
-            // Update the window size
-            uint16_t prevWindowSize = maintainer.getWindowSize();
-            uint16_t newWindowSize = getWindowSize(packet);
-            maintainer.setWindowSize(newWindowSize);
-
-            tcp_seq_t seqNumber = getSequenceNumber(packet);
-
-            if(otherMaintainer.isLastAckSentSet())
-            {
-                tcp_seq_t lastAckSentOtherSide = otherMaintainer.getLastAckSent();
-
-                if(!isSyn(packet) && SEQ_LT(seqNumber, lastAckSentOtherSide))
-                {
-                    if (unlikely(_verbose)) {
-                        click_chatter("Lost ACK, re-acking. Seq is %lu, other is %lu",seqNumber, lastAckSentOtherSide);
-                    }
-                    // We receive content that has already been ACKed.
-                    // This case occurs when the ACK is lost between the middlebox and
-                    // the destination.
-                    // In this case, we re-ACK the content and we discard it
-                    ackPacket(packet);
-                    packet->kill();
-                    fcb_in->common->lock.release();
-                    return NULL;
-                }
-            }
-
-            // Take care of the ACK value in the packet
-            bool isAnAck = isAck(packet);
-            tcp_seq_t ackNumber = 0;
-            tcp_seq_t newAckNumber = 0;
-            if(isAnAck)
-            {
-                // Map the ack number according to the ByteStreamMaintainer of the other direction
-                ackNumber = getAckNumber(packet);
-                newAckNumber = otherMaintainer.mapAck(ackNumber);
-
-                // Check the value of the previous ack received if it exists
-                bool lastAckReceivedSet = fcb_in->common->lastAckReceivedSet();
-                uint32_t prevLastAckReceived = 0;
-                if(lastAckReceivedSet)
-                    prevLastAckReceived = fcb_in->common->getLastAckReceived(getFlowDirection());
-
-
-                // Check if we acknowledged new data
-                if(lastAckReceivedSet && SEQ_GT(ackNumber, prevLastAckReceived))
-                {
-                    // Increase congestion window
-                    uint64_t cwnd = otherMaintainer.getCongestionWindowSize();
-                    uint64_t ssthresh = otherMaintainer.getSsthresh();
-                    // Sender segment size
-                    uint16_t mss = otherMaintainer.getMSS();
-                    uint64_t increase = 0;
-
-                    // Check if we are in slow start mode
-                    if(cwnd <= ssthresh)
-                        increase = mss;
-                    else
-                        increase = mss * mss / cwnd;
-
-                    otherMaintainer.setCongestionWindowSize(cwnd + increase);
-
-                    maintainer.setDupAcks(0);
-                }
-
-                // Update the value of the last ACK received
-                fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
-
-                // Prune the ByteStreamMaintainer of the other side
-                otherMaintainer.prune(ackNumber);
-
-                // Update the statistics about the RTT
-                // And potentially update the retransmission timer
-                fcb_in->common->lock.release();
-                fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
-                fcb_in->common->lock.acquire();
-
-                // Check if the current packet is just an ACK without additional information
-                if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
-                {
-                    bool isDup = false;
-                    // Check duplicate acks
-                    if(prevLastAckReceived == ackNumber)
-                    {
-                        isDup = true;
-                        uint8_t dupAcks = maintainer.getDupAcks();
-                        dupAcks++;
-                        maintainer.setDupAcks(dupAcks);
-
-                        // Fast retransmit
-                        if(dupAcks >= 3)
-                        {
-                            fcb_in->common->lock.release();
-                            fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
-                            fcb_in->common->lock.acquire();
-                            maintainer.setDupAcks(0);
-                        }
-                    }
-
-                    // Check that the ACK value is greater than what we have already
-                    // sent to the destination.
-                    // If this is a duplicate ACK, we don't discard it so that the mechanism
-                    // of fast retransmission is preserved
-                    if(maintainer.isLastAckSentSet() && SEQ_LEQ(newAckNumber, maintainer.getLastAckSent()) && !isDup)
-                    {
-                        // If this is not the case, the packet does not bring any additional information
-                        // We can drop it
-                        packet->kill();
-                        fcb_in->common->lock.release();
-                        return NULL;
-                    }
-                }
-
-                // If needed, update the ACK value in the packet with the mapped one
-                if(ackNumber != newAckNumber)
-                    setAckNumber(packet, newAckNumber);
-            }
-            fcb_in->common->lock.release();
-            return packet;
-        } else { //Resize not allowed
-            // Compute the offset of the TCP payload
-
-            if (isAck(p)) {
-                fcb_in->common->setLastAckReceived(getFlowDirection(),getAckNumber(p));
-            }
-            uint16_t offset = getPayloadOffset(p);
-            p->setContentOffset(offset);
-
-            return p;
-        }
+        return processOrderedTCP(fcb_in, p);
     };
-    auto drop = [](Packet* p){};
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, drop);
+
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, (void));
+    if (fcb_in->packetList) {
+        BATCH_CREATE_INIT(nowOrderBatch);
+        while (fcb_in->packetList && getSequenceNumber(fcb_in->packetList) == fcb_in->expectedPacketSeq) {
+            Packet* p = fcb_in->packetList;
+            fcb_in->packetList = p->next();
+            BATCH_CREATE_APPEND(nowOrderBatch, p);
+        }
+
+        if (nowOrderBatch) {
+            BATCH_CREATE_FINISH(nowOrderBatch);
+            auto refnt = [this,fcb_in](Packet* p){return processOrderedTCP(fcb_in,p);};
+            EXECUTE_FOR_EACH_PACKET_DROPPABLE(refnt, nowOrderBatch, (void));
+            fcb_acquire(nowOrderBatch->count());
+            if (flow)
+                flow->append_batch(nowOrderBatch);
+            else
+                flow = nowOrderBatch;
+        }
+    }
     if (flow)
         output(0).push_batch(flow);
 }
@@ -375,6 +513,18 @@ TCPIn* TCPIn::getReturnElement()
     return returnElement;
 }
 
+void TCPIn::resetReorderer(struct fcb_tcpin* tcpreorder) {
+        SFCB_STACK( //Packet in the list have no reference
+            FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
+                click_chatter("WARNING : Non-free TCPReorder flow bucket");
+                p->kill();
+            }
+        );
+        tcpreorder->packetList = 0;
+        tcpreorder->packetListLength = 0;
+        tcpreorder->expectedPacketSeq = 0;
+}
+
 void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
     auto fcb_in = fcb_data_for(fcb);
     auto &common = fcb_in->common;
@@ -382,6 +532,7 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
         fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
         fcb_in->conn_release_fnt = 0;
     }
+    resetReorderer(fcb_in);
     if (fcb_in->modificationLists) {
         for(HashTable<tcp_seq_t, ModificationList*>::iterator it = fcb_in->modificationLists->begin();
             it != fcb_in->modificationLists->end(); ++it)
@@ -641,13 +792,14 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
         return false;
     }
 
-    do_check:
+    do_check: //Packet is Fin or Rst
     fcb_in->common->lock.acquire(); //Re read with lock if not in fast path
     state = fcb_in->common->state;
 
     if (isRst(packet)) {
         fcb_in->common->state = TCPState::CLOSED;
         fcb_in->common->lock.release();
+        resetReorderer(fcb_in);
         return false;
     }
 
@@ -773,11 +925,12 @@ bool TCPIn::assignTCPCommon(Packet *packet)
         //click_chatter("AL Common is %p",fcb_in->common);
     }
 
+    fcb_in->expectedPacketSeq = getSequenceNumber(packet); //Not next because this one will be checked just after
+
     fcb_acquire_timeout(TCP_TIMEOUT);
     fcb_set_release_fnt(fcb_in, release_tcp);
 
     // Set information about the flow
-    click_chatter("Dir %d",getFlowDirection());
     fcb_in->common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));
     fcb_in->common->maintainers[getFlowDirection()].setIpDst(getDestinationAddress(packet));
     fcb_in->common->maintainers[getFlowDirection()].setPortSrc(getSourcePort(packet));

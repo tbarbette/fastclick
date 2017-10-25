@@ -51,7 +51,6 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
 
             bool hasModificationList = inElement->hasModificationList(packet);
 
-            click_chatter("Has mod %d",hasModificationList);
             ByteStreamMaintainer &byteStreamMaintainer = fcb_in->common->maintainers[getFlowDirection()];
             ModificationList *modList = NULL;
 
