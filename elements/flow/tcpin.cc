@@ -553,11 +553,12 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
         //lock->acquire();
         //tin->tableTcpCommon->erase(flowID); //TODO : consume if it was not taken by the other side
         poolFcbTcpCommon.release(common);
-        fcb_in->common = 0;
         //lock->release();
     }
     else
         common->lock.release();
+
+    fcb_in->common = 0;
 
 }
 
