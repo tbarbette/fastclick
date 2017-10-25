@@ -59,7 +59,6 @@ int SimpleTCPRetransmitter::initialize(ErrorHandler *errh) {
 
 void
 SimpleTCPRetransmitter::release_flow(fcb_transmit_buffer* fcb) {
-
     if (fcb->first_unacked) {
         //click_chatter("SimpleTCPRetransmitter :: Releasing %d transmit buffers", fcb->first_unacked->count());
         fcb->first_unacked->fast_kill();
@@ -68,14 +67,14 @@ SimpleTCPRetransmitter::release_flow(fcb_transmit_buffer* fcb) {
     return;
 }
 
-void SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBatch *batch)
+void
+SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBatch *batch)
 {
     //If the flow is killed, just push the batch to port 0 (let RST go through)
     if (unlikely(!_in->fcb_data()->common || _in->fcb_data()->common->state == TCPState::CLOSED)) {
         output_push_batch(0, batch);
         return;
     }
-
 
     if(port == 0) { //Normal packet to buffer
         /**

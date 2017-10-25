@@ -59,7 +59,15 @@ TCPReorder(FLOWDIRECTION [, MERGESORT])
 
 =s middlebox
 
-reorders TCP packets
+reorders TCP packets. This element is deprecated, the functionality has
+been merged in TCPIn. Still, it is interesting to see how to make
+a standalone TCP reorderer that will not do much more than that.
+
+Its default is that as it does not speak with the other side of the connection,
+a RST is not propagated to the other side. Meaning that if a connection
+is reused after a RST, the other side will see packets out of order.
+Proper implementation needs a "dual" state, something only accessible after
+TCPIn
 
 =d
 

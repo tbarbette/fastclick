@@ -204,6 +204,16 @@ bool TCPIn::putPacketInList(struct fcb_tcpin* tcpreorder, Packet* packetToAdd)
 
 Packet*
 TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
+
+
+    if(checkConnectionClosed(p))
+    {
+        if (unlikely(_verbose))
+            click_chatter("Connection is already closed");
+        p->kill();
+        return 0;
+    }
+
     tcp_seq_t currentSeq = getSequenceNumber(p);
     fcb_in->lastSent = currentSeq;
     fcb_in->expectedPacketSeq = getNextSequenceNumber(p);
@@ -357,15 +367,6 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
         p->setContentOffset(offset);
 
         return p;
-    }
-
-
-    if(checkConnectionClosed(p))
-    {
-        if (unlikely(_verbose))
-            click_chatter("Connection is already closed");
-        p->kill();
-        return 0;
     }
 }
 
