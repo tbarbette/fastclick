@@ -391,8 +391,10 @@ eagain:
                 // packet. This is not supposed to happen and it means that
                 // the first two packets of the connection are not SYN packets
                     click_chatter("Warning: Trying to assign a common tcp memory area"
-                        " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d)",
-                        isSyn(p),isRst(p),isAck(p));
+                        " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d, src %s:%d dst %s:%d)",
+                        isSyn(p),isRst(p),isAck(p),
+                        IPAddress(p->ip_header()->ip_src).unparse(), ntohs(p->tcp_header()->th_sport),
+                        IPAddress(p->ip_header()->ip_dst).unparse(), ntohs(p->tcp_header()->th_dport));
                     p->kill();
                 }
 
@@ -439,7 +441,9 @@ eagain:
                     if(!checkRetransmission(fcb_in, p, false)) {
                         return 0;
                     }
-                    click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d). Dropping it",fcb_in->common->state, isAck(p));
+                    click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d, src %s:%d dst %s:%d). Dropping it",fcb_in->common->state, isAck(p),
+                            IPAddress(p->ip_header()->ip_src).unparse(), ntohs(p->tcp_header()->th_sport),
+                            IPAddress(p->ip_header()->ip_dst).unparse(), ntohs(p->tcp_header()->th_dport));
                     p->kill();
                     return NULL;
                 }
@@ -519,7 +523,7 @@ TCPIn* TCPIn::getReturnElement()
 void TCPIn::resetReorderer(struct fcb_tcpin* tcpreorder) {
         SFCB_STACK( //Packet in the list have no reference
             FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
-                click_chatter("WARNING : Non-free TCPReorder flow bucket");
+                click_chatter("WARNING : Non-free TCPReorder flow bucket , seq %lu, expected %lu",getSequenceNumber(p),tcpreorder->expectedPacketSeq);
                 p->kill();
             }
         );

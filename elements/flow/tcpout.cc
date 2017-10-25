@@ -159,6 +159,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             fcb_in->common->lock.release();
 
             computeTCPChecksum(packet);
+            return packet;
         } else {
             tcp_seq_t seq = getSequenceNumber(p);
             tcp_seq_t ack = getAckNumber(p);
@@ -186,9 +187,8 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                 p = packet;
                 computeTCPChecksum(packet);
             }
+            return p;
         }
-
-        return p;
     };
     EXECUTE_FOR_EACH_PACKET(fnt, flow);
 
