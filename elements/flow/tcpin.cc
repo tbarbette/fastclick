@@ -136,7 +136,8 @@ eagain:
                 // packet. This is not supposed to happen and it means that
                 // the first two packets of the connection are not SYN packets
                     click_chatter("Warning: Trying to assign a common tcp memory area"
-                        " for a non-SYN packet or a non-matching tupple");
+                        " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d)",
+                        isSyn(p),isRst(p),isAck(p));
                     p->kill();
                 }
 

@@ -123,6 +123,8 @@ private:
      */
     bool putPacketInList(struct fcb_tcpreorder *fcb, Packet* packet);
 
+    void killList(struct fcb_tcpreorder* tcpreorder);
+
     /**
      * @brief Send the in-order packets from the list of waiting packets
      * @param fcb A pointer to the FCB of the flow

@@ -123,12 +123,27 @@ void TCPReorder::push_batch(int port, fcb_tcpreorder* tcpreorder, PacketBatch *b
 
     }
     unordered:
-    //click_chatter("Flow is now unordered... Awaiting %lu, have %lu", tcpreorder->expectedPacketSeq, getSequenceNumber(batch->first()));
+    if (unlikely(_verbose))
+        click_chatter("Flow is now unordered... Awaiting %lu, have %lu", tcpreorder->expectedPacketSeq, getSequenceNumber(batch->first()));
 
     int num = batch->count();
     // Complexity: O(k) (k elements in the batch)
     FOR_EACH_PACKET_SAFE(batch, packet)
     {
+        if (isRst(packet)) {
+            if (_verbose)
+                click_chatter("Resetting the flow (have %d packets)!");
+            killList(tcpreorder);
+            tcpreorder->expectedPacketSeq = 0;
+            Packet* next = packet->next();
+            while(next) {
+                Packet* tmp = next;
+                next = next->next();
+                tmp->kill();
+            }
+            checked_output_push_batch(0,PacketBatch::make_from_packet(packet));
+            return;
+        }
         //click_chatter("TCPReorder : processing Packet %p seq %d flow %p",packet,getSequenceNumber(packet),tcpreorder);
 
         if(!checkRetransmission(tcpreorder, packet, false)) {
@@ -195,6 +210,16 @@ bool TCPReorder::checkRetransmission(struct fcb_tcpreorder *tcpreorder, Packet* 
     // retransmission
     if(SEQ_LT(getSequenceNumber(packet), tcpreorder->expectedPacketSeq))
     {
+        if (_verbose) {
+            click_chatter("Retransmission ! Sequence is %lu, expected %lu", getSequenceNumber(packet), tcpreorder->expectedPacketSeq);
+        }
+        if (SEQ_GT(getNextSequenceNumber(packet), tcpreorder->expectedPacketSeq)) {
+            //If the packets overlap expectedPacketSeq, this is a split retransmission and we need to keep the good part of the packet
+            if (_verbose) {
+                click_chatter("Split retransmission !");
+                return true;
+            }
+        }
         // If always_retransmit is not set:
         // We do not send the packet to the second output if the retransmission is a packet
         // that has not already been sent to the next element. In this case, this is a
@@ -242,10 +267,6 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         if(SEQ_LT(currentSeq, tcpreorder->expectedPacketSeq))
         {
             click_chatter("Warning: received a retransmission with a different split (current %lu, expected %lu, last %lu)",currentSeq, tcpreorder->expectedPacketSeq, (last?getSequenceNumber(last):0));
-            #ifndef HAVE_FLOW
-            // Warning if the system is used outside middleclick
-            click_chatter("This may be the sign that a second flow is interfering, this can cause bugs.");
-            #endif
             Packet* to_delete = packet;
             int num = 0;
             SFCB_STACK( //Do not drop reference as they are from the waiting list packets that are unreferenced
@@ -267,9 +288,12 @@ PacketBatch* TCPReorder::sendEligiblePackets(struct fcb_tcpreorder *tcpreorder, 
         if(currentSeq != tcpreorder->expectedPacketSeq)
         {
             if (_verbose)
-                click_chatter("Not the expected packet, have %lu expected %lu. Count is %d. Uc %d",currentSeq,tcpreorder->expectedPacketSeq,count,fcb_stack->count());
+                click_chatter("Not the expected packet, have %d expected %d, last sent is %d. Count is %d. Uc %d",currentSeq,tcpreorder->expectedPacketSeq,tcpreorder->lastSent, count,fcb_stack->count());
+            //The packet 
+//            if (getNextSequenceNumber(
             tcpreorder->packetList = packet;
             // Check before exiting that we did not have a batch to send
+            // TODO : Send pro-active retransmit if option
             goto send_batch;
         }
 
@@ -358,12 +382,22 @@ bool TCPReorder::putPacketInList(struct fcb_tcpreorder* tcpreorder, Packet* pack
     return true;
 }
 
+void TCPReorder::killList(struct fcb_tcpreorder* tcpreorder) {
+        SFCB_STACK( //Packet in the list have no reference
+            FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
+                click_chatter("WARNING : Non-free TCPReorder flow bucket");
+                p->kill();
+            }
+        );
+        tcpreorder->packetList = 0;
+        tcpreorder->packetListLength = 0;
+}
+
 bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch* batch)
 {
     Packet* packet = batch->first();
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
-
 
     // Check if the packet is a SYN packet
     if(flags & TH_SYN)
@@ -384,6 +418,7 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
                 //click_chatter("But seems good...");
             }
         }
+
         // Update the expected sequence number
         tcpreorder->expectedPacketSeq = getSequenceNumber(packet);
         //click_chatter("First packet received (%u) for flow %p", tcpreorder->expectedPacketSeq,fcb_stack);
@@ -392,20 +427,19 @@ bool TCPReorder::checkFirstPacket(struct fcb_tcpreorder* tcpreorder, PacketBatch
         if (!_tcp_context && !_notimeout) {
             fcb_acquire_timeout(2000);
         }
+
         // Ensure that the list of waiting packets is free
         // (SYN should always be the first packet)
-        SFCB_STACK( //Packet in the list have no reference
-        FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
-            click_chatter("WARNING : Non-free TCPReorder flow bucket");
-            p->kill();
-        }
-        );
-        tcpreorder->packetList = 0;
-        tcpreorder->packetListLength = 0;
+        killList(tcpreorder);
     } else {
         if (!tcpreorder->expectedPacketSeq) {
-            //click_chatter("The flow does not start with a syn! We should send a RST sometime !"); //TODO : This is the role of the tcp ctx
+            //click_chatter("The flow does not start with a syn! We should send a RST sometime !"); //No, this is the role of the tcp ctx
             if (isRst(batch->first())) { //Let the RST pass for a bad SYN
+                if (_verbose)
+                    click_chatter("Resetting the flow !");
+                killList(tcpreorder);
+                tcpreorder->expectedPacketSeq = 0;
+
                 if (batch->count() == 1) {
                     checked_output_push_batch(0,batch);
                     return false;
