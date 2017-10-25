@@ -30,14 +30,14 @@ class FlowElement : public BatchElement {
 public:
 	FlowElement();
 	~FlowElement();
-	virtual FlowNode* get_table(int iport, FlowElement* lastContext);
+	virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack);
 
     FlowClassifier* _classifier;
     FlowClassifier* one_upstream_classifier() {
         return _classifier;
     }
 
-    virtual FlowNode* resolveContext(FlowType);
+    virtual FlowNode* resolveContext(FlowType, Vector<FlowElement*> stack);
     virtual FlowType getContext();
 
     virtual bool stopClassifier() { return false; };
@@ -345,7 +345,7 @@ public:
 		return true;
 	}
 
-	static FlowNode* get_downward_table(Element* e, int output, FlowElement* context);
+	static FlowNode* get_downward_table(Element* e, int output, Vector<FlowElement*> context);
 };
 
 
@@ -407,8 +407,9 @@ int FlowStateElement<Derived, T>::initialize(ErrorHandler *errh) {
  * Define a context (such as FLOW_IP) but no rule/session
  */
 #define FLOW_ELEMENT_DEFINE_CONTEXT(ft) \
-FlowNode* get_table(int iport, FlowElement* context) override CLICK_COLD {\
-    return FlowElement::get_table(iport, this);\
+FlowNode* get_table(int iport, Vector<FlowElement*> context) override CLICK_COLD {\
+    context.push_back(this);\
+    return FlowElement::get_table(iport, context);\
 }\
 virtual FlowType getContext() override {\
     return ft;\
@@ -418,8 +419,10 @@ virtual FlowType getContext() override {\
  * Define a context (such as FLOW_TCP) and a rule/session definition
  */
 #define FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(rule,ft) \
-FlowNode* get_table(int iport, FlowElement* context) override CLICK_COLD {\
-    FlowNode* down = FlowElement::get_table(iport,ft == FLOW_NONE ? context : this); \
+FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) override CLICK_COLD {\
+    if (ft)\
+        contextStack.push_back(this);\
+    FlowNode* down = FlowElement::get_table(iport,contextStack); \
     FlowNode* my = FlowClassificationTable::parse(rule).root;\
     return my->combine(down, true, true);\
 }\
@@ -437,19 +440,21 @@ virtual FlowType getContext() override {\
  * Defin two rules/sessions but no context
  */
 #define FLOW_ELEMENT_DEFINE_SESSION_DUAL(ruleA,ruleB) \
-FlowNode* get_table(int iport, FlowElement* context) override CLICK_COLD {\
+FlowNode* get_table(int iport, Vector<FlowElement*> context) override CLICK_COLD {\
     return FlowClassificationTable::parse(ruleA).root->combine(FlowClassificationTable::parse(ruleB).root,false,false)->combine(FlowElement::get_table(iport,context), true,true);\
 }
 
 /**
- * Define the context and a rule but only for one specific port
+ * Define the context no matter the input port, and a rule but only for one specific port
  */
 #define FLOW_ELEMENT_DEFINE_PORT_SESSION_CONTEXT(port_num,rule,ft) \
-FlowNode* get_table(int iport, FlowElement* context) override {\
+FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) override {\
     if (iport == port_num) {\
-        return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport,context), true, true);\
+        return FlowClassificationTable::parse(rule).root->combine(FlowElement::get_table(iport,contextStack), true, true);\
     }\
-    return FlowElement::get_table(iport,(ft == 0)?context:this);\
+    if (ft)\
+        contextStack.push_back(this);\
+    return FlowElement::get_table(iport,contextStack);\
 }\
 virtual FlowType getContext() override {\
     return ft;\

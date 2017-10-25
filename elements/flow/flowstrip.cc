@@ -46,26 +46,37 @@ FlowStrip::simple_action_batch(PacketBatch *head)
 	return head;
 }
 
-void FlowStrip::apply_offset(FlowNode* node) {
-	node->level()->add_offset(_nbytes);
+void FlowStrip::apply_offset(FlowNode* node, bool invert) {
+	node->level()->add_offset(invert?-_nbytes:_nbytes);
 
 	FlowNode::NodeIterator it = node->iterator();
 	FlowNodePtr* child;
 	while ((child = it.next()) != 0) {
 		if (child->ptr && child->is_node())
-			apply_offset(child->node);
+			apply_offset(child->node,invert);
 	}
 	if (node->default_ptr()->ptr && node->default_ptr()->is_node())
-		apply_offset(node->default_ptr()->node);
+		apply_offset(node->default_ptr()->node,invert);
 }
 
-FlowNode* FlowStrip::get_table(int,FlowElement* context) {
+FlowNode* FlowStrip::get_table(int,Vector<FlowElement*> context) {
+    context.push_back(this);
 	FlowNode* root = FlowElementVisitor::get_downward_table(this, 0,context);
 	if (root)
-		apply_offset(root);
+		apply_offset(root, false);
 	return root;
 }
 
+FlowNode* FlowStrip::resolveContext(FlowType t, Vector<FlowElement*> contextStack) {
+    if (contextStack.size() > 1) {
+        FlowNode* n = contextStack[contextStack.size() - 2]->resolveContext(t, contextStack.sub(0,contextStack.size()-1));
+        if (n) {
+            apply_offset(n, true);
+            return n;
+        }
+    }
+    return FlowElement::resolveContext(t,contextStack);
+}
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)
 EXPORT_ELEMENT(FlowStrip)

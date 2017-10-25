@@ -24,7 +24,7 @@ public:
 
     void push_batch(int, int* flowdata, PacketBatch* batch) override;
 
-    FlowNode* get_table(int,FlowElement*) override;
+    FlowNode* get_table(int,Vector<FlowElement*>) override;
 
 private :
     typedef struct {

@@ -37,7 +37,7 @@ public:
     FLOW_ELEMENT_DEFINE_CONTEXT(FLOW_IP);
 
 
-    virtual FlowNode* resolveContext(FlowType t);
+    virtual FlowNode* resolveContext(FlowType t, Vector<FlowElement*> contextStack) override;
 /*
     virtual void removeBytes(WritablePacket* packet, uint32_t position,
         uint32_t length) override;

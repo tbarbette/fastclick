@@ -45,8 +45,10 @@ public:
         bool is_default;
     } Rule;
     static Rule parse(String s, bool verbose = false);
-    static Rule make_drop_rule() {
-        return parse("- drop");
+    static Rule make_drop_rule(bool ed = false) {
+        Rule r = parse("- drop");
+        if (ed)
+            r.root->traverse_all_leaves([](FlowNodePtr* ptr){ ptr->leaf->set_early_drop();}, true, true);
     }
     static Rule make_ip_mask(IPAddress dst, IPAddress mask);
 protected:

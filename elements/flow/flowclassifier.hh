@@ -64,7 +64,7 @@ public:
     void push_batch_builder(int port, PacketBatch*);
     void push_batch(int port, PacketBatch*);
 
-    virtual FlowNode* get_table(int iport, FlowElement* lastContext) {
+    virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) {
         click_chatter("Warning : Sub-table optimization not supported as of now.");
         return 0;
     }
@@ -74,7 +74,7 @@ public:
 #endif
     bool run_idle_task(IdleTask*) override;
 
-    virtual FlowNode* resolveContext(FlowType t) override;
+    virtual FlowNode* resolveContext(FlowType t, Vector<FlowElement*> contextStack) override;
 
 	FlowClassificationTable& table() {
 		return _table;

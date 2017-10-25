@@ -42,17 +42,17 @@ IPIn::push_batch(int port, PacketBatch* flow)
 }
 
 FlowNode*
-IPIn::resolveContext(FlowType t) {
+IPIn::resolveContext(FlowType t, Vector<FlowElement*> contextStack) {
     String prot;
     switch (t) {
         case FLOW_UDP:
-            prot = "9/11";
+            prot = "9/11!";
             break;
         case FLOW_TCP:
-            prot = "9/06";
+            prot = "9/06!";
             break;
         default:
-            return FlowElement::resolveContext(t);
+            return FlowElement::resolveContext(t, contextStack);
     }
     return FlowClassificationTable::parse(prot).root;
 }

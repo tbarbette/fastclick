@@ -35,22 +35,11 @@ class FlowUnstrip : public FlowElement {
 
   PacketBatch *simple_action_batch(PacketBatch *);
 
-  inline void apply_offset(FlowNode* node) {
-	node->level()->add_offset(-_nbytes);
-
-  	FlowNode::NodeIterator it = node->iterator();
-		FlowNodePtr* child;
-		while ((child = it.next()) != 0) {
-			if (child->ptr && child->is_node())
-				apply_offset(child->node);
-		}
-		if (node->default_ptr()->ptr && node->default_ptr()->is_node())
-			apply_offset(node->default_ptr()->node);
-  }
-
-  FlowNode* get_table(int,FlowElement* context) override;
-
+  void apply_offset(FlowNode* node, bool invert);
+  FlowNode* get_table(int,Vector<FlowElement*> context) override;
+  FlowNode* resolveContext(FlowType t, Vector<FlowElement*> contextStack) override;
 };
+
 
 CLICK_ENDDECLS
 #endif

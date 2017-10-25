@@ -75,7 +75,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 	return 0;
 }
 
-FlowNode* FlowDispatcher::get_child(int output, bool append_drop,FlowElement* context) {
+FlowNode* FlowDispatcher::get_child(int output, bool append_drop,Vector<FlowElement*> context) {
     FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output, context);
     if (!child_table)
         return 0;
@@ -88,7 +88,7 @@ FlowNode* FlowDispatcher::get_child(int output, bool append_drop,FlowElement* co
     return child_table;
 }
 
-bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_drop, FlowElement* context) {
+bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_drop, Vector<FlowElement*> context) {
     FlowNode* child_table = get_child(output, append_drop, context);
     bool changed = false;
     if (child_table) {
@@ -107,7 +107,7 @@ bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_d
 }
 
 
-FlowNode* FlowDispatcher::get_table(int, FlowElement* context) {
+FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 	if (!_table) {
 		if (_verbose) {
 			click_chatter("%s : Computing table with %d rules :",name().c_str(),rules.size());

@@ -154,22 +154,23 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-FlowNode* FlowClassifier::resolveContext(FlowType t) {
+FlowNode* FlowClassifier::resolveContext(FlowType t, Vector<FlowElement*> contextStack) {
     String prot;
     if (_context == FLOW_ETHER) {
         switch (t) {
             case FLOW_IP:
-                prot = "12/0800";
+                prot = "12/0800!";
                 break;
             case FLOW_ARP:
-                prot = "12/0806";
+                prot = "12/0806!";
                 break;
             default:
-                return FlowElement::resolveContext(t);
+                return FlowElement::resolveContext(t, contextStack);
         }
     } else {
-        return FlowElement::resolveContext(t);
+        return FlowElement::resolveContext(t, contextStack);
     }
+
     return FlowClassificationTable::parse(prot).root;
 
 }
@@ -279,7 +280,9 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     auto passing = get_passing_threads();
     _table.get_pool()->compress(passing);
 
-    FlowNode* table = FlowElementVisitor::get_downward_table(this, 0, this);
+    Vector<FlowElement*> s(1,0);
+    s[0] = this;
+    FlowNode* table = FlowElementVisitor::get_downward_table(this, 0, s);
 
     if (!table)
        return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());

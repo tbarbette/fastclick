@@ -193,6 +193,8 @@ class Vector {
 
     inline void clear();
 
+    inline Vector<T> sub(size_type begin, size_type sz);
+
     inline void swap(Vector<T> &x);
 
     inline void shuffle(int n);
@@ -490,6 +492,16 @@ inline bool Vector<T>::reserve(size_type n) {
 template <typename T>
 inline void Vector<T>::swap(Vector<T> &x) {
     vm_.swap(x.vm_);
+}
+
+/** @brief Swap the contents of this vector and @a x. */
+template <typename T>
+inline Vector<T> Vector<T>::sub(size_type begin, size_type sz) {
+    Vector<T> n(sz,0);
+    for (int i = 0; i < sz; i++) {
+        n[i] = *(T *)&vm_.l_[i + begin];
+    }
+    return n;
 }
 
 /** @brief Replace this vector's contents with a copy of @a x. */

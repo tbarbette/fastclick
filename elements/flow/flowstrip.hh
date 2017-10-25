@@ -30,9 +30,11 @@ class FlowStrip : public FlowElement { public:
 
     PacketBatch *simple_action_batch(PacketBatch *) override;
 
-    void apply_offset(FlowNode* node);
+    void apply_offset(FlowNode* node, bool invert);
 
-    FlowNode* get_table(int,FlowElement* context) override;
+    FlowNode* get_table(int,Vector<FlowElement*> context) override;
+
+    virtual FlowNode* resolveContext(FlowType t, Vector<FlowElement*> stack) override;
   private:
 
     unsigned _nbytes;
