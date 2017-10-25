@@ -393,8 +393,8 @@ eagain:
                     click_chatter("Warning: Trying to assign a common tcp memory area"
                         " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d, src %s:%d dst %s:%d)",
                         isSyn(p),isRst(p),isAck(p),
-                        IPAddress(p->ip_header()->ip_src).unparse(), ntohs(p->tcp_header()->th_sport),
-                        IPAddress(p->ip_header()->ip_dst).unparse(), ntohs(p->tcp_header()->th_dport));
+                        IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
+                        IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
                     p->kill();
                 }
 
@@ -442,8 +442,8 @@ eagain:
                         return 0;
                     }
                     click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d, src %s:%d dst %s:%d). Dropping it",fcb_in->common->state, isAck(p),
-                            IPAddress(p->ip_header()->ip_src).unparse(), ntohs(p->tcp_header()->th_sport),
-                            IPAddress(p->ip_header()->ip_dst).unparse(), ntohs(p->tcp_header()->th_dport));
+                            IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
+                            IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
                     p->kill();
                     return NULL;
                 }
