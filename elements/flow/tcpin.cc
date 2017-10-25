@@ -204,8 +204,6 @@ bool TCPIn::putPacketInList(struct fcb_tcpin* tcpreorder, Packet* packetToAdd)
 
 Packet*
 TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
-
-
     if(checkConnectionClosed(p))
     {
         if (unlikely(_verbose))
@@ -453,20 +451,21 @@ eagain:
             if (unlikely(_verbose))
                     click_chatter("Flow is unordered... Awaiting %lu, have %lu", fcb_in->expectedPacketSeq, currentSeq);
 
+            if (isRst(p)) { //If it's a RST, we process it even ooo
+                if (unlikely(_verbose)) {
+                    click_chatter("Rst out of order !");
+                }
+                goto force_process_packet;
+            }
             //If packet is retransmission, we send it to the retransmitter
             if(!checkRetransmission(fcb_in, p, false)) {
-                if (isRst(p)) { //If it's a RST, we process it even ooo
-                    checkConnectionClosed(p);
-                    p->kill();
-                    return 0;
-                }
                 return 0;
             }
 
             putPacketInList(fcb_in, p);
             return 0;
         }
-
+        force_process_packet:
         return processOrderedTCP(fcb_in, p);
     };
 
