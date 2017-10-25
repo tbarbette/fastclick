@@ -436,6 +436,9 @@ eagain:
                     fcb_in->common = 0;
                     goto eagain;
                 } else {
+                    if(!checkRetransmission(fcb_in, p, false)) {
+                        return 0;
+                    }
                     click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d). Dropping it",fcb_in->common->state, isAck(p));
                     p->kill();
                     return NULL;
