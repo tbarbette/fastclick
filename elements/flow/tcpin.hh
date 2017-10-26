@@ -61,8 +61,7 @@ public:
 
     inline void setLastAckReceived(int direction, tcp_seq_t ackNumber)
     {
-        if (SEQ_GT(ackNumber, lastAckReceived[direction]))
-            lastAckReceived[direction] = ackNumber;
+        lastAckReceived[direction] = ackNumber;
     }
 
 

@@ -17,6 +17,7 @@
 SimpleTCPRetransmitter::SimpleTCPRetransmitter()
 {
     _verbose = false;
+    _proack = true;
 }
 
 SimpleTCPRetransmitter::~SimpleTCPRetransmitter()
@@ -34,7 +35,8 @@ SimpleTCPRetransmitter::cast(const char * name) {
 int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
-    .complete() < 0)
+            .read("PROACK",_proack)
+            .complete() < 0)
         return -1;
 
     ElementCastTracker visitor(router(), "TCPIn");
@@ -135,7 +137,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
 
         FOR_EACH_PACKET_SAFE(batch, packet) {
             uint32_t seq = getSequenceNumber(packet);
-            if (fcb_in->common->lastAckReceivedSet() && SEQ_LT(seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()))) {
+            if (_proack && fcb_in->common->lastAckReceivedSet() && SEQ_LT(seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()))) {
                 if (_verbose)
                     click_chatter("Client just did not receive the ack, let's ACK him (seq %lu, last ack %lu, state %d)",seq,fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),fcb_in->common->state);
                 _in->ackPacket(packet,true);

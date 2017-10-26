@@ -506,6 +506,9 @@ int TCPIn::initialize(ErrorHandler *errh) {
         tableFcbTcpCommon.disable_mt();
     }
     _modification_level = outElement->maxModificationLevel();
+    if (this->returnElement->getFlowDirection() != 1 - getFlowDirection()) {
+        return errh->error("Bad flow direction between %p{element}=%d and %p{element}=%d",this,this->returnElement,getFlowDirection(),this->returnElement->getFlowDirection());
+    }
     return 0;
 }
 
@@ -811,7 +814,8 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
     }
 
     if(state == TCPState::OPEN) {
-        //click_chatter("TCP is now closing with the first FIN");
+        if (_verbose)
+            click_chatter("TCP is now closing with the first FIN");
         fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_1;
         fcb_in->common->lock.release();
         return false; //Let the FIN through. We cannot release now as there is an ACK that needs to come
@@ -819,7 +823,8 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
     } else if(state == TCPState::BEING_CLOSED_GRACEFUL_1)
     {
         if(isFin(packet)) {
-            //click_chatter("Connection is being closed gracefully, this is the second FIN");
+            if (_verbose)
+                click_chatter("Connection is being closed gracefully, this is the second FIN");
             fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_2;
         }
         fcb_in->common->lock.release();
@@ -827,7 +832,8 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
     }
     else if(state == TCPState::BEING_CLOSED_GRACEFUL_2)
     {
-        //click_chatter("Connection is being closed gracefully, this is the last ACK");
+        if (_verbose)
+            click_chatter("Connection is being closed gracefully, this is the last ACK");
         fcb_in->common->state = TCPState::CLOSED;
         fcb_in->common->lock.release();
         return false; //We need the out element to eventually correct the ACK number
