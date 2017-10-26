@@ -87,7 +87,6 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
             if (getPayloadLength(packet) == 0)
                 continue;
             Packet* clone = packet->clone(true); //Fast clone. If using DPDK, we only hold a buffer reference
-            clone->set_next(0);
             clone->set_mac_header(packet->mac_header());
             clone->set_network_header(packet->network_header());
             clone->set_transport_header(packet->transport_header());
@@ -158,7 +157,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                             lastretransmit = pr;
                             //click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
                             fcb_acquire(1);
-                            output_push_batch(0,PacketBatch::make_from_packet(packet->clone()));
+                            output_push_batch(0,PacketBatch::make_from_packet(packet->clone(true)));
                         }
                         goto found;
                     }
