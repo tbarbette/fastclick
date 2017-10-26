@@ -27,6 +27,7 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 TCPOut::initialize(ErrorHandler *errh) {
     if (maxModificationLevel() & MODIFICATION_RESIZE) {
+        click_chatter("%p{element} Flow resizing support enabled",this);
         _allow_resize = true;
         if (_readonly) {
             return errh->error("Cannot modify packets in read-only mode !");
