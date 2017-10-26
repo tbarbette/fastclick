@@ -10,7 +10,7 @@
 
 CLICK_DECLS
 
-TCPOut::TCPOut() : inElement(NULL),_readonly(false)
+TCPOut::TCPOut() : inElement(NULL),_readonly(false), _allow_resize(false)
 {
 
 }
