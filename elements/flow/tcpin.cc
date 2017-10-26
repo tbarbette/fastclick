@@ -952,6 +952,12 @@ bool TCPIn::assignTCPCommon(Packet *packet)
     return true;
 }
 
+bool TCPIn::isEstablished()
+{
+    auto fcb_in = fcb_data();
+    return fcb_in->common && fcb_in->common->state > TCPState::ESTABLISHING;
+}
+
 bool TCPIn::isLastUsefulPacket(Packet *packet)
 {
     if(isFin(packet) || isRst(packet))

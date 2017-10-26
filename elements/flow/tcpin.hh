@@ -215,6 +215,7 @@ protected:
          uint32_t) override CLICK_WARN_UNUSED_RESULT;
     virtual void requestMorePackets(Packet *packet, bool force = false) override;
     virtual void closeConnection(Packet *packet, bool graceful) override;
+    virtual bool isEstablished() override;
     virtual bool isLastUsefulPacket(Packet *packet) override;
     virtual unsigned int determineFlowDirection() override;
 

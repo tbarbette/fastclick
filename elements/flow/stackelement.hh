@@ -216,6 +216,14 @@ protected:
     virtual bool registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk);
 
     /**
+     * @brief Tells if the current session is established
+     * Only applicable to context with connection status
+     * @return A boolean indicating whether the connection is established or not
+     * of the flow
+     */
+    virtual bool isEstablished();
+
+    /**
      * @brief Indicate whether a given packet is the last useful one for this side of the flow
      * @param fcb A pointer to the FCB of the flow
      * @param packet The packet

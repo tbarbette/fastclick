@@ -1,7 +1,8 @@
 /*
- * MidStat.{cc,hh} -- remove insults in web pages
- * Romain Gaillard
+ * midstat.{cc,hh} -- MiddleBox statistics
  * Tom Barbette
+ *
+ * Based on the idea from mOS
  */
 
 #include <click/config.h>
