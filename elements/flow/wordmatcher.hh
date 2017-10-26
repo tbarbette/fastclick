@@ -9,14 +9,14 @@
 CLICK_DECLS
 
 /**
- * Structure used by the InsultRemover element
+ * Structure used by the WordMatcher element
  */
-struct fcb_insultremover
+struct fcb_WordMatcher
 {
     FlowBuffer flowBuffer;
     uint32_t counterRemoved;
 
-    fcb_insultremover()
+    fcb_WordMatcher()
     {
         /*counterRemoved = 0;*/
     }
@@ -25,7 +25,7 @@ struct fcb_insultremover
 /*
 =c
 
-InsultRemover([CLOSECONNECTION])
+WordMatcher([CLOSECONNECTION])
 
 =s middlebox
 
@@ -51,20 +51,20 @@ Boolean if true, replace the insult instead of removing the bytes. Default to tr
 
 #define POOL_BUFFER_ENTRIES_SIZE 300
 
-class InsultRemover : public StackSpaceElement<fcb_insultremover>
+class WordMatcher : public StackSpaceElement<fcb_WordMatcher>
 {
 public:
-    /** @brief Construct an InsultRemover element
+    /** @brief Construct an WordMatcher element
      */
-    InsultRemover() CLICK_COLD;
+    WordMatcher() CLICK_COLD;
 
-    const char *class_name() const        { return "InsultRemover"; }
+    const char *class_name() const        { return "WordMatcher"; }
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PUSH; }
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
-    void push_batch(int port, fcb_insultremover* fcb, PacketBatch*) override;
+    void push_batch(int port, fcb_WordMatcher* fcb, PacketBatch*) override;
 
 protected:
 
@@ -76,7 +76,7 @@ protected:
      * @return The result of the deletion (1: insult found and removed, -1 insult not found, 0
      * insult not found but may start at the end of the last packet in the buffer)
      */
-    int removeInsult(struct fcb_insultremover* fcb, const char *insult);
+    int removeInsult(struct fcb_WordMatcher* fcb, const char *insult);
 
     per_thread<MemoryPool<struct flowBufferEntry>> poolBufferEntries;
 

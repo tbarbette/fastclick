@@ -474,6 +474,45 @@ class StackBufferElement : public StackStateElement<Derived, BufferData<T>>
     }
 };
 
+template <class Derived, typename T>
+class StackChunkBufferElement : public StackStateElement<Derived, BufferData<T>>
+{
+    public:
+
+    const char *processing() const final    { return Element::PUSH; }
+
+    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
+    {
+        auto it = fcb_data->flowBuffer.enqueueAllChunkIter(flow);
+        int action = static_cast<Derived*>(this)->process_data(&fcb_data->userdata,it);
+        if (action < 0) {
+            this->closeConnection((it.current() ? it.current() : flow->first()), true);
+            release_flow(fcb_data);
+            return;
+        } else if (action > 0) {
+            this->closeConnection((it.current() ? it.current() : flow->first()), true);
+            this->checked_output_push_batch(action,fcb_data->flowBuffer.dequeueAll());
+            return;
+        }
+
+        PacketBatch* passed = it.flush();
+//        click_chatter("Passed %d",passed);
+        if (it.current()) {
+//            click_chatter("Pending %p",it.current());
+            this->requestMorePackets(it.current(), false);
+        }
+        if (passed)
+            this->checked_output_push_batch(action,passed);
+    }
+
+    void release_flow(BufferData<T>* fcb) {
+        PacketBatch* batch = fcb->flowBuffer.dequeueAll();
+        if (batch) {
+            batch->fast_kill();
+        }
+    }
+};
+
 
 
 CLICK_ENDDECLS

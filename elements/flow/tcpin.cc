@@ -218,8 +218,7 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
 
 
     if (allowResize()) {
-        //TODO : fine-grain this lock
-        fcb_in->common->lock.acquire();
+
 
         WritablePacket *packet = p->uniqueify();
 
@@ -230,6 +229,8 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
         uint16_t offset = getPayloadOffset(packet);
         packet->setContentOffset(offset);
 
+        //TODO : fine-grain this lock
+        fcb_in->common->lock.acquire();
         ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
         ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
 
@@ -391,8 +392,8 @@ eagain:
                 // packet. This is not supposed to happen and it means that
                 // the first two packets of the connection are not SYN packets
                     click_chatter("Warning: Trying to assign a common tcp memory area"
-                        " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d, src %s:%d dst %s:%d)",
-                        isSyn(p),isRst(p),isAck(p),
+                        " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d, F:%d, src %s:%d dst %s:%d)",
+                        isSyn(p),isRst(p),isAck(p),isFin(p),
                         IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
                         IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
                     p->kill();
@@ -523,7 +524,7 @@ TCPIn* TCPIn::getReturnElement()
 void TCPIn::resetReorderer(struct fcb_tcpin* tcpreorder) {
         SFCB_STACK( //Packet in the list have no reference
             FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
-                click_chatter("WARNING : Non-free TCPReorder flow bucket , seq %lu, expected %lu",getSequenceNumber(p),tcpreorder->expectedPacketSeq);
+                //click_chatter("WARNING : Non-free TCPReorder flow bucket , seq %lu, expected %lu",getSequenceNumber(p),tcpreorder->expectedPacketSeq);
                 p->kill();
             }
         );
@@ -621,6 +622,7 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
         newState = TCPState::BEING_CLOSED_GRACEFUL_1;
     }
     fcb_in->common->state = newState;
+    fcb_in->common->lock.release();
 
     //Send FIN or RST to other side
         // Get the information needed to ack the given packet
@@ -645,7 +647,6 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
 
     //click_chatter("Closing connection on flow %u (graceful: %u)",        getFlowDirection(), graceful);
 
-    fcb_in->common->lock.release();
 
     if (!graceful) { //This is the last time this side will see a packet, release
         releaseFCBState();

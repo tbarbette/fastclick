@@ -25,6 +25,7 @@ struct flowBufferEntry
 };
 
 class FlowBufferContentIter;
+class FlowBufferChunkIter;
 class FlowBufferIter;
 class StackElement;
 struct fcb;
@@ -137,6 +138,8 @@ public:
 
 
     FlowBufferContentIter enqueueAllIter(PacketBatch* batch);
+    FlowBufferChunkIter enqueueAllChunkIter(PacketBatch* batch);
+
 private:
     inline bool isInitialized() {
         return head != 0;
@@ -262,6 +265,65 @@ private:
     uint32_t offsetInPacket; // Current offset in the current packet
 };
 
+class Chunk { public:
+    const unsigned char* bytes;
+    const unsigned length;
+};
+
+/** @class FlowBufferContentIter
+ * @brief This iterator allows to iterate the content in the buffer seamlessly accross the packets
+ */
+class FlowBufferChunkIter
+{
+public:
+    friend class FlowBuffer;
+
+    /** @brief Construct a FlowBufferContentIter
+     * @param _flowBuffer The FlowBuffer to which this iterator is linked
+     * @param _entry The entry in the buffer to which this iterator points
+     */
+    inline FlowBufferChunkIter(FlowBuffer *_flowBuffer, Packet* packet);
+
+    /** @brief Compare two FlowBufferContentIter
+     * @param other The FlowBufferContentIter to be compared to
+     * @return True if the two iterators point to the same data in the flow
+     */
+    inline bool operator==(const FlowBufferChunkIter& other) const;
+
+    /** @brief Compare two FlowBufferContentIter
+     * @param other The FlowBufferContentIter to be compared to
+     * @return False if the two iterators point to the same data in the flow
+     */
+    inline bool operator!=(const FlowBufferChunkIter& other) const;
+
+    /** @brief Return the byte to which this iterator points
+     * @return The byte to which this iterator points
+     */
+    inline Chunk operator*();
+
+    /** @brief Move the iterator to the next byte in the buffer
+     * @return The iterator moved
+     */
+    inline FlowBufferChunkIter& operator++();
+
+    inline operator bool() const {
+        return entry != 0;
+    }
+
+    /**
+     * Return all packets up to the current position, not included
+     */
+    inline PacketBatch* flush();
+
+    inline Packet* current() {
+        return entry;
+    }
+
+private:
+
+    FlowBuffer *flowBuffer;
+    Packet* entry;
+};
 
 
 // FlowBuffer Iterator
@@ -372,6 +434,73 @@ inline FlowBufferContentIter& FlowBufferContentIter::operator++()
 
 
 inline PacketBatch* FlowBufferContentIter::flush() {
+    if (entry == 0) {
+        return this->flowBuffer->dequeueAll();
+    } else {
+
+        return this->flowBuffer->dequeueUpTo(entry);
+    }
+}
+
+
+//FlowBufferChunkIter
+inline FlowBufferChunkIter::FlowBufferChunkIter(FlowBuffer *_flowBuffer,
+    Packet* _entry) : flowBuffer(_flowBuffer), entry(_entry)
+{
+    //The offset at first start must be valid
+    while (entry && entry->getContentOffset() == entry->length())
+    {
+        entry = entry->next();
+    }
+}
+
+inline bool FlowBufferChunkIter::operator==(const FlowBufferChunkIter& other) const
+{
+    if(this->flowBuffer != other.flowBuffer)
+        return false;
+
+    if(this->entry == NULL && other.entry == NULL)
+        return true;
+
+    if(this->entry != other.entry)
+        return false;
+
+    return true;
+}
+
+inline bool FlowBufferChunkIter::operator!=(const FlowBufferChunkIter& other) const
+{
+    return !(*this == other);
+}
+
+inline Chunk FlowBufferChunkIter::operator*()
+{
+    assert(entry != NULL);
+
+    WritablePacket* wp = static_cast<WritablePacket*>(entry);
+    int off = wp->getContentOffset();
+    unsigned char* content = wp->data() + off;
+
+    return Chunk{content, wp->length() - off};
+}
+
+
+inline FlowBufferChunkIter& FlowBufferChunkIter::operator++()
+{
+    assert(entry != NULL);
+
+    entry = entry->next();
+    //Advance while the entry have no content
+    while (entry && entry->getContentOffset() == entry->length())
+    {
+        entry = entry->next();
+    }
+
+    return *this;
+}
+
+
+inline PacketBatch* FlowBufferChunkIter::flush() {
     if (entry == 0) {
         return this->flowBuffer->dequeueAll();
     } else {

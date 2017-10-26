@@ -116,7 +116,87 @@ FlowIDSMatcher::add_handlers() {
 }
 
 
+//Chunk
+
+FlowIDSChunkMatcher::FlowIDSChunkMatcher() : _program()
+{
+    _stalled = 0;
+    _matched = 0;
+}
+
+FlowIDSChunkMatcher::~FlowIDSChunkMatcher() {
+}
+
+int
+FlowIDSChunkMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    bool payload_only = false;
+    if (Args(this, errh).bind(conf)
+            .consume() < 0)
+      return -1;
+
+    for (int i=0; i < conf.size(); ++i) {
+        String pattern = cp_unquote(conf[i]);
+        int result = _program.add_pattern(pattern);
+        if (result != 0) {
+            // This should not happen
+            return errh->error("Error (%d) adding pattern %d: %s", result, i, pattern.c_str());
+        }
+    }
+    return 0;
+}
+
+
+
+int
+FlowIDSChunkMatcher::process_data(fcb_FlowIDSMatcher* fcb_data, FlowBufferChunkIter& iterator) {
+    SimpleDFA::state_t state = fcb_data->state;
+    if (state == SimpleDFA::MATCHED)
+        return -1;
+
+    while (iterator) {
+        Chunk ch = *iterator;
+        _program.next_chunk(ch.bytes,ch.length,state);
+        if (unlikely(state == SimpleDFA::MATCHED)) {
+            _matched ++;
+            return 1;
+        }
+        ++iterator;
+    }
+    fcb_data->state = state;
+    return 0;
+}
+
+
+String
+FlowIDSChunkMatcher::read_handler(Element *e, void *thunk)
+{
+    FlowIDSMatcher *c = (FlowIDSMatcher *)e;
+    switch ((intptr_t)thunk) {
+      default:
+          return "<error>";
+    }
+}
+
+int
+FlowIDSChunkMatcher::write_handler(const String &in_str, Element *e, void *thunk, ErrorHandler *errh)
+{
+    FlowIDSMatcher *c = (FlowIDSMatcher *)e;
+    switch ((intptr_t)thunk) {
+        default:
+            return errh->error("<internal>");
+    }
+}
+
+void
+FlowIDSChunkMatcher::add_handlers() {
+    add_data_handlers("stalled", Handler::h_read, &_stalled);
+    add_data_handlers("matched", Handler::h_read, &_matched);
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(FlowIDSMatcher)
-ELEMENT_REQUIRES(userlevel RegexSet)
+EXPORT_ELEMENT(FlowIDSChunkMatcher)
+ELEMENT_REQUIRES(userlevel)
 ELEMENT_MT_SAFE(FlowIDSMatcher)
+ELEMENT_MT_SAFE(FlowIDSChunkMatcher)

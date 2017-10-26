@@ -51,6 +51,16 @@ FlowBufferContentIter FlowBuffer::enqueueAllIter(PacketBatch* batch) {
 }
 
 
+FlowBufferChunkIter FlowBuffer::enqueueAllChunkIter(PacketBatch* batch) {
+    if (head != 0) {
+        head->append_batch(batch);
+    } else {
+        head = batch;
+    }
+    return FlowBufferChunkIter(this,batch);
+}
+
+
 void FlowBuffer::enqueue(Packet *packet)
 {
     if(unlikely(!isInitialized()))

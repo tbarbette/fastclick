@@ -129,8 +129,16 @@ public:
         }
     }
 
-    inline void next(unsigned char c, state_t &state) {
+    inline void next(const unsigned char& c, state_t &state) {
         state = vector[state].next[c];
+    }
+
+    inline void next_chunk(const unsigned char*& c, const int& size, state_t &state) {
+        for (int i = 0; i < size; i++) {
+            state = vector[state].next[*(c + i)];
+            if (state == MATCHED)
+                return;
+        }
     }
 
     void print(Vector<NextState> v) {

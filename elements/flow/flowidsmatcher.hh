@@ -54,5 +54,30 @@ class FlowIDSMatcher : public StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatch
 		atomic_uint32_t _matched;
 };
 
+class FlowIDSChunkMatcher : public StackChunkBufferElement<FlowIDSChunkMatcher,fcb_FlowIDSMatcher> { //Use CTRP to avoid virtual
+    public:
+
+        FlowIDSChunkMatcher() CLICK_COLD;
+        ~FlowIDSChunkMatcher() CLICK_COLD;
+
+        const char *class_name() const      { return "FlowIDSChunkMatcher"; }
+        const char *port_count() const    { return PORTS_1_1X2; }
+
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
+        int process_data(fcb_FlowIDSMatcher*, FlowBufferChunkIter&);
+
+        virtual int maxModificationLevel() override {
+            int r = StackChunkBufferElement<FlowIDSChunkMatcher,fcb_FlowIDSMatcher>::maxModificationLevel();
+            return r;
+        }
+    private:
+        static String read_handler(Element *, void *) CLICK_COLD;
+        static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
+        SimpleDFA _program;
+        atomic_uint32_t _stalled;
+        atomic_uint32_t _matched;
+};
+
 CLICK_ENDDECLS
 #endif

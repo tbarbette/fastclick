@@ -1,5 +1,5 @@
 /*
- * insultremover.{cc,hh} -- remove insults in web pages
+ * WordMatcher.{cc,hh} -- remove insults in web pages
  * Romain Gaillard
  * Tom Barbette
  */
@@ -8,12 +8,12 @@
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
-#include "insultremover.hh"
+#include "wordmatcher.hh"
 #include "tcpelement.hh"
 
 CLICK_DECLS
 
-InsultRemover::InsultRemover() : insults()
+WordMatcher::WordMatcher() : insults()
 {
     // Initialize the memory pool of each thread
     for(unsigned int i = 0; i < poolBufferEntries.weight(); ++i)
@@ -25,7 +25,7 @@ InsultRemover::InsultRemover() : insults()
     _full = false;
 }
 
-int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
+int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     //TODO : use a proper automaton for insults
     _insert_msg = "<font color='red'>Blocked content !</font><br />";
@@ -64,8 +64,8 @@ int InsultRemover::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-InsultRemover::maxModificationLevel() {
-    int mod = StackSpaceElement<fcb_insultremover>::maxModificationLevel() | MODIFICATION_WRITABLE;
+WordMatcher::maxModificationLevel() {
+    int mod = StackSpaceElement<fcb_WordMatcher>::maxModificationLevel() | MODIFICATION_WRITABLE;
     if (!_replace) {
         mod |= MODIFICATION_RESIZE | MODIFICATION_STALL;
     } else {
@@ -75,9 +75,9 @@ InsultRemover::maxModificationLevel() {
 }
 
 
-void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, PacketBatch* flow)
+void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch* flow)
 {
-    insultremover->flowBuffer.enqueueAll(flow);
+    WordMatcher->flowBuffer.enqueueAll(flow);
 
     /**
      * This is mostly an example element, so we have two modes :
@@ -88,8 +88,8 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
     {
         const char* insult = insults[i].c_str();
         if (_replace) {
-            auto iter = insultremover->flowBuffer.contentBegin();
-            auto end = insultremover->flowBuffer.contentEnd();
+            auto iter = WordMatcher->flowBuffer.contentBegin();
+            auto end = WordMatcher->flowBuffer.contentEnd();
 
             while (iter != end) {
                 if (*iter ==  insult[0]) {
@@ -109,7 +109,7 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
                             }
                         }
                         if (insult[pos] == '\0') {
-                            insultremover->counterRemoved += 1;
+                            WordMatcher->counterRemoved += 1;
                             if (closeAfterInsults)
                                 goto closeconn;
                             pos = 0;
@@ -128,11 +128,11 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
             int result;
             do {
                 if (!_insert) { //If not insert, just remove
-                    result = insultremover->flowBuffer.removeInFlow(insult, this);
+                    result = WordMatcher->flowBuffer.removeInFlow(insult, this);
                 } else if (!_full){ //Insert but not full, replace pattern per message
-                    result = insultremover->flowBuffer.replaceInFlow(insult, _insert_msg.c_str(), this);
+                    result = WordMatcher->flowBuffer.replaceInFlow(insult, _insert_msg.c_str(), this);
                 } else { //Full, repalce the whole flow per message
-                    result = insultremover->flowBuffer.searchInFlow(insult);
+                    result = WordMatcher->flowBuffer.searchInFlow(insult);
                 }
                 if (result == 1) {
                     if (closeAfterInsults)
@@ -142,7 +142,7 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
                         //Remove all bytes
                         //Add msg
                     }
-                    insultremover->counterRemoved += 1;
+                    WordMatcher->counterRemoved += 1;
                 }
             } while (result == 1);
 
@@ -160,13 +160,13 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
     }
     finished:
     //Finished without being in the middle of an insult. If closeconn was set and there was an insult, we already jumped further.
-    output_push_batch(0, insultremover->flowBuffer.dequeueAll());
+    output_push_batch(0, WordMatcher->flowBuffer.dequeueAll());
     return;
 
     closeconn:
 
     closeConnection(flow, true);
-    insultremover->flowBuffer.dequeueAll()->fast_kill();
+    WordMatcher->flowBuffer.dequeueAll()->fast_kill();
 
     return;
 
@@ -180,5 +180,5 @@ void InsultRemover::push_batch(int port, fcb_insultremover* insultremover, Packe
 
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(InsultRemover)
-ELEMENT_MT_SAFE(InsultRemover)
+EXPORT_ELEMENT(WordMatcher)
+ELEMENT_MT_SAFE(WordMatcher)
