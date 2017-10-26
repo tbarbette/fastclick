@@ -182,7 +182,7 @@ void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
 #endif
         return q;
     };
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, [](Packet*p){p->kill();});
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, (void));
 
     checked_output_push_batch(0, batch);
 }
@@ -266,7 +266,7 @@ void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* 
 #endif
         return q;
     };
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, [](Packet* p){p->kill();});
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, (void));
 
     checked_output_push_batch(0, batch);
 }

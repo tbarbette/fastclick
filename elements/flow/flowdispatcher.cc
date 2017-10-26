@@ -76,7 +76,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 FlowNode* FlowDispatcher::get_child(int output, bool append_drop,Vector<FlowElement*> context) {
-    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output, context);
+    FlowNode* child_table = FlowElementVisitor::get_downward_table(this, output, context, _children_merge);
     if (!child_table)
         return 0;
     child_table->check();
@@ -142,6 +142,8 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                     //Just keep the root
                 }
             }
+
+            assert(rules[i].root);
 
             //Now set data for all leaf of the rule
             auto fnt = [this,i](FlowNodePtr* ptr) {

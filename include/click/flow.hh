@@ -49,6 +49,7 @@ public:
         Rule r = parse("- drop");
         if (ed)
             r.root->traverse_all_leaves([](FlowNodePtr* ptr){ ptr->leaf->set_early_drop();}, true, true);
+        return r;
     }
     static Rule make_ip_mask(IPAddress dst, IPAddress mask);
 protected:

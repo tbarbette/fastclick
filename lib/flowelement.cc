@@ -25,7 +25,7 @@ CLICK_DECLS
 #ifdef HAVE_FLOW
 
 FlowNode*
-FlowElementVisitor::get_downward_table(Element* e,int output, Vector<FlowElement*> contextStack) {
+FlowElementVisitor::get_downward_table(Element* e,int output, Vector<FlowElement*> contextStack, bool resolve_context) {
 	FlowNode* merged = 0;
 
     FlowElementVisitor v(e);
@@ -45,12 +45,15 @@ FlowElementVisitor::get_downward_table(Element* e,int output, Vector<FlowElement
 			e->router()->please_stop_driver();
 			return 0;
 		}
-		FlowNode* ctx = contextStack.back()->resolveContext(v.dispatchers[i].elem->getContext(),contextStack);
+		FlowNode* ctx = 0;
+		if (resolve_context) {
+		    ctx = contextStack.back()->resolveContext(v.dispatchers[i].elem->getContext(),contextStack);
+		}
 		FlowNode* child_table;
 		if (ctx) {
 		    child_table = ctx->combine(v.dispatchers[i].elem->get_table(v.dispatchers[i].iport, contextStack),true,true);
 		} else {
-		    child_table = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport, contextStack),true,true;
+		    child_table = v.dispatchers[i].elem->get_table(v.dispatchers[i].iport, contextStack);
 		}
 #if DEBUG_CLASSIFIER
 		click_chatter("Traversal merging of %p{element} [%d] : ",v.dispatchers[i].elem,v.dispatchers[i].iport);

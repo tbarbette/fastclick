@@ -1,5 +1,5 @@
-#ifndef MIDDLEBOX_INSULTREM_HH
-#define MIDDLEBOX_INSULTREM_HH
+#ifndef MIDDLEBOX_WORDMATCHER_HH
+#define MIDDLEBOX_WORDMATCHER_HH
 #include <click/element.hh>
 #include <click/vector.hh>
 #include <click/multithread.hh>

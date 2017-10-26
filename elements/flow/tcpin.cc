@@ -218,8 +218,6 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
 
 
     if (allowResize()) {
-
-
         WritablePacket *packet = p->uniqueify();
 
         // Set the annotation indicating the initial ACK value

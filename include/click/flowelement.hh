@@ -345,7 +345,7 @@ public:
 		return true;
 	}
 
-	static FlowNode* get_downward_table(Element* e, int output, Vector<FlowElement*> context);
+	static FlowNode* get_downward_table(Element* e, int output, Vector<FlowElement*> context, bool resolve_context = false);
 };
 
 
