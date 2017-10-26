@@ -23,12 +23,8 @@ int FlowCounter::configure(Vector<String> &conf, ErrorHandler *errh)
     .complete() < 0)
         return -1;
 
-
     return 0;
 }
-
-
-
 
 void FlowCounter::push_batch(int, int* fcb, PacketBatch* flow)
 {
