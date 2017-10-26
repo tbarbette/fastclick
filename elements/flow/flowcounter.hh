@@ -44,8 +44,10 @@ public:
     void push_batch(int port, int* fcb, PacketBatch*);
 
     inline bool new_flow(void*, Packet*) {
-        _state->count++;
-        _state->open++;
+        if (isEstablished()) {
+            _state->count++;
+            _state->open++;
+        }
         return true;
     }
 protected:

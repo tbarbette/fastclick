@@ -30,9 +30,10 @@ int FlowCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 
-void FlowCounter::push_batch(int port, int* fcb, PacketBatch* flow)
+void FlowCounter::push_batch(int, int* fcb, PacketBatch* flow)
 {
     *fcb += flow->length();
+    output_push_batch(0, flow);
 }
 
 
