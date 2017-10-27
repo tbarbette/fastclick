@@ -31,6 +31,7 @@ class FlowCRC : public StackChunkBufferElement<FlowCRC,fcb_crc> { //Use CTRP to 
     private:
         static String read_handler(Element *, void *) CLICK_COLD;
         static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
+        bool _add;
 };
 
 CLICK_ENDDECLS

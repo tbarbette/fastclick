@@ -29,7 +29,7 @@
 CLICK_DECLS
 
 
-FlowCRC::FlowCRC()
+FlowCRC::FlowCRC() : _add(true)
 {
 }
 
@@ -47,9 +47,39 @@ FlowCRC::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 FlowCRC::process_data(fcb_crc* fcb, FlowBufferChunkIter& iterator) {
     unsigned crc = fcb->crc;
+    unsigned remain = 0;
+    unsigned remainder = 0;
     while (iterator) {
         auto chunk = *iterator;
-        crc = update_crc(crc, (char *) chunk.bytes, chunk.length);
+        if (_add) {
+            unsigned* b;
+            int l =  chunk.length;
+            if (remain) {
+                unsigned char* br = (unsigned char *)chunk.bytes;
+                do {
+                    remainder += *br;
+                    br++;
+                    l--;
+                    if (--remain == 0)
+                        break;
+                    remainder <<= 8;
+                } while(1);
+                b = (unsigned*)br;
+            } else {
+                b = (unsigned*)chunk.bytes;;
+            }
+            int i = 0;
+            for (i = 0; i < l / 4; i ++) {
+                crc += *b;
+                ++b;
+            }
+            remain = l - (i*4);
+            for (i = 0; i < remain; i++) {
+                remainder += *b << 8;
+            }
+        } else {
+            crc = update_crc(crc, (char *) chunk.bytes, chunk.length);
+        }
         ++iterator;
     }
     fcb->crc = crc;
