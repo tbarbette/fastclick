@@ -55,8 +55,8 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    //FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
-    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY", FLOW_TCP);
+    FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
+    //FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY", FLOW_TCP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
@@ -72,6 +72,7 @@ private:
     per_thread<state> _state;
     Vector<IPAddress> _dsts;
     Vector<IPAddress> _sips;
+    bool _own_state;
 
 
     LBHashtable _map;
@@ -89,8 +90,8 @@ public:
     const char *port_count() const      { return "1/1"; }
     const char *processing() const      { return PUSH; }
 
-    //FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
-    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffff 22/0/ffff:ARRAY", FLOW_TCP);
+    FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
+    //FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffff 22/0/ffff:ARRAY", FLOW_TCP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
@@ -98,6 +99,7 @@ public:
     void push_batch(int, TTuple*, PacketBatch *);
 private:
     FlowIPLoadBalancer* _lb;
+    bool _own_state;
 };
 
 

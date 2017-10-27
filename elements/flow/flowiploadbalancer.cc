@@ -16,7 +16,7 @@ CLICK_DECLS
 
 #define LOADBALANCER_FLOW_TIMEOUT 60 * 1000
 
-FlowIPLoadBalancer::FlowIPLoadBalancer() {
+FlowIPLoadBalancer::FlowIPLoadBalancer() : _own_state(true) {
 
 };
 
@@ -30,6 +30,7 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
                .read("SIP",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_sips)
+               .read("STATE", _own_state)
                .complete() < 0)
         return -1;
     click_chatter("%p{element} has %d routes and %d sources",this,_dsts.size(),_sips.size());
@@ -101,7 +102,8 @@ void FlowIPLoadBalancer::push_batch(int, TTuple* flowdata, PacketBatch* batch) {
 #if DEBUG_LB
         click_chatter("Adding entry %s %d [%d]",entry.chosen_server.unparse().c_str(),entry.port,s.last);
 #endif
-        fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
+        if (_own_state)
+            fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
     } else {
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
         if (!fcb_stack->hasTimeout())
@@ -117,7 +119,8 @@ void FlowIPLoadBalancer::push_batch(int, TTuple* flowdata, PacketBatch* batch) {
 #if DEBUG_LB || DEBUG_CLASSIFIER_TIMEOUT > 1
             click_chatter("Forward Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
 #endif
-            fcb_release_timeout();
+            if (_own_state)
+                fcb_release_timeout();
         }
         return q;
     };
@@ -126,7 +129,7 @@ void FlowIPLoadBalancer::push_batch(int, TTuple* flowdata, PacketBatch* batch) {
     checked_output_push_batch(0, batch);
 }
 
-FlowIPLoadBalancerReverse::FlowIPLoadBalancerReverse() {
+FlowIPLoadBalancerReverse::FlowIPLoadBalancerReverse() : _own_state(true) {
 
 };
 
@@ -140,6 +143,7 @@ FlowIPLoadBalancerReverse::configure(Vector<String> &conf, ErrorHandler *errh)
     Element* e;
     if (Args(conf, this, errh)
                .read_p("LB",e)
+               .read("STATE",_own_state)
                .complete() < 0)
         return -1;
     _lb = reinterpret_cast<FlowIPLoadBalancer*>(e);
@@ -195,8 +199,8 @@ void FlowIPLoadBalancerReverse::push_batch(int, TTuple* flowdata, PacketBatch* b
         }
         *flowdata = ptr.value();
 #endif
-
-        fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
+        if (_own_state)
+            fcb_acquire_timeout(LOADBALANCER_FLOW_TIMEOUT);
     } else {
 #if DEBUG_LB
         click_chatter("Saved entry %s -> %s",flowdata->pair.src.unparse().c_str(),flowdata->pair.dst.unparse().c_str());
@@ -217,7 +221,8 @@ void FlowIPLoadBalancerReverse::push_batch(int, TTuple* flowdata, PacketBatch* b
 #if DEBUG_LB || DEBUG_CLASSIFIER_TIMEOUT > 1
             click_chatter("Reverse Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
 #endif
-            fcb_release_timeout();
+            if (_own_state)
+                fcb_release_timeout();
         }
         return q;
     };
