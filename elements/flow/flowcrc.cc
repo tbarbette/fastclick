@@ -50,6 +50,7 @@ FlowCRC::process_data(fcb_crc* fcb, FlowBufferChunkIter& iterator) {
     while (iterator) {
         auto chunk = *iterator;
         crc = update_crc(crc, (char *) chunk.bytes, chunk.length);
+        ++iterator;
     }
     fcb->crc = crc;
     return 0;
