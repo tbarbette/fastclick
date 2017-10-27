@@ -13,7 +13,7 @@ CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
     poolFcbTcpCommon(),
-    tableFcbTcpCommon()
+    tableFcbTcpCommon(), _verbose(false)
 {
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
