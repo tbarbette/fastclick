@@ -47,8 +47,8 @@ FlowCRC::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 FlowCRC::process_data(fcb_crc* fcb, FlowBufferChunkIter& iterator) {
     unsigned crc = fcb->crc;
-    unsigned remain = 0;
-    unsigned remainder = 0;
+    unsigned remain = fcb->remain;
+    unsigned remainder = fcb->remainder;
     while (iterator) {
         auto chunk = *iterator;
         if (_add) {
@@ -83,6 +83,8 @@ FlowCRC::process_data(fcb_crc* fcb, FlowBufferChunkIter& iterator) {
         ++iterator;
     }
     fcb->crc = crc;
+    fcb->remain = remain;
+    fcb->remainder = remainder;;
     return 0;
 }
 

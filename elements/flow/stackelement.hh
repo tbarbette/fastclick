@@ -489,6 +489,15 @@ class StackChunkBufferElement : public StackStateElement<Derived, BufferData<T>>
 
     const char *processing() const final    { return Element::PUSH; }
 
+
+    /**
+     * CRTP virtual
+     */
+    inline void release_stream(T*) {
+        return;
+    }
+
+
     void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
     {
         auto it = fcb_data->flowBuffer.enqueueAllChunkIter(flow);
@@ -514,6 +523,7 @@ class StackChunkBufferElement : public StackStateElement<Derived, BufferData<T>>
     }
 
     void release_flow(BufferData<T>* fcb) {
+        static_cast<Derived*>(this)->release_stream(&fcb->userdata);
         PacketBatch* batch = fcb->flowBuffer.dequeueAll();
         if (batch) {
             batch->fast_kill();

@@ -9,6 +9,8 @@ CLICK_DECLS
 
 struct fcb_crc {
     unsigned int crc = 0xffffffff;
+    unsigned int remain = 0;
+    unsigned int remainder = 0;
 };
 
 class FlowCRC : public StackChunkBufferElement<FlowCRC,fcb_crc> { //Use CTRP to avoid virtual
@@ -28,6 +30,14 @@ class FlowCRC : public StackChunkBufferElement<FlowCRC,fcb_crc> { //Use CTRP to 
             //return r | MODIFICATION_STALL;
             return r;
         }
+
+        /**
+         * CRTP virtual
+         */
+       /* inline void release_stream(fcb_crc* fcb) {
+            click_chatter("%u",fcb->crc);
+        }*/
+
     private:
         static String read_handler(Element *, void *) CLICK_COLD;
         static int write_handler(const String&, Element*, void*, ErrorHandler*) CLICK_COLD;
