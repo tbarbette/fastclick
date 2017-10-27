@@ -466,12 +466,12 @@ HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
 
     }
     if (likely(_mt))
-        bucket.list.read_end();
+        bucket.list.write_end();
     return false;
     found:
     _table->_size--;
     if (likely(_mt))
-        bucket.list.read_end();
+        bucket.list.write_end();
     return true;
 }
 

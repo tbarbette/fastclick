@@ -374,10 +374,11 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
     click_chatter("Fcb in : %p, Common : %p, Batch : %p", fcb_in, fcb_in->common,flow);
 #endif
     auto fnt = [this,fcb_in](Packet* p) -> Packet* {
+        bool keep_fct = false;
         if(fcb_in->common == NULL)
         {
 eagain:
-            if(!assignTCPCommon(p))
+            if(!assignTCPCommon(p, keep_fct))
             {
                 if (isRst(p)) {
                     //click_chatter("RST received");
@@ -435,6 +436,7 @@ eagain:
                     release_tcp_internal(fcb_save);
                     );
                     fcb_in->common = 0;
+                    keep_fct = true;
                     goto eagain;
                 } else {
                     if(!checkRetransmission(fcb_in, p, false)) {
@@ -486,9 +488,9 @@ eagain:
 
         if (nowOrderBatch) {
             BATCH_CREATE_FINISH(nowOrderBatch);
+            fcb_acquire(nowOrderBatch->count());
             auto refnt = [this,fcb_in](Packet* p){return processOrderedTCP(fcb_in,p);};
             EXECUTE_FOR_EACH_PACKET_DROPPABLE(refnt, nowOrderBatch, (void));
-            fcb_acquire(nowOrderBatch->count());
             if (flow)
                 flow->append_batch(nowOrderBatch);
             else
@@ -553,20 +555,24 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
         }
         poolModificationTracker.release(fcb_in->modificationLists);
     }
-     common->lock.acquire();
-    //The last one release common
-    if (--common->use_count == 0) {
-        common->lock.release();
-        //click_chatter("Ok, I'm releasing common ;)");
-        common->~tcp_common();
-        //lock->acquire();
-        //tin->tableTcpCommon->erase(flowID); //TODO : consume if it was not taken by the other side
-        poolFcbTcpCommon.release(common);
-        //lock->release();
-    }
-    else
-        common->lock.release();
+    if (common) {
+        common->lock.acquire();
+        //The last one release common
+        if (--common->use_count == 0) {
+            common->lock.release();
+            //click_chatter("Ok, I'm releasing common ;)");
+            common->~tcp_common();
+            //lock->acquire();
+            //tin->tableTcpCommon->erase(flowID); //TODO : consume if it was not taken by the other side
+            poolFcbTcpCommon.release(common);
+            //lock->release();
+        }
+        else
+            common->lock.release();
 
+    } else {
+        click_chatter("Double release !");
+    }
     fcb_in->common = 0;
 
 }
@@ -577,8 +583,10 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
 
     tin->release_tcp_internal(fcb);
 
-    if (fcb_in->previous_fnt)
+    if (fcb_in->previous_fnt) {
+        assert(fcb_in->previous_fnt != &release_tcp);
         fcb_in->previous_fnt(fcb, fcb_in->previous_thunk);
+    }
 
 }
 
@@ -867,7 +875,7 @@ bool TCPIn::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeas
     return true;
 }
 
-bool TCPIn::assignTCPCommon(Packet *packet)
+bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
 {
     auto fcb_in = fcb_data();
 
@@ -921,6 +929,7 @@ bool TCPIn::assignTCPCommon(Packet *packet)
         tcp_common *allocated = poolFcbTcpCommon.allocate();
 
         // Add an entry if the hashtable
+
         tableFcbTcpCommon.find_insert(flowID, allocated);
 
         // Set the pointer in the structure
@@ -940,8 +949,10 @@ bool TCPIn::assignTCPCommon(Packet *packet)
 
     fcb_in->expectedPacketSeq = getSequenceNumber(packet); //Not next because this one will be checked just after
 
-    fcb_acquire_timeout(TCP_TIMEOUT);
-    fcb_set_release_fnt(fcb_in, release_tcp);
+    if (!keep_fct) {
+        fcb_acquire_timeout(TCP_TIMEOUT);
+        fcb_set_release_fnt(fcb_in, release_tcp);
+    }
 
     // Set information about the flow
     fcb_in->common->maintainers[getFlowDirection()].setIpSrc(getSourceAddress(packet));

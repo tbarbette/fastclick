@@ -263,7 +263,7 @@ private:
      * @param packet The packet
      * @return A boolean indicating whether the structure has been assigned
      */
-    bool assignTCPCommon(Packet *packet);
+    bool assignTCPCommon(Packet *packet, bool keep_fct);
 
     /**
      * @brief Check whether the connection has been closed or not
