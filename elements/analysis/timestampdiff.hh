@@ -16,8 +16,27 @@ TimestampDiff()
 =s timestamps
 
 Compute the difference between the recorded timestamp of a packet using
-RecordTimestamp and the number inside the packet payload probably setted using
-NumberPacket
+RecordTimestamp and the number inside the packet payload potentially set
+using NumberPacket
+
+Arguments:
+
+=item RECORDER
+
+Instance of RecordTimestamp that provides the initial timestamp.
+
+=item OFFSET
+
+Integer. Offset in the packet where the timestamp resides.
+
+=item N
+
+Size of the reservoir. Defaults to 0.
+
+=item MAXDELAY
+
+Integer. Maximum delay in milliseconds. If a packet exhibits such a delay (or greater),
+the user is notified. Defaults to 1000 ms (1 sec).
 
 =a
 
@@ -48,7 +67,7 @@ private:
     int _offset;
     int _limit;
     int _max_delay;
-    RecordTimestamp* _rt;
+    RecordTimestamp *_rt;
     atomic_uint32_t nd;
     inline int smaction(Packet* p);
 
