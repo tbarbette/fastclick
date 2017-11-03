@@ -48,7 +48,7 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
 }
 
 inline void
-RecordTimestamp::smaction(Packet* p) {
+RecordTimestamp::smaction(Packet *p) {
     uint64_t i;
     if (_offset >= 0) {
         i = NumberPacket::read_number_of_packet(p, _offset);
