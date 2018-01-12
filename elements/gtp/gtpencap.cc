@@ -61,7 +61,11 @@ GTPEncap::simple_action(Packet *p_in)
   gtp->gtp_flags = 0;
   gtp->gtp_msg_type = 0xff;
   gtp->gtp_msg_len = htons(p->length() - sizeof(click_gtp));
-  gtp->gtp_teid = htonl(_eid);
+  if (_eid == 0) {
+      gtp->gtp_teid = htonl(AGGREGATE_ANNO(p));
+  } else {
+      gtp->gtp_teid = htonl(_eid);
+  }
 
   return p;
 }
