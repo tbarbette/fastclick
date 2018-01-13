@@ -17,7 +17,10 @@
 #include <rte_mempool.h>
 #include <rte_pci.h>
 #include <rte_version.h>
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
 #include <rte_bus_pci.h>
+#endif
 
 #include <click/packet.hh>
 #include <click/error.hh>
