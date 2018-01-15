@@ -34,13 +34,13 @@ CLICK_DECLS
 #define LOAD_UNIT 10
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0), _rx_intr(-1)
+    _dev(0), _rx_intr(-1), _active(true)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
     _burst = 32;
-    ndesc = 256;
+    ndesc = DPDKDevice::DEF_DEV_RXDESC;
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     _rule_id = 0;
@@ -55,6 +55,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     //Default parameters
     int numa_node = 0;
+    int maxqueues = 128;
     String dev;
     EtherAddress mac;
     bool has_mac = false;
@@ -75,6 +76,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     #endif
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
+        .read("MAXQUEUES",maxqueues)
         .read("ACTIVE", _active)
         .read("RX_INTR", _rx_intr)
         .complete() < 0)
@@ -84,7 +86,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         if (allow_nonexistent)
             return 0;
         else
-            return errh->error("%s: Unknown or invalid PORT", dev.c_str());
+            return errh->error("%s : Unknown or invalid PORT", dev.c_str());
     }
 
     if (_use_numa) {
@@ -93,14 +95,14 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int r;
     if (n_queues == -1) {
-        if (firstqueue == -1) {
-            firstqueue = 0;
-            //With DPDK we'll take as many queues as available threads
-             r = configure_rx(numa_node, 1, 128, errh);
-        } else {
-            //If a queue number is setted, user probably want only one queue
-            r = configure_rx(numa_node, 1, 1, errh);
-        }
+	if (firstqueue == -1) {
+		firstqueue = 0;
+		//With DPDK we'll take as many queues as available threads
+		 r = configure_rx(numa_node,1,maxqueues,errh);
+	} else {
+		//If a queue number is setted, user probably want only one queue
+		r = configure_rx(numa_node,1,1,errh);
+	}
     } else {
         if (firstqueue == -1)
             firstqueue = 0;
@@ -200,13 +202,12 @@ bool FromDPDKDevice::run_task(Task * t)
 #endif
         unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
+            unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
+            rte_prefetch0(data);
 #if CLICK_PACKET_USE_DPDK
-            rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
             WritablePacket *p = Packet::make(pkts[i]);
 #elif HAVE_ZEROCOPY
-            rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
-            WritablePacket *p =
-                    Packet::make(rte_pktmbuf_mtod(pkts[i], unsigned char *),
+            WritablePacket *p = Packet::make(data,
                      rte_pktmbuf_data_len(pkts[i]),
                      DPDKDevice::free_pkt,
                      pkts[i],
@@ -214,11 +215,13 @@ bool FromDPDKDevice::run_task(Task * t)
                      rte_pktmbuf_tailroom(pkts[i])
                      );
 #else
-            WritablePacket *p = Packet::make((void*)rte_pktmbuf_mtod(pkts[i], unsigned char *),
+            WritablePacket *p = Packet::make(data,
                                      (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
             rte_pktmbuf_free(pkts[i]);
+            data = p->data();
 #endif
             p->set_packet_type_anno(Packet::HOST);
+            p->set_mac_header(data);
             if (_set_rss_aggregate)
 #if RTE_VERSION > RTE_VERSION_NUM(1,7,0,0)
                 SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);

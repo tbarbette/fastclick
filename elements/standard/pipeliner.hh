@@ -35,9 +35,9 @@ public:
     const char *port_count() const      { return "1-/1"; }
     const char *processing() const      { return PUSH; }
 
-    int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
+    int configure(Vector<String>&, ErrorHandler*) override CLICK_COLD;
     int thread_configure(ThreadReconfigurationStage, ErrorHandler*) override CLICK_COLD;
-    int initialize(ErrorHandler*) CLICK_COLD;
+    int initialize(ErrorHandler *errh) override CLICK_COLD;
 
     void cleanup(CleanupStage);
 

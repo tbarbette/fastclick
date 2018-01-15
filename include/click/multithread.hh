@@ -398,11 +398,11 @@ class unprotected_rcu : public unprotected_rcu_singlewriter<T,N> { public:
 
     inline T& write_begin() {
         _write_lock.acquire();
-        return this->template unprotected_rcu_singlewriter<T,N>::write_begin();
+        return this->unprotected_rcu_singlewriter<T,N>::write_begin();
     }
 
     inline void write_commit() {
-        this->template unprotected_rcu_singlewriter<T,N>::write_commit();
+        this->unprotected_rcu_singlewriter<T,N>::write_commit();
         _write_lock.release();
     }
 

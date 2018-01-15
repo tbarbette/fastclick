@@ -26,6 +26,7 @@ CLICK_DECLS
 
 AverageCounter::AverageCounter()
 {
+    _mp = false;
 }
 
 void
@@ -58,15 +59,16 @@ AverageCounter::initialize(ErrorHandler *)
 PacketBatch *
 AverageCounter::simple_action_batch(PacketBatch *batch)
 {
-    uint32_t jpart = click_jiffies();
+    click_jiffies_t jpart = click_jiffies();
     if (_first == 0)
-		_first = jpart;
-    FOR_EACH_PACKET(batch,p) {
-		if (jpart - _first >= _ignore) {
-		_count++;
-		_byte_count += p->length();
-		}
-    }
+        _first.compare_swap(0, jpart);
+    if (jpart - _first >= _ignore) {
+        uint64_t l = 0;
+        FOR_EACH_PACKET(batch,p) {
+            l+=p->length();
+        }
+		add_count(batch->count(), l);
+	}
     _last = jpart;
     return batch;
 }
@@ -75,12 +77,11 @@ AverageCounter::simple_action_batch(PacketBatch *batch)
 Packet *
 AverageCounter::simple_action(Packet *p)
 {
-    uint32_t jpart = click_jiffies();
+    click_jiffies_t jpart = click_jiffies();
     if (_first == 0)
-    	_first = jpart;
+	_first.compare_swap(0, jpart);
     if (jpart - _first >= _ignore) {
-	_count++;
-	_byte_count += p->length();
+	    add_count(1,p->length());
     }
     _last = jpart;
     return p;
@@ -156,6 +157,12 @@ AverageCounter::add_handlers()
   add_write_handler("reset", averagecounter_reset_write_handler, 0, Handler::BUTTON);
 }
 
+AverageCounterMP::AverageCounterMP()
+{
+    _mp = true;
+}
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(AverageCounter)
-ELEMENT_MT_SAFE(AverageCounter)
+EXPORT_ELEMENT(AverageCounterMP)
+ELEMENT_MT_SAFE(AverageCounterMP)

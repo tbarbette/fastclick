@@ -95,20 +95,23 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
     return 0;
 }
 
+
 int
 Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh) {
     if (stage != THREAD_RECONFIGURE_PRE && stage != THREAD_INITIALIZE)
         return 0;
 
-    Bitvector passing = get_passing_threads();
+    bool fp;
+    Bitvector passing = get_passing_threads(false, -1, this, fp);
     storage.compress(passing);
     stats.compress(passing);
     _home_thread_id = home_thread_id();
+
     for (unsigned i = 0; i < storage.weight(); i++) {
-        if (!storage.get_value(i).initialized()) {
+        if (!storage.get_value(i).initialized())
             storage.get_value(i).initialize(_ring_size);
-        }
     }
+
 
     for (int i = 0; i < passing.weight(); i++) {
         if (passing[i]) {
@@ -132,9 +135,9 @@ Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh
                       "this is intended, set NOUSELESS to true but I seriously "
                       "doubt that.");
     }
+
     return 0;
 }
-
 
 int
 Pipeliner::initialize(ErrorHandler *errh)
@@ -246,9 +249,11 @@ Pipeliner::run_task(Task* t)
                     out->append_batch(b);
                 }
             }
+            //WritablePacket::pool_hint(b->count(),storage.get_mapping(i));
 #else
             Packet* p = s.extract();
             output(0).push(p);
+            //WritablePacket::pool_hint(HINT_THRESHOLD,storage.get_mapping(i));
             r = true;
 #endif
         }

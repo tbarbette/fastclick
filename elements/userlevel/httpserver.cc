@@ -292,7 +292,6 @@ void HTTPServer::cleanup(CleanupStage) {
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel)
+ELEMENT_REQUIRES(userlevel microhttpd)
 EXPORT_ELEMENT(HTTPServer)
 ELEMENT_MT_SAFE(HTTPServer)
-ELEMENT_LIBS((-lmicrohttpd))

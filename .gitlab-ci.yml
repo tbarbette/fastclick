@@ -1,39 +1,41 @@
 variables:
-    DPDK_VERSION: "17.02"
+    DPDK_VERSION: "17.08"
     NETMAP_VERSION: "11.1"
+    CONFIG: "--enable-gtp --enable-json $CONFIG"
+
 batch:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule --disable-verbose-batch && make && make check
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch && make && make check
 autobatch:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch --disable-linuxmodule --disable-verbose-batch --enable-auto-batch=port && make && make check
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-batch $CONFIG --disable-verbose-batch --enable-auto-batch=port && make && make check
 
 ip6:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json --disable-linuxmodule --disable-batch && make && make check
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-ip6 --enable-json $CONFIG --disable-batch && make && make check
 mt:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --disable-linuxmodule --disable-batch && make && make check
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG --disable-batch && make && make check
 dpdk-batch:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --enable-batch --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk $CONFIG --enable-batch --disable-verbose-batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
 
 dpdk-nobatch:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk --disable-linuxmodule --disable--batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread --without-netmap --enable-dpdk $CONFIG --disable--batch RTE_SDK=$RTE_SDK RTE_TARGET=$RTE_TARGET && make
 
 netmap_single:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" $CONFIG_NETMAP --disable-linuxmodule --disable-verbose-batch && make
+        - ./configure CXXFLAGS="-std=gnu++11" $CONFIG_NETMAP $CONFIG --disable-verbose-batch && make
 netmap:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --enable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --enable-netmap-pool --enable-zerocopy $CONFIG --disable-verbose-batch && make
 netmap_nopool:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --enable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --enable-zerocopy $CONFIG --disable-verbose-batch && make && make check
 netmap_nopool_nozc:
     script:
-        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --disable-zerocopy --disable-linuxmodule --disable-verbose-batch && make && make check
+        - ./configure CXXFLAGS="-std=gnu++11" --enable-user-multithread $CONFIG_NETMAP --disable-netmap-pool --disable-zerocopy $CONFIG --disable-verbose-batch && make && make check
 cache:
     paths:
         - dpdk-$DPDK_VERSION

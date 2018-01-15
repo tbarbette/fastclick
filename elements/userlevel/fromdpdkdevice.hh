@@ -162,6 +162,7 @@ private:
     };
 
     DPDKDevice* _dev;
+    bool _active;
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     uint32_t _rule_id;

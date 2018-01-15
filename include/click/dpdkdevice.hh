@@ -18,6 +18,10 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+#include <rte_bus_pci.h>
+#endif
+
 #include <click/packet.hh>
 #include <click/error.hh>
 #include <click/hashtable.hh>
@@ -217,14 +221,12 @@ public:
     uint8_t port_id;
 
     DPDKDevice() : port_id(-1) {
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        initialize_flow_director(port_id, ErrorHandler::default_handler());
-    #endif
-    }
+    } CLICK_COLD;
 
     DPDKDevice(uint8_t port_id) : port_id(port_id) {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        initialize_flow_director(port_id, ErrorHandler::default_handler());
+        if (port_id >= 0)
+            initialize_flow_director(port_id, ErrorHandler::default_handler());
     #endif
     } CLICK_COLD;
 
@@ -323,6 +325,9 @@ public:
     static int TX_WTHRESH;
     static String MEMPOOL_PREFIX;
 
+    static unsigned DEF_DEV_RXDESC;
+    static unsigned DEF_DEV_TXDESC;
+
     static unsigned DEF_RING_NDESC;
     static unsigned DEF_BURST_SIZE;
 
@@ -376,6 +381,29 @@ private:
     }
 
     friend class DPDKDeviceArg;
+    friend class DPDKInfo;
+};
+
+class DPDKRing { public:
+
+    DPDKRing() CLICK_COLD;
+    ~DPDKRing() CLICK_COLD;
+
+    int parse(Args* args);
+
+    struct rte_mempool *_message_pool;
+    String _MEM_POOL;
+    String _PROC_1;
+    String _PROC_2;
+
+    unsigned     _ndesc;
+    unsigned     _burst_size;
+    short        _numa_zone;
+    int _flags;
+
+    struct rte_ring    *_ring;
+    counter_t    _count;
+
 };
 
 /** @class DPDKDeviceArg

@@ -21,6 +21,7 @@
 
 #include <click/config.h>
 #include <click/dpdkdevice.hh>
+#include <click/element.hh>
 #include <rte_errno.h>
 #if RTE_VERSION >= RTE_VERSION_NUM(17,2,0,0)
 extern "C" {
@@ -883,6 +884,7 @@ int FlowDirector::flow_rule_complain(const uint8_t &port_id, struct rte_flow_err
 
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+
 /**
  * Called by the constructor of DPDKDevice.
  * Flow Director must be strictly invoked once for each port.
@@ -1145,11 +1147,11 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
         info.rx_queues.resize(1);
-        info.n_rx_descs = 64;
+        info.n_rx_descs = DEF_DEV_RXDESC;
     }
     if (info.tx_queues.size() == 0) {
         info.tx_queues.resize(1);
-        info.n_tx_descs = 64;
+        info.n_tx_descs = DEF_DEV_TXDESC;
     }
 
     if (rte_eth_dev_configure(port_id, info.rx_queues.size(), info.tx_queues.size(),
@@ -1354,7 +1356,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 #endif
 
     const unsigned n_ports = rte_eth_dev_count();
-    if (n_ports == 0)
+    if (n_ports == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
     for (HashTable<uint8_t, DPDKDevice>::const_iterator it = _devs.begin();
@@ -1493,7 +1495,7 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
         port_id = DPDKDevice::get_port_from_pci(data[0],data[1],data[2],data[3]);
     }
 
-    if (port_id >= 0 && port_id < rte_eth_dev_count()){
+    if (port_id >= 0 && port_id < rte_eth_dev_count()) {
         result = DPDKDevice::get_device(port_id);
     }
     else {
@@ -1502,6 +1504,75 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
     }
 
     return true;
+}
+
+DPDKRing::DPDKRing() :
+    _message_pool(0),
+       _numa_zone(0), _burst_size(0), _flags(0), _ring(0),
+       _count(0), _MEM_POOL("") {
+}
+
+DPDKRing::~DPDKRing() {
+
+}
+
+int
+DPDKRing::parse(Args* args) {
+    bool spenq = false;
+    bool spdeq = false;
+    String origin;
+    String destination;
+    _flags = 0;
+    const Element* e = args->context();
+    ErrorHandler* errh = args->errh();
+
+    if (args ->  read_p("MEM_POOL",  _MEM_POOL)
+            .read_p("FROM_PROC", origin)
+            .read_p("TO_PROC",   destination)
+            .read("BURST",        _burst_size)
+            .read("NDESC",        _ndesc)
+            .read("NUMA_ZONE",    _numa_zone)
+            .read("SP_ENQ", spenq)
+            .read("SC_DEQ", spdeq)
+            .execute() < 0)
+        return -1;
+
+    if (spenq)
+        _flags |= RING_F_SP_ENQ;
+    if (spdeq)
+        _flags |= RING_F_SC_DEQ;
+
+    if ( _MEM_POOL.empty() || (_MEM_POOL.length() == 0) ) {
+        _MEM_POOL = "0";
+    }
+
+    if (origin.empty() || destination.empty() ) {
+        errh->error("Enter FROM_PROC and TO_PROC names");
+        return -1;
+    }
+
+    if ( _ndesc == 0 ) {
+        _ndesc = DPDKDevice::DEF_RING_NDESC;
+        click_chatter("Default number of descriptors is set (%d)\n",
+                        e->name().c_str(), _ndesc);
+    }
+
+    _MEM_POOL = DPDKDevice::MEMPOOL_PREFIX + _MEM_POOL;
+
+    // If user does not specify the port number
+    // we assume that the process belongs to the
+    // memory zone of device 0.
+    // TODO: Search the Click DAG to find a FromDPDKDevice, take its' port_id
+    //       and use _numa_zone = DPDKDevice::get_port_numa_node(_port_id);
+    if ( _numa_zone < 0 ) {
+        click_chatter("[%s] Assuming NUMA zone 0\n", e->name().c_str());
+        _numa_zone = 0;
+    }
+
+    _PROC_1 = origin+"_2_"+destination;
+    _PROC_2 = destination+"_2_"+origin;
+
+    return 0;
 }
 
 #if HAVE_DPDK_PACKET_POOL
@@ -1524,6 +1595,9 @@ int DPDKDevice::TX_PTHRESH = 36;
 int DPDKDevice::TX_HTHRESH = 0;
 int DPDKDevice::TX_WTHRESH = 0;
 String DPDKDevice::MEMPOOL_PREFIX = "click_mempool_";
+
+unsigned DPDKDevice::DEF_DEV_RXDESC = 256;
+unsigned DPDKDevice::DEF_DEV_TXDESC = 256;
 
 unsigned DPDKDevice::DEF_RING_NDESC = 1024;
 unsigned DPDKDevice::DEF_BURST_SIZE = 32;

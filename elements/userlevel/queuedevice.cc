@@ -148,6 +148,10 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
         errh->warning("No threads end up in this queuedevice...?");
     }
 
+    if (n_threads > _maxqueues) {
+        queue_share = n_threads / _maxqueues;
+    }
+
     if (n_threads >= _maxqueues)
         n_queues = _maxqueues;
     else

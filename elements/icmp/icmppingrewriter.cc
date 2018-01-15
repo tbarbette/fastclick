@@ -2,11 +2,13 @@
  * icmppingrewriter.{cc,hh} -- rewrites ICMP echoes and replies
  * Eddie Kohler
  *
- * Per-core, thread safe data structures by Georgios Katsikas
+ * Per-core, thread safe data structures by Georgios Katsikas and batching by
+ *  Tom Barbette
  *
  * Copyright (c) 2000-2001 Mazu Networks, Inc.
  * Copyright (c) 2009-2010 Meraki, Inc.
  * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2017 University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -160,7 +162,7 @@ ICMPPingRewriter::add_flow(int, const IPFlowID &flowid,
 }
 
 int
-ICMPPingRewriter::smaction(int port, Packet *p_in)
+ICMPPingRewriter::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     click_ip *iph = p->ip_header();
@@ -172,11 +174,12 @@ ICMPPingRewriter::smaction(int port, Packet *p_in)
 	|| p->transport_length() < 6
 	|| (icmph->icmp_type != ICMP_ECHO && icmph->icmp_type != ICMP_ECHOREPLY)) {
     mapping_fail:
-	const IPRewriterInput &is = _input_specs[port];
-	if (is.kind == IPRewriterInput::i_nochange)
-	    return is.foutput;
-	else
-	    return -1;
+        const IPRewriterInput &is = _input_specs[port];
+        if (is.kind == IPRewriterInput::i_nochange) {
+            return is.foutput;
+        } else {
+            return -1;
+        }
     }
 
     bool echo = icmph->icmp_type == ICMP_ECHO;
@@ -208,20 +211,19 @@ ICMPPingRewriter::smaction(int port, Packet *p_in)
         click_jiffies(),
         _timeouts[click_current_cpu_id()]
     );
-
     return m->output();
 }
 
-
 void
 ICMPPingRewriter::push(int port, Packet *p_in) {
-    checked_output_push(smaction(port, p_in),p_in);
+    checked_output_push(process(port, p_in),p_in);
 }
 
 #if HAVE_BATCH
 void
-ICMPPingRewriter::push_batch(int port, PacketBatch *batch) {
-    auto fnt = [this,port](Packet* p){return smaction(port, p);};
+ICMPPingRewriter::push_batch(int port, PacketBatch *batch)
+{
+    auto fnt = [this,port](Packet*p){return process(port,p);};
     CLASSIFY_EACH_PACKET(noutputs() + 1,fnt,batch,checked_output_push_batch);
 }
 #endif
