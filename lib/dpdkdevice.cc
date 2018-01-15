@@ -23,6 +23,7 @@
 #include <click/dpdkdevice.hh>
 #include <click/element.hh>
 #include <rte_errno.h>
+
 #if RTE_VERSION >= RTE_VERSION_NUM(17,2,0,0)
 extern "C" {
 #include <rte_pmd_ixgbe.h>
@@ -51,6 +52,7 @@ union L4_RULE {
     struct rte_flow_item_tcp tcp;
     struct rte_flow_item_any any;
 } L4_RULE;
+
 // DPDKDevice mode
 String FlowDirector::FLOW_DIR_FLAG = "flow_dir";
 
@@ -117,9 +119,11 @@ FlowDirector::~FlowDirector()
  * Manages the Flow Director instances.
  *
  * @param port_id the ID of the NIC
+ * @param errh an instance of the error handler
  * @return a Flow Director object for this NIC
  */
-FlowDirector *FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandler *errh)
+FlowDirector *
+FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandler *errh)
 {
     // Invalid port ID
     if (port_id >= rte_eth_dev_count()) {
@@ -146,7 +150,8 @@ FlowDirector *FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandl
  * @param port_id the ID of the NIC
  * @param filename the file that contains the rules
  */
-int FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
+int
+FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
 {
     uint32_t rule_no = 0;
 
@@ -159,11 +164,10 @@ int FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
 
     char  *line = NULL;
     size_t  len = 0;
-    ssize_t read_chars;
 
     // Read file line-by-line (or rule-by-rule)
-    while ((read_chars = getline(&line, &len, fp)) != -1) {
-        FlowDirector::flow_rule_install(port_id, rule_no++, String(line));
+    while ((getline(&line, &len, fp)) != -1) {
+        FlowDirector::generic_flow_rule_install(port_id, rule_no++, String(line));
     }
 
     // Close the file
@@ -180,6 +184,20 @@ int FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
     );
 }
 
+bool
+FlowDirector::generic_flow_rule_install(const uint8_t &port_id, const uint32_t &rule_id, const String &rule)
+{
+    // Only active instances can configure a NIC
+    if (!_dev_flow_dir[port_id]->get_active()) {
+        return false;
+    }
+
+    _errh->message("Flow Director (port %u): Rule #%4u - %s", port_id, rule_id, rule.c_str());
+
+
+    return false;
+}
+
 /**
  * Translate a string-based rule into a flow rule object
  * and install it to the NIC.
@@ -189,7 +207,8 @@ int FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
  * @param rule a flow rule as a string
  * @return a flow rule object
  */
-bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rule_id, const String &rule)
+bool
+FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rule_id, const String &rule)
 {
     // Only active instances can configure a NIC
     if (!_dev_flow_dir[port_id]->get_active()) {
@@ -579,7 +598,8 @@ bool FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rul
  * @param actions  a flow rule's actions
  * @return status
  */
-bool FlowDirector::flow_rule_validate(
+bool
+FlowDirector::flow_rule_validate(
         const uint8_t                &port_id,
         const uint32_t               &rule_id,
         const struct rte_flow_attr   *attr,
@@ -613,7 +633,8 @@ bool FlowDirector::flow_rule_validate(
  * @param actions  a flow rule's actions
  * @return status
  */
-bool FlowDirector::flow_rule_add(
+bool
+FlowDirector::flow_rule_add(
         const uint8_t                &port_id,
         const uint32_t               &rule_id,
         const struct rte_flow_attr   *attr,
@@ -658,7 +679,8 @@ bool FlowDirector::flow_rule_add(
  * @param rule_id a rule ID
  * @return a flow rule object
  */
-struct FlowDirector::port_flow *FlowDirector::flow_rule_get(const uint8_t &port_id, const uint32_t &rule_id)
+struct FlowDirector::port_flow *
+FlowDirector::flow_rule_get(const uint8_t &port_id, const uint32_t &rule_id)
 {
     // Get the list of rules of this port
     Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
@@ -682,7 +704,8 @@ struct FlowDirector::port_flow *FlowDirector::flow_rule_get(const uint8_t &port_
  * @param rule_id a flow rule's ID
  * @return status
  */
-bool FlowDirector::flow_rule_delete(const uint8_t &port_id, const uint32_t &rule_id)
+bool
+FlowDirector::flow_rule_delete(const uint8_t &port_id, const uint32_t &rule_id)
 {
     // Only active instances can configure a NIC
     if (!_dev_flow_dir[port_id]->get_active()) {
@@ -729,7 +752,8 @@ bool FlowDirector::flow_rule_delete(const uint8_t &port_id, const uint32_t &rule
  * @param port_id the ID of the NIC
  * @return the number of rules being flushed
  */
-uint32_t FlowDirector::flow_rules_flush(const uint8_t &port_id)
+uint32_t
+FlowDirector::flow_rules_flush(const uint8_t &port_id)
 {
     // Only active instances can configure a NIC
     if (!_dev_flow_dir[port_id]->get_active()) {
@@ -770,7 +794,8 @@ uint32_t FlowDirector::flow_rules_flush(const uint8_t &port_id)
  * @param port_id the ID of the NIC
  * @return the number of rules being flushed
  */
-uint32_t FlowDirector::memory_clean(const uint8_t &port_id)
+uint32_t
+FlowDirector::memory_clean(const uint8_t &port_id)
 {
     // Get the list of rules of this port
     Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
@@ -805,7 +830,8 @@ uint32_t FlowDirector::memory_clean(const uint8_t &port_id)
  * @param port_id the ID of the NIC
  * @param message the message to be printed
  */
-void FlowDirector::flow_rule_usage(const uint8_t &port_id, const char *message)
+void
+FlowDirector::flow_rule_usage(const uint8_t &port_id, const char *message)
 {
     _errh->error("Flow Director (port %u): %s", port_id, message);
     _errh->error("Flow Director (port %u): Usage: pattern [p1] and .. and [p2] action queue index [queue no]", port_id);
@@ -817,7 +843,8 @@ void FlowDirector::flow_rule_usage(const uint8_t &port_id, const char *message)
  * @param port_id the ID of the NIC
  * @return the number of rules being installed
  */
-uint32_t FlowDirector::flow_rules_count(const uint8_t &port_id)
+uint32_t
+FlowDirector::flow_rules_count(const uint8_t &port_id)
 {
     // Only active instances might have some rules
     if (!_dev_flow_dir[port_id]->get_active()) {
@@ -838,7 +865,8 @@ uint32_t FlowDirector::flow_rules_count(const uint8_t &port_id)
  * @param port_id the ID of the NIC
  * @param error an instance of DPDK's error structure
  */
-int FlowDirector::flow_rule_complain(const uint8_t &port_id, struct rte_flow_error *error)
+int
+FlowDirector::flow_rule_complain(const uint8_t &port_id, struct rte_flow_error *error)
 {
     static const char *const errstrlist[] = {
         [RTE_FLOW_ERROR_TYPE_NONE] = "no error",
@@ -1073,7 +1101,7 @@ int DPDKDevice::set_mode(String mode, int num_pools, Vector<int> vf_vlan, ErrorH
     if (mode == FlowDirector::FLOW_DIR_FLAG) {
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
         click_chatter(
-            "Flow Director (port %u): Active with source '%s'",
+            "Flow Director (port %u): Active with source file '%s'",
             port_id, rules_path.empty() ? "None" : rules_path.c_str()
         );
         flow_dir->set_active(true);

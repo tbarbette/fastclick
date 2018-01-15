@@ -9,6 +9,7 @@
 #define UINT16_MAX 65535
 #endif
 
+#include <rte_version.h>
 #include <rte_common.h>
 #include <rte_eal.h>
 #include <rte_ethdev.h>
@@ -16,7 +17,10 @@
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
 #include <rte_pci.h>
-#include <rte_version.h>
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+#include <rte_bus_pci.h>
+#endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
 #include <rte_bus_pci.h>
@@ -142,6 +146,13 @@ public:
 
     // Flush the rules
     static uint32_t flow_rules_flush(const uint8_t &port_id);
+
+    // Parse a string-based rule and translate it into a flow rule object
+    static bool generic_flow_rule_install(
+        const uint8_t  &port_id,
+        const uint32_t &rule_id,
+        const String   &rule
+    );
 
     // Parse a string-based rule and translate it into a flow rule object
     static bool flow_rule_install(
