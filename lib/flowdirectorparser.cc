@@ -153,13 +153,7 @@ cmdline_parse_token_num_t cmd_2tuple_filter_queue_id =
 	TOKEN_NUM_INITIALIZER(struct cmd_2tuple_filter_result,
 				queue_id, UINT16);
 
-cmdline_parse_inst_t cmd_2tuple_filter = {
-	.f = cmd_2tuple_filter_parsed,
-	.data = NULL,
-	.help_str = "2tuple_filter <port_id> add|del dst_port <value> protocol "
-		"<value> mask <value> tcp_flags <value> priority <value> queue "
-		"<queue_id>: Add a 2tuple filter",
-	.tokens = {
+cmdline_parse_token_hdr_t *cmd_2tuple_filter_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_2tuple_filter_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_2tuple_filter_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_2tuple_filter_ops,
@@ -176,7 +170,15 @@ cmdline_parse_inst_t cmd_2tuple_filter = {
 		(cmdline_parse_token_hdr_t *)&cmd_2tuple_filter_queue,
 		(cmdline_parse_token_hdr_t *)&cmd_2tuple_filter_queue_id,
 		NULL,
-	},
+	};
+
+cmdline_parse_inst_t cmd_2tuple_filter = {
+	.f = cmd_2tuple_filter_parsed,
+	.data = NULL,
+	.help_str = "2tuple_filter <port_id> add|del dst_port <value> protocol "
+		"<value> mask <value> tcp_flags <value> priority <value> queue "
+		"<queue_id>: Add a 2tuple filter",
+	.tokens = cmd_2tuple_filter_tokens,
 };
 
 /* *** ADD/REMOVE A 5tuple FILTER *** */
@@ -327,14 +329,7 @@ cmdline_parse_token_num_t cmd_5tuple_filter_queue_id =
 	TOKEN_NUM_INITIALIZER(struct cmd_5tuple_filter_result,
 				queue_id, UINT16);
 
-cmdline_parse_inst_t cmd_5tuple_filter = {
-	.f = cmd_5tuple_filter_parsed,
-	.data = NULL,
-	.help_str = "5tuple_filter <port_id> add|del dst_ip <value> "
-		"src_ip <value> dst_port <value> src_port <value> "
-		"protocol <value>  mask <value> tcp_flags <value> "
-		"priority <value> queue <queue_id>: Add/Del a 5tuple filter",
-	.tokens = {
+cmdline_parse_token_hdr_t *cmd_5tuple_filter_tokens[] {
 		(cmdline_parse_token_hdr_t *)&cmd_5tuple_filter_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_5tuple_filter_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_5tuple_filter_ops,
@@ -357,7 +352,16 @@ cmdline_parse_inst_t cmd_5tuple_filter = {
 		(cmdline_parse_token_hdr_t *)&cmd_5tuple_filter_queue,
 		(cmdline_parse_token_hdr_t *)&cmd_5tuple_filter_queue_id,
 		NULL,
-	},
+	};
+
+cmdline_parse_inst_t cmd_5tuple_filter = {
+	.f = cmd_5tuple_filter_parsed,
+	.data = NULL,
+	.help_str = "5tuple_filter <port_id> add|del dst_ip <value> "
+		"src_ip <value> dst_port <value> src_port <value> "
+		"protocol <value>  mask <value> tcp_flags <value> "
+		"priority <value> queue <queue_id>: Add/Del a 5tuple filter",
+	.tokens = cmd_5tuple_filter_tokens,
 };
 
 /* *** ADD/REMOVE A flex FILTER *** */
@@ -526,13 +530,8 @@ cmdline_parse_token_string_t cmd_flex_filter_queue =
 cmdline_parse_token_num_t cmd_flex_filter_queue_id =
 	TOKEN_NUM_INITIALIZER(struct cmd_flex_filter_result,
 				queue_id, UINT16);
-cmdline_parse_inst_t cmd_flex_filter = {
-	.f = cmd_flex_filter_parsed,
-	.data = NULL,
-	.help_str = "flex_filter <port_id> add|del len <value> bytes "
-		"<value> mask <value> priority <value> queue <queue_id>: "
-		"Add/Del a flex filter",
-	.tokens = {
+
+cmdline_parse_token_hdr_t *cmd_flex_filter_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flex_filter_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_flex_filter_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flex_filter_ops,
@@ -547,7 +546,15 @@ cmdline_parse_inst_t cmd_flex_filter = {
 		(cmdline_parse_token_hdr_t *)&cmd_flex_filter_queue,
 		(cmdline_parse_token_hdr_t *)&cmd_flex_filter_queue_id,
 		NULL,
-	},
+	};
+
+cmdline_parse_inst_t cmd_flex_filter = {
+	.f = cmd_flex_filter_parsed,
+	.data = NULL,
+	.help_str = "flex_filter <port_id> add|del len <value> bytes "
+		"<value> mask <value> priority <value> queue <queue_id>: "
+		"Add/Del a flex filter",
+	.tokens = cmd_flex_filter_tokens,
 };
 
 /* *** Filters Control *** */
@@ -641,13 +648,7 @@ cmd_ethertype_filter_parsed(void *parsed_result,
 			strerror(-ret));
 }
 
-cmdline_parse_inst_t cmd_ethertype_filter = {
-	.f = cmd_ethertype_filter_parsed,
-	.data = NULL,
-	.help_str = "ethertype_filter <port_id> add|del mac_addr|mac_ignr "
-		"<mac_addr> ethertype <value> drop|fw queue <queue_id>: "
-		"Add or delete an ethertype filter entry",
-	.tokens = {
+cmdline_parse_token_hdr_t *cmd_ethertype_filter_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_ethertype_filter_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_ethertype_filter_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_ethertype_filter_ops,
@@ -659,7 +660,15 @@ cmdline_parse_inst_t cmd_ethertype_filter = {
 		(cmdline_parse_token_hdr_t *)&cmd_ethertype_filter_queue,
 		(cmdline_parse_token_hdr_t *)&cmd_ethertype_filter_queue_id,
 		NULL,
-	},
+};
+
+cmdline_parse_inst_t cmd_ethertype_filter = {
+	.f = cmd_ethertype_filter_parsed,
+	.data = NULL,
+	.help_str = "ethertype_filter <port_id> add|del mac_addr|mac_ignr "
+		"<mac_addr> ethertype <value> drop|fw queue <queue_id>: "
+		"Add or delete an ethertype filter entry",
+	.tokens = cmd_ethertype_filter_tokens,
 };
 
 /* *** deal with flow director filter *** */
@@ -1138,18 +1147,7 @@ cmdline_parse_token_num_t cmd_flow_director_tunnel_id_value =
 	TOKEN_NUM_INITIALIZER(struct cmd_flow_director_result,
 			      tunnel_id_value, UINT32);
 
-cmdline_parse_inst_t cmd_add_del_ip_flow_director = {
-	.f = cmd_flow_director_filter_parsed,
-	.data = NULL,
-	.help_str = "flow_director_filter <port_id> mode IP add|del|update flow"
-		" ipv4-other|ipv4-frag|ipv4-tcp|ipv4-udp|ipv4-sctp|"
-		"ipv6-other|ipv6-frag|ipv6-tcp|ipv6-udp|ipv6-sctp|"
-		"l2_payload src <src_ip> dst <dst_ip> tos <tos_value> "
-		"proto <proto_value> ttl <ttl_value> vlan <vlan_value> "
-		"flexbytes <flexbyte_values> drop|fw <pf_vf> queue <queue_id> "
-		"fd_id <fd_id_value>: "
-		"Add or delete an ip flow director entry on NIC",
-	.tokens = {
+cmdline_parse_token_hdr_t *cmd_add_del_ip_flow_director_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mode,
@@ -1178,15 +1176,24 @@ cmdline_parse_inst_t cmd_add_del_ip_flow_director = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id_value,
 		NULL,
-	},
-};
+	};
 
-cmdline_parse_inst_t cmd_add_del_udp_flow_director = {
+cmdline_parse_inst_t cmd_add_del_ip_flow_director = {
 	.f = cmd_flow_director_filter_parsed,
 	.data = NULL,
-	.help_str = "flow_director_filter ... : Add or delete an udp/tcp flow "
-		"director entry on NIC",
-	.tokens = {
+	.help_str = "flow_director_filter <port_id> mode IP add|del|update flow"
+		" ipv4-other|ipv4-frag|ipv4-tcp|ipv4-udp|ipv4-sctp|"
+		"ipv6-other|ipv6-frag|ipv6-tcp|ipv6-udp|ipv6-sctp|"
+		"l2_payload src <src_ip> dst <dst_ip> tos <tos_value> "
+		"proto <proto_value> ttl <ttl_value> vlan <vlan_value> "
+		"flexbytes <flexbyte_values> drop|fw <pf_vf> queue <queue_id> "
+		"fd_id <fd_id_value>: "
+		"Add or delete an ip flow director entry on NIC",
+	.tokens = cmd_add_del_ip_flow_director_tokens,
+};
+
+
+cmdline_parse_token_hdr_t *cmd_add_del_udp_flow_director_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mode,
@@ -1215,15 +1222,17 @@ cmdline_parse_inst_t cmd_add_del_udp_flow_director = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id_value,
 		NULL,
-	},
-};
+	};
 
-cmdline_parse_inst_t cmd_add_del_sctp_flow_director = {
+cmdline_parse_inst_t cmd_add_del_udp_flow_director = {
 	.f = cmd_flow_director_filter_parsed,
 	.data = NULL,
-	.help_str = "flow_director_filter ... : Add or delete a sctp flow "
+	.help_str = "flow_director_filter ... : Add or delete an udp/tcp flow "
 		"director entry on NIC",
-	.tokens = {
+	.tokens = cmd_add_del_udp_flow_director_tokens,
+};
+
+cmdline_parse_token_hdr_t *cmd_add_del_sctp_flow_director_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mode,
@@ -1254,15 +1263,17 @@ cmdline_parse_inst_t cmd_add_del_sctp_flow_director = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id_value,
 		NULL,
-	},
-};
+	};
 
-cmdline_parse_inst_t cmd_add_del_l2_flow_director = {
+cmdline_parse_inst_t cmd_add_del_sctp_flow_director = {
 	.f = cmd_flow_director_filter_parsed,
 	.data = NULL,
-	.help_str = "flow_director_filter ... : Add or delete a L2 flow "
+	.help_str = "flow_director_filter ... : Add or delete a sctp flow "
 		"director entry on NIC",
-	.tokens = {
+	.tokens = cmd_add_del_sctp_flow_director_tokens,
+};
+
+cmdline_parse_token_hdr_t *cmd_add_del_l2_flow_director_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mode,
@@ -1281,15 +1292,17 @@ cmdline_parse_inst_t cmd_add_del_l2_flow_director = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id_value,
 		NULL,
-	},
-};
+	};
 
-cmdline_parse_inst_t cmd_add_del_mac_vlan_flow_director = {
+cmdline_parse_inst_t cmd_add_del_l2_flow_director = {
 	.f = cmd_flow_director_filter_parsed,
 	.data = NULL,
-	.help_str = "flow_director_filter ... : Add or delete a MAC VLAN flow "
+	.help_str = "flow_director_filter ... : Add or delete a L2 flow "
 		"director entry on NIC",
-	.tokens = {
+	.tokens = cmd_add_del_l2_flow_director_tokens,
+};
+
+cmdline_parse_token_hdr_t *cmd_add_del_mac_vlan_flow_director_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mode,
@@ -1307,16 +1320,18 @@ cmdline_parse_inst_t cmd_add_del_mac_vlan_flow_director = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id_value,
 		NULL,
-	},
 };
 
-cmdline_parse_inst_t cmd_add_del_tunnel_flow_director = {
+cmdline_parse_inst_t cmd_add_del_mac_vlan_flow_director = {
 	.f = cmd_flow_director_filter_parsed,
 	.data = NULL,
-	.help_str = "flow_director_filter ... : Add or delete a tunnel flow "
+	.help_str = "flow_director_filter ... : Add or delete a MAC VLAN flow "
 		"director entry on NIC",
-	.tokens = {
-		(cmdline_parse_token_hdr_t *)&cmd_flow_director_filter,
+	.tokens = cmd_add_del_l2_flow_director_tokens,
+};
+
+cmdline_parse_token_hdr_t *cmd_add_del_tunnel_flow_director_tokens[] = {
+        (cmdline_parse_token_hdr_t *)&cmd_flow_director_filter,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mode,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mode_tunnel,
@@ -1337,7 +1352,14 @@ cmdline_parse_inst_t cmd_add_del_tunnel_flow_director = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_fd_id_value,
 		NULL,
-	},
+	};
+
+cmdline_parse_inst_t cmd_add_del_tunnel_flow_director = {
+	.f = cmd_flow_director_filter_parsed,
+	.data = NULL,
+	.help_str = "flow_director_filter ... : Add or delete a tunnel flow "
+		"director entry on NIC",
+	.tokens = cmd_add_del_tunnel_flow_director_tokens,
 };
 
 struct cmd_flush_flow_director_result {
@@ -1375,16 +1397,19 @@ cmd_flush_flow_director_parsed(void *parsed_result,
 			strerror(-ret));
 }
 
+
+cmdline_parse_token_hdr_t *cmd_flush_flow_director_tokens[] = {
+		(cmdline_parse_token_hdr_t *)&cmd_flush_flow_director_flush,
+		(cmdline_parse_token_hdr_t *)&cmd_flush_flow_director_port_id,
+		NULL,
+};
+
 cmdline_parse_inst_t cmd_flush_flow_director = {
 	.f = cmd_flush_flow_director_parsed,
 	.data = NULL,
 	.help_str = "flush_flow_director <port_id>: "
 		"Flush all flow director entries of a device on NIC",
-	.tokens = {
-		(cmdline_parse_token_hdr_t *)&cmd_flush_flow_director_flush,
-		(cmdline_parse_token_hdr_t *)&cmd_flush_flow_director_port_id,
-		NULL,
-	},
+	.tokens = cmd_flush_flow_director_tokens,
 };
 
 /* *** deal with flow director mask *** */
@@ -1538,12 +1563,7 @@ cmdline_parse_token_num_t cmd_flow_director_mask_tunnel_id_value =
 	TOKEN_NUM_INITIALIZER(struct cmd_flow_director_mask_result,
 			      tunnel_id_mask, UINT32);
 
-cmdline_parse_inst_t cmd_set_flow_director_ip_mask = {
-	.f = cmd_flow_director_mask_parsed,
-	.data = NULL,
-	.help_str = "flow_director_mask ... : "
-		"Set IP mode flow director's mask on NIC",
-	.tokens = {
+cmdline_parse_token_hdr_t* cmd_set_flow_director_ip_mask_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_mode,
@@ -1559,15 +1579,17 @@ cmdline_parse_inst_t cmd_set_flow_director_ip_mask = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_ipv6_dst,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_port_dst,
 		NULL,
-	},
-};
+	};
 
-cmdline_parse_inst_t cmd_set_flow_director_mac_vlan_mask = {
+cmdline_parse_inst_t cmd_set_flow_director_ip_mask = {
 	.f = cmd_flow_director_mask_parsed,
 	.data = NULL,
-	.help_str = "flow_director_mask ... : Set MAC VLAN mode "
-		"flow director's mask on NIC",
-	.tokens = {
+	.help_str = "flow_director_mask ... : "
+		"Set IP mode flow director's mask on NIC",
+	.tokens = cmd_set_flow_director_ip_mask_tokens,
+};
+
+cmdline_parse_token_hdr_t* cmd_set_flow_director_mac_vlan_mask_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_mode,
@@ -1575,15 +1597,17 @@ cmdline_parse_inst_t cmd_set_flow_director_mac_vlan_mask = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_vlan,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_vlan_value,
 		NULL,
-	},
 };
 
-cmdline_parse_inst_t cmd_set_flow_director_tunnel_mask = {
+cmdline_parse_inst_t cmd_set_flow_director_mac_vlan_mask = {
 	.f = cmd_flow_director_mask_parsed,
 	.data = NULL,
-	.help_str = "flow_director_mask ... : Set tunnel mode "
+	.help_str = "flow_director_mask ... : Set MAC VLAN mode "
 		"flow director's mask on NIC",
-	.tokens = {
+	.tokens = cmd_set_flow_director_mac_vlan_mask_tokens
+};
+
+cmdline_parse_token_hdr_t *cmd_set_flow_director_tunnel_mask_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_mode,
@@ -1597,7 +1621,14 @@ cmdline_parse_inst_t cmd_set_flow_director_tunnel_mask = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_tunnel_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_mask_tunnel_id_value,
 		NULL,
-	},
+	};
+
+cmdline_parse_inst_t cmd_set_flow_director_tunnel_mask = {
+	.f = cmd_flow_director_mask_parsed,
+	.data = NULL,
+	.help_str = "flow_director_mask ... : Set tunnel mode "
+		"flow director's mask on NIC",
+	.tokens = cmd_set_flow_director_tunnel_mask_tokens,
 };
 
 /* *** deal with flow director mask on flexible payload *** */
@@ -1708,19 +1739,21 @@ cmdline_parse_token_string_t cmd_flow_director_flexmask_mask =
 	TOKEN_STRING_INITIALIZER(struct cmd_flow_director_flex_mask_result,
 				 mask, NULL);
 
-cmdline_parse_inst_t cmd_set_flow_director_flex_mask = {
-	.f = cmd_flow_director_flex_mask_parsed,
-	.data = NULL,
-	.help_str = "flow_director_flex_mask ... : "
-		"Set flow director's flex mask on NIC",
-	.tokens = {
+cmdline_parse_token_hdr_t *cmd_set_flow_director_flex_mask_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexmask,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexmask_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexmask_flow,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexmask_flow_type,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexmask_mask,
 		NULL,
-	},
+	};
+
+cmdline_parse_inst_t cmd_set_flow_director_flex_mask = {
+	.f = cmd_flow_director_flex_mask_parsed,
+	.data = NULL,
+	.help_str = "flow_director_flex_mask ... : "
+		"Set flow director's flex mask on NIC",
+    .tokens = cmd_set_flow_director_flex_mask_tokens,
 };
 
 /* *** deal with flow director flexible payload configuration *** */
@@ -1828,18 +1861,20 @@ cmdline_parse_token_string_t cmd_flow_director_flexpayload_payload_cfg =
 	TOKEN_STRING_INITIALIZER(struct cmd_flow_director_flexpayload_result,
 				 payload_cfg, NULL);
 
-cmdline_parse_inst_t cmd_set_flow_director_flex_payload = {
-	.f = cmd_flow_director_flxpld_parsed,
-	.data = NULL,
-	.help_str = "flow_director_flexpayload ... : "
-		"Set flow director's flex payload on NIC",
-	.tokens = {
+cmdline_parse_token_hdr_t* cmd_set_flow_director_flex_payload_tokens[] = {
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexpayload,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexpayload_port_id,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexpayload_payload_layer,
 		(cmdline_parse_token_hdr_t *)&cmd_flow_director_flexpayload_payload_cfg,
 		NULL,
-	},
+	};
+
+cmdline_parse_inst_t cmd_set_flow_director_flex_payload = {
+	.f = cmd_flow_director_flxpld_parsed,
+	.data = NULL,
+	.help_str = "flow_director_flexpayload ... : "
+		"Set flow director's flex payload on NIC",
+	.tokens = cmd_set_flow_director_flex_payload_tokens,
 };
 
 /* Generic flow interface command. */

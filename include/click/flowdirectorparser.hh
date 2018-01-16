@@ -48,12 +48,14 @@
 #include <rte_ethdev.h>
 #include <rte_byteorder.h>
 #include <rte_string_fns.h>
-#include <cmdline_parse.h>
-#include <cmdline_parse_num.h>
-#include <cmdline_parse_string.h>
-#include <cmdline_parse_ipaddr.h>
-#include <cmdline_parse_etheraddr.h>
-#include <cmdline_flow.h>
+extern "C" {
+    #include <cmdline_parse.h>
+    #include <cmdline_parse_num.h>
+    #include <cmdline_parse_string.h>
+    #include <cmdline_parse_ipaddr.h>
+    #include <cmdline_parse_etheraddr.h>
+    #include <cmdline_flow.h>
+}
 #include <rte_flow.h>
 
 CLICK_DECLS
