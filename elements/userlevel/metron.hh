@@ -283,6 +283,12 @@ class Metron : public Element {
         const float CPU_OVERLOAD_LIMIT = (float) 0.7;
         const float CPU_UNERLOAD_LIMIT = (float) 0.4;
 
+        // Default REST configuration
+        const int DEF_LOCAL_PORT = 80;
+        const int DEF_DISCOVER_PORT = 8181;
+        const String DEF_DISCOVER_USER = "onos";
+        const String DEF_DISCOVER_PATH = "/onos/v1/network/configuration/";
+
     private:
         String _id;
         Vector<String> _args;

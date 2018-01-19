@@ -48,22 +48,23 @@ Metron::~Metron() {
 
 int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
     Vector<Element *> nics;
-    _discover_port = 8181;
-    _discover_myport = 80;
-    _discover_path = "/onos/v1/network/configuration/";
+    _discover_port = DEF_DISCOVER_PORT;
+    _discover_myport = DEF_LOCAL_PORT;
+    _discover_user = DEF_DISCOVER_USER;
+    _discover_path = DEF_DISCOVER_PATH;
     if (Args(conf, this, errh)
-        .read_mp("ID", _id)
-        .read_all("NIC", nics)
-        .read_all("SLAVE_DPDK_ARGS", _dpdk_args)
-        .read_all("SLAVE_ARGS", _args)
-        .read("TIMING_STATS", _timing_stats)
-        .read("DISCOVER_IP",_discover_ip)
-        .read("DISCOVER_PORT",_discover_port)
-        .read("IP",_discover_myip)
-        .read("PORT",_discover_myport)
-        .read("DISCOVER_PATH",_discover_path)
-        .read("DISCOVER_USER",_discover_user)
-        .read("DISCOVER_PASSWORD",_discover_password)
+        .read_mp ("ID",                _id)
+        .read_all("NIC",               nics)
+        .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
+        .read_all("SLAVE_ARGS",        _args)
+        .read    ("TIMING_STATS",      _timing_stats)
+        .read    ("IP",                _discover_myip)
+        .read    ("PORT",              _discover_myport)
+        .read    ("DISCOVER_IP",       _discover_ip)
+        .read    ("DISCOVER_PORT",     _discover_port)
+        .read    ("DISCOVER_PATH",     _discover_path)
+        .read    ("DISCOVER_USER",     _discover_user)
+        .read_mp ("DISCOVER_PASSWORD", _discover_password)
         .complete() < 0)
         return -1;
 
@@ -116,13 +117,17 @@ void Metron::discover() {
     CURL *curl;
     CURLcode res;
 
-    /* get a curl handle */
+    /* Get a curl handle */
     curl = curl_easy_init();
     if(curl) {
         struct curl_slist *headers=NULL;
+        headers = curl_slist_append(headers, "Accept: application/json");
         headers = curl_slist_append(headers, "Content-Type: application/json");
-        String url = "http://"+_discover_ip+":"+String(_discover_port)+_discover_path;
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        headers = curl_slist_append(headers, "charsets: utf-8");
+
+        /* Compose the URL */
+        String url = "http://" + _discover_ip + ":" + String((long)_discover_port) + _discover_path;
+
         /* Now specify the POST data */
         Json j = Json::make_object();
         Json device;
@@ -136,15 +141,20 @@ void Metron::discover() {
             rest.set("url", "");
             rest.set("testUrl", "");
             setHwInfo(rest);
-            device.set("rest",rest);
+            device.set("rest", rest);
+
             Json basic = Json::make_object();
             basic.set("driver", "restServer");
-            device.set("basic",basic);
+            device.set("basic", basic);
         }
         Json devices = Json::make_object();
-        devices.set("rest:"+_discover_myip+":"+String(_discover_myport),device);
+        devices.set("rest:" + _discover_myip + ":" + String((long)_discover_myport), device);
         j.set("devices", devices);
         String s = j.unparse(true);
+
+        // Curl settings
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, s.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, s.length());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
