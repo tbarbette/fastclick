@@ -303,6 +303,8 @@ class Metron : public Element {
         int _discover_port;
         String _discover_path;
         String _discover_myip;
+        String _discover_user;
+        String _discover_password;
         int _discover_myport;
 
         int runChain(ServiceChain *sc, ErrorHandler *errh);

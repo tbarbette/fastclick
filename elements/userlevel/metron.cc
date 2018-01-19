@@ -62,6 +62,8 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
         .read("IP",_discover_myip)
         .read("PORT",_discover_myport)
         .read("DISCOVER_PATH",_discover_path)
+        .read("DISCOVER_USER",_discover_user)
+        .read("DISCOVER_PASSWORD",_discover_password)
         .complete() < 0)
         return -1;
 
@@ -146,7 +148,10 @@ void Metron::discover() {
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, s.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, s.length());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
+        if (_discover_user) {
+            curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_ANY);
+            curl_easy_setopt(curl, CURLOPT_USERPWD, ":");
+        }
 
         /* Perform the request, res will get the return code */
         res = curl_easy_perform(curl);
