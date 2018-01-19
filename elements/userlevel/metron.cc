@@ -121,7 +121,8 @@ void Metron::discover() {
     if(curl) {
         struct curl_slist *headers=NULL;
         headers = curl_slist_append(headers, "Content-Type: application/json");
-        curl_easy_setopt(curl, CURLOPT_URL, "http://"+_discover_ip+":"+_discover_port+_discover_path);
+        String url = "http://"+_discover_ip+":"+String(_discover_port)+_discover_path;
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         /* Now specify the POST data */
         Json j = Json::make_object();
         Json device;
@@ -135,29 +136,28 @@ void Metron::discover() {
             rest.set("url", "");
             rest.set("testUrl", "");
             setHwInfo(rest);
-            device.push_back(rest);
+            device.set("rest",rest);
             Json basic = Json::make_object();
             basic.set("driver", "restServer");
-            device.push_back(basic);
+            device.set("basic",basic);
         }
         Json devices = Json::make_object();
-        devices.set("rest:"+_discover_myip+":"+_discover_myport,device);
+        devices.set("rest:"+_discover_myip+":"+String(_discover_myport),device);
         j.set("devices", devices);
-        String s;
-        j.to_s(s);
+        String s = j.unparse(true);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, s.c_str());
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, s.length());
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         if (_discover_user) {
             curl_easy_setopt(curl, CURLOPT_HTTPAUTH, (long)CURLAUTH_ANY);
-            curl_easy_setopt(curl, CURLOPT_USERPWD, ":");
+            curl_easy_setopt(curl, CURLOPT_USERPWD, (_discover_user + ":" +  _discover_password).c_str());
         }
 
         /* Perform the request, res will get the return code */
         res = curl_easy_perform(curl);
         /* Check for errors */
         if(res != CURLE_OK)
-          click_chatter("curl_easy_perform() failed: %s\n",
+          click_chatter("Could not connect to %s: %s\n", url.c_str(),
                   curl_easy_strerror(res));
 
         /* always cleanup */
