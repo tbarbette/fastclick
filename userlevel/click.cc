@@ -712,7 +712,7 @@ particular purpose.\n");
         int n_eal_args = rte_eal_init(dpdk_arg.size(), dpdk_arg.data());
         if (n_eal_args < 0)
             rte_exit(EXIT_FAILURE,
-                     "Click was built with Intel DPDK support but there was an\n"
+                     "Click was built with DPDK support but there was an\n"
                      "          error parsing the EAL arguments.\n");
         click_nthreads = rte_lcore_count();
     }
