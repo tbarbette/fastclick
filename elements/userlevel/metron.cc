@@ -618,7 +618,6 @@ void Metron::setHwInfo(Json &j) {
     j.set("manufacturer", Json(_cpu_vendor));
     j.set("hwVersion", Json(_hw));
     j.set("swVersion", Json("Click " + _sw));
-    j.set("serial", Json(_serial));
 }
 
 Json Metron::toJSON() {
@@ -627,6 +626,8 @@ Json Metron::toJSON() {
 
     // Info
     setHwInfo(jroot);
+
+    jroot.set("serial", Json(_serial));
 
     // CPU resources
     Json jcpus = Json::make_array();
