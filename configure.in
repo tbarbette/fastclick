@@ -187,9 +187,14 @@ fi
 
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
-#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
 if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
     AC_DEFINE([HAVE_MICROHTTPD])
+fi
+
+AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
+AC_CHECK_HEADERS([curl/curl.h], [ac_have_curl_h=yes], [ac_have_curl_h=no])
+if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
+    AC_DEFINE([HAVE_CURL])
 fi
 
 

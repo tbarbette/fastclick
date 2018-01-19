@@ -31,6 +31,10 @@
 #include "fromdpdkdevice.hh"
 #include "todpdkdevice.hh"
 
+#if HAVE_CURL
+    #include <curl/curl.h>
+#endif
+
 
 CLICK_DECLS
 
@@ -44,14 +48,27 @@ Metron::~Metron() {
 
 int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
     Vector<Element *> nics;
+    _discover_port = 8181;
+    _discover_myport = 80;
+    _discover_path = "/onos/v1/network/configuration/";
     if (Args(conf, this, errh)
         .read_mp("ID", _id)
         .read_all("NIC", nics)
         .read_all("SLAVE_DPDK_ARGS", _dpdk_args)
         .read_all("SLAVE_ARGS", _args)
         .read("TIMING_STATS", _timing_stats)
+        .read("DISCOVER_IP",_discover_ip)
+        .read("DISCOVER_PORT",_discover_port)
+        .read("IP",_discover_myip)
+        .read("PORT",_discover_myport)
+        .read("DISCOVER_PATH",_discover_path)
         .complete() < 0)
         return -1;
+
+#ifndef HAVE_CURL
+    if (_discover_ip)
+        return errh->error("Asking for discovery but Click was compiled without libcurl support !");
+#endif
 
     for (Element *e : nics) {
         NIC nic;
@@ -85,7 +102,63 @@ int Metron::initialize(ErrorHandler *errh) {
     _timer.initialize(this);
     _timer.schedule_after_sec(1);
 
+#if HAVE_CURL
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    discover();
+#endif
     return 0;
+}
+
+void Metron::discover() {
+#if HAVE_CURL
+    CURL *curl;
+    CURLcode res;
+
+    /* get a curl handle */
+    curl = curl_easy_init();
+    if(curl) {
+        struct curl_slist *headers=NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        curl_easy_setopt(curl, CURLOPT_URL, "http://"+_discover_ip+":"+_discover_port+_discover_path);
+        /* Now specify the POST data */
+        Json j = Json::make_object();
+        Json device;
+        {
+            Json rest = Json::make_object();
+            rest.set("username", "nfv");
+            rest.set("password", "");
+            rest.set("ip", _discover_myip);
+            rest.set("port", _discover_myport);
+            rest.set("protocol", "http");
+            rest.set("url", "");
+            rest.set("testUrl", "");
+            setHwInfo(rest);
+            device.push_back(rest);
+            Json basic = Json::make_object();
+            basic.set("driver", "restServer");
+            device.push_back(basic);
+        }
+        Json devices = Json::make_object();
+        devices.set("rest:"+_discover_myip+":"+_discover_myport,device);
+        j.set("devices", devices);
+        String s;
+        j.to_s(s);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, s.c_str());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, s.length());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+
+        /* Perform the request, res will get the return code */
+        res = curl_easy_perform(curl);
+        /* Check for errors */
+        if(res != CURLE_OK)
+          click_chatter("curl_easy_perform() failed: %s\n",
+                  curl_easy_strerror(res));
+
+        /* always cleanup */
+        curl_easy_cleanup(curl);
+    }
+#endif
 }
 
 void Metron::run_timer(Timer *t) {
@@ -160,6 +233,9 @@ void Metron::run_timer(Timer *t) {
 
 
 void Metron::cleanup(CleanupStage) {
+#if HAVE_CURL
+    curl_global_cleanup();
+#endif
     // TODO: Not sure why but buggy...
     /*
     auto begin = _scs.begin();
@@ -533,15 +609,19 @@ void Metron::add_handlers() {
     set_handler("chains_proxy", Handler::f_write | Handler::f_read | Handler::f_read_param, param_handler, h_chains_proxy);
 }
 
+void Metron::setHwInfo(Json &j) {
+    j.set("manufacturer", Json(_cpu_vendor));
+    j.set("hwVersion", Json(_hw));
+    j.set("swVersion", Json("Click " + _sw));
+    j.set("serial", Json(_serial));
+}
+
 Json Metron::toJSON() {
     Json jroot = Json::make_object();
     jroot.set("id", Json(_id));
 
     // Info
-    jroot.set("manufacturer", Json(_cpu_vendor));
-    jroot.set("hwVersion", Json(_hw));
-    jroot.set("swVersion", Json("Click " + _sw));
-    jroot.set("serial", Json(_serial));
+    setHwInfo(jroot);
 
     // CPU resources
     Json jcpus = Json::make_array();

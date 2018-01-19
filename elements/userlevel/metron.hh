@@ -241,6 +241,7 @@ class Metron : public Element {
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         int initialize(ErrorHandler *) CLICK_COLD;
+        void discover();
         void cleanup(CleanupStage) CLICK_COLD;
 
         void run_timer(Timer *t) override;
@@ -249,6 +250,8 @@ class Metron : public Element {
         static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
         static String read_handler(Element *e, void *user_data) CLICK_COLD;
         static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler *errh) CLICK_COLD;
+
+        void setHwInfo(Json &j);
 
         Json toJSON();
         Json statsToJSON();
@@ -296,6 +299,11 @@ class Metron : public Element {
         String _serial;
 
         bool _timing_stats;
+        String _discover_ip;
+        int _discover_port;
+        String _discover_path;
+        String _discover_myip;
+        int _discover_myport;
 
         int runChain(ServiceChain *sc, ErrorHandler *errh);
 
