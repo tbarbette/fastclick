@@ -70,14 +70,6 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh) {
         .complete() < 0)
         return -1;
 
-    click_chatter("     Agent   IP: %s", _agent_ip.c_str());
-    click_chatter("     Agent Port: %d", _agent_port);
-    click_chatter("Controller   IP: %s", _discover_ip.c_str());
-    click_chatter("Controller Port: %d", _discover_port);
-    click_chatter("Controller Path: %s", _discover_path.c_str());
-    click_chatter("Controller User: %s", _discover_user.c_str());
-    click_chatter("Controller Pass: %s", _discover_password.c_str());
-
 #ifndef HAVE_CURL
     if (_discover_ip) {
         return errh->error(
