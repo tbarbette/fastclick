@@ -1,6 +1,8 @@
-// -*- c-basic-offset: 4 -*-
+// -*- mode: c++; c-basic-offset: 4 -*-
+
 #ifndef CLICK_METRON_HH
 #define CLICK_METRON_HH
+
 #include <click/element.hh>
 #include <click/etheraddress.hh>
 #include <click/task.hh>
@@ -8,6 +10,7 @@
 #include <click/hashmap.hh>
 
 #include "../json/json.hh"
+
 CLICK_DECLS
 
 class Metron;
@@ -45,7 +48,10 @@ class NIC {
         Json toJSON(bool stats = false);
 
         int queuePerPool() {
-            return atoi(callRead("nb_rx_queues").c_str()) / atoi(callRead("nb_vf_pools").c_str());
+            return atoi(
+                callRead("nb_rx_queues").c_str()) /
+                atoi(callRead("nb_vf_pools").c_str()
+            );
         }
 
         int cpuToQueue(int id) {
@@ -71,9 +77,11 @@ class ServiceChain {
                 }
 
                 String method;
-                ServiceChain* _sc;
+                ServiceChain *_sc;
 
-                static RxFilter* fromJSON(Json j, ServiceChain *sc, ErrorHandler *errh);
+                static RxFilter *fromJSON(
+                    Json j, ServiceChain *sc, ErrorHandler *errh
+                );
                 Json toJSON();
 
                 int cpuToQueue(NIC *nic, int cpuid) {
@@ -180,10 +188,13 @@ class ServiceChain {
 
         void checkAlive();
 
-        int call(String fnt, bool hasResponse, String handler, String &response, String params);
+        int call(
+            String fnt, bool hasResponse, String handler,
+            String &response, String params
+        );
         String simpleCallRead(String handler);
-        int callRead(String handler, String &response, String params="");
-        int callWrite(String handler, String &response, String params="");
+        int callRead(String handler, String &response, String params = "");
+        int callWrite(String handler, String &response, String params = "");
 
         Vector<int> &getCpuMapRef() {
             return _cpus;
@@ -230,6 +241,7 @@ class ServiceChain {
 =c
 
 Metron */
+
 class Metron : public Element {
     public:
 
@@ -241,15 +253,21 @@ class Metron : public Element {
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         int initialize(ErrorHandler *) CLICK_COLD;
-        void discover();
+        bool discover();
         void cleanup(CleanupStage) CLICK_COLD;
 
         void run_timer(Timer *t) override;
 
         void add_handlers() CLICK_COLD;
-        static int param_handler(int operation, String &param, Element *e, const Handler *, ErrorHandler *errh) CLICK_COLD;
+        static int param_handler(
+            int operation, String &param, Element *e,
+            const Handler *, ErrorHandler *errh
+        ) CLICK_COLD;
         static String read_handler(Element *e, void *user_data) CLICK_COLD;
-        static int write_handler(const String &data, Element *e, void *user_data, ErrorHandler *errh) CLICK_COLD;
+        static int write_handler(
+            const String &data, Element *e, void *user_data,
+            ErrorHandler *errh
+        ) CLICK_COLD;
 
         void setHwInfo(Json &j);
 
@@ -257,7 +275,8 @@ class Metron : public Element {
         Json statsToJSON();
 
         enum {
-            h_resources, h_stats, h_chains,
+            h_resources, h_stats,
+            h_chains, h_discovered,
             h_delete_chains, h_put_chains,
             h_chains_stats, h_chains_proxy
         };
@@ -283,11 +302,18 @@ class Metron : public Element {
         const float CPU_OVERLOAD_LIMIT = (float) 0.7;
         const float CPU_UNERLOAD_LIMIT = (float) 0.4;
 
-        // Default REST configuration
-        const int DEF_LOCAL_PORT = 80;
-        const int DEF_DISCOVER_PORT = 8181;
-        const String DEF_DISCOVER_USER = "onos";
-        const String DEF_DISCOVER_PATH = "/onos/v1/network/configuration/";
+        /* Agent's default REST configuration */
+        const int    DEF_AGENT_PORT  = 80;
+        const String DEF_AGENT_PROTO = "http";
+
+        /* Controller's default REST configuration */
+        const int    DEF_DISCOVER_PORT   = 8181;
+        const String DEF_DISCOVER_DRIVER = "restServer";
+        const String DEF_DISCOVER_USER   = "onos";
+        const String DEF_DISCOVER_PATH   = "/onos/v1/network/configuration/";
+
+        /* Bound the discovery process */
+        const unsigned short DISCOVERY_ATTEMPTS = 3;
 
     private:
         String _id;
@@ -305,13 +331,20 @@ class Metron : public Element {
         String _serial;
 
         bool _timing_stats;
+
+        /* Agent's (local) information */
+        String _agent_ip;
+        int    _agent_port;
+
+        /* Controller's (remote) information */
         String _discover_ip;
-        int _discover_port;
+        int    _discover_port;
         String _discover_path;
-        String _discover_myip;
         String _discover_user;
         String _discover_password;
-        int _discover_myport;
+
+        /* Discovery status */
+        bool _discovered;
 
         int runChain(ServiceChain *sc, ErrorHandler *errh);
 
