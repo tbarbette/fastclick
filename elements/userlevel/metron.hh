@@ -354,4 +354,5 @@ class Metron : public Element {
 };
 
 CLICK_ENDDECLS
+
 #endif
