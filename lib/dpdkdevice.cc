@@ -43,16 +43,6 @@ CLICK_DECLS
  */
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
-#define MASK_FROM_PREFIX(p) ~((1 << (32 - p)) - 1)
-
-// Unifies TCP and UDP parsing
-union L4_RULE {
-    enum rte_flow_item_type type;
-    struct rte_flow_item_udp udp;
-    struct rte_flow_item_tcp tcp;
-    struct rte_flow_item_any any;
-} L4_RULE;
-
 // DPDKDevice mode
 String FlowDirector::FLOW_DIR_FLAG = "flow_dir";
 
@@ -62,44 +52,26 @@ String FlowDirector::FLOW_RULE_DEL   = "del_rule";
 String FlowDirector::FLOW_RULE_LIST  = "count_rules";
 String FlowDirector::FLOW_RULE_FLUSH = "flush_rules";
 
-// Rule structure constants
-String FlowDirector::FLOW_RULE_PATTERN = "pattern";
-String FlowDirector::FLOW_RULE_ACTION  = "action";
-String FlowDirector::FLOW_RULE_IP4_PREFIX = "/";
-
-// Supported patterns
-const Vector<String> FlowDirector::FLOW_RULE_PATTERNS_VEC = [] {
-    Vector<String> v;
-    v.push_back("ip src");
-    v.push_back("ip dst");
-    v.push_back("tcp port src");
-    v.push_back("tcp port dst");
-    v.push_back("udp port src");
-    v.push_back("udp port dst");
-    return v;
-}();
-
-// Supported actions
-const Vector<String> FlowDirector::FLOW_RULE_ACTIONS_VEC = [] {
-    Vector<String> v;
-    v.push_back("queue index");
-    return v;
-}();
+// Default verbosity setting
+bool FlowDirector::DEF_VERBOSITY = true;
 
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<uint8_t, FlowDirector *> FlowDirector::_dev_flow_dir;
+
+// A unique parser
+struct cmdline *FlowDirector::_parser = NULL;
 
 // A unique error handler
 ErrorVeneer *FlowDirector::_errh;
 
 FlowDirector::FlowDirector() :
-        _port_id(-1), _active(false), _verbose(false)
+        _port_id(-1), _active(false), _verbose(DEF_VERBOSITY)
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
 }
 
 FlowDirector::FlowDirector(uint8_t port_id, ErrorHandler *errh) :
-        _port_id(port_id), _active(false), _verbose(false)
+        _port_id(port_id), _active(false), _verbose(DEF_VERBOSITY)
 {
     _errh = new ErrorVeneer(errh);
 
@@ -110,9 +82,25 @@ FlowDirector::FlowDirector(uint8_t port_id, ErrorHandler *errh) :
 
 FlowDirector::~FlowDirector()
 {
+    // Destroy the parser
+    if (_parser) {
+        cmdline_quit(_parser);
+        delete _parser;
+    }
+
     if (_verbose) {
         _errh->message("Flow Director (port %u): Destroyed", _port_id);
     }
+}
+
+struct cmdline *
+FlowDirector::get_parser(ErrorHandler *errh)
+{
+    if (!_parser) {
+        return init_parser(errh);
+    }
+
+    return _parser;
 }
 
 /**
@@ -127,7 +115,10 @@ FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandler *errh)
 {
     // Invalid port ID
     if (port_id >= rte_eth_dev_count()) {
-        click_chatter("Flow Director (port %u): Denied to create instance for invalid port", port_id);
+        click_chatter(
+            "Flow Director (port %u): Denied to create instance for invalid port",
+            port_id
+        );
         return 0;
     }
 
@@ -139,6 +130,9 @@ FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandler *errh)
         flow_dir = new FlowDirector(port_id, errh);
         _dev_flow_dir[port_id] = flow_dir;
     }
+
+    // Create a Flow Director parser
+    _parser = get_parser(errh);
 
     // Ship it back
     return flow_dir;
@@ -159,7 +153,8 @@ FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
     fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
         return _errh->error(
-            "Flow Director (port %u): Failed to open file '%s'", port_id, filename.c_str());
+            "Flow Director (port %u): Failed to open file '%s'",
+            port_id, filename.c_str());
     }
 
     char  *line = NULL;
@@ -167,7 +162,11 @@ FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
 
     // Read file line-by-line (or rule-by-rule)
     while ((getline(&line, &len, fp)) != -1) {
-        FlowDirector::generic_flow_rule_install(port_id, rule_no++, String(line));
+        _errh->message(
+            "Flow Director (port %u): Rule %u is given to the parser",
+            port_id, rule_no
+        );
+        FlowDirector::flow_rule_install(port_id, rule_no++, String(line));
     }
 
     // Close the file
@@ -182,20 +181,6 @@ FlowDirector::add_rules_file(const uint8_t &port_id, const String &filename)
         "Flow Director (port %u): %u/%u rules are installed",
         port_id, _dev_flow_dir[port_id]->_rule_list.size(), rule_no
     );
-}
-
-bool
-FlowDirector::generic_flow_rule_install(const uint8_t &port_id, const uint32_t &rule_id, const String &rule)
-{
-    // Only active instances can configure a NIC
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        return false;
-    }
-
-    _errh->message("Flow Director (port %u): Rule #%4u - %s", port_id, rule_id, rule.c_str());
-
-
-    return false;
 }
 
 /**
@@ -215,376 +200,17 @@ FlowDirector::flow_rule_install(const uint8_t &port_id, const uint32_t &rule_id,
         return false;
     }
 
-    //////////////////////////////////////////////////////////////////////
-    // Flow Attributes: Only ingress rules are currently supported
-    //////////////////////////////////////////////////////////////////////
-    struct rte_flow_attr attr = {
-        .group    = 0,
-        .priority = 0,
-        .ingress  = 1,
-        .egress   = 0,
-        .reserved = 0,
-    };
-    //////////////////////////////////////////////////////////////////////
+    // _errh->message("Flow Director (port %u): Rule #%4u - %s", port_id, rule_id, rule);
 
-
-    //////////////////////////////////////////////////////////////////////
-    // Flow Patterns
-    //////////////////////////////////////////////////////////////////////
-    // L2 - Ethernet type is always IPv4
-    struct rte_flow_item_eth flow_item_eth_type_ipv4 = {
-        .dst = {
-            .addr_bytes = { 0 }
-        },
-        .src = {
-            .addr_bytes = { 0 }
-        },
-        .type = rte_cpu_to_be_16(ETHER_TYPE_IPv4)
-    };
-
-    struct rte_flow_item_eth flow_item_eth_mask_type_ipv4 = {
-        .dst = {
-            .addr_bytes = { 0 }
-        },
-        .src = {
-            .addr_bytes = { 0 }
-        },
-        .type = rte_cpu_to_be_16(0xFFFF)
-    };
-    //////////////////////////////////////////////////////////////////////
-
-
-    //////////////////////////////////////////////////////////////////////
-    // Flow Actions
-    //////////////////////////////////////////////////////////////////////
-    // Only queue -> core dispatching is currently supported
-    struct rte_flow_action_queue queue_conf;
-    //////////////////////////////////////////////////////////////////////
-
-
-    // Every rule must start with 'pattern'
-    if (!rule.starts_with(FlowDirector::FLOW_RULE_PATTERN)) {
-        flow_rule_usage(port_id, "Rule must begin with pattern keyword");
+    int res = cmd_parse(_parser, (char *) rule.c_str(), _errh);
+    if (res == ERROR) {
+        _errh->error("Flow Director (port %u): Failed to parse rule #%4u", port_id, rule_id);
         return false;
     }
 
-    // Useful indices
-    int pattern_start = FlowDirector::FLOW_RULE_PATTERN.length() + 1;
-    int action_pos = rule.find_left(FlowDirector::FLOW_RULE_ACTION, pattern_start);
-    if (action_pos < 0) {
-        flow_rule_usage(port_id, "Rule without action keyword is invalid");
-        return false;
-    }
-    int action_start = action_pos + FlowDirector::FLOW_RULE_ACTION.length() + 1;
-    int pattern_end = action_pos - 1;
+    _errh->message("Flow Director (port %u): Rule #%4u - Successfully parsed", port_id, rule_id);
 
-    // Patterns and actions are separated
-    String pattern_str = rule.substring(pattern_start, pattern_end - pattern_start + 1).trim_space();
-    String action_str  = rule.substring(action_start).trim_space();
-
-    // Split a pattern into multiple sub-patterns
-    Vector<String> sub_patterns;
-    int pattern_index = 0;
-    while (pattern_index >= 0) {
-        int until = pattern_str.find_left("and", pattern_index);
-        if (until < 0) {
-            // Keep this last part until the end
-            sub_patterns.push_back(pattern_str.substring(pattern_index + 1).trim_space_left().trim_space());
-            break;
-        }
-        // Keep this sub-pattern
-        sub_patterns.push_back(pattern_str.substring(pattern_index, until - pattern_index - 1).trim_space_left().trim_space());
-
-        // Move to the next, after 'and '
-        pattern_index = until + 3;
-    }
-
-    if (sub_patterns.size() == 0) {
-        flow_rule_usage(port_id, "Rule begins with pattern but has no patterns");
-        return false;
-    }
-
-    if (_dev_flow_dir[port_id]->get_verbose()) {
-        _errh->message("Flow Director (port %u): Parsing flow rule #%4u", port_id, rule_id);
-    }
-
-    // Fill the pattern's data
-    bool valid_pattern = true;
-    uint8_t  ip_proto = 0x00;
-    uint8_t  ip_proto_mask = 0x00;
-    uint8_t  ip_src[4];
-    uint8_t  ip_dst[4];
-    uint32_t ip_src_mask = rte_cpu_to_be_32(0xFFFFFFFF);
-    uint32_t ip_dst_mask = rte_cpu_to_be_32(0xFFFFFFFF);
-    uint16_t port_src = rte_cpu_to_be_16(0x0000);
-    uint16_t port_dst = rte_cpu_to_be_16(0x0000);
-    uint16_t port_src_mask = rte_cpu_to_be_16(0x0000);
-    uint16_t port_dst_mask = rte_cpu_to_be_16(0x0000);
-    String proto = "";
-    for (String pat : sub_patterns) {
-        // Valid patterns
-        for (String p : FLOW_RULE_PATTERNS_VEC) {
-            // This is a valid pattern
-            if (pat.starts_with(p)) {
-                String ip_str = pat.substring(p.length() + 1);
-
-                // IPv4 address match
-                if ((p == "ip src") || (p == "ip dst")) {
-                    String ip_prefix_str;
-                    String ip_rule_str;
-
-                    // Check whether a prefix is given
-                    int prefix_pos = ip_str.find_left(FlowDirector::FLOW_RULE_IP4_PREFIX, 0);
-                    uint32_t ip_prefix = 0;
-
-                    // There is a prefix after the IP
-                    if (prefix_pos >= 0) {
-                        int first_space_pos = ip_str.find_left(' ', prefix_pos);
-                        ip_prefix_str = ip_str.substring(prefix_pos + 1);
-                        ip_prefix = atoi(ip_prefix_str.c_str());
-                        ip_rule_str = ip_str.substring(0, prefix_pos);
-                    } else {
-                        ip_rule_str = ip_str;
-                    }
-
-                    unsigned prev = 0;
-                    unsigned curr = 0;
-                    unsigned j = 0;
-                    while(curr < ip_rule_str.length()) {
-                        if ((ip_rule_str.at(curr) == '.') || (curr == (ip_rule_str.length()-1))) {
-                            unsigned offset = (curr-prev > 0) ? (curr-prev) : 1;
-                            String ip_byte = ip_rule_str.substring(prev, offset);
-
-                            if (p == "ip src") {
-                                ip_src[j] = atoi(ip_byte.c_str());
-                            } else if (p == "ip dst") {
-                                ip_dst[j] = atoi(ip_byte.c_str());
-                            } else {
-                                continue;
-                            }
-
-                            prev = curr + 1;
-                            curr++;
-                            j++;
-                        } else {
-                            curr++;
-                        }
-                    }
-
-                    // Set the mask based on the prefix
-                    if (ip_prefix > 0) {
-                        (p == "ip src") ? ip_src_mask = rte_cpu_to_be_32(MASK_FROM_PREFIX(ip_prefix)):
-                                          ip_dst_mask = rte_cpu_to_be_32(MASK_FROM_PREFIX(ip_prefix));
-                    }
-
-                    if (curr == (ip_rule_str.length()) && _dev_flow_dir[port_id]->get_verbose()) {
-                        (p == "ip src") ?
-                            _errh->message(
-                                "\tL3 pattern: %s with IP: %u.%u.%u.%u and mask %s",
-                                pat.c_str(), ip_src[0], ip_src[1], ip_src[2], ip_src[3],
-                                IPAddress(ip_src_mask).unparse().c_str()
-                            )
-                            :
-                            _errh->message(
-                                "\tL3 pattern: %s with IP: %u.%u.%u.%u and mask %s",
-                                pat.c_str(), ip_dst[0], ip_dst[1], ip_dst[2], ip_dst[3],
-                                IPAddress(ip_dst_mask).unparse().c_str()
-                            );
-                    }
-
-                    continue;
-                }
-
-                // TCP match
-                if (pat.starts_with("tcp")) {
-                    proto = "tcp";
-                    ip_proto = 0x06;
-                // UDP match
-                } else if (pat.starts_with("udp")) {
-                    proto = "udp";
-                    ip_proto = 0x11;
-                } else {
-                    valid_pattern = false;
-                    continue;
-                }
-                ip_proto_mask = 0xFF;
-
-                // Get src or dst type
-                String port_type = pat.substring(9, 3);
-                // Get port number
-                String port_str = pat.substring(p.length() + 1);
-
-                if (port_type == "src") {
-                    port_src = atoi(port_str.c_str());
-                    port_src_mask = rte_cpu_to_be_16(0xFFFF);
-                } else {
-                    port_dst = atoi(port_str.c_str());
-                    port_dst_mask = rte_cpu_to_be_16(0xFFFF);
-                }
-
-                if (_dev_flow_dir[port_id]->get_verbose()) {
-                    _errh->message(
-                        "\tL4 pattern: Proto %s (%u), Port type: %s, Port No: %s",
-                        proto.c_str(), ip_proto, port_type.c_str(), port_str.c_str()
-                    );
-                }
-            }
-        }
-    }
-
-    if (!valid_pattern) {
-        flow_rule_usage(port_id, String("Unsupported pattern " + pattern_str).c_str());
-        return false;
-    }
-
-    // Compose the IP pattern
-    struct rte_flow_item_ipv4 ip_rule = {
-        .hdr = {
-            .version_ihl     = 0x00,
-            .type_of_service = 0x00,
-            .total_length    = rte_cpu_to_be_16(0x0000),
-            .packet_id       = rte_cpu_to_be_16(0x0000),
-            .fragment_offset = rte_cpu_to_be_16(0x0000),
-            .time_to_live    = 0x00,
-            .next_proto_id   = ip_proto,
-            .hdr_checksum    = rte_cpu_to_be_16(0x0000),
-            .src_addr        = rte_cpu_to_be_32(IPv4(ip_src[0], ip_src[1], ip_src[2], ip_src[3])),
-            .dst_addr        = rte_cpu_to_be_32(IPv4(ip_dst[0], ip_dst[1], ip_dst[2], ip_dst[3])),
-        },
-    };
-
-    struct rte_flow_item_ipv4 ip_rule_mask = {
-        .hdr = {
-            .version_ihl     = 0x00,
-            .type_of_service = 0x00,
-            .total_length    = rte_cpu_to_be_16(0x0000),
-            .packet_id       = rte_cpu_to_be_16(0x0000),
-            .fragment_offset = rte_cpu_to_be_16(0x0000),
-            .time_to_live    = 0x00,
-            .next_proto_id   = ip_proto_mask,
-            .hdr_checksum    = rte_cpu_to_be_16(0x0000),
-            .src_addr        = ip_src_mask,
-            .dst_addr        = ip_dst_mask,
-        },
-    };
-
-    // Compose the transport layer pattern
-    union L4_RULE l4_rule;
-    union L4_RULE l4_rule_mask;
-    void *l4_rule_spec = NULL;
-    void *l4_rule_mask_spec = NULL;
-    // TCP matching
-    if (proto == "tcp") {
-        l4_rule.type = RTE_FLOW_ITEM_TYPE_TCP;
-
-        l4_rule.tcp.hdr.src_port = rte_cpu_to_be_16(port_src);
-        l4_rule.tcp.hdr.dst_port = rte_cpu_to_be_16(port_dst);
-        l4_rule_spec = (void *) &l4_rule.tcp;
-
-        l4_rule_mask.tcp.hdr.src_port = rte_cpu_to_be_16(port_src_mask);
-        l4_rule_mask.tcp.hdr.dst_port = rte_cpu_to_be_16(port_dst_mask);
-        l4_rule_mask_spec = (void *) &l4_rule_mask.tcp;
-    // UDP matching
-    } else if (proto == "udp") {
-        l4_rule.type = RTE_FLOW_ITEM_TYPE_UDP;
-
-        l4_rule.udp.hdr.src_port = rte_cpu_to_be_16(port_src);
-        l4_rule.udp.hdr.dst_port = rte_cpu_to_be_16(port_dst);
-        l4_rule_spec = (struct rte_flow_item_udp *) &l4_rule.udp;
-
-        l4_rule_mask.udp.hdr.src_port = rte_cpu_to_be_16(port_src_mask);
-        l4_rule_mask.udp.hdr.dst_port = rte_cpu_to_be_16(port_dst_mask);
-        l4_rule_mask_spec = (struct rte_flow_item_udp *) &l4_rule_mask.udp;
-    // No L4 matching
-    } else {
-        l4_rule.type = RTE_FLOW_ITEM_TYPE_ANY;
-        l4_rule.any.num = rte_cpu_to_be_32(1);
-        l4_rule_spec = (void *) &l4_rule.any;
-        l4_rule_mask.any.num = rte_cpu_to_be_32(0xFFFFFFFF);
-        l4_rule_mask_spec = (void *) &l4_rule_mask.any;
-    }
-
-    // struct rte_flow_item_udp udp_rule;
-    // udp_rule.hdr.src_port = rte_cpu_to_be_16(port_src);
-
-    // struct rte_flow_item_udp udp_rule_mask;
-    // udp_rule.hdr.src_port = rte_cpu_to_be_16(port_src_mask);
-
-    // Compose the pattern
-    struct rte_flow_item patterns[] = {
-        {
-            .type = RTE_FLOW_ITEM_TYPE_ETH,
-            .spec = (void *) &flow_item_eth_type_ipv4,
-            .last = NULL,
-            .mask = (void *) &flow_item_eth_mask_type_ipv4,
-        },
-        {
-            .type = RTE_FLOW_ITEM_TYPE_IPV4,
-            .spec = &ip_rule,
-            .last = NULL,
-            .mask = &ip_rule_mask,
-        },
-        // TODO: When I assign my own void* it does not work. Works with direct assignment of structs (see udp_rule[_mask] above)
-        // {
-        //     .type = l4_rule.type,
-        //     .spec = l4_rule_spec,
-        //     .last = NULL,
-        //     .mask = l4_rule_mask_spec,
-        // },
-        {
-            .type = RTE_FLOW_ITEM_TYPE_END,
-            .spec = NULL,
-            .last = NULL,
-            .mask = NULL,
-        }
-    };
-
-    // Compose a DPDK action
-    bool valid_action = false;
-    for (String act : FLOW_RULE_ACTIONS_VEC) {
-        if (action_str.starts_with(act) > 0) {
-            String act_str = action_str.substring(act.length() + 1);
-            uint16_t queue_index = atoi(act_str.c_str());
-
-            // TODO: Ensure that there are enough queues
-            // if (queue_index >= rx_queues_nb) {
-            //     _errh->error("Flow Director (port %u): Not enough queues for action: %s", action_str.c_str());
-            //     return false;
-            // }
-
-            queue_conf.index = queue_index;
-            valid_action = true;
-
-            if (_dev_flow_dir[port_id]->get_verbose()) {
-                _errh->message("\tAction with queue index: %d", queue_index);
-            }
-        }
-    }
-
-    if (!valid_action) {
-        flow_rule_usage(port_id, String("Unsupported action " + action_str).c_str());
-        return false;
-    }
-
-    struct rte_flow_action actions[] =
-    {
-        {
-            .type = RTE_FLOW_ACTION_TYPE_QUEUE,
-            .conf = &queue_conf
-        },
-        {
-            .type = RTE_FLOW_ACTION_TYPE_END,
-            .conf = NULL
-        }
-    };
-
-    // Validate the rule
-    if (!flow_rule_validate(port_id, rule_id, &attr, patterns, actions)) {
-        return false;
-    }
-
-    // Add the rule to the NIC and to our memory
-    return flow_rule_add(port_id, rule_id, &attr, patterns, actions);
+    return true;
 }
 
 /**

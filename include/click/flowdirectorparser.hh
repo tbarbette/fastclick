@@ -44,29 +44,39 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include <rte_config.h>
 #include <rte_common.h>
 #include <rte_ethdev.h>
 #include <rte_byteorder.h>
 #include <rte_string_fns.h>
+#include <rte_flow.h>
 extern "C" {
     #include <cmdline_parse.h>
     #include <cmdline_parse_num.h>
     #include <cmdline_parse_string.h>
     #include <cmdline_parse_ipaddr.h>
     #include <cmdline_parse_etheraddr.h>
-    #include <cmdline_flow.h>
+    #include <cmdline_socket.h>
+    // TODO: Use RTE_SDK
+    #include "/home/katsikas/nfv/dpdk/app/test-pmd/testpmd.h"
+    #include "/home/katsikas/nfv/dpdk/app/test-pmd/cmdline_flow.h"
+    #include "/home/katsikas/nfv/dpdk/app/test-pmd/cmdline_flow.c"
 }
-#include <rte_flow.h>
-
-CLICK_DECLS
 
 #define RTE_PORT_STOPPED        (uint16_t)0
 #define RTE_PORT_STARTED        (uint16_t)1
 #define RTE_PORT_CLOSED         (uint16_t)2
 #define RTE_PORT_HANDLING       (uint16_t)3
+#define ERROR  (int)-1
+#define SUCCESS (int)0
 
-portid_t nb_ports;             /**< Number of probed ethernet ports. */
+CLICK_DECLS
 
+extern cmdline_parse_inst_t cmd_flow;
+
+/**
+ * Helpers functions for parsing.
+ */
 void fdir_set_flex_mask(portid_t port_id,
 			struct rte_eth_fdir_flex_mask *cfg);
 void fdir_set_flex_payload(portid_t port_id,
@@ -74,28 +84,16 @@ void fdir_set_flex_payload(portid_t port_id,
 static void cmd_reconfig_device_queue(portid_t id,
 			uint8_t dev, uint8_t queue);
 
-struct rte_fdir_conf fdir_conf = {
-	.mode = RTE_FDIR_MODE_NONE,
-	.pballoc = RTE_FDIR_PBALLOC_64K,
-	.status = RTE_FDIR_REPORT_STATUS,
-	.drop_queue = 127,
-	.mask = {
-		.vlan_tci_mask = 0x0,
-		.ipv4_mask     = {
-			.src_ip = 0xFFFFFFFF,
-			.dst_ip = 0xFFFFFFFF,
-		},
-		.ipv6_mask     = {
-			.src_ip = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-			.dst_ip = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
-		},
-		.src_port_mask = 0xFFFF,
-		.dst_port_mask = 0xFFFF,
-		.mac_addr_byte_mask = 0xFF,
-		.tunnel_id_mask = 0xFFFFFFFF,
-		.tunnel_type_mask = 1,
-	},
-};
+/**
+ * Flow parsing functions.
+ */
+struct cmdline *init_parser(ErrorHandler *errh);
+
+struct cmdline *cmdline_alloc(cmdline_parse_ctx_t *ctx, const char *prompt);
+
+int cmd_parse(struct cmdline *cl, char *input_cmd, ErrorHandler *errh);
+
+int cmdline_input(struct cmdline *cl, char *input_cmd, ErrorHandler *errh);
 
 /* *** A 2tuple FILTER *** */
 struct cmd_2tuple_filter_result {
@@ -141,12 +139,6 @@ struct cmd_5tuple_filter_result {
 	uint16_t  queue_id;
 };
 
-
-
-class FlowDirectorParser {
-	public:
-
-};
-
 CLICK_ENDDECLS
+
 #endif

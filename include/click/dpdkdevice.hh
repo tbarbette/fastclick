@@ -24,6 +24,7 @@
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
 #include <rte_bus_pci.h>
+#include <cmdline.h>
 #endif
 
 #include <click/packet.hh>
@@ -32,6 +33,7 @@
 #include <click/vector.hh>
 #include <click/args.hh>
 #include <click/etheraddress.hh>
+#include <click/flowdirectorparser.hh>
 
 CLICK_DECLS
 class DPDKDeviceArg;
@@ -94,16 +96,8 @@ public:
     static String FLOW_RULE_LIST;
     static String FLOW_RULE_FLUSH;
 
-    // Rule structure constants
-    static String FLOW_RULE_PATTERN;
-    static String FLOW_RULE_ACTION;
-    static String FLOW_RULE_IP4_PREFIX;
-
-    // Supported patterns
-    static const Vector<String> FLOW_RULE_PATTERNS_VEC;
-
-    // Supported actions
-    static const Vector<String> FLOW_RULE_ACTIONS_VEC;
+    // For debugging
+    static bool DEF_VERBOSITY;
 
     // Global table of ports mapped to their Flow Director objects
     static HashTable<uint8_t, FlowDirector *> _dev_flow_dir;
@@ -113,6 +107,9 @@ public:
         const uint8_t &port_id,
         ErrorHandler *errh
     );
+
+    // Parser initialization
+    static struct cmdline *get_parser(ErrorHandler *errh);
 
     inline static void delete_error_handler() { delete _errh; };
 
@@ -148,13 +145,6 @@ public:
     static uint32_t flow_rules_flush(const uint8_t &port_id);
 
     // Parse a string-based rule and translate it into a flow rule object
-    static bool generic_flow_rule_install(
-        const uint8_t  &port_id,
-        const uint32_t &rule_id,
-        const String   &rule
-    );
-
-    // Parse a string-based rule and translate it into a flow rule object
     static bool flow_rule_install(
         const uint8_t  &port_id,
         const uint32_t &rule_id,
@@ -186,6 +176,9 @@ private:
 
     // Filename that contains the rules to be installed
     String _rules_filename;
+
+    // Command line parser
+    static struct cmdline *_parser;
 
     // A unique error handler
     static ErrorVeneer *_errh;
