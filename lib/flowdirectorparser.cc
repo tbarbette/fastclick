@@ -47,9 +47,7 @@
 
 CLICK_DECLS
 
-/**
- * Auxiliary data structures.
- */
+// Auxiliary data structures. //
 struct rte_fdir_conf fdir_conf = {
 	.mode = RTE_FDIR_MODE_NONE,
 	.pballoc = RTE_FDIR_PBALLOC_64K,
@@ -73,7 +71,7 @@ struct rte_fdir_conf fdir_conf = {
 	},
 };
 
-struct rte_port *ports;	/**< For all probed ethernet ports. */
+struct rte_port *ports;	// For all probed ethernet ports. //
 
 /*
  * Store specified sockets on which memory pool to be used by ports
@@ -98,7 +96,8 @@ uint8_t txring_numa[RTE_MAX_ETHPORTS];
  */
 portid_t nb_ports;
 
-/* *** ADD/REMOVE A 2tuple FILTER *** */
+
+// ADD/REMOVE A 2tuple FILTER
 static void
 cmd_2tuple_filter_parsed(void *parsed_result,
 			__attribute__((unused)) struct cmdline *cl,
@@ -138,7 +137,7 @@ cmd_2tuple_filter_parsed(void *parsed_result,
 		filter.tcp_flags = res->tcp_flags_value;
 	}
 
-	/* need convert to big endian. */
+	// need convert to big endian.
 	filter.dst_port = rte_cpu_to_be_16(res->dst_port_value);
 	filter.queue = res->queue_id;
 
@@ -230,7 +229,7 @@ cmdline_parse_inst_t cmd_2tuple_filter = {
 	},
 };
 
-/* *** ADD/REMOVE A 5tuple FILTER *** */
+// ADD/REMOVE A 5tuple FILTER //
 static void
 cmd_5tuple_filter_parsed(void *parsed_result,
 			__attribute__((unused)) struct cmdline *cl,
@@ -274,7 +273,7 @@ cmd_5tuple_filter_parsed(void *parsed_result,
 	}
 
 	if (res->dst_ip_value.family == AF_INET)
-		/* no need to convert, already big endian. */
+		// no need to convert, already big endian.
 		filter.dst_ip = res->dst_ip_value.addr.ipv4.s_addr;
 	else {
 		if (filter.dst_ip_mask == 0) {
@@ -285,7 +284,7 @@ cmd_5tuple_filter_parsed(void *parsed_result,
 	}
 
 	if (res->src_ip_value.family == AF_INET)
-		/* no need to convert, already big endian. */
+		// no need to convert, already big endian.
 		filter.src_ip = res->src_ip_value.addr.ipv4.s_addr;
 	else {
 		if (filter.src_ip_mask == 0) {
@@ -294,7 +293,7 @@ cmd_5tuple_filter_parsed(void *parsed_result,
 		}
 		filter.src_ip = 0;
 	}
-	/* need convert to big endian. */
+	// need convert to big endian.
 	filter.dst_port = rte_cpu_to_be_16(res->dst_port_value);
 	filter.src_port = rte_cpu_to_be_16(res->src_port_value);
 	filter.queue = res->queue_id;
@@ -411,7 +410,7 @@ cmdline_parse_inst_t cmd_5tuple_filter = {
 	},
 };
 
-/* *** ADD/REMOVE A flex FILTER *** */
+// ADD/REMOVE A flex FILTER //
 struct cmd_flex_filter_result {
 	cmdline_fixed_string_t filter;
 	cmdline_fixed_string_t ops;
@@ -466,7 +465,7 @@ cmd_flex_filter_parsed(void *parsed_result,
 	bytes_ptr = res->bytes_value;
 	mask_ptr = res->mask_value;
 
-	 /* translate bytes string to array. */
+	 // translate bytes string to array.
 	if (bytes_ptr[0] == '0' && ((bytes_ptr[1] == 'x') ||
 		(bytes_ptr[1] == 'X')))
 		bytes_ptr += 2;
@@ -478,7 +477,7 @@ cmd_flex_filter_parsed(void *parsed_result,
 	for (i = 0; i < len; i++) {
 		c = bytes_ptr[i];
 		if (isxdigit(c) == 0) {
-			/* invalid characters. */
+			// invalid characters.
 			printf("invalid input\n");
 			return;
 		}
@@ -493,7 +492,7 @@ cmd_flex_filter_parsed(void *parsed_result,
 			byte |= val << 4;
 	}
 	printf("\n");
-	 /* translate mask string to uint8_t array. */
+	 // translate mask string to uint8_t array.
 	if (mask_ptr[0] == '0' && ((mask_ptr[1] == 'x') ||
 		(mask_ptr[1] == 'X')))
 		mask_ptr += 2;
@@ -507,7 +506,7 @@ cmd_flex_filter_parsed(void *parsed_result,
 	for (i = 0; i < len; i++) {
 		c = mask_ptr[i];
 		if (isxdigit(c) == 0) {
-			/* invalid characters. */
+			// invalid characters.
 			printf("invalid input\n");
 			return;
 		}
@@ -602,9 +601,9 @@ cmdline_parse_inst_t cmd_flex_filter = {
 	},
 };
 
-/* *** Filters Control *** */
+// Filters Control //
 
-/* *** deal with ethertype filter *** */
+// deal with ethertype filter //
 struct cmd_ethertype_filter_result {
 	cmdline_fixed_string_t filter;
 	portid_t port_id;
@@ -714,7 +713,7 @@ cmdline_parse_inst_t cmd_ethertype_filter = {
 	},
 };
 
-/* *** deal with flow director filter *** */
+// deal with flow director filter //
 struct cmd_flow_director_result {
 	cmdline_fixed_string_t flow_director_filter;
 	portid_t port_id;
@@ -924,7 +923,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 	case RTE_ETH_FLOW_FRAG_IPV4:
 	case RTE_ETH_FLOW_NONFRAG_IPV4_OTHER:
 		entry.input.flow.ip4_flow.proto = res->proto_value;
-		/* fall-through */
+		// fall-through
 	case RTE_ETH_FLOW_NONFRAG_IPV4_UDP:
 	case RTE_ETH_FLOW_NONFRAG_IPV4_TCP:
 		IPV4_ADDR_TO_UINT(res->ip_dst,
@@ -933,7 +932,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 			entry.input.flow.ip4_flow.src_ip);
 		entry.input.flow.ip4_flow.tos = res->tos_value;
 		entry.input.flow.ip4_flow.ttl = res->ttl_value;
-		/* need convert to big endian. */
+		// need convert to big endian. //
 		entry.input.flow.udp4_flow.dst_port =
 				rte_cpu_to_be_16(res->port_dst);
 		entry.input.flow.udp4_flow.src_port =
@@ -946,7 +945,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 			entry.input.flow.sctp4_flow.ip.src_ip);
 		entry.input.flow.ip4_flow.tos = res->tos_value;
 		entry.input.flow.ip4_flow.ttl = res->ttl_value;
-		/* need convert to big endian. */
+		// need convert to big endian. //
 		entry.input.flow.sctp4_flow.dst_port =
 				rte_cpu_to_be_16(res->port_dst);
 		entry.input.flow.sctp4_flow.src_port =
@@ -957,7 +956,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 	case RTE_ETH_FLOW_FRAG_IPV6:
 	case RTE_ETH_FLOW_NONFRAG_IPV6_OTHER:
 		entry.input.flow.ipv6_flow.proto = res->proto_value;
-		/* fall-through */
+		// fall-through //
 	case RTE_ETH_FLOW_NONFRAG_IPV6_UDP:
 	case RTE_ETH_FLOW_NONFRAG_IPV6_TCP:
 		IPV6_ADDR_TO_ARRAY(res->ip_dst,
@@ -966,7 +965,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 			entry.input.flow.ipv6_flow.src_ip);
 		entry.input.flow.ipv6_flow.tc = res->tos_value;
 		entry.input.flow.ipv6_flow.hop_limits = res->ttl_value;
-		/* need convert to big endian. */
+		// need convert to big endian. //
 		entry.input.flow.udp6_flow.dst_port =
 				rte_cpu_to_be_16(res->port_dst);
 		entry.input.flow.udp6_flow.src_port =
@@ -979,7 +978,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 			entry.input.flow.sctp6_flow.ip.src_ip);
 		entry.input.flow.ipv6_flow.tc = res->tos_value;
 		entry.input.flow.ipv6_flow.hop_limits = res->ttl_value;
-		/* need convert to big endian. */
+		// need convert to big endian. //
 		entry.input.flow.sctp6_flow.dst_port =
 				rte_cpu_to_be_16(res->port_dst);
 		entry.input.flow.sctp6_flow.src_port =
@@ -1016,7 +1015,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 
 	entry.input.flow_ext.vlan_tci = rte_cpu_to_be_16(res->vlan_value);
 
-	entry.action.flex_off = 0;  /*use 0 by default */
+	entry.action.flex_off = 0;  // use 0 by default //
 	if (!strcmp(res->drop, "drop"))
 		entry.action.behavior = RTE_ETH_FDIR_REJECT;
 	else
@@ -1046,7 +1045,7 @@ cmd_flow_director_filter_parsed(void *parsed_result,
 		}
 	}
 
-	/* set to report FD ID by default */
+	// set to report FD ID by default //
 	entry.action.report_status = RTE_ETH_FDIR_REPORT_ID;
 	entry.action.rx_queue = res->queue_id;
 	entry.soft_id = res->fd_id_value;
@@ -1440,7 +1439,7 @@ cmdline_parse_inst_t cmd_flush_flow_director = {
 	},
 };
 
-/* *** deal with flow director mask *** */
+// deal with flow director mask //
 struct cmd_flow_director_mask_result {
 	cmdline_fixed_string_t flow_director_mask;
 	portid_t port_id;
@@ -1480,7 +1479,7 @@ cmd_flow_director_mask_parsed(void *parsed_result,
 	}
 
 	port = &ports[res->port_id];
-	/** Check if the port is not started **/
+	// Check if the port is not started //
 	if (port->port_status != RTE_PORT_STOPPED) {
 		printf("Please stop port %d first\n", res->port_id);
 		return;
@@ -1653,7 +1652,7 @@ cmdline_parse_inst_t cmd_set_flow_director_tunnel_mask = {
 	},
 };
 
-/* *** deal with flow director mask on flexible payload *** */
+// deal with flow director mask on flexible payload //
 struct cmd_flow_director_flex_mask_result {
 	cmdline_fixed_string_t flow_director_flexmask;
 	portid_t port_id;
@@ -1682,7 +1681,7 @@ cmd_flow_director_flex_mask_parsed(void *parsed_result,
 	}
 
 	port = &ports[res->port_id];
-	/** Check if the port is not started **/
+	// Check if the port is not started //
 	if (port->port_status != RTE_PORT_STOPPED) {
 		printf("Please stop port %d first\n", res->port_id);
 		return;
@@ -1706,7 +1705,7 @@ cmd_flow_director_flex_mask_parsed(void *parsed_result,
 	}
 
 	if (!strcmp(res->flow_type, "none")) {
-		/* means don't specify the flow type */
+		// means don't specify the flow type //
 		flex_mask.flow_type = RTE_ETH_FLOW_UNKNOWN;
 		for (i = 0; i < RTE_ETH_FLOW_MAX; i++)
 			memset(&port->dev_conf.fdir_conf.flex_conf.flex_mask[i],
@@ -1776,7 +1775,7 @@ cmdline_parse_inst_t cmd_set_flow_director_flex_mask = {
 	},
 };
 
-/* *** deal with flow director flexible payload configuration *** */
+// deal with flow director flexible payload configuration //
 struct cmd_flow_director_flexpayload_result {
 	cmdline_fixed_string_t flow_director_flexpayload;
 	portid_t port_id;
@@ -1839,7 +1838,7 @@ cmd_flow_director_flxpld_parsed(void *parsed_result,
 	}
 
 	port = &ports[res->port_id];
-	/** Check if the port is not started **/
+	// Check if the port is not started //
 	if (port->port_status != RTE_PORT_STOPPED) {
 		printf("Please stop port %d first\n", res->port_id);
 		return;
@@ -1895,7 +1894,7 @@ cmdline_parse_inst_t cmd_set_flow_director_flex_payload = {
 	},
 };
 
-/* Generic flow interface command. */
+// Generic flow interface command. //
 // cmdline_parse_inst_t cmd_flow;
 // #ifdef RTE_BUILD_SHARED_LIB
 // cmdline_parse_inst_t cmd_flow;
@@ -1903,8 +1902,7 @@ cmdline_parse_inst_t cmd_set_flow_director_flex_payload = {
 // extern cmdline_parse_inst_t cmd_flow;
 // #endif
 
-
-/* List of Flow Director instructions. */
+// List of Flow Director instructions. //
 cmdline_parse_ctx_t main_ctx[] = {
 	(cmdline_parse_inst_t *)&cmd_ethertype_filter,
 	(cmdline_parse_inst_t *)&cmd_2tuple_filter,
@@ -1926,9 +1924,7 @@ cmdline_parse_ctx_t main_ctx[] = {
 	NULL,
 };
 
-/**
- * Helpers functions for parsing.
- */
+// Helper functions for parsing. //
 int
 port_id_is_invalid(portid_t port_id, enum print_warning warning)
 {
@@ -2012,26 +2008,24 @@ cmd_reconfig_device_queue(portid_t id, uint8_t dev, uint8_t queue)
 		portid_t pid;
 
 		RTE_ETH_FOREACH_DEV(pid) {
-			/* check if need_reconfig has been set to 1 */
+			// check if need_reconfig has been set to 1 //
 			if (ports[pid].need_reconfig == 0)
 				ports[pid].need_reconfig = dev;
-			/* check if need_reconfig_queues has been set to 1 */
+			// check if need_reconfig_queues has been set to 1 //
 			if (ports[pid].need_reconfig_queues == 0)
 				ports[pid].need_reconfig_queues = queue;
 		}
 	} else if (!port_id_is_invalid(id, DISABLED_WARN)) {
-		/* check if need_reconfig has been set to 1 */
+		// check if need_reconfig has been set to 1 //
 		if (ports[id].need_reconfig == 0)
 			ports[id].need_reconfig = dev;
-		/* check if need_reconfig_queues has been set to 1 */
+		// check if need_reconfig_queues has been set to 1 //
 		if (ports[id].need_reconfig_queues == 0)
 			ports[id].need_reconfig_queues = queue;
 	}
 }
 
-/**
- * Flow parsing functions.
- */
+// Flow parsing functions. //
 struct cmdline *
 init_parser(ErrorHandler *errh)
 {

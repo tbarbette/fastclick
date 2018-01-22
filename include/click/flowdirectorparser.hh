@@ -75,7 +75,7 @@ CLICK_DECLS
 extern cmdline_parse_inst_t cmd_flow;
 
 /**
- * Helpers functions for parsing.
+ * Helper functions for parsing.
  */
 void fdir_set_flex_mask(portid_t port_id,
 			struct rte_eth_fdir_flex_mask *cfg);
