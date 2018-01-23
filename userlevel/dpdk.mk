@@ -236,7 +236,6 @@ DPDK_LIB=$(_LDLIBS-y) $(CPU_LDLIBS) $(EXTRA_LDLIBS)
 DPDK_LIB := $(shell echo $(DPDK_LIB) | \
     awk '{for (i = 1; i <= NF; i++) { if (!seen[$$i]++) print $$i }}')
 
-
 RTE_SDK_FULL=`readlink -f $RTE_SDK`
 
 CFLAGS += -I$(DPDK_INCLUDE)
@@ -246,5 +245,13 @@ CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
 
 include $(RTE_SDK)/mk/internal/rte.build-pre.mk
 
-
 override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIB)
+
+
+test-pmd/%.o:
+	$(CC) -o $@  -c $(RTE_SDK)/app/test-pmd/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
+
+librte_parse.a: test-pmd/cmdline_flow.o test-pmd/tm.o test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o test-pmd/macfwd.o test-pmd/cmdline.o test-pmd/txonly.o test-pmd/csumonly.o test-pmd/flowgen.o test-pmd/icmpecho.o test-pmd/ieee1588fwd.o test-pmd/iofwd.o test-pmd/macfwd.o test-pmd/macswap.o test-pmd/rxonly.o test-pmd/config.o
+	$(CC) -o librte_parse.o -c ../lib/librte_parse/testpmd.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
+	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $? librte_parse.o,AR librte_parse.a)
+	$(call verbose_cmd,$(RANLIB),RANLIB,librte_parse.a)

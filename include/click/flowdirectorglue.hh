@@ -55,7 +55,11 @@ extern "C" {
  * Declared: Nowhere, but we need it in app/test-pmd/cmdline.c
  *  Comment: You can create a app/test-pmd/cmdline.h with this definition only
  */
-cmdline_parse_ctx_t *cmdline_get_ctx();
+extern cmdline_parse_ctx_t main_ctx[];
+
+cmdline_parse_ctx_t *cmdline_get_ctx() {
+    return main_ctx;
+}
 
 /**
  *  Defined: lib/librte_cmdline/cmdline.h
