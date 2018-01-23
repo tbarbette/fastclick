@@ -51,13 +51,18 @@ extern "C" {
  */
 
 /**
- *  Defined: Nowhere, but we need it in app/test-pmd/cmdline.c
- * Declared: Nowhere, but we need it in app/test-pmd/cmdline.c
- *  Comment: You can create a app/test-pmd/cmdline.h with this definition only
+ * External reference to the main_ctx array
+ * defined in app/test-pmd/cmdline.c.
+ * This array is crucial for the successful
+ * call of the cmdline_new() function below.
  */
 extern cmdline_parse_ctx_t main_ctx[];
 
-cmdline_parse_ctx_t *cmdline_get_ctx() {
+/**
+ *  Defined: Nowhere, but we need it to acquire main_ctx
+ * Declared: Nowhere, but we need it to acquire main_ctx
+ */
+static cmdline_parse_ctx_t *cmdline_get_ctx() {
     return main_ctx;
 }
 
