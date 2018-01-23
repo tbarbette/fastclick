@@ -20,6 +20,7 @@
  */
 
 #include <click/config.h>
+#include <click/element.hh>
 #include <click/dpdkdevice.hh>
 
 #include <rte_errno.h>
