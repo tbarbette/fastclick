@@ -491,7 +491,7 @@ int FromDPDKDevice::flow_handler(const String &input, Element *e, void *thunk, E
 
     switch((uintptr_t) thunk) {
         case h_add_rule: {
-            if (!FlowDirector::flow_rule_install(fd->_dev->port_id, fd->_rule_id, input)) {
+            if (!FlowDirector::flow_rule_install(fd->_dev->port_id, fd->_rule_id, input.c_str())) {
                 errh->message("Flow Director: Failed to add rule '%s' to port %d", input.c_str(), fd->_dev->port_id);
                 return -1;
             }

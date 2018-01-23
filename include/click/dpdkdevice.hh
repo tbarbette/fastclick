@@ -1,7 +1,11 @@
 #ifndef CLICK_DPDKDEVICE_HH
 #define CLICK_DPDKDEVICE_HH
 
-//Prevent bug under some configurations (like travis-ci's one) where these macros get undefined
+/**
+ * Prevent bug under some configurations
+ * (like travis-ci's one) where these
+ * macros get undefined.
+ */
 #ifndef UINT8_MAX
 #define UINT8_MAX 255
 #endif
@@ -19,12 +23,7 @@
 #include <rte_pci.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
-#include <rte_bus_pci.h>
-#endif
-
-#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
-#include <rte_bus_pci.h>
-#include <cmdline.h>
+    #include <rte_bus_pci.h>
 #endif
 
 #include <click/packet.hh>
@@ -33,7 +32,9 @@
 #include <click/vector.hh>
 #include <click/args.hh>
 #include <click/etheraddress.hh>
-#include <click/flowdirectorparser.hh>
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #include <click/flowdirectorparser.hh>
+#endif
 
 CLICK_DECLS
 class DPDKDeviceArg;
@@ -102,59 +103,52 @@ public:
     // Global table of ports mapped to their Flow Director objects
     static HashTable<uint8_t, FlowDirector *> _dev_flow_dir;
 
+    inline static void delete_error_handler() { delete _errh; };
+
+    // Port ID handlers
+    inline void    set_port_id(const uint8_t &port_id) {
+        _port_id = port_id;
+    };
+    inline uint8_t get_port_id() { return _port_id; };
+
+    // Activation/deactivation handlers
+    inline void set_active(const bool &active) {
+        _active = active;
+    };
+    inline bool get_active() { return _active; };
+
+    // Verbosity handlers
+    inline void set_verbose(const bool &verbose) {
+        _verbose = verbose;
+    };
+    inline bool get_verbose() { return _verbose; };
+
+    // Rules' file handlers
+    inline void   set_rules_filename(const String &file) {
+        _rules_filename = file;
+    };
+    inline String get_rules_filename() { return _rules_filename; };
+
+    // Parser initialization
+    static struct cmdline *get_parser(ErrorHandler *errh);
+
     // Manages the Flow Director instances
     static FlowDirector *get_flow_director(
         const uint8_t &port_id,
         ErrorHandler *errh
     );
 
-    // Parser initialization
-    static struct cmdline *get_parser(ErrorHandler *errh);
-
-    inline static void delete_error_handler() { delete _errh; };
-
-    // Port ID handlers
-    inline void    set_port_id(const uint8_t &port_id) { _port_id = port_id; };
-    inline uint8_t get_port_id() { return _port_id; };
-
-    // Activation/deactivation handlers
-    inline void set_active(const bool &active) { _active = active; };
-    inline bool get_active() { return _active; };
-
-    // Verbosity handlers
-    inline void set_verbose(const bool &verbose) { _verbose = verbose; };
-    inline bool get_verbose() { return _verbose; };
-
-    // Rules' file handlers
-    inline void   set_rules_filename(const String &file) { _rules_filename = file; };
-    inline String get_rules_filename() { return _rules_filename; };
-
-    /*
-     * Add rules from a file
-     * @return 0 if success
-     */
-    static int add_rules_file(
+    // Add flow rules to a NIC from a file
+    static int add_rules_from_file(
         const uint8_t &port_id,
         const String &filename
     );
 
-    // Count the rules
-    static uint32_t flow_rules_count(const uint8_t &port_id);
-
-    // Flush the rules
-    static uint32_t flow_rules_flush(const uint8_t &port_id);
-
-    // Parse a string-based rule and translate it into a flow rule object
+    // Install a flow rule into a NIC
     static bool flow_rule_install(
         const uint8_t  &port_id,
         const uint32_t &rule_id,
-        const String   &rule
-    );
-
-    // Delete a flow rule
-    static bool flow_rule_delete(
-        const uint8_t  &port_id,
-        const uint32_t &rule_id
+        const char     *rule
     );
 
     // Return a flow rule object with a specific ID
@@ -163,12 +157,24 @@ public:
         const uint32_t &rule_id
     );
 
+    // Delete a flow rule from a NIC
+    static bool flow_rule_delete(
+        const uint8_t  &port_id,
+        const uint32_t &rule_id
+    );
+
+    // Counts the number of rules in a NIC
+    static uint32_t flow_rules_count(const uint8_t &port_id);
+
+    // Flush all the rules from a NIC
+    static uint32_t flow_rules_flush(const uint8_t &port_id);
+
 private:
 
     // Device ID
     uint8_t _port_id;
 
-    // Indicates whether Flow Director is active for the given device
+    // Indicates whether Flow Director is active for a given device
     bool _active;
 
     // Set stdout verbosity
@@ -177,7 +183,7 @@ private:
     // Filename that contains the rules to be installed
     String _rules_filename;
 
-    // Command line parser
+    // Flow rule commands' parser
     static struct cmdline *_parser;
 
     // A unique error handler
@@ -185,24 +191,6 @@ private:
 
     // Clean up the rules of a particular NIC
     static uint32_t memory_clean(const uint8_t &port_id);
-
-    // Reports whether a flow rule would be accepted by the device
-    static bool flow_rule_validate(
-        const uint8_t                &port_id,
-        const uint32_t               &rule_id,
-        const struct rte_flow_attr   *attr,
-        const struct rte_flow_item   *patterns,
-        const struct rte_flow_action *actions
-    );
-
-    // Adds a newly-created flow rule to the NIC and to our memory
-    static bool flow_rule_add(
-        const uint8_t                &port_id,
-        const uint32_t               &rule_id,
-        const struct rte_flow_attr   *attr,
-        const struct rte_flow_item   *patterns,
-        const struct rte_flow_action *actions
-    );
 
     // Reports problems that occur during the NIC configuration
     static int flow_rule_complain(
