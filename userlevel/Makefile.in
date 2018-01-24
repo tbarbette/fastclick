@@ -179,7 +179,8 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a librte_parse.*
+	rm -rf test-pmd/
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
