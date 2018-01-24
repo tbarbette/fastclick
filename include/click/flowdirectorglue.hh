@@ -17,38 +17,49 @@
  * legally binding.
  */
 
-#ifndef _CLICK_FLOWDIRECTOR_GLUE_H_
-#define _CLICK_FLOWDIRECTOR_GLUE_H_
+#ifndef CLICK_FLOWDIRECTOR_GLUE_H
+#define CLICK_FLOWDIRECTOR_GLUE_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include <rte_version.h>
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+
+#include <rte_malloc.h>
+#include <rte_ethdev.h>
 #include <rte_flow.h>
 #include <cmdline.h>
 #include <cmdline_parse.h>
+#include "/home/katsikas/nfv/dpdk/app/test-pmd/testpmd.h"
 
 /**
- * Build instructions for gluing with DPDK.
- *
- * Direct connection with DPDK:
- * We need the following source files from DPDK:
- * \-> app/test-pmd/cmdline.c
- *     Contains object list of instructions cmdline_parse_ctx_t main_ctx[].
- *     This object must be used as 1st argument in cmdline_new below.
- *     To do so, we can write a simple getter as follows:
- *     cmdline_parse_ctx_t *main_ctx = cmdline_get_ctx();
- *     and then call cmdline_new(main_ctx, ...) as I do in
- *     flow_parser_alloc() (in lib/flowdirectorparser.cc)
- * \-> lib/librte_cmdline/cmdline.c
- *     Provides cmdline_new(main_ctx, ...)
- *     Returns a parser (struct cmdline *) instance
- *     Given that we got main_ctx, this is trivial call.
- * |-> lib/librte_cmdline/cmdline_parse.c
- *     Provides cmdline_parse(cl, input_cmd)
- *     Uses the parser instance (struct cmdline *) returned by
- *     cmdline_new() above.
+ * External reference to the ports array
+ * defined in app/test-pmd/testpmd.c.
+ * This array is crucial for the successful
+ * call of the port_flow_*() functions in
+ * app/test-pmd/config.c.
  */
+extern struct rte_port *ports;
+
+/**
+ *  Returns the global instance for all ports.
+ */
+static struct rte_port *get_ports() {
+    return ports;
+}
+
+/**
+ *  Returns the global instance for a given port.
+ */
+static struct rte_port *get_port(const portid_t &port_id) {
+	if (!ports || (port_id < 0)) {
+		return NULL;
+	}
+    return &ports[port_id];
+}
 
 /**
  * External reference to the main_ctx array
@@ -88,22 +99,10 @@ int cmdline_parse(
 	const char *buf
 );
 
-/**
- * Implicit connections with DPDK:
- * Apart from the files above, you will also need the following
- * source files:
- * |-> The whole librte_cmdline library
- * |-> app/test-pmd/testpmd.c
- * |-> app/test-pmd/config.c
- * |-> app/test-pmd/cmdline_flow.c
- * |-> app/test-pmd/cmdline_mtr.c
- * |-> app/test-pmd/cmdline_tm.c
- * Note that the last two files appear only after DPDK 17.11,
- * so we need to put RTE_VERSION guardians.
- */
+#endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _CLICK_FLOWDIRECTOR_GLUE_H_ */
+#endif /* CLICK_FLOWDIRECTOR_GLUE_H */

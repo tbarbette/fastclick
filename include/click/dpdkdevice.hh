@@ -32,9 +32,6 @@
 #include <click/vector.hh>
 #include <click/args.hh>
 #include <click/etheraddress.hh>
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdirectorparser.hh>
-#endif
 
 CLICK_DECLS
 class DPDKDeviceArg;
@@ -47,175 +44,15 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
-/**
- * DPDK's Flow Director API.
- */
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-
-class DPDKDevice;
-
-class FlowDirector {
-
-public:
-    FlowDirector();
-    FlowDirector(uint8_t port_id, ErrorHandler *errh);
-    ~FlowDirector();
-
-    /**
-     * Descriptor for a single flow.
-     */
-    struct port_flow {
-        port_flow() :
-            rule_id(0), flow(0), attr(0),
-            pattern(0), actions(0) {};
-
-        port_flow(
-            uint32_t                id,
-            struct rte_flow        *flow,
-            struct rte_flow_attr   *attr,
-            struct rte_flow_item   *pattern,
-            struct rte_flow_action *actions
-        ) : rule_id(id), flow(flow), attr(attr),
-            pattern(pattern), actions(actions) {};
-
-        uint32_t                rule_id;
-        struct rte_flow        *flow;
-        struct rte_flow_attr   *attr;
-        struct rte_flow_item   *pattern;
-        struct rte_flow_action *actions;
-    };
-
-    // Current list of flow rules
-    Vector<struct port_flow *> _rule_list;
-
-    // DPDKDevice mode
-    static String FLOW_DIR_FLAG;
-
-    // Supported flow director handlers (called from FromDPDKDevice)
-    static String FLOW_RULE_ADD;
-    static String FLOW_RULE_DEL;
-    static String FLOW_RULE_LIST;
-    static String FLOW_RULE_FLUSH;
-
-    // For debugging
-    static bool DEF_VERBOSITY;
-
-    // Global table of ports mapped to their Flow Director objects
-    static HashTable<uint8_t, FlowDirector *> _dev_flow_dir;
-
-    inline static void delete_error_handler() { delete _errh; };
-
-    // Port ID handlers
-    inline void    set_port_id(const uint8_t &port_id) {
-        _port_id = port_id;
-    };
-    inline uint8_t get_port_id() { return _port_id; };
-
-    // Activation/deactivation handlers
-    inline void set_active(const bool &active) {
-        _active = active;
-    };
-    inline bool get_active() { return _active; };
-
-    // Verbosity handlers
-    inline void set_verbose(const bool &verbose) {
-        _verbose = verbose;
-    };
-    inline bool get_verbose() { return _verbose; };
-
-    // Rules' file handlers
-    inline void   set_rules_filename(const String &file) {
-        _rules_filename = file;
-    };
-    inline String get_rules_filename() { return _rules_filename; };
-
-    // Parser initialization
-    static struct cmdline *get_parser(ErrorHandler *errh);
-
-    // Manages the Flow Director instances
-    static FlowDirector *get_flow_director(
-        const uint8_t &port_id,
-        ErrorHandler *errh
-    );
-
-    // Add flow rules to a NIC from a file
-    static int add_rules_from_file(
-        const uint8_t &port_id,
-        const String &filename
-    );
-
-    // Install a flow rule into a NIC
-    static bool flow_rule_install(
-        const uint8_t  &port_id,
-        const uint32_t &rule_id,
-        const char     *rule
-    );
-
-    // Return a flow rule object with a specific ID
-    static struct port_flow *flow_rule_get(
-        const uint8_t  &port_id,
-        const uint32_t &rule_id
-    );
-
-    // Delete a flow rule from a NIC
-    static bool flow_rule_delete(
-        const uint8_t  &port_id,
-        const uint32_t &rule_id
-    );
-
-    // Counts the number of rules in a NIC
-    static uint32_t flow_rules_count(const uint8_t &port_id);
-
-    // Flush all the rules from a NIC
-    static uint32_t flow_rules_flush(const uint8_t &port_id);
-
-private:
-
-    // Device ID
-    uint8_t _port_id;
-
-    // Indicates whether Flow Director is active for a given device
-    bool _active;
-
-    // Set stdout verbosity
-    bool _verbose;
-
-    // Filename that contains the rules to be installed
-    String _rules_filename;
-
-    // Flow rule commands' parser
-    static struct cmdline *_parser;
-
-    // A unique error handler
-    static ErrorVeneer *_errh;
-
-    // Clean up the rules of a particular NIC
-    static uint32_t memory_clean(const uint8_t &port_id);
-
-    // Reports problems that occur during the NIC configuration
-    static int flow_rule_complain(
-        const uint8_t &port_id,
-        struct rte_flow_error *error
-    );
-
-    // Reports the correct usage of a Flow Director rule along with a message
-    static void flow_rule_usage(
-        const uint8_t &port_id,
-        const char *message
-    );
-};
-
-#endif
-
 class DPDKDevice {
 public:
 
-    uint8_t port_id;
+    uint16_t port_id;
 
     DPDKDevice() : port_id(-1) {
     } CLICK_COLD;
 
-    DPDKDevice(uint8_t port_id) : port_id(port_id) {
+    DPDKDevice(uint16_t port_id) : port_id(port_id) {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         if (port_id >= 0)
             initialize_flow_director(port_id, ErrorHandler::default_handler());
@@ -246,7 +83,7 @@ public:
     };
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    void initialize_flow_director(const uint8_t &port_id, ErrorHandler *errh);
+    void initialize_flow_director(const uint16_t &port_id, ErrorHandler *errh);
 #endif
 
     int add_rx_queue(
@@ -265,7 +102,7 @@ public:
 
     static struct rte_mempool *get_mpool(unsigned int);
 
-    static int get_port_numa_node(uint8_t port_id);
+    static int get_port_numa_node(uint16_t port_id);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     int set_mode(
@@ -297,10 +134,10 @@ public:
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 
-    static unsigned int get_nb_txdesc(uint8_t port_id);
+    static unsigned int get_nb_txdesc(uint16_t port_id);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    static int configure_nic(const uint8_t &port_id);
+    static int configure_nic(const uint16_t &port_id);
 #endif
 
     static void cleanup(ErrorHandler *errh);
@@ -344,7 +181,7 @@ private:
     struct DevInfo info;
 
     static bool _is_initialized;
-    static HashTable<uint8_t, DPDKDevice> _devs;
+    static HashTable<uint16_t, DPDKDevice> _devs;
     static unsigned _nr_pktmbuf_pools;
     static bool no_more_buffer_msg_printed;
 
@@ -354,13 +191,13 @@ private:
 
     static int alloc_pktmbufs() CLICK_COLD;
 
-    static DPDKDevice* get_device(const uint8_t &port_id) {
+    static DPDKDevice* get_device(const uint16_t &port_id) {
         return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
     }
 
-    static int get_port_from_pci(uint16_t domain, uint8_t bus, uint8_t dev_id, uint8_t function) {
+    static int get_port_from_pci(uint16_t domain, uint8_t bus, uint16_t dev_id, uint8_t function) {
        struct rte_eth_dev_info dev_info;
-       for (uint8_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
+       for (uint16_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
           rte_eth_dev_info_get(port_id, &dev_info);
           struct rte_pci_addr addr = dev_info.pci_dev->addr;
           if (addr.domain   == domain &&

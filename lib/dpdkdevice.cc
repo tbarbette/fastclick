@@ -1,5 +1,5 @@
 /*
- * dpdkdevice.{cc,hh} -- library for interfacing with Intel's DPDK
+ * dpdkdevice.{cc,hh} -- library for interfacing with DPDK
  * Cyril Soldani, Tom Barbette
  *
  * Integration of DPDK's Flow API by Georgios Katsikas
@@ -22,467 +22,17 @@
 #include <click/config.h>
 #include <click/element.hh>
 #include <click/dpdkdevice.hh>
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #include <click/flowdirector.hh>
+#endif
 
-#include <rte_errno.h>
 #if RTE_VERSION >= RTE_VERSION_NUM(17,2,0,0)
 extern "C" {
     #include <rte_pmd_ixgbe.h>
 }
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-extern "C" {
-    #include <rte_flow.h>
-}
-#endif
-
 CLICK_DECLS
-
-/**
- * Flow Director implementation.
- */
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-
-// DPDKDevice mode
-String FlowDirector::FLOW_DIR_FLAG = "flow_dir";
-
-// Supported flow director handlers (called from FromDPDKDevice)
-String FlowDirector::FLOW_RULE_ADD   = "add_rule";
-String FlowDirector::FLOW_RULE_DEL   = "del_rule";
-String FlowDirector::FLOW_RULE_LIST  = "count_rules";
-String FlowDirector::FLOW_RULE_FLUSH = "flush_rules";
-
-// Default verbosity setting
-bool FlowDirector::DEF_VERBOSITY = true;
-
-// Global table of DPDK ports mapped to their Flow Director objects
-HashTable<uint8_t, FlowDirector *> FlowDirector::_dev_flow_dir;
-
-// A unique parser
-struct cmdline *FlowDirector::_parser = NULL;
-
-// A unique error handler
-ErrorVeneer *FlowDirector::_errh;
-
-FlowDirector::FlowDirector() :
-        _port_id(-1), _active(false), _verbose(DEF_VERBOSITY)
-{
-    _errh = new ErrorVeneer(ErrorHandler::default_handler());
-}
-
-FlowDirector::FlowDirector(uint8_t port_id, ErrorHandler *errh) :
-        _port_id(port_id), _active(false), _verbose(DEF_VERBOSITY)
-{
-    _errh = new ErrorVeneer(errh);
-
-    if (_verbose) {
-        _errh->message("Flow Director (port %u): Created", port_id);
-    }
-}
-
-FlowDirector::~FlowDirector()
-{
-    // Destroy the parser
-    if (_parser) {
-        cmdline_quit(_parser);
-        delete _parser;
-    }
-
-    if (_verbose) {
-        _errh->message("Flow Director (port %u): Destroyed", _port_id);
-    }
-}
-
-/**
- * Obtains an instance of the Flow Director parser.
- *
- * @param errh an instance of the error handler
- * @return a Flow Director parser object
- */
-struct cmdline *
-FlowDirector::get_parser(ErrorHandler *errh)
-{
-    if (!_parser) {
-        return flow_parser_init(errh);
-    }
-
-    return _parser;
-}
-
-/**
- * Manages the Flow Director instances.
- *
- * @param port_id the ID of the NIC
- * @param errh an instance of the error handler
- * @return a Flow Director object for this NIC
- */
-FlowDirector *
-FlowDirector::get_flow_director(const uint8_t &port_id, ErrorHandler *errh)
-{
-    // Invalid port ID
-    if (port_id >= rte_eth_dev_count()) {
-        click_chatter(
-            "Flow Director (port %u): Denied to create instance "
-            "for invalid port", port_id
-        );
-        return 0;
-    }
-
-    // Get the Flow Director of the desired port
-    FlowDirector *flow_dir = _dev_flow_dir.get(port_id);
-
-    // Not there, let's created it
-    if (!flow_dir) {
-        flow_dir = new FlowDirector(port_id, errh);
-        _dev_flow_dir[port_id] = flow_dir;
-    }
-
-    // Create a Flow Director parser
-    _parser = get_parser(errh);
-
-    // Ship it back
-    return flow_dir;
-}
-
-/**
- * Installs a set of string-based rules read from a file.
- *
- * @param port_id the ID of the NIC
- * @param filename the file that contains the rules
- */
-int
-FlowDirector::add_rules_from_file(
-        const uint8_t &port_id, const String &filename)
-{
-    uint32_t rule_no = 0;
-
-    FILE *fp = NULL;
-    fp = fopen(filename.c_str(), "r");
-    if (fp == NULL) {
-        return _errh->error(
-            "Flow Director (port %u): Failed to open file '%s'",
-            port_id, filename.c_str());
-    }
-
-    char  *line = NULL;
-    size_t  len = 0;
-
-    // Read file line-by-line (or rule-by-rule)
-    while ((getline(&line, &len, fp)) != -1) {
-        _errh->message(
-            "Flow Director (port %u): Rule %u is given to the parser",
-            port_id, rule_no
-        );
-        FlowDirector::flow_rule_install(port_id, rule_no++, line);
-    }
-
-    // Close the file
-    fclose(fp);
-
-    // Free memory
-    if (line) {
-        free(line);
-    }
-
-    _errh->message(
-        "Flow Director (port %u): %u/%u rules are installed",
-        port_id, _dev_flow_dir[port_id]->_rule_list.size(), rule_no
-    );
-}
-
-/**
- * Translate a string-based rule into a flow rule object
- * and install it to the NIC.
- *
- * @param port_id the ID of the NIC
- * @param rule_id a flow rule's ID
- * @param rule a flow rule as a string
- * @return a flow rule object
- */
-bool
-FlowDirector::flow_rule_install(
-        const uint8_t &port_id, const uint32_t &rule_id, const char *rule)
-{
-    // Only active instances can configure a NIC
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        return false;
-    }
-
-    int res = flow_parser_parse(_parser, (char *) rule, _errh);
-    if (res == FLOWDIR_ERROR) {
-        _errh->error(
-            "Flow Director (port %u): Failed to parse rule #%4u",
-            port_id, rule_id
-        );
-        return false;
-    }
-
-    _errh->message(
-        "Flow Director (port %u): Rule #%4u - Successfully parsed",
-        port_id, rule_id
-    );
-
-    return true;
-}
-
-/**
- * Returns a flow rule object of a specific port with a specific ID.
- *
- * @param port_id the ID of the NIC
- * @param rule_id a rule ID
- * @return a flow rule object
- */
-struct FlowDirector::port_flow *
-FlowDirector::flow_rule_get(const uint8_t &port_id, const uint32_t &rule_id)
-{
-    // Get the list of rules of this port
-    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
-    if (!port_rules.empty()) {
-        return 0;
-    }
-
-    for (unsigned i=0 ; i<port_rules.size() ; i++) {
-        if (rule_id == port_rules[i]->rule_id) {
-            return port_rules[i];
-        }
-    }
-
-    return 0;
-}
-
-/**
- * Removes a flow rule object from the NIC and from our memory.
- *
- * @param port_id the ID of the NIC
- * @param rule_id a flow rule's ID
- * @return status
- */
-bool
-FlowDirector::flow_rule_delete(const uint8_t &port_id, const uint32_t &rule_id)
-{
-    // Only active instances can configure a NIC
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        return false;
-    }
-
-    struct port_flow *flow_rule = FlowDirector::flow_rule_get(
-        port_id, rule_id
-    );
-    if (!flow_rule) {
-        _errh->error(
-            "Flow Director (port %u): Flow rule #%4u not found",
-            port_id, rule_id
-        );
-        return false;
-    }
-
-    struct rte_flow_error error;
-    memset(&error, 0x33, sizeof(error));
-
-    if (rte_flow_destroy(port_id, flow_rule->flow, &error) < 0) {
-        flow_rule_complain(port_id, &error);
-        return false;
-    }
-    _errh->message(
-        "Flow Director (port %u): Flow rule #%4u destroyed\n",
-        port_id, flow_rule->rule_id
-    );
-
-    // Delete also from the vector
-    // TODO: Check
-    delete flow_rule;
-    // for (HashTable<uint8_t, Vector<struct port_flow *>>::const_iterator
-    //          it = _rule_list.begin(); it != _rule_list.end(); ++it) {
-    //     if (it.key() != port_id) {
-    //         continue;
-    //     }
-
-    //     // Port found
-    //     if (it.value()->rule_id == rule_id) {
-    //         delete it.value();
-    //         break;
-    //     }
-    // }
-
-    return true;
-}
-
-/**
- * Count all the rules installed to a NIC.
- *
- * @param port_id the ID of the NIC
- * @return the number of rules being installed
- */
-uint32_t
-FlowDirector::flow_rules_count(const uint8_t &port_id)
-{
-    // Only active instances might have some rules
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        return 0;
-    }
-
-    // Get the list of rules of this port
-    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
-
-    // The size of the list is the number of current flow rules
-    return (uint32_t) port_rules.size();
-}
-
-/**
- * Flushes all the rules from a NIC.
- *
- * @param port_id the ID of the NIC
- * @return the number of rules being flushed
- */
-uint32_t
-FlowDirector::flow_rules_flush(const uint8_t &port_id)
-{
-    // Only active instances can configure a NIC
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        if (_dev_flow_dir[port_id]->get_verbose()) {
-            _errh->message(
-                "Flow Director (port %u): Nothing to flush", port_id
-            );
-        }
-        return 0;
-    }
-
-    // Get the list of rules of this port
-    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
-    if (port_rules.empty()) {
-        if (_dev_flow_dir[port_id]->get_verbose()) {
-            _errh->message(
-                "Flow Director (port %u): Nothing to flush", port_id
-            );
-        }
-        return 0;
-    }
-
-    struct rte_flow_error error;
-    memset(&error, 0x44, sizeof(error));
-
-    // First remove the rules from the NIC
-    if (rte_flow_flush(port_id, &error)) {
-        return flow_rule_complain(port_id, &error);
-    }
-
-    if (_dev_flow_dir[port_id]->get_verbose()) {
-        _errh->message("Flow Director (port %u): NIC is flushed", port_id);
-    }
-
-    // And then clean up our memory
-    return memory_clean(port_id);
-}
-
-/**
- * Clean up the rules of a particular NIC.
- *
- * @param port_id the ID of the NIC
- * @return the number of rules being flushed
- */
-uint32_t
-FlowDirector::memory_clean(const uint8_t &port_id)
-{
-    // Get the list of rules of this port
-    Vector<struct port_flow *> port_rules = _dev_flow_dir[port_id]->_rule_list;
-    if (port_rules.empty()) {
-        if (_dev_flow_dir[port_id]->get_verbose()) {
-            _errh->message(
-                "Flow Director (port %u): Nothing to clean", port_id
-            );
-        }
-        return 0;
-    }
-
-    // And then clean up our memory
-    uint32_t rules_flushed = 0;
-    for (unsigned i=0; i<port_rules.size(); i++) {
-        if (port_rules[i] != NULL) {
-            delete (port_rules[i]);
-            rules_flushed++;
-        }
-    }
-    port_rules.clear();
-
-    if (_dev_flow_dir[port_id]->get_verbose()) {
-        _errh->message(
-            "Flow Director (port %u): Flushed %u rules from memory",
-            port_id, rules_flushed
-        );
-    }
-
-    return rules_flushed;
-}
-
-/**
- * Print a message out of a flow error.
- * (Copied from DPDK).
- *
- * @param port_id the ID of the NIC
- * @param error an instance of DPDK's error structure
- */
-int
-FlowDirector::flow_rule_complain(
-        const uint8_t &port_id, struct rte_flow_error *error)
-{
-    static const char *const errstrlist[] = {
-        [RTE_FLOW_ERROR_TYPE_NONE] = "no error",
-        [RTE_FLOW_ERROR_TYPE_UNSPECIFIED] = "cause unspecified",
-        [RTE_FLOW_ERROR_TYPE_HANDLE] = "flow rule (handle)",
-        [RTE_FLOW_ERROR_TYPE_ATTR_GROUP] = "group field",
-        [RTE_FLOW_ERROR_TYPE_ATTR_PRIORITY] = "priority field",
-        [RTE_FLOW_ERROR_TYPE_ATTR_INGRESS] = "ingress field",
-        [RTE_FLOW_ERROR_TYPE_ATTR_EGRESS] = "egress field",
-        [RTE_FLOW_ERROR_TYPE_ATTR] = "attributes structure",
-        [RTE_FLOW_ERROR_TYPE_ITEM_NUM] = "pattern length",
-        [RTE_FLOW_ERROR_TYPE_ITEM] = "specific pattern item",
-        [RTE_FLOW_ERROR_TYPE_ACTION_NUM] = "number of actions",
-        [RTE_FLOW_ERROR_TYPE_ACTION] = "specific action",
-    };
-    const char *errstr;
-    char buf[32];
-    int err = rte_errno;
-
-    if ((unsigned int)error->type >= RTE_DIM(errstrlist) ||
-        !errstrlist[error->type]) {
-        errstr = "unknown type";
-    }
-    else {
-        errstr = errstrlist[error->type];
-    }
-
-    _errh->error("Flow Director (port %u): Caught error type %d (%s): %s%s\n",
-        port_id,
-        error->type,
-        errstr,
-        error->cause ? (snprintf(buf, sizeof(buf), "cause: %p, ",
-        error->cause), buf) : "",
-        error->message ? error->message : "(no stated reason)"
-    );
-
-    return -err;
-}
-
-/**
- * Reports the correct usage of a Flow Director
- * rule along with a message.
- *
- * @param port_id the ID of the NIC
- * @param message the message to be printed
- */
-void
-FlowDirector::flow_rule_usage(const uint8_t &port_id, const char *message)
-{
-    _errh->error("Flow Director (port %u): %s", port_id, message);
-    _errh->error("Flow Director (port %u): Usage: pattern [p1] and .. and [p2] "
-                    "action queue index [queue no]", port_id
-    );
-}
-
-#endif
-
-
-/* End of Flow Director */
 
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -493,7 +43,7 @@ FlowDirector::flow_rule_usage(const uint8_t &port_id, const char *message)
  * @param port_id the ID of the device where Flow Director is invoked
  */
 void DPDKDevice::initialize_flow_director(
-        const uint8_t &port_id, ErrorHandler *errh)
+        const uint16_t &port_id, ErrorHandler *errh)
 {
     FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
     if (!flow_dir) {
@@ -512,11 +62,12 @@ void DPDKDevice::initialize_flow_director(
         click_chatter("Flow Director (port %u): Port is set", port_id);
     }
 }
-#endif
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
-int DPDKDevice::get_port_numa_node(uint8_t port_id)
+int DPDKDevice::get_port_numa_node(uint16_t port_id)
 {
     if (port_id >= rte_eth_dev_count())
         return -1;
@@ -530,15 +81,16 @@ unsigned int DPDKDevice::get_nb_txdesc()
 }
 
 /**
- * This function is called by DPDK when Click run as a secondary process. It
- *     checks that the prefix match with the given config prefix and add it if it does so.
+ * This function is called by DPDK when Click runs as a secondary process.
+ * It checks that the prefix matches with the given config prefix and adds
+ * it if it does so.
  */
 #if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
-void add_pool(struct rte_mempool * rte, void *arg){
+void add_pool(struct rte_mempool *rte, void *arg){
 #else
-void add_pool(const struct rte_mempool * rte, void *arg){
+void add_pool(const struct rte_mempool *rte, void *arg){
 #endif
-    int* i = (int*)arg;
+    int *i = (int *) arg;
     if (strncmp(
             DPDKDevice::MEMPOOL_PREFIX.c_str(),
             const_cast<struct rte_mempool *>(rte)->name,
@@ -560,7 +112,7 @@ int DPDKDevice::alloc_pktmbufs()
      * allocate a unused pool
      */
     int max_socket = -1;
-    for (HashTable<uint8_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<uint16_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int numa_node = DPDKDevice::get_port_numa_node(it.key());
         if (numa_node > max_socket)
@@ -685,7 +237,7 @@ int DPDKDevice::set_mode(
     }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    if (mode == FlowDirector::FLOW_DIR_FLAG) {
+    if (mode == FlowDirector::FLOW_DIR_MODE) {
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
         click_chatter(
             "Flow Director (port %u): Active with source file '%s'",
@@ -984,7 +536,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (n_ports == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
-    for (HashTable<uint8_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<uint16_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
         if (it.key() >= n_ports)
             return errh->error("Cannot find DPDK port %u", it.key());
@@ -996,7 +548,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         );
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        for (HashTable<uint8_t, DPDKDevice>::iterator it = _devs.begin();
+        for (HashTable<uint16_t, DPDKDevice>::iterator it = _devs.begin();
             it != _devs.end(); ++it) {
             int ret = it.value().initialize_device(errh);
             if (ret < 0)
@@ -1008,13 +560,13 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
     // Configure Flow Director
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    for (HashTable<uint8_t, FlowDirector *>::iterator
+    for (HashTable<uint16_t, FlowDirector *>::iterator
             it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
-        uint8_t port_id = it.key();
+        uint16_t port_id = it.key();
 
         // Only if the device is registered and has the correct mode
-        if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_FLAG) {
+        if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_MODE) {
             int err = DPDKDevice::configure_nic(port_id);
             if (err != 0) {
                 errh->error("Error %d while configuring FLowDirector", err);
@@ -1028,7 +580,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-int DPDKDevice::configure_nic(const uint8_t &port_id)
+int DPDKDevice::configure_nic(const uint16_t &port_id)
 {
     if (_is_initialized) {
         // Invoke Flow Director only if active
@@ -1056,14 +608,14 @@ void DPDKDevice::cleanup(ErrorHandler *errh)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     errh->message("\n");
 
-    for (HashTable<uint8_t, FlowDirector *>::const_iterator
+    for (HashTable<uint16_t, FlowDirector *>::const_iterator
             it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
         if (it == NULL) {
             continue;
         }
 
-        uint8_t port_id = it.key();
+        uint16_t port_id = it.key();
 
         // Flush
         uint32_t rules_flushed = FlowDirector::flow_rules_flush(port_id);
@@ -1089,7 +641,7 @@ bool
 DPDKDeviceArg::parse(
     const String &str, DPDKDevice* &result, const ArgContext &ctx)
 {
-    uint8_t port_id;
+    uint16_t port_id;
 
     if (!IntArg().parse(str, port_id)) {
        //Try parsing a ffff:ff:ff.f format. Code adapted from EtherAddressArg::parse
@@ -1252,7 +804,7 @@ unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
 
 bool DPDKDevice::_is_initialized = false;
-HashTable<uint8_t, DPDKDevice> DPDKDevice::_devs;
+HashTable<uint16_t, DPDKDevice> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;
 unsigned DPDKDevice::_nr_pktmbuf_pools;
 bool DPDKDevice::no_more_buffer_msg_printed = false;

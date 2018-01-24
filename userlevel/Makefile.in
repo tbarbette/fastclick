@@ -109,7 +109,7 @@ RTE_VER_MINOR = @RTE_VER_MINOR@
 RTE_VER_YEAR = @RTE_VER_YEAR@
 RTE_VER_MONTH = @RTE_VER_MONTH@
 include dpdk.mk
-EXTRA_DRIVER_OBJS := dpdkdevice.o flowdirectorparser.o $(EXTRA_DRIVER_OBJS)
+EXTRA_DRIVER_OBJS := dpdkdevice.o flowdirector.o flowdirectorparser.o $(EXTRA_DRIVER_OBJS)
 endif
 
 ifndef MINDRIVER

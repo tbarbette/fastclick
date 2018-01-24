@@ -24,13 +24,32 @@
 #include <click/error.hh>
 #include <click/flowdirectorglue.hh>
 
-#define FLOWDIR_ERROR ((int)-1)
+#define FLOWDIR_ERROR   ((int)-1)
+#define FLOWDIR_SUCCESS ((int) 0)
 
 CLICK_DECLS
 
 /**
- * Flow parsing API
+ * Flow Director parsing API.
  */
+
+/**
+ * Allocates memory for storing port information.
+ * Copied from RTE_SDK/app/test-pmd/testpmd.c.
+ */
+static void
+init_port(void)
+{
+	/* Configuration of Ethernet ports. */
+	ports = (struct rte_port *) rte_zmalloc("fastclick: ports",
+			    sizeof(struct rte_port) * RTE_MAX_ETHPORTS,
+			    RTE_CACHE_LINE_SIZE);
+	if (ports == NULL) {
+		rte_exit(EXIT_FAILURE,
+				"rte_zmalloc(%d struct rte_port) failed\n",
+				RTE_MAX_ETHPORTS);
+	}
+}
 
 /**
  * Obtains an instance of the Flow Director parser.
@@ -72,4 +91,4 @@ int flow_parser_parse(
 
 CLICK_ENDDECLS
 
-#endif
+#endif /* CLICK_FLOWDIRECTORPARSER_HH */

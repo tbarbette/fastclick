@@ -1,8 +1,7 @@
 // -*- c-basic-offset: 4; related-file-name: "flowdirectorparser.hh" -*-
 /*
- * flowdirectorparser.cc -- element that passes flow rule instructions
- * to DPDK-based NICs. These instructions cover the following operations:
- * flow rule (i) creation, (ii) deletion, (iii)list, and (iv) flush.
+ * flowdirectorparser.cc -- element that relays flow rule instructions
+ * to DPDK's flow parsing library.
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS AB
  * Copyright (c) 2018 Tom Barbette, University of Liège
@@ -22,13 +21,28 @@
 
 CLICK_DECLS
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+
 /**
- * Flow parsing implementation
+ * Extern variables in app/test-pmd/testpmd.h
+ * defined in app/test-pmd/testpmd.c.
+ * Since the latter source is not compiled
+ * with Click, we need to define these variables
+ * here to avoid undefined variable erros.
  */
+uint8_t   port_numa[RTE_MAX_ETHPORTS];
+uint8_t rxring_numa[RTE_MAX_ETHPORTS];
+uint8_t txring_numa[RTE_MAX_ETHPORTS];
+
+/**
+ * Flow Director parsing implementation.
+ */
+
 struct cmdline *
 flow_parser_init(ErrorHandler *errh)
 {
 	errh->message("Initializing flow parser...");
+	init_port();
 	return flow_parser_alloc("", errh);
 }
 
@@ -59,5 +73,7 @@ flow_parser_parse(struct cmdline *cl, char *input_cmd, ErrorHandler *errh)
 
 	return cmdline_parse(cl, input_cmd);
 }
+
+#endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
 CLICK_ENDDECLS

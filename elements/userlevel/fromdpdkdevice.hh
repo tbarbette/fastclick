@@ -50,7 +50,8 @@ Integer.  A specific hardware queue to use. Default is 0.
 
 =item N_QUEUES
 
-Integer.  Number of hardware queues to use. -1 or default is to use as many queues as threads assigned to this element.
+Integer.  Number of hardware queues to use. -1 or default is to use as many queues
+as threads assigned to this element.
 
 =item PROMISC
 
@@ -130,7 +131,7 @@ public:
     bool run_task(Task *);
     void run_timer(Timer* t);
     void selected(int fd, int mask);
-    
+
     ToDPDKDevice* findOutputElement();
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -141,9 +142,13 @@ public:
 private:
 
     static String read_handler(Element *, void *) CLICK_COLD;
-    static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
+    static int write_handler(
+        const String &, Element *, void *, ErrorHandler *
+    ) CLICK_COLD;
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    static int flow_handler (const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
+    static int flow_handler (
+        const String &, Element *, void *, ErrorHandler *
+    ) CLICK_COLD;
 #endif
     static String status_handler(Element *e, void *thunk) CLICK_COLD;
     static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
@@ -163,10 +168,6 @@ private:
 
     DPDKDevice* _dev;
     bool _active;
-
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    uint32_t _rule_id;
-#endif
 
     int _rx_intr;
     class FDState { public:
