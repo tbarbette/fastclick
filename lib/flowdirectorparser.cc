@@ -24,17 +24,6 @@ CLICK_DECLS
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
 /**
- * Extern variables in app/test-pmd/testpmd.h
- * defined in app/test-pmd/testpmd.c.
- * Since the latter source is not compiled
- * with Click, we need to define these variables
- * here to avoid undefined variable erros.
- */
-uint8_t   port_numa[RTE_MAX_ETHPORTS];
-uint8_t rxring_numa[RTE_MAX_ETHPORTS];
-uint8_t txring_numa[RTE_MAX_ETHPORTS];
-
-/**
  * Flow Director parsing implementation.
  */
 
