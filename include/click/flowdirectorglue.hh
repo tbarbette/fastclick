@@ -33,7 +33,7 @@ extern "C" {
 #include <rte_flow.h>
 #include <cmdline.h>
 #include <cmdline_parse.h>
-#include "/home/katsikas/nfv/dpdk/app/test-pmd/testpmd.h"
+#include <testpmd.h>
 
 /**
  * External reference to the ports array

@@ -238,7 +238,7 @@ DPDK_LIB := $(shell echo $(DPDK_LIB) | \
 
 RTE_SDK_FULL=`readlink -f $RTE_SDK`
 
-CFLAGS += -I$(DPDK_INCLUDE)
+CFLAGS += -I$(DPDK_INCLUDE) -I$(RTE_SDK)/app/test-pmd/
 
 # Merge and rename flags
 CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
