@@ -65,7 +65,10 @@ FlowDirector::FlowDirector(portid_t port_id, ErrorHandler *errh) :
     _rules_nb[port_id] = 0;
 
     if (_verbose) {
-        _errh->message("Flow Director (port %u): Created", port_id);
+        _errh->message(
+            "Flow Director (port %u): Created (state inactive)",
+            _port_id
+        );
     }
 }
 
@@ -75,12 +78,23 @@ FlowDirector::~FlowDirector()
     if (_parser) {
         cmdline_quit(_parser);
         delete _parser;
+        _parser = NULL;
+        if (_verbose) {
+            _errh->message(
+                "Flow Director (port %u): Parser deleted", _port_id
+            );
+        }
     }
 
-    _rules_nb.clear();
+    // Clean up flow rule counters
+    if (!_rules_nb.empty()) {
+        _rules_nb.clear();
+    }
 
     if (_verbose) {
-        _errh->message("Flow Director (port %u): Destroyed", _port_id);
+        _errh->message(
+            "Flow Director (port %u): Destroyed", _port_id
+        );
     }
 }
 

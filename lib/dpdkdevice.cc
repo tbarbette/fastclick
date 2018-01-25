@@ -50,17 +50,9 @@ void DPDKDevice::initialize_flow_director(
         return;
     }
 
-    // Already initialized
-    if (flow_dir->get_port_id() >= 0) {
-        return;
-    }
-
-    flow_dir->set_port_id(port_id);
-    flow_dir->set_active(false);
-
-    if (FlowDirector::_dev_flow_dir[port_id]->get_verbose()) {
-        click_chatter("Flow Director (port %u): Port is set", port_id);
-    }
+    // Verify
+    const uint16_t p_id = flow_dir->get_port_id();
+    assert((p_id >= 0) && (p_id == port_id));
 }
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
@@ -239,12 +231,12 @@ int DPDKDevice::set_mode(
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     if (mode == FlowDirector::FLOW_DIR_MODE) {
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
-        click_chatter(
-            "Flow Director (port %u): Active with source file '%s'",
-            port_id, rules_path.empty() ? "None" : rules_path.c_str()
-        );
         flow_dir->set_active(true);
         flow_dir->set_rules_filename(rules_path);
+        click_chatter(
+            "Flow Director (port %u): Source file '%s'",
+            port_id, rules_path.empty() ? "None" : rules_path.c_str()
+        );
     }
 #endif
 
@@ -563,7 +555,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     for (HashTable<uint16_t, FlowDirector *>::iterator
             it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
-        uint16_t port_id = it.key();
+        const uint16_t port_id = it.key();
 
         // Only if the device is registered and has the correct mode
         if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_MODE) {

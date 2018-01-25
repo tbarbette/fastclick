@@ -86,7 +86,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         if (allow_nonexistent)
             return 0;
         else
-            return errh->error("%s : Unknown or invalid PORT", dev.c_str());
+            return errh->error("%s: Unknown or invalid PORT", dev.c_str());
     }
 
     if (_use_numa) {
@@ -197,7 +197,7 @@ void FromDPDKDevice::cleanup(CleanupStage)
     cleanup_tasks();
 }
 
-bool FromDPDKDevice::run_task(Task * t)
+bool FromDPDKDevice::run_task(Task *t)
 {
     struct rte_mbuf *pkts[_burst];
     int ret = 0;
@@ -411,7 +411,7 @@ String FromDPDKDevice::status_handler(Element *e, void * thunk)
     return 0;
 }
 
-String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
+String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     struct rte_eth_stats stats;
@@ -441,7 +441,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
 }
 
 int FromDPDKDevice::write_handler(
-        const String& input, Element* e, void* thunk, ErrorHandler* errh) {
+        const String &input, Element *e, void *thunk, ErrorHandler *errh) {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     if (!fd->_dev) {
         return -1;

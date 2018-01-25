@@ -67,6 +67,10 @@ public:
     // Activation/deactivation handlers
     inline void set_active(const bool &active) {
         _active = active;
+        _errh->message(
+            "Flow Director (port %u): State active",
+            _port_id
+        );
     };
     inline bool get_active() { return _active; };
 

@@ -83,7 +83,10 @@ public:
     };
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    void initialize_flow_director(const uint16_t &port_id, ErrorHandler *errh);
+    void initialize_flow_director(
+        const uint16_t &port_id,
+        ErrorHandler   *errh
+    );
 #endif
 
     int add_rx_queue(
