@@ -273,12 +273,13 @@ class Metron : public Element {
 
         Json toJSON();
         Json statsToJSON();
+        Json controllersToJSON();
 
         enum {
-            h_resources, h_stats,
-            h_chains, h_discovered,
+            h_discovered, h_controllers,
+            h_resources,  h_stats,
             h_delete_chains, h_put_chains,
-            h_chains_stats, h_chains_proxy
+            h_chains, h_chains_stats, h_chains_proxy
         };
 
         ServiceChain *findChainById(String id);
@@ -307,10 +308,11 @@ class Metron : public Element {
         const String DEF_AGENT_PROTO = "http";
 
         /* Controller's default REST configuration */
-        const int    DEF_DISCOVER_PORT   = 8181;
-        const String DEF_DISCOVER_DRIVER = "restServer";
-        const String DEF_DISCOVER_USER   = "onos";
-        const String DEF_DISCOVER_PATH   = "/onos/v1/network/configuration/";
+        const int    DEF_DISCOVER_PORT      = 80;
+        const int    DEF_DISCOVER_REST_PORT = 8181;
+        const String DEF_DISCOVER_DRIVER    = "restServer";
+        const String DEF_DISCOVER_USER      = "onos";
+        const String DEF_DISCOVER_PATH      = "/onos/v1/network/configuration/";
 
         /* Bound the discovery process */
         const unsigned short DISCOVERY_ATTEMPTS = 3;
@@ -338,7 +340,8 @@ class Metron : public Element {
 
         /* Controller's (remote) information */
         String _discover_ip;
-        int    _discover_port;
+        int    _discover_port;      // Port that talks to agent (Metron protocol)
+        int    _discover_rest_port; // REST port
         String _discover_path;
         String _discover_user;
         String _discover_password;

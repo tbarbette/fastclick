@@ -52,10 +52,11 @@ Metron::~Metron()
 int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Vector<Element *> nics;
-    _agent_port    = DEF_AGENT_PORT;
-    _discover_port = DEF_DISCOVER_PORT;
-    _discover_user = DEF_DISCOVER_USER;
-    _discover_path = DEF_DISCOVER_PATH;
+    _agent_port         = DEF_AGENT_PORT;
+    _discover_port      = _agent_port;
+    _discover_rest_port = DEF_DISCOVER_REST_PORT;
+    _discover_user      = DEF_DISCOVER_USER;
+    _discover_path      = DEF_DISCOVER_PATH;
 
     if (Args(conf, this, errh)
         .read_mp ("ID",                _id)
@@ -66,7 +67,7 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("AGENT_IP",          _agent_ip)
         .read    ("AGENT_PORT",        _agent_port)
         .read    ("DISCOVER_IP",       _discover_ip)
-        .read    ("DISCOVER_PORT",     _discover_port)
+        .read    ("DISCOVER_PORT",     _discover_rest_port)
         .read    ("DISCOVER_PATH",     _discover_path)
         .read    ("DISCOVER_USER",     _discover_user)
         .read    ("DISCOVER_PASSWORD", _discover_password)
@@ -93,8 +94,8 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     // Ports must strictly become positive uint16_t
-    if ((_agent_port    <= 0) || (_agent_port    > UINT16_MAX) ||
-        (_discover_port <= 0) || (_discover_port > UINT16_MAX)) {
+    if (        (_agent_port <= 0) ||         (_agent_port > UINT16_MAX) ||
+        (_discover_rest_port <= 0) || (_discover_rest_port > UINT16_MAX)) {
         return errh->error("Invalid port number");
     }
 #endif
@@ -151,6 +152,12 @@ int Metron::initialize(ErrorHandler *errh)
     return 0;
 }
 
+/**
+ * This method advertizes Metron agent's features
+ * though the REST port of the controller and not
+ * through the port used by the Metron protocol
+ * (usually default http).
+ */
 bool Metron::discover()
 {
 #if HAVE_CURL
@@ -167,7 +174,7 @@ bool Metron::discover()
 
         /* Compose the URL */
         String url = "http://" + _discover_ip + ":" +
-                    String(_discover_port) + _discover_path;
+                    String(_discover_rest_port) + _discover_path;
 
         /* Now specify the POST data */
         Json j = Json::make_object();
@@ -215,7 +222,7 @@ bool Metron::discover()
         } else {
             click_chatter(
                 "Successfully advertised features to Metron controller %s:%d\n",
-                _discover_ip.c_str(), _discover_port
+                _discover_ip.c_str(), _discover_rest_port
             );
         }
 
@@ -539,6 +546,10 @@ String Metron::read_handler(Element *e, void *user_data)
         case h_discovered: {
             return m->_discovered? "true":"false";
         }
+        case h_controllers: {
+            jroot = m->controllersToJSON();
+            break;
+        }
         case h_resources: {
             jroot = m->toJSON();
             break;
@@ -709,11 +720,12 @@ Metron::param_handler(
 
 void Metron::add_handlers()
 {
-    add_read_handler("resources", read_handler, h_resources);
-    add_read_handler("stats", read_handler, h_stats);
-    add_read_handler("discovered", read_handler, h_discovered);
+    add_read_handler ("discovered",    read_handler,  h_discovered);
+    add_read_handler ("controllers",   read_handler,  h_controllers);
+    add_read_handler ("resources",     read_handler,  h_resources);
+    add_read_handler ("stats",         read_handler,  h_stats);
     add_write_handler("delete_chains", write_handler, h_delete_chains);
-    add_write_handler("put_chains", write_handler, h_put_chains);
+    add_write_handler("put_chains",    write_handler, h_put_chains);
 
     set_handler(
         "chains",
@@ -774,8 +786,8 @@ Json Metron::statsToJSON()
     Json jroot = Json::make_object();
 
     // High-level CPU resources
-    jroot.set("busyCpus",Json(getAssignedCpuNr()));
-    jroot.set("freeCpus",Json(getCpuNr() - getAssignedCpuNr()));
+    jroot.set("busyCpus", Json(getAssignedCpuNr()));
+    jroot.set("freeCpus", Json(getCpuNr() - getAssignedCpuNr()));
 
     // Per core load
     Json jcpus = Json::make_array();
@@ -844,6 +856,28 @@ Json Metron::statsToJSON()
         begin++;
     }
     jroot.set("nics", jnics);
+
+    return jroot;
+}
+
+Json Metron::controllersToJSON()
+{
+    Json jroot = Json::make_object();
+
+    // No controller
+    if (!_discovered) {
+        return jroot;
+    }
+
+    // A list with a single controller (always)
+    Json jctrls_list = Json::make_array();
+    Json jctrl = Json::make_object();
+    jctrl.set("ip", _discover_ip);
+    jctrl.set("port", _discover_port);
+    jctrl.set("type", "default");
+    jctrls_list.push_back(jctrl);
+
+    jroot.set("controllers", jctrls_list);
 
     return jroot;
 }
