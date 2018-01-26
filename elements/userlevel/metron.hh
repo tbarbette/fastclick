@@ -274,6 +274,7 @@ class Metron : public Element {
         Json toJSON();
         Json statsToJSON();
         Json controllersToJSON();
+        int  controllersFromJson(Json j);
 
         enum {
             h_discovered, h_controllers,

@@ -558,7 +558,10 @@ String Metron::read_handler(Element *e, void *user_data)
             jroot = m->statsToJSON();
             break;
         }
-
+        default: {
+            click_chatter("Unknown read handler: %d", what);
+            return "";
+        }
     }
 
     return jroot.unparse(true);
@@ -570,6 +573,9 @@ int Metron::write_handler(
     Metron *m = static_cast<Metron *>(e);
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
     switch (what) {
+        case h_controllers: {
+            return m->controllersFromJson(Json::parse(data));
+        }
         case h_delete_chains: {
             ServiceChain *sc = m->findChainById(data);
             if (sc == 0) {
@@ -591,6 +597,9 @@ int Metron::write_handler(
                 return errh->error("Unknown ID %s", id.c_str());
             }
             return sc->reconfigureFromJSON(Json::parse(changes), m, errh);
+        }
+        default: {
+            errh->error("Unknown write handler: %d", what);
         }
     }
 
@@ -659,9 +668,8 @@ Metron::param_handler(
                 param = sc->simpleCallRead(param.substring(pos + 1));
                 return 0;
             }
-            default:
-            {
-                return errh->error("Invalid operation");
+            default: {
+                return errh->error("Invalid read operation in param handler");
             }
         }
 
@@ -711,10 +719,14 @@ Metron::param_handler(
                 }
                 return 0;
             }
+            default: {
+                return errh->error("Invalid write operation in param handler");
+            }
+
         }
         return -1;
     } else {
-        return errh->error("Unknown operation");
+        return errh->error("Unknown operation in param handler");
     }
 }
 
@@ -724,6 +736,7 @@ void Metron::add_handlers()
     add_read_handler ("controllers",   read_handler,  h_controllers);
     add_read_handler ("resources",     read_handler,  h_resources);
     add_read_handler ("stats",         read_handler,  h_stats);
+    add_write_handler("controllers",   write_handler, h_controllers);
     add_write_handler("delete_chains", write_handler, h_delete_chains);
     add_write_handler("put_chains",    write_handler, h_put_chains);
 
@@ -882,6 +895,59 @@ Json Metron::controllersToJSON()
     return jroot;
 }
 
+int Metron::controllersFromJson(Json j)
+{
+    // A list of controllers is expected
+    Json jlist = j.get("controllers");
+
+    for (unsigned short i=0; i<jlist.size(); i++) {
+        String ctrl_ip;
+        int    ctrl_port = -1;
+        String ctrl_type;
+
+        // Get this controller's information
+        Json jctrl = jlist[i];
+
+        // Store the new parameters
+        ctrl_ip   = jctrl.get_s("ip");
+        ctrl_port = jctrl.get_i("port");
+        ctrl_type = jctrl.get_s("type");
+
+        // Incorrect information received
+        if (ctrl_ip.empty() || (ctrl_port < 0)) {
+            click_chatter(
+                "Invalid controller information: IP (%s), Port (%d)",
+                ctrl_ip.c_str(), ctrl_port
+            );
+            return -1;
+        }
+
+        // Need to re-discover, we got a new controller instance
+        if ((ctrl_ip != _discover_ip) || (!_discovered)) {
+            _discover_ip   = ctrl_ip;
+            _discover_port = ctrl_port;
+
+            click_chatter(
+                "Controller instance update: IP (%s), Port (%d)",
+                ctrl_ip.c_str(), ctrl_port
+            );
+
+            // Initiate discovery
+            return discover();
+        } else {
+            click_chatter(
+                "Controller instance persists: IP (%s), Port (%d)",
+                ctrl_ip.c_str(), ctrl_port
+            );
+        }
+
+        // No support for multiple controller instances
+        break;
+    }
+
+    return 0;
+}
+
 /***************************************
  * RxFilter
  **************************************/
@@ -892,7 +958,7 @@ ServiceChain::RxFilter *ServiceChain::RxFilter::fromJSON(
     rf->method = j.get_s("method").lower();
     if (rf->method != "mac") {
         errh->error(
-            "Unsupported RX Filter method: %s", rf->method.c_str()
+            "Unsupported RX filter method: %s", rf->method.c_str()
         );
         return 0;
     }
