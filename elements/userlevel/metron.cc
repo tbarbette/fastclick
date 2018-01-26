@@ -938,7 +938,8 @@ int Metron::controllersFromJson(Json j)
             );
 
             // Initiate discovery
-            return discover();
+            _discovered = discover();
+            return _discovered;
         } else {
             click_chatter(
                 "Controller instance persists: IP (%s), Port (%d)",
