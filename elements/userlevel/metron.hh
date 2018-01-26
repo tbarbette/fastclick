@@ -93,7 +93,7 @@ class ServiceChain {
                 Vector<Vector<String>> values;
         };
 
-        enum ScStatus{
+        enum ScStatus {
             SC_FAILED,
             SC_OK=1
         };
@@ -275,11 +275,13 @@ class Metron : public Element {
         Json statsToJSON();
         Json controllersToJSON();
         int  controllersFromJson(Json j);
+        int  deleteControllersFromJson(void);
 
+        // Read and write handlers
         enum {
             h_discovered, h_controllers,
             h_resources,  h_stats,
-            h_delete_chains, h_put_chains,
+            h_delete_controllers, h_delete_chains, h_put_chains,
             h_chains, h_chains_stats, h_chains_proxy
         };
 

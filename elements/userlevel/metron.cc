@@ -576,6 +576,10 @@ int Metron::write_handler(
         case h_controllers: {
             return m->controllersFromJson(Json::parse(data));
         }
+        case h_delete_controllers: {
+            // Data is irrelevant, just reset controller info
+            return m->deleteControllersFromJson();
+        }
         case h_delete_chains: {
             ServiceChain *sc = m->findChainById(data);
             if (sc == 0) {
@@ -732,13 +736,14 @@ Metron::param_handler(
 
 void Metron::add_handlers()
 {
-    add_read_handler ("discovered",    read_handler,  h_discovered);
-    add_read_handler ("controllers",   read_handler,  h_controllers);
-    add_read_handler ("resources",     read_handler,  h_resources);
-    add_read_handler ("stats",         read_handler,  h_stats);
-    add_write_handler("controllers",   write_handler, h_controllers);
-    add_write_handler("delete_chains", write_handler, h_delete_chains);
-    add_write_handler("put_chains",    write_handler, h_put_chains);
+    add_read_handler ("discovered",         read_handler,  h_discovered);
+    add_read_handler ("controllers",        read_handler,  h_controllers);
+    add_read_handler ("resources",          read_handler,  h_resources);
+    add_read_handler ("stats",              read_handler,  h_stats);
+    add_write_handler("controllers",        write_handler, h_controllers);
+    add_write_handler("delete_controllers", write_handler, h_delete_controllers);
+    add_write_handler("delete_chains",      write_handler, h_delete_chains);
+    add_write_handler("put_chains",         write_handler, h_put_chains);
 
     set_handler(
         "chains",
@@ -928,7 +933,7 @@ int Metron::controllersFromJson(Json j)
             _discover_port = ctrl_port;
 
             click_chatter(
-                "Controller instance update: IP (%s), Port (%d)",
+                "Controller instance updated: IP (%s), Port (%d)",
                 ctrl_ip.c_str(), ctrl_port
             );
 
@@ -944,6 +949,17 @@ int Metron::controllersFromJson(Json j)
         // No support for multiple controller instances
         break;
     }
+
+    return 0;
+}
+
+int Metron::deleteControllersFromJson(void)
+{
+    // Reset controller information
+    _discover_ip   = "";
+    _discover_port = -1;
+
+    click_chatter("Controller instance removed");
 
     return 0;
 }
