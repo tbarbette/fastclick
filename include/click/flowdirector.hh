@@ -154,7 +154,7 @@ private:
     );
 };
 
-#endif
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
 CLICK_ENDDECLS
 

@@ -22,11 +22,12 @@
 #include <click/config.h>
 #include <click/element.hh>
 #include <click/dpdkdevice.hh>
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdirector.hh>
+#if RTE_VERSION <= RTE_VERSION_NUM(16,11,0,0)
+    #include <rte_errno.h>
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,2,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #include <click/flowdirector.hh>
 extern "C" {
     #include <rte_pmd_ixgbe.h>
 }
@@ -43,7 +44,7 @@ CLICK_DECLS
  * @param port_id the ID of the device where Flow Director is invoked
  */
 void DPDKDevice::initialize_flow_director(
-        const uint16_t &port_id, ErrorHandler *errh)
+        const portid_t &port_id, ErrorHandler *errh)
 {
     FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
     if (!flow_dir) {
@@ -51,7 +52,7 @@ void DPDKDevice::initialize_flow_director(
     }
 
     // Verify
-    const uint16_t p_id = flow_dir->get_port_id();
+    const portid_t p_id = flow_dir->get_port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
@@ -59,7 +60,7 @@ void DPDKDevice::initialize_flow_director(
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
-int DPDKDevice::get_port_numa_node(uint16_t port_id)
+int DPDKDevice::get_port_numa_node(portid_t port_id)
 {
     if (port_id >= rte_eth_dev_count())
         return -1;
@@ -104,7 +105,7 @@ int DPDKDevice::alloc_pktmbufs()
      * allocate a unused pool
      */
     int max_socket = -1;
-    for (HashTable<uint16_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int numa_node = DPDKDevice::get_port_numa_node(it.key());
         if (numa_node > max_socket)
@@ -528,7 +529,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (n_ports == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
-    for (HashTable<uint16_t, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
         if (it.key() >= n_ports)
             return errh->error("Cannot find DPDK port %u", it.key());
@@ -540,7 +541,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         );
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        for (HashTable<uint16_t, DPDKDevice>::iterator it = _devs.begin();
+        for (HashTable<portid_t, DPDKDevice>::iterator it = _devs.begin();
             it != _devs.end(); ++it) {
             int ret = it.value().initialize_device(errh);
             if (ret < 0)
@@ -552,10 +553,10 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
     // Configure Flow Director
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    for (HashTable<uint16_t, FlowDirector *>::iterator
+    for (HashTable<portid_t, FlowDirector *>::iterator
             it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
-        const uint16_t port_id = it.key();
+        const portid_t port_id = it.key();
 
         // Only if the device is registered and has the correct mode
         if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_MODE) {
@@ -572,7 +573,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-int DPDKDevice::configure_nic(const uint16_t &port_id)
+int DPDKDevice::configure_nic(const portid_t &port_id)
 {
     if (_is_initialized) {
         // Invoke Flow Director only if active
@@ -600,14 +601,14 @@ void DPDKDevice::cleanup(ErrorHandler *errh)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     errh->message("\n");
 
-    for (HashTable<uint16_t, FlowDirector *>::const_iterator
+    for (HashTable<portid_t, FlowDirector *>::const_iterator
             it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
         if (it == NULL) {
             continue;
         }
 
-        uint16_t port_id = it.key();
+        portid_t port_id = it.key();
 
         // Flush
         uint32_t rules_flushed = FlowDirector::flow_rules_flush(port_id);
@@ -633,7 +634,7 @@ bool
 DPDKDeviceArg::parse(
     const String &str, DPDKDevice* &result, const ArgContext &ctx)
 {
-    uint16_t port_id;
+    portid_t port_id;
 
     if (!IntArg().parse(str, port_id)) {
        //Try parsing a ffff:ff:ff.f format. Code adapted from EtherAddressArg::parse
@@ -796,7 +797,7 @@ unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
 
 bool DPDKDevice::_is_initialized = false;
-HashTable<uint16_t, DPDKDevice> DPDKDevice::_devs;
+HashTable<portid_t, DPDKDevice> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;
 unsigned DPDKDevice::_nr_pktmbuf_pools;
 bool DPDKDevice::no_more_buffer_msg_printed = false;

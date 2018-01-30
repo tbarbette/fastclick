@@ -22,6 +22,10 @@
 #include <rte_mempool.h>
 #include <rte_pci.h>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #include <click/flowdirectorglue.hh>
+#endif
+
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
     #include <rte_bus_pci.h>
 #endif
@@ -32,6 +36,18 @@
 #include <click/vector.hh>
 #include <click/args.hh>
 #include <click/etheraddress.hh>
+
+/**
+ * Unified type for DPDK port IDs.
+ * Until DPDK v17.05 was uint8_t
+ * After DPDK v17.05 has been uint16_t
+ */
+#ifndef PORTID_T_DEFINED
+    #define PORTID_T_DEFINED
+    typedef uint8_t portid_t;
+#else
+    // Already defined in <testpmd.h>
+#endif
 
 CLICK_DECLS
 class DPDKDeviceArg;
@@ -47,12 +63,12 @@ extern bool dpdk_enabled;
 class DPDKDevice {
 public:
 
-    uint16_t port_id;
+    portid_t port_id;
 
     DPDKDevice() : port_id(-1) {
     } CLICK_COLD;
 
-    DPDKDevice(uint16_t port_id) : port_id(port_id) {
+    DPDKDevice(portid_t port_id) : port_id(port_id) {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         if (port_id >= 0)
             initialize_flow_director(port_id, ErrorHandler::default_handler());
@@ -84,7 +100,7 @@ public:
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     void initialize_flow_director(
-        const uint16_t &port_id,
+        const portid_t &port_id,
         ErrorHandler   *errh
     );
 #endif
@@ -105,7 +121,7 @@ public:
 
     static struct rte_mempool *get_mpool(unsigned int);
 
-    static int get_port_numa_node(uint16_t port_id);
+    static int get_port_numa_node(portid_t port_id);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     int set_mode(
@@ -137,10 +153,10 @@ public:
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 
-    static unsigned int get_nb_txdesc(uint16_t port_id);
+    static unsigned int get_nb_txdesc(portid_t port_id);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    static int configure_nic(const uint16_t &port_id);
+    static int configure_nic(const portid_t &port_id);
 #endif
 
     static void cleanup(ErrorHandler *errh);
@@ -184,7 +200,7 @@ private:
     struct DevInfo info;
 
     static bool _is_initialized;
-    static HashTable<uint16_t, DPDKDevice> _devs;
+    static HashTable<portid_t, DPDKDevice> _devs;
     static unsigned _nr_pktmbuf_pools;
     static bool no_more_buffer_msg_printed;
 
@@ -194,13 +210,13 @@ private:
 
     static int alloc_pktmbufs() CLICK_COLD;
 
-    static DPDKDevice* get_device(const uint16_t &port_id) {
+    static DPDKDevice* get_device(const portid_t &port_id) {
         return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
     }
 
-    static int get_port_from_pci(uint16_t domain, uint8_t bus, uint16_t dev_id, uint8_t function) {
+    static int get_port_from_pci(uint32_t domain, uint8_t bus, uint8_t dev_id, uint8_t function) {
        struct rte_eth_dev_info dev_info;
-       for (uint16_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
+       for (portid_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
           rte_eth_dev_info_get(port_id, &dev_info);
           struct rte_pci_addr addr = dev_info.pci_dev->addr;
           if (addr.domain   == domain &&

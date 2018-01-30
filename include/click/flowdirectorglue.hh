@@ -36,6 +36,14 @@ extern "C" {
 #include <testpmd.h>
 
 /**
+ * Denotes that portid_t is defined
+ * in <testpmd.h>.
+ * DPDKDevice will use this or define
+ * its own (depending on the DPDK version).
+ */
+#define PORTID_T_DEFINED
+
+/**
  * External reference to the ports array
  * defined in app/test-pmd/testpmd.c.
  * This array is crucial for the successful

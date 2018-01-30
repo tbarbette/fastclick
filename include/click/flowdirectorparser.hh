@@ -24,6 +24,8 @@
 #include <click/error.hh>
 #include <click/flowdirectorglue.hh>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+
 #define FLOWDIR_ERROR   ((int)-1)
 #define FLOWDIR_SUCCESS ((int) 0)
 
@@ -90,5 +92,7 @@ int flow_parser_parse(
 );
 
 CLICK_ENDDECLS
+
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
 #endif /* CLICK_FLOWDIRECTORPARSER_HH */
