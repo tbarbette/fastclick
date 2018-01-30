@@ -247,16 +247,81 @@ include $(RTE_SDK)/mk/internal/rte.build-pre.mk
 
 override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIB)
 
+############################################################
+## Flow director library available at or after DPDK v17.05
+############################################################
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 5 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
+
+$(debug LIBRTE_PARSE=YES)
+
+TEST_PMD_C_MODIFIED=$(shell grep -Fxc "uint8_t port_numa[RTE_MAX_ETHPORTS];" $(RTE_SDK)/app/test-pmd/testpmd.c)
+
+ifeq ($(TEST_PMD_C_MODIFIED),0)
+modify_testpmd_c:
+	sed -i '120i uint8_t port_numa[RTE_MAX_ETHPORTS];' $(RTE_SDK)/app/test-pmd/testpmd.c
+	sed -i '121i uint8_t rxring_numa[RTE_MAX_ETHPORTS];' $(RTE_SDK)/app/test-pmd/testpmd.c
+	sed -i '122i uint8_t txring_numa[RTE_MAX_ETHPORTS];' $(RTE_SDK)/app/test-pmd/testpmd.c
+else
+modify_testpmd_c: ;
+endif
+
+TEST_PMD_H_MODIFIED=$(shell grep -Fxc "extern uint8_t port_numa[RTE_MAX_ETHPORTS];" $(RTE_SDK)/app/test-pmd/testpmd.h)
+
+ifeq ($(TEST_PMD_H_MODIFIED),0)
+modify_testpmd_h:
+	sed -i 's/uint8_t\sport_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t port_numa[RTE_MAX_ETHPORTS];/g' $(RTE_SDK)/app/test-pmd/testpmd.h
+	sed -i 's/uint8_t\srxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t rxring_numa[RTE_MAX_ETHPORTS];/g' $(RTE_SDK)/app/test-pmd/testpmd.h
+	sed -i 's/uint8_t\stxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t txring_numa[RTE_MAX_ETHPORTS];/g' $(RTE_SDK)/app/test-pmd/testpmd.h
+	sed -i '/extern\senum\sdcb_queue_mapping_mode\sdcb_q_mapping\;/d' $(RTE_SDK)/app/test-pmd/testpmd.h
+else
+modify_testpmd_h: ;
+endif
+
+LIBRTE_PARSE_EXISTS=$(shell [ -d ../lib/librte_parse ] && echo "y"  || echo "n")
+
+ifeq ($(LIBRTE_PARSE_EXISTS),n)
+prepare_librte_parse:
+	# Create the necessary folders for librte_parse
+	mkdir -p ../lib/librte_parse
+	mkdir -p test-pmd
+	# Copy testpmd.c of the target DPDK version
+	cp -u $(RTE_SDK)/app/test-pmd/testpmd.c ../lib/librte_parse/
+	# Strip the main function off to prevent complilation errors, while linking with Click
+	sed -i '/main(int/Q' ../lib/librte_parse/testpmd.c
+	head -n -1 ../lib/librte_parse/testpmd.c > ../lib/librte_parse/testpmd_t.c;
+	mv ../lib/librte_parse/testpmd_t.c ../lib/librte_parse/testpmd.c
+else
+prepare_librte_parse: ;
+endif
 
 test-pmd/%.o:
-	mkdir -p test-pmd
 	$(CC) -o $@ -O3 -c $(RTE_SDK)/app/test-pmd/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
 
-librte_parse.a: \
-	test-pmd/cmdline_flow.o test-pmd/tm.o test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o \
+# Object files present across all(?) DPDK versions
+PARSE_OBJS = \
+	test-pmd/cmdline_flow.o \
 	test-pmd/macfwd.o test-pmd/cmdline.o test-pmd/txonly.o test-pmd/csumonly.o test-pmd/flowgen.o \
 	test-pmd/icmpecho.o test-pmd/ieee1588fwd.o test-pmd/iofwd.o test-pmd/macswap.o \
-	test-pmd/rxonly.o test-pmd/config.o
+	test-pmd/rxonly.o test-pmd/config.o \
+
+# Additional object files, present at or after DPDK v17.11
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
+PARSE_OBJS += test-pmd/tm.o test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
+endif
+
+librte_parse.a: \
+	$(PARSE_OBJS) $(EXTRA_OBJS)
 	$(CC) -o librte_parse.o -O3 -c ../lib/librte_parse/testpmd.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
 	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $? librte_parse.o,AR librte_parse.a)
 	$(call verbose_cmd,$(RANLIB),RANLIB,librte_parse.a)
+
+else
+
+$(debug LIBRTE_PARSE=NO)
+
+modify_testpmd_c: ;
+modify_testpmd_h: ;
+prepare_librte_parse: ;
+librte_parse.a: ;
+
+endif # RTE_VERSION >= 17.05
