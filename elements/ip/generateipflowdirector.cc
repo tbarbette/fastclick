@@ -3,7 +3,7 @@
  * GenerateIPFlowDirector.{cc,hh} -- element generates Flow Director patterns out of input traffic
  * Georgios Katsikas, Tom Barbette
  *
- * Copyright (c) 2017 Georgios Katsikas, RISE SICS AB
+ * Copyright (c) 2017 Georgios Katsikas, RISE SICS
  * Copyright (c) 2017 Tom Barbette, University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a

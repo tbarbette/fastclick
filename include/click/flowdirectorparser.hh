@@ -3,7 +3,7 @@
  * flowdirectorparser.hh -- Flow Director parsing API between
  * Click and DPDK.
  *
- * Copyright (c) 2018 Georgios Katsikas, RISE SICS AB
+ * Copyright (c) 2018 Georgios Katsikas, RISE SICS
  * Copyright (c) 2018 Tom Barbette, University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a

@@ -4,7 +4,7 @@
  * Tom Barbette, Georgios Katsikas
  *
  * Copyright (c) 2017 Tom Barbette, University of Liège
- * Copyright (c) 2017 Georgios Katsikas, RISE SICS AB
+ * Copyright (c) 2017 Georgios Katsikas, RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),

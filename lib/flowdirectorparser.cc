@@ -3,7 +3,7 @@
  * flowdirectorparser.cc -- element that relays flow rule instructions
  * to DPDK's flow parsing library.
  *
- * Copyright (c) 2018 Georgios Katsikas, RISE SICS AB
+ * Copyright (c) 2018 Georgios Katsikas, RISE SICS
  * Copyright (c) 2018 Tom Barbette, University of Liège
  *
  * Permission is hereby granted, free of charge, to any person obtaining a

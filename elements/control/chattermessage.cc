@@ -7,7 +7,7 @@
 #include <elements/json/json.hh>
 CLICK_DECLS
 
-ChatterMessage::ChatterMessage() : 
+ChatterMessage::ChatterMessage() :
 	_active(false), _channel("default") {
 }
 

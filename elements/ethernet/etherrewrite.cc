@@ -5,7 +5,7 @@
  * Batching support from Georgios Katsikas
  *
  * Copyright (c) 2015 University of Liege
- * Copyright (c) 2017 Georgios Katsikas, RISE SICS AB
+ * Copyright (c) 2017 Georgios Katsikas, RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
