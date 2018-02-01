@@ -40,6 +40,11 @@ String DPDKDevice::get_device_vendor_name()
     return info.vendor_name;
 }
 
+uint16_t DPDKDevice::get_device_id()
+{
+    return info.device_id;
+}
+
 const char *DPDKDevice::get_device_driver()
 {
     return info.driver;
@@ -212,8 +217,10 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_IP;
 
     // Obtain general device information
-    info.vendor_id = dev_info.pci_dev->id.vendor_id;
-    info.device_id = dev_info.pci_dev->id.device_id;
+    if (dev_info.pci_dev) {
+        info.vendor_id = dev_info.pci_dev->id.vendor_id;
+        info.device_id = dev_info.pci_dev->id.device_id;
+    }
     info.driver = dev_info.driver_name;
     info.vendor_name = "Unknown";
 
