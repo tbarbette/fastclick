@@ -62,6 +62,8 @@ public:
 
     String get_device_vendor_name();
 
+    uint16_t get_device_id();
+
     const char *get_device_driver();
 
     static struct rte_mempool *get_mpool(unsigned int);
@@ -118,11 +120,24 @@ private:
 
     struct DevInfo {
         inline DevInfo() :
-            vendor_id(PCI_ANY_ID), vendor_name(), driver(0),
+            vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
             n_tx_descs(0), mac() {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
+        }
+
+        void print_device_info() {
+            click_chatter("   Vendor   ID: %d", vendor_id);
+            click_chatter("   Vendor Name: %s", vendor_name.c_str());
+            click_chatter("   Device   ID: %d", device_id);
+            click_chatter("   Driver Name: %s", driver);
+            click_chatter("Promisc   Mode: %s", promisc? "true":"false");
+            click_chatter("   MAC Address: %s", mac.unparse().c_str());
+            click_chatter("# of Rx Queues: %d", rx_queues.size());
+            click_chatter("# of Tx Queues: %d", tx_queues.size());
+            click_chatter("# of Rx  Descs: %d", n_rx_descs);
+            click_chatter("# of Tx  Descs: %d", n_tx_descs);
         }
 
         uint16_t vendor_id;
