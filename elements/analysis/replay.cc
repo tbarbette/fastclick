@@ -43,6 +43,7 @@ int ReplayBase::parse(Args* args) {
              .read("BURST", _burst)
              .read("VERBOSE", _verbose)
              .read("FREEONTERMINATE", _freeonterminate)
+             .read("LIMIT", _limit)
              .read("ACTIVE",_active)
              .execute() < 0) {
         return -1;
