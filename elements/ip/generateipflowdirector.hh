@@ -71,11 +71,14 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
     private:
 
         /**
-         * When the dump handler is called, each rule is assigned
-         * to a CPU core in a round-robin fashion.
+         * NIC to host the rules.
          */
-        static int _nb_cores;
-        static const int DEF_NB_CORES;
+        static uint16_t _port;
+        /**
+         * Number of CPU cores to be used for load balancing.
+         */
+        static uint16_t _nb_cores;
+        static const uint16_t DEF_NB_CORES;
 
 };
 
