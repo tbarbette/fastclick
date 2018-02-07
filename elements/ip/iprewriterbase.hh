@@ -183,7 +183,7 @@ class IPRewriterBase : public BatchElement { public:
 
     void shift_heap_best_effort(click_jiffies_t now_j);
     bool shrink_heap_for_new_flow(IPRewriterFlow *flow, click_jiffies_t now_j);
-    void shrink_heap(bool clear_all);
+    void shrink_heap(bool clear_all, int thid);
 
     friend class IPRewriterFlow;
 
