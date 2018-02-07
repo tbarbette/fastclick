@@ -27,13 +27,12 @@
 
 CLICK_DECLS
 
-const int GenerateIPLookup::DEF_OUT_PORT = 1;
-int GenerateIPLookup::_out_port = DEF_OUT_PORT;
+static const uint8_t DEF_OUT_PORT = 1;
 
 /**
  * IPRouteTable rules' generator out of incoming traffic.
  */
-GenerateIPLookup::GenerateIPLookup() : GenerateIPPacket()
+GenerateIPLookup::GenerateIPLookup() : _out_port(DEF_OUT_PORT), GenerateIPPacket()
 {
 }
 
@@ -45,14 +44,9 @@ int
 GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-            .read_p("OUT_PORT", _out_port)
+            .read_mp("OUT_PORT", _out_port)
             .consume() < 0)
         return -1;
-
-    if (_out_port < 0) {
-        _out_port = DEF_OUT_PORT;
-        errh->warning("OUT_PORT is set to default value: %d", _out_port);
-    }
 
     // Routers care about destination IP addresses
     _mask = IPFlowID(0, 0, 0xffffffff, 0);
@@ -101,7 +95,7 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
 
     StringAccum acc;
 
-    int n = 0;
+    uint64_t n = 0;
     while (g->_map.size() > g->_nrules) {
         HashTable<IPFlow> newmap;
         ++n;
@@ -114,12 +108,13 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
 
         g->_map = newmap;
         if (n == 32) {
-            return "Impossible to lower the rules and keep the choosen fields";
+            return "Impossible to lower the rules and keep the chosen fields";
         }
     }
 
     for (auto flow : g->_map) {
-        acc << flow.flowid().daddr() << '/' << String(32 - n) << " " << _out_port << ",\n";
+        acc << flow.flowid().daddr() << '/' << String(32 - n) <<
+               " " << g->_out_port << ",\n";
     }
 
     return acc.take_string();

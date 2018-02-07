@@ -70,11 +70,9 @@ class GenerateIPLookup : public GenerateIPPacket {
     private:
 
         /**
-         * When the dump handler is called, each rule is assigned
-         * to this output port in order to fill the routing table.
+         * Element's output port associated with the rules.
          */
-        static int _out_port;
-        static const int DEF_OUT_PORT;
+        uint8_t _out_port;
 
 };
 
