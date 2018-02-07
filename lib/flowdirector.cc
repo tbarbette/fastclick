@@ -226,16 +226,35 @@ FlowDirector::flow_rule_install(
         return false;
     }
 
+    // TODO: Fix DPDK to return proper status
     int res = flow_parser_parse(_parser, (char *) rule, _errh);
-    if (res == FLOWDIR_ERROR) {
-        _errh->error(
-            "Flow Director (port %u): Failed to parse rule #%4u",
-            port_id, rule_id
-        );
-        return false;
+    if (res >= 0) {
+        return true;
     }
 
-    return true;
+    // Resolve the error
+    String error;
+    switch (res) {
+        case CMDLINE_PARSE_BAD_ARGS:
+            error = "bad arguments";
+            break;
+        case CMDLINE_PARSE_AMBIGUOUS:
+            error = "ambiguous input";
+            break;
+        case CMDLINE_PARSE_NOMATCH:
+            error = "no match";
+            break;
+        default:
+            error = "unknown error";
+            break;
+    }
+
+    _errh->error(
+        "Flow Director (port %u): Failed to parse rule #%4u due to %s",
+        port_id, rule_id, error.c_str()
+    );
+
+    return false;
 }
 
 /**
