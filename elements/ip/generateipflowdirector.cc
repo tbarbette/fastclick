@@ -118,7 +118,8 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
     uint64_t i = 0;
     for (auto flow : g->_map) {
         acc << "flow create "<< String(g->_port) <<
-               " ingress pattern ipv4" <<
+               " ingress pattern eth /" <<
+               " ipv4" <<
                " src spec " << flow.flowid().saddr() <<
                " src mask " << IPAddress::make_prefix(32 - n) <<
                " dst spec " << flow.flowid().daddr() <<
