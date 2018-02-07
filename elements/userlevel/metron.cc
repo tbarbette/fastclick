@@ -1611,7 +1611,7 @@ String NIC::getDeviceId()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel)
+ELEMENT_REQUIRES(userlevel Json)
 
 EXPORT_ELEMENT(Metron)
 ELEMENT_MT_SAFE(Metron)

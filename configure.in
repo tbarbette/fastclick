@@ -608,7 +608,7 @@ ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
 ELEMENTS_ARG_ENABLE(ip6, [include IPv6 elements], NO, AC_DEFINE(HAVE_IP6))
 ELEMENTS_ARG_ENABLE(ipsec, [include IP security elements], NO, AC_DEFINE(HAVE_IPSEC))
-ELEMENTS_ARG_ENABLE(json, [include JSON helpers], NO)
+ELEMENTS_ARG_ENABLE(json, [include JSON helpers], NO, AC_DEFINE(HAVE_JSON))
 ELEMENTS_ARG_ENABLE(local, [include local elements], NO)
 ELEMENTS_ARG_ENABLE(radio, [include radio elements], NO)
 ELEMENTS_ARG_ENABLE(research, [include research elements], NO)
@@ -2323,3 +2323,25 @@ for ac_dir in bin etc include share share/click; do
 done
 
 AC_OUTPUT
+
+echo "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json"
+
+if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json" = yesyesyes; then
+    have_metron="yes"
+else
+    have_metron="no"
+fi
+
+echo "
+
+Configuration:
+    C Compiler:                  ${CC}
+    C++ Compiler:                ${CXX}
+
+    DPDK support:                ${enable_dpdk}
+    Netmap support:              ${HAVE_NETMAP}
+
+    Metron support:              ${have_metron}
+"
+
+echo "Now type make to build FastClick..."

@@ -24,10 +24,13 @@
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/etheraddress.hh>
+#include <click/straccum.hh>
 
 #include "fromdpdkdevice.hh"
 #include "todpdkdevice.hh"
+#if HAVE_JSON
 #include "../json/json.hh"
+#endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     #include <click/flowdirector.hh>
@@ -365,6 +368,7 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             return EtherAddress((unsigned char*)&mac_addr).unparse_colon();
         }
         case h_vf_mac: {
+#if HAVE_JSON
             Json jaddr = Json::make_array();
             for (int i = 0; i < fd->_dev->nbVFPools(); i++) {
                 struct ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
@@ -374,6 +378,16 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
                     ).unparse_colon());
             }
             return jaddr.unparse();
+#else
+            String s = "";
+            for (int i = 0; i < fd->_dev->nbVFPools(); i++) {
+                struct ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
+                s += EtherAddress(
+                        reinterpret_cast<unsigned char *>(&mac)
+                    ).unparse_colon() + ";";
+            }
+            return s;
+#endif
         }
     }
 

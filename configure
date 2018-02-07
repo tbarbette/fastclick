@@ -7515,6 +7515,7 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_json" = x \) && enable_json=yes
 if test "x$enable_json" = xyes; then
     :
+    $as_echo "#define HAVE_JSON 1" >>confdefs.h
 
 fi
 # Check whether --enable-local was given.
@@ -15544,3 +15545,25 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+
+echo "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json"
+
+if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json" = yesyesyes; then
+    have_metron="yes"
+else
+    have_metron="no"
+fi
+
+echo "
+
+Configuration:
+    C Compiler:                  ${CC}
+    C++ Compiler:                ${CXX}
+
+    DPDK support:                ${enable_dpdk}
+    Netmap support:              ${HAVE_NETMAP}
+
+    Metron support:              ${have_metron}
+"
+
+echo "Now type make to build FastClick..."
