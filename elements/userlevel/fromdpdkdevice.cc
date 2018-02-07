@@ -389,6 +389,10 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             return s;
 #endif
         }
+        case h_vendor:
+            return fd->_dev->get_device_vendor_name();
+        case h_driver:
+            return String(fd->_dev->get_device_driver());
     }
 
     return 0;
@@ -672,6 +676,8 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("nb_vf_pools",read_handler, h_nb_vf_pools);
 
     add_read_handler("mac",read_handler, h_mac);
+    add_read_handler("vendor", read_handler, h_vendor);
+    add_read_handler("driver", read_handler, h_driver);
     add_write_handler("add_mac",write_handler, h_add_mac, 0);
     add_write_handler("remove_mac",write_handler, h_remove_mac, 0);
     add_read_handler("vf_mac_addr",read_handler, h_vf_mac);

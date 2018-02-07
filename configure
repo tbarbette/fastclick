@@ -1528,7 +1528,7 @@ Optional Features:
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
-    --enable-dpdk         use Intel DPDK
+    --enable-dpdk         use DPDK
     --enable-dpdk-pool    use DPDK buffer instead of standard click malloc'ed
                           buffer
     --enable-dpdk-packet  Click packets are DPDK packet
@@ -6955,8 +6955,8 @@ if test "x$enable_dpdk" = "xyes"; then
         as_fn_error $? "
 =========================================
 
-Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for Intel DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
+Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for DPDK.
+Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi

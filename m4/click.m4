@@ -496,14 +496,14 @@ AC_DEFUN([CLICK_CHECK_NUMA], [
 
     HAVE_NUMA=no
 
-    if test "$use_numa" != "no"; then        
+    if test "$use_numa" != "no"; then
         AC_SEARCH_LIBS([numa_available], [numa], [ac_have_libnuma=yes], [ac_have_libnuma=no])
 
         if test "$ac_have_libnuma" = yes; then
             AC_DEFINE([HAVE_NUMA], [1], [Define if you have the <nuda.h> header file.])
             LDFLAGS="$LDFLAGS -Lnuma"
         fi
-        
+
         if test "$HAVE_NUMA" = yes; then
             AC_CACHE_CHECK([whether numa.h works],
                 [ac_cv_working_numa_h], [

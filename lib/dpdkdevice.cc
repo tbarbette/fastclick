@@ -22,6 +22,8 @@
 #include <click/config.h>
 #include <click/element.hh>
 #include <click/dpdkdevice.hh>
+#include <click/userutils.hh>
+
 #if RTE_VERSION <= RTE_VERSION_NUM(16,11,0,0)
     #include <rte_errno.h>
 #endif
@@ -35,6 +37,25 @@ extern "C" {
 
 CLICK_DECLS
 
+uint16_t DPDKDevice::get_device_vendor_id()
+{
+    return info.vendor_id;
+}
+
+String DPDKDevice::get_device_vendor_name()
+{
+    return info.vendor_name;
+}
+
+uint16_t DPDKDevice::get_device_id()
+{
+    return info.device_id;
+}
+
+const char *DPDKDevice::get_device_driver()
+{
+    return info.driver;
+}
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
@@ -168,6 +189,55 @@ int DPDKDevice::alloc_pktmbufs()
 struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
     return _pktmbuf_pools[socket_id];
 }
+
+/**
+ * Extracts from 'info' what is after the 'key'.
+ * E.g. an expected input is:
+ * XX:YY.Z Ethernet controller: Mellanox Technologies MT27700 Family [ConnectX-4]
+ * and we want to keep what is after our key 'Ethernet controller: '.
+ *
+ * @param info string to parse
+ * @param key substring to indicate the new index
+ * @return substring of info that succeeds the key
+ */
+static String parse_pci_info(String info, String key)
+{
+    String s;
+
+    // Extract what is after the keyword
+    s = info.substring(info.find_left(key) + key.length());
+    if (s.empty()) {
+        return String();
+    }
+
+    // Find the position of the delimiter
+    int pos = s.find_left(':') + 2;
+    if (pos < 0) {
+        return String();
+    }
+
+    // Extract what comes after the delimiter
+    s = s.substring(pos, s.find_left("\n") - pos);
+    if (s.empty()) {
+        return String();
+    }
+
+    return s;
+}
+
+/**
+ * Keeps the left-most substring of 'str'
+ * until the first occurence of the delimiter.
+ *
+ * @param str string to parse
+ * @param delimiter character that indicates where to stop
+ * @return substring of str that preceds the delimiter
+ */
+static String keep_token_left(String str, char delimiter)
+{
+    return str.substring(0, str.find_left(delimiter));
+}
+
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 int DPDKDevice::set_mode(
@@ -313,6 +383,25 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
     }
 
+        // Obtain general device information
+    if (dev_info.pci_dev) {
+        info.vendor_id = dev_info.pci_dev->id.vendor_id;
+        info.device_id = dev_info.pci_dev->id.device_id;
+    }
+    info.driver = dev_info.driver_name;
+    info.vendor_name = "Unknown";
+
+    // Combine vendor and device IDs
+    char vendor_and_dev[10];
+    sprintf(vendor_and_dev, "%x:%x", info.vendor_id, info.device_id);
+
+    // Retrieve more information about the vendor of this NIC
+    String dev_pci = shell_command_output_string("lspci -d " + String(vendor_and_dev), "", errh);
+    String long_vendor_name = parse_pci_info(dev_pci, "Ethernet controller");
+    if (!long_vendor_name.empty()) {
+        info.vendor_name = keep_token_left(long_vendor_name, ' ');
+    }
+
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
         info.rx_queues.resize(1);
@@ -323,12 +412,15 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         info.n_tx_descs = DEF_DEV_TXDESC;
     }
 
-    if (rte_eth_dev_configure(
+
+    int ret;
+    if (ret = rte_eth_dev_configure(
             port_id, info.rx_queues.size(),
             info.tx_queues.size(), &dev_conf) < 0)
         return errh->error(
-            "Cannot initialize DPDK port %u with %u RX and %u TX queues",
-            port_id, info.rx_queues.size(), info.tx_queues.size());
+            "Cannot initialize DPDK port %u with %u RX and %u TX queues\nError %d : %s",
+            port_id, info.rx_queues.size(), info.tx_queues.size(),
+            ret, strerror(ret));
 
     rte_eth_dev_info_get(port_id, &dev_info);
 
