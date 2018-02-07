@@ -263,7 +263,8 @@ IPRewriterBase::initialize(ErrorHandler *errh)
 void
 IPRewriterBase::cleanup(CleanupStage)
 {
-    shrink_heap(true);
+    for (int i = 0; i < _mem_units_no; i++)
+        shrink_heap(true, i);
     for (int i = 0; i < _input_specs.size(); ++i)
 	if (_input_specs[i].kind == IPRewriterInput::i_pattern)
 	    _input_specs[i].u.pattern->unuse();
@@ -299,21 +300,23 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
     IPRewriterEntry *old = map.set(&flow->entry(false));
     assert(!old);
 
+    auto &heap = _heap[click_current_cpu_id()];
+
     if (!reply_map_ptr)
 	reply_map_ptr = &reply_element->_map[click_current_cpu_id()];
     old = reply_map_ptr->set(&flow->entry(true));
     if (unlikely(old)) {		// Assume every map has the same heap.
 	if (likely(old->flow() != flow))
-	    old->flow()->destroy(_heap[click_current_cpu_id()]);
+	    old->flow()->destroy(heap);
     }
 
-    Vector<IPRewriterFlow *> &myheap = _heap[click_current_cpu_id()]->_heaps[flow->guaranteed()];
+    Vector<IPRewriterFlow *> &myheap = heap->_heaps[flow->guaranteed()];
     myheap.push_back(flow);
     push_heap(myheap.begin(), myheap.end(),
 	      IPRewriterFlow::heap_less(), IPRewriterFlow::heap_place());
     ++_input_specs[input].count;
 
-    if (unlikely(_heap[click_current_cpu_id()]->size() > _heap[click_current_cpu_id()]->capacity())) {
+    if (unlikely(heap->size() > heap->capacity())) {
 	// This may destroy the newly added mapping, if it has the lowest
 	// expiration time.  How can we tell?  If (1) flows are added to the
 	// heap one at a time, so the heap was formerly no bigger than the
@@ -321,7 +324,7 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 	// destroy 'flow' if it's the top of the heap.
 	click_jiffies_t now_j = click_jiffies();
 	assert(click_jiffies_less(now_j, flow->expiry())
-	       && _heap[click_current_cpu_id()]->size() == _heap[click_current_cpu_id()]->capacity() + 1);
+	       && heap->size() == heap->capacity() + 1);
 	if (shrink_heap_for_new_flow(flow, now_j)) {
 	    ++_input_specs[input].failures;
 	    return 0;
@@ -367,18 +370,18 @@ IPRewriterBase::shrink_heap_for_new_flow(IPRewriterFlow *flow,
 }
 
 void
-IPRewriterBase::shrink_heap(bool clear_all)
+IPRewriterBase::shrink_heap(bool clear_all, int thid)
 {
     click_jiffies_t now_j = click_jiffies();
     shift_heap_best_effort(now_j);
-    Vector<IPRewriterFlow *> &best_effort_heap = _heap[click_current_cpu_id()]->_heaps[0];
+    Vector<IPRewriterFlow *> &best_effort_heap = _heap[thid]->_heaps[0];
     while (best_effort_heap.size() && best_effort_heap[0]->expired(now_j))
-	best_effort_heap[0]->destroy(_heap[click_current_cpu_id()]);
+	best_effort_heap[0]->destroy(_heap[thid]);
 
-    int32_t capacity = clear_all ? 0 : _heap[click_current_cpu_id()]->_capacity;
-    while (_heap[click_current_cpu_id()]->size() > capacity) {
-	IPRewriterFlow *deadf = _heap[click_current_cpu_id()]->_heaps[_heap[click_current_cpu_id()]->_heaps[0].empty()][0];
-	deadf->destroy(_heap[click_current_cpu_id()]);
+    int32_t capacity = clear_all ? 0 : _heap[thid]->_capacity;
+    while (_heap[thid]->size() > capacity) {
+	IPRewriterFlow *deadf = _heap[thid]->_heaps[_heap[thid]->_heaps[0].empty()][0];
+	deadf->destroy(_heap[thid]);
     }
 }
 
@@ -386,7 +389,7 @@ void
 IPRewriterBase::gc_timer_hook(Timer *t, void *user_data)
 {
     IPRewriterBase *rw = static_cast<IPRewriterBase *>(user_data);
-    rw->shrink_heap(false);
+    rw->shrink_heap(false, click_current_cpu_id());
     if (rw->_gc_interval_sec)
         t->reschedule_after_sec(rw->_gc_interval_sec);
 }
@@ -455,14 +458,16 @@ IPRewriterBase::write_handler(const String &str, Element *e, void *user_data, Er
     IPRewriterBase *rw = static_cast<IPRewriterBase *>(e);
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
     if (what == h_capacity) {
+
+    assert(click_current_cpu_id() == 0); //MT to be reviewed
 	if (Args(e, errh).push_back_words(str)
 	    .read_mp("CAPACITY", rw->_heap[click_current_cpu_id()]->_capacity) //TODO : Same comments about MT
 	    .complete() < 0)
 	    return -1;
-	rw->shrink_heap(false);
+	rw->shrink_heap(false, click_current_cpu_id());
 	return 0;
     } else if (what == h_clear) {
-	rw->shrink_heap(true);
+	rw->shrink_heap(true, click_current_cpu_id());
 	return 0;
     } else
 	return -1;
@@ -477,6 +482,8 @@ IPRewriterBase::pattern_write_handler(const String &str, Element *e, void *user_
     int r = rw->parse_input_spec(str, is, what, errh);
     if (r >= 0) {
 	IPRewriterInput *spec = &rw->_input_specs[what];
+
+    assert(click_current_cpu_id() == 0); //MT to be reviewed
 
 	// remove all existing flows created by this input
 	for (int which_heap = 0; which_heap < 2; ++which_heap) {
