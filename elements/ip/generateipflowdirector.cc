@@ -28,14 +28,13 @@
 
 CLICK_DECLS
 
-uint16_t GenerateIPFlowDirector::_port;
-const uint16_t GenerateIPFlowDirector::DEF_NB_CORES = 16;
-uint16_t GenerateIPFlowDirector::_nb_cores = DEF_NB_CORES;
+static const uint16_t DEF_NB_CORES = 16;
 
 /**
  * Flow Director rules' generator out of incoming traffic.
  */
-GenerateIPFlowDirector::GenerateIPFlowDirector() : GenerateIPFilter()
+GenerateIPFlowDirector::GenerateIPFlowDirector() :
+        _port(0), _nb_cores(DEF_NB_CORES), GenerateIPFilter()
 {
 }
 
@@ -112,13 +111,13 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
         }
         g->_map = newmap;
         if (n == 32) {
-            return "Impossible to lower the rules and keep the choosen fields";
+            return "Impossible to lower the rules and keep the chosen fields";
         }
     }
 
     uint64_t i = 0;
     for (auto flow : g->_map) {
-        acc << "flow create "<< String(_port) <<
+        acc << "flow create "<< String(g->_port) <<
                " ingress pattern ipv4" <<
                " src spec " << flow.flowid().saddr() <<
                " src mask " << IPAddress::make_prefix(32 - n) <<
@@ -139,8 +138,8 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
         */
 
         // Round-robin across the available CPU cores
-        uint16_t core = (i % _nb_cores);
-        assert((core >= 0) && (core <_nb_cores));
+        uint16_t core = (i % g->_nb_cores);
+        assert((core >= 0) && (core < g->_nb_cores));
         acc << " end actions queue index " << core << " / end\n";
 
         i++;

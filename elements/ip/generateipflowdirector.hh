@@ -73,13 +73,11 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
         /**
          * NIC to host the rules.
          */
-        static uint16_t _port;
+        uint16_t _port;
         /**
          * Number of CPU cores to be used for load balancing.
          */
-        static uint16_t _nb_cores;
-        static const uint16_t DEF_NB_CORES;
-
+        uint16_t _nb_cores;
 };
 
 CLICK_ENDDECLS
