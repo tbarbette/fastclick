@@ -30,8 +30,12 @@ IPFlowID::IPFlowID(const Packet *p, bool reverse)
 {
     const click_ip *iph = p->ip_header();
     const click_udp *udph = p->udp_header();
-    assert(p->has_network_header() && p->has_transport_header()
-	   && IP_FIRSTFRAG(iph));
+
+    if (!p->has_network_header()   ||
+        !p->has_transport_header() ||
+        !IP_FIRSTFRAG(iph)) {
+        return;
+    }
 
     if (likely(!reverse))
 	assign(iph->ip_src.s_addr, udph->uh_sport,
@@ -43,7 +47,10 @@ IPFlowID::IPFlowID(const Packet *p, bool reverse)
 
 IPFlowID::IPFlowID(const click_ip *iph, bool reverse)
 {
-    assert(iph && IP_FIRSTFRAG(iph));
+    if (!iph || !IP_FIRSTFRAG(iph)) {
+        return;
+    }
+
     const click_udp *udph = reinterpret_cast<const click_udp *>(reinterpret_cast<const unsigned char *>(iph) + (iph->ip_hl << 2));
 
     if (likely(!reverse))
