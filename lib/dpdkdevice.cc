@@ -691,8 +691,6 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    errh->message("\n");
-
     for (HashTable<portid_t, FlowDirector *>::const_iterator
             it = FlowDirector::_dev_flow_dir.begin();
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
