@@ -57,7 +57,7 @@ GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     // Default mask
-    _mask = IPFlowID(0xffffffff, (_keep_sport?0xffff:0), 0xffffffff, (_keep_dport?0xffff:0));
+    _mask = IPFlowID(0xffffffff, (_keep_sport ? 0xffff:0), 0xffffffff, (_keep_dport ? 0xffff:0));
 
     return GenerateIPFilter::configure(conf, errh);
 }
@@ -117,6 +117,13 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
 
     uint64_t i = 0;
     for (auto flow : g->_map) {
+
+        // Wildcards are intentionally excluded
+        if ((flow.flowid().saddr().s() == "0.0.0.0") ||
+            (flow.flowid().daddr().s() == "0.0.0.0")) {
+            continue;
+        }
+
         acc << "flow create "<< String(g->_port) <<
                " ingress pattern eth /" <<
                " ipv4" <<
