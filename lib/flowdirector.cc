@@ -175,11 +175,18 @@ FlowDirector::add_rules_from_file(
 
     char  *line = NULL;
     size_t  len = 0;
+    const char ignore_chars[] = "\n\t ";
 
     // Read file line-by-line (or rule-by-rule)
     while ((getline(&line, &len, fp)) != -1) {
+        // Skip empty lines or spaces
+        if ((strlen(line) == 0) ||
+            (strchr(ignore_chars, line[0]))) {
+            continue;
+        }
+
         // Filter out irrelevant DPDK commands
-        if (!strstr (line, "create") && !strstr (line, "delete")) {
+        if (!strstr(line, "create") && !strstr(line, "delete")) {
             _errh->warning(
                 "Flow Director (port %u): "
                 "Expects only create and/or delete rules", port_id
