@@ -164,10 +164,10 @@ AggregateCounterBase<T>::make_peer(uint32_t a, Node *n, bool frozen)
 
     Node *down[2];
     if (!(down[0] = new_node(*_state)))
-	return 0;
+	    return 0;
     if (!(down[1] = new_node(*_state))) {
-	free_node(*_state,down[0]);
-	return 0;
+	    free_node(*_state,down[0]);
+	    return 0;
     }
 
     // swivel is first bit 'a' and 'old->input' differ
@@ -224,10 +224,64 @@ AggregateCounterBase<T>::find_node(uint32_t a, bool frozen)
 }
 
 template <typename T> inline bool
+AggregateCounterBase<T>::update_batch(PacketBatch *batch, bool frozen)
+{
+    if (!_active)
+	return false;
+
+    uint32_t last_agg = 0;
+    Node *n = 0;
+    AggregateCounterState &s = _state.get();
+
+    FOR_EACH_PACKET(batch,p) {
+        // AGGREGATE_ANNO is already in host byte order!
+        uint32_t agg = AGGREGATE_ANNO(p);
+        if (agg == last_agg && n) {
+        } else {
+            n = find_node(last_agg, frozen);
+            if (!n)
+                return false;
+            last_agg = agg;
+        }
+
+        uint32_t amount;
+        if (!_bytes)
+            amount = 1 + (_use_packet_count ? EXTRA_PACKETS_ANNO(p) : 0);
+        else {
+            amount = p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0);
+        if (_ip_bytes && p->has_network_header())
+            amount -= p->network_header_offset();
+        }
+
+        // update _num_nonzero; possibly call handler
+        if (amount && !n->count) {
+            if (_num_nonzero >= _call_nnz) {
+                _call_nnz = (uint32_t)(-1);
+                _call_nnz_h->call_write();
+                // handler may have changed our state; reupdate
+                return update(p, frozen || _frozen);
+            }
+            _num_nonzero++;
+        }
+
+        n->count += amount;
+        s.count += amount;
+        if (s.count >= _call_count) {
+            _call_count = (uint64_t)(-1);
+            _call_count_h->call_write();
+        }
+    }
+    return true;
+}
+
+
+template <typename T> inline bool
 AggregateCounterBase<T>::update(Packet *p, bool frozen)
 {
     if (!_active)
 	return false;
+
+    AggregateCounterState& s = _state.get();
 
     // AGGREGATE_ANNO is already in host byte order!
     uint32_t agg = AGGREGATE_ANNO(p);
@@ -256,8 +310,8 @@ AggregateCounterBase<T>::update(Packet *p, bool frozen)
     }
 
     n->count += amount;
-    _count += amount;
-    if (_count >= _call_count) {
+    s.count += amount;
+    if (s.count >= _call_count) {
 	_call_count = (uint64_t)(-1);
 	_call_count_h->call_write();
     }
@@ -329,7 +383,7 @@ AggregateCounterBase<T>::clear(AggregateCounterState &s, ErrorHandler *errh)
     s.root->count = 0;
     s.root->child[0] = s.root->child[1] = 0;
     _num_nonzero = 0;
-    _count = 0;
+    s.count = 0;
     return 0;
 }
 
@@ -345,7 +399,7 @@ AggregateCounterBase<T>::reaggregate_node(AggregateCounterState &s, Node *n)
 	if (!n->count)
 	    _num_nonzero++;
 	n->count++;
-	_count++;
+	s.count++;
     }
 
     if (l) {
@@ -395,7 +449,7 @@ AggregateCounterBase<T>::write_nodes(const Node *n, FILE *f, WriteFormat format,
 	buffer[pos++] = n->aggregate;
 	buffer[pos++] = n->count;
 	if (pos == len) {
-	    write_batch(f, format, buffer, pos, _count, errh);
+	    write_batch(f, format, buffer, pos, _state.cst().count, errh);
 	    pos = 0;
 	}
     }
@@ -439,7 +493,7 @@ AggregateCounterBase<T>::write_file(String where, WriteFormat format,
     for (auto const &s : _state)
         write_nodes(s.root, f, format, buf, pos, 1024, errh);
     if (pos)
-	write_batch(f, format, buf, pos, _count, errh);
+	    write_batch(f, format, buf, pos, _state.cst().count, errh);
 
     bool had_err = ferror(f);
     if (f != stdout)
@@ -484,7 +538,7 @@ AggregateCounterBase<T>::read_handler(Element *e, void *thunk)
 	else
 	    return String(ac->_call_count) + " " + ac->_call_count_h->unparse();
       case AC_COUNT:
-	return String(ac->_count);
+	return String(ac->_state->count);
       case AC_NAGG:
 	return String(ac->_num_nonzero);
       default:

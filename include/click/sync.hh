@@ -158,6 +158,10 @@ public:
         return storage[click_current_cpu_id()].v;
     }
 
+    inline const T& cst() const{
+        return storage[click_current_cpu_id()].v;
+    }
+
     /**
      * get_value_for_thread get the value for a given thread id
      * Do not do for (int i = 0; i < size(); i++) get_value_for_thread
@@ -274,7 +278,16 @@ public:
         return &(v);
     }
 
+
     inline T& operator*() {
+        return v;
+    }
+
+    inline T& get() {
+        return v;
+    }
+
+    inline const T& cst() const {
         return v;
     }
 

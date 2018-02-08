@@ -200,7 +200,8 @@ struct AggregateCounterState {
     Node* root;
     Node* free;
     Vector<Node*>  blocks;
-    AggregateCounterState() : root(0), free(0), blocks() {
+    uint64_t count;
+    AggregateCounterState() : root(0), free(0), blocks(), count(0) {
 
     }
 };
@@ -219,6 +220,7 @@ class AggregateCounterBase : public BatchElement { public:
     void add_handlers() CLICK_COLD;
 
     inline bool update(Packet *, bool frozen = false);
+    inline bool update_batch(PacketBatch *, bool frozen = false);
     void push(int, Packet *);
     Packet *pull(int);
 #if HAVE_BATCH
@@ -243,7 +245,6 @@ class AggregateCounterBase : public BatchElement { public:
 
     T _state;
     uint32_t _num_nonzero;
-    uint64_t _count;
 
     uint32_t _call_nnz;
     HandlerCall *_call_nnz_h;
