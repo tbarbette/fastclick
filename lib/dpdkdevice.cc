@@ -254,9 +254,9 @@ int DPDKDevice::set_mode(
 
     if (mode == "") {
         return 0;
-    } else if ((mode == "none") || (mode == "flow_dir")) {
+    } else if (mode == "none") {
             m = ETH_MQ_RX_NONE;
-    } else if (mode == "rss") {
+    } else if ((mode == "rss") || (mode == "flow_dir")) { {
             m = ETH_MQ_RX_RSS;
     } else if (mode == "vmdq") {
             m = ETH_MQ_RX_VMDQ_ONLY;
