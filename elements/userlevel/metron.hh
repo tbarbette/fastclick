@@ -130,12 +130,12 @@ class ServiceChain {
             return id;
         }
 
-        inline int get_used_cpu_nr() {
-            return _used_cpu_nr;
+        inline int get_used_cpu_nb() {
+            return _used_cpus_nb;
         }
 
-        inline int get_max_cpu_nr() {
-            return _max_cpu_nr;
+        inline int get_max_cpu_nb() {
+            return _max_cpus_nb;
         }
 
 
@@ -143,7 +143,7 @@ class ServiceChain {
             return _cpus[i];
         }
 
-        inline int get_nic_nr() {
+        inline int get_nics_nb() {
             return _nics.size();
         }
 
@@ -229,8 +229,8 @@ class ServiceChain {
         int _pid;
         struct timing_stats _timing_stats;
         struct autoscale_timing_stats _as_timing_stats;
-        int _used_cpu_nr;
-        int _max_cpu_nr;
+        int _used_cpus_nb;
+        int _max_cpus_nb;
         bool _autoscale;
         Timestamp _last_autoscale;
 
@@ -290,7 +290,7 @@ class Metron : public Element {
         int instantiate_chain(ServiceChain *sc, ErrorHandler *errh);
         int remove_chain(ServiceChain *sc, ErrorHandler *errh);
 
-        int get_cpu_nr() {
+        int get_cpus_nb() {
             return click_max_cpu_ids();
         }
 
@@ -298,7 +298,7 @@ class Metron : public Element {
             return _scs.size();
         }
 
-        int get_assigned_cpu_nr();
+        int get_assigned_cpus_nb();
 
         bool assign_cpus(ServiceChain *sc, Vector<int> &map);
         void unassign_cpus(ServiceChain *sc);
