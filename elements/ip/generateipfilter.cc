@@ -127,25 +127,26 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
         return "GenerateIPFilter element not found";
     }
 
-    StringAccum acc;
-
-    int n = 0;
+    uint8_t n = 0;
     while (g->_map.size() > g->_nrules) {
-        HashTable<IPFlow> newmap;
+        HashTable<IPFlow> new_map;
         ++n;
         g->_mask = IPFlowID(
             IPAddress::make_prefix(32 - n), g->_mask.sport(),
             IPAddress::make_prefix(32 - n), g->_mask.dport()
         );
         for (auto flow : g->_map) {
-            flow.setMask(g->_mask);
-            newmap.find_insert(flow);
+            flow.set_mask(g->_mask);
+            new_map.find_insert(flow);
         }
-        g->_map = newmap;
+        g->_map = new_map;
         if (n == 32) {
             return "Impossible to lower the rules and keep the choosen fields";
         }
     }
+
+    StringAccum acc;
+
     for (auto flow : g->_map) {
         acc << "allow src net " << flow.flowid().saddr() << '/' << String(32-n) << " && "
                  << " dst net " << flow.flowid().daddr() << '/' << String(32-n);

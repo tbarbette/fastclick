@@ -87,7 +87,7 @@ class GenerateIPPacket : public BatchElement {
                 }
 
 
-                void setMask(IPFlowID mask) {
+                void set_mask(IPFlowID mask) {
                     _flowid = _flowid & mask;
                 }
 

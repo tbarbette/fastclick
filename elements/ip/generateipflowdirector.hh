@@ -69,7 +69,6 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
     #endif
 
     private:
-
         /**
          * NIC to host the rules.
          */
@@ -78,6 +77,14 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
          * Number of CPU cores to be used for load balancing.
          */
         uint16_t _nb_cores;
+
+        /**
+         * Round-robin policy to assign rules (flow-based) to CPU cores.
+         */
+        static String round_robin_core_allocation(
+            GenerateIPFlowDirector *g,
+            const uint8_t n
+        );
 };
 
 CLICK_ENDDECLS

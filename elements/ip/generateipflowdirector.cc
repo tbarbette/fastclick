@@ -88,36 +88,17 @@ GenerateIPFlowDirector::simple_action_batch(PacketBatch *batch)
 #endif
 
 String
-GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
+GenerateIPFlowDirector::round_robin_core_allocation(
+        GenerateIPFlowDirector *g, const uint8_t n)
 {
-    GenerateIPFlowDirector *g = static_cast<GenerateIPFlowDirector *>(e);
     if (!g) {
-        return "GenerateIPFlowDirector element not found";
+        return "";
     }
 
     StringAccum acc;
 
-    uint8_t n = 0;
-    while (g->_map.size() > g->_nrules) {
-        HashTable<IPFlow> newmap;
-        ++n;
-        g->_mask = IPFlowID(
-            IPAddress::make_prefix(32 - n), g->_mask.sport(),
-            IPAddress::make_prefix(32 - n), g->_mask.dport()
-        );
-        for (auto flow : g->_map) {
-            flow.setMask(g->_mask);
-            newmap.find_insert(flow);
-        }
-        g->_map = newmap;
-        if (n == 32) {
-            return "Impossible to lower the rules and keep the chosen fields";
-        }
-    }
-
     uint64_t i = 0;
     for (auto flow : g->_map) {
-
         // Wildcards are intentionally excluded
         if ((flow.flowid().saddr().s() == "0.0.0.0") ||
             (flow.flowid().daddr().s() == "0.0.0.0")) {
@@ -154,6 +135,35 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
     }
 
     return acc.take_string();
+}
+
+String
+GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
+{
+    GenerateIPFlowDirector *g = static_cast<GenerateIPFlowDirector *>(e);
+    if (!g) {
+        return "GenerateIPFlowDirector element not found";
+    }
+
+    uint8_t n = 0;
+    while (g->_map.size() > g->_nrules) {
+        HashTable<IPFlow> new_map;
+        ++n;
+        g->_mask = IPFlowID(
+            IPAddress::make_prefix(32 - n), g->_mask.sport(),
+            IPAddress::make_prefix(32 - n), g->_mask.dport()
+        );
+        for (auto flow : g->_map) {
+            flow.set_mask(g->_mask);
+            new_map.find_insert(flow);
+        }
+        g->_map = new_map;
+        if (n == 32) {
+            return "Impossible to lower the rules and keep the chosen fields";
+        }
+    }
+
+    return round_robin_core_allocation(g, n);
 }
 
 void
