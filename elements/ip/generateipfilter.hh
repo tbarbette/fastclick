@@ -80,15 +80,23 @@ class GenerateIPPacket : public BatchElement {
 
                 void initialize(const IPFlowID &flowid) {
                     _flowid = flowid;
+                    _flow_size_bytes = 0;
                 }
 
                 const IPFlowID &flowid() const {
                     return _flowid;
                 }
 
+                uint32_t flow_size() {
+                    return _flow_size_bytes;
+                }
 
                 void set_mask(IPFlowID mask) {
                     _flowid = _flowid & mask;
+                }
+
+                void update_flow_size(const uint32_t extra_size) {
+                    _flow_size_bytes += extra_size;
                 }
 
                 key_const_reference hashkey() const {
@@ -98,6 +106,7 @@ class GenerateIPPacket : public BatchElement {
             private:
 
                 IPFlowID _flowid;
+                uint32_t _flow_size_bytes;
         };
 
         int _nrules;

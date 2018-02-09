@@ -102,10 +102,23 @@ GenerateIPFilter::cleanup(CleanupStage)
 Packet *
 GenerateIPFilter::simple_action(Packet *p)
 {
+    // Create a flow signature for this packet
     IPFlowID flowid(p);
-    IPFlow flow = IPFlow();
-    flow.initialize(flowid & _mask);
-    _map.find_insert(flow);
+    IPFlow new_flow = IPFlow();
+    new_flow.initialize(flowid & _mask);
+
+    // Check if we already have such a flow
+    IPFlow *found = _map.find(flowid).get();
+
+    // New flow
+    if (!found) {
+        // Its length is the length of this packet
+        new_flow.update_flow_size(p->length());
+        _map.find_insert(new_flow);
+    } else {
+        // Aggregate
+        found->update_flow_size(p->length());
+    }
 
     return p;
 }
@@ -141,7 +154,7 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
         }
         g->_map = new_map;
         if (n == 32) {
-            return "Impossible to lower the rules and keep the choosen fields";
+            return "Impossible to lower the number of rules and keep the choosen fields";
         }
     }
 
