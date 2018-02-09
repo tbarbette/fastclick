@@ -24,23 +24,23 @@ CLICK_DECLS
 
 class HashSwitch : public BatchElement {
 
-  int _offset;
-  int _length;
+    int _offset;
+    int _length;
 
  public:
 
-  HashSwitch() CLICK_COLD;
+    HashSwitch() CLICK_COLD;
 
-  const char *class_name() const		{ return "HashSwitch"; }
-  const char *port_count() const		{ return "1/1-"; }
-  const char *processing() const		{ return PUSH; }
+    const char *class_name() const        { return "HashSwitch"; }
+    const char *port_count() const        { return "1/1-"; }
+    const char *processing() const        { return PUSH; }
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  int process(Packet *);
-  void push(int port, Packet *);
- #if HAVE_BATCH
-  void push_batch(int port, PacketBatch *);
+    int process(Packet *);
+    void push(int port, Packet *);
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *);
 #endif
 
 };

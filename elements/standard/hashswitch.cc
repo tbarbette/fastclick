@@ -25,8 +25,7 @@
 #include <click/args.hh>
 CLICK_DECLS
 
-HashSwitch::HashSwitch()
-  : _offset(-1)
+HashSwitch::HashSwitch() : _offset(-1)
 {
 }
 
@@ -34,45 +33,46 @@ int
 HashSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	.read_mp("OFFSET", _offset)
-	.read_mp("LENGTH", _length).complete() < 0)
-	return -1;
+        .read_mp("OFFSET", _offset)
+        .read_mp("LENGTH", _length).complete() < 0)
+    return -1;
+
     if (_length == 0)
-	return errh->error("length must be > 0");
+        return errh->error("length must be > 0");
     return 0;
 }
 
 int
 HashSwitch::process(Packet *p)
 {
-  const unsigned char *data = p->data();
-  int o = _offset, l = _length;
-  if ((int)p->length() < o + l)
-    return 0;
-  else {
-    int d = 0;
-    for (int i = o; i < o + l; i++)
-      d += data[i];
-    int n = noutputs();
-    if (n == 2 || n == 4 || n == 8)
-      return (d ^ (d>>4)) & (n-1);
-    else
-      return (d % n);
-  }
+    const unsigned char *data = p->data();
+    int o = _offset, l = _length;
+    if ((int)p->length() < o + l)
+        return 0;
+    else {
+        int d = 0;
+        for (int i = o; i < o + l; i++)
+            d += data[i];
+        int n = noutputs();
+        if (n == 2 || n == 4 || n == 8)
+            return (d ^ (d>>4)) & (n-1);
+        else
+            return (d % n);
+    }
 }
 
 void
 HashSwitch::push(int port, Packet *p)
 {
-  output(process(p)).push(p);
+    output(process(p)).push(p);
 }
 
 #if HAVE_BATCH
 void
 HashSwitch::push_batch(int port, PacketBatch *batch)
 {
-  auto fnt = [this, port](Packet *p) { return process(p); };
-  CLASSIFY_EACH_PACKET(noutputs() + 1, fnt, batch, checked_output_push_batch);
+    auto fnt = [this, port](Packet *p) { return process(p); };
+    CLASSIFY_EACH_PACKET(noutputs() + 1, fnt, batch, checked_output_push_batch);
 }
 #endif
 
