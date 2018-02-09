@@ -21,11 +21,11 @@ class CPU {
             : _id(id), _vendor(vendor), _frequency(_frequency) {
         }
 
-        int getId();
-        String getVendor();
-        long getFrequency();
+        int get_id();
+        String get_vendor();
+        long get_frequency();
 
-        Json toJSON();
+        Json to_json();
 
         static const int MEGA_HZ = 1000000;
 
@@ -39,26 +39,26 @@ class NIC {
     public:
         Element *element;
 
-        String getId() {
+        String get_id() {
             return element->name();
         }
 
-        String getDeviceId();
+        String get_device_id();
 
-        Json toJSON(bool stats = false);
+        Json to_json(bool stats = false);
 
-        int queuePerPool() {
+        int queue_per_pool() {
             return atoi(
-                callRead("nb_rx_queues").c_str()) /
-                atoi(callRead("nb_vf_pools").c_str()
+                call_read("nb_rx_queues").c_str()) /
+                atoi(call_read("nb_vf_pools").c_str()
             );
         }
 
-        int cpuToQueue(int id) {
-            return id * (queuePerPool());
+        int cpu_to_queue(int id) {
+            return id * (queue_per_pool());
         }
 
-        String callRead(String h);
+        String call_read(String h);
         String callTxRead(String h);
 };
 
@@ -82,10 +82,10 @@ class ServiceChain {
                 static RxFilter *fromJSON(
                     Json j, ServiceChain *sc, ErrorHandler *errh
                 );
-                Json toJSON();
+                Json to_json();
 
-                int cpuToQueue(NIC *nic, int cpuid) {
-                    return nic->cpuToQueue(cpuid);
+                int cpu_to_queue(NIC *nic, int cpuid) {
+                    return nic->cpu_to_queue(cpuid);
                 }
 
                 virtual int apply(NIC *nic, ErrorHandler *errh);
@@ -95,11 +95,11 @@ class ServiceChain {
 
         enum ScStatus {
             SC_FAILED,
-            SC_OK=1
+            SC_OK = 1
         };
 
         String id;
-        RxFilter *rxFilter;
+        RxFilter *rx_filter;
         String config;
 
         enum ScStatus status;
@@ -123,40 +123,40 @@ class ServiceChain {
         static ServiceChain *fromJSON(Json j, Metron *m, ErrorHandler *errh);
         int reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh);
 
-        Json toJSON();
-        Json statsToJSON();
+        Json to_json();
+        Json stats_to_json();
 
-        inline String getId() {
+        inline String get_id() {
             return id;
         }
 
-        inline int getUsedCpuNr() {
+        inline int get_used_cpu_nr() {
             return _used_cpu_nr;
         }
 
-        inline int getMaxCpuNr() {
+        inline int get_max_cpu_nr() {
             return _max_cpu_nr;
         }
 
 
-        inline int getCpuMap(int i) {
+        inline int get_cpu_map(int i) {
             return _cpus[i];
         }
 
-        inline int getNICNr() {
+        inline int get_nic_nr() {
             return _nics.size();
         }
 
-        inline NIC *getNICById(String id) {
+        inline NIC *get_nic_by_id(String id) {
             for (NIC *nic : _nics) {
-                if (nic->getId() == id)
+                if (nic->get_id() == id)
                     return nic;
             }
 
             return 0;
         }
 
-        inline int getNICIndex(NIC *nic) {
+        inline int get_nic_index(NIC *nic) {
             for (int i = 0; i < _nics.size(); i++) {
                 if (_nics[i] == nic)
                     return i;
@@ -165,58 +165,58 @@ class ServiceChain {
             return -1;
         }
 
-        inline NIC *getNICByIndex(int i) {
+        inline NIC *get_nic_by_index(int i) {
             return _nics[i];
         }
 
-        Bitvector assignedCpus();
+        Bitvector assigned_cpus();
 
-        String generateConfig();
-        String generateConfigSlaveFDName(int nic_index, int cpu_index) {
+        String generate_config();
+        String generate_config_slave_fd_name(int nic_index, int cpu_index) {
             return "slaveFD" + String(nic_index) + "C" + String(cpu_index);
         }
 
-        Vector<String> buildCmdLine(int socketfd);
+        Vector<String> build_cmd_line(int socketfd);
 
-        void controlInit(int fd, int pid);
+        void control_init(int fd, int pid);
 
-        int controlReadLine(String &line);
+        int control_read_line(String &line);
 
-        void controlWriteLine(String cmd);
+        void control_write_line(String cmd);
 
-        String controlSendCommand(String cmd);
+        String control_send_command(String cmd);
 
-        void checkAlive();
+        void check_alive();
 
         int call(
-            String fnt, bool hasResponse, String handler,
+            String fnt, bool has_response, String handler,
             String &response, String params
         );
-        String simpleCallRead(String handler);
-        int callRead(String handler, String &response, String params = "");
-        int callWrite(String handler, String &response, String params = "");
+        String simple_call_read(String handler);
+        int call_read(String handler, String &response, String params = "");
+        int call_write(String handler, String &response, String params = "");
 
-        Vector<int> &getCpuMapRef() {
+        Vector<int> &get_cpu_map_ref() {
             return _cpus;
         }
 
         struct timing_stats {
             Timestamp start, parse, launch;
-            Json toJSON();
+            Json to_json();
         };
-        void setTimingStats(struct timing_stats ts) {
+        void set_timing_stats(struct timing_stats ts) {
             _timing_stats = ts;
         }
 
         struct autoscale_timing_stats {
             Timestamp autoscale_start, autoscale_end;
-            Json toJSON();
+            Json to_json();
         };
-        void setAutoscaleTimingStats(struct autoscale_timing_stats ts) {
+        void set_autoscale_timing_stats(struct autoscale_timing_stats ts) {
             _as_timing_stats = ts;
         }
 
-        void doAutoscale(int nCpuChange);
+        void do_autoscale(int nCpuChange);
 
     private:
 
@@ -269,13 +269,13 @@ class Metron : public Element {
             ErrorHandler *errh
         ) CLICK_COLD;
 
-        void setHwInfo(Json &j);
+        void set_hw_info(Json &j);
 
-        Json toJSON();
-        Json statsToJSON();
-        Json controllersToJSON();
-        int  controllersFromJson(Json j);
-        int  deleteControllersFromJson(void);
+        Json to_json();
+        Json stats_to_json();
+        Json controllers_to_json();
+        int  controllers_from_json(Json j);
+        int  delete_controllers_from_json(void);
 
         // Read and write handlers
         enum {
@@ -285,23 +285,23 @@ class Metron : public Element {
             h_chains, h_chains_stats, h_chains_proxy
         };
 
-        ServiceChain *findChainById(String id);
+        ServiceChain *find_chain_by_id(String id);
 
-        int instantiateChain(ServiceChain *sc, ErrorHandler *errh);
-        int removeChain(ServiceChain *sc, ErrorHandler *errh);
+        int instantiate_chain(ServiceChain *sc, ErrorHandler *errh);
+        int remove_chain(ServiceChain *sc, ErrorHandler *errh);
 
-        int getCpuNr() {
+        int get_cpu_nr() {
             return click_max_cpu_ids();
         }
 
-        int getNbChains() {
+        int get_chains_nb() {
             return _scs.size();
         }
 
-        int getAssignedCpuNr();
+        int get_assigned_cpu_nr();
 
-        bool assignCpus(ServiceChain *sc, Vector<int> &map);
-        void unassignCpus(ServiceChain *sc);
+        bool assign_cpus(ServiceChain *sc, Vector<int> &map);
+        void unassign_cpus(ServiceChain *sc);
 
         const float CPU_OVERLOAD_LIMIT = (float) 0.7;
         const float CPU_UNERLOAD_LIMIT = (float) 0.4;
