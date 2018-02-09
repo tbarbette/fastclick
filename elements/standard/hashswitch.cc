@@ -3,7 +3,10 @@
  * specified packet fields
  * Eddie Kohler
  *
+ * Computational batching support by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2018 Georgios Katsikas, RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -39,24 +42,39 @@ HashSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void
-HashSwitch::push(int, Packet *p)
+int
+HashSwitch::process(Packet *p)
 {
   const unsigned char *data = p->data();
   int o = _offset, l = _length;
   if ((int)p->length() < o + l)
-    output(0).push(p);
+    return 0;
   else {
     int d = 0;
     for (int i = o; i < o + l; i++)
       d += data[i];
     int n = noutputs();
     if (n == 2 || n == 4 || n == 8)
-      output((d ^ (d>>4)) & (n-1)).push(p);
+      return (d ^ (d>>4)) & (n-1);
     else
-      output(d % n).push(p);
+      return (d % n);
   }
 }
+
+void
+HashSwitch::push(int port, Packet *p)
+{
+  output(process(p)).push(p);
+}
+
+#if HAVE_BATCH
+void
+HashSwitch::push_batch(int port, PacketBatch *batch)
+{
+  auto fnt = [this, port](Packet *p) { return process(p); };
+  CLASSIFY_EACH_PACKET(noutputs() + 1, fnt, batch, checked_output_push_batch);
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(HashSwitch)

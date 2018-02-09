@@ -1,6 +1,6 @@
 #ifndef CLICK_HASHSWITCH_HH
 #define CLICK_HASHSWITCH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -22,7 +22,7 @@ CLICK_DECLS
  * Switch, RoundRobinSwitch, StrideSwitch, RandomSwitch
  */
 
-class HashSwitch : public Element {
+class HashSwitch : public BatchElement {
 
   int _offset;
   int _length;
@@ -37,7 +37,11 @@ class HashSwitch : public Element {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+  int process(Packet *);
   void push(int port, Packet *);
+ #if HAVE_BATCH
+  void push_batch(int port, PacketBatch *);
+#endif
 
 };
 
