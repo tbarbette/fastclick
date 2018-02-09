@@ -583,7 +583,7 @@ int Metron::write_handler(
         case h_delete_chains: {
             ServiceChain *sc = m->find_chain_by_id(data);
             if (sc == 0) {
-                return errh->error("Unknown ID %s", data.c_str());
+                return errh->error("Unknown service chain ID %s", data.c_str());
             }
 
             int ret = m->remove_chain(sc, errh);
@@ -598,7 +598,7 @@ int Metron::write_handler(
             String changes = data.substring(id.length() + 1);
             ServiceChain *sc = m->find_chain_by_id(id);
             if (sc == 0) {
-                return errh->error("Unknown ID %s", id.c_str());
+                return errh->error("Unknown service chain ID %s", id.c_str());
             }
             return sc->reconfigureFromJSON(Json::parse(changes), m, errh);
         }
@@ -634,7 +634,7 @@ Metron::param_handler(
                 } else {
                     ServiceChain *sc = m->find_chain_by_id(param);
                     if (!sc) {
-                        return errh->error("Unknown ID: %s", param.c_str());
+                        return errh->error("Unknown service chain ID: %s", param.c_str());
                     }
                     jroot = sc->to_json();
                 }
@@ -652,7 +652,7 @@ Metron::param_handler(
                 } else {
                     ServiceChain *sc = m->find_chain_by_id(param);
                     if (!sc) {
-                        return errh->error("Unknown ID: %s", param.c_str());
+                        return errh->error("Unknown service chain ID: %s", param.c_str());
                     }
                     jroot = sc->stats_to_json();
                 }
@@ -661,13 +661,13 @@ Metron::param_handler(
             case h_chains_proxy: {
                 int pos = param.find_left("/");
                 if (pos <= 0) {
-                    param = "You must give an ID, then a command";
+                    param = "You must give a service chain ID, then a command";
                     return 0;
                 }
                 String ids = param.substring(0, pos);
                 ServiceChain *sc = m->find_chain_by_id(ids);
                 if (!sc) {
-                    return errh->error("Unknown ID: %s", ids.c_str());
+                    return errh->error("Unknown service chain ID: %s", ids.c_str());
                 }
                 param = sc->simple_call_read(param.substring(pos + 1));
                 return 0;
@@ -892,7 +892,7 @@ Json Metron::controllers_to_json()
     Json jctrl = Json::make_object();
     jctrl.set("ip", _discover_ip);
     jctrl.set("port", _discover_port);
-    jctrl.set("type", "default");
+    jctrl.set("type", "tcp");
     jctrls_list.push_back(jctrl);
 
     jroot.set("controllers", jctrls_list);
@@ -1045,7 +1045,7 @@ ServiceChain *ServiceChain::fromJSON(
     sc->_max_cpu_nr = j.get_i("maxCpus");
     if (sc->_used_cpu_nr > sc->_max_cpu_nr) {
         errh->error(
-            "Max CPU number must be greater than the used CPU number"
+            "Max number of CPUs must be greater than the number of used CPUs"
         );
         return 0;
     }
@@ -1217,7 +1217,7 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
                 if (newCpusNr > get_max_cpu_nr()) {
                     return errh->error(
                         "Number of used CPUs must be less or equal "
-                        "than the max number of CPUs!"
+                        "than the maximum number of CPUs!"
                     );
                 }
                 for (int inic = 0; inic < get_nic_nr(); inic++) {
@@ -1233,7 +1233,7 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
                                 ret, response.c_str()
                             );
                         }
-                        click_chatter("Response %d %s", ret, response.c_str());
+                        click_chatter("Response %d: %s", ret, response.c_str());
                     }
                 }
             } else {
@@ -1251,7 +1251,7 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
                         );
                         if (ret < 200 || ret >= 300) {
                             return errh->error(
-                                "Response to activate input was %d : %s",
+                                "Response to activate input was %d: %s",
                                 ret, response.c_str()
                             );
                         }
@@ -1259,7 +1259,7 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
                 }
             }
 
-            click_chatter("Used CPU number is now: %d", newCpusNr);
+            click_chatter("Number of used CPUs is now: %d", newCpusNr);
             _used_cpu_nr = newCpusNr;
             return 0;
         } else {
@@ -1564,15 +1564,15 @@ Json NIC::to_json(bool stats)
         // TODO: Support VLAN and MPLS
         Json jtagging = Json::make_array();
         jtagging.push_back("mac");
-        nic.set("rx_filter", jtagging);
+        nic.set("rxFilter", jtagging);
     } else {
         nic.set("rxCount", call_read("hw_count"));
         nic.set("rxBytes", call_read("hw_bytes"));
         nic.set("rxDropped", call_read("hw_dropped"));
         nic.set("rxErrors", call_read("hw_errors"));
-        nic.set("txCount", callTxRead("hw_count"));
-        nic.set("txBytes", callTxRead("hw_bytes"));
-        nic.set("txErrors", callTxRead("hw_errors"));
+        nic.set("txCount", call_tx_read("hw_count"));
+        nic.set("txBytes", call_tx_read("hw_bytes"));
+        nic.set("txErrors", call_tx_read("hw_errors"));
     }
 
     return nic;
@@ -1589,7 +1589,7 @@ String NIC::call_read(String h)
     return "undefined";
 }
 
-String NIC::callTxRead(String h)
+String NIC::call_tx_read(String h)
 {
     // TODO: Ensure element type
     ToDPDKDevice *td = dynamic_cast<FromDPDKDevice *>(element)->findOutputElement();

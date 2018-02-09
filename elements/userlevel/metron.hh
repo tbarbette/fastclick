@@ -59,7 +59,7 @@ class NIC {
         }
 
         String call_read(String h);
-        String callTxRead(String h);
+        String call_tx_read(String h);
 };
 
 class ServiceChain {
