@@ -64,7 +64,6 @@ class NIC {
 
 class ServiceChain {
     public:
-
         class RxFilter {
             public:
 
@@ -219,7 +218,6 @@ class ServiceChain {
         void do_autoscale(int nCpuChange);
 
     private:
-
         Metron *_metron;
         Vector<int> _cpus;
         Vector<NIC *> _nics;
@@ -244,7 +242,6 @@ Metron */
 
 class Metron : public Element {
     public:
-
         Metron() CLICK_COLD;
         ~Metron() CLICK_COLD;
 

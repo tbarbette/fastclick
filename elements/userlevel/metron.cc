@@ -109,10 +109,10 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-static String parseVendorInfo(String hwInfo, String key)
+static String parseVendorInfo(String hw_info, String key)
 {
     String s;
-    s = hwInfo.substring(hwInfo.find_left(key) + key.length());
+    s = hw_info.substring(hw_info.find_left(key) + key.length());
     int pos = s.find_left(':') + 2;
     s = s.substring(pos, s.find_left("\n") - pos);
 
@@ -123,13 +123,13 @@ int Metron::initialize(ErrorHandler *errh)
 {
     _cpu_map.resize(get_cpus_nb(), 0);
 
-    String hwInfo = file_string("/proc/cpuinfo");
-    _cpu_vendor = parseVendorInfo(hwInfo, "vendor_id");
-    _hw = parseVendorInfo(hwInfo, "model name");
+    String hw_info = file_string("/proc/cpuinfo");
+    _cpu_vendor = parseVendorInfo(hw_info, "vendor_id");
+    _hw = parseVendorInfo(hw_info, "model name");
     _sw = CLICK_VERSION;
 
-    String swInfo = shell_command_output_string("dmidecode -t 1", "", errh);
-    _serial = parseVendorInfo(swInfo, "Serial Number");
+    String sw_info = shell_command_output_string("dmidecode -t 1", "", errh);
+    _serial = parseVendorInfo(sw_info, "Serial Number");
 
     _timer.initialize(this);
     _timer.schedule_after_sec(1);
@@ -373,7 +373,6 @@ void Metron::unassign_cpus(ServiceChain *sc)
     }
 }
 
-
 int ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
 {
     //Only MAC address is currently supported. Only thing to do is to get addr
@@ -435,10 +434,11 @@ int Metron::runChain(ServiceChain *sc, ErrorHandler *errh)
             return errh->error("Could not apply RX filter");
         }
     }
-    int configpipe[2], ctlsocket[2];
-    if (pipe(configpipe) == -1)
+
+    int config_pipe[2], ctl_socket[2];
+    if (pipe(config_pipe) == -1)
         return errh->error("Could not create pipe");
-    if (socketpair(PF_UNIX, SOCK_STREAM, 0, ctlsocket) == -1)
+    if (socketpair(PF_UNIX, SOCK_STREAM, 0, ctl_socket) == -1)
         return errh->error("Could not create socket");
 
     // Launch slave
@@ -452,12 +452,12 @@ int Metron::runChain(ServiceChain *sc, ErrorHandler *errh)
         int ret;
 
         close(0);
-        dup2(configpipe[0], 0);
-        close(configpipe[0]);
-        close(configpipe[1]);
-        close(ctlsocket[0]);
+        dup2(config_pipe[0], 0);
+        close(config_pipe[0]);
+        close(config_pipe[1]);
+        close(ctl_socket[0]);
 
-        Vector<String> argv = sc->build_cmd_line(ctlsocket[1]);
+        Vector<String> argv = sc->build_cmd_line(ctl_socket[1]);
 
         char *argv_char[argv.size() + 1];
         for (int i = 0; i < argv.size(); i++) {
@@ -470,10 +470,10 @@ int Metron::runChain(ServiceChain *sc, ErrorHandler *errh)
         exit(1);
     } else {
         click_chatter("Child %d launched successfully", pid);
-        close(configpipe[0]);
-        close(ctlsocket[1]);
+        close(config_pipe[0]);
+        close(ctl_socket[1]);
         int flags = 1;
-        /*int fd = ctlsocket[0];
+        /*int fd = ctl_socket[0];
         if (ioctl(fd, FIONBIO, &flags) != 0) {
             flags = fcntl(fd, F_GETFL);
             if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
@@ -486,7 +486,7 @@ int Metron::runChain(ServiceChain *sc, ErrorHandler *errh)
         int pos = 0;
         while (pos != conf.length()) {
             ssize_t r = write(
-                configpipe[1], conf.begin() + pos, conf.length() - pos
+                config_pipe[1], conf.begin() + pos, conf.length() - pos
             );
             if (r == 0 || (r == -1 && errno != EAGAIN && errno != EINTR)) {
                 if (r == -1) {
@@ -501,12 +501,12 @@ int Metron::runChain(ServiceChain *sc, ErrorHandler *errh)
         }
 
         if (pos != conf.length()) {
-            close(configpipe[1]);
-            close(ctlsocket[0]);
+            close(config_pipe[1]);
+            close(ctl_socket[0]);
             return -1;
         } else {
-            close(configpipe[1]);
-            sc->control_init(ctlsocket[0], pid);
+            close(config_pipe[1]);
+            sc->control_init(ctl_socket[0], pid);
         }
         String s;
         int v = sc->control_read_line(s);
@@ -610,9 +610,7 @@ int Metron::write_handler(
     return -1;
 }
 
-
-int
-Metron::param_handler(
+int Metron::param_handler(
         int operation, String &param, Element *e,
         const Handler *h, ErrorHandler *errh)
 {
@@ -816,27 +814,27 @@ Json Metron::stats_to_json()
      * Mark them so that we can find the idle ones next.
      */
     int assigned_cpus = 0;
-    Vector<int> busyCpus;
+    Vector<int> busy_cpus;
     auto sci = _scs.begin();
     while (sci != _scs.end()) {
         ServiceChain *sc = sci.value();
 
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
-            int cpuId = sc->get_cpu_map(j);
+            int cpu_id = sc->get_cpu_map(j);
             float cpuload = sc->_cpuload[j];
 
             /* Replace the initialized values above
              * with the real monitoring data.
              */
             Json jcpu = Json::make_object();
-            jcpu.set("id",   cpuId);
+            jcpu.set("id",   cpu_id);
             jcpu.set("load", cpuload);
             jcpu.set("busy", true);      // This CPU core is busy
 
             jcpus.push_back(jcpu);
 
             assigned_cpus++;
-            busyCpus.push_back(cpuId);
+            busy_cpus.push_back(cpu_id);
         }
 
         sci++;
@@ -844,9 +842,9 @@ Json Metron::stats_to_json()
 
     // Now, inititialize the load of each idle core to 0
     for (int j = 0; j < get_cpus_nb(); j++) {
-        int *found = find(busyCpus.begin(), busyCpus.end(), j);
+        int *found = find(busy_cpus.begin(), busy_cpus.end(), j);
         // This is a busy one
-        if (found != busyCpus.end()) {
+        if (found != busy_cpus.end()) {
             continue;
         }
 
@@ -1208,20 +1206,20 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
 {
     for (auto jfield : j) {
         if (jfield.first == "cpus") {
-            int newCpusNr = jfield.second.to_i();
+            int new_cpus_nb = jfield.second.to_i();
             int ret;
             String response = "";
-            if (newCpusNr == get_used_cpu_nb())
+            if (new_cpus_nb == get_used_cpu_nb())
                 continue;
-            if (newCpusNr > get_used_cpu_nb()) {
-                if (newCpusNr > get_max_cpu_nb()) {
+            if (new_cpus_nb > get_used_cpu_nb()) {
+                if (new_cpus_nb > get_max_cpu_nb()) {
                     return errh->error(
                         "Number of used CPUs must be less or equal "
                         "than the maximum number of CPUs!"
                     );
                 }
                 for (int inic = 0; inic < get_nics_nb(); inic++) {
-                    for (int i = get_used_cpu_nb(); i < newCpusNr; i++) {
+                    for (int i = get_used_cpu_nb(); i < new_cpus_nb; i++) {
                         ret = call_write(
                             generate_config_slave_fd_name(
                                 inic, get_cpu_map(i)
@@ -1237,13 +1235,13 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
                     }
                 }
             } else {
-                if (newCpusNr < 0) {
+                if (new_cpus_nb < 0) {
                     return errh->error(
                         "Number of used CPUs must be greater or equal than 0!"
                     );
                 }
                 for (int inic = 0; inic < get_nics_nb(); inic++) {
-                    for (int i = newCpusNr; i < get_used_cpu_nb(); i++) {
+                    for (int i = new_cpus_nb; i < get_used_cpu_nb(); i++) {
                         int ret = call_write(
                             generate_config_slave_fd_name(
                                 inic, get_cpu_map(i)
@@ -1259,8 +1257,8 @@ int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
                 }
             }
 
-            click_chatter("Number of used CPUs is now: %d", newCpusNr);
-            _used_cpus_nb = newCpusNr;
+            click_chatter("Number of used CPUs is now: %d", new_cpus_nb);
+            _used_cpus_nb = new_cpus_nb;
             return 0;
         } else {
             return errh->error(
@@ -1406,7 +1404,6 @@ Vector<String> ServiceChain::build_cmd_line(int socketfd)
     }
     return argv;
 }
-
 
 Bitvector ServiceChain::assigned_cpus()
 {
