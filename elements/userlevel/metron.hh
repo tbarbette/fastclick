@@ -322,8 +322,8 @@ class Metron : public Element {
         Vector<String> _args;
         Vector<String> _dpdk_args;
 
-        HashMap<String,NIC> _nics;
-        HashMap<String,ServiceChain *> _scs;
+        HashMap<String, NIC> _nics;
+        HashMap<String, ServiceChain *> _scs;
 
         Vector<ServiceChain *> _cpu_map;
 
