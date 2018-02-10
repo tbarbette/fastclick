@@ -154,7 +154,7 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
         }
         g->_map = new_map;
         if (n == 32) {
-            return "Impossible to lower the number of rules and keep the choosen fields";
+            return "Impossible to reduce the number of rules below: " + String(g->_map.size());
         }
     }
 

@@ -27,7 +27,7 @@ Keyword arguments are:
 
 =item NB_RULES
 
-Integer. Number of rules to be generated.
+Integer. Upper limit of rules to be generated.
 Default is 8000.
 
 =item KEEP_SPORT
