@@ -32,6 +32,7 @@ HashSwitch::HashSwitch() : _offset(-1)
 int
 HashSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    _max = noutputs();
     if (Args(conf, this, errh)
         .read_mp("OFFSET", _offset)
         .read_mp("LENGTH", _length)
@@ -41,8 +42,6 @@ HashSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (_length == 0)
         return errh->error("length must be > 0");
-
-    _max = noutputs();
 
     return 0;
 }
@@ -77,7 +76,7 @@ void
 HashSwitch::push_batch(int port, PacketBatch *batch)
 {
     auto fnt = [this, port](Packet *p) { return process(p); };
-    CLASSIFY_EACH_PACKET(noutputs() + 1, fnt, batch, checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(_max + 1, fnt, batch, checked_output_push_batch);
 }
 #endif
 
