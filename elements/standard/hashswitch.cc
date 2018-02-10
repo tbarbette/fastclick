@@ -34,11 +34,16 @@ HashSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
         .read_mp("OFFSET", _offset)
-        .read_mp("LENGTH", _length).complete() < 0)
+        .read_mp("LENGTH", _length)
+        .read("MAX", _max)
+        .complete() < 0)
     return -1;
 
     if (_length == 0)
         return errh->error("length must be > 0");
+
+    _max = noutputs();
+
     return 0;
 }
 
@@ -53,7 +58,7 @@ HashSwitch::process(Packet *p)
         int d = 0;
         for (int i = o; i < o + l; i++)
             d += data[i];
-        int n = noutputs();
+        int n = _max;
         if (n == 2 || n == 4 || n == 8)
             return (d ^ (d>>4)) & (n-1);
         else
