@@ -32,13 +32,17 @@ HashSwitch::HashSwitch() : _offset(-1)
 int
 HashSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    _max = noutputs();
     if (Args(conf, this, errh)
         .read_mp("OFFSET", _offset)
-        .read_mp("LENGTH", _length).complete() < 0)
+        .read_mp("LENGTH", _length)
+        .read("MAX", _max)
+        .complete() < 0)
     return -1;
 
     if (_length == 0)
         return errh->error("length must be > 0");
+
     return 0;
 }
 
@@ -53,7 +57,7 @@ HashSwitch::process(Packet *p)
         int d = 0;
         for (int i = o; i < o + l; i++)
             d += data[i];
-        int n = noutputs();
+        int n = _max;
         if (n == 2 || n == 4 || n == 8)
             return (d ^ (d>>4)) & (n-1);
         else
@@ -72,7 +76,7 @@ void
 HashSwitch::push_batch(int port, PacketBatch *batch)
 {
     auto fnt = [this, port](Packet *p) { return process(p); };
-    CLASSIFY_EACH_PACKET(noutputs() + 1, fnt, batch, checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(_max + 1, fnt, batch, checked_output_push_batch);
 }
 #endif
 

@@ -26,6 +26,7 @@ class HashSwitch : public BatchElement {
 
     int _offset;
     int _length;
+    int _max;
 
  public:
 
