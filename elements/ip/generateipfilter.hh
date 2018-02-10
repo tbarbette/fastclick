@@ -80,11 +80,16 @@ class GenerateIPPacket : public BatchElement {
 
                 void initialize(const IPFlowID &flowid) {
                     _flowid = flowid;
+                    _flow_proto = 0;
                     _flow_size_bytes = 0;
                 }
 
                 const IPFlowID &flowid() const {
                     return _flowid;
+                }
+
+                uint8_t flow_proto() {
+                    return _flow_proto;
                 }
 
                 uint32_t flow_size() {
@@ -93,6 +98,14 @@ class GenerateIPPacket : public BatchElement {
 
                 void set_mask(IPFlowID mask) {
                     _flowid = _flowid & mask;
+                }
+
+                void set_proto(const uint8_t proto) {
+                    _flow_proto += proto;
+                }
+
+                void set_flow_size(const uint32_t flow_size) {
+                    _flow_size_bytes = flow_size;
                 }
 
                 void update_flow_size(const uint32_t extra_size) {
@@ -106,6 +119,7 @@ class GenerateIPPacket : public BatchElement {
             private:
 
                 IPFlowID _flowid;
+                uint8_t  _flow_proto;
                 uint32_t _flow_size_bytes;
         };
 

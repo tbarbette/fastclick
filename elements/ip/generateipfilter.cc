@@ -114,6 +114,13 @@ GenerateIPFilter::simple_action(Packet *p)
     if (!found) {
         // Its length is the length of this packet
         new_flow.update_flow_size(p->length());
+
+        // Keep the protocol type
+        if (_keep_sport || _keep_dport) {
+            new_flow.set_proto(p->ip_header()->ip_p);
+        }
+
+        // Insert this new flow into the flow map
         _map.find_insert(new_flow);
     } else {
         // Aggregate
