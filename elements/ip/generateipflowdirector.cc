@@ -265,7 +265,8 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
         double load_distance_from_ideal = std::abs((double) g->_queue_load_map[i] - (double) balance_point_per_queue);
         // Normalize this distance
         double load_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
-        assert((load_imbalance_ratio >= 0) && (load_imbalance_ratio <= 1));
+        // Imbalance ratio can be > 1, if load balancing is skewed
+        assert(load_imbalance_ratio >= 0);
 
         // Update the total imbalance ratio
         total_load_imbalance_ratio += load_imbalance_ratio;
@@ -280,8 +281,8 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
     }
     // Average imbalance ratio
     total_load_imbalance_ratio /= g->_nb_queues;
-    // Has to be a proper ratio
-    assert((total_load_imbalance_ratio >= 0) && (total_load_imbalance_ratio <= 1));
+    // Total imbalance ratio can be > 1, if load balancing is skewed
+    assert(total_load_imbalance_ratio >= 0);
 
     acc << "Total load imbalance ratio: ";
     acc.snprintf(8, "%.4f", total_load_imbalance_ratio * 100);
