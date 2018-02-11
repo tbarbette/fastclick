@@ -234,7 +234,7 @@ GenerateIPFlowDirector::policy_based_rule_generation(
     acc << "Time to create the flow map: ";
     acc.snprintf(9, "%d", elapsed_sec);
     acc << " seconds (";
-    acc.snprintf(4, "%.2f", (float) elapsed_sec / (float) 60);
+    acc.snprintf(5, "%.2f", (float) elapsed_sec / (float) 60);
     acc << " minutes)\n";
 
     return acc.take_string();
@@ -259,7 +259,6 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
     acc.snprintf(15, "%.0f", balance_point_per_queue);
     acc << " bytes \n";
 
-    uint16_t counted_queues = 0;
     double total_imbalance_ratio = 0;
 
     for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
@@ -269,7 +268,7 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
         double queue_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
         assert((queue_imbalance_ratio >= 0) && (queue_imbalance_ratio <= 1));
 
-        counted_queues++;
+        // Update the total imbalance ratio
         total_imbalance_ratio += queue_imbalance_ratio;
 
         acc << "NIC queue ";
@@ -280,9 +279,8 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
         acc.snprintf(9, "%8.4f", queue_imbalance_ratio * 100);
         acc << "%)\n";
     }
-    assert(counted_queues > 0);
     // Average imbalance ratio
-    total_imbalance_ratio /= counted_queues;
+    total_imbalance_ratio /= g->_nb_queues;
     // Has to be a proper ratio
     assert((total_imbalance_ratio >= 0) && (total_imbalance_ratio <= 1));
 
