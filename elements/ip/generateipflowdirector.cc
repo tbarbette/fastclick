@@ -221,8 +221,8 @@ GenerateIPFlowDirector::policy_based_rule_generation(
         acc << " / end\n";
 
         // Update the queue load map
-        uint32_t current_load = g->_queue_load_map[chosen_queue];
-        uint32_t additional_load = flow.flow_size();
+        uint64_t current_load = g->_queue_load_map[chosen_queue];
+        uint64_t additional_load = flow.flow_size();
         g->_queue_load_map.insert(chosen_queue, current_load + additional_load);
 
         i++;
@@ -254,25 +254,23 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
         total_load += g->_queue_load_map[i];
     }
 
-    float balance_point_per_queue = (float) total_load / (float) g->_nb_queues;
+    double balance_point_per_queue = (double) total_load / (double) g->_nb_queues;
     acc << "Ideal load per queue: ";
     acc.snprintf(15, "%.0f", balance_point_per_queue);
     acc << " bytes \n";
 
-    uint8_t counted_queues = 0;
-    float total_imbalance_ratio = 0;
+    uint16_t counted_queues = 0;
+    double total_imbalance_ratio = 0;
 
     for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
         // This is the distance from the ideal load (assuming optimal load balancing)
-        float load_distance_from_ideal = abs((float) g->_queue_load_map[i] - (float) balance_point_per_queue);
+        double load_distance_from_ideal = std::abs((double) g->_queue_load_map[i] - (double) balance_point_per_queue);
         // Normalize this distance
-        float queue_imbalance_ratio = (float) load_distance_from_ideal / (float) balance_point_per_queue;
-        // assert((queue_imbalance_ratio >= 0) && (queue_imbalance_ratio <= 1));
-        // TODO: Fix as one of the queues gets a negative ratio
-        if (queue_imbalance_ratio >= 0) {
-            counted_queues++;
-            total_imbalance_ratio += queue_imbalance_ratio;
-        }
+        double queue_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
+        assert((queue_imbalance_ratio >= 0) && (queue_imbalance_ratio <= 1));
+
+        counted_queues++;
+        total_imbalance_ratio += queue_imbalance_ratio;
 
         acc << "NIC queue ";
         acc.snprintf(2, "%2d", i);
