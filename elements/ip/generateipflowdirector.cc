@@ -25,7 +25,6 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/straccum.hh>
-#include <click/hashmap.hh>
 
 #include "generateipflowdirector.hh"
 
@@ -259,33 +258,33 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
     acc.snprintf(15, "%.0f", balance_point_per_queue);
     acc << " bytes \n";
 
-    double total_imbalance_ratio = 0;
+    double total_load_imbalance_ratio = 0;
 
     for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
         // This is the distance from the ideal load (assuming optimal load balancing)
         double load_distance_from_ideal = std::abs((double) g->_queue_load_map[i] - (double) balance_point_per_queue);
         // Normalize this distance
-        double queue_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
-        assert((queue_imbalance_ratio >= 0) && (queue_imbalance_ratio <= 1));
+        double load_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
+        assert((load_imbalance_ratio >= 0) && (load_imbalance_ratio <= 1));
 
         // Update the total imbalance ratio
-        total_imbalance_ratio += queue_imbalance_ratio;
+        total_load_imbalance_ratio += load_imbalance_ratio;
 
         acc << "NIC queue ";
         acc.snprintf(2, "%2d", i);
         acc << " distance from ideal load: ";
         acc.snprintf(15, "%15.0f", load_distance_from_ideal);
         acc << " bytes (load imbalance ratio ";
-        acc.snprintf(9, "%8.4f", queue_imbalance_ratio * 100);
+        acc.snprintf(9, "%8.4f", load_imbalance_ratio * 100);
         acc << "%)\n";
     }
     // Average imbalance ratio
-    total_imbalance_ratio /= g->_nb_queues;
+    total_load_imbalance_ratio /= g->_nb_queues;
     // Has to be a proper ratio
-    assert((total_imbalance_ratio >= 0) && (total_imbalance_ratio <= 1));
+    assert((total_load_imbalance_ratio >= 0) && (total_load_imbalance_ratio <= 1));
 
     acc << "Total load imbalance ratio: ";
-    acc.snprintf(8, "%.4f", total_imbalance_ratio * 100);
+    acc.snprintf(8, "%.4f", total_load_imbalance_ratio * 100);
     acc << "%\n";
 
     return acc.take_string();

@@ -1,6 +1,7 @@
 #ifndef CLICK_GENERATEIPFLOWDIRECTOR_HH
 #define CLICK_GENERATEIPFLOWDIRECTOR_HH
 
+#include <click/hashmap.hh>
 #include <click/timestamp.hh>
 
 #include "generateipfilter.hh"
