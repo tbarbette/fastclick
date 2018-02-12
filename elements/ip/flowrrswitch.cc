@@ -58,7 +58,7 @@ FlowRRSwitch::cleanup(CleanupStage)
 void
 FlowRRSwitch::round_robin()
 {
-    _current_port = (_current_port % _max);
+    _current_port = ((++_current_port) % _max);
 }
 
 int
