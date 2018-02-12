@@ -231,7 +231,7 @@ GenerateIPFlowDirector::policy_based_rule_generation(
 
     acc << "\n";
     acc << "Time to create the flow map: ";
-    acc.snprintf(9, "%d", elapsed_sec);
+    acc.snprintf(9, "%" PRIu32, elapsed_sec);
     acc << " seconds (";
     acc.snprintf(5, "%.2f", (float) elapsed_sec / (float) 60);
     acc << " minutes)\n";
@@ -371,7 +371,8 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
             // Watch out, a lot prints!!
             if (VERBOSE) {
                 click_chatter(
-                    "New flow %5ld: %15s --> %15s matches %3ld flows. Previous size %12ld -- New size %12ld",
+                    "New flow %5" PRIu64 ": %15s --> %15s matches %3" PRIu64 " flows. "
+                    "Previous size %12" PRIu32 " -- New size %12" PRIu32,
                     i,
                     flow.flowid().saddr().s().c_str(),
                     flow.flowid().daddr().s().c_str(),
