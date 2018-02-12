@@ -32,8 +32,11 @@ static const uint8_t DEF_OUT_PORT = 1;
 /**
  * IPRouteTable rules' generator out of incoming traffic.
  */
-GenerateIPLookup::GenerateIPLookup() : _out_port(DEF_OUT_PORT), GenerateIPPacket()
+GenerateIPLookup::GenerateIPLookup() :
+        _out_port(DEF_OUT_PORT), GenerateIPFilter()
 {
+    _keep_sport = false;
+    _keep_dport = false;
 }
 
 GenerateIPLookup::~GenerateIPLookup()
@@ -68,20 +71,14 @@ GenerateIPLookup::cleanup(CleanupStage)
 Packet *
 GenerateIPLookup::simple_action(Packet *p)
 {
-    IPFlowID flowid(p);
-    IPFlow flow = IPFlow();
-    flow.initialize(flowid & _mask);
-    _map.find_insert(flow);
-
-    return p;
+    return GenerateIPFilter::simple_action(p);
 }
 
 #if HAVE_BATCH
 PacketBatch*
 GenerateIPLookup::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
-    return batch;
+    return GenerateIPFilter::simple_action_batch(batch);
 }
 #endif
 
@@ -106,7 +103,7 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
 
         g->_map = new_map;
         if (n == 32) {
-            return "Impossible to lower the rules and keep the chosen fields";
+            return "Impossible to reduce the number of rules below: " + String(g->_map.size());
         }
     }
 

@@ -40,12 +40,12 @@ Default is 1.
 /**
  * Abstract, base class that offers IPFlow representation & storage.
  */
-class GenerateIPPacket;
+class GenerateIPFilter;
 
 /**
  * Uses the base class to generate IPRouteTable patterns out of the traffic.
  */
-class GenerateIPLookup : public GenerateIPPacket {
+class GenerateIPLookup : public GenerateIPFilter {
 
     public:
 
