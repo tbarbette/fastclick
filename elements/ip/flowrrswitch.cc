@@ -85,12 +85,14 @@ FlowRRSwitch::process(int port, Packet *p)
 
         // Set the destiny of the next flow
         round_robin();
-    } else {
-        // Update this existing flow
-        found->update_size(p->length());
+
+        return new_flow.output_port();
     }
 
-    return new_flow.output_port();
+    // Update this existing flow
+    found->update_size(p->length());
+
+    return found->output_port();
 }
 
 void
