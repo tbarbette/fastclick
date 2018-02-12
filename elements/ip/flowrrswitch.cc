@@ -39,7 +39,14 @@ int
 FlowRRSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     _max = noutputs();
+    if (Args(conf, this, errh)
+        .read("MAX", _max)
+        .complete() < 0)
+    return -1;
+
     _mask = IPFlowID(0xffffffff, 0xffff, 0xffffffff, 0xffff);
+
+    return 0;
 }
 
 void
