@@ -137,7 +137,7 @@ class FlowRRSwitch : public BatchElement {
          * Assign a new flow to an output
          * port in a round-robin fashion.
          */
-        uint8_t round_robin();
+        void round_robin();
 
         /**
          * Read handlers.

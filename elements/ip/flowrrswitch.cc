@@ -48,11 +48,10 @@ FlowRRSwitch::cleanup(CleanupStage)
     _map.clear();
 }
 
-uint8_t
+void
 FlowRRSwitch::round_robin()
 {
     _current_port = (_current_port % _max);
-    return _current_port;
 }
 
 int
