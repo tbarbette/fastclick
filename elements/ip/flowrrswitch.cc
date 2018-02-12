@@ -104,7 +104,7 @@ void
 FlowRRSwitch::push_batch(int port, PacketBatch *batch)
 {
     auto fnt = [this, port](Packet *p) { return process(port, p); };
-    CLASSIFY_EACH_PACKET(_max + 1, fnt, batch, checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(_max, fnt, batch, checked_output_push_batch);
 }
 #endif
 
