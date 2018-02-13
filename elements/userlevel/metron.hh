@@ -11,6 +11,23 @@
 
 #include "../json/json.hh"
 
+#define SC_CONF_TYPES \
+    sctype(UNKNOWN), \
+    sctype(CLICK),   \
+    sctype(STANDALONE)
+
+#define sctype(x) x
+
+/**
+ * The service chain types supported by Metron:
+ * |-> Click-based
+ * |-> Standalone (for integration with blackbox NFs)
+ */
+typedef enum { SC_CONF_TYPES } ScType;
+
+#undef sctype
+#define sctype(x) #x
+
 CLICK_DECLS
 
 class Metron;
@@ -78,7 +95,7 @@ class ServiceChain {
                 String method;
                 ServiceChain *_sc;
 
-                static RxFilter *fromJSON(
+                static RxFilter *from_json(
                     Json j, ServiceChain *sc, ErrorHandler *errh
                 );
                 Json to_json();
@@ -92,15 +109,20 @@ class ServiceChain {
                 Vector<Vector<String>> values;
         };
 
-        enum ScStatus {
-            SC_FAILED,
-            SC_OK = 1
-        };
-
+        /**
+         * Service chain public attributes.
+         */
         String id;
         RxFilter *rx_filter;
         String config;
 
+        // Service chain type
+        ScType config_type;
+
+        enum ScStatus {
+            SC_FAILED,
+            SC_OK = 1
+        };
         enum ScStatus status;
 
         class Stat {
@@ -116,10 +138,13 @@ class ServiceChain {
         };
         Vector<Stat> nic_stats;
 
+        /**
+         * Service chain methods.
+         */
         ServiceChain(Metron *m);
         ~ServiceChain();
 
-        static ServiceChain *fromJSON(Json j, Metron *m, ErrorHandler *errh);
+        static ServiceChain *from_json(Json j, Metron *m, ErrorHandler *errh);
         int reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh);
 
         Json to_json();

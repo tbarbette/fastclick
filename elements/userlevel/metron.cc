@@ -691,7 +691,7 @@ int Metron::param_handler(
                     }
 
                     // Parse
-                    ServiceChain *sc = ServiceChain::fromJSON(jsc.second, m, errh);
+                    ServiceChain *sc = ServiceChain::from_json(jsc.second, m, errh);
                     if (m->_timing_stats) {
                         ts.parse = Timestamp::now_steady();
                     }
@@ -966,7 +966,7 @@ int Metron::delete_controllers_from_json(void)
 /***************************************
  * RxFilter
  **************************************/
-ServiceChain::RxFilter *ServiceChain::RxFilter::fromJSON(
+ServiceChain::RxFilter *ServiceChain::RxFilter::from_json(
         Json j, ServiceChain *sc, ErrorHandler *errh)
 {
     ServiceChain::RxFilter *rf = new RxFilter(sc);
@@ -1030,7 +1030,50 @@ ServiceChain::~ServiceChain()
     }
 }
 
-ServiceChain *ServiceChain::fromJSON(
+/**
+ * Array of all supported service chain types.
+ */
+static const char *SC_TYPES_STR_ARRAY[] = { SC_CONF_TYPES };
+
+/**
+ * Returns all the supported service chain types as
+ * a space-separated string.
+ */
+const String supported_sc_types()
+{
+    String supported;
+    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
+    for (uint8_t i = 1; i < n; ++i)
+    {
+        supported += String(SC_TYPES_STR_ARRAY[i]).lower() + " ";
+    }
+
+    return supported;
+}
+
+/**
+ * Converts an enum-based service chain type into string.
+ */
+const String sc_type_enum_to_str(ScType s)
+{
+    return String(SC_TYPES_STR_ARRAY[static_cast<uint8_t>(s)]).lower();
+}
+
+/**
+ * Converts a string-based service chain type into enum.
+ */
+ScType sc_type_str_to_enum(const String sc_type)
+{
+    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
+    for (uint8_t i = 0; i < n; ++i)
+    {
+        if (strcmp(SC_TYPES_STR_ARRAY[i], sc_type.c_str()) == 0)
+            return (ScType) i;
+    }
+    return UNKNOWN;
+}
+
+ServiceChain *ServiceChain::from_json(
         Json j, Metron *m, ErrorHandler *errh)
 {
     ServiceChain *sc = new ServiceChain(m);
@@ -1038,6 +1081,16 @@ ServiceChain *ServiceChain::fromJSON(
     if (sc->id == "") {
         sc->id = String(m->get_chains_nb());
     }
+    String sc_type_str = j.get_s("configType");
+    ScType sc_type = sc_type_str_to_enum(sc_type_str.upper());
+    if (sc_type == UNKNOWN) {
+        errh->error(
+            "Unsupported configuration type for service chain: %s\n"
+            "Supported types are: %s", sc->id.c_str(), supported_sc_types().c_str()
+        );
+        return 0;
+    }
+    sc->config_type = sc_type;
     sc->config = j.get_s("config");
     sc->_used_cpus_nb = j.get_i("cpus");
     sc->_max_cpus_nb = j.get_i("maxCpus");
@@ -1064,7 +1117,7 @@ ServiceChain *ServiceChain::fromJSON(
         sc->_nics.push_back(nic);
     }
     sc->nic_stats.resize(sc->_nics.size() * sc->_max_cpus_nb,Stat());
-    sc->rx_filter = ServiceChain::RxFilter::fromJSON(
+    sc->rx_filter = ServiceChain::RxFilter::from_json(
         j.get("rxFilter"), sc, errh
     );
 
@@ -1077,6 +1130,7 @@ Json ServiceChain::to_json()
 
     jsc.set("id", get_id());
     jsc.set("rxFilter", rx_filter->to_json());
+    jsc.set("configType", sc_type_enum_to_str(config_type));
     jsc.set("config", config);
     jsc.set("expandedConfig", generate_config());
     Json jcpus = Json::make_array();
