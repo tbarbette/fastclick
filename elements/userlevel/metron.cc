@@ -328,7 +328,8 @@ void Metron::cleanup(CleanupStage)
     // Delete service chains
     auto begin = _scs.begin();
     while (begin != _scs.end()) {
-        delete begin.value();
+        // TODO: Fix
+        // delete begin.value();
     }
 }
 
