@@ -174,7 +174,7 @@ void ToDPDKDevice::add_handlers()
     add_read_handler("hw_errors",statistics_handler, h_oerrors);
 }
 
-inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {
+inline void ToDPDKDevice::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue) {
     if (_timeout >= 0 || iqueue.nr_pending) {
         if (iqueue.timeout.scheduled()) {
             //No more pending packets, remove timer
@@ -199,7 +199,7 @@ void ToDPDKDevice::run_timer(Timer *)
 
 /* Flush as much as possible packets from a given internal queue to the DPDK
  * device. */
-void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
+void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) {
     unsigned sent = 0;
     unsigned r;
     /* sub_burst is the number of packets DPDK should send in one call if
@@ -237,7 +237,7 @@ void ToDPDKDevice::flush_internal_tx_queue(TXInternalQueue &iqueue) {
 void ToDPDKDevice::push(int, Packet *p)
 {
     // Get the thread-local internal queue
-    TXInternalQueue &iqueue = _iqueues.get();
+    DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
 
     bool congestioned;
     do {
@@ -293,7 +293,7 @@ void ToDPDKDevice::push(int, Packet *p)
 void ToDPDKDevice::push_batch(int, PacketBatch *head)
 {
     // Get the thread-local internal queue
-    TXInternalQueue &iqueue = _iqueues.get();
+    DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
 
     Packet* p = head;
     Packet* next;
