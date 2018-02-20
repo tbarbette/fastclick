@@ -284,5 +284,6 @@ HardwareCounter::add_handlers()
 
 CLICK_ENDDECLS
 ELEMENT_LIBS(-lpapi)
+ELEMENT_REQUIRES(papi)
 EXPORT_ELEMENT(HardwareCounter)
 ELEMENT_MT_SAFE(HardwareCounter)
