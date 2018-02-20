@@ -14,6 +14,7 @@
 #define SC_CONF_TYPES \
     sctype(UNKNOWN), \
     sctype(CLICK),   \
+    sctype(MIXED),   \
     sctype(STANDALONE)
 
 #define sctype(x) x
