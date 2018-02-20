@@ -90,7 +90,7 @@ AverageCounter::simple_action(Packet *p)
 uint64_t get_count(AverageCounter* c, int user_data) {
   switch(user_data) {
     case 3:
-      return (c->byte_count() * 8) + (c->count() * 12);
+      return (c->byte_count() * 8) + (c->count() * 24);
     case 2:
       return c->byte_count() * 8;
     case 1:
