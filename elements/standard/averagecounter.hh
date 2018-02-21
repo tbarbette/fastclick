@@ -65,6 +65,8 @@ class AverageCounter : public BatchElement { public:
 #endif
     Packet *simple_action(Packet *);
 
+
+    bool _link_fcs;
   private:
 
     volatile uint64_t _count;
