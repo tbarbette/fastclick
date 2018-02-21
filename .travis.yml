@@ -92,4 +92,4 @@ addons:
         - libstdc++-4.8-dev
         - g++-4.8
 sudo: false
-dist: precise
+dist: trusty
