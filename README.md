@@ -70,7 +70,7 @@ georgios.katsikas at ri.se if you encounter any problems with Metron.
 Please do not report Metron-related or FastClick-related problems on the vanilla Click mailing list.
 If you are sure that your problem is Click related, post it on vanilla Click's [issue tracker][click-issue-tracker].
 
-The FastClick reamde is available [here][fastclick-readme], while the original Click reamde is available [here][click-readme].
+The FastClick README is available [here][fastclick-readme], while the original Click README is available [here][click-readme].
 
 [metron-paper]: https://people.kth.se/~dejanko/documents/publications/metron-nsdi18.pdf
 [metron-nsdi-page]: https://www.usenix.org/conference/nsdi18/presentation/katsikas
