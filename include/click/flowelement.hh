@@ -464,6 +464,8 @@ virtual FlowType getContext() override {\
 #define FLOW_ELEMENT_DEFINE_SESSION(rule,context)
 #define FLOW_ELEMENT_DEFINE_PORT_CONTEXT(port,rule,context)
 #define FLOW_ELEMENT_DEFINE_SESSION_DUAL(ruleA,ruleB,context)
+#define FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(rule,context)
+#define FLOW_ELEMENT_DEFINE_PORT_SESSION_CONTEXT(port,rule,context)
 typedef BatchElement FlowElement;
 #endif
 CLICK_ENDDECLS
