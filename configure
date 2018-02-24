@@ -837,6 +837,7 @@ enable_ethernet
 enable_etherswitch
 enable_flow
 enable_grid
+enable_gtp
 enable_icmp
 enable_ids
 enable_ip
@@ -1519,7 +1520,7 @@ Optional Features:
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
-    --enable-dpdk         use Intel DPDK
+    --enable-dpdk         use DPDK
     --enable-dpdk-pool    use DPDK buffer instead of standard click malloc'ed
                           buffer
     --enable-dpdk-packet  Click packets are DPDK packet
@@ -1546,6 +1547,7 @@ Optional Features:
   --enable-etherswitch    include Ethernet switch elements
   --enable-flow           include Enable flow system and elements
   --enable-grid           include Grid elements (see FAQ)
+  --enable-gtp            include GTP elements
   --disable-icmp          do not include ICMP elements
   --disable-ids           do not include IDS elements from OpenBox
   --disable-ip            do not include IP elements
@@ -6712,6 +6714,86 @@ else
     LIBS="$save_libs"
 fi
 
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing MHD_start_daemon" >&5
+$as_echo_n "checking for library containing MHD_start_daemon... " >&6; }
+if ${ac_cv_search_MHD_start_daemon+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char MHD_start_daemon ();
+int
+main ()
+{
+return MHD_start_daemon ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' microhttpd; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_search_MHD_start_daemon=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_MHD_start_daemon+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_MHD_start_daemon+:} false; then :
+
+else
+  ac_cv_search_MHD_start_daemon=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_MHD_start_daemon" >&5
+$as_echo "$ac_cv_search_MHD_start_daemon" >&6; }
+ac_res=$ac_cv_search_MHD_start_daemon
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  ac_have_libmicrohttpd=yes
+else
+  ac_have_libmicrohttpd=no
+fi
+
+for ac_header in microhttpd.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "microhttpd.h" "ac_cv_header_microhttpd_h" "$ac_includes_default"
+if test "x$ac_cv_header_microhttpd_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_MICROHTTPD_H 1
+_ACEOF
+ ac_have_microhttpd_h=yes
+else
+  ac_have_microhttpd_h=no
+fi
+
+done
+
+#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
+if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+    $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
+
+fi
+
+
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
   enableval=$enable_select; :
@@ -6792,8 +6874,8 @@ if test "x$enable_dpdk" = "xyes"; then
         as_fn_error $? "
 =========================================
 
-Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for Intel DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
+Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for DPDK.
+Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi
@@ -7307,6 +7389,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_grid" = xNO -o "x$enable_grid" = x \) && enable_grid=yes
 if test "x$enable_grid" = xyes; then
+    :
+
+fi
+# Check whether --enable-gtp was given.
+if test "${enable_gtp+set}" = set; then :
+  enableval=$enable_gtp;
+else
+  enable_gtp=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_gtp" = xNO -o "x$enable_gtp" = x \) && enable_gtp=yes
+if test "x$enable_gtp" = xyes; then
     :
 
 fi
@@ -13981,6 +14074,10 @@ if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
+if test "x$enable_gtp" = xyes; then
+    provisions="$provisions gtp"
+fi
+
 if test "x$have_int64_types" = xyes; then
     provisions="$provisions int64"
 fi
@@ -14003,8 +14100,12 @@ if test $ac_have_linux_kernel = y; then
     fi
 fi
 
-if test "$ac_have_mbgdevio_h" = yes; then
+if test "$ac_have_libmbdevio$ac_have_mbgdevio_h" = yesyes; then
     provisions="$provisions mbglib"
+fi
+
+if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+    provisions="$provisions microhttpd"
 fi
 
 if test "x$use_netmap" != xno; then

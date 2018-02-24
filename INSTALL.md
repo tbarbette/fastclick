@@ -302,7 +302,7 @@ machines, have a look at [the cnplab/cosmos toolstack](http://github.com/cnplab/
 DPDK
 ----
 
-Support for using Intel DPDK for high-speed userspace I/O is enabled using
+Support for using DPDK for high-speed userspace I/O is enabled using
 
     ./configure RTE_SDK=... RTE_TARGET=... \
         --enable-dpdk --enable-user-multithread --disable-linuxmodule

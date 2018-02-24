@@ -18,6 +18,10 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+#include <rte_bus_pci.h>
+#endif
+
 #include <click/packet.hh>
 #include <click/error.hh>
 #include <click/hashtable.hh>
@@ -53,6 +57,14 @@ public:
     void set_mac(EtherAddress mac);
 
     unsigned int get_nb_txdesc();
+
+    uint16_t get_device_vendor_id();
+
+    String get_device_vendor_name();
+
+    uint16_t get_device_id();
+
+    const char *get_device_driver();
 
     static struct rte_mempool *get_mpool(unsigned int);
 
@@ -90,6 +102,9 @@ public:
     static int TX_WTHRESH;
     static String MEMPOOL_PREFIX;
 
+    static unsigned DEF_DEV_RXDESC;
+    static unsigned DEF_DEV_TXDESC;
+
     static unsigned DEF_RING_NDESC;
     static unsigned DEF_BURST_SIZE;
 
@@ -105,12 +120,30 @@ private:
 
     struct DevInfo {
         inline DevInfo() :
+            vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
             n_tx_descs(0), mac() {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
 
+        void print_device_info() {
+            click_chatter("   Vendor   ID: %d", vendor_id);
+            click_chatter("   Vendor Name: %s", vendor_name.c_str());
+            click_chatter("   Device   ID: %d", device_id);
+            click_chatter("   Driver Name: %s", driver);
+            click_chatter("Promisc   Mode: %s", promisc? "true":"false");
+            click_chatter("   MAC Address: %s", mac.unparse().c_str());
+            click_chatter("# of Rx Queues: %d", rx_queues.size());
+            click_chatter("# of Tx Queues: %d", tx_queues.size());
+            click_chatter("# of Rx  Descs: %d", n_rx_descs);
+            click_chatter("# of Tx  Descs: %d", n_tx_descs);
+        }
+
+        uint16_t vendor_id;
+        String vendor_name;
+        uint16_t device_id;
+        const char *driver;
         Vector<bool> rx_queues;
         Vector<bool> tx_queues;
         bool promisc;

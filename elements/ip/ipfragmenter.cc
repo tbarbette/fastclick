@@ -97,7 +97,10 @@ IPFragmenter::fragment(Packet *p_in)
 	if (_verbose || _drops < 5)
 	    click_chatter("IPFragmenter(%d) DF %p{ip_ptr} %p{ip_ptr} len=%d", _mtu, &ip_in->ip_src, &ip_in->ip_dst, p_in->length());
 	_drops++;
-	checked_output_push(1, p_in);
+	    if (receives_batch)
+	        checked_output_push_batch(1, PacketBatch::make_from_packet(p_in));
+	    else
+	        checked_output_push(1, p_in);
 	return;
     }
 
@@ -120,7 +123,12 @@ IPFragmenter::fragment(Packet *p_in)
     ip->ip_sum = click_in_cksum((const unsigned char *)ip, hlen);
     Packet *first_fragment = p->clone();
     first_fragment->take(p->length() - p->network_header_offset() - hlen - first_dlen);
-    output(0).push(first_fragment);
+#if HAVE_BATCH
+    if (receives_batch)
+        output_push_batch(0, PacketBatch::make_from_packet(first_fragment));
+    else
+#endif
+        output(0).push(first_fragment);
     _fragments++;
 
     // output the remaining fragments
@@ -150,8 +158,12 @@ IPFragmenter::fragment(Packet *p_in)
 	    qip->ip_sum = click_in_cksum((const unsigned char *)qip, out_hlen);
 
 	    q->copy_annotations(p);
-
-	    output(0).push(q);
+#if HAVE_BATCH
+	    if (receives_batch)
+	        output_push_batch(0, PacketBatch::make_from_packet(q));
+	    else
+#endif
+	        output(0).push(q);
 	    _fragments++;
 	}
 
@@ -169,6 +181,17 @@ IPFragmenter::push(int, Packet *p)
     else
 	fragment(p);
 }
+
+#if HAVE_BATCH
+void
+IPFragmenter::push_batch(int, PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_SPLITTABLE([this](Packet*p){return (p->network_length() <= (int) _mtu)?p:0;}, //Return p if _mtu is ok, 0 if not
+                                        batch, //The batch
+                                        fragment, //Call fragment on the packet that is not _mtu sized
+                                        [this](PacketBatch*batch){output_push_batch(0,batch);}); //Flush the batch before calling fragment
+}
+#endif
 
 void
 IPFragmenter::add_handlers()

@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true)
+ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _limit(-1)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -43,6 +43,7 @@ int ReplayBase::parse(Args* args) {
              .read("BURST", _burst)
              .read("VERBOSE", _verbose)
              .read("FREEONTERMINATE", _freeonterminate)
+             .read("LIMIT", _limit)
              .read("ACTIVE",_active)
              .execute() < 0) {
         return -1;

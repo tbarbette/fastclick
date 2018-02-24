@@ -134,6 +134,11 @@ class atomic_uint64_t { public:
     inline void nonatomic_dec();
     inline void operator--();
     inline void operator--(int);
+
+    inline uint64_t compare_swap(uint64_t expected, uint64_t desired);
+
+    inline static void add(volatile uint64_t &x, uint64_t delta);
+    inline static uint64_t compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired);
   private:
 
 #if CLICK_LINUXMODULE
@@ -793,6 +798,22 @@ atomic_uint64_t::operator+=(int64_t delta)
     return *this;
 }
 
+/** @brief  Atomically increment value @a x. */
+inline void
+atomic_uint64_t::add(volatile uint64_t &x, uint64_t delta)
+{
+#if CLICK_LINUXMODULE
+    atomic64_add(delta, x);
+#elif CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
+          : "=m" (x)
+          : "r" (delta), "m" (x)
+          : "cc");
+#else
+    x += delta;
+#endif
+}
+
 /** @brief  Atomically subtract @a delta from the value. */
 inline atomic_uint64_t &
 atomic_uint64_t::operator-=(int64_t delta)
@@ -889,7 +910,54 @@ atomic_uint64_t::operator--(int)
 #endif
 }
 
+/** @brief  Perform a compare-and-swap operation.
+ *  @param  x         value
+ *  @param  expected  test value
+ *  @param  desired   new value
+ *  @return The actual old value.  If it equaled @a expected, @a x has been
+ *	    set to @a desired.
+ *
+ * Behaves like this, but in one atomic step:
+ * @code
+ * uint62_t actual = x;
+ * if (x == expected)
+ *     x = desired;
+ * return actual;
+ * @endcode
+ *
+ * Also acts as a memory barrier. */
+inline uint64_t
+atomic_uint64_t::compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired)
+{
+#if CLICK_ATOMIC_X86
+    asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
+		  : "=a" (expected), "=m" (x)
+		  : "r" (desired), "0" (expected), "m" (x)
+		  : "cc", "memory");
+    return expected;
+#elif CLICK_LINUXMODULE && defined(cmpxchg)
+    return cmpxchg(&x, expected, desired);
+#elif CLICK_LINUXMODULE
+# warning "using nonatomic approximation for atomic_uint§2_t::compare_and_swap"
+    unsigned long flags;
+    local_irq_save(flags);
+    uint64_t actual = x;
+    if (actual == expected)
+	x = desired;
+    local_irq_restore(flags);
+    return actual;
+#else
+    uint64_t actual = x;
+    if (actual == expected)
+	x = desired;
+    return actual;
+#endif
+}
 
+inline uint64_t
+atomic_uint64_t::compare_swap(uint64_t expected, uint64_t desired) {
+    return compare_swap(CLICK_ATOMIC_VAL, expected, desired);
+}
 
 CLICK_ENDDECLS
 #endif

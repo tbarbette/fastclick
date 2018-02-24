@@ -184,6 +184,15 @@ else
     LIBS="$save_libs"
 fi
 
+
+AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
+AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
+#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
+if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+    AC_DEFINE([HAVE_MICROHTTPD])
+fi
+
+
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
 AS_HELP_STRING([  --disable-select], [do not use select()])],
@@ -211,7 +220,7 @@ if echo "$enable_select" | grep kqueue >/dev/null 2>&1 && test "$enable_kqueue" 
 fi
 
 AC_ARG_ENABLE([dpdk],
-    [AS_HELP_STRING([  --enable-dpdk], [use Intel DPDK])],
+    [AS_HELP_STRING([  --enable-dpdk], [use DPDK])],
     [:], [enable_dpdk=no])
 
 AC_ARG_ENABLE([dpdk-pool],
@@ -236,8 +245,8 @@ if test "x$enable_dpdk" = "xyes"; then
         AC_MSG_ERROR([
 =========================================
 
-Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for Intel DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per Intel DPDK documentation.
+Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for DPDK.
+Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
 =========================================])
     fi
@@ -597,6 +606,7 @@ ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
 ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO, AC_DEFINE(HAVE_FLOW))
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
+ELEMENTS_ARG_ENABLE(gtp, [include GTP elements], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ids, [include IDS elements from OpenBox], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
@@ -2213,6 +2223,11 @@ if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
+dnl add 'gtp' if gtp elements are available
+if test "x$enable_gtp" = xyes; then
+    provisions="$provisions gtp"
+fi
+
 dnl add 'int64' if 64-bit integers are available
 if test "x$have_int64_types" = xyes; then
     provisions="$provisions int64"
@@ -2240,8 +2255,13 @@ if test $ac_have_linux_kernel = y; then
 fi
 
 dnl add 'mbglib' if mbglib support is available
-if test "$ac_have_mbgdevio_h" = yes; then
+if test "$ac_have_libmbdevio$ac_have_mbgdevio_h" = yesyes; then
     provisions="$provisions mbglib"
+fi
+
+dnl add 'microhttpd' if libmicrohttpd support is available
+if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+    provisions="$provisions microhttpd"
 fi
 
 dnl add 'netmap' if netmap support is available

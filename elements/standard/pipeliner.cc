@@ -100,7 +100,8 @@ int
 Pipeliner::initialize(ErrorHandler *errh)
 {
 
-    Bitvector passing = get_passing_threads();
+    bool fp;
+    Bitvector passing = get_passing_threads(false, -1, this, fp);
     storage.compress(passing);
     stats.compress(passing);
     _home_thread_id = home_thread_id();
@@ -121,7 +122,7 @@ Pipeliner::initialize(ErrorHandler *errh)
     }
 
 
-    for (int i = 0; i < passing.weight(); i++) {
+    for (int i = 0; i < passing.size(); i++) {
         if (passing[i]) {
             click_chatter("%p{element} : Pipeline from %d to %d",this, i,_home_thread_id);
             WritablePacket::pool_transfer(_home_thread_id,i);

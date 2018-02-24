@@ -21,29 +21,43 @@
 #include <click/args.hh>
 CLICK_DECLS
 
-StoreData::StoreData()
+StoreData::StoreData() : _grow(false)
 {
 }
 
 int
 StoreData::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    return Args(conf, this, errh).read_mp("OFFSET", _offset)
-	.read_mp("DATA", _data).complete();
+    return Args(conf, this, errh)
+        .read_mp("OFFSET", _offset)
+        .read_mp("DATA", _data)
+        .read("GROW", _grow)
+        .complete();
 }
 
 Packet *
 StoreData::simple_action(Packet *p)
 {
     if (p->length() <= _offset)
-	return p;
+        return p;
     else if (WritablePacket *q = p->uniqueify()) {
-	int len = q->length() - _offset;
-	memcpy(q->data() + _offset, _data.data(), (_data.length() < len ? _data.length() : len));
-	return q;
+        int len = q->length() - _offset;
+        if (_grow && _data.length() < len)
+            q = q->put(_data.length() - len);
+        memcpy(q->data() + _offset, _data.data(), (_data.length() < len ? _data.length() : len));
+        return q;
     } else
-	return 0;
+        return 0;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+StoreData::simple_action_batch(PacketBatch *head)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(StoreData::simple_action,head,[](Packet*){});
+    return head;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StoreData)

@@ -1,6 +1,5 @@
 #ifndef CLICK_ETHERREWRITE_HH
 #define CLICK_ETHERREWRITE_HH
-#include <click/element.hh>
 #include <click/batchelement.hh>
 #include <clicknet/ether.h>
 CLICK_DECLS
@@ -58,14 +57,13 @@ class EtherRewrite : public BatchElement { public:
     void add_handlers() CLICK_COLD;
 
     inline Packet *smaction(Packet *);
-
-    Packet *pull(int);
+    Packet *pull(int) override;
+    void push(int, Packet *) override;
 
 #if HAVE_BATCH
-    PacketBatch* simple_action_batch(PacketBatch *);
+    void push_batch(int, PacketBatch *) override;
+    PacketBatch *pull_batch(int, unsigned) override;
 #endif
-
-    void push(int, Packet *);
 
   private:
 

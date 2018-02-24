@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_STOREDATA_HH
 #define CLICK_STOREDATA_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /* =c
@@ -14,7 +14,7 @@ CLICK_DECLS
  *
  * =a AlignmentInfo, click-align(1) */
 
-class StoreData : public Element { public:
+class StoreData : public BatchElement { public:
 
     StoreData() CLICK_COLD;
 
@@ -23,11 +23,14 @@ class StoreData : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     Packet *simple_action(Packet *);
-
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
   private:
 
     unsigned _offset;
     String _data;
+    bool _grow;
 
 };
 

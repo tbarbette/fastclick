@@ -35,7 +35,7 @@ FromDPDKDevice::FromDPDKDevice() :
 		in_batch_mode = BATCH_MODE_YES;
 	#endif
 	_burst = 32;
-	ndesc = 256;
+	ndesc = DPDKDevice::DEF_DEV_RXDESC;
 }
 
 FromDPDKDevice::~FromDPDKDevice()
@@ -272,6 +272,10 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             struct ether_addr mac_addr;
             rte_eth_macaddr_get(fd->_dev->port_id, &mac_addr);
             return EtherAddress((unsigned char*)&mac_addr).unparse();
+        case h_vendor:
+            return fd->_dev->get_device_vendor_name();
+        case h_driver:
+            return String(fd->_dev->get_device_driver());
         }
     }
 
@@ -342,6 +346,8 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("active", read_handler, h_active);
     add_read_handler("count", count_handler, 0);
     add_read_handler("mac",read_handler, h_mac);
+    add_read_handler("vendor", read_handler, h_vendor);
+    add_read_handler("driver", read_handler, h_driver);
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
