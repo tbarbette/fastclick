@@ -11,9 +11,11 @@ The Metron data plane uses two features available in modern network interface ca
 Specifically, the Metron data plane uses either:
   1. the Virtual Machine Device queues (VMDq) of DPDK to implement hardware dispatching based on the values of input packets' destination MAC address or
   2. DPDK's Flow Director library to classify and dispatch input traffic.
+
 The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be used by the Metron data plane to perform CPU core dispatching.
 This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch connected between the source and the NFV server.
 The Flow Director mode allows the Metron data plane agent to perform tagging in a more autonomous way, without necessarily involving the controller.
+
 This repository provides the source code of Metron's data plane.
 
 
@@ -68,8 +70,7 @@ georgios.katsikas at ri.se if you encounter any problems with Metron.
 Please do not report Metron-related or FastClick-related problems on the vanilla Click mailing list.
 If you are sure that your problem is Click related, post it on vanilla Click's [issue tracker][click-issue-tracker].
 
-The FastClick reamde is available [here][fastclick-readme].
-The  original Click reamde is available [here][click-readme].
+The FastClick reamde is available [here][fastclick-readme], while the original Click reamde is available [here][click-readme].
 
 [metron-paper]: https://people.kth.se/~dejanko/documents/publications/metron-nsdi18.pdf
 [metron-nsdi-page]: https://www.usenix.org/conference/nsdi18/presentation/katsikas
