@@ -29,7 +29,9 @@ First, setup your DPDK environment (version 17.05 or later) and then configure M
 
 Build
 ----
+```bash
 make -j <coresNb>
+```
 
 
 Deploy
