@@ -2,6 +2,7 @@
 #define CLICK_FLOWCOMMON_HH
 #include <click/ring.hh>
 #include <click/multithread.hh>
+#include <functional>
 
 CLICK_DECLS
 
@@ -27,6 +28,7 @@ CLICK_DECLS
     #define flow_assert(...)
 #endif
 
+#define FLOW_ATOMIC_USE_COUNT 1
 #define HAVE_DYNAMIC_FLOW_RELEASE_FNT 1
 
 class FlowControlBlock;
@@ -56,7 +58,11 @@ struct FlowReleaseChain {
 class FlowControlBlock {
 
 private:
+#ifdef FLOW_ATOMIC_USE_COUNT
+    atomic_uint32_t use_count;
+#else
 	int use_count;
+#endif
 
 	public:
 
@@ -119,8 +125,10 @@ private:
 		inline void initialize() {
 			use_count = 0;
             flags = 0;
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
             release_fnt = 0;
             thunk = 0;
+#endif
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 			next = 0; //TODO : only once?
 #endif

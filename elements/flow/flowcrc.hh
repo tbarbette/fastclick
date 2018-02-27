@@ -4,7 +4,6 @@
 #include "stackelement.hh"
 #include <click/flowbuffer.hh>
 #include <click/simpledfa.hh>
-#include <click/crc32.h>
 CLICK_DECLS
 
 struct fcb_crc {

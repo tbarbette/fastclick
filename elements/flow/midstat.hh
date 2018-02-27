@@ -13,7 +13,7 @@ CLICK_DECLS
  */
 struct fcb_MidStat
 {
-    int buffer;
+    int count;
 };
 
 struct mstat

@@ -259,15 +259,12 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
         }
 #endif
         parent->check(true);
-        //parent->print();
-        //click_chatter("Releasing parent");
         child = parent; //Child is A
         data = child->node_data;
         parent = child->parent(); //Parent is 0
         up++;
     };
 }
-
 
 
 int FlowClassifier::initialize(ErrorHandler *errh) {

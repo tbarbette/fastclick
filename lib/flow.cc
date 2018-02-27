@@ -1006,6 +1006,10 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
         return this;
 }
 
+/**
+ * Optimize table, removing entries known to be of some value in the leaf
+ * If the path is not mt-safe but reaches a non-mutable level (eg dynamic), a thread node will be added
+ */
 FlowNode* FlowNode::optimize(bool mt_safe) {
 	FlowNodePtr* ptr;
 

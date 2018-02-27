@@ -1,12 +1,9 @@
 /*
- * FlowIDSMatcher.{cc,hh} -- element classifies packets by contents
- * using regular expression matching
+ * FlowIDSMatcher.{cc,hh}
  *
- * Element originally imported from http://www.openboxproject.org/
+ * Tom Barbette
  *
- * Computational batching support by Tom Barbette
- *
- * Copyright (c) 2017 University of Liege
+ * Copyright (c) 2017-2018 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,6 +21,7 @@
 #include <click/args.hh>
 #include <click/confparse.hh>
 #include <click/router.hh>
+#include <click/crc32.h>
 #include "flowcrc.hh"
 
 CLICK_DECLS
@@ -84,7 +82,7 @@ FlowCRC::process_data(fcb_crc* fcb, FlowBufferChunkIter& iterator) {
     }
     fcb->crc = crc;
     fcb->remain = remain;
-    fcb->remainder = remainder;;
+    fcb->remainder = remainder;
     return 0;
 }
 

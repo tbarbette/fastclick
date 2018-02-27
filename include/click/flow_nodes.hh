@@ -823,7 +823,7 @@ static const uint8_t HASH_SIZES_NR = 10;
 template<int capacity_n>
 class FlowNodeHash : public FlowNode  {
 
-    static constexpr void* DESTRUCTED_NODE = (void*)-1;
+    #define DESTRUCTED_NODE (void*)-1
 
     static constexpr uint32_t hash_sizes[HASH_SIZES_NR] = {257,521,1031,2053,4099,8209,16411,32771,65539,131072}; //Prime for less collisions, after the last we double
     static constexpr uint32_t step_sizes[HASH_SIZES_NR] = { 37, 67, 131, 257, 521,1031, 2053, 4099, 8209, 16411}; //Prime for less collisions, after the last we double
@@ -853,15 +853,15 @@ class FlowNodeHash : public FlowNode  {
     /*inline uint32_t highwater() const {
         return capacity_n / 3;
     }*/
-    inline constexpr uint32_t max_highwater() {
+    inline constexpr uint32_t max_highwater() const {
         return 3 * (capacity() / 5);
     }
 
-    inline constexpr uint32_t collision_threshold() {
+    inline constexpr uint32_t collision_threshold() const {
         return ((capacity() / 20) > 32 ? 32 : capacity()/20);
     }
 
-    inline constexpr uint32_t hole_threshold() {
+    inline constexpr uint32_t hole_threshold() const {
         return ((capacity() / 30) > 24 ? 24 : capacity()/30);
     }
 
