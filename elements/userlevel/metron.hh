@@ -22,7 +22,8 @@
 /**
  * The service chain types supported by Metron:
  * |-> Click-based
- * |-> Standalone (for integration with blackbox NFs)
+ * |-> Standalone (a standalone blackbox NF)
+ * |-> Mixed (Click NFs followed by a blackbox NF)
  */
 typedef enum { SC_CONF_TYPES } ScType;
 
