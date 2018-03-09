@@ -1,7 +1,7 @@
 variables:
     DPDK_VERSION: "17.08"
     NETMAP_VERSION: "11.1"
-    CONFIG: "--enable-gtp --enable-json $CONFIG"
+    CONFIG: "--enable-gtp --enable-json"
 
 batch:
     script:
