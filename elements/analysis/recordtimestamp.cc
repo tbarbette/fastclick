@@ -32,7 +32,7 @@ RecordTimestamp::~RecordTimestamp() {
 }
 
 int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
-    unsigned n = 0;
+    uint32_t n = 0;
     if (Args(conf, this, errh)
             .read("N", n)
             .read("OFFSET", _offset)

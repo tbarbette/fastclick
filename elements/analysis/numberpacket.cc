@@ -41,14 +41,15 @@ int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
-inline Packet* NumberPacket::smaction(Packet* p) {
+inline Packet* NumberPacket::smaction(Packet *p) {
     WritablePacket *wp = nullptr;
-    if ((int)p->length() >= _offset + 8)
+    if (p->length() >= (unsigned)_offset + _size_of_number) {
         wp = p->uniqueify();
+    }
     else {
-        wp = p->put(_offset + 8 - p->length());
+        wp = p->put(_offset + _size_of_number - p->length());
         assert(wp);
-        wp->ip_header()->ip_len = htons(_offset + 8);
+        wp->ip_header()->ip_len = htons(_offset + _size_of_number);
     }
     // Skip header
     *reinterpret_cast<uint64_t *>(wp->data() + _offset) = _count.fetch_and_add(1);
