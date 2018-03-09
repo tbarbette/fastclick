@@ -5,7 +5,7 @@
  * Various latency percentiles by Georgios Katsikas
  *
  * Copyright (c) 2015-2016 University of Liège
- * Copyright (c) 2017 RISE SICS AB
+ * Copyright (c) 2017 RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -36,7 +36,7 @@
 
 CLICK_DECLS
 
-TimestampDiff::TimestampDiff() : _delays(), _offset(40), _limit(0), _max_delay(1000) {
+TimestampDiff::TimestampDiff() : _delays(), _offset(40), _limit(0), _max_delay_ms(1000) {
     nd = 0;
 }
 
@@ -50,7 +50,7 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh) {
             .read_mp("RECORDER", e)
             .read("OFFSET",_offset)
             .read("N", _limit)
-            .read("MAXDELAY", _max_delay)
+            .read("MAXDELAY", _max_delay_ms)
             .complete() < 0)
         return -1;
 
@@ -94,7 +94,7 @@ String TimestampDiff::read_handler(Element *e, void *arg) {
     unsigned max = 0;
 
     // Return updated min, mean, and max values
-    tsd->min_mean_max(tsd->_delays, min, mean, max);
+    tsd->min_mean_max(tsd->_delays, min, mean, max, tsd->nd);
 
     switch (reinterpret_cast<intptr_t>(arg)) {
         case TSD_MIN_HANDLER:
@@ -103,12 +103,8 @@ String TimestampDiff::read_handler(Element *e, void *arg) {
             return String(mean);
         case TSD_MAX_HANDLER:
             return String(max);
-        case TSD_STD_HANDLER: {
-            double var = 0.0;
-            for (auto delay : tsd->_delays)
-                var += pow(delay - mean, 2);
-            return String(sqrt(var / tsd->nd));
-        }
+        case TSD_STD_HANDLER:
+            return String(tsd->standard_deviation(tsd->_delays, mean, tsd->nd));
         case TSD_PERC_00_HANDLER:
             return String(min);
         case TSD_PERC_01_HANDLER:
@@ -162,18 +158,22 @@ void TimestampDiff::add_handlers() {
 }
 
 inline int TimestampDiff::smaction(Packet* p) {
+
     Timestamp now = Timestamp::now_steady();
-    uint64_t i = NumberPacket::read_number_of_packet(p,_offset);
+    uint64_t i = NumberPacket::read_number_of_packet(p, _offset);
     Timestamp old = get_recordtimestamp_instance()->get(i);
     if (old == Timestamp::uninitialized_t())
         return 1;
+
     Timestamp diff = now - old;
-    if (diff.msecval() > _max_delay)
-        click_chatter("delay over 1s for packet %llu: %uµs",
-                      i, diff.sec() * 1000000 + diff.usec());
+    if (diff.msecval() > _max_delay_ms)
+        click_chatter(
+            "Packet %" PRIu64 " experienced delay %u ms > %u ms",
+            i, (diff.sec() * 1000000 + diff.usec())/1000, _max_delay_ms
+        );
     else {
         if (_limit) {
-            unsigned long my = nd.fetch_and_add(1);
+            uint32_t my = nd.fetch_and_add(1);
             _delays[my] = diff.usec();
         } else {
             _delays.push_back(diff.usec());
@@ -200,7 +200,9 @@ RecordTimestamp* TimestampDiff::get_recordtimestamp_instance() {
 }
 
 void
-TimestampDiff::min_mean_max(Vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max)
+TimestampDiff::min_mean_max(
+        Vector<unsigned> &vec, unsigned &min, double &mean,
+        unsigned &max, const atomic_uint32_t nd)
 {
     double sum = 0.0;
 
@@ -215,6 +217,16 @@ TimestampDiff::min_mean_max(Vector<unsigned> &vec, unsigned &min, double &mean, 
     }
 
     mean = sum / nd;
+}
+
+double
+TimestampDiff::standard_deviation(
+        Vector<unsigned> &vec, double mean, const atomic_uint32_t nd)
+{
+    double var = 0.0;
+    for (auto delay : vec)
+        var += pow(delay - mean, 2);
+    return sqrt(var / nd);
 }
 
 double
