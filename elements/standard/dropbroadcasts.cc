@@ -30,6 +30,15 @@ DropBroadcasts::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+DropBroadcasts::simple_action_batch(PacketBatch *batch)
+{
+  EXECUTE_FOR_EACH_PACKET_DROPPABLE(DropBroadcasts::simple_action, batch, [](Packet *){});
+  return batch;
+}
+#endif
+
 static String
 dropbroadcasts_read_drops(Element *f, void *)
 {
