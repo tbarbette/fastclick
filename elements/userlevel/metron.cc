@@ -693,17 +693,18 @@ int Metron::param_handler(
 
                     // Parse
                     ServiceChain *sc = ServiceChain::from_json(jsc.second, m, errh);
+                    String sc_id = sc->id;
                     if (m->_timing_stats) {
                         ts.parse = Timestamp::now_steady();
                     }
                     if (!sc) {
                         return errh->error("Could not instantiate a service chain");
                     }
-                    if (m->find_chain_by_id(sc->id) != 0) {
+                    if (m->find_chain_by_id(sc_id) != 0) {
                         delete sc;
                         return errh->error(
                             "A service chain with ID %s already exists. "
-                            "Delete it first.", sc->id.c_str());
+                            "Delete it first.", sc_id.c_str());
                     }
 
                     // Instantiate
@@ -712,7 +713,7 @@ int Metron::param_handler(
                         delete sc;
                         return errh->error(
                             "Could not start the service chain "
-                            "with ID %s", sc->id.c_str()
+                            "with ID %s", sc_id.c_str()
                         );
                     }
                     if (m->_timing_stats) {
