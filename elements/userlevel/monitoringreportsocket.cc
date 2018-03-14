@@ -115,7 +115,7 @@ MonitoringReportSocket::MonitoringReportSocket()
     _family(AF_INET), _remote_port(0),
     _sndbuf(-1), _nodelay(1), _verbose(false),
     _tot_msg_length(MIN_TOT_MSG_LEN),
-    _frequency(DEF_FREQ)
+    _frequency(DEF_FREQ), _core_nb(0)
 {
 }
 
@@ -143,16 +143,26 @@ MonitoringReportSocket::configure(Vector<String> &conf, ErrorHandler *errh)
     // Remove keyword arguments
     if (args
             .read("FREQUENCY", _frequency)
+            .read("CORE_NB",   _core_nb)
             .read("SNDBUF",    _sndbuf)
             .read("NODELAY",   _nodelay)
             .read("VERBOSE",   _verbose)
             .consume() < 0)
         return -1;
 
-     if (_frequency <= 0) {
+    if (_frequency <= 0) {
         return errh->error(
             "Monitoring frequency is %d seconds, but must be greater or equal than %d seconds",
             _frequency, MAX_FREQ
+        );
+    }
+
+    unsigned max_core_nb = click_max_cpu_ids();
+
+    if ((_core_nb < 0) || (_core_nb >= max_core_nb)) {
+        return errh->error(
+            "Invalid CPU core number: %d. Only %d CPU cores are available.",
+            _core_nb, max_core_nb
         );
     }
 
@@ -328,6 +338,7 @@ MonitoringReportSocket::initialize(ErrorHandler *errh)
 
     // Schedule this element
     _timer.initialize(this);
+    _timer.move_thread(_core_nb);
     _timer.schedule_after_sec(1);
 
     return 0;
@@ -500,8 +511,8 @@ MonitoringReportSocket::print_data(char *buffer, const int buffer_len)
     handler_name = &buffer[sizeof(ts) + sizeof(value)];
 
     click_chatter(
-        "Timestamp: %" PRId64 " - Value: %" PRId64 " - Name: %s",
-        htonll(ts), htonll(value), handler_name
+        "[Monitoring Thread %d] Timestamp: %" PRId64 " - Value: %" PRId64 " - Name: %s",
+        click_current_cpu_id(), htonll(ts), htonll(value), handler_name
     );
 }
 

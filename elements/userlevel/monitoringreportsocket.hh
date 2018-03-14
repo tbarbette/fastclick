@@ -84,7 +84,7 @@ class MonitoringReportSocket : public Element {
 
     const char *class_name() const	{ return "MonitoringReportSocket"; }
     const char *port_count() const  { return PORTS_0_0; }
-    int configure_phase() const { return CONFIGURE_PHASE_LAST; }
+    int configure_phase() const { return CONFIGURE_PHASE_DEFAULT; }
 
     int configure(Vector<String> &conf, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
@@ -103,9 +103,9 @@ protected:
     Timer _timer;
 
 private:
-    String _socktype_str; // TCP or UDP
-    int _fd;	            // Socket descriptor
-    int _active;	        // Connection descriptor
+    String _socktype_str;     // TCP or UDP
+    int    _fd;               // Socket descriptor
+    int    _active;           // Connection descriptor
 
     // Remote connection info
     struct hostent    *_server;
@@ -124,6 +124,7 @@ private:
 
     unsigned _frequency;      // Frequency at which data is sent through the socket
     unsigned _tot_msg_length; // Total number of bytes for a message
+    unsigned _core_nb;        // CPU core to run this element
 
     HashTable<Element *, Vector<String>> _elementHandlers; // Elements to lists of handlers
 
