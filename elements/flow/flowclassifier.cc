@@ -803,6 +803,20 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
 
 }
 
+String FlowClassifier::read_handler(Element* e, void* thunk) {
+    int n = 0;
+    FlowClassifier* fc = static_cast<FlowClassifier*>(e);
+    fc->_table.get_root()->traverse_all_leaves([&n](FlowNodePtr* ptr) {
+        click_chatter("%d",ptr->leaf->count());
+        n++;
+    },true,true);
+    return String(n);
+};
+
+void FlowClassifier::add_handlers() {
+    add_read_handler("leaves", FlowClassifier::read_handler, 0);
+}
+
 int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};
 
 CLICK_ENDDECLS

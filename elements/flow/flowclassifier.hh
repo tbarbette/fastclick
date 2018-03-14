@@ -64,6 +64,9 @@ public:
     void push_batch_builder(int port, PacketBatch*);
     void push_batch(int port, PacketBatch*);
 
+    static String read_handler(Element* e, void* thunk);
+    void add_handlers() override CLICK_COLD;
+
     virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) {
         click_chatter("Warning : Sub-table optimization not supported as of now.");
         return 0;
