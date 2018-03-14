@@ -693,13 +693,14 @@ int Metron::param_handler(
 
                     // Parse
                     ServiceChain *sc = ServiceChain::from_json(jsc.second, m, errh);
-                    String sc_id = sc->id;
                     if (m->_timing_stats) {
                         ts.parse = Timestamp::now_steady();
                     }
                     if (!sc) {
                         return errh->error("Could not instantiate a service chain");
                     }
+
+                    String sc_id = sc->id;
                     if (m->find_chain_by_id(sc_id) != 0) {
                         delete sc;
                         return errh->error(
