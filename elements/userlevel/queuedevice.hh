@@ -229,6 +229,9 @@ protected:
     }
 
     inline int thread_for_queue(int queue) {
+        if (_queue_to_thread.empty()) {
+            return 0;
+        }
         return _queue_to_thread[queue];
     }
 
