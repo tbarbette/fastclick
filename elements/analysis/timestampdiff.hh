@@ -55,7 +55,7 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
-    static String read_handler(Element*, void*) CLICK_COLD;
+    static String read_handler(Element *, void *) CLICK_COLD;
 
     void push(int, Packet *);
 #if HAVE_BATCH
@@ -65,27 +65,22 @@ public:
 private:
     Vector<unsigned> _delays;
     int _offset;
-    int _limit;
+    uint32_t _limit;
     int _max_delay_ms;
     RecordTimestamp *_rt;
-    atomic_uint32_t nd;
-    inline int smaction(Packet* p);
+    atomic_uint32_t _nd;
+    inline int smaction(Packet *p);
 
-    RecordTimestamp* get_recordtimestamp_instance();
+    RecordTimestamp *get_recordtimestamp_instance();
 
     void min_mean_max(
-        Vector<unsigned> &vec,
         unsigned &min,
-        double &mean,
-        unsigned &max,
-        const atomic_uint32_t nd
+        double   &mean,
+        unsigned &max
     );
-    double standard_deviation(
-        Vector<unsigned> &vec,
-        double mean,
-        const atomic_uint32_t nd
-    );
-    double percentile(Vector<unsigned> &vec, double percent);
+    double standard_deviation(const double mean);
+    double percentile(const double percent);
+    unsigned last_value_seen();
 };
 
 CLICK_ENDDECLS
