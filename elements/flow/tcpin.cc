@@ -13,7 +13,7 @@ CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
     poolFcbTcpCommon(),
-    tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(true)
+    tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(false)
 {
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
@@ -47,6 +47,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     .read("REORDER", _reorder)
     .read("OUTNAME", outName)
     .read("VERBOSE", _verbose)
+    .read("PROACK", _proactive_dup)
     .complete() < 0)
         return -1;
 
@@ -132,7 +133,7 @@ bool TCPIn::checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bo
     if(SEQ_LT(getSequenceNumber(packet), tcpreorder->expectedPacketSeq))
     {
         if (unlikely(_verbose)) {
-            click_chatter("Retransmission ! Sequence is %lu, expected %lu", getSequenceNumber(packet), tcpreorder->expectedPacketSeq);
+            click_chatter("Retransmission ! Sequence is %lu, expected %lu, last sent %lu", getSequenceNumber(packet), tcpreorder->expectedPacketSeq, tcpreorder->lastSent);
         }
         if (SEQ_GT(getNextSequenceNumber(packet), tcpreorder->expectedPacketSeq)) {
             //If the packets overlap expectedPacketSeq, this is a split retransmission and we need to keep the good part of the packet
@@ -147,7 +148,7 @@ bool TCPIn::checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bo
         // retransmission for a packet we already have in the waiting list so we can discard
         // the retransmission
         // Always retransmit will be set for SYN, as the whole list will be flushed
-        if(noutputs() == 2 && (always_retransmit || SEQ_GEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
+        if(noutputs() == 2 && (always_retransmit || SEQ_LEQ(getSequenceNumber(packet), tcpreorder->lastSent)))
         {
             PacketBatch *batch = PacketBatch::make_from_packet(packet);
             output_push_batch(1, batch);
@@ -480,8 +481,13 @@ eagain:
             }
 
             if (_proactive_dup) {
+                //This needs more enginnering, not retransmit too much, and only after processing all of the input maybe
+                tcp_seq_t ack = fcb_in->expectedPacketSeq;
+/*                tcp_seq_t last_ack = fcb_in->common->maintainers[getOppositeFlowDirection()].getLastAckSent();
+                if (SEQ_GT(ack, last_ack))
+                    ack = last_ack;*/
                 if (_verbose)
-                    click_chatter("Sending proactive DUP ACK");
+                    click_chatter("Sending proactive DUP ACK for %lu",ack);
 
                 // Get the information needed to ack the given packet
                 uint32_t saddr = getDestinationAddress(p);
@@ -497,14 +503,15 @@ eagain:
                     seq = getAckNumber(p);
                 }
 
-                tcp_seq_t ack =  fcb_in->expectedPacketSeq;
-
                 fcb_in->common->lock.acquire();
                 // Craft and send the ack
                 outElement->sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
                     sport, dport, seq, ack, true); //We force the sending as we want DUP ack on purpose
                 fcb_in->common->lock.release();
             }
+
+
+
             putPacketInList(fcb_in, p);
             return 0;
         }
@@ -515,21 +522,33 @@ eagain:
     EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, (void));
     if (fcb_in->packetList) {
         BATCH_CREATE_INIT(nowOrderBatch);
-        while (fcb_in->packetList && getSequenceNumber(fcb_in->packetList) == fcb_in->expectedPacketSeq) {
+        while (fcb_in->packetList)
+        {
+
+            if (getSequenceNumber(fcb_in->packetList) != fcb_in->expectedPacketSeq)
+                break;
+
+            if (_verbose)
+                click_chatter("Now in order %u %u !", getSequenceNumber(fcb_in->packetList), fcb_in->expectedPacketSeq);
             Packet* p = fcb_in->packetList;
             fcb_in->packetList = p->next();
             BATCH_CREATE_APPEND(nowOrderBatch, p);
+            fcb_in->expectedPacketSeq = getNextSequenceNumber(p);
         }
 
         if (nowOrderBatch) {
             BATCH_CREATE_FINISH(nowOrderBatch);
+            if (_verbose)
+                click_chatter("Now order : %p %d",nowOrderBatch,nowOrderBatch->count());
             fcb_acquire(nowOrderBatch->count());
             auto refnt = [this,fcb_in](Packet* p){return processOrderedTCP(fcb_in,p);};
             EXECUTE_FOR_EACH_PACKET_DROPPABLE(refnt, nowOrderBatch, (void));
             if (flow)
                 flow->append_batch(nowOrderBatch);
-            else
+            else {
+                click_chatter("Processing now ordered!");
                 flow = nowOrderBatch;
+            }
         }
     }
     if (flow)

@@ -912,11 +912,8 @@ Packet::clone(bool fast)
     if (!p)
 	return 0;
     if (unlikely(fast)) {
+        memcpy(p, this, sizeof(Packet));
         p->_use_count = 1;
-        p->_head = _head;
-        p->_data = _data;
-        p->_tail = _tail;
-        p->_end = _end;
 #if HAVE_DPDK
         if (DPDKDevice::is_dpdk_packet(this)) {
           p->_destructor = DPDKDevice::free_pkt;

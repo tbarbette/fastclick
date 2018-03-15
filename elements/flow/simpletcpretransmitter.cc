@@ -36,6 +36,7 @@ int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
             .read("PROACK",_proack)
+            .read("VERBOSE", _verbose)
             .complete() < 0)
         return -1;
 
@@ -143,6 +144,9 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                 continue;
             }
             if (getPayloadLength(packet) == 0) {
+                if (unlikely(_verbose)) {
+                    click_chatter("Retransmitted packet is an ACK");
+                }
                 if (batch->count() == 1) {
                     output_push_batch(0,batch);
                     return;
@@ -150,14 +154,16 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                     output_push_batch(0,PacketBatch::make_from_packet(packet->clone()));
             } else {
                 //Seq is bigger than last ack, (the original of) this packet was lost before the dest reached it (or we never received the ack)
-                FOR_EACH_PACKET(fcb->first_unacked, pr) {
+                FOR_EACH_PACKET_SAFE(fcb->first_unacked, pr) {
                     if (getSequenceNumber(pr) == seq) {
                         if (lastretransmit == pr) { //Avoid double retransmission
+                            //TODO : do we want to do that?
                             if (_verbose)
                                 click_chatter("Avoid double retransmit");
                         } else {
                             lastretransmit = pr;
-                            //click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
+                            if (unlikely(_verbose))
+                                click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
                             fcb_acquire(1);
                             output_push_batch(0,PacketBatch::make_from_packet(packet->clone(true)));
                         }
