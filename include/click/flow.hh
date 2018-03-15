@@ -162,8 +162,8 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                             //click_chatter("New leaf with data '%x'",data.data_64);
                             //click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
                             child_ptr->set_leaf(_pool.allocate());
-                            assert(child_ptr->leaf);
-                            assert(child_ptr->is_leaf());
+                            flow_assert(child_ptr->leaf);
+                            flow_assert(child_ptr->is_leaf());
                             child_ptr->leaf->initialize();
                             child_ptr->leaf->parent = parent;
     /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT

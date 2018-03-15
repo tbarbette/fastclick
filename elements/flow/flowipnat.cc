@@ -17,7 +17,7 @@ CLICK_DECLS
 #define NAT_COLLIDE 1  //Avoid port collisions
 
 
-FlowIPNAT::FlowIPNAT() : _sip() {
+FlowIPNAT::FlowIPNAT() : _sip(), _map(65536) {
 
 };
 

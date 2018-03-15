@@ -207,6 +207,7 @@ private:
 
 	inline FlowControlBlock* alloc_new() {
 		FlowControlBlock* fcb = (FlowControlBlock*)CLICK_LALLOC(sizeof(FlowControlBlock) + _data_size);
+        assert(fcb);
 /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		fcb->release_fnt = &pool_release_fnt;
 		fcb->thunk = this;

@@ -769,6 +769,9 @@ void HashContainerMP<K,V,Item>::rehash(size_type n)
 
 template <typename K, typename V>
 class HashTableMP : public HashContainerMP<K,V,shared<V> > { public:
+    HashTableMP() : HashContainerMP<K,V,shared<V> >::HashContainerMP() {
+    }
+
     HashTableMP(int n) : HashContainerMP<K,V,shared<V> >::HashContainerMP(n) {
     }
 };
