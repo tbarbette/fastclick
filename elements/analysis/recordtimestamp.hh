@@ -7,6 +7,8 @@
 
 CLICK_DECLS
 
+class NumberPacket;
+
 /*
 =c
 
@@ -60,6 +62,7 @@ private:
     int _offset;
     bool _dynamic;
     Vector<Timestamp> _timestamps;
+    NumberPacket *_np;
 };
 
 inline Timestamp RecordTimestamp::get(uint64_t i) {
