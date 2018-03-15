@@ -216,8 +216,10 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
 
 
     // Check if the ACK does not bring any additional information
-    if(!force && maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent()))
+    if(!force && maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent())) {
+        click_chatter("Ack not sent, no new knowledge");
         return;
+    }
 
     // Update the number of the last ack sent for the other side
     maintainer.setLastAckSent(ack);
