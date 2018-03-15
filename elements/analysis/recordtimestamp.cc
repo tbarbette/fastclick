@@ -33,9 +33,9 @@ RecordTimestamp::~RecordTimestamp() {
 
 int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     uint32_t n = 0;
-    Element *e;
+    Element *e = NULL;
     if (Args(conf, this, errh)
-            .read_mp("COUNTER", e)
+            .read("COUNTER", e)
             .read("N", n)
             .read("OFFSET", _offset)
             .read("DYNAMIC", _dynamic)
@@ -46,7 +46,7 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
         n = 65536;
     _timestamps.reserve(n);
 
-    if ((_np = static_cast<NumberPacket *>(e->cast("NumberPacket"))) == 0)
+    if (e && (_np = static_cast<NumberPacket *>(e->cast("NumberPacket"))) == 0)
         return errh->error("COUNTER must be a valid NumberPacket element");
 
     return 0;
@@ -56,7 +56,7 @@ inline void
 RecordTimestamp::smaction(Packet *p) {
     uint64_t i;
     if (_offset >= 0) {
-        i = _np->read_number_of_packet(p, _offset);
+        i = _np ? _np->read_number_of_packet(p, _offset) : NumberPacket::read_number_of_packet(p, _offset);
         assert(i < INT_MAX);
         while (i >= _timestamps.size()) {
             if (!_dynamic && i >= _timestamps.capacity()) {
