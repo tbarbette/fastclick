@@ -178,10 +178,10 @@ MonitoringReportSocket::configure(Vector<String> &conf, ErrorHandler *errh)
         String element_with_handler = canonical_handler_name(conf[i]);
         const char *dot = find(element_with_handler, '.');
 
-        // There is a dot between the element name and handler
+        // There is no dot between the element name and handler
         if (dot == element_with_handler.end()) {
             return errh->error(
-                "%s is not a valid element with a handler (element.handler format is expected)",
+                "'%s' is not a valid element with a handler (element.handler format is expected)",
                 element_with_handler.c_str()
             );
         }
@@ -191,13 +191,13 @@ MonitoringReportSocket::configure(Vector<String> &conf, ErrorHandler *errh)
         Element *e = router()->find(element_name);
 
         if (!e) {
-            return errh->error("No element %s in this Click configuration", element_name.c_str());
+            return errh->error("No element '%s' in this Click configuration", element_name.c_str());
         }
 
         // Get the element's handler (whatever there is after the dot)
         String handler_name = element_with_handler.substring(dot + 1, element_with_handler.end());
         if (!handler_name || handler_name.empty()) {
-            return errh->error("Invalid handler in element %s", element_name.c_str());
+            return errh->error("No handler for element '%s'", element_name.c_str());
         }
 
         const Handler *h = Router::handler(e, handler_name);
@@ -212,7 +212,7 @@ MonitoringReportSocket::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     if (_elementHandlers.empty()) {
-        return errh->error("Please provide an element handler");
+        return errh->error("Please provide at least one element handler");
     }
 
     return 0;
@@ -241,6 +241,8 @@ MonitoringReportSocket::initialize_socket_error(ErrorHandler *errh, const char *
 String
 MonitoringReportSocket::check_handlers(ErrorHandler *errh)
 {
+    String status = "";
+
     // Go through the input elements and their handlers
     auto el = _elementHandlers.begin();
     while (el != _elementHandlers.end()) {
@@ -252,15 +254,15 @@ MonitoringReportSocket::check_handlers(ErrorHandler *errh)
 
             // No such an element handler
             if (!h || !h->read_visible()) {
-                return "Element '%%s' does not have handler '%s'",
-                    e->name().c_str(), handler_name.c_str();
+                status = "Element '" + e->name() + "' does not have a handler '" + handler_name + "'";
+                return status;
             }
         }
 
         el++;
     }
 
-    return "";
+    return status;
 }
 
 int
@@ -511,8 +513,8 @@ MonitoringReportSocket::print_data(char *buffer, const int buffer_len)
     handler_name = &buffer[sizeof(ts) + sizeof(value)];
 
     click_chatter(
-        "[Monitoring Thread %d] Timestamp: %" PRId64 " - Value: %" PRId64 " - Name: %s",
-        click_current_cpu_id(), htonll(ts), htonll(value), handler_name
+        "[Monitoring element %s] [Thread %d] Timestamp: %" PRId64 " - Value: %" PRId64 " - Name: %s",
+        this->name().c_str(), click_current_cpu_id(), htonll(ts), htonll(value), handler_name
     );
 }
 
