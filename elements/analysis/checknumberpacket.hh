@@ -47,7 +47,7 @@ public:
     void add_handlers();
 private:
     int _offset;
-    int _count;
+    uint64_t _count;
     Vector<int> _numbers;
 
     enum{H_MAX, H_MIN, H_COUNT, H_DUMP};
