@@ -473,7 +473,6 @@ eagain:
             if(!checkRetransmission(fcb_in, p, false)) {
                 return 0;
             }
-            this->ackPacket(p);
 
             if (_proactive_dup) {
                 if (_verbose)
