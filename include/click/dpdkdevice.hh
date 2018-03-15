@@ -54,6 +54,8 @@ public:
     int add_tx_queue(int &queue_id, unsigned n_desc,
                              ErrorHandler *errh) CLICK_COLD;
 
+    EtherAddress get_mac();
+
     void set_mac(EtherAddress mac);
 
     unsigned int get_nb_txdesc();
