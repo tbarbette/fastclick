@@ -270,6 +270,16 @@ class HashContainerMP { public:
         return s;
     }
 
+    /** @brief Return the number of buckets. */
+    inline size_type buckets() {
+        size_type s;
+        if (likely(_mt))
+            _table.read_begin();
+        s = _table->_nbuckets;
+        if (likely(_mt))
+            _table.read_end();
+        return s;
+    }
     /** @brief Return true iff size() == 0. */
     inline bool empty() {
         return size() == 0;
@@ -759,6 +769,8 @@ void HashContainerMP<K,V,Item>::rehash(size_type n)
 
 template <typename K, typename V>
 class HashTableMP : public HashContainerMP<K,V,shared<V> > { public:
+    HashTableMP(int n) : HashContainerMP<K,V,shared<V> >::HashContainerMP(n) {
+    }
 };
 
 
