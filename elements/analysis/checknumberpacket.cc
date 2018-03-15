@@ -49,8 +49,11 @@ inline int CheckNumberPacket::smaction(Packet* p) {
         return 1;
     }
     uint64_t n = *reinterpret_cast<const uint64_t *>(p->data() + _offset);
-    if (n >= (uint64_t)_count) {
-        click_chatter("%p{element} : %lu out of scope (count is %d) !",this,n,_count);
+    if (n >= _count) {
+        click_chatter(
+          "%p{element}: %" PRIu64 " out of scope (count is %" PRIu64 ") !",
+          this, n, _count
+        );
         return 1;
     } else {
         _numbers[n]++;
@@ -121,7 +124,7 @@ CheckNumberPacket::write_handler(const String &s_in, Element *e, void *thunk, Er
     String s = cp_uncomment(s_in);
     switch ((intptr_t)thunk) {
       case H_COUNT: {
-          int n;
+          uint64_t n;
           if (IntArg().parse(s, n)) {
               fd->_count = n;
               fd->_numbers.resize(n,0);
