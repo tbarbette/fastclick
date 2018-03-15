@@ -295,7 +295,7 @@ private:
     unsigned int flowDirection;
 
     int _modification_level;
-    bool _verbose;
+    int _verbose;
     bool _reorder;
     bool _proactive_dup;
     friend class TCPOut;
