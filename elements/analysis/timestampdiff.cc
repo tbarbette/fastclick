@@ -18,7 +18,7 @@
  * legally binding.
  */
 
-#include <click/config.h> // Doc says this should come first
+#include <click/config.h>
 
 #include "timestampdiff.hh"
 
@@ -36,15 +36,16 @@
 
 CLICK_DECLS
 
-TimestampDiff::TimestampDiff() : _delays(), _offset(40), _limit(0), _max_delay_ms(1000) {
-    nd = 0;
+TimestampDiff::TimestampDiff() : _delays(), _offset(40), _limit(0), _max_delay_ms(1000)
+{
+    _nd = 0;
 }
 
 TimestampDiff::~TimestampDiff() {
 }
 
-int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh) {
-
+int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
+{
     Element* e;
     if (Args(conf, this, errh)
             .read_mp("RECORDER", e)
@@ -84,17 +85,19 @@ enum {
     TSD_PERC_95_HANDLER,
     TSD_PERC_99_HANDLER,
     TSD_PERC_100_HANDLER,
+    TSD_LAST_SEEN,
     TSD_DUMP_HANDLER
 };
 
-String TimestampDiff::read_handler(Element *e, void *arg) {
+String TimestampDiff::read_handler(Element *e, void *arg)
+{
     TimestampDiff *tsd = static_cast<TimestampDiff *>(e);
     unsigned min = UINT_MAX;
     double  mean = 0.0;
     unsigned max = 0;
 
     // Return updated min, mean, and max values
-    tsd->min_mean_max(tsd->_delays, min, mean, max, tsd->nd);
+    tsd->min_mean_max(min, mean, max);
 
     switch (reinterpret_cast<intptr_t>(arg)) {
         case TSD_MIN_HANDLER:
@@ -104,32 +107,35 @@ String TimestampDiff::read_handler(Element *e, void *arg) {
         case TSD_MAX_HANDLER:
             return String(max);
         case TSD_STD_HANDLER:
-            return String(tsd->standard_deviation(tsd->_delays, mean, tsd->nd));
+            return String(tsd->standard_deviation(mean));
         case TSD_PERC_00_HANDLER:
             return String(min);
         case TSD_PERC_01_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 1));
+            return String(tsd->percentile(1));
         case TSD_PERC_05_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 5));
+            return String(tsd->percentile(5));
         case TSD_PERC_10_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 10));
+            return String(tsd->percentile(10));
         case TSD_PERC_25_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 25));
+            return String(tsd->percentile(25));
         case TSD_MED_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 50));
+            return String(tsd->percentile(50));
         case TSD_PERC_75_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 75));
+            return String(tsd->percentile(75));
         case TSD_PERC_90_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 90));
+            return String(tsd->percentile(90));
         case TSD_PERC_95_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 95));
+            return String(tsd->percentile(95));
         case TSD_PERC_99_HANDLER:
-            return String(tsd->percentile(tsd->_delays, 99));
+            return String(tsd->percentile(99));
         case TSD_PERC_100_HANDLER:
             return String(max);
+        case TSD_LAST_SEEN: {
+            return String(tsd->last_value_seen());
+        }
         case TSD_DUMP_HANDLER: {
             StringAccum s;
-            for (size_t i = 0; i < tsd->nd; ++i)
+            for (size_t i = 0; i < tsd->_nd; ++i)
                 s << i << ": " << String(tsd->_delays[i]) << "\n";
             return s.take_string();
         }
@@ -138,7 +144,8 @@ String TimestampDiff::read_handler(Element *e, void *arg) {
     }
 }
 
-void TimestampDiff::add_handlers() {
+void TimestampDiff::add_handlers()
+{
     add_read_handler("average", read_handler, TSD_AVG_HANDLER);
     add_read_handler("min", read_handler, TSD_MIN_HANDLER);
     add_read_handler("max", read_handler, TSD_MAX_HANDLER);
@@ -154,16 +161,18 @@ void TimestampDiff::add_handlers() {
     add_read_handler("perc95", read_handler, TSD_PERC_95_HANDLER);
     add_read_handler("perc99", read_handler, TSD_PERC_99_HANDLER);
     add_read_handler("perc100", read_handler, TSD_PERC_100_HANDLER);
+    add_read_handler("last", read_handler, TSD_LAST_SEEN);
     add_read_handler("dump", read_handler, TSD_DUMP_HANDLER);
 }
 
-inline int TimestampDiff::smaction(Packet* p) {
-
+inline int TimestampDiff::smaction(Packet *p)
+{
     Timestamp now = Timestamp::now_steady();
     uint64_t i = NumberPacket::read_number_of_packet(p, _offset);
     Timestamp old = get_recordtimestamp_instance()->get(i);
-    if (old == Timestamp::uninitialized_t())
+    if (old == Timestamp::uninitialized_t()) {
         return 1;
+    }
 
     Timestamp diff = now - old;
     if (diff.msecval() > _max_delay_ms)
@@ -172,41 +181,44 @@ inline int TimestampDiff::smaction(Packet* p) {
             i, (diff.sec() * 1000000 + diff.usec())/1000, _max_delay_ms
         );
     else {
+        uint32_t next_index = _nd.fetch_and_add(1);
         if (_limit) {
-            uint32_t my = nd.fetch_and_add(1);
-            _delays[my] = diff.usec();
+            _delays[next_index] = diff.usec();
         } else {
             _delays.push_back(diff.usec());
-            nd++;
         }
     }
     return 0;
 }
 
-void TimestampDiff::push(int, Packet *p) {
+void TimestampDiff::push(int, Packet *p)
+{
     int o = smaction(p);
-    checked_output_push(o,p);
+    checked_output_push(o, p);
 }
 
 #if HAVE_BATCH
 void
-TimestampDiff::push_batch(int, PacketBatch * batch) {
-    CLASSIFY_EACH_PACKET(2,smaction,batch,checked_output_push_batch);
+TimestampDiff::push_batch(int, PacketBatch *batch)
+{
+    CLASSIFY_EACH_PACKET(2, smaction, batch, checked_output_push_batch);
 }
 #endif
 
-RecordTimestamp* TimestampDiff::get_recordtimestamp_instance() {
+RecordTimestamp* TimestampDiff::get_recordtimestamp_instance()
+{
     return _rt;
 }
 
 void
-TimestampDiff::min_mean_max(
-        Vector<unsigned> &vec, unsigned &min, double &mean,
-        unsigned &max, const atomic_uint32_t nd)
+TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max)
 {
+    const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
     double sum = 0.0;
 
-    for (auto delay : vec) {
+    for (uint32_t i=0; i<current_vector_length; i++) {
+        unsigned delay = _delays[i];
+
         sum += static_cast<double>(delay);
         if (delay < min) {
             min = delay;
@@ -216,51 +228,75 @@ TimestampDiff::min_mean_max(
         }
     }
 
-    mean = sum / nd;
+    // Set minimum properly if not updated above
+    if (min == UINT_MAX) {
+        min = 0;
+    }
+
+    mean = sum / current_vector_length;
 }
 
 double
-TimestampDiff::standard_deviation(
-        Vector<unsigned> &vec, double mean, const atomic_uint32_t nd)
+TimestampDiff::standard_deviation(const double mean)
 {
+    const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
     double var = 0.0;
-    for (auto delay : vec)
-        var += pow(delay - mean, 2);
-    return sqrt(var / nd);
+
+    for (uint32_t i=0; i<current_vector_length; i++) {
+        var += pow(_delays[i] - mean, 2);
+    }
+
+    // Prevent square root of zero
+    if (var == 0) {
+        return static_cast<double>(0);
+    }
+
+    return sqrt(var / current_vector_length);
 }
 
 double
-TimestampDiff::percentile(Vector<unsigned> &vec, double percent)
+TimestampDiff::percentile(const double percent)
 {
-    double perc = -1;
+    double perc = 0;
 
-    // The size of the vector of latencies
-    size_t vec_size = nd;
+    const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
 
     // The desired percentile
-    size_t idx = (percent * vec_size) / 100;
+    size_t idx = (percent * current_vector_length) / 100;
 
     // Implies empty vector, no percentile.
-    if ((idx == 0) && (vec_size == 0)) {
+    if ((idx == 0) && (current_vector_length == 0)) {
         return perc;
     }
     // Implies that user asked for the 0 percetile (i.e., min).
-    else if ((idx == 0) && (vec_size > 0)) {
-        std::sort(vec.begin(), vec.end());
-        perc = static_cast<double>(vec[0]);
+    else if ((idx == 0) && (current_vector_length > 0)) {
+        std::sort(_delays.begin(), _delays.end());
+        perc = static_cast<double>(_delays[0]);
         return perc;
     // Implies that user asked for the 100 percetile (i.e., max).
-    } else if (idx == vec_size) {
-        std::sort(vec.begin(), vec.end());
-        perc = static_cast<double>(vec[vec_size - 1]);
+    } else if (idx == current_vector_length) {
+        std::sort(_delays.begin(), _delays.end());
+        perc = static_cast<double>(_delays[current_vector_length - 1]);
         return perc;
     }
 
-    auto nth = vec.begin() + idx;
-    std::nth_element(vec.begin(), nth, vec.begin() + nd);
+    auto nth = _delays.begin() + idx;
+    std::nth_element(_delays.begin(), nth, _delays.begin() + current_vector_length);
     perc = static_cast<double>(*nth);
 
     return perc;
+}
+
+unsigned
+TimestampDiff::last_value_seen()
+{
+    const int32_t last_vector_index = static_cast<const int32_t>(_nd.value() - 1);
+
+    if (last_vector_index < 0) {
+        return 0;
+    }
+
+    return _delays[last_vector_index];
 }
 
 CLICK_ENDDECLS
