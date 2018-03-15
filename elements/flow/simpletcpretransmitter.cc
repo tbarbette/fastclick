@@ -153,6 +153,8 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                 FOR_EACH_PACKET(fcb->first_unacked, pr) {
                     if (getSequenceNumber(pr) == seq) {
                         if (lastretransmit == pr) { //Avoid double retransmission
+                            if (_verbose)
+                                click_chatter("Avoid double retransmit");
                         } else {
                             lastretransmit = pr;
                             //click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
