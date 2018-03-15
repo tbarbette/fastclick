@@ -296,6 +296,8 @@ private:
 
     int _modification_level;
     bool _verbose;
+    bool _reorder;
+    bool _proactive_dup;
     friend class TCPOut;
 };
 

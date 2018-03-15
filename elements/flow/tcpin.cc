@@ -13,7 +13,7 @@ CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
     poolFcbTcpCommon(),
-    tableFcbTcpCommon(), _verbose(false)
+    tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(true)
 {
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
@@ -44,6 +44,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     if(Args(conf, this, errh)
     .read_mp("RETURNNAME", returnName)
     .read("FLOWDIRECTION", flowDirectionParam)
+    .read("REORDER", _reorder)
     .read("OUTNAME", outName)
     .read("VERBOSE", _verbose)
     .complete() < 0)
@@ -164,7 +165,9 @@ bool TCPIn::checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bo
     return true;
 }
 
-
+/**
+ * Put packet in unordered list, directly at the right place
+ */
 bool TCPIn::putPacketInList(struct fcb_tcpin* tcpreorder, Packet* packetToAdd)
 {
     Packet* last = NULL;
@@ -406,7 +409,7 @@ eagain:
                 WritablePacket* packet = p->uniqueify();
                 closeConnection(packet, false);
                 if (unlikely(_verbose))
-                    click_chatter("Packet is not syn, closing connection");
+                    click_chatter("Packet is not SYN, closing connection");
                 packet->kill();
                 return NULL;
             }
@@ -420,7 +423,7 @@ eagain:
             p = packet;
 
             if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
-                fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
+                fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now before the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN;
             }
         } /* fcb_in->common != NULL */
@@ -449,15 +452,15 @@ eagain:
                     return NULL;
                 }
             } else if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
-                fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now befor the GT check for the OPEN state
+                fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now before the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN;
             }
         }
 
         tcp_seq_t currentSeq = getSequenceNumber(p);
-        if (currentSeq != fcb_in->expectedPacketSeq) {
+        if (_reorder && currentSeq != fcb_in->expectedPacketSeq) {
             if (unlikely(_verbose))
-                    click_chatter("Flow is unordered... Awaiting %lu, have %lu", fcb_in->expectedPacketSeq, currentSeq);
+                click_chatter("Flow is unordered... Awaiting %lu, have %lu", fcb_in->expectedPacketSeq, currentSeq);
 
             if (isRst(p)) { //If it's a RST, we process it even ooo
                 if (unlikely(_verbose)) {
@@ -465,11 +468,39 @@ eagain:
                 }
                 goto force_process_packet;
             }
+
             //If packet is retransmission, we send it to the retransmitter
             if(!checkRetransmission(fcb_in, p, false)) {
                 return 0;
             }
+            this->ackPacket(p);
 
+            if (_proactive_dup) {
+                if (_verbose)
+                    click_chatter("Sending proactive DUP ACK");
+
+                // Get the information needed to ack the given packet
+                uint32_t saddr = getDestinationAddress(p);
+                uint32_t daddr = getSourceAddress(p);
+                uint16_t sport = getDestinationPort(p);
+                uint16_t dport = getSourcePort(p);
+                // The SEQ value is the initial ACK value in the packet sent
+                // by the source.
+                tcp_seq_t seq;
+                if (allowResize()) {
+                    seq = getInitialAck(p);
+                } else {
+                    seq = getAckNumber(p);
+                }
+
+                tcp_seq_t ack =  fcb_in->expectedPacketSeq;
+
+                fcb_in->common->lock.acquire();
+                // Craft and send the ack
+                outElement->sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+                    sport, dport, seq, ack, true); //We force the sending as we want DUP ack on purpose
+                fcb_in->common->lock.release();
+            }
             putPacketInList(fcb_in, p);
             return 0;
         }
