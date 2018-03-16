@@ -56,10 +56,6 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
             .complete() < 0)
         return -1;
 
-    if (get_passing_threads().weight() > 1 && !_limit) {
-        return errh->error("TimestampDiff is only thread safe if N is set");
-    }
-
     if ((_rt = static_cast<RecordTimestamp*>(e->cast("RecordTimestamp"))) == 0)
         return errh->error("RECORDER must be a valid RecordTimestamp element");
 
@@ -67,6 +63,15 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (_limit) {
         _delays.resize(_limit, 0);
+    }
+
+    return 0;
+}
+
+int TimestampDiff::initialize(ErrorHandler *errh)
+{
+    if (get_passing_threads().weight() > 1 && !_limit) {
+        return errh->error("TimestampDiff is only thread safe if N is set");
     }
 
     return 0;

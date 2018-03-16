@@ -54,6 +54,7 @@ public:
     const char *flow_code() const { return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
     static String read_handler(Element *, void *) CLICK_COLD;
 
