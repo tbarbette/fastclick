@@ -134,6 +134,8 @@ public:
         ErrorHandler *errh
     ) CLICK_COLD;
 
+    EtherAddress get_mac();
+
     void set_mac(EtherAddress mac);
 
     unsigned int get_nb_txdesc();

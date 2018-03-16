@@ -66,14 +66,25 @@ private:
     Vector<unsigned> _delays;
     int _offset;
     int _limit;
-    int _max_delay;
+    int _max_delay_ms;
     RecordTimestamp *_rt;
     atomic_uint32_t nd;
     inline int smaction(Packet* p);
 
     RecordTimestamp* get_recordtimestamp_instance();
 
-    void min_mean_max(Vector<unsigned> &vec, unsigned &min, double &mean, unsigned &max);
+    void min_mean_max(
+        Vector<unsigned> &vec,
+        unsigned &min,
+        double &mean,
+        unsigned &max,
+        const atomic_uint32_t nd
+    );
+    double standard_deviation(
+        Vector<unsigned> &vec,
+        double mean,
+        const atomic_uint32_t nd
+    );
     double percentile(Vector<unsigned> &vec, double percent);
 };
 

@@ -47,6 +47,7 @@ public:
 private:
     atomic_uint32_t _count;
     int _offset;
+    const int _size_of_number = sizeof(uint64_t);
 
     inline Packet* smaction(Packet* p) CLICK_WARN_UNUSED_RESULT;
 
