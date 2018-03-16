@@ -40,9 +40,9 @@ class SetTimestamp : public BatchElement { public:
     const char *port_count() const		{ return PORTS_1_1; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    Packet *simple_action(Packet *) override;
 #if HAVE_BATCH
-    PacketBatch *simple_action_batch(PacketBatch *);
+    PacketBatch *simple_action_batch(PacketBatch *) override;
 #endif
 
   private:
