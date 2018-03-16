@@ -5,7 +5,7 @@
  * Computational batching support by Georgios Katsikas
  *
  * Copyright (c) 2009 Intel Corporation
- * Copyright (c) 2017 RISE SICS AB
+ * Copyright (c) 2017 RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
