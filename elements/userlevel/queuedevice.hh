@@ -160,12 +160,13 @@ protected:
     bool get_spawning_threads(Bitvector& bmk, bool)
     {
     	if (noutputs()) { //RX
-		for (int i = 0; i < n_queues; i++) {
-    			for (int j = 0; j < queue_share; j++) {
-    				bmk[thread_for_queue(i) - j] = 1;
-    			}
-    		}
-    		return true;
+            assert(thread_for_queue_available());
+            for (int i = 0; i < n_queues; i++) {
+                for (int j = 0; j < queue_share; j++) {
+                    bmk[thread_for_queue(i) - j] = 1;
+                }
+            }
+            return true;
     	} else { //TX
     		if (input_is_pull(0)) {
     			bmk[router()->home_thread_id(this)] = 1;
@@ -228,8 +229,11 @@ protected:
         return _tasks[id_for_thread(tid)];
     }
 
+    inline bool thread_for_queue_available() {
+        return !_queue_to_thread.empty();
+    }
+
     inline int thread_for_queue(int queue) {
-        assert(!_queue_to_thread.empty());
         return _queue_to_thread[queue];
     }
 
