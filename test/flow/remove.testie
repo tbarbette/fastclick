@@ -7,7 +7,7 @@ FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 -> fs :: FlowClassifier(VERBOSE 0, CONTEXT NONE)
 ~> IPIn
 -> UDPIn
--> InsultRemover(WORD is, MODE MASK)
+-> WordMatcher(WORD is, MODE MASK)
 -> IPOut
 -> Print("OUT",-2)
 -> ToIPSummaryDump(MASK, FIELDS wire_len src dst proto payload);
@@ -19,7 +19,7 @@ FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 -> FlowClassifier(VERBOSE 0, CONTEXT NONE)
 ~> IPIn
 -> UDPIn
--> InsultRemover(WORD is, MODE REMOVE)
+-> WordMatcher(WORD is, MODE REMOVE)
 -> IPOut
 -> Print("OUT",-2)
 -> ToIPSummaryDump(REMOVE, FIELDS wire_len src dst proto payload);
@@ -29,7 +29,7 @@ FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 -> FlowClassifier(VERBOSE 0, CONTEXT NONE)
 ~> IPIn
 -> UDPIn
--> InsultRemover(WORD is, MODE REPLACE)
+-> WordMatcher(WORD is, MODE REPLACE)
 -> IPOut
 -> Print("OUT",-2)
 -> ToIPSummaryDump(REPLACE, FIELDS wire_len src dst proto payload);

@@ -298,6 +298,7 @@ private:
     int _verbose;
     bool _reorder;
     bool _proactive_dup;
+    bool _retransmit_pt;
     friend class TCPOut;
 };
 

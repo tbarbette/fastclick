@@ -114,8 +114,7 @@ ipOUT[0]
  -> pINRX :: Print(DIRECTRX)
  ~> IPIn
  -> IPPrint(BACKWARD)
- -> TCPReorder
- -> tINRX :: TCPIn(FLOWDIRECTION 0,OUTNAME tOUTRX,RETURNNAME tINTX)
+ -> tINRX :: TCPIn(FLOWDIRECTION 0,OUTNAME tOUTRX,RETURNNAME tINTX,RETRANSMIT_PT true)
  -> tOUTRX :: TCPOut(READONLY true)
  -> IPOut(READONLY true)
  -> IPPrint(BACKWARDOUT)
@@ -128,14 +127,13 @@ ipOUT[1]
  -> other :: FlowContextDispatcher(- 0, - 1)
  -> IPPrint("FORWARD")
  -> IPIn
- -> treTX :: TCPReorder
- -> tINTX :: TCPIn(FLOWDIRECTION 1, OUTNAME tOUTTX, RETURNNAME tINRX)
+ -> tINTX :: TCPIn(FLOWDIRECTION 1, OUTNAME tOUTTX, RETURNNAME tINRX, RETRANSMIT_PT true)
  -> tOUTTX :: TCPOut(READONLY false)
  -> ipOUTTX :: IPOut(READONLY false)
  -> IPPrint(DIRECTTXOUT)
  -> [0]r2;
 
-treTX[1] -> IPPrint(REXMIT)  -> Discard;
+//treTX[1] -> IPPrint(REXMIT)  -> Discard;
 //-> [0]ipOUTTX;
 
 other[1] -> IPPrint(OTHERTX) -> [0]r2;

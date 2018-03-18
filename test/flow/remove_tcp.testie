@@ -7,9 +7,9 @@ FromIPSummaryDump(RX, STOP true, CHECKSUM true, TIMING true)
 -> FlowClassifier(VERBOSE 2, CONTEXT NONE)
 ~> IPIn
 -> IPPrint(RX)
--> tcpin_rx2 :: TCPIn(RETURNNAME tcpin_tx2, VERBOSE true)
+-> tcpin_rx2 :: TCPIn(RETURNNAME tcpin_tx2, VERBOSE 1)
 -> IPPrint(RXTCP)
--> InsultRemover(WORD is, MODE REMOVE)
+-> WordMatcher(WORD is, MODE REMOVE)
 -> Print("OUTR",-1)
 -> IPPrint("OUTR")
 -> to_rx :: TCPOut
@@ -27,7 +27,7 @@ tee[1]
 -> Print("TX",-1)
 ~> IPIn
 -> IPPrint(TX)
--> tcpin_tx2 :: TCPIn(RETURNNAME tcpin_rx2, VERBOSE true)
+-> tcpin_tx2 :: TCPIn(RETURNNAME tcpin_rx2, VERBOSE 1)
 -> to_tx :: TCPOut
 -> IPOut
 -> IPPrint(TXOUT)

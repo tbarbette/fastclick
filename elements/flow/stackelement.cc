@@ -13,7 +13,7 @@ bool StackVisitor::visit(Element *e, bool, int port, Element*, int, int)
     // Check that the element is a stack element
     // If this is not the case, we skip it and continue the traversing
     if(!StackElement::isStackElement(e)) {
-        click_chatter("%p{element} is not stack",e);
+        //click_chatter("%p{element} is not stack",e);
         return true;
     }
 

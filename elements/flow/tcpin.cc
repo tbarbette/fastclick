@@ -13,7 +13,7 @@ CLICK_DECLS
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
     poolFcbTcpCommon(),
-    tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(false)
+    tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(false),_retransmit_pt(false)
 {
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
@@ -48,6 +48,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     .read("OUTNAME", outName)
     .read("VERBOSE", _verbose)
     .read("PROACK", _proactive_dup)
+    .read("RETRANSMIT_PT",_retransmit_pt)
     .complete() < 0)
         return -1;
 
@@ -64,7 +65,7 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
         outElement = this->router()->find(outName, errh);
     }
 
-    if (noutputs() == 1) {
+    if (noutputs() == 1 && !_retransmit_pt) {
         ElementCastTracker visitor(router(),"TCPRetransmitter");
         router()->visit_downstream(this, -1, &visitor);
         if (visitor.size() != 1) {
@@ -125,8 +126,14 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+/**
+ * Check if a packet is a retransmission
+ * @return False if packet is a retransmission. In which case it has been consumed
+ */
 bool TCPIn::checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bool always_retransmit)
 {
+    if (_retransmit_pt)
+        return false;
     // If we receive a packet with a sequence number lower than the expected one
     // (taking into account the wrapping sequence numbers), we consider to have a
     // retransmission
