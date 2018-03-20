@@ -158,6 +158,12 @@ DriverManager(
                 pause,
                 stop);
 %expect stderr
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
+{{Adding element.*}}
 Table of r2/fc after optimization :
 ---
 12/65535 (THREECASE, 2 childs)

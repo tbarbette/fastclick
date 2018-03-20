@@ -31,6 +31,16 @@ public:
 
     virtual bool is_mt_safe() const { return false;};
 
+    virtual bool is_usefull() {
+        return true;
+    }
+    /**
+     * Prune this level with another level, that is we know that this level
+     *  is a sub-path of the other one, and there is no need to classify on
+     *  the given level
+     */
+    virtual void prune(FlowLevel*) {};
+
     /**
      * Tell if two node are of the same type, and on the same field/value/mask if applicable
      *
@@ -623,6 +633,10 @@ public:
         return _offset;
     }
 
+    virtual int mask_size() const = 0;
+
+    virtual uint8_t get_mask(int o) const = 0;
+
     bool equals(FlowLevel* level) {
         return ((FlowLevel::equals(level))&& (_offset == dynamic_cast<FlowLevelOffset*>(level)->_offset));
     }
@@ -650,8 +664,49 @@ public:
         _offset = offset;
     }
 
-    uint8_t mask() const {
+    T mask() const {
         return _mask;
+    }
+
+    virtual int mask_size() const {
+        return sizeof(T);
+    }
+
+    virtual uint8_t get_mask(int o) const {
+        if (o < _offset)
+            return 0;
+        if (o > _offset + mask_size())
+            return 0;
+        return ((uint8_t*)&_mask)[o-_offset];
+    }
+
+    virtual bool is_usefull() override {
+        return _mask != 0;
+    }
+
+    virtual void prune(FlowLevel* other) override {
+        FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
+        if (ol == 0)
+            return;
+        /*if (_offset >= ol->offset() + ol->mask_size()) { //Starts after the end
+            // - A A A A (1 L4)
+            // B         (0 L1)
+            // 1 >= 1
+            return false;
+        }
+        if (_offset + mask_size() <= ol->offset()) { //Ends after the beginning of other
+            // A A A A - (0 L4)
+            //         B (4 L1)
+            // 4 <= 4
+            return false;
+        }*/
+        //There is an overlap
+        // A A A A (0 L4)
+        // B       (0 L1)
+        for (int i = 0; i < mask_size(); i++) {
+            uint8_t inverted = ol->get_mask(_offset + i);
+            _mask = _mask & (~(T)inverted);
+        }
     }
 
     inline long unsigned get_max_value() {

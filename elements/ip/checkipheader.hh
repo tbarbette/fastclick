@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKIPHEADER_HH
 #define CLICK_CHECKIPHEADER_HH
-#include <click/flowelement.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 class Args;
@@ -104,7 +104,7 @@ subdivided by error. Only available if the DETAILS keyword argument was true.
 =a CheckIPHeader2, MarkIPHeader, SetIPChecksum, StripIPHeader,
 CheckTCPHeader, CheckUDPHeader, CheckICMPHeader */
 
-class CheckIPHeader : public FlowElement { public:
+class CheckIPHeader : public BatchElement { public:
 
   CheckIPHeader() CLICK_COLD;
   ~CheckIPHeader() CLICK_COLD;

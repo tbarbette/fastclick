@@ -697,6 +697,13 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
                     child_ptr->set_node(other_child_ptr->node);
                     child_ptr->node->set_parent(this);
                 } else {
+                    click_chatter("ERROR when merging :");
+                    other_child_ptr->print();
+                    child_ptr->print();
+                    click_chatter("Their parents are :");
+                    other->print();
+                    this->print();
+                    click_chatter("There are probably merging paths");
                     assert(false);
                 }
             }
@@ -811,36 +818,45 @@ void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
  */
 FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed)  {
     if (is_dummy()) { //If we are dummy, we cannot prune TODO: Still prune parent?
-        changed = false;
         return FlowNodePtr(this);
     }
+
+    debug_flow("Prune level %s, i %d, data %llu",level->print().c_str(),inverted,data.data_64);
     if (level->is_dynamic()) {
 #if DEBUG_CLASSIFIER
-        click_chatter("Not pruning a dynamic level");
+        click_chatter("Pruning a dynamic level");
 #endif
-        return FlowNodePtr(this);
-    }
-    debug_flow("Prune level %s, i %d, data %llu",level->print().c_str(),inverted,data.data_64);
-    if (level->equals(this->level())) { //Same level
-        if (inverted) {
-            //Remove data from level if it exists
-            FlowNodePtr* ptr = find(data);
-            assert(this->child_deletable());
-            FlowNodePtr child = *ptr;
-            ptr->ptr = 0;
-            dec_num();
-            changed = true;
-            //TODO delete child
+        /*Remove identical sessions*/
+        if (this->level()->is_dynamic()) {
+            assert(this->getNum() == 0);
+            this->level()->prune(level);
+            if (!this->level()->is_usefull()) {
+                assert(this->getNum() == 0);
+                return _default;
+            }
+        }
+    } else {
+        if (level->equals(this->level())) { //Same level
+            if (inverted) {
+                //Remove data from level if it exists
+                FlowNodePtr* ptr = find(data);
+                assert(this->child_deletable());
+                FlowNodePtr child = *ptr;
+                ptr->ptr = 0;
+                dec_num();
+                changed = true;
+                //TODO delete child
 
-        } else {
-            //Return the child
-            FlowNodePtr* ptr = find_or_default(data);
-            FlowNodePtr child = *ptr;
-            dec_num();
-            ptr->ptr = 0;
-            //TODO delete this;
-            changed = true;
-            return child;
+            } else {
+                //Return the child
+                FlowNodePtr* ptr = find_or_default(data);
+                FlowNodePtr child = *ptr;
+                dec_num();
+                ptr->ptr = 0;
+                //TODO delete this;
+                changed = true;
+                return child;
+            }
         }
     }
 
@@ -1013,9 +1029,25 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
 FlowNode* FlowNode::optimize(bool mt_safe) {
 	FlowNodePtr* ptr;
 
-	if (level()->is_mt_safe()) {
-	    mt_safe = true;
-	}
+	//Before everything else, remove this level if it's dynamic but useless
+    if (level()->is_dynamic() && !level()->is_usefull()) {
+        assert(getNum() == 0);
+        //No nead for this level
+        if (default_ptr()->is_node()) {
+#if DEBUG_CLASSIFIER
+                click_chatter("Optimize : no need for this dynamic level");
+#endif
+                _default.set_parent(0);
+                return _default.node;
+        } else {
+            click_chatter("WARNING : useless path, please specify this to author");
+        }
+    }
+
+    if (level()->is_mt_safe()) {
+        mt_safe = true;
+    }
+
 
 	if (level()->is_dynamic() && !mt_safe) {
 	    FlowLevel* thread = new FlowLevelThread(click_max_cpu_ids());
@@ -1172,6 +1204,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 #if DEBUG_CLASSIFIER
 		click_chatter("Dynamic level won't be optimized");
 #endif
+		//TODO : merge classification that could be merged
 		return dynamic_cast<FlowNodeDefinition*>(this)->create_final(mt_safe);
 	}
 
