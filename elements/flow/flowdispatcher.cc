@@ -69,7 +69,11 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 	    else
 	        return errh->error("Invalid rule set. There is no rule and not a single output.");
 	} else if (!rules[rules.size() -1].is_default || _children_merge) {
-	    rules.push_back(FlowClassificationTable::make_drop_rule());
+	    auto r = FlowClassificationTable::make_drop_rule();
+	    if (defaultOutput == noutputs() - 1) { //The last output is a reject port
+	        r.output = noutputs() - 1;
+	    }
+	    rules.push_back(r);
 	}
 
 	return 0;

@@ -638,6 +638,36 @@ template class FlowNodeHash<9>;
 
 
 
+template<typename T>
+bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
+    assert(is_dynamic());
+    FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
+    if (ol == 0)
+        return FlowLevelOffset::prune(other);
+
+    T m = _mask;
+    for (int i = 0; i < mask_size(); i++) {
+        uint8_t inverted = ol->get_mask(_offset + i);
+        //click_chatter("DMask %d %u",i,inverted);
+        m = m & (~((T)inverted << ((mask_size() - i - 1)*8)));
+    }
+    /*
+     * Should we care if other is dynamic ?
+     * if (other->is_dynamic())
+     *  //EG 0/FF is pruned with 0/05/FF
+     * else
+     * //EG 0/FF is pruned with 0/0/FF
+     * -> In each cache we just have to remove the known part from the mask
+     */
+
+    if (_mask != m) {
+        _mask = m;
+        return true;
+    }
+    return false;
+    //click_chatter("DMask is now %x",_mask);
+}
+
 FlowNodePtr
 FlowLevel::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
     if (other->equals(this)) {
@@ -652,19 +682,6 @@ FlowLevel::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &chan
     return FlowNodePtr(node);
 }
 
-template<typename T>
-void FlowLevelGeneric<T>::prune(FlowLevel* other) {
-    assert(is_dynamic());
-    FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
-    if (ol == 0)
-        return;
-    for (int i = 0; i < mask_size(); i++) {
-        uint8_t inverted = ol->get_mask(_offset + i);
-        //click_chatter("DMask %d %u",i,inverted);
-        _mask = _mask & (~((T)inverted << ((mask_size() - i - 1)*8)));
-    }
-    //click_chatter("DMask is now %x",_mask);
-}
 
 template<typename T>
 FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {

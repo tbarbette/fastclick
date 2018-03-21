@@ -413,6 +413,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 
 	assert(other->parent() == 0);
 
+	//Remove useless level (case where this is dummy)
 	if (dynamic_cast<FlowLevelDummy*>(this->level()) != 0) {
 	        debug_flow("COMBINE (as child : %d, default is leaf : %d) : I am dummy",as_child,_default.is_leaf());
 	        if (_default.is_leaf()) {
@@ -428,6 +429,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 	        }
 	}
 
+	//Remove useless level (case where other is dummy)
 	if (dynamic_cast<FlowLevelDummy*>(other->level()) != 0) { //Other is dummy :
 	    debug_flow("COMBINE : Other is dummy")
 	    //If other is a dummy (and we're not)
@@ -496,6 +498,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority) {
 
 void FlowNode::__combine_child(FlowNode* other, bool priority) {
 	if (level()->equals(other->level())) { //Same level
+
 #if DEBUG_CLASSIFIER
 		click_chatter("COMBINE : same level");
 #endif
@@ -561,20 +564,6 @@ void FlowNode::__combine_child(FlowNode* other, bool priority) {
         this->check();
 		return;
 	}
-    /*
-    else if (dynamic_cast<FlowLevelOffset*>(level()) && dynamic_cast<FlowLevelOffset*>(other->level())) {
-#if DEBUG_CLASSIFIER
-		click_chatter("COMBINE : two level offset");
-#endif
-        assert(false);
-		FlowLevelOffset* o1 = dynamic_cast<FlowLevelOffset*>(level());
-		FlowLevelOffset* o2 = dynamic_cast<FlowLevelOffset*>(other->level());
-
-//if (o1->get_max_value() == o2->get_max_value() && abs(o1->offset() - o2->offset())) { //Offset is different
-
-//		}
-	}
-*/
 
 	 {
 
@@ -601,49 +590,6 @@ void FlowNode::__combine_child(FlowNode* other, bool priority) {
  * Add a rule to all default path
  */
 void FlowNode::__combine_else(FlowNode* other, bool priority) {
-
-    /**
-     * Function replacing all default leaf and empty default per other
-     */
-    /*auto fnt = [this,other](FlowNode* parent) -> bool {
-            if (parent->_default.ptr == 0) {
-                click_chatter("Creating default leaf");
-
-                //Set default takes care of setting child's parent
-                FlowNodePtr no(other->duplicate(true, 1));
-
-                //Prune the downward tree with all values of the future new parent
-                FlowNode* gparent = parent;
-                FlowNodeData gdata = {0};
-                bool was_default = true;
-                while (gparent != NULL) {
-                    if (!was_default)
-                        no = no.node->prune(gparent->level(),gdata);
-                    if (!no.ptr) { //Completely pruned, keep the _default as it.
-                        return true;
-                    }
-                    if (no.is_leaf()) {
-                        break;
-                    }
-                    gdata = gparent->node_data;
-                    FlowNode* child = gparent;
-                    gparent = gparent->parent();
-                    was_default = !gparent || child == gparent->default_ptr()->node;
-                }
-                if (no.is_leaf()) {
-                    *parent->default_ptr() = no;
-                } else {
-                    assert (parent == parent->combine(no.node, false));
-                }
-            } else {
-                click_chatter("Replacing default leaf");
-                assert(parent->default_ptr()->is_leaf());
-                parent->_default.replace_leaf_with_node(other);
-            }
-            return true;
-        };
-
-*/
 
     if (level()->equals(other->level())) { //Same level
         if (other->level()->is_dynamic()) {
@@ -817,45 +763,78 @@ void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
  * Prune the tree by adding the knowledge that the given level will or will not (inverted) be of the given value
  * if inverted, it means the level will NOT be data
  */
-FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed)  {
-    if (is_dummy()) { //If we are dummy, we cannot prune TODO: Still prune parent?
+FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, bool &changed)  {
+    if (is_dummy()) { //If we are dummy, we cannot prune
         return FlowNodePtr(this);
     }
 
     FlowNodePtr ptr(this);
 
-    debug_flow("Prune level %s, i %d, data %llu",level->print().c_str(),inverted,data.data_64);
-    if (level->is_dynamic()) {
-#if DEBUG_CLASSIFIER
-        click_chatter("Pruning a dynamic level");
-#endif
-        /*Remove identical sessions*/
-        if (inverted) { //We're in the default path, nothing to remove as it won't help that we know we won't see some dynamic value
+    debug_flow("Prune level %s(dyn%d) with %s(dyn%d), i %d, data %llu",
+            level()->print().c_str(),level()->is_dynamic(),
+            olevel->print().c_str(),olevel->is_dynamic(),
+            inverted,
+            data.data_64);
 
-        } else {
-            assert(this->getNum() == 0);
-            this->level()->prune(level);
-            if (!this->level()->is_usefull()) {
-                assert(this->getNum() == 0);
-                return _default;
+    if (level()->is_dynamic()) { //If we are dynamic, we can remove from our mask the mask of the second value
+        debug_flow("Pruning a dynamic level...");
+        if (inverted && !olevel->is_dynamic()) {//We're in the default path, nothing to remove as it won't help that we know we won't see some static value
+            debug_flow("Inverted...");
+        } else { //Not inverted (we will see the given value), or inverted but other is a dynamic value meaning that the bits of level will be known when reaching this value
+            assert(!(olevel->is_dynamic() && !inverted));//We would be in the child of a dynamic level that is not on a defautl path
+            /**
+             * If other is dynamic or not does not matter, we will have those bits fixed, so we remove it from our dynamic mask
+             */
+            if (this->level()->prune(olevel)) {
+                changed = true;
+                if (!this->level()->is_usefull()) {
+                    debug_flow("Not usefull anymore, returning default !");
+                    assert(this->getNum() == 0);
+                    ptr = _default;
+                } else {
+                    assert(this->getNum() == 0);
+                    /*ptr.node->apply_default([ptr,olevel,data,inverted,&changed](FlowNodePtr* cur){
+                        if (cur->is_leaf()) {
+                            return;
+                        }
+                        FlowNodeData old_data = cur->data();
+                        FlowNodePtr newcur = cur->node->prune(olevel, data, inverted, changed);
+                        if (cur->ptr == newcur.ptr) //CHild did not change
+                            return;
+                        changed = true;
+                        assert(newcur.ptr != 0);
+                        if (newcur.is_node()) {
+                            newcur.node->check();
+                        }
+                        *cur = newcur;
+                        cur->set_data(old_data);
+                        cur->set_parent(ptr.node);
+                    });*/
+                }
             }
         }
-    } else {
-        if (inverted) {
-            if (level->equals(this->level())) { //Same level
-                //Remove data from level if it exists
-                FlowNodePtr* ptr_child = find(data);
-                assert(this->child_deletable());
-                FlowNodePtr child = *ptr_child;
-                ptr_child->ptr = 0;
-                dec_num();
-                changed = true;
-                //TODO delete child
-            }
-        } else {
-            //Return the child
-            ptr = _level->prune(level, data, this, changed);
 
+    } else {
+        debug_flow("Pruning a static level...");
+        if (olevel->is_dynamic()) {
+            //At this time the value will be known... But that does not help us
+            click_chatter("Static child of a dynamic parent.");
+            assert(false);
+        } else {
+            if (inverted) {
+                if (olevel->equals(this->level())) { //Same level
+                    //Remove data from level if it exists
+                    FlowNodePtr* ptr_child = find(data);
+                    assert(this->child_deletable());
+                    FlowNodePtr child = *ptr_child;
+                    ptr_child->ptr = 0;
+                    dec_num();
+                    changed = true;
+                    //TODO delete child
+                }
+            } else {
+                ptr = _level->prune(olevel, data, this, changed);
+            }
         }
         /*if (level->equals(this->level())) { //Same level
             if (inverted) {
@@ -887,12 +866,12 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
     /**
      * Prune all child node including default
      */
-    ptr.node->apply_default([ptr,level,data,inverted,&changed](FlowNodePtr* cur){
+    ptr.node->apply_default([ptr,olevel,data,inverted,&changed](FlowNodePtr* cur){
         if (cur->is_leaf()) {
             return;
         }
         FlowNodeData old_data = cur->data();
-        FlowNodePtr newcur = cur->node->prune(level, data, inverted, changed);
+        FlowNodePtr newcur = cur->node->prune(olevel, data, inverted, changed);
         if (cur->ptr == newcur.ptr) //CHild did not change
             return;
         changed = true;
@@ -968,7 +947,9 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
 
     flow_assert(other->is_full_dummy() || !other->is_dummy());
 #if DEBUG_CLASSIFIER
-    click_chatter("Pruning:");
+    click_chatter("Replacing leaf");
+    print();
+    click_chatter("Of:");
     if (this->parent() and this->parent()->parent())
         this->parent()->root()->print();
     else if (this->parent())
@@ -976,15 +957,16 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
     else
         this->print();
     click_chatter("With other :");
-    other->print();
+    no.print();
 #endif
     //Prune the downward tree with all values of the future new parent
     FlowNode* gparent = old_parent;
     FlowNodeData gdata = old_data;
     bool was_default = old_parent->default_ptr()->ptr == leaf;
     while (gparent != NULL) {
-        no = no.node->prune(gparent->level(),gdata, false, changed);
+        no = no.node->prune(gparent->level(),gdata, was_default, changed);
         if (!no.ptr) { //Completely pruned, keep the FCB as it.
+            debug_flow("Completely pruned");
             return true;
         }
         if (no.is_leaf()) {
@@ -1047,7 +1029,7 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
 }
 
 /**
- * Optimize table, removing entries known to be of some value in the leaf
+ * Optimize table, changing nodes perf the appropriate data structure, removinf useless classification step entries
  * If the path is not mt-safe but reaches a non-mutable level (eg dynamic), a thread node will be added
  */
 FlowNode* FlowNode::optimize(bool mt_safe) {
@@ -1229,7 +1211,6 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 #if DEBUG_CLASSIFIER
 		click_chatter("Dynamic level won't be optimized");
 #endif
-		//TODO : merge classification that could be merged
 		return dynamic_cast<FlowNodeDefinition*>(this)->create_final(mt_safe);
 	}
 

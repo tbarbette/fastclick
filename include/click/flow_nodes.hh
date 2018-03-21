@@ -119,8 +119,9 @@ public:
      * Prune this level with another level, that is we know that this level
      *  is a sub-path of the other one, and there is no need to classify on
      *  the given level
+     *  @return true if something changed
      */
-    virtual void prune(FlowLevel*) {};
+    virtual bool prune(FlowLevel*) {return false;};
 
     virtual FlowNodePtr prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed);
 
@@ -696,7 +697,7 @@ public:
     }
 
     //Remove from the mask what is already set in other
-    virtual void prune(FlowLevel* other) override;
+    virtual bool prune(FlowLevel* other) override;
 
     /**
      * Remove children that don't match data at offset overlaps
