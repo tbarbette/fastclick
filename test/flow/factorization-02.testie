@@ -1,0 +1,37 @@
+%info
+Simple session factorization
+
+%script
+click CONF
+
+%file CONF
+    fcA :: FlowClassifier(VERBOSE 3, VERBOSE_FCB 0)
+    -> FlowDispatcher(0/08)
+    -> FlowDispatcher(0/08)
+    -> Print(PASSED) -> Discard;
+InfiniteSource(DATA \<0823>, LIMIT 1, STOP true) -> fcA;
+InfiniteSource(DATA \<0923>, LIMIT 1, STOP true) -> fcA;
+
+DriverManager(wait,wait);
+
+%expect stderr
+Table of fcA after optimization :
+---
+0/FF (TWOCASE, 1 childs)
+|-> 8 UC:1 ED:0 (data 08000000000000000000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
+---
+Table of fcA after getting new packet (length 2) :
+---
+0/FF (TWOCASE, 1 childs)
+|-> 8 UC:1 ED:0 (data 08000000000000000000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
+---
+PASSED:    2 | 0823
+Table of fcA after getting new packet (length 2) :
+---
+0/FF (TWOCASE, 1 childs)
+|-> 8 UC:1 ED:0 (data 08000000000000000000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
+---
+

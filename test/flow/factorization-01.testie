@@ -1,0 +1,26 @@
+%info
+Simple session factorization
+
+%script
+click CONF
+
+%file CONF
+InfiniteSource(DATA \<0123>, LIMIT 1, STOP true)
+    -> fcA :: FlowClassifier(VERBOSE 3, VERBOSE_FCB 0) -> FlowDispatcher(0/00/ff) -> FlowDispatcher(0/00/ff) -> Print(PASSED) -> Discard;
+
+
+%expect stderr
+Table of fcA after optimization :
+---
+0/FF (ARRAY, 0 childs, dynamic)
+|-> DEFAULT 18446744073709551615 UC:1 ED:0 (data ffffffffffffffff0000000000000000)
+---
+Table of fcA after getting new packet (length 2) :
+---
+0/FF (ARRAY, 1 childs, dynamic)
+|-> 1 UC:0 ED:0 (data 01000000000000000000000000000000)
+|-> DEFAULT 18446744073709551615 UC:1 ED:0 (data ffffffffffffffff0000000000000000)
+---
+PASSED:    2 | 0123
+
+
