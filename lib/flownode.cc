@@ -635,3 +635,136 @@ template class FlowNodeHash<6>;
 template class FlowNodeHash<7>;
 template class FlowNodeHash<8>;
 template class FlowNodeHash<9>;
+
+
+template<typename T>
+void FlowLevelGeneric<T>::prune(FlowLevel* other) {
+    assert(is_dynamic());
+    FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
+    if (ol == 0)
+        return;
+    for (int i = 0; i < mask_size(); i++) {
+        uint8_t inverted = ol->get_mask(_offset + i);
+        //click_chatter("DMask %d %u",i,inverted);
+        _mask = _mask & (~((T)inverted << ((mask_size() - i - 1)*8)));
+    }
+    //click_chatter("DMask is now %x",_mask);
+}
+
+template<typename T>
+FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
+        FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
+        if (ol == 0)
+            return FlowNodePtr(node);
+
+        int shift = offset() - ol->offset();
+        T shiftedmask = 0;
+
+        for (int i = 0; i < mask_size(); i++) {
+            //click_chatter("Mask for %d : %x",i,ol->get_mask(_offset + i));
+            shiftedmask = shiftedmask | (ol->get_mask(_offset + i) << ((mask_size() - i - 1)*8));
+        }
+        //click_chatter("Offset %d, shiftedmask %x mask %x",shift,shiftedmask,_mask);
+        if (_mask == shiftedmask) { //Value totally define the child, only keep that one
+            FlowNodePtr* ptr = node->find_or_default(data);
+            FlowNodePtr child = *ptr;
+            node->dec_num();
+            ptr->ptr = 0;
+            //TODO delete this;
+            changed = true;
+            return child;
+        } else {
+            //A B (O 2) other
+            //  C D (1 2) --> only keep children with C == B
+            T shifteddata;
+            if (shift < 0) {
+                shifteddata = data.data_64 >> (-shift * 8);
+            } else {
+                shifteddata = data.data_64 << (shift * 8);
+            }
+            shifteddata = shifteddata & shiftedmask & _mask;
+            //click_chatter("Shifteddata %x",shifteddata);
+            node->apply([this,node,shiftedmask,shifteddata](FlowNodePtr* cur){
+                    if ((((T)cur->data().data_64) & shiftedmask) != shifteddata) {
+                        //click_chatter("%x does not match %x",cur->data().data_64 & shiftedmask, shifteddata);
+                        cur->ptr = 0;
+                        //TODO delete
+                        node->dec_num();
+                    }
+            });
+            _mask = _mask & shiftedmask;
+            if (node->getNum() == 0) {
+                return *node->default_ptr();
+            }
+            return FlowNodePtr(node);
+        }
+}
+
+template<typename T>
+FlowLevel* FlowLevelGeneric<T>::optimize() {
+    T nmask = _mask;
+    int sz = sizeof(T); //Eg. 4 for uint32_t
+    int i = 0;
+    int offset = _offset;
+    while (i < sz && (((nmask >> ((sz - i - 1) * 8)) & 0xff) == (uint8_t)0)) {
+        i++;
+    }
+    int r = 0;
+
+    //00FFFF00 -> i = 1
+    //offset+=i;
+    sz -= i;
+    //FFFF00
+    i = 0;
+    /*while (i < sz && ((nmask & 0xff) == 0)) { //Imply to rebuild all data
+        nmask = nmask >> 8;
+        i++;
+    }*/
+    sz -= i;
+    //FFFF
+
+    //if (sz < sizeof(T)) {
+        switch(sz) {
+            case 0:
+                assert(false);
+                return 0;
+            case 1:
+                if (nmask == (uint8_t)-1)
+                    return (new FlowLevelField<uint8_t>(offset))->assign(this);
+                return (new FlowLevelGeneric<uint8_t>(nmask,offset))->assign(this);
+            case 2:
+                if (nmask == (uint16_t)-1)
+                    return (new FlowLevelField<uint16_t>(offset))->assign(this);
+                return (new FlowLevelGeneric<uint16_t>(nmask,offset))->assign(this);
+            case 3:
+                /*if (offset - 1 & 0x3 == 0)
+                    offset -= 1;
+                else if (offset & 0x3 == 0)
+                    nmask <<= 8;
+                else if (offset - 1 & 0x1 == 0)
+                    offset -= 1;
+                else
+                    nmask <<= 8;*/
+            case 4:
+                if (nmask == (uint32_t)-1)
+                    return (new FlowLevelField<uint32_t>(offset))->assign(this);
+                return (new FlowLevelGeneric<uint32_t>(nmask,offset))->assign(this);
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+                if (nmask == (uint64_t)-1)
+                    return (new FlowLevelField<uint64_t>(offset))->assign(this);
+                return this;//new FlowLevelGeneric<uint64_t>(offset,nmask);
+            default:
+                assert(false);
+        }
+    //}
+
+    return this;
+}
+
+template class FlowLevelGeneric<uint8_t>;
+template class FlowLevelGeneric<uint16_t>;
+template class FlowLevelGeneric<uint32_t>;
+template class FlowLevelGeneric<uint64_t>;

@@ -104,8 +104,10 @@ FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), 
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
+    _size_verbose = 3;
 #else
     _verbose = 0;
+    _size_verbose = 0;
 #endif
 }
 
@@ -127,6 +129,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("BUILDER",_builder)
             .read("AGGTRUST",_collision_is_life)
             .read("VERBOSE",_verbose)
+            .read("VERBOSE_FCB", _size_verbose)
             .read("CONTEXT",context)
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
             .read("CLEAN_TIMER",_clean_timer)
@@ -136,7 +139,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     FlowBufferVisitor v(this, sizeof(FlowNodeData) + (_aggcache?sizeof(uint32_t):0) + reserve);
-    v.display_assignation = _verbose > 1;
+    v.display_assignation = _size_verbose > 0;
     router()->visit_ports(this,true,-1,&v);
 #if DEBUG_CLASSIFIER
     click_chatter("%s : pool size %d",name().c_str(),v.data_size);
@@ -567,7 +570,11 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             fcb = _table.match(p,_aggcache);
         }
         if (_verbose > 2) {
-            click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
+            if (_verbose > 3) {
+                click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
+            } else {
+                click_chatter("Table of %s after getting new packet (length %d) :",name().c_str(),p->length());
+            }
             _table.get_root()->print(-1,false);
         }
         if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {
@@ -668,7 +675,11 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
             fcb = _table.match(p,_aggcache);
         }
         if (_verbose > 2) {
-            click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
+            if (_verbose > 3) {
+                click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
+            } else {
+                click_chatter("Table of %s after getting new packet (length %d) :",name().c_str(),p->length());
+            }
             _table.get_root()->print(-1,false);
         }
         if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {

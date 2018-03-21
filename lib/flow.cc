@@ -1061,7 +1061,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
                 click_chatter("Optimize : no need for this dynamic level");
 #endif
                 _default.set_parent(0);
-                return _default.node;
+                return _default.node->optimize(mt_safe);
         } else {
             click_chatter("WARNING : useless path, please specify this to author");
         }
@@ -1071,6 +1071,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
         mt_safe = true;
     }
 
+    _level = level()->optimize();
 
 	if (level()->is_dynamic() && !mt_safe) {
 	    FlowLevel* thread = new FlowLevelThread(click_max_cpu_ids());

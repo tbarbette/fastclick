@@ -169,6 +169,10 @@ public:
     }
 
     virtual FlowLevel *duplicate() = 0;
+
+    virtual FlowLevel *optimize() {
+        return this;
+    }
 };
 
 #define FLOW_NODE_DEFINE(T,fnt) \
@@ -694,69 +698,12 @@ public:
     }
 
     //Remove from the mask what is already set in other
-    virtual void prune(FlowLevel* other) override {
-        assert(is_dynamic());
-        FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
-        if (ol == 0)
-            return;
-        for (int i = 0; i < mask_size(); i++) {
-            uint8_t inverted = ol->get_mask(_offset + i);
-            //click_chatter("DMask %d %u",i,inverted);
-            _mask = _mask & (~((T)inverted << ((mask_size() - i - 1)*8)));
-        }
-        //click_chatter("DMask is now %x",_mask);
-    }
+    virtual void prune(FlowLevel* other) override;
 
     /**
      * Remove children that don't match data at offset overlaps
      */
-    virtual FlowNodePtr prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) override {
-            FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
-            if (ol == 0)
-                return FlowNodePtr(node);
-
-            int shift = offset() - ol->offset();
-            T shiftedmask = 0;
-
-            for (int i = 0; i < mask_size(); i++) {
-                //click_chatter("Mask for %d : %x",i,ol->get_mask(_offset + i));
-                shiftedmask = shiftedmask | (ol->get_mask(_offset + i) << ((mask_size() - i - 1)*8));
-            }
-            //click_chatter("Offset %d, shiftedmask %x mask %x",shift,shiftedmask,_mask);
-            if (_mask == shiftedmask) { //Value totally define the child, only keep that one
-                FlowNodePtr* ptr = node->find_or_default(data);
-                FlowNodePtr child = *ptr;
-                node->dec_num();
-                ptr->ptr = 0;
-                //TODO delete this;
-                changed = true;
-                return child;
-            } else {
-                //A B (O 2) other
-                //  C D (1 2) --> only keep children with C == B
-                T shifteddata;
-                if (shift < 0) {
-                    shifteddata = data.data_64 >> (-shift * 8);
-                } else {
-                    shifteddata = data.data_64 << (shift * 8);
-                }
-                shifteddata = shifteddata & shiftedmask & _mask;
-                //click_chatter("Shifteddata %x",shifteddata);
-                node->apply([this,node,shiftedmask,shifteddata](FlowNodePtr* cur){
-                        if ((((T)cur->data().data_64) & shiftedmask) != shifteddata) {
-                            //click_chatter("%x does not match %x",cur->data().data_64 & shiftedmask, shifteddata);
-                            cur->ptr = 0;
-                            //TODO delete
-                            node->dec_num();
-                        }
-                });
-                _mask = _mask & shiftedmask;
-                if (node->getNum() == 0) {
-                    return *node->default_ptr();
-                }
-                return FlowNodePtr(node);
-            }
-        }
+    virtual FlowNodePtr prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) override;
 
     inline long unsigned get_max_value() {
         return _mask;
@@ -765,8 +712,6 @@ public:
     inline FlowNodeData get_data(Packet* packet) {
         return FlowNodeData((T)(*((T*)(packet->data() + _offset)) & _mask));
     }
-
-
 
     String print() {
         StringAccum s;
@@ -779,7 +724,6 @@ public:
         return s.take_string();
     }
 
-
     FlowLevel* duplicate() override {
         return (new FlowLevelGeneric<T>(_mask,_offset))->assign(this);
     }
@@ -787,12 +731,77 @@ public:
     bool equals(FlowLevel* level) {
         return ((FlowLevelOffset::equals(level)) && (_mask == dynamic_cast<FlowLevelGeneric<T>*>(level)->_mask));
     }
+
+
+    virtual FlowLevel *optimize() override;
+};
+
+/**
+ * Flow level for any offset/mask of T bits
+ */
+template <typename T>
+class FlowLevelField : public FlowLevelOffset {
+public:
+
+    FlowLevelField(int offset) : FlowLevelOffset(offset) {
+        _get_data = &get_data_ptr;
+    }
+    FLOW_LEVEL_DEFINE(FlowLevelField<T>,get_data);
+
+    FlowLevelField() : FlowLevelField(0) {
+
+    }
+
+    T mask() const {
+        return (T)-1;
+    }
+
+    virtual uint8_t get_mask(int o) const {
+        if (o < _offset)
+            return 0;
+        if (o > _offset + mask_size())
+            return 0;
+        return 0xff;
+    }
+
+    virtual int mask_size() const {
+        return sizeof(T);
+    }
+
+    inline long unsigned get_max_value() {
+        return mask();
+    }
+
+    inline FlowNodeData get_data(Packet* packet) {
+        //click_chatter("%d %x",_offset,*(T*)(packet->data() + _offset));
+        return FlowNodeData(*(T*)(packet->data() + _offset));
+    }
+
+    String print() {
+        StringAccum s;
+        s << _offset;
+        s << "/";
+        for (int i = 0; i < sizeof(T); i++) {
+            s << "FF";
+        }
+        return s.take_string();
+    }
+
+    FlowLevel* duplicate() override {
+        return (new FlowLevelField<T>(_offset))->assign(this);
+    }
+
 };
 
 using FlowLevelGeneric8 = FlowLevelGeneric<uint8_t>;
 using FlowLevelGeneric16 = FlowLevelGeneric<uint16_t>;
 using FlowLevelGeneric32 = FlowLevelGeneric<uint32_t>;
 using FlowLevelGeneric64 = FlowLevelGeneric<uint64_t>;
+
+using FlowLevelField8 = FlowLevelField<uint8_t>;
+using FlowLevelField16 = FlowLevelField<uint16_t>;
+using FlowLevelField32 = FlowLevelField<uint32_t>;
+using FlowLevelField64 = FlowLevelField<uint64_t>;
 
 /**
  * Node implemented using a linkedlist

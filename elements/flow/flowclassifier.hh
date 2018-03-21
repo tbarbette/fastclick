@@ -29,6 +29,7 @@ class FlowClassifier: public FlowElement {
     bool _aggcache;
     int _pull_burst;
     int _verbose;
+    int _size_verbose;
     int _builder;
     int _builder_mask;
     bool _collision_is_life;
