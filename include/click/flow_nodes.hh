@@ -2,89 +2,12 @@
 #define CLICK_FLOW_NODES_HH 1
 
 #include <click/allocator.hh>
+#include <click/straccum.hh>
 
 #define FLOW_LEVEL_DEFINE(T,fnt) \
         static FlowNodeData get_data_ptr(void* thunk, Packet* p) {\
             return static_cast<T*>(thunk)->fnt(p);\
         }
-
-class FlowLevel {
-private:
-    //bool deletable;
-protected:
-    bool _dynamic;
-    bool _islong = false;
-public:
-    FlowLevel() :
-        //deletable(true),
-        _dynamic(false) {
-
-    };
-
-    typedef FlowNodeData (*GetDataFn)(void*, Packet* packet);
-    GetDataFn _get_data;
-
-    virtual ~FlowLevel() {};
-    virtual long unsigned get_max_value() = 0;
-
-    virtual void add_offset(int offset) {};
-
-    virtual bool is_mt_safe() const { return false;};
-
-    virtual bool is_usefull() {
-        return true;
-    }
-    /**
-     * Prune this level with another level, that is we know that this level
-     *  is a sub-path of the other one, and there is no need to classify on
-     *  the given level
-     */
-    virtual void prune(FlowLevel*) {};
-
-    /**
-     * Tell if two node are of the same type, and on the same field/value/mask if applicable
-     *
-     * However this is not checking if runtime data and dynamic are equals
-     */
-    virtual bool equals(FlowLevel* level) {
-        return typeid(*this) == typeid(*level) && _islong == level->_islong && _dynamic == level->_dynamic;
-    }
-
-    inline FlowNodeData get_data(Packet* p) {
-        return _get_data(this,p);
-    }
-
-    int current_level = 0;
-
-    FlowNode* create_node(FlowNode* parent, bool better, bool better_impl);
-
-    bool is_dynamic() {
-        return _dynamic;
-    }
-
-    void set_dynamic() {
-        _dynamic = true;
-    }
-
-    /*bool is_deletable() {
-        return deletable;
-    }*/
-
-    virtual String print() = 0;
-
-    inline bool is_long() const {
-        return _islong;
-    }
-
-    FlowLevel* assign(FlowLevel* l) {
-        _dynamic = l->_dynamic;
-        //deletable = l->deletable;
-        _islong = l->_islong;
-        return this;
-    }
-
-    virtual FlowLevel *duplicate() = 0;
-};
 
 class FlowNode;
 
@@ -137,13 +60,13 @@ public :
         return !_is_leaf;
     }
 
-    /*	inline FlowNodePtr duplicate() {
-		FlowNodePtr v;
-		v.ptr = ptr;
-		v._is_leaf = _is_leaf;
-		v.set_data(data());
-		return v;
-	}
+    /*  inline FlowNodePtr duplicate() {
+        FlowNodePtr v;
+        v.ptr = ptr;
+        v._is_leaf = _is_leaf;
+        v.set_data(data());
+        return v;
+    }
      */
     void print() const;
 
@@ -163,6 +86,89 @@ public :
 
     void node_combine_ptr(FlowNode* parent, FlowNodePtr, bool as_child, bool priority);
     void default_combine(FlowNode* parent, FlowNodePtr*, bool as_child, bool priority);
+};
+
+
+class FlowLevel {
+private:
+    //bool deletable;
+protected:
+    bool _dynamic;
+    bool _islong = false;
+public:
+    FlowLevel() :
+        //deletable(true),
+        _dynamic(false) {
+
+    };
+
+    typedef FlowNodeData (*GetDataFn)(void*, Packet* packet);
+    GetDataFn _get_data;
+
+    virtual ~FlowLevel() {};
+    virtual long unsigned get_max_value() = 0;
+
+    virtual void add_offset(int offset) {};
+
+    virtual bool is_mt_safe() const { return false;};
+
+    virtual bool is_usefull() {
+        return true;
+    }
+    /**
+     * Prune this level with another level, that is we know that this level
+     *  is a sub-path of the other one, and there is no need to classify on
+     *  the given level
+     */
+    virtual void prune(FlowLevel*) {};
+
+    virtual FlowNodePtr prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
+        return FlowNodePtr(node);
+    }
+
+    /**
+     * Tell if two node are of the same type, and on the same field/value/mask if applicable
+     *
+     * However this is not checking if runtime data and dynamic are equals
+     */
+    virtual bool equals(FlowLevel* level) {
+        return typeid(*this) == typeid(*level) && _islong == level->_islong && _dynamic == level->_dynamic;
+    }
+
+    inline FlowNodeData get_data(Packet* p) {
+        return _get_data(this,p);
+    }
+
+    int current_level = 0;
+
+    FlowNode* create_node(FlowNode* parent, bool better, bool better_impl);
+
+    bool is_dynamic() {
+        return _dynamic;
+    }
+
+    void set_dynamic() {
+        _dynamic = true;
+    }
+
+    /*bool is_deletable() {
+        return deletable;
+    }*/
+
+    virtual String print() = 0;
+
+    inline bool is_long() const {
+        return _islong;
+    }
+
+    FlowLevel* assign(FlowLevel* l) {
+        _dynamic = l->_dynamic;
+        //deletable = l->deletable;
+        _islong = l->_islong;
+        return this;
+    }
+
+    virtual FlowLevel *duplicate() = 0;
 };
 
 #define FLOW_NODE_DEFINE(T,fnt) \
@@ -642,6 +648,9 @@ public:
     }
 
 };
+
+static const char hex[] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','F'};
+
 /**
  * Flow level for any offset/mask of T bits
  */
@@ -684,30 +693,70 @@ public:
         return _mask != 0;
     }
 
+    //Remove from the mask what is already set in other
     virtual void prune(FlowLevel* other) override {
+        assert(is_dynamic());
         FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
         if (ol == 0)
             return;
-        /*if (_offset >= ol->offset() + ol->mask_size()) { //Starts after the end
-            // - A A A A (1 L4)
-            // B         (0 L1)
-            // 1 >= 1
-            return false;
-        }
-        if (_offset + mask_size() <= ol->offset()) { //Ends after the beginning of other
-            // A A A A - (0 L4)
-            //         B (4 L1)
-            // 4 <= 4
-            return false;
-        }*/
-        //There is an overlap
-        // A A A A (0 L4)
-        // B       (0 L1)
         for (int i = 0; i < mask_size(); i++) {
             uint8_t inverted = ol->get_mask(_offset + i);
-            _mask = _mask & (~(T)inverted);
+            //click_chatter("DMask %d %u",i,inverted);
+            _mask = _mask & (~((T)inverted << ((mask_size() - i - 1)*8)));
         }
+        //click_chatter("DMask is now %x",_mask);
     }
+
+    /**
+     * Remove children that don't match data at offset overlaps
+     */
+    virtual FlowNodePtr prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) override {
+            FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
+            if (ol == 0)
+                return FlowNodePtr(node);
+
+            int shift = offset() - ol->offset();
+            T shiftedmask = 0;
+
+            for (int i = 0; i < mask_size(); i++) {
+                //click_chatter("Mask for %d : %x",i,ol->get_mask(_offset + i));
+                shiftedmask = shiftedmask | (ol->get_mask(_offset + i) << ((mask_size() - i - 1)*8));
+            }
+            //click_chatter("Offset %d, shiftedmask %x mask %x",shift,shiftedmask,_mask);
+            if (_mask == shiftedmask) { //Value totally define the child, only keep that one
+                FlowNodePtr* ptr = node->find_or_default(data);
+                FlowNodePtr child = *ptr;
+                node->dec_num();
+                ptr->ptr = 0;
+                //TODO delete this;
+                changed = true;
+                return child;
+            } else {
+                //A B (O 2) other
+                //  C D (1 2) --> only keep children with C == B
+                T shifteddata;
+                if (shift < 0) {
+                    shifteddata = data.data_64 >> (-shift * 8);
+                } else {
+                    shifteddata = data.data_64 << (shift * 8);
+                }
+                shifteddata = shifteddata & shiftedmask & _mask;
+                //click_chatter("Shifteddata %x",shifteddata);
+                node->apply([this,node,shiftedmask,shifteddata](FlowNodePtr* cur){
+                        if ((((T)cur->data().data_64) & shiftedmask) != shifteddata) {
+                            //click_chatter("%x does not match %x",cur->data().data_64 & shiftedmask, shifteddata);
+                            cur->ptr = 0;
+                            //TODO delete
+                            node->dec_num();
+                        }
+                });
+                _mask = _mask & shiftedmask;
+                if (node->getNum() == 0) {
+                    return *node->default_ptr();
+                }
+                return FlowNodePtr(node);
+            }
+        }
 
     inline long unsigned get_max_value() {
         return _mask;
@@ -717,8 +766,17 @@ public:
         return FlowNodeData((T)(*((T*)(packet->data() + _offset)) & _mask));
     }
 
+
+
     String print() {
-        return String(_offset) + "/" + String((unsigned long long)_mask) ;
+        StringAccum s;
+        s << _offset;
+        s << "/";
+        for (int i = 0; i < sizeof(T); i++) {
+            uint8_t t = ((uint8_t*)&_mask)[i];
+            s << hex[t >> 4] << hex[t & 0xf];
+        }
+        return s.take_string();
     }
 
 

@@ -172,7 +172,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                     if (mask != "")
                         maskv = std::stoul(mask,nullptr,16);
                     else
-                        maskv = (1 << value.length() * 4) - 1;
+                        maskv = (1ul << value.length() * 4) - 1;
 
                     //TODO error for > 64
 
@@ -734,7 +734,7 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
     FlowNodePtr* cur;
     FlowNodePtr Vpruned_default(other->duplicate(true, 1));
     while ((cur = it.next()) != 0) {
-        if (!cur->is_leaf()) {
+        if (cur->is_node()) {
             bool changed;
             cur->node_combine_ptr(this, other->duplicate(true, 1)->prune(level(), cur->data(), false, changed),false, priority);
         } else {
@@ -812,6 +812,7 @@ void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
     }
 }
 
+
 /**
  * Prune the tree by adding the knowledge that the given level will or will not (inverted) be of the given value
  * if inverted, it means the level will NOT be data
@@ -821,13 +822,17 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
         return FlowNodePtr(this);
     }
 
+    FlowNodePtr ptr(this);
+
     debug_flow("Prune level %s, i %d, data %llu",level->print().c_str(),inverted,data.data_64);
     if (level->is_dynamic()) {
 #if DEBUG_CLASSIFIER
         click_chatter("Pruning a dynamic level");
 #endif
         /*Remove identical sessions*/
-        if (this->level()->is_dynamic()) {
+        if (inverted) { //We're in the default path, nothing to remove as it won't help that we know we won't see some dynamic value
+
+        } else {
             assert(this->getNum() == 0);
             this->level()->prune(level);
             if (!this->level()->is_usefull()) {
@@ -836,7 +841,22 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
             }
         }
     } else {
-        if (level->equals(this->level())) { //Same level
+        if (inverted) {
+            if (level->equals(this->level())) { //Same level
+                //Remove data from level if it exists
+                FlowNodePtr* ptr_child = find(data);
+                assert(this->child_deletable());
+                FlowNodePtr child = *ptr_child;
+                ptr_child->ptr = 0;
+                dec_num();
+                changed = true;
+                //TODO delete child
+            }
+        } else {
+            ptr = _level->prune(level, data, this, changed);
+
+        }
+        /*if (level->equals(this->level())) { //Same level
             if (inverted) {
                 //Remove data from level if it exists
                 FlowNodePtr* ptr = find(data);
@@ -857,13 +877,16 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
                 changed = true;
                 return child;
             }
-        }
+        }*/
     }
 
+    if (ptr.is_leaf()) {
+        return ptr;
+    }
     /**
      * Prune all child node including default
      */
-    apply_default([this,level,data,inverted,&changed](FlowNodePtr* cur){
+    ptr.node->apply_default([ptr,level,data,inverted,&changed](FlowNodePtr* cur){
         if (cur->is_leaf()) {
             return;
         }
@@ -878,7 +901,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
         }
         *cur = newcur;
         cur->set_data(old_data);
-        cur->set_parent(this);
+        cur->set_parent(ptr.node);
     });
     /**
      * If inverted and there is no more children, remove the node
@@ -893,7 +916,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
             return def;
         }
     }
-    return FlowNodePtr(this);
+    return ptr;
 }
 
 /**
