@@ -15,33 +15,33 @@ Script(TYPE ACTIVE, stop);
 
 Table of b after optimization :
 ---
-0/255 (TWOCASE, 1 childs)
+0/FF (TWOCASE, 1 childs)
 |-> 16 UC:1 ED:0 (data 100000000000000000000000)
 |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
 ---
 Table of d1 after optimization :
 ---
-0/255 (THREECASE, 2 childs)
+0/FF (THREECASE, 2 childs)
 |-> 32 UC:1 ED:0 (data 200000000000000000000000)
 |-> 16 UC:1 ED:0 (data 100000000000000000000000)
 |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
 ---
 Table of a after optimization :
 ---
-0/255 (TWOCASE, 1 childs)
+0/FF (TWOCASE, 1 childs)
 |-> 16 UC:1 ED:0 (data 100000000000000000000000)
 |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
 ---
 Table of d2 after optimization :
 ---
-0/255 (THREECASE, 2 childs)
+0/FF (THREECASE, 2 childs)
 |-> 32 UC:1 ED:0 (data 200000000000000000000000)
 |-> 16 UC:1 ED:0 (data 100000000000000000000000)
 |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
 ---
 Table of c after optimization :
 ---
-0/255 (TWOCASE, 1 childs)
+0/FF (TWOCASE, 1 childs)
 |-> 16 UC:1 ED:0 (data 100000000000000000000000)
 |-> DEFAULT 0 UC:1 ED:0 (data 000000000000000001000000)
 ---

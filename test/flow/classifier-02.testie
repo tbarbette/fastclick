@@ -1,7 +1,7 @@
 %info
 Test with child rules
 
-c an d serve no purpose and the classification should reflect that. It is actually not possible for them to not be true
+It is actually not possible for f and g to be true,
 f and g result in always drop. It is not possible to have 0/10 and 0/12 on the same path, idem for g.
 
 %script
@@ -12,69 +12,26 @@ Idle -> a :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 4/20) -> Discard;
 
 Idle -> b :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(4/20 0/10) -> Discard;
 
-Idle -> c :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 4/20) -> FlowDispatcher(0/10) -> Discard;
-
-Idle -> d :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 4/20) -> FlowDispatcher(0/10 4/20) -> Discard;
-
-Idle -> f :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 4/20) -> FlowDispatcher(0/12) -> Discard;
-
-Idle -> g :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 4/20) -> FlowDispatcher(4/12) -> Discard;
 
 Script(TYPE ACTIVE, stop);
 
 %expect stderr
-Table of f after optimization :
----
-0/255 (TWOCASE, 1 childs)
-|-> 16
-|  4/255 (TWOCASE, 1 childs)
-|  |-> 32 UC:1 ED:1 (data 200000000000000000000000ffffffff)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
----
 Table of a after optimization :
 ---
-0/255 (TWOCASE, 1 childs)
+0/FF (TWOCASE, 1 childs)
 |-> 16
-|  4/255 (TWOCASE, 1 childs)
-|  |-> 32 UC:1 ED:0 (data 20000000000000000000000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
----
-Table of g after optimization :
----
-0/255 (TWOCASE, 1 childs)
-|-> 16
-|  4/255 (TWOCASE, 1 childs)
-|  |-> 32 UC:1 ED:1 (data 200000000000000000000000ffffffff)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
----
-Table of c after optimization :
----
-0/255 (TWOCASE, 1 childs)
-|-> 16
-|  4/255 (TWOCASE, 1 childs)
-|  |-> 32 UC:1 ED:0 (data 20000000000000000000000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
----
-Table of d after optimization :
----
-0/255 (TWOCASE, 1 childs)
-|-> 16
-|  4/255 (TWOCASE, 1 childs)
-|  |-> 32 UC:1 ED:0 (data 20000000000000000000000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
+|  4/FF (TWOCASE, 1 childs)
+|  |-> 32 UC:1 ED:0 (data 200000000000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
+|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
 ---
 Table of b after optimization :
 ---
-4/255 (TWOCASE, 1 childs)
+4/FF (TWOCASE, 1 childs)
 |-> 32
-|  0/255 (TWOCASE, 1 childs)
-|  |-> 16 UC:1 ED:0 (data 10000000000000000000000000000000)
-|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff00000000)
+|  0/FF (TWOCASE, 1 childs)
+|  |-> 16 UC:1 ED:0 (data 100000000000000000000000)
+|  |-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
+|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
 ---
 

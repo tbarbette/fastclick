@@ -274,7 +274,7 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
         if (!_children_merge) {
             FlowNodePtr anynt = FlowNodePtr(_table->duplicate(true, 1));
             for (int i = 0; i < rules_copy.size() ; ++i) {
-                click_chatter("VERIF Rule (id default %d):",rules_copy[i].is_default);
+                click_chatter("VERIF Rule (id %d default %d):",i,rules_copy[i].is_default);
                 rules_copy[i].root->traverse_all_leaves([this,rules_copy,i,&anynt](FlowNodePtr* node){
                     if (anynt.is_leaf()) {
                         if (!anynt.leaf->data[_flow_data_offset] == rules_copy[i].output) {
@@ -291,6 +291,10 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                     FlowNodePtr nt = FlowNodePtr(anynt.node->duplicate(true, 1)); //We check in the tree excluded from the previous rule
                     //Remove all data up from the child
                     FlowNodeData child_data = node->data();
+                    /*click_chatter("NT before:");
+                    nt.print();
+                    click_chatter("ANYNT before:");
+                    anynt.print();*/
                     node->parent()->traverse_parents([&nt,&child_data,&anynt](FlowNode* parent) {
                         click_chatter("VERIF Pruning %s %lu",parent->level()->print().c_str(),child_data);
                         bool changed;
@@ -300,7 +304,10 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                             anynt = anynt.node->prune(parent->level(), child_data,true, changed);
                         child_data = parent->node_data;
                     });
-
+                    /*click_chatter("NT:");
+                    nt.print();
+                    click_chatter("ANYNT:");
+                    anynt.print();*/
 
                     (rules_copy[i].is_default?anynt:nt).traverse_all_leaves([this,rules_copy,i,nt,anynt](FlowNodePtr* cur){
                         if (!cur->leaf->data[_flow_data_offset] == rules_copy[i].output) {

@@ -637,6 +637,21 @@ template class FlowNodeHash<8>;
 template class FlowNodeHash<9>;
 
 
+
+FlowNodePtr
+FlowLevel::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
+    if (other->equals(this)) {
+        FlowNodePtr* ptr = node->find_or_default(data);
+        FlowNodePtr child = *ptr;
+        node->dec_num();
+        ptr->ptr = 0;
+        //TODO delete this;
+        changed = true;
+        return child;
+    }
+    return FlowNodePtr(node);
+}
+
 template<typename T>
 void FlowLevelGeneric<T>::prune(FlowLevel* other) {
     assert(is_dynamic());
@@ -655,7 +670,7 @@ template<typename T>
 FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
         FlowLevelOffset* ol = dynamic_cast<FlowLevelOffset*>(other);
         if (ol == 0)
-            return FlowNodePtr(node);
+            return FlowLevel::prune(other,data,node,changed);
 
         int shift = offset() - ol->offset();
         T shiftedmask = 0;
@@ -666,6 +681,7 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
         }
         //click_chatter("Offset %d, shiftedmask %x mask %x",shift,shiftedmask,_mask);
         if (_mask == shiftedmask) { //Value totally define the child, only keep that one
+            //click_chatter("Child");
             FlowNodePtr* ptr = node->find_or_default(data);
             FlowNodePtr child = *ptr;
             node->dec_num();
@@ -673,7 +689,8 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
             //TODO delete this;
             changed = true;
             return child;
-        } else {
+        } else if ((_mask & shiftedmask) != 0) {
+            //click_chatter("Overlapping %s %s",this->print().c_str(),other->print().c_str());
             //A B (O 2) other
             //  C D (1 2) --> only keep children with C == B
             T shifteddata;
@@ -696,6 +713,9 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
             if (node->getNum() == 0) {
                 return *node->default_ptr();
             }
+            return FlowNodePtr(node);
+        } else {
+            //click_chatter("NON Overlapping %s %s",this->print().c_str(),other->print().c_str());
             return FlowNodePtr(node);
         }
 }

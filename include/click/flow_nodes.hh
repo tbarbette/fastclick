@@ -122,9 +122,7 @@ public:
      */
     virtual void prune(FlowLevel*) {};
 
-    virtual FlowNodePtr prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
-        return FlowNodePtr(node);
-    }
+    virtual FlowNodePtr prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed);
 
     /**
      * Tell if two node are of the same type, and on the same field/value/mask if applicable

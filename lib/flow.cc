@@ -853,6 +853,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* level,FlowNodeData data, bool inverted, b
                 //TODO delete child
             }
         } else {
+            //Return the child
             ptr = _level->prune(level, data, this, changed);
 
         }
