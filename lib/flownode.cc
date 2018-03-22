@@ -504,13 +504,16 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
             }
         } else {
             while (childs[idx].ptr) {
+                //While there is something in that bucket already
                 if (childs[idx].ptr == DESTRUCTED_NODE || childs[idx].data().data_64 != data.data_64) {
-                    if (insert_idx == UINT_MAX &&  childs[idx].is_node() && childs[idx].node->released()) {
+                    //Destructed node, we can actually use this idx --> set insert_idx to this pointer as we can replace it
+                    if (insert_idx == UINT_MAX && (childs[idx].ptr == DESTRUCTED_NODE || childs[idx].is_node() && childs[idx].node->released())) {
                         insert_idx = idx;
                         ri ++;
                     }
-                } else {
+                } else { //We found the right bucket, that already exists
                     if (insert_idx != UINT_MAX) {
+                        //If we have an insert_idx, swap bucket to "compress" elements
                         debug_flow("Swap IDX %d<->%d",insert_idx,idx);
                         FlowNodePtr tmp = childs[insert_idx];
                         childs[insert_idx] = childs[idx];
@@ -529,7 +532,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
                     assert(i <= capacity());
     #endif
             }
-            if (insert_idx != UINT_MAX) {
+            if (insert_idx != UINT_MAX) { //We found an empty pointer if we have an insert_idx, we use that one instead
                 debug_flow("Recovered IDX %d",insert_idx);
                 /*idx = next_idx(idx);
                 int j = 0;
@@ -553,7 +556,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
 
         if (i > collision_threshold()) {
             if (!growing()) {
-                click_chatter("%d collisions! Hint for a better hash table size (current capacity is %d, size is %d, data is %lu)!",i,capacity(),getNum(),data.data_32);
+                click_chatter("%d collisions! Hint for a better hash table size at level %s (current capacity is %d, size is %d, data is %lu)!",i,level()->print().c_str(),capacity(),getNum(),data.data_32);
                 click_chatter("%d released in collision !",ri);
                 if (childs[idx].ptr == 0 || (childs[idx].is_node() && childs[idx].node->released())) {
                     FlowNode* n = this->start_growing(true);
