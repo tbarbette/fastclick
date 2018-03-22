@@ -232,6 +232,7 @@ protected:
     }
 
     /**
+     * Testing function to check if a packet is matching the given leaf in its parent
      * True if matches
      */
     inline bool _leaf_reverse_match(FlowControlBlock* &leaf, Packet* &p) {
@@ -244,6 +245,9 @@ protected:
             return level()->get_data(p).data_64 == leaf->data_64[0];
     }
 
+    /**
+     * Testing function to ensure that a node is matching this packet in its parent
+     */
     inline bool _node_reverse_match(FlowNode* &child, Packet* &p) {
         if (default_ptr()->ptr == child) //If default, we need to check it does not match any non-default
             return this->find_or_default(level()->get_data(p))->ptr == child;

@@ -233,17 +233,17 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
             break;
         }
         if (child->growing()) {
-            click_chatter("Releasing a growing child, we can remove it from the tree. Parent num is %d",parent->getNum());
+            debug_flow("Releasing a growing child, we can remove it from the tree. Parent num is %d",parent->getNum());
             flow_assert(parent->getNum() == parent->findGetNum());
             FlowNode* subchild = child->default_ptr()->node;
             child->default_ptr()->ptr = 0; //Remove the default to prevent deletion
             if (child == parent->default_ptr()->ptr) { //Growing child of growing
-                click_chatter("Default");
+                debug_flow("Default");
                 child->set_parent(0);
                 child->destroy();
                 parent->default_ptr()->ptr = subchild;
             } else { //Growing child of normal, we cannot swap pointer because find could give a different bucket
-                click_chatter("Child");
+                debug_flow("Child");
                 parent->release_child(FlowNodePtr(child), data); //A->release(B)
                 flow_assert(parent->getNum() == parent->findGetNum());
                 parent->find(data)->set_node(subchild);

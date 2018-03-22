@@ -574,6 +574,13 @@ void FlowNodeHash<capacity_n>::renew() {
 
 }*/
 
+/**
+ * Remove the children object that can be found at DATA
+ * Will not release leafs child
+ * Will destroy node if we are growing or node is growing
+ * Will release node if not
+ *
+ */
 template<int capacity_n>
 void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData data) {
     int j = 0;
@@ -586,19 +593,14 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
     while (childs[idx].ptr != child.ptr) {
         idx = next_idx(idx);
         ++i;
-#if DEBUG_CLASSIFIER_CHECK
-        assert(i < capacity());
-#endif
+        flow_assert(i < capacity());
     }
 
     if (child.is_leaf()) {
         childs[idx].ptr = DESTRUCTED_NODE; //FCB deletion is handled by the caller which goes bottom up
     } else {
-        if (unlikely(growing())) { //If we are growing, or the child is growing, we want to destroy the child definitively
+        if (unlikely(growing() || child.node->growing())) { //If we are growing, or the child is growing, we want to destroy the child definitively
             childs[idx].ptr = DESTRUCTED_NODE;
-            child.node->destroy();
-        } else if (unlikely(child.node->growing())) {
-            childs[idx].ptr = 0;
             child.node->destroy();
         } else {
             if (i > hole_threshold() && childs[next_idx(idx)].ptr == 0) { // Keep holes if there are quite a lot of collisions
