@@ -191,7 +191,9 @@ protected:
     FlowNode* _parent;
 
     //bool _child_deletable;
+#if FLOW_KEEP_STRUCTURE
     bool _released;
+#endif
     bool _growing;
     //FlowNodePtr*(_find)(FlowNode*,FlowNodeData data);
 
@@ -286,9 +288,12 @@ public:
     }
 
 
-    FlowNode() :  num(0),_level(0),_default(),_parent(0), _growing(false),
+    FlowNode() :  num(0),_level(0),_default(),_parent(0), _growing(false)
 //            _child_deletable(true),
-            _released(false) {
+#if FLOW_KEEP_STRUCTURE
+            _released(false),
+#endif
+    {
         node_data.data_64 = 0;
     }
 
@@ -344,10 +349,16 @@ public:
     int findGetNum();
 
     virtual ~FlowNode() {
-        if (_default.ptr && _default.is_node())
+        if (_default.ptr && _default.is_node()) {
+#if FLOW_KEEP_STRUCTURE
             _default.node->release();
+#else
+            _default.node->destroy();
+#endif
+        }
     };
 
+#if FLOW_KEEP_STRUCTURE
     inline bool released() const {
         return _released;
     }
@@ -358,7 +369,9 @@ public:
 #if DEBUG_CLASSIFIER
         apply([](FlowNodePtr* p) {
             if (p->ptr && p->is_node()) {
+#if FLOW_KEEP_STRUCTURE
                 flow_assert(p->node->released());
+#endif
             }
         });
 #endif
@@ -368,7 +381,7 @@ public:
         //return _child_deletable;
         return true;
     }
-
+#endif
 
     inline FlowNodePtr* find(FlowNodeData data) {
         return _find((void*)this,data);
@@ -377,7 +390,11 @@ public:
 
     inline FlowNodePtr* find_or_default(const FlowNodeData data) {
         FlowNodePtr* ptr = _find(this,data);
-        if (ptr->ptr == 0 || (ptr->is_node() && ptr->node->released()))
+        if (ptr->ptr == 0
+#if FLOW_KEEP_STRUCTURE
+                || (ptr->is_node() && ptr->node->released())
+#endif
+                )
             return default_ptr();
         return ptr;
     }
@@ -422,9 +439,11 @@ public:
 
     virtual void release_child(FlowNodePtr fl, FlowNodeData data) = 0;
 
+#if FLOW_KEEP_STRUCTURE
     inline void renew() {
         _released = false;
     }
+#endif
 
     virtual String name() const = 0;
 
@@ -894,15 +913,24 @@ public:
 	}*/
 
     void release_child(FlowNodePtr child, FlowNodeData data) {
-        if (child_deletable()) {
+#if FLOW_KEEP_STRUCTURE
+        if (child_deletable())
+#endif
+        {
             if (child.is_leaf()) {
                 childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
             } else {
                 if (growing()) {
                     child.node->destroy();
                     child.node = 0;
-                } else
+                } else {
+#if FLOW_KEEP_STRUCTURE
                     child.node->release();
+#else
+                    child.node->destroy();
+                    child.node = 0;
+#endif
+                }
             }
             num--;
         }
@@ -1103,7 +1131,6 @@ class FlowNodeHash : public FlowNode  {
         return level << (8+level);
     }
 
-    //virtual void renew() override;
     FlowNodePtr* find_hash(FlowNodeData data);
 
     void release_child(FlowNodePtr child, FlowNodeData data);

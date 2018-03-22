@@ -46,7 +46,11 @@ int FlowNode::findGetNum() {
     apply([&count](FlowNodePtr* p) {
         flow_assert(p->ptr != (void*)-1);
         flow_assert(p->ptr);
-        if (p->is_leaf() || !p->node->released())
+        if (p->is_leaf()
+#if FLOW_KEEP_STRUCTURE
+                || !p->node->released()
+#endif
+                )
             count++;
     });
     return count;
@@ -82,7 +86,10 @@ void FlowNode::check(bool allow_parent) {
             if (!allow_parent && cur->node->parent() != node)
                 goto error;
             assert(cur->ptr != (void*)-1);
-            if (!cur->node->released()) {
+#if FLOW_KEEP_STRUCTURE
+            if (!cur->node->released())
+#endif
+            {
                 cur->node->check(allow_parent);
                 num++;
             }
@@ -103,7 +110,9 @@ void FlowNode::check(bool allow_parent) {
         if (!allow_parent && node->default_ptr()->parent() != node)
             goto error;
         if (node->default_ptr()->is_node()) {
+#if FLOW_KEEP_STRUCTURE
             assert(!node->default_ptr()->node->released());
+#endif
             assert(node->level()->is_dynamic() || node->get_default().node->parent() == node);
             node->get_default().node->check(allow_parent);
         } else {
@@ -505,10 +514,13 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
         } else {
             while (childs[idx].ptr) {
                 //While there is something in that bucket already
-                flow_assert(childs[idx].ptr != DESTRUCTED_NODE);
-                if (childs[idx].data().data_64 != data.data_64) {
+                if (childs[idx].ptr == DESTRUCTED_NODE || childs[idx].data().data_64 != data.data_64) {
                     //Destructed node, we can actually use this idx --> set insert_idx to this pointer as we can replace it
-                    if (insert_idx == UINT_MAX && childs[idx].is_node() && childs[idx].node->released()) {
+                    if (insert_idx == UINT_MAX
+#if FLOW_KEEP_STRUCTURE
+                            && childs[idx].is_node() && childs[idx].node->released()
+#endif
+                            ) {
                         insert_idx = idx;
                         ri ++;
                     }
@@ -559,7 +571,11 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
             if (!growing()) {
                 click_chatter("%d collisions! Hint for a better hash table size at level %s (current capacity is %d, size is %d, data is %lu)!",i,level()->print().c_str(),capacity(),getNum(),data.data_32);
                 click_chatter("%d released in collision !",ri);
-                if (childs[idx].ptr == 0 || (childs[idx].is_node() && childs[idx].node->released())) {
+                if (childs[idx].ptr == 0
+#if FLOW_KEEP_STRUCTURE
+                        || (childs[idx].is_node() && childs[idx].node->released())
+#endif
+                        ) {
                     FlowNode* n = this->start_growing(true);
                     if (n == 0) {
                         click_chatter("ERROR : CANNOT GROW, I'M ALREADY TOO FAT");
@@ -580,9 +596,9 @@ void FlowNodeHash<capacity_n>::renew() {
 
 /**
  * Remove the children object that can be found at DATA
- * Will not release leafs child
- * Will destroy node if we are growing or node is growing
- * Will release node if not
+ * Will not release leafs child (FCBs)
+ * Will destroy node if this node is currently growing
+ * If KEEP_STRUCTURe, Will release node if not growing, if not KEEP_STRUCTURE, will destroy child
  *
  */
 template<int capacity_n>
@@ -617,15 +633,22 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
                     idx = prev_idx(idx);
                     if (childs[idx].ptr == DESTRUCTED_NODE) {
                         childs[idx].ptr = 0;
+#if FLOW_KEEP_STRUCTURE
                     } else if (childs[idx].is_node() && childs[idx].node->released()) {
                         childs[idx].node->destroy();
                         childs[idx].ptr = 0;
+#endif
                     } else
                         break;
                     --i;
                 }
             } else {
+#if FLOW_KEEP_STRUCTURE
                 child.node->release();
+#else
+                childs[idx].ptr = DESTRUCTED_NODE;
+                child.node->destroy();
+#endif
             }
         }
     }

@@ -825,7 +825,9 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
                 if (olevel->equals(this->level())) { //Same level
                     //Remove data from level if it exists
                     FlowNodePtr* ptr_child = find(data);
+#if FLOW_KEEP_STRUCTURE
                     assert(this->child_deletable());
+#endif
                     FlowNodePtr child = *ptr_child;
                     ptr_child->ptr = 0;
                     dec_num();

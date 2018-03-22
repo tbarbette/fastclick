@@ -114,8 +114,12 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
 #if DEBUG_CLASSIFIER_MATCH > 1
         click_chatter("->Ptr is %p, is_leaf : %d",child_ptr->ptr, child_ptr->is_leaf());
 #endif
-        flow_assert(child_ptr->ptr != (void*)-1);
-        if (unlikely(child_ptr->ptr == NULL || (child_ptr->is_node() && child_ptr->node->released()))) { //Unlikely to create a new node.
+
+        if (unlikely(child_ptr->ptr == NULL || (child_ptr->ptr == (void*)-1) //Do not change ptr here to 0, as we could follow defautl path without changing this one
+#if FLOW_KEEP_STRUCTURE
+                || (child_ptr->is_node() && child_ptr->node->released())
+#endif
+                )) { //Unlikely to create a new node.
 
             if (parent->get_default().ptr) {
                 if (parent->level()->is_dynamic() || always_dup) {
@@ -179,11 +183,14 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                             _root->check(true);
                             return child_ptr->leaf;
                         } else {
+#if FLOW_KEEP_STRUCTURE
                             if (child_ptr->ptr && child_ptr->node->released()) { //Childptr is a released node, just renew it
                                 child_ptr->node->renew();
                                 child_ptr->set_data(data);
                                 flow_assert(parent->find(data)->ptr == child_ptr->ptr);
-                            } else {
+                            } else
+#endif
+                            {
                                 flow_assert(parent->default_ptr()->node->getNum() == 0);
                                 FlowNode* newNode = parent->level()->create_node(parent->default_ptr()->node, false, false);
                                 newNode->_level = parent->default_ptr()->node->level();
