@@ -190,6 +190,7 @@ private:
     	}
 
         inline void add(FlowControlBlock* fcb) {
+            flow_assert(fcb);
         	*((FlowControlBlock**)fcb) = p;
         	p = fcb;
         	count++;
@@ -197,6 +198,7 @@ private:
 
         inline FlowControlBlock* get() {
         	FlowControlBlock* fcb = p;
+		flow_assert(fcb);
         	p = *((FlowControlBlock**)fcb);
         	count--;
         	fcb->initialize();
@@ -293,6 +295,7 @@ public:
 
 		} else {
 			FlowControlBlock* fcb = alloc_new();
+			flow_assert(fcb);
 			return fcb;
 		}
 	}
