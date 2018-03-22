@@ -254,7 +254,7 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
                 flow_assert(parent->getNum() == parent->findGetNum());
                 //parent->find(data)->set_node(subchild);
                 //subchild->node_data = data;
-                parent->inc_num();
+                //parent->inc_num();
             }
 
             flow_assert(parent->getNum() == parent->findGetNum());
