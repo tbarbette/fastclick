@@ -819,6 +819,7 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
 
 String FlowClassifier::read_handler(Element* e, void* thunk) {
     FlowClassifier* fc = static_cast<FlowClassifier*>(e);
+    fcb_table = &fc->_table;
     switch ((intptr_t)thunk) {
         case 0: {
             int n = 0;
@@ -826,10 +827,12 @@ String FlowClassifier::read_handler(Element* e, void* thunk) {
                 click_chatter("%d",ptr->leaf->count());
                 n++;
             },true,true);
+            fcb_table = 0;
             return String(n);
         }
         case 1:
             fc->_table.get_root()->print(-1,false);
+            fcb_table = 0;
             return String("");
         default:
             return String("<unknown>");
