@@ -12,7 +12,7 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER_RELEASE 0
 #define DEBUG_CLASSIFIER_TIMEOUT 0
 #define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
-#define DEBUG_CLASSIFIER 1 //1 : Build-time only, >1 : whole time
+#define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
 #define DEBUG_CLASSIFIER_CHECK 0
 
@@ -327,17 +327,8 @@ public:
 class FlowTableHolder {
 public:
 
-    FlowTableHolder() :
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-old_flows(fcb_list()),
-#endif
-_pool(), _classifier_release_fnt(0), _classifier_thunk(0)
-    {
-
-    }
-    ~FlowTableHolder() {
-
-    }
+    FlowTableHolder();
+    ~FlowTableHolder();
 
     FCBPool* get_pool() {
         return &_pool;

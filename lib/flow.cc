@@ -53,6 +53,38 @@ FlowNode* FlowClassificationTable::get_root() {
     return _root;
 }
 
+FlowTableHolder::FlowTableHolder() :
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+old_flows(fcb_list()),
+#endif
+_pool(), _classifier_release_fnt(0), _classifier_thunk(0)
+    {
+
+    }
+
+FlowTableHolder::~FlowTableHolder() {
+    for (int i = 0; i < old_flows.weight(); i++) {
+        fcb_list& head = old_flows.get_value(i);
+        FlowControlBlock* next = 0;
+        FlowControlBlock* b = head._next;
+        FlowControlBlock** prev = &head._next;
+
+        #if DEBUG_CLASSIFIER_TIMEOUT_CHECK || DEBUG_CLASSIFIER_TIMEOUT
+            assert(head.count() == head.find_count());
+        #endif
+        while (b != 0) {
+            next = b->next;
+            b->flags = 0;
+            *prev = b->next;
+            head._count--;
+            b->_do_release();
+            b = next;
+        }
+    }
+}
+
+
+
 void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void* thunk) {
 	_classifier_release_fnt = pool_release_fnt;
 	_classifier_thunk = thunk;
