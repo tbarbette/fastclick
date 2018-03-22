@@ -648,7 +648,7 @@ bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
     T m = _mask;
     for (int i = 0; i < mask_size(); i++) {
         uint8_t inverted = ol->get_mask(_offset + i);
-        //click_chatter("DMask %d %u",i,inverted);
+        //click_chatter("DMask %d (tot %d) mask %x",i,_offset + i,inverted);
         m = m & (~((T)inverted << ((mask_size() - i - 1)*8)));
     }
     /*
@@ -662,6 +662,7 @@ bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
 
     if (_mask != m) {
         _mask = m;
+        //click_chatter("MASK CHANGED ! %x %s",m,print().c_str());
         return true;
     }
     return false;

@@ -684,10 +684,10 @@ public:
         return sizeof(T);
     }
 
-    virtual uint8_t get_mask(int o) const {
-        if (o < _offset)
+    virtual uint8_t get_mask(int o) const override {
+        if (o < _offset) //2 < 0
             return 0;
-        if (o > _offset + mask_size())
+        if (o >= _offset + mask_size())
             return 0;
         return ((uint8_t*)&_mask)[o-_offset];
     }
@@ -758,7 +758,7 @@ public:
     virtual uint8_t get_mask(int o) const {
         if (o < _offset)
             return 0;
-        if (o > _offset + mask_size())
+        if (o >= _offset + mask_size())
             return 0;
         return 0xff;
     }
