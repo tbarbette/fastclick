@@ -283,6 +283,10 @@ public:
     FlowNodeData node_data;
 
 
+    /**
+     * Destroy release memory efficiently (may call a pool instead of pure delete)
+     * Will kill all children, including default
+     */
     virtual void destroy() {
         delete this;
     }
@@ -1135,20 +1139,7 @@ class FlowNodeHash : public FlowNode  {
 
     void release_child(FlowNodePtr child, FlowNodeData data);
 
-    /**
-     * Destroy all sub-nodes
-     * (do not release FCBs?)
-     */
-    virtual ~FlowNodeHash() {
-        for (int i = 0; i < capacity(); i++) {
-            if (childs[i].ptr && childs[i].ptr != DESTRUCTED_NODE && !childs[i].is_leaf()) {
-                childs[i].node->destroy();
-                childs[i].node = 0;
-            }
-        }
-        static_assert(capacity() < INT_MAX / 2);
-        static_assert(step() < capacity() / 2);
-    }
+    virtual ~FlowNodeHash() override;
 
     NodeIterator iterator() override {
         return NodeIterator(new HashNodeIterator(this));
@@ -1426,6 +1417,10 @@ class FlowAllocator { public:
     static void release(T* e) {
         instance()->release(e);
     }
+    static void release_unitialized(T* e) {
+        instance()->release_unitialized(e);
+    }
+
 };
 
 //template<int capacity> class FlowAllocator<FlowNodeHash<capacity> > : public FlowAllocator {};

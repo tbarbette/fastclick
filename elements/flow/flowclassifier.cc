@@ -229,7 +229,7 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
         click_chatter("[%d] Releasing parent %s's child %p, growing %d, num %d, child is type %s num %d",up,parent->name().c_str(), child, parent->growing(), parent->getNum(),child->name().c_str(),child->getNum());
 #endif
         parent->check(true);
-        assert(child->level()->is_dynamic());
+        flow_assert(child->level()->is_dynamic());
         if (parent->growing() && !child->growing() && child == parent->default_ptr()->ptr) {
             //If child is default path, it is the default child table of a growing table and must not be deleted
             //click_chatter("Non growing child of its growing original, not deleting");
@@ -252,6 +252,7 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
                 debug_flow("Child");
                 parent->release_child(FlowNodePtr(child), data); //A->release(B)
                 flow_assert(parent->getNum() == parent->findGetNum());
+                flow_assert(parent->find(data)->ptr == 0 || parent->find(data)->ptr == (void*)-1);
                 //parent->find(data)->set_node(subchild);
                 //subchild->node_data = data;
                 //parent->inc_num();
@@ -262,8 +263,13 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
             break;
         }
 
+        //Delete the default to avoid having him deleted. As we are a dynamic, default is another dynamic currently in use !
+        child->default_ptr()->ptr = 0;
         flow_assert(parent->getNum() == parent->findGetNum());
         parent->release_child(FlowNodePtr(child), data); //A->release(B)
+        flow_assert(parent->getNum() == parent->findGetNum());
+
+        flow_assert(parent->find(data)->ptr == 0 || parent->find(data)->ptr == (void*)-1);
 #if DEBUG_CLASSIFIER_CHECK
         if (parent->getNum() != parent->findGetNum()) {
             click_chatter("Parent has %d != %d counted childs",parent->getNum(),parent->findGetNum());

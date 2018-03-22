@@ -107,6 +107,7 @@ void FlowNode::check(bool allow_parent) {
 
     if (node->default_ptr()->ptr != 0) {
 
+        assert(node->get_default().ptr != (void*)-1);
         if (!allow_parent && node->default_ptr()->parent() != node)
             goto error;
         if (node->default_ptr()->is_node()) {
@@ -432,24 +433,37 @@ FlowNodeDefinition::create_final(bool mt_safe) {
 /***************************************
  * FlowNodeArray
  *************************************/
+/**
+ * Destroy puts back the memory and kill all children
+ */
 void FlowNodeArray::destroy() {
 #if DEBUG_CLASSIFIER_CHECK
     //This will break final destruction
     apply([](FlowNodePtr* p) {
         if (p->ptr) {
-            assert(p->is_node());
+     //       assert(p->is_node());
 # if FLOW_KEEP_STRUCTURE
-            assert(p->node->released());
+       //     assert(p->node->released());
 # endif
         }
+
+# if !FLOW_KEEP_STRUCTURE
+        //assert(!p->ptr);
+#endif
     });
 #endif
     FlowAllocator<FlowNodeArray>::release(this);
 }
+
+/**
+ * Delete fully kills children
+ */
 FlowNodeArray::~FlowNodeArray() {
+    //Base destructor will delete the default
     for (int i = 0; i < childs.size(); i++) {
         if (childs[i].ptr != NULL && childs[i].is_node()) {
                childs[i].node->destroy();
+               childs[i].node = 0;
         }
     }
 }
@@ -465,10 +479,43 @@ FlowNode* FlowNodeArray::duplicate(bool recursive,int use_count) {
 /******************************
  * FlowNodeHash
  ******************************/
+
+/**
+ * Destroy puts back the memory and kill all children, but not default
+ */
 template<int capacity_n>
 void FlowNodeHash<capacity_n>::destroy() {
     flow_assert(num == 0); //Not true on final destroy
-    FlowAllocator<FlowNodeHash<capacity_n>>::release(this);
+    //This is copy pasted to avoid virtual destruction
+    for (int i = 0; i < capacity(); i++) {
+        if (childs[i].ptr && childs[i].ptr != DESTRUCTED_NODE && !childs[i].is_leaf()) {
+            delete childs[i].node;
+            childs[i].node = 0;
+        }
+    }
+        if (_default.ptr && _default.is_node()) {
+#if FLOW_KEEP_STRUCTURE
+            _default.node->release();
+#else
+            _default.node->destroy();
+#endif
+        }
+    FlowAllocator<FlowNodeHash<capacity_n>>::release_unitialized(this);
+}
+
+/**
+ * Delete FlowNodehash and its children and default
+ */
+template<int capacity_n>
+FlowNodeHash<capacity_n>::~FlowNodeHash() {
+        for (int i = 0; i < capacity(); i++) {
+            if (childs[i].ptr && childs[i].ptr != DESTRUCTED_NODE && !childs[i].is_leaf()) {
+                delete childs[i].node;
+                childs[i].node = 0;
+            }
+        }
+        static_assert(capacity() < INT_MAX / 2);
+        static_assert(step() < capacity() / 2);
 }
 
 

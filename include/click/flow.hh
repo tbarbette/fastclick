@@ -82,7 +82,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
     do {
         FlowNode* child = parent;
         parent = parent->parent();
-
+        flow_assert(parent);
         if (likely(!parent->_node_reverse_match(child,p))) {
 #if DEBUG_CLASSIFIER_MATCH > 2
             click_chatter("DIF is_default %d Child %x %x level %s",parent->default_ptr()->ptr == child ,parent->level()->get_data(p).data_64, child->node_data.data_64,parent->level()->print().c_str());
