@@ -46,11 +46,11 @@ int FlowNode::findGetNum() {
     apply([&count](FlowNodePtr* p) {
         flow_assert(p->ptr != (void*)-1);
         flow_assert(p->ptr);
-        if (p->is_leaf()
 #if FLOW_KEEP_STRUCTURE
+        if (p->is_leaf()
                 || !p->node->released()
-#endif
                 )
+#endif
             count++;
     });
     return count;
