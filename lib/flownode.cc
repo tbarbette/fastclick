@@ -438,7 +438,9 @@ void FlowNodeArray::destroy() {
     apply([](FlowNodePtr* p) {
         if (p->ptr) {
             assert(p->is_node());
+# if FLOW_KEEP_STRUCTURE
             assert(p->node->released());
+# endif
         }
     });
 #endif
