@@ -818,17 +818,27 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
 }
 
 String FlowClassifier::read_handler(Element* e, void* thunk) {
-    int n = 0;
     FlowClassifier* fc = static_cast<FlowClassifier*>(e);
-    fc->_table.get_root()->traverse_all_leaves([&n](FlowNodePtr* ptr) {
-        click_chatter("%d",ptr->leaf->count());
-        n++;
-    },true,true);
-    return String(n);
+    switch ((intptr_t)thunk) {
+        case 0: {
+            int n = 0;
+            fc->_table.get_root()->traverse_all_leaves([&n](FlowNodePtr* ptr) {
+                click_chatter("%d",ptr->leaf->count());
+                n++;
+            },true,true);
+            return String(n);
+        }
+        case 1:
+            fc->_table.get_root()->print(-1,false);
+            return String("");
+        default:
+            return String("<unknown>");
+    }
 };
 
 void FlowClassifier::add_handlers() {
     add_read_handler("leaves", FlowClassifier::read_handler, 0);
+    add_read_handler("print_tree", FlowClassifier::read_handler, 1);
 }
 
 int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};
