@@ -123,7 +123,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                         //Table is growing, look at the child for new element
                         if (parent->getNum() == 0) { //Table is growing, but have no more child.
                             click_chatter("Table %s finished growing, deleting %p, type %s",parent->level()->print().c_str(), parent, parent->name().c_str());
-                            assert(parent->getNum() == parent->findGetNum());
+                            flow_assert(parent->getNum() == parent->findGetNum());
                            // assert(false); //The release took care of this //TODO : this actually happens from time to time. I guess when releasing is prevented at the end of the tree. To inquiry. not bad
                         } else {
 #if DEBUG_CLASSIFIER

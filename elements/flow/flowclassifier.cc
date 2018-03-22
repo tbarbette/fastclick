@@ -225,8 +225,9 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
 #endif
         parent->check(true);
         assert(child->level()->is_dynamic());
-        if (parent->growing() && !child->growing() && child == parent->default_ptr()->ptr) { //If child is default root, it is the default child table of a growing table and must not be deleted
-            click_chatter("Non growing child of its growing original, not deleting");
+        if (parent->growing() && !child->growing() && child == parent->default_ptr()->ptr) {
+            //If child is default path, it is the default child table of a growing table and must not be deleted
+            //click_chatter("Non growing child of its growing original, not deleting");
             //parent->release_child(FlowNodePtr(child), data);
             flow_assert(parent->getNum() == parent->findGetNum());
             break;
