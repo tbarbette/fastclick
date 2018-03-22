@@ -193,6 +193,11 @@ void FlowClassifier::run_timer(Timer*) {
 #endif
 
 
+
+/**
+ * Remove a fcb from the tree, deleting empty dynamic nodes in the parents
+ * The FCB release itself is handled by the caller
+ */
 void release_subflow(FlowControlBlock* fcb, void* thunk) {
 #if DEBUG_CLASSIFIER_RELEASE
     click_chatter("Release from tree fcb %p data %d, parent %p",fcb,fcb->data_64[0],fcb->parent);
@@ -237,20 +242,21 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
             flow_assert(parent->getNum() == parent->findGetNum());
             FlowNode* subchild = child->default_ptr()->node;
             child->default_ptr()->ptr = 0; //Remove the default to prevent deletion
-            if (child == parent->default_ptr()->ptr) { //Growing child of growing
+            if (child == parent->default_ptr()->ptr) { //Growing child was the default path
                 debug_flow("Default");
                 child->set_parent(0);
                 child->destroy();
                 parent->default_ptr()->ptr = subchild;
+                subchild->set_parent(parent);
             } else { //Growing child of normal, we cannot swap pointer because find could give a different bucket
                 debug_flow("Child");
                 parent->release_child(FlowNodePtr(child), data); //A->release(B)
                 flow_assert(parent->getNum() == parent->findGetNum());
-                parent->find(data)->set_node(subchild);
-                subchild->node_data = data;
+                //parent->find(data)->set_node(subchild);
+                //subchild->node_data = data;
                 parent->inc_num();
             }
-            subchild->set_parent(parent);
+
             flow_assert(parent->getNum() == parent->findGetNum());
             parent->check(true);
             break;

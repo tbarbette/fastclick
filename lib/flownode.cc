@@ -505,9 +505,10 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
         } else {
             while (childs[idx].ptr) {
                 //While there is something in that bucket already
-                if (childs[idx].ptr == DESTRUCTED_NODE || childs[idx].data().data_64 != data.data_64) {
+                flow_assert(childs[idx].ptr != DESTRUCTED_NODE);
+                if (childs[idx].data().data_64 != data.data_64) {
                     //Destructed node, we can actually use this idx --> set insert_idx to this pointer as we can replace it
-                    if (insert_idx == UINT_MAX && (childs[idx].ptr == DESTRUCTED_NODE || childs[idx].is_node() && childs[idx].node->released())) {
+                    if (insert_idx == UINT_MAX && childs[idx].is_node() && childs[idx].node->released()) {
                         insert_idx = idx;
                         ri ++;
                     }
@@ -602,10 +603,11 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
     if (child.is_leaf()) {
         childs[idx].ptr = DESTRUCTED_NODE; //FCB deletion is handled by the caller which goes bottom up
     } else {
-        if (unlikely(growing() || child.node->growing())) { //If we are growing, or the child is growing, we want to destroy the child definitively
+        if (unlikely(growing())) { //If we are growing, or the child is growing, we want to destroy the child definitively
             childs[idx].ptr = DESTRUCTED_NODE;
             child.node->destroy();
         } else {
+            //flow_assert(!child.node->growing()); //If the child is growing, the caller has to swap it, not destroy it
             if (i > hole_threshold() && childs[next_idx(idx)].ptr == 0) { // Keep holes if there are quite a lot of collisions
                 click_chatter("Keep hole in %s",level()->print().c_str());
                 childs[idx].ptr = 0;

@@ -1108,8 +1108,11 @@ class FlowNodeHash : public FlowNode  {
 
     void release_child(FlowNodePtr child, FlowNodeData data);
 
+    /**
+     * Destroy all sub-nodes
+     * (do not release FCBs?)
+     */
     virtual ~FlowNodeHash() {
-        //Same than destroy but don't release ourselves at the end
         for (int i = 0; i < capacity(); i++) {
             if (childs[i].ptr && childs[i].ptr != DESTRUCTED_NODE && !childs[i].is_leaf()) {
                 childs[i].node->destroy();
