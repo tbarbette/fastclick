@@ -121,6 +121,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                 if (parent->level()->is_dynamic() || always_dup) {
                     if (unlikely(parent->growing())) {
                         //Table is growing, look at the child for new element
+#if DEBUG_CLASSIFIER
                         if (parent->getNum() == 0) { //Table is growing, but have no more child.
                             debug_flow("Table %s finished growing, deleting %p, type %s",parent->level()->print().c_str(), parent, parent->name().c_str());
                             flow_assert(parent->getNum() == parent->findGetNum());
@@ -130,6 +131,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                             click_chatter("Growing table, %d/%d",parent->num, parent->max_size());
 #endif
                         }
+#endif
                         parent = parent->default_ptr()->node;
                         continue;
                     } else if (unlikely(parent->num >= parent->max_size())) { //Parent is not growing, but we should start growing
