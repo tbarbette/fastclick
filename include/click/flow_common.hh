@@ -173,6 +173,8 @@ extern __thread FlowTableHolder* fcb_table;
 #define SFCB_STACK(fnt) \
 		{FlowControlBlock* fcb_save = fcb_stack;fcb_stack=0;fnt;fcb_stack=fcb_save;}
 
+#define CLICK_DEBUG_FCBPOOL 0
+
 #define SFCB_POOL_COUNT 32
 #define SFCB_POOL_SIZE 2048
 class FCBPool {

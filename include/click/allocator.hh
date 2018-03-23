@@ -7,7 +7,7 @@
 #include <click/multithread.hh>
 #include <click/sync.hh>
 #include <typeinfo>
-#define CLICK_DEBUG_ALLOCATOR 1
+#define CLICK_DEBUG_ALLOCATOR 0
 
 CLICK_DECLS
 
