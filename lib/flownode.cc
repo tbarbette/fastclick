@@ -72,6 +72,7 @@ int FlowNode::findGetNum() {
 }*/
 
 #if DEBUG_CLASSIFIER || DEBUG_CLASSIFIER_CHECK
+
 /**
  * Ensure consistency of the tree
  * @param node

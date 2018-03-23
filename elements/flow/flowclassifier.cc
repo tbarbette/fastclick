@@ -343,6 +343,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         //todo : INIT timer if needed? The current solution seems ok
 #endif
     }
+
     assert(one_upstream_classifier() != this);
     return 0;
 }
@@ -391,13 +392,24 @@ inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
         int ic = 0;
         do {
             if (c->agg == agg && c->fcb == fcb) {
-                c->agg = 0;
+                FlowCache* bxch = bucket + _cache_ring_size - 1;
+                while (bxch->agg == 0) {
+                    bxch--;
+                }
+                c->agg = bxch->agg;
+                c->fcb = bxch->fcb;
+                bxch->agg = 0;
+#if DEBUG_FLOW_CLASSIFIER
+                bxch->fcb = 0;
+#endif
                 return;
             }
             ic++;
             c++;
         } while (ic < _cache_ring_size);
+        click_chatter("REMOVING a FCB from the cache that was not in the cache");
 #else
+#error NOT WORKING BECAUSE OF HOLE
         FlowCache* bucket = _cache.get() + hash;
         if (bucket->agg == agg) {
             bucket->agg = 0;
