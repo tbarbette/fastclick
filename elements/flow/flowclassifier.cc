@@ -100,7 +100,7 @@ public:
     }
 };
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true) {
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true), _do_release(true) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
@@ -182,6 +182,7 @@ FlowNode* FlowClassifier::resolveContext(FlowType t, Vector<FlowElement*> contex
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 void FlowClassifier::run_timer(Timer*) {
+    click_chatter("Release timer!");
 #if DEBUG_CLASSIFIER_RELEASE
     click_chatter("Force run check-release");
 #endif
@@ -333,15 +334,15 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         }
     }
 
-
+    if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-    for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
-        IdleTask* idletask = new IdleTask(this);
-        idletask->initialize(this, i, 100);
-    }
-    //todo : INIT timer if needed? The current solution seems ok
+        for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
+            IdleTask* idletask = new IdleTask(this);
+            idletask->initialize(this, i, 100);
+        }
+        //todo : INIT timer if needed? The current solution seems ok
 #endif
-
+    }
     assert(one_upstream_classifier() != this);
     return 0;
 }
@@ -806,27 +807,29 @@ void FlowClassifier::push_batch(int port, PacketBatch* batch) {
         push_batch_builder(port,batch);
     else
         push_batch_simple(port,batch);
+
+    if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-    auto &head = _table.old_flows.get();
-    if (head.count() > head._count_thresh) {
+        auto &head = _table.old_flows.get();
+        if (head.count() > head._count_thresh) {
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
-        click_chatter("%p{element} Forced release because %d is > than %d",this,head.count(), head._count_thresh);
+            click_chatter("%p{element} Forced release because %d is > than %d",this,head.count(), head._count_thresh);
 #endif
-        _table.check_release();
-        if (unlikely(head.count() < (head._count_thresh / 8) && head._count_thresh > FlowTableHolder::fcb_list::DEFAULT_THRESH)) {
-            head._count_thresh /= 2;
-        } else
-            head._count_thresh *= 2;
+            _table.check_release();
+            if (unlikely(head.count() < (head._count_thresh / 8) && head._count_thresh > FlowTableHolder::fcb_list::DEFAULT_THRESH)) {
+                head._count_thresh /= 2;
+            } else
+                head._count_thresh *= 2;
 #if DEBUG_CLASSIFIER_TIMEOUT > 0
-        click_chatter("%p{element} Forced release count %d thresh %d",this,head.count(), head._count_thresh);
+            click_chatter("%p{element} Forced release count %d thresh %d",this,head.count(), head._count_thresh);
+#endif
+        }
 #endif
     }
-#endif
     fcb_stack = tmp_stack;
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = tmp_table;
 //#endif
-
 }
 
 String FlowClassifier::read_handler(Element* e, void* thunk) {

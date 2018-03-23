@@ -1405,6 +1405,16 @@ FlowControlBlock* FlowControlBlock::duplicate(int use_count) {
     return fcb;
 }
 
+void FCBPool::compress(Bitvector threads) {
+    lists.compress(threads);
+    for (unsigned i = 0; i < lists.weight(); i++) {
+        SFCBList &list = lists.get_value(i);
+        for (int j = 0; j < SFCB_POOL_SIZE; j++) {
+            FlowControlBlock* fcb = alloc_new();
+            list.add(fcb);
+        }
+    }
+}
 
 FlowControlBlock*
 FCBPool::init_allocate() {
@@ -1417,7 +1427,7 @@ FCBPool::init_allocate() {
 void
 FCBPool::init_release(FlowControlBlock* fcb) {
        CLICK_LFREE(fcb,sizeof(FlowControlBlock) + (init_data_size() * 2));
-   }
+}
 
 
 

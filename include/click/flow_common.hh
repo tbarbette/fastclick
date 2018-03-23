@@ -3,7 +3,7 @@
 #include <click/ring.hh>
 #include <click/multithread.hh>
 #include <functional>
-
+#include <click/allocator.hh>
 CLICK_DECLS
 
 #ifdef HAVE_FLOW
@@ -178,32 +178,58 @@ extern __thread FlowTableHolder* fcb_table;
 class FCBPool {
 private:
     class SFCBList {
+        private:
+            FlowControlBlock* _p;
+            unsigned _count;
+        public:
 
-    public:
-    	FlowControlBlock* p;
-        unsigned count;
-        operator int() const { return count; }
-        SFCBList (int c ) : p(0), count( c ) {
-        }
-    	SFCBList() : p(0), count(0) {
+            operator int() const { return _count; }
 
-    	}
+            SFCBList (int c) : _p(0), _count( c ) {
+            }
 
-        inline void add(FlowControlBlock* fcb) {
-            flow_assert(fcb);
-        	*((FlowControlBlock**)fcb) = p;
-        	p = fcb;
-        	count++;
-        }
+	    SFCBList() : _p(0), _count(0) {
+		}
 
-        inline FlowControlBlock* get() {
-        	FlowControlBlock* fcb = p;
-		flow_assert(fcb);
-        	p = *((FlowControlBlock**)fcb);
-        	count--;
-        	fcb->initialize();
-        	return fcb;
-        }
+            inline void reset() {
+                _p = 0;
+                _count = 0;
+            }
+
+            inline void assign(SFCBList list) {
+                assert(_p == NULL);
+                assert(_count == 0);
+                _count = list._count;
+                _p = list._p;
+            }
+
+            inline int count() const {
+                return _count;
+            }
+
+            inline void add(FlowControlBlock* fcb) {
+                flow_assert(fcb);
+#if CLICK_DEBUG_FCBPOOL
+                assert(*(((uint64_t*)fcb) + 1) != ALLOCATOR_POISON);
+                *(((uint64_t*)fcb) + 1) = ALLOCATOR_POISON;
+#endif
+                *((FlowControlBlock**)fcb) = _p;
+                _p = fcb;
+                _count++;
+            }
+
+            inline FlowControlBlock* get() {
+                FlowControlBlock* fcb = _p;
+                flow_assert(fcb);
+#if CLICK_DEBUG_FCBPOOL
+                assert(*(((uint64_t*)fcb) + 1) == ALLOCATOR_POISON);
+                *(((uint64_t*)fcb) + 1) = 0;
+#endif
+                _p = *((FlowControlBlock**)fcb);
+                _count--;
+                fcb->initialize();
+                return fcb;
+            }
     };
 
 
@@ -270,29 +296,19 @@ public:
 		FCBPool::initialized++;
 	}
 
-	void compress(Bitvector threads) {
-		lists.compress(threads);
-		for (unsigned i = 0; i < lists.weight(); i++) {
-			SFCBList &list = lists.get_value(i);
-			for (int j = 0; j < SFCB_POOL_SIZE; j++) {
-				FlowControlBlock* fcb = alloc_new();
-				list.add(fcb);
-			}
-		}
-	}
+	void compress(Bitvector threads);
 
 	inline FlowControlBlock* allocate() {
-		if (lists->count > 0)
+		if (lists->count() > 0)
 			return lists->get();
 
 		SFCBList newlist;
 
 		newlist = global_fcb_list_ring.extract();
-		if (newlist.count) {
-			lists->count = newlist.count;
-			lists->p = newlist.p;
-			return lists->get();
-
+		if (newlist.count()) {
+			lists->assign(newlist);
+            FlowControlBlock* fcb = lists->get();
+			return fcb;
 		} else {
 			FlowControlBlock* fcb = alloc_new();
 			flow_assert(fcb);
@@ -307,10 +323,9 @@ public:
     }
 
 	inline void release(FlowControlBlock* fcb) {
-		if (lists->count >= SFCB_POOL_SIZE) {
+		if (lists->count() >= SFCB_POOL_SIZE) {
 			global_fcb_list_ring.insert(lists.get());
-			lists->p = 0;
-			lists->count = 0;
+			lists->reset();
 		}
 		lists->add(fcb);
 	}

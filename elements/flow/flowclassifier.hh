@@ -40,6 +40,7 @@ class FlowClassifier: public FlowElement {
     Timer _timer;
     bool _early_drop;
     FlowType _context;
+    bool _do_release;
 
     per_thread<FlowBatch*> _builder_batch;
 public:

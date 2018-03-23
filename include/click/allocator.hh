@@ -7,8 +7,11 @@
 #include <click/multithread.hh>
 #include <click/sync.hh>
 #include <typeinfo>
-#define CLICK_DEBUG_ALLOCATOR 0
+#define CLICK_DEBUG_ALLOCATOR 1
+
 CLICK_DECLS
+
+#define ALLOCATOR_POISON 0xA2C188F15E9AB55C
 
 class pool_allocator_mt_base {
 public:
@@ -50,6 +53,9 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
 
     typedef struct item_t{
         struct item_t* next;
+#if CLICK_DEBUG_ALLOCATOR
+        uint64_t poison;
+#endif
     } item;
 
     typedef struct Pool_t {
@@ -112,6 +118,11 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
 #endif
                 p.first->next = 0;
                 p.count++;
+            } else {
+#if CLICK_DEBUG_ALLOCATOR
+                assert( ((item*)(p.first))->poison == ALLOCATOR_POISON);
+                ((item*)(p.first))->poison = 0;
+#endif
             }
         }
         e = (T*)p.first;
@@ -142,6 +153,10 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
 #endif
         Pool& p = _pool.get();
         ++p.count;
+#if CLICK_DEBUG_ALLOCATOR
+        assert(((item*)e)->poison != ALLOCATOR_POISON);
+        ((item*)e)->poison = ALLOCATOR_POISON;
+#endif
         if (unlikely(p.count == POOL_SIZE + 1)) {
             _global_lock.acquire();
             if (_global_count == POOL_COUNT-1 || _dying) {
