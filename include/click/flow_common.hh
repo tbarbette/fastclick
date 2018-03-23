@@ -8,6 +8,8 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
+#define FLOW_KEEP_STRUCTURE 1
+
 #define DEBUG_CLASSIFIER_MATCH 0 //0 no, 1 build-time only, 2 whole time, 3 print table after each dup
 #define DEBUG_CLASSIFIER_RELEASE 0
 #define DEBUG_CLASSIFIER_TIMEOUT 0

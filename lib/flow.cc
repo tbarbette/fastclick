@@ -90,6 +90,15 @@ void FlowTableHolder::set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void*
 	_classifier_thunk = thunk;
 }
 
+FlowClassificationTable::~FlowClassificationTable() {
+        bool previous = pool_allocator_mt_base::dying();
+        pool_allocator_mt_base::set_dying(true);
+        if (_root)
+            _root->destroy();
+        pool_allocator_mt_base::set_dying(previous);
+        _root = 0;
+}
+
 FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress dst, IPAddress mask) {
     FlowLevelGeneric32* fl = new FlowLevelGeneric32();
     fl->set_match(offsetof(click_ip,ip_dst),mask.addr());

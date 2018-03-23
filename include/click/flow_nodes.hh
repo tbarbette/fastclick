@@ -295,7 +295,7 @@ public:
     FlowNode() :  num(0),_level(0),_default(),_parent(0), _growing(false)
 //            _child_deletable(true),
 #if FLOW_KEEP_STRUCTURE
-            _released(false),
+            ,_released(false)
 #endif
     {
         node_data.data_64 = 0;
