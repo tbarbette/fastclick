@@ -209,6 +209,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                 }
             } else {
                 click_chatter("ERROR : no classification node and no default path !");// allowed with the "!" symbol
+                _root->print();
                 return 0;
             }
         } else if (child_ptr->is_leaf()) {
