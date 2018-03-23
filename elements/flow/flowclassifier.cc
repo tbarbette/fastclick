@@ -203,7 +203,10 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
 #if DEBUG_CLASSIFIER_RELEASE
     click_chatter("Release from tree fcb %p data %d, parent %p",fcb,fcb->data_64[0],fcb->parent);
 #endif
-    if (fcb->parent == NULL) return;
+    if (fcb->parent == NULL) {
+        assert(false);
+        return;
+    }
 
     //A -> B -> F
 
@@ -381,6 +384,27 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
     return false; //No reschedule
 }
 
+/**
+ * Testing function
+ */
+inline int FlowClassifier::cache_find(FlowControlBlock* fcb) {
+    if (!_aggcache)
+        return 0;
+    FlowCache* bucket = _cache.get();
+    int n = 0;
+    int i = 0;
+    while (bucket < _cache.get() + (_cache_size * _cache_ring_size)) {
+        if (bucket->agg != 0 && bucket->fcb == fcb) {
+            click_chatter("agg%u b%d fcb%p",bucket->agg,i,fcb);
+            fcb->print("");
+            n++;
+        }
+        bucket++;
+        i++;
+    }
+    return n;
+}
+
 inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
     if (!_aggcache)
         return;
@@ -389,7 +413,7 @@ inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
         return;
     uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
 #if USE_CACHE_RING
-        FlowCache* bucket = _cache.get() + (hash * _cache_ring_size);
+        FlowCache* bucket = _cache.get() + ((uint32_t)hash * _cache_ring_size);
         FlowCache* c = bucket;
         int ic = 0;
         do {
@@ -431,7 +455,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
         FlowControlBlock* fcb = 0;
         uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
 #if USE_CACHE_RING
-        FlowCache* bucket = _cache.get() + hash * _cache_ring_size;
+        FlowCache* bucket = _cache.get() + ((uint32_t)hash * _cache_ring_size);
 #else
         FlowCache* bucket = _cache.get() + hash;
 #endif

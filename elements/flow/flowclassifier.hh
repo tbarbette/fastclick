@@ -60,6 +60,7 @@ public:
 
     bool stopClassifier() override CLICK_COLD { return true; };
 
+    inline int cache_find(FlowControlBlock* fcb);
     inline void remove_cache_fcb(FlowControlBlock* fcb);
     inline FlowControlBlock* get_cache_fcb(Packet* p, uint32_t agg);
     void push_batch_simple(int port, PacketBatch*);
