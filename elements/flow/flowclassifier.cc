@@ -385,6 +385,8 @@ inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
     if (!_aggcache)
         return;
     uint32_t agg = *((uint32_t*)&fcb->node_data[1]);
+    if (agg == 0)
+        return;
     uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
 #if USE_CACHE_RING
         FlowCache* bucket = _cache.get() + (hash * _cache_ring_size);
@@ -407,7 +409,7 @@ inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
             ic++;
             c++;
         } while (ic < _cache_ring_size);
-        click_chatter("REMOVING a FCB from the cache that was not in the cache");
+        click_chatter("REMOVING a FCB from the cache that was not in the cache %p, agg %u",fcb, agg);
 #else
 #error NOT WORKING BECAUSE OF HOLE
         FlowCache* bucket = _cache.get() + hash;
