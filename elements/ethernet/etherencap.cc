@@ -100,6 +100,15 @@ EtherEncap::push_batch(int, PacketBatch *batch) {
         }
     }
 }
+
+PacketBatch *
+EtherEncap::pull_batch(int port, unsigned max)
+{
+	PacketBatch* batch;
+    MAKE_BATCH(EtherEncap::pull(port),batch,max);
+    return batch;
+}
+
 #endif
 
 Packet *
