@@ -62,7 +62,9 @@ _pool(), _classifier_release_fnt(0), _classifier_thunk(0)
 
     }
 
-FlowTableHolder::~FlowTableHolder() {
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+void
+FlowTableHolder::delete_all_flows() {
     for (int i = 0; i < old_flows.weight(); i++) {
         fcb_list& head = old_flows.get_value(i);
         FlowControlBlock* next = 0;
@@ -82,6 +84,13 @@ FlowTableHolder::~FlowTableHolder() {
         }
     }
 }
+#endif
+
+FlowTableHolder::~FlowTableHolder() {
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+    delete_all_flows();
+#endif
+}
 
 
 
@@ -94,9 +103,9 @@ FlowClassificationTable::~FlowClassificationTable() {
         bool previous = pool_allocator_mt_base::dying();
         pool_allocator_mt_base::set_dying(true);
         if (_root)
-            _root->destroy();
-        pool_allocator_mt_base::set_dying(previous);
+            delete _root;
         _root = 0;
+        pool_allocator_mt_base::set_dying(previous);
 }
 
 FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress dst, IPAddress mask) {
@@ -822,7 +831,10 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
         if (inverted && !olevel->is_dynamic()) {//We're in the default path, nothing to remove as it won't help that we know we won't see some static value
             debug_flow("Inverted...");
         } else { //Not inverted (we will see the given value), or inverted but other is a dynamic value meaning that the bits of level will be known when reaching this value
-            assert(!(olevel->is_dynamic() && !inverted));//We would be in the child of a dynamic level that is not on a defautl path
+/*            if ((olevel->is_dynamic() && !inverted)) {//We would be in the child of a dynamic level that is not on a defautl path
+                print();
+                assert(false);
+            }*/ //ALLOWED FOR VERIF-PRUNING
             /**
              * If other is dynamic or not does not matter, we will have those bits fixed, so we remove it from our dynamic mask
              */
@@ -1312,6 +1324,15 @@ void FlowControlBlock::print(String prefix, int data_offset, bool show_ptr) cons
 	else
 	    click_chatter("%s %lu UC:%d ED:%d (data %s)",prefix.c_str(),node_data[0].data_64,count(),is_early_drop(),data_str);
 }
+
+void FlowControlBlock::reverse_print() {
+    FlowNode* p = parent;
+    String prefix = "";
+    print(prefix);
+    if (parent)
+        parent->reverse_print();
+}
+
 
 void FlowNodePtr::print() const{
 	if (is_leaf())

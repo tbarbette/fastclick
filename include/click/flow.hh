@@ -29,7 +29,7 @@ public:
     void set_root(FlowNode* node);
     FlowNode* get_root();
 
-    inline FlowControlBlock* match(Packet* p,bool always_dup);
+    inline FlowControlBlock* match(Packet* p);
     inline bool reverse_match(FlowControlBlock* sfcb, Packet* p);
 
     typedef struct {
@@ -60,7 +60,15 @@ protected:
  */
 bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
     FlowNode* parent = (FlowNode*)sfcb->parent;
-
+#if DEBUG_CLASSIFIER
+    if (parent != _root && (!parent || !_root->find_node(parent))) {
+        click_chatter("GOING TO CRASH WHILE MATCHING fcb %p, with parent %p", sfcb, parent);
+        click_chatter("Parent exists : %d",_root->find_node(parent));
+        _root->print();
+        sfcb->reverse_print();
+        assert(false);
+    }
+#endif
     if (unlikely(!parent->_leaf_reverse_match(sfcb,p))) {
 #if DEBUG_CLASSIFIER_MATCH > 2
         click_chatter("DIF is_default %d Leaf %x %x level %s",parent->default_ptr()->ptr == sfcb,parent->level()->get_data(p).data_64, sfcb->node_data[0].data_64,parent->level()->print().c_str());
@@ -72,7 +80,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 #endif
     }
 
-    do {
+    while (parent != _root) {
         FlowNode* child = parent;
         parent = parent->parent();
         flow_assert(parent);
@@ -86,18 +94,19 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
             click_chatter("MAT is_default %d Child %x %x level %s",parent->default_ptr()->ptr == child,parent->level()->get_data(p).data_64, child->node_data.data_64,parent->level()->print().c_str());
 #endif
         }
-    } while (parent != _root);
+    };
     return true;
 }
 
 
-FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
-    always_dup = false;
+FlowControlBlock* FlowClassificationTable::match(Packet* p) {
+    const bool always_dup = false;
     FlowNode* parent = _root;
     FlowNodePtr* child_ptr = 0;
 #if DEBUG_CLASSIFIER_MATCH > 1
     int level_nr = 0;
 #endif
+    bool dynamic = false;
     do {
         FlowNodeData data = parent->level()->get_data(p);
 #if DEBUG_CLASSIFIER_MATCH > 1
@@ -108,16 +117,17 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
         click_chatter("->Ptr is %p, is_leaf : %d",child_ptr->ptr, child_ptr->is_leaf());
 #endif
 
-        if (unlikely(child_ptr->ptr == NULL || (child_ptr->ptr == (void*)-1) //Do not change ptr here to 0, as we could follow defautl path without changing this one
+        if (unlikely(IS_FREE_PTR_ANY(child_ptr->ptr) //Do not change ptr here to 0, as we could follow defautl path without changing this one
 #if FLOW_KEEP_STRUCTURE
                 || (child_ptr->is_node() && child_ptr->node->released())
 #endif
                 )) { //Unlikely to create a new node.
 
             if (parent->get_default().ptr) {
-                if (parent->level()->is_dynamic() || always_dup) {
+                if (parent->level()->is_dynamic()) {
                     if (unlikely(parent->growing())) {
-                        //Table is growing, look at the child for new element
+                        //Table is growing, and we could not find a child, we go to the default table
+                        /*
 #if DEBUG_CLASSIFIER
                         if (parent->getNum() == 0) { //Table is growing, but have no more child.
                             debug_flow("Table %s finished growing, deleting %p, type %s",parent->level()->print().c_str(), parent, parent->name().c_str());
@@ -129,6 +139,8 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
 #endif
                         }
 #endif
+*/
+                        flow_assert(parent->default_ptr()->node->parent() == parent);
                         parent = parent->default_ptr()->node;
                         continue;
                     } else if (unlikely(parent->num >= parent->max_size())) { //Parent is not growing, but we should start growing
@@ -142,6 +154,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                             //TODO : release some children
                             return 0;
                         }
+                        flow_assert(_root->find_node(parent));
                         continue;
 
 #endif
@@ -173,7 +186,8 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
     #if DEBUG_CLASSIFIER_MATCH > 3
                             _root->print();
     #endif
-                            _root->check(true);
+                            _root->check(true, false);
+                            flow_assert(reverse_match(child_ptr->leaf, p));
                             return child_ptr->leaf;
                         } else {
 #if FLOW_KEEP_STRUCTURE
@@ -199,11 +213,15 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                             }
                         }
                         flow_assert(parent->getNum() == parent->findGetNum());
+
+                        _root->check(true, false);
                     }
                 } else { //There is a default but it is not a dynamic level, nor always_dup is set
                     child_ptr = parent->default_ptr();
                     if (child_ptr->is_leaf()) {
-                        _root->check(true);
+                        _root->check(true, false);
+
+                        flow_assert(reverse_match(child_ptr->leaf, p));
                         return child_ptr->leaf;
                     }
                 }
@@ -213,38 +231,18 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p,bool always_dup) {
                 return 0;
             }
         } else if (child_ptr->is_leaf()) {
+
+            flow_assert(reverse_match(child_ptr->leaf, p));
             return child_ptr->leaf;
         } else { // is an existing node, and not released. Just descend
 
         }
+
+        flow_assert(child_ptr->node->parent() == parent);
         parent = child_ptr->node;
 
-        assert(parent);
+        flow_assert(parent);
     } while(1);
-
-
-
-    /*int action_id = 0;
-	  //=OXM_OF_METADATA_W
-	struct ofp_action_header* action = action_table[action_id];
-	switch (action->type) {
-		case OFPAT_SET_FIELD:
-			struct ofp_action_set_field* action_set_field = (struct ofp_action_set_field*)action;
-			struct ofp_match* match = (struct ofp_match*)action_set_field->field;
-			switch(match->type) {
-				case OFPMT_OXM:
-					switch (OXM_HEADER(match->oxm_fields)) {
-						case OFPXMC_PACKET_REGS:
-
-					}
-					break;
-				default:
-					click_chatter("Error : action field type %d unhandled !",match->type);
-			}
-			break;
-		default:
-			click_chatter("Error : action type %d unhandled !",action->type);
-	}*/
 }
 
 inline FlowNodeData FlowNodePtr::data() {

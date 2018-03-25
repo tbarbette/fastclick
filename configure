@@ -812,6 +812,7 @@ enable_dpdk_pool
 enable_dpdk_packet
 enable_zerocopy
 enable_sloppy
+enable_flow_structure
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -1526,6 +1527,10 @@ Optional Features:
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
     --disable-sloppy      disable Sloppy flow timeouts
+    --enable-flow-structure
+                          do not free classifier nodes in pool, mark them as
+                          released to somehow keep the receive strucutre
+                          intact
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -6947,6 +6952,18 @@ fi
 
 if test "x$enable_sloppy" = xyes; then
     $as_echo "#define HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-flow-structure was given.
+if test "${enable_flow_structure+set}" = set; then :
+  enableval=$enable_flow_structure; :
+else
+  enable_keep_structure=no
+fi
+
+if test "x$enable_keep_structure" = xyes; then
+    $as_echo "#define FLOW_KEEP_STRUCTURE 1" >>confdefs.h
 
 fi
 

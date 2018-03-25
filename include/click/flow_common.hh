@@ -8,7 +8,6 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-#define FLOW_KEEP_STRUCTURE 1
 
 #define DEBUG_CLASSIFIER_MATCH 0 //0 no, 1 build-time only, 2 whole time, 3 print table after each dup
 #define DEBUG_CLASSIFIER_RELEASE 0
@@ -16,12 +15,25 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
 #define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
+#define HAVE_STATIC_CLASSIFICATION 0
+
+#define RELEASE_RESET 0
+#define RELEASE_KEEP 1
+#define RELEASE_EPOCH 2
+
+#define FLOW_HASH_RELEASE RELEASE_EPOCH
+
 #define DEBUG_CLASSIFIER_CHECK 0
 
-#if DEBUG_CLASSIFIER
+#if DEBUG_CLASSIFIER > 1
+    #define debug_flow_2(...) click_chatter(__VA_ARGS__);
     #define debug_flow(...) click_chatter(__VA_ARGS__);
+#elif DEBUG_CLASSIFIER
+    #define debug_flow(...) click_chatter(__VA_ARGS__);
+    #define debug_flow_2(...)
 #else
     #define debug_flow(...)
+    #define debug_flow_2(...)
 #endif
 
 #if DEBUG_CLASSIFIER_CHECK || DEBUG_CLASSIFIER
@@ -154,6 +166,7 @@ private:
         inline FCBPool* get_pool() const;
 
 		void print(String prefix, int data_offset =-1, bool show_ptr=false) const;
+        void reverse_print();
 
 		bool empty();
 
@@ -215,6 +228,7 @@ private:
                 flow_assert(fcb);
 #if CLICK_DEBUG_FCBPOOL
                 assert(*(((uint64_t*)fcb) + 1) != ALLOCATOR_POISON);
+                assert(fcb->count() == 0);
                 *(((uint64_t*)fcb) + 1) = ALLOCATOR_POISON;
 #endif
                 *((FlowControlBlock**)fcb) = _p;
@@ -354,6 +368,9 @@ public:
     }
 
 
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+    void delete_all_flows();
+#endif
     void set_release_fnt(SubFlowRealeaseFnt pool_release_fnt, void* thunk);
 
 
@@ -441,10 +458,11 @@ extern __thread FlowTableHolder* fcb_table;
         }
 
 inline void FlowControlBlock::_do_release() {
-#if DEBUG_CLASSIFIER
+#if DEBUG_CLASSIFIER && HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     assert(!(flags & FLOW_TIMEOUT_INLIST));
-    //click_chatter("Release fnt is %p",release_fnt);
 #endif
+
+    //click_chatter("Release fnt is %p",release_fnt);
     SFCB_STACK(
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
        if (release_fnt)
@@ -456,7 +474,7 @@ inline void FlowControlBlock::_do_release() {
 }
 
 inline void FlowControlBlock::release(int packets_nr) {
-	if (use_count - packets_nr  < 0) {
+	if ((int)use_count - packets_nr  < 0) {
 		click_chatter("ERROR : negative release : release %p, use_count = %d, releasing %d",this,use_count,packets_nr);
 		assert(use_count - packets_nr >= 0);
 	}
@@ -467,7 +485,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 #endif
 
 	if (use_count == 0) {
-	    debug_flow("Release fcb %p, uc 0, hc %d",this,hasTimeout());
+	    debug_flow_2("Release fcb %p, uc 0, hc %d",this,hasTimeout());
 		//assert(this->hasTimeout());
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 	    if (this->hasTimeout()) {

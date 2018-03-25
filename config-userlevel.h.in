@@ -220,6 +220,9 @@
 /* Define if Flow sloppy timeout is enabled. */
 #undef HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 
+/* Define if flow nodes should be released. */
+#undef FLOW_KEEP_STRUCTURE
+
 /* Define if Netmap support is enabled. */
 #undef HAVE_NETMAP
 

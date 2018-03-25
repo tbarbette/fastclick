@@ -25,18 +25,19 @@
  *********************************/
 
 FlowNode* FlowNode::start_growing(bool impl) {
-                        click_chatter("Table starting to grow (was level %s, node %s)",level()->print().c_str(),name().c_str());
+            click_chatter("Table starting to grow (was level %s, node %s, impl %d)",level()->print().c_str(),name().c_str(), impl);
             set_growing(true);
             FlowNode* newNode = level()->create_node(this, true, impl);
             if (newNode == 0) {
                 //TODO : better to release old flows
+                debug_flow("Could not expand");
                 return 0;
             }
             newNode->_default = _default;
             newNode->_level = _level;
             newNode->_parent = this;
             _default.set_node(newNode);
-
+            click_chatter("Table is now (level %s, node %s)",newNode->level()->print().c_str(),newNode->name().c_str());
             return newNode;
 }
 
@@ -54,6 +55,21 @@ int FlowNode::findGetNum() {
             count++;
     });
     return count;
+}
+
+FlowNode*
+FlowNode::find_node(FlowNode* other) {
+    FlowNode* found = 0;
+    apply_default([other,&found](FlowNodePtr* p) {
+        if (p->ptr && p->is_node()) {
+            if (p->node == other || p->node->find_node(other)) {
+                found = p->node;
+                return false;
+            }
+        }
+        return true;
+    });
+    return found;
 }
 
 /*FlowNodePtr* FlowNode::get_first_leaf_ptr() {
@@ -77,7 +93,7 @@ int FlowNode::findGetNum() {
  * Ensure consistency of the tree
  * @param node
  */
-void FlowNode::check(bool allow_parent) {
+void FlowNode::check(bool allow_parent, bool allow_default) {
     FlowNode* node = this;
     NodeIterator it = node->iterator();
     FlowNodePtr* cur = 0;
@@ -91,7 +107,7 @@ void FlowNode::check(bool allow_parent) {
             if (!cur->node->released())
 #endif
             {
-                cur->node->check(allow_parent);
+                cur->node->check(allow_parent, allow_default);
                 num++;
             }
         } else {
@@ -105,7 +121,13 @@ void FlowNode::check(bool allow_parent) {
         print();
         assert(num == getNum());
     }
-
+    if (!allow_default) {
+        if (node->default_ptr()->ptr == 0) {
+            click_chatter("This node has no default path, this is not allowed : ");
+            node->reverse_print();
+            assert(false);
+        }
+    }
     if (node->default_ptr()->ptr != 0) {
 
         assert(node->get_default().ptr != (void*)-1);
@@ -116,7 +138,7 @@ void FlowNode::check(bool allow_parent) {
             assert(!node->default_ptr()->node->released());
 #endif
             assert(node->level()->is_dynamic() || node->get_default().node->parent() == node);
-            node->get_default().node->check(allow_parent);
+            node->get_default().node->check(allow_parent, allow_default);
         } else {
             node->default_ptr()->leaf->check();
         }
@@ -129,12 +151,23 @@ void FlowNode::check(bool allow_parent) {
 }
 #endif
 
-void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr) {
+void FlowNode::reverse_print() {
+    FlowNode* p = this;
+    String prefix = "";
+    while (p != 0) {
+        prefix += "--";
+        FlowNode::print(p,prefix,-1, true,false);
+        p = p->parent();
+    };
+}
+
+void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr, bool recursive) {
     if (show_ptr) {
-        if (node->level()->is_dynamic())
+        if (node->level()->is_dynamic()) {
             click_chatter("%s%s (%s, %d childs, dynamic) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
-        else
+        } else {
             click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+        }
     } else {
         if (node->level()->is_dynamic())
             click_chatter("%s%s (%s, %d childs, dynamic)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
@@ -142,6 +175,8 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
             click_chatter("%s%s (%s, %d childs)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
     }
 
+    if (!recursive)
+        return;
     NodeIterator it = const_cast<FlowNode*>(node)->iterator();
     FlowNodePtr* cur = 0;
     while ((cur = it.next()) != 0) {
@@ -320,6 +355,7 @@ void FlowNode::traverse_parents(std::function<void(FlowNode*)> fnt) {
     return;
 }
 
+
 FlowNode* FlowNode::create_hash(int l) {
     FlowNode* fl;
     switch(l) {
@@ -435,24 +471,12 @@ FlowNodeDefinition::create_final(bool mt_safe) {
  * FlowNodeArray
  *************************************/
 /**
- * Destroy puts back the memory and kill all children
+ * Destroy puts back the memory and release default
+ * @precond at run-time, num is 0 and there is no default
  */
 void FlowNodeArray::destroy() {
-#if DEBUG_CLASSIFIER_CHECK
-    //This will break final destruction
-    apply([](FlowNodePtr* p) {
-        if (p->ptr) {
-     //       assert(p->is_node());
-# if FLOW_KEEP_STRUCTURE
-       //     assert(p->node->released());
-# endif
-        }
+    flow_assert(pool_allocator_mt_base::dying() || num == 0); //Not true on final destroy
 
-# if !FLOW_KEEP_STRUCTURE
-        //assert(!p->ptr);
-#endif
-    });
-#endif
     FlowAllocator<FlowNodeArray>::release(this);
 }
 
@@ -463,7 +487,7 @@ FlowNodeArray::~FlowNodeArray() {
     //Base destructor will delete the default
     for (int i = 0; i < childs.size(); i++) {
         if (childs[i].ptr != NULL && childs[i].is_node()) {
-               childs[i].node->destroy();
+               delete childs[i].node;
                childs[i].node = 0;
         }
     }
@@ -482,35 +506,45 @@ FlowNode* FlowNodeArray::duplicate(bool recursive,int use_count) {
  ******************************/
 
 /**
- * Destroy puts back the memory and kill all children, but not default
+ * Destroy puts back the node in the pool
+ * @precond num is 0 and there is no default
  */
 template<int capacity_n>
 void FlowNodeHash<capacity_n>::destroy() {
-    flow_assert(num == 0); //Not true on final destroy
+
+    flow_assert(num == 0);
     //This is copy pasted to avoid virtual destruction
+#if FLOW_HASH_RELEASE == RELEASE_RESET
     for (int i = 0; i < capacity(); i++) {
-        if (childs[i].ptr && childs[i].ptr != DESTRUCTED_NODE && !childs[i].is_leaf()) {
-            delete childs[i].node;
-            childs[i].node = 0;
+        if (!IS_EMPTY_PTR(childs[i].ptr, this)) {
+            flow_assert(IS_DESTRUCTED_NODE(childs[i].ptr,this));
+/*            if (childs[i].ptr != DESTRUCTED_NODE && childs[i].is_node()) {
+                childs[i].node->destroy();
+            }*/
+            childs[i].ptr = 0;
         }
     }
-        if (_default.ptr && _default.is_node()) {
-#if FLOW_KEEP_STRUCTURE
-            _default.node->release();
-#else
-            _default.node->destroy();
-#endif
+#elif FLOW_HASH_RELEASE == RELEASE_EPOCH
+    this->epoch ++;
+    if (this->epoch == MAX_EPOCH) {
+        this->epoch = 1;
+        for (int i = 0; i < capacity(); i++) {
+            flow_assert(IS_DESTRUCTED_NODE(childs[i].ptr,this));
+            childs[i].ptr = 0;
         }
-    FlowAllocator<FlowNodeHash<capacity_n>>::release_unitialized(this);
+    }
+#endif
+    FlowAllocator<FlowNodeHash<capacity_n>>::release(this);
 }
 
 /**
  * Delete FlowNodehash and its children and default
+ * @precond leafs are deleted
  */
 template<int capacity_n>
 FlowNodeHash<capacity_n>::~FlowNodeHash() {
         for (int i = 0; i < capacity(); i++) {
-            if (childs[i].ptr && childs[i].ptr != DESTRUCTED_NODE && !childs[i].is_leaf()) {
+            if (IS_VALID_NODE(childs[i],this)) {
                 delete childs[i].node;
                 childs[i].node = 0;
             }
@@ -534,8 +568,6 @@ FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count) {
 
 template<int capacity_n>
 FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
-        //click_chatter("Searching for %d in hash table leaf %d",data,leaf);
-
         flow_assert(getNum() <= max_highwater());
         int i = 0;
 
@@ -552,8 +584,8 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
         click_chatter("Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
 #endif
         if (unlikely(growing())) { //Growing means the table is currently in destructions, so we check for DESTRUCTED_NODE pointers also, and no insert_idx trick
-            while (childs[idx].ptr) {
-                if (childs[idx].ptr != DESTRUCTED_NODE && childs[idx].data().data_64 == data.data_64)
+            while (!IS_EMPTY_PTR(childs[idx].ptr,this)) {
+                if (IS_VALID_PTR(childs[idx].ptr,this) && childs[idx].data().data_64 == data.data_64)
                     break;
                 idx = next_idx(idx);
                 i++;
@@ -562,18 +594,20 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
     #endif
             }
         } else {
-            while (childs[idx].ptr) {
+            while (!IS_EMPTY_PTR(childs[idx].ptr,this)) {
                 //While there is something in that bucket already
-                if (childs[idx].ptr == DESTRUCTED_NODE || childs[idx].data().data_64 != data.data_64) {
-                    //Destructed node, we can actually use this idx --> set insert_idx to this pointer as we can replace it
-                    if (insert_idx == UINT_MAX
+                if (IS_DESTRUCTED_PTR(childs[idx].ptr,this)
 #if FLOW_KEEP_STRUCTURE
-                            && childs[idx].is_node() && childs[idx].node->released()
+                            || (childs[idx].is_node() && childs[idx].node->released())
 #endif
-                            ) {
+                        ) {
+                    //If destructed node, we can actually use this idx --> set insert_idx to this pointer as we can replace it
+                    if (insert_idx == UINT_MAX) {
                         insert_idx = idx;
                         ri ++;
                     }
+                } else if (childs[idx].data().data_64 != data.data_64) {
+
                 } else { //We found the right bucket, that already exists
                     if (insert_idx != UINT_MAX) {
                         //If we have an insert_idx, swap bucket to "compress" elements
@@ -591,23 +625,14 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
                 idx = next_idx(idx);
                 i++;
 
-    #if DEBUG_CLASSIFIER
-                    assert(i <= capacity());
-    #endif
+                if (i == capacity()) {
+                    flow_assert(insert_idx != UINT_MAX);
+                    click_chatter("Fully fulled hash table ! GROW NOW !");
+                    break;
+                }
             }
             if (insert_idx != UINT_MAX) { //We found an empty pointer if we have an insert_idx, we use that one instead
-                debug_flow("Recovered IDX %d",insert_idx);
-                /*idx = next_idx(idx);
-                int j = 0;
-                //If we merge a hole, delete the rest
-                THIS IS WRONG
-                while (j < 16 && childs[idx].ptr && childs[idx].is_node() && childs[idx].node->released()) {
-                    childs[idx].node->destroy();
-                    childs[idx].node = 0;
-                    idx = next_idx(idx);
-                    j ++;
-                }*/
-
+                debug_flow_2("Recovered IDX %d",insert_idx);
                 idx = insert_idx;
             }
         }
@@ -621,7 +646,8 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
             if (!growing()) {
                 click_chatter("%d collisions! Hint for a better hash table size at level %s (current capacity is %d, size is %d, data is %lu)!",i,level()->print().c_str(),capacity(),getNum(),data.data_32);
                 click_chatter("%d released in collision !",ri);
-                if (childs[idx].ptr == 0
+                //If the found node was free, we can start growing
+                if (IS_FREE_PTR(childs[idx].ptr, this)
 #if FLOW_KEEP_STRUCTURE
                         || (childs[idx].is_node() && childs[idx].node->released())
 #endif
@@ -637,12 +663,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
         }
 
         return &childs[idx];
-    }
-/*template<int capacity_n>
-void FlowNodeHash<capacity_n>::renew() {
-    _released = false;
-
-}*/
+}
 
 /**
  * Remove the children object that can be found at DATA
@@ -667,24 +688,25 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
     }
 
     if (child.is_leaf()) {
-        childs[idx].ptr = DESTRUCTED_NODE; //FCB deletion is handled by the caller which goes bottom up
+        SET_DESTRUCTED_NODE(childs[idx].ptr,this); //FCB deletion is handled by the caller which goes bottom up
     } else {
         if (unlikely(growing())) { //If we are growing, or the child is growing, we want to destroy the child definitively
-            childs[idx].ptr = DESTRUCTED_NODE;
+            SET_DESTRUCTED_NODE(childs[idx].ptr,this);
             child.node->destroy();
-        } else {
+        } else { //Child is node and not growing
             //flow_assert(!child.node->growing()); //If the child is growing, the caller has to swap it, not destroy it
-            if (i > hole_threshold() && childs[next_idx(idx)].ptr == 0) { // Keep holes if there are quite a lot of collisions
+            if (i > hole_threshold() && IS_EMPTY_PTR(childs[next_idx(idx)].ptr,this)) { // Keep holes if there are quite a lot of collisions
                 click_chatter("Keep hole in %s",level()->print().c_str());
                 childs[idx].ptr = 0;
                 child.node->destroy();
                 i--;
                 while (i > (2 * (hole_threshold() / 3))) {
                     idx = prev_idx(idx);
-                    if (childs[idx].ptr == DESTRUCTED_NODE) {
+                    if (IS_FREE_PTR(childs[idx].ptr,this)) {
                         childs[idx].ptr = 0;
 #if FLOW_KEEP_STRUCTURE
                     } else if (childs[idx].is_node() && childs[idx].node->released()) {
+                        childs[idx].node._default.ptr = 0;
                         childs[idx].node->destroy();
                         childs[idx].ptr = 0;
 #endif
@@ -696,7 +718,7 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
 #if FLOW_KEEP_STRUCTURE
                 child.node->release();
 #else
-                childs[idx].ptr = DESTRUCTED_NODE;
+                SET_DESTRUCTED_NODE(childs[idx].ptr,this);
                 child.node->destroy();
 #endif
             }
