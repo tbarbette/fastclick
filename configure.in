@@ -2248,7 +2248,7 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
 fi
 
 dnl add 'netmap' if netmap support is available
-if test "x$have_netmap" == xyes; then
+if test "x$HAVE_NETMAP" == xyes; then
     provisions="$provisions netmap"
 fi
 

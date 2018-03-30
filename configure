@@ -14058,7 +14058,7 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
     provisions="$provisions microhttpd"
 fi
 
-if test "x$have_netmap" == xyes; then
+if test "x$HAVE_NETMAP" == xyes; then
     provisions="$provisions netmap"
 fi
 
