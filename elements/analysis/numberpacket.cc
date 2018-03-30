@@ -55,15 +55,15 @@ inline Packet* NumberPacket::smaction(Packet *p) {
         wp->ip_header()->ip_len = htons(_offset + _size_of_number);
     }
 
-    uint64_t number = _count;
-    _count++;
-
+    // Skip header
     if (_net_order) {
-        number = htonll(number);
+        *reinterpret_cast<uint64_t *>(wp->data() + _offset) = htonll(_count);
+    } else {
+        *reinterpret_cast<uint64_t *>(wp->data() + _offset) = _count;
     }
 
-    // Skip header
-    *reinterpret_cast<uint64_t *>(wp->data() + _offset) = number;
+    // Atomically increment
+    _count++;
 
     return wp;
 }

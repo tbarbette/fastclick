@@ -1,11 +1,8 @@
 #ifndef CLICK_NUMBERPACKET_HH
 #define CLICK_NUMBERPACKET_HH
 
+#include <click/glue.hh>
 #include <click/batchelement.hh>
-
-#define TYPE_INIT 0
-#define TYPE_LITEND 1
-#define TYPE_BIGEND 2
 
 CLICK_DECLS
 
@@ -47,31 +44,6 @@ public:
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch *) override;
 #endif
-
-    static unsigned long long htonll(unsigned long long src) {
-        static int typ = TYPE_INIT;
-        unsigned char c;
-        union {
-            unsigned long long ull;
-            unsigned char c[8];
-        } x;
-
-        if (typ == TYPE_INIT) {
-            x.ull = 0x01;
-            typ = (x.c[7] == 0x01ULL) ? TYPE_BIGEND : TYPE_LITEND;
-        }
-
-        if (typ == TYPE_BIGEND)
-            return src;
-
-        x.ull = src;
-        c = x.c[0]; x.c[0] = x.c[7]; x.c[7] = c;
-        c = x.c[1]; x.c[1] = x.c[6]; x.c[6] = c;
-        c = x.c[2]; x.c[2] = x.c[5]; x.c[5] = c;
-        c = x.c[3]; x.c[3] = x.c[4]; x.c[4] = c;
-
-        return x.ull;
-    }
 
     static inline uint64_t read_number_of_packet(
             const Packet *p, int offset, bool net_order = false) {
