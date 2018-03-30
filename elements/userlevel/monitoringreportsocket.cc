@@ -40,11 +40,8 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 
+#include "../analysis/numberpacket.hh"
 #include "monitoringreportsocket.hh"
-
-#define TYPE_INIT 0 
-#define TYPE_LITEND 1 
-#define TYPE_BIGEND 2
 
 CLICK_DECLS
 
@@ -80,33 +77,6 @@ char_to_int64(char buffer[]) {
     int64_t number = 0;
     memcpy(&number, buffer, sizeof(int64_t));
     return number;
-}
-
-static unsigned long long
-htonll(unsigned long long src)
-{
-    static int typ = TYPE_INIT;
-    unsigned char c;
-    union { 
-        unsigned long long ull;
-        unsigned char c[8];
-    } x;
-
-    if (typ == TYPE_INIT) {
-        x.ull = 0x01;
-        typ = (x.c[7] == 0x01ULL) ? TYPE_BIGEND : TYPE_LITEND;
-    }
-
-    if (typ == TYPE_BIGEND)
-        return src;
-
-    x.ull = src;
-    c = x.c[0]; x.c[0] = x.c[7]; x.c[7] = c;
-    c = x.c[1]; x.c[1] = x.c[6]; x.c[6] = c;
-    c = x.c[2]; x.c[2] = x.c[5]; x.c[5] = c;
-    c = x.c[3]; x.c[3] = x.c[4]; x.c[4] = c;
-
-    return x.ull;
 }
 
 MonitoringReportSocket::MonitoringReportSocket()
@@ -401,7 +371,7 @@ MonitoringReportSocket::run_timer(Timer *t)
         // Create a fixed-size buffer and, at first, store a timestamp
         char buffer[_tot_msg_length];
         bzero(buffer, _tot_msg_length);
-        int64_to_char(buffer, htonll(ts));
+        int64_to_char(buffer, NumberPacket::htonll(ts));
 
         for (String handler_name : _elementHandlers[e]) {
             // Ask for a handler instance with this name
@@ -418,7 +388,7 @@ MonitoringReportSocket::run_timer(Timer *t)
              * If handler's name is longer than HANDLER_LEN,
              * we send only the first HANDLER_LEN characters.
              */
-            int64_to_char(&buffer[sizeof(ts)], htonll(value));
+            int64_to_char(&buffer[sizeof(ts)], NumberPacket::htonll(value));
             snprintf(&buffer[sizeof(ts) + sizeof(value)], HANDLER_LEN, "%s", handler_name.c_str());
             buffer[sizeof(ts) + sizeof(value) + handler_name.length() + 1] = '\0';
 
@@ -514,7 +484,7 @@ MonitoringReportSocket::print_data(char *buffer, const int buffer_len)
 
     click_chatter(
         "[Monitoring element %s] [Thread %d] Timestamp: %" PRId64 " - Value: %" PRId64 " - Name: %s",
-        this->name().c_str(), click_current_cpu_id(), htonll(ts), htonll(value), handler_name
+        this->name().c_str(), click_current_cpu_id(), NumberPacket::htonll(ts), NumberPacket::htonll(value), handler_name
     );
 }
 

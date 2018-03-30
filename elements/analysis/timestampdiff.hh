@@ -66,6 +66,7 @@ private:
     Vector<unsigned> _delays;
     int _offset;
     uint32_t _limit;
+    bool _net_order;
     int _max_delay_ms;
     RecordTimestamp *_rt;
     atomic_uint32_t _nd;

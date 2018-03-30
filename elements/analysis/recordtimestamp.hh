@@ -19,6 +19,11 @@ RecordTimestamp([I<keywords> N])
 record current timestamp in a vector each time a packet is pushed through this
 element.
 
+=item COUNTER
+
+Relies on a specific NumberPacket element to fetch the packet counter.
+Defaults to no COUNTER element.
+
 =item N
 
 Size of the vector, defaults to 65536.
@@ -33,6 +38,13 @@ If not set or < 0, the vector will be filled in order.
 
 If true, allows to grow the vector on runtime. This is disabled by default because it is not multi thread safe a,d creates a spike in latency that is due to the long time taken to resize. If
 the number of packets reaches a non dynamic TimestampDiff, it will crash.
+
+=item NET_ORDER
+
+Writes the number in network order format and returns this number
+acounting for this format.
+If COUNTER is set, it adheres to the settings of that element.
+Otherwise, user can set it. Defaults to false.
 
 =a
 
@@ -58,9 +70,14 @@ public:
 
     inline Timestamp get(uint64_t i);
 
+    inline bool has_net_order() {
+        return _net_order;
+    }
+
 private:
     int _offset;
     bool _dynamic;
+    bool _net_order;
     Vector<Timestamp> _timestamps;
     NumberPacket *_np;
 };

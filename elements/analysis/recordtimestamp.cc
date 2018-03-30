@@ -25,7 +25,8 @@
 
 CLICK_DECLS
 
-RecordTimestamp::RecordTimestamp() : _offset(-1), _timestamps(), _dynamic(false), _np(0) {
+RecordTimestamp::RecordTimestamp() :
+    _offset(-1), _dynamic(false), _net_order(false), _timestamps(), _np(0) {
 }
 
 RecordTimestamp::~RecordTimestamp() {
@@ -39,6 +40,7 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
             .read("N", n)
             .read("OFFSET", _offset)
             .read("DYNAMIC", _dynamic)
+            .read("NET_ORDER", _net_order)
             .complete() < 0)
         return -1;
 
@@ -49,6 +51,11 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (e && (_np = static_cast<NumberPacket *>(e->cast("NumberPacket"))) == 0)
         return errh->error("COUNTER must be a valid NumberPacket element");
 
+    // Adhere to the settings of the counter element, bypassing the configuration
+    if (_np) {
+        _net_order = _np->has_net_order();
+    }
+
     return 0;
 }
 
@@ -56,8 +63,9 @@ inline void
 RecordTimestamp::smaction(Packet *p) {
     uint64_t i;
     if (_offset >= 0) {
-        i = _np ? _np->read_number_of_packet(p, _offset) : NumberPacket::read_number_of_packet(p, _offset);
-        assert(i < INT_MAX);
+        i = _np ? _np->read_number_of_packet(p, _offset, _net_order) :
+                  NumberPacket::read_number_of_packet(p, _offset, _net_order);
+        assert(i < ULLONG_MAX);
         while (i >= _timestamps.size()) {
             if (!_dynamic && i >= _timestamps.capacity()) {
                 click_chatter("fatal error : DYNAMIC is not set and record timestamp reserved capacity is too small. Use N to augment the capacity.");
@@ -69,7 +77,6 @@ RecordTimestamp::smaction(Packet *p) {
     } else {
         _timestamps.push_back(Timestamp::now_steady());
     }
-
 }
 
 void RecordTimestamp::push(int, Packet *p) {
