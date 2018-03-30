@@ -978,7 +978,7 @@ atomic_uint64_t::fetch_and_add(uint64_t delta)
           : "cc");
     return delta;
 #elif CLICK_LINUXMODULE && HAVE_LINUX_ATOMIC_ADD_RETURN
-    return atomic_add_return(&_val, delta) - delta;
+    return atomic64_add_return(&_val, delta) - delta;
 #elif CLICK_LINUXMODULE
 # warning "using nonatomic approximation for atomic_uint64_t::fetch_and_add"
     unsigned long flags;
