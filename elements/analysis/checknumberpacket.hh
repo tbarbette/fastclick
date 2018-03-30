@@ -2,6 +2,7 @@
 #define CLICK_CHECKNUMBERPACKET_HH
 
 #include <click/batchelement.hh>
+#include "numberpacket.hh"
 
 CLICK_DECLS
 
@@ -17,6 +18,11 @@ Check there is an increasing number inside the payload of each packets
 =item OFFSET
 
 Set an offset to write the data. Default to 40.
+
+=item NET_ORDER
+
+Writes the number in network order format and returns this number
+acounting for this format. Defaults to false.
 
 =a
 
@@ -39,14 +45,15 @@ public:
     void push_batch(int,PacketBatch *) override;
 #endif
 
-    static inline uint64_t read_number_of_packet(const Packet *p, int offset) {
-        return *(reinterpret_cast<const uint64_t *>(p->data() + offset));
+    static inline uint64_t read_number_of_packet(
+            const Packet *p, int offset, bool net_order = false) {
+        return NumberPacket::read_number_of_packet(p, offset, net_order);
     }
-
 
     void add_handlers();
 private:
     int _offset;
+    bool _net_order;
     uint64_t _count;
     Vector<int> _numbers;
 

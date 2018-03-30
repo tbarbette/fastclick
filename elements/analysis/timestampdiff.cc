@@ -36,7 +36,8 @@
 
 CLICK_DECLS
 
-TimestampDiff::TimestampDiff() : _delays(), _offset(40), _limit(0), _max_delay_ms(1000)
+TimestampDiff::TimestampDiff() :
+    _delays(), _offset(40), _limit(0), _net_order(false), _max_delay_ms(1000)
 {
     _nd = 0;
 }
@@ -61,6 +62,8 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if ((_rt = static_cast<RecordTimestamp*>(e->cast("RecordTimestamp"))) == 0)
         return errh->error("RECORDER must be a valid RecordTimestamp element");
+
+    _net_order = _rt->has_net_order();
 
     if (_limit) {
         _delays.resize(_limit, 0);
@@ -168,7 +171,7 @@ void TimestampDiff::add_handlers()
 inline int TimestampDiff::smaction(Packet *p)
 {
     Timestamp now = Timestamp::now_steady();
-    uint64_t i = NumberPacket::read_number_of_packet(p, _offset);
+    uint64_t i = NumberPacket::read_number_of_packet(p, _offset, _net_order);
     Timestamp old = get_recordtimestamp_instance()->get(i);
     if (old == Timestamp::uninitialized_t()) {
         return 1;
