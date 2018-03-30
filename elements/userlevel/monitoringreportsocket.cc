@@ -40,7 +40,6 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 
-#include "../analysis/numberpacket.hh"
 #include "monitoringreportsocket.hh"
 
 CLICK_DECLS
@@ -371,7 +370,7 @@ MonitoringReportSocket::run_timer(Timer *t)
         // Create a fixed-size buffer and, at first, store a timestamp
         char buffer[_tot_msg_length];
         bzero(buffer, _tot_msg_length);
-        int64_to_char(buffer, NumberPacket::htonll(ts));
+        int64_to_char(buffer, htonll(ts));
 
         for (String handler_name : _elementHandlers[e]) {
             // Ask for a handler instance with this name
@@ -388,7 +387,7 @@ MonitoringReportSocket::run_timer(Timer *t)
              * If handler's name is longer than HANDLER_LEN,
              * we send only the first HANDLER_LEN characters.
              */
-            int64_to_char(&buffer[sizeof(ts)], NumberPacket::htonll(value));
+            int64_to_char(&buffer[sizeof(ts)], htonll(value));
             snprintf(&buffer[sizeof(ts) + sizeof(value)], HANDLER_LEN, "%s", handler_name.c_str());
             buffer[sizeof(ts) + sizeof(value) + handler_name.length() + 1] = '\0';
 
@@ -484,7 +483,7 @@ MonitoringReportSocket::print_data(char *buffer, const int buffer_len)
 
     click_chatter(
         "[Monitoring element %s] [Thread %d] Timestamp: %" PRId64 " - Value: %" PRId64 " - Name: %s",
-        this->name().c_str(), click_current_cpu_id(), NumberPacket::htonll(ts), NumberPacket::htonll(value), handler_name
+        this->name().c_str(), click_current_cpu_id(), htonll(ts), htonll(value), handler_name
     );
 }
 
