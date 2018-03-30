@@ -228,7 +228,7 @@ Packet::~Packet()
             _destructor(_head, _end - _head, _destructor_argument);
     } else
 #  if HAVE_NETMAP_PACKET_POOL
-    if (NetmapBufQ::is_valid_netmap_packet(this)) {
+    if (_head && NetmapBufQ::is_valid_netmap_packet(this)) {
         NetmapBufQ::local_pool()->insert_p(_head);
     } else
 #  endif
@@ -419,11 +419,11 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
         p->_data = p->_head + headroom;
         p->_tail = p->_data + length;
         p->_end = p->_head + CLICK_PACKET_POOL_BUFSIZ;
-#if HAVE_DPDK_PACKET_POOL || HAVE_NETMAP_PACKET_POOL
+#if HAVE_DPDK_PACKET_POOL
        buffer_destructor_type type = p->_destructor;
 #endif
         p->initialize();
-#if HAVE_DPDK_PACKET_POOL || HAVE_NETMAP_PACKET_POOL
+#if HAVE_DPDK_PACKET_POOL
         p->_destructor = type;
 #endif
     } else {
@@ -511,7 +511,7 @@ inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 #else
     if (likely(!p->_data_packet && p->_head && !p->_destructor)) {
 # if HAVE_NETMAP_PACKET_POOL
-        return true;
+        return NetmapBufQ::is_valid_netmap_packet(p);
 # else
         if (likely(p->_end - p->_head == CLICK_PACKET_POOL_BUFSIZ)) //Is standard buffer size?
             return true;
@@ -1019,18 +1019,27 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
     // free old data
-    if (_data_packet)
+    if (_data_packet) {
       _data_packet->kill();
+    }
 # if CLICK_USERLEVEL || CLICK_MINIOS
     else if (_destructor) {
       _destructor(old_head, old_end - old_head, _destructor_argument);
-    } else
-      delete[] old_head;
+    } else {
+#  if HAVE_NETMAP_PACKET_POOL
+      if (NetmapBufQ::is_valid_netmap_buffer(old_head)) {
+        NetmapBufQ::local_pool()->insert_p(old_head);
+      } else
+#  endif
+      {
+        delete[] old_head;
+      }
+    }
 # if HAVE_DPDK_PACKET_POOL
-      p->_destructor = desc;
-      p->_destructor_argument = arg;
+    p->_destructor = desc;
+    p->_destructor_argument = arg;
 #  else
-      _destructor = 0;
+    _destructor = 0;
 # endif
 
 # elif CLICK_BSDMODULE

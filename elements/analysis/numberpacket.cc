@@ -1,8 +1,10 @@
 /*
  * numberpacket.{cc,hh} -- Store a packet count inside packet payload
  * Cyril Soldani, Tom Barbette
+ * Support for network order numbering by Georgios Katsikas
  *
  * Copyright (c) 2015-2016 University of Liège
+ * Copyright (c) 2018 RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -17,14 +19,14 @@
 
 #include <click/config.h>
 
-#include "numberpacket.hh"
-
 #include <click/args.hh>
 #include <click/error.hh>
 
+#include "numberpacket.hh"
+
 CLICK_DECLS
 
-NumberPacket::NumberPacket() : _offset(40) {
+NumberPacket::NumberPacket() : _offset(40), _net_order(false) {
     _count = 0;
 }
 
@@ -34,6 +36,7 @@ NumberPacket::~NumberPacket() {
 int NumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(conf, this, errh)
         .read_p("OFFSET", _offset)
+        .read("NET_ORDER", _net_order)
         .complete() < 0)
         return -1;
     if (_offset < 0)
@@ -51,8 +54,15 @@ inline Packet* NumberPacket::smaction(Packet *p) {
         assert(wp);
         wp->ip_header()->ip_len = htons(_offset + _size_of_number);
     }
-    // Skip header
-    *reinterpret_cast<uint64_t *>(wp->data() + _offset) = _count.fetch_and_add(1);
+
+    uint64_t number = _count.fetch_and_add(1);
+
+    // Skip header    
+    if (_net_order) {
+        *reinterpret_cast<uint64_t *>(wp->data() + _offset) = htonll(number);
+    } else {
+        *reinterpret_cast<uint64_t *>(wp->data() + _offset) = number;
+    }
 
     return wp;
 }

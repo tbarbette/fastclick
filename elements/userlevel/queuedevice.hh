@@ -135,6 +135,7 @@ protected:
     {
     	if (noutputs()) { //RX
             if (_active) {
+                assert(thread_for_queue_available());
                 for (int i = 0; i < n_queues; i++) {
                     for (int j = 0; j < queue_share; j++) {
                         bmk[thread_for_queue(i) - j] = 1;
@@ -208,6 +209,10 @@ protected:
 
     inline Task* task_for_thread(int tid) {
         return _tasks[id_for_thread(tid)];
+    }
+
+    inline bool thread_for_queue_available() {
+        return !_queue_to_thread.empty();
     }
 
     inline int thread_for_queue(int queue) {
