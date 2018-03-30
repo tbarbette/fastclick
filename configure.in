@@ -2248,7 +2248,7 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
 fi
 
 dnl add 'netmap' if netmap support is available
-if test "x$use_netmap" != xno; then
+if test "x$have_netmap" == xyes; then
     provisions="$provisions netmap"
 fi
 
@@ -2318,3 +2318,15 @@ for ac_dir in bin etc include share share/click; do
 done
 
 AC_OUTPUT
+
+echo "
+
+Configuration:
+    C Compiler:                  ${CC}
+    C++ Compiler:                ${CXX}
+
+    DPDK support:                ${enable_dpdk}
+    Netmap support:              ${HAVE_NETMAP}
+"
+
+echo "Now type make to build FastClick..."

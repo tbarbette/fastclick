@@ -14058,7 +14058,7 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
     provisions="$provisions microhttpd"
 fi
 
-if test "x$use_netmap" != xno; then
+if test "x$have_netmap" == xyes; then
     provisions="$provisions netmap"
 fi
 
@@ -15456,3 +15456,15 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+
+echo "
+
+Configuration:
+    C Compiler:                  ${CC}
+    C++ Compiler:                ${CXX}
+
+    DPDK support:                ${enable_dpdk}
+    Netmap support:              ${HAVE_NETMAP}
+"
+
+echo "Now type make to build FastClick..."

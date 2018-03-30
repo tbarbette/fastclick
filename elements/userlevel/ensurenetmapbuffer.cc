@@ -85,9 +85,6 @@ EnsureNetmapBuffer::simple_action(Packet* p) {
 #endif
 }
 
-
-
-
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel netmap)
 EXPORT_ELEMENT(EnsureNetmapBuffer)
