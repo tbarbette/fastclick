@@ -11,7 +11,9 @@ CLICK_DECLS
 class IPRewriterBase;
 class IPRewriterFlow;
 class IPRewriterHeap;
+class IPRewriterHeapIMP;
 class IPRewriterInput;
+class IPRewriterInputIMP;
 
 class IPRewriterEntry { public:
 
@@ -48,6 +50,12 @@ class IPRewriterEntry { public:
     const IPRewriterFlow *flow() const {
 	return reinterpret_cast<const IPRewriterFlow *>(this - _direction);
     }
+    IPRewriterFlow *flowimp() {
+	return reinterpret_cast<IPRewriterFlow *>(this - _direction);
+    }
+    const IPRewriterFlow *flowimp() const {
+	return reinterpret_cast<const IPRewriterFlow *>(this - _direction);
+    }
 
     key_const_reference hashkey() const {
 	return _flowid;
@@ -64,12 +72,17 @@ class IPRewriterEntry { public:
 
 };
 
-
-class IPRewriterFlow { public:
-
+class IPRewriterFlow {
+    public:
     IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		   const IPFlowID &rewritten_flowid,
 		   uint8_t ip_p, bool guaranteed, click_jiffies_t expiry_j);
+/*
+    IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
+		   const IPFlowID &rewritten_flowid,
+		   uint8_t ip_p, bool guaranteed, click_jiffies_t expiry_j);
+*/
+
 
     IPRewriterEntry &entry(bool direction) {
 	return _e[direction];
@@ -102,6 +115,9 @@ class IPRewriterFlow { public:
     void change_expiry(IPRewriterHeap *h, bool guaranteed,
 		       click_jiffies_t expiry_j);
 
+    void change_expiry(IPRewriterHeapIMP *h, bool guaranteed,
+		       click_jiffies_t expiry_j);
+
     /** @brief Set expiration time to a timeout after @a now_j.
      * @param h heap containing this flow
      * @param now_j current time in absolute jiffies
@@ -117,6 +133,12 @@ class IPRewriterFlow { public:
 	change_expiry(h, !!timeouts[1], now_j + timeout);
     }
 
+    void change_expiry_by_timeout(IPRewriterHeapIMP *h, click_jiffies_t now_j,
+				  const uint32_t timeouts[2]) {
+	uint32_t timeout = timeouts[1] ? timeouts[1] : timeouts[0];
+	change_expiry(h, !!timeouts[1], now_j + timeout);
+    }
+
     uint8_t ip_p() const {
 	return _ip_p;
     }
@@ -126,7 +148,11 @@ class IPRewriterFlow { public:
     }
 
     IPRewriterInput *owner() const {
-	return _owner;
+    	return _owner;
+    }
+
+    IPRewriterInputIMP *ownerimp() const {
+    	return (IPRewriterInputIMP*)_owner;
     }
 
     uint8_t reply_anno() const {
@@ -170,13 +196,16 @@ class IPRewriterFlow { public:
     uint32_t _agg;
 
     friend class IPRewriterBase;
+    friend class IPRewriterBaseIMP;
     friend class IPRewriterEntry;
 
   private:
 
     void destroy(IPRewriterHeap *heap);
+    void destroy(IPRewriterHeapIMP *heap);
 
 };
+
 
 
 inline IPFlowID
@@ -184,6 +213,7 @@ IPRewriterEntry::rewritten_flowid() const
 {
     return (this + (_direction ? -1 : 1))->_flowid.reverse();
 }
+
 
 inline void
 IPRewriterFlow::update_csum(uint16_t *csum, bool direction, uint16_t csum_delta)

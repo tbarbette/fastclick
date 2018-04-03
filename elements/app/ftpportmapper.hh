@@ -83,7 +83,7 @@ CLICK_DECLS
  * L<RFC 959, File Transfer Protocol (FTP)|http://www.ietf.org/rfc/rfc0959.txt>
  */
 
-class FTPPortMapper : public Element { public:
+class FTPPortMapper : public SimpleElement<FTPPortMapper> { public:
 
     FTPPortMapper() CLICK_COLD;
     ~FTPPortMapper() CLICK_COLD;
@@ -100,7 +100,7 @@ class FTPPortMapper : public Element { public:
   private:
 
     TCPRewriter *_control_rewriter;
-    IPRewriterBase *_data_rewriter;
+    IPRewriterBaseIMP *_data_rewriter;
     int _data_rewriter_input;
 
 };

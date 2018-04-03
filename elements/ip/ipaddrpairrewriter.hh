@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_IPADDRPAIRREWRITER_HH
 #define CLICK_IPADDRPAIRREWRITER_HH
-#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 #include "elements/ip/iprwmapping.hh"
 CLICK_DECLS
 
@@ -114,7 +114,7 @@ IPAddrRewriter.
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter,
 StoreIPAddress (for simple uses) */
 
-class IPAddrPairRewriter : public IPRewriterBase { public:
+class IPAddrPairRewriter : public IPRewriterBaseIMP { public:
 
     class IPAddrPairFlow : public IPRewriterFlow { public:
 
@@ -172,7 +172,7 @@ class IPAddrPairRewriter : public IPRewriterBase { public:
 inline void
 IPAddrPairRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, map());
     static_cast<IPAddrPairFlow *>(flow)->~IPAddrPairFlow();
     _allocator[click_current_cpu_id()].deallocate(flow);
 }

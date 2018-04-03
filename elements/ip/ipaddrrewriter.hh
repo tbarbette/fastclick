@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_IPADDRREWRITER_HH
 #define CLICK_IPADDRREWRITER_HH
-#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 #include "elements/ip/iprwmapping.hh"
 CLICK_DECLS
 
@@ -113,7 +113,7 @@ IPAddrRewriter.
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter,
 StoreIPAddress (for simple uses) */
 
-class IPAddrRewriter : public IPRewriterBase { public:
+class IPAddrRewriter : public IPRewriterBaseIMP { public:
 
     class IPAddrFlow : public IPRewriterFlow { public:
 
@@ -136,20 +136,19 @@ class IPAddrRewriter : public IPRewriterBase { public:
     const char *class_name() const		{ return "IPAddrRewriter"; }
     void *cast(const char *);
 
-    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
-    //void take_state(Element *, ErrorHandler *);
+    int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
 
-    inline IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
+    inline IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input) override;
     IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-			      const IPFlowID &rewritten_flowid, int input);
-    void destroy_flow(IPRewriterFlow *flow);
+			      const IPFlowID &rewritten_flowid, int input) override;
+    void destroy_flow(IPRewriterFlow *flow) override;
 
-    void push(int, Packet *);
+    void push(int, Packet *) override;
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch *batch);
+    void push_batch(int port, PacketBatch *batch) override;
 #endif
 
-    void add_handlers() CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
 
   protected:
 
@@ -172,7 +171,7 @@ class IPAddrRewriter : public IPRewriterBase { public:
 inline void
 IPAddrRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, map());
     static_cast<IPAddrFlow *>(flow)->~IPAddrFlow();
     _allocator[click_current_cpu_id()].deallocate(flow);
 }

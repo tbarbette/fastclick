@@ -38,7 +38,7 @@ int
 FTPPortMapper::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     TCPRewriter *new_control_rewriter;
-    IPRewriterBase *new_data_rewriter;
+    IPRewriterBaseIMP *new_data_rewriter;
     int new_data_rewriter_input;
 
     if (Args(conf, this, errh)
@@ -176,7 +176,7 @@ FTPPortMapper::simple_action(Packet *p)
 
   // update sequence numbers in old mapping
   tcp_seq_t interesting_seqno = ntohl(wp_tcph->th_seq) + len;
-  TCPRewriter::TCPFlow *p_flow = static_cast<TCPRewriter::TCPFlow *>(p_mapping->flow());
+  TCPFlow *p_flow = static_cast<TCPFlow *>(p_mapping->flowimp());
   p_flow->update_seqno_delta(p_mapping->direction(), interesting_seqno,
                              buflen - port_arg_len);
   // assume the annotation from the control rewriter also applies to the

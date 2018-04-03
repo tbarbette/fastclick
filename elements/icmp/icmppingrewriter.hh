@@ -1,6 +1,6 @@
 #ifndef CLICK_ICMPPINGREWRITER_HH
 #define CLICK_ICMPPINGREWRITER_HH
-#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 #include "elements/ip/iprwmapping.hh"
 #include <clicknet/icmp.h>
 CLICK_DECLS
@@ -78,14 +78,14 @@ packets to the rewritten destination address. Default is true.
 
 IPRewriter, ICMPPingResponder */
 
-class ICMPPingRewriter : public IPRewriterBase { public:
+class ICMPPingRewriter : public IPRewriterBaseIMP { public:
 
     class ICMPPingFlow : public IPRewriterFlow { public:
 
-	ICMPPingFlow(IPRewriterInput *owner, const IPFlowID &flowid,
+	ICMPPingFlow(IPRewriterInputIMP *owner, const IPFlowID &flowid,
 		     const IPFlowID &rewritten_flowid,
 		     bool guaranteed, click_jiffies_t expiry_j)
-	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
+	    : IPRewriterFlow((IPRewriterInput*)owner, flowid, rewritten_flowid,
 			     IP_PROTO_ICMP, guaranteed, expiry_j) {
 	    _udp_csum_delta = 0;
 	    click_update_in_cksum(&_udp_csum_delta, flowid.sport(), rewritten_flowid.sport());
@@ -136,7 +136,7 @@ class ICMPPingRewriter : public IPRewriterBase { public:
 inline void
 ICMPPingRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, map());
     static_cast<ICMPPingFlow *>(flow)->~ICMPPingFlow();
     _allocator[click_current_cpu_id()].deallocate(flow);
 }

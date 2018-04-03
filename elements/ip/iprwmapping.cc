@@ -32,11 +32,12 @@
 #include <click/heap.hh>
 CLICK_DECLS
 
+
 IPRewriterFlow::IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 			       const IPFlowID &rewritten_flowid,
 			       uint8_t ip_p, bool guaranteed,
 			       click_jiffies_t expiry_j)
-    : _expiry_j(expiry_j), _ip_p(ip_p), _tflags(0),
+    : _expiry_j(expiry_j), _place(0), _ip_p(ip_p), _tflags(0),
       _guaranteed(guaranteed), _reply_anno(0),
       _owner(owner)
 {
@@ -55,8 +56,16 @@ IPRewriterFlow::IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
     static uint32_t id;
     _agg = id++;
 }
+/*
+IPRewriterFlow::IPRewriterFlow(IPRewriterInput *owner, const IPFlowID &flowid,
+			       const IPFlowID &rewritten_flowid,
+			       uint8_t ip_p, bool guaranteed,
+			       click_jiffies_t expiry_j) : IPRewriterFlow((IPRewriterInput*)owner,
+					   flowid, rewritten_flowid, ip_p, guaranteed, expiry_j) {
 
-void
+}*/
+
+ void
 IPRewriterFlow::apply(WritablePacket *p, bool direction, unsigned annos)
 {
     assert(p->has_network_header());
@@ -92,7 +101,7 @@ IPRewriterFlow::apply(WritablePacket *p, bool direction, unsigned annos)
 }
 
 void
-IPRewriterFlow::change_expiry(IPRewriterHeap *h, bool guaranteed,
+IPRewriterFlow::change_expiry(IPRewriterHeap*h, bool guaranteed,
 			      click_jiffies_t expiry_j)
 {
     Vector<IPRewriterFlow *> &current_heap = h->_heaps[_guaranteed];
@@ -114,6 +123,11 @@ IPRewriterFlow::change_expiry(IPRewriterHeap *h, bool guaranteed,
 		    heap_less(), heap_place());
 }
 
+void IPRewriterFlow::change_expiry(IPRewriterHeapIMP *h, bool guaranteed,
+		   click_jiffies_t expiry_j) {
+	change_expiry((IPRewriterHeap*)h, guaranteed, expiry_j);
+}
+
 void
 IPRewriterFlow::destroy(IPRewriterHeap *heap)
 {
@@ -126,10 +140,16 @@ IPRewriterFlow::destroy(IPRewriterHeap *heap)
 }
 
 void
+IPRewriterFlow::destroy(IPRewriterHeapIMP *heap)
+{
+   destroy((IPRewriterHeap*)heap);
+}
+
+void
 IPRewriterFlow::unparse_ports(StringAccum &sa, bool direction,
 			      click_jiffies_t now) const
 {
-    IPRewriterBase *my_e = _owner->owner, *reply_e = _owner->reply_element;
+    IPRewriterBaseAncestor *my_e = _owner->owner, *reply_e = _owner->reply_element();
 #if 1 /* UNPARSE_PORTS_OUTPUTS */
     sa << " [";
     if (!direction)
@@ -154,7 +174,7 @@ IPRewriterFlow::unparse_ports(StringAccum &sa, bool direction,
 #endif
 }
 
-void
+ void
 IPRewriterFlow::unparse(StringAccum &sa, bool direction,
 			click_jiffies_t now) const
 {

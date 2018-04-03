@@ -21,7 +21,7 @@
  */
 
 #include <click/config.h>
-#include "udprewriter.hh"
+#include "udprewriterimp.hh"
 #include <click/args.hh>
 #include <click/straccum.hh>
 #include <click/error.hh>
@@ -30,67 +30,27 @@
 #include <clicknet/udp.h>
 CLICK_DECLS
 
-void
-UDPFlow::apply(WritablePacket *p, bool direction, unsigned annos)
-{
-    assert(p->has_network_header());
-    click_ip *iph = p->ip_header();
-
-    // IP header
-    const IPFlowID &revflow = _e[!direction].flowid();
-    iph->ip_src = revflow.daddr();
-    iph->ip_dst = revflow.saddr();
-    if (annos & 1)
-	p->set_dst_ip_anno(revflow.saddr());
-    if (direction && (annos & 2))
-	p->set_anno_u8(annos >> 2, _reply_anno);
-    update_csum(&iph->ip_sum, direction, _ip_csum_delta);
-
-    // end if not first fragment
-    if (!IP_FIRSTFRAG(iph))
-	return;
-
-    // TCP/UDP header
-    click_udp *udph = p->udp_header();
-    udph->uh_sport = revflow.dport(); // TCP ports in the same place
-    udph->uh_dport = revflow.sport();
-    if (iph->ip_p == IP_PROTO_TCP) {
-	if (p->transport_length() >= 18)
-	    update_csum(&reinterpret_cast<click_tcp *>(udph)->th_sum, direction, _udp_csum_delta);
-    } else if (iph->ip_p == IP_PROTO_UDP) {
-	if (p->transport_length() >= 8 && udph->uh_sum)
-	    // 0 checksum is no checksum
-	    update_csum(&udph->uh_sum, direction, _udp_csum_delta);
-    }
-
-    // track connection state
-    if (direction)
-	_tflags |= 1;
-    if (_tflags < 6)
-	_tflags += 2;
-}
-
-UDPRewriter::UDPRewriter() : _allocator()
+UDPRewriterIMP::UDPRewriterIMP() : _allocator()
 {
 }
 
-UDPRewriter::~UDPRewriter()
+UDPRewriterIMP::~UDPRewriterIMP()
 {
 }
 
 void *
-UDPRewriter::cast(const char *n)
+UDPRewriterIMP::cast(const char *n)
 {
     if (strcmp(n, "IPRewriterBase") == 0)
 	return (IPRewriterBase *)this;
-    else if (strcmp(n, "UDPRewriter") == 0)
-	return (UDPRewriter *)this;
+    else if (strcmp(n, "UDPRewriterIMP") == 0)
+	return (UDPRewriterIMP *)this;
     else
 	return 0;
 }
 
 int
-UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
+UDPRewriterIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool dst_anno = true, has_reply_anno = false,
 	has_udp_streaming_timeout, has_streaming_timeout;
@@ -115,15 +75,15 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
     if (!has_udp_streaming_timeout && !has_streaming_timeout) {
-        _udp_streaming_timeout = timeouts()[0];
+    	_udp_streaming_timeout = utimeouts[0];
     }
     _udp_streaming_timeout *= CLICK_HZ; // IPRewriterBase handles the others
 
-    return IPRewriterBase::configure(conf, errh);
+    return IPRewriterBaseIMP::configure(conf, errh);
 }
 
 IPRewriterEntry *
-UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
+UDPRewriterIMP::add_flow(int ip_p, const IPFlowID &flowid,
 		      const IPFlowID &rewritten_flowid, int input)
 {
     void *data = _allocator->allocate();
@@ -131,7 +91,7 @@ UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
         return 0;
 
     UDPFlow *flow = new(data) UDPFlow
-	(&input_specs(input), flowid, rewritten_flowid, ip_p,
+	((IPRewriterInput*)&input_specs(input), flowid, rewritten_flowid, ip_p,
 	 !!timeouts()[1], click_jiffies() +
          relevant_timeout(timeouts()));
 
@@ -139,7 +99,7 @@ UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
 }
 
 int
-UDPRewriter::process(int port, Packet *p_in)
+UDPRewriterIMP::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     if (!p) {
@@ -153,7 +113,7 @@ UDPRewriter::process(int port, Packet *p_in)
     if ((ip_p != IP_PROTO_TCP && ip_p != IP_PROTO_UDP && ip_p != IP_PROTO_DCCP)
 	|| !IP_FIRSTFRAG(iph)
 	|| p->transport_length() < 8) {
-        const IPRewriterInput &is = _input_specs[port];
+        const IPRewriterInputIMP &is = input_specs(port);
         if (is.kind == IPRewriterInput::i_nochange)
             return is.foutput;
         else
@@ -169,7 +129,7 @@ UDPRewriter::process(int port, Packet *p_in)
 
         int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
         if (result == rw_addmap) {
-            m = UDPRewriter::add_flow(ip_p, flowid, rewritten_flowid, port);
+            m = UDPRewriterIMP::add_flow(ip_p, flowid, rewritten_flowid, port);
         }
 
         if (!m) {
@@ -192,7 +152,7 @@ UDPRewriter::process(int port, Packet *p_in)
 }
 
 void
-UDPRewriter::push(int port, Packet *p)
+UDPRewriterIMP::push(int port, Packet *p)
 {
     int output_port = process(port, p);
     if (output_port < 0) {
@@ -206,7 +166,7 @@ UDPRewriter::push(int port, Packet *p)
 
 #if HAVE_BATCH
 void
-UDPRewriter::push_batch(int port, PacketBatch *batch)
+UDPRewriterIMP::push_batch(int port, PacketBatch *batch)
 {
     auto fnt = [this,port](Packet*p){return process(port,p);};
     CLASSIFY_EACH_PACKET(noutputs() + 1,fnt,batch,checked_output_push_batch);
@@ -214,20 +174,16 @@ UDPRewriter::push_batch(int port, PacketBatch *batch)
 #endif
 
 String
-UDPRewriter::dump_mappings_handler(Element *e, void *)
+UDPRewriterIMP::dump_mappings_handler(Element *e, void *)
 {
-    UDPRewriter *rw = (UDPRewriter *)e;
-    click_jiffies_t now = click_jiffies();
+    UDPRewriterIMP *rw = (UDPRewriterIMP *)e;
     StringAccum sa;
-	for (Map::iterator iter = rw->map().begin(); iter.live(); ++iter) {
-		iter->flowimp()->unparse(sa, iter->direction(), now);
-		sa << '\n';
-	}
+    rw->dump_mappings(sa);
     return sa.take_string();
 }
 
 void
-UDPRewriter::add_handlers()
+UDPRewriterIMP::add_handlers()
 {
     add_read_handler("table", dump_mappings_handler);
     add_read_handler("mappings", dump_mappings_handler, 0, Handler::h_deprecated);
@@ -236,4 +192,4 @@ UDPRewriter::add_handlers()
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(IPRewriterBase)
-EXPORT_ELEMENT(UDPRewriter)
+EXPORT_ELEMENT(UDPRewriterIMP)

@@ -1,7 +1,6 @@
 #ifndef CLICK_UDPREWRITER_HH
 #define CLICK_UDPREWRITER_HH
-#include "elements/ip/iprewriterbase.hh"
-#include "elements/ip/iprwmapping.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 #include <click/sync.hh>
 CLICK_DECLS
 
@@ -88,7 +87,7 @@ sequentially (which can make testing easier), append a pound sign to the
 range, as in '1024-65535#'.  To choose a random port rather than preferring
 the source, append a '?'.
 
-Say a packet with flow ID (SA, SP, DA, DP, PROTO) is received, and the
+Say a packet with flow IDnode041 (SA, SP, DA, DP, PROTO) is received, and the
 corresponding new flow ID is (SA', SP', DA', DP').  Then two mappings are
 installed:
 
@@ -165,9 +164,7 @@ table.
 =a TCPRewriter, IPAddrRewriter, IPAddrPairRewriter, IPRewriterPatterns,
 RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter */
 
-class UDPRewriter : public IPRewriterBase { public:
-
-    class UDPFlow : public IPRewriterFlow { public:
+class UDPFlow : public IPRewriterFlow { public:
 
 	UDPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		const IPFlowID &rewritten_flowid, int ip_p,
@@ -182,7 +179,11 @@ class UDPRewriter : public IPRewriterBase { public:
 
 	void apply(WritablePacket *p, bool direction, unsigned annos);
 
-    };
+};
+
+
+
+class UDPRewriter : public IPRewriterBase { public:
 
     UDPRewriter() CLICK_COLD;
     ~UDPRewriter() CLICK_COLD;
@@ -193,11 +194,11 @@ class UDPRewriter : public IPRewriterBase { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-			      const IPFlowID &rewritten_flowid, int input);
-    void destroy_flow(IPRewriterFlow *flow);
-    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>(flow)) -
-               _timeouts[click_current_cpu_id()][1];
+			      const IPFlowID &rewritten_flowid, int input) override;
+    void destroy_flow(IPRewriterFlow *flow) override;
+    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) override {
+	return ((IPRewriterFlow*)flow)->expiry() + udp_flow_timeout(static_cast<const UDPFlow *>((IPRewriterFlow*)flow)) -
+               timeouts()[1];
     }
 
     void push(int, Packet *);
@@ -219,7 +220,7 @@ class UDPRewriter : public IPRewriterBase { public:
 	if (mf->streaming())
 	    return _udp_streaming_timeout;
 	else
-	    return _timeouts[click_current_cpu_id()][0];
+	    return timeouts()[0];
     }
 
     static String dump_mappings_handler(Element *, void *);
@@ -232,10 +233,12 @@ class UDPRewriter : public IPRewriterBase { public:
 inline void
 UDPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, map());
     flow->~IPRewriterFlow();
     _allocator->deallocate(flow);
 }
+
+
 
 CLICK_ENDDECLS
 #endif

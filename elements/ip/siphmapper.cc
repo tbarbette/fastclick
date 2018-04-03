@@ -23,7 +23,7 @@
 #if CLICK_BSDMODULE
 # include <sys/limits.h>
 #endif
-#include "elements/ip/iprwpattern.hh"
+#include "iprwpattern.hh"
 #include "siphmapper.hh"
 CLICK_DECLS
 
@@ -118,18 +118,19 @@ SourceIPHashMapper::cleanup(CleanupStage)
 }
 
 void
-SourceIPHashMapper::notify_rewriter(IPRewriterBase *user,
+SourceIPHashMapper::notify_rewriter(IPRewriterBaseAncestor *user,
 				    IPRewriterInput *input, ErrorHandler *errh)
 {
     for (int i = 0; i < _is.size(); i++) {
 	if (_is[i].foutput >= user->noutputs()
-	    || _is[i].routput >= input->reply_element->noutputs())
+	    || _is[i].routput >= input->reply_element()->noutputs())
 	    errh->error("output port out of range in %s pattern %d", declaration().c_str(), i);
     }
 }
 
 int
-SourceIPHashMapper::rewrite_flowid(IPRewriterInput *input,
+SourceIPHashMapper::rewrite_flowid(
+                IPRewriterInputAncestor *input,
 				   const IPFlowID &flowid,
 				   IPFlowID &rewritten_flowid,
 				   Packet *p, int mapid)
@@ -146,7 +147,7 @@ SourceIPHashMapper::rewrite_flowid(IPRewriterInput *input,
     tmp = tmp % INT_MAX;
 
     int v = _hasher->hash2ind (tmp);
-    _is[v].reply_element = input->reply_element;
+    _is[v].set_reply_element(((IPRewriterInput*)input)->reply_element());
     input->foutput = _is[v].foutput;
     input->routput = _is[v].routput;
     return _is[v].rewrite_flowid(flowid, rewritten_flowid, p, mapid);

@@ -153,7 +153,8 @@ setting.
 =item UDP_GUARANTEE I<time>
 
 UDP connection mappings are guaranteed to exist for I<time> seconds after each successfully processed packet. Defaults to 5 seconds.
-
+class IPRewriterFlow;
+class IPRewriterEntry;
 =item REAP_INTERVAL I<time>
 
 Reap timed-out connections every I<time> seconds. Default is 15 minutes.
@@ -218,42 +219,40 @@ RoundRobinIPMapper, FTPPortMapper, ICMPRewriter, ICMPPingRewriter */
 
 class IPRewriter : public TCPRewriter { public:
 
-    typedef UDPRewriter::UDPFlow UDPFlow;
-
     IPRewriter() CLICK_COLD;
     ~IPRewriter() CLICK_COLD;
 
-    const char *class_name() const		{ return "IPRewriter"; }
-    void *cast(const char *);
+    const char *class_name() const override { return "IPRewriter"; }
+    void *cast(const char *) override;
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
     IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
     HashContainer<IPRewriterEntry> *get_map(int mapid) {
 	if (mapid == IPRewriterInput::mapid_default)
-	    return &_map[click_current_cpu_id()];
+	    return &map();
 	else if (mapid == IPRewriterInput::mapid_iprewriter_udp)
-	    return &_state->_udp_map;
+	    return &_ipstate->_udp_map;
 	else
 	    return 0;
     }
     IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-			      const IPFlowID &rewritten_flowid, int input);
-    void destroy_flow(IPRewriterFlow *flow);
-    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	if (flow->ip_p() == IP_PROTO_TCP)
+			      const IPFlowID &rewritten_flowid, int input) override;
+    void destroy_flow(IPRewriterFlow *flow) override;
+    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) override {
+	if (((IPRewriterFlow*)flow)->ip_p() == IP_PROTO_TCP)
 	    return TCPRewriter::best_effort_expiry(flow);
 	else
-	    return flow->expiry() +
-                  udp_flow_timeout(static_cast<const UDPFlow *>(flow), _state.get()) - _state->_udp_timeouts[1];
+	    return ((IPRewriterFlow*)flow)->expiry() +
+                  udp_flow_timeout(static_cast<const UDPFlow *>((IPRewriterFlow*)flow), _ipstate.get()) - _ipstate->_udp_timeouts[1];
     }
 
-    void push(int, Packet *);
+    void push(int, Packet *) override;
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch *batch);
+    void push_batch(int port, PacketBatch *batch) override;
 #endif
 
-    void add_handlers() CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
 
   private:
     class IPState { public:
@@ -265,7 +264,7 @@ class IPRewriter : public TCPRewriter { public:
         uint32_t                            _udp_streaming_timeout;
     };
 
-    per_thread<IPState> _state;
+    not_per_thread<IPState> _ipstate;
 
     int process(int port, Packet *p_in);
 
@@ -277,8 +276,8 @@ class IPRewriter : public TCPRewriter { public:
     }
 
     static inline Map &reply_udp_map(IPRewriterInput *rwinput) {
-	IPRewriter *x = static_cast<IPRewriter *>(rwinput->reply_element);
-	return x->_state->_udp_map;
+	IPRewriter *x = static_cast<IPRewriter *>(rwinput->reply_element());
+	return x->_ipstate->_udp_map;
     }
     static String udp_mappings_handler(Element *e, void *user_data);
 
@@ -291,9 +290,9 @@ IPRewriter::destroy_flow(IPRewriterFlow *flow)
     if (flow->ip_p() == IP_PROTO_TCP)
 	TCPRewriter::destroy_flow(flow);
     else {
-	unmap_flow(flow, _state->_udp_map, &reply_udp_map(flow->owner()));
+	unmap_flow(flow, _ipstate->_udp_map, &reply_udp_map(flow->owner()));
 	flow->~IPRewriterFlow();
-	_state->_udp_allocator.deallocate(flow);
+	_ipstate->_udp_allocator.deallocate(flow);
     }
 }
 

@@ -16,7 +16,7 @@
  * listed in the Click LICENSE file. These conditions include: you must
  * preserve this copyright notice, and you cannot mention the copyright
  * holders in advertising related to the Software without their permission.
- * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR LIED. This
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
@@ -33,7 +33,7 @@ CLICK_DECLS
 // TCPMapping
 
 int
-TCPRewriter::TCPFlow::update_seqno_delta(bool direction,
+TCPFlow::update_seqno_delta(bool direction,
 					 tcp_seq_t trigger, int32_t d)
 {
     // delta transitions must be added in increasing order by sequence number
@@ -87,7 +87,7 @@ TCPRewriter::TCPFlow::update_seqno_delta(bool direction,
 }
 
 void
-TCPRewriter::TCPFlow::apply_sack(bool direction, click_tcp *tcph, int len)
+TCPFlow::apply_sack(bool direction, click_tcp *tcph, int len)
 {
     if ((int)(tcph->th_off << 2) < len)
 	len = tcph->th_off << 2;
@@ -149,7 +149,7 @@ TCPRewriter::TCPFlow::apply_sack(bool direction, click_tcp *tcph, int len)
 }
 
 void
-TCPRewriter::TCPFlow::apply(WritablePacket *p, bool direction, unsigned annos)
+TCPFlow::apply(WritablePacket *p, bool direction, unsigned annos)
 {
     assert(p->has_network_header());
     click_ip *iph = p->ip_header();
@@ -226,7 +226,7 @@ TCPRewriter::TCPFlow::apply(WritablePacket *p, bool direction, unsigned annos)
 }
 
 void
-TCPRewriter::TCPFlow::unparse(StringAccum &sa, bool direction, click_jiffies_t now) const
+TCPFlow::unparse(StringAccum &sa, bool direction, click_jiffies_t now) const
 {
     sa << _e[direction].flowid() << " => " << _e[direction].rewritten_flowid();
     if (_dt && _dt->delta[direction] != 0)
@@ -281,10 +281,8 @@ TCPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 	.consume() < 0)
 	return -1;
 
-    for (unsigned i=0; i<_mem_units_no; i++) {
-        _timeouts[i][0] = timeouts[0];
-        _timeouts[i][1] = timeouts[1];
-    }
+    initialize_timeout(0, timeouts[0]);
+    initialize_timeout(1, timeouts[1]);
 
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
     _tcp_data_timeout *= CLICK_HZ; // IPRewriterBase handles the others
@@ -302,11 +300,11 @@ TCPRewriter::add_flow(int /*ip_p*/, const IPFlowID &flowid,
 	return 0;
 
     TCPFlow *flow = new(data) TCPFlow
-	(&_input_specs[input], flowid, rewritten_flowid,
-	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-         relevant_timeout(_timeouts[click_current_cpu_id()]));
+	((IPRewriterInput*)&input_specs(input), flowid, rewritten_flowid,
+	 !!timeouts()[1], click_jiffies() +
+         relevant_timeout(timeouts()));
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, map());
 }
 
 int
@@ -323,29 +321,29 @@ TCPRewriter::process(int port, Packet *p_in)
     if (iph->ip_p != IP_PROTO_TCP
 	|| !IP_FIRSTFRAG(iph)
 	|| p->transport_length() < 8) {
-	const IPRewriterInput &is = _input_specs[port];
-	    if (is.kind == IPRewriterInput::i_nochange)
+	const IPRewriterInput &is = input_specs(port);
+	    if (is.kind == IPRewriterInputAncestor::i_nochange)
             return is.foutput;
         else
             return -1;
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = map().get(flowid);
 
     if (!m) {			// create new mapping
-	IPRewriterInput &is = _input_specs.unchecked_at(port);
-	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
+    	IPRewriterInput &is = input_specs_unchecked(port);
+    	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 
-	int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
-	if (result == rw_addmap) {
-	    m = TCPRewriter::add_flow(IP_PROTO_TCP, flowid, rewritten_flowid, port);
+		int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
+		if (result == rw_addmap) {
+			m = TCPRewriter::add_flow(IP_PROTO_TCP, flowid, rewritten_flowid, port);
         }
 
-	if (!m) {
-	    return result;
-	} else if (_annos & 2) {
-	    m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
+		if (!m) {
+			return result;
+		} else if (_annos & 2) {
+			m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
         }
     }
 
@@ -353,10 +351,10 @@ TCPRewriter::process(int port, Packet *p_in)
     mf->apply(p, m->direction(), _annos);
 
     click_jiffies_t now_j = click_jiffies();
-    if (_timeouts[click_current_cpu_id()][1])
-	mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
+    if (timeouts()[1])
+    	mf->change_expiry(heap(), true, now_j + timeouts()[1]);
     else
-	mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + tcp_flow_timeout(mf));
+    	mf->change_expiry(heap(), false, now_j + tcp_flow_timeout(mf));
 
     return m->output();
 }
@@ -388,7 +386,7 @@ TCPRewriter::tcp_mappings_handler(Element *e, void *)
     TCPRewriter *rw = (TCPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); ++iter) {
+    for (Map::iterator iter = rw->map().begin(); iter.live(); ++iter) {
 	TCPFlow *f = static_cast<TCPFlow *>(iter->flow());
 	f->unparse(sa, iter->direction(), now);
 	sa << '\n';

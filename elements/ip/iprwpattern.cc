@@ -20,7 +20,6 @@
  */
 
 #include <click/config.h>
-#include "iprwpattern.hh"
 #include "elements/ip/iprwmapping.hh"
 #include "elements/ip/iprwpatterns.hh"
 #include <clicknet/ip.h>
@@ -32,25 +31,26 @@
 #include <click/nameinfo.hh>
 #include <click/straccum.hh>
 #include <click/error.hh>
+#include "iprwpattern.hh"
 CLICK_DECLS
 
 IPRewriterPattern::IPRewriterPattern(const IPAddress &saddr, int sport,
-		       const IPAddress &daddr, int dport,
-		       bool is_napt, bool sequential, bool same_first,
-		       uint32_t variation_top)
+        const IPAddress &daddr, int dport,
+        bool is_napt, bool sequential, bool same_first,
+        uint32_t variation_top)
     : _saddr(saddr), _sport(sport), _daddr(daddr), _dport(dport),
-      _variation_top(variation_top), _next_variation(0), _is_napt(is_napt),
-      _sequential(sequential), _same_first(same_first), _refcount(0)
+    _variation_top(variation_top), _next_variation(0), _is_napt(is_napt),
+    _sequential(sequential), _same_first(same_first), _refcount(0)
 {
 }
 
 namespace {
-enum { PE_SYNTAX, PE_NOPATTERN, PE_SADDR, PE_SPORT, PE_DADDR, PE_DPORT };
-static const char* const pe_messages[] = {
-    "syntax error",
-    "no such pattern",
-    "bad source address",
-    "bad source port",
+    enum { PE_SYNTAX, PE_NOPATTERN, PE_SADDR, PE_SPORT, PE_DADDR, PE_DPORT };
+    static const char* const pe_messages[] = {
+        "syntax error",
+        "no such pattern",
+        "bad source address",
+        "bad source port",
     "bad destination address",
     "bad destination port"
 };
@@ -68,77 +68,77 @@ ip_address_variation(const String &str, IPAddress *addr, int32_t *variation,
     if (end > str.begin() && end[-1] == '#')
 	*sequential = true, *same_first = false, --end;
     else if (end > str.begin() && end[-1] == '?')
-	*same_first = false, --end;
+        *same_first = false, --end;
     const char *dash = find(str.begin(), end, '-');
     IPAddress addr2;
 
     if (dash != end
-	&& IPAddressArg().parse(str.substring(str.begin(), dash), *addr, context)
-	&& IPAddressArg().parse(str.substring(dash + 1, end), addr2, context)
-	&& ntohl(addr2.addr()) >= ntohl(addr->addr())) {
-	*variation = ntohl(addr2.addr()) - ntohl(addr->addr());
-	return true;
+            && IPAddressArg().parse(str.substring(str.begin(), dash), *addr, context)
+            && IPAddressArg().parse(str.substring(dash + 1, end), addr2, context)
+            && ntohl(addr2.addr()) >= ntohl(addr->addr())) {
+        *variation = ntohl(addr2.addr()) - ntohl(addr->addr());
+        return true;
     } else if (dash == end
-	       && IPPrefixArg(true).parse(str.substring(str.begin(), end), *addr, addr2, context)
-	       && *addr && addr2 && addr2.mask_to_prefix_len() >= 0) {
-	if (addr2.addr() == 0xFFFFFFFFU)
-	    *variation = 0;
-	else if (addr2.addr() == htonl(0xFFFFFFFEU)) {
-	    *addr &= addr2;
-	    *variation = 1;
-	} else {
-	    // don't count PREFIX.0 and PREFIX.255
-	    *addr = (*addr & addr2) | IPAddress(htonl(1));
-	    *variation = ~ntohl(addr2.addr()) - 2;
-	}
-	return true;
+            && IPPrefixArg(true).parse(str.substring(str.begin(), end), *addr, addr2, context)
+            && *addr && addr2 && addr2.mask_to_prefix_len() >= 0) {
+        if (addr2.addr() == 0xFFFFFFFFU)
+            *variation = 0;
+        else if (addr2.addr() == htonl(0xFFFFFFFEU)) {
+            *addr &= addr2;
+            *variation = 1;
+        } else {
+            // don't count PREFIX.0 and PREFIX.255
+            *addr = (*addr & addr2) | IPAddress(htonl(1));
+            *variation = ~ntohl(addr2.addr()) - 2;
+        }
+        return true;
     } else
-	return false;
+        return false;
 }
 
-static bool
+    static bool
 port_variation(const String &str, int32_t *port, int32_t *variation,
-	       bool *sequential, bool *same_first)
+        bool *sequential, bool *same_first)
 {
     const char *end = str.end();
     if (end > str.begin() && end[-1] == '#')
-	*sequential = true, *same_first = false, --end;
+        *sequential = true, *same_first = false, --end;
     else if (end > str.begin() && end[-1] == '?')
-	*same_first = false, --end;
+        *same_first = false, --end;
     const char *dash = find(str.begin(), end, '-');
     int32_t port2 = 0;
 
     if (IntArg().parse(str.substring(str.begin(), dash), *port)
-	&& IntArg().parse(str.substring(dash + 1, end), port2)
-	&& *port >= 0 && port2 >= *port && port2 < 65536) {
-	*variation = port2 - *port;
-	return true;
+            && IntArg().parse(str.substring(dash + 1, end), port2)
+            && *port >= 0 && port2 >= *port && port2 < 65536) {
+        *variation = port2 - *port;
+        return true;
     } else
-	return false;
+        return false;
 }
 }
 
 bool
 IPRewriterPattern::parse(const Vector<String> &words,
-			 IPRewriterPattern **pstore,
-			 Element *context, ErrorHandler *errh)
+        IPRewriterPattern **pstore,
+        Element *context, ErrorHandler *errh)
 {
     if (words.size() < 1 || words.size() > 4)
-	return pattern_error(PE_SYNTAX, errh);
+        return pattern_error(PE_SYNTAX, errh);
 
     if (words.size() == 1) {
-	int32_t x;
-	Vector<IPRewriterPattern *> *patterns =
-	    static_cast<Vector<IPRewriterPattern *> *>(context->router()->attachment("IPRewriterPatterns"));
-	if (NameInfo::query_int(NameInfo::T_IPREWRITER_PATTERN, context,
-				words[0], &x)
-	    && patterns && x >= 0 && x < patterns->size()) {
-	    *pstore = (*patterns)[x];
-	    return true;
-	} else {
-	    errh->error("no such pattern %<%s%>", words[0].c_str());
-	    return false;
-	}
+        int32_t x;
+        Vector<IPRewriterPattern *> *patterns =
+            static_cast<Vector<IPRewriterPattern *> *>(context->router()->attachment("IPRewriterPatterns"));
+        if (NameInfo::query_int(NameInfo::T_IPREWRITER_PATTERN, context,
+                    words[0], &x)
+                && patterns && x >= 0 && x < patterns->size()) {
+            *pstore = (*patterns)[x];
+            return true;
+        } else {
+            errh->error("no such pattern %<%s%>", words[0].c_str());
+            return false;
+        }
     }
 
     IPAddress saddr, daddr;
@@ -148,19 +148,19 @@ IPRewriterPattern::parse(const Vector<String> &words,
     // source address
     int i = 0;
     if (!(words[i].equals("-", 1)
-	  || IPAddressArg().parse(words[i], saddr, context)
-	  || ip_address_variation(words[i], &saddr, &variation,
-				  &sequential, &same_first, context)))
-	return pattern_error(PE_SADDR, errh);
+                || IPAddressArg().parse(words[i], saddr, context)
+                || ip_address_variation(words[i], &saddr, &variation,
+                    &sequential, &same_first, context)))
+        return pattern_error(PE_SADDR, errh);
 
     // source port
     if (words.size() >= 3) {
-	i = words.size() == 3 ? 2 : 1;
-	if (!(words[i].equals("-", 1)
-	      || (IntArg().parse(words[i], sport) && sport > 0 && sport < 65536)
-	      || port_variation(words[i], &sport, &variation,
-				&sequential, &same_first)))
-	    return pattern_error(PE_SPORT, errh);
+        i = words.size() == 3 ? 2 : 1;
+        if (!(words[i].equals("-", 1)
+                    || (IntArg().parse(words[i], sport) && sport > 0 && sport < 65536)
+                    || port_variation(words[i], &sport, &variation,
+                        &sequential, &same_first)))
+            return pattern_error(PE_SPORT, errh);
 	i = words.size() == 3 ? 0 : 1;
     }
 
@@ -186,7 +186,7 @@ IPRewriterPattern::parse(const Vector<String> &words,
 
 bool
 IPRewriterPattern::parse_ports(const Vector<String> &words,
-			       IPRewriterInput *input,
+				   IPRewriterInputAncestor *input,
 			       Element *, ErrorHandler *errh)
 {
     if (!(words.size() == 2
@@ -198,8 +198,9 @@ IPRewriterPattern::parse_ports(const Vector<String> &words,
 	return errh->error("bad reply port"), false;
 }
 
+template <class I>
 bool
-IPRewriterPattern::parse_with_ports(const String &conf, IPRewriterInput *input,
+IPRewriterPattern::parse_with_ports_base(const String &conf, I *input,
 				    Element *e, ErrorHandler *errh)
 {
     Vector<String> words, port_words;
@@ -212,9 +213,14 @@ IPRewriterPattern::parse_with_ports(const String &conf, IPRewriterInput *input,
     port_words.push_back(words[words.size() - 1]);
     words.resize(words.size() - 2);
 
-    return parse(words, &input->u.pattern, e, errh)
+    return parse(words, (IPRewriterPattern**)&input->u.pattern, e, errh)
 	&& parse_ports(port_words, input, e, errh);
 }
+
+template bool IPRewriterPattern::parse_with_ports_base<IPRewriterInput>(const String &conf, IPRewriterInput *input,
+				    Element *e, ErrorHandler *errh);
+template bool IPRewriterPattern::parse_with_ports_base<IPRewriterInputIMP>(const String &conf, IPRewriterInputIMP *input,
+	    Element *e, ErrorHandler *errh);
 
 int
 IPRewriterPattern::rewrite_flowid(const IPFlowID &flowid,
@@ -258,7 +264,7 @@ IPRewriterPattern::rewrite_flowid(const IPFlowID &flowid,
 		goto found_variation;
 	}
 
-	return IPRewriterBase::rw_drop;
+	return IPRewriterBaseAncestor::rw_drop;
 
     found_variation:
 	if (_is_napt)
@@ -268,7 +274,7 @@ IPRewriterPattern::rewrite_flowid(const IPFlowID &flowid,
 	_next_variation = val + 1;
     }
 
-    return IPRewriterBase::rw_addmap;
+    return IPRewriterBaseAncestor::rw_addmap;
 }
 
 String

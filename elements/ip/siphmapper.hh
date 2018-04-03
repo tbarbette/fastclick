@@ -3,7 +3,7 @@
 #include <click/element.hh>
 #include <click/ipflowid.hh>
 #include <clicknet/ip.h>
-#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -182,7 +182,7 @@ private:
 };
 
 
-class SourceIPHashMapper : public Element, public IPMapper { public:
+class SourceIPHashMapper : public Element, public IPMapperIMP { public:
 
   SourceIPHashMapper() CLICK_COLD;
   ~SourceIPHashMapper() CLICK_COLD;
@@ -194,11 +194,12 @@ class SourceIPHashMapper : public Element, public IPMapper { public:
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;
 
-    void notify_rewriter(IPRewriterBase *user, IPRewriterInput *input,
-			 ErrorHandler *errh);
-    int rewrite_flowid(IPRewriterInput *input,
+    void notify_rewriter(IPRewriterBaseAncestor *user, IPRewriterInput *input,
+			 ErrorHandler *errh) override;
+
+    int rewrite_flowid(IPRewriterInputAncestor *input,
 		       const IPFlowID &flowid, IPFlowID &rewritten_flowid,
-		       Packet *p, int mapid);
+		       Packet *p, int mapid) override;
 
 protected:
     int parse_server(const String &conf, IPRewriterInput *input,

@@ -1,7 +1,6 @@
 #ifndef CLICK_TCPREWRITER_HH
 #define CLICK_TCPREWRITER_HH
-#include "elements/ip/iprewriterbase.hh"
-#include "elements/ip/iprwmapping.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 #include <clicknet/tcp.h>
 CLICK_DECLS
 
@@ -92,9 +91,8 @@ flow and returns in the same format.  Otherwise, returns nothing.
 =a IPRewriter, IPAddrRewriter, IPAddrPairRewriter, IPRewriterPatterns,
 FTPPortMapper */
 
-class TCPRewriter : public IPRewriterBase { public:
 
-    class TCPFlow : public IPRewriterFlow { public:
+class TCPFlow : public IPRewriterFlow { public:
 
 	TCPFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		const IPFlowID &rewritten_flowid,
@@ -151,31 +149,33 @@ class TCPRewriter : public IPRewriterBase { public:
 	delta_transition *_dt;
 
 	void apply_sack(bool direction, click_tcp *tcp, int transport_len);
+};
 
-    };
+
+class TCPRewriter : public IPRewriterBase { public:
 
     TCPRewriter() CLICK_COLD;
     ~TCPRewriter() CLICK_COLD;
 
-    const char *class_name() const		{ return "TCPRewriter"; }
-    void *cast(const char *);
+    const char *class_name() const override	{ return "TCPRewriter"; }
+    void *cast(const char *) override;
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
     IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
-			      const IPFlowID &rewritten_flowid, int input);
-    void destroy_flow(IPRewriterFlow *flow);
-    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>(flow)) -
-               _timeouts[click_current_cpu_id()][1];
+			      const IPFlowID &rewritten_flowid, int input) override;
+    void destroy_flow(IPRewriterFlow *flow) override;
+    click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) override {
+	return flow->expiry() + tcp_flow_timeout(static_cast<const TCPFlow *>((IPRewriterFlow*)flow)) -
+               timeouts()[1];
     }
 
-    void push(int, Packet *);
+    void push(int, Packet *) override;
 #if HAVE_BATCH
-     void push_batch(int port, PacketBatch *batch);
+     void push_batch(int port, PacketBatch *batch) override;
 #endif
 
-    void add_handlers() CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
 
  protected:
     per_thread<SizedHashAllocator<sizeof(TCPFlow)>> _allocator;
@@ -196,7 +196,7 @@ class TCPRewriter : public IPRewriterBase { public:
 	else if (mf->both_data())
 	    return _tcp_data_timeout;
 	else
-	    return _timeouts[click_current_cpu_id()][0];
+	    return timeouts()[0];
     }
 
     static String tcp_mappings_handler(Element *, void *);
@@ -207,13 +207,13 @@ class TCPRewriter : public IPRewriterBase { public:
 inline void
 TCPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, map());
     static_cast<TCPFlow *>(flow)->~TCPFlow();
     _allocator->deallocate(flow);
 }
 
 inline tcp_seq_t
-TCPRewriter::TCPFlow::new_seq(bool direction, tcp_seq_t seqno) const
+TCPFlow::new_seq(bool direction, tcp_seq_t seqno) const
 {
     delta_transition *dt = _dt;
     while (dt && dt->has_trigger(direction)
@@ -223,7 +223,7 @@ TCPRewriter::TCPFlow::new_seq(bool direction, tcp_seq_t seqno) const
 }
 
 inline tcp_seq_t
-TCPRewriter::TCPFlow::new_ack(bool direction, tcp_seq_t ackno) const
+TCPFlow::new_ack(bool direction, tcp_seq_t ackno) const
 {
     delta_transition *dt = _dt;
     while (dt && dt->has_trigger(!direction)

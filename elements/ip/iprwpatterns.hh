@@ -1,6 +1,6 @@
 #ifndef CLICK_IPRWPATTERNS_HH
 #define CLICK_IPRWPATTERNS_HH
-#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 #include <click/hashtable.hh>
 CLICK_DECLS
 
@@ -16,7 +16,7 @@ CLICK_DECLS
  * pattern, 'NAME SADDR SPORT DADDR DPORT'.  The NAMEs for every argument in
  * every IPRewriterPatterns element in the configuration must be distinct.
  *
- * =a IPRewriter
+ * =a IPRewriter, IPRewriterPatternsIMP
  */
 
 class IPRewriterPatterns : public Element { public:
@@ -26,10 +26,21 @@ class IPRewriterPatterns : public Element { public:
 
     const char *class_name() const { return "IPRewriterPatterns"; }
 
-    int configure_phase() const	{ return IPRewriterBase::CONFIGURE_PHASE_PATTERNS; }
+    int configure_phase() const	{ return IPRewriterBaseIMP::CONFIGURE_PHASE_PATTERNS; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
 
+};
+
+class IPRewriterPatternsIMP : public IPRewriterPatterns { public:
+
+	IPRewriterPatternsIMP() CLICK_COLD;
+    ~IPRewriterPatternsIMP() CLICK_COLD;
+
+    const char *class_name() const { return "IPRewriterPatternsIMP"; }
+
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    void cleanup(CleanupStage) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

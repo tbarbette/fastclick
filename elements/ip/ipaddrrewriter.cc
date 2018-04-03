@@ -103,9 +103,7 @@ IPAddrRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool has_reply_anno = false;
     int reply_anno;
-    for (unsigned i=0; i<_mem_units_no; i++) {
-        _timeouts[i][0] = 60 * 120;     // 2 hours
-    }
+    initialize_timeout(0, 60 * 120); // 2 hours
 
     if (Args(this, errh).bind(conf)
 	.read("REPLY_ANNO", has_reply_anno, AnnoArg(1), reply_anno)
@@ -113,23 +111,23 @@ IPAddrRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 	return -1;
 
     _annos = 1 + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
-    return IPRewriterBase::configure(conf, errh);
+    return IPRewriterBaseIMP::configure(conf, errh);
 }
 
 IPRewriterEntry *
 IPAddrRewriter::get_entry(int, const IPFlowID &xflowid, int input)
 {
     IPFlowID flowid(xflowid.saddr(), 0, IPAddress(), 0);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = map().get(flowid);
     if (!m) {
 	IPFlowID rflowid(IPAddress(), 0, xflowid.daddr(), 0);
-	m = _map[click_current_cpu_id()].get(rflowid);
+	m = map().get(rflowid);
     }
-    if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
-	IPRewriterInput &is = _input_specs[input];
-	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
-	if (is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap)
-	    m = add_flow(0, flowid, rewritten_flowid, input);
+    if (!m && (unsigned) input < (unsigned) input_specs_size()) {
+    	IPRewriterInputIMP &is = input_specs(input);
+    	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
+    	if (is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap)
+    		m = add_flow(0, flowid, rewritten_flowid, input);
     }
     return m;
 }
@@ -146,11 +144,11 @@ IPAddrRewriter::add_flow(int, const IPFlowID &flowid,
 	return 0;
 
     IPAddrFlow *flow = new(data) IPAddrFlow
-	(&_input_specs[input], flowid, rewritten_flowid,
-	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-         relevant_timeout(_timeouts[click_current_cpu_id()]));
+	((IPRewriterInput*)&input_specs(input), flowid, rewritten_flowid,
+	 !!timeouts()[1], click_jiffies() +
+         relevant_timeout(timeouts()));
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, map());
 }
 
 int
@@ -164,15 +162,15 @@ IPAddrRewriter::process(int port, Packet *p_in)
     click_ip *iph = p->ip_header();
 
     IPFlowID flowid(iph->ip_src, 0, IPAddress(), 0);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = map().get(flowid);
 
     if (!m) {
 	IPFlowID rflowid = IPFlowID(IPAddress(), 0, iph->ip_dst, 0);
-	m = _map[click_current_cpu_id()].get(rflowid);
+	m = map().get(rflowid);
     }
 
     if (!m) {			// create new mapping
-	IPRewriterInput &is = _input_specs.unchecked_at(port);
+	IPRewriterInputIMP &is = input_specs_unchecked(port);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 	int result = is.rewrite_flowid(flowid, rewritten_flowid, p);
 	if (result == rw_addmap)
@@ -180,15 +178,15 @@ IPAddrRewriter::process(int port, Packet *p_in)
 	if (!m) {
 	    return result;
 	} else if (_annos & 2)
-	    m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
+	    m->flowimp()->set_reply_anno(p->anno_u8(_annos >> 2));
     }
 
-    IPAddrFlow *mf = static_cast<IPAddrFlow *>(m->flow());
+    IPAddrFlow *mf = static_cast<IPAddrFlow *>(m->flowimp());
     mf->apply(p, m->direction(), _annos);
     mf->change_expiry_by_timeout(
-        _heap[click_current_cpu_id()],
+       heap(),
         click_jiffies(),
-        _timeouts[click_current_cpu_id()]
+        timeouts()
     );
 
     return m->output();
@@ -275,8 +273,8 @@ IPAddrRewriter::dump_mappings_handler(Element *e, void *)
     IPAddrRewriter *rw = (IPAddrRewriter *)e;
     StringAccum sa;
     click_jiffies_t now = click_jiffies();
-    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); iter++) {
-	IPAddrFlow *f = static_cast<IPAddrFlow *>(iter->flow());
+    for (Map::iterator iter = rw->map().begin(); iter.live(); iter++) {
+	IPAddrFlow *f = static_cast<IPAddrFlow *>(iter->flowimp());
 	f->unparse(sa, iter->direction(), now);
 	sa << '\n';
     }

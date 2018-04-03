@@ -8,6 +8,8 @@ CLICK_DECLS
 class IPRewriterFlow;
 class IPRewriterEntry;
 class IPRewriterInput;
+class IPRewriterInputIMP;
+class IPRewriterInputAncestor;
 
 class IPRewriterPattern { public:
 
@@ -15,12 +17,19 @@ class IPRewriterPattern { public:
 		      const IPAddress &daddr, int dport,
 		      bool is_napt, bool sequential, bool same_first,
 		      uint32_t variation);
+
     static bool parse(const Vector<String> &words, IPRewriterPattern **result,
 		      Element *context, ErrorHandler *errh);
-    static bool parse_ports(const Vector<String> &words, IPRewriterInput *input,
+    static bool parse_ports(const Vector<String> &words, IPRewriterInputAncestor *input,
 			    Element *model, ErrorHandler *errh);
-    static bool parse_with_ports(const String &str, IPRewriterInput *input,
+    template <class I>
+    static bool parse_with_ports_base(const String &str, I *input,
 				 Element *context, ErrorHandler *errh);
+
+    static inline bool parse_with_ports(const String &str, IPRewriterInput *input,
+			 Element *context, ErrorHandler *errh) {
+    	return parse_with_ports_base<IPRewriterInput>(str,input,context,errh);
+    }
 
     void use() {
 	_refcount++;
@@ -42,7 +51,7 @@ class IPRewriterPattern { public:
 
     String unparse() const;
 
-  private:
+  protected:
 
     IPAddress _saddr;
     int _sport;			// net byte order
@@ -61,6 +70,18 @@ class IPRewriterPattern { public:
     IPRewriterPattern(const IPRewriterPattern&);
     IPRewriterPattern& operator=(const IPRewriterPattern&);
 
+};
+
+class IPRewriterPatternIMP : public IPRewriterPattern { public:
+
+	~IPRewriterPatternIMP() {
+		static_assert(sizeof(IPRewriterPatternIMP) == sizeof(IPRewriterPattern), "IPRewriterPatternIMP must be castable to IPRewriterPattern");
+	}
+
+    static inline bool parse_with_ports(const String &str, IPRewriterInputIMP *input,
+			 Element *context, ErrorHandler *errh) {
+    	return parse_with_ports_base<IPRewriterInputIMP>(str,input,context,errh);
+    }
 };
 
 CLICK_ENDDECLS

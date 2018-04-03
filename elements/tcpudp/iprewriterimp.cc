@@ -1,5 +1,5 @@
 /*
- * iprewriter.{cc,hh} -- rewrites packet source and destination
+ * iprewriterimp.{cc,hh} -- rewrites packet source and destination
  * Max Poletto, Eddie Kohler
  *
  * Per-core, thread safe data structures and computational batching
@@ -16,13 +16,13 @@
  * listed in the Click LICENSE file. These conditions include: you must
  * preserve this copyright notice, and you cannot mention the copyright
  * holders in advertising related to the Software without their permission.
- * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR LIED. This
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
 
 #include <click/config.h>
-#include "iprewriter.hh"
+#include "iprewriterimp.hh"
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include <clicknet/udp.h>
@@ -33,29 +33,29 @@
 #include <click/router.hh>
 CLICK_DECLS
 
-IPRewriter::IPRewriter() : _ipstate()
+IPRewriterIMP::IPRewriterIMP() : _ipstate()
 {
 }
 
-IPRewriter::~IPRewriter()
+IPRewriterIMP::~IPRewriterIMP()
 {
 }
 
 void *
-IPRewriter::cast(const char *n)
+IPRewriterIMP::cast(const char *n)
 {
-    if (strcmp(n, "IPRewriterBase") == 0)
-	return (IPRewriterBase *)this;
-    else if (strcmp(n, "TCPRewriter") == 0)
-	return (TCPRewriter *)this;
-    else if (strcmp(n, "IPRewriter") == 0)
+    if (strcmp(n, "IPRewriterBaseIMP") == 0)
+	return (IPRewriterBaseIMP *)this;
+    else if (strcmp(n, "TCPRewriterIMP") == 0)
+	return (TCPRewriterIMP *)this;
+    else if (strcmp(n, "IPRewriterIMP") == 0)
 	return this;
     else
 	return 0;
 }
 
 int
-IPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
+IPRewriterIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool has_udp_streaming_timeout = false;
     uint32_t udp_timeouts[2];
@@ -83,32 +83,32 @@ IPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
         state._udp_streaming_timeout = udp_streaming_timeout;
     }
 
-    return TCPRewriter::configure(conf, errh);
+    return TCPRewriterIMP::configure(conf, errh);
 }
 
 inline IPRewriterEntry *
-IPRewriter::get_entry(int ip_p, const IPFlowID &flowid, int input)
+IPRewriterIMP::get_entry(int ip_p, const IPFlowID &flowid, int input)
 {
     if (ip_p == IP_PROTO_TCP)
-	return TCPRewriter::get_entry(ip_p, flowid, input);
+	return TCPRewriterIMP::get_entry(ip_p, flowid, input);
     if (ip_p != IP_PROTO_UDP)
 	return 0;
     IPRewriterEntry *m = _ipstate->_udp_map.get(flowid);
     if (!m && (unsigned) input < (unsigned) input_specs_size()) {
-	IPRewriterInput &is = input_specs(input);
+	IPRewriterInputIMP &is = input_specs(input);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
-	if (is.rewrite_flowid(flowid, rewritten_flowid, 0, IPRewriterInput::mapid_iprewriter_udp) == rw_addmap)
-	    m = IPRewriter::add_flow(0, flowid, rewritten_flowid, input);
+	if (is.rewrite_flowid(flowid, rewritten_flowid, 0, IPRewriterInputIMP::mapid_iprewriter_udp) == rw_addmap)
+	    m = IPRewriterIMP::add_flow(0, flowid, rewritten_flowid, input);
     }
     return m;
 }
 
 IPRewriterEntry *
-IPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
+IPRewriterIMP::add_flow(int ip_p, const IPFlowID &flowid,
 		     const IPFlowID &rewritten_flowid, int input)
 {
     if (ip_p == IP_PROTO_TCP)
-	return TCPRewriter::add_flow(ip_p, flowid, rewritten_flowid, input);
+	return TCPRewriterIMP::add_flow(ip_p, flowid, rewritten_flowid, input);
 
     void *data = _ipstate->_udp_allocator.allocate();
     if (!data) {
@@ -116,7 +116,7 @@ IPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
 	return 0;
     }
 
-    IPRewriterInput& rwinput = input_specs(input);
+    IPRewriterInputIMP& rwinput = input_specs(input);
     IPRewriterFlow *flow = new(data) IPRewriterFlow
 	((IPRewriterInput*)&rwinput, flowid, rewritten_flowid, ip_p,
 	 !!_ipstate->_udp_timeouts[1],
@@ -126,7 +126,7 @@ IPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
 }
 
 int
-IPRewriter::process(int port, Packet *p_in)
+IPRewriterIMP::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     click_ip *iph = p->ip_header();
@@ -136,7 +136,7 @@ IPRewriter::process(int port, Packet *p_in)
     if ((iph->ip_p != IP_PROTO_TCP && iph->ip_p != IP_PROTO_UDP)
 	|| !IP_FIRSTFRAG(iph)
 	|| p->transport_length() < 8) {
-        const IPRewriterInput &is = input_specs(port);
+        const IPRewriterInputIMP &is = input_specs(port);
         if (is.kind == IPRewriterInputAncestor::i_nochange)
             return is.foutput;
         else
@@ -152,12 +152,12 @@ IPRewriter::process(int port, Packet *p_in)
     IPRewriterEntry *m = umap->get(flowid);
 
     if (!m) {			// create new mapping
-	IPRewriterInput &is = input_specs_unchecked(port);
+	IPRewriterInputIMP &is = input_specs_unchecked(port);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 	int result = is.rewrite_flowid(flowid, rewritten_flowid, p, iph->ip_p == IP_PROTO_TCP ?
              0 : IPRewriterInput::mapid_iprewriter_udp);
 	if (result == rw_addmap)
-	    m = IPRewriter::add_flow(iph->ip_p, flowid, rewritten_flowid, port);
+	    m = IPRewriterIMP::add_flow(iph->ip_p, flowid, rewritten_flowid, port);
 	if (!m) {
 	    return result;
 	} else if (_annos & 2)
@@ -189,7 +189,7 @@ IPRewriter::process(int port, Packet *p_in)
 }
 
 void
-IPRewriter::push(int port, Packet *p)
+IPRewriterIMP::push(int port, Packet *p)
 {
     int output_port = process(port, p);
     if ( output_port < 0 ) {
@@ -202,7 +202,7 @@ IPRewriter::push(int port, Packet *p)
 
 #if HAVE_BATCH
 void
-IPRewriter::push_batch(int port, PacketBatch *batch)
+IPRewriterIMP::push_batch(int port, PacketBatch *batch)
 {
     auto fnt = [this,port](Packet*p){return process(port,p);};
     CLASSIFY_EACH_PACKET(noutputs() + 1,fnt,batch,checked_output_push_batch);
@@ -210,9 +210,9 @@ IPRewriter::push_batch(int port, PacketBatch *batch)
 #endif
 
 String
-IPRewriter::udp_mappings_handler(Element *e, void *)
+IPRewriterIMP::udp_mappings_handler(Element *e, void *)
 {
-    IPRewriter *rw = (IPRewriter *)e;
+    IPRewriterIMP *rw = (IPRewriterIMP *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
     for (unsigned i = 0; i < rw->_ipstate.weight(); i++) {
@@ -225,7 +225,7 @@ IPRewriter::udp_mappings_handler(Element *e, void *)
 }
 
 void
-IPRewriter::add_handlers()
+IPRewriterIMP::add_handlers()
 {
     add_read_handler("tcp_table", tcp_mappings_handler);
     add_read_handler("udp_table", udp_mappings_handler);
@@ -236,5 +236,5 @@ IPRewriter::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(TCPRewriter UDPRewriter)
-EXPORT_ELEMENT(IPRewriter)
+ELEMENT_REQUIRES(TCPRewriterIMP UDPRewriterIMP)
+EXPORT_ELEMENT(IPRewriterIMP)

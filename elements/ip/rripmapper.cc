@@ -18,9 +18,9 @@
 
 #include <click/config.h>
 #include "rripmapper.hh"
-#include "elements/ip/iprwpattern.hh"
 #include <click/confparse.hh>
 #include <click/error.hh>
+#include "iprwpattern.hh"
 CLICK_DECLS
 
 RoundRobinIPMapper::RoundRobinIPMapper()
@@ -43,7 +43,7 @@ RoundRobinIPMapper::cast(const char *name)
 }
 
 int
-RoundRobinIPMapper::configure(Vector<String> &conf, ErrorHandler *errh)
+RoundRobinIPMapperBase::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (conf.size() == 0)
 	return errh->error("no patterns given");
@@ -64,25 +64,26 @@ RoundRobinIPMapper::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-RoundRobinIPMapper::cleanup(CleanupStage)
+RoundRobinIPMapperBase::cleanup(CleanupStage)
 {
     for (int i = 0; i < _is.size(); i++)
 	_is[i].u.pattern->unuse();
 }
 
+
 void
-RoundRobinIPMapper::notify_rewriter(IPRewriterBase *user,
+RoundRobinIPMapper::notify_rewriter(IPRewriterBaseAncestor *user,
 				    IPRewriterInput *input, ErrorHandler *errh)
 {
     for (int i = 0; i < _is.size(); i++) {
 	if (_is[i].foutput >= user->noutputs()
-	    || _is[i].routput >= input->reply_element->noutputs())
+	    || _is[i].routput >= input->reply_element()->noutputs())
 	    errh->error("output port out of range in %s pattern %d", declaration().c_str(), i);
     }
 }
 
 int
-RoundRobinIPMapper::rewrite_flowid(IPRewriterInput *input,
+RoundRobinIPMapper::rewrite_flowid(IPRewriterInputAncestor *input,
 				   const IPFlowID &flowid,
 				   IPFlowID &rewritten_flowid,
 				   Packet *p, int mapid)
@@ -92,7 +93,7 @@ RoundRobinIPMapper::rewrite_flowid(IPRewriterInput *input,
 	++_last_pattern;
 	if (_last_pattern == _is.size())
 	    _last_pattern = 0;
-	is.reply_element = input->reply_element;
+	is.set_reply_element(((IPRewriterInput*)input)->reply_element());
 	int result = is.rewrite_flowid(flowid, rewritten_flowid, p, mapid);
 	if (result != IPRewriterBase::rw_drop
 	    || is.kind == IPRewriterInput::i_drop) {
@@ -104,6 +105,65 @@ RoundRobinIPMapper::rewrite_flowid(IPRewriterInput *input,
     return IPRewriterBase::rw_drop;
 }
 
+
+RoundRobinIPMapperIMP::RoundRobinIPMapperIMP()
+{
+}
+
+RoundRobinIPMapperIMP::~RoundRobinIPMapperIMP()
+{
+
+}
+
+
+void
+RoundRobinIPMapperIMP::notify_rewriter(IPRewriterBaseAncestor *user,
+				    IPRewriterInput *input_base, ErrorHandler *errh)
+{
+    IPRewriterInputIMP* input = (IPRewriterInputIMP*)input_base;
+    for (int i = 0; i < _is.size(); i++) {
+	if (_is[i].foutput >= user->noutputs()
+	    || _is[i].routput >= input->reply_element()->noutputs())
+	    errh->error("output port out of range in %s pattern %d", declaration().c_str(), i);
+    }
+}
+
+void *
+RoundRobinIPMapperIMP::cast(const char *name)
+{
+  if (name && strcmp("RoundRobinIPMapperIMP", name) == 0)
+    return (Element *)this;
+  else if (name && strcmp("IPMapperIMP", name) == 0)
+    return (IPMapperIMP *)this;
+  else
+    return 0;
+}
+
+
+int
+RoundRobinIPMapperIMP::rewrite_flowid(IPRewriterInputAncestor *input,
+				   const IPFlowID &flowid,
+				   IPFlowID &rewritten_flowid,
+				   Packet *p, int mapid)
+{
+    for (int i = 0; i < _is.size(); ++i) {
+	IPRewriterInputIMP &is = (IPRewriterInputIMP&)_is[_last_pattern];
+	++_last_pattern;
+	if (_last_pattern == _is.size())
+	    _last_pattern = 0;
+	is.set_reply_element(((IPRewriterInputIMP*)input)->reply_element());
+	int result = is.rewrite_flowid(flowid, rewritten_flowid, p, mapid);
+	if (result != IPRewriterBase::rw_drop
+	    || is.kind == IPRewriterInput::i_drop) {
+	    input->foutput = is.foutput;
+	    input->routput = is.routput;
+	    return result;
+	}
+    }
+    return IPRewriterBase::rw_drop;
+}
+
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(IPRewriterBase)
-EXPORT_ELEMENT(RoundRobinIPMapper)
+EXPORT_ELEMENT(RoundRobinIPMapper RoundRobinIPMapperIMP)

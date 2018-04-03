@@ -18,11 +18,12 @@
 
 #include <click/config.h>
 #include "iprwpatterns.hh"
-#include "elements/ip/iprwpattern.hh"
 #include <click/confparse.hh>
 #include <click/router.hh>
 #include <click/error.hh>
 #include <click/nameinfo.hh>
+#include "iprwpattern.hh"
+#include "iprwpattern.hh"
 CLICK_DECLS
 
 IPRewriterPatterns::IPRewriterPatterns()
@@ -83,6 +84,66 @@ IPRewriterPatterns::cleanup(CleanupStage)
     }
 }
 
+IPRewriterPatternsIMP::IPRewriterPatternsIMP()
+{
+}
+
+IPRewriterPatternsIMP::~IPRewriterPatternsIMP()
+{
+}
+
+int
+IPRewriterPatternsIMP::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    void *&patterns_attachment = router()->force_attachment("IPRewriterPatternsIMP");
+    if (!patterns_attachment)
+	patterns_attachment = new Vector<IPRewriterPattern *>;
+    Vector<IPRewriterPattern *> *patterns =
+	static_cast<Vector<IPRewriterPattern *> *>(patterns_attachment);
+
+    for (int i = 0; i < conf.size(); ++i) {
+	String name = cp_shift_spacevec(conf[i]);
+	if (!name)
+	    continue;
+
+	int32_t x;
+	if (NameInfo::query_int(NameInfo::T_IPREWRITER_PATTERN, this,
+				name, &x)) {
+	    errh->error("pattern %<%s%> already defined", name.c_str());
+	    continue;
+	}
+
+	Vector<String> words;
+	cp_spacevec(conf[i], words);
+	IPRewriterPattern *p;
+	if (!IPRewriterPattern::parse(words, &p, this, errh))
+	    continue;
+
+	p->use();
+	patterns->push_back(p);
+	NameInfo::define_int(NameInfo::T_IPREWRITER_PATTERN, this,
+			     name, patterns->size() - 1);
+    }
+
+    return errh->nerrors() ? -1 : 0;
+}
+
+
+void
+IPRewriterPatternsIMP::cleanup(CleanupStage)
+{
+    void *&patterns_attachment = router()->force_attachment("IPRewriterPatternsIMP");
+    if (patterns_attachment) {
+	Vector<IPRewriterPattern *> *patterns =
+	    static_cast<Vector<IPRewriterPattern *> *>(patterns_attachment);
+	for (int i = 0; i < patterns->size(); ++i)
+	    (*patterns)[i]->unuse();
+	delete patterns;
+	patterns_attachment = 0;
+    }
+}
+
+
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(IPRewriterPattern)
 EXPORT_ELEMENT(IPRewriterPatterns)
+EXPORT_ELEMENT(IPRewriterPatternsIMP)

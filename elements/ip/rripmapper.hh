@@ -1,6 +1,6 @@
 #ifndef CLICK_RRIPMAPPER_HH
 #define CLICK_RRIPMAPPER_HH
-#include "elements/ip/iprewriterbase.hh"
+#include "elements/ip/iprewriterbaseimp.hh"
 CLICK_DECLS
 
 /*
@@ -19,28 +19,47 @@ CLICK_DECLS
  *
  * =a IPRewriter, TCPRewriter, IPRewriterPatterns */
 
-class RoundRobinIPMapper : public Element, public IPMapper { public:
+class RoundRobinIPMapperBase : public Element { public:
+    int configure_phase() const	override { return IPRewriterBase::CONFIGURE_PHASE_MAPPER;}
+    int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
+
+    void cleanup(CleanupStage) override CLICK_COLD;
+ protected:
+
+    Vector<IPRewriterInput> _is;
+    int _last_pattern;
+};
+
+
+class RoundRobinIPMapper : public RoundRobinIPMapperBase, public IPMapper { public:
 
     RoundRobinIPMapper() CLICK_COLD;
     ~RoundRobinIPMapper() CLICK_COLD;
 
-    const char *class_name() const	{ return "RoundRobinIPMapper"; }
+    const char *class_name() const override { return "RoundRobinIPMapper"; }
     void *cast(const char *);
 
-    int configure_phase() const		{ return IPRewriterBase::CONFIGURE_PHASE_MAPPER;}
-    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
-
-    void notify_rewriter(IPRewriterBase *user, IPRewriterInput *input,
-			 ErrorHandler *errh);
-    int rewrite_flowid(IPRewriterInput *input,
+    void notify_rewriter(IPRewriterBaseAncestor *user, IPRewriterInput *input,
+			 ErrorHandler *errh) override;
+    int rewrite_flowid(IPRewriterInputAncestor *input,
 		       const IPFlowID &flowid, IPFlowID &rewritten_flowid,
-		       Packet *p, int mapid);
+		       Packet *p, int mapid) override;
 
- private:
+};
 
-    Vector<IPRewriterInput> _is;
-    int _last_pattern;
+class RoundRobinIPMapperIMP : public RoundRobinIPMapperBase, public IPMapperIMP { public:
+
+	RoundRobinIPMapperIMP() CLICK_COLD;
+    ~RoundRobinIPMapperIMP() CLICK_COLD;
+
+    const char *class_name() const override { return "RoundRobinIPMapperIMP"; }
+    void *cast(const char *) override;
+
+    void notify_rewriter(IPRewriterBaseAncestor *user, IPRewriterInput *input,
+			 ErrorHandler *errh) override;
+    int rewrite_flowid(IPRewriterInputAncestor *input,
+		       const IPFlowID &flowid, IPFlowID &rewritten_flowid,
+		       Packet *p, int mapid) override;
 
 };
 
