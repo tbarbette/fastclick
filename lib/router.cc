@@ -1174,7 +1174,7 @@ Router::initialize(ErrorHandler *errh)
 
 #if HAVE_DPDK
     if (all_ok) {
-        //DPDK initialization may be affected by some configuration and needed by some element initialization (Packet::make with --enable-dpdk-packet-pool)
+        //DPDK initialization may be affected by some configuration and needed by some element initialization (Packet::make with --enable-dpdk-pool)
         all_ok = DPDKDevice::static_initialize(ErrorHandler::default_handler()) == 0;
     }
 #endif

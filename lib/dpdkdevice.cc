@@ -417,6 +417,9 @@ int DPDKDevice::add_tx_queue(int &queue_id, unsigned n_desc,
 
 int DPDKDevice::static_initialize(ErrorHandler* errh) {
 #if HAVE_DPDK_PACKET_POOL
+    if (!dpdk_enabled) {
+        return errh->error("You must start Click with --dpdk option when compiling with --enable-dpdk-pool");
+    }
     if (!alloc_pktmbufs()) {
         errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
         if (rte_errno == 12) {
@@ -454,7 +457,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
             return errh->error("Cannot find DPDK port %u", it.key());
 
     err = static_initialize(errh);
-    if (!err)
+    if (err != 0)
         return err;
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
