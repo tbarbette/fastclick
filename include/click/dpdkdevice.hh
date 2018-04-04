@@ -74,6 +74,8 @@ public:
 
     static int initialize(ErrorHandler *errh);
 
+    static int static_initialize(ErrorHandler *errh);
+
     static int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {

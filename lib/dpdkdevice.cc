@@ -114,10 +114,12 @@ bool DPDKDevice::alloc_pktmbufs()
 
     // Allocate pktmbuf_pool array
     typedef struct rte_mempool *rte_mempool_p;
-    _pktmbuf_pools = new rte_mempool_p[_nr_pktmbuf_pools];
-    if (!_pktmbuf_pools)
-        return false;
-    memset(_pktmbuf_pools, 0, _nr_pktmbuf_pools * sizeof(rte_mempool_p));
+    if (!_pktmbuf_pools) {
+        _pktmbuf_pools = new rte_mempool_p[_nr_pktmbuf_pools];
+        if (!_pktmbuf_pools)
+            return false;
+        memset(_pktmbuf_pools, 0, _nr_pktmbuf_pools * sizeof(rte_mempool_p));
+    }
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         // Create a pktmbuf pool for each active socket
@@ -413,8 +415,23 @@ int DPDKDevice::add_tx_queue(int &queue_id, unsigned n_desc,
     return add_queue(DPDKDevice::TX, queue_id, false, n_desc, errh);
 }
 
+int DPDKDevice::static_initialize(ErrorHandler* errh) {
+#if HAVE_DPDK_PACKET_POOL
+    if (!alloc_pktmbufs()) {
+        errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
+        if (rte_errno == 12) {
+            errh->error("Maybe try to allocate less buffers with DPDKInfo(X) or allocate more memory to DPDK by giving/increasing the -m parameter or allocate more hugepages.");
+        }
+        return -1;
+    }
+#endif
+    return 0;
+}
+
 int DPDKDevice::initialize(ErrorHandler *errh)
 {
+    int err = 0;
+
     if (_is_initialized)
         return 0;
 
@@ -436,8 +453,9 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         if (it.key() >= n_ports)
             return errh->error("Cannot find DPDK port %u", it.key());
 
-    if (!alloc_pktmbufs())
-        return errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
+    err = static_initialize(errh);
+    if (!err)
+        return err;
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         for (HashTable<unsigned, DPDKDevice>::iterator it = _devs.begin();

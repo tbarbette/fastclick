@@ -1169,6 +1169,11 @@ Router::initialize(ErrorHandler *errh)
         }
     }
 
+    if (all_ok) {
+        //DPDK initialization may be affected by some configuration and needed by some element initialization (Packet::make with --enable-dpdk-packet-pool)
+        all_ok = DPDKDevice::static_initialize(ErrorHandler::default_handler()) == 0;
+    }
+
 #if HAVE_BATCH
     if (all_ok) {
         //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instantiating batches
