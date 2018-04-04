@@ -429,6 +429,7 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
     if (!dpdk_enabled) {
         return errh->error("You must start Click with --dpdk option when compiling with --enable-dpdk-pool");
     }
+#endif
     if (!alloc_pktmbufs()) {
         errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
         if (rte_errno == 12) {
@@ -436,7 +437,6 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
         }
         return -1;
     }
-#endif
     return 0;
 }
 
