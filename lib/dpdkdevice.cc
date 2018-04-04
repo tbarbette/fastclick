@@ -110,15 +110,24 @@ bool DPDKDevice::alloc_pktmbufs()
     if (max_socket == -1)
         max_socket = 0;
 
-    _nr_pktmbuf_pools = max_socket + 1;
+    int n_pktmbuf_pools = max_socket + 1;
 
     // Allocate pktmbuf_pool array
     typedef struct rte_mempool *rte_mempool_p;
-    if (!_pktmbuf_pools) {
-        _pktmbuf_pools = new rte_mempool_p[_nr_pktmbuf_pools];
-        if (!_pktmbuf_pools)
+    if (_nr_pktmbuf_pools < n_pktmbuf_pools) {
+        auto pktmbuf_pools = new rte_mempool_p[n_pktmbuf_pools];
+        if (!pktmbuf_pools)
             return false;
-        memset(_pktmbuf_pools, 0, _nr_pktmbuf_pools * sizeof(rte_mempool_p));
+        for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+            pktmbuf_pools[i] = _pktmbuf_pools[i];
+        }
+        if (_pktmbuf_pools)
+            delete[] _pktmbuf_pools;
+        for (int i = _nr_pktmbuf_pools; i < n_pktmbuf_pools; i++) {
+            pktmbuf_pools[i] = 0;
+        }
+        _pktmbuf_pools = pktmbuf_pools;
+        _nr_pktmbuf_pools = n_pktmbuf_pools;
     }
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
