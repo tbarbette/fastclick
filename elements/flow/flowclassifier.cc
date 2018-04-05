@@ -269,10 +269,11 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
                 }
 
                 parent->find(data)->set_node(subchild);
+                subchild->set_parent(parent);
                 subchild->node_data = data;
                 parent->inc_num();
             }
-            //break;
+            break; //TODO : should we always break ?
         } else { //Child is not growing, we remove a normal child
             debug_flow_2("Non-growing");
             //Delete the default to avoid having him deleted. As we are a dynamic, default is another dynamic currently in use !
