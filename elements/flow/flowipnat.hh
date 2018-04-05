@@ -98,6 +98,7 @@ private:
 
 private:
     IPAddress _sip;
+    bool _accept_nonsyn;
     NATHashtable _map;
     friend class FlowIPNATReverse;
 };

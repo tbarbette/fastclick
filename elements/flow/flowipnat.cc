@@ -17,7 +17,7 @@ CLICK_DECLS
 #define NAT_COLLIDE 1  //Avoid port collisions
 
 
-FlowIPNAT::FlowIPNAT() : _sip(), _map(65536) {
+FlowIPNAT::FlowIPNAT() : _sip(), _map(65536), _accept_nonsyn(true) {
 
 };
 
@@ -30,6 +30,7 @@ FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
                .read_mp("SIP",_sip)
+               .read("ACCEPT_NONSYN", _accept_nonsyn)
                .complete() < 0)
         return -1;
 
@@ -110,7 +111,7 @@ PortRef* FlowIPNAT::pick_port() {
 }
 
 bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
-    if (!p->tcp_header()->th_flags & TH_SYN) {
+    if (!_accept_nonsyn && !p->tcp_header()->th_flags & TH_SYN) {
         click_chatter("Flow does not start with a SYN...");
         return false;
     }
