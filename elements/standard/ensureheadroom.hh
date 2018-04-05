@@ -25,6 +25,7 @@ class EnsureHeadroom : public BatchElement { public:
 	Packet* smaction(Packet*);
 	private:
    unsigned _headroom;
+   bool _force;
 };
 
 CLICK_ENDDECLS
