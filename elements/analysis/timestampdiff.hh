@@ -16,8 +16,8 @@ TimestampDiff()
 =s timestamps
 
 Compute the difference between the recorded timestamp of a packet using
-RecordTimestamp and the number inside the packet payload potentially set
-using NumberPacket
+RecordTimestamp and a fresh timestamp. Computations are performed only for
+numbered packets, either by a NumberPacket element or an external entity.
 
 Arguments:
 

@@ -1,5 +1,5 @@
 /*
- * recordtimestamp.{cc,hh} -- Store a packet count inside packet payload
+ * recordtimestamp.{cc,hh} -- Store a timestamp for numbered packets
  * Cyril Soldani, Tom Barbette
  *
  * Copyright (c) 2015-2016 University of Liège
