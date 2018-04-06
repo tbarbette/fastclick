@@ -42,6 +42,10 @@ Keyword arguments are:
 Unsigned Integer. The frequency in seconds to schedule this element,
 thus send data to the remote server.
 
+=item CORE_NB
+
+Unsigned Integer. CPU core ID to schedule this element.
+
 =item SNDBUF
 
 Unsigned integer. Sets the maximum size in bytes of the underlying

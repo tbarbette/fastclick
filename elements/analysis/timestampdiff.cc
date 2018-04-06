@@ -1,5 +1,6 @@
 /*
- * timestampdiff.{cc,hh} -- Store a packet count inside packet payload
+ * timestampdiff.{cc,hh} -- Compute the difference between the recorded
+ * timestamp of a packet using RecordTimestamp and a fresh timestamp
  * Cyril Soldani, Tom Barbette
  *
  * Various latency percentiles by Georgios Katsikas

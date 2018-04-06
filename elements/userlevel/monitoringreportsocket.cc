@@ -1,6 +1,6 @@
 // -*- mode: c++; c-basic-offset: 2 -*-
 /*
- * monitoringreportsocket.{cc,hh} -- periodically reports timestampted
+ * monitoringreportsocket.{cc,hh} -- periodically reports timestamped
  * values of element handlers via a UDP or TCP socket.
  * Useful for element handlers that contain arithmetic values.
  * Can be used for monitoring purposes; e.g., to report the run-time
