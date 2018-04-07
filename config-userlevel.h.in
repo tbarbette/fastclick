@@ -223,6 +223,9 @@
 /* Define if flow nodes should be released. */
 #undef FLOW_KEEP_STRUCTURE
 
+/* Define if flow hash mode. */
+#define FLOW_HASH_RELEASE 2
+
 /* Define if Netmap support is enabled. */
 #undef HAVE_NETMAP
 

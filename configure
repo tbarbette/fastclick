@@ -813,6 +813,7 @@ enable_dpdk_packet
 enable_zerocopy
 enable_sloppy
 enable_flow_structure
+enable_flow_hash
 enable_linuxmodule
 enable_fixincludes
 enable_multithread
@@ -1527,10 +1528,12 @@ Optional Features:
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
     --disable-sloppy      disable Sloppy flow timeouts
-    --enable-flow-structure
+    --disable-flow-structure
                           do not free classifier nodes in pool, mark them as
                           released to somehow keep the receive strucutre
                           intact
+    --enable-flow-hash=[reset|keep|epoch]
+                          set flow hashtable release mechanism
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
     --enable-multithread  support kernel multithreading
@@ -6959,12 +6962,44 @@ fi
 if test "${enable_flow_structure+set}" = set; then :
   enableval=$enable_flow_structure; :
 else
-  enable_keep_structure=no
+  enable_flow_structure=yes
 fi
 
-if test "x$enable_keep_structure" = xyes; then
+if test "x$enable_flow_structure" = xyes; then
     $as_echo "#define FLOW_KEEP_STRUCTURE 1" >>confdefs.h
 
+fi
+
+# Check whether --enable-flow-hash was given.
+if test "${enable_flow_hash+set}" = set; then :
+  enableval=$enable_flow_hash; :
+else
+  enable_flow_hash=""
+fi
+
+
+if echo "$enable_flow_hash" | grep epoch >/dev/null 2>&1; then
+
+$as_echo "#define FLOW_HASH_RELEASE 2" >>confdefs.h
+
+elif echo "$enable_flow_hash" | grep keep >/dev/null 2>&1; then
+
+$as_echo "#define FLOW_HASH_RELEASE 1" >>confdefs.h
+
+elif echo "$enable_flow_hash" | grep reset >/dev/null 2>&1; then
+
+$as_echo "#define FLOW_HASH_RELEASE 0" >>confdefs.h
+
+else
+    if test "x$enable_flow_structure" = xyes; then
+
+$as_echo "#define FLOW_HASH_RELEASE 1" >>confdefs.h
+
+    else
+
+$as_echo "#define FLOW_HASH_RELEASE 2" >>confdefs.h
+
+    fi
 fi
 
 
