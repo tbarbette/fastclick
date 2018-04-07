@@ -706,7 +706,7 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
                         childs[idx].ptr = 0;
 #if FLOW_KEEP_STRUCTURE
                     } else if (childs[idx].is_node() && childs[idx].node->released()) {
-                        childs[idx].node._default.ptr = 0;
+                        childs[idx].node->default_ptr()->ptr = 0;
                         childs[idx].node->destroy();
                         childs[idx].ptr = 0;
 #endif
