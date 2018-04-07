@@ -194,13 +194,11 @@ public:
     int findGetNum();
 
     virtual ~FlowNode() {
-        if (_default.ptr && _default.is_node()) {
-#if FLOW_KEEP_STRUCTURE
-            _default.node->release();
-#else
-            _default.node->destroy();
-#endif
-        }
+/*        if (_default.ptr && _default.is_node()) {
+            click_chatter("%p", _default.node);
+            delete _default.node;
+        }*/
+        //Default may be referenced multiple times in dynamics, TODO: delete from somewhere else
     };
 
 #if FLOW_KEEP_STRUCTURE

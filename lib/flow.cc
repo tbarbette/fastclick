@@ -87,9 +87,12 @@ FlowTableHolder::delete_all_flows() {
 #endif
 
 FlowTableHolder::~FlowTableHolder() {
+    auto previous = fcb_table;
+    fcb_table = this;
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     delete_all_flows();
 #endif
+    fcb_table = previous;
 }
 
 

@@ -374,12 +374,12 @@ void FlowClassifier::cleanup(CleanupStage stage) {
 //            _table.get_root()->print();
         }
         pool_allocator_mt_base::set_dying(previous);
-/*    if (_table.get_root()) {
+    if (_table.get_root()) {
         _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
             _table.get_pool()->release(ptr->leaf);
             ptr->leaf = 0;
         }, true, true);
-    }*/
+    }
     fcb_table = 0;
     /*click_chatter("%p{element} Hit : %d",this,cache_hit);
     click_chatter("%p{element}  Shared : %d",this,cache_sharing);
