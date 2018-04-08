@@ -513,6 +513,10 @@ public:
 
     FlowNode* duplicate(bool recursive,int use_count) override;
 
+    virtual int max_size() const {
+        return childs.size();
+    }
+
     class ArrayNodeIterator : public NodeIteratorBase {
         FlowNodeArray* _node;
         int cur;
@@ -603,6 +607,7 @@ class FlowNodeHash : public FlowNode  {
     virtual int max_size() const override {
         return max_highwater();
     }
+
     unsigned int hash32(uint32_t d) const {
         return ((d << 3) + (d >> 9) + (d >> 12) + (d >> 25)) % capacity();
     }
@@ -891,6 +896,7 @@ class FlowNodeThreeCase : public FlowNode  {
     String name() const {
         return "THREECASE";
     }
+
     int max_size() const {
         return 2;
     }

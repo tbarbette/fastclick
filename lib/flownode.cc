@@ -25,7 +25,7 @@
  *********************************/
 
 FlowNode* FlowNode::start_growing(bool impl) {
-            click_chatter("Table starting to grow (was level %s, node %s, impl %d)",level()->print().c_str(),name().c_str(), impl);
+            click_chatter("Table starting to grow (was level %s, node %s, num %d, max %d, impl %d)",level()->print().c_str(),name().c_str(), num, max_size(), impl);
             set_growing(true);
             FlowNode* newNode = level()->create_node(this, true, impl);
             if (newNode == 0) {
