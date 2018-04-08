@@ -1,0 +1,27 @@
+%script
+click C1
+
+%file C1
+fc1 :: FlowClassifier(VERBOSE 1)
+
+-> fd :: FlowDispatcher(10/0/ffffffff)
+-> fd2 :: FlowDispatcher(10/0/ffff 12/0/ffff)
+-> Print(A)
+-> Discard;
+
+fd[1]
+-> Print(B) -> Discard;
+
+InfiniteSource(LENGTH 20, LIMIT 1, STOP true) -> fc1;
+
+DriverManager(pause, stop);
+
+%expect stderr
+Table of fc1 after optimization :
+---
+10/FFFFFFFF (HASH-257, 0 childs, dynamic)
+|-> DEFAULT 18446744073709551615 UC:1 ED:0 (data ffffffffffffffff0000000000000000)
+---
+A:   20 | 52616e64 6f6d2062 756c6c73 68697420 696e2061
+
+

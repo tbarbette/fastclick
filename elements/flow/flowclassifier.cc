@@ -249,13 +249,11 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
             debug_flow("Releasing a growing child, we can remove it from the tree. Parent num is %d",parent->getNum());
             flow_assert(parent->getNum() == parent->findGetNum());
             FlowNode* subchild = child->default_ptr()->node;
-            child->default_ptr()->ptr = 0; //Remove the default to prevent deletion
 
             //Clean the growing flag for fast pool reuse
             child->set_growing(false);
             if (child == parent->default_ptr()->ptr) { //Growing child was the default path
                 debug_flow("Default");
-//                child->set_parent(0);
                 child->destroy();
                 parent->default_ptr()->ptr = subchild;
                 subchild->set_parent(parent);
@@ -276,8 +274,6 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
             break; //TODO : should we always break ?
         } else { //Child is not growing, we remove a normal child
             debug_flow_2("Non-growing");
-            //Delete the default to avoid having him deleted. As we are a dynamic, default is another dynamic currently in use !
-            child->default_ptr()->ptr = 0;
             flow_assert(parent->getNum() == parent->findGetNum());
             parent->release_child(FlowNodePtr(child), data); //A->release(B)
         }

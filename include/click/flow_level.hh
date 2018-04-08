@@ -364,16 +364,7 @@ public:
         return FlowNodeData((T)(*((T*)(packet->data() + _offset)) & _mask));
     }
 
-    String print() {
-        StringAccum s;
-        s << _offset;
-        s << "/";
-        for (int i = 0; i < sizeof(T); i++) {
-            uint8_t t = ((uint8_t*)&_mask)[i];
-            s << hex[t >> 4] << hex[t & 0xf];
-        }
-        return s.take_string();
-    }
+    String print();
 
     FlowLevel* duplicate() override {
         return (new FlowLevelGeneric<T>(_mask,_offset))->assign(this);

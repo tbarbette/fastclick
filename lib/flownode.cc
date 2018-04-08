@@ -706,7 +706,6 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
                         childs[idx].ptr = 0;
 #if FLOW_KEEP_STRUCTURE
                     } else if (childs[idx].is_node() && childs[idx].node->released()) {
-                        childs[idx].node->default_ptr()->ptr = 0;
                         childs[idx].node->destroy();
                         childs[idx].ptr = 0;
 #endif
@@ -738,7 +737,7 @@ template class FlowNodeHash<7>;
 template class FlowNodeHash<8>;
 template class FlowNodeHash<9>;
 
-
+#define FLOW_DEBUG_PRUNE DEBUG_CLASSIFIER
 
 template<typename T>
 bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
@@ -750,7 +749,9 @@ bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
     T m = _mask;
     for (int i = 0; i < mask_size(); i++) {
         uint8_t inverted = ol->get_mask(_offset + i);
-        //click_chatter("DMask %d (tot %d) mask %x",i,_offset + i,inverted);
+#if FLOW_DEBUG_PRUNE
+        click_chatter("DMask %d (tot %d) mask %x",i,_offset + i,inverted);
+#endif
         m = m & (~((T)inverted << ((mask_size() - i - 1)*8)));
     }
     /*
@@ -771,6 +772,19 @@ bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
     //click_chatter("DMask is now %x",_mask);
 }
 
+
+template<typename T>
+String FlowLevelGeneric<T>::print() {
+    StringAccum s;
+    s << _offset;
+    s << "/";
+    for (int i = 0; i < sizeof(T); i++) {
+        uint8_t t = ((uint8_t*)&_mask)[i];
+        s << hex[t >> 4] << hex[t & 0xf];
+    }
+    return s.take_string();
+}
+
 FlowNodePtr
 FlowLevel::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
     if (other->equals(this)) {
@@ -781,6 +795,10 @@ FlowLevel::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &chan
         //TODO delete this;
         changed = true;
         return child;
+    } else {
+#if FLOW_DEBUG_PRUNE
+       click_chatter("Cannot prune %s with %s",node->level()->print().c_str(),other->print().c_str());
+#endif
     }
     return FlowNodePtr(node);
 }
@@ -794,14 +812,22 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
 
         int shift = offset() - ol->offset();
         T shiftedmask = 0;
-
+#if FLOW_DEBUG_PRUNE
+       click_chatter("Prune %s with %s",node->level()->print().c_str(),other->print().c_str());
+#endif
         for (int i = 0; i < mask_size(); i++) {
-            //click_chatter("Mask for %d : %x",i,ol->get_mask(_offset + i));
+#if FLOW_DEBUG_PRUNE
+            click_chatter("Mask for %d : %x",i,ol->get_mask(_offset + i));
+#endif
             shiftedmask = shiftedmask | (ol->get_mask(_offset + i) << ((mask_size() - i - 1)*8));
         }
-        //click_chatter("Offset %d, shiftedmask %x mask %x",shift,shiftedmask,_mask);
+#if FLOW_DEBUG_PRUNE
+        click_chatter("Offset %d, shiftedmask %x mask %x",shift,shiftedmask,_mask);
+#endif
         if (_mask == shiftedmask) { //Value totally define the child, only keep that one
-            //click_chatter("Child");
+#if FLOW_DEBUG_PRUNE
+            click_chatter("Child");
+#endif
             FlowNodePtr* ptr = node->find_or_default(data);
             FlowNodePtr child = *ptr;
             node->dec_num();
@@ -810,7 +836,9 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
             changed = true;
             return child;
         } else if ((_mask & shiftedmask) != 0) {
-            //click_chatter("Overlapping %s %s",this->print().c_str(),other->print().c_str());
+#if FLOW_DEBUG_PRUNE
+            click_chatter("Overlapping %s %s",this->print().c_str(),other->print().c_str());
+#endif
             //A B (O 2) other
             //  C D (1 2) --> only keep children with C == B
             T shifteddata;
@@ -820,10 +848,14 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
                 shifteddata = data.data_64 << (shift * 8);
             }
             shifteddata = shifteddata & shiftedmask & _mask;
-            //click_chatter("Shifteddata %x",shifteddata);
+#if FLOW_DEBUG_PRUNE
+            click_chatter("Shifteddata %x",shifteddata);
+#endif
             node->apply([this,node,shiftedmask,shifteddata](FlowNodePtr* cur){
                     if ((((T)cur->data().data_64) & shiftedmask) != shifteddata) {
-                        //click_chatter("%x does not match %x",cur->data().data_64 & shiftedmask, shifteddata);
+#if FLOW_DEBUG_PRUNE
+                        click_chatter("%x does not match %x",cur->data().data_64 & shiftedmask, shifteddata);
+#endif
                         cur->ptr = 0;
                         //TODO delete
                         node->dec_num();
@@ -835,7 +867,9 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
             }
             return FlowNodePtr(node);
         } else {
-            //click_chatter("NON Overlapping %s %s",this->print().c_str(),other->print().c_str());
+#if FLOW_DEBUG_PRUNE
+            click_chatter("NON Overlapping %s %s",this->print().c_str(),other->print().c_str());
+#endif
             return FlowNodePtr(node);
         }
 }

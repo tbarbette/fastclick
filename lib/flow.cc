@@ -846,7 +846,15 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
                 if (!this->level()->is_usefull()) {
                     debug_flow("Not usefull anymore, returning default !");
                     assert(this->getNum() == 0);
-                    ptr = _default;
+                    changed= true;
+                    if (_default.is_node()) {
+                        debug_flow("Node");
+                        ptr = _default.node->prune(olevel, data, inverted, changed);
+                    } else {
+                        debug_flow("Leaf");
+                        ptr = _default;
+                    }
+
                 } else {
                     assert(this->getNum() == 0);
                     /*ptr.node->apply_default([ptr,olevel,data,inverted,&changed](FlowNodePtr* cur){

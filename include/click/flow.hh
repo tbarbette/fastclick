@@ -227,6 +227,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
                 }
             } else {
                 click_chatter("ERROR : no classification node and no default path !");// allowed with the "!" symbol
+                click_chatter("Level %s, data %lu", parent->level()->print().c_str(),data.data_64);
                 _root->print();
                 return 0;
             }
