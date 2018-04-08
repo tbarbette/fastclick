@@ -143,7 +143,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
                         flow_assert(parent->default_ptr()->node->parent() == parent);
                         parent = parent->default_ptr()->node;
                         continue;
-                    } else if (unlikely(parent->num >= parent->max_size())) { //Parent is not growing, but we should start growing
+                    } else if (unlikely(parent->num > parent->max_size())) { //Parent is not growing, but we should start growing
 #if HAVE_STATIC_CLASSIFICATION
                         click_chatter("MAX CAPACITY ACHIEVED, DROPPING");
                         return 0;
