@@ -13,7 +13,7 @@ NumberPacket()
 
 =s
 
-Set an increasing number inside the payload of each packets
+Set an increasing number inside the payload of each packet
 
 =item OFFSET
 

@@ -35,6 +35,9 @@
 #include <click/notifier.hh>
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
+#if HAVE_DPDK_PACKET_POOL
+#include <click/dpdkdevice.hh>
+#endif
 #if HAVE_NETMAP_PACKET_POOL
 #include <click/netmapdevice.hh>
 #endif
@@ -1168,6 +1171,13 @@ Router::initialize(ErrorHandler *errh)
                 element_stage[i] = Element::CLEANUP_CONFIGURED;
         }
     }
+
+#if HAVE_DPDK_PACKET_POOL
+    if (all_ok) {
+        //DPDK initialization may be affected by some configuration and needed by some element initialization (Packet::make with --enable-dpdk-pool)
+        all_ok = DPDKDevice::static_initialize(ErrorHandler::default_handler()) == 0;
+    }
+#endif
 
 #if HAVE_BATCH
     if (all_ok) {
