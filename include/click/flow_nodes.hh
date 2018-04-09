@@ -6,8 +6,8 @@
 #include "flow_level.hh"
 
 #define FLOW_NODE_DEFINE(T,fnt) \
-        static FlowNodePtr* find_ptr(void* thunk, FlowNodeData data) {\
-            return static_cast<T*>(thunk)->fnt(data);\
+        static FlowNodePtr* find_ptr(void* thunk, FlowNodeData data, bool &need_grow) {\
+            return static_cast<T*>(thunk)->fnt(data,need_grow);\
         }
 
 
@@ -33,9 +33,8 @@ protected:
     bool _released;
 #endif
     bool _growing;
-    //FlowNodePtr*(_find)(FlowNode*,FlowNodeData data);
 
-    typedef FlowNodePtr* (*FindFn)(void*,FlowNodeData data);
+    typedef FlowNodePtr* (*FindFn)(void*,FlowNodeData data,bool &need_grow);
 
     FindFn _find;
 
@@ -144,7 +143,8 @@ public:
         return _level;
     }
     inline void add_node(FlowNodeData data, FlowNode* node) {
-        FlowNodePtr* ptr = _find(this,data);
+        bool need_grow;
+        FlowNodePtr* ptr = _find(this,data,need_grow);
         assert(ptr->ptr == 0);
         inc_num();
         ptr->set_node(node);
@@ -152,7 +152,8 @@ public:
     }
 
     inline void add_leaf(FlowNodeData data, FlowControlBlock* leaf) {
-        FlowNodePtr* ptr = _find(this,data);
+        bool need_grow;
+        FlowNodePtr* ptr = _find(this,data,need_grow);
         assert(ptr->ptr == 0);
         inc_num();
         ptr->set_leaf(leaf);
@@ -175,9 +176,6 @@ public:
 
     FlowNode* find_node(FlowNode* other);
 
-    virtual int max_size() const {
-        return INT_MAX;
-    }
     virtual FlowNode* duplicate(bool recursive,int use_count) = 0;
 
     void assign(FlowNode* node) {
@@ -220,13 +218,14 @@ public:
 
 #endif
 
-    inline FlowNodePtr* find(FlowNodeData data) {
-        return _find((void*)this,data);
+    inline FlowNodePtr* find(FlowNodeData data, bool &need_grow) {
+        return _find((void*)this,data,need_grow);
     }
 
 
     inline FlowNodePtr* find_or_default(const FlowNodeData data) {
-        FlowNodePtr* ptr = _find(this,data);
+        bool need_grow;
+        FlowNodePtr* ptr = _find(this,data,need_grow);
         if (ptr->ptr == 0
 #if FLOW_KEEP_STRUCTURE
                 || (ptr->is_node() && ptr->node->released())
@@ -464,7 +463,7 @@ public:
 
     FLOW_NODE_DEFINE(FlowNodeArray,find_array);
 
-    inline FlowNodePtr* find_array(FlowNodeData data) {
+    inline FlowNodePtr* find_array(FlowNodeData data, bool need_grow) {
         return &childs[data.data_32];
     }
 
@@ -494,10 +493,6 @@ public:
     ~FlowNodeArray();
 
     FlowNode* duplicate(bool recursive,int use_count) override;
-
-    virtual int max_size() const {
-        return childs.size();
-    }
 
     class ArrayNodeIterator : public NodeIteratorBase {
         FlowNodeArray* _node;
@@ -584,10 +579,6 @@ class FlowNodeHash : public FlowNode  {
 
     inline constexpr uint32_t hole_threshold() const {
         return ((capacity() / 30) > 24 ? 24 : capacity()/30);
-    }
-
-    virtual int max_size() const override {
-        return max_highwater();
     }
 
     unsigned int hash32(uint32_t d) const {
@@ -701,7 +692,7 @@ class FlowNodeHash : public FlowNode  {
         return level << (8+level);
     }
 
-    FlowNodePtr* find_hash(FlowNodeData data);
+    FlowNodePtr* find_hash(FlowNodeData data, bool &need_grow);
 
     void release_child(FlowNodePtr child, FlowNodeData data);
 
@@ -739,10 +730,6 @@ class FlowNodeDummy : public FlowNode {
         return "DUMMY";
     }
 
-    int max_size() const {
-        return 0;
-    }
-
     FlowNode* duplicate(bool recursive,int use_count) override {
         FlowNodeDummy* fh = new FlowNodeDummy();
         fh->duplicate_internal(this,recursive,use_count);
@@ -759,7 +746,7 @@ class FlowNodeDummy : public FlowNode {
         assert(false);
     }
 
-    FlowNodePtr* find_dummy(FlowNodeData data) {
+    FlowNodePtr* find_dummy(FlowNodeData data, bool&) {
         return &_default;
     }
 
@@ -804,17 +791,13 @@ class FlowNodeTwoCase : public FlowNode  {
         return fh;
     }
 
-    int max_size() const {
-        return 1;
-    }
-
     FlowNodeTwoCase(FlowNodePtr c) : child(c) {
         c.set_parent(this);
         _find = &find_ptr;
     }
     FLOW_NODE_DEFINE(FlowNodeTwoCase,find_two);
 
-    FlowNodePtr* find_two(FlowNodeData data) {
+    FlowNodePtr* find_two(FlowNodeData data, bool&) {
         if (data.data_64 == child.data().data_64)
             return &child;
         else
@@ -879,10 +862,6 @@ class FlowNodeThreeCase : public FlowNode  {
         return "THREECASE";
     }
 
-    int max_size() const {
-        return 2;
-    }
-
     FlowNode* duplicate(bool recursive,int use_count) override {
         FlowNodeThreeCase* fh = new FlowNodeThreeCase(childA,childB);
         fh->duplicate_internal(this,recursive,use_count);
@@ -896,7 +875,7 @@ class FlowNodeThreeCase : public FlowNode  {
     }
     FLOW_NODE_DEFINE(FlowNodeThreeCase,find_three);
 
-    FlowNodePtr* find_three(FlowNodeData data) {
+    FlowNodePtr* find_three(FlowNodeData data, bool&) {
         if (data.data_64 == childA.data().data_64)
             return &childA;
         else if (data.data_64 == childB.data().data_64)

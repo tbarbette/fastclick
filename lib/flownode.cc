@@ -25,7 +25,7 @@
  *********************************/
 
 FlowNode* FlowNode::start_growing(bool impl) {
-            click_chatter("Table starting to grow (was level %s, node %s, num %d, max %d, impl %d)",level()->print().c_str(),name().c_str(), num, max_size(), impl);
+            click_chatter("Table starting to grow (was level %s, node %s, num %d, impl %d)",level()->print().c_str(),name().c_str(), num, impl);
             set_growing(true);
             FlowNode* newNode = level()->create_node(this, true, impl);
             if (newNode == 0) {
@@ -566,7 +566,7 @@ FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count) {
 }
 
 template<int capacity_n>
-FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
+FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data, bool &need_grow) {
         flow_assert(getNum() <= max_highwater());
         int i = 0;
 
@@ -627,6 +627,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
                 if (i == capacity()) {
                     flow_assert(insert_idx != UINT_MAX);
                     click_chatter("Fully fulled hash table ! GROW NOW !");
+                    need_grow = true;
                     break;
                 }
             }
@@ -641,23 +642,12 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data) {
         click_chatter("Final Idx is %d, table v = %p, num %d, capacity %d",idx,childs[idx].ptr,getNum(),capacity());
 #endif
 
-        if (i > collision_threshold()) {
+        if (i > collision_threshold() || num > max_highwater() ) {
             if (!growing()) {
                 click_chatter("%d collisions! Hint for a better hash table size at level %s (current capacity is %d, size is %d, data is %lu)!",i,level()->print().c_str(),capacity(),getNum(),data.data_32);
                 click_chatter("%d released in collision !",ri);
                 //If the found node was free, we can start growing
-                if (IS_FREE_PTR(childs[idx].ptr, this)
-#if FLOW_KEEP_STRUCTURE
-                        || (childs[idx].is_node() && childs[idx].node->released())
-#endif
-                        ) {
-                    FlowNode* n = this->start_growing(true);
-                    if (n == 0) {
-                        click_chatter("ERROR : CANNOT GROW, I'M ALREADY TOO FAT");
-                        return &childs[idx];
-                    }
-                    return n->find(data);
-                }
+                need_grow = true;
             }
         }
 

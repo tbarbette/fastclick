@@ -108,11 +108,12 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
 #endif
     bool dynamic = false;
     do {
+        bool need_grow = false;
         FlowNodeData data = parent->level()->get_data(p);
 #if DEBUG_CLASSIFIER_MATCH > 1
         click_chatter("[%d] Data level %d is %016llX",click_current_cpu_id(), level_nr++,data.data_64);
 #endif
-        child_ptr = parent->find(data);
+        child_ptr = parent->find(data,need_grow);
 #if DEBUG_CLASSIFIER_MATCH > 1
         click_chatter("->Ptr is %p, is_leaf : %d",child_ptr->ptr, child_ptr->is_leaf());
 #endif
@@ -143,22 +144,23 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
                         flow_assert(parent->default_ptr()->node->parent() == parent);
                         parent = parent->default_ptr()->node;
                         continue;
-                    } else if (unlikely(parent->num > parent->max_size())) { //Parent is not growing, but we should start growing
+                   } else { //Parent is not growing
+                        if (need_grow) {
 #if HAVE_STATIC_CLASSIFICATION
-                        click_chatter("MAX CAPACITY ACHIEVED, DROPPING");
-                        return 0;
-#else
-                        parent = parent->start_growing(false);
-                        if (!parent) {
-                            click_chatter("Could not grow !? Dropping flow !");
-                            //TODO : release some children
+                            click_chatter("MAX CAPACITY ACHIEVED, DROPPING");
                             return 0;
-                        }
-                        flow_assert(_root->find_node(parent));
-                        continue;
-
+#else
+                            parent = parent->start_growing(false);
+                            if (!parent) {
+                                click_chatter("Could not grow !? Dropping flow !");
+                                //TODO : release some children
+                                return 0;
+                            }
+                            flow_assert(_root->find_node(parent));
+                            continue;
 #endif
-                    } else { //Parent is not growing, and we don't need to start growing (likely)
+                        }
+
 #if DEBUG_CLASSIFIER_CHECK
                         if(parent->getNum() != parent->findGetNum()) {
                             click_chatter("%d %d",parent->getNum(), parent->findGetNum());

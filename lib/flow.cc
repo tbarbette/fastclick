@@ -119,7 +119,8 @@ FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress ds
     node->_parent = 0;
     FlowControlBlock* fcb = FCBPool::init_allocate();
     FlowNodeData ip = FlowNodeData(dst.addr());
-    FlowNodePtr* parent_ptr = node->find(ip);
+    bool need_grow;
+    FlowNodePtr* parent_ptr = node->find(ip,need_grow);
     parent_ptr->set_leaf(fcb);
     parent_ptr->set_data(ip);
     parent_ptr->leaf->parent = node;
@@ -290,7 +291,8 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                 } else {
                     //click_chatter("Value %d to output %d",valuev, output);
                     lastvalue = (FlowNodeData){.data_64 = valuev};
-                    parent_ptr = node->find(lastvalue);
+                    bool need_grow;
+                    parent_ptr = node->find(lastvalue, need_grow);
                 }
 
                 ++it;
@@ -567,7 +569,8 @@ void FlowNode::__combine_child(FlowNode* other, bool priority) {
 			click_chatter("COMBINE-CHILD : taking child %lu",other_child_ptr->data().data_64);
 #endif
 
-            FlowNodePtr* child_ptr = find(other_child_ptr->data());
+            bool need_grow;
+            FlowNodePtr* child_ptr = find(other_child_ptr->data(),need_grow);
             if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us
                 *child_ptr = *other_child_ptr;
                 child_ptr->set_parent(this);
@@ -657,8 +660,8 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
         FlowNodePtr* other_child_ptr;
         while ((other_child_ptr = other_childs.next()) != 0) { //For each child of the other node
             debug_flow("COMBINE-ELSE : taking child %lu",other_child_ptr->data().data_64);
-
-            FlowNodePtr* child_ptr = find(other_child_ptr->data());
+            bool need_grow;
+            FlowNodePtr* child_ptr = find(other_child_ptr->data(),need_grow);
             if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us, merging it with a dup of our default
                 if (_default.ptr) {
                     debug_flow("Our child is empty, duplicating default (is_leaf : %d)",_default.is_leaf());
@@ -886,7 +889,8 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
             if (inverted) {
                 if (olevel->equals(this->level())) { //Same level
                     //Remove data from level if it exists
-                    FlowNodePtr* ptr_child = find(data);
+                    bool need_grow;
+                    FlowNodePtr* ptr_child = find(data,need_grow);
                     FlowNodePtr child = *ptr_child;
                     ptr_child->ptr = 0;
                     dec_num();
@@ -1129,7 +1133,8 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 	         newNode->_level = fa->default_ptr()->node->level();
 	         *newNode->default_ptr() = *fa->default_ptr()->node->default_ptr();
 	         FlowNodeData data = FlowNodeData((uint32_t)i);
-	         FlowNodePtr* child_ptr = fa->find(data);
+             bool need_grow;
+	         FlowNodePtr* child_ptr = fa->find(data,need_grow);
 	         child_ptr->set_node(newNode);
              child_ptr->set_data(data);
              child_ptr->set_parent(fa);

@@ -266,7 +266,8 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
                     parent->release_child(FlowNodePtr(child), data); //A->release(B)
                 }
 
-                parent->find(data)->set_node(subchild);
+                bool need_grow;
+                parent->find(data,need_grow)->set_node(subchild);
                 subchild->set_parent(parent);
                 subchild->node_data = data;
                 parent->inc_num();
