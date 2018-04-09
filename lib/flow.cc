@@ -265,7 +265,6 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                 }
 
                 node->_level = f;
-                //node->_child_deletable = f->is_deletable();
                 node->_parent = parent;
                 if (important == "!") {
                     //click_chatter("Important !");
@@ -304,7 +303,6 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
             FlowLevel*  f = new FlowLevelDummy();
             FlowNodeDefinition* fl = new FlowNodeDefinition();
             fl->_level = f;
-            //fl->_child_deletable = f->is_deletable();
             fl->_parent = root;
             root = fl;
             parent = root;
@@ -889,9 +887,6 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
                 if (olevel->equals(this->level())) { //Same level
                     //Remove data from level if it exists
                     FlowNodePtr* ptr_child = find(data);
-#if FLOW_KEEP_STRUCTURE
-                    assert(this->child_deletable());
-#endif
                     FlowNodePtr child = *ptr_child;
                     ptr_child->ptr = 0;
                     dec_num();
@@ -906,7 +901,6 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
             if (inverted) {
                 //Remove data from level if it exists
                 FlowNodePtr* ptr = find(data);
-                assert(this->child_deletable());
                 FlowNodePtr child = *ptr;
                 ptr->ptr = 0;
                 dec_num();
@@ -1125,10 +1119,21 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 	if (level()->is_dynamic() && !mt_safe) {
 	    FlowLevel* thread = new FlowLevelThread(click_max_cpu_ids());
 	    FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
+
         fa->initialize(thread->get_max_value());
         fa->_level = thread;
         fa->_parent = parent();
 	    fa->set_default(this->optimize(true));
+	    for (int i = 0; i < click_max_cpu_ids(); i++) {
+	         FlowNode* newNode = thread->create_node(fa->default_ptr()->node, false, false);
+	         newNode->_level = fa->default_ptr()->node->level();
+	         *newNode->default_ptr() = *fa->default_ptr()->node->default_ptr();
+	         FlowNodeData data = FlowNodeData((uint32_t)i);
+	         FlowNodePtr* child_ptr = fa->find(data);
+	         child_ptr->set_node(newNode);
+             child_ptr->set_data(data);
+             child_ptr->set_parent(fa);
+	    }
 	    return fa;
 	}
 

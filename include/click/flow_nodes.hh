@@ -29,7 +29,6 @@ protected:
     };
     FlowNodePtr _default;
 
-    //bool _child_deletable;
 #if FLOW_KEEP_STRUCTURE
     bool _released;
 #endif
@@ -134,7 +133,6 @@ public:
 
 
     FlowNode() :  num(0),_level(0),_default(),_parent(0), _growing(false), node_data()
-//            _child_deletable(true),
 #if FLOW_KEEP_STRUCTURE
             ,_released(false)
 #endif
@@ -220,10 +218,6 @@ public:
 #endif
     };
 
-    inline bool child_deletable() const {
-        //return _child_deletable;
-        return true;
-    }
 #endif
 
     inline FlowNodePtr* find(FlowNodeData data) {
@@ -474,22 +468,11 @@ public:
         return &childs[data.data_32];
     }
 
-
     String name() const {
         return "ARRAY";
     }
-    /*
-	void _remove(FlowNode* child) {
-		delete childs[child->data];
-		childs[child->data] = NULL;
-		num--;
-	}*/
 
     void release_child(FlowNodePtr child, FlowNodeData data) {
-#if FLOW_KEEP_STRUCTURE
-        if (child_deletable())
-#endif
-        {
             if (child.is_leaf()) {
                 childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
             } else {
@@ -506,7 +489,6 @@ public:
                 }
             }
             num--;
-        }
     }
 
     ~FlowNodeArray();

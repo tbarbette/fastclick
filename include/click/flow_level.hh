@@ -251,7 +251,6 @@ class FlowLevelThread  : public FlowLevel {
 public:
     FlowLevelThread(int nthreads) : _numthreads(nthreads) {
         _get_data = &get_data_ptr;
-        _dynamic = true;
     }
     FLOW_LEVEL_DEFINE(FlowLevelThread,get_data_thread);
 
@@ -261,7 +260,7 @@ public:
     }
 
     inline FlowNodeData get_data_thread(Packet*) {
-        return (FlowNodeData){.data_8 = (uint8_t)click_current_cpu_id()};
+        return FlowNodeData((uint32_t)click_current_cpu_id());
     }
 
     String print() {

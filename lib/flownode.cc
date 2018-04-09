@@ -448,7 +448,6 @@ FlowNodeDefinition::create_final(bool mt_safe) {
         }
     }
     fl->_level = _level;
-    //fl->_child_deletable = _level->is_deletable();
     fl->_parent = parent();
 
     NodeIterator it = iterator();
