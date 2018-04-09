@@ -350,7 +350,7 @@ EtherAddress DPDKDevice::get_mac() {
  * If v[id] is already true, this function return false. True if it is a
  *   new slot or if the existing slot was false.
  */
-bool set_slot(Vector<bool> &v, int &id) {
+bool set_slot(Vector<bool> &v, unsigned &id) {
     if (id <= 0) {
         int i;
         for (i = 0; i < v.size(); i ++) {
@@ -370,7 +370,7 @@ bool set_slot(Vector<bool> &v, int &id) {
 }
 
 int DPDKDevice::add_queue(DPDKDevice::Dir dir,
-                           int &queue_id, bool promisc, unsigned n_desc,
+                           unsigned &queue_id, bool promisc, unsigned n_desc,
                            ErrorHandler *errh)
 {
     if (_is_initialized) {
@@ -391,7 +391,7 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
                         "for device %u", port_id);
             info.n_rx_descs = n_desc;
         }
-        if (!set_slot(info.rx_queues,queue_id))
+        if (!set_slot(info.rx_queues, queue_id))
             return errh->error(
                         "Some elements are assigned to the same RX queue "
                         "for device %u", port_id);
@@ -412,13 +412,13 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
     return 0;
 }
 
-int DPDKDevice::add_rx_queue(int &queue_id, bool promisc,
+int DPDKDevice::add_rx_queue(unsigned &queue_id, bool promisc,
                               unsigned n_desc, ErrorHandler *errh)
 {
     return add_queue(DPDKDevice::RX, queue_id, promisc, n_desc, errh);
 }
 
-int DPDKDevice::add_tx_queue(int &queue_id, unsigned n_desc,
+int DPDKDevice::add_tx_queue(unsigned &queue_id, unsigned n_desc,
                               ErrorHandler *errh)
 {
     return add_queue(DPDKDevice::TX, queue_id, false, n_desc, errh);
@@ -508,7 +508,10 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
            else if (*s >= 'A' && *s <= 'F')
              digit = *s - 'A' + 10;
            else {
-             if (((*s == ':' && d < 2) || (*s == '.' && d == 2)) && (p == 1 || (d < 3 && p == 2) || (d == 0 && (p == 3 || p == 4))) && d < 3) {
+             if (((*s == ':' && d < 2) ||
+                (*s == '.' && d == 2)) &&
+                (p == 1 || (d < 3 && p == 2) || (d == 0 && (p == 3 || p == 4)))
+                && d < 3) {
                p = 0;
                ++d;
                continue;
@@ -516,7 +519,8 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
                break;
            }
 
-           if ((d == 0 && p == 4) || (d > 0 && p == 2) || (d == 3 && p == 1) || d == 4)
+           if ((d == 0 && p == 4) || (d > 0 && p == 2)||
+                (d == 3 && p == 1) || d == 4)
                break;
 
            data[d] = (p ? data[d] << 4 : 0) + digit;
@@ -528,11 +532,14 @@ DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &c
             return false;
         }
 
-        port_id = DPDKDevice::get_port_from_pci(data[0],data[1],data[2],data[3]);
+        port_id = DPDKDevice::get_port_from_pci(
+            data[0], data[1], data[2], data[3]
+        );
     }
 
-    if (port_id >= 0 && port_id < rte_eth_dev_count())
+    if (port_id >= 0 && port_id < rte_eth_dev_count()) {
         result = DPDKDevice::get_device(port_id);
+    }
     else {
         ctx.error("Cannot resolve PCI address to DPDK device");
         return false;
@@ -611,7 +618,11 @@ DPDKRing::parse(Args* args) {
 }
 
 #if HAVE_DPDK_PACKET_POOL
-int DPDKDevice::NB_MBUF = 32*4096*2; //Must be able to fill the packet data pool, and then have some packets for IO
+/**
+ * Must be able to fill the packet data pool,
+ * and then have some packets for I/O.
+ */
+int DPDKDevice::NB_MBUF = 32*4096*2;
 #else
 int DPDKDevice::NB_MBUF = 65536;
 #endif

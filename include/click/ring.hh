@@ -72,7 +72,7 @@ CLICK_DECLS
 template <typename T> class DynamicRing {
 
 protected:
-uint32_t _size;
+    uint32_t _size;
 
 	inline uint32_t next_i(uint32_t i) {
 		if (i == _size -1)
@@ -139,7 +139,11 @@ public:
     uint32_t head;
     uint32_t tail;
 
-    void initialize(int size) {
+    inline bool initialized() {
+        return _size > 0;
+    }
+
+    inline void initialize(int size) {
         _size = size;
         ring = new T[size];
     }

@@ -52,6 +52,36 @@ PaintSwitch::push(int, Packet *p)
     }
 }
 
+#if HAVE_BATCH
+void
+PaintSwitch::push_batch(int, PacketBatch *batch) {
+    auto fnt = [this](Packet* p){
+        int output_port = static_cast<int>(p->anno_u8(_anno));
+        if (output_port != 0xFF) {
+            if (output_port < noutputs())
+                return output_port;
+            else
+                return noutputs();
+        } else {
+            for (int i = 0; i < noutputs() - 1; i++) {
+                if (Packet *q = p->clone()) {
+                    output(i).push_batch(PacketBatch::make_from_packet(q));
+                }
+            }
+            return noutputs() - 1;
+        }
+    };
+    auto on_finish = [this](int port, PacketBatch* batch) {
+        if (likely(port < noutputs())) {
+            output(port).push_batch(batch);
+        } else {
+            batch->fast_kill();
+        }
+    };
+    CLASSIFY_EACH_PACKET((noutputs() + 1), fnt, batch, on_finish);
+}
+#endif
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(PaintSwitch)
 ELEMENT_MT_SAFE(PaintSwitch)

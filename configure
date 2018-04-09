@@ -7427,6 +7427,7 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_json" = x \) && enable_json=yes
 if test "x$enable_json" = xyes; then
     :
+    $as_echo "#define HAVE_JSON 1" >>confdefs.h
 
 fi
 # Check whether --enable-local was given.

@@ -71,7 +71,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (int i = 0; i < n_queues; i++) {
+    for (unsigned i = 0; i < n_queues; i++) {
         ret = _dev->add_tx_queue(i, ndesc , errh);
         if (ret != 0) return ret;    }
 
@@ -98,7 +98,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (unsigned i = 0; i < _iqueues.weight();i++) {
+    for (unsigned i = 0; i < _iqueues.weight(); i++) {
         _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
         _iqueues.get_value(i).timeout.assign(this);
         _iqueues.get_value(i).timeout.initialize(this);
@@ -111,7 +111,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     get_passing_threads();
 
     if (all_initialized()) {
-        int ret =DPDKDevice::initialize(errh);
+        int ret = DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
     }
     return 0;
@@ -120,9 +120,31 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 void ToDPDKDevice::cleanup(CleanupStage)
 {
     cleanup_tasks();
-    for (unsigned i = 0; i < _iqueues.weight();i++) {
-            delete[] _iqueues.get_value(i).pkts;
+    for (unsigned i = 0; i < _iqueues.weight(); i++) {
+        delete[] _iqueues.get_value(i).pkts;
     }
+}
+
+String ToDPDKDevice::statistics_handler(Element *e, void * thunk)
+{
+    ToDPDKDevice *td = static_cast<ToDPDKDevice *>(e);
+    struct rte_eth_stats stats;
+    if (!td->_dev)
+        return "0";
+
+    if (rte_eth_stats_get(td->_dev->port_id, &stats))
+        return String::make_empty();
+
+    switch((uintptr_t) thunk) {
+        case h_opackets:
+            return String(stats.opackets);
+        case h_obytes:
+            return String(stats.obytes);
+        case h_oerrors:
+            return String(stats.oerrors);
+    }
+
+    return 0;
 }
 
 void ToDPDKDevice::add_handlers()
@@ -130,6 +152,10 @@ void ToDPDKDevice::add_handlers()
     add_read_handler("count", count_handler, 0);
     add_read_handler("dropped", dropped_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
+
+    add_read_handler("hw_count",statistics_handler, h_opackets);
+    add_read_handler("hw_bytes",statistics_handler, h_obytes);
+    add_read_handler("hw_errors",statistics_handler, h_oerrors);
 }
 
 inline void ToDPDKDevice::set_flush_timer(TXInternalQueue &iqueue) {

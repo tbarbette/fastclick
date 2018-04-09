@@ -1,6 +1,6 @@
 #ifndef CLICK_PAINTSWITCH_HH
 #define CLICK_PAINTSWITCH_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -28,7 +28,7 @@ specify any one-byte annotation.
 =a StaticSwitch, PullSwitch, RoundRobinSwitch, StrideSwitch, HashSwitch,
 RandomSwitch, Paint, PaintTee */
 
-class PaintSwitch : public Element { public:
+class PaintSwitch : public BatchElement { public:
 
     PaintSwitch() CLICK_COLD;
 
@@ -39,6 +39,9 @@ class PaintSwitch : public Element { public:
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
     void push(int, Packet *);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
 
   private:
 

@@ -1,7 +1,11 @@
 #ifndef CLICK_DPDKDEVICE_HH
 #define CLICK_DPDKDEVICE_HH
 
-//Prevent bug under some configurations (like travis-ci's one) where these macros get undefined
+/**
+ * Prevent bug under some configurations
+ * (like travis-ci's one) where these
+ * macros get undefined.
+ */
 #ifndef UINT8_MAX
 #define UINT8_MAX 255
 #endif
@@ -19,7 +23,7 @@
 #include <rte_version.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
-#include <rte_bus_pci.h>
+    #include <rte_bus_pci.h>
 #endif
 
 #include <click/packet.hh>
@@ -48,10 +52,10 @@ public:
     DPDKDevice();
     DPDKDevice(unsigned port_id);
 
-    int add_rx_queue(int &queue_id, bool promisc,
+    int add_rx_queue(unsigned &queue_id, bool promisc,
                              unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
-    int add_tx_queue(int &queue_id, unsigned n_desc,
+    int add_tx_queue(unsigned &queue_id, unsigned n_desc,
                              ErrorHandler *errh) CLICK_COLD;
 
     EtherAddress get_mac();
@@ -164,7 +168,7 @@ private:
     static bool no_more_buffer_msg_printed;
 
     int initialize_device(ErrorHandler *errh) CLICK_COLD;
-    int add_queue(Dir dir, int &queue_id, bool promisc,
+    int add_queue(Dir dir, unsigned &queue_id, bool promisc,
                    unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
     static bool alloc_pktmbufs() CLICK_COLD;

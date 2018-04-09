@@ -23,6 +23,7 @@
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
 #include <click/etheraddress.hh>
+#include <click/straccum.hh>
 
 #include "fromdpdkdevice.hh"
 
@@ -104,7 +105,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     ret = initialize_rx(errh);
     if (ret != 0) return ret;
 
-    for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+    for (unsigned i = firstqueue; i <= lastqueue; i++) {
         ret = _dev->add_rx_queue(i , _promisc, ndesc, errh);
         if (ret != 0) return ret;
     }
@@ -113,7 +114,12 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     if (queue_share > 1)
-        return errh->error("Sharing queue between multiple threads is not yet supported by FromDPDKDevice. Raise the number using N_QUEUES of queues or limit the number of threads using MAXTHREADS");
+        return errh->error(
+            "Sharing queue between multiple threads is not "
+            "yet supported by FromDPDKDevice. "
+            "Raise the number using N_QUEUES of queues or "
+            "limit the number of threads using MAXTHREADS"
+        );
 
     if (all_initialized()) {
         ret = DPDKDevice::initialize(errh);
@@ -128,15 +134,16 @@ void FromDPDKDevice::cleanup(CleanupStage)
 	cleanup_tasks();
 }
 
-bool FromDPDKDevice::run_task(Task * t)
+bool FromDPDKDevice::run_task(Task *t)
 {
     struct rte_mbuf *pkts[_burst];
     int ret = 0;
 
-    for (int iqueue = queue_for_thisthread_begin(); iqueue<=queue_for_thisthread_end();iqueue++) {
+    for (int iqueue = queue_for_thisthread_begin();
+            iqueue<=queue_for_thisthread_end(); iqueue++) {
 #if HAVE_BATCH
-	 PacketBatch* head = 0;
-     WritablePacket *last;
+         PacketBatch* head = 0;
+         WritablePacket *last;
 #endif
         unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
         for (unsigned i = 0; i < n; ++i) {
@@ -173,7 +180,7 @@ bool FromDPDKDevice::run_task(Task * t)
                 last->set_next(p);
             last = p;
 #else
-             output(0).push(p);
+            output(0).push(p);
 #endif
         }
 #if HAVE_BATCH
@@ -203,18 +210,23 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
               if (!fd->_dev)
                   return "false";
               else
-                  return "true";
+                  return String(fd->_active);
+        case h_device:
+              if (!fd->_dev)
+                  return "undefined";
+              else
+                  return String((int) fd->_dev->port_id);
         case h_mac: {
             if (!fd->_dev)
                 return String::make_empty();
             struct ether_addr mac_addr;
             rte_eth_macaddr_get(fd->_dev->port_id, &mac_addr);
-            return EtherAddress((unsigned char*)&mac_addr).unparse();
+            return EtherAddress((unsigned char*)&mac_addr).unparse_colon();
+        }
         case h_vendor:
             return fd->_dev->get_device_vendor_name();
         case h_driver:
             return String(fd->_dev->get_device_driver());
-        }
     }
 
     return 0;
@@ -224,8 +236,9 @@ String FromDPDKDevice::status_handler(Element *e, void * thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     struct rte_eth_link link;
-    if (!fd->_dev)
+    if (!fd->_dev) {
         return "0";
+    }
 
     rte_eth_link_get_nowait(fd->_dev->port_id, &link);
 #ifndef ETH_LINK_UP
@@ -235,7 +248,8 @@ String FromDPDKDevice::status_handler(Element *e, void * thunk)
       case h_carrier:
           return (link.link_status == ETH_LINK_UP ? "1" : "0");
       case h_duplex:
-          return (link.link_status == ETH_LINK_UP ? (link.link_duplex == ETH_LINK_FULL_DUPLEX ? "1" : "0") : "-1");
+          return (link.link_status == ETH_LINK_UP ?
+            (link.link_duplex == ETH_LINK_FULL_DUPLEX ? "1" : "0") : "-1");
 #if RTE_VERSION >= RTE_VERSION_NUM(16,04,0,0)
       case h_autoneg:
           return String(link.link_autoneg);
@@ -246,12 +260,13 @@ String FromDPDKDevice::status_handler(Element *e, void * thunk)
     return 0;
 }
 
-String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
+String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
     struct rte_eth_stats stats;
-    if (!fd->_dev)
+    if (!fd->_dev) {
         return "0";
+    }
 
     if (rte_eth_stats_get(fd->_dev->port_id, &stats))
         return String::make_empty();
@@ -261,7 +276,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
             return String(stats.ipackets);
         case h_ibytes:
             return String(stats.ibytes);
-        case h_idropped:
+        case h_imissed:
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
@@ -270,9 +285,102 @@ String FromDPDKDevice::statistics_handler(Element *e, void * thunk)
     return 0;
 }
 
+
+int FromDPDKDevice::write_handler(
+        const String &input, Element *e, void *thunk, ErrorHandler *errh) {
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    if (!fd->_dev) {
+        return -1;
+    }
+
+    switch((uintptr_t) thunk) {
+        case h_add_mac: {
+            EtherAddress mac;
+            int pool = 0;
+            int ret;
+            if (!EtherAddressArg().parse(input, mac)) {
+                return errh->error("Invalid MAC address %s",input.c_str());
+            }
+
+            ret = rte_eth_dev_mac_addr_add(
+                fd->_dev->port_id,
+                reinterpret_cast<ether_addr*>(mac.data()), pool
+            );
+            if (ret != 0) {
+                return errh->error("Could not add mac address !");
+            }
+            return 0;
+        }
+        case h_active: {
+            bool active;
+            if (!BoolArg::parse(input,active))
+                return errh->error("Not a valid boolean");
+            if (fd->_active != active) {
+                fd->_active = active;
+                if (fd->_active) {
+                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
+                        fd->_tasks[i]->reschedule();
+                    }
+                } else {
+                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
+                        fd->_tasks[i]->unschedule();
+                    }
+                }
+            }
+            return 0;
+        }
+    }
+    return -1;
+}
+
+
+int FromDPDKDevice::xstats_handler(
+        int operation, String& input, Element* e,
+        const Handler *handler, ErrorHandler* errh) {
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    if (!fd->_dev)
+        return -1;
+
+        struct rte_eth_xstat_name* names;
+#if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
+        int len = rte_eth_xstats_get_names(fd->_dev->port_id, 0, 0);
+        names = static_cast<struct rte_eth_xstat_name*>(
+            malloc(sizeof(struct rte_eth_xstat_name) * len)
+        );
+        rte_eth_xstats_get_names(fd->_dev->port_id,names,len);
+        struct rte_eth_xstat* xstats;
+        xstats = static_cast<struct rte_eth_xstat*>(malloc(
+            sizeof(struct rte_eth_xstat) * len)
+        );
+        rte_eth_xstats_get(fd->_dev->port_id,xstats,len);
+        if (input == "") {
+            StringAccum acc;
+            for (int i = 0; i < len; i++) {
+                acc << names[i].name << "["<<
+                xstats[i].id << "] = " <<
+                xstats[i].value << "\n";
+            }
+
+            input = acc.take_string();
+        } else {
+            for (int i = 0; i < len; i++) {
+                if (strcmp(names[i].name,input.c_str()) == 0) {
+                    input = String(xstats[i].value);
+                    return 0;
+                }
+            }
+            return -1;
+        }
+#else
+        input = "unsupported with DPDK < 16.07";
+        return -1;
+#endif
+    return 0;
+}
+
 void FromDPDKDevice::add_handlers()
 {
-
+    add_read_handler("device",read_handler, h_device);
 
     add_read_handler("duplex",status_handler, h_duplex);
 #if RTE_VERSION >= RTE_VERSION_NUM(16,04,0,0)
@@ -280,16 +388,24 @@ void FromDPDKDevice::add_handlers()
 #endif
     add_read_handler("speed",status_handler, h_speed);
     add_read_handler("carrier",status_handler, h_carrier);
+    add_read_handler("type",status_handler, h_type);
+
+    set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler);
 
     add_read_handler("active", read_handler, h_active);
-    add_read_handler("count", count_handler, 0);
+    add_write_handler("active", write_handler, h_active);
+    add_read_handler("count", count_handler, h_count);
+    add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
+
     add_read_handler("mac",read_handler, h_mac);
     add_read_handler("vendor", read_handler, h_vendor);
     add_read_handler("driver", read_handler, h_driver);
+    add_write_handler("add_mac",write_handler, h_add_mac, 0);
+    add_write_handler("remove_mac",write_handler, h_remove_mac, 0);
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
-    add_read_handler("hw_dropped",statistics_handler, h_idropped);
+    add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
 
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);

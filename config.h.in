@@ -117,6 +117,9 @@
 /* Define if IPsec support is enabled. */
 #undef HAVE_IPSEC
 
+/* Define if Json support is enabled. */
+#undef HAVE_JSON
+
 /* Define to 1 if the system has the type `long long'. */
 #undef HAVE_LONG_LONG
 

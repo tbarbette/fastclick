@@ -47,6 +47,7 @@ protected:
 
     int _maxthreads;
     int firstqueue;
+    int lastqueue;
 
     // n_queues will be the final choice in [_minqueues, _maxqueues].
     int n_queues;
@@ -73,8 +74,9 @@ protected:
     };
     per_thread<ThreadState> thread_state;
 
-
     int _this_node; //Numa node index
+
+    bool _active;
 
     inline bool lock_attempt() {
         if (_locks[id_for_thread()] != NO_LOCK) {
@@ -102,48 +104,16 @@ protected:
             _locks[id_for_thread()] = (uint32_t)0;
     }
 
-    inline unsigned long long n_count() {
-        unsigned long long total = 0;
-        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-            total += thread_state.get_value(i)._count;
-        }
-        return total;
-    }
+    enum {h_count};
 
-    inline unsigned long long n_dropped() {
-        unsigned long long total = 0;
-        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-            total += thread_state.get_value(i)._dropped;
-        }
-        return total;
-    }
-
-    inline void reset_count() {
-        for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-            thread_state.get_value(i)._count = 0;
-            thread_state.get_value(i)._dropped = 0;
-        }
-    }
-
-    static String count_handler(Element *e, void *)
-    {
-        QueueDevice *tdd = static_cast<QueueDevice *>(e);
-        return String(tdd->n_count());
-    }
-
-    static String dropped_handler(Element *e, void *)
-        {
-            QueueDevice *tdd = static_cast<QueueDevice *>(e);
-            return String(tdd->n_dropped());
-        }
+    unsigned long long n_count();
+    unsigned long long n_dropped();
+    void reset_count();
+    static String count_handler(Element *e, void *user_data);
+    static String dropped_handler(Element *e, void *);
 
     static int reset_count_handler(const String &, Element *e, void *,
-                                    ErrorHandler *)
-    {
-        QueueDevice *tdd = static_cast<QueueDevice *>(e);
-        tdd->reset_count();
-        return 0;
-    }
+                                    ErrorHandler *);
 
     inline void add_count(unsigned int n) {
         thread_state->_count += n;
@@ -160,17 +130,21 @@ protected:
     bool get_spawning_threads(Bitvector& bmk, bool)
     {
     	if (noutputs()) { //RX
-            assert(thread_for_queue_available());
-            for (int i = 0; i < n_queues; i++) {
-                for (int j = 0; j < queue_share; j++) {
-                    bmk[thread_for_queue(i) - j] = 1;
+            if (_active) {
+                assert(thread_for_queue_available());
+                for (int i = 0; i < n_queues; i++) {
+                    for (int j = 0; j < queue_share; j++) {
+                        bmk[thread_for_queue(i) - j] = 1;
+                    }
                 }
             }
             return true;
     	} else { //TX
-    		if (input_is_pull(0)) {
-    			bmk[router()->home_thread_id(this)] = 1;
-    		}
+            if (_active) {
+                if (input_is_pull(0)) {
+                    bmk[router()->home_thread_id(this)] = 1;
+                }
+            }
     		return true;
     	}
     }
@@ -199,7 +173,11 @@ protected:
     }
 
     inline int queue_for_thread_end(int tid) {
-        return _thread_to_firstqueue[tid] + queue_per_threads - 1;
+        int q =  _thread_to_firstqueue[tid] + queue_per_threads - 1;
+        if (unlikely(q > lastqueue))
+            return lastqueue;
+        return q;
+
     }
 
     inline int queue_for_thisthread_begin() {
@@ -247,6 +225,7 @@ class RXQueueDevice : public QueueDevice {
 protected:
 	bool _promisc;
 	bool _set_rss_aggregate;
+	bool _set_paint_anno;
 	int _threadoffset;
 	bool _use_numa;
 
