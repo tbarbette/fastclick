@@ -543,6 +543,7 @@ inline void PacketBatch::kill() {
 #define BATCH_RECYCLE_END() {}
 #define BATCH_RECYCLE_PACKET(p) {p->kill();}
 #define BATCH_RECYCLE_PACKET_NONATOMIC(p) {p->kill_nonatomic();}
+#define BATCH_RECYCLE_UNKNOWN_PACKET(p) {p->kill();}
 #endif
 
 /**
