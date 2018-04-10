@@ -271,8 +271,8 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
                 subchild->set_parent(parent);
                 subchild->node_data = data;
                 parent->inc_num();
+                break; //No need to continue, parent now has a child
             }
-            break; //TODO : should we always break ?
         } else { //Child is not growing, we remove a normal child
             debug_flow_2("Non-growing");
             flow_assert(parent->getNum() == parent->findGetNum());

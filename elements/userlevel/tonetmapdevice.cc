@@ -316,7 +316,7 @@ do_send:
 	}
 }
 
-/*Timer for push mode. It will raise the IODONE flag when running to allow a new
+/*Timer for push (non-batch) mode. It will raise the IODONE flag when running to allow a new
  * full synchronization of the ring to be done.*/
 void
 ToNetmapDevice::run_timer(Timer *) {
