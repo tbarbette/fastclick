@@ -172,9 +172,9 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     bool run_task(Task *);
 
     inline Packet *get_packet(bool push=false);
-    Packet *pull(int);
+    Packet *pull(int) override;
 #if HAVE_BATCH
-    PacketBatch *pull_batch(int,int);
+    PacketBatch *pull_batch(int,unsigned) override;
 #endif
     void run_timer(Timer *timer);
 
@@ -216,7 +216,7 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     int _minor_version;
     IPFlowID _given_flowid;
 
-    int _burst;
+    unsigned _burst;
 
     int read_binary(String &, ErrorHandler *);
 

@@ -75,7 +75,7 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     uint8_t default_proto = IP_PROTO_TCP;
     _sampling_prob = (1 << SAMPLING_SHIFT);
     String default_contents, default_flowid, data;
-    int burst = 1;
+    unsigned burst = 1;
 
     if (Args(conf, this, errh)
         .read_p("FILENAME", FilenameArg(), _ff.filename())
@@ -755,12 +755,14 @@ FromIPSummaryDump::pull(int)
 }
 #if HAVE_BATCH
 PacketBatch *
-FromIPSummaryDump::pull_batch(int,int max)
+FromIPSummaryDump::pull_batch(int,unsigned max)
 {
     if (!_active)
     return 0;
-    PacketBatch* batch;
+    PacketBatch* batch = 0;
     MAKE_BATCH(get_packet(), batch, max);
+    if (!batch)
+        return 0;
     if (batch->count() == max) {
         _notifier.wake();
     }

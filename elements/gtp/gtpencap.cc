@@ -81,6 +81,7 @@ GTPEncap::simple_action_batch(PacketBatch* batch) {
 String GTPEncap::read_handler(Element *e, void *thunk)
 {
     GTPEncap *u = static_cast<GTPEncap *>(e);
+    (void)u; //TODO
     switch ((uintptr_t) thunk) {
       default:
 	return String();

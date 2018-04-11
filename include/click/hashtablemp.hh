@@ -361,7 +361,7 @@ class HashContainerMP { public:
     void release_pending(bool force=false) {
         ListItem* it;
         ListItem* next;
-        for (int i = 0; i < _pending_release.weight() ; i++) {
+        for (unsigned i = 0; i < _pending_release.weight() ; i++) {
             it = _pending_release.get_value(i);
             while (it) {
                 next = it->_hashnext;
@@ -396,14 +396,14 @@ void HashContainerMP<K,V,Item>::deinitialize()
 
 template <typename K, typename V, typename Item>
 HashContainerMP<K,V,Item>::HashContainerMP() :
-    _table(), _pending_release(0), _mt(true)
+  _mt(true), _table(), _pending_release(0)
 {
     initialize(initial_bucket_count);
 }
 
 template <typename K, typename V, typename Item>
 HashContainerMP<K,V,Item>::HashContainerMP(size_type nb) :
-    _table(), _pending_release(0)
+     _mt(true), _table(), _pending_release(0)
 {
     size_type b = 1;
     while (b < nb && b < max_bucket_count)
@@ -517,7 +517,6 @@ retry:\
             goto retry;\
         }\
         ListItem* e = allocate(ListItem(key,value));\
-        V* v = e->item.unprotected_ptr();\
         click_hashmp_assert(e->item.refcnt() == 0);\
         e->_hashnext = bucket.list->head;\
 \

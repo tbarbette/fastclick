@@ -230,7 +230,7 @@ CLICK_DECLS
         Packet* last = head;\
         if (head != NULL) {\
             unsigned int count = 1;\
-            while (count < (max>0?max:BATCH_MAX_PULL)) {\
+            while (count < (unsigned)(max>0?max:BATCH_MAX_PULL)) {\
                 Packet* current = fnt;\
                 if (current == NULL)\
                     break;\

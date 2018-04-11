@@ -397,6 +397,8 @@ String QueueDevice::count_handler(Element *e, void *user_data)
     switch (what) {
         case h_count:
             return String(tdd->n_count());
+        default:
+            return "<undefined>";
     }
 }
 

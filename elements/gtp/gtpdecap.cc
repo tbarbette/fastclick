@@ -35,8 +35,6 @@ GTPDecap::~GTPDecap()
 int
 GTPDecap::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    uint32_t eid;
-
     if (Args(conf, this, errh)
 	.complete() < 0)
 	return -1;

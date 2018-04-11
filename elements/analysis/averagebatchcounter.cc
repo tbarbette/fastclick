@@ -67,7 +67,7 @@ AverageBatchCounter::run_timer(Timer* t)
     total.count_packets += last_tick.count_packets;
     last_tick.count_batches = 0;
     last_tick.count_packets = 0;
-    for (int i = 0; i < _stats.weight(); i++) {
+    for (unsigned i = 0; i < _stats.weight(); i++) {
         last_tick.count_batches += _stats.get_value(i).count_batches;
         last_tick.count_packets += _stats.get_value(i).count_packets;
         _stats.get_value(i).count_batches = 0;

@@ -38,8 +38,6 @@ GTPTable::~GTPTable()
 int
 GTPTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    uint32_t eid;
-
     if (Args(conf, this, errh)
             .read_mp("PING_DST",_ping_dst)
 	.complete() < 0)
@@ -76,9 +74,8 @@ GTPTable::process(int port, Packet* p) {
 
                 uint32_t gen = click_random();
                 uint16_t icmp_id = gen + 3;
-                uint16_t icmp_seq = gen >> 16 + 3;
+                uint16_t icmp_seq = (gen >> 16) + 3;
 
-                //size_t hsz = sizeof(click_ip) + sizeof(click_icmp_echo);
                 size_t data_size = 60;
                 WritablePacket* q = Packet::make(sz + data_size);
                 if (q) {
@@ -151,6 +148,8 @@ GTPTable::process(int port, Packet* p) {
 
 
         }
+
+        (void)known; //TODO
 
         //Pull packet to inner header
         p->pull(sz);
