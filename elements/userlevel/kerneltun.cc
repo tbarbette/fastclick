@@ -72,6 +72,9 @@ KernelTun::KernelTun()
       _printed_write_err(false), _printed_read_err(false),
       _selected_calls(0), _packets(0)
 {
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 KernelTun::~KernelTun()
@@ -498,94 +501,134 @@ KernelTun::selected(int fd, int)
 	return;
     ++_selected_calls;
     unsigned n = _burst;
-    while (n > 0 && one_selected(now))
-	--n;
+#if HAVE_BATCH
+    BATCH_CREATE_INIT(batch);
+#endif
+    while (n > 0) {
+        WritablePacket* p = 0;
+        int o = one_selected(now, p);
+        if (likely(o == 0)) {
+#if HAVE_BATCH
+            BATCH_CREATE_APPEND(batch,p);
+#else
+            output(0).push(p);
+#endif
+        } else if (o == 2) {
+            break;
+        } else if (o == 1) {
+#if HAVE_BATCH
+            checked_output_push_batch(1, PacketBatch::make_from_packet(p));
+#else
+            checked_output_push(1, p);
+#endif
+        }
+        --n;
+    }
+#if HAVE_BATCH
+    BATCH_CREATE_FINISH(batch);
+    if (batch)
+        output(0).push_batch(batch);
+#endif
 }
 
 bool
-KernelTun::one_selected(const Timestamp &now)
+KernelTun::one_selected(const Timestamp &now, WritablePacket* &p)
 {
-    WritablePacket *p = Packet::make(_headroom, 0, _mtu_in, 0);
+    p = Packet::make(_headroom, 0, _mtu_in, 0);
     if (!p) {
-	click_chatter("out of memory!");
-	return false;
+        click_chatter("out of memory!");
+        return 2;
     }
 
     int cc = read(_fd, p->data(), _mtu_in);
     if (cc > 0) {
-	++_packets;
-	p->take(_mtu_in - cc);
-	bool ok = false;
+        ++_packets;
+        p->take(_mtu_in - cc);
+        bool ok = false;
 
-	if (_tap) {
-	    if (_type == LINUX_UNIVERSAL)
-		// 2-byte padding, 2-byte Ethernet type, then Ethernet header
-		p->pull(4);
-	    else if (_type == LINUX_ETHERTAP)
-		// 2-byte padding, then Ethernet header
-		p->pull(2);
-	    ok = true;
-	} else if (_type == LINUX_UNIVERSAL) {
-	    // 2-byte padding followed by an Ethernet type
-	    uint16_t etype = *(uint16_t *)(p->data() + 2);
-	    p->pull(4);
-	    if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6))
-		checked_output_push(1, p->clone());
-	    else
-		ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
-	} else if (_type == BSD_TUN) {
-	    // 4-byte address family followed by IP header
-	    int af = ntohl(*(unsigned *)p->data());
-	    p->pull(4);
-	    if (af != AF_INET && af != AF_INET6) {
-		click_chatter("KernelTun(%s): don't know AF %d", _dev_name.c_str(), af);
-		checked_output_push(1, p->clone());
-	    } else
-		ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
-	} else if (_type == OSX_TUN || _type == NETBSD_TUN) {
-	    ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
-	} else { /* _type == LINUX_ETHERTAP */
-	    // 2-byte padding followed by a mostly-useless Ethernet header
-	    uint16_t etype = *(uint16_t *)(p->data() + 14);
-	    p->pull(16);
-	    if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6))
-		checked_output_push(1, p->clone());
-	    else
-		ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
-	}
+        if (_tap) {
+            if (_type == LINUX_UNIVERSAL)
+            // 2-byte padding, 2-byte Ethernet type, then Ethernet header
+            p->pull(4);
+            else if (_type == LINUX_ETHERTAP)
+            // 2-byte padding, then Ethernet header
+            p->pull(2);
+            ok = true;
+        } else if (_type == LINUX_UNIVERSAL) {
+            // 2-byte padding followed by an Ethernet type
+            uint16_t etype = *(uint16_t *)(p->data() + 2);
+            p->pull(4);
+            if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6)) {
+#if HAVE_BATCH
+                checked_output_push(1, p->clone());
+#else
+                checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+#endif
+            } else
+                ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
+        } else if (_type == BSD_TUN) {
+            // 4-byte address family followed by IP header
+            int af = ntohl(*(unsigned *)p->data());
+            p->pull(4);
+            if (af != AF_INET && af != AF_INET6) {
+                click_chatter("KernelTun(%s): don't know AF %d", _dev_name.c_str(), af);
+#if HAVE_BATCH
+                checked_output_push(1, p->clone());
+#else
+                checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+#endif
+            } else
+                ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
+        } else if (_type == OSX_TUN || _type == NETBSD_TUN) {
+            ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
+        } else { /* _type == LINUX_ETHERTAP */
+            // 2-byte padding followed by a mostly-useless Ethernet header
+            uint16_t etype = *(uint16_t *)(p->data() + 14);
+            p->pull(16);
+            if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6))
+                return 1;
+            else
+                ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
+        }
 
-	if (ok) {
-	    p->set_timestamp_anno(now);
-	    output(0).push(p);
-	} else
-	    checked_output_push(1, p);
-	return true;
+        if (ok) {
+            p->set_timestamp_anno(now);
+            return 0;
+        } else {
+            return 1;
+        }
     } else {
-	p->kill();
-	if (errno != EAGAIN && errno != EWOULDBLOCK
-	    && (!_ignore_q_errs || !_printed_read_err || errno != ENOBUFS)) {
-	    _printed_read_err = true;
-	    perror("KernelTun read");
-	}
-	return false;
+        p->kill();
+        if (errno != EAGAIN && errno != EWOULDBLOCK
+	        && (!_ignore_q_errs || !_printed_read_err || errno != ENOBUFS)) {
+            _printed_read_err = true;
+	        perror("KernelTun read");
+       }
+       return 2;
     }
 }
 
 bool
 KernelTun::run_task(Task *)
 {
+#if HAVE_BATCH
+    PacketBatch *p = input(0).pull_batch(_burst);
+    if (p)
+        push_batch(0, p);
+#else
     Packet *p = input(0).pull();
     if (p)
-	push(0, p);
+	    push(0, p);
+#endif
     else if (!_signal)
 	return false;
+
     _task.fast_reschedule();
     return p != 0;
 }
 
 void
-KernelTun::push(int, Packet *p)
-{
+KernelTun::process(Packet* p) {
     const click_ip *iph = 0;
     int check_length;
 
@@ -672,6 +715,20 @@ KernelTun::push(int, Packet *p)
     } else
 	click_chatter("%s(%s): out of memory", class_name(), _dev_name.c_str());
 }
+
+void
+KernelTun::push(int, Packet *p)
+{
+    process(p);
+}
+
+#if HAVE_BATCH
+void
+KernelTun::push_batch(int, PacketBatch *batch) {
+    FOR_EACH_PACKET_SAFE(batch, p)
+        process(p);
+}
+#endif
 
 void
 KernelTun::add_handlers()
