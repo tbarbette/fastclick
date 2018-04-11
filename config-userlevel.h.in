@@ -8,6 +8,12 @@
 /* Define if accept() uses socklen_t. */
 #undef HAVE_ACCEPT_SOCKLEN_T
 
+/* Define if aligned_alloc is implemented */
+#undef HAVE_ALIGNED_ALLOC
+
+/* Define if the compiler supports aligned new (C++ 17) */
+#undef HAVE_ALIGNED_NEW
+
 /* Define if kqueue() may be used to wait for file descriptor events. */
 #undef HAVE_ALLOW_KQUEUE
 

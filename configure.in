@@ -52,6 +52,15 @@ AC_C_INLINE
 CLICK_PROG_CXX
 AC_PROG_CXXCPP
 
+AC_TRY_RUN([#include <new>
+
+int main() {
+    std::size_t sz = 8;
+    std::align_val_t al{64};
+    void* a = operator new(sz,al);
+    return (a == nullptr?1:0);
+}],AC_DEFINE([HAVE_ALIGNED_NEW]))
+
 CLICK_PROG_KERNEL_CC
 CLICK_PROG_KERNEL_CXX
 
@@ -706,7 +715,7 @@ dnl
 
 AC_LANG_C
 AC_REPLACE_FUNCS(strerror)
-AC_CHECK_FUNCS(random snprintf strnlen strtof strtold strtoul tcgetpgrp vsnprintf)
+AC_CHECK_FUNCS(random snprintf strnlen strtof strtold strtoul tcgetpgrp vsnprintf aligned_alloc)
 AC_LANG_CPLUSPLUS
 
 
