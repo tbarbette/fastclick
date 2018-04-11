@@ -53,6 +53,19 @@ GTPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+bool
+GTPLookup::run_task(Task* t) {
+	Packet* batch = _queue.get();
+	Packet* p = batch;
+	if (p == 0)
+		return false;
+	Packet* next;
+	do {
+		next = p->next();
+	} while ((p = next) != 0);
+    return true;
+}
+
 int
 GTPLookup::process(int port, Packet* p_in) {
     //click_jiffies_t now = click_jiffies();
@@ -73,8 +86,9 @@ GTPLookup::process(int port, Packet* p_in) {
         } else { //This is the GTP_IN, we must resolve and update
             auto gtp_out = _table->_gtpmap.find(*gtp_tunnel);
             if (!gtp_out) {
-                click_chatter("Mapping is still unknown ! Dropping packets. Choose a closer ping server...");
-                return -1;
+                click_chatter("Mapping is still unknown ! Queuing packets. Choose a closer ping server...");
+
+                return 2;
             }
             *gtp_tunnel = *gtp_out;
             gtp_tunnel->known = true;
@@ -143,7 +157,11 @@ void
 GTPLookup::push(int port, Packet *p)
 {
     int o = process(port,p);
-    checked_output_push(o, p);
+    if (o == 2) {
+	    p->set_next(_queue.get());
+	    _queue.set(p);
+    } else
+	    checked_output_push(o, p);
 }
 
 #if HAVE_BATCH
@@ -152,7 +170,14 @@ GTPLookup::push_batch(int port, PacketBatch* batch) {
     auto fnt = [this,port](Packet*p) {
         return process(port,p);
     };
-	CLASSIFY_EACH_PACKET(2,fnt,batch,checked_output_push_batch);
+	CLASSIFY_EACH_PACKET(3,fnt,batch,[this](int o, PacketBatch* batch){
+			if (o == 2) {
+			    batch->tail()->set_next(_queue.get());
+			    _queue.set(batch);
+			} else {
+				checked_output_push_batch(o,batch);
+			}
+	});
 	return;
 }
 #endif

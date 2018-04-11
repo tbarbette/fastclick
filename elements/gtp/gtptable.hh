@@ -80,9 +80,9 @@ class GTPTable : public BatchElement { public:
     bool can_live_reconfigure() const	{ return true; }
 
     int process(int, Packet*);
-    void push(int, Packet *);
+    void push(int, Packet *) override;
 #if HAVE_BATCH
-	void push_batch(int port, PacketBatch *);
+	void push_batch(int port, PacketBatch *) override;
 #endif
   private:
 
