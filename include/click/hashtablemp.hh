@@ -73,10 +73,10 @@ class HashContainerMP { public:
         ~iterator() {
             if (_h) {
                 if (_b < _h->_table->_nbuckets) {
-                    if (likely(_mt))
+                    if (likely(_h->_mt))
                         _h->_table->buckets[_b].list.read_end();
                 }
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table.read_end();
             }
         }
@@ -90,10 +90,10 @@ class HashContainerMP { public:
             }
             while (!_item) {
                 //click_chatter("Bucket %d : %p",_b,_h->_table->buckets[_b]);
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.read_end();
                 if (++_b == _h->_table->_nbuckets) return;
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.read_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
@@ -134,7 +134,7 @@ class HashContainerMP { public:
         //global read lock must be held!
         iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
             _b = 0;
-            if (likely(_mt))
+            if (likely(_h->_mt))
                 _h->_table->buckets[_b].list.read_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
@@ -153,10 +153,10 @@ class HashContainerMP { public:
         ~write_iterator() {
             if (_h) {
                 if (_b < _h->_table->_nbuckets) {
-                    if (likely(_mt))
+                    if (likely(_h->_mt))
                         _h->_table->buckets[_b].list.write_end();
                 }
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table.read_end();
             }
             _h = 0; //Prevent read destruction
@@ -170,10 +170,10 @@ class HashContainerMP { public:
                 _prev = _item;
             }
             while (!_item) {
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.write_end();
                 if (++_b == _h->_table->_nbuckets) return;
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.write_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
@@ -218,7 +218,7 @@ class HashContainerMP { public:
         //global read lock must be held!
         write_iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
             _b = 0;
-            if (likely(_mt))
+            if (likely(h->_mt))
                 _h->_table->buckets[_b].list.write_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
@@ -370,6 +370,8 @@ class HashContainerMP { public:
             }
         }
     }
+
+    friend class iterator;
 
 };
 
