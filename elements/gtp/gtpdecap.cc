@@ -1,9 +1,8 @@
 /*
- * gtpdecap.{cc,hh} -- element encapsulates packet in UDP/IP header
- * Benjie Chen, Eddie Kohler
+ * gtpdecap.{cc,hh}
+ * Tom Barbette
  *
- * Copyright (c) 1999-2000 Massachusetts Institute of Technology
- * Copyright (c) 2007 Regents of the University of California
+ * Copyright (c) 2018 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),

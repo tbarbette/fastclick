@@ -1,5 +1,5 @@
 /*
- * gtpencap.{cc,hh}
+ * gtpfilter.{cc,hh} -- GTP Filtering element
  * Tom Barbette
  *
  * Copyright (c) 2018 University of Liege
@@ -17,81 +17,67 @@
 
 #include <click/config.h>
 #include <clicknet/ip.h>
+#include <clicknet/udp.h>
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
-#include <click/standard/alignmentinfo.hh>
-#include "gtpencap.hh"
-
+#include "gtpfilter.hh"
 
 CLICK_DECLS
 
-GTPEncap::GTPEncap()
-    : _eid(0)
+GTPFilter::GTPFilter()
 {
 }
 
-GTPEncap::~GTPEncap()
+GTPFilter::~GTPFilter()
 {
 }
 
 int
-GTPEncap::configure(Vector<String> &conf, ErrorHandler *errh)
+GTPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    uint32_t eid;
-
     if (Args(conf, this, errh)
-	.read_mp("TEID", eid)
 	.complete() < 0)
 	return -1;
-
-    _eid = eid;
 
     return 0;
 }
 
 Packet *
-GTPEncap::simple_action(Packet *p_in)
+GTPFilter::simple_action(Packet *p_in)
 {
-  WritablePacket *p = p_in->push(sizeof(click_gtp));
-  click_gtp *gtp = reinterpret_cast<click_gtp *>(p->data());
-  gtp->gtp_v = 1;
-  gtp->gtp_pt = 1;
-  gtp->gtp_reserved = 0;
-  gtp->gtp_flags = 0;
-  gtp->gtp_msg_type = 0xff;
-  gtp->gtp_msg_len = htons(p->length() - sizeof(click_gtp));
-  if (_eid == 0) {
-      gtp->gtp_teid = htonl(AGGREGATE_ANNO(p));
-  } else {
-      gtp->gtp_teid = htonl(_eid);
-  }
+  Packet* p = p_in;
+  const click_ip *ip = reinterpret_cast<const click_ip *>(p->data());
+  const click_udp *udp = reinterpret_cast<const click_udp *>(p->data() + sizeof(click_ip));
+  const click_gtp *gtp = reinterpret_cast<const click_gtp *>(p->data() + sizeof(click_ip) + sizeof(click_udp));
+  //GTPTuple gtp_id(IP6Address(ip->ip_src), IPAddress(ip->ip_dst), ntohs(udp->uh_sport), ntohl(gtp->gtp_teid));
+
 
   return p;
 }
 
 #if HAVE_BATCH
 PacketBatch*
-GTPEncap::simple_action_batch(PacketBatch* batch) {
-	EXECUTE_FOR_EACH_PACKET(GTPEncap::simple_action,batch);
+GTPFilter::simple_action_batch(PacketBatch* batch) {
+	EXECUTE_FOR_EACH_PACKET(GTPFilter::simple_action,batch);
 	return batch;
 }
 #endif
 
-String GTPEncap::read_handler(Element *e, void *thunk)
+String GTPFilter::read_handler(Element *e, void *thunk)
 {
-    GTPEncap *u = static_cast<GTPEncap *>(e);
+    GTPFilter *u = static_cast<GTPFilter *>(e);
     switch ((uintptr_t) thunk) {
       default:
 	return String();
     }
 }
 
-void GTPEncap::add_handlers()
+void GTPFilter::add_handlers()
 {
 
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(GTPEncap)
-ELEMENT_MT_SAFE(GTPEncap)
+EXPORT_ELEMENT(GTPFilter)
+ELEMENT_MT_SAFE(GTPFilter)
