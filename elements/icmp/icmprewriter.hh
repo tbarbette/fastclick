@@ -1,6 +1,6 @@
 #ifndef CLICK_ICMPREWRITER_HH
 #define CLICK_ICMPREWRITER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <clicknet/udp.h>
 #include <clicknet/icmp.h>
 #include "elements/ip/iprewriterbase.hh"
@@ -58,7 +58,7 @@ ICMPPingRewriter, or other related classes.
 
 IPAddrRewriter, IPRewriter, ICMPPingRewriter, TCPRewriter */
 
-class ICMPRewriter : public Element { public:
+class ICMPRewriter : public BatchElement { public:
 
     ICMPRewriter() CLICK_COLD;
     ~ICMPRewriter() CLICK_COLD;
@@ -70,7 +70,9 @@ class ICMPRewriter : public Element { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     void push(int, Packet *);
-
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
   protected:
 
     struct MapEntry {
@@ -91,7 +93,7 @@ class ICMPRewriter : public Element { public:
     void rewrite_ping_packet(WritablePacket *, click_ip *, click_icmp_echo *,
 			     const IPFlowID &, IPRewriterEntry *);
 
-    int handle(WritablePacket *p);
+    int handle(Packet* &p);
 
 };
 
