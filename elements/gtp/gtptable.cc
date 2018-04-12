@@ -40,6 +40,7 @@ GTPTable::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
             .read_mp("PING_DST",_ping_dst)
+            .read("VERBOSE", _verbose)
 	.complete() < 0)
 	return -1;
 
