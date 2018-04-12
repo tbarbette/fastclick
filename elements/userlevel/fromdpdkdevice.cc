@@ -31,6 +31,7 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
+    _is_kni(false),
     _dev(0)
 {
 #if HAVE_BATCH
@@ -66,15 +67,26 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
 
-    if (!DPDKDeviceArg::parse(dev, _dev)) {
-        if (allow_nonexistent)
-            return 0;
-        else
-            return errh->error("%s: Unknown or invalid PORT", dev.c_str());
+    if (_is_kni) {
+        _dev = DPDKDevice::get_kni_device(dev);
+    } else {
+        if (!DPDKDeviceArg::parse(dev, _dev)) {
+            if (allow_nonexistent)
+                return 0;
+            else
+                return errh->error("%s: Unknown or invalid PORT", dev.c_str());
+        }
     }
 
     if (_use_numa) {
         numa_node = DPDKDevice::get_port_numa_node(_dev->port_id);
+    }
+
+    if (_is_kni) {
+        firstqueue = 0;
+        n_queues = 1;
+        configure_rx(numa_node,1,1,errh);
+        return 0;
     }
 
     int r;
@@ -117,9 +129,11 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     ret = initialize_rx(errh);
     if (ret != 0) return ret;
 
-    for (unsigned i = (unsigned)firstqueue; i <= (unsigned)lastqueue; i++) {
-        ret = _dev->add_rx_queue(i , _promisc, ndesc, errh);
-        if (ret != 0) return ret;
+    if (_is_kni) {
+        for (unsigned i = (unsigned)firstqueue; i <= (unsigned)lastqueue; i++) {
+            ret = _dev->add_rx_queue(i , _promisc, ndesc, errh);
+            if (ret != 0) return ret;
+        }
     }
 
     ret = initialize_tasks(_active,errh);
@@ -146,7 +160,7 @@ void FromDPDKDevice::cleanup(CleanupStage)
     cleanup_tasks();
 }
 
-bool FromDPDKDevice::run_task(Task *t)
+template<bool is_kni> inline bool FromDPDKDevice::_run_task(Task *t)
 {
     struct rte_mbuf *pkts[_burst];
     int ret = 0;
@@ -157,7 +171,12 @@ bool FromDPDKDevice::run_task(Task *t)
          PacketBatch* head = 0;
          WritablePacket *last;
 #endif
-        unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
+        unsigned n;
+        if (!is_kni) {
+            n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
+        } else {
+            n = rte_kni_rx_burst(_dev->kni, pkts, _burst);
+        }
         for (unsigned i = 0; i < n; ++i) {
             unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
             rte_prefetch0(data);
@@ -208,12 +227,21 @@ bool FromDPDKDevice::run_task(Task *t)
             add_count(n);
             ret = 1;
         }
+        if (is_kni) {
+            ret = rte_kni_handle_request(_dev->kni);
+            if (ret != 0)
+                click_chatter("handle request error");
+        }
     }
 
     /*We reschedule directly, as we cannot know if there is actually packet
      * available and dpdk has no select mechanism*/
     t->fast_reschedule();
     return (ret);
+}
+
+bool FromDPDKDevice::run_task(Task *t) {
+    return _run_task<false>(t);
 }
 
 String FromDPDKDevice::read_handler(Element *e, void * thunk)
@@ -432,7 +460,21 @@ void FromDPDKDevice::add_handlers()
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
 
+FromDPDKKNI::FromDPDKKNI() {
+    _is_kni = true;
+}
+
+FromDPDKKNI::~FromDPDKKNI() {
+
+}
+
+bool FromDPDKKNI::run_task(Task *t) {
+    return _run_task<true>(t);
+}
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
+EXPORT_ELEMENT(FromDPDKKNI)
+ELEMENT_MT_SAFE(FromDPDKKNI)
 EXPORT_ELEMENT(FromDPDKDevice)
 ELEMENT_MT_SAFE(FromDPDKDevice)

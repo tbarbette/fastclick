@@ -140,18 +140,29 @@ public:
         h_opackets,h_obytes,h_oerrors
     };
 
-    void run_timer(Timer *);
+    void run_timer(Timer *) override;
+
+    template<bool> inline void _push(int port, Packet *p);
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch *head);
+    template<bool> inline void _push_batch(int port, PacketBatch *head);
 #endif
-    void push(int port, Packet *p);
+
+protected:
+
+    bool _is_kni;
+
+    per_thread<DPDKDevice::TXInternalQueue> _iqueues;
+
+    template <bool is_kni> void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
+
+    void push(int port, Packet *p) override;
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *head) override;
+#endif
 
 private:
 
     inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
-    void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
-
-    per_thread<DPDKDevice::TXInternalQueue> _iqueues;
 
     DPDKDevice* _dev;
     int _timeout;
@@ -159,6 +170,20 @@ private:
     bool _vlan;
 
     friend class FromDPDKDevice;
+};
+
+class ToDPDKKNI : public ToDPDKDevice {
+public:
+
+    ToDPDKKNI() CLICK_COLD;
+    ~ToDPDKKNI() CLICK_COLD;
+
+
+    void run_timer(Timer *) override;
+    void push(int port, Packet *p) override;
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *head) override;
+#endif
 };
 
 CLICK_ENDDECLS

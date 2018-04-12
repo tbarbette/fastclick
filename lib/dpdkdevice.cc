@@ -221,6 +221,19 @@ static String keep_token_left(String str, char delimiter)
     return str.substring(0, str.find_left(delimiter));
 }
 
+DPDKDevice* DPDKDevice::get_kni_device(String kni_name) {
+    for (HashTable<portid_t, DPDKDevice>::iterator it = _devs.begin();
+         it != _devs.end(); ++it) {
+        if (it.value().kni_name == kni_name)
+            return &it.value();
+    }
+    unsigned port_id = (_n_kni ++) + (PORT_KNI_MASK + 1);
+    DPDKDevice* dev = &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
+    dev->kni_name = kni_name;
+    return dev;
+}
+
+
 int DPDKDevice::initialize_device(ErrorHandler *errh)
 {
     struct rte_eth_conf dev_conf;
@@ -825,5 +838,7 @@ HashTable<portid_t, DPDKDevice> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;
 unsigned DPDKDevice::_nr_pktmbuf_pools;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
+
+unsigned DPDKDevice::_n_kni = 0;
 
 CLICK_ENDDECLS

@@ -156,12 +156,18 @@ public:
     }
     bool can_live_reconfigure() const { return false; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void add_handlers() CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
-    bool run_task(Task *);
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
+    void cleanup(CleanupStage) override CLICK_COLD;
+    bool run_task(Task *) override;
     
+protected:
+
+    bool _is_kni;
+
+    template<bool> inline bool _run_task(Task *);
+
 private:
 
     static String read_handler(Element *, void *) CLICK_COLD;
@@ -182,6 +188,39 @@ private:
     };
 
     DPDKDevice* _dev;
+};
+
+
+/*
+=title FromDPDKKNI
+
+=c
+
+FromDPDKKNI(PORT)
+
+=s netdevices
+
+reads packets from network device using a DPDK KNI device
+
+=d
+
+Reads packets from the KNI device named PORT with DPDK
+
+KNI allows to efficiently exchange DPDK packets with the kernel. KNI
+module must be loaded.
+
+As of now, it is only single threaded. So N_QUEUES will be forced to 1, and
+QUEUES to 0.
+*/
+class FromDPDKKNI : public FromDPDKDevice {
+public:
+
+    FromDPDKKNI() CLICK_COLD;
+    ~FromDPDKKNI() CLICK_COLD;
+
+    const char *class_name() const { return "FromDPDKKNI"; }
+
+    bool run_task(Task *) override;
 };
 
 CLICK_ENDDECLS

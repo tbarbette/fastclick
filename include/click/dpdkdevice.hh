@@ -20,6 +20,7 @@
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
 #include <rte_pci.h>
+#include <rte_kni.h>
 #include <rte_version.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
@@ -62,8 +63,11 @@ extern bool dpdk_enabled;
 
 class DPDKDevice {
 public:
-
     portid_t port_id;
+
+    #define PORT_KNI_MASK 0xff
+    rte_kni* kni; //Set only if mode is KNI
+    String kni_name;
 
     DPDKDevice() CLICK_COLD;
     DPDKDevice(portid_t port_id) CLICK_COLD;
@@ -223,6 +227,7 @@ public:
             Timer timeout;
     } __attribute__((aligned(64)));
 
+    static DPDKDevice* get_kni_device(String kni_name);
 
 private:
 
@@ -234,6 +239,10 @@ private:
     static HashTable<portid_t, DPDKDevice> _devs;
     static unsigned _nr_pktmbuf_pools;
     static bool no_more_buffer_msg_printed;
+
+    static unsigned _n_kni;
+
+    static rte_kni* kni_alloc(uint8_t port_id, const char* kni_name);
 
     int initialize_device(ErrorHandler *errh) CLICK_COLD;
     int add_queue(Dir dir, unsigned &queue_id, bool promisc,

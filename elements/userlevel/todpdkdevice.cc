@@ -25,6 +25,7 @@
 CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
+    _is_kni(false),
     _iqueues(), _dev(0),
     _timeout(0), _congestion_warning_printed(false)
 {
@@ -50,11 +51,22 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES", maxqueues)
         .complete() < 0)
             return -1;
-    if (!DPDKDeviceArg::parse(dev, _dev)) {
-        if (allow_nonexistent)
-            return 0;
-        else
-            return errh->error("%s : Unknown or invalid PORT", dev.c_str());
+
+    if (_is_kni) {
+        _dev = DPDKDevice::get_kni_device(dev);
+    } else {
+        if (!DPDKDeviceArg::parse(dev, _dev)) {
+            if (allow_nonexistent)
+                return 0;
+            else
+                return errh->error("%s : Unknown or invalid PORT", dev.c_str());
+        }
+    }
+
+    if (_is_kni) {
+        firstqueue = 0;
+        n_queues = 1;
+        maxqueues = 1;
     }
 
     //TODO : If user put multiple ToDPDKDevice with the same port and without the QUEUE parameter, try to share the available queues among them
@@ -77,9 +89,12 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (unsigned i = 0; i < (unsigned)n_queues; i++) {
-        ret = _dev->add_tx_queue(i, ndesc , errh);
-        if (ret != 0) return ret;    }
+    if (!_is_kni) {
+        for (unsigned i = 0; i < (unsigned)n_queues; i++) {
+            ret = _dev->add_tx_queue(i, ndesc , errh);
+            if (ret != 0) return ret;
+        }
+    }
 
 #if HAVE_BATCH
     if (batch_mode() == BATCH_MODE_YES) {
@@ -184,12 +199,13 @@ inline void ToDPDKDevice::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue) {
 
 void ToDPDKDevice::run_timer(Timer *)
 {
-    flush_internal_tx_queue(_iqueues.get());
+    flush_internal_tx_queue<false>(_iqueues.get());
 }
 
 /* Flush as much as possible packets from a given internal queue to the DPDK
  * device. */
-void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) {
+template <bool is_kni> void
+ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) {
     unsigned sent = 0;
     unsigned r;
     /* sub_burst is the number of packets DPDK should send in one call if
@@ -209,8 +225,12 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
             // The sub_burst wraps around the ring
             sub_burst = _internal_tx_queue_size - iqueue.index;
         //Todo : if there is multiple queue assigned to this thread, send on all of them
-        r = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
-                             sub_burst);
+        if (is_kni) {
+            r = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
+                                  sub_burst);
+        } else {
+            r = rte_kni_tx_burst(_dev->kni, &iqueue.pkts[iqueue.index], sub_burst);
+        };
         iqueue.nr_pending -= r;
         iqueue.index += r;
 
@@ -224,7 +244,9 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
     add_count(sent);
 }
 
-void ToDPDKDevice::push(int, Packet *p)
+
+template <bool is_kni> inline void
+ToDPDKDevice::_push(int, Packet *p)
 {
     // Get the thread-local internal queue
     DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
@@ -256,7 +278,7 @@ void ToDPDKDevice::push(int, Packet *p)
         }
 
         if ((int)iqueue.nr_pending >= _burst || congestioned) {
-            flush_internal_tx_queue(iqueue);
+            flush_internal_tx_queue<is_kni>(iqueue);
         }
         set_flush_timer(iqueue); //We wait until burst for sending packets, so flushing timer is especially important here
 
@@ -271,6 +293,11 @@ void ToDPDKDevice::push(int, Packet *p)
 #endif
 }
 
+void
+ToDPDKDevice::push(int port, Packet *p) {
+    return _push<false>(port, p);
+}
+
 
 /**
  * push_batch seems more complex than in tonetmapdevice, but it's only because
@@ -280,7 +307,8 @@ void ToDPDKDevice::push(int, Packet *p)
  *  a ring.
  */
 #if HAVE_BATCH
-void ToDPDKDevice::push_batch(int, PacketBatch *head)
+template <bool is_kni> inline void
+ToDPDKDevice::_push_batch(int, PacketBatch *head)
 {
     // Get the thread-local internal queue
     DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
@@ -323,7 +351,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 
         //Flush the queue if we have pending packets
         if ((int)iqueue.nr_pending >= _burst || congestioned) {
-            flush_internal_tx_queue(iqueue);
+            flush_internal_tx_queue<is_kni>(iqueue);
         }
         set_flush_timer(iqueue);
 
@@ -343,11 +371,41 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 #if !CLICK_PACKET_USE_DPDK
     BATCH_RECYCLE_END();
 #endif
+}
+
+void
+ToDPDKDevice::push_batch(int port, PacketBatch *head) {
+    _push_batch<false>(port, head);
+}
+#endif //HAVE_BATCH
+
+ToDPDKKNI::ToDPDKKNI() {
+    _is_kni = true;
+}
+
+ToDPDKKNI::~ToDPDKKNI() {
 
 }
-#endif
+
+void
+ToDPDKKNI::run_timer(Timer *)
+{
+    flush_internal_tx_queue<true>(_iqueues.get());
+}
+
+void
+ToDPDKKNI::push(int port, Packet *p) {
+    return _push<true>(port, p);
+}
+
+void
+ToDPDKKNI::push_batch(int port, PacketBatch *head) {
+    _push_batch<false>(port, head);
+}
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk)
+EXPORT_ELEMENT(ToDPDKKNI)
+ELEMENT_MT_SAFE(ToDPDKKNI)
 EXPORT_ELEMENT(ToDPDKDevice)
 ELEMENT_MT_SAFE(ToDPDKDevice)
