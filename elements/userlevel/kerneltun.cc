@@ -496,9 +496,10 @@ KernelTun::cleanup(CleanupStage)
 void
 KernelTun::selected(int fd, int)
 {
-    Timestamp now = Timestamp::now();
     if (fd != _fd)
 	return;
+
+    Timestamp now = Timestamp::now();
     ++_selected_calls;
     unsigned n = _burst;
 #if HAVE_BATCH
@@ -531,7 +532,7 @@ KernelTun::selected(int fd, int)
 #endif
 }
 
-bool
+int
 KernelTun::one_selected(const Timestamp &now, WritablePacket* &p)
 {
     p = Packet::make(_headroom, 0, _mtu_in, 0);
@@ -560,9 +561,9 @@ KernelTun::one_selected(const Timestamp &now, WritablePacket* &p)
             p->pull(4);
             if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6)) {
 #if HAVE_BATCH
-                checked_output_push(1, p->clone());
-#else
                 checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+#else
+                checked_output_push(1, p->clone());
 #endif
             } else
                 ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
@@ -573,9 +574,9 @@ KernelTun::one_selected(const Timestamp &now, WritablePacket* &p)
             if (af != AF_INET && af != AF_INET6) {
                 click_chatter("KernelTun(%s): don't know AF %d", _dev_name.c_str(), af);
 #if HAVE_BATCH
-                checked_output_push(1, p->clone());
-#else
                 checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+#else
+                checked_output_push(1, p->clone());
 #endif
             } else
                 ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
@@ -586,7 +587,11 @@ KernelTun::one_selected(const Timestamp &now, WritablePacket* &p)
             uint16_t etype = *(uint16_t *)(p->data() + 14);
             p->pull(16);
             if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6))
-                return 1;
+#if HAVE_BATCH
+                checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
+#else
+                checked_output_push(1, p->clone());
+#endif
             else
                 ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
         }

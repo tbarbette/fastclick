@@ -168,7 +168,7 @@ class KernelTun : public BatchElement { public:
     int alloc_tun(ErrorHandler *);
     int setup_tun(ErrorHandler *);
     int updown(IPAddress, IPAddress, ErrorHandler *);
-    bool one_selected(const Timestamp &now, WritablePacket* &p);
+    int one_selected(const Timestamp &now, WritablePacket* &p);
     void process(Packet* p);
 
     friend class KernelTap;
