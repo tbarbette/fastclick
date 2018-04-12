@@ -113,6 +113,14 @@ class IP6Address { public:
 	    && data32()[2] == 0;
     }
 
+    /** @brief Return true iff the address has a Well Known prefix(WKP) (RFC 6052)
+     *
+     * An IPv6 address in the form of "64:ff9b::192.0.2.5" has a WKP
+     */
+    bool has_wellKnown_prefix() const {
+    	return data32()[0] == htonl(0x0064ff9b);
+    }
+
     /** @brief Return true iff the address is a IPv4-mapped address.
      *
      * An IPv4-mapped address has format "::FFFF:w:x:y:z", where the
