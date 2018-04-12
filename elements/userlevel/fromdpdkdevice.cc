@@ -50,12 +50,15 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int maxqueues = 128;
     String dev;
     EtherAddress mac;
+    uint16_t mtu = 0;
     bool has_mac = false;
+    bool has_mtu = false;
 
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
+        .read("MTU", mtu).read_status(has_mtu)
         .read("MAXQUEUES",maxqueues)
         .read("ACTIVE", _active)
         .complete() < 0)
@@ -90,7 +93,10 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (r != 0) return r;
 
     if (has_mac)
-        _dev->set_mac(mac);
+        _dev->set_init_mac(mac);
+
+    if (has_mtu)
+        _dev->set_init_mtu(mtu);
 
     return 0;
 }

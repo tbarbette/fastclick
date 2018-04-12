@@ -60,7 +60,8 @@ public:
 
     EtherAddress get_mac();
 
-    void set_mac(EtherAddress mac);
+    void set_init_mac(EtherAddress mac);
+    void set_init_mtu(uint16_t mtu);
 
     unsigned int get_nb_txdesc();
 
@@ -130,7 +131,7 @@ private:
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0), mac() {
+            n_tx_descs(0), init_mac(), init_mtu(0) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -141,7 +142,7 @@ private:
             click_chatter("   Device   ID: %d", device_id);
             click_chatter("   Driver Name: %s", driver);
             click_chatter("Promisc   Mode: %s", promisc? "true":"false");
-            click_chatter("   MAC Address: %s", mac.unparse().c_str());
+            click_chatter("   MAC Address: %s", init_mac.unparse().c_str());
             click_chatter("# of Rx Queues: %d", rx_queues.size());
             click_chatter("# of Tx Queues: %d", tx_queues.size());
             click_chatter("# of Rx  Descs: %d", n_rx_descs);
@@ -157,7 +158,8 @@ private:
         bool promisc;
         unsigned n_rx_descs;
         unsigned n_tx_descs;
-        EtherAddress mac;
+        EtherAddress init_mac;
+        uint16_t init_mtu;
     };
 
     struct DevInfo info;
