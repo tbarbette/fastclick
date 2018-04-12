@@ -42,6 +42,7 @@ class GTPLookup : public BatchElement { public:
 #endif
   private:
 	GTPTable *_table;
+    bool _checksum;
     atomic_uint32_t _id;
 
 

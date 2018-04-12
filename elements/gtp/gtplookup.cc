@@ -28,7 +28,7 @@
 
 CLICK_DECLS
 
-GTPLookup::GTPLookup()
+GTPLookup::GTPLookup() : _checksum(true)
 {
 }
 
@@ -42,6 +42,7 @@ GTPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
     Element* e;
     if (Args(conf, this, errh)
             .read_mp("TABLE",e)
+            .read("CHECKSUM", _checksum)
 	.complete() < 0)
 	return -1;
 
@@ -127,8 +128,12 @@ GTPLookup::process(int port, Packet* p_in) {
           uint16_t len = p->length() - sizeof(click_ip);
           udp->uh_ulen = htons(len);
           udp->uh_sum = 0;
-          unsigned csum = click_in_cksum((unsigned char *)udp, len);
-          udp->uh_sum = click_in_cksum_pseudohdr(csum, ip, len);
+          if (_checksum) {
+              unsigned csum = click_in_cksum((unsigned char *)udp, len);
+              udp->uh_sum = click_in_cksum_pseudohdr(csum, ip, len);
+          } else {
+              udp->uh_sum = 0;
+          }
           return 0;
     }
 }
