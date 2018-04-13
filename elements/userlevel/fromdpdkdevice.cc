@@ -60,7 +60,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
         .read("MAXQUEUES",maxqueues)
-        .read("ACTIVE", _active)
         .complete() < 0)
         return -1;
 
@@ -179,6 +178,9 @@ bool FromDPDKDevice::run_task(Task *t)
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
 #endif
+            if (_set_paint_anno) {
+                SET_PAINT_ANNO(p, iqueue);
+            }
 #if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);
@@ -286,9 +288,9 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
+        default:
+            return "<unknown>";
     }
-
-    return 0;
 }
 
 
@@ -413,8 +415,6 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
-
-    add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
