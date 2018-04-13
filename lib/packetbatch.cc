@@ -19,6 +19,7 @@
 #include <click/config.h>
 #include <click/packetbatch.hh>
 #include <click/netmapdevice.hh>
+#include <click/dpdkdevice.hh>
 
 CLICK_DECLS
 
