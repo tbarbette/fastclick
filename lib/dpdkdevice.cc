@@ -657,7 +657,7 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
         return errh->error("You must start Click with --dpdk option when compiling with --enable-dpdk-pool");
     }
 #endif
-    if (!alloc_pktmbufs()) {
+    if (alloc_pktmbufs()) {
         errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
         if (rte_errno == 12) {
             errh->error("Maybe try to allocate less buffers with DPDKInfo(X) or allocate more memory to DPDK by giving/increasing the -m parameter or allocate more hugepages.");
