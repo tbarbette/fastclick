@@ -83,7 +83,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
         .read("MAXQUEUES",maxqueues)
-        .read("ACTIVE", _active)
         .read("RX_INTR", _rx_intr)
         .complete() < 0)
         return -1;
@@ -459,9 +458,9 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
         case h_count_rules:
             return String(FlowDirector::flow_rules_count(fd->_dev->port_id));
     #endif
+        default:
+            return "<unknown>";
     }
-
-    return "<unknown>";
 }
 
 int FromDPDKDevice::write_handler(

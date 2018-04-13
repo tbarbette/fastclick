@@ -52,6 +52,7 @@ Args& QueueDevice::parse(Args &args) {
 		.read("MAXTHREADS", _maxthreads)
 		.read("BURST", _burst)
 		.read("VERBOSE", _verbose)
+		.read("ACTIVE", _active)
 	    .read("ALLOW_NONEXISTENT", allow_nonexistent);
 
 	n_elements ++;
