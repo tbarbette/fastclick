@@ -13,7 +13,6 @@
 #define UINT16_MAX 65535
 #endif
 
-#include <rte_version.h>
 #include <rte_common.h>
 #include <rte_eal.h>
 #include <rte_ethdev.h>
@@ -21,6 +20,7 @@
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
 #include <rte_pci.h>
+#include <rte_version.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     #include <click/flowdirectorglue.hh>
@@ -66,22 +66,16 @@ public:
 
     portid_t port_id;
 
-    DPDKDevice() : port_id(-1) {
-    } CLICK_COLD;
-
-    DPDKDevice(portid_t port_id) : port_id(port_id) {
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        if (port_id >= 0)
-            initialize_flow_director(port_id, ErrorHandler::default_handler());
-    #endif
-    } CLICK_COLD;
+    DPDKDevice() CLICK_COLD;
+    DPDKDevice(portid_t port_id) CLICK_COLD;
 
     struct DevInfo {
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
             n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
-            num_pools(0), vf_vlan(), mac() {
+            num_pools(0), vf_vlan(),
+            init_mac(), init_mtu(0) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -94,7 +88,7 @@ public:
             click_chatter("   Device   ID: %d", device_id);
             click_chatter("   Driver Name: %s", driver);
             click_chatter("Promisc   Mode: %s", promisc? "true":"false");
-            click_chatter("   MAC Address: %s", mac.unparse().c_str());
+            click_chatter("   MAC Address: %s", init_mac.unparse().c_str());
             click_chatter("# of Rx Queues: %d", rx_queues.size());
             click_chatter("# of Tx Queues: %d", tx_queues.size());
             click_chatter("# of Rx  Descs: %d", n_rx_descs);
@@ -114,7 +108,8 @@ public:
         String mq_mode_str;
         int num_pools;
         Vector<int> vf_vlan;
-        EtherAddress mac;
+        EtherAddress init_mac;
+        uint16_t init_mtu;
     };
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -135,19 +130,14 @@ public:
     ) CLICK_COLD;
 
     EtherAddress get_mac();
-
     void set_init_mac(EtherAddress mac);
-
     void set_init_mtu(uint16_t mtu);
 
     unsigned int get_nb_txdesc();
 
     uint16_t get_device_vendor_id();
-
     String get_device_vendor_name();
-
     uint16_t get_device_id();
-
     const char *get_device_driver();
 
     static struct rte_mempool *get_mpool(unsigned int);

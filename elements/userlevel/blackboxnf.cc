@@ -32,12 +32,12 @@ BlackboxNF::BlackboxNF() :
     _task(this), _message_pool(0), _recv_ring(0), _send_ring(0), _recv_ring_reverse(0),
     _numa_zone(0), _burst_size(0), _exec(""), _args(""), _manual(false),
     _internal_tx_queue_size(1024),
-    _timeout(0),_blocking(false)
+    _timeout(0),_blocking(false),
+    _flags(0)
 {
     in_batch_mode = BATCH_MODE_NEEDED;
 
     _ndesc = DPDKDevice::DEF_RING_NDESC;
-    _def_burst_size = DPDKDevice::DEF_BURST_SIZE;
 }
 
 BlackboxNF::~BlackboxNF()
@@ -47,6 +47,9 @@ BlackboxNF::~BlackboxNF()
 int
 BlackboxNF::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    bool spenq = false;
+    bool spdeq = false;
+
     String _origin = String(click_random() % 65536);
     String _destination = String(click_random() % 65536);
 
@@ -66,8 +69,15 @@ BlackboxNF::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("TO_RING",      _PROC_1)
         .read("TO_REVERSE_RING", _PROC_REVERSE)
         .read("FROM_RING",    _PROC_2)
+        .read("SP_ENQ", spenq)
+        .read("SC_DEQ", spdeq)
         .complete() < 0)
         return -1;
+
+    if (spenq)
+        _flags |= RING_F_SP_ENQ;
+    if (spdeq)
+        _flags |= RING_F_SC_DEQ;
 
     if (_MEM_POOL == "")
         _MEM_POOL = "ring_" + _origin;
@@ -101,7 +111,7 @@ int
 BlackboxNF::initialize(ErrorHandler *errh)
 {
     if ( _burst_size == 0 ) {
-        _burst_size = _def_burst_size;
+        _burst_size = DPDKDevice::DEF_BURST_SIZE;
         errh->warning("[%s] Non-positive BURST number. Setting default (%d)\n",
                         name().c_str(), _burst_size);
     }
@@ -110,25 +120,25 @@ BlackboxNF::initialize(ErrorHandler *errh)
         errh->warning("[%s] BURST should not be greater than half the number of descriptors (%d)\n",
                         name().c_str(), _ndesc);
     }
-    else if (_burst_size > _def_burst_size) {
+    else if (_burst_size > DPDKDevice::DEF_BURST_SIZE) {
         errh->warning("[%s] BURST should not be greater than 32 as DPDK won't send more packets at once\n",
                         name().c_str());
     }
 
     _recv_ring = rte_ring_create(
         _PROC_1.c_str(), DPDKDevice::RING_SIZE,
-        rte_socket_id(), DPDKDevice::RING_FLAGS
+        rte_socket_id(), _flags
     );
     if (_PROC_REVERSE) {
         _recv_ring_reverse = rte_ring_create(
             _PROC_REVERSE.c_str(), DPDKDevice::RING_SIZE,
-            rte_socket_id(), DPDKDevice::RING_FLAGS
+            rte_socket_id(), _flags
         );
     }
 
     _send_ring = rte_ring_create(
         _PROC_2.c_str(), DPDKDevice::RING_SIZE,
-        rte_socket_id(), DPDKDevice::RING_FLAGS
+        rte_socket_id(), _flags
     );
 
     _message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
@@ -139,7 +149,7 @@ BlackboxNF::initialize(ErrorHandler *errh)
             DPDKDevice::RING_POOL_CACHE_SIZE,
             DPDKDevice::RING_PRIV_DATA_SIZE,
             NULL, NULL, NULL, NULL,
-            rte_socket_id(), DPDKDevice::RING_FLAGS
+            rte_socket_id(), _flags
         );
     }
 
@@ -334,8 +344,8 @@ BlackboxNF::flush_internal_tx_ring(DPDKDevice::TXInternalQueue &iqueue)
     unsigned sub_burst;
 
     do {
-        sub_burst = iqueue.nr_pending > _def_burst_size ?
-            _def_burst_size : iqueue.nr_pending;
+        sub_burst = iqueue.nr_pending > DPDKDevice::DEF_BURST_SIZE ?
+            DPDKDevice::DEF_BURST_SIZE : iqueue.nr_pending;
 
         // The sub_burst wraps around the ring
         if (iqueue.index + sub_burst >= _internal_tx_queue_size)

@@ -18,6 +18,7 @@
 
 #include <click/config.h>
 #include <click/args.hh>
+#include <click/straccum.hh>
 #include "dpdkinfo.hh"
 
 CLICK_DECLS
@@ -41,7 +42,6 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
         .read("MEMPOOL_PREFIX", DPDKDevice::MEMPOOL_PREFIX)
         .read("DEF_RING_NDESC", DPDKDevice::DEF_RING_NDESC)
         .read("DEF_BURST_SIZE", DPDKDevice::DEF_BURST_SIZE)
-        .read("RING_FLAGS",     DPDKDevice::RING_FLAGS)
         .read("RING_SIZE",      DPDKDevice::RING_SIZE)
         .read("RING_POOL_CACHE_SIZE", DPDKDevice::RING_POOL_CACHE_SIZE)
         .read("RING_PRIV_DATA_SIZE",  DPDKDevice::RING_PRIV_DATA_SIZE)
@@ -49,6 +49,31 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
         return -1;
 
     return 0;
+}
+
+String DPDKInfo::read_handler(Element *e, void * thunk)
+{
+    DPDKInfo *fd = static_cast<DPDKInfo *>(e);
+
+    switch((uintptr_t) thunk) {
+        case h_pool_count:
+            StringAccum acc;
+            for (int i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++) {
+#if RTE_VERSION < RTE_VERSION_NUM(17,02,0,0)
+                int avail = rte_mempool_count(DPDKDevice::_pktmbuf_pools[i]);
+#else
+                int avail = rte_mempool_avail_count(DPDKDevice::_pktmbuf_pools[i]);
+#endif
+                acc << "0 " << String(avail) << "\n";
+            }
+            return acc.take_string();
+    }
+
+    return "<error>";
+}
+
+void DPDKInfo::add_handlers() {
+    add_read_handler("pool_count", read_handler, h_pool_count);
 }
 
 DPDKInfo* DPDKInfo::instance = 0;

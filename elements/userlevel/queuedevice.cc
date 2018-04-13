@@ -418,6 +418,8 @@ String QueueDevice::count_handler(Element *e, void *user_data)
             return String(tdd->n_useless());
         case h_useful:
             return String(tdd->n_useful());
+        default:
+            return "<undefined>";
     }
 }
 

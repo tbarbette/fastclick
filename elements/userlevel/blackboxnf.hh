@@ -61,7 +61,6 @@ class BlackboxNF : public BatchElement {
         String _args;
         unsigned     _ndesc;
         unsigned     _burst_size;
-        unsigned     _def_burst_size;
         unsigned int _iqueue_size;
         short        _numa_zone;
         bool _manual;
@@ -74,7 +73,7 @@ class BlackboxNF : public BatchElement {
 
         counter_t    _n_sent;
         counter_t    _n_dropped;
-
+	int _flags;
 
         static String read_handler(Element*, void*) CLICK_COLD;
         void push_batch(int, PacketBatch *head);

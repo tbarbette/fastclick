@@ -23,10 +23,8 @@
 #include <click/element.hh>
 #include <click/dpdkdevice.hh>
 #include <click/userutils.hh>
+#include <rte_errno.h>
 
-#if RTE_VERSION <= RTE_VERSION_NUM(16,11,0,0)
-    #include <rte_errno.h>
-#endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     #include <click/flowdirector.hh>
@@ -36,6 +34,16 @@ extern "C" {
 #endif
 
 CLICK_DECLS
+
+DPDKDevice::DPDKDevice() : port_id(-1), info() {
+}
+
+DPDKDevice::DPDKDevice(portid_t port_id) : port_id(port_id) {
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        if (port_id >= 0)
+            initialize_flow_director(port_id, ErrorHandler::default_handler());
+    #endif
+};
 
 uint16_t DPDKDevice::get_device_vendor_id()
 {
@@ -141,16 +149,27 @@ int DPDKDevice::alloc_pktmbufs()
 
 
     if (max_socket == -1)
-        return -1;
+        max_socket = 0;
 
-    _nr_pktmbuf_pools = max_socket + 1;
+    int n_pktmbuf_pools = max_socket + 1;
 
     // Allocate pktmbuf_pool array
     typedef struct rte_mempool *rte_mempool_p;
-    _pktmbuf_pools = new rte_mempool_p[_nr_pktmbuf_pools];
-    if (!_pktmbuf_pools)
-        return -1;
-    memset(_pktmbuf_pools, 0, _nr_pktmbuf_pools * sizeof(rte_mempool_p));
+    if (_nr_pktmbuf_pools < n_pktmbuf_pools) {
+        auto pktmbuf_pools = new rte_mempool_p[n_pktmbuf_pools];
+        if (!pktmbuf_pools)
+            return false;
+        for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+            pktmbuf_pools[i] = _pktmbuf_pools[i];
+        }
+        if (_pktmbuf_pools)
+            delete[] _pktmbuf_pools;
+        for (int i = _nr_pktmbuf_pools; i < n_pktmbuf_pools; i++) {
+            pktmbuf_pools[i] = 0;
+        }
+        _pktmbuf_pools = pktmbuf_pools;
+        _nr_pktmbuf_pools = n_pktmbuf_pools;
+    }
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         // Create a pktmbuf pool for each active socket
@@ -323,8 +342,8 @@ static struct ether_addr pool_addr_template = {
 
 struct ether_addr DPDKDevice::gen_mac( int a, int b) {
     struct ether_addr mac;
-     if (info.mac != EtherAddress()) {
-         memcpy(&mac,info.mac.data(),sizeof(struct ether_addr));
+     if (info.init_mac != EtherAddress()) {
+         memcpy(&mac,info.init_mac.data(),sizeof(struct ether_addr));
      } else
          mac = pool_addr_template;
     mac.addr_bytes[4] = a;
@@ -383,7 +402,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
     }
 
-        // Obtain general device information
+    // Obtain general device information
     if (dev_info.pci_dev) {
         info.vendor_id = dev_info.pci_dev->id.vendor_id;
         info.device_id = dev_info.pci_dev->id.device_id;
@@ -412,6 +431,20 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         info.n_tx_descs = DEF_DEV_TXDESC;
     }
 
+    if (info.rx_queues.size() > dev_info.max_rx_queues) {
+        return errh->error("Port %d can only use %d RX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+    }
+    if (info.tx_queues.size() > dev_info.max_tx_queues) {
+        return errh->error("Port %d can only use %d TX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+    }
+
+    if (info.n_rx_descs < dev_info.rx_desc_lim.nb_min || info.n_rx_descs > dev_info.rx_desc_lim.nb_max) {
+        return errh->error("The number of receive descriptors is %d but needs to be between %d and %d",info.n_rx_descs, dev_info.rx_desc_lim.nb_min, dev_info.rx_desc_lim.nb_max);
+    }
+
+    if (info.n_tx_descs < dev_info.tx_desc_lim.nb_min || info.n_tx_descs > dev_info.tx_desc_lim.nb_max) {
+        return errh->error("The number of transmit descriptors is %d but needs to be between %d and %d",info.n_tx_descs, dev_info.tx_desc_lim.nb_min, dev_info.tx_desc_lim.nb_max);
+    }
 
     int ret;
     if (ret = rte_eth_dev_configure(
@@ -618,9 +651,25 @@ int DPDKDevice::add_tx_queue(unsigned &queue_id, unsigned n_desc,
     return add_queue(DPDKDevice::TX, queue_id, false, n_desc, errh);
 }
 
+int DPDKDevice::static_initialize(ErrorHandler* errh) {
+#if HAVE_DPDK_PACKET_POOL
+    if (!dpdk_enabled) {
+        return errh->error("You must start Click with --dpdk option when compiling with --enable-dpdk-pool");
+    }
+#endif
+    if (!alloc_pktmbufs()) {
+        errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
+        if (rte_errno == 12) {
+            errh->error("Maybe try to allocate less buffers with DPDKInfo(X) or allocate more memory to DPDK by giving/increasing the -m parameter or allocate more hugepages.");
+        }
+        return -1;
+    }
+    return 0;
+}
+
 int DPDKDevice::initialize(ErrorHandler *errh)
 {
-    int ret;
+    int err = 0;
 
     if (_is_initialized)
         return 0;
@@ -646,11 +695,9 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         if (it.key() >= n_ports)
             return errh->error("Cannot find DPDK port %u", it.key());
 
-    if ((ret = alloc_pktmbufs()) != 0)
-        return errh->error(
-            "Could not allocate packet MBuf pools, error %d : %s",
-            ret,rte_strerror(ret)
-        );
+    err = static_initialize(errh);
+    if (err != 0)
+        return err;
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         for (HashTable<portid_t, DPDKDevice>::iterator it = _devs.begin();
@@ -901,7 +948,6 @@ unsigned DPDKDevice::DEF_DEV_TXDESC = 256;
 unsigned DPDKDevice::DEF_RING_NDESC = 1024;
 unsigned DPDKDevice::DEF_BURST_SIZE = 32;
 
-unsigned DPDKDevice::RING_FLAGS = 0;
 unsigned DPDKDevice::RING_SIZE  = 64;
 unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
