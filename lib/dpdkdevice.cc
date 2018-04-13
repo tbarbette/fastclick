@@ -1,9 +1,10 @@
 /*
- * dpdkdevice.{cc,hh} -- library for interfacing with Intel's DPDK
- * Cyril Soldani, Tom Barbette
+ * dpdkdevice.{cc,hh} -- library for interfacing with DPDK
+ * Cyril Soldani, Tom Barbette, Georgios Katsikas
  *
  * Copyright (c) 2014-2016 University of Liege
  * Copyright (c) 2016 Cisco Meraki
+ * Copyright (c) 2017 RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -17,8 +18,8 @@
  */
 
 #include <click/config.h>
-#include <click/dpdkdevice.hh>
 #include <click/element.hh>
+#include <click/dpdkdevice.hh>
 #include <click/userutils.hh>
 #include <rte_errno.h>
 
@@ -27,7 +28,7 @@ CLICK_DECLS
 DPDKDevice::DPDKDevice() : port_id(-1), info() {
 }
 
-DPDKDevice::DPDKDevice(unsigned port_id) : port_id(port_id) {
+DPDKDevice::DPDKDevice(portid_t port_id) : port_id(port_id) {
 };
 
 uint16_t DPDKDevice::get_device_vendor_id()
@@ -52,7 +53,7 @@ const char *DPDKDevice::get_device_driver()
 
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
-int DPDKDevice::get_port_numa_node(unsigned port_id)
+int DPDKDevice::get_port_numa_node(portid_t port_id)
 {
     if (port_id >= rte_eth_dev_count())
         return -1;
@@ -66,16 +67,20 @@ unsigned int DPDKDevice::get_nb_txdesc()
 }
 
 /**
- * This function is called by DPDK when Click run as a secondary process. It
- *     checks that the prefix match with the given config prefix and add it if it does so.
+ * This function is called by DPDK when Click runs as a secondary process.
+ * It checks that the prefix matches with the given config prefix and adds
+ * it if it does so.
  */
 #if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
-void add_pool(struct rte_mempool * rte, void *arg){
+void add_pool(struct rte_mempool *rte, void *arg){
 #else
-void add_pool(const struct rte_mempool * rte, void *arg){
+void add_pool(const struct rte_mempool *rte, void *arg){
 #endif
-    int* i = (int*)arg;
-    if (strncmp(DPDKDevice::MEMPOOL_PREFIX.c_str(), const_cast<struct rte_mempool *>(rte)->name, DPDKDevice::MEMPOOL_PREFIX.length()) != 0)
+    int *i = (int *) arg;
+    if (strncmp(
+            DPDKDevice::MEMPOOL_PREFIX.c_str(),
+            const_cast<struct rte_mempool *>(rte)->name,
+            DPDKDevice::MEMPOOL_PREFIX.length()) != 0)
         return;
     DPDKDevice::_pktmbuf_pools[*i] = const_cast<struct rte_mempool *>(rte);
     click_chatter("Found DPDK primary pool #%d %s",*i, DPDKDevice::_pktmbuf_pools[*i]->name);
@@ -87,13 +92,13 @@ int core_to_numa_node(unsigned lcore_id) {
        return (numa_node < 0) ? 0 : numa_node;
 }
 
-bool DPDKDevice::alloc_pktmbufs()
+int DPDKDevice::alloc_pktmbufs()
 {
     /* Count NUMA sockets for each device and each node, we do not want to
      * allocate a unused pool
      */
     int max_socket = -1;
-    for (HashTable<unsigned, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it) {
         int numa_node = DPDKDevice::get_port_numa_node(it.key());
         if (numa_node > max_socket)
@@ -134,7 +139,8 @@ bool DPDKDevice::alloc_pktmbufs()
         // Create a pktmbuf pool for each active socket
         for (int i = 0; i < _nr_pktmbuf_pools; i++) {
                 if (!_pktmbuf_pools[i]) {
-                        const char* name = (DPDKDevice::MEMPOOL_PREFIX + String(i)).c_str();
+                        String mempool_name = DPDKDevice::MEMPOOL_PREFIX + String(i);
+                        const char* name = mempool_name.c_str();
                         _pktmbuf_pools[i] =
 #if RTE_VERSION >= RTE_VERSION_NUM(2,2,0,0)
                         rte_pktmbuf_pool_create(name, NB_MBUF,
@@ -148,19 +154,19 @@ bool DPDKDevice::alloc_pktmbufs()
 #endif
 
                         if (!_pktmbuf_pools[i])
-                                return false;
+                                return rte_errno;
                 }
         }
     } else {
-                int i = 0;
-                rte_mempool_walk(add_pool,(void*)&i);
+        int i = 0;
+        rte_mempool_walk(add_pool,(void*)&i);
         if (i == 0) {
-                click_chatter("Could not get pools from the primary DPDK process");
-                return false;
+            click_chatter("Could not get pools from the primary DPDK process");
+            return -1;
         }
     }
 
-    return true;
+    return 0;
 }
 
 struct rte_mempool *DPDKDevice::get_mpool(unsigned int socket_id) {
@@ -272,11 +278,29 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 
     int ret;
-    if ((ret = rte_eth_dev_configure(port_id, info.rx_queues.size(), info.tx_queues.size(),
-                              &dev_conf)) < 0)
+    if (ret = rte_eth_dev_configure(
+            port_id, info.rx_queues.size(),
+            info.tx_queues.size(), &dev_conf) < 0)
         return errh->error(
-            "Cannot initialize DPDK port %u with %u RX and %u TX queues.\nError %d : %s",
-            port_id, info.rx_queues.size(), info.tx_queues.size(), ret,strerror(ret));
+            "Cannot initialize DPDK port %u with %u RX and %u TX queues\nError %d : %s",
+            port_id, info.rx_queues.size(), info.tx_queues.size(),
+            ret, strerror(ret));
+
+    rte_eth_dev_info_get(port_id, &dev_info);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
+    if (dev_info.nb_rx_queues != info.rx_queues.size()) {
+        return errh->error("Device only initialized %d RX queues instead of %d. "
+                "Please check configuration.", dev_info.nb_rx_queues,
+                info.rx_queues.size());
+    }
+    if (dev_info.nb_tx_queues != info.tx_queues.size()) {
+        return errh->error("Device only initialized %d TX queues instead of %d. "
+                "Please check configuration.", dev_info.nb_tx_queues,
+                info.tx_queues.size());
+    }
+#endif
+
     struct rte_eth_rxconf rx_conf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&rx_conf, &dev_info.default_rxconf, sizeof rx_conf);
@@ -299,7 +323,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
-    for (int i = 0; i < info.rx_queues.size(); ++i) {
+    for (unsigned i = 0; i < info.rx_queues.size(); ++i) {
         if (rte_eth_rx_queue_setup(
                 port_id, i, info.n_rx_descs, numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
@@ -308,7 +332,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 i, port_id, numa_node, rte_strerror(rte_errno));
     }
 
-    for (int i = 0; i < info.tx_queues.size(); ++i)
+    for (unsigned i = 0; i < info.tx_queues.size(); ++i)
         if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
                                    &tx_conf) != 0)
             return errh->error(
@@ -473,7 +497,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     if (n_ports == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
-    for (HashTable<unsigned, DPDKDevice>::const_iterator it = _devs.begin();
+    for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
         if (it.key() >= n_ports)
             return errh->error("Cannot find DPDK port %u", it.key());
@@ -483,7 +507,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return err;
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
-        for (HashTable<unsigned, DPDKDevice>::iterator it = _devs.begin();
+        for (HashTable<portid_t, DPDKDevice>::iterator it = _devs.begin();
             it != _devs.end(); ++it) {
             int ret = it.value().initialize_device(errh);
             if (ret < 0)
@@ -502,9 +526,10 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 
 
 bool
-DPDKDeviceArg::parse(const String &str, DPDKDevice* &result, const ArgContext &ctx)
+DPDKDeviceArg::parse(
+    const String &str, DPDKDevice* &result, const ArgContext &ctx)
 {
-    int port_id;
+    portid_t port_id;
 
     if (!IntArg().parse(str, port_id)) {
        //Try parsing a ffff:ff:ff.f format. Code adapted from EtherAddressArg::parse
@@ -666,9 +691,9 @@ unsigned DPDKDevice::RING_POOL_CACHE_SIZE = 32;
 unsigned DPDKDevice::RING_PRIV_DATA_SIZE  = 0;
 
 bool DPDKDevice::_is_initialized = false;
-HashTable<unsigned, DPDKDevice> DPDKDevice::_devs;
+HashTable<portid_t, DPDKDevice> DPDKDevice::_devs;
 struct rte_mempool** DPDKDevice::_pktmbuf_pools;
-int DPDKDevice::_nr_pktmbuf_pools;
+unsigned DPDKDevice::_nr_pktmbuf_pools;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
 
 CLICK_ENDDECLS

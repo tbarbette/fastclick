@@ -1,10 +1,11 @@
 // -*- c-basic-offset: 4; related-file-name: "fromdpdkdevice.hh" -*-
 /*
  * fromdpdkdevice.{cc,hh} -- element reads packets live from network via
- * Intel's DPDK
+ * the DPDK.
  *
  * Copyright (c) 2014-2015 Cyril Soldani, University of Liège
- * Copyright (c) 2016 Tom Barbette, University of Liège
+ * Copyright (c) 2016-2017 Tom Barbette, University of Liège
+ * Copyright (c) 2017 Georgios Katsikas, RISE SICS
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,13 +31,13 @@
 CLICK_DECLS
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0), _active(true)
+    _dev(0)
 {
-	#if HAVE_BATCH
-		in_batch_mode = BATCH_MODE_YES;
-	#endif
-	_burst = 32;
-	ndesc = DPDKDevice::DEF_DEV_RXDESC;
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
+    _burst = 32;
+    ndesc = DPDKDevice::DEF_DEV_RXDESC;
 }
 
 FromDPDKDevice::~FromDPDKDevice()
@@ -67,7 +68,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         if (allow_nonexistent)
             return 0;
         else
-            return errh->error("%s : Unknown or invalid PORT", dev.c_str());
+            return errh->error("%s: Unknown or invalid PORT", dev.c_str());
     }
 
     if (_use_numa) {
@@ -87,9 +88,10 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     } else {
         if (firstqueue == -1)
             firstqueue = 0;
-        r = configure_rx(numa_node,n_queues,n_queues,errh);
+        r = configure_rx(numa_node, n_queues, n_queues, errh);
     }
-    if (r != 0) return r;
+    if (r != 0)
+        return r;
 
     if (has_mac)
         _dev->set_init_mac(mac);
@@ -136,7 +138,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
 
 void FromDPDKDevice::cleanup(CleanupStage)
 {
-	cleanup_tasks();
+    cleanup_tasks();
 }
 
 bool FromDPDKDevice::run_task(Task *t)
@@ -292,7 +294,6 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return "<unknown>";
     }
 }
-
 
 int FromDPDKDevice::write_handler(
         const String &input, Element *e, void *thunk, ErrorHandler *errh) {

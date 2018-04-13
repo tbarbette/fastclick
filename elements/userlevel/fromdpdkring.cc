@@ -32,8 +32,6 @@ FromDPDKRing::FromDPDKRing() :
     #if HAVE_BATCH
         in_batch_mode = BATCH_MODE_YES;
     #endif
-
-    _ndesc = DPDKDevice::DEF_RING_NDESC;
 }
 
 FromDPDKRing::~FromDPDKRing()
@@ -90,7 +88,6 @@ FromDPDKRing::initialize(ErrorHandler *errh)
     _message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
 
     if (!_message_pool) {
-        click_chatter("Creating %s",_MEM_POOL.c_str());
         _message_pool = rte_mempool_create(
             _MEM_POOL.c_str(), _ndesc,
             DPDKDevice::MBUF_DATA_SIZE,
@@ -132,6 +129,7 @@ FromDPDKRing::run_task(Task *t)
 #endif
 
     struct rte_mbuf *pkts[_burst_size];
+
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     int n = rte_ring_dequeue_burst(_ring, (void **)pkts, _burst_size, &avail);
 #else

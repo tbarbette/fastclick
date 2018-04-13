@@ -150,7 +150,6 @@ private:
     };
 
     DPDKDevice* _dev;
-    bool _active;
 };
 
 CLICK_ENDDECLS
