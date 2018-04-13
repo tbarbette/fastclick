@@ -213,6 +213,66 @@ CLICK_DECLS
     }
 
 /**
+ * Equivalent to CLASSIFY_EACH_PACKET but ignore the packet if fnt returns -1
+ */
+
+#define CLASSIFY_EACH_PACKET_IGNORE(nbatches,fnt,cep_batch,on_finish)\
+    {\
+        PacketBatch* out[(nbatches)];\
+        bzero(out,sizeof(PacketBatch*)*(nbatches));\
+        PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
+        Packet* p = cep_batch;\
+        Packet* last = NULL;\
+        int last_o = -1;\
+        int passed = 0;\
+        for (;p != NULL;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
+            int o = (fnt(p));\
+            if (o>=(nbatches)) o = (nbatches - 1);\
+            if (o == last_o) {\
+                passed ++;\
+            } else {\
+                if (last == NULL) {\
+                    if (o == -1) continue;\
+                    out[o] = static_cast<PacketBatch*>(p);\
+                    out[o]->set_count(1);\
+                    out[o]->set_tail(p);\
+                } else {\
+                    if (last_o != -1) {\
+                        out[last_o]->set_tail(last);\
+                        out[last_o]->set_count(out[last_o]->count() + passed);\
+                    }\
+                    if (o != -1) {\
+                        if (!out[o]) {\
+                            out[o] = static_cast<PacketBatch*>(p);\
+                            out[o]->set_count(1);\
+                            out[o]->set_tail(p);\
+                        } else {\
+                            out[o]->append_packet(p);\
+                        }\
+                    }\
+                    passed = 0;\
+                }\
+            }\
+            last = p;\
+            last_o = o;\
+        }\
+\
+        if (passed && last_o != -1) {\
+            out[last_o]->set_tail(last);\
+            out[last_o]->set_count(out[last_o]->count() + passed);\
+        }\
+\
+        int i = 0;\
+        for (; i < (nbatches); i++) {\
+            if (out[i]) {\
+                out[i]->tail()->set_next(NULL);\
+                (on_finish(i,out[i]));\
+            }\
+        }\
+    }
+
+
+/**
  * Create a batch by calling multiple times (up to max) a given function and
  *   linking them together in respect to the PacketBatch semantic.
  *
@@ -230,7 +290,7 @@ CLICK_DECLS
         Packet* last = head;\
         if (head != NULL) {\
             unsigned int count = 1;\
-            while (count < (max>0?max:BATCH_MAX_PULL)) {\
+            while (count < (unsigned)(max>0?max:BATCH_MAX_PULL)) {\
                 Packet* current = fnt;\
                 if (current == NULL)\
                     break;\

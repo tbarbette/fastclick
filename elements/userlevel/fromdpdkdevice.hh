@@ -167,7 +167,6 @@ private:
     };
 
     DPDKDevice* _dev;
-    bool _active;
 
     int _rx_intr;
     class FDState { public:

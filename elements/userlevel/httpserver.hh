@@ -6,6 +6,7 @@
 #include <click/task.hh>
 #include <click/notifier.hh>
 #include <click/multithread.hh>
+#include <click/hashmap.hh>
 #include <click/ring.hh>
 CLICK_DECLS
 
@@ -42,6 +43,7 @@ class HTTPServer : public Element { public:
     );
 private:
     int _port;
+    HashMap<String, String> _alias_map;
     bool _verbose;
     struct MHD_Daemon * _daemon;
 

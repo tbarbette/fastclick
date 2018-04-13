@@ -57,11 +57,23 @@ void HTTPServer::update_fd_set() {
 }
 
 int HTTPServer::configure(Vector<String> &conf, ErrorHandler *errh) {
+    Vector<String> alias_map;
     if (Args(conf, this, errh)
             .read_p("PORT", _port) //TODO AUTH
+            .read_all("ALIAS_MAP", alias_map)
             .read("VERBOSE", _verbose)
             .complete() < 0)
         return -1;
+
+    for (String a : alias_map) {
+        int s = a.find_left(':');
+        if (s == -1)
+            return errh->error("Cannot find ':' in alias %s",a);
+        String path = a.substring(0,s);
+        if (path[0] == '/')
+            path = path.substring(1);
+        _alias_map.insert(path,String(a.substring(s+1)));
+    }
 
     return 0;
 }
@@ -116,6 +128,11 @@ int HTTPServer::ahc_echo(
     String path = String(&url[1]);
     if (path[0] == '/')
         path = path.substring(1);
+
+    auto it = server->_alias_map.findp(path);
+    if (it != 0) {
+        path = *it;
+    }
 
     Element *e = 0;
     String ename;

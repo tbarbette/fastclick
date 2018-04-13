@@ -47,7 +47,6 @@ int CheckNumberPacket::configure(Vector<String> &conf, ErrorHandler *errh) {
 }
 
 inline int CheckNumberPacket::smaction(Packet *p) {
-    WritablePacket *wp = nullptr;
     if ((int)p->length() < _offset + 8) {
         return 1;
     }

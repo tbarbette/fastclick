@@ -83,7 +83,7 @@ private:
 };
 
 inline Timestamp RecordTimestamp::get(uint64_t i) {
-    if (i >= _timestamps.size())
+    if (i >= (unsigned)_timestamps.size())
         return Timestamp::uninitialized_t();
     Timestamp t = _timestamps[i];
     if (t == Timestamp::uninitialized_t())

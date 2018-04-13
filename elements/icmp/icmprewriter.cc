@@ -92,8 +92,16 @@ update_in_cksum(uint16_t *csum, const uint16_t *old_hw, const uint16_t *new_hw,
 }
 
 int
-ICMPRewriter::handle(WritablePacket *p)
+ICMPRewriter::handle(Packet* &p_in)
 {
+    WritablePacket *p = p_in->uniqueify();
+    if (!p)
+	return -1;
+    else if (p->ip_header()->ip_p != IP_PROTO_ICMP) {
+	return noutputs();
+    }
+    p_in = p;
+
     // check ICMP type
     click_icmp *icmph = p->icmp_header();
     if (icmph->icmp_type != ICMP_UNREACH
@@ -230,17 +238,18 @@ ICMPRewriter::handle(WritablePacket *p)
 void
 ICMPRewriter::push(int, Packet *p_in)
 {
-    WritablePacket *p = p_in->uniqueify();
-    if (!p)
-	return;
-    else if (p->ip_header()->ip_p != IP_PROTO_ICMP) {
-	p->kill();
-	return;
-    }
-
-    int output = handle(p);
-    checked_output_push(output, p);
+    int output = handle(p_in);
+    if (output == -1)
+        return;
+    checked_output_push(output, p_in);
 }
+
+#if HAVE_BATCH
+void
+ICMPRewriter::push_batch(int, PacketBatch *batch) {
+    CLASSIFY_EACH_PACKET_IGNORE(noutputs() + 1,handle,batch,checked_output_push_batch);
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(IPRewriterBase ICMPPingRewriter)

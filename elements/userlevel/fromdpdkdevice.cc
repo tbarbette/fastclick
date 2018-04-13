@@ -41,7 +41,7 @@ CLICK_DECLS
 #define LOAD_UNIT 10
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0), _rx_intr(-1), _active(true)
+    _dev(0), _rx_intr(-1)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -61,7 +61,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int maxqueues = 128;
     String dev;
     EtherAddress mac;
+    uint16_t mtu = 0;
     bool has_mac = false;
+    bool has_mtu = false;
     String mode = "";
     int num_pools = 0;
     Vector<int> vf_vlan;
@@ -73,6 +75,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("PORT", dev))
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
+        .read("MTU", mtu).read_status(has_mtu)
         .read("MODE", mode)
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         .read("FLOW_DIR_RULES_FILE", rules_filename)
@@ -115,7 +118,10 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         return r;
 
     if (has_mac)
-        _dev->set_mac(mac);
+        _dev->set_init_mac(mac);
+
+    if (has_mtu)
+        _dev->set_init_mtu(mtu);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     if ((mode == FlowDirector::FLOW_DIR_MODE) && (rules_filename.empty())) {
@@ -455,7 +461,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
     #endif
     }
 
-    return "0";
+    return "<unknown>";
 }
 
 int FromDPDKDevice::write_handler(

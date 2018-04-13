@@ -1080,10 +1080,10 @@ protected:
 template <typename T>
 class fast_rcu { public:
 #define N 2
-    fast_rcu() : _rcu_current(0), _write_epoch(1), _epochs(0) {
+    fast_rcu() : _rcu_current(0), _epochs(0), _write_epoch(1) {
     }
 
-    fast_rcu(T v) : _rcu_current(0), _write_epoch(1), _epochs(0) {
+    fast_rcu(T v) : _rcu_current(0), _epochs(0), _write_epoch(1){
         initialize(v);
     }
 
@@ -1123,7 +1123,7 @@ class fast_rcu { public:
         int rcu_next = (rcu_current_local + 1) & 1;
         int bad_epoch = (_write_epoch - N) + 1;
 
-        int i = 0;
+        unsigned i = 0;
         loop:
         for (; i < _epochs.weight(); i ++) {
             int te = _epochs.get_value(i);

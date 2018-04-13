@@ -136,7 +136,9 @@ public:
 
     EtherAddress get_mac();
 
-    void set_mac(EtherAddress mac);
+    void set_init_mac(EtherAddress mac);
+
+    void set_init_mtu(uint16_t mtu);
 
     unsigned int get_nb_txdesc();
 
@@ -166,7 +168,9 @@ public:
 
     static int initialize(ErrorHandler *errh);
 
-    int static_cleanup();
+    static int static_initialize(ErrorHandler *errh);
+
+    static int static_cleanup();
 
     inline static bool is_dpdk_packet(Packet* p) {
         return p->buffer_destructor() == DPDKDevice::free_pkt;

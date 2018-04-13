@@ -64,10 +64,10 @@ RecordTimestamp::smaction(Packet *p) {
     uint64_t i;
     if (_offset >= 0) {
         i = _np ? _np->read_number_of_packet(p, _offset, _net_order) :
-                  NumberPacket::read_number_of_packet(p, _offset, _net_order);
+            NumberPacket::read_number_of_packet(p, _offset, _net_order);
         assert(i < ULLONG_MAX);
-        while (i >= _timestamps.size()) {
-            if (!_dynamic && i >= _timestamps.capacity()) {
+        while (i >= (unsigned)_timestamps.size()) {
+            if (!_dynamic && i >= (unsigned)_timestamps.capacity()) {
                 click_chatter("fatal error : DYNAMIC is not set and record timestamp reserved capacity is too small. Use N to augment the capacity.");
                 assert(false);
             }

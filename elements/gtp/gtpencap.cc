@@ -1,9 +1,8 @@
 /*
- * gtpencap.{cc,hh} -- element encapsulates packet in UDP/IP header
- * Benjie Chen, Eddie Kohler
+ * gtpencap.{cc,hh}
+ * Tom Barbette
  *
- * Copyright (c) 1999-2000 Massachusetts Institute of Technology
- * Copyright (c) 2007 Regents of the University of California
+ * Copyright (c) 2018 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,6 +22,7 @@
 #include <click/glue.hh>
 #include <click/standard/alignmentinfo.hh>
 #include "gtpencap.hh"
+
 
 CLICK_DECLS
 
@@ -81,6 +81,7 @@ GTPEncap::simple_action_batch(PacketBatch* batch) {
 String GTPEncap::read_handler(Element *e, void *thunk)
 {
     GTPEncap *u = static_cast<GTPEncap *>(e);
+    (void)u; //TODO
     switch ((uintptr_t) thunk) {
       default:
 	return String();

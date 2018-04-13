@@ -134,6 +134,21 @@ void click_lfree(volatile void *p, size_t size);
 # define CLICK_LFREE(p, size)	delete[] ((void) (size), (uint8_t *)(p))
 #endif
 
+#if HAVE_ALIGNED_NEW
+# define CLICK_ALIGNED_NEW(T,size) (new T[_size])
+# define CLICK_ALIGNED_DELETE(p,T,size) (delete[] p)
+#else
+# if HAVE_ALIGNED_ALLOC
+#  define CLICK_ALIGNED_ALLOC(T,size) ((T*)(aligned_alloc(64, sizeof(T) * size)))
+#  define CLICK_ALIGNED_FREE(p,T,size) (free(p))
+# else
+#  warning Using normal allocation instead of aligned one, please use a compiler that supports aligned_alloc
+#  define CLICK_ALIGNED_ALLOC(T,size) CLICK_LALLOC(sizeof(T) * size)
+#  define CLICK_ALIGNED_FREE(p,T,size) CLICK_LFREE(p,sizeof(T) * size);
+# endif
+# define CLICK_ALIGNED_NEW(T,size) ({T* v = CLICK_ALIGNED_ALLOC(T,size);for (unsigned i = 0; i < size; i++) {new(&v[i]) T();};v;})
+# define CLICK_ALIGNED_DELETE(p,T,size) {for (unsigned i = 0; i < size; i++) p[i].~T();CLICK_ALIGNED_FREE(p,T,size);}
+#endif
 
 // RANDOMNESS
 
