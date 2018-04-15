@@ -19,6 +19,7 @@
 #include <click/glue.hh>
 #include <click/flow.hh>
 #include <stdlib.h>
+#include <algorithm>
 
 /********************************
  * FlowNode functions
@@ -433,13 +434,28 @@ FlowNodeDefinition::create_final(bool mt_safe) {
         if (_level->get_max_value() == 0)
             fl = new FlowNodeDummy();
         else if (_level->get_max_value() > 256) {
-            FlowNode* fh0 = FlowNode::create_hash(0);
-            _level->current_level = 0;
-    #if DEBUG_CLASSIFIER
-            assert(fh0->getNum() == 0);
-            fh0->check();
-    #endif
-            fl = fh0;
+            if (!_level->is_dynamic()) {
+                FlowNodeHeap* flh = new FlowNodeHeap();
+                flh->initialize(this);
+                flh->_level = _level;
+                flh->_parent = parent();
+                flh->apply([fl,mt_safe](FlowNodePtr* cur) {
+                    cur->set_parent(fl);
+                    if (cur->is_node()) {
+                        cur->node = cur->node->optimize(mt_safe);
+                    }
+                });
+                flh->set_default(_default);
+                return flh;
+            } else {
+                FlowNode* fh0 = FlowNode::create_hash(0);
+                _level->current_level = 0;
+        #if DEBUG_CLASSIFIER
+                assert(fh0->getNum() == 0);
+                fh0->check();
+        #endif
+                fl = fh0;
+            }
         } else {
             FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
             _level->current_level = 100;
@@ -463,6 +479,58 @@ FlowNodeDefinition::create_final(bool mt_safe) {
     fl->set_default(_default);
     return fl;
 }
+
+/***************************************
+ * FlowNodeHeap
+ *************************************/
+
+void
+FlowNodeHeap::append_heap(FlowNode* fn,Vector<uint32_t>& vls, int i, int v_left, int v_right) {
+    bool need_grow;
+    if (v_right < v_left)
+        return;
+    int middle;
+    middle = (v_left + v_right) / 2;
+    if (vls.size() <= i)
+        vls.resize(i + 1);
+    childs[i] = *fn->find(FlowNodeData((uint32_t)vls[v_left]), need_grow);
+
+    append_heap(fn, vls,left_idx(i),v_left,middle -1);
+    append_heap(fn, vls,right_idx(i),middle + 1, v_right);
+}
+
+void
+FlowNodeHeap::initialize(FlowNode* fn) {
+    Vector<uint32_t> vls = Vector<uint32_t>();
+    fn->apply([&vls](FlowNodePtr* ptr){vls.push_back(ptr->data().data_32);});
+    std::sort(vls.begin(), vls.end());
+    int middle = vls.size() / 2;
+    bool need_grow;
+    childs.resize(1);
+    childs[0] = *fn->find(FlowNodeData((uint32_t)vls[middle]), need_grow);
+    append_heap(fn, vls,left_idx(0),0,middle -1);
+    append_heap(fn, vls,right_idx(0),middle + 1, vls.size() - 1);
+}
+
+/**
+ * Delete fully kills children
+ */
+FlowNodeHeap::~FlowNodeHeap() {
+    //Base destructor will delete the default
+    for (int i = 0; i < childs.size(); i++) {
+        if (childs[i].ptr != NULL && childs[i].is_node()) {
+               delete childs[i].node;
+               childs[i].node = 0;
+        }
+    }
+}
+FlowNode* FlowNodeHeap::duplicate(bool recursive,int use_count) {
+    FlowNodeHeap* fa = FlowAllocator<FlowNodeHeap>::allocate();
+    fa->initialize(this);
+    fa->duplicate_internal(this,recursive,use_count);
+    return fa;
+}
+
 
 
 

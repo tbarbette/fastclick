@@ -445,6 +445,79 @@ public:
 };*/
 
 /**
+ * Node implemented using a heap, static node only
+ */
+class FlowNodeHeap: public FlowNode  {
+    Vector<FlowNodePtr> childs;
+
+public:
+
+    FlowNodeHeap() {
+        _find = &find_ptr;
+    }
+
+    void append_heap(FlowNode* fn,Vector<uint32_t>& vls, int i, int v_left, int v_right);
+    void initialize(FlowNode*);
+
+    FLOW_NODE_DEFINE(FlowNodeHeap,find_heap);
+
+#define left_idx(i) (i*2 + 1)
+#define right_idx(i) (i*2 + 2)
+
+    inline FlowNodePtr* find_heap(FlowNodeData data, bool &need_grow) {
+        int i = 0;
+        while (childs[i].ptr) {
+            uint32_t cd = childs[i].data().data_32;
+            if (cd == data.data_32)
+                return &childs[i];
+            else if (cd < data.data_32) {
+                i = right_idx(i);
+            } else {
+                i = left_idx(i);
+            }
+        }
+        return 0;
+    }
+
+    String name() const {
+        return "HEAP";
+    }
+
+    void release_child(FlowNodePtr child, FlowNodeData data) override {
+        click_chatter("TODO : release child heap");
+    }
+
+    ~FlowNodeHeap();
+
+    FlowNode* duplicate(bool recursive,int use_count) override;
+
+    class HeapNodeIterator : public NodeIteratorBase {
+        FlowNodeHeap* _node;
+        int cur;
+    public:
+        HeapNodeIterator(FlowNodeHeap* n) : cur(0) {
+            _node = n;
+        }
+
+        FlowNodePtr* next() {
+            do {
+                if (cur >= _node->childs.size())
+                    return 0;
+                if (_node->childs[cur].ptr)
+                    return &_node->childs[cur++];
+                cur++;
+            }
+            while (1);
+        }
+    };
+
+    NodeIterator iterator() override {
+        return NodeIterator(new HeapNodeIterator(this));
+    }
+};
+
+
+/**
  * Node implemented using an array
  */
 class FlowNodeArray : public FlowNode  {
@@ -463,7 +536,7 @@ public:
 
     FLOW_NODE_DEFINE(FlowNodeArray,find_array);
 
-    inline FlowNodePtr* find_array(FlowNodeData data, bool need_grow) {
+    inline FlowNodePtr* find_array(FlowNodeData data, bool &need_grow) {
         return &childs[data.data_32];
     }
 
@@ -471,7 +544,7 @@ public:
         return "ARRAY";
     }
 
-    void release_child(FlowNodePtr child, FlowNodeData data) {
+    void release_child(FlowNodePtr child, FlowNodeData data) override {
             if (child.is_leaf()) {
                 childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
             } else {
@@ -884,7 +957,7 @@ class FlowNodeThreeCase : public FlowNode  {
             return &_default;
     }
 
-    void release_child(FlowNodePtr child, FlowNodeData data) {
+    void release_child(FlowNodePtr child, FlowNodeData data) override {
         click_chatter("TODO renew release threecase");
         /*if (child_deletable()) {
 			if (is_leaf()) {
