@@ -437,12 +437,15 @@ FlowNodeDefinition::create_final(bool mt_safe) {
             if (!_level->is_dynamic()) {
                 FlowNodeHeap* flh = new FlowNodeHeap();
                 flh->initialize(this);
+                assert(getNum() == flh->getNum());
                 flh->_level = _level;
                 flh->_parent = parent();
                 flh->apply([fl,mt_safe](FlowNodePtr* cur) {
                     cur->set_parent(fl);
                     if (cur->is_node()) {
-                        cur->node = cur->node->optimize(mt_safe);
+                        FlowNodeData data = cur->data();
+                        cur->set_node(cur->node->optimize(mt_safe));
+                        cur->set_data(data);
                     }
                 });
                 flh->set_default(_default);
@@ -491,9 +494,10 @@ FlowNodeHeap::append_heap(FlowNode* fn,Vector<uint32_t>& vls, int i, int v_left,
         return;
     int middle;
     middle = (v_left + v_right) / 2;
-    if (vls.size() <= i)
-        vls.resize(i + 1);
+    if (childs.size() <= right_idx(i+1))
+        childs.resize(right_idx(i) + 1);
     childs[i] = *fn->find(FlowNodeData((uint32_t)vls[v_left]), need_grow);
+    inc_num();
 
     append_heap(fn, vls,left_idx(i),v_left,middle -1);
     append_heap(fn, vls,right_idx(i),middle + 1, v_right);
@@ -506,10 +510,17 @@ FlowNodeHeap::initialize(FlowNode* fn) {
     std::sort(vls.begin(), vls.end());
     int middle = vls.size() / 2;
     bool need_grow;
-    childs.resize(1);
+    childs.resize(right_idx(0) + 1);
     childs[0] = *fn->find(FlowNodeData((uint32_t)vls[middle]), need_grow);
+    inc_num();
     append_heap(fn, vls,left_idx(0),0,middle -1);
     append_heap(fn, vls,right_idx(0),middle + 1, vls.size() - 1);
+/*    for (int i = 0 ; i < childs.size(); i ++) {
+        click_chatter("[%d] %u ; L:%d R:%d",i,childs[i].ptr?childs[i].data().data_32:0,left_idx(i),right_idx(i));
+        bool need_grow;
+        if (childs[i].ptr)
+            assert(find_heap(childs[i].data(),need_grow) == &childs[i]);
+    }*/
 }
 
 /**

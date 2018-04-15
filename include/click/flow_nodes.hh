@@ -476,7 +476,7 @@ public:
                 i = left_idx(i);
             }
         }
-        return 0;
+        return &childs[i];
     }
 
     String name() const {
