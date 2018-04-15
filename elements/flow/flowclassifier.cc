@@ -216,7 +216,8 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
     //A -> B -> F
 
     //Parent of the fcb is release_ptr
-    fc->remove_cache_fcb(fcb);
+    if (fc->is_dynamic_cache_enabled())
+        fc->remove_cache_fcb(fcb);
     FlowNode* child = static_cast<FlowNode*>(fcb->parent); //Child is B
     flow_assert(child->getNum() == child->findGetNum());
     flow_assert(fcb->parent);
@@ -335,7 +336,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         ptr->leaf = nfcb;
     }, true, true);
 
-    if (_aggcache) {
+    if (_aggcache && _cache_size > 0) {
         for (unsigned i = 0; i < _cache.weight(); i++) {
             _cache.get_value(i) = (FlowCache*)CLICK_LALLOC(sizeof(FlowCache) * _cache_size * _cache_ring_size);
             bzero(_cache.get_value(i), sizeof(FlowCache) * _cache_size * _cache_ring_size);
@@ -422,8 +423,6 @@ inline int FlowClassifier::cache_find(FlowControlBlock* fcb) {
 }
 
 inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
-    if (!_aggcache)
-        return;
     uint32_t agg = *((uint32_t*)&(fcb->node_data[1]));
     if (agg == 0)
         return;
@@ -611,6 +610,43 @@ static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
 #endif
 }
 
+inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, Timestamp &now) {
+    if (_aggcache) {
+        uint32_t agg = AGGREGATE_ANNO(p);
+        if (!(lastagg == agg && fcb && likely(_table.reverse_match(fcb,p)))) {
+            if (_cache_size > 0)
+                fcb = get_cache_fcb(p,agg);
+            else
+                fcb = _table.match(p);
+            lastagg = agg;
+        }
+    }
+    else
+    {
+        fcb = _table.match(p);
+    }
+    if (unlikely(_verbose > 2)) {
+        if (_verbose > 3) {
+            click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
+        } else {
+            click_chatter("Table of %s after getting new packet (length %d) :",name().c_str(),p->length());
+        }
+        _table.get_root()->print(-1,_verbose > 3);
+    }
+    if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {
+        if (_verbose > 1)
+            debug_flow("Early drop !");
+        if (last) {
+            last->set_next(next);
+        }
+        SFCB_STACK(p->kill(););
+        p = next;
+        return false;
+    }
+    check_fcb_still_valid(fcb, now);
+    return true;
+}
+
 /**
  * Push batch simple simply classify packets and push a batch when a packet
  * is different
@@ -633,34 +669,9 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 #endif
         Packet* next = p->next();
 
-        if (_aggcache) {
-            uint32_t agg = AGGREGATE_ANNO(p);
-            if (!(lastagg == agg && fcb && likely(_table.reverse_match(fcb,p))))
-                fcb = get_cache_fcb(p,agg);
-        }
-        else
-        {
-            fcb = _table.match(p);
-        }
-        if (_verbose > 2) {
-            if (_verbose > 3) {
-                click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
-            } else {
-                click_chatter("Table of %s after getting new packet (length %d) :",name().c_str(),p->length());
-            }
-            _table.get_root()->print(-1,_verbose > 3);
-        }
-        if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {
-            if (_verbose > 1)
-                debug_flow("Early drop !");
-            if (last) {
-                last->set_next(next);
-            }
-            SFCB_STACK(p->kill(););
-            p = next;
+        if (!get_fcb_for(p,fcb,lastagg,last,next,now)) {
             continue;
         }
-        check_fcb_still_valid(fcb, now);
         if (awaiting_batch == NULL) {
 #if DEBUG_CLASSIFIER > 1
             click_chatter("New fcb %p",fcb);
@@ -739,34 +750,8 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 #endif
         Packet* next = p->next();
 
-        if (_aggcache) {
-            uint32_t agg = AGGREGATE_ANNO(p);
-            if (!(lastagg == agg && fcb && likely(_table.reverse_match(fcb,p))))
-                fcb = get_cache_fcb(p,agg);
-        }
-        else
-        {
-            fcb = _table.match(p);
-        }
-        if (_verbose > 2) {
-            if (_verbose > 3) {
-                click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
-            } else {
-                click_chatter("Table of %s after getting new packet (length %d) :",name().c_str(),p->length());
-            }
-            _table.get_root()->print(-1,_verbose > 3);
-        }
-        if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {
-            if (_verbose > 1)
-                debug_flow("Early drop !");
-            if (last) {
-                last->set_next(next);
-            }
-            SFCB_STACK(p->kill(););
-            p = next;
+        if (!get_fcb_for(p,fcb,lastagg,last,next,now))
             continue;
-        }
-        check_fcb_still_valid(fcb, now);
         if (lastfcb == fcb) {
             //Just continue as they are still linked
         } else {

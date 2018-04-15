@@ -40,7 +40,7 @@ class FlowClassifier: public FlowElement {
     Timer _timer;
     bool _early_drop;
     FlowType _context;
-    bool _do_release;
+    const bool _do_release;
 
     per_thread<FlowBatch*> _builder_batch;
 public:
@@ -64,12 +64,17 @@ public:
     inline FlowControlBlock* set_fcb_cache(FlowCache* &c, Packet* &p, const uint32_t& agg);
     inline void remove_cache_fcb(FlowControlBlock* fcb);
     inline FlowControlBlock* get_cache_fcb(Packet* p, uint32_t agg);
-    void push_batch_simple(int port, PacketBatch*);
-    void push_batch_builder(int port, PacketBatch*);
+    inline bool get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, Timestamp &now);
+    inline void push_batch_simple(int port, PacketBatch*);
+    inline void push_batch_builder(int port, PacketBatch*);
     void push_batch(int port, PacketBatch*);
 
     static String read_handler(Element* e, void* thunk);
     void add_handlers() override CLICK_COLD;
+
+    inline bool is_dynamic_cache_enabled() {
+        return _aggcache && _cache_size > 0;
+    }
 
     virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack) {
         click_chatter("Warning : Sub-table optimization not supported as of now.");
