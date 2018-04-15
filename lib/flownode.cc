@@ -440,8 +440,8 @@ FlowNodeDefinition::create_final(bool mt_safe) {
                 assert(getNum() == flh->getNum());
                 flh->_level = _level;
                 flh->_parent = parent();
-                flh->apply([fl,mt_safe](FlowNodePtr* cur) {
-                    cur->set_parent(fl);
+                flh->apply([flh,mt_safe](FlowNodePtr* cur) {
+                    cur->set_parent(flh);
                     if (cur->is_node()) {
                         FlowNodeData data = cur->data();
                         cur->set_node(cur->node->optimize(mt_safe));

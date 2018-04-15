@@ -196,7 +196,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
                             if (child_ptr->ptr && child_ptr->node->released()) { //Childptr is a released node, just renew it
                                 child_ptr->node->renew();
                                 child_ptr->set_data(data);
-                                flow_assert(parent->find(data)->ptr == child_ptr->ptr);
+                                //flow_assert(parent->find(data)->ptr == child_ptr->ptr);
                             } else
 #endif
                             {
@@ -211,7 +211,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
 
                                 child_ptr->set_data(data);
                                 child_ptr->set_parent(parent);
-                                flow_assert(parent->find(data)->ptr == child_ptr->ptr);
+//                                flow_assert(parent->find(data)->ptr == child_ptr->ptr);
                             }
                         }
                         flow_assert(parent->getNum() == parent->findGetNum());
