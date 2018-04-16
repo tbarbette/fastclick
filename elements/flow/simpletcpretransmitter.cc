@@ -95,6 +95,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
             //Actually add the packet in the FCB
             if (fcb->first_unacked) {
                 fcb->first_unacked->append_packet(clone);
+                clone->set_next(0);
             } else {
                 fcb->first_unacked = PacketBatch::make_from_packet(clone);
             }

@@ -72,6 +72,7 @@ void FlowBuffer::enqueue(Packet *packet)
     // Add the node at the end of the list
     if (head) {
         head->append_packet(packet);
+        packet->set_next(0);
     } else {
         head = PacketBatch::make_from_packet(packet);
     }
