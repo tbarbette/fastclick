@@ -381,13 +381,6 @@ EtherAddress DPDKDevice::get_mac() {
     return EtherAddress((unsigned char*)&addr);
 }
 
-EtherAddress DPDKDevice::get_mac() {
-    assert(_is_initialized);
-    struct ether_addr addr;
-    rte_eth_macaddr_get(port_id,&addr);
-    return EtherAddress((unsigned char*)&addr);
-}
-
 /**
  * Set v[id] to true in vector v, expanding it if necessary. If id is 0,
  * the first available slot will be taken.
