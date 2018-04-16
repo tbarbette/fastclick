@@ -2,7 +2,8 @@
  * icmppingrewriter.{cc,hh} -- rewrites ICMP echoes and replies
  * Eddie Kohler
  *
- * Per-core, thread safe data structures by Georgios Katsikas and batching by Tom Barbette
+ * Per-core, thread safe data structures by Georgios Katsikas and batching by
+ *  Tom Barbette
  *
  * Copyright (c) 2000-2001 Mazu Networks, Inc.
  * Copyright (c) 2009-2010 Meraki, Inc.
@@ -214,15 +215,8 @@ ICMPPingRewriter::process(int port, Packet *p_in)
 }
 
 void
-ICMPPingRewriter::push(int port, Packet *p)
-{
-    int output_port = process(port, p);
-    if (output_port < 0) {
-        p->kill();
-        return;
-    }
-
-    output(output_port).push(p);
+ICMPPingRewriter::push(int port, Packet *p_in) {
+    checked_output_push(process(port, p_in),p_in);
 }
 
 #if HAVE_BATCH

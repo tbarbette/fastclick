@@ -50,8 +50,8 @@ LinkUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read_mp("LATENCY", _latency)
 	.read_mp("BANDWIDTH", BandwidthArg(), _bandwidth).complete() < 0)
 	return -1;
-    if (_bandwidth < 100)
-	return errh->error("bandwidth too small, minimum 100Bps");
+    if (_bandwidth < 100 && _bandwidth != 0)
+        return errh->error("bandwidth too small, minimum 100Bps, or 0 to disable bandwidth");
     _bandwidth /= 100;
     return 0;
 }
@@ -81,8 +81,12 @@ LinkUnqueue::cleanup(CleanupStage)
 void
 LinkUnqueue::delay_by_bandwidth(Packet *p, const Timestamp &tv) const
 {
-    uint32_t length = p->length() + EXTRA_LENGTH_ANNO(p);
-    uint32_t delay = (length * 10000) / _bandwidth;
+
+    uint32_t delay = 0;
+    if (_bandwidth > 0) {
+        uint32_t length = p->length() + EXTRA_LENGTH_ANNO(p);
+        delay = (length * 10000) / _bandwidth;
+    }
     p->set_timestamp_anno(tv + Timestamp::make_usec(delay));
 }
 

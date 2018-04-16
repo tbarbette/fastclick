@@ -106,36 +106,26 @@ Pipeliner::initialize(ErrorHandler *errh)
     stats.compress(passing);
     _home_thread_id = home_thread_id();
 
-    if (_ring_size == -1) {
-    #  if HAVE_BATCH
-        if (receives_batch) {
-            _ring_size = 16;
-        } else
-    #  endif
-        {
-            _ring_size = 1024;
-        }
-    }
-
     for (unsigned i = 0; i < storage.weight(); i++) {
-        storage.get_value(i).initialize(_ring_size);
+        if (!storage.get_value(i).initialized())
+            storage.get_value(i).initialize(_ring_size);
     }
 
 
-    for (int i = 0; i < passing.size(); i++) {
+    for (int i = 0; i < passing.weight(); i++) {
         if (passing[i]) {
-            click_chatter("%p{element} : Pipeline from %d to %d",this, i,_home_thread_id);
+            click_chatter("%p{element} : Pipeline from %d to %d", this, i, _home_thread_id);
             WritablePacket::pool_transfer(_home_thread_id,i);
         }
     }
 
     if (_block && !_allow_direct_traversal && passing[_home_thread_id]) {
         return errh->error("Possible deadlock ! Pipeliner is served by thread "
-						   "%d, and the same thread can push packets to it. "
-						   "As Pipeliner is in blocking mode without direct "
-						   "traversal, it could block trying to push a "
-						   "packet, preventing the very same thread to drain "
-						   "the queue.");
+                           "%d, and the same thread can push packets to it. "
+                           "As Pipeliner is in blocking mode without direct "
+                           "traversal, it could block trying to push a "
+                           "packet, preventing the very same thread to drain "
+                           "the queue.");
     }
 
     if (!_nouseless && passing.weight() == 1 && passing[_home_thread_id] == 1) {

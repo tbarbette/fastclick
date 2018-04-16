@@ -25,33 +25,37 @@
 #include <click/router.hh>
 CLICK_DECLS
 
-AggregateCounter::AggregateCounter()
-    : _root(0), _free(0), _call_nnz_h(0), _call_count_h(0)
+
+template <typename T>
+AggregateCounterBase<T>::AggregateCounterBase()
+    : _state(), _call_nnz_h(0), _call_count_h(0)
 {
 }
 
-AggregateCounter::~AggregateCounter()
+template <typename T>
+AggregateCounterBase<T>::~AggregateCounterBase()
 {
 }
 
-AggregateCounter::Node *
-AggregateCounter::new_node_block()
+template <typename T>
+Node *
+AggregateCounterBase<T>::new_node_block(AggregateCounterState &s)
 {
-    assert(!_free);
+    assert(!s.free);
     int block_size = 1024;
     Node *block = new Node[block_size];
     if (!block)
 	return 0;
-    _blocks.push_back(block);
+    s.blocks.push_back(block);
     for (int i = 1; i < block_size - 1; i++)
 	block[i].child[0] = &block[i+1];
     block[block_size - 1].child[0] = 0;
-    _free = &block[1];
+    s.free = &block[1];
     return &block[0];
 }
 
-int
-AggregateCounter::configure(Vector<String> &conf, ErrorHandler *errh)
+template <typename T> int
+AggregateCounterBase<T>::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool bytes = false;
     bool ip_bytes = false;
@@ -113,35 +117,41 @@ AggregateCounter::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int
-AggregateCounter::initialize(ErrorHandler *errh)
+template <typename T> int
+AggregateCounterBase<T>::initialize(ErrorHandler *errh)
 {
     if (_call_nnz_h && _call_nnz_h->initialize_write(this, errh) < 0)
 	return -1;
     if (_call_count_h && _call_count_h->initialize_write(this, errh) < 0)
 	return -1;
 
-    if (clear(errh) < 0)
-	return -1;
+
+    for (auto &s : _state) {
+        if (clear(s, errh) < 0)
+                return -1;
+    }
 
     _frozen = false;
     _active = true;
     return 0;
 }
 
-void
-AggregateCounter::cleanup(CleanupStage)
+template <typename T> void
+AggregateCounterBase<T>::cleanup(CleanupStage)
 {
-    for (int i = 0; i < _blocks.size(); i++)
-	delete[] _blocks[i];
-    _blocks.clear();
+    for (auto &s : _state) {
+        for (int i = 0; i < s.blocks.size(); i++)
+            delete[] s.blocks[i];
+        s.blocks.clear();
+    }
     delete _call_nnz_h;
     delete _call_count_h;
     _call_nnz_h = _call_count_h = 0;
 }
 
-AggregateCounter::Node *
-AggregateCounter::make_peer(uint32_t a, Node *n, bool frozen)
+template <typename T>
+Node *
+AggregateCounterBase<T>::make_peer(uint32_t a, Node *n, bool frozen)
 {
     /*
      * become a peer
@@ -153,11 +163,11 @@ AggregateCounter::make_peer(uint32_t a, Node *n, bool frozen)
 	return 0;
 
     Node *down[2];
-    if (!(down[0] = new_node()))
-	return 0;
-    if (!(down[1] = new_node())) {
-	free_node(down[0]);
-	return 0;
+    if (!(down[0] = new_node(*_state)))
+	    return 0;
+    if (!(down[1] = new_node(*_state))) {
+	    free_node(*_state,down[0]);
+	    return 0;
     }
 
     // swivel is first bit 'a' and 'old->input' differ
@@ -185,11 +195,12 @@ AggregateCounter::make_peer(uint32_t a, Node *n, bool frozen)
     return (n->aggregate == a ? n : down[bitvalue]);
 }
 
-AggregateCounter::Node *
-AggregateCounter::find_node(uint32_t a, bool frozen)
+template <typename T>
+Node *
+AggregateCounterBase<T>::find_node(uint32_t a, bool frozen)
 {
     // straight outta tcpdpriv
-    Node *n = _root;
+    Node *n = _state->root;
     while (n) {
 	if (n->aggregate == a)
 	    return (n->count || !frozen ? n : 0);
@@ -208,15 +219,69 @@ AggregateCounter::find_node(uint32_t a, bool frozen)
     }
 
     if (!frozen)
-	click_chatter("AggregateCounter: out of memory!");
+	click_chatter("%p{element} out of memory!",this);
     return 0;
 }
 
-inline bool
-AggregateCounter::update(Packet *p, bool frozen)
+template <typename T> inline bool
+AggregateCounterBase<T>::update_batch(PacketBatch *batch, bool frozen)
 {
     if (!_active)
 	return false;
+
+    uint32_t last_agg = 0;
+    Node *n = 0;
+    AggregateCounterState &s = _state.get();
+
+    FOR_EACH_PACKET(batch,p) {
+        // AGGREGATE_ANNO is already in host byte order!
+        uint32_t agg = AGGREGATE_ANNO(p);
+        if (agg == last_agg && n) {
+        } else {
+            n = find_node(last_agg, frozen);
+            if (!n)
+                return false;
+            last_agg = agg;
+        }
+
+        uint32_t amount;
+        if (!_bytes)
+            amount = 1 + (_use_packet_count ? EXTRA_PACKETS_ANNO(p) : 0);
+        else {
+            amount = p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0);
+        if (_ip_bytes && p->has_network_header())
+            amount -= p->network_header_offset();
+        }
+
+        // update _num_nonzero; possibly call handler
+        if (amount && !n->count) {
+            if (_num_nonzero >= _call_nnz) {
+                _call_nnz = (uint32_t)(-1);
+                _call_nnz_h->call_write();
+                // handler may have changed our state; reupdate
+                return update(p, frozen || _frozen);
+            }
+            _num_nonzero++;
+        }
+
+        n->count += amount;
+        s.count += amount;
+        if (s.count >= _call_count) {
+            _call_count = (uint64_t)(-1);
+            _call_count_h->call_write();
+        }
+    }
+    return true;
+}
+
+
+template <typename T> inline bool
+AggregateCounterBase<T>::update(Packet *p, bool frozen)
+{
+    if (!_active)
+	return false;
+
+    AggregateCounterState& s = _state.get();
 
     // AGGREGATE_ANNO is already in host byte order!
     uint32_t agg = AGGREGATE_ANNO(p);
@@ -245,23 +310,23 @@ AggregateCounter::update(Packet *p, bool frozen)
     }
 
     n->count += amount;
-    _count += amount;
-    if (_count >= _call_count) {
+    s.count += amount;
+    if (s.count >= _call_count) {
 	_call_count = (uint64_t)(-1);
 	_call_count_h->call_write();
     }
     return true;
 }
 
-void
-AggregateCounter::push(int port, Packet *p)
+template <typename T> void
+AggregateCounterBase<T>::push(int port, Packet *p)
 {
     port = !update(p, _frozen || (port == 1));
     output(noutputs() == 1 ? 0 : port).push(p);
 }
 
-Packet *
-AggregateCounter::pull(int port)
+template <typename T> Packet *
+AggregateCounterBase<T>::pull(int port)
 {
     Packet *p = input(ninputs() == 1 ? 0 : port).pull();
     if (p && _active)
@@ -269,90 +334,114 @@ AggregateCounter::pull(int port)
     return p;
 }
 
+#if HAVE_BATCH
+template <typename T> void
+AggregateCounterBase<T>::push_batch(int port, PacketBatch *batch)
+{
+    auto fnt = [this,port](Packet*p){return !update(p, _frozen || (port == 1));};
+    CLASSIFY_EACH_PACKET(2,fnt,batch,[this](int port, PacketBatch* batch){ output(noutputs() == 1 ? 0 : port).push_batch(batch);});
+}
+
+template <typename T> PacketBatch *
+AggregateCounterBase<T>::pull_batch(int port,unsigned max)
+{
+    PacketBatch *batch = input(ninputs() == 1 ? 0 : port).pull_batch(max);
+    if (batch && _active) {
+        FOR_EACH_PACKET(batch,p) {
+        update(p, _frozen || (port == 1));
+        }
+    }
+    return batch;
+}
+#endif
+
 
 // CLEAR, REAGGREGATE
 
-void
-AggregateCounter::clear_node(Node *n)
+template <typename T> void
+AggregateCounterBase<T>::clear_node(AggregateCounterState &s, Node *n)
 {
     if (n->child[0]) {
-	clear_node(n->child[0]);
-	clear_node(n->child[1]);
+	clear_node(s, n->child[0]);
+	clear_node(s, n->child[1]);
     }
-    free_node(n);
+    free_node(s,n);
 }
 
-int
-AggregateCounter::clear(ErrorHandler *errh)
+template <typename T> int
+AggregateCounterBase<T>::clear(AggregateCounterState &s, ErrorHandler *errh)
 {
-    if (_root)
-	clear_node(_root);
-
-    if (!(_root = new_node())) {
-	if (errh)
-	    errh->error("out of memory!");
-	return -1;
+    if (s.root)
+        clear_node(s, s.root);
+    if (!(s.root = new_node(s))) {
+        if (errh)
+            errh->error("out of memory!");
+        return -1;
     }
-    _root->aggregate = 0;
-    _root->count = 0;
-    _root->child[0] = _root->child[1] = 0;
+
+    s.root->aggregate = 0;
+    s.root->count = 0;
+    s.root->child[0] = s.root->child[1] = 0;
     _num_nonzero = 0;
-    _count = 0;
+    s.count = 0;
     return 0;
 }
 
 
-void
-AggregateCounter::reaggregate_node(Node *n)
+template <typename T> void
+AggregateCounterBase<T>::reaggregate_node(AggregateCounterState &s, Node *n)
 {
     Node *l = n->child[0], *r = n->child[1];
     uint32_t count = n->count;
-    free_node(n);
+    free_node(s, n);
 
     if ((n = find_node(count, false))) {
 	if (!n->count)
 	    _num_nonzero++;
 	n->count++;
-	_count++;
+	s.count++;
     }
 
     if (l) {
-	reaggregate_node(l);
-	reaggregate_node(r);
+	reaggregate_node(s,l);
+	reaggregate_node(s, r);
     }
 }
 
-void
-AggregateCounter::reaggregate_counts()
+template <typename T> void
+AggregateCounterBase<T>::reaggregate_counts()
 {
-    Node *old_root = _root;
-    _root = 0;
-    clear();
-    reaggregate_node(old_root);
+    for (auto &s : _state) {
+        Node *old_root = s.root;
+        s.root = 0;
+        clear(s);
+        reaggregate_node(s, old_root);
+    }
 }
 
 
 // HANDLERS
 
-static void
-write_batch(FILE *f, AggregateCounter::WriteFormat format,
+template <typename T>
+void
+AggregateCounterBase<T>::write_batch(FILE *f, WriteFormat format,
 	    uint32_t *buffer, int pos, double count, ErrorHandler *)
 {
-    if (format == AggregateCounter::WR_BINARY)
+    if (format == AggregateCounterBase<T>::WR_BINARY)
 	ignore_result(fwrite(buffer, sizeof(uint32_t), pos, f));
-    else if (format == AggregateCounter::WR_TEXT_IP)
+    else if (format == AggregateCounterBase<T>::WR_TEXT_IP)
 	for (int i = 0; i < pos; i += 2)
 	    fprintf(f, "%d.%d.%d.%d %u\n", (buffer[i] >> 24) & 255, (buffer[i] >> 16) & 255, (buffer[i] >> 8) & 255, buffer[i] & 255, buffer[i+1]);
-    else if (format == AggregateCounter::WR_TEXT_PDF)
+    else if (format == AggregateCounterBase<T>::WR_TEXT_PDF)
 	for (int i = 0; i < pos; i += 2)
 	    fprintf(f, "%u %.12g\n", buffer[i], buffer[i+1] / count);
-    else if (format == AggregateCounter::WR_TEXT)
+    else if (format == AggregateCounterBase<T>::WR_TEXT)
 	for (int i = 0; i < pos; i += 2)
 	    fprintf(f, "%u %u\n", buffer[i], buffer[i+1]);
 }
 
-void
-AggregateCounter::write_nodes(Node *n, FILE *f, WriteFormat format,
+template <typename T> void
+AggregateCounterBase<T>::write_nodes(const Node *n, FILE *f, WriteFormat format,
 			      uint32_t *buffer, int &pos, int len,
 			      ErrorHandler *errh) const
 {
@@ -360,7 +449,7 @@ AggregateCounter::write_nodes(Node *n, FILE *f, WriteFormat format,
 	buffer[pos++] = n->aggregate;
 	buffer[pos++] = n->count;
 	if (pos == len) {
-	    write_batch(f, format, buffer, pos, _count, errh);
+	    write_batch(f, format, buffer, pos, _state.cst().count, errh);
 	    pos = 0;
 	}
     }
@@ -371,8 +460,8 @@ AggregateCounter::write_nodes(Node *n, FILE *f, WriteFormat format,
 	write_nodes(n->child[1], f, format, buffer, pos, len, errh);
 }
 
-int
-AggregateCounter::write_file(String where, WriteFormat format,
+template <typename T> int
+AggregateCounterBase<T>::write_file(String where, WriteFormat format,
 			     ErrorHandler *errh) const
 {
     FILE *f;
@@ -401,9 +490,10 @@ AggregateCounter::write_file(String where, WriteFormat format,
 
     uint32_t buf[1024];
     int pos = 0;
-    write_nodes(_root, f, format, buf, pos, 1024, errh);
+    for (auto const &s : _state)
+        write_nodes(s.root, f, format, buf, pos, 1024, errh);
     if (pos)
-	write_batch(f, format, buf, pos, _count, errh);
+	    write_batch(f, format, buf, pos, _state.cst().count, errh);
 
     bool had_err = ferror(f);
     if (f != stdout)
@@ -414,10 +504,10 @@ AggregateCounter::write_file(String where, WriteFormat format,
 	return 0;
 }
 
-int
-AggregateCounter::write_file_handler(const String &data, Element *e, void *thunk, ErrorHandler *errh)
+template <typename T> int
+AggregateCounterBase<T>::write_file_handler(const String &data, Element *e, void *thunk, ErrorHandler *errh)
 {
-    AggregateCounter *ac = static_cast<AggregateCounter *>(e);
+    AggregateCounterBase<T> *ac = static_cast<AggregateCounterBase<T> *>(e);
     String fn;
     if (!FilenameArg().parse(cp_uncomment(data), fn))
 	return errh->error("argument should be filename");
@@ -430,10 +520,10 @@ enum {
     AC_AGGREGATE_CALL, AC_COUNT_CALL, AC_NAGG, AC_COUNT
 };
 
-String
-AggregateCounter::read_handler(Element *e, void *thunk)
+template <typename T> String
+AggregateCounterBase<T>::read_handler(Element *e, void *thunk)
 {
-    AggregateCounter *ac = static_cast<AggregateCounter *>(e);
+    AggregateCounterBase<T> *ac = static_cast<AggregateCounterBase<T> *>(e);
     switch ((intptr_t)thunk) {
       case AC_BANNER:
 	return ac->_output_banner;
@@ -448,7 +538,7 @@ AggregateCounter::read_handler(Element *e, void *thunk)
 	else
 	    return String(ac->_call_count) + " " + ac->_call_count_h->unparse();
       case AC_COUNT:
-	return String(ac->_count);
+	return String(ac->_state->count);
       case AC_NAGG:
 	return String(ac->_num_nonzero);
       default:
@@ -456,10 +546,10 @@ AggregateCounter::read_handler(Element *e, void *thunk)
     }
 }
 
-int
-AggregateCounter::write_handler(const String &data, Element *e, void *thunk, ErrorHandler *errh)
+template <typename T> int
+AggregateCounterBase<T>::write_handler(const String &data, Element *e, void *thunk, ErrorHandler *errh)
 {
-    AggregateCounter *ac = static_cast<AggregateCounter *>(e);
+    AggregateCounterBase<T> *ac = static_cast<AggregateCounterBase<T> *>(e);
     String s = cp_uncomment(data);
     switch ((intptr_t)thunk) {
       case AC_FROZEN: {
@@ -490,8 +580,13 @@ AggregateCounter::write_handler(const String &data, Element *e, void *thunk, Err
 	else if (data && data.length() == 1)
 	    ac->_output_banner = "";
 	return 0;
-      case AC_CLEAR:
-	return ac->clear(errh);
+      case AC_CLEAR: {
+          int ret = 0;
+          for (auto &s : ac->_state) {
+              if (ac->clear(s,errh) != 0)
+                  ret = -1;
+          }
+          return ret;}
       case AC_AGGREGATE_CALL: {
 	  uint32_t new_nnz = (uint32_t)(-1);
 	  if (s) {
@@ -519,8 +614,9 @@ AggregateCounter::write_handler(const String &data, Element *e, void *thunk, Err
     }
 }
 
-void
-AggregateCounter::add_handlers()
+
+template <typename T> void
+AggregateCounterBase<T>::add_handlers()
 {
     add_write_handler("write_text_file", write_file_handler, WR_TEXT);
     add_write_handler("write_ascii_file", write_file_handler, WR_TEXT);
@@ -545,6 +641,11 @@ AggregateCounter::add_handlers()
     add_read_handler("nagg", read_handler, AC_NAGG);
 }
 
+template class AggregateCounterBase<not_per_thread<AggregateCounterState> >;
+template class AggregateCounterBase<per_thread<AggregateCounterState> >;
+
 ELEMENT_REQUIRES(userlevel int64)
 EXPORT_ELEMENT(AggregateCounter)
+EXPORT_ELEMENT(AggregateCounterIMP)
+ELEMENT_MT_SAFE(AggregateCounterIMP)
 CLICK_ENDDECLS

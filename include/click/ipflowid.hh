@@ -176,6 +176,12 @@ inline bool operator!=(const IPFlowID &a, const IPFlowID &b)
 	|| a.saddr() != b.saddr() || a.daddr() != b.daddr();
 }
 
+
+inline IPFlowID operator&(const IPFlowID &a, const IPFlowID &b)
+{
+    return IPFlowID(a.saddr() & b.saddr(), a.sport() & b.sport(), a.daddr() & b.daddr(), a.dport() & b.dport());
+}
+
 StringAccum &operator<<(StringAccum &, const IPFlowID &);
 
 inline IPFlowID::operator String() const

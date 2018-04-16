@@ -696,6 +696,7 @@ LIBOBJS
 freebsd_includedir
 freebsd_srcdir
 FINDELEMFLAGS
+all_element_groups
 element_groups
 linux_srcdir
 linux_builddir
@@ -1970,6 +1971,48 @@ fi
 
 } # ac_fn_cxx_try_cpp
 
+# ac_fn_cxx_try_run LINENO
+# ------------------------
+# Try to link conftest.$ac_ext, and return whether this succeeded. Assumes
+# that executables *can* be run.
+ac_fn_cxx_try_run ()
+{
+  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
+  if { { ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
+$as_echo "$ac_try_echo"; } >&5
+  (eval "$ac_link") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; } && { ac_try='./conftest$ac_exeext'
+  { { case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
+$as_echo "$ac_try_echo"; } >&5
+  (eval "$ac_try") 2>&5
+  ac_status=$?
+  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+  test $ac_status = 0; }; }; then :
+  ac_retval=0
+else
+  $as_echo "$as_me: program exited with status $ac_status" >&5
+       $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+       ac_retval=$ac_status
+fi
+  rm -rf conftest.dSYM conftest_ipa8_conftest.oo
+  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
+  as_fn_set_status $ac_retval
+
+} # ac_fn_cxx_try_run
+
 # ac_fn_cxx_check_header_mongrel LINENO HEADER VAR INCLUDES
 # ---------------------------------------------------------
 # Tests whether HEADER exists, giving a warning if it cannot be compiled using
@@ -2215,48 +2258,6 @@ $as_echo "$ac_res" >&6; }
   eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
 
 } # ac_fn_c_check_func
-
-# ac_fn_cxx_try_run LINENO
-# ------------------------
-# Try to link conftest.$ac_ext, and return whether this succeeded. Assumes
-# that executables *can* be run.
-ac_fn_cxx_try_run ()
-{
-  as_lineno=${as_lineno-"$1"} as_lineno_stack=as_lineno_stack=$as_lineno_stack
-  if { { ac_try="$ac_link"
-case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
-$as_echo "$ac_try_echo"; } >&5
-  (eval "$ac_link") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; } && { ac_try='./conftest$ac_exeext'
-  { { case "(($ac_try" in
-  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
-  *) ac_try_echo=$ac_try;;
-esac
-eval ac_try_echo="\"\$as_me:${as_lineno-$LINENO}: $ac_try_echo\""
-$as_echo "$ac_try_echo"; } >&5
-  (eval "$ac_try") 2>&5
-  ac_status=$?
-  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
-  test $ac_status = 0; }; }; then :
-  ac_retval=0
-else
-  $as_echo "$as_me: program exited with status $ac_status" >&5
-       $as_echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-       ac_retval=$ac_status
-fi
-  rm -rf conftest.dSYM conftest_ipa8_conftest.oo
-  eval $as_lineno_stack; ${as_lineno_stack:+:} unset as_lineno
-  as_fn_set_status $ac_retval
-
-} # ac_fn_cxx_try_run
 
 # ac_fn_cxx_compute_int LINENO EXPR VAR INCLUDES
 # ----------------------------------------------
@@ -5838,6 +5839,32 @@ ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ex
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <new>
+
+int main() {
+    std::size_t sz = 8;
+    std::align_val_t al{64};
+    void* a = operator new(sz,al);
+    return (a == nullptr?1:0);
+}
+_ACEOF
+if ac_fn_cxx_try_run "$LINENO"; then :
+  $as_echo "#define HAVE_ALIGNED_NEW 1" >>confdefs.h
+
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
 
 
     test -z "$ac_user_kernel_cc" && \
@@ -7521,6 +7548,7 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_json" = x \) && enable_json=yes
 if test "x$enable_json" = xyes; then
     :
+    $as_echo "#define HAVE_JSON 1" >>confdefs.h
 
 fi
 # Check whether --enable-local was given.
@@ -7637,11 +7665,14 @@ else
 fi
 
 
-for i in `(cd $srcdir/elements; ls | sed '/^CVS$/d;/^bsdmodule$/d;/^linuxmodule$/d;/^ns$/d;/^userlevel$/d;/^minios$/d')`; do
+all_element_groups=
+for i in `(cd $srcdir/elements; ls | sed '/^CVS$/d;/^\.git/d;/^bsdmodule$/d;/^linuxmodule$/d;/^ns$/d;/^userlevel$/d;/^minios$/d')`; do
     enableval=`eval 'echo $'"enable_$i"`
     test "x$enable_all_elements" = xyes -a "x$enableval" '!=' xno && enableval=yes
     test -d "$srcdir/elements/$i" -a "$enableval" = "yes" && element_groups="$element_groups $i"
+    test -d "$srcdir/elements/$i" && all_element_groups="$all_element_groups$i "
 done
+
 
 FINDELEMFLAGS=
 if test "x$enable_skip_elements" != xno -a "x$enable_skip_elements" != xyes; then
@@ -7768,7 +7799,7 @@ esac
 fi
 
 
-for ac_func in random snprintf strnlen strtof strtold strtoul tcgetpgrp vsnprintf
+for ac_func in random snprintf strnlen strtof strtold strtoul tcgetpgrp vsnprintf aligned_alloc
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -14160,7 +14191,7 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
     provisions="$provisions microhttpd"
 fi
 
-if test "x$use_netmap" != xno; then
+if test "x$HAVE_NETMAP" == xyes; then
     provisions="$provisions netmap"
 fi
 
@@ -15558,3 +15589,15 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+
+echo "
+
+Configuration:
+    C Compiler:                  ${CC}
+    C++ Compiler:                ${CXX}
+
+    DPDK support:                ${enable_dpdk}
+    Netmap support:              ${HAVE_NETMAP}
+"
+
+echo "Now type make to build FastClick..."

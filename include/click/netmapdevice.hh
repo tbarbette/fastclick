@@ -93,6 +93,10 @@ public:
 				(p->buffer() > NetmapBufQ::buf_start && p->buffer() < NetmapBufQ::buf_end));
 	}
 
+	inline static bool is_valid_netmap_buffer(void* data) {
+		return (data > NetmapBufQ::buf_start && data < NetmapBufQ::buf_end);
+	}
+
 	inline static bool is_valid_netmap_packet(Packet* p) {
 		return (p->buffer() > NetmapBufQ::buf_start && p->buffer() < NetmapBufQ::buf_end);
 	}

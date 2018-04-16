@@ -1,6 +1,7 @@
 #ifndef CLICK_AGGCOUNTER_HH
 #define CLICK_AGGCOUNTER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
+#include <click/multithread.hh>
 CLICK_DECLS
 class HandlerCall;
 
@@ -189,12 +190,28 @@ form.
 
 AggregateIP, AggregatePacketCounter, FromIPSummaryDump, FromDump */
 
-class AggregateCounter : public Element { public:
+struct Node {
+    uint32_t aggregate;
+    uint32_t count;
+    Node *child[2];
+};
 
-    AggregateCounter() CLICK_COLD;
-    ~AggregateCounter() CLICK_COLD;
+struct AggregateCounterState {
+    Node* root;
+    Node* free;
+    Vector<Node*>  blocks;
+    uint64_t count;
+    AggregateCounterState() : root(0), free(0), blocks(), count(0) {
 
-    const char *class_name() const	{ return "AggregateCounter"; }
+    }
+};
+
+template <typename T>
+class AggregateCounterBase : public BatchElement { public:
+
+    AggregateCounterBase() CLICK_COLD;
+    ~AggregateCounterBase() CLICK_COLD;
+
     const char *port_count() const	{ return "1-2/1-2"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -203,22 +220,21 @@ class AggregateCounter : public Element { public:
     void add_handlers() CLICK_COLD;
 
     inline bool update(Packet *, bool frozen = false);
+    inline bool update_batch(PacketBatch *, bool frozen = false);
     void push(int, Packet *);
     Packet *pull(int);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *) override;
+    PacketBatch *pull_batch(int, unsigned) override;
+#endif
 
     bool empty() const			{ return _num_nonzero == 0; }
-    int clear(ErrorHandler * = 0);
+    int clear(AggregateCounterState &s, ErrorHandler * = 0);
     enum WriteFormat { WR_TEXT = 0, WR_BINARY = 1, WR_TEXT_IP = 2, WR_TEXT_PDF = 3 };
     int write_file(String, WriteFormat, ErrorHandler *) const;
     void reaggregate_counts();
 
   private:
-
-    struct Node {
-	uint32_t aggregate;
-	uint32_t count;
-	Node *child[2];
-    };
 
     bool _bytes : 1;
     bool _ip_bytes : 1;
@@ -227,11 +243,8 @@ class AggregateCounter : public Element { public:
     bool _frozen;
     bool _active;
 
-    Node *_root;
-    Node *_free;
-    Vector<Node *> _blocks;
+    T _state;
     uint32_t _num_nonzero;
-    uint64_t _count;
 
     uint32_t _call_nnz;
     HandlerCall *_call_nnz_h;
@@ -240,38 +253,48 @@ class AggregateCounter : public Element { public:
 
     String _output_banner;
 
-    Node *new_node();
-    Node *new_node_block();
-    void free_node(Node *);
+    Node *new_node(AggregateCounterState &s);
+    Node *new_node_block(AggregateCounterState &s);
+    void free_node(AggregateCounterState &s, Node *);
 
     Node *make_peer(uint32_t, Node *, bool frozen);
     Node *find_node(uint32_t, bool frozen = false);
-    void reaggregate_node(Node *);
-    void clear_node(Node *);
+    void reaggregate_node(AggregateCounterState &s, Node *);
+    void clear_node(AggregateCounterState &s, Node *);
 
-    void write_nodes(Node *, FILE *, WriteFormat, uint32_t *, int &, int, ErrorHandler *) const;
+    static void write_batch(FILE *f, WriteFormat format, uint32_t *buffer, int pos, double count, ErrorHandler *);
+    void write_nodes(const Node *, FILE *, WriteFormat, uint32_t *, int &, int, ErrorHandler *) const;
     static int write_file_handler(const String &, Element *, void *, ErrorHandler *);
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
 
 };
+class AggregateCounter : public AggregateCounterBase<not_per_thread<AggregateCounterState> > { public:
+    const char *class_name() const  { return "AggregateCounter"; }
+};
 
-inline AggregateCounter::Node *
-AggregateCounter::new_node()
+class AggregateCounterIMP : public AggregateCounterBase<per_thread<AggregateCounterState> > { public:
+    const char *class_name() const  { return "AggregateCounterIMP"; }
+};
+
+
+template <typename T>
+Node *
+AggregateCounterBase<T>::new_node(AggregateCounterState &s)
 {
-    if (_free) {
-	Node *n = _free;
-	_free = n->child[0];
+    if (s.free) {
+	Node *n = s.free;
+	s.free = n->child[0];
 	return n;
     } else
-	return new_node_block();
+	return new_node_block(s);
 }
 
-inline void
-AggregateCounter::free_node(Node *n)
+template <typename T> inline void
+AggregateCounterBase<T>::free_node(AggregateCounterState &s, Node *n)
 {
-    n->child[0] = _free;
-    _free = n;
+    n->child[0] = s.free;
+    s.free = n;
 }
 
 CLICK_ENDDECLS

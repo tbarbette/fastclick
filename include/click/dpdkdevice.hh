@@ -1,7 +1,11 @@
 #ifndef CLICK_DPDKDEVICE_HH
 #define CLICK_DPDKDEVICE_HH
 
-//Prevent bug under some configurations (like travis-ci's one) where these macros get undefined
+/**
+ * Prevent bug under some configurations
+ * (like travis-ci's one) where these
+ * macros get undefined.
+ */
 #ifndef UINT8_MAX
 #define UINT8_MAX 255
 #endif
@@ -19,7 +23,7 @@
 #include <rte_version.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
-#include <rte_bus_pci.h>
+    #include <rte_bus_pci.h>
 #endif
 
 #include <click/packet.hh>
@@ -28,6 +32,19 @@
 #include <click/vector.hh>
 #include <click/args.hh>
 #include <click/etheraddress.hh>
+#include <click/timer.hh>
+
+/**
+ * Unified type for DPDK port IDs.
+ * Until DPDK v17.05 was uint8_t
+ * After DPDK v17.05 has been uint16_t
+ */
+#ifndef PORTID_T_DEFINED
+    #define PORTID_T_DEFINED
+    typedef uint8_t portid_t;
+#else
+    // Already defined in <testpmd.h>
+#endif
 
 CLICK_DECLS
 class DPDKDeviceArg;
@@ -43,36 +60,75 @@ extern bool dpdk_enabled;
 class DPDKDevice {
 public:
 
-    unsigned port_id;
+    portid_t port_id;
 
-    DPDKDevice();
-    DPDKDevice(unsigned port_id);
+    DPDKDevice() CLICK_COLD;
+    DPDKDevice(portid_t port_id) CLICK_COLD;
 
-    int add_rx_queue(int &queue_id, bool promisc,
-                             unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
+    struct DevInfo {
+        inline DevInfo() :
+            vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
+            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
+            n_tx_descs(0),
+            init_mac(), init_mtu(0) {
+            rx_queues.reserve(128);
+            tx_queues.reserve(128);
+        }
 
-    int add_tx_queue(int &queue_id, unsigned n_desc,
-                             ErrorHandler *errh) CLICK_COLD;
+        void print_device_info() {
+            click_chatter("   Vendor   ID: %d", vendor_id);
+            click_chatter("   Vendor Name: %s", vendor_name.c_str());
+            click_chatter("   Device   ID: %d", device_id);
+            click_chatter("   Driver Name: %s", driver);
+            click_chatter("Promisc   Mode: %s", promisc? "true":"false");
+            click_chatter("   MAC Address: %s", init_mac.unparse().c_str());
+            click_chatter("# of Rx Queues: %d", rx_queues.size());
+            click_chatter("# of Tx Queues: %d", tx_queues.size());
+            click_chatter("# of Rx  Descs: %d", n_rx_descs);
+            click_chatter("# of Tx  Descs: %d", n_tx_descs);
+        }
+
+        uint16_t vendor_id;
+        String vendor_name;
+        uint16_t device_id;
+        const char *driver;
+        Vector<bool> rx_queues;
+        Vector<bool> tx_queues;
+        bool promisc;
+        unsigned n_rx_descs;
+        unsigned n_tx_descs;
+        EtherAddress init_mac;
+        uint16_t init_mtu;
+    };
+
+    int add_rx_queue(
+        unsigned &queue_id, bool promisc,
+        unsigned n_desc, ErrorHandler *errh
+    ) CLICK_COLD;
+
+    int add_tx_queue(
+        unsigned &queue_id, unsigned n_desc,
+        ErrorHandler *errh
+    ) CLICK_COLD;
 
     EtherAddress get_mac();
-
-    void set_mac(EtherAddress mac);
+    void set_init_mac(EtherAddress mac);
+    void set_init_mtu(uint16_t mtu);
 
     unsigned int get_nb_txdesc();
 
     uint16_t get_device_vendor_id();
-
     String get_device_vendor_name();
-
     uint16_t get_device_id();
-
     const char *get_device_driver();
 
     static struct rte_mempool *get_mpool(unsigned int);
 
-    static int get_port_numa_node(unsigned port_id);
+    static int get_port_numa_node(portid_t port_id);
 
     static int initialize(ErrorHandler *errh);
+
+    static int static_initialize(ErrorHandler *errh);
 
     static int static_cleanup();
 
@@ -90,7 +146,7 @@ public:
 
     static void free_pkt(unsigned char *, size_t, void *pktmbuf);
 
-    static unsigned int get_nb_txdesc(unsigned port_id);
+    static unsigned int get_nb_txdesc(const portid_t &port_id);
 
     static int NB_MBUF;
     static int MBUF_DATA_SIZE;
@@ -110,70 +166,62 @@ public:
     static unsigned DEF_RING_NDESC;
     static unsigned DEF_BURST_SIZE;
 
+    static unsigned RING_FLAGS;
     static unsigned RING_SIZE;
     static unsigned RING_POOL_CACHE_SIZE;
     static unsigned RING_PRIV_DATA_SIZE;
 
     static struct rte_mempool** _pktmbuf_pools;
 
+    /*
+    * TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
+    * to be sent. It is used as an internal buffer to be passed to DPDK ring
+    * queue.
+    * |-> index is the index of the first valid packet awaiting to be sent, while
+    *     nr_pending is the number of packets.
+    * |-> index + nr_pending may be greater than
+    *     _internal_tx_queue_size but index should be wrapped-around.
+    */
+    class TXInternalQueue {
+        public:
+            TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
+
+            // Array of DPDK Buffers
+            struct rte_mbuf **pkts;
+            // Index of the first valid packet in the packets array
+            unsigned int index;
+            // Number of valid packets awaiting to be sent after index
+            unsigned int nr_pending;
+
+            // Timer to limit time a batch will take to be completed
+            Timer timeout;
+    } __attribute__((aligned(64)));
+
+
 private:
 
     enum Dir { RX, TX };
 
-    struct DevInfo {
-        inline DevInfo() :
-            vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
-            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0), mac() {
-            rx_queues.reserve(128);
-            tx_queues.reserve(128);
-        }
-
-        void print_device_info() {
-            click_chatter("   Vendor   ID: %d", vendor_id);
-            click_chatter("   Vendor Name: %s", vendor_name.c_str());
-            click_chatter("   Device   ID: %d", device_id);
-            click_chatter("   Driver Name: %s", driver);
-            click_chatter("Promisc   Mode: %s", promisc? "true":"false");
-            click_chatter("   MAC Address: %s", mac.unparse().c_str());
-            click_chatter("# of Rx Queues: %d", rx_queues.size());
-            click_chatter("# of Tx Queues: %d", tx_queues.size());
-            click_chatter("# of Rx  Descs: %d", n_rx_descs);
-            click_chatter("# of Tx  Descs: %d", n_tx_descs);
-        }
-
-        uint16_t vendor_id;
-        String vendor_name;
-        uint16_t device_id;
-        const char *driver;
-        Vector<bool> rx_queues;
-        Vector<bool> tx_queues;
-        bool promisc;
-        unsigned n_rx_descs;
-        unsigned n_tx_descs;
-        EtherAddress mac;
-    };
-
     struct DevInfo info;
 
     static bool _is_initialized;
-    static HashTable<unsigned, DPDKDevice> _devs;
-    static int _nr_pktmbuf_pools;
+    static HashTable<portid_t, DPDKDevice> _devs;
+    static unsigned _nr_pktmbuf_pools;
     static bool no_more_buffer_msg_printed;
 
     int initialize_device(ErrorHandler *errh) CLICK_COLD;
-    int add_queue(Dir dir, int &queue_id, bool promisc,
+    int add_queue(Dir dir, unsigned &queue_id, bool promisc,
                    unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
-    static bool alloc_pktmbufs() CLICK_COLD;
+    static int alloc_pktmbufs() CLICK_COLD;
 
-    static DPDKDevice* get_device(unsigned port_id) {
-       return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
+    static DPDKDevice* get_device(const portid_t &port_id) {
+        return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
     }
 
-    static int get_port_from_pci(uint16_t domain, uint8_t bus, uint8_t dev_id, uint8_t function) {
+    static int get_port_from_pci(uint32_t domain, uint8_t bus, uint8_t dev_id, uint8_t function) {
        struct rte_eth_dev_info dev_info;
-       for (uint8_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
+       for (portid_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
           rte_eth_dev_info_get(port_id, &dev_info);
           struct rte_pci_addr addr = dev_info.pci_dev->addr;
           if (addr.domain   == domain &&

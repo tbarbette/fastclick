@@ -109,28 +109,28 @@ class KernelTun : public BatchElement { public:
     KernelTun() CLICK_COLD;
     ~KernelTun() CLICK_COLD;
 
-    const char *class_name() const	{ return "KernelTun"; }
-    const char *port_count() const	{ return "0-1/1-2"; }
-    const char *processing() const	{ return "a/h"; }
-    const char *flow_code() const	{ return "x/y"; }
-    const char *flags() const		{ return "S3"; }
+    const char *class_name() const override	{ return "KernelTun"; }
+    const char *port_count() const override	{ return "0-1/1-2"; }
+    const char *processing() const override	{ return "a/h"; }
+    const char *flow_code() const override	{ return "x/y"; }
+    const char *flags() const override		{ return "S3"; }
 
-    void *cast(const char *);
-    int configure_phase() const		{ return CONFIGURE_PHASE_PRIVILEGED - 1; }
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
-    void cleanup(CleanupStage) CLICK_COLD;
-    void add_handlers() CLICK_COLD;
+    void *cast(const char *) override;
+    int configure_phase() const override	{ return CONFIGURE_PHASE_PRIVILEGED - 1; }
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
+    void cleanup(CleanupStage) override CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
     
     bool get_spawning_threads(Bitvector &, bool) override;
 
-    void selected(int fd, int mask);
+    void selected(int fd, int mask) override;
 
+    void push(int port, Packet *) override;
 #if HAVE_BATCH
-    void push_batch(int,PacketBatch*);
+    void push_batch(int port, PacketBatch *) override;
 #endif
-    void push(int port, Packet *);
-    bool run_task(Task *);
+    bool run_task(Task *) override;
 
   private:
 
@@ -168,7 +168,8 @@ class KernelTun : public BatchElement { public:
     int alloc_tun(ErrorHandler *);
     int setup_tun(ErrorHandler *);
     int updown(IPAddress, IPAddress, ErrorHandler *);
-    bool one_selected(const Timestamp &now);
+    int one_selected(const Timestamp &now, WritablePacket* &p);
+    void process(Packet* p);
 
     friend class KernelTap;
 

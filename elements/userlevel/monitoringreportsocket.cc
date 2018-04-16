@@ -1,6 +1,6 @@
 // -*- mode: c++; c-basic-offset: 2 -*-
 /*
- * monitoringreportsocket.{cc,hh} -- periodically reports timestampted
+ * monitoringreportsocket.{cc,hh} -- periodically reports timestamped
  * values of element handlers via a UDP or TCP socket.
  * Useful for element handlers that contain arithmetic values.
  * Can be used for monitoring purposes; e.g., to report the run-time
@@ -42,10 +42,6 @@
 
 #include "monitoringreportsocket.hh"
 
-#define TYPE_INIT 0
-#define TYPE_LITEND 1
-#define TYPE_BIGEND 2
-
 CLICK_DECLS
 
 // Default frequency is 2 seconds
@@ -80,33 +76,6 @@ char_to_int64(char buffer[]) {
     int64_t number = 0;
     memcpy(&number, buffer, sizeof(int64_t));
     return number;
-}
-
-static unsigned long long
-htonll(unsigned long long src)
-{
-    static int typ = TYPE_INIT;
-    unsigned char c;
-    union {
-        unsigned long long ull;
-        unsigned char c[8];
-    } x;
-
-    if (typ == TYPE_INIT) {
-        x.ull = 0x01;
-        typ = (x.c[7] == 0x01ULL) ? TYPE_BIGEND : TYPE_LITEND;
-    }
-
-    if (typ == TYPE_BIGEND)
-        return src;
-
-    x.ull = src;
-    c = x.c[0]; x.c[0] = x.c[7]; x.c[7] = c;
-    c = x.c[1]; x.c[1] = x.c[6]; x.c[6] = c;
-    c = x.c[2]; x.c[2] = x.c[5]; x.c[5] = c;
-    c = x.c[3]; x.c[3] = x.c[4]; x.c[4] = c;
-
-    return x.ull;
 }
 
 MonitoringReportSocket::MonitoringReportSocket()
@@ -436,9 +405,9 @@ MonitoringReportSocket::run_timer(Timer *t)
                     );
                 }
             } while (buffer && !status);
+            
 
-
-            if (_verbose) {
+            if (_verbose) {            
                 click_chatter(
                     "Handler %s.%s: Timestamp %" PRId64 " - Value: %" PRId64
                     " - Name %s - Message length %d bytes",

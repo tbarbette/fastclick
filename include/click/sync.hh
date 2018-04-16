@@ -62,7 +62,7 @@ private:
 
     void initialize(unsigned int n, T v) {
         _size = n;
-        storage = new AT[_size];
+        storage = CLICK_ALIGNED_NEW(AT,_size);
         for (unsigned i = 0; i < n; i++) {
             storage[i].v = v;
         }
@@ -73,7 +73,7 @@ private:
 public:
     explicit per_thread() {
         _size = click_max_cpu_ids();
-        storage = new AT[_size];
+        storage = CLICK_ALIGNED_NEW(AT,_size);
     }
 
     explicit per_thread(T v) {
@@ -90,13 +90,13 @@ public:
      * This will destroy all data
      */
     void resize(unsigned int max_cpu_id, T v) {
-        delete[] storage;
+        CLICK_ALIGNED_DELETE(storage, AT, _size);
         initialize(max_cpu_id,v);
     }
 
     ~per_thread() {
         if (_size) {
-            delete[] storage;
+            CLICK_ALIGNED_DELETE(storage,AT,_size);
             _size = 0;
         }
     }
@@ -137,8 +137,8 @@ public:
     inline void operator=(const per_thread<T>& pt) {
         if (_size != pt._size) {
             if (storage)
-                delete[] storage;
-            storage = new AT[_size];
+               CLICK_ALIGNED_DELETE(storage,AT, _size);
+            storage = CLICK_ALIGNED_NEW(AT, _size);
         }
         for (int i = 0; i < pt.weight(); i++) {
             storage[i] = pt.storage[i];
@@ -155,6 +155,10 @@ public:
     }
 
     inline T& get() const{
+        return storage[click_current_cpu_id()].v;
+    }
+
+    inline const T& cst() const{
         return storage[click_current_cpu_id()].v;
     }
 
@@ -274,7 +278,16 @@ public:
         return &(v);
     }
 
+
     inline T& operator*() {
+        return v;
+    }
+
+    inline T& get() {
+        return v;
+    }
+
+    inline const T& cst() const {
         return v;
     }
 

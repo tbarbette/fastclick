@@ -36,6 +36,9 @@
 #include <click/nameinfo.hh>
 #include <click/bighashmap_arena.hh>
 #include <click/allocator.hh>
+#if HAVE_DPDK_PACKET_POOL
+#include <click/dpdkdevice.hh>
+#endif
 #if HAVE_NETMAP_PACKET_POOL
 #include <click/netmapdevice.hh>
 #endif
@@ -106,8 +109,6 @@ Router::~Router()
 {
     if (_refcount != 0)
         click_chatter("deleting router while ref count = %d", _refcount.value());
-
-    pool_allocator_mt_base::set_dying(true);
 
     // unuse the hotswap router
     if (_hotswap_router)
@@ -606,6 +607,7 @@ Router::check_hookup_completeness(ErrorHandler *errh)
 
     return errh->nerrors() == before_all ? 0 : -1;
 }
+
 
 // PORT INDEXES
 
@@ -1265,6 +1267,13 @@ Router::initialize(ErrorHandler *errh)
         }
     }
 
+#if HAVE_DPDK_PACKET_POOL
+    if (all_ok) {
+        //DPDK initialization may be affected by some configuration and needed by some element initialization (Packet::make with --enable-dpdk-pool)
+        all_ok = DPDKDevice::static_initialize(ErrorHandler::default_handler()) == 0;
+    }
+#endif
+
 #if HAVE_BATCH
     if (all_ok) {
         //In the first phase we propagate batch mode from all BATCH_MODE_YES elements, being the one instantiating batches
@@ -1328,58 +1337,32 @@ Router::initialize(ErrorHandler *errh)
     if (all_ok) {
         _state = ROUTER_PREINITIALIZE;
         initialize_handlers(true, true);
-        Element::EventType events[] = {Element::__NEVER_OVERRIDE, Element::INIT_PLATFORM, Element::INIT_INITIALIZE};
-        for (int e = 0; e < 3; e++) {
-            Element::EventType event = events[e];
-            int turn = 0;
-            again:
-            for (int ord = 0; all_ok && ord < _elements.size(); ord++) {
-                int i = _element_configure_order[ord];
-                if (e == 0) {
-                assert(element_stage[i] == Element::CLEANUP_CONFIGURED);
-    #if CLICK_DMALLOC
-                sprintf(dmalloc_buf, "i%d  ", i);
-                CLICK_DMALLOC_REG(dmalloc_buf);
-    #endif
-    /*#if HAVE_NETMAP_PACKET_POOL
-                if (element_stage[i] < Element::CONFIGURE_PHASE_PRIVILEGED && !NetmapBufQ::initialized()) {
-                    click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-pool to configure script to disable this feature.");
-                    all_ok = false;
-                    break;
-                }
-    #endif*/
-                }
-                RouterContextErrh cerrh(errh, "While initializing", element(i));
-                assert(!cerrh.nerrors());
-                int r = _elements[i]->event(&cerrh, event);
-                if (event == Element::__NEVER_OVERRIDE) {
-                    if (r != 982732) {
-                        cerrh.error("Element has a bad implementation. It overrides event.");
-                    }
-                } else {
-
-                    if (r == 0) {
-                        element_stage[i] = Element::CLEANUP_INITIALIZED;
-                    } else if (r > 0 ){
-                        turn++;
-                        if (turn > _elements.size()) {
-                            all_ok = false;
-                            errh->error("Too many re-initializations");
-                            break;
-                        }
-                        goto again;
-                    } else {
-                        // don't report 'unspecified error' for ErrorElements:
-                        // keep error messages clean
-                        if (!cerrh.nerrors() && !_elements[i]->cast("Error"))
-                            cerrh.error("unspecified error");
-                        element_stage[i] = Element::CLEANUP_INITIALIZE_FAILED;
-                        all_ok = false;
-                    }
-                }
-            }
-            if (!all_ok)
+        for (int ord = 0; all_ok && ord < _elements.size(); ord++) {
+            int i = _element_configure_order[ord];
+            assert(element_stage[i] == Element::CLEANUP_CONFIGURED);
+#if CLICK_DMALLOC
+            sprintf(dmalloc_buf, "i%d  ", i);
+            CLICK_DMALLOC_REG(dmalloc_buf);
+#endif
+#if HAVE_NETMAP_PACKET_POOL
+            if (element_stage[i] < Element::CONFIGURE_PHASE_PRIVILEGED && !NetmapBufQ::initialized()) {
+                click_chatter("You have to add NetmapDevices to use netmap packet pool functionnality. You may pass --disable-netmap-pool to configure script to disable this feature.");
+                all_ok = false;
                 break;
+            }
+#endif
+            RouterContextErrh cerrh(errh, "While initializing", element(i));
+            assert(!cerrh.nerrors());
+            if (_elements[i]->initialize(&cerrh) >= 0)
+                element_stage[i] = Element::CLEANUP_INITIALIZED;
+            else {
+                // don't report 'unspecified error' for ErrorElements:
+                // keep error messages clean
+                if (!cerrh.nerrors() && !_elements[i]->cast("Error"))
+                    cerrh.error("unspecified error");
+                element_stage[i] = Element::CLEANUP_INITIALIZE_FAILED;
+                all_ok = false;
+            }
         }
     }
 

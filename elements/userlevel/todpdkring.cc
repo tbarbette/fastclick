@@ -30,7 +30,7 @@ ToDPDKRing::ToDPDKRing() :
     _blocking(false), _congestion_warning_printed(false),
     _dropped(0)
 {
-    _ndesc = DPDKDevice::DEF_RING_NDESC;
+
 }
 
 ToDPDKRing::~ToDPDKRing()
@@ -140,7 +140,7 @@ ToDPDKRing::run_timer(Timer *)
 }
 
 inline void
-ToDPDKRing::set_flush_timer(TXInternalQueue &iqueue)
+ToDPDKRing::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue)
 {
     if ( _timeout >= 0 ) {
         if ( iqueue.timeout.scheduled() ) {
@@ -162,7 +162,7 @@ ToDPDKRing::set_flush_timer(TXInternalQueue &iqueue)
 
 /* Flush as many packets as possible from the internal queue of the DPDK ring. */
 void
-ToDPDKRing::flush_internal_tx_ring(TXInternalQueue &iqueue)
+ToDPDKRing::flush_internal_tx_ring(DPDKDevice::TXInternalQueue &iqueue)
 {
     unsigned n;
     unsigned sent = 0;
@@ -217,7 +217,7 @@ void
 ToDPDKRing::push(int, Packet *p)
 {
     // Get the internal queue
-    TXInternalQueue &iqueue = _iqueue;
+    DPDKDevice::TXInternalQueue &iqueue = _iqueue;
 
     bool congestioned;
     do {
@@ -277,7 +277,7 @@ void
 ToDPDKRing::push_batch(int, PacketBatch *head)
 {
     // Get the internal queue
-    TXInternalQueue &iqueue = _iqueue;
+    DPDKDevice::TXInternalQueue &iqueue = _iqueue;
 
     Packet *p    = head;
     Packet *next = NULL;

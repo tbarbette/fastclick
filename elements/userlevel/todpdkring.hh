@@ -133,34 +133,11 @@ class ToDPDKRing : public BatchElement, DPDKRing {
         void push(int port, Packet      *p);
 
     private:
-        /*
-        * TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
-        * to be sent. It is used as an internal buffer to be passed to DPDK ring
-        * queue.
-        * |-> index is the index of the first valid packet awaiting to be sent, while
-        *     nr_pending is the number of packets.
-        * |-> index + nr_pending may be greater than
-        *     _internal_tx_queue_size but index should be wrapped-around.
-        */
-        class TXInternalQueue {
-            public:
-                TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
 
-                // Array of DPDK Buffers
-                struct rte_mbuf **pkts;
-                // Index of the first valid packet in the packets array
-                unsigned int index;
-                // Number of valid packets awaiting to be sent after index
-                unsigned int nr_pending;
+        inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
+        void flush_internal_tx_ring(DPDKDevice::TXInternalQueue &iqueue);
 
-                // Timer to limit time a batch will take to be completed
-                Timer timeout;
-        } __attribute__((aligned(64)));
-
-        inline void set_flush_timer(TXInternalQueue &iqueue);
-        void flush_internal_tx_ring(TXInternalQueue &iqueue);
-
-        TXInternalQueue     _iqueue;
+        DPDKDevice::TXInternalQueue     _iqueue;
 
         unsigned int _internal_tx_queue_size;
 

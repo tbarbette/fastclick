@@ -16,8 +16,8 @@ TimestampDiff()
 =s timestamps
 
 Compute the difference between the recorded timestamp of a packet using
-RecordTimestamp and the number inside the packet payload potentially set
-using NumberPacket
+RecordTimestamp and a fresh timestamp. Computations are performed only for
+numbered packets, either by a NumberPacket element or an external entity.
 
 Arguments:
 
@@ -51,10 +51,12 @@ public:
     const char *class_name() const { return "TimestampDiff"; }
     const char *port_count() const { return PORTS_1_1X2; }
     const char *processing() const { return PUSH; }
+    const char *flow_code() const { return "x/x"; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
-    static String read_handler(Element*, void*) CLICK_COLD;
+    static String read_handler(Element *, void *) CLICK_COLD;
 
     void push(int, Packet *);
 #if HAVE_BATCH
@@ -64,27 +66,23 @@ public:
 private:
     Vector<unsigned> _delays;
     int _offset;
-    int _limit;
+    uint32_t _limit;
+    bool _net_order;
     int _max_delay_ms;
     RecordTimestamp *_rt;
-    atomic_uint32_t nd;
-    inline int smaction(Packet* p);
+    atomic_uint32_t _nd;
+    inline int smaction(Packet *p);
 
-    RecordTimestamp* get_recordtimestamp_instance();
+    RecordTimestamp *get_recordtimestamp_instance();
 
     void min_mean_max(
-        Vector<unsigned> &vec,
         unsigned &min,
-        double &mean,
-        unsigned &max,
-        const atomic_uint32_t nd
+        double   &mean,
+        unsigned &max
     );
-    double standard_deviation(
-        Vector<unsigned> &vec,
-        double mean,
-        const atomic_uint32_t nd
-    );
-    double percentile(Vector<unsigned> &vec, double percent);
+    double standard_deviation(const double mean);
+    double percentile(const double percent);
+    unsigned last_value_seen();
 };
 
 CLICK_ENDDECLS

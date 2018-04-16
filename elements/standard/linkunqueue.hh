@@ -24,7 +24,7 @@ serial link with latency LATENCY (microsecond precision) and bandwidth
 BANDWIDTH (such as "384kbps"). Thus, every packet is delayed at least
 by LATENCY, and additionally delayed by its packet size and BANDWIDTH, and
 by any packets ahead of it in the virtual link. Packets are pushed out the
-single output port when their time comes.
+single output port when their time comes. If BANDWITH is 0, only the LATENCY will introduce some delay.
 
 LinkUnqueue listens for upstream notification, such as that available from
 Queue.

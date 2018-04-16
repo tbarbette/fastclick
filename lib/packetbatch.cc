@@ -19,6 +19,9 @@
 #include <click/config.h>
 #include <click/packetbatch.hh>
 #include <click/netmapdevice.hh>
+#if HAVE_DPDK_PACKET_POOL
+# include <click/dpdkdevice.hh>
+#endif
 
 CLICK_DECLS
 
@@ -39,7 +42,11 @@ void PacketBatch::recycle_batch(bool is_data) {
 }
 
 /**
- * Recycle a whole batch, faster in most cases than a loop of kill
+ * Recycle a whole batch, faster in most cases as it add batches to the pool in
+ * two calls.
+ *
+ * If you are iterating over all packets, consider doing the same than this
+ *  function directly to avoid dual iteration.
  */
 void PacketBatch::fast_kill() {
     BATCH_RECYCLE_START();

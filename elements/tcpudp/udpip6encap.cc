@@ -124,6 +124,15 @@ UDPIP6Encap::simple_action(Packet *p_in)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+UDPIP6Encap::simple_action_batch(PacketBatch *batch)
+{
+	EXECUTE_FOR_EACH_PACKET(UDPIP6Encap::simple_action,batch);
+	return batch;
+}
+#endif
+
 String UDPIP6Encap::read_handler(Element *e, void *thunk)
 {
     UDPIP6Encap *u = static_cast<UDPIP6Encap *>(e);

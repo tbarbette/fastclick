@@ -50,7 +50,8 @@ Integer.  A specific hardware queue to use. Default is 0.
 
 =item N_QUEUES
 
-Integer.  Number of hardware queues to use. -1 or default is to use as many queues as threads assigned to this element.
+Integer.  Number of hardware queues to use. -1 or default is to use as many queues
+as threads assigned to this element.
 
 =item PROMISC
 
@@ -107,6 +108,8 @@ Resets "count" to zero.
 
 =a DPDKInfo, ToDPDKDevice */
 
+class ToDPDKDevice;
+
 class FromDPDKDevice : public RXQueueDevice {
 public:
 
@@ -133,18 +136,24 @@ public:
     
 private:
 
-    static String read_handler(Element*, void*) CLICK_COLD;
-    static int write_handler(const String&, Element*, void*, ErrorHandler*)
-        CLICK_COLD;
-    static String status_handler(Element *e, void * thunk) CLICK_COLD;
-    static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
+    static String read_handler(Element *, void *) CLICK_COLD;
+    static int write_handler(
+        const String &, Element *, void *, ErrorHandler *
+    ) CLICK_COLD;
+    static String status_handler(Element *e, void *thunk) CLICK_COLD;
+    static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
+    static int xstats_handler(int operation, String &input, Element *e,
+                              const Handler *handler, ErrorHandler *errh);
     enum {
-        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed,
-        h_ipackets, h_ibytes, h_ierrors, h_idropped, h_active, h_mac
+        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
+        h_ipackets, h_ibytes, h_imissed, h_ierrors,
+        h_active,
+        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
+        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+        h_device,
     };
 
     DPDKDevice* _dev;
-    bool _active;
 };
 
 CLICK_ENDDECLS

@@ -122,17 +122,23 @@ public:
     const char *class_name() const { return "ToDPDKDevice"; }
     const char *port_count() const { return PORTS_1_0; }
     const char *processing() const { return PUSH; }
+
     int configure_phase() const {
         return CONFIGURE_PHASE_PRIVILEGED;
     }
     bool can_live_reconfigure() const { return false; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *) override CLICK_COLD;
 
-    void cleanup(CleanupStage stage) CLICK_COLD;
+    void cleanup(CleanupStage stage) override CLICK_COLD;
 
+    static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
     void add_handlers() CLICK_COLD;
+
+    enum {
+        h_opackets,h_obytes,h_oerrors
+    };
 
     void run_timer(Timer *);
 #if HAVE_BATCH
@@ -142,37 +148,18 @@ public:
 
 private:
 
-    /* TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
-     * to be sent. It is used as an internal buffer to be passed to DPDK device
-	 * queue.
-     * index is the index of the first valid packets awaiting to be sent, while
-     * nr_pending is the number of packets. index + nr_pending may be greater
-     * than _internal_tx_queue_size but index should be wrapped-around. */
-    class TXInternalQueue {
-    public:
-        TXInternalQueue() : pkts(0), index(0), nr_pending(0) { }
+    inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
+    void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
 
-        // Array of DPDK Buffers
-        struct rte_mbuf ** pkts;
-        // Index of the first valid packet in the pkts array
-        unsigned int index;
-        // Number of valid packets awaiting to be sent after index
-        unsigned int nr_pending;
-
-        // Timer to limit time a batch will take to be completed
-        Timer timeout;
-    } __attribute__((aligned(64)));
-
-    inline void set_flush_timer(TXInternalQueue &iqueue);
-    void flush_internal_tx_queue(TXInternalQueue &);
-
-    per_thread<TXInternalQueue> _iqueues;
+    per_thread<DPDKDevice::TXInternalQueue> _iqueues;
 
     DPDKDevice* _dev;
     int _timeout;
     bool _congestion_warning_printed;
     bool _create;
     bool _vlan;
+
+    friend class FromDPDKDevice;
 };
 
 CLICK_ENDDECLS

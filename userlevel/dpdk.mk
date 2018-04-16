@@ -53,12 +53,15 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_EFD)            += -lrte_efd
 _LDLIBS-$(CONFIG_RTE_LIBRTE_HASH)           += -lrte_hash
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MEMBER)         += -lrte_member
 _LDLIBS-$(CONFIG_RTE_LIBRTE_JOBSTATS)       += -lrte_jobstats
+_LDLIBS-$(CONFIG_RTE_LIBRTE_LATENCY_STATS)  += -lrte_latencystats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_METRICS)        += -lrte_metrics
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BITRATE)        += -lrte_bitratestats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LATENCY_STATS)  += -lrte_latencystats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LPM)            += -lrte_lpm
 _LDLIBS-$(CONFIG_RTE_LIBRTE_POWER)          += -lrte_power
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ACL)            += -lrte_acl
+_LDLIBS-$(CONFIG_RTE_LIBRTE_JOBSTATS)       += -lrte_jobstats
+_LDLIBS-$(CONFIG_RTE_LIBRTE_METRICS)        += -lrte_metrics
 _LDLIBS-$(CONFIG_RTE_LIBRTE_METER)          += -lrte_meter
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_SCHED)          += -lrte_sched
@@ -147,6 +150,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_IXGBE_PMD)      += -lrte_pmd_ixgbe
 ifeq ($(CONFIG_RTE_LIBRTE_KNI),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KNI)        += -lrte_pmd_kni
 endif
+_LDLIBS-$(CONFIG_RTE_LIBRTE_LIO_PMD)        += -lrte_pmd_lio
 _LDLIBS-$(CONFIG_RTE_LIBRTE_E1000_PMD)      += -lrte_pmd_e1000
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ENA_PMD)        += -lrte_pmd_ena
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LIO_PMD)        += -lrte_pmd_lio
@@ -168,7 +172,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_THUNDERX_NICVF_PMD) += -lrte_pmd_thunderx_nicvf -lm
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SZEDATA2)   += -lrte_pmd_szedata2
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_RING)       += -lrte_pmd_ring
 ifeq ($(CONFIG_RTE_LIBRTE_SCHED),y)
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SOFTNIC)      += -lrte_pmd_softnic
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SOFTNIC)    += -lrte_pmd_softnic
 endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD)    += -lrte_pmd_sfc_efx
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_TAP)        += -lrte_pmd_tap

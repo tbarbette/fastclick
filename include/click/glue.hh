@@ -134,6 +134,21 @@ void click_lfree(volatile void *p, size_t size);
 # define CLICK_LFREE(p, size)	delete[] ((void) (size), (uint8_t *)(p))
 #endif
 
+#if HAVE_ALIGNED_NEW
+# define CLICK_ALIGNED_NEW(T,size) (new T[_size])
+# define CLICK_ALIGNED_DELETE(p,T,size) (delete[] p)
+#else
+# if HAVE_ALIGNED_ALLOC
+#  define CLICK_ALIGNED_ALLOC(T,size) ((T*)(aligned_alloc(64, sizeof(T) * size)))
+#  define CLICK_ALIGNED_FREE(p,T,size) (free(p))
+# else
+#  warning Using normal allocation instead of aligned one, please use a compiler that supports aligned_alloc
+#  define CLICK_ALIGNED_ALLOC(T,size) CLICK_LALLOC(sizeof(T) * size)
+#  define CLICK_ALIGNED_FREE(p,T,size) CLICK_LFREE(p,sizeof(T) * size);
+# endif
+# define CLICK_ALIGNED_NEW(T,size) ({T* v = CLICK_ALIGNED_ALLOC(T,size);for (unsigned i = 0; i < size; i++) {new(&v[i]) T();};v;})
+# define CLICK_ALIGNED_DELETE(p,T,size) {for (unsigned i = 0; i < size; i++) p[i].~T();CLICK_ALIGNED_FREE(p,T,size);}
+#endif
 
 // RANDOMNESS
 
@@ -725,6 +740,36 @@ inline click_cycles_t cycles_hz() {
 }
 #endif
 
+// Host to network order
+
+#define TYPE_INIT 0
+#define TYPE_LITEND 1
+#define TYPE_BIGEND 2
+
+inline unsigned long long htonll(unsigned long long src) {
+    static int typ = TYPE_INIT;
+    unsigned char c;
+    union {
+        unsigned long long ull;
+        unsigned char c[8];
+    } x;
+
+    if (typ == TYPE_INIT) {
+        x.ull = 0x01;
+        typ = (x.c[7] == 0x01ULL) ? TYPE_BIGEND : TYPE_LITEND;
+    }
+
+    if (typ == TYPE_BIGEND)
+        return src;
+
+    x.ull = src;
+    c = x.c[0]; x.c[0] = x.c[7]; x.c[7] = c;
+    c = x.c[1]; x.c[1] = x.c[6]; x.c[6] = c;
+    c = x.c[2]; x.c[2] = x.c[5]; x.c[5] = c;
+    c = x.c[3]; x.c[3] = x.c[4]; x.c[4] = c;
+
+    return x.ull;
+}
 
 CLICK_ENDDECLS
 

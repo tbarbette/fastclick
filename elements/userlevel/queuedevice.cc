@@ -28,7 +28,7 @@ Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 QueueDevice::QueueDevice() : _minqueues(0),_maxqueues(128), usable_threads(),
-	queue_per_threads(1), queue_share(1), ndesc(0), allow_nonexistent(false), _maxthreads(-1),firstqueue(-1),n_queues(-1),thread_share(1),
+	queue_per_threads(1), queue_share(1), ndesc(0), allow_nonexistent(false), _maxthreads(-1),firstqueue(-1),lastqueue(-1),n_queues(-1),thread_share(1),
 	_this_node(0), _active(true) {
 	_verbose = 1;
 }
@@ -52,7 +52,7 @@ Args& QueueDevice::parse(Args &args) {
 		.read("MAXTHREADS", _maxthreads)
 		.read("BURST", _burst)
 		.read("VERBOSE", _verbose)
-        .read("ACTIVE", _active)
+		.read("ACTIVE", _active)
 	    .read("ALLOW_NONEXISTENT", allow_nonexistent);
 
 	n_elements ++;
@@ -73,10 +73,10 @@ Args& RXQueueDevice::parse(Args &args) {
 #endif
 	_threadoffset = -1;
 	_set_rss_aggregate = false;
-	_set_timestamp = false;
+	_set_paint_anno = false;
 
 	args.read("RSS_AGGREGATE", _set_rss_aggregate)
-	    .read("TIMESTAMP",_set_timestamp)
+        .read("PAINT_QUEUE", _set_paint_anno)
 		.read("NUMA", _use_numa)
 		.read("THREADOFFSET", _threadoffset);
 
@@ -146,7 +146,7 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
     }
 
     if (n_threads == 0) {
-        return errh->error("No threads end up in this queuedevice...? Aborting.");
+        errh->warning("No threads end up in this queuedevice...?");
     }
 
     if (n_threads > _maxqueues) {
@@ -158,12 +158,13 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
     else
         n_queues = max(_minqueues,n_threads);
 
-    queue_per_threads = n_queues / n_threads;
-    if (queue_per_threads == 0) {
-        queue_per_threads = 1;
-        thread_share = n_threads / n_queues;
+    if (n_threads > 0) {
+        queue_per_threads = n_queues / n_threads;
+        if (queue_per_threads == 0) {
+            queue_per_threads = 1;
+            thread_share = n_threads / n_queues;
+        }
     }
-
     n_initialized++;
     if (_verbose > 1) {
 		if (input_is_push(0))
@@ -184,12 +185,16 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
         usable_threads[router()->thread_sched()
             ->initial_home_thread_id(this)] = 1;
         n_threads = 1;
-        if (n_threads >= _maxqueues)
-            n_queues = _maxqueues;
-        else
-            n_queues = max(_minqueues,n_threads);
+        if (n_queues == -1) {
+            if (n_threads >= _maxqueues)
+                n_queues = _maxqueues;
+            else
+                n_queues = max(_minqueues,n_threads);
+        }
+        queue_per_threads = n_queues / n_threads;
+        lastqueue = firstqueue + n_queues - 1;
 
-	   click_chatter(
+	    click_chatter(
 				"%s : remove StaticThreadSched to use FastClick's "
 				"auto-thread assignment", class_name());
 		goto end;
@@ -223,6 +228,9 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
                    click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
            } else
                usable_threads &= (~v);
+           if (_threadoffset != -1 && !usable_threads[_threadoffset]) {
+               click_chatter("WARNING : The THREADOFFSET parameter will be ignored because that thread is not usable / assigned to another element.");
+           }
        }
 
        cores_in_node = usable_threads.weight();
@@ -272,6 +280,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
        queue_per_threads = n_queues / n_threads;
 
        if (queue_per_threads * n_threads < n_queues) queue_per_threads ++;
+       lastqueue = firstqueue + n_queues - 1;
 
        for (int b = 0; b < usable_threads.size(); b++) {
            if (count >= n_threads) {
@@ -359,5 +368,53 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
 }
 
+unsigned long long QueueDevice::n_count() {
+    unsigned long long total = 0;
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        total += thread_state.get_value(i)._count;
+    }
+    return total;
+}
+
+unsigned long long QueueDevice::n_dropped() {
+    unsigned long long total = 0;
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        total += thread_state.get_value(i)._dropped;
+    }
+    return total;
+}
+
+void QueueDevice::reset_count() {
+    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
+        thread_state.get_value(i)._count = 0;
+        thread_state.get_value(i)._dropped = 0;
+    }
+}
+
+String QueueDevice::count_handler(Element *e, void *user_data)
+{
+    QueueDevice *tdd = static_cast<QueueDevice *>(e);
+    intptr_t what = reinterpret_cast<intptr_t>(user_data);
+    switch (what) {
+        case h_count:
+            return String(tdd->n_count());
+        default:
+            return "<undefined>";
+    }
+}
+
+String QueueDevice::dropped_handler(Element *e, void *)
+{
+    QueueDevice *tdd = static_cast<QueueDevice *>(e);
+    return String(tdd->n_dropped());
+}
+
+int QueueDevice::reset_count_handler(const String &, Element *e, void *,
+                                ErrorHandler *)
+{
+    QueueDevice *tdd = static_cast<QueueDevice *>(e);
+    tdd->reset_count();
+    return 0;
+}
 CLICK_ENDDECLS
 ELEMENT_PROVIDES(QueueDevice)

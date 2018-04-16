@@ -428,10 +428,11 @@ Element::Element()
     in_batch_mode(BATCH_MODE_NO),
 #endif
     receives_batch(false),
-#if HAVE_FULLPUSH_NONATOMIC
-    _is_fullpush(false),
-#endif
     _router(0), _eindex(-1)
+#if HAVE_FULLPUSH_NONATOMIC
+    ,_is_fullpush(false)
+#endif
+
 {
     nelements_allocated++;
     _ports[0] = _ports[1] = &_inline_ports[0];

@@ -13,7 +13,7 @@ AverageBatchCounter
 
 =s analysis
 
-keep average statistics about batching
+keep average statistics about batching since last reset and last tick
 
  */
 

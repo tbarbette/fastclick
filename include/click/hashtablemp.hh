@@ -73,10 +73,10 @@ class HashContainerMP { public:
         ~iterator() {
             if (_h) {
                 if (_b < _h->_table->_nbuckets) {
-                    if (likely(_mt))
+                    if (likely(_h->_mt))
                         _h->_table->buckets[_b].list.read_end();
                 }
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table.read_end();
             }
         }
@@ -90,10 +90,10 @@ class HashContainerMP { public:
             }
             while (!_item) {
                 //click_chatter("Bucket %d : %p",_b,_h->_table->buckets[_b]);
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.read_end();
                 if (++_b == _h->_table->_nbuckets) return;
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.read_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
@@ -134,7 +134,7 @@ class HashContainerMP { public:
         //global read lock must be held!
         iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
             _b = 0;
-            if (likely(_mt))
+            if (likely(_h->_mt))
                 _h->_table->buckets[_b].list.read_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
@@ -153,10 +153,10 @@ class HashContainerMP { public:
         ~write_iterator() {
             if (_h) {
                 if (_b < _h->_table->_nbuckets) {
-                    if (likely(_mt))
+                    if (likely(_h->_mt))
                         _h->_table->buckets[_b].list.write_end();
                 }
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table.read_end();
             }
             _h = 0; //Prevent read destruction
@@ -170,10 +170,10 @@ class HashContainerMP { public:
                 _prev = _item;
             }
             while (!_item) {
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.write_end();
                 if (++_b == _h->_table->_nbuckets) return;
-                if (likely(_mt))
+                if (likely(_h->_mt))
                     _h->_table->buckets[_b].list.write_begin();
                 _item = _h->_table->buckets[_b].list->head;
                 _prev = 0;
@@ -218,7 +218,7 @@ class HashContainerMP { public:
         //global read lock must be held!
         write_iterator(HashContainerMP<K,V,Item>* h) : _h(h), _prev(0) {
             _b = 0;
-            if (likely(_mt))
+            if (likely(h->_mt))
                 _h->_table->buckets[_b].list.write_begin();
             _item =  _h->_table->buckets[_b].list->head;
             if (_item == 0) {
@@ -304,8 +304,11 @@ class HashContainerMP { public:
     /** @brief Test if an element with key @a key exists in the table. */
     inline bool contains(const K& key);
 
-    /** @brief Return a pointer for the element with @a key, if any. */
+    /** @brief Return a read pointer for the element with @a key, if any. */
     inline ptr find(const K &key);
+
+    /** @brief Return a write pointer for the element with @a key, if any. */
+    inline write_ptr find_write(const K &key);
 
     /** @brief Copy the value of V for K in storage if K is found, delete it from the table and return true. If nonfound, nothing is deleted and return false. */
     inline bool find_remove(const K &key, V &storage);
@@ -314,7 +317,7 @@ class HashContainerMP { public:
 
     inline write_ptr find_insert_write(const K &key, const V &value);
 
-    ptr *set(const K &key, const V &value);
+    inline void set(const K &key, const V &value);
 
     inline void erase(const K &key);
 
@@ -368,7 +371,7 @@ class HashContainerMP { public:
     void release_pending(bool force=false) {
         ListItem* it;
         ListItem* next;
-        for (int i = 0; i < _pending_release.weight() ; i++) {
+        for (unsigned i = 0; i < _pending_release.weight() ; i++) {
             it = _pending_release.get_value(i);
             while (it) {
                 next = it->_hashnext;
@@ -377,6 +380,8 @@ class HashContainerMP { public:
             }
         }
     }
+
+    friend class iterator;
 
 };
 
@@ -401,14 +406,14 @@ void HashContainerMP<K,V,Item>::deinitialize()
 
 template <typename K, typename V, typename Item>
 HashContainerMP<K,V,Item>::HashContainerMP() :
-    _table(), _pending_release(0), _mt(true)
+  _mt(true), _table(), _pending_release(0)
 {
     initialize(initial_bucket_count);
 }
 
 template <typename K, typename V, typename Item>
 HashContainerMP<K,V,Item>::HashContainerMP(size_type nb) :
-    _table(), _pending_release(0)
+     _mt(true), _table(), _pending_release(0)
 {
     size_type b = 1;
     while (b < nb && b < max_bucket_count)
@@ -424,28 +429,38 @@ HashContainerMP<K,V,Item>::~HashContainerMP()
     release_pending(true);
     deinitialize();
 }
+#define MAKE_FIND(ptr_type) \
+        if (likely(_mt))\
+            _table.read_begin();\
+        size_type b = bucket(key);\
+        Bucket& bucket = _table->buckets[b];\
+        if (likely(_mt))\
+            bucket.list.read_begin();\
+        if (likely(_mt))\
+            _table.read_end();\
+        ListItem *pprev;\
+        ptr_type p;\
+        for (pprev = bucket.list->head; pprev; pprev = hashnext(pprev))\
+        if (hashkeyeq(hashkey(pprev), key)) {\
+            p.assign(&pprev->item);\
+            break;\
+        }\
+        if (likely(_mt))\
+            bucket.list.read_end();\
 
 template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::ptr
 HashContainerMP<K,V,Item>::find(const K &key)
 {
-    if (likely(_mt))
-        _table.read_begin();
-    size_type b = bucket(key);
-    Bucket& bucket = _table->buckets[b];
-    if (likely(_mt))
-        bucket.list.read_begin();
-    if (likely(_mt))
-        _table.read_end();
-    ListItem *pprev;
-    ptr p;
-    for (pprev = bucket.list->head; pprev; pprev = hashnext(pprev))
-    if (hashkeyeq(hashkey(pprev), key)) {
-        p.assign(&pprev->item);
-        break;
-    }
-    if (likely(_mt))
-        bucket.list.read_end();
+    MAKE_FIND(ptr);
+    return p;
+}
+
+template <typename K, typename V, typename Item>
+inline typename HashContainerMP<K,V,Item>::write_ptr
+HashContainerMP<K,V,Item>::find_write(const K &key)
+{
+    MAKE_FIND(write_ptr);
     return p;
 }
 
@@ -485,7 +500,7 @@ HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
     return true;
 }
 
-#define MAKE_FIND_INSERT(ptr_type) \
+#define MAKE_FIND_INSERT(ptr_type,on_exists) \
     if (likely(_mt))\
         _table.read_begin();\
     size_type b = bucket(key);\
@@ -504,6 +519,7 @@ retry:\
         }\
     }\
     if (p) {\
+        on_exists\
         if (likely(_mt))\
             bucket.list.read_end();\
     } else {\
@@ -511,7 +527,6 @@ retry:\
             goto retry;\
         }\
         ListItem* e = allocate(ListItem(key,value));\
-        V* v = e->item.unprotected_ptr();\
         click_hashmp_assert(e->item.refcnt() == 0);\
         e->_hashnext = bucket.list->head;\
 \
@@ -529,7 +544,7 @@ retry:\
 template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::ptr
 HashContainerMP<K,V,Item>::find_insert(const K &key,const V &value) {
-    MAKE_FIND_INSERT(ptr);
+    MAKE_FIND_INSERT(ptr,{});
     click_hashmp_assert(p.refcnt() > 0);
     return p;
 }
@@ -537,9 +552,15 @@ HashContainerMP<K,V,Item>::find_insert(const K &key,const V &value) {
 template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::write_ptr
 HashContainerMP<K,V,Item>::find_insert_write(const K &key,const V &value) {
-    MAKE_FIND_INSERT(write_ptr);
+    MAKE_FIND_INSERT(write_ptr,{});
     click_hashmp_assert(p.refcnt() == -1);
     return p;
+}
+
+template <typename K, typename V, typename Item>
+inline void
+HashContainerMP<K,V,Item>::set(const K &key,const V &value) {
+    MAKE_FIND_INSERT(write_ptr,{*p = value;});
 }
 
 
