@@ -171,7 +171,7 @@
 #undef SIZEOF_VOID_P
 
 /* Define if you want to run multithreaded Click. */
-#undef __MTCLICKx__
+#undef __MTCLICK__
 
 /* Define inline, if necessary. C only. */
 #ifndef __cplusplus
