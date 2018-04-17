@@ -813,6 +813,7 @@ enable_dpdk_pool
 enable_dpdk_packet
 enable_zerocopy
 enable_sloppy
+enable_flow_atomic
 enable_flow_structure
 enable_flow_hash
 enable_linuxmodule
@@ -1529,6 +1530,7 @@ Optional Features:
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
     --disable-sloppy      disable Sloppy flow timeouts
+    --disable-flow-atomic use non-atomic flow reference counting
     --disable-flow-structure
                           do not free classifier nodes in pool, mark them as
                           released to somehow keep the receive strucutre
@@ -6982,6 +6984,18 @@ fi
 
 if test "x$enable_sloppy" = xyes; then
     $as_echo "#define HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-flow-atomic was given.
+if test "${enable_flow_atomic+set}" = set; then :
+  enableval=$enable_flow_atomic; :
+else
+  enable_flow_atomic=yes
+fi
+
+if test "x$enable_flow_atomic" = xyes; then
+    $as_echo "#define FLOW_ATOMIC_USE_COUNT 1" >>confdefs.h
 
 fi
 
