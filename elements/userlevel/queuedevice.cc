@@ -47,17 +47,17 @@ void QueueDevice::static_initialize() {
 }
 
 Args& QueueDevice::parse(Args &args) {
-	args.read_p("QUEUE", firstqueue)
-		.read("N_QUEUES",n_queues)
-		.read("MAXTHREADS", _maxthreads)
-		.read("BURST", _burst)
-		.read("VERBOSE", _verbose)
-		.read("ACTIVE", _active)
-	    .read("ALLOW_NONEXISTENT", allow_nonexistent);
+    args.read_p("QUEUE", firstqueue)
+            .read("N_QUEUES",n_queues)
+            .read("MAXTHREADS", _maxthreads)
+            .read("BURST", _burst)
+            .read("VERBOSE", _verbose)
+            .read("ACTIVE", _active)
+            .read("ALLOW_NONEXISTENT", allow_nonexistent);
 
-	n_elements ++;
+    n_elements ++;
 
-	return args;
+    return args;
 }
 
 Args& RXQueueDevice::parse(Args &args) {
@@ -76,9 +76,9 @@ Args& RXQueueDevice::parse(Args &args) {
 	_set_paint_anno = false;
 
 	args.read("RSS_AGGREGATE", _set_rss_aggregate)
-        .read("PAINT_QUEUE", _set_paint_anno)
-		.read("NUMA", _use_numa)
-		.read("THREADOFFSET", _threadoffset);
+            .read("PAINT_QUEUE", _set_paint_anno)
+            .read("NUMA", _use_numa)
+            .read("THREADOFFSET", _threadoffset);
 
 #if !HAVE_NUMA
 	if (_use_numa) {
@@ -90,13 +90,13 @@ Args& RXQueueDevice::parse(Args &args) {
 }
 
 Args& TXQueueDevice::parse(Args &args, ErrorHandler* errh) {
-	QueueDevice::parse(args);
-	args.read("IQUEUE", _internal_tx_queue_size)
-		.read("BLOCKING", _blocking);
-    if ((_internal_tx_queue_size & (_internal_tx_queue_size - 1)) != 0) {
-        errh->error("IQUEUE must be a power of 2");
-    }
-	return args;
+        QueueDevice::parse(args);
+        args.read("IQUEUE", _internal_tx_queue_size)
+            .read("BLOCKING", _blocking);
+        if ((_internal_tx_queue_size & (_internal_tx_queue_size - 1)) != 0) {
+            errh->error("IQUEUE must be a power of 2");
+        }
+        return args;
 }
 
 int RXQueueDevice::configure_rx(int numa_node, int minqueues, int maxqueues, ErrorHandler *) {

@@ -263,10 +263,14 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 
     if (info.rx_queues.size() > dev_info.max_rx_queues) {
-        return errh->error("Port %d can only use %d RX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+        return errh->error("Port %d can only use %d RX queues (asked for %d), use MAXQUEUES to set the maximum "
+                           "number of queues or N_QUEUES to strictly define it.", port_id, dev_info.max_rx_queues, info.rx_queues.size());
     }
     if (info.tx_queues.size() > dev_info.max_tx_queues) {
-        return errh->error("Port %d can only use %d TX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+        return errh->error("Port %d can only use %d TX queues (FastClick asked for %d, probably to serve that same amount of threads).\n"
+                           "Add the argument \"MAXQUEUES %d\" to the corresponding ToDPDKDevice to set the maximum "
+                           "number of queues to %d or \"N_QUEUES %d\" to strictly define it. "
+                           "If the TX device has more threads than queues due to this parameter change, it will automatically rely on locking to share the queues as evenly as possible between the threads.", port_id, dev_info.max_tx_queues, info.tx_queues.size(), dev_info.max_tx_queues, dev_info.max_tx_queues, dev_info.max_tx_queues);
     }
 
     if (info.n_rx_descs < dev_info.rx_desc_lim.nb_min || info.n_rx_descs > dev_info.rx_desc_lim.nb_max) {
