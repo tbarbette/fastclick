@@ -65,7 +65,7 @@ If you use Metron in your work, please cite our [paper][metron-paper]:
 	url          = {https://www.usenix.org/system/files/conference/nsdi18/nsdi18-katsikas.pdf},
 	address      = {Renton, WA},
 	acmid        = {},
-	publisher    = {{USENIX} Association}
+	publisher    = {USENIX Association}
 }
 ```
 
