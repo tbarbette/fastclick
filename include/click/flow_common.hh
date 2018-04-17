@@ -40,7 +40,6 @@ CLICK_DECLS
     #define flow_assert(...)
 #endif
 
-#define FLOW_ATOMIC_USE_COUNT 1
 #define HAVE_DYNAMIC_FLOW_RELEASE_FNT 1
 
 class FlowControlBlock;
