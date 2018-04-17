@@ -6,7 +6,7 @@ Metron
 About
 ----
 Metron's control plane is based on the [ONOS SDN controller][onos], which we extended with [southbound drivers][metron-driver] that allow Metron to monitor and configure commodity servers.
-Metron's data plane extends [FastClick][fastclick], which in turn uses [DPDK][dpdk] as a high performance network I/O subsystem.
+Metron's data plane extends [FastClick][fastclick] (see the paper [here][fastclick-paper]), which in turn uses [DPDK][dpdk] as a high performance network I/O subsystem.
 The Metron data plane uses two features available in modern network interface cards (NICs) to achieve accurate dispatching of input traffic to the desired CPU core(s), thus eliminating inter-core communication.
 Specifically, the Metron data plane uses either:
   1. the Virtual Machine Device queues (VMDq) of DPDK to implement hardware dispatching based on the values of input packets' destination MAC address or
@@ -85,6 +85,7 @@ The FastClick README is available [here][fastclick-readme], while the original C
 [onos]: https://onosproject.org/
 [metron-driver]: https://github.com/opennetworkinglab/onos/tree/master/drivers/server
 [fastclick]: https://github.com/tbarbette/fastclick
+[fastclick-paper]: https://orbi.uliege.be/bitstream/2268/181954/1/userspaceio.pdf
 [dpdk]: https://dpdk.org/
 [fastclick-issue-tracker]: https://github.com/tbarbette/fastclick/issues
 [click-issue-tracker]: https://github.com/kohler/click/issues
