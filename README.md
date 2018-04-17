@@ -1,6 +1,6 @@
 Metron
 =========
-[Metron][metron-paper] is a high performance and ultra efficient NFV service chaining platform to appear in [USENIX NSDI 2018][metron-nsdi-page].
+[Metron][metron-paper] is an ultra high performance and efficient NFV service chaining platform, appeared in [USENIX NSDI 2018][metron-nsdi-page].
 
 
 About
@@ -16,14 +16,14 @@ The VMDq mode requires a device prior to the server to tag incoming packets with
 This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch connected between the source and the NFV server.
 The Flow Director mode allows the Metron data plane agent to perform tagging in a more autonomous way, without necessarily involving the controller.
 
-This repository provides the source code of Metron's data plane.
+This repository provides the source code of Metron's high performance data plane.
 
 
 Configure
 ----
 First, setup your DPDK environment (version 17.05 or later) and then configure Metron with:
 ```bash
-./configure RTE_SDK=path-to-dpdk RTE_TARGET=dpdk-target --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-std=gnu11 -O3" CXXFLAGS="-std=gnu++14 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --enable-dpdk-pool --disable-dpdk-packet --enable-local --enable-nanotimestamp --enable-all-elements --enable-analysis --enable-json
+./configure RTE_SDK=path-to-dpdk RTE_TARGET=dpdk-target --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-std=gnu11 -O3" CXXFLAGS="-std=gnu++14 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --enable-dpdk-pool --disable-dpdk-packet --enable-nanotimestamp --enable-all-elements --enable-json
 ```
 
 
@@ -54,11 +54,15 @@ If you use Metron in your work, please cite our [paper][metron-paper]:
 @inproceedings{katsikas-metron.nsdi18,
 	author       = {Katsikas, Georgios P. and Barbette, Tom and Kosti\'{c}, Dejan and Steinert, Rebecca and Maguire Jr., Gerald Q.},
 	title        = {{Metron: NFV Service Chains at the True Speed of the Underlying Hardware}},
-	booktitle    = {To appear in the proceedings of the 15th USENIX Conference on Networked Systems Design and Implementation},
+	booktitle    = {15th USENIX Conference on Networked Systems Design and Implementation (NSDI 18)},
 	series       = {NSDI'18},
 	year         = {2018},
-	url          = {https://people.kth.se/~dejanko/documents/publications/metron-nsdi18.pdf},
+	isbn         = {978-1-931971-43-0},
+	pages        = {171--186},
+	numpages     = {16},
+	url          = {https://www.usenix.org/system/files/conference/nsdi18/nsdi18-katsikas.pdf},
 	address      = {Renton, WA},
+	acmid        = {},
 	publisher    = {{USENIX} Association}
 }
 ```
@@ -74,7 +78,7 @@ If you are sure that your problem is Click related, post it on vanilla Click's [
 
 The FastClick README is available [here][fastclick-readme], while the original Click README is available [here][click-readme].
 
-[metron-paper]: https://people.kth.se/~dejanko/documents/publications/metron-nsdi18.pdf
+[metron-paper]: https://www.usenix.org/system/files/conference/nsdi18/nsdi18-katsikas.pdf
 [metron-nsdi-page]: https://www.usenix.org/conference/nsdi18/presentation/katsikas
 [onos]: https://onosproject.org/
 [metron-driver]: https://github.com/opennetworkinglab/onos/tree/master/drivers/server
