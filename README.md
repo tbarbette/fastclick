@@ -14,9 +14,11 @@ Specifically, the Metron data plane uses either:
 
 The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be used by the Metron data plane to perform CPU core dispatching.
 This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch connected between the source and the NFV server.
-The Flow Director mode allows the Metron data plane agent to perform tagging in a more autonomous way, without necessarily involving the controller.
+The Flow Director mode allows a Metron agent to perform traffic classification and dispatching using its own NIC(s), without involving any prior network element in the path.
 
 This repository provides the source code of Metron's high performance data plane.
+Metron controller's code has not been released yet (only the [southbound driver][metron-driver] is public), but you can totally reproduce our results by running Metron's dataplane in Flow Director mode, using your desired traffic classification and dispatching rules.
+For more details, see the Deploy section below.
 
 
 Configure
