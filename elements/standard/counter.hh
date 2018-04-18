@@ -342,6 +342,120 @@ class CounterRxWMP : public CounterMP { public:
     const char *processing() const      { return AGNOSTIC; }
     const char *port_count() const      { return PORTS_1_1; }
 };
+
+class CounterRWMP : public CounterBase { public:
+
+    CounterRWMP() CLICK_COLD;
+    ~CounterRWMP() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterRWMP"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+
+
+    int initialize(ErrorHandler *) CLICK_COLD;
+
+    int can_atomic() { return 2; } CLICK_COLD;
+
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch* batch);
+#endif
+
+    void reset();
+
+    counter_int_type count() override {
+        PER_THREAD_MEMBER_SUM(counter_int_type,sum,_stats,s._count);
+        return sum;
+    }
+
+    counter_int_type byte_count() override {
+        PER_THREAD_MEMBER_SUM(counter_int_type,sum,_stats,s._byte_count);
+        return sum;
+    }
+
+    stats read() {
+        counter_int_type count = 0;
+        counter_int_type byte_count = 0;
+        for (unsigned i = 0; i < _stats.weight(); i++) { \
+            count += _stats.get_value(i).s._count;
+            byte_count += _stats.get_value(i).s._byte_count;
+        }
+        return {count,byte_count};
+    }
+
+    inline void acquire() {
+loop:
+        for (unsigned i = 0; i < _stats.weight(); i++) {
+            if (!_stats.get_value(i).lock.attempt()) {
+                for (unsigned j = 0; j < i; j++) {
+                    _stats.get_value(j).lock.release();
+                }
+                goto loop;
+            }
+        }
+    }
+
+    inline void release() {
+        for (unsigned i = 0; i < _stats.weight(); i++)
+            _stats.get_value(i).lock.release();
+    }
+
+    stats atomic_read() {
+        counter_int_type count = 0;
+        counter_int_type byte_count = 0;
+        if (_atomic == 2) {
+            acquire();
+            for (unsigned i = 0; i < _stats.weight(); i++) {
+                count += _stats.get_value(i).s._count;
+                byte_count += _stats.get_value(i).s._byte_count;
+            }
+            release();
+        } else {
+            for (unsigned i = 0; i < _stats.weight(); i++) {
+                _stats.get_value(i).lock.acquire();
+                count += _stats.get_value(i).s._count;
+                byte_count += _stats.get_value(i).s._byte_count;
+                _stats.get_value(i).lock.release();
+            }
+        }
+
+        return {count,byte_count};
+    }
+
+    void add(stats s) override {
+        _stats->s._count += s._count;
+        _stats->s._byte_count += s._byte_count;
+    }
+
+    void atomic_add(stats s) override {
+        _stats->lock.acquire();
+        _stats->s._count += s._count;
+        _stats->s._byte_count += s._byte_count;
+        _stats->lock.release();
+    }
+
+protected:
+    class bucket { public:
+        bucket() : s(), lock() {
+        }
+        stats s;
+        Spinlock lock;
+    };
+    per_thread<bucket> _stats CLICK_CACHE_ALIGN;
+
+};
+
+class CounterPRWMP : public CounterRWMP { public:
+
+    CounterPRWMP() CLICK_COLD;
+    ~CounterPRWMP() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterPRWMP"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+};
+
 /*
 class CounterRCUMP : public CounterBase { public:
 
