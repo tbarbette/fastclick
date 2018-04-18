@@ -9,15 +9,15 @@ Metron's control plane is based on the [ONOS SDN controller][onos], which we ext
 Metron's data plane extends [FastClick][fastclick] (see the paper [here][fastclick-paper]), which in turn uses [DPDK][dpdk] as a high performance network I/O subsystem.
 The Metron data plane uses two features available in modern network interface cards (NICs) to achieve accurate dispatching of input traffic to the desired CPU core(s), thus eliminating inter-core communication.
 Specifically, the Metron data plane uses either:
-  1. the Virtual Machine Device queues (VMDq) of DPDK to implement hardware dispatching based on the values of input packets' destination MAC address or
-  2. DPDK's Flow Director library to classify and dispatch input traffic.
+  1. the Virtual Machine Device queues (VMDq) to implement hardware dispatching based on the values of input packets' destination MAC address or
+  2. DPDK's Flow Director library to classify and dispatch input traffic to available NIC queues (associated with CPU cores).
 
-The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be used by the Metron data plane to perform CPU core dispatching.
-This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch connected between the source and the NFV server.
-The Flow Director mode allows a Metron agent to perform traffic classification and dispatching using its own NIC(s), without involving any prior network element in the path.
+The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be matched by the Metron data plane to perform CPU core dispatching.
+This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch connected between a source and an NFV server.
+The Flow Director mode allows a Metron server to perform traffic classification and dispatching using its own NIC(s), without involving any prior network element in the path.
 
 This repository provides the source code of Metron's high performance data plane.
-Metron controller's code has not been released yet (only the [southbound driver][metron-driver] is public), but you can totally reproduce our results by running Metron's dataplane in Flow Director mode, using your desired traffic classification and dispatching rules.
+Metron controller's code has not been released yet (only the [southbound driver][metron-driver] is public), but you can totally reproduce our results by running Metron's data plane in Flow Director mode, using your desired traffic classification and dispatching rules.
 For more details, see the Deploy section below.
 
 
@@ -36,14 +36,14 @@ make -j <coresNb>
 ```
 
 
-Deploy
+Deployment Examples
 ----
-To deploy Metron agent in VMDq mode, do:
+To deploy Metron server in VMDq mode, do:
 ```bash
 sudo bin/click --dpdk -c 0xffff -n 4 -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-vmdq.conf
 ```
 
-To deploy Metron agent in Flow Director mode, do:
+To deploy Metron server in Flow Director mode, do:
 ```bash
 sudo bin/click --dpdk -c 0xffff -n 4 -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-flow-director.conf rulesFile=conf/metron/test_nic_rules
 ```
