@@ -372,6 +372,7 @@ void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data)
             click_chatter("In %p{element} :",this);
             click_chatter("Index [%d] : Cannot set data to %d, as it is already %d",i,*((T*)(&fcb->data[_flow_data_offset])),data);
             click_chatter("Is marked as set : %d", fcb->data[FCBPool::init_data_size() + _flow_data_offset + i]);
+            fcb->print("");
             click_chatter("It generally means your graph is messed up");
             assert(false);
         }

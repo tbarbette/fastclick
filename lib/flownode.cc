@@ -807,6 +807,9 @@ template class FlowNodeHash<9>;
 
 #define FLOW_DEBUG_PRUNE DEBUG_CLASSIFIER
 
+/**
+ * Prune a dynamic level with some other
+ */
 template<typename T>
 bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
     assert(is_dynamic());
@@ -816,11 +819,15 @@ bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
 
     T m = _mask;
     for (int i = 0; i < mask_size(); i++) {
-        uint8_t inverted = ol->get_mask(_offset + i);
+        uint8_t omask = ol->get_mask(_offset + i);
 #if FLOW_DEBUG_PRUNE
-        click_chatter("DMask %d (tot %d) mask %x",i,_offset + i,inverted);
+        click_chatter("DMask %d (tot %d) mask %x",i,_offset + i,omask);
 #endif
-        m = m & (~((T)inverted << ((mask_size() - i - 1)*8)));
+        //If the mask overlaps, we remove this part from our mask
+        if (omask) {
+            uint8_t inverted = omask;
+            m = m & (~((T)inverted << ((i)*8)));
+        }
     }
     /*
      * Should we care if other is dynamic ?
@@ -833,7 +840,9 @@ bool FlowLevelGeneric<T>::prune(FlowLevel* other) {
 
     if (_mask != m) {
         _mask = m;
-        //click_chatter("MASK CHANGED ! %x %s",m,print().c_str());
+#if FLOW_DEBUG_PRUNE
+        click_chatter("MASK CHANGED ! %x %s",m,print().c_str());
+#endif
         return true;
     }
     return false;

@@ -65,7 +65,7 @@ public :
         return v;
     }
      */
-    void print() const;
+    void print(int data_offset = -1) const;
 
     //---
     //Compile time functions

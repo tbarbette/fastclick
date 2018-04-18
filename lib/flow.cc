@@ -812,6 +812,21 @@ void FlowNode::apply_default(std::function<void(FlowNodePtr*)> fnt) {
     }
 }
 
+/**
+ * Remove all branch of the tree that fully match the given leaf.
+ */
+/*FlowNodePtr FlowNodePtr::remove_matching(FlowControlBlock* leaf) {
+    traverse_all_leaves([this](FlowNodePtr* node){
+        bool remove = false;
+        leaf->parent()->traverse_parents([](FlowNode* parent) {
+            //if (node->prune())
+        });
+        FlowNodePtr dup = this->duplicate();
+        if (dup)
+    });
+}
+//TODO
+*/
 
 /**
  * Prune the tree by adding the knowledge that the given level will or will not (inverted) be of the given value
@@ -1355,11 +1370,11 @@ void FlowControlBlock::reverse_print() {
 }
 
 
-void FlowNodePtr::print() const{
+void FlowNodePtr::print(int data_offset) const{
 	if (is_leaf())
-		leaf->print("");
+		leaf->print("",data_offset);
 	else
-		node->print();
+		node->print(data_offset);
 }
 
 
