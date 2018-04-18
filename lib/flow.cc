@@ -131,7 +131,7 @@ FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress ds
 }
 
 FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verbose) {
-    std::regex reg("((?:(?:(?:agg|thread|(?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?))(?:[:]HASH-[0-9]+|[:]ARRAY)?[!]? ?)+)|-)( keep)?( [0-9]+| drop)?",
+    std::regex reg("((?:(?:(?:agg|thread|(?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?))(?:[:]HASH-[0-9]+|[:]ARRAY)?[!]?[ \t]*)+)|-)([ \t]+keep)?([ \t]+[0-9]+|[ \t]+drop)?",
              std::regex_constants::icase);
     std::regex classreg("thread|agg|(ip[+])?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?([:]HASH-[0-9]+|[:]ARRAY)?([!])?",
                  std::regex_constants::icase);

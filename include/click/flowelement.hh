@@ -368,7 +368,13 @@ int FlowSpaceElement<T>::initialize(ErrorHandler *errh) {
 template<typename T>
 void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data) {
     for (int i = 0; i < sizeof(T); i++) {
-        assert(!fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] || fcb->data[_flow_data_offset + i] == ((uint8_t*)&data)[i]);
+        if (fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] && fcb->data[_flow_data_offset + i] != ((uint8_t*)&data)[i]) {
+            click_chatter("In %p{element} :",this);
+            click_chatter("Index [%d] : Cannot set data to %d, as it is already %d",i,*((T*)(&fcb->data[_flow_data_offset])),data);
+            click_chatter("Is marked as set : %d", fcb->data[FCBPool::init_data_size() + _flow_data_offset + i]);
+            click_chatter("It generally means your graph is messed up");
+            assert(false);
+        }
         fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] = 0xff;
     }
     *((T*)(&fcb->data[_flow_data_offset])) = data;
