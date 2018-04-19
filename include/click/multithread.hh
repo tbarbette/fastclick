@@ -541,13 +541,8 @@ private:
  * Carefull : calling write_begin while read is held or vice versa will end up in deadlock
  */
 
-template <class V>
-class __rwlock { public:
-    __rwlock() : _v(){
-        _refcnt = 0;
-    }
-
-    __rwlock(V v) : _v(v) {
+class RWLock { public:
+    RWLock() {
         _refcnt = 0;
     }
 
@@ -569,6 +564,10 @@ class __rwlock { public:
 
     inline void write_begin() {
         while (_refcnt.compare_swap(0,-1) != 0) click_relax_fence();
+    }
+
+    inline bool write_attempt() {
+        return (_refcnt.compare_swap(0,-1) == 0);
     }
 
     /**
@@ -601,10 +600,24 @@ class __rwlock { public:
      * TLDR : if false, you have loosed your read lock and neither
      * acquired the write
      */
-    bool read_to_write() CLICK_WARN_UNUSED_RESULT;
+    inline bool read_to_write() CLICK_WARN_UNUSED_RESULT;
 
-    uint32_t refcnt() {
+    inline uint32_t refcnt() {
         return _refcnt;
+    }
+
+private:
+    atomic_uint32_t _refcnt;
+
+};
+
+
+template <class V>
+class __rwlock : public RWLock { public:
+    __rwlock() : _v(){
+    }
+
+    __rwlock(V v) : _v(v) {
     }
 
     V _v;
@@ -616,9 +629,6 @@ class __rwlock { public:
     V& operator*() {
         return _v;
     }
-
-private:
-    atomic_uint32_t _refcnt;
 };
 
 /**
@@ -897,8 +907,8 @@ private:
     __rwlock<V> _v;
 };
 
-template <typename V>
-bool __rwlock<V>::read_to_write() {
+inline bool
+RWLock::read_to_write() {
        /* Sadly, read_to_write is more complex than write_to_read,
         * because
         * two readers could want to become writer at the same time,

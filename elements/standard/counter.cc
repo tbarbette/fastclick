@@ -403,6 +403,85 @@ CounterRxWMP::~CounterRxWMP()
 {
 }
 
+CounterLockMP::CounterLockMP()
+{
+    _atomic = 1;
+}
+
+CounterLockMP::~CounterLockMP()
+{
+}
+
+CounterPLockMP::CounterPLockMP()
+{
+    _atomic = 2;
+}
+
+CounterPLockMP::~CounterPLockMP()
+{
+}
+
+
+
+int
+CounterLockMP::initialize(ErrorHandler *errh) {
+    if (CounterBase::initialize(errh) != 0)
+        return -1;
+    //If not in simple mode, we only allow one writer so we can sum up the total number of threads
+
+    return 0;
+}
+
+Packet*
+CounterLockMP::simple_action(Packet *p)
+{
+    _stats->lock.acquire();
+    _stats->s._count++;
+    _stats->s._byte_count += p->length();
+    _stats->lock.release();
+    if (unlikely(!_simple))
+        check_handlers(CounterLockMP::count(), CounterLockMP::byte_count()); //BUG : if not atomic, then handler may be called twice
+    return p;
+}
+
+#if HAVE_BATCH
+PacketBatch*
+CounterLockMP::simple_action_batch(PacketBatch *batch)
+{
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch, p)
+            CounterLockMP::simple_action(p);
+        return batch;
+    }
+
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+
+    _stats->lock.acquire();
+    _stats->s._count += batch->count();
+    _stats->s._byte_count += bc;
+    _stats->lock.release();
+    if (unlikely(!_simple))
+        check_handlers(CounterLockMP::count(), CounterLockMP::byte_count());
+
+    return batch;
+}
+#endif
+
+void
+CounterLockMP::reset()
+{
+    acquire();
+    for (unsigned i = 0; i < _stats.weight(); i++) { \
+        _stats.get_value(i).s._count = 0;
+        _stats.get_value(i).s._byte_count = 0;
+    }
+    release();
+    CounterBase::reset();
+}
+
 CounterRWMP::CounterRWMP()
 {
     _atomic = 1;
@@ -435,10 +514,10 @@ CounterRWMP::initialize(ErrorHandler *errh) {
 Packet*
 CounterRWMP::simple_action(Packet *p)
 {
-    _stats->lock.acquire();
+    _stats->lock.write_begin();
     _stats->s._count++;
     _stats->s._byte_count += p->length();
-    _stats->lock.release();
+    _stats->lock.write_end();
     if (unlikely(!_simple))
         check_handlers(CounterRWMP::count(), CounterRWMP::byte_count()); //BUG : if not atomic, then handler may be called twice
     return p;
@@ -459,10 +538,10 @@ CounterRWMP::simple_action_batch(PacketBatch *batch)
         bc += p->length();
     }
 
-    _stats->lock.acquire();
+    _stats->lock.write_begin();
     _stats->s._count += batch->count();
     _stats->s._byte_count += bc;
-    _stats->lock.release();
+    _stats->lock.write_end();
     if (unlikely(!_simple))
         check_handlers(CounterRWMP::count(), CounterRWMP::byte_count());
 
@@ -473,12 +552,12 @@ CounterRWMP::simple_action_batch(PacketBatch *batch)
 void
 CounterRWMP::reset()
 {
-    acquire();
+    acquire_write();
     for (unsigned i = 0; i < _stats.weight(); i++) { \
         _stats.get_value(i).s._count = 0;
         _stats.get_value(i).s._byte_count = 0;
     }
-    release();
+    release_write();
     CounterBase::reset();
 }
 
@@ -834,11 +913,14 @@ EXPORT_ELEMENT(CounterMP)
 ELEMENT_MT_SAFE(CounterMP)
 EXPORT_ELEMENT(CounterRxWMP)
 ELEMENT_MT_SAFE(CounterRxWMP)
+EXPORT_ELEMENT(CounterLockMP)
+ELEMENT_MT_SAFE(CounterLockMP)
+EXPORT_ELEMENT(CounterPLockMP)
+ELEMENT_MT_SAFE(CounterPLockMP)
 EXPORT_ELEMENT(CounterRWMP)
 ELEMENT_MT_SAFE(CounterRWMP)
 EXPORT_ELEMENT(CounterPRWMP)
 ELEMENT_MT_SAFE(CounterPRWMP)
-
 EXPORT_ELEMENT(CounterRW)
 ELEMENT_MT_SAFE(CounterRW)
 EXPORT_ELEMENT(CounterPRW)
