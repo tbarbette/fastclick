@@ -24,7 +24,7 @@
 
 CLICK_DECLS
 
-CounterTest::CounterTest() : _counter(0), _rate(0), _atomic(true), _standalone(false), _task(this), _read(0), _write(0)
+CounterTest::CounterTest() : _counter(0), _rate(0), _atomic(true), _standalone(false), _task(this), _read(0), _write(0), _pass(1)
 {
 }
 
@@ -38,6 +38,7 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("RATE", _rate)
         .read("ATOMIC", _atomic)
         .read("STANDALONE", _standalone)
+        .read("PASS", _pass)
         .complete() < 0)
         return -1;
     _counter = (CounterBase*)e->cast("CounterBase");
@@ -56,19 +57,24 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
         _add_fnt=(void (*)(CounterBase*,CounterBase::stats))(_counter->*addfnt);
         _read_fnt=(CounterBase::stats(*)(CounterBase*))(_counter->*readfnt);
     }
+    if (_pass < 1)
+        return errh->error("PASS must be >= 1");
     return 0;
 }
 
 #if HAVE_BATCH
 void
 CounterTest::push_batch(int, PacketBatch* batch) {
-    for (int i = 0; i < _rate; i++) {
-        if (!router()->running())
-            break;
-        if (_atomic) {
-            _read_fnt(_counter);
-        } else {
-            _counter->count();
+    if (++_cur_pass == _pass) {
+        _cur_pass.set(0);
+        for (int i = 0; i < _rate; i++) {
+            if (!router()->running())
+                break;
+            if (_atomic) {
+                _read_fnt(_counter);
+            } else {
+                _counter->count();
+            }
         }
     }
     output_push_batch(0, batch);

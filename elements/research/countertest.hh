@@ -40,6 +40,8 @@ private:
     bool _atomic;
     bool _standalone;
     Task _task;
+    int _pass;
+    per_thread<int> _cur_pass;
     void(*_add_fnt)(CounterBase*,CounterBase::stats);
     CounterBase::stats(*_read_fnt)(CounterBase*);
 
