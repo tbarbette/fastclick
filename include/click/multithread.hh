@@ -641,12 +641,12 @@ class __rwlock : public RWLock { public:
  * If max_writer is 1, this becomes rwlock, but with a priority on the reads
  */
 
-class rXwlock { public:
-    rXwlock() : max_write(-65535) {
+class rXwlockPR { public:
+    rXwlockPR() : max_write(-65535) {
         _refcnt = 0;
     }
 
-    rXwlock(int32_t max_writers) {
+    rXwlockPR(int32_t max_writers) {
         _refcnt = 0;
         set_max_writers(max_writers);
     }
@@ -713,6 +713,140 @@ class rXwlock { public:
 private:
     atomic_uint32_t _refcnt;
     int32_t max_write;
+} CLICK_CACHE_ALIGN;
+
+/**
+ * Read XOR Write lock. Allow either multiple reader or multiple
+ * writer. When a reader arrives, writers stop taking the usecount. The reader
+ * has access once all writer finish.
+ *
+ * To stop writer from locking, the reader will CAS a very low value.
+ *
+ * If max_writer is 1, this becomes rwlock, but with a priority on the reads
+ */
+
+class rXwlockPW { public:
+    rXwlockPW() : max_write(-65535) {
+        _refcnt = 0;
+    }
+
+    rXwlockPW(int32_t max_writers) {
+        _refcnt = 0;
+        set_max_writers(max_writers);
+    }
+
+    void set_max_writers(int32_t max_writers) {
+        assert(max_writers < 65535);
+        write_begin();
+        max_write = - max_writers;
+        write_end();
+    }
+
+    inline void write_begin() {
+        uint32_t current_refcnt;
+        do {
+            current_refcnt = _refcnt;
+            if (unlikely((int32_t)current_refcnt < 0)) {
+                if ((int32_t)current_refcnt <= -65536) {
+                    //Just wait for the other reader out there to win
+                } else {
+                    if (_refcnt.compare_swap(current_refcnt,current_refcnt - 65536) == current_refcnt) {
+                        //We could lower the value, so wait for it to reach -65536 (0 writer but one reader waiting) and continue
+                        do {
+                            click_relax_fence();
+                        } while((int32_t)_refcnt != -65536);
+                        //When it is -65536, driver cannot take it and reader are waiting, so we can set it directly
+                        _refcnt = 1;
+                        break;
+                    }
+                }
+            } else { // >= 0, just grab another reader (>0)
+                if (likely(_refcnt.compare_swap(current_refcnt,current_refcnt+1) == current_refcnt))
+                    break;
+            }
+            click_relax_fence();
+        } while (1);
+    }
+
+    inline void write_end() {
+        click_write_fence();
+        _refcnt--;
+    }
+
+    inline void write_get() {
+        _refcnt++;
+    }
+
+    inline void read_begin() {
+        uint32_t current_refcnt;
+        do {
+            current_refcnt = _refcnt;
+            if (likely((int32_t)current_refcnt <= 0 && (int32_t)current_refcnt > max_write)) {
+                if (_refcnt.compare_swap(current_refcnt,current_refcnt - 1) == current_refcnt)
+                    break;
+            }
+            click_relax_fence();
+        } while (1);
+    }
+
+    inline void read_end() {
+        click_read_fence();
+        _refcnt++;
+    }
+
+
+private:
+    atomic_uint32_t _refcnt;
+    int32_t max_write;
+} CLICK_CACHE_ALIGN;
+
+
+
+class rXwlock { public:
+    rXwlock() {
+        _refcnt = 0;
+    }
+
+    inline void read_begin() {
+        uint32_t current_refcnt;
+        current_refcnt = _refcnt;
+        while ((int32_t)current_refcnt < 0 || _refcnt.compare_swap(current_refcnt,current_refcnt+1) != current_refcnt) {
+            click_relax_fence();
+            current_refcnt = _refcnt;
+        }
+    }
+
+    void set_max_writers(int32_t max_writers) {
+
+    }
+
+
+
+    inline void read_end() {
+        click_read_fence();
+        _refcnt--;
+    }
+
+    inline void read_get() {
+        _refcnt++;
+    }
+
+    inline void write_begin() {
+        uint32_t current_refcnt;
+        current_refcnt = _refcnt;
+        while ((int32_t)current_refcnt > 0 || _refcnt.compare_swap(current_refcnt,current_refcnt-1) != current_refcnt) {
+            click_relax_fence();
+            current_refcnt = _refcnt;
+        }
+    }
+
+    inline void write_end() {
+        click_write_fence();
+        _refcnt++;
+    }
+
+private:
+    atomic_uint32_t _refcnt;
 } CLICK_CACHE_ALIGN;
 
 

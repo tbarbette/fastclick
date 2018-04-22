@@ -252,11 +252,11 @@ protected:
     counter_int_type _byte_count;
 };
 
+template <typename T>
+class CounterMPBase : public CounterBase { public:
 
-class CounterMP : public CounterBase { public:
-
-	CounterMP() CLICK_COLD;
-    ~CounterMP() CLICK_COLD;
+	CounterMPBase() CLICK_COLD;
+    ~CounterMPBase() CLICK_COLD;
 
     const char *class_name() const		{ return "CounterMP"; }
     const char *processing() const		{ return AGNOSTIC; }
@@ -265,7 +265,7 @@ class CounterMP : public CounterBase { public:
     void* cast(const char *name)
     {
         if (strcmp("CounterMP", name) == 0)
-            return (CounterMP *)this;
+            return (CounterMPBase<T> *)this;
         else
             return CounterBase::cast(name);
     }
@@ -329,11 +329,30 @@ class CounterMP : public CounterBase { public:
     }
 
 protected:
-    rXwlock _atomic_lock CLICK_CACHE_ALIGN;
+    T _atomic_lock CLICK_CACHE_ALIGN;
     per_thread<stats> _stats CLICK_CACHE_ALIGN;
 };
 
-class CounterRxWMP : public CounterMP { public:
+
+class CounterMP : public CounterMPBase<rXwlockPR> { public:
+
+};
+
+
+template <typename T>
+class CounterRxWMPBase : public CounterMPBase<T> { public:
+
+    CounterRxWMPBase() CLICK_COLD {
+    }
+
+    ~CounterRxWMPBase() CLICK_COLD {
+    }
+
+    const char *processing() const      { return Element::AGNOSTIC; }
+    const char *port_count() const      { return Element::PORTS_1_1; }
+};
+
+class CounterRxWMP : public CounterRxWMPBase<rXwlock> { public:
 
     CounterRxWMP() CLICK_COLD;
     ~CounterRxWMP() CLICK_COLD;
@@ -342,6 +361,26 @@ class CounterRxWMP : public CounterMP { public:
     const char *processing() const      { return AGNOSTIC; }
     const char *port_count() const      { return PORTS_1_1; }
 };
+
+class CounterRxWMPPR : public CounterRxWMPBase<rXwlockPR> { public:
+
+    CounterRxWMPPR() CLICK_COLD;
+    ~CounterRxWMPPR() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterRxWMPPR"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+};
+class CounterRxWMPPW : public CounterRxWMPBase<rXwlockPW> { public:
+
+    CounterRxWMPPW() CLICK_COLD;
+    ~CounterRxWMPPW() CLICK_COLD;
+
+    const char *class_name() const      { return "CounterRxWMPPW"; }
+    const char *processing() const      { return AGNOSTIC; }
+    const char *port_count() const      { return PORTS_1_1; }
+};
+
 
 class CounterLockMP : public CounterBase { public:
 
