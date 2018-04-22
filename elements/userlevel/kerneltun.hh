@@ -5,6 +5,7 @@
 #include <click/etheraddress.hh>
 #include <click/task.hh>
 #include <click/notifier.hh>
+#include <click/multithread.hh>
 CLICK_DECLS
 
 /*
@@ -132,6 +133,18 @@ class KernelTun : public BatchElement { public:
 #endif
     bool run_task(Task *) override;
 
+  protected:
+
+    int configure_common(Args &, ErrorHandler *) CLICK_COLD;
+    int initialize_common(ErrorHandler *) CLICK_COLD;
+    int setup_tun(ErrorHandler *, int);
+    int one_selected(const Timestamp &now, WritablePacket* &p, int fd);
+    void process(Packet* p, int fd);
+
+    bool _tap;
+    String _dev_name;
+    int _flags;
+
   private:
 
     enum { DEFAULT_MTU = 1500 };
@@ -142,8 +155,7 @@ class KernelTun : public BatchElement { public:
     int _mtu_in;
     int _mtu_out;
     Type _type;
-    bool _tap;
-    String _dev_name;
+
     IPAddress _near;
     IPAddress _mask;
     IPAddress _gw;
@@ -166,13 +178,37 @@ class KernelTun : public BatchElement { public:
 #endif
     int try_tun(const String &, ErrorHandler *);
     int alloc_tun(ErrorHandler *);
-    int setup_tun(ErrorHandler *);
     int updown(IPAddress, IPAddress, ErrorHandler *);
-    int one_selected(const Timestamp &now, WritablePacket* &p);
-    void process(Packet* p);
 
     friend class KernelTap;
 
+};
+
+
+class KernelTunMP : public KernelTun { public:
+    KernelTunMP() CLICK_COLD;
+    ~KernelTunMP() CLICK_COLD;
+
+    const char *class_name() const override	{ return "KernelTunMP"; }
+    const char *port_count() const override	{ return "0-1/1-2"; }
+    const char *processing() const override	{ return PUSH; }
+
+    int initialize(ErrorHandler *) override CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+
+    void push(int port, Packet *) override;
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch *) override;
+#endif
+
+    bool get_spawning_threads(Bitvector &, bool) override;
+private:
+    struct inputstate {
+        int fd;
+//        Task task; used for pull, no need
+    };
+    Bitvector _spawning;
+    per_thread_omem<inputstate> _state;
 };
 
 CLICK_ENDDECLS
