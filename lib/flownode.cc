@@ -183,9 +183,9 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
     while ((cur = it.next()) != 0) {
         if (!cur->is_leaf()) {
             if (show_ptr)
-                click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().data_64,cur->parent());
+                click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().get_long(),cur->parent());
             else
-                click_chatter("%s|-> %lu",prefix.c_str(),cur->data().data_64);
+                click_chatter("%s|-> %lu",prefix.c_str(),cur->data().get_long());
             print(cur->node,prefix + "|  ",data_offset, show_ptr);
         } else {
             cur->leaf->print(prefix + "|->",data_offset, show_ptr);
@@ -505,9 +505,17 @@ FlowNodeHeap::append_heap(FlowNode* fn,Vector<uint32_t>& vls, int i, int v_left,
 
 void
 FlowNodeHeap::initialize(FlowNode* fn) {
+    //List of encountered values
     Vector<uint32_t> vls = Vector<uint32_t>();
+    //Add all seen values to the list
     fn->apply([&vls](FlowNodePtr* ptr){vls.push_back(ptr->data().data_32);});
+
+    //Sort the list, so we take the middle values
     std::sort(vls.begin(), vls.end());
+    /*for (int i = 0 ; i < vls.size(); i ++) {
+        click_chatter("%d",vls[i]);
+    }*/
+
     int middle = vls.size() / 2;
     bool need_grow;
     childs.resize(right_idx(0) + 1);
@@ -515,12 +523,12 @@ FlowNodeHeap::initialize(FlowNode* fn) {
     inc_num();
     append_heap(fn, vls,left_idx(0),0,middle -1);
     append_heap(fn, vls,right_idx(0),middle + 1, vls.size() - 1);
-/*    for (int i = 0 ; i < childs.size(); i ++) {
+    for (int i = 0 ; i < childs.size(); i ++) {
         click_chatter("[%d] %u ; L:%d R:%d",i,childs[i].ptr?childs[i].data().data_32:0,left_idx(i),right_idx(i));
         bool need_grow;
         if (childs[i].ptr)
             assert(find_heap(childs[i].data(),need_grow) == &childs[i]);
-    }*/
+    }
 }
 
 /**
@@ -650,10 +658,11 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data, bool &need_
         int i = 0;
 
         unsigned int idx;
-
+#if HAVE_LONG_CLASSIFICATION
         if (level()->is_long())
             idx = hash64(data.data_32);
         else
+#endif
             idx = hash32(data.data_32);
 
         unsigned int insert_idx = UINT_MAX;
@@ -663,7 +672,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data, bool &need_
 #endif
         if (unlikely(growing())) { //Growing means the table is currently in destructions, so we check for DESTRUCTED_NODE pointers also, and no insert_idx trick
             while (!IS_EMPTY_PTR(childs[idx].ptr,this)) {
-                if (IS_VALID_PTR(childs[idx].ptr,this) && childs[idx].data().data_64 == data.data_64)
+                if (IS_VALID_PTR(childs[idx].ptr,this) && childs[idx].data().equals(data))
                     break;
                 idx = next_idx(idx);
                 i++;
@@ -684,7 +693,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data, bool &need_
                         insert_idx = idx;
                         ri ++;
                     }
-                } else if (childs[idx].data().data_64 != data.data_64) {
+                } else if (!childs[idx].data().equals(data)) {
 
                 } else { //We found the right bucket, that already exists
                     if (insert_idx != UINT_MAX) {
@@ -698,7 +707,7 @@ FlowNodePtr*  FlowNodeHash<capacity_n>::find_hash(FlowNodeData data, bool &need_
                     goto found;
                 }
     #if DEBUG_CLASSIFIER > 1
-                click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].ptr == DESTRUCTED_NODE ? -1 : childs[idx].data().data_64, data.data_64);
+                click_chatter("Collision hash[%d] is taken by %x while searching space for %x !",idx,childs[idx].ptr == DESTRUCTED_NODE ? -1 : childs[idx].data().get_long(), data.get_long());
     #endif
                 idx = next_idx(idx);
                 i++;
@@ -744,9 +753,11 @@ template<int capacity_n>
 void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData data) {
     int j = 0;
     unsigned idx;
+#if HAVE_LONG_CLASSIFICATION
     if (level()->is_long())
         idx = hash64(data.data_32);
     else
+#endif
         idx = hash32(data.data_32);
     int i = 0; //Collision number
     while (childs[idx].ptr != child.ptr) {
@@ -920,18 +931,18 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
             //  C D (1 2) --> only keep children with C == B
             T shifteddata;
             if (shift < 0) {
-                shifteddata = data.data_64 >> (-shift * 8);
+                shifteddata = data.get_long() >> (-shift * 8);
             } else {
-                shifteddata = data.data_64 << (shift * 8);
+                shifteddata = data.get_long() << (shift * 8);
             }
             shifteddata = shifteddata & shiftedmask & _mask;
 #if FLOW_DEBUG_PRUNE
             click_chatter("Shifteddata %x",shifteddata);
 #endif
             node->apply([this,node,shiftedmask,shifteddata](FlowNodePtr* cur){
-                    if ((((T)cur->data().data_64) & shiftedmask) != shifteddata) {
+                    if ((((T)cur->data().get_long()) & shiftedmask) != shifteddata) {
 #if FLOW_DEBUG_PRUNE
-                        click_chatter("%x does not match %x",cur->data().data_64 & shiftedmask, shifteddata);
+                        click_chatter("%x does not match %x",cur->data().get_long() & shiftedmask, shifteddata);
 #endif
                         cur->ptr = 0;
                         //TODO delete
@@ -1000,6 +1011,7 @@ FlowLevel* FlowLevelGeneric<T>::optimize() {
                 if (nmask == (uint32_t)-1)
                     return (new FlowLevelField<uint32_t>(offset))->assign(this);
                 return (new FlowLevelGeneric<uint32_t>(nmask,offset))->assign(this);
+#if HAVE_LONG_CLASSIFICATION
             case 5:
             case 6:
             case 7:
@@ -1007,6 +1019,7 @@ FlowLevel* FlowLevelGeneric<T>::optimize() {
                 if (nmask == (uint64_t)-1)
                     return (new FlowLevelField<uint64_t>(offset))->assign(this);
                 return this;//new FlowLevelGeneric<uint64_t>(offset,nmask);
+#endif
             default:
                 assert(false);
         }
@@ -1018,4 +1031,6 @@ FlowLevel* FlowLevelGeneric<T>::optimize() {
 template class FlowLevelGeneric<uint8_t>;
 template class FlowLevelGeneric<uint16_t>;
 template class FlowLevelGeneric<uint32_t>;
+#if HAVE_LONG_CLASSIFICATION
 template class FlowLevelGeneric<uint64_t>;
+#endif

@@ -92,7 +92,9 @@ private:
     //bool deletable;
 protected:
     bool _dynamic;
+#if HAVE_LONG_CLASSIFICATION
     bool _islong = false;
+#endif
 public:
     FlowLevel() :
         //deletable(true),
@@ -129,7 +131,11 @@ public:
      * However this is not checking if runtime data and dynamic are equals
      */
     virtual bool equals(FlowLevel* level) {
-        return typeid(*this) == typeid(*level) && _islong == level->_islong && _dynamic == level->_dynamic;
+        return typeid(*this) == typeid(*level) &&
+#if HAVE_LONG_CLASSIFICATION
+                _islong == level->_islong &&
+#endif
+                _dynamic == level->_dynamic;
     }
 
     inline FlowNodeData get_data(Packet* p) {
@@ -155,15 +161,21 @@ public:
     }*/
 
     virtual String print() = 0;
-
+#if HAVE_LONG_CLASSIFICATION
     inline bool is_long() const {
         return _islong;
     }
-
+#else
+    inline bool is_long() const {
+        return false;
+    }
+#endif
     FlowLevel* assign(FlowLevel* l) {
         _dynamic = l->_dynamic;
         //deletable = l->deletable;
+#if HAVE_LONG_CLASSIFICATION
         _islong = l->_islong;
+#endif
         return this;
     }
 
@@ -437,12 +449,14 @@ public:
 using FlowLevelGeneric8 = FlowLevelGeneric<uint8_t>;
 using FlowLevelGeneric16 = FlowLevelGeneric<uint16_t>;
 using FlowLevelGeneric32 = FlowLevelGeneric<uint32_t>;
+#if HAVE_LONG_CLASSIFICATION
 using FlowLevelGeneric64 = FlowLevelGeneric<uint64_t>;
-
+#endif
 using FlowLevelField8 = FlowLevelField<uint8_t>;
 using FlowLevelField16 = FlowLevelField<uint16_t>;
 using FlowLevelField32 = FlowLevelField<uint32_t>;
+#if HAVE_LONG_CLASSIFICATION
 using FlowLevelField64 = FlowLevelField<uint64_t>;
-
+#endif
 
 #endif

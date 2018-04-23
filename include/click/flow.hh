@@ -71,12 +71,12 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 #endif
     if (unlikely(!parent->_leaf_reverse_match(sfcb,p))) {
 #if DEBUG_CLASSIFIER_MATCH > 2
-        click_chatter("DIF is_default %d Leaf %x %x level %s",parent->default_ptr()->ptr == sfcb,parent->level()->get_data(p).data_64, sfcb->node_data[0].data_64,parent->level()->print().c_str());
+        click_chatter("DIF is_default %d Leaf %x %x level %s",parent->default_ptr()->ptr == sfcb,parent->level()->get_data(p).get_long(), sfcb->node_data[0].get_long(),parent->level()->print().c_str());
 #endif
         return false;
     } else {
 #if DEBUG_CLASSIFIER_MATCH > 2
-        click_chatter("MAT is_default %d Leaf %x %x level %s",parent->default_ptr()->ptr == sfcb,parent->level()->get_data(p).data_64, sfcb->node_data[0].data_64,parent->level()->print().c_str());
+        click_chatter("MAT is_default %d Leaf %x %x level %s",parent->default_ptr()->ptr == sfcb,parent->level()->get_data(p).get_long(), sfcb->node_data[0].get_long(),parent->level()->print().c_str());
 #endif
     }
 
@@ -86,12 +86,12 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
         flow_assert(parent);
         if (likely(!parent->_node_reverse_match(child,p))) {
 #if DEBUG_CLASSIFIER_MATCH > 2
-            click_chatter("DIF is_default %d Child %x %x level %s",parent->default_ptr()->ptr == child ,parent->level()->get_data(p).data_64, child->node_data.data_64,parent->level()->print().c_str());
+            click_chatter("DIF is_default %d Child %x %x level %s",parent->default_ptr()->ptr == child ,parent->level()->get_data(p).get_long(), child->node_data.get_long(),parent->level()->print().c_str());
 #endif
             return false;
         } else {
 #if DEBUG_CLASSIFIER_MATCH > 2
-            click_chatter("MAT is_default %d Child %x %x level %s",parent->default_ptr()->ptr == child,parent->level()->get_data(p).data_64, child->node_data.data_64,parent->level()->print().c_str());
+            click_chatter("MAT is_default %d Child %x %x level %s",parent->default_ptr()->ptr == child,parent->level()->get_data(p).get_long(), child->node_data.get_long(),parent->level()->print().c_str());
 #endif
         }
     };
@@ -111,7 +111,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
         bool need_grow = false;
         FlowNodeData data = parent->level()->get_data(p);
 #if DEBUG_CLASSIFIER_MATCH > 1
-        click_chatter("[%d] Data level %d is %016llX",click_current_cpu_id(), level_nr++,data.data_64);
+        click_chatter("[%d] Data level %d is %016llX",click_current_cpu_id(), level_nr++,data.get_long());
 #endif
         child_ptr = parent->find(data,need_grow);
 #if DEBUG_CLASSIFIER_MATCH > 1
@@ -173,7 +173,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
     #if DEBUG_CLASSIFIER_MATCH > 1
                             click_chatter("DUPLICATE leaf");
     #endif
-                            //click_chatter("New leaf with data '%x'",data.data_64);
+                            //click_chatter("New leaf with data '%x'",data.get_long());
                             //click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
                             child_ptr->set_leaf(_pool.allocate());
                             flow_assert(child_ptr->leaf);
@@ -229,7 +229,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
                 }
             } else {
                 click_chatter("ERROR : no classification node and no default path !");// allowed with the "!" symbol
-                click_chatter("Level %s, data %lu", parent->level()->print().c_str(),data.data_64);
+                click_chatter("Level %s, data %lu", parent->level()->print().c_str(),data.get_long());
                 _root->print();
                 return 0;
             }

@@ -50,14 +50,42 @@ union FlowNodeData{
 	uint8_t data_8;
 	uint16_t data_16;
 	uint32_t data_32;
+#if HAVE_LONG_CLASSIFICATION
 	uint64_t data_64;
 	void* data_ptr;
+#endif
 
-	FlowNodeData() : data_64(0) {};
-	FlowNodeData(uint8_t d) : data_8(d) {};
-	FlowNodeData(uint16_t d) : data_16(d) {};
-	FlowNodeData(uint32_t d) : data_32(d) {};
-	FlowNodeData(uint64_t d) : data_64(d) {};
+	explicit FlowNodeData() :
+#if HAVE_LONG_CLASSIFICATION
+	    data_64(0)
+#else
+	    data_32(0)
+#endif
+	{};
+	explicit FlowNodeData(uint8_t d) : data_8(d) {};
+	explicit FlowNodeData(uint16_t d) : data_16(d) {};
+	explicit FlowNodeData(uint32_t d) : data_32(d) {};
+#if HAVE_LONG_CLASSIFICATION
+	explicit FlowNodeData(uint64_t d) : data_64(d) {};
+#else
+	explicit FlowNodeData(uint64_t d) : data_32((uint32_t)d) {};
+#endif
+
+	inline bool equals(const FlowNodeData &other) {
+#if HAVE_LONG_CLASSIFICATION
+        return data_64 == other.data_64;
+#else
+        return data_32 == other.data_32;
+#endif
+	}
+
+	inline uint64_t get_long() const {
+#if HAVE_LONG_CLASSIFICATION
+        return data_64;
+#else
+        return data_32;
+#endif
+	}
 };
 
 typedef void (*SubFlowRealeaseFnt)(FlowControlBlock* fcb, void* thunk);
@@ -130,6 +158,9 @@ private:
             uint64_t data_64[0];
             FlowNodeData node_data[0];
         };
+        inline FlowNodeData& get_data() {
+            return node_data[0];
+        }
         //No data after this
 
         void combine_data(uint8_t* data);
@@ -164,6 +195,7 @@ private:
 
 		void print(String prefix, int data_offset =-1, bool show_ptr=false) const;
         void reverse_print();
+        FlowNode* find_root();
 
 		bool empty();
 

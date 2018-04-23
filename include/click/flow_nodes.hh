@@ -82,7 +82,7 @@ protected:
 #endif
             return this->find_or_default(level()->get_data(p))->ptr == leaf;
         } else {
-            return level()->get_data(p).data_64 == leaf->data_64[0];
+            return level()->get_data(p).equals(leaf->get_data());
         }
     }
 
@@ -93,7 +93,7 @@ protected:
         if (default_ptr()->ptr == child) //If default, we need to check it does not match any non-default
             return this->find_or_default(level()->get_data(p))->ptr == child;
         else
-            return level()->get_data(p).data_64 == child->node_data.data_64;
+            return level()->get_data(p).equals(child->node_data);
     }
 
     /**
@@ -658,11 +658,12 @@ class FlowNodeHash : public FlowNode  {
         return ((d << 3) + (d >> 9) + (d >> 12) + (d >> 25)) % capacity();
     }
 
+#if HAVE_LONG_CLASSIFICATION
     unsigned int hash64(uint64_t ld) const {
         uint32_t d = (uint32_t)ld ^ (ld >> 32);
         return ((d << 3) + (d >> 9) + (d >> 12) + (d >> 25)) % capacity();
     }
-
+#endif
 
     inline int next_idx(int idx) const {
         idx = (idx + step());
@@ -871,7 +872,7 @@ class FlowNodeTwoCase : public FlowNode  {
     FLOW_NODE_DEFINE(FlowNodeTwoCase,find_two);
 
     FlowNodePtr* find_two(FlowNodeData data, bool&) {
-        if (data.data_64 == child.data().data_64)
+        if (data.equals(child.data()))
             return &child;
         else
             return &_default;
@@ -949,9 +950,9 @@ class FlowNodeThreeCase : public FlowNode  {
     FLOW_NODE_DEFINE(FlowNodeThreeCase,find_three);
 
     FlowNodePtr* find_three(FlowNodeData data, bool&) {
-        if (data.data_64 == childA.data().data_64)
+        if (data.equals(childA.data()))
             return &childA;
-        else if (data.data_64 == childB.data().data_64)
+        else if (data.equals(childB.data()))
             return &childB;
         else
             return &_default;

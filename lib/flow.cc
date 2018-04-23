@@ -248,6 +248,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                         if (verbose)
                             click_chatter("HASH32 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
                         f = fl;
+#if HAVE_LONG_CLASSIFICATION
                     } else {
                         FlowLevelGeneric64* fl = new FlowLevelGeneric64();
                         fl->set_match(std::stoul(offset),maskv);
@@ -255,6 +256,11 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                             click_chatter("HASH64 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
                         f = fl;
                     }
+#else
+                    } else {
+                        assert(false);
+                    }
+#endif
                     if (maskv & valuev == 0)
                         dynamic = true;
                 }
@@ -287,10 +293,10 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                     //click_chatter("Dynamic node to output %d",output);
                     parent_ptr = node->default_ptr();
                     node->level()->set_dynamic();
-                    lastvalue = (FlowNodeData){.data_64 = (uint64_t)-1};
+                    lastvalue = FlowNodeData((uint64_t)-1);
                 } else {
                     //click_chatter("Value %d to output %d",valuev, output);
-                    lastvalue = (FlowNodeData){.data_64 = valuev};
+                    lastvalue = FlowNodeData((uint64_t)valuev);
                     bool need_grow;
                     parent_ptr = node->find(lastvalue, need_grow);
                 }
@@ -566,7 +572,7 @@ void FlowNode::__combine_child(FlowNode* other, bool priority) {
 		FlowNodePtr* other_child_ptr;
 		while ((other_child_ptr = other_childs.next()) != 0) { //For each child of the other node
 #if DEBUG_CLASSIFIER
-			click_chatter("COMBINE-CHILD : taking child %lu",other_child_ptr->data().data_64);
+			click_chatter("COMBINE-CHILD : taking child %lu",other_child_ptr->data().get_long());
 #endif
 
             bool need_grow;
@@ -659,7 +665,7 @@ void FlowNode::__combine_else(FlowNode* other, bool priority) {
          */
         FlowNodePtr* other_child_ptr;
         while ((other_child_ptr = other_childs.next()) != 0) { //For each child of the other node
-            debug_flow("COMBINE-ELSE : taking child %lu",other_child_ptr->data().data_64);
+            debug_flow("COMBINE-ELSE : taking child %lu",other_child_ptr->data().get_long());
             bool need_grow;
             FlowNodePtr* child_ptr = find(other_child_ptr->data(),need_grow);
             if (child_ptr->ptr == 0) { //We have no same data, so we just append the other's child to us, merging it with a dup of our default
@@ -843,7 +849,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
             level()->print().c_str(),level()->is_dynamic(),
             olevel->print().c_str(),olevel->is_dynamic(),
             inverted,
-            data.data_64);
+            data.get_long());
 
     if (level()->is_dynamic()) { //If we are dynamic, we can remove from our mask the mask of the second value
         debug_flow("Pruning a dynamic level...");
@@ -860,6 +866,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
             if (this->level()->prune(olevel)) {
                 changed = true;
                 if (!this->level()->is_usefull()) {
+                    print();
                     debug_flow("Not usefull anymore, returning default !");
                     assert(this->getNum() == 0);
                     changed= true;
@@ -895,7 +902,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
         }
 
     } else {
-        debug_flow("Pruning a static level...");
+        debug_flow("Pruning a static level...",inverted);
         if (olevel->is_dynamic()) {
             //At this time the value will be known... But that does not help us
             click_chatter("Static child of a dynamic parent.");
@@ -904,6 +911,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
             if (inverted) {
                 if (olevel->equals(this->level())) { //Same level
                     //Remove data from level if it exists
+                    click_chatter("Same level!");
                     bool need_grow;
                     FlowNodePtr* ptr_child = find(data,need_grow);
                     FlowNodePtr child = *ptr_child;
@@ -1222,7 +1230,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 				}
 			} else {
 #if DEBUG_CLASSIFIER
-				click_chatter("Optimize : only 2 possible case (value %lu or default %lu)",child->data().data_64,_default.data().data_64);
+				click_chatter("Optimize : only 2 possible case (value %lu or default %lu)",child->data().get_long(),_default.data().get_long());
 #endif
 				FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize(mt_safe));
 				fl->assign(this);
@@ -1254,7 +1262,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 
 			if (_default.ptr == 0 && !childB->else_drop()) {
 #if DEBUG_CLASSIFIER
-				click_chatter("Optimize : 2 child and no default value : only 2 possible case (value %lu or value %lu)!",childA->data().data_64,childB->data().data_64);
+				click_chatter("Optimize : 2 child and no default value : only 2 possible case (value %lu or value %lu)!",childA->data().get_long(),childB->data().get_long());
 #endif
 				FlowNodePtr newA = childA->optimize(mt_safe);
 				FlowNodeTwoCase* fl = new FlowNodeTwoCase(newA);
@@ -1265,7 +1273,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 				newnode = fl;
 			} else {
 #if DEBUG_CLASSIFIER
-				click_chatter("Optimize : only 3 possible cases (value %lu, value %lu or default %lu)",childA->data().data_64,childB->data().data_64,_default.data().data_64);
+				click_chatter("Optimize : only 3 possible cases (value %lu, value %lu or default %lu)",childA->data().get_long(),childB->data().get_long(),_default.data().get_long());
 #endif
 				FlowNodePtr ncA = childA->optimize(mt_safe);
 				FlowNodePtr ncB = childB->optimize(mt_safe);
@@ -1357,9 +1365,9 @@ void FlowControlBlock::print(String prefix, int data_offset, bool show_ptr) cons
 	    sprintf(&data_str[j],"%02x",data[data_offset]);
 	}
 	if (show_ptr)
-	    click_chatter("%s %lu Parent:%p UC:%d ED:%d (%p data %s)",prefix.c_str(),node_data[0].data_64,parent,count(),is_early_drop(),this,data_str);
+	    click_chatter("%s %lu Parent:%p UC:%d ED:%d (%p data %s)",prefix.c_str(),node_data[0].get_long(),parent,count(),is_early_drop(),this,data_str);
 	else
-	    click_chatter("%s %lu UC:%d ED:%d (data %s)",prefix.c_str(),node_data[0].data_64,count(),is_early_drop(),data_str);
+	    click_chatter("%s %lu UC:%d ED:%d (data %s)",prefix.c_str(),node_data[0].get_long(),count(),is_early_drop(),data_str);
 }
 
 void FlowControlBlock::reverse_print() {
@@ -1368,6 +1376,14 @@ void FlowControlBlock::reverse_print() {
     print(prefix);
     if (parent)
         parent->reverse_print();
+}
+
+FlowNode* FlowControlBlock::find_root() {
+    FlowNode* p = parent;
+    while (p != 0) {
+        p = p->parent();
+    }
+    return p;
 }
 
 
