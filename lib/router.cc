@@ -967,6 +967,37 @@ Router::visit(Element *first_element, bool forward, int first_port,
     return 0;
 }
 
+class ReachVisitor : public RouterVisitor { public:
+    Element* _target;
+    bool _reached;
+
+    ReachVisitor(Element* t) : _reached(false), _target(t) {
+
+    }
+
+    bool visit(Element *e, bool isoutput, int port,
+               Element *from_e, int from_port, int distance) {
+        if (e == _target) {
+            _reached = true;
+            return false;
+        }
+        return true;
+    }
+
+    bool reached() {
+        return _reached;
+    }
+};
+
+bool
+Router::element_can_reach(Element* a, Element* b) {
+    ReachVisitor r(b);
+    visit(a, true, -1, &r);
+    if (!r.reached())
+        visit(a, false, -1, &r);
+    return r.reached();
+}
+
 /** @brief Traverse the router configuration from one of @a e's ports, passing per each ports
  * @param e element to start search
  * @param forward true to search down from outputs, false to search up from

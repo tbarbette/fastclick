@@ -57,6 +57,7 @@ class Router { public:
     Element* find(const String& name, String context, ErrorHandler* errh = 0) const;
     Element* find(const String& name, const Element* context, ErrorHandler* errh = 0) const;
 
+    bool element_can_reach(Element* a, Element* b);
     int visit(Element *e, bool isoutput, int port, RouterVisitor *visitor) const;
     int visit_ports(Element *e, bool isoutput, int port, RouterVisitor *visitor) const;
     int visit_downstream(Element *e, int port, RouterVisitor *visitor) const;

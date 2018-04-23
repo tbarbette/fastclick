@@ -117,5 +117,13 @@ FlowType  FlowElement::getContext() {
     return FLOW_NONE;
 }
 
+void *
+VirtualFlowSpaceElement::cast(const char *name) {
+    if (strcmp("VirtualFlowSpaceElement", name) == 0) {
+        return this;
+    }
+    return FlowElement::cast(name);
+}
+
 #endif
 CLICK_ENDDECLS

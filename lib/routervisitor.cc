@@ -41,7 +41,7 @@ ElementCastTracker::visit(Element *e, bool, int, Element *, int, int)
 {
     if (e->cast(_name.c_str())) {
 	insert(e);
-	return false;
+	return _continue;
     } else
 	return true;
 }

@@ -56,7 +56,7 @@ void* StackElement::cast(const char *name)
     if(strcmp(name, "StackElement") == 0)
         return (StackElement*)this;
     else
-        return Element::cast(name);
+        return VirtualFlowSpaceElement::cast(name);
  }
 
 void StackElement::buildFunctionStack()

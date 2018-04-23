@@ -61,6 +61,8 @@ public:
 
 	int configure_phase() const		{ return CONFIGURE_PHASE_DEFAULT + 5; }
 
+	void *cast(const char *name) override;
+
     inline void fcb_acquire(int count = 1) {
         fcb_stack->acquire(count);
     }
@@ -167,7 +169,7 @@ public:
 protected:
 	int _flow_data_offset;
 	friend class FlowBufferVisitor;
-
+	friend class FlowClassifier;
 
 
 };
@@ -369,10 +371,11 @@ template<typename T>
 void FlowSpaceElement<T>::fcb_set_init_data(FlowControlBlock* fcb, const T data) {
     for (int i = 0; i < sizeof(T); i++) {
         if (fcb->data[FCBPool::init_data_size() + _flow_data_offset + i] && fcb->data[_flow_data_offset + i] != ((uint8_t*)&data)[i]) {
-            click_chatter("In %p{element} :",this);
+            click_chatter("In %p{element} for offset %d :",this, _flow_data_offset+i);
             click_chatter("Index [%d] : Cannot set data to %d, as it is already %d",i,*((T*)(&fcb->data[_flow_data_offset])),data);
             click_chatter("Is marked as set : %d", fcb->data[FCBPool::init_data_size() + _flow_data_offset + i]);
-            fcb->print("");
+            fcb->reverse_print();
+
             click_chatter("It generally means your graph is messed up");
             assert(false);
         }

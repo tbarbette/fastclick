@@ -291,6 +291,17 @@ Bitvector::set_range(int start, int length, bool value) {
 	}
 }
 
+bool
+Bitvector::range(int start, int length) {
+    for (int i = start; i < start + length; i++) {
+        if (i >= size())
+            return false;
+        if ((*this)[i])
+            return true;
+    }
+    return false;
+}
+
 Bitvector Bitvector::from_mask(unsigned long mask) {
 	int vsize = sizeof(unsigned long) * 8;
 	Bitvector v(vsize);

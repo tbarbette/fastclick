@@ -74,6 +74,7 @@ class Bitvector {
 
     void swap(Bitvector &x);
     void set_range(int start, int length, bool value);
+    bool range(int start, int length);
 
     inline int weight() const;
     inline int weight_range(int start, int length) const;

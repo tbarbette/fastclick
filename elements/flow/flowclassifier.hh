@@ -43,6 +43,15 @@ class FlowClassifier: public FlowElement {
     const bool _do_release;
 
     per_thread<FlowBatch*> _builder_batch;
+    static int _n_classifiers;
+    int _reserve;
+    static Vector<FlowClassifier *> _classifiers;
+    typedef Pair<Element*,int> EDPair;
+    Vector<EDPair>  _reachable_list;
+
+    int _pool_data_size;
+
+    void build_fcb();
 public:
 
     FlowClassifier() CLICK_COLD;

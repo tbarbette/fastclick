@@ -3,6 +3,7 @@
 #define CLICK_ROUTERVISITOR_HH
 #include <click/element.hh>
 #include <click/bitvector.hh>
+#include <click/pair.hh>
 CLICK_DECLS
 
 /** @class RouterVisitor
@@ -141,8 +142,8 @@ class ElementCastTracker : public ElementTracker { public:
     /** @brief Construct an ElementCastTracker.
      * @param router the router to be traversed
      * @param name the cast of interest */
-    ElementCastTracker(Router *router, const String &name)
-	: ElementTracker(router), _name(name) {
+    ElementCastTracker(Router *router, const String &name, bool stopAtFirst = true)
+	: ElementTracker(router), _name(name), _continue(!stopAtFirst) {
     }
 
     bool visit(Element *e, bool isoutput, int port,
@@ -151,8 +152,10 @@ class ElementCastTracker : public ElementTracker { public:
   private:
 
     String _name;
+    bool _continue;
 
 };
+
 
 /** @class ElementNeighborhoodTracker
  * @brief Router configuration visitor that collects close-by elements.

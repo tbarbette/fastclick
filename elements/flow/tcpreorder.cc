@@ -52,7 +52,7 @@ TCPReorder::cast(const char *n) {
    if (strcmp("TCPElement", n) == 0) {
        return static_cast<TCPElement*>(this);
    }
-   return Element::cast(n);
+   return FlowSpaceElement<fcb_tcpreorder>::cast(n);
 }
 
 void TCPReorder::flushListFrom(fcb_tcpreorder *tcpreorder, Packet* toKeep,
