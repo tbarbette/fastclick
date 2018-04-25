@@ -21,8 +21,8 @@ bool StackVisitor::visit(Element *e, bool, int port, Element*, int, int)
     StackElement *element = reinterpret_cast<StackElement*>(e);
 
     // Add the starting element in the list of the current element
-    click_chatter("Adding element %p{element} as predecessor of %p{element}", startElement,
-        element);
+    click_chatter("Adding element %p{element} as predecessor of %p{element}",
+            startElement, element);
     element->addStackElementInList(startElement, port);
 
     // Stop search when we encounter the IPOut Element

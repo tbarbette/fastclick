@@ -163,11 +163,11 @@ bool TCPIn::checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bo
         else
         {
             if (_retransmit) {
-                if (_verbose)
+                if (unlikely(_verbose))
                                     click_chatter("Retransmit passed to retransmitter");
                 _retransmit->push_batch(PacketBatch::make_from_packet(packet));
             } else {
-                if (_verbose)
+                if (unlikely(_verbose))
                     click_chatter("Killed retransmission");
                 packet->kill();
             }

@@ -26,18 +26,15 @@ SimpleTCPRetransmitter([INITIALBUFFERSIZE])
 
 =s middlebox
 
-TCPRetransmitter to use with TCPReorder. Keeps reference of packets pushed
+TCPRetransmitter to use with TCPIn. Keeps reference of packets pushed
 on port 0 in the middleclick sractchpad until the ack is received on the other
 side. If a packet is sent on port 1, it will retransmit the packet kept in
 memory matching the sequence number.
 
 This elements therfore allow to protect against sequence overwriting attacks but
 completely lets both sides manage the retransmission and timings. If
-you don't care, then simply push the retransmissions directly.
-
-TCPRetransmitter will do a full TCP-compliant retransmission as the owner of the
-data and is compatible with flow resizing. Here the sequence is not
-translated so it is not to be used with resizing.
+you don't care, then simply push the retransmissions directly, without this
+element (eg fine for a NAT, LB, ... packet besed fct).
 
 =a TCPIn, TCPOut, TCPReorder, TCPRetransmitter */
 

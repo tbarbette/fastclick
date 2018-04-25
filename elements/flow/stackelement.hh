@@ -425,7 +425,7 @@ public :
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
                  my_fcb->seen = true;
                  if (!this->registerConnectionClose(my_fcb, &release_fnt, (void*)this)) {
-                     click_chatter("ERROR in %p{element}: No element handle the connection",this);
+                     click_chatter("ERROR in %p{element}: No element handles the connection",this);
                      abort();
                  }
              } else {
