@@ -35,6 +35,7 @@ int MidStat::configure(Vector<String> &conf, ErrorHandler *errh)
 void MidStat::push_batch(int port, fcb_MidStat* fcb, PacketBatch* flow)
 {
     fcb->count += flow->count();
+    output(0).push_batch(flow);
 
 }
 
