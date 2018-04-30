@@ -28,160 +28,6 @@ FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), 
     FlowClassifier::_n_classifiers++;
 }
 
-
-class ElementDistanceCastTracker : public RouterVisitor { public:
-
-    typedef Pair<Element*,int> EDPair;
-
-
-     ElementDistanceCastTracker(Router *router, const String &name, bool stopAtFirst = true);
-
-     /** @brief Return the elements that matched. */
-     const Vector<EDPair> &elements() const {
-         return _elements;
-     }
-
-     /** @brief Add element @a e to the set of matching elements. */
-     void insert(Element *e, int distance) {
-         if (!_reached[e->eindex()]) {
-             _reached[e->eindex()] = true;
-             _elements.push_back(EDPair(e,distance));
-         } else {
-             for (int i = 0; i < _elements.size(); i++)
-                 if (_elements[i].first == e) {
-                     if (_elements[i].second > distance)
-                         _elements[i].second = distance;
-                     break;
-                 }
-         }
-     }
-
-     /** @brief Clear the set of matching elements. */
-     void clear() {
-         _reached.clear();
-         _elements.clear();
-     }
-
-   private:
-
-    bool visit(Element *e, bool isoutput, int port,
-           Element *from_e, int from_port, int distance);
-
-    Bitvector _reached;
-    Vector<EDPair> _elements;
-    String _name;
-    bool _continue;
-
-};
-
-
-ElementDistanceCastTracker::ElementDistanceCastTracker(Router *router, const String &name, bool stopAtFirst)
-    :  _reached(router->nelements(), false), _name(name), _continue(!stopAtFirst) {
-}
-
-bool
-ElementDistanceCastTracker::visit(Element *e, bool, int,
-                  Element *, int, int distance)
-{
-    FlowElement* fe = dynamic_cast<FlowElement*>(e);
-    if (fe && fe->stopClassifier())
-        return false;
-    if (e->cast(_name.c_str())) {
-        insert(e,distance);
-        return _continue;
-    } else
-        return true;
-}
-struct el {
-    int id;
-    int count;
-    int distance;
-};
-
-bool cmp(el a, el b) {
-    return a.count > b.count || (a.count==b.count &&  a.distance < b.distance);
-}
-
-void
-FlowClassifier::build_fcb() {
-    //1 : find list of reachable elements
-    ElementDistanceCastTracker reachables(router(),"VirtualFlowSpaceElement", false);
-    click_chatter("Reachable VirtualFlowSpaceElement element list :");
-    router()->visit(this, true, -1, &reachables);
-    for (int i = 0; i < reachables.elements().size(); i++) {
-        click_chatter("Reachable from %p{element} : %p{element}",this,reachables.elements()[i].first);
-    }
-     _reachable_list = reachables.elements();
-    _classifiers.push_back(this);
-    //If last of the classifiers
-    if (_classifiers.size() == _n_classifiers) {
-        click_chatter("Last classifier");
-        typedef Pair<int,int> CountDistancePair;
-        HashTable<int,CountDistancePair> common(CountDistancePair{0,INT_MAX});
-        int min_place = 0;
-
-        //Counting elements that appear multiple times and their minimal distance
-        for (int i = 0; i < _classifiers.size(); i++) {
-            FlowClassifier* fc = dynamic_cast<FlowClassifier*>(_classifiers[i]);
-            if (fc->_reserve > min_place)
-                min_place = fc->_reserve;
-            for (int j = 0; j < _classifiers[i]->_reachable_list.size(); j++) {
-                auto ptr = common.find_insert(_classifiers[i]->_reachable_list[j].first->eindex(),CountDistancePair(0,_classifiers[i]->_reachable_list[j].second));
-                ptr->second.first++;
-                if (ptr->second.second > _classifiers[i]->_reachable_list[j].second)
-                    ptr->second.second = _classifiers[i]->_reachable_list[j].second;
-            }
-        }
-
-        //Placing elements in a vector to sort them
-        Vector<el> elements;
-        for (auto it = common.begin(); it != common.end(); it++) {
-            //click_chatter("%p{element} -> %d,%d ",router()->element(it->first),it->second.first,it->second.second);
-            elements.push_back(el{it->first,it->second.first, it->second.second});
-        }
-
-        //Sorting the element, so we place first, shared first
-        std::sort(elements.begin(), elements.end(),cmp);
-        std::set<int> already_placed;
-        for (auto it = elements.begin(); it != elements.end(); it++) {
-            VirtualFlowSpaceElement* e = dynamic_cast<VirtualFlowSpaceElement*>(router()->element(it->id));
-            int my_place = min_place;
-            Bitvector v(false);
-            for (auto ai = already_placed.begin(); ai != already_placed.end(); ai++) {
-                int aid = *ai;
-                VirtualFlowSpaceElement* ae = dynamic_cast<VirtualFlowSpaceElement*>(router()->element(aid));
-                if (router()->element_can_reach(e,ae)) {
-                    if (v.size() < ae->flow_data_offset() + ae->flow_data_size())
-                        v.resize(ae->flow_data_offset() + ae->flow_data_size());
-                    v.set_range(ae->flow_data_offset(), ae->flow_data_size(), true);
-                }
-            }
-
-            while (v.range(my_place,e->flow_data_size())) {
-                my_place++;
-            }
-
-            if (_size_verbose > 0)
-                click_chatter("Placing  %p{element} at %d",e,my_place);
-            already_placed.insert(it->id);
-            e->_flow_data_offset = my_place;
-            e->_classifier = dynamic_cast<FlowClassifier*>(_classifiers[0]);
-        }
-        //Set pool data size for classifiers
-        for (int i = 0; i < _classifiers.size(); i++) {
-            FlowClassifier* fc = _classifiers[i];
-            fc->_pool_data_size = min_place;
-            for (int j = 0; j < fc->_reachable_list.size(); j++) {
-                VirtualFlowSpaceElement* vfe = dynamic_cast<VirtualFlowSpaceElement*>(fc->_reachable_list[j].first);
-                int tot = vfe->flow_data_offset() + vfe->flow_data_size();
-                if (tot > fc->_pool_data_size)
-                    fc->_pool_data_size = tot;
-            }
-            fc->_table.get_pool()->initialize(fc->_pool_data_size, &fc->_table);
-        }
-    }
-}
-
 FlowClassifier::~FlowClassifier() {
 
 }
@@ -969,6 +815,197 @@ String FlowClassifier::read_handler(Element* e, void* thunk) {
 void FlowClassifier::add_handlers() {
     add_read_handler("leaves", FlowClassifier::read_handler, 0);
     add_read_handler("print_tree", FlowClassifier::read_handler, 1);
+}
+
+
+class ElementDistanceCastTracker : public RouterVisitor { public:
+
+    typedef Pair<Element*,int> EDPair;
+
+
+     ElementDistanceCastTracker(Router *router, const String &name, bool stopAtFirst = true);
+
+     /** @brief Return the elements that matched. */
+     const Vector<EDPair> &elements() const {
+         return _elements;
+     }
+
+     /** @brief Add element @a e to the set of matching elements. */
+     void insert(Element *e, int distance) {
+         if (!_reached[e->eindex()]) {
+             _reached[e->eindex()] = true;
+             _elements.push_back(EDPair(e,distance));
+         } else {
+             for (int i = 0; i < _elements.size(); i++)
+                 if (_elements[i].first == e) {
+                     if (_elements[i].second > distance)
+                         _elements[i].second = distance;
+                     break;
+                 }
+         }
+     }
+
+     /** @brief Clear the set of matching elements. */
+     void clear() {
+         _reached.clear();
+         _elements.clear();
+     }
+
+   private:
+
+    bool visit(Element *e, bool isoutput, int port,
+           Element *from_e, int from_port, int distance);
+
+    Bitvector _reached;
+    Vector<EDPair> _elements;
+    String _name;
+    bool _continue;
+
+};
+
+
+ElementDistanceCastTracker::ElementDistanceCastTracker(Router *router, const String &name, bool stopAtFirst)
+    :  _reached(router->nelements(), false), _name(name), _continue(!stopAtFirst) {
+}
+
+bool
+ElementDistanceCastTracker::visit(Element *e, bool, int,
+                  Element *, int, int distance)
+{
+    FlowElement* fe = dynamic_cast<FlowElement*>(e);
+    if (fe && fe->stopClassifier())
+        return false;
+    if (e->cast(_name.c_str())) {
+        insert(e,distance);
+        return _continue;
+    } else
+        return true;
+}
+
+class UnstackVisitor : public RouterVisitor {
+public:
+    bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance) {
+        FlowElement* fe = dynamic_cast<FlowElement*>(e);
+
+        if (fe && fe->stopClassifier())
+            return false;
+
+        VirtualFlowSpaceElement* fbe = dynamic_cast<VirtualFlowSpaceElement*>(e);
+        if (fbe == NULL) {
+
+            const char *f = e->router()->flow_code_override(e->eindex());
+            if (!f)
+                f = e->flow_code();
+            if (strcmp(f,Element::COMPLETE_FLOW) != 0) {
+#if DEBUG_CLASSIFIER > 0
+                click_chatter("%p{element}: Unstacking flows from port %d", e,
+port);
+#endif
+                const_cast<Element::Port&>(from_e->port(true,from_port)).set_unstack(true);
+                return false;
+            }
+        }
+
+        return true;
+    }
+};
+
+
+struct el {
+    int id;
+    int count;
+    int distance;
+};
+
+bool cmp(el a, el b) {
+    return a.count > b.count || (a.count==b.count &&  a.distance < b.distance);
+}
+
+void
+FlowClassifier::build_fcb() {
+    //Find list of reachable elements
+    ElementDistanceCastTracker reachables(router(),"VirtualFlowSpaceElement", false);
+    click_chatter("Reachable VirtualFlowSpaceElement element list :");
+    router()->visit(this, true, -1, &reachables);
+    for (int i = 0; i < reachables.elements().size(); i++) {
+        click_chatter("Reachable from %p{element} : %p{element}",this,reachables.elements()[i].first);
+    }
+
+    _reachable_list = reachables.elements();
+    _classifiers.push_back(this);
+    //If last of the classifiers
+    if (_classifiers.size() == _n_classifiers) {
+        click_chatter("Last classifier");
+        typedef Pair<int,int> CountDistancePair;
+        HashTable<int,CountDistancePair> common(CountDistancePair{0,INT_MAX});
+        int min_place = 0;
+
+        //Counting elements that appear multiple times and their minimal distance
+        for (int i = 0; i < _classifiers.size(); i++) {
+            FlowClassifier* fc = dynamic_cast<FlowClassifier*>(_classifiers[i]);
+            if (fc->_reserve > min_place)
+                min_place = fc->_reserve;
+            for (int j = 0; j < _classifiers[i]->_reachable_list.size(); j++) {
+                auto ptr = common.find_insert(_classifiers[i]->_reachable_list[j].first->eindex(),CountDistancePair(0,_classifiers[i]->_reachable_list[j].second));
+                ptr->second.first++;
+                if (ptr->second.second > _classifiers[i]->_reachable_list[j].second)
+                    ptr->second.second = _classifiers[i]->_reachable_list[j].second;
+            }
+
+            //Set unstack before non-compatible element
+            UnstackVisitor uv = UnstackVisitor();
+            router()->visit_ports(_classifiers[i], true, -1, &uv);
+        }
+
+        //Placing elements in a vector to sort them
+        Vector<el> elements;
+        for (auto it = common.begin(); it != common.end(); it++) {
+            //click_chatter("%p{element} -> %d,%d ",router()->element(it->first),it->second.first,it->second.second);
+            elements.push_back(el{it->first,it->second.first, it->second.second});
+        }
+
+        //Sorting the element, so we place first, shared first
+        std::sort(elements.begin(), elements.end(),cmp);
+        std::set<int> already_placed;
+        for (auto it = elements.begin(); it != elements.end(); it++) {
+            VirtualFlowSpaceElement* e = dynamic_cast<VirtualFlowSpaceElement*>(router()->element(it->id));
+            int my_place = min_place;
+            Bitvector v(false);
+            for (auto ai = already_placed.begin(); ai != already_placed.end(); ai++) {
+                int aid = *ai;
+                VirtualFlowSpaceElement* ae = dynamic_cast<VirtualFlowSpaceElement*>(router()->element(aid));
+                if (router()->element_can_reach(e,ae)) {
+                    if (v.size() < ae->flow_data_offset() + ae->flow_data_size())
+                        v.resize(ae->flow_data_offset() + ae->flow_data_size());
+                    v.set_range(ae->flow_data_offset(), ae->flow_data_size(), true);
+                }
+            }
+
+            while (v.range(my_place,e->flow_data_size())) {
+                my_place++;
+            }
+
+            if (_size_verbose > 0)
+                click_chatter("Placing  %p{element} at %d",e,my_place);
+            already_placed.insert(it->id);
+            e->_flow_data_offset = my_place;
+            e->_classifier = dynamic_cast<FlowClassifier*>(_classifiers[0]);
+        }
+
+        //Set pool data size for classifiers
+        for (int i = 0; i < _classifiers.size(); i++) {
+            FlowClassifier* fc = _classifiers[i];
+            fc->_pool_data_size = min_place;
+            for (int j = 0; j < fc->_reachable_list.size(); j++) {
+                VirtualFlowSpaceElement* vfe = dynamic_cast<VirtualFlowSpaceElement*>(fc->_reachable_list[j].first);
+                int tot = vfe->flow_data_offset() + vfe->flow_data_size();
+                if (tot > fc->_pool_data_size)
+                    fc->_pool_data_size = tot;
+            }
+            fc->_table.get_pool()->initialize(fc->_pool_data_size, &fc->_table);
+        }
+    }
 }
 
 //int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};
