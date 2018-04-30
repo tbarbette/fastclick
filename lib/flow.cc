@@ -1153,6 +1153,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 	         child_ptr->set_node(newNode);
              child_ptr->set_data(data);
              child_ptr->set_parent(fa);
+             fa->inc_num();
 	    }
 	    return fa;
 	}
