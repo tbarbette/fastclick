@@ -38,10 +38,7 @@ public:
 
 
     virtual FlowNode* resolveContext(FlowType t, Vector<FlowElement*> contextStack) override;
-/*
-    virtual void removeBytes(WritablePacket* packet, uint32_t position,
-        uint32_t length) override;
-*/
+
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     void push_batch(int, PacketBatch*) override;

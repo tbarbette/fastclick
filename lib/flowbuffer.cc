@@ -10,6 +10,7 @@
 #include <click/glue.hh>
 #include <click/flowbuffer.hh>
 #include "../elements/flow/stackelement.hh"
+#include <immintrin.h>
 
 CLICK_DECLS
 
@@ -91,12 +92,6 @@ FlowBufferContentIter FlowBuffer::contentEnd()
 
 int FlowBuffer::searchInFlow(const char *pattern)
 {
-    if(!isInitialized())
-    {
-        click_chatter("Error: FlowBuffer not initialized");
-        return -1;
-    }
-
     int feedback = -1;
     FlowBufferContentIter iter = search(contentBegin(), pattern, &feedback);
 
@@ -132,6 +127,12 @@ PacketBatch* FlowBuffer::dequeueAll()
     head = 0;
     return batch;
 }
+
+int FlowBuffer::getSize()
+{
+    return head->count();
+}
+
 
 PacketBatch* FlowBuffer::dequeueUpTo(Packet* packet)
 {
@@ -174,8 +175,71 @@ FlowBufferIter FlowBuffer::end()
     return FlowBufferIter(this, NULL);
 }
 
+FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const char* needle, const int pattern_length,
+        int *feedback) {
+    const __m256i first = _mm256_set1_epi8(needle[0]);
+    const __m256i last  = _mm256_set1_epi8(needle[pattern_length - 1]);
 
-FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char* pattern,
+
+    unsigned char* s = start.get_ptr();
+    int n = start.leftInChunk();
+    int i = 0;
+    *feedback = -1;
+    FlowBufferContentIter next;
+    while (true) {
+        //click_chatter("Search at %d/%d",i,n);
+        const __m256i block_first = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
+        const __m256i block_last  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + pattern_length - 1));
+
+        const __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);
+        const __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);
+
+        uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));
+
+        while (mask != 0) {
+
+            const auto bitpos = __builtin_ctz(mask);
+
+            if (memcmp(s + i + bitpos + 1, needle + 1, pattern_length - 2) == 0) {
+                start += (i + bitpos);
+                *feedback = 1;
+                return start;
+            }
+
+            mask = mask & (mask - 1);
+        }
+        i += 32;
+        if (i + 32 + pattern_length >= n) {
+            if (start.lastChunk()) {
+                start += i - pattern_length;
+                //click_chatter("searching now!");
+                return search(start,needle,feedback);
+            } else {
+                if (i + pattern_length >= n) {
+                    //click_chatter("Next chunk");
+                    start = next;
+                    //int am = i+pattern_length-n;
+                    i = 0;
+                    s = start.get_ptr();
+                    n = start.leftInChunk();
+                } else {
+                    //click_chatter("InterChunk prep!");
+                    int am = i+32+pattern_length-n;
+                    next = start;
+                    next.moveToNextChunk();
+                    //click_chatter("Copy %s at the end of %s, %d",(char*)next.get_ptr(),(char*)s+n,am);
+                    strncpy((char*)s+n,(char*)next.get_ptr(),am);
+                    //click_chatter("Result (am is %d): %s",am,s);
+                    next += am;
+                }
+            }
+        }
+    }
+    *feedback = -1;
+    return contentEnd();
+}
+
+FlowBufferContentIter FlowBuffer::isearch(FlowBufferContentIter start, const char* pattern,
     int *feedback)
 {
     const char *currentPattern = pattern;
@@ -184,7 +248,6 @@ FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char
     // Search until we reach the end of the buffer
     while(start != contentEnd())
     {
-        //click_chatter("%d %d %c",start.offsetInPacket,contentEnd().offsetInPacket,*start);
         currentPattern = pattern;
         FlowBufferContentIter currentContent = start;
         nbFound = 0;
@@ -222,6 +285,53 @@ FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char
     return contentEnd();
 }
 
+FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char* pattern,
+    int *feedback)
+{
+    const char *currentPattern = pattern;
+    int nbFound = 0;
+
+    // Search until we reach the end of the buffer
+    while(start != contentEnd())
+    {
+        currentPattern = pattern;
+        FlowBufferContentIter currentContent = start;
+        nbFound = 0;
+
+        // Check if the characters in the buffer and in the pattern match (case insensitive)
+        while(currentContent != contentEnd()
+            && (*currentContent == *currentPattern) && *currentPattern != '\0')
+        {
+            ++currentPattern;
+            ++currentContent;
+            nbFound++;
+        }
+
+        // We have reached the end of the pattern, it means that we found it
+        if(*currentPattern == '\0')
+        {
+            *feedback = 1;
+            return start;
+        }
+
+        // If we have found at least one matching character at the end, the rest may be in the
+        // next packet
+        if(currentContent == contentEnd() && nbFound > 0)
+        {
+            *feedback = 0;
+            return start;
+        }
+
+        ++start;
+    }
+
+    // Nothing found
+    *feedback = -1;
+
+    return contentEnd();
+}
+
+
 
 int FlowBuffer::removeInFlow(const char* pattern, StackElement* owner)
 {
@@ -238,11 +348,12 @@ int FlowBuffer::removeInFlow(const char* pattern, StackElement* owner)
 
 void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length, StackElement* owner)
 {
+    assert(length > 0);
     uint32_t toRemove = length;
     uint32_t offsetInPacket = start.offsetInPacket;
     WritablePacket *packet = static_cast<WritablePacket*>(start.entry);
 
-    // Continue until there are still data to remove
+    // Continue while the is data to remove
     while(toRemove > 0)
     {
         assert(packet != NULL);
@@ -259,6 +370,8 @@ void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length, StackEleme
         else
             toRemove -= inThisPacket;
 
+        //click_chatter("To remove : %d. In this packet %d",toRemove, inThisPacket);
+
         // Remove the data in this packet
         owner->removeBytes(packet, offsetInPacket, inThisPacket);
 
@@ -268,24 +381,19 @@ void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length, StackEleme
     }
 }
 
-int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement, StackElement* owner)
+int FlowBuffer::replaceInFlow(FlowBufferContentIter iter, const int pattern_length, const char *replacement, const int replacement_length, StackElement* owner)
 {
     int feedback = -1;
-    FlowBufferContentIter iter = search(contentBegin(), pattern, &feedback);
-
     if(iter == contentEnd())
         return feedback;
 
-    uint32_t lenPattern = strlen(pattern);
-    uint32_t lenReplacement = strlen(replacement);
-
     // We compute the difference between the size of the previous content and the new one
-    long offset = lenReplacement - lenPattern;
+    long offset = replacement_length - pattern_length;
 
     // We compute how many bytes of the old content will be replaced by the new content
-    uint32_t toReplace = lenPattern;
-    if(toReplace > lenReplacement)
-        toReplace = lenReplacement;
+    uint32_t toReplace = pattern_length;
+    if(toReplace > replacement_length)
+        toReplace = replacement_length;
 
     // Replace pattern by "replacement" until we reach the end of one of the two strings
     for(int i = 0; i < toReplace; ++i)
@@ -310,7 +418,7 @@ int FlowBuffer::replaceInFlow(const char* pattern, const char *replacement, Stac
             assert(entry);
 
             // Copy the rest of the replacement where we added bytes
-            for(int i = 0; i < lenReplacement - toReplace; ++i) {
+            for(int i = 0; i < replacement_length - toReplace; ++i) {
                 entry->getPacketContent()[offsetInPacket + i] = replacement[toReplace + i];
             }
 

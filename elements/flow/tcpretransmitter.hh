@@ -71,8 +71,6 @@ public:
      */
     ~TCPRetransmitter() CLICK_COLD;
 
-    bool isOutElement()                   { return true; }
-
     // Click related methods
     const char *class_name() const        { return "TCPRetransmitter"; }
     const char *port_count() const        { return "2/1"; }

@@ -20,9 +20,10 @@ WordMatcher::WordMatcher() : insults()
         poolBufferEntries.get_value(i).initialize(POOL_BUFFER_ENTRIES_SIZE);
 
     closeAfterInsults = false;
-    _replace = true;
+    _mask = true;
     _insert = false;
     _full = false;
+    _all = false;
 }
 
 int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -30,25 +31,32 @@ int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
     //TODO : use a proper automaton for insults
     _insert_msg = "<font color='red'>Blocked content !</font><br />";
     String mode = "MASK";
+    bool all = false;
     if(Args(conf, this, errh)
             .read_all("WORD", insults)
             .read_p("MODE", mode)
             .read_p("MSG", _insert_msg)
             .read_p("CLOSECONNECTION", closeAfterInsults)
+            .read("ALL",all)
     .complete() < 0)
         return -1;
 
-    if (mode == "MASK") {
-        _replace = true;
+    if (all) {
+        _all = all;
+        errh->warning("Element not optimized for ALL");
+    }
+    _mask = false;
+    if (mode == "CLOSE") {
+        _insert = false;
+        closeAfterInsults = true;
+    } else if (mode == "MASK") {
+        _mask = true;
         _insert = false;
     } else if (mode == "REMOVE") {
-        _replace = false;
         _insert = false;
     } else if (mode == "REPLACE") {
-        _replace = false;
         _insert = true;
     } else if (mode == "FULL") {
-        _replace = false;
         _insert = false;
         _full = true;
     } else {
@@ -66,7 +74,7 @@ int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 WordMatcher::maxModificationLevel() {
     int mod = StackSpaceElement<fcb_WordMatcher>::maxModificationLevel() | MODIFICATION_WRITABLE;
-    if (!_replace) {
+    if (!_mask) {
         mod |= MODIFICATION_RESIZE | MODIFICATION_STALL;
     } else {
         mod |= MODIFICATION_REPLACE;
@@ -87,7 +95,7 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
     for(int i = 0; i < insults.size(); ++i)
     {
         const char* insult = insults[i].c_str();
-        if (_replace) {
+        if (_mask) { //Masking mode
             auto iter = WordMatcher->flowBuffer.contentBegin();
             auto end = WordMatcher->flowBuffer.contentEnd();
 
@@ -126,13 +134,17 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
             }
         } else {
             int result;
+            FlowBufferContentIter iter;
             do {
-                if (!_insert) { //If not insert, just remove
-                    result = WordMatcher->flowBuffer.removeInFlow(insult, this);
-                } else if (!_full){ //Insert but not full, replace pattern per message
-                    result = WordMatcher->flowBuffer.replaceInFlow(insult, _insert_msg.c_str(), this);
-                } else { //Full, repalce the whole flow per message
-                    result = WordMatcher->flowBuffer.searchInFlow(insult);
+                //iter = WordMatcher->flowBuffer.search(WordMatcher->flowBuffer.contentBegin(), insult, &result);
+                iter = WordMatcher->flowBuffer.searchSSE(WordMatcher->flowBuffer.contentBegin(), insult, insults[i].length(), &result);
+                //click_chatter("Found %d at %d,",result,iter.current()?iter.leftInChunk():-1);
+                if (result == 1) {
+                    if (!_insert) { //If not insert, just remove
+                        WordMatcher->flowBuffer.remove(iter,insults[i].length(), this);
+                    } else if (!_full){ //Insert but not full, replace pattern per message
+                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), _insert_msg.length(), this);
+                    }
                 }
                 if (result == 1) {
                     if (closeAfterInsults)
@@ -144,13 +156,14 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                     }
                     WordMatcher->counterRemoved += 1;
                 }
-            } while (result == 1);
+            } while (_all && result == 1);
 
             // While we keep finding complete insults in the packet
             if (result == 0) { //Finished in the middle of a potential match
                 if(!isLastUsefulPacket(flow->tail())) {
                     requestMorePackets(flow->tail(), false);
-                    flow = 0; // We will re-match the whole buffer, not that much efficient. See FlowIDSMatcher for better implementation
+                    flow = WordMatcher->flowBuffer.dequeueUpTo(iter.current());
+                    // We will re-match the whole last packet, see FlowIDSMatcher for better implementation
                     goto needMore;
                 } else {
                     goto finished;

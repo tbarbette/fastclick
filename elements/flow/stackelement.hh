@@ -71,12 +71,6 @@ public:
     // Custom methods
 
     /**
-     * @brief Indicate whether the element is an exit point element of the stack
-     * @return A boolean indicating whether the element is an exit point element of the stack
-     */
-    virtual bool isOutElement()          { return false; }
-
-    /**
      * @brief Method used during the building of the function stack. It sets the element
      * on which we must call the corresponding method to propagate the call in the stack
      * @param element The next element (upstream) in the function stack

@@ -83,9 +83,10 @@ protected:
     Vector<String> insults; // Vector containing the words to remove from the web pages
 
     bool closeAfterInsults;
-    bool _replace;
+    bool _mask;
     bool _insert;
     bool _full;
+    bool _all;
     String _insert_msg;
 };
 

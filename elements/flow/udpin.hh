@@ -6,23 +6,6 @@
 
 CLICK_DECLS
 
-/*
-=c
-
-UDPIn()
-
-=s middlebox
-
-entry point of an IP path in the stack of the middlebox
-
-=d
-
-This element is the entry point of an IP path in the stack of the middlebox by which all
-IP packets must go before their IP content is processed. Each path containing a UDPIn element
-must also contain an IPOut element
-
-=a IPOut */
-
 class UDPIn : public StackElement, public IPElement
 {
 public:

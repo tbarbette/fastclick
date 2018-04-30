@@ -78,7 +78,7 @@ public:
     /** @brief Return the size of the buffer
      * @return The number of packets in the buffer
      */
-    uint32_t getSize();
+    int getSize();
 
     /** @brief Return an iterator pointing to the first packet of the buffer
      * @return An iterator pointing to the first packet of the buffer
@@ -118,7 +118,7 @@ public:
      * 0 if the pattern has not been found but the pattern could start at the end of the last
      * packet in the buffer and thus enqueuing the next packet could result in a match.
      */
-    int replaceInFlow(const char* pattern, const char *replacement, StackElement* owner);
+    int replaceInFlow(FlowBufferContentIter pos, const int pattern_length, const char *replacement, const int replacement_length, StackElement* owner);
 
     /** @brief Return a content iterator pointing to the first byte of content in the buffer
      * @return A content iterator pointing to the first byte of content in the buffer
@@ -140,11 +140,6 @@ public:
     FlowBufferContentIter enqueueAllIter(PacketBatch* batch);
     FlowBufferChunkIter enqueueAllChunkIter(PacketBatch* batch);
 
-private:
-    inline bool isInitialized() {
-        return head != 0;
-    }
-
     /** @brief Search a pattern in the buffer
      * @param start Content iterator indicating where to start the search
      * @param pattern The pattern to search
@@ -154,6 +149,8 @@ private:
      * or after the end of the content if not found
      */
     FlowBufferContentIter search(FlowBufferContentIter start, const char* pattern, int *feedback);
+    FlowBufferContentIter isearch(FlowBufferContentIter start, const char* pattern, int *feedback);
+    FlowBufferContentIter searchSSE(FlowBufferContentIter start, const char* pattern, const int pattern_length, int *feedback);
 
     /** @brief Remove data in the flow (across the packets)
      * @param fcb A pointer to the FCB of the flow
@@ -161,6 +158,14 @@ private:
      * @param length The number of bytes to remove
      */
     void remove(FlowBufferContentIter start, uint32_t length, StackElement* owner);
+
+
+private:
+    inline bool isInitialized() {
+        return head != 0;
+    }
+
+
 
     PacketBatch *head;
 };
@@ -212,6 +217,8 @@ class FlowBufferContentIter
 public:
     friend class FlowBuffer;
 
+    inline FlowBufferContentIter() {}; //Invalid placeholder
+
     /** @brief Construct a FlowBufferContentIter
      * @param _flowBuffer The FlowBuffer to which this iterator is linked
      * @param _entry The entry in the buffer to which this iterator points
@@ -235,10 +242,20 @@ public:
      */
     inline unsigned char& operator*();
 
+    /** @brief Return the byte to which this iterator points
+     * @return The byte to which this iterator points
+     */
+    inline unsigned char* get_ptr();
+
     /** @brief Move the iterator to the next byte in the buffer
      * @return The iterator moved
      */
     inline FlowBufferContentIter& operator++();
+
+    /** @brief Move the iterator to the next N bytes in the buffer
+     * @return The iterator moved
+     */
+    inline FlowBufferContentIter& operator+=(int p);
 
     inline operator bool() const {
         return entry != 0;
@@ -251,6 +268,19 @@ public:
 
     inline Packet* current() {
         return entry;
+    }
+
+    inline bool lastChunk() {
+        return entry->next() == 0;
+    }
+
+    inline bool moveToNextChunk() {
+        entry = entry->next();
+        offsetInPacket = 0;
+    }
+
+    inline int leftInChunk() {
+        return entry->length() - (entry->getContentOffset() + offsetInPacket);
     }
 
 private:
@@ -406,11 +436,17 @@ inline bool FlowBufferContentIter::operator!=(const FlowBufferContentIter& other
 
 inline unsigned char& FlowBufferContentIter::operator*()
 {
-    assert(entry != NULL);
-
     unsigned char* content = static_cast<WritablePacket*>(entry)->getPacketContent();
 
     return *(content + offsetInPacket);
+}
+
+
+inline unsigned char* FlowBufferContentIter::get_ptr()
+{
+    unsigned char* content = static_cast<WritablePacket*>(entry)->getPacketContent();
+
+    return content + offsetInPacket;
 }
 
 
@@ -428,6 +464,23 @@ inline FlowBufferContentIter& FlowBufferContentIter::operator++()
         offsetInPacket = 0;
         entry = entry->next();
     }
+
+    return *this;
+}
+
+inline FlowBufferContentIter& FlowBufferContentIter::operator+=(int p)
+{
+    assert(entry != NULL);
+
+    while (entry->getContentOffset() + offsetInPacket + p >= entry->length()) {
+        p -= entry->length() - entry->getContentOffset() + offsetInPacket; //Remove from p what was left in packet
+        offsetInPacket = 0;
+        entry = entry->next();
+        if (!entry)
+            return *this;
+    }
+
+    offsetInPacket += p;
 
     return *this;
 }

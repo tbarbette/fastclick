@@ -190,18 +190,21 @@ int StackElement::maxModificationLevel() {
 void StackElement::removeBytes(WritablePacket* packet, uint32_t position,
     uint32_t length)
 {
+    //click_chatter("Calling rmbyte on %p{element}", this);
     // Call the "removeBytes" method on every element in the stack
     if(previousStackElement == NULL) {
-        click_chatter("No previous elem before %p{element}",this);
+        //click_chatter("No previous elem before %p{element}. Removing data",this);
         unsigned char *source = packet->data();
         position += packet->getContentOffset();
         uint32_t bytesAfter = packet->length() - position;
-        if (bytesAfter > 0)
+        if (bytesAfter > 0) {
+            //click_chatter("Bytes after !");
             memmove(&source[position], &source[position + length], bytesAfter);
+        }
         packet->take(length);
         return;
-    }
-
+    }// else
+        //click_chatter("Previous elem before %p{element} that is %p{element}",this,previousStackElement);
     previousStackElement->removeBytes(packet, position, length);
 }
 

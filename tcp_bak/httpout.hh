@@ -44,8 +44,6 @@ public:
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PUSH; }
 
-    bool isOutElement()                   { return true; }
-
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
     void push_batch(int, PacketBatch*) override;
