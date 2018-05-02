@@ -1,6 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_BWRATEDSPLITTER_HH
 #define CLICK_BWRATEDSPLITTER_HH
+#include <click/batchelement.hh>
 #include "elements/standard/ratedsplitter.hh"
 CLICK_DECLS
 
@@ -53,6 +54,14 @@ class BandwidthRatedSplitter : public RatedSplitter { public:
     const char *class_name() const	{ return "BandwidthRatedSplitter"; }
 
     void push(int port, Packet *);
+
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
+
+  private:
+
+    inline int smaction(Packet *p) CLICK_WARN_UNUSED_RESULT;
 
 };
 

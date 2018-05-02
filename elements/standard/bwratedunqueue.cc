@@ -38,24 +38,40 @@ BandwidthRatedUnqueue::run_task(Task *)
     _tb.refill();
 
     if (_tb.contains(tb_bandwidth_thresh)) {
-	if (Packet *p = input(0).pull()) {
-	    _tb.remove(p->length());
-	    _pushes++;
-	    worked = true;
-	    output(0).push(p);
-	} else {
-	    _failed_pulls++;
-	    if (!_signal)
-		return false;	// without rescheduling
-	}
+#if HAVE_BATCH
+        PacketBatch* batch = input(0).pull_batch(32);
+        if (batch) {
+            int c = 0;
+            FOR_EACH_PACKET(batch, p) c += p->length();
+            _tb.remove(c);
+            _packets += batch->count();
+            _pushes++;
+            worked = true;
+            output(0).push_batch(batch);
+        } else {
+            _failed_pulls++;
+            if (!_signal)
+                return false; // without rescheduling
+        }
+#else
+        if (Packet *p = input(0).pull()) {
+            _tb.remove(p->length());
+            _packets++;
+            _pushes++;
+            worked = true;
+            output(0).push(p);
+        } else {
+            _failed_pulls++;
+            if (!_signal)
+                return false; // without rescheduling
+        }
+#endif
     } else {
 	_timer.schedule_after(Timestamp::make_jiffies(_tb.time_until_contains(tb_bandwidth_thresh)));
 	_empty_runs++;
 	return false;
     }
     _task.fast_reschedule();
-    if (!worked)
-	_empty_runs++;
     return worked;
 }
 
