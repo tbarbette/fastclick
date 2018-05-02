@@ -51,6 +51,8 @@ class RouterVisitor { public:
     virtual bool visit(Element *e, bool isoutput, int port,
 		       Element *from_e, int from_port, int distance);
 
+    virtual int distance(Element *e, Element *from_e);
+
 };
 
 /** @class ElementTracker

@@ -41,6 +41,7 @@ class FlowClassifier: public FlowElement {
     bool _early_drop;
     FlowType _context;
     const bool _do_release;
+    bool _ordered;
 
     per_thread<FlowBatch*> _builder_batch;
     static int _n_classifiers;
@@ -50,6 +51,7 @@ class FlowClassifier: public FlowElement {
     Vector<EDPair>  _reachable_list;
 
     int _pool_data_size;
+
 
     void build_fcb();
 public:

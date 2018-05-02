@@ -926,20 +926,25 @@ Router::visit(Element *first_element, bool forward, int first_port,
 
     Bitvector result_bv(ngports(!forward), false), scratch;
 
-    Vector<Port> sources;
+    typedef Pair<Port,int> PortDistance;
+    Vector<PortDistance> sources;
     if (first_port < 0) {
-        for (int port = 0; port < first_element->nports(forward); ++port)
-            sources.push_back(Port(first_element->eindex(), port));
-    } else if (first_port < first_element->nports(forward))
-        sources.push_back(Port(first_element->eindex(), first_port));
+        for (int port = 0; port < first_element->nports(forward); ++port) {
+            int distance = visitor->distance(_elements[first_element->eindex()], 0);
+            sources.push_back(PortDistance{Port(first_element->eindex(), port), distance});
+        }
+    } else if (first_port < first_element->nports(forward)) {
+        int distance = visitor->distance(_elements[first_element->eindex()], 0);
+        sources.push_back(PortDistance{Port(first_element->eindex(), first_port), distance});
+    }
 
-    Vector<Port> next_sources;
-    int distance = 1;
+    Vector<PortDistance> next_sources;
 
     while (sources.size()) {
         next_sources.clear();
 
-        for (Port *sp = sources.begin(); sp != sources.end(); ++sp)
+        for (PortDistance *spd = sources.begin(); spd != sources.end(); ++spd) {
+            Port* sp = &spd->first;
             for (int cix = connindex_lower_bound(forward, *sp);
                  cix < _conn.size(); ++cix) {
                 int ci = (forward ? _conn_output_sorter[cix] : cix);
@@ -950,18 +955,18 @@ Router::visit(Element *first_element, bool forward, int first_port,
                 if (result_bv[conng])
                     continue;
                 result_bv[conng] = true;
-
+                int distance = spd->second + visitor->distance(_elements[connpt.idx], _elements[sp->idx]);
                 if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
                                     _elements[sp->idx], sp->port, distance))
                     continue;
                 _elements[connpt.idx]->port_flow(!forward, connpt.port, &scratch);
                 for (int port = 0; port < scratch.size(); ++port)
                     if (scratch[port])
-                        next_sources.push_back(Port(connpt.idx, port));
+                        next_sources.push_back(PortDistance{Port(connpt.idx, port),distance});
             }
+        }
 
         sources.swap(next_sources);
-        ++distance;
     }
 
     return 0;
