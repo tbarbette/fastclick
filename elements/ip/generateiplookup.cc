@@ -105,6 +105,11 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
         g->_mask = IPFlowID(0, 0, IPAddress::make_prefix(32 - n), 0);
 
         for (auto flow : g->_map) {
+            // Wildcards are intentionally excluded
+            if ((flow.flowid().daddr().s() == "0.0.0.0")) {
+                continue;
+            }
+
             flow.set_mask(g->_mask);
             new_map.find_insert(flow);
         }
@@ -115,11 +120,18 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
         }
     }
 
+    uint64_t rules_nb = 0;
     StringAccum acc;
 
     for (auto flow : g->_map) {
         acc << flow.flowid().daddr() << '/' << String(32 - n) << " " << (int) g->_out_port << ",\n";
+        rules_nb++;
     }
+
+    acc << "\n";
+    acc << "# of Rules: ";
+    acc.snprintf(12, "%" PRIu64, rules_nb);
+    acc << "\n";
 
     return acc.take_string();
 }

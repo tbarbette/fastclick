@@ -200,6 +200,12 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
             IPAddress::make_prefix(32 - n), g->_mask.dport()
         );
         for (auto flow : g->_map) {
+            // Wildcards are intentionally excluded
+            if ((flow.flowid().saddr().s() == "0.0.0.0") ||
+                (flow.flowid().daddr().s() == "0.0.0.0")) {
+                continue;
+            }
+
             flow.set_mask(g->_mask);
             new_map.find_insert(flow);
         }
@@ -209,6 +215,7 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
         }
     }
 
+    uint64_t rules_nb = 0;
     StringAccum acc;
 
     for (auto flow : g->_map) {
@@ -224,7 +231,14 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
             acc << " && dst port " << flow.flowid().dport();
         }
         acc << ",\n";
+
+        rules_nb++;
     }
+
+    acc << "\n";
+    acc << "# of Rules: ";
+    acc.snprintf(12, "%" PRIu64, rules_nb);
+    acc << "\n";
 
     return acc.take_string();
 }
