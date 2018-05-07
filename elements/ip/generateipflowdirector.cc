@@ -40,7 +40,7 @@ GenerateIPFlowDirector::GenerateIPFlowDirector() :
         _port(0), _nb_queues(DEF_NB_QUEUES),
         _queue_load_map(),
         _queue_alloc_policy(LOAD_AWARE),
-        GenerateIPFilter()
+        GenerateIPFilter(FLOW_DIRECTOR)
 {
     _keep_dport = false;
 }
@@ -320,6 +320,7 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
     if (!g) {
         return "GenerateIPFlowDirector element not found";
     }
+    assert(g->_pattern_type == FLOW_DIRECTOR);
 
     Timestamp before = Timestamp::now();
 
@@ -368,7 +369,7 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
                 }
             }
 
-            // Watch out, a lot prints!!
+            // Watch out, a lot of prints!!
             if (VERBOSE) {
                 click_chatter(
                     "New flow %5" PRIu64 ": %15s --> %15s matches %3" PRIu64 " flows. "

@@ -24,6 +24,8 @@
 #include <click/straccum.hh>
 
 #include "generateipfilter.hh"
+#include "generateiplookup.hh"
+#include "generateipflowdirector.hh"
 
 CLICK_DECLS
 
@@ -66,8 +68,16 @@ GenerateIPPacket::cleanup(CleanupStage)
 /**
  * IP FIlter rules' generator out of incoming traffic.
  */
-GenerateIPFilter::GenerateIPFilter() : GenerateIPPacket(), _keep_sport(false), _keep_dport(true)
+GenerateIPFilter::GenerateIPFilter() :
+    GenerateIPPacket(), _keep_sport(false), _keep_dport(true),
+    _pattern_type(NONE)
 {
+}
+
+GenerateIPFilter::GenerateIPFilter(RulePattern pattern_type) :
+    GenerateIPPacket(), _keep_sport(false), _keep_dport(true)
+{
+    _pattern_type = pattern_type;
 }
 
 GenerateIPFilter::~GenerateIPFilter()
@@ -77,13 +87,45 @@ GenerateIPFilter::~GenerateIPFilter()
 int
 GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    String pattern_type = "IPFILTER";
+
     if (Args(conf, this, errh)
             .read("KEEP_SPORT", _keep_sport)
             .read("KEEP_DPORT", _keep_dport)
+            .read("PATTERN_TYPE", pattern_type)
             .consume() < 0)
         return -1;
 
     _mask = IPFlowID(0xffffffff, (_keep_sport?0xffff:0), 0xffffffff, (_keep_dport?0xffff:0));
+
+    /**
+     * Sub-classes of GenerateIPFilter have this member already set.
+     * Only GenerateIPFilter is instantiated with NONE, thus we need to set it now.
+     */
+    if (_pattern_type == NONE) {
+        if (pattern_type.upper() == "IPFILTER") {
+            _pattern_type = IPFILTER;
+        } else if (pattern_type.upper() == "IPCLASSIFIER") {
+            _pattern_type = IPCLASSIFIER;
+        } else {
+            errh->error("Invalid PATTERN_TYPE for GenerateIPFilter. Select in [IPFILTER, IPCLASSIFIER]");
+            return -1;
+        }
+    // GenerateIPLookup sub-class
+    } else if (_pattern_type == IPLOOKUP) {
+        GenerateIPLookup *lookup_ptr = dynamic_cast<GenerateIPLookup *>(this);
+        if (lookup_ptr == NULL) {
+            errh->error("Invalid PATTERN_TYPE for GenerateIPLookup.");
+            return -1;
+        }
+    // GenerateIPFlowDirector sub-class
+    } else if (_pattern_type == FLOW_DIRECTOR) {
+        GenerateIPFlowDirector *fd_ptr = dynamic_cast<GenerateIPFlowDirector *>(this);
+        if (fd_ptr == NULL) {
+            errh->error("Invalid PATTERN_TYPE for GenerateIPFlowDirector.");
+            return -1;
+        }
+    }
 
     return GenerateIPPacket::configure(conf, errh);
 }
@@ -147,6 +189,8 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
         return "GenerateIPFilter element not found";
     }
 
+    assert(g->_pattern_type == IPFILTER || g->_pattern_type == IPCLASSIFIER);
+
     uint8_t n = 0;
     while (g->_map.size() > g->_nrules) {
         HashTable<IPFlow> new_map;
@@ -168,7 +212,11 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
     StringAccum acc;
 
     for (auto flow : g->_map) {
-        acc << "allow src net " << flow.flowid().saddr() << '/' << String(32-n) << " && "
+        if (g->_pattern_type == IPFILTER) {
+            acc << "allow ";
+        }
+
+        acc << "src net " << flow.flowid().saddr() << '/' << String(32-n) << " && "
                  << " dst net " << flow.flowid().daddr() << '/' << String(32-n);
         if (g->_keep_sport)
             acc << " && src port " << flow.flowid().sport();

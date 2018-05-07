@@ -33,7 +33,7 @@ static const uint8_t DEF_OUT_PORT = 1;
  * IPRouteTable rules' generator out of incoming traffic.
  */
 GenerateIPLookup::GenerateIPLookup() :
-        _out_port(DEF_OUT_PORT), GenerateIPFilter()
+        _out_port(DEF_OUT_PORT), GenerateIPFilter(IPLOOKUP)
 {
     _keep_sport = false;
     _keep_dport = false;
@@ -50,6 +50,11 @@ GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_mp("OUT_PORT", _out_port)
             .consume() < 0)
         return -1;
+
+    if (_out_port < 0) {
+        errh->error("Invalid OUT_PORT. Input a non-negative integer.");
+        return -1;
+    }
 
     // Routers care about destination IP addresses
     _mask = IPFlowID(0, 0, 0xffffffff, 0);
@@ -90,6 +95,9 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
         return "GenerateIPLookup element not found";
     }
 
+    assert(g->_pattern_type == IPLOOKUP);
+    assert(g->_out_port >= 0);
+
     uint8_t n = 0;
     while (g->_map.size() > g->_nrules) {
         HashTable<IPFlow> new_map;
@@ -110,8 +118,7 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
     StringAccum acc;
 
     for (auto flow : g->_map) {
-        acc << flow.flowid().daddr() << '/' << String(32 - n) <<
-               " " << g->_out_port << ",\n";
+        acc << flow.flowid().daddr() << '/' << String(32 - n) << " " << (int) g->_out_port << ",\n";
     }
 
     return acc.take_string();

@@ -137,8 +137,19 @@ class GenerateIPPacket : public BatchElement {
 class GenerateIPFilter : public GenerateIPPacket {
 
     public:
+        /**
+         * Rule pattern type.
+         */
+        enum RulePattern {
+            IPFILTER,
+            IPCLASSIFIER,
+            IPLOOKUP,
+            FLOW_DIRECTOR,
+            NONE
+        };
 
         GenerateIPFilter() CLICK_COLD;
+        GenerateIPFilter(RulePattern pattern_type) CLICK_COLD;
         ~GenerateIPFilter() CLICK_COLD;
 
         const char *class_name() const { return "GenerateIPFilter"; }
@@ -160,6 +171,8 @@ class GenerateIPFilter : public GenerateIPPacket {
 
         bool _keep_sport;
         bool _keep_dport;
+
+        RulePattern _pattern_type;
 
 };
 
