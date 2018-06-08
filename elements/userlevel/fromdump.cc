@@ -28,6 +28,7 @@
 #include <click/handlercall.hh>
 #include <click/packet_anno.hh>
 #include <click/userutils.hh>
+#include <clicknet/ether.h>
 #if CLICK_NS
 # include <click/master.hh>
 #endif
@@ -46,8 +47,11 @@ CLICK_DECLS
 #define	SWAPSHORT(y) \
 	( (((y)&0xff)<<8) | ((u_short)((y)&0xff00)>>8) )
 
+#define MIN_MTU 60
+#define MAX_MTU 9000
+
 FromDump::FromDump()
-    : _packet(0), _end_h(0), _count(0), _timer(this), _task(this), _preload_head(0)
+    : _packet(0), _end_h(0), _count(0), _timer(this), _task(this), _preload_head(0), _force_len(-1)
 {
 }
 
@@ -78,6 +82,7 @@ FromDump::declaration() const
 int
 FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    int force_len = -1;
     bool timing = false, stop = false, active = true, force_ip = false;
     Timestamp first_time, first_time_off, last_time, last_time_off, interval;
     HandlerCall end_h;
@@ -97,6 +102,7 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("ACTIVE", active)
 	.read("SAMPLE", FixedPointArg(SAMPLING_SHIFT), _sampling_prob)
 	.read("FORCE_IP", force_ip)
+	.read("FORCE_LEN", force_len)
 	.read("START", first_time)
 	.read("START_AFTER", first_time_off)
 	.read("END", last_time)
@@ -155,6 +161,12 @@ FromDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _have_any_times = false;
     _timing = timing;
     _force_ip = force_ip;
+    _force_len = force_len;
+
+    if ((_force_len != -1) && ((_force_len < MIN_MTU) || (_force_len > MAX_MTU))) {
+        errh->error("FORCE_LEN requires a valid frame size");
+        return -1;
+    }
 
 #if CLICK_NS
     if (per_node) {
@@ -441,11 +453,44 @@ FromDump::read_packet(ErrorHandler *errh)
     p = _ff.get_packet(caplen, ts.sec(), ts.subsec(), errh);
     if (!p)
 	return false;
+
+    // Adjust the packet length if requested by the user
+    if (_force_len != -1) {
+        // User likes larger packets
+        if (_force_len > caplen) {
+            p = p->nonunique_put(_force_len - caplen);
+            if (!p) {
+                _packet = 0;
+                return false;
+            }
+        // User likes smaller packets
+        } else if (_force_len < caplen) {
+            WritablePacket *q = p->uniqueify();
+            click_ip *ip = reinterpret_cast<click_ip *>(q->data() + sizeof(click_ether));
+            if (!ip) {
+                _packet = 0;
+                return false;
+            }
+            // Keep the old length for incremental IP checksum calculation
+            uint16_t len_old = ip->ip_len;
+
+            // Reduce the packet's length
+            q->take(caplen - _force_len);
+            // Update the IP header
+            ip->ip_len = htons(q->length() - 14);
+            // and don't forget the checksum
+            click_update_in_cksum(&ip->ip_sum, len_old, ip->ip_len);
+
+            p = q;
+        }
+    }
+
     SET_EXTRA_LENGTH_ANNO(p, len - caplen);
     _ff.shift_pos(skiplen);
 
     p->set_mac_header(p->data());
     _packet = p;
+
     return true;
 }
 
@@ -509,7 +554,7 @@ FromDump::run_task(Task *)
 	_packet = 0;
 	return true;
     } else
-	return false;
+    return false;
 }
 
 Packet *
