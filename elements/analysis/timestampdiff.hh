@@ -71,6 +71,8 @@ private:
     int _max_delay_ms;
     RecordTimestamp *_rt;
     atomic_uint32_t _nd;
+    bool _verbose;
+
     inline int smaction(Packet *p);
 
     RecordTimestamp *get_recordtimestamp_instance();

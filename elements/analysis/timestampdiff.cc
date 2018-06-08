@@ -38,7 +38,7 @@
 CLICK_DECLS
 
 TimestampDiff::TimestampDiff() :
-    _delays(), _offset(40), _limit(0), _net_order(false), _max_delay_ms(1000)
+    _delays(), _offset(40), _limit(0), _net_order(false), _max_delay_ms(1000), _verbose(true)
 {
     _nd = 0;
 }
@@ -54,6 +54,7 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("OFFSET",_offset)
             .read("N", _limit)
             .read("MAXDELAY", _max_delay_ms)
+            .read("VERBOSE", _verbose)
             .complete() < 0)
         return -1;
 
@@ -179,16 +180,20 @@ inline int TimestampDiff::smaction(Packet *p)
     Timestamp now = Timestamp::now_steady();
     uint64_t i = NumberPacket::read_number_of_packet(p, _offset, _net_order);
     Timestamp old = get_recordtimestamp_instance()->get(i);
+
     if (old == Timestamp::uninitialized_t()) {
         return 1;
     }
 
     Timestamp diff = now - old;
-    if (diff.msecval() > _max_delay_ms)
-        click_chatter(
-            "Packet %" PRIu64 " experienced delay %u ms > %u ms",
-            i, (diff.sec() * 1000000 + diff.usec())/1000, _max_delay_ms
-        );
+    if ((diff.msecval() > _max_delay_ms)) {
+        if (_verbose) {
+            click_chatter(
+                "Packet %" PRIu64 " experienced delay %u ms > %u ms",
+                i, (diff.sec() * 1000000 + diff.usec())/1000, _max_delay_ms
+            );
+        }
+    }
     else {
         uint32_t next_index = _nd.fetch_and_add(1);
         if (_limit) {
