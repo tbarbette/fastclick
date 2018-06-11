@@ -60,7 +60,7 @@ BlackboxNF::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
         .read_mp("EXEC", _exec)
-        .read("ARGS", _args)
+        .read_p("ARGS", _args)
         .read("BURST",        _burst_size)
         .read("NDESC",        _ndesc)
         .read("NUMA_ZONE",    _numa_zone)
@@ -71,6 +71,7 @@ BlackboxNF::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("FROM_RING",    _PROC_2)
         .read("SP_ENQ", spenq)
         .read("SC_DEQ", spdeq)
+        .read("BLOCKING", _blocking)
         .complete() < 0)
         return -1;
 
@@ -129,6 +130,7 @@ BlackboxNF::initialize(ErrorHandler *errh)
         _PROC_1.c_str(), DPDKDevice::RING_SIZE,
         rte_socket_id(), _flags
     );
+
     if (_PROC_REVERSE) {
         _recv_ring_reverse = rte_ring_create(
             _PROC_REVERSE.c_str(), DPDKDevice::RING_SIZE,
@@ -209,7 +211,10 @@ BlackboxNF::runSlave() {
         while (*a != 0) {
             if (!quote && *a == ' ') {
                 *a = '\0';
-                chars.push_back(begin);
+
+                char* cpy = (char*)malloc((strlen(begin) + 1) * sizeof(char));
+                strcpy(cpy, begin);
+                chars.push_back(cpy);
                 click_chatter("%s",begin);
                 begin = a + 1;
             }
@@ -220,13 +225,22 @@ BlackboxNF::runSlave() {
                     tmp = String(begin) + _MEM_POOL + String(a+5);
                     begin = const_cast<char*>(tmp.c_str());
                     a = begin + cur + _MEM_POOL.length() - 1;
-               }
+                } else if (strncmp(a + 1,"CPU_RANGE", 9) == 0) {
+                    int cur = a-begin;
+                    *a = '\0';
+                    String s = String(home_thread_id()) + "-" + String(home_thread_id());
+                    tmp = String(begin) + s + String(a + 10);
+                    begin = const_cast<char*>(tmp.c_str());
+                    a = begin + cur + s.length() - 1;
+                }
+
             }
             if (*a == '"') {
                 quote = !quote;
-
+                memmove(a, a+1, strlen(a));
+            } else {
+                a++;
             }
-            a++;
         }
         if (begin != a)
             chars.push_back(begin);
@@ -240,7 +254,7 @@ BlackboxNF::runSlave() {
             click_chatter("%s", s.c_str());
             exit(1);
         }
-        if ((ret = execv(chars[0], chars.data()))) {
+        if ((ret = execvp(chars[0], chars.data()))) {
             click_chatter("Could not launch slave process: %d %d", ret, errno);
         }
         exit(1);

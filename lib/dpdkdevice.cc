@@ -850,7 +850,7 @@ DPDKDeviceArg::parse(
 
 DPDKRing::DPDKRing() :
     _message_pool(0),
-       _numa_zone(0), _burst_size(0), _flags(0), _ring(0),
+       _numa_zone(0), _burst_size(0), _flags(0), _ring(0), _force_create(false), _force_lookup(false),
        _count(0), _MEM_POOL("") {
 }
 
@@ -876,6 +876,8 @@ DPDKRing::parse(Args* args) {
             .read("NUMA_ZONE",    _numa_zone)
             .read("SP_ENQ", spenq)
             .read("SC_DEQ", spdeq)
+            .read("FORCE_LOOKUP", _force_lookup)
+            .read("FORCE_CREATE", _force_create)
             .execute() < 0)
         return -1;
 

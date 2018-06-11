@@ -300,6 +300,9 @@ class DPDKRing { public:
     struct rte_ring    *_ring;
     counter_t    _count;
 
+    bool _force_create;
+    bool _force_lookup;
+
 };
 
 /** @class DPDKDeviceArg
