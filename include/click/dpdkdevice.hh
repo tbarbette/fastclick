@@ -132,6 +132,15 @@ public:
 
     static int static_cleanup();
 
+#if CLICK_PACKET_USE_DPDK
+    inline static bool is_dpdk_packet(Packet* p) {
+        return true;
+    }
+
+    inline static bool is_dpdk_buffer(Packet* p) {
+        return true;
+    }
+#else
     inline static bool is_dpdk_packet(Packet* p) {
         return p->buffer_destructor() == DPDKDevice::free_pkt;
     }
@@ -139,6 +148,7 @@ public:
     inline static bool is_dpdk_buffer(Packet* p) {
         return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
     }
+#endif
 
     inline static rte_mbuf* get_pkt(unsigned numa_node);
     inline static rte_mbuf* get_pkt();

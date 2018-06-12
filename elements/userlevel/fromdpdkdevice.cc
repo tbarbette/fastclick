@@ -157,7 +157,7 @@ bool FromDPDKDevice::run_task(Task *t)
             unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
             rte_prefetch0(data);
 #if CLICK_PACKET_USE_DPDK
-            WritablePacket *p = Packet::make(pkts[i]);
+            WritablePacket *p = static_cast<WritablePacket*>(Packet::make(pkts[i]));
 #elif HAVE_ZEROCOPY
             WritablePacket *p = Packet::make(data,
                      rte_pktmbuf_data_len(pkts[i]),

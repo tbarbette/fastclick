@@ -85,8 +85,9 @@ PacketBatch::make_batch(unsigned char *data, uint16_t count, uint16_t *length,
         buffer_destructor_type destructor, void* argument )
 {
 #if CLICK_PACKET_USE_DPDK
-assert(false); //TODO
-#endif
+    click_chatter("UNIMPLEMENTED");
+    assert(false); //TODO
+#else
 
 # if HAVE_CLICK_PACKET_POOL
     WritablePacket *p = WritablePacket::pool_batch_allocate(count);
@@ -115,6 +116,7 @@ assert(false); //TODO
         click_chatter("Size of list %d, expected %d\n", i, count);
     }
     return PacketBatch::make_from_simple_list(head, last, i);
+#endif
 }
 
 #endif //HAVE_BATCH

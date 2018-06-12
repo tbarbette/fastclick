@@ -146,8 +146,7 @@ FromDPDKRing::run_task(Task *t)
 
     #if CLICK_PACKET_USE_DPDK
         rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
-        WritablePacket *p = Packet::make(pkts[i]);
-
+        WritablePacket *p = static_cast<WritablePacket*>(Packet::make(pkts[i]));
     #elif HAVE_ZEROCOPY
         rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
         WritablePacket *p = Packet::make(
