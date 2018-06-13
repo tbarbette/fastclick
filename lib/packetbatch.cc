@@ -19,7 +19,9 @@
 #include <click/config.h>
 #include <click/packetbatch.hh>
 #include <click/netmapdevice.hh>
-#include <click/dpdkdevice.hh>
+#if HAVE_DPDK
+# include <click/dpdkdevice.hh>
+#endif
 
 CLICK_DECLS
 

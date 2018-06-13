@@ -73,20 +73,6 @@ GenerateIPLookup::cleanup(CleanupStage)
 {
 }
 
-Packet *
-GenerateIPLookup::simple_action(Packet *p)
-{
-    return GenerateIPFilter::simple_action(p);
-}
-
-#if HAVE_BATCH
-PacketBatch*
-GenerateIPLookup::simple_action_batch(PacketBatch *batch)
-{
-    return GenerateIPFilter::simple_action_batch(batch);
-}
-#endif
-
 String
 GenerateIPLookup::read_handler(Element *e, void *user_data)
 {

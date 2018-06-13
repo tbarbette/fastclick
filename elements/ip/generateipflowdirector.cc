@@ -102,20 +102,6 @@ GenerateIPFlowDirector::cleanup(CleanupStage)
 {
 }
 
-Packet *
-GenerateIPFlowDirector::simple_action(Packet *p)
-{
-    return GenerateIPFilter::simple_action(p);
-}
-
-#if HAVE_BATCH
-PacketBatch*
-GenerateIPFlowDirector::simple_action_batch(PacketBatch *batch)
-{
-    return GenerateIPFilter::simple_action_batch(batch);
-}
-#endif
-
 /**
  * Assign rules to NIC queues in a round-robin fashion.
  * This means, each new flow goes to the next NIC queue
@@ -434,5 +420,5 @@ GenerateIPFlowDirector::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel dpdk GenerateIPFilter)
+ELEMENT_REQUIRES(userlevel GenerateIPFilter)
 EXPORT_ELEMENT(GenerateIPFlowDirector)

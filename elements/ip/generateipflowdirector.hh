@@ -5,7 +5,6 @@
 #include <click/timestamp.hh>
 
 #include "generateipfilter.hh"
-#include "generateipflowdirector.hh"
 
 CLICK_DECLS
 
@@ -64,11 +63,6 @@ Default is false.
 =a DPDKDevice, GenerateIPFilter */
 
 /**
- * Base class that offers IPFlow representation & storage.
- */
-class GenerateIPFilter;
-
-/**
  * Uses the base class to generate Flow Director patterns out of the traffic.
  */
 class GenerateIPFlowDirector : public GenerateIPFilter {
@@ -76,7 +70,7 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
     public:
 
         GenerateIPFlowDirector() CLICK_COLD;
-        ~GenerateIPFlowDirector() CLICK_COLD;
+        virtual ~GenerateIPFlowDirector() CLICK_COLD;
 
         const char *class_name() const { return "GenerateIPFlowDirector"; }
         const char *port_count() const { return PORTS_1_1; }
@@ -87,11 +81,6 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
         void add_handlers() CLICK_COLD;
 
         static String read_handler(Element *handler, void *user_data);
-
-        Packet *simple_action(Packet *p);
-    #if HAVE_BATCH
-        PacketBatch *simple_action_batch(PacketBatch *batch);
-    #endif
 
     private:
         /**

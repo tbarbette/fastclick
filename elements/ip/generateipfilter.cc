@@ -176,7 +176,7 @@ GenerateIPFilter::simple_action(Packet *p)
 PacketBatch*
 GenerateIPFilter::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(simple_action, batch);
+    EXECUTE_FOR_EACH_PACKET(GenerateIPFilter::simple_action, batch);
     return batch;
 }
 #endif

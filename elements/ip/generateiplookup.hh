@@ -62,11 +62,6 @@ class GenerateIPLookup : public GenerateIPFilter {
 
         static String read_handler(Element *handler, void *user_data);
 
-        Packet *simple_action(Packet *p);
-    #if HAVE_BATCH
-        PacketBatch *simple_action_batch(PacketBatch *batch);
-    #endif
-
     private:
 
         /**

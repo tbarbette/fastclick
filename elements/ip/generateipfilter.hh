@@ -52,7 +52,7 @@ class GenerateIPPacket : public BatchElement {
     public:
 
         GenerateIPPacket() CLICK_COLD;
-        virtual ~GenerateIPPacket() CLICK_COLD;
+        ~GenerateIPPacket() CLICK_COLD;
 
         const char *class_name() const { return "GenerateIPPacket"; }
         const char *port_count() const { return PORTS_1_1; }
@@ -62,9 +62,9 @@ class GenerateIPPacket : public BatchElement {
         void cleanup(CleanupStage) CLICK_COLD;
 
         // Make this base class abstract
-        virtual Packet *simple_action(Packet *p) = 0;
+        virtual Packet *simple_action(Packet *p) override = 0;
     #if HAVE_BATCH
-        virtual PacketBatch *simple_action_batch(PacketBatch *batch) = 0;
+        virtual PacketBatch *simple_action_batch(PacketBatch *batch) override = 0;
     #endif
 
     protected:
@@ -162,9 +162,9 @@ class GenerateIPFilter : public GenerateIPPacket {
 
         static String read_handler(Element *handler, void *user_data);
 
-        Packet *simple_action(Packet *p);
+        virtual Packet *simple_action(Packet *p) override;
     #if HAVE_BATCH
-        PacketBatch *simple_action_batch(PacketBatch *batch);
+        virtual PacketBatch *simple_action_batch(PacketBatch *batch) override;
     #endif
 
     protected:
