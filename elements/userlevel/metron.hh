@@ -11,6 +11,12 @@
 
 #include "../json/json.hh"
 
+/**
+ * The service chain types supported by Metron:
+ * |-> Click-based
+ * |-> Standalone (a standalone blackbox NF)
+ * |-> Mixed (Click NFs followed by a blackbox NF)
+ */
 #define SC_CONF_TYPES \
     sctype(UNKNOWN), \
     sctype(CLICK),   \
@@ -19,16 +25,30 @@
 
 #define sctype(x) x
 
-/**
- * The service chain types supported by Metron:
- * |-> Click-based
- * |-> Standalone (a standalone blackbox NF)
- * |-> Mixed (Click NFs followed by a blackbox NF)
- */
 typedef enum { SC_CONF_TYPES } ScType;
 
 #undef sctype
 #define sctype(x) #x
+
+/**
+ * The Rx filter types supported by Metron:
+ * |->  MAC-based using VMDq
+ * |-> VLAN-based using VMDq
+ * |-> Flow-based using Flow Director
+ */
+#define RX_FILTER_TYPES \
+    rxfiltertype(NONE), \
+    rxfiltertype(MAC), \
+    rxfiltertype(VLAN), \
+    rxfiltertype(FLOW)
+
+#define rxfiltertype(x) x
+
+typedef enum { RX_FILTER_TYPES } RxFilterType;
+
+#undef rxfiltertype
+#define rxfiltertype(x) #x
+
 
 CLICK_DECLS
 
@@ -64,7 +84,7 @@ class NIC {
 
         String get_device_id();
 
-        Json to_json(bool stats = false);
+        Json to_json(RxFilterType rx_mode, bool stats = false);
 
         int queue_per_pool() {
             return atoi(
@@ -89,12 +109,11 @@ class ServiceChain {
                 RxFilter(ServiceChain *sc) : _sc(sc) {
 
                 }
-
                 ~RxFilter() {
 
                 }
 
-                String method;
+                RxFilterType method;
                 ServiceChain *_sc;
 
                 static RxFilter *from_json(
@@ -147,7 +166,7 @@ class ServiceChain {
         ~ServiceChain();
 
         static ServiceChain *from_json(Json j, Metron *m, ErrorHandler *errh);
-        int reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh);
+        int reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh);
 
         Json to_json();
         Json stats_to_json();
@@ -376,7 +395,10 @@ class Metron : public Element {
         /* Discovery status */
         bool _discovered;
 
-        int runChain(ServiceChain *sc, ErrorHandler *errh);
+        /* Rx filter mode */
+        RxFilterType _rx_mode;
+
+        int run_chain(ServiceChain *sc, ErrorHandler *errh);
 
         Timer _timer;
 
