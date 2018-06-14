@@ -38,6 +38,96 @@
 
 CLICK_DECLS
 
+/***************************************
+ * Helper functions
+ **************************************/
+/**
+ * Array of all supported service chain types.
+ */
+static const char *SC_TYPES_STR_ARRAY[] = { SC_CONF_TYPES };
+
+/**
+ * Returns all the supported service chain types as
+ * a space-separated string.
+ */
+const String supported_sc_types()
+{
+    String supported;
+    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
+    for (uint8_t i = 1; i < n; ++i) {
+        supported += String(SC_TYPES_STR_ARRAY[i]).lower() + " ";
+    }
+
+    return supported;
+}
+
+/**
+ * Converts an enum-based service chain type into string.
+ */
+const String sc_type_enum_to_str(ScType s)
+{
+    return String(SC_TYPES_STR_ARRAY[static_cast<uint8_t>(s)]).lower();
+}
+
+/**
+ * Converts a string-based service chain type into enum.
+ */
+ScType sc_type_str_to_enum(const String sc_type)
+{
+    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
+    for (uint8_t i = 0; i < n; ++i) {
+        if (strcmp(SC_TYPES_STR_ARRAY[i], sc_type.c_str()) == 0) {
+            return (ScType) i;
+        }
+    }
+    return UNKNOWN;
+}
+
+/**
+ * Array of all supported Rx filter types.
+ */
+static const char *RX_FILTER_TYPES_STR_ARRAY[] = { RX_FILTER_TYPES };
+
+/**
+ * Returns all the supported Rx filter types as
+ * a space-separated string.
+ */
+const String supported_rx_filter_types()
+{
+    String supported;
+    const uint8_t n = sizeof(RX_FILTER_TYPES_STR_ARRAY) / sizeof(RX_FILTER_TYPES_STR_ARRAY[0]);
+    for (uint8_t i = 1; i < n; ++i) {
+        supported += String(RX_FILTER_TYPES_STR_ARRAY[i]).lower() + " ";
+    }
+
+    return supported;
+}
+
+/**
+ * Converts an enum-based Rx filter type into string.
+ */
+const String rx_filter_type_enum_to_str(RxFilterType rf)
+{
+    return String(RX_FILTER_TYPES_STR_ARRAY[static_cast<uint8_t>(rf)]).lower();
+}
+
+/**
+ * Converts a string-based Rx filter type into enum.
+ */
+RxFilterType rx_filter_type_str_to_enum(const String rf_str)
+{
+    const uint8_t n = sizeof(RX_FILTER_TYPES_STR_ARRAY) / sizeof(RX_FILTER_TYPES_STR_ARRAY[0]);
+    for (uint8_t i = 0; i < n; ++i) {
+        if (strcmp(RX_FILTER_TYPES_STR_ARRAY[i], rf_str.c_str()) == 0) {
+            return (RxFilterType) i;
+        }
+    }
+    return NONE;
+}
+
+/***************************************
+ * Metron
+ **************************************/
 Metron::Metron() :
     _timing_stats(true), _timer(this), _discovered(false)
 {
@@ -52,6 +142,7 @@ Metron::~Metron()
 int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Vector<Element *> nics;
+    String rx_mode;
     _agent_port         = DEF_AGENT_PORT;
     _discover_port      = _agent_port;
     _discover_rest_port = DEF_DISCOVER_REST_PORT;
@@ -63,6 +154,7 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("NIC",               nics)
         .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
         .read_all("SLAVE_ARGS",        _args)
+        .read    ("RX_MODE",           rx_mode)
         .read    ("TIMING_STATS",      _timing_stats)
         .read    ("AGENT_IP",          _agent_ip)
         .read    ("AGENT_PORT",        _agent_port)
@@ -73,6 +165,24 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("DISCOVER_PASSWORD", _discover_password)
         .complete() < 0)
         return -1;
+
+    // Default Rx filter mode is MAC-based VMDq
+    if (rx_mode.empty()) {
+        _rx_mode = MAC;
+    } else {
+        _rx_mode = rx_filter_type_str_to_enum(rx_mode.upper());
+
+        if (_rx_mode == NONE) {
+            return errh->error(
+                "Supported Rx filter modes are: %s",
+                supported_rx_filter_types().c_str()
+            );
+        }
+    }
+    errh->message(
+        "Rx filter mode: %s",
+        rx_filter_type_enum_to_str(_rx_mode).c_str()
+    );
 
 #ifndef HAVE_CURL
     if (_discover_ip) {
@@ -153,7 +263,7 @@ int Metron::initialize(ErrorHandler *errh)
 }
 
 /**
- * This method advertizes Metron agent's features
+ * Advertizes Metron agent's features
  * though the REST port of the controller and not
  * through the port used by the Metron protocol
  * (usually default http).
@@ -215,13 +325,15 @@ bool Metron::discover()
         /* Send the request and get the return code in res */
         res = curl_easy_perform(curl);
 
+        click_chatter("Discovery message: %s", s.c_str());
+
         /* Check for errors */
         if(res != CURLE_OK) {
             click_chatter("Reattempting to connect to %s due to: %s\n",
                 url.c_str(), curl_easy_strerror(res));
         } else {
             click_chatter(
-                "Successfully advertised features to Metron controller %s:%d\n",
+                "Successfully advertised features to Metron controller on %s:%d\n",
                 _discover_ip.c_str(), _discover_rest_port
             );
         }
@@ -231,9 +343,9 @@ bool Metron::discover()
 
         return (res == CURLE_OK);
     }
+#endif
 
     return false;
-#endif
 }
 
 void Metron::run_timer(Timer *t)
@@ -376,7 +488,7 @@ void Metron::unassign_cpus(ServiceChain *sc)
 
 int ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
 {
-    //Only MAC address is currently supported. Only thing to do is to get addr
+    // Only MAC address is currently supported. Only thing to do is to get addr
     Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
     int inic = _sc->get_nic_index(nic);
     assert(inic >= 0);
@@ -413,7 +525,7 @@ int Metron::instantiate_chain(ServiceChain *sc, ErrorHandler *errh)
         return -1;
     }
 
-    int ret = runChain(sc, errh);
+    int ret = run_chain(sc, errh);
     if (ret == 0) {
         sc->status = ServiceChain::SC_OK;
         _scs.insert(sc->get_id(), sc);
@@ -428,7 +540,7 @@ int Metron::instantiate_chain(ServiceChain *sc, ErrorHandler *errh)
  * Run a service chain and keep a control socket to it.
  * CPUs must already be assigned.
  */
-int Metron::runChain(ServiceChain *sc, ErrorHandler *errh)
+int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
@@ -601,7 +713,7 @@ int Metron::write_handler(
             if (sc == 0) {
                 return errh->error("Unknown service chain ID %s", id.c_str());
             }
-            return sc->reconfigureFromJSON(Json::parse(changes), m, errh);
+            return sc->reconfigure_from_json(Json::parse(changes), m, errh);
         }
         default: {
             errh->error("Unknown write handler: %d", what);
@@ -792,7 +904,7 @@ Json Metron::to_json()
     Json jnics = Json::make_array();
     auto begin = _nics.begin();
     while (begin != _nics.end()) {
-        jnics.push_back(begin.value().to_json(false));
+        jnics.push_back(begin.value().to_json(this->_rx_mode, false));
         begin++;
     }
     jroot.set("nics", jnics);
@@ -871,7 +983,7 @@ Json Metron::stats_to_json()
     Json jnics = Json::make_array();
     auto begin = _nics.begin();
     while (begin != _nics.end()) {
-        jnics.push_back(begin.value().to_json(true));
+        jnics.push_back(begin.value().to_json(this->_rx_mode, true));
         begin++;
     }
     jroot.set("nics", jnics);
@@ -973,13 +1085,18 @@ ServiceChain::RxFilter *ServiceChain::RxFilter::from_json(
         Json j, ServiceChain *sc, ErrorHandler *errh)
 {
     ServiceChain::RxFilter *rf = new RxFilter(sc);
-    rf->method = j.get_s("method").lower();
-    if (rf->method != "mac") {
+
+    RxFilterType rf_type = rx_filter_type_str_to_enum(j.get_s("method").upper());
+    if (rf_type == NONE) {
         errh->error(
-            "Unsupported RX filter method: %s", rf->method.c_str()
+            "Unsupported Rx filter mode for service chain: %s\n"
+            "Supported Rx filter modes are: %s", sc->id.c_str(),
+            supported_rx_filter_types().c_str()
         );
         return 0;
     }
+    rf->method = rf_type;
+
     rf->values.resize(sc->get_nics_nb(), Vector<String>());
     Json jnic_values = j.get("values");
 
@@ -1001,7 +1118,8 @@ Json ServiceChain::RxFilter::to_json()
 {
     Json j;
 
-    j.set("method", method);
+    j.set("method", rx_filter_type_enum_to_str(method));
+
     Json jnic_values = Json::make_object();
     for (int i = 0; i < _sc->get_nics_nb(); i++) {
         NIC *nic = _sc->get_nic_by_index(i);
@@ -1031,49 +1149,6 @@ ServiceChain::~ServiceChain()
     if (rx_filter) {
         delete rx_filter;
     }
-}
-
-/**
- * Array of all supported service chain types.
- */
-static const char *SC_TYPES_STR_ARRAY[] = { SC_CONF_TYPES };
-
-/**
- * Returns all the supported service chain types as
- * a space-separated string.
- */
-const String supported_sc_types()
-{
-    String supported;
-    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
-    for (uint8_t i = 1; i < n; ++i)
-    {
-        supported += String(SC_TYPES_STR_ARRAY[i]).lower() + " ";
-    }
-
-    return supported;
-}
-
-/**
- * Converts an enum-based service chain type into string.
- */
-const String sc_type_enum_to_str(ScType s)
-{
-    return String(SC_TYPES_STR_ARRAY[static_cast<uint8_t>(s)]).lower();
-}
-
-/**
- * Converts a string-based service chain type into enum.
- */
-ScType sc_type_str_to_enum(const String sc_type)
-{
-    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
-    for (uint8_t i = 0; i < n; ++i)
-    {
-        if (strcmp(SC_TYPES_STR_ARRAY[i], sc_type.c_str()) == 0)
-            return (ScType) i;
-    }
-    return UNKNOWN;
 }
 
 ServiceChain *ServiceChain::from_json(
@@ -1259,7 +1334,7 @@ Json ServiceChain::autoscale_timing_stats::to_json()
     return j;
 }
 
-int ServiceChain::reconfigureFromJSON(Json j, Metron *m, ErrorHandler *errh)
+int ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 {
     for (auto jfield : j) {
         if (jfield.first == "cpus") {
@@ -1603,7 +1678,7 @@ Json CPU::to_json()
 /******************************
  * NIC
  ******************************/
-Json NIC::to_json(bool stats)
+Json NIC::to_json(RxFilterType rx_mode, bool stats)
 {
     Json nic = Json::make_object();
 
@@ -1615,9 +1690,8 @@ Json NIC::to_json(bool stats)
         nic.set("status", call_read("carrier"));
         nic.set("portType", call_read("type"));
         nic.set("hwAddr", call_read("mac").replace('-',':'));
-        // TODO: Support VLAN and MPLS
         Json jtagging = Json::make_array();
-        jtagging.push_back("mac");
+        jtagging.push_back(rx_filter_type_enum_to_str(rx_mode));
         nic.set("rxFilter", jtagging);
     } else {
         nic.set("rxCount", call_read("hw_count"));
