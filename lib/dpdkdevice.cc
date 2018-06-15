@@ -274,17 +274,17 @@ int DPDKDevice::set_mode(
     if (mode == "") {
         return 0;
     } else if (mode == "none") {
-            m = ETH_MQ_RX_NONE;
-    } else if ((mode == "rss") || (mode == "flow_dir")) {
-            m = ETH_MQ_RX_RSS;
+        m = ETH_MQ_RX_NONE;
+    } else if ((mode == "rss") || (mode == FlowDirector::FLOW_DIR_MODE)) {
+        m = ETH_MQ_RX_RSS;
     } else if (mode == "vmdq") {
-            m = ETH_MQ_RX_VMDQ_ONLY;
+        m = ETH_MQ_RX_VMDQ_ONLY;
     } else if (mode == "vmdq_rss") {
-            m = ETH_MQ_RX_VMDQ_RSS;
+        m = ETH_MQ_RX_VMDQ_RSS;
     } else if (mode == "vmdq_dcb") {
-            m = ETH_MQ_RX_VMDQ_DCB;
+        m = ETH_MQ_RX_VMDQ_DCB;
     } else if (mode == "vmdq_dcb_rss") {
-            m = ETH_MQ_RX_VMDQ_DCB_RSS;
+        m = ETH_MQ_RX_VMDQ_DCB_RSS;
     } else {
         return errh->error("Unknown mode %s",mode.c_str());
     }
@@ -334,6 +334,14 @@ int DPDKDevice::set_mode(
     info.mq_mode_str = mode;
 
     return 0;
+}
+
+rte_eth_rx_mq_mode DPDKDevice::get_mode() {
+    return getInfo().mq_mode;
+}
+
+String DPDKDevice::get_mode_str() {
+    return getInfo().mq_mode_str;
 }
 
 static struct ether_addr pool_addr_template = {

@@ -80,8 +80,6 @@ public:
             tx_queues.reserve(128);
         }
 
-        String get_mq_mode() { return mq_mode_str; }
-
         void print_device_info() {
             click_chatter("   Vendor   ID: %d", vendor_id);
             click_chatter("   Vendor Name: %s", vendor_name.c_str());
@@ -163,6 +161,8 @@ public:
         ErrorHandler *errh
     );
 #endif
+    rte_eth_rx_mq_mode get_mode();
+    String get_mode_str();
 
     static int initialize(ErrorHandler *errh);
 
