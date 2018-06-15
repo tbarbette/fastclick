@@ -229,6 +229,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     rte_eth_dev_info_get(port_id, &dev_info);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
+    if (strcmp(dev_info.driver_name,"net_mlx5") == 0) {
+        errh->warning("WARNING : DPDK 17.11 to 18.02 included have broken support for secondary process with mlx5. Use 18.05 with mlx5 cards if you use secondary process.");
+    }
+#endif
+
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
