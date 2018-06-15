@@ -18,7 +18,6 @@
 #include <click/config.h> // Doc says this should come first
 
 #include "recordtimestamp.hh"
-#include "numberpacket.hh"
 
 #include <click/args.hh>
 #include <click/error.hh>
@@ -63,12 +62,11 @@ inline void
 RecordTimestamp::smaction(Packet *p) {
     uint64_t i;
     if (_offset >= 0) {
-        i = _np ? _np->read_number_of_packet(p, _offset, _net_order) :
-            NumberPacket::read_number_of_packet(p, _offset, _net_order);
+        i = get_numberpacket(p, _offset, _net_order);
         assert(i < ULLONG_MAX);
         while (i >= (unsigned)_timestamps.size()) {
             if (!_dynamic && i >= (unsigned)_timestamps.capacity()) {
-                click_chatter("fatal error : DYNAMIC is not set and record timestamp reserved capacity is too small. Use N to augment the capacity.");
+                click_chatter("Fatal error: DYNAMIC is not set and record timestamp reserved capacity is too small. Use N to augment the capacity.");
                 assert(false);
             }
             _timestamps.resize(_timestamps.size() == 0? _timestamps.capacity():_timestamps.size() * 2, Timestamp::uninitialized_t());

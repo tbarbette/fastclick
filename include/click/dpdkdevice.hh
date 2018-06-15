@@ -140,6 +140,14 @@ public:
     uint16_t get_device_id();
     const char *get_device_driver();
 
+    static unsigned int dev_count() {
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
+        return rte_eth_dev_count_avail();
+#else
+        return rte_eth_dev_count();
+#endif
+    }
+
     static struct rte_mempool *get_mpool(unsigned int);
 
     static int get_port_numa_node(portid_t port_id);
@@ -162,6 +170,15 @@ public:
 
     static int static_cleanup();
 
+#if CLICK_PACKET_USE_DPDK
+    inline static bool is_dpdk_packet(Packet* p) {
+        return true;
+    }
+
+    inline static bool is_dpdk_buffer(Packet* p) {
+        return true;
+    }
+#else
     inline static bool is_dpdk_packet(Packet* p) {
         return p->buffer_destructor() == DPDKDevice::free_pkt;
     }
@@ -169,6 +186,7 @@ public:
     inline static bool is_dpdk_buffer(Packet* p) {
         return is_dpdk_packet(p) || (p->data_packet() && is_dpdk_packet(p->data_packet()));
     }
+#endif
 
     inline static rte_mbuf* get_pkt(unsigned numa_node);
     inline static rte_mbuf* get_pkt();
@@ -262,9 +280,12 @@ private:
         return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
     }
 
+#if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     static int get_port_from_pci(uint32_t domain, uint8_t bus, uint8_t dev_id, uint8_t function) {
        struct rte_eth_dev_info dev_info;
-       for (portid_t port_id = 0 ; port_id < rte_eth_dev_count(); ++port_id) {
+
+       uint16_t count = rte_eth_dev_count();
+       for (portid_t port_id = 0 ; port_id < count; ++port_id) {
           rte_eth_dev_info_get(port_id, &dev_info);
           struct rte_pci_addr addr = dev_info.pci_dev->addr;
           if (addr.domain   == domain &&
@@ -273,8 +294,10 @@ private:
               addr.function == function)
               return port_id;
        }
+
        return -1;
     }
+#endif
 
     friend class DPDKDeviceArg;
     friend class DPDKInfo;

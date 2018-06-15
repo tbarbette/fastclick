@@ -47,6 +47,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("PORT", dev), errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
+        .read("MAXQUEUES", maxqueues)
         .complete() < 0)
             return -1;
     if (!DPDKDeviceArg::parse(dev, _dev)) {
