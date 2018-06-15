@@ -323,8 +323,8 @@ int DPDKDevice::set_mode(
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
         flow_dir->set_active(true);
         flow_dir->set_rules_filename(rules_path);
-        click_chatter(
-            "Flow Director (port %u): Source file '%s'",
+        errh->message(
+            "Flow Director (port %u): State active - Source file '%s'",
             port_id, rules_path.empty() ? "None" : rules_path.c_str()
         );
     }
