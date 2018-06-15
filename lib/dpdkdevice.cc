@@ -55,7 +55,7 @@ const char *DPDKDevice::get_device_driver()
  * is not well supported. This function will return 0 instead in that case. */
 int DPDKDevice::get_port_numa_node(portid_t port_id)
 {
-    if (port_id >= rte_eth_dev_count())
+    if (port_id >= dev_count())
         return -1;
     int numa_node = rte_eth_dev_socket_id(port_id);
     return (numa_node == -1) ? 0 : numa_node;
@@ -239,11 +239,16 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
 
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
     if (dev_info.pci_dev) {
         info.vendor_id = dev_info.pci_dev->id.vendor_id;
         info.device_id = dev_info.pci_dev->id.device_id;
     }
+#else
+    //TODO
+#endif
     info.driver = dev_info.driver_name;
     info.vendor_name = "Unknown";
 
@@ -503,13 +508,12 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return errh->error("Cannot probe the PCI bus");
 #endif
 
-    const unsigned n_ports = rte_eth_dev_count();
-    if (n_ports == 0 && _devs.size() > 0)
+    if (dev_count() == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
     for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
-        if (it.key() >= n_ports)
+        if (it.key() >= dev_count())
             return errh->error("Cannot find DPDK port %u", it.key());
 
     err = static_initialize(errh);
@@ -542,6 +546,13 @@ DPDKDeviceArg::parse(
     portid_t port_id;
 
     if (!IntArg().parse(str, port_id)) {
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
+       uint16_t id;
+       if (rte_eth_dev_get_port_by_name(str.c_str(), &id) != 0)
+           return false;
+       else
+           port_id = id;
+#else
        //Try parsing a ffff:ff:ff.f format. Code adapted from EtherAddressArg::parse
         unsigned data[4];
         int d = 0, p = 0;
@@ -583,9 +594,10 @@ DPDKDeviceArg::parse(
         port_id = DPDKDevice::get_port_from_pci(
             data[0], data[1], data[2], data[3]
         );
+#endif
     }
 
-    if (port_id >= 0 && port_id < rte_eth_dev_count()) {
+    if (port_id >= 0 && port_id < DPDKDevice::dev_count()) {
         result = DPDKDevice::get_device(port_id);
     }
     else {
