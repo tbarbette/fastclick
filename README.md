@@ -12,13 +12,12 @@ Specifically, the Metron data plane uses either:
   1. the Virtual Machine Device queues (VMDq) to implement hardware dispatching based on the values of input packets' destination MAC address or
   2. DPDK's Flow Director library to classify and dispatch input traffic to available NIC queues (associated with CPU cores).
 
-The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be matched by the Metron data plane to perform CPU core dispatching.
-This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch connected between a source and an NFV server.
+The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be matched by the NIC of the Metron data plane agnet to perform CPU core dispatching.
+This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch between a traffic source and the NFV server where the Metron agent is deployed.
 The Flow Director mode allows a Metron server to perform traffic classification and dispatching using its own NIC(s), without involving any prior network element in the path.
 
 This repository provides the source code of Metron's high performance data plane.
-Metron controller's code has not been released yet (only the [southbound driver][metron-driver] is public), but you can totally reproduce our results by running Metron's data plane in Flow Director mode, using your desired traffic classification and dispatching rules.
-For more details, see the Deploy section below.
+Metron controller's code has not been released yet, only the [southbound driver][metron-driver] is made public.
 
 
 Configure
@@ -40,12 +39,12 @@ Deployment Examples
 ----
 To deploy Metron server in VMDq mode, do:
 ```bash
-sudo bin/click --dpdk -c 0xffff -n 4 -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-vmdq.conf
+sudo bin/click --dpdk -c 0xffff -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-vmdq.conf
 ```
 
 To deploy Metron server in Flow Director mode, do:
 ```bash
-sudo bin/click --dpdk -c 0xffff -n 4 -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-flow-director.conf rulesFile=conf/metron/test_nic_rules
+sudo bin/click --dpdk -c 0xffff -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-flow-director.conf
 ```
 
 
