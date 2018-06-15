@@ -375,13 +375,12 @@ bool Metron::discover()
         /* Send the request and get the return code in res */
         res = curl_easy_perform(curl);
 
-        click_chatter("Discovery message: %s", s.c_str());
-
         /* Check for errors */
         if(res != CURLE_OK) {
             click_chatter("Reattempting to connect to %s due to: %s\n",
                 url.c_str(), curl_easy_strerror(res));
         } else {
+            click_chatter("Discovery message: %s\n", s.c_str());
             click_chatter(
                 "Successfully advertised features to Metron controller on %s:%d\n",
                 _discover_ip.c_str(), _discover_rest_port
@@ -548,10 +547,10 @@ int ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     values[inic].resize(_sc->get_max_cpu_nb());
 
     for (int i = 0; i < _sc->get_max_cpu_nb() ; i++) {
-         if (atoi(nic->call_read("nb_vf_pools").c_str()) <= _sc->get_cpu_map(i)) {
-             return errh->error("Not enough VF pools");
-         }
-         values[inic][i] = jaddrs[_sc->get_cpu_map(i)].to_s();
+        if (atoi(nic->call_read("nb_vf_pools").c_str()) <= _sc->get_cpu_map(i)) {
+            return errh->error("Not enough VF pools");
+        }
+        values[inic][i] = jaddrs[_sc->get_cpu_map(i)].to_s();
     }
 
     return 0;
@@ -594,7 +593,7 @@ int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
-            return errh->error("Could not apply RX filter");
+            return errh->error("Could not apply Rx filter");
         }
     }
 
@@ -610,9 +609,7 @@ int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
         return errh->error("Fork error. Too many processes?");
     }
     if (pid == 0) {
-        int i;
-
-        int ret;
+        int i, ret;
 
         close(0);
         dup2(config_pipe[0], 0);
@@ -630,6 +627,7 @@ int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
         if ((ret = execv(argv_char[0], argv_char))) {
             click_chatter("Could not launch slave process: %d %d", ret, errno);
         }
+
         exit(1);
     } else {
         click_chatter("Child %d launched successfully", pid);
@@ -671,6 +669,7 @@ int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
             close(config_pipe[1]);
             sc->control_init(ctl_socket[0], pid);
         }
+
         String s;
         int v = sc->control_read_line(s);
         if (v <= 0) {
@@ -682,6 +681,7 @@ int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
         }
         return 0;
     }
+
     assert(0);
     return -1;
 }
@@ -1197,6 +1197,7 @@ ServiceChain::~ServiceChain()
 {
     // Do not delete NICs, we are not the owner of those pointers
     if (rx_filter) {
+        rx_filter->values.clear();
         delete rx_filter;
     }
 }
