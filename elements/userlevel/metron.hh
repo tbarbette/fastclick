@@ -398,7 +398,9 @@ class Metron : public Element {
         /* Rx filter mode */
         RxFilterType _rx_mode;
 
+        /* Private methods */
         int run_chain(ServiceChain *sc, ErrorHandler *errh);
+        int confirm_nic_mode(ErrorHandler *errh);
 
         Timer _timer;
 

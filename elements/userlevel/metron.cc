@@ -32,6 +32,10 @@
 #include "todpdkdevice.hh"
 #include "metron.hh"
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #include <click/flowdirector.hh>
+#endif
+
 #if HAVE_CURL
     #include <curl/curl.h>
 #endif
@@ -129,7 +133,7 @@ RxFilterType rx_filter_type_str_to_enum(const String rf_str)
  * Metron
  **************************************/
 Metron::Metron() :
-    _timing_stats(true), _timer(this), _discovered(false)
+    _timing_stats(true), _timer(this), _discovered(false), _rx_mode(MAC)
 {
 
 }
@@ -166,10 +170,8 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
 
-    // Default Rx filter mode is MAC-based VMDq
-    if (rx_mode.empty()) {
-        _rx_mode = MAC;
-    } else {
+    // Set the Rx filter mode
+    if (!rx_mode.empty()) {
         _rx_mode = rx_filter_type_str_to_enum(rx_mode.upper());
 
         if (_rx_mode == NONE) {
@@ -178,6 +180,15 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
                 supported_rx_filter_types().c_str()
             );
         }
+
+    #if RTE_VERSION < RTE_VERSION_NUM(17,5,0,0)
+        if (_rx_mode == FLOW) {
+            return errh->error(
+                "Rx filter mode %s requires DPDK 17.05 or higher",
+                supported_rx_filter_types().c_str()
+            );
+        }
+    #endif
     }
     errh->message(
         "Rx filter mode: %s",
@@ -210,10 +221,48 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 #endif
 
+    // Setup pointers with the underlying NICs
     for (Element *e : nics) {
         NIC nic;
         nic.element = e;
         _nics.insert(nic.get_id(), nic);
+    }
+
+    // Confirm the mode of the underlying NICs
+    return confirm_nic_mode(errh);
+}
+
+int Metron::confirm_nic_mode(ErrorHandler *errh)
+{
+    auto nic = _nics.begin();
+    while (nic != _nics.end()) {
+        // Cast input element
+        FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(nic.value().element);
+        // Get its Rx mode
+        String fd_mode = fd->get_device()->get_mode_str();
+
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        if ((_rx_mode == FLOW) && (fd_mode != FlowDirector::FLOW_DIR_MODE)) {
+            return errh->error(
+                "Metron RX_MODE %s requires FromDPDKDevice(%s) MODE %s",
+                rx_filter_type_enum_to_str(_rx_mode).c_str(),
+                nic.value().get_id().c_str(),
+                FlowDirector::FLOW_DIR_MODE.c_str()
+            );
+        }
+    #endif
+
+        // TODO: What if _rx_mode = VLAN and fd_mode = vmdq?
+        //       The agent should be able to provide MAC or VLAN tags.
+        if ((_rx_mode == MAC) && (fd_mode != "vmdq")) {
+            return errh->error(
+                "Metron RX_MODE %s requires FromDPDKDevice(%s) MODE vmdq",
+                rx_filter_type_enum_to_str(_rx_mode).c_str(),
+                nic.value().get_id().c_str()
+            );
+        }
+
+        nic++;
     }
 
     return 0;
@@ -241,9 +290,6 @@ int Metron::initialize(ErrorHandler *errh)
     String sw_info = shell_command_output_string("dmidecode -t 1", "", errh);
     _serial = parseVendorInfo(sw_info, "Serial Number");
 
-    _timer.initialize(this);
-    _timer.schedule_after_sec(1);
-
 #if HAVE_CURL
     // Only if user has requested discovery
     if (_discover_ip) {
@@ -259,6 +305,10 @@ int Metron::initialize(ErrorHandler *errh)
         errh->warning("To proceed, Metron controller must initiate the discovery");
     }
 #endif
+
+    _timer.initialize(this);
+    _timer.schedule_after_sec(1);
+
     return 0;
 }
 
