@@ -139,6 +139,10 @@ public:
     int flow_director_write(const String &h, const String &flow);
 #endif
 
+    inline DPDKDevice *get_device() {
+        return _dev;
+    }
+
 private:
 
     static String read_handler(Element *, void *) CLICK_COLD;
