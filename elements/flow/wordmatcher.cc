@@ -87,6 +87,10 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
 {
     WordMatcher->flowBuffer.enqueueAll(flow);
 
+    auto iter = WordMatcher->flowBuffer.contentBegin();
+    if (!iter.current()) {
+        goto finished;
+    }
     /**
      * This is mostly an example element, so we have two modes :
      * - Replacement, done inline using the iterator directly in this element
@@ -96,7 +100,6 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
     {
         const char* insult = insults[i].c_str();
         if (_mask) { //Masking mode
-            auto iter = WordMatcher->flowBuffer.contentBegin();
             auto end = WordMatcher->flowBuffer.contentEnd();
 
             while (iter != end) {
@@ -136,8 +139,8 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
             int result;
             FlowBufferContentIter iter;
             do {
-                //iter = WordMatcher->flowBuffer.search(WordMatcher->flowBuffer.contentBegin(), insult, &result);
-                iter = WordMatcher->flowBuffer.searchSSE(WordMatcher->flowBuffer.contentBegin(), insult, insults[i].length(), &result);
+                //iter = WordMatcher->flowBuffer.search(iter, insult, &result);
+                iter = WordMatcher->flowBuffer.searchSSE(iter, insult, insults[i].length(), &result);
                 //click_chatter("Found %d at %d,",result,iter.current()?iter.leftInChunk():-1);
                 if (result == 1) {
                     if (!_insert) { //If not insert, just remove

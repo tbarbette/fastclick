@@ -15,7 +15,8 @@ struct TCPState
 {
     enum Value
     {
-        ESTABLISHING = 0,
+        ESTABLISHING_1 = 0,
+        ESTABLISHING_2,
         OPEN, // The connection is open and nothing has been made to close it
         BEING_CLOSED_GRACEFUL_1, // The connection is being closed gracefully (via first FIN packets)
         BEING_CLOSED_GRACEFUL_2, // The connection is being closed gracefully (via second FIN packets, second should free after this)

@@ -47,7 +47,7 @@ public:
 
     tcp_common() : lastAckReceived() //This is indeed called as it is not part of the FCBs
     {
-        state = TCPState::ESTABLISHING;
+        //state = TCPState::ESTABLISHING;
         use_count = 0;
     }
 

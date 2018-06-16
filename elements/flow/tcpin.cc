@@ -435,7 +435,7 @@ eagain:
             manageOptions(packet);
             p = packet;
 
-            if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
+            if (isAck(p) && fcb_in->common->state < TCPState::OPEN) {
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now before the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN;
             }
@@ -464,7 +464,14 @@ eagain:
                     p->kill();
                     return NULL;
                 }
-            } else if (isAck(p) && fcb_in->common->state == TCPState::ESTABLISHING) {
+            } else if (isAck(p) && fcb_in->common->state < TCPState::OPEN) {
+                if (getFlowDirection() == 1 && fcb_in->common->state == TCPState::ESTABLISHING_1
+                        || getFlowDirection() == 0 && fcb_in->common->state == TCPState::ESTABLISHING_2) {
+                    if (_verbose > 1)
+                        click_chatter("Unexpected packet");
+                    p->kill();
+                    return 0;
+                }
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now before the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN;
             }
@@ -516,8 +523,6 @@ eagain:
                     sport, dport, seq, ack, true); //We force the sending as we want DUP ack on purpose
                 fcb_in->common->lock.release();
             }
-
-
 
             putPacketInList(fcb_in, p);
             return 0;
@@ -865,7 +870,7 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
             goto do_check;
         }
         return false;
-    } else if (state == TCPState::ESTABLISHING) {
+    } else if (state < TCPState::OPEN) {
         if (isRst(packet)) {
             goto do_check;
         }
@@ -948,6 +953,7 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
     // The data in the flow will start at current sequence number
     uint32_t flowStart = getSequenceNumber(packet);
 
+
     // Check if we are the side initiating the connection or not
     // (if ACK flag, we are not the initiator)
     if(((flags & TH_ACK && flags & TH_SYN)) || flags & TH_RST)
@@ -975,6 +981,8 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
 
         if (allowResize() || returnElement->allowResize()) {
             // Initialize the RBT with the RBTManager
+            if (_verbose > 1)
+                click_chatter("Initialize direction %d",getFlowDirection());
             fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
         }
         //click_chatter("RE Common is %p",fcb_in->common);
@@ -982,7 +990,8 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
     else
     {
         if(!(flags & TH_SYN)) {//First packet, not rst and not syn... Discard
-            //click_chatter("Not syn !");
+            if (_verbose > 1)
+                click_chatter("Not syn !");
             return false;
         }
 
@@ -991,7 +1000,6 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
         tcp_common *allocated = poolFcbTcpCommon.allocate();
 
         // Add an entry if the hashtable
-
         tableFcbTcpCommon.find_insert(flowID, allocated);
 
         // Set the pointer in the structure
@@ -999,8 +1007,15 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
         fcb_in->common->use_count++;
         if (allowResize() || returnElement->allowResize()) {
             // Initialize the RBT with the RBTManager
+            if (_verbose > 1)
+                click_chatter("Initialize direction %d",getFlowDirection());
             fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
         }
+
+        if (getFlowDirection() == 1)
+            fcb_in->common->state = TCPState::ESTABLISHING_1;
+        else
+            fcb_in->common->state = TCPState::ESTABLISHING_2;
 
         // Store in our structure the information needed to free the memory
         // of the common structure
@@ -1028,7 +1043,7 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
 bool TCPIn::isEstablished()
 {
     auto fcb_in = fcb_data();
-    return fcb_in->common && fcb_in->common->state > TCPState::ESTABLISHING;
+    return fcb_in->common && fcb_in->common->state > TCPState::ESTABLISHING_2;
 }
 
 bool TCPIn::isLastUsefulPacket(Packet *packet)

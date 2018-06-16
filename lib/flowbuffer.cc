@@ -180,6 +180,7 @@ FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const c
     const __m256i first = _mm256_set1_epi8(needle[0]);
     const __m256i last  = _mm256_set1_epi8(needle[pattern_length - 1]);
 
+    assert(start.entry);
 
     unsigned char* s = start.get_ptr();
     int n = start.leftInChunk();
