@@ -55,7 +55,7 @@ int SimpleTCPRetransmitter::initialize(ErrorHandler *errh) {
     if (StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>::initialize(errh) != 0)
         return -1;
     if (_in->getOutElement()->maxModificationLevel() & MODIFICATION_RESIZE) {
-        return errh->error("SimpleTCPRetransmitter does not work when resizing the flow ! Use the non simple one.");
+        _resize = true;
     }
     return 0;
 }
@@ -71,6 +71,38 @@ SimpleTCPRetransmitter::release_flow(fcb_transmit_buffer* fcb) {
 }
 
 void
+SimpleTCPRetransmitter::forward_packets(fcb_transmit_buffer* fcb, PacketBatch* batch) {
+    /**
+     * Just prune the buffer and put the packet with payload in the list (don't buffer ACKs)
+     */
+    prune(fcb);
+    FOR_EACH_PACKET_SAFE(batch,packet) {
+        if (getPayloadLength(packet) == 0)
+            continue;
+        Packet* clone = packet->clone(true); //Fast clone. If using DPDK, we only hold a buffer reference
+        assert(clone->buffer() == packet->buffer());
+        /*click_chatter("%p %p %p",clone->mac_header(),packet->mac_header());
+        clone->set_mac_header(packet->mac_header());
+        clone->set_network_header(packet->network_header());
+        clone->set_transport_header(packet->transport_header());*/
+
+        //Actually add the packet in the FCB
+        if (fcb->first_unacked) {
+            fcb->first_unacked->append_packet(clone);
+            clone->set_next(0);
+        } else {
+            fcb->first_unacked = PacketBatch::make_from_packet(clone);
+        }
+    }
+
+    //Send the original batch
+    if(batch != NULL)
+        output_push_batch(0, batch);
+
+    return;
+}
+
+void
 SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBatch *batch)
 {
     //If the flow is killed, just push the batch to port 0 (let RST go through)
@@ -80,37 +112,12 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
     }
 
     if(port == 0) { //Normal packet to buffer
-        /**
-         * Just prune the buffer and put the packet with payload in the list (don't buffer ACKs)
-         */
-        prune(fcb);
-        FOR_EACH_PACKET_SAFE(batch,packet) {
-            if (getPayloadLength(packet) == 0)
-                continue;
-            Packet* clone = packet->clone(true); //Fast clone. If using DPDK, we only hold a buffer reference
-            clone->set_mac_header(packet->mac_header());
-            clone->set_network_header(packet->network_header());
-            clone->set_transport_header(packet->transport_header());
-
-            //Actually add the packet in the FCB
-            if (fcb->first_unacked) {
-                fcb->first_unacked->append_packet(clone);
-                clone->set_next(0);
-            } else {
-                fcb->first_unacked = PacketBatch::make_from_packet(clone);
-            }
-        }
-
-        //Send the original batch
-        if(batch != NULL)
-            output_push_batch(0, batch);
-
-        return;
+        forward_packets(fcb, batch);
     } else { /* port == 1 */ //Retransmission
         auto fcb_in = _in->fcb_data(); //Scratchpad for TCPIn
 
         //Retransmission of a SYN -> Let it go through
-        if (fcb_in->common->state == TCPState::ESTABLISHING && isSyn(batch->first()) || isRst(batch->first())) {
+        if ((fcb_in->common->state < TCPState::OPEN) && isSyn(batch->first()) || isRst(batch->first())) {
             if (_verbose)
                 click_chatter("Unestablished connection, letting the rt packet go through");
             if (batch->count() > 1) {
@@ -136,12 +143,22 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
         prune(fcb);
         Packet* lastretransmit = 0;
 
+        unsigned int flowDirection = determineFlowDirection();
+        ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[flowDirection];
+
         FOR_EACH_PACKET_SAFE(batch, packet) {
             uint32_t seq = getSequenceNumber(packet);
-            if (_proack && fcb_in->common->lastAckReceivedSet() && SEQ_LT(seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()))) {
+            uint32_t mappedSeq;
+            if (_resize)
+                mappedSeq = maintainer.mapSeq(seq);
+            else
+                mappedSeq = seq;
+
+            if (_proack && fcb_in->common->lastAckReceivedSet() && SEQ_LT(mappedSeq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()))) {
                 if (_verbose)
                     click_chatter("Client just did not receive the ack, let's ACK him (seq %lu, last ack %lu, state %d)",seq,fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),fcb_in->common->state);
                 _in->ackPacket(packet,true);
+
                 continue;
             }
             if (getPayloadLength(packet) == 0) {
@@ -156,7 +173,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
             } else {
                 //Seq is bigger than last ack, (the original of) this packet was lost before the dest reached it (or we never received the ack)
                 FOR_EACH_PACKET_SAFE(fcb->first_unacked, pr) {
-                    if (getSequenceNumber(pr) == seq) {
+                    if (getSequenceNumber(pr) == mappedSeq) {
                         if (lastretransmit == pr) { //Avoid double retransmission
                             //TODO : do we want to do that?
                             if (_verbose)
@@ -166,7 +183,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                             if (unlikely(_verbose))
                                 click_chatter("Retransmitting one packet from the buffer (seq %lu)",getSequenceNumber(pr));
                             fcb_acquire(1);
-                            output_push_batch(0,PacketBatch::make_from_packet(packet->clone(true)));
+                            output_push_batch(0,PacketBatch::make_from_packet(pr->clone(true)));
                         }
                         goto found;
                     }
@@ -182,9 +199,6 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
         return;
     }
 }
-
-
-
 
 void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
 {

@@ -15,10 +15,6 @@ CLICK_DECLS
 
 WordMatcher::WordMatcher() : insults()
 {
-    // Initialize the memory pool of each thread
-    for(unsigned int i = 0; i < poolBufferEntries.weight(); ++i)
-        poolBufferEntries.get_value(i).initialize(POOL_BUFFER_ENTRIES_SIZE);
-
     closeAfterInsults = false;
     _mask = true;
     _insert = false;
@@ -91,8 +87,9 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
     if (!iter.current()) {
         goto finished;
     }
+
     /**
-     * This is mostly an example element, so we have two modes :
+     * This is mostly an example element. We have two modes for demo:
      * - Replacement, done inline using the iterator directly in this element
      * - Removing, done calling iterator.remove
      */
@@ -137,19 +134,18 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
             }
         } else {
             int result;
-            FlowBufferContentIter iter;
             do {
                 //iter = WordMatcher->flowBuffer.search(iter, insult, &result);
                 iter = WordMatcher->flowBuffer.searchSSE(iter, insult, insults[i].length(), &result);
-                //click_chatter("Found %d at %d,",result,iter.current()?iter.leftInChunk():-1);
                 if (result == 1) {
                     if (!_insert) { //If not insert, just remove
                         WordMatcher->flowBuffer.remove(iter,insults[i].length(), this);
+                        while (iter.leftInChunk() == 0 && iter)
+                            iter.moveToNextChunk();
                     } else if (!_full){ //Insert but not full, replace pattern per message
                         WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), _insert_msg.length(), this);
                     }
-                }
-                if (result == 1) {
+
                     if (closeAfterInsults)
                         goto closeconn;
                     if (_full) {
@@ -159,8 +155,11 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                     }
                     WordMatcher->counterRemoved += 1;
                 }
-            } while (_all && result == 1);
 
+                if (!_all)
+                    break;
+
+            } while (result == 1 && iter.leftInChunk());
             // While we keep finding complete insults in the packet
             if (result == 0) { //Finished in the middle of a potential match
                 if(!isLastUsefulPacket(flow->tail())) {

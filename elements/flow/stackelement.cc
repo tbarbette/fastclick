@@ -198,7 +198,6 @@ void StackElement::removeBytes(WritablePacket* packet, uint32_t position,
         position += packet->getContentOffset();
         uint32_t bytesAfter = packet->length() - position;
         if (bytesAfter > 0) {
-            //click_chatter("Bytes after !");
             memmove(&source[position], &source[position + length], bytesAfter);
         }
         packet->take(length);

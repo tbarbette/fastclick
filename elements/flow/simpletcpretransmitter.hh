@@ -66,6 +66,7 @@ public:
 
     static const int timeout = 0; //Timeout will be managed by TCP
 
+    void forward_packets(fcb_transmit_buffer* fcb, PacketBatch* batch);
     void release_flow(fcb_transmit_buffer*);
 
 
@@ -74,7 +75,7 @@ public:
             return;
         StackElement::addStackElementInList(element,port);
     }
-private:
+protected:
 
     /**
      * @brief Prune the buffer. Used when data are ACKed by the destination
@@ -94,6 +95,7 @@ private:
     bool _verbose;
     bool _proack;
     TCPIn* _in;
+    bool _resize;
 };
 
 CLICK_ENDDECLS

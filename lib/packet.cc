@@ -910,7 +910,7 @@ Packet::clone(bool fast)
     Packet *p = new WritablePacket; // no initialization
 # endif
     if (!p)
-	return 0;
+        return 0;
     if (unlikely(fast)) {
         memcpy(p, this, sizeof(Packet));
         p->_use_count = 1;

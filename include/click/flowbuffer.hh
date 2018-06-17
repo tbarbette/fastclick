@@ -157,7 +157,7 @@ public:
      * @param start A content iterator pointing to the first byte to remove
      * @param length The number of bytes to remove
      */
-    void remove(FlowBufferContentIter start, uint32_t length, StackElement* owner);
+    void remove(const FlowBufferContentIter start, uint32_t length, StackElement* owner);
 
 
 private:
@@ -274,13 +274,27 @@ public:
         return entry->next() == 0;
     }
 
-    inline bool moveToNextChunk() {
+    inline void moveToNextChunk() {
         entry = entry->next();
         offsetInPacket = 0;
     }
 
     inline int leftInChunk() {
+        if (!entry)
+            return 0;
         return entry->length() - (entry->getContentOffset() + offsetInPacket);
+    }
+
+    void print_ascii() {
+        FlowBufferContentIter n = *this;
+        while (n) {
+            char buf[n.leftInChunk() + 1];
+            memcpy(buf, n.get_ptr(), n.leftInChunk());
+            buf[n.leftInChunk()] = '\0';
+            click_chatter("'%s'",buf);
+            n.moveToNextChunk();
+        }
+
     }
 
 private:

@@ -70,16 +70,6 @@ protected:
 
     virtual int maxModificationLevel() override;
 
-    /** @brief Remove an insult in the web page stored in the buffer
-     * @param fcb Pointer to the FCB of the flow
-     * @param insult The insult to remove
-     * @return The result of the deletion (1: insult found and removed, -1 insult not found, 0
-     * insult not found but may start at the end of the last packet in the buffer)
-     */
-    int removeInsult(struct fcb_WordMatcher* fcb, const char *insult);
-
-    per_thread<MemoryPool<struct flowBufferEntry>> poolBufferEntries;
-
     Vector<String> insults; // Vector containing the words to remove from the web pages
 
     bool closeAfterInsults;

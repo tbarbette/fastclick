@@ -177,22 +177,25 @@ FlowBufferIter FlowBuffer::end()
 
 FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const char* needle, const int pattern_length,
         int *feedback) {
+    int n = start.leftInChunk();
+    //If the first chunk is small, don't bother SSE
+    if (n < 32)
+        return search(start,needle,feedback);
+
     const __m256i first = _mm256_set1_epi8(needle[0]);
     const __m256i last  = _mm256_set1_epi8(needle[pattern_length - 1]);
-
-    assert(start.entry);
-
     unsigned char* s = start.get_ptr();
-    int n = start.leftInChunk();
     int i = 0;
     *feedback = -1;
-    FlowBufferContentIter next;
+    FlowBufferContentIter next = start;
+    next.moveToNextChunk();
+    __m256i eq_first;
+
     while (true) {
-        //click_chatter("Search at %d/%d",i,n);
         const __m256i block_first = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
         const __m256i block_last  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + pattern_length - 1));
 
-        const __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);
+        eq_first = _mm256_cmpeq_epi8(first, block_first);
         const __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);
 
         uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));
@@ -212,7 +215,14 @@ FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const c
         i += 32;
         if (i + 32 + pattern_length >= n) {
             if (start.lastChunk()) {
-                start += i - pattern_length;
+                //We have to check if a pattern could start in the last part
+                uint32_t z = _mm256_movemask_epi8(eq_first);
+                if (z != 0) {
+                    start += min(n - pattern_length, i - pattern_length);
+                } else {
+                    start += i - pattern_length;
+                }
+
                 //click_chatter("searching now!");
                 return search(start,needle,feedback);
             } else {
@@ -236,6 +246,9 @@ FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const c
             }
         }
     }
+    //Should be unreachable
+    assert(false);
+
     *feedback = -1;
     return contentEnd();
 }
@@ -347,7 +360,7 @@ int FlowBuffer::removeInFlow(const char* pattern, StackElement* owner)
     return 1;
 }
 
-void FlowBuffer::remove(FlowBufferContentIter start, uint32_t length, StackElement* owner)
+void FlowBuffer::remove(const FlowBufferContentIter start, uint32_t length, StackElement* owner)
 {
     assert(length > 0);
     uint32_t toRemove = length;
