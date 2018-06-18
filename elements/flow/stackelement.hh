@@ -135,20 +135,6 @@ protected:
     uint32_t getInitialAck(Packet *packet) const;
 
     /**
-     * @brief Indicate whether the packet has useful content for the current protocol
-     * @param The packet
-     * @return A boolean indicating if the useful content of the packet is empty
-     */
-    inline bool isPacketContentEmpty(Packet* packet) const;
-
-    /**
-     * @brief Return the size of the useful content of the packet
-     * @param The packet
-     * @return The size of the useful content of the packet
-     */
-    inline static uint16_t getPacketContentSize(Packet *packet);
-
-    /**
      * @brief Used to create the function stack. It will run a StackVisitor
      * downstream that will register this element as the next element in the function stack
      * of the next stack element.
@@ -524,7 +510,6 @@ class StackChunkBufferElement : public StackStateElement<Derived, BufferData<T>>
         }
     }
 };
-
 
 
 CLICK_ENDDECLS

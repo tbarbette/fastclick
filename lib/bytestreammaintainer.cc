@@ -412,8 +412,10 @@ ByteStreamMaintainer::~ByteStreamMaintainer()
 {
     if(initialized)
     {
-        //RBTreeDestroy(treeAck); TODO
-        //RBTreeDestroy(treeSeq); TODO
+        if (treeAck)
+            RBTreeDestroy(treeAck);
+        if (treeSeq)
+            RBTreeDestroy(treeSeq);
     }
 }
 

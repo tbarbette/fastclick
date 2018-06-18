@@ -1,9 +1,23 @@
 #ifndef MIDDLEBOX_HTTPOUT_HH
 #define MIDDLEBOX_HTTPOUT_HH
+
 #include <click/element.hh>
 #include "stackelement.hh"
+#include "tcpelement.hh"
 
 CLICK_DECLS
+
+class HTTPIn;
+
+
+/**
+ * Structure used by the HTTPIn element
+ */
+struct fcb_httpout
+{
+    FlowBuffer flowBuffer;
+};
+
 
 /*
 =c
@@ -24,16 +38,9 @@ element must also contain an HTTPIn element
 /**
  * Structure used by the HTTPOut element
  */
-struct fcb_httpout
-{
-    FlowBuffer flowBuffer;
-};
 
 
-
-#define POOL_BUFFER_ENTRIES_SIZE 300
-
-class HTTPOut : public StackElement, public TCPElement
+class HTTPOut : public StackSpaceElement<struct fcb_httpout>, public TCPElement
 {
 public:
     /** @brief Construct an HTTPOut element
@@ -46,7 +53,7 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    void push_batch(int, PacketBatch*) override;
+    void push_batch(int, struct fcb_httpout*, PacketBatch*) override;
 protected:
     /** @brief Modify the content of an HTTP header
      * @param fcb Pointer to the FCB of the flow
@@ -55,10 +62,10 @@ protected:
      * @param content New content of the header
      * @return The packet with the HTTP header modified
      */
-    WritablePacket* setHeaderContent(struct fcb *fcb, WritablePacket* packet,
+    WritablePacket* setHeaderContent(struct fcb_httpout *fcb, WritablePacket* packet,
         const char* headerName, const char* content) CLICK_WARN_UNUSED_RESULT;
 
-    per_thread<MemoryPool<struct flowBufferEntry>> poolBufferEntries;
+    HTTPIn* _in;
 };
 
 CLICK_ENDDECLS

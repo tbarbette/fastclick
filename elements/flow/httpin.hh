@@ -2,6 +2,7 @@
 #define MIDDLEBOX_HTTPIN_HH
 #include <click/element.hh>
 #include "stackelement.hh"
+#include "tcpelement.hh"
 
 CLICK_DECLS
 
@@ -45,7 +46,7 @@ must also contain an HTTPOut element
 
 =a HTTPOut */
 
-class HTTPIn : public StackSpaceElement<fcb_httpin>
+class HTTPIn : public StackSpaceElement<fcb_httpin>, TCPElement
 {
 public:
     HTTPIn() CLICK_COLD;
@@ -60,7 +61,7 @@ protected:
 
     void push_batch(int port, fcb_httpin* fcb, PacketBatch* flow) override;
 
-    virtual bool isLastUsefulPacket(struct fcb* fcb, Packet *packet);
+    virtual bool isLastUsefulPacket(Packet *packet);
 
 private:
     /** @brief Remove an HTTP header from a request or a response
@@ -78,21 +79,21 @@ private:
      * @param bufferSize Maximum size of the header (the content will be truncated if the buffer
      * is not large enough to contain it)
      */
-    void getHeaderContent(WritablePacket* packet, const char* headerName,
+    void getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const char* headerName,
         char* buffer, uint32_t bufferSize);
 
     /** @brief Process the headers and set the URL and the method in the httpin part of the FCB
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the headers are located
      */
-    void setRequestParameters(WritablePacket *packet);
+    void setRequestParameters(struct fcb_httpin *fcb, WritablePacket *packet);
 
     /** @brief Modify the HTTP version in the header to set it to 1.0
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the headers are located
      * @return The packet with the HTTP version modified
      */
-    WritablePacket* setHTTP10(WritablePacket *packet) CLICK_WARN_UNUSED_RESULT;
+    WritablePacket* setHTTP10(struct fcb_httpin *fcb, WritablePacket *packet) CLICK_WARN_UNUSED_RESULT;
 
 };
 

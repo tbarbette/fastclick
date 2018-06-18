@@ -6,12 +6,13 @@
  * Copyright - University of Liege
  *
  */
-
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
+
 #include "httpin.hh"
+
 
 CLICK_DECLS
 
@@ -27,45 +28,48 @@ int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 {
-    FOR_EACH_PACKET(flow, packet) {
+    auto fnt = [this,fcb](Packet* p){
+        // Check that the packet contains HTTP content
+        if(p->isPacketContentEmpty())
+            return p;
 
-	    // Check that the packet contains HTTP content
-	    if(isPacketContentEmpty(packet))
-		return packet;
+        // By default, the packet is not considered to be the last one
+        // containing HTTP content
+        setAnnotationLastUseful(p, false);
 
-	    // By default, the packet is not considered to be the last one
-	    // containing HTTP content
-	    setAnnotationLastUseful(packet, false);
+        WritablePacket* packet = p->uniqueify();
+        p = packet;
+        if(!fcb->headerFound)
+        {
+            // Remove the "Accept-Encoding" header to avoid receiving
+            // compressed content
+            packet = setHTTP10(fcb, packet);
+            setRequestParameters(fcb, packet);
+            removeHeader(packet, "Accept-Encoding");
+            char buffer[250];
+            getHeaderContent(fcb, packet, "Content-Length", buffer, 250);
+            fcb->contentLength = (uint64_t)atol(buffer);
+        }
 
-	    if(!fcb->httpin.headerFound)
-	    {
-		// Remove the "Accept-Encoding" header to avoid receiving
-		// compressed content
-		packet = setHTTP10(fcb, packet);
-		setRequestParameters(fcb, packet);
-		removeHeader(fcb, packet, "Accept-Encoding");
-		char buffer[250];
-		getHeaderContent(fcb, packet, "Content-Length", buffer, 250);
-		fcb->httpin.contentLength = (uint64_t)atol(buffer);
-	    }
+        // Compute the offset of the HTML payload
+        char* source = searchInContent((char*)packet->getPacketContent(), "\r\n\r\n",
+        packet->getPacketContentSize());
+        if(source != NULL)
+        {
+            uint32_t offset = (int)(source - (char*)packet->data() + 4);
+            packet->setContentOffset(offset);
+            fcb->headerFound = true;
+        }
 
-	    // Compute the offset of the HTML payload
-	    char* source = searchInContent((char*)getPacketContent(packet), "\r\n\r\n",
-		getPacketContentSize(packet));
-	    if(source != NULL)
-	    {
-		uint32_t offset = (int)(source - (char*)packet->data() + 4);
-		packet->setContentOffset(, offset);
-		fcb->httpin.headerFound = true;
-	    }
-
-	    // Add the size of the HTTP content to the counter
-	    uint16_t currentContent = getPacketContentSize(packet);
-	    fcb->httpin.contentSeen += currentContent;
-	    // Check if we have seen all the HTTP content
-	    if(fcb->httpin.contentSeen >= fcb->httpin.contentLength)
-		setAnnotationLastUseful(packet, true);
-	}
+        // Add the size of the HTTP content to the counter
+        uint16_t currentContent = packet->getPacketContentSize();
+        fcb->contentSeen += currentContent;
+        // Check if we have seen all the HTTP content
+        if(fcb->contentSeen >= fcb->contentLength)
+            setAnnotationLastUseful(packet, true);
+        return p;
+    };
+    EXECUTE_FOR_EACH_PACKET(fnt,flow);
 	output(0).push_batch(flow);
 }
 
@@ -93,10 +97,10 @@ void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
     uint32_t position = beginning - source;
 
     // Remove data corresponding to the header
-    removeBytes(fcb, packet, position, nbBytesToRemove);
+    removeBytes(packet, position, nbBytesToRemove);
 }
 
-void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const char* headerName,
+void HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const char* headerName,
      char* buffer, uint32_t bufferSize)
 {
     unsigned char* source = getPayload(packet);
@@ -139,7 +143,7 @@ void HTTPIn::getHeaderContent(struct fcb *fcb, WritablePacket* packet, const cha
     buffer[contentSize] = '\0';
 }
 
-WritablePacket* HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
+WritablePacket* HTTPIn::setHTTP10(struct fcb_httpin *fcb, WritablePacket *packet)
 {
     unsigned char* source = getPayload(packet);
     // Search the end of the first line
@@ -165,9 +169,9 @@ WritablePacket* HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
     // Ensure that the line has the right length
     int offset = endVersion - beginning - 8; // 8 is the length of "HTTP/1.1"
     if(offset > 0)
-        removeBytes(fcb, packet, beginning - source + 8, offset);
+        removeBytes(packet, beginning - source + 8, offset);
     else
-        packet = insertBytes(fcb, packet , beginning - source + 5, -offset);
+        packet = insertBytes(packet , beginning - source + 5, -offset);
 
     beginning[5] = '1';
     beginning[6] = '.';
@@ -176,7 +180,7 @@ WritablePacket* HTTPIn::setHTTP10(struct fcb *fcb, WritablePacket *packet)
     return packet;
 }
 
-void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
+void HTTPIn::setRequestParameters(struct fcb_httpin *fcb, WritablePacket *packet)
 {
 
     unsigned char* source = getPayload(packet);
@@ -199,8 +203,8 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
     if(methodLength >= 16)
         methodLength = 15;
 
-    memcpy(fcb->httpin.method, source, methodLength);
-    fcb->httpin.method[methodLength] = '\0';
+    memcpy(fcb->method, source, methodLength);
+    fcb->method[methodLength] = '\0';
 
     uint32_t lengthLeft = getPayloadLength(packet) - (urlStart - source);
 
@@ -215,16 +219,16 @@ void HTTPIn::setRequestParameters(struct fcb *fcb, WritablePacket *packet)
     if(urlLength >= 2048)
         urlLength = 2047;
 
-    memcpy(fcb->httpin.url, urlStart + 1, urlLength);
-    fcb->httpin.url[urlLength] = '\0';
+    memcpy(fcb->url, urlStart + 1, urlLength);
+    fcb->url[urlLength] = '\0';
 
-    fcb->httpin.isRequest = true;
+    fcb->isRequest = true;
 }
 
 
 bool HTTPIn::isLastUsefulPacket(Packet *packet)
 {
-    return (getAnnotationLastUseful(packet) || StackElement::isLastUsefulPacket(fcb, packet));
+    return (getAnnotationLastUseful(packet) || StackElement::isLastUsefulPacket(packet));
 }
 
 CLICK_ENDDECLS

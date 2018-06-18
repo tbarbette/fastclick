@@ -120,6 +120,12 @@ bool StackElement::getAnnotationBit(Packet* p, int bit) const
     return (bool)value;
 }
 
+
+char* StackElement::searchInContent(char *content, const char *pattern, uint32_t length) {
+
+}
+
+
 void StackElement::setAnnotationLastUseful(Packet *p, bool value) const
 {
     setAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL, value);
