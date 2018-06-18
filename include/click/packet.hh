@@ -104,7 +104,11 @@ class Packet { public:
     inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
+#if CLICK_PACKET_USE_DPDK
+    inline void get() {rte_mbuf_refcnt_update(mb(), 1);};
+#else
     inline void get() {_use_count++;};
+#endif
 
     inline const unsigned char *data() const;
     inline const unsigned char *end_data() const;
@@ -130,13 +134,16 @@ class Packet { public:
         return reinterpret_cast<const struct rte_mbuf *>(this);
     }
     void *destructor_argument() const {
+        click_chatter("ILLEGAL CALL TO destructor_argument");
         assert(false);
         return NULL;
     }
     void set_buffer_destructor(buffer_destructor_type) {
+        click_chatter("ILLEGAL CALL TO set_buffer_destructor");
         assert(false);
     }
     void set_destructor_argument(void*) {
+        click_chatter("ILLEGAL CALL TO set_destructor_argument");
          assert(false);
     }
 #elif CLICK_BSDMODULE
@@ -1011,6 +1018,8 @@ Packet::clear_annotations(bool all)
 	set_next(0);
 	set_prev(0);
     }
+#elif CLICK_PACKET_USE_DPDK
+    memset(all_anno(), 0, all ? sizeof(AllAnno) : sizeof(Anno));
 #else
     memset(&_aa, 0, all ? sizeof(AllAnno) : sizeof(Anno));
 #endif
@@ -1038,6 +1047,10 @@ Packet::copy_annotations(const Packet *p, bool)
 inline void
 WritablePacket::initialize()
 {
+#if CLICK_PACKET_USE_DPDK
+    click_chatter("UNIMPLEMENTED");
+    assert(false); //Should be initialized by DPDK
+#else
     _use_count = 1;
     _data_packet = 0;
 # if CLICK_USERLEVEL || CLICK_MINIOS
@@ -1045,13 +1058,20 @@ WritablePacket::initialize()
 # elif CLICK_BSDMODULE
     _m = 0;
 # endif
+#endif
     clear_annotations();
 }
 inline void
 WritablePacket::initialize_data()
 {
+#if CLICK_PACKET_USE_DPDK
+
+    click_chatter("UNIMPLEMENTED");
+    assert(false); //This may not illegal but I need to check what to be done
+#else
     _use_count = 1;
     _data_packet = 0;
+#endif
     clear_annotations(false);
 }
 #endif

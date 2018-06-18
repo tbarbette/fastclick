@@ -435,14 +435,6 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
 	return p;
 }
 
-/**
- * Give a hint that some packets from one thread will switch to another thread
- */
-void WritablePacket::pool_transfer(int from, int to) {
-    (void)from;
-    (void)to;
-}
-
 inline void
 WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
 #  if HAVE_MULTITHREAD
@@ -617,7 +609,6 @@ WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned 
 
 # endif /* HAVE_CLICK_PACKET_POOL */
 
-
 inline bool
 Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
 {
@@ -687,6 +678,16 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
 }
 
 #endif /* !CLICK_LINUXMODULE && !CLICK_PACKET_USE_DPDK */
+
+/**
+ * Give a hint that some packets from one thread will switch to another thread
+ */
+void WritablePacket::pool_transfer(int from, int to) {
+    (void)from;
+    (void)to;
+}
+
+
 
 
 /** @brief Create and return a new packet.
@@ -835,9 +836,14 @@ Packet::copy(Packet* p, int headroom)
 {
     if (headroom + p->length() > buffer_length())
         return false;
+#if CLICK_PACKET_USE_DPDK
+    click_chatter("UNIMPLEMENTED!");
+    assert(false);
+#else
     _data = _head + headroom;
     memcpy(_data,p->data(),p->length());
     _tail = _data + p->length();
+#endif
     copy_annotations(p);
     set_mac_header(p->mac_header() ? data() + p->mac_header_offset() : 0);
     set_network_header(p->network_header() ? data() + p->network_header_offset() : 0);
@@ -998,9 +1004,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
             kill();
         return 0;
     }
-    //rte_pktmbuf_headroom(nmb) = rte_pktmbuf_headroom(mb) + extra_headroom;
-    nmb->pkt.data = (unsigned char*)nmb->buf_addr + ((unsigned char*)mb->pkt.data - (unsigned char*)mb->buf_addr) + extra_headroom;
-
+    nmb->data_off = mb->data_off + extra_headroom;
 
     rte_pktmbuf_data_len(nmb) = length();
     rte_pktmbuf_pkt_len(nmb) = length();

@@ -22,7 +22,7 @@
 CLICK_DECLS
 
 EnsureHeadroom::EnsureHeadroom()
-    :  _headroom(Packet::default_headroom)
+    :  _headroom(Packet::default_headroom), _force(false)
 {
 
 }
@@ -32,6 +32,7 @@ EnsureHeadroom::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
 	.read_p("HEADROOM", _headroom)
+	.read_p("FORCE_SHRINK", _force)
 	.complete() < 0)
 	return -1;
     return 0;
@@ -40,7 +41,7 @@ EnsureHeadroom::configure(Vector<String> &conf, ErrorHandler *errh)
 inline Packet* EnsureHeadroom::smaction(Packet* p) {
 	int length = p->length();
 	Packet* q;
-	if (p->headroom() < _headroom) {
+	if (p->headroom() < _headroom || _force) {
 		q = p->shift_data(_headroom - p->headroom());
 	}	else
 		q = p;

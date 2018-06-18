@@ -234,6 +234,7 @@ class FromDump : public Element { public:
     int _minor_version;
     int _linktype;
     long _preload;
+    int _force_len;
 
     Timestamp _first_time;
     Timestamp _last_time;

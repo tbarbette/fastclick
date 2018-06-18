@@ -4,6 +4,7 @@
 #include <click/vector.hh>
 #include <click/batchelement.hh>
 #include <click/timestamp.hh>
+#include "numberpacket.hh"
 
 CLICK_DECLS
 
@@ -71,6 +72,11 @@ public:
 
     inline bool has_net_order() {
         return _net_order;
+    }
+
+    inline uint64_t get_numberpacket(Packet *p, int offset, bool net_order) {
+        return _np ? _np->read_number_of_packet(p, offset, net_order) :
+                     NumberPacket::read_number_of_packet(p, offset, net_order);
     }
 
 private:

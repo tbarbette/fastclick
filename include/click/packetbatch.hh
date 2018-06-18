@@ -530,6 +530,14 @@ public :
 
     void fast_kill();
     void fast_kill_nonatomic();
+#else
+    inline void fast_kill() {
+        kill();
+    }
+
+    void fast_kill_nonatomic() {
+        kill();
+    }
 #endif
 };
 

@@ -55,7 +55,7 @@ const char *DPDKDevice::get_device_driver()
  * is not well supported. This function will return 0 instead in that case. */
 int DPDKDevice::get_port_numa_node(portid_t port_id)
 {
-    if (port_id >= rte_eth_dev_count())
+    if (port_id >= dev_count())
         return -1;
     int numa_node = rte_eth_dev_socket_id(port_id);
     return (numa_node == -1) ? 0 : numa_node;
@@ -229,15 +229,26 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     rte_eth_dev_info_get(port_id, &dev_info);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
+    if (strcmp(dev_info.driver_name,"net_mlx5") == 0) {
+        errh->warning("WARNING : DPDK 17.11 to 18.02 included have broken support for secondary process with mlx5. Use 18.05 with mlx5 cards if you use secondary process.");
+    }
+#endif
+
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
 
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
     if (dev_info.pci_dev) {
         info.vendor_id = dev_info.pci_dev->id.vendor_id;
         info.device_id = dev_info.pci_dev->id.device_id;
     }
+#else
+    //TODO
+#endif
     info.driver = dev_info.driver_name;
     info.vendor_name = "Unknown";
 
@@ -263,10 +274,14 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 
     if (info.rx_queues.size() > dev_info.max_rx_queues) {
-        return errh->error("Port %d can only use %d RX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+        return errh->error("Port %d can only use %d RX queues (asked for %d), use MAXQUEUES to set the maximum "
+                           "number of queues or N_QUEUES to strictly define it.", port_id, dev_info.max_rx_queues, info.rx_queues.size());
     }
     if (info.tx_queues.size() > dev_info.max_tx_queues) {
-        return errh->error("Port %d can only use %d TX queues, use MAXQUEUES to set the maximum number of queues or N_QUEUES to strictly define it.");
+        return errh->error("Port %d can only use %d TX queues (FastClick asked for %d, probably to serve that same amount of threads).\n"
+                           "Add the argument \"MAXQUEUES %d\" to the corresponding ToDPDKDevice to set the maximum "
+                           "number of queues to %d or \"N_QUEUES %d\" to strictly define it. "
+                           "If the TX device has more threads than queues due to this parameter change, it will automatically rely on locking to share the queues as evenly as possible between the threads.", port_id, dev_info.max_tx_queues, info.tx_queues.size(), dev_info.max_tx_queues, dev_info.max_tx_queues, dev_info.max_tx_queues);
     }
 
     if (info.n_rx_descs < dev_info.rx_desc_lim.nb_min || info.n_rx_descs > dev_info.rx_desc_lim.nb_max) {
@@ -493,13 +508,12 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         return errh->error("Cannot probe the PCI bus");
 #endif
 
-    const unsigned n_ports = rte_eth_dev_count();
-    if (n_ports == 0 && _devs.size() > 0)
+    if (dev_count() == 0 && _devs.size() > 0)
         return errh->error("No DPDK-enabled ethernet port found");
 
     for (HashTable<portid_t, DPDKDevice>::const_iterator it = _devs.begin();
          it != _devs.end(); ++it)
-        if (it.key() >= n_ports)
+        if (it.key() >= dev_count())
             return errh->error("Cannot find DPDK port %u", it.key());
 
     err = static_initialize(errh);
@@ -532,6 +546,13 @@ DPDKDeviceArg::parse(
     portid_t port_id;
 
     if (!IntArg().parse(str, port_id)) {
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
+       uint16_t id;
+       if (rte_eth_dev_get_port_by_name(str.c_str(), &id) != 0)
+           return false;
+       else
+           port_id = id;
+#else
        //Try parsing a ffff:ff:ff.f format. Code adapted from EtherAddressArg::parse
         unsigned data[4];
         int d = 0, p = 0;
@@ -573,9 +594,10 @@ DPDKDeviceArg::parse(
         port_id = DPDKDevice::get_port_from_pci(
             data[0], data[1], data[2], data[3]
         );
+#endif
     }
 
-    if (port_id >= 0 && port_id < rte_eth_dev_count()) {
+    if (port_id >= 0 && port_id < DPDKDevice::dev_count()) {
         result = DPDKDevice::get_device(port_id);
     }
     else {
