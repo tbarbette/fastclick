@@ -24,23 +24,30 @@ HTTPOut::HTTPOut()
 
 int HTTPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+        ElementCastTracker visitor(router(),"HTTPIn");
+        router()->visit_upstream(this, -1, &visitor);
+        if (visitor.size() != 1) {
+            return errh->error("Found no or more than 1 HTTPIn element. Specify which one to use with OUTNAME");
+        }
+        _in = static_cast<HTTPIn*>(visitor[0]);
+
     return 0;
 }
 
 void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
 {
-    FOR_EACH_PACKET(flow, p) {
-        WritablePacket *packet = p->uniqueify();
-
-        assert(packet != NULL);
-/*
+    auto fnt = [this,fcb](Packet*p) -> Packet* {
+    /*
         // Initialize the buffer if not already done
         if(!fcb->flowBuffer.isInitialized())
             fcb->flowBuffer.initialize();*/
 
         // Check that the packet contains HTTP content
-        if(!packet->isPacketContentEmpty() && _in->fcb_data()->contentLength > 0)
+        if(!p->isPacketContentEmpty() && _in->fcb_data()->contentLength > 0)
         {
+            WritablePacket *packet = p->uniqueify();
+
+            assert(packet != NULL);
             FlowBuffer &flowBuffer = fcb->flowBuffer;
             flowBuffer.enqueue(packet);
             requestMorePackets(packet);
@@ -82,8 +89,14 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                 }
 
             }
+
+            return NULL;
         }
-    }
+        else
+            return p;
+    };
+
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, [](Packet*){});
 }
 
 WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacket* packet,
