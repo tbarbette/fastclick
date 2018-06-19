@@ -37,10 +37,6 @@ int HTTPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
 {
     auto fnt = [this,fcb](Packet*p) -> Packet* {
-    /*
-        // Initialize the buffer if not already done
-        if(!fcb->flowBuffer.isInitialized())
-            fcb->flowBuffer.initialize();*/
 
         // Check that the packet contains HTTP content
         if(!p->isPacketContentEmpty() && _in->fcb_data()->contentLength > 0)
@@ -65,38 +61,36 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                     ++it;
                 }
 
-                WritablePacket *toPush = (WritablePacket*)flowBuffer.dequeue();
+                PacketBatch *toPush = flowBuffer.dequeueAll();
 
+                int sz = toPush->count();
+                Packet* next = toPush->next();
+                Packet* tail = toPush->tail();
                 char bufferHeader[25];
 
                 sprintf(bufferHeader, "%lu", newContentLength);
-                toPush = setHeaderContent(fcb, toPush, "Content-Length", bufferHeader);
-
-                // Flush the buffer
-
-                PacketBatch *headBatch = PacketBatch::make_from_packet(toPush);
-
-                PacketBatch *tailBatch = NULL;
-                uint32_t max = flowBuffer.getSize();
-                MAKE_BATCH(flowBuffer.dequeue(), tailBatch, max);
-
-                if(headBatch != NULL)
-                {
-                    // Join the two batches
-                    if(tailBatch != NULL)
-                        headBatch->append_batch(tailBatch);
-                    output_push_batch(0, headBatch);
+                WritablePacket* newHead = setHeaderContent(fcb, toPush, "Content-Length", bufferHeader);
+                if (newHead != toPush) {
+                    toPush = PacketBatch::start_head(newHead);
+                    toPush->set_next(next);
+                    toPush->set_count(sz);
+                    toPush->set_tail(tail);
                 }
 
+                // Flush the buffer
+                output_push_batch(0, toPush);
             }
 
             return NULL;
         }
-        else
+        else {
             return p;
+        }
     };
 
     EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, [](Packet*){});
+    if (flow)
+        output_push_batch(0,flow);
 }
 
 WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacket* packet,

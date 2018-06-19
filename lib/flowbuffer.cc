@@ -64,12 +64,6 @@ FlowBufferChunkIter FlowBuffer::enqueueAllChunkIter(PacketBatch* batch) {
 
 void FlowBuffer::enqueue(Packet *packet)
 {
-    if(unlikely(!isInitialized()))
-    {
-        click_chatter("Error: FlowBuffer not initialized");
-        return;
-    }
-
     // Add the node at the end of the list
     if (head) {
         head->append_packet(packet);

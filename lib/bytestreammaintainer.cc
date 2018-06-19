@@ -414,8 +414,10 @@ ByteStreamMaintainer::~ByteStreamMaintainer()
     {
         if (treeAck)
             RBTreeDestroy(treeAck);
+        treeAck = 0;
         if (treeSeq)
             RBTreeDestroy(treeSeq);
+        treeSeq = 0;
     }
 }
 

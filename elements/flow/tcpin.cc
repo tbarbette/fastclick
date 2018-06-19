@@ -622,15 +622,14 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
         poolModificationTracker.release(fcb_in->modificationLists);
     }
     if (common) {
+        //click_chatter("Release common");
         common->lock.acquire();
         //The last one release common
         if (--common->use_count == 0) {
             common->lock.release();
-            //click_chatter("Ok, I'm releasing common ;)");
-            common->~tcp_common();
             //lock->acquire();
             //tin->tableTcpCommon->erase(flowID); //TODO : consume if it was not taken by the other side
-            poolFcbTcpCommon.release(common);
+            poolFcbTcpCommon.release(common); //Will call ~common
             //lock->release();
         }
         else
@@ -664,7 +663,6 @@ void TCPIn::releaseFCBState() {
     //click_chatter("TCP is closing, killing state");
     fcb_release_timeout();
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
-    assert(fcb_data()->common);
     SFCB_STACK(
     release_tcp_internal(fcb_save);
     );
