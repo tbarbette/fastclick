@@ -37,7 +37,7 @@ you can pin to different thread using StaticThreadSched.
 
 Arguments:
 
-=over 8
+=over 20
 
 =item PORT
 
@@ -80,14 +80,63 @@ to share the threads available on the device's NUMA node equally.
 
 Integer.  Number of descriptors per ring. The default is 256.
 
+=item MAC
+
+Colon-separated string. The device's MAC address.
+
+=item MTU
+
+Integer. The maximum transfer unit of the device.
+
+=item MODE
+
+String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
+vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 17.05, flow_dir is also
+supported.
+
+=item FLOW_DIR_RULES_FILE
+
+String. For DPDK version >= 17.05, if MODE is set to flow_dir, a path to
+a file with Flow Director rules can be supplied to the device.
+These rules are installed in the NIC using DPDK's flow API.
+
+=item VF_POOLS
+
+Integer. The number of virtual function pools to be used by VMDq.
+
+=item VF_VLAN
+
+Vector of Integers. Contains the VLAN tags to be used for dispatching input
+traffic using VLAN-based VMDq.
+
 =item ALLOW_NONEXISTENT
 
-Boolean.  Do not fail if the PORT do not existent. If it's the case the task
+Boolean.  Do not fail if the PORT does not exist. If it's the case the task
 will never run and this element will behave like Idle.
 
+=item RSS_AGGREGATE
+
+Boolean. If True, sets the RSS hash into the aggregate annotation
+field of each packet. Defaults to False.
+
+=item PAINT_QUEUE
+
+Boolean. If True, sets the hardware queue number into the paint annotation
+field of each packet. Defaults to False.
+
+=item NUMA
+
+Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
+
 =item ACTIVE
+
 Boolean. If False, the device is only initialized. Use this when you want
 to read packet using secondary DPDK applications.
+
+=item VERBOSE
+
+Boolean. If True, more detailed messages about the device are printed to
+the stdout. Defaults to False.
 
 =back
 
