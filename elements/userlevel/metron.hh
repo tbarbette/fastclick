@@ -35,12 +35,14 @@ typedef enum { SC_CONF_TYPES } ScType;
  * |->  MAC-based using VMDq
  * |-> VLAN-based using VMDq
  * |-> Flow-based using Flow Director
+ * |-> Hash-based using RSS (default FastClick)
  */
 #define RX_FILTER_TYPES \
     rxfiltertype(NONE), \
     rxfiltertype(MAC), \
     rxfiltertype(VLAN), \
-    rxfiltertype(FLOW)
+    rxfiltertype(FLOW), \
+    rxfiltertype(RSS)
 
 #define rxfiltertype(x) x
 
@@ -51,6 +53,180 @@ typedef enum { RX_FILTER_TYPES } RxFilterType;
 
 
 CLICK_DECLS
+
+/*
+=c
+
+Metron(
+    ID, NIC, RX_MODE,
+    AGENT_IP, AGENT_PORT,
+    DISCOVER_IP, DISCOVER_PORT,
+    DISCOVER_PATH, DISCOVER_USER,
+    DISCOVER_PASSWORD, TIMING_STATS,
+    SLAVE_DPDK_ARGS, SLAVE_ARGS,
+    PIN_TO_CORE
+)
+
+=s userlevel
+
+Metron data plane agent for high performance service chaining
+
+=d
+
+Receives and executes instructions from a remote Metron controller instance.
+These instructions are related to the management of high performance NFV
+service chains.
+The Metron agent also reports monitoring statistics to the controller.
+
+Keyword arguments are:
+
+=over 14
+
+=item ID
+
+String. The ID of this Metron data plane agent.
+
+=item NIC
+
+String. Instance of a FromDPDKDevice element.
+Multiple instances can be supplied by invoking
+NIC <instance i> i times.
+
+=item RX_MODE
+
+String. The mode of the underlying FromDPDKDevice elements.
+Three modes are supported as follows:
+1) FLOW: The NIC utilizes DPDK's Flow API to classify and
+dispatch input flows to the system's CPU cores. FromDPDKDevice
+elements must be configured with MODE flow_dir.
+The Metron controller sends the rules to be installed to the NIC.
+There rules ressemble a typical match-action API, where the action
+is to dispatch the matched flow to a certain hardware queue, where
+a CPU core is waiting for additional processing.
+2) MAC: The NIC utilizes the destination MAC address of incoming
+packets for dispatching to the correct CPU core, using Virtual
+Machine Device queues (VMDq). FromDPDKDevice elements must be
+configured with MODE vmdq.
+This mode requires an additional network element (e.g., a programmable
+switch), prior to the Metron server, to set the destination MAC address
+of each packet according to the values advertize by the Metron agent.
+If this is not done, incoming traffic will never be dispatched to
+a CPU core, as the destination MAC address will likely be wrong.
+3) RSS: The NIC utilizes its hash-based Receive-Side Scaling (RSS)
+function to distribute incoming traffic to the system's CPU cores.
+FromDPDKDevice elements must be configured with MODE rss. This is
+the standard FastClick mode, which does not reap the benefits of
+Metron, but it is supported for ccompatibility reasons.
+Default RX_MODE is FLOW.
+
+=item AGENT_IP
+
+String. The IP address of this Metron data plane agent.
+Used to communicate with the Metron controller.
+
+=item AGENT_PORT
+
+Integer. The port of this Metron data plane agent.
+Used to communicate with the Metron controller.
+The communication is web-based, thus the default port is
+usually 80.
+
+=item DISCOVER_IP
+
+String. The IP address of the remote Metron controller instance.
+
+=item DISCOVER_PORT
+
+Integer. The port of the remote Metron controller instance.
+Because the Metron controller is based on the ONOS SDN controller,
+this port defaults to 8181.
+
+=item DISCOVER_PATH
+
+String. The web resource path where the Metron controller expects
+requests. Defaults to '/onos/v1/network/configuration/'.
+
+=item DISCOVER_USER
+
+String. The username to access Metron controller's web services.
+Defaults to 'onos'.
+
+=item DISCOVER_PASSWORD
+
+String. The password to access Metron controller's web services.
+Defaults to 'rocks'.
+
+=item TIMING_STATS
+
+Boolean. If true, the Metron data plane agent reports timing statistics
+related to the deployment of each service chain. Defaults to true.
+
+=item SLAVE_ARGS
+
+String. DPDK arguments to pass to the primary DPDK process, which is the
+Metron data plane agent.
+
+=item SLAVE_DPDK_ARGS
+
+String. DPDK arguments to pass to the deployed service chain instances,
+which typically are secondary DPDK processes. For example, the following
+arguments could be passed: '-b 03:00.0' if you want a certain NIC to be
+blacklisted by a service chain.
+
+=item PIN_TO_CORE
+
+Integer. The CPU core to pin the Metron data plane agent. Defaults to 0.
+
+=back
+
+=h discovered read-only
+
+Returns whether the Metron agent is associated with a controller or not.
+
+=h resources read-only
+
+Returns a JSON object with information about the Metron agent.
+
+=h stats read-only
+
+Returns a JSON object with global statistics about the Metron agent.
+
+=h controllers read/write
+
+Returns or sets the conteoller instance associated with this Metron agent.
+
+=h chains read/write
+
+Returns the currently deployed service chains or instantiates a set of new
+service chains encoded as a JSON object.
+
+=h chains_stats read
+
+Returns a JSON object with either all service chain-level statistics of the
+deployed service chains or statistics only for a desired service chain.
+
+=h put_chains write
+
+Reconfigures a set of already deployed service chains encoded as a JSON object.
+
+=h rules read/write
+
+Returns or sets the rules associated with either all deployed service chains or a specific
+service chain.
+
+=h delete_chains write
+
+Tears down a deployed service chain.
+
+=h delete_rules write
+
+Removes the rules associated with a service chain or all service chains.
+
+=h delete_controllers write
+
+Disassociates this Metron agent from a Metron controller instance.
+
+*/
 
 class Metron;
 
@@ -76,13 +252,28 @@ class CPU {
 
 class NIC {
     public:
+        NIC() : _rules(), _verbose(true) {
+
+        }
+
+        ~NIC() {
+            remove_rules();
+        }
+
         Element *element;
 
-        String get_id() {
+        inline String get_id() {
             return element->name();
         }
 
         String get_device_id();
+
+        HashMap<long, String> *find_rules_by_core_id(const int core_id);
+        Vector<String> rules_list_by_core_id(const int core_id);
+        bool add_rule(const int core_id, const long rule_id, const String rule);
+        bool install_rule(const String rule);
+        bool remove_rule(const int core_id, const long rule_id, const String rule);
+        bool remove_rules();
 
         Json to_json(RxFilterType rx_mode, bool stats = false);
 
@@ -99,6 +290,14 @@ class NIC {
 
         String call_read(String h);
         String call_tx_read(String h);
+        int    call_rx_write(String h, const String input);
+
+    private:
+        // Maps CPU cores to a map of rules ID -> rules
+        HashMap<int, HashMap<long, String> *> _rules;
+
+        bool _verbose;
+
 };
 
 class ServiceChain {
@@ -110,7 +309,7 @@ class ServiceChain {
 
                 }
                 ~RxFilter() {
-
+                    values.clear();
                 }
 
                 RxFilterType method;
@@ -170,6 +369,10 @@ class ServiceChain {
 
         Json to_json();
         Json stats_to_json();
+
+        // TODO: remove static
+        Json rules_to_json();
+        static int rules_from_json(Json j, Metron *m, ErrorHandler *errh);
 
         inline String get_id() {
             return id;
@@ -263,6 +466,8 @@ class ServiceChain {
 
         void do_autoscale(int nCpuChange);
 
+        const unsigned short AUTOSCALE_WINDOW = 5000;
+
     private:
         Metron *_metron;
         Vector<int> _cpus;
@@ -318,26 +523,24 @@ class Metron : public Element {
         Json stats_to_json();
         Json controllers_to_json();
         int  controllers_from_json(Json j);
-        int  delete_controllers_from_json(void);
+        int  delete_controller_from_json(const String &ip);
 
         // Read and write handlers
         enum {
-            h_discovered, h_controllers,
-            h_resources,  h_stats,
-            h_delete_controllers, h_delete_chains, h_put_chains,
-            h_chains, h_chains_stats, h_chains_proxy
+            h_discovered, h_resources, h_controllers, h_stats,
+            h_put_chains, h_chains, h_chains_stats, h_chains_rules, h_chains_proxy,
+            h_delete_chains, h_delete_controllers, h_delete_rules
         };
 
-        ServiceChain *find_chain_by_id(String id);
-
-        int instantiate_chain(ServiceChain *sc, ErrorHandler *errh);
-        int remove_chain(ServiceChain *sc, ErrorHandler *errh);
+        ServiceChain *find_service_chain_by_id(String id);
+        int instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh);
+        int remove_service_chain(ServiceChain *sc, ErrorHandler *errh);
 
         int get_cpus_nb() {
             return click_max_cpu_ids();
         }
 
-        int get_chains_nb() {
+        int get_service_chains_nb() {
             return _scs.size();
         }
 
@@ -365,6 +568,7 @@ class Metron : public Element {
 
     private:
         String _id;
+        int _core_id;
         Vector<String> _args;
         Vector<String> _dpdk_args;
 

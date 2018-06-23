@@ -1,11 +1,12 @@
 // -*- c-basic-offset: 4; related-file-name: "metron.hh" -*-
 /*
  * metron.{cc,hh} -- element that deploys, monitors, and
- * (re)configures multiple NFV service chains driven by
- * a remote controller
+ * (re)configures NFV service chains driven by a remote
+ * controller
  *
  * Copyright (c) 2017 Tom Barbette, University of Liège
- * Copyright (c) 2017 Georgios Katsikas, RISE SICS
+ * Copyright (c) 2017 Georgios Katsikas, RISE SICS and
+ *                    KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -46,29 +47,32 @@ CLICK_DECLS
  * Helper functions
  **************************************/
 /**
- * Array of all supported service chain types.
- */
-static const char *SC_TYPES_STR_ARRAY[] = { SC_CONF_TYPES };
-
-/**
- * Returns all the supported service chain types as
+ * Returns all the elements in a given array as
  * a space-separated string.
  */
-const String supported_sc_types()
+const String
+supported_types(const char **array)
 {
     String supported;
-    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
+
+    const uint8_t n = sizeof(array) / sizeof(array[0]);
     for (uint8_t i = 1; i < n; ++i) {
-        supported += String(SC_TYPES_STR_ARRAY[i]).lower() + " ";
+        supported += String(array[i]).lower() + " ";
     }
 
     return supported;
 }
 
 /**
+ * Array of all supported service chain types.
+ */
+static const char *SC_TYPES_STR_ARRAY[] = { SC_CONF_TYPES };
+
+/**
  * Converts an enum-based service chain type into string.
  */
-const String sc_type_enum_to_str(ScType s)
+const String
+sc_type_enum_to_str(ScType s)
 {
     return String(SC_TYPES_STR_ARRAY[static_cast<uint8_t>(s)]).lower();
 }
@@ -76,9 +80,11 @@ const String sc_type_enum_to_str(ScType s)
 /**
  * Converts a string-based service chain type into enum.
  */
-ScType sc_type_str_to_enum(const String sc_type)
+ScType
+sc_type_str_to_enum(const String sc_type)
 {
-    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) / sizeof(SC_TYPES_STR_ARRAY[0]);
+    const uint8_t n = sizeof(SC_TYPES_STR_ARRAY) /
+                      sizeof(SC_TYPES_STR_ARRAY[0]);
     for (uint8_t i = 0; i < n; ++i) {
         if (strcmp(SC_TYPES_STR_ARRAY[i], sc_type.c_str()) == 0) {
             return (ScType) i;
@@ -93,24 +99,10 @@ ScType sc_type_str_to_enum(const String sc_type)
 static const char *RX_FILTER_TYPES_STR_ARRAY[] = { RX_FILTER_TYPES };
 
 /**
- * Returns all the supported Rx filter types as
- * a space-separated string.
- */
-const String supported_rx_filter_types()
-{
-    String supported;
-    const uint8_t n = sizeof(RX_FILTER_TYPES_STR_ARRAY) / sizeof(RX_FILTER_TYPES_STR_ARRAY[0]);
-    for (uint8_t i = 1; i < n; ++i) {
-        supported += String(RX_FILTER_TYPES_STR_ARRAY[i]).lower() + " ";
-    }
-
-    return supported;
-}
-
-/**
  * Converts an enum-based Rx filter type into string.
  */
-const String rx_filter_type_enum_to_str(RxFilterType rf)
+const String
+rx_filter_type_enum_to_str(RxFilterType rf)
 {
     return String(RX_FILTER_TYPES_STR_ARRAY[static_cast<uint8_t>(rf)]).lower();
 }
@@ -118,9 +110,11 @@ const String rx_filter_type_enum_to_str(RxFilterType rf)
 /**
  * Converts a string-based Rx filter type into enum.
  */
-RxFilterType rx_filter_type_str_to_enum(const String rf_str)
+RxFilterType
+rx_filter_type_str_to_enum(const String rf_str)
 {
-    const uint8_t n = sizeof(RX_FILTER_TYPES_STR_ARRAY) / sizeof(RX_FILTER_TYPES_STR_ARRAY[0]);
+    const uint8_t n = sizeof(RX_FILTER_TYPES_STR_ARRAY) /
+                      sizeof(RX_FILTER_TYPES_STR_ARRAY[0]);
     for (uint8_t i = 0; i < n; ++i) {
         if (strcmp(RX_FILTER_TYPES_STR_ARRAY[i], rf_str.c_str()) == 0) {
             return (RxFilterType) i;
@@ -129,11 +123,24 @@ RxFilterType rx_filter_type_str_to_enum(const String rf_str)
     return NONE;
 }
 
+static String
+parseVendorInfo(String hw_info, String key)
+{
+    String s;
+
+    s = hw_info.substring(hw_info.find_left(key) + key.length());
+    int pos = s.find_left(':') + 2;
+    s = s.substring(pos, s.find_left("\n") - pos);
+
+    return s;
+}
+
 /***************************************
  * Metron
  **************************************/
 Metron::Metron() :
-    _timing_stats(true), _timer(this), _discovered(false), _rx_mode(MAC)
+    _timer(this), _core_id(0), _timing_stats(true),
+    _discovered(false), _rx_mode(FLOW)
 {
 
 }
@@ -143,7 +150,8 @@ Metron::~Metron()
 
 }
 
-int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
+int
+Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Vector<Element *> nics;
     String rx_mode;
@@ -167,8 +175,18 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("DISCOVER_PATH",     _discover_path)
         .read    ("DISCOVER_USER",     _discover_user)
         .read    ("DISCOVER_PASSWORD", _discover_password)
+        .read    ("PIN_TO_CORE",       _core_id)
         .complete() < 0)
         return -1;
+
+    unsigned max_core_nb = click_max_cpu_ids();
+    if ((_core_id < 0) || (_core_id >= max_core_nb)) {
+        return errh->error(
+            "Cannot pin Metron agent to CPU core: %d. "
+            "Use a CPU core index in [0,%d].",
+            _core_id, max_core_nb
+        );
+    }
 
     // Set the Rx filter mode
     if (!rx_mode.empty()) {
@@ -177,7 +195,7 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         if (_rx_mode == NONE) {
             return errh->error(
                 "Supported Rx filter modes are: %s",
-                supported_rx_filter_types().c_str()
+                supported_types(RX_FILTER_TYPES_STR_ARRAY).c_str()
             );
         }
 
@@ -185,7 +203,7 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         if (_rx_mode == FLOW) {
             return errh->error(
                 "Rx filter mode %s requires DPDK 17.05 or higher",
-                supported_rx_filter_types().c_str()
+                supported_types(RX_FILTER_TYPES_STR_ARRAY).c_str()
             );
         }
     #endif
@@ -232,7 +250,8 @@ int Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     return confirm_nic_mode(errh);
 }
 
-int Metron::confirm_nic_mode(ErrorHandler *errh)
+int
+Metron::confirm_nic_mode(ErrorHandler *errh)
 {
     auto nic = _nics.begin();
     while (nic != _nics.end()) {
@@ -262,23 +281,22 @@ int Metron::confirm_nic_mode(ErrorHandler *errh)
             );
         }
 
+        if ((_rx_mode == RSS) && (fd_mode != "rss")) {
+            return errh->error(
+                "RX_MODE %s is the default FastClick mode and requires FromDPDKDevice(%s) MODE rss",
+                rx_filter_type_enum_to_str(_rx_mode).c_str(),
+                nic.value().get_id().c_str()
+            );
+        }
+
         nic++;
     }
 
     return 0;
 }
 
-static String parseVendorInfo(String hw_info, String key)
-{
-    String s;
-    s = hw_info.substring(hw_info.find_left(key) + key.length());
-    int pos = s.find_left(':') + 2;
-    s = s.substring(pos, s.find_left("\n") - pos);
-
-    return s;
-}
-
-int Metron::initialize(ErrorHandler *errh)
+int
+Metron::initialize(ErrorHandler *errh)
 {
     _cpu_map.resize(get_cpus_nb(), 0);
 
@@ -307,6 +325,7 @@ int Metron::initialize(ErrorHandler *errh)
 #endif
 
     _timer.initialize(this);
+    _timer.move_thread(_core_id);
     _timer.schedule_after_sec(1);
 
     return 0;
@@ -318,7 +337,8 @@ int Metron::initialize(ErrorHandler *errh)
  * through the port used by the Metron protocol
  * (usually default http).
  */
-bool Metron::discover()
+bool
+Metron::discover()
 {
 #if HAVE_CURL
     CURL *curl;
@@ -397,7 +417,8 @@ bool Metron::discover()
     return false;
 }
 
-void Metron::run_timer(Timer *t)
+void
+Metron::run_timer(Timer *t)
 {
     auto sci = _scs.begin();
     double alpha_up = 0.5;
@@ -481,7 +502,8 @@ void Metron::run_timer(Timer *t)
     _timer.reschedule_after_sec(1);
 }
 
-void Metron::cleanup(CleanupStage)
+void
+Metron::cleanup(CleanupStage)
 {
 #if HAVE_CURL
     curl_global_cleanup();
@@ -490,11 +512,13 @@ void Metron::cleanup(CleanupStage)
     auto begin = _scs.begin();
     while (begin != _scs.end()) {
         // TODO: Fix
-        // delete begin.value();
+        delete begin.value();
+        begin++;
     }
 }
 
-int Metron::get_assigned_cpus_nb()
+int
+Metron::get_assigned_cpus_nb()
 {
     int tot = 0;
     for (int i = 0; i < get_cpus_nb(); i++) {
@@ -506,7 +530,8 @@ int Metron::get_assigned_cpus_nb()
     return tot;
 }
 
-bool Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
+bool
+Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 {
     int j = 0;
     if (this->get_assigned_cpus_nb() + sc->get_max_cpu_nb() >= this->get_cpus_nb()) {
@@ -525,7 +550,8 @@ bool Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
     return false;
 }
 
-void Metron::unassign_cpus(ServiceChain *sc)
+void
+Metron::unassign_cpus(ServiceChain *sc)
 {
     int j = 0;
     for (int i = 0; i < get_cpus_nb(); i++) {
@@ -535,28 +561,62 @@ void Metron::unassign_cpus(ServiceChain *sc)
     }
 }
 
-int ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
+int
+ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
 {
-    // Only MAC address is currently supported. Only thing to do is to get addr
-    Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
+    // Get the NIC index requested by the controller
     int inic = _sc->get_nic_index(nic);
     assert(inic >= 0);
+    // Allocate the right number of tags
     if (values.size() <= _sc->get_nics_nb()) {
         values.resize(_sc->get_nics_nb());
     }
     values[inic].resize(_sc->get_max_cpu_nb());
 
-    for (int i = 0; i < _sc->get_max_cpu_nb() ; i++) {
-        if (atoi(nic->call_read("nb_vf_pools").c_str()) <= _sc->get_cpu_map(i)) {
-            return errh->error("Not enough VF pools");
+    // Only MAC address is currently supported. Only thing to do is to get addr
+    if (method == MAC) {
+        click_chatter("Rx filters in MAC-based VMDq mode");
+
+        Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
+        // click_chatter("VF MAC addresses: %s", nic->call_read("vf_mac_addr").c_str());
+
+        for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
+            int available_pools = atoi(nic->call_read("nb_vf_pools").c_str());
+            if (available_pools <= _sc->get_cpu_map(i)) {
+                return errh->error("Not enough VF pools: %d are available", available_pools);
+            }
+            values[inic][i] = jaddrs[_sc->get_cpu_map(i)].to_s();
         }
-        values[inic][i] = jaddrs[_sc->get_cpu_map(i)].to_s();
+    } else if (method == FLOW) {
+        click_chatter("Rx filters in Flow Director mode");
+
+        int inic = _sc->get_nic_index(nic);
+        assert(inic >= 0);
+        if (values.size() <= _sc->get_nics_nb()) {
+            values.resize(_sc->get_nics_nb());
+        }
+        values[inic].resize(_sc->get_max_cpu_nb());
+
+        // TODO
+        // Do we need anyhitng else here?
+    } else if (method == VLAN) {
+        click_chatter("Rx filters in VLAN-based VMDq mode");
+        return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
+    } else if (method == RSS) {
+        click_chatter("Rx filters in RSS mode");
+        // TODO: This should be trivial to support
+        return errh->error("RSS-based dispatching is not implemented yet");
     }
 
     return 0;
 }
 
-ServiceChain *Metron::find_chain_by_id(String id)
+/**
+ * Returns a service chain instance by looking up its ID
+ * or NULL if no such service chain ID exists.
+ */
+ServiceChain *
+Metron::find_service_chain_by_id(String id)
 {
     return _scs.find(id);
 }
@@ -567,9 +627,10 @@ ServiceChain *Metron::find_chain_by_id(String id)
  * Upon failure, CPUs are unassigned.
  * It is the responsibility of the caller to delete the chain upon an error.
  */
-int Metron::instantiate_chain(ServiceChain *sc, ErrorHandler *errh)
+int
+Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
-    if (!assign_cpus(sc,sc->get_cpu_map_ref())) {
+    if (!assign_cpus(sc, sc->get_cpu_map_ref())) {
         errh->error("Could not assign enough CPUs");
         return -1;
     }
@@ -589,7 +650,8 @@ int Metron::instantiate_chain(ServiceChain *sc, ErrorHandler *errh)
  * Run a service chain and keep a control socket to it.
  * CPUs must already be assigned.
  */
-int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
+int
+Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
@@ -690,15 +752,26 @@ int Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
  * Stop and remove a chain from the internal list, then unassign CPUs.
  * It is the responsibility of the caller to delete the chain.
  */
-int Metron::remove_chain(ServiceChain *sc, ErrorHandler *)
+int
+Metron::remove_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
+    // No controller
+    if (!_discovered) {
+        return errh->error(
+            "Cannot remove service chain %s: Metron agent is not associated with a controller",
+            sc->get_id().c_str()
+        );
+    }
+
     sc->control_send_command("WRITE stop");
     _scs.remove(sc->get_id());
     unassign_cpus(sc);
+
     return 0;
 }
 
-String Metron::read_handler(Element *e, void *user_data)
+String
+Metron::read_handler(Element *e, void *user_data)
 {
     Metron *m = static_cast<Metron *>(e);
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
@@ -707,14 +780,14 @@ String Metron::read_handler(Element *e, void *user_data)
 
     switch (what) {
         case h_discovered: {
-            return m->_discovered? "true":"false";
-        }
-        case h_controllers: {
-            jroot = m->controllers_to_json();
-            break;
+            return m->_discovered? "true" : "false";
         }
         case h_resources: {
             jroot = m->to_json();
+            break;
+        }
+        case h_controllers: {
+            jroot = m->controllers_to_json();
             break;
         }
         case h_stats: {
@@ -730,7 +803,8 @@ String Metron::read_handler(Element *e, void *user_data)
     return jroot.unparse(true);
 }
 
-int Metron::write_handler(
+int
+Metron::write_handler(
         const String &data, Element *e, void *user_data, ErrorHandler *errh)
 {
     Metron *m = static_cast<Metron *>(e);
@@ -739,31 +813,55 @@ int Metron::write_handler(
         case h_controllers: {
             return m->controllers_from_json(Json::parse(data));
         }
-        case h_delete_controllers: {
-            // Data is irrelevant, just reset controller info
-            return m->delete_controllers_from_json();
+        case h_put_chains: {
+            String id = data.substring(0, data.find_left('\n'));
+            String changes = data.substring(id.length() + 1);
+            ServiceChain *sc = m->find_service_chain_by_id(id);
+            if (!sc) {
+                return errh->error(
+                    "Cannot reconfigure service chain of unknown service chain ID %s",
+                    id.c_str()
+                );
+            }
+            return sc->reconfigure_from_json(Json::parse(changes), m, errh);
         }
         case h_delete_chains: {
-            ServiceChain *sc = m->find_chain_by_id(data);
-            if (sc == 0) {
-                return errh->error("Unknown service chain ID %s", data.c_str());
+            ServiceChain *sc = m->find_service_chain_by_id(data);
+            if (!sc) {
+                return errh->error(
+                    "Cannot delete service chain of unknown service chain ID %s",
+                    data.c_str()
+                );
             }
 
-            int ret = m->remove_chain(sc, errh);
+            int ret = m->remove_service_chain(sc, errh);
             if (ret == 0) {
                 delete(sc);
             }
 
             return ret;
         }
-        case h_put_chains: {
-            String id = data.substring(0, data.find_left('\n'));
-            String changes = data.substring(id.length() + 1);
-            ServiceChain *sc = m->find_chain_by_id(id);
-            if (sc == 0) {
-                return errh->error("Unknown service chain ID %s", id.c_str());
+        case h_delete_controllers: {
+            return m->delete_controller_from_json((const String &) data);
+        }
+        case h_delete_rules: {
+            ServiceChain *sc = m->find_service_chain_by_id(data);
+            if (!sc) {
+                return errh->error(
+                    "Cannot delete rules of unknown service chain ID %s",
+                    data.c_str()
+                );
             }
-            return sc->reconfigure_from_json(Json::parse(changes), m, errh);
+
+            click_chatter(
+                "Metron controller requested rule deletion for service chain %s",
+                sc->get_id().c_str()
+            );
+
+            // TODO
+            // Find the NIC and call nic->call_rx_write("flush_rules", "");
+
+            return 0;
         }
         default: {
             errh->error("Unknown write handler: %d", what);
@@ -773,11 +871,13 @@ int Metron::write_handler(
     return -1;
 }
 
-int Metron::param_handler(
+int
+Metron::param_handler(
         int operation, String &param, Element *e,
         const Handler *h, ErrorHandler *errh)
 {
     Metron *m = static_cast<Metron *>(e);
+    // Metron agent --> Controller
     if (operation == Handler::f_read) {
         Json jroot = Json::make_object();
 
@@ -791,9 +891,9 @@ int Metron::param_handler(
                         jscs.push_back(begin.value()->to_json());
                         begin++;
                     }
-                    jroot.set("servicechains",jscs);
+                    jroot.set("servicechains", jscs);
                 } else {
-                    ServiceChain *sc = m->find_chain_by_id(param);
+                    ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
                         return errh->error("Unknown service chain ID: %s", param.c_str());
                     }
@@ -809,13 +909,38 @@ int Metron::param_handler(
                         jscs.push_back(begin.value()->stats_to_json());
                         begin++;
                     }
-                    jroot.set("servicechains",jscs);
+                    jroot.set("servicechains", jscs);
                 } else {
-                    ServiceChain *sc = m->find_chain_by_id(param);
+                    ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
                         return errh->error("Unknown service chain ID: %s", param.c_str());
                     }
                     jroot = sc->stats_to_json();
+                }
+                break;
+            }
+            case h_chains_rules: {
+                if (param == "") {
+                    click_chatter("Metron controller requested local rules for all service chains");
+
+                    Json jscs = Json::make_array();
+                    auto begin = m->_scs.begin();
+                    while (begin != m->_scs.end()) {
+                        jscs.push_back(begin.value()->rules_to_json());
+                        begin++;
+                    }
+                    // jscs.push_back(ServiceChain::rules_to_json());
+                    jroot.set("rules", jscs);
+                } else {
+                    ServiceChain *sc = m->find_service_chain_by_id(param);
+                    if (!sc) {
+                        return errh->error("Unknown service chain ID: %s", param.c_str());
+                    }
+                    click_chatter(
+                        "Metron controller requested local rules for service chain %s",
+                        sc->get_id().c_str()
+                    );
+                    jroot = sc->rules_to_json();
                 }
                 break;
             }
@@ -826,7 +951,7 @@ int Metron::param_handler(
                     return 0;
                 }
                 String ids = param.substring(0, pos);
-                ServiceChain *sc = m->find_chain_by_id(ids);
+                ServiceChain *sc = m->find_service_chain_by_id(ids);
                 if (!sc) {
                     return errh->error("Unknown service chain ID: %s", ids.c_str());
                 }
@@ -841,6 +966,7 @@ int Metron::param_handler(
         param = jroot.unparse(true);
 
         return 0;
+    // Controller --> Metron agent
     } else if (operation == Handler::f_write) {
         intptr_t what = reinterpret_cast<intptr_t>(h->write_user_data());
         switch (what) {
@@ -862,8 +988,8 @@ int Metron::param_handler(
                         return errh->error("Could not instantiate a service chain");
                     }
 
-                    String sc_id = sc->id;
-                    if (m->find_chain_by_id(sc_id) != 0) {
+                    String sc_id = sc->get_id();
+                    if (m->find_service_chain_by_id(sc_id) != 0) {
                         delete sc;
                         return errh->error(
                             "A service chain with ID %s already exists. "
@@ -871,7 +997,7 @@ int Metron::param_handler(
                     }
 
                     // Instantiate
-                    int ret = m->instantiate_chain(sc, errh);
+                    int ret = m->instantiate_service_chain(sc, errh);
                     if (ret != 0) {
                         delete sc;
                         return errh->error(
@@ -884,6 +1010,28 @@ int Metron::param_handler(
                         sc->set_timing_stats(ts);
                     }
                 }
+
+                return 0;
+            }
+            case h_chains_rules: {
+                click_chatter("Metron controller requested rule installation");
+                // click_chatter("%s", param.c_str());
+
+                Json jroot = Json::parse(param);
+                Json jlist = jroot.get("rules");
+                for (auto jsc : jlist) {
+                    String sc_id = jsc.second.get_s("id");
+                    click_chatter("Service chain ID: %s", sc_id.c_str());
+
+                    ServiceChain *sc = m->find_service_chain_by_id(sc_id);
+
+                    // Parse
+                    int ret =  ServiceChain::rules_from_json(jsc.second, m, errh);
+                    if (ret != 0) {
+                        return errh->error("Cannot install rules: Parsing error");
+                    }
+                }
+
                 return 0;
             }
             default: {
@@ -897,17 +1045,20 @@ int Metron::param_handler(
     }
 }
 
-void Metron::add_handlers()
+void
+Metron::add_handlers()
 {
+    // HTTP get handlers
     add_read_handler ("discovered",         read_handler,  h_discovered);
-    add_read_handler ("controllers",        read_handler,  h_controllers);
     add_read_handler ("resources",          read_handler,  h_resources);
+    add_read_handler ("controllers",        read_handler,  h_controllers);
     add_read_handler ("stats",              read_handler,  h_stats);
+
+    // HTTP post handlers
     add_write_handler("controllers",        write_handler, h_controllers);
-    add_write_handler("delete_controllers", write_handler, h_delete_controllers);
-    add_write_handler("delete_chains",      write_handler, h_delete_chains);
     add_write_handler("put_chains",         write_handler, h_put_chains);
 
+    // Get and POST HTTP handlers with parameters
     set_handler(
         "chains",
         Handler::f_write | Handler::f_read | Handler::f_read_param,
@@ -918,21 +1069,41 @@ void Metron::add_handlers()
         param_handler, h_chains_stats
     );
     set_handler(
-        "chains_proxy", Handler::f_write | Handler::f_read | Handler::f_read_param,
+        "rules", Handler::f_write | Handler::f_read | Handler::f_read_param,
+        param_handler, h_chains_rules, h_chains_rules
+    );
+    set_handler(
+        "chains_proxy", Handler::f_read | Handler::f_read_param,
         param_handler, h_chains_proxy
     );
+
+    // HTTP delete handlers
+    add_write_handler("delete_chains",      write_handler, h_delete_chains);
+    add_write_handler("delete_rules",       write_handler, h_delete_rules);
+    add_write_handler("delete_controllers", write_handler, h_delete_controllers);
 }
 
-void Metron::set_hw_info(Json &j)
+void
+Metron::set_hw_info(Json &j)
 {
     j.set("manufacturer", Json(_cpu_vendor));
     j.set("hwVersion", Json(_hw));
     j.set("swVersion", Json("Click " + _sw));
 }
 
-Json Metron::to_json()
+Json
+Metron::to_json()
 {
     Json jroot = Json::make_object();
+
+    // No controller
+    if (!_discovered) {
+        click_chatter(
+            "Cannot publish local resources: Metron agent is not associated with a controller"
+        );
+        return jroot;
+    }
+
     jroot.set("id", Json(_id));
     jroot.set("serial", Json(_serial));
 
@@ -962,9 +1133,18 @@ Json Metron::to_json()
     return jroot;
 }
 
-Json Metron::stats_to_json()
+Json
+Metron::stats_to_json()
 {
     Json jroot = Json::make_object();
+
+    // No controller
+    if (!_discovered) {
+        click_chatter(
+            "Cannot report statistics: Metron agent is not associated with a controller"
+        );
+        return jroot;
+    }
 
     // High-level CPU resources
     jroot.set("busyCpus", Json(get_assigned_cpus_nb()));
@@ -1041,7 +1221,8 @@ Json Metron::stats_to_json()
     return jroot;
 }
 
-Json Metron::controllers_to_json()
+Json
+Metron::controllers_to_json()
 {
     Json jroot = Json::make_object();
 
@@ -1063,7 +1244,8 @@ Json Metron::controllers_to_json()
     return jroot;
 }
 
-int Metron::controllers_from_json(Json j)
+int
+Metron::controllers_from_json(Json j)
 {
     // A list of controllers is expected
     Json jlist = j.get("controllers");
@@ -1117,13 +1299,30 @@ int Metron::controllers_from_json(Json j)
     return 0;
 }
 
-int Metron::delete_controllers_from_json(void)
+int
+Metron::delete_controller_from_json(const String &ip)
 {
+    // This agent is not associated with a Metron controller at the moment
+    if (_discover_ip.empty()) {
+        click_chatter("No controller associated with this Metron agent");
+        return -1;
+    }
+
+    // Request to remove a controller must have correct IP
+    if ((!ip.empty()) && (ip != _discover_ip)) {
+        click_chatter("Metron agent is not associated with a Metron controller on %s", ip.c_str());
+        return -1;
+    }
+
+    click_chatter(
+        "Metron controller instance on %s:%d has been removed",
+        _discover_ip.c_str(), _discover_port
+    );
+
     // Reset controller information
+    _discovered = false;
     _discover_ip   = "";
     _discover_port = -1;
-
-    click_chatter("Controller instance removed");
 
     return 0;
 }
@@ -1131,7 +1330,8 @@ int Metron::delete_controllers_from_json(void)
 /***************************************
  * RxFilter
  **************************************/
-ServiceChain::RxFilter *ServiceChain::RxFilter::from_json(
+ServiceChain::RxFilter *
+ServiceChain::RxFilter::from_json(
         Json j, ServiceChain *sc, ErrorHandler *errh)
 {
     ServiceChain::RxFilter *rf = new RxFilter(sc);
@@ -1141,7 +1341,7 @@ ServiceChain::RxFilter *ServiceChain::RxFilter::from_json(
         errh->error(
             "Unsupported Rx filter mode for service chain: %s\n"
             "Supported Rx filter modes are: %s", sc->id.c_str(),
-            supported_rx_filter_types().c_str()
+            supported_types(RX_FILTER_TYPES_STR_ARRAY).c_str()
         );
         return 0;
     }
@@ -1164,7 +1364,8 @@ ServiceChain::RxFilter *ServiceChain::RxFilter::from_json(
     return rf;
 }
 
-Json ServiceChain::RxFilter::to_json()
+Json
+ServiceChain::RxFilter::to_json()
 {
     Json j;
 
@@ -1202,20 +1403,22 @@ ServiceChain::~ServiceChain()
     }
 }
 
-ServiceChain *ServiceChain::from_json(
+ServiceChain *
+ServiceChain::from_json(
         Json j, Metron *m, ErrorHandler *errh)
 {
     ServiceChain *sc = new ServiceChain(m);
     sc->id = j.get_s("id");
     if (sc->id == "") {
-        sc->id = String(m->get_chains_nb());
+        sc->id = String(m->get_service_chains_nb());
     }
     String sc_type_str = j.get_s("configType");
     ScType sc_type = sc_type_str_to_enum(sc_type_str.upper());
     if (sc_type == UNKNOWN) {
         errh->error(
             "Unsupported configuration type for service chain: %s\n"
-            "Supported types are: %s", sc->id.c_str(), supported_sc_types().c_str()
+            "Supported types are: %s",
+            sc->id.c_str(), supported_types(SC_TYPES_STR_ARRAY).c_str()
         );
         return 0;
     }
@@ -1253,7 +1456,8 @@ ServiceChain *ServiceChain::from_json(
     return sc;
 }
 
-Json ServiceChain::to_json()
+Json
+ServiceChain::to_json()
 {
     Json jsc = Json::make_object();
 
@@ -1282,7 +1486,8 @@ Json ServiceChain::to_json()
     return jsc;
 }
 
-Json ServiceChain::stats_to_json()
+Json
+ServiceChain::stats_to_json()
 {
     Json jsc = Json::make_object();
     jsc.set("id", get_id());
@@ -1359,8 +1564,8 @@ Json ServiceChain::stats_to_json()
         jnic.set("txErrors",  tx_errors);
         jnics.push_back(jnic);
     }
-
     jsc.set("nics", jnics);
+
     if (_metron->_timing_stats) {
         jsc.set("timing_stats", _timing_stats.to_json());
         jsc.set("autoscale_timing_stats", _as_timing_stats.to_json());
@@ -1369,7 +1574,86 @@ Json ServiceChain::stats_to_json()
     return jsc;
 }
 
-Json ServiceChain::timing_stats::to_json()
+Json
+ServiceChain::rules_to_json()
+{
+    Json jsc = Json::make_object();
+
+    // Service chain ID
+    jsc.set("id", get_id());
+    // jsc.set("id", "sc:id:00001");
+
+    // Service chain's Rx filter method
+    Json j;
+    j.set("method", rx_filter_type_enum_to_str(rx_filter->method));
+    // j.set("method", "flow");
+    jsc.set("rxFilter", j);
+
+    Json jrules = Json::make_object();
+
+    ///////////////////////////////////////////////////
+    // This is test code to be removed
+    // for (int i = 0; i < 1; i++) {
+    //     String is = String(i);
+
+    //     Json jcpus = Json::make_object();
+    //     for (int j = 0; j < 1; j ++) {
+    //         String js = String(j);
+
+    //         // For now it is an empty array, no rules
+    //         Json jcpu_rules = Json::make_array();
+    //         Json jcpu = Json::make_object();
+    //         jcpu.set("ruleId", 1234567);
+    //         jcpu.set("ruleContent", "ingress pattern eth type is 2048 / ipv4 proto spec 6 proto mask 0x0 src is 10.0.0.0/24 dst is 20.0.0.0/24 / end actions queue index 0 / end");
+    //         jcpu_rules.push_back(jcpu);
+
+    //         jcpus.set(js, jcpu_rules);
+    //     }
+    //     jrules.set("id" + is, jcpus);
+    // }
+    ///////////////////////////////////////////////////
+
+    // All NICs
+    for (int i = 0; i < get_nics_nb(); i++) {
+        String nic_id = String(i);
+        NIC *nic = _nics[i];
+
+        Json jcpus = Json::make_object();
+        // All CPU cores
+        for (int j = 0; j < get_max_cpu_nb(); j ++) {
+            String core_id = String(j);
+
+            Json jcpu_rules = Json::make_array();
+
+            // Fetch the rules for this NIC and this CPU core
+            HashMap<long, String> *rules_map = nic->find_rules_by_core_id(atoi(core_id.c_str()));
+            auto begin = rules_map->begin();
+            while (begin != rules_map->end()) {
+                long rule_id = begin.key();
+                String rule = begin.value();
+
+                Json jcpu = Json::make_object();
+                jcpu.set("ruleId", rule_id);
+                jcpu.set("ruleContent", rule);
+                jcpu_rules.push_back(jcpu);
+
+                begin++;
+            }
+            jcpus.set(core_id, jcpu_rules);
+        }
+
+        // One NIC has multiple CPU cores
+        // TODO: Why this should be idX? and not fdX?
+        jrules.set("id" + nic_id, jcpus);
+    }
+
+    jsc.set("nicRules", jrules);
+
+    return jsc;
+}
+
+Json
+ServiceChain::timing_stats::to_json()
 {
     Json j = Json::make_object();
     j.set("parse", (parse - start).nsecval());
@@ -1378,15 +1662,25 @@ Json ServiceChain::timing_stats::to_json()
     return j;
 }
 
-Json ServiceChain::autoscale_timing_stats::to_json()
+Json
+ServiceChain::autoscale_timing_stats::to_json()
 {
     Json j = Json::make_object();
     j.set("autoscale", (autoscale_end - autoscale_start).nsecval());
     return j;
 }
 
-int ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
+int
+ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 {
+    // No controller
+    if (!m->_discovered) {
+        click_chatter(
+            "Cannot reconfigure service chain: Metron agent is not associated with a controller"
+        );
+        return -1;
+    }
+
     for (auto jfield : j) {
         if (jfield.first == "cpus") {
             int new_cpus_nb = jfield.second.to_i();
@@ -1454,15 +1748,85 @@ int ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
     return 0;
 }
 
-void ServiceChain::do_autoscale(int nCpuChange)
+int
+ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
+{
+    // No controller
+    if (!m->_discovered) {
+        errh->error(
+            "Cannot reconfigure service chain: Metron agent is not associated with a controller"
+        );
+        return -1;
+    }
+
+    RxFilterType rx_filter = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
+    if (rx_filter != FLOW) {
+        errh->error(
+            "Cannot install rules for service chain: "
+            "Invalid Rx filter mode %s is sent by the controller.",
+            rx_filter_type_enum_to_str(rx_filter).c_str()
+        );
+        return -1;
+    }
+    click_chatter("       Rx Filter: %s", rx_filter_type_enum_to_str(rx_filter).c_str());
+
+    Json jrulesAll = j.get("nicRules");
+    for (auto jnic : jrulesAll) {
+        String nic_id = jnic.first;
+        click_chatter("             NIC: %s", nic_id.c_str());
+
+        Json jrulesNic = jnic.second;
+        for (auto jcpu : jrulesNic) {
+            String cpu_id = jcpu.first;
+            int cpu_index = atoi(cpu_id.c_str());
+            click_chatter("             CPU: %d", cpu_index);
+
+            Json jrulesCpu = jcpu.second;
+            for (auto jrule : jrulesCpu) {
+                long rule_id = jrule.second.get_i("ruleId");
+                String rule = jrule.second.get_s("ruleContent");
+                click_chatter("         Rule ID: %ld", rule_id);
+                click_chatter("            Rule: %s", rule.c_str());
+
+                // TODO: Store this rule when this method becomes non-static
+                // NIC *nic = this->get_nic_by_id(nic_id);
+                // if (!nic) {
+                //     return errh->error(
+                //         "Metron controller attempted to install rules on unknown NIC ID: %s",
+                //         nic_id.c_str()
+                //     );
+                // }
+
+                // if (!nic->add_rule(cpu_index, rule_id, rule)) {
+                //     return errh->error(
+                //         "Metron controller failed to store rule %ld for NIC %s and CPU core %d",
+                //         rule_id, nic_id.c_str(), cpu_index
+                //     );
+                // }
+
+                // if (!nic->install_rule(rule)) {
+                //     return errh->error(
+                //         "Metron controller failed to install rule %ld for NIC %s and CPU core %d",
+                //         rule_id, nic_id.c_str(), cpu_index
+                //     );
+                // }
+            }
+        }
+    }
+
+    return 0;
+}
+
+void
+ServiceChain::do_autoscale(int n_cpu_change)
 {
     ErrorHandler *errh = ErrorHandler::default_handler();
-    if ((Timestamp::now() - _last_autoscale).msecval() < 5000) {
+    if ((Timestamp::now() - _last_autoscale).msecval() < AUTOSCALE_WINDOW) {
         return;
     }
 
     _last_autoscale = Timestamp::now();
-    int nnew = _used_cpus_nb + nCpuChange;
+    int nnew = _used_cpus_nb + n_cpu_change;
     if (nnew <= 0 || nnew > get_max_cpu_nb()) {
         return;
     }
@@ -1496,7 +1860,8 @@ void ServiceChain::do_autoscale(int nCpuChange)
     this->set_autoscale_timing_stats(ts);
 }
 
-String ServiceChain::generate_config()
+String
+ServiceChain::generate_config()
 {
     String newconf = "elementclass MetronSlave {\n" + config + "\n};\n\n";
     if (_autoscale) {
@@ -1555,7 +1920,8 @@ String ServiceChain::generate_config()
     return newconf;
 }
 
-Vector<String> ServiceChain::build_cmd_line(int socketfd)
+Vector<String>
+ServiceChain::build_cmd_line(int socketfd)
 {
     int i;
     Vector<String> argv;
@@ -1588,7 +1954,8 @@ Vector<String> ServiceChain::build_cmd_line(int socketfd)
     return argv;
 }
 
-Bitvector ServiceChain::assigned_cpus()
+Bitvector
+ServiceChain::assigned_cpus()
 {
     Bitvector b;
     b.resize(_metron->_cpu_map.size());
@@ -1598,22 +1965,25 @@ Bitvector ServiceChain::assigned_cpus()
     return b;
 }
 
-void ServiceChain::check_alive()
+void
+ServiceChain::check_alive()
 {
     if (kill(_pid, 0) != 0) {
-        _metron->remove_chain(this, ErrorHandler::default_handler());
+        _metron->remove_service_chain(this, ErrorHandler::default_handler());
     } else {
         click_chatter("PID %d is alive", _pid);
     }
 }
 
-void ServiceChain::control_init(int fd, int pid)
+void
+ServiceChain::control_init(int fd, int pid)
 {
     _socket = fd;
     _pid = pid;
 }
 
-int ServiceChain::control_read_line(String &line)
+int
+ServiceChain::control_read_line(String &line)
 {
     char buf[1024];
     int n = read(_socket, &buf, 1024);
@@ -1630,12 +2000,14 @@ int ServiceChain::control_read_line(String &line)
     return line.length();
 }
 
-void ServiceChain::control_write_line(String cmd)
+void
+ServiceChain::control_write_line(String cmd)
 {
     int n = write(_socket, (cmd + "\r\n").c_str(),cmd.length() + 1);
 }
 
-String ServiceChain::control_send_command(String cmd)
+String
+ServiceChain::control_send_command(String cmd)
 {
     control_write_line(cmd);
     String ret;
@@ -1644,7 +2016,8 @@ String ServiceChain::control_send_command(String cmd)
     return ret;
 }
 
-int ServiceChain::call(
+int
+ServiceChain::call(
         String fnt, bool has_response, String handler,
         String &response, String params)
 {
@@ -1675,7 +2048,8 @@ int ServiceChain::call(
     return code;
 }
 
-String ServiceChain::simple_call_read(String handler)
+String
+ServiceChain::simple_call_read(String handler)
 {
     String response;
 
@@ -1687,12 +2061,14 @@ String ServiceChain::simple_call_read(String handler)
     return "";
 }
 
-int ServiceChain::call_read(String handler, String &response, String params)
+int
+ServiceChain::call_read(String handler, String &response, String params)
 {
     return call("READ", true, handler, response, params);
 }
 
-int ServiceChain::call_write(String handler, String &response, String params)
+int
+ServiceChain::call_write(String handler, String &response, String params)
 {
     return call("WRITE", false, handler, response, params);
 }
@@ -1700,22 +2076,26 @@ int ServiceChain::call_write(String handler, String &response, String params)
 /******************************
  * CPU
  ******************************/
-int CPU::get_id()
+int
+CPU::get_id()
 {
     return this->_id;
 }
 
-String CPU::get_vendor()
+String
+CPU::get_vendor()
 {
     return this->_vendor;
 }
 
-long CPU::get_frequency()
+long
+CPU::get_frequency()
 {
     return this->_frequency;
 }
 
-Json CPU::to_json()
+Json
+CPU::to_json()
 {
     Json cpu = Json::make_object();
 
@@ -1729,7 +2109,8 @@ Json CPU::to_json()
 /******************************
  * NIC
  ******************************/
-Json NIC::to_json(RxFilterType rx_mode, bool stats)
+Json
+NIC::to_json(RxFilterType rx_mode, bool stats)
 {
     Json nic = Json::make_object();
 
@@ -1757,7 +2138,8 @@ Json NIC::to_json(RxFilterType rx_mode, bool stats)
     return nic;
 }
 
-String NIC::call_read(String h)
+String
+NIC::call_read(String h)
 {
     const Handler *hC = Router::handler(element, h);
 
@@ -1768,25 +2150,242 @@ String NIC::call_read(String h)
     return "undefined";
 }
 
-String NIC::call_tx_read(String h)
+String
+NIC::call_tx_read(String h)
 {
     // TODO: Ensure element type
     ToDPDKDevice *td = dynamic_cast<FromDPDKDevice *>(element)->findOutputElement();
     if (!td) {
-        return "Could not find matching ToDPDKDevice!";
+        return "Could not find matching ToDPDKDevice for NIC %s" + get_id();
     }
 
-    const Handler *hC = Router::handler(td, h);
-    if (hC && hC->visible()) {
-        return hC->call_read(td, ErrorHandler::default_handler());
+    const Handler *hc = Router::handler(td, h);
+    if (hc && hc->visible()) {
+        return hc->call_read(td, ErrorHandler::default_handler());
     }
 
     return "undefined";
 }
 
-String NIC::get_device_id()
+int
+NIC::call_rx_write(String h, const String input)
+{
+    FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(element);
+    if (!fd) {
+        click_chatter("Could not find matching FromDPDKDevice for NIC %s", get_id().c_str());
+        return 1;
+    }
+
+    const Handler *hc = Router::handler(fd, h);
+    if (hc && hc->visible()) {
+        return hc->call_write(input, fd, ErrorHandler::default_handler());
+    }
+
+    click_chatter(
+        "Could not find matching handler %s for NIC %s",
+        h.c_str(),
+        get_id().c_str()
+    );
+
+    return 1;
+}
+
+String
+NIC::get_device_id()
 {
     return call_read("device");
+}
+
+HashMap<long, String> *
+NIC::find_rules_by_core_id(const int core_id) {
+    if (core_id < 0) {
+        click_chatter(
+            "Unable to find rules for NIC %s: Invalid core ID %d",
+            get_id().c_str(), core_id
+        );
+        return 0;
+    }
+
+    return _rules.find(core_id);
+}
+
+Vector<String>
+NIC::rules_list_by_core_id(const int core_id) {
+    Vector<String> rules;
+
+    if (core_id < 0) {
+        click_chatter(
+            "Unable to find rules for NIC %s: Invalid core ID %d",
+            get_id().c_str(), core_id
+        );
+        return rules;
+    }
+
+    HashMap<long, String> *rules_map = find_rules_by_core_id(core_id);
+    if (!rules_map) {
+        click_chatter(
+            "No rules associated with NIC %s and CPU core %d",
+            get_id().c_str(), core_id
+        );
+        return rules;
+    }
+
+    auto begin = rules_map->begin();
+    while (begin != rules_map->end()) {
+        String rule = begin.value();
+
+        if (!rule.empty()) {
+            rules.push_back(rule);
+        }
+
+        begin++;
+    }
+
+    return rules;
+}
+
+bool
+NIC::add_rule(const int core_id, const long rule_id, const String rule)
+{
+    if (core_id < 0) {
+        click_chatter(
+            "Unable to add rule to NIC %s: Invalid core ID %d",
+            get_id().c_str(), core_id
+        );
+        return false;
+    }
+
+    if (rule_id < 0) {
+        click_chatter(
+            "Unable to add rule to NIC %s: Invalid rule ID %ld",
+            get_id().c_str(), rule_id
+        );
+        return false;
+    }
+
+    if (rule.empty()) {
+        click_chatter(
+            "Unable to add rule to NIC %s: Empty rule",
+            get_id().c_str()
+        );
+        return false;
+    }
+
+    HashMap<long, String> *rules_map = find_rules_by_core_id(core_id);
+    if (!rules_map) {
+        rules_map = new HashMap<long, String>();
+    }
+
+    rules_map->insert(rule_id, rule);
+
+    if (_verbose) {
+        click_chatter(
+            "Rule %ld added to NIC %s and mapped with CPU core %d",
+            rule_id, get_id().c_str(), core_id
+        );
+    }
+
+    return true;
+}
+
+bool
+NIC::install_rule(const String rule)
+{
+    if (rule.empty()) {
+        click_chatter(
+            "Unable to install rule to NIC %s: Empty rule",
+            get_id().c_str()
+        );
+        return false;
+    }
+
+    // Calls FlowDirector using FromDPDKDevice's flow handler add_rule
+    if (call_rx_write("add_rule", rule) != 0) {
+        click_chatter(
+            "Unable to install rule '%s' to NIC %s",
+            rule.c_str(), get_id().c_str()
+        );
+
+        return false;
+    }
+
+    if (_verbose) {
+        click_chatter(
+            "Rule '%s' installed to NIC %s",
+            rule.c_str(), get_id().c_str()
+        );
+    }
+
+    return true;
+}
+
+bool
+NIC::remove_rule(const int core_id, const long rule_id, const String rule)
+{
+    if (core_id < 0) {
+        click_chatter(
+            "Unable to remove rule from NIC %s: Invalid core ID %d",
+            get_id().c_str(), core_id
+        );
+        return false;
+    }
+
+    if (rule_id < 0) {
+        click_chatter(
+            "Unable to remove rule from NIC %s: Invalid rule ID %ld",
+            get_id().c_str(), rule_id
+        );
+        return false;
+    }
+
+    HashMap<long, String> *rules_map = find_rules_by_core_id(core_id);
+    if (!rules_map) {
+        click_chatter(
+            "Unable to remove rule from NIC %s: Core ID %ld has no rules",
+            get_id().c_str(), rule_id
+        );
+        return false;
+    }
+
+    if (!rules_map->remove(rule_id)) {
+        if (_verbose) {
+            click_chatter(
+                "Failed to remove rule %ld from NIC %s and CPU core %d",
+                rule_id, get_id().c_str(), core_id
+            );
+        }
+
+        return false;
+    }
+
+    if (_verbose) {
+        click_chatter(
+            "Rule %ld removed from NIC %s and CPU core %d",
+            rule_id, get_id().c_str(), core_id
+        );
+    }
+
+    return true;
+}
+
+bool NIC::remove_rules()
+{
+    auto begin = _rules.begin();
+    while (begin != _rules.end()) {
+        int core_id = begin.key();
+        HashMap<long, String> *cpu_rules = begin.value();
+
+        if (!cpu_rules) {
+            continue;
+        }
+
+        cpu_rules->clear();
+        delete cpu_rules;
+
+        begin++;
+    }
+
+    _rules.clear();
 }
 
 CLICK_ENDDECLS
