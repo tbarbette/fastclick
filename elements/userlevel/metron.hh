@@ -8,6 +8,7 @@
 #include <click/task.hh>
 #include <click/notifier.hh>
 #include <click/hashmap.hh>
+#include <click/dpdkdevice.hh>
 
 #include "../json/json.hh"
 
@@ -262,6 +263,10 @@ class NIC {
 
         Element *element;
 
+        inline portid_t get_port_id() {
+            return static_cast<FromDPDKDevice *>(element)->get_device()->port_id;
+        }
+
         inline String get_id() {
             return element->name();
         }
@@ -271,7 +276,7 @@ class NIC {
         HashMap<long, String> *find_rules_by_core_id(const int core_id);
         Vector<String> rules_list_by_core_id(const int core_id);
         bool add_rule(const int core_id, const long rule_id, const String rule);
-        bool install_rule(const String rule);
+        bool install_rule(String rule);
         bool remove_rule(const int core_id, const long rule_id, const String rule);
         bool remove_rules();
 
@@ -370,9 +375,8 @@ class ServiceChain {
         Json to_json();
         Json stats_to_json();
 
-        // TODO: remove static
         Json rules_to_json();
-        static int rules_from_json(Json j, Metron *m, ErrorHandler *errh);
+        int rules_from_json(Json j, Metron *m, ErrorHandler *errh);
 
         inline String get_id() {
             return id;

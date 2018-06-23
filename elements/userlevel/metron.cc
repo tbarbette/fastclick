@@ -819,7 +819,7 @@ Metron::write_handler(
             ServiceChain *sc = m->find_service_chain_by_id(id);
             if (!sc) {
                 return errh->error(
-                    "Cannot reconfigure service chain of unknown service chain ID %s",
+                    "Cannot reconfigure service chain: Unknown service chain ID %s",
                     id.c_str()
                 );
             }
@@ -829,7 +829,7 @@ Metron::write_handler(
             ServiceChain *sc = m->find_service_chain_by_id(data);
             if (!sc) {
                 return errh->error(
-                    "Cannot delete service chain of unknown service chain ID %s",
+                    "Cannot delete service chain: Unknown service chain ID %s",
                     data.c_str()
                 );
             }
@@ -848,7 +848,7 @@ Metron::write_handler(
             ServiceChain *sc = m->find_service_chain_by_id(data);
             if (!sc) {
                 return errh->error(
-                    "Cannot delete rules of unknown service chain ID %s",
+                    "Cannot delete NIC rules: Unknown service chain ID %s",
                     data.c_str()
                 );
             }
@@ -877,6 +877,7 @@ Metron::param_handler(
         const Handler *h, ErrorHandler *errh)
 {
     Metron *m = static_cast<Metron *>(e);
+
     // Metron agent --> Controller
     if (operation == Handler::f_read) {
         Json jroot = Json::make_object();
@@ -895,7 +896,10 @@ Metron::param_handler(
                 } else {
                     ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
-                        return errh->error("Unknown service chain ID: %s", param.c_str());
+                        return errh->error(
+                            "Cannot report service chain info: Unknown service chain ID: %s",
+                            param.c_str()
+                        );
                     }
                     jroot = sc->to_json();
                 }
@@ -913,7 +917,10 @@ Metron::param_handler(
                 } else {
                     ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
-                        return errh->error("Unknown service chain ID: %s", param.c_str());
+                        return errh->error(
+                            "Cannot report statistics: Unknown service chain ID: %s",
+                            param.c_str()
+                        );
                     }
                     jroot = sc->stats_to_json();
                 }
@@ -924,17 +931,21 @@ Metron::param_handler(
                     click_chatter("Metron controller requested local rules for all service chains");
 
                     Json jscs = Json::make_array();
+
                     auto begin = m->_scs.begin();
                     while (begin != m->_scs.end()) {
                         jscs.push_back(begin.value()->rules_to_json());
                         begin++;
                     }
-                    // jscs.push_back(ServiceChain::rules_to_json());
+
                     jroot.set("rules", jscs);
                 } else {
                     ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
-                        return errh->error("Unknown service chain ID: %s", param.c_str());
+                        return errh->error(
+                            "Cannot report NIC rules: Unknown service chain ID: %s",
+                            param.c_str()
+                        );
                     }
                     click_chatter(
                         "Metron controller requested local rules for service chain %s",
@@ -953,7 +964,10 @@ Metron::param_handler(
                 String ids = param.substring(0, pos);
                 ServiceChain *sc = m->find_service_chain_by_id(ids);
                 if (!sc) {
-                    return errh->error("Unknown service chain ID: %s", ids.c_str());
+                    return errh->error(
+                        "Unknown service chain ID: %s",
+                        ids.c_str()
+                    );
                 }
                 param = sc->simple_call_read(param.substring(pos + 1));
                 return 0;
@@ -981,11 +995,13 @@ Metron::param_handler(
 
                     // Parse
                     ServiceChain *sc = ServiceChain::from_json(jsc.second, m, errh);
+                    if (!sc) {
+                        return errh->error(
+                            "Could not instantiate a service chain"
+                        );
+                    }
                     if (m->_timing_stats) {
                         ts.parse = Timestamp::now_steady();
-                    }
-                    if (!sc) {
-                        return errh->error("Could not instantiate a service chain");
                     }
 
                     String sc_id = sc->get_id();
@@ -1001,8 +1017,8 @@ Metron::param_handler(
                     if (ret != 0) {
                         delete sc;
                         return errh->error(
-                            "Could not start the service chain "
-                            "with ID %s", sc_id.c_str()
+                            "Cannot instantiate service chain with ID %s",
+                            sc_id.c_str()
                         );
                     }
                     if (m->_timing_stats) {
@@ -1024,11 +1040,20 @@ Metron::param_handler(
                     click_chatter("Service chain ID: %s", sc_id.c_str());
 
                     ServiceChain *sc = m->find_service_chain_by_id(sc_id);
+                    if (!sc) {
+                        return errh->error(
+                            "Cannot install NIC rules: Unknown service chain ID %s",
+                            sc_id.c_str()
+                        );
+                    }
 
                     // Parse
-                    int ret =  ServiceChain::rules_from_json(jsc.second, m, errh);
+                    int ret =  sc->rules_from_json(jsc.second, m, errh);
                     if (ret != 0) {
-                        return errh->error("Cannot install rules: Parsing error");
+                        return errh->error(
+                            "Cannot install NIC rules for service chain ID %s: Parse error",
+                            sc_id.c_str()
+                        );
                     }
                 }
 
@@ -1141,7 +1166,7 @@ Metron::stats_to_json()
     // No controller
     if (!_discovered) {
         click_chatter(
-            "Cannot report statistics: Metron agent is not associated with a controller"
+            "Cannot report global statistics: Metron agent is not associated with a controller"
         );
         return jroot;
     }
@@ -1168,7 +1193,8 @@ Metron::stats_to_json()
             int cpu_id = sc->get_cpu_map(j);
             float cpuload = sc->_cpuload[j];
 
-            /* Replace the initialized values above
+            /*
+             * Replace the initialized values above
              * with the real monitoring data.
              */
             Json jcpu = Json::make_object();
@@ -1581,37 +1607,13 @@ ServiceChain::rules_to_json()
 
     // Service chain ID
     jsc.set("id", get_id());
-    // jsc.set("id", "sc:id:00001");
 
     // Service chain's Rx filter method
     Json j;
     j.set("method", rx_filter_type_enum_to_str(rx_filter->method));
-    // j.set("method", "flow");
     jsc.set("rxFilter", j);
 
     Json jrules = Json::make_object();
-
-    ///////////////////////////////////////////////////
-    // This is test code to be removed
-    // for (int i = 0; i < 1; i++) {
-    //     String is = String(i);
-
-    //     Json jcpus = Json::make_object();
-    //     for (int j = 0; j < 1; j ++) {
-    //         String js = String(j);
-
-    //         // For now it is an empty array, no rules
-    //         Json jcpu_rules = Json::make_array();
-    //         Json jcpu = Json::make_object();
-    //         jcpu.set("ruleId", 1234567);
-    //         jcpu.set("ruleContent", "ingress pattern eth type is 2048 / ipv4 proto spec 6 proto mask 0x0 src is 10.0.0.0/24 dst is 20.0.0.0/24 / end actions queue index 0 / end");
-    //         jcpu_rules.push_back(jcpu);
-
-    //         jcpus.set(js, jcpu_rules);
-    //     }
-    //     jrules.set("id" + is, jcpus);
-    // }
-    ///////////////////////////////////////////////////
 
     // All NICs
     for (int i = 0; i < get_nics_nb(); i++) {
@@ -1739,7 +1741,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
             return 0;
         } else {
             return errh->error(
-                "Unsupported reconfigure option: %s",
+                "Unsupported reconfiguration option: %s",
                 jfield.first.c_str()
             );
         }
@@ -2172,7 +2174,10 @@ NIC::call_rx_write(String h, const String input)
 {
     FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(element);
     if (!fd) {
-        click_chatter("Could not find matching FromDPDKDevice for NIC %s", get_id().c_str());
+        click_chatter(
+            "Could not find matching FromDPDKDevice for NIC %s",
+            get_id().c_str()
+        );
         return 1;
     }
 
@@ -2289,7 +2294,7 @@ NIC::add_rule(const int core_id, const long rule_id, const String rule)
 }
 
 bool
-NIC::install_rule(const String rule)
+NIC::install_rule(String rule)
 {
     if (rule.empty()) {
         click_chatter(
@@ -2298,6 +2303,9 @@ NIC::install_rule(const String rule)
         );
         return false;
     }
+
+    // Rule needs to be prepended with the command type and port ID
+    rule = "flow create " + String(get_port_id()) + rule;
 
     // Calls FlowDirector using FromDPDKDevice's flow handler add_rule
     if (call_rx_write("add_rule", rule) != 0) {
