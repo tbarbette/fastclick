@@ -124,7 +124,7 @@ rx_filter_type_str_to_enum(const String rf_str)
 }
 
 static String
-parseVendorInfo(String hw_info, String key)
+parse_vendor_info(String hw_info, String key)
 {
     String s;
 
@@ -177,7 +177,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("DISCOVER_PASSWORD", _discover_password)
         .read    ("PIN_TO_CORE",       _core_id)
         .complete() < 0)
-        return -1;
+        return ERROR;
 
     // The CPU core ID where this element will be pinned
     unsigned max_core_nb = click_max_cpu_ids();
@@ -294,7 +294,7 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
         nic++;
     }
 
-    return 0;
+    return SUCCESS;
 }
 
 int
@@ -303,12 +303,12 @@ Metron::initialize(ErrorHandler *errh)
     _cpu_map.resize(get_cpus_nb(), 0);
 
     String hw_info = file_string("/proc/cpuinfo");
-    _cpu_vendor = parseVendorInfo(hw_info, "vendor_id");
-    _hw = parseVendorInfo(hw_info, "model name");
+    _cpu_vendor = parse_vendor_info(hw_info, "vendor_id");
+    _hw = parse_vendor_info(hw_info, "model name");
     _sw = CLICK_VERSION;
 
     String sw_info = shell_command_output_string("dmidecode -t 1", "", errh);
-    _serial = parseVendorInfo(sw_info, "Serial Number");
+    _serial = parse_vendor_info(sw_info, "Serial Number");
 
 #if HAVE_CURL
     // Only if user has requested discovery
@@ -330,7 +330,7 @@ Metron::initialize(ErrorHandler *errh)
     _timer.move_thread(_core_id);
     _timer.schedule_after_sec(1);
 
-    return 0;
+    return SUCCESS;
 }
 
 /**
@@ -453,7 +453,7 @@ Metron::run_timer(Timer *t)
                if (useful_diff + useless_diff == 0) {
                    sc->nic_stats[stat_idx].load = 0;
                    // click_chatter(
-                   //      "[SC %d] Load NIC %d CPU %d - %f : No data yet",
+                   //      "[SC %d] Load NIC %d CPU %d - %f: No data yet",
                    //      sn, i, j, sc->nic_stats[stat_idx].load
                    //  );
                    continue;
@@ -535,10 +535,11 @@ Metron::get_assigned_cpus_nb()
 bool
 Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 {
-    int j = 0;
     if (this->get_assigned_cpus_nb() + sc->get_max_cpu_nb() >= this->get_cpus_nb()) {
         return false;
     }
+
+    int j = 0;
 
     for (int i = 0; i < get_cpus_nb(); i++) {
         if (_cpu_map[i] == 0) {
@@ -555,7 +556,6 @@ Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 void
 Metron::unassign_cpus(ServiceChain *sc)
 {
-    int j = 0;
     for (int i = 0; i < get_cpus_nb(); i++) {
         if (_cpu_map[i] == sc) {
             _cpu_map[i] = 0;
@@ -569,13 +569,13 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     // Get the NIC index requested by the controller
     int inic = _sc->get_nic_index(nic);
     assert(inic >= 0);
+
     // Allocate the right number of tags
     if (values.size() <= _sc->get_nics_nb()) {
         values.resize(_sc->get_nics_nb());
     }
     values[inic].resize(_sc->get_max_cpu_nb());
 
-    // Only MAC address is currently supported. Only thing to do is to get addr
     if (method == MAC) {
         click_chatter("Rx filters in MAC-based VMDq mode");
 
@@ -610,7 +610,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
         return errh->error("RSS-based dispatching is not implemented yet");
     }
 
-    return 0;
+    return SUCCESS;
 }
 
 /**
@@ -634,18 +634,18 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     if (!assign_cpus(sc, sc->get_cpu_map_ref())) {
         errh->error("Could not assign enough CPUs");
-        return -1;
+        return ERROR;
     }
 
     int ret = run_chain(sc, errh);
     if (ret == 0) {
         sc->status = ServiceChain::SC_OK;
         _scs.insert(sc->get_id(), sc);
-        return 0;
+        return SUCCESS;
     }
 
     unassign_cpus(sc);
-    return -1;
+    return ERROR;
 }
 
 /**
@@ -728,7 +728,7 @@ Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
         if (pos != conf.length()) {
             close(config_pipe[1]);
             close(ctl_socket[0]);
-            return -1;
+            return ERROR;
         } else {
             close(config_pipe[1]);
             sc->control_init(ctl_socket[0], pid);
@@ -743,11 +743,11 @@ Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
             kill(pid, SIGKILL);
             return errh->error("Unexpected ControlSocket command");
         }
-        return 0;
+        return SUCCESS;
     }
 
     assert(0);
-    return -1;
+    return ERROR;
 }
 
 /**
@@ -769,7 +769,7 @@ Metron::remove_service_chain(ServiceChain *sc, ErrorHandler *errh)
     _scs.remove(sc->get_id());
     unassign_cpus(sc);
 
-    return 0;
+    return SUCCESS;
 }
 
 String
@@ -863,14 +863,14 @@ Metron::write_handler(
             // TODO
             // Find the NIC and call nic->call_rx_write("flush_rules", "");
 
-            return 0;
+            return SUCCESS;
         }
         default: {
             errh->error("Unknown write handler: %d", what);
         }
     }
 
-    return -1;
+    return ERROR;
 }
 
 int
@@ -961,7 +961,7 @@ Metron::param_handler(
                 int pos = param.find_left("/");
                 if (pos <= 0) {
                     param = "You must give a service chain ID, then a command";
-                    return 0;
+                    return SUCCESS;
                 }
                 String ids = param.substring(0, pos);
                 ServiceChain *sc = m->find_service_chain_by_id(ids);
@@ -972,7 +972,7 @@ Metron::param_handler(
                     );
                 }
                 param = sc->simple_call_read(param.substring(pos + 1));
-                return 0;
+                return SUCCESS;
             }
             default: {
                 return errh->error("Invalid read operation in param handler");
@@ -981,7 +981,7 @@ Metron::param_handler(
 
         param = jroot.unparse(true);
 
-        return 0;
+        return SUCCESS;
     // Controller --> Metron agent
     } else if (operation == Handler::f_write) {
         intptr_t what = reinterpret_cast<intptr_t>(h->write_user_data());
@@ -1029,7 +1029,7 @@ Metron::param_handler(
                     }
                 }
 
-                return 0;
+                return SUCCESS;
             }
             case h_chains_rules: {
                 click_chatter("Metron controller requested rule installation");
@@ -1059,14 +1059,14 @@ Metron::param_handler(
                     }
                 }
 
-                return 0;
+                return SUCCESS;
             }
             default: {
                 return errh->error("Invalid write operation in param handler");
             }
 
         }
-        return -1;
+        return ERROR;
     } else {
         return errh->error("Unknown operation in param handler");
     }
@@ -1297,7 +1297,7 @@ Metron::controllers_from_json(Json j)
                 "Invalid controller information: IP (%s), Port (%d)",
                 ctrl_ip.c_str(), ctrl_port
             );
-            return -1;
+            return ERROR;
         }
 
         // Need to re-discover, we got a new controller instance
@@ -1324,7 +1324,7 @@ Metron::controllers_from_json(Json j)
         break;
     }
 
-    return 0;
+    return SUCCESS;
 }
 
 int
@@ -1333,13 +1333,13 @@ Metron::delete_controller_from_json(const String &ip)
     // This agent is not associated with a Metron controller at the moment
     if (_discover_ip.empty()) {
         click_chatter("No controller associated with this Metron agent");
-        return -1;
+        return ERROR;
     }
 
     // Request to remove a controller must have correct IP
     if ((!ip.empty()) && (ip != _discover_ip)) {
         click_chatter("Metron agent is not associated with a Metron controller on %s", ip.c_str());
-        return -1;
+        return ERROR;
     }
 
     click_chatter(
@@ -1352,7 +1352,7 @@ Metron::delete_controller_from_json(const String &ip)
     _discover_ip   = "";
     _discover_port = -1;
 
-    return 0;
+    return SUCCESS;
 }
 
 /***************************************
@@ -1371,7 +1371,7 @@ ServiceChain::RxFilter::from_json(
             "Supported Rx filter modes are: %s", sc->id.c_str(),
             supported_types(RX_FILTER_TYPES_STR_ARRAY).c_str()
         );
-        return 0;
+        return NULL;
     }
     rf->method = rf_type;
 
@@ -1448,7 +1448,7 @@ ServiceChain::from_json(
             "Supported types are: %s",
             sc->id.c_str(), supported_types(SC_TYPES_STR_ARRAY).c_str()
         );
-        return 0;
+        return NULL;
     }
     sc->config_type = sc_type;
     sc->config = j.get_s("config");
@@ -1458,7 +1458,7 @@ ServiceChain::from_json(
         errh->error(
             "Max number of CPUs must be greater than the number of used CPUs"
         );
-        return 0;
+        return NULL;
     }
     sc->_autoscale = false;
     if (!j.get("autoscale", sc->_autoscale)) {
@@ -1472,7 +1472,7 @@ ServiceChain::from_json(
         if (!nic) {
             errh->error("Unknown NIC: %s", jnic.second.as_s().c_str());
             delete sc;
-            return 0;
+            return NULL;
         }
         sc->_nics.push_back(nic);
     }
@@ -1682,7 +1682,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
         click_chatter(
             "Cannot reconfigure service chain: Metron agent is not associated with a controller"
         );
-        return -1;
+        return ERROR;
     }
 
     for (auto jfield : j) {
@@ -1740,7 +1740,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
             click_chatter("Number of used CPUs is now: %d", new_cpus_nb);
             _used_cpus_nb = new_cpus_nb;
-            return 0;
+            return SUCCESS;
         } else {
             return errh->error(
                 "Unsupported reconfiguration option: %s",
@@ -1749,7 +1749,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
         }
     }
 
-    return 0;
+    return SUCCESS;
 }
 
 int
@@ -1760,7 +1760,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         errh->error(
             "Cannot reconfigure service chain: Metron agent is not associated with a controller"
         );
-        return -1;
+        return ERROR;
     }
 
     RxFilterType rx_filter = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
@@ -1770,7 +1770,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             "Invalid Rx filter mode %s is sent by the controller.",
             rx_filter_type_enum_to_str(rx_filter).c_str()
         );
-        return -1;
+        return ERROR;
     }
     click_chatter("       Rx Filter: %s", rx_filter_type_enum_to_str(rx_filter).c_str());
 
@@ -1818,7 +1818,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         }
     }
 
-    return 0;
+    return SUCCESS;
 }
 
 void
@@ -2030,7 +2030,7 @@ ServiceChain::call(
     );
     if (ret == "") {
         check_alive();
-        return -1;
+        return ERROR;
     }
 
     int code = atoi(ret.substring(0, 3).c_str());
@@ -2145,10 +2145,10 @@ NIC::to_json(RxFilterType rx_mode, bool stats)
 String
 NIC::call_read(String h)
 {
-    const Handler *hC = Router::handler(element, h);
+    const Handler *hc = Router::handler(element, h);
 
-    if (hC && hC->visible()) {
-        return hC->call_read(element, ErrorHandler::default_handler());
+    if (hc && hc->visible()) {
+        return hc->call_read(element, ErrorHandler::default_handler());
     }
 
     return "undefined";
@@ -2180,7 +2180,7 @@ NIC::call_rx_write(String h, const String input)
             "Could not find matching FromDPDKDevice for NIC %s",
             get_id().c_str()
         );
-        return 1;
+        return ERROR;
     }
 
     const Handler *hc = Router::handler(fd, h);
@@ -2194,7 +2194,7 @@ NIC::call_rx_write(String h, const String input)
         get_id().c_str()
     );
 
-    return 1;
+    return ERROR;
 }
 
 String
@@ -2210,7 +2210,7 @@ NIC::find_rules_by_core_id(const int core_id) {
             "Unable to find rules for NIC %s: Invalid core ID %d",
             get_id().c_str(), core_id
         );
-        return 0;
+        return NULL;
     }
 
     return _rules.find(core_id);
