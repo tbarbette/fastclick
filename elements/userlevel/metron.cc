@@ -179,6 +179,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
 
+    // The CPU core ID where this element will be pinned
     unsigned max_core_nb = click_max_cpu_ids();
     if ((_core_id < 0) || (_core_id >= max_core_nb)) {
         return errh->error(
@@ -223,7 +224,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
 
 #if HAVE_CURL
-    // No discovery if missing information
+    // No discovery if key information is missing
     if (_discover_ip &&
         (!_agent_ip) || (!_discover_user) || (!_discover_password)) {
         return errh->error(
@@ -281,6 +282,7 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
             );
         }
 
+        // TODO: Let the agent operate in standard FastClick mode using RSS
         if ((_rx_mode == RSS) && (fd_mode != "rss")) {
             return errh->error(
                 "RX_MODE %s is the default FastClick mode and requires FromDPDKDevice(%s) MODE rss",
@@ -1519,7 +1521,7 @@ ServiceChain::stats_to_json()
     jsc.set("id", get_id());
 
     Json jcpus = Json::make_array();
-    for (int j = 0; j < get_max_cpu_nb(); j ++) {
+    for (int j = 0; j < get_max_cpu_nb(); j++) {
         String js = String(j);
         int avg_max = 0;
         for (int i = 0; i < get_nics_nb(); i++) {
@@ -1549,7 +1551,7 @@ ServiceChain::stats_to_json()
         uint64_t tx_dropped = 0;
         uint64_t tx_errors  = 0;
 
-        for (int j = 0; j < get_max_cpu_nb(); j ++) {
+        for (int j = 0; j < get_max_cpu_nb(); j++) {
             String js = String(j);
             rx_count += atol(
                 simple_call_read("slaveFD" + is + "C" + js + ".count").c_str()
@@ -1622,7 +1624,7 @@ ServiceChain::rules_to_json()
 
         Json jcpus = Json::make_object();
         // All CPU cores
-        for (int j = 0; j < get_max_cpu_nb(); j ++) {
+        for (int j = 0; j < get_max_cpu_nb(); j++) {
             String core_id = String(j);
 
             Json jcpu_rules = Json::make_array();
@@ -1961,7 +1963,7 @@ ServiceChain::assigned_cpus()
 {
     Bitvector b;
     b.resize(_metron->_cpu_map.size());
-    for (int i = 0; i < b.size(); i ++) {
+    for (int i = 0; i < b.size(); i++) {
         b[i] = _metron->_cpu_map[i] == this;
     }
     return b;
