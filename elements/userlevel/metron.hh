@@ -229,6 +229,10 @@ Disassociates this Metron agent from a Metron controller instance.
 
 */
 
+// Return status
+const int ERROR = -1;
+const int SUCCESS = 0;
+
 class Metron;
 
 class CPU {
@@ -405,7 +409,7 @@ class ServiceChain {
                     return nic;
             }
 
-            return 0;
+            return NULL;
         }
 
         inline int get_nic_index(NIC *nic) {
@@ -414,7 +418,7 @@ class ServiceChain {
                     return i;
             }
 
-            return -1;
+            return ERROR;
         }
 
         inline NIC *get_nic_by_index(int i) {
