@@ -668,6 +668,7 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
 
         char *argv_char[argv.size() + 1];
         for (int i = 0; i < argv.size(); i++) {
+            // click_chatter("Cmd line arg: %s", argv[i].c_str());
             argv_char[i] = strdup(argv[i].c_str());
         }
         argv_char[argv.size()] = 0;
@@ -680,7 +681,6 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
         click_chatter("Child %d launched successfully", pid);
         close(config_pipe[0]);
         close(ctl_socket[1]);
-        click_chatter("Closed sockets");
         int flags = 1;
         /*int fd = ctl_socket[0];
         if (ioctl(fd, FIONBIO, &flags) != 0) {
@@ -892,7 +892,7 @@ Metron::param_handler(
                     ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
                         return errh->error(
-                            "Cannot report service chain info: Unknown service chain ID: %s",
+                            "Cannot report service chain info: Unknown service chain ID %s",
                             param.c_str()
                         );
                     }
@@ -913,7 +913,7 @@ Metron::param_handler(
                     ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
                         return errh->error(
-                            "Cannot report statistics: Unknown service chain ID: %s",
+                            "Cannot report statistics: Unknown service chain ID %s",
                             param.c_str()
                         );
                     }
@@ -938,7 +938,7 @@ Metron::param_handler(
                     ServiceChain *sc = m->find_service_chain_by_id(param);
                     if (!sc) {
                         return errh->error(
-                            "Cannot report NIC rules: Unknown service chain ID: %s",
+                            "Cannot report NIC rules: Unknown service chain ID %s",
                             param.c_str()
                         );
                     }
@@ -1026,7 +1026,6 @@ Metron::param_handler(
             }
             case h_chains_rules: {
                 click_chatter("Metron controller requested rule installation");
-                // click_chatter("%s", param.c_str());
 
                 Json jroot = Json::parse(param);
                 Json jlist = jroot.get("rules");
@@ -1712,19 +1711,19 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
     }
     click_chatter("       Rx Filter: %s", rx_filter_type_enum_to_str(rx_filter).c_str());
 
-    Json jrulesAll = j.get("nicRules");
-    for (auto jnic : jrulesAll) {
-        String nic_id = jnic.first;
+    Json jnics = j.get("nics");
+    for (auto jnic : jnics) {
+        // TODO: This might become a simple integer
+        String nic_id = jnic.second.get_s("nicId");
         click_chatter("             NIC: %s", nic_id.c_str());
 
-        Json jrulesNic = jnic.second;
-        for (auto jcpu : jrulesNic) {
-            String cpu_id = jcpu.first;
-            int cpu_index = atoi(cpu_id.c_str());
+        Json jcpus = jnic.second.get("cpus");
+        for (auto jcpu : jcpus) {
+            int cpu_index = jcpu.second.get_i("cpuId");
             click_chatter("             CPU: %d", cpu_index);
 
-            Json jrulesCpu = jcpu.second;
-            for (auto jrule : jrulesCpu) {
+            Json jrules = jcpu.second.get("cpuRules");
+            for (auto jrule : jrules) {
                 long rule_id = jrule.second.get_i("ruleId");
                 String rule = jrule.second.get_s("ruleContent");
                 click_chatter("         Rule ID: %ld", rule_id);
@@ -1776,42 +1775,52 @@ ServiceChain::rules_to_json()
     jsc.set("rxFilter", j);
 
     Json jrules = Json::make_object();
+    Json jnics_array = Json::make_array();
 
     // All NICs
     for (int i = 0; i < get_nics_nb(); i++) {
         String nic_id = String(i);
         NIC *nic = _nics[i];
 
-        Json jcpus = Json::make_object();
-        // All CPU cores
-        for (int j = 0; j < get_max_cpu_nb(); j++) {
-            String core_id = String(j);
+        Json jnic = Json::make_object();
+        // TODO: Why this should be idX? and not fdX? or simply X
+        jnic.set("nicId", "id" + nic_id);
 
-            Json jcpu_rules = Json::make_array();
+        Json jcpus_array = Json::make_array();
+
+        // One NIC can dispatch to multiple CPU cores
+        for (int j = 0; j < get_max_cpu_nb(); j++) {
+            Json jcpu = Json::make_object();
+            jcpu.set("cpuId", j);
+
+            Json jrules = Json::make_array();
 
             // Fetch the rules for this NIC and this CPU core
-            HashMap<long, String> *rules_map = nic->find_rules_by_core_id(atoi(core_id.c_str()));
+            HashMap<long, String> *rules_map = nic->find_rules_by_core_id(j);
             auto begin = rules_map->begin();
             while (begin != rules_map->end()) {
                 long rule_id = begin.key();
                 String rule = begin.value();
 
-                Json jcpu = Json::make_object();
-                jcpu.set("ruleId", rule_id);
-                jcpu.set("ruleContent", rule);
-                jcpu_rules.push_back(jcpu);
+                Json jrule = Json::make_object();
+                jrule.set("ruleId", rule_id);
+                jrule.set("ruleContent", rule);
+                jrules.push_back(jrule);
 
                 begin++;
             }
-            jcpus.set(core_id, jcpu_rules);
+
+            jcpu.set("cpuRules", jrules);
+
+            jcpus_array.push_back(jcpu);
         }
 
-        // One NIC has multiple CPU cores
-        // TODO: Why this should be idX? and not fdX?
-        jrules.set("id" + nic_id, jcpus);
+        jnic.set("cpus", jcpus_array);
+
+        jnics_array.push_back(jnic);
     }
 
-    jsc.set("nicRules", jrules);
+    jsc.set("nics", jnics_array);
 
     return jsc;
 }
