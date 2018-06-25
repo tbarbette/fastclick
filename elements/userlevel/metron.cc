@@ -123,6 +123,9 @@ rx_filter_type_str_to_enum(const String rf_str)
     return NONE;
 }
 
+/**
+ * Parses input string and returns information after key.
+ */
 static String
 parse_vendor_info(String hw_info, String key)
 {
@@ -150,6 +153,9 @@ Metron::~Metron()
 
 }
 
+/**
+ * Configures Metron according to user inputs.
+ */
 int
 Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -251,6 +257,10 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     return confirm_nic_mode(errh);
 }
 
+/**
+ * Verifies that Metron configuration complies with the
+ * underlying FromDPDKDevice elements' configuration.
+ */
 int
 Metron::confirm_nic_mode(ErrorHandler *errh)
 {
@@ -297,6 +307,10 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
     return SUCCESS;
 }
 
+/**
+ * Allocates memory resources before the start up
+ * and performs controller discovery.
+ */
 int
 Metron::initialize(ErrorHandler *errh)
 {
@@ -370,7 +384,7 @@ Metron::discover()
             rest.set("protocol", DEF_AGENT_PROTO);
             rest.set("url", "");
             rest.set("testUrl", "");
-            set_hw_info(rest);
+            hw_info_to_json(rest);
             device.set("rest", rest);
 
             Json basic = Json::make_object();
@@ -419,6 +433,9 @@ Metron::discover()
     return false;
 }
 
+/**
+ * Metron agent's run-time.
+ */
 void
 Metron::run_timer(Timer *t)
 {
@@ -504,6 +521,9 @@ Metron::run_timer(Timer *t)
     _timer.reschedule_after_sec(1);
 }
 
+/**
+ * Releases memory resources before exiting.
+ */
 void
 Metron::cleanup(CleanupStage)
 {
@@ -519,6 +539,9 @@ Metron::cleanup(CleanupStage)
     }
 }
 
+/**
+ * Returns the number of CPU cores assigned to a service chain.
+ */
 int
 Metron::get_assigned_cpus_nb()
 {
@@ -532,6 +555,9 @@ Metron::get_assigned_cpus_nb()
     return tot;
 }
 
+/**
+ * Sets the CPU map of a given service chain.
+ */
 bool
 Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 {
@@ -545,14 +571,18 @@ Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
         if (_cpu_map[i] == 0) {
             _cpu_map[i] = sc;
             map[j++] = i;
-            if (j == sc->get_max_cpu_nb())
+            if (j == sc->get_max_cpu_nb()) {
                 return true;
+            }
         }
     }
 
     return false;
 }
 
+/**
+ * Resets the CPU map of a given service chain.
+ */
 void
 Metron::unassign_cpus(ServiceChain *sc)
 {
@@ -561,56 +591,6 @@ Metron::unassign_cpus(ServiceChain *sc)
             _cpu_map[i] = 0;
         }
     }
-}
-
-int
-ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
-{
-    // Get the NIC index requested by the controller
-    int inic = _sc->get_nic_index(nic);
-    assert(inic >= 0);
-
-    // Allocate the right number of tags
-    if (values.size() <= _sc->get_nics_nb()) {
-        values.resize(_sc->get_nics_nb());
-    }
-    values[inic].resize(_sc->get_max_cpu_nb());
-
-    if (method == MAC) {
-        click_chatter("Rx filters in MAC-based VMDq mode");
-
-        Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
-        // click_chatter("VF MAC addresses: %s", nic->call_read("vf_mac_addr").c_str());
-
-        for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
-            int available_pools = atoi(nic->call_read("nb_vf_pools").c_str());
-            if (available_pools <= _sc->get_cpu_map(i)) {
-                return errh->error("Not enough VF pools: %d are available", available_pools);
-            }
-            values[inic][i] = jaddrs[_sc->get_cpu_map(i)].to_s();
-        }
-    } else if (method == FLOW) {
-        click_chatter("Rx filters in Flow Director mode");
-
-        int inic = _sc->get_nic_index(nic);
-        assert(inic >= 0);
-        if (values.size() <= _sc->get_nics_nb()) {
-            values.resize(_sc->get_nics_nb());
-        }
-        values[inic].resize(_sc->get_max_cpu_nb());
-
-        // TODO
-        // Do we need anyhitng else here?
-    } else if (method == VLAN) {
-        click_chatter("Rx filters in VLAN-based VMDq mode");
-        return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
-    } else if (method == RSS) {
-        click_chatter("Rx filters in RSS mode");
-        // TODO: This should be trivial to support
-        return errh->error("RSS-based dispatching is not implemented yet");
-    }
-
-    return SUCCESS;
 }
 
 /**
@@ -633,12 +613,15 @@ int
 Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     if (!assign_cpus(sc, sc->get_cpu_map_ref())) {
-        errh->error("Could not assign enough CPUs");
+        errh->error(
+            "Cannot instantiate service chain %s: Not enough CPUs",
+            sc->get_id().c_str()
+        );
         return ERROR;
     }
 
-    int ret = run_chain(sc, errh);
-    if (ret == 0) {
+    int ret = run_service_chain(sc, errh);
+    if (ret == SUCCESS) {
         sc->status = ServiceChain::SC_OK;
         _scs.insert(sc->get_id(), sc);
         return SUCCESS;
@@ -650,10 +633,10 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
 
 /**
  * Run a service chain and keep a control socket to it.
- * CPUs must already be assigned.
+ * CPU cores must already be assigned by assign_cpus().
  */
 int
-Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
+Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
@@ -689,7 +672,7 @@ Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
         }
         argv_char[argv.size()] = 0;
         if ((ret = execv(argv_char[0], argv_char))) {
-            click_chatter("Could not launch slave process: %d %d", ret, errno);
+            errh->message("Could not launch slave process: %d %d", ret, errno);
         }
 
         exit(1);
@@ -697,6 +680,7 @@ Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
         click_chatter("Child %d launched successfully", pid);
         close(config_pipe[0]);
         close(ctl_socket[1]);
+        click_chatter("Closed sockets");
         int flags = 1;
         /*int fd = ctl_socket[0];
         if (ioctl(fd, FIONBIO, &flags) != 0) {
@@ -737,7 +721,7 @@ Metron::run_chain(ServiceChain *sc, ErrorHandler *errh)
         String s;
         int v = sc->control_read_line(s);
         if (v <= 0) {
-            return errh->error("Could not read from control socket: error %d", v);
+            return errh->error("Could not read from control socket: Error %d", v);
         }
         if (!s.starts_with("Click::ControlSocket/1.")) {
             kill(pid, SIGKILL);
@@ -772,6 +756,9 @@ Metron::remove_service_chain(ServiceChain *sc, ErrorHandler *errh)
     return SUCCESS;
 }
 
+/**
+ * Metron agent's read handlers.
+ */
 String
 Metron::read_handler(Element *e, void *user_data)
 {
@@ -805,6 +792,9 @@ Metron::read_handler(Element *e, void *user_data)
     return jroot.unparse(true);
 }
 
+/**
+ * Metron agent's write handlers.
+ */
 int
 Metron::write_handler(
         const String &data, Element *e, void *user_data, ErrorHandler *errh)
@@ -873,6 +863,9 @@ Metron::write_handler(
     return ERROR;
 }
 
+/**
+ * Metron agent's parameter handlers.
+ */
 int
 Metron::param_handler(
         int operation, String &param, Element *e,
@@ -1072,6 +1065,9 @@ Metron::param_handler(
     }
 }
 
+/**
+ * Creates Metron agent's handlers.
+ */
 void
 Metron::add_handlers()
 {
@@ -1110,14 +1106,20 @@ Metron::add_handlers()
     add_write_handler("delete_controllers", write_handler, h_delete_controllers);
 }
 
+/**
+ * Encodes hardware information to JSON.
+ */
 void
-Metron::set_hw_info(Json &j)
+Metron::hw_info_to_json(Json &j)
 {
     j.set("manufacturer", Json(_cpu_vendor));
     j.set("hwVersion", Json(_hw));
     j.set("swVersion", Json("Click " + _sw));
 }
 
+/**
+ * Encodes Metron resources to JSON.
+ */
 Json
 Metron::to_json()
 {
@@ -1135,7 +1137,7 @@ Metron::to_json()
     jroot.set("serial", Json(_serial));
 
     // Info
-    set_hw_info(jroot);
+    hw_info_to_json(jroot);
 
     // CPU resources
     Json jcpus = Json::make_array();
@@ -1160,6 +1162,9 @@ Metron::to_json()
     return jroot;
 }
 
+/**
+ * Encodes global Metron statistics to JSON.
+ */
 Json
 Metron::stats_to_json()
 {
@@ -1249,6 +1254,9 @@ Metron::stats_to_json()
     return jroot;
 }
 
+/**
+ * Encodes controller information to JSON.
+ */
 Json
 Metron::controllers_to_json()
 {
@@ -1272,6 +1280,9 @@ Metron::controllers_to_json()
     return jroot;
 }
 
+/**
+ * Decodes controller information from JSON.
+ */
 int
 Metron::controllers_from_json(Json j)
 {
@@ -1327,6 +1338,9 @@ Metron::controllers_from_json(Json j)
     return SUCCESS;
 }
 
+/**
+ * Disassociates this Metron agent from a Metron controller.
+ */
 int
 Metron::delete_controller_from_json(const String &ip)
 {
@@ -1348,7 +1362,7 @@ Metron::delete_controller_from_json(const String &ip)
     );
 
     // Reset controller information
-    _discovered = false;
+    _discovered    = false;
     _discover_ip   = "";
     _discover_port = -1;
 
@@ -1358,6 +1372,9 @@ Metron::delete_controller_from_json(const String &ip)
 /***************************************
  * RxFilter
  **************************************/
+/**
+ * Converts JSON object to Rx filter configuration.
+ */
 ServiceChain::RxFilter *
 ServiceChain::RxFilter::from_json(
         Json j, ServiceChain *sc, ErrorHandler *errh)
@@ -1392,6 +1409,9 @@ ServiceChain::RxFilter::from_json(
     return rf;
 }
 
+/**
+ * Converts Rx filter configuration to JSON object.
+ */
 Json
 ServiceChain::RxFilter::to_json()
 {
@@ -1413,6 +1433,61 @@ ServiceChain::RxFilter::to_json()
     return j;
 }
 
+/**
+ * Applies an Rx filter configuration to a NIC
+ * by allocating space for tags and then populating
+ * the desired tag values.
+ */
+int
+ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
+{
+    // Get the NIC index requested by the controller
+    int inic = _sc->get_nic_index(nic);
+    assert(inic >= 0);
+
+    // Allocate the right number of tags
+    if (values.size() <= _sc->get_nics_nb()) {
+        values.resize(_sc->get_nics_nb());
+    }
+    values[inic].resize(_sc->get_max_cpu_nb());
+
+    if (method == MAC) {
+        click_chatter("Rx filters in MAC-based VMDq mode");
+
+        Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
+        // click_chatter("VF MAC addresses: %s", nic->call_read("vf_mac_addr").c_str());
+
+        for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
+            int available_pools = atoi(nic->call_read("nb_vf_pools").c_str());
+            if (available_pools <= _sc->get_cpu_map(i)) {
+                return errh->error("Not enough VF pools: %d are available", available_pools);
+            }
+            values[inic][i] = jaddrs[_sc->get_cpu_map(i)].to_s();
+        }
+    } else if (method == FLOW) {
+        click_chatter("Rx filters in Flow Director mode");
+
+        int inic = _sc->get_nic_index(nic);
+        assert(inic >= 0);
+        if (values.size() <= _sc->get_nics_nb()) {
+            values.resize(_sc->get_nics_nb());
+        }
+        values[inic].resize(_sc->get_max_cpu_nb());
+
+        // TODO
+        // Do we need anyhitng else here?
+    } else if (method == VLAN) {
+        click_chatter("Rx filters in VLAN-based VMDq mode");
+        return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
+    } else if (method == RSS) {
+        click_chatter("Rx filters in RSS mode");
+        // TODO: This should be trivial to support
+        return errh->error("RSS-based dispatching is not implemented yet");
+    }
+
+    return SUCCESS;
+}
+
 /************************
  * Service Chain
  ************************/
@@ -1431,6 +1506,9 @@ ServiceChain::~ServiceChain()
     }
 }
 
+/**
+ * Decodes service chain information from JSON.
+ */
 ServiceChain *
 ServiceChain::from_json(
         Json j, Metron *m, ErrorHandler *errh)
@@ -1484,6 +1562,9 @@ ServiceChain::from_json(
     return sc;
 }
 
+/**
+ * Encodes service chain information to JSON.
+ */
 Json
 ServiceChain::to_json()
 {
@@ -1514,6 +1595,9 @@ ServiceChain::to_json()
     return jsc;
 }
 
+/**
+ * Encodes service chain statistics to JSON.
+ */
 Json
 ServiceChain::stats_to_json()
 {
@@ -1602,6 +1686,82 @@ ServiceChain::stats_to_json()
     return jsc;
 }
 
+/**
+ * Decodes service chain rules from JSON
+ * and applies the rules to the respective NIC.
+ */
+int
+ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
+{
+    // No controller
+    if (!m->_discovered) {
+        errh->error(
+            "Cannot reconfigure service chain: Metron agent is not associated with a controller"
+        );
+        return ERROR;
+    }
+
+    RxFilterType rx_filter = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
+    if (rx_filter != FLOW) {
+        errh->error(
+            "Cannot install rules for service chain: "
+            "Invalid Rx filter mode %s is sent by the controller.",
+            rx_filter_type_enum_to_str(rx_filter).c_str()
+        );
+        return ERROR;
+    }
+    click_chatter("       Rx Filter: %s", rx_filter_type_enum_to_str(rx_filter).c_str());
+
+    Json jrulesAll = j.get("nicRules");
+    for (auto jnic : jrulesAll) {
+        String nic_id = jnic.first;
+        click_chatter("             NIC: %s", nic_id.c_str());
+
+        Json jrulesNic = jnic.second;
+        for (auto jcpu : jrulesNic) {
+            String cpu_id = jcpu.first;
+            int cpu_index = atoi(cpu_id.c_str());
+            click_chatter("             CPU: %d", cpu_index);
+
+            Json jrulesCpu = jcpu.second;
+            for (auto jrule : jrulesCpu) {
+                long rule_id = jrule.second.get_i("ruleId");
+                String rule = jrule.second.get_s("ruleContent");
+                click_chatter("         Rule ID: %ld", rule_id);
+                click_chatter("            Rule: %s", rule.c_str());
+
+                // TODO: Store this rule when this method becomes non-static
+                // NIC *nic = this->get_nic_by_id(nic_id);
+                // if (!nic) {
+                //     return errh->error(
+                //         "Metron controller attempted to install rules on unknown NIC ID: %s",
+                //         nic_id.c_str()
+                //     );
+                // }
+
+                // if (!nic->add_rule(cpu_index, rule_id, rule)) {
+                //     return errh->error(
+                //         "Metron controller failed to store rule %ld for NIC %s and CPU core %d",
+                //         rule_id, nic_id.c_str(), cpu_index
+                //     );
+                // }
+
+                // if (!nic->install_rule(rule)) {
+                //     return errh->error(
+                //         "Metron controller failed to install rule %ld for NIC %s and CPU core %d",
+                //         rule_id, nic_id.c_str(), cpu_index
+                //     );
+                // }
+            }
+        }
+    }
+
+    return SUCCESS;
+}
+
+/**
+ * Encodes service chain rules to JSON.
+ */
 Json
 ServiceChain::rules_to_json()
 {
@@ -1656,6 +1816,9 @@ ServiceChain::rules_to_json()
     return jsc;
 }
 
+/**
+ * Encodes service chain's timing statistics to JSON.
+ */
 Json
 ServiceChain::timing_stats::to_json()
 {
@@ -1666,6 +1829,9 @@ ServiceChain::timing_stats::to_json()
     return j;
 }
 
+/**
+ * Encodes service chain's timing statistics related to autoscale to JSON.
+ */
 Json
 ServiceChain::autoscale_timing_stats::to_json()
 {
@@ -1674,6 +1840,10 @@ ServiceChain::autoscale_timing_stats::to_json()
     return j;
 }
 
+/**
+ * Decodes service chain's reconfiguration from JSON
+ * and applies this reconfiguration.
+ */
 int
 ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 {
@@ -1752,75 +1922,11 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
     return SUCCESS;
 }
 
-int
-ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
-{
-    // No controller
-    if (!m->_discovered) {
-        errh->error(
-            "Cannot reconfigure service chain: Metron agent is not associated with a controller"
-        );
-        return ERROR;
-    }
-
-    RxFilterType rx_filter = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
-    if (rx_filter != FLOW) {
-        errh->error(
-            "Cannot install rules for service chain: "
-            "Invalid Rx filter mode %s is sent by the controller.",
-            rx_filter_type_enum_to_str(rx_filter).c_str()
-        );
-        return ERROR;
-    }
-    click_chatter("       Rx Filter: %s", rx_filter_type_enum_to_str(rx_filter).c_str());
-
-    Json jrulesAll = j.get("nicRules");
-    for (auto jnic : jrulesAll) {
-        String nic_id = jnic.first;
-        click_chatter("             NIC: %s", nic_id.c_str());
-
-        Json jrulesNic = jnic.second;
-        for (auto jcpu : jrulesNic) {
-            String cpu_id = jcpu.first;
-            int cpu_index = atoi(cpu_id.c_str());
-            click_chatter("             CPU: %d", cpu_index);
-
-            Json jrulesCpu = jcpu.second;
-            for (auto jrule : jrulesCpu) {
-                long rule_id = jrule.second.get_i("ruleId");
-                String rule = jrule.second.get_s("ruleContent");
-                click_chatter("         Rule ID: %ld", rule_id);
-                click_chatter("            Rule: %s", rule.c_str());
-
-                // TODO: Store this rule when this method becomes non-static
-                // NIC *nic = this->get_nic_by_id(nic_id);
-                // if (!nic) {
-                //     return errh->error(
-                //         "Metron controller attempted to install rules on unknown NIC ID: %s",
-                //         nic_id.c_str()
-                //     );
-                // }
-
-                // if (!nic->add_rule(cpu_index, rule_id, rule)) {
-                //     return errh->error(
-                //         "Metron controller failed to store rule %ld for NIC %s and CPU core %d",
-                //         rule_id, nic_id.c_str(), cpu_index
-                //     );
-                // }
-
-                // if (!nic->install_rule(rule)) {
-                //     return errh->error(
-                //         "Metron controller failed to install rule %ld for NIC %s and CPU core %d",
-                //         rule_id, nic_id.c_str(), cpu_index
-                //     );
-                // }
-            }
-        }
-    }
-
-    return SUCCESS;
-}
-
+/**
+ * Scales a service chain in or out based on local perception of the
+ * service chain's state.
+ * This function is orthogonal to the scaling performed by the controller.
+ */
 void
 ServiceChain::do_autoscale(int n_cpu_change)
 {
@@ -1864,6 +1970,10 @@ ServiceChain::do_autoscale(int n_cpu_change)
     this->set_autoscale_timing_stats(ts);
 }
 
+/**
+ * Generates the software configuration for a given service chain
+ * as received by the controller.
+ */
 String
 ServiceChain::generate_config()
 {
@@ -1924,6 +2034,10 @@ ServiceChain::generate_config()
     return newconf;
 }
 
+/**
+ * Generates the necessary DPDK arguments for the deployment
+ * of a service chain as a secondary DPDK process.
+ */
 Vector<String>
 ServiceChain::build_cmd_line(int socketfd)
 {
@@ -1958,6 +2072,9 @@ ServiceChain::build_cmd_line(int socketfd)
     return argv;
 }
 
+/**
+ * Returns a bit map with the CPU core assignment of a service chain.
+ */
 Bitvector
 ServiceChain::assigned_cpus()
 {
@@ -1969,6 +2086,9 @@ ServiceChain::assigned_cpus()
     return b;
 }
 
+/**
+ * Checks whether a service chain is alive or not.
+ */
 void
 ServiceChain::check_alive()
 {
@@ -1979,6 +2099,9 @@ ServiceChain::check_alive()
     }
 }
 
+/**
+ * Initializes the control socket of a service chain.
+ */
 void
 ServiceChain::control_init(int fd, int pid)
 {
@@ -1986,6 +2109,9 @@ ServiceChain::control_init(int fd, int pid)
     _pid = pid;
 }
 
+/**
+ * Reads a control message from the control socket of a service chain.
+ */
 int
 ServiceChain::control_read_line(String &line)
 {
@@ -2004,12 +2130,19 @@ ServiceChain::control_read_line(String &line)
     return line.length();
 }
 
+/**
+ * Writes a control message to the control socket of a service chain.
+ */
 void
 ServiceChain::control_write_line(String cmd)
 {
     int n = write(_socket, (cmd + "\r\n").c_str(),cmd.length() + 1);
 }
 
+/**
+ * Passes a control message through the control socket and gets
+ * a response.
+ */
 String
 ServiceChain::control_send_command(String cmd)
 {
@@ -2020,6 +2153,9 @@ ServiceChain::control_send_command(String cmd)
     return ret;
 }
 
+/**
+ * Implements handlers for a service chain using the control socket.
+ */
 int
 ServiceChain::call(
         String fnt, bool has_response, String handler,
@@ -2052,12 +2188,15 @@ ServiceChain::call(
     return code;
 }
 
+/**
+ * Implements simple read handlers for a service chain.
+ */
 String
 ServiceChain::simple_call_read(String handler)
 {
     String response;
 
-    int code = call("READ", true, handler,response, "");
+    int code = call("READ", true, handler, response, "");
     if (code >= 200 && code < 300) {
         return response;
     }
@@ -2065,12 +2204,18 @@ ServiceChain::simple_call_read(String handler)
     return "";
 }
 
+/**
+ * Implements read handlers for a service chain.
+ */
 int
 ServiceChain::call_read(String handler, String &response, String params)
 {
     return call("READ", true, handler, response, params);
 }
 
+/**
+ * Implements write handlers for a service chain.
+ */
 int
 ServiceChain::call_write(String handler, String &response, String params)
 {
@@ -2080,24 +2225,36 @@ ServiceChain::call_write(String handler, String &response, String params)
 /******************************
  * CPU
  ******************************/
+/**
+ * Retunrs a CPU ID.
+ */
 int
 CPU::get_id()
 {
     return this->_id;
 }
 
+/**
+ * Retunrs a CPU's vendor name.
+ */
 String
 CPU::get_vendor()
 {
     return this->_vendor;
 }
 
+/**
+ * Retunrs a CPU's frequency in MHz.
+ */
 long
 CPU::get_frequency()
 {
     return this->_frequency;
 }
 
+/**
+ * Encodes CPU information to JSON.
+ */
 Json
 CPU::to_json()
 {
@@ -2113,6 +2270,12 @@ CPU::to_json()
 /******************************
  * NIC
  ******************************/
+/**
+ * Encodes NIC information to JSON.
+ * Depending on the value of the second argument,
+ * this piece of information can either be generic
+ * NIC information of NIC statistics.
+ */
 Json
 NIC::to_json(RxFilterType rx_mode, bool stats)
 {
@@ -2142,6 +2305,9 @@ NIC::to_json(RxFilterType rx_mode, bool stats)
     return nic;
 }
 
+/**
+ * Implements read handlers for a NIC.
+ */
 String
 NIC::call_read(String h)
 {
@@ -2154,6 +2320,9 @@ NIC::call_read(String h)
     return "undefined";
 }
 
+/**
+ * Relays handler calls to a NIC's underlying Tx element.
+ */
 String
 NIC::call_tx_read(String h)
 {
@@ -2171,6 +2340,9 @@ NIC::call_tx_read(String h)
     return "undefined";
 }
 
+/**
+ * Relays handler calls to a NIC's underlying Rx element.
+ */
 int
 NIC::call_rx_write(String h, const String input)
 {
@@ -2197,12 +2369,18 @@ NIC::call_rx_write(String h, const String input)
     return ERROR;
 }
 
+/**
+ * Returns the device ID of a NIC.
+ */
 String
 NIC::get_device_id()
 {
     return call_read("device");
 }
 
+/**
+ * Returns a map of rule Is to rules for a given NIC.
+ */
 HashMap<long, String> *
 NIC::find_rules_by_core_id(const int core_id) {
     if (core_id < 0) {
@@ -2216,6 +2394,9 @@ NIC::find_rules_by_core_id(const int core_id) {
     return _rules.find(core_id);
 }
 
+/**
+ * Returns a list of rules associated with a NIC.
+ */
 Vector<String>
 NIC::rules_list_by_core_id(const int core_id) {
     Vector<String> rules;
@@ -2251,6 +2432,9 @@ NIC::rules_list_by_core_id(const int core_id) {
     return rules;
 }
 
+/**
+ * Adds a new rule to a given NIC's local cache.
+ */
 bool
 NIC::add_rule(const int core_id, const long rule_id, const String rule)
 {
@@ -2295,6 +2479,9 @@ NIC::add_rule(const int core_id, const long rule_id, const String rule)
     return true;
 }
 
+/**
+ * Installs a new rule to a given NIC.
+ */
 bool
 NIC::install_rule(String rule)
 {
@@ -2329,6 +2516,9 @@ NIC::install_rule(String rule)
     return true;
 }
 
+/**
+ * Removes a new rule from a given NIC.
+ */
 bool
 NIC::remove_rule(const int core_id, const long rule_id, const String rule)
 {
@@ -2378,6 +2568,9 @@ NIC::remove_rule(const int core_id, const long rule_id, const String rule)
     return true;
 }
 
+/**
+ * Removes all rules from a given NIC.
+ */
 bool NIC::remove_rules()
 {
     auto begin = _rules.begin();
