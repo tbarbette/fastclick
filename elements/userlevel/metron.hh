@@ -329,8 +329,8 @@ class ServiceChain {
                 );
                 Json to_json();
 
-                int cpu_to_queue(NIC *nic, int cpuid) {
-                    return nic->cpu_to_queue(cpuid);
+                inline int cpu_to_queue(NIC *nic, int cpu_id) {
+                    return nic->cpu_to_queue(cpu_id);
                 }
 
                 virtual int apply(NIC *nic, ErrorHandler *errh);
@@ -525,7 +525,7 @@ class Metron : public Element {
             ErrorHandler *errh
         ) CLICK_COLD;
 
-        void set_hw_info(Json &j);
+        void hw_info_to_json(Json &j);
 
         Json to_json();
         Json stats_to_json();
@@ -611,7 +611,7 @@ class Metron : public Element {
         RxFilterType _rx_mode;
 
         /* Private methods */
-        int run_chain(ServiceChain *sc, ErrorHandler *errh);
+        int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int confirm_nic_mode(ErrorHandler *errh);
 
         Timer _timer;
