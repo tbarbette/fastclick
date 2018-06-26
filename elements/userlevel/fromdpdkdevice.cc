@@ -456,7 +456,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.ierrors);
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         case h_count_rules:
-            return String(FlowDirector::flow_rules_count(fd->_dev->port_id));
+            return String(FlowDirector::flow_rules_count(fd->get_device()->get_port_id()));
     #endif
         default:
             return "<unknown>";
@@ -527,7 +527,7 @@ int FromDPDKDevice::flow_handler(
         const String &input, Element *e, void *thunk, ErrorHandler *errh)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
-    if (!fd->_dev) {
+    if (!fd->get_device()) {
         return -1;
     }
 
@@ -546,7 +546,7 @@ int FromDPDKDevice::flow_handler(
         }
         case h_del_rule: {
             uint32_t rule_id = atoi(input.c_str());
-            if (!FlowDirector::flow_rule_delete(fd->get_device()->get_port_id(), rule_id)) {
+            if (!FlowDirector::flow_rule_delete(port_id, rule_id)) {
                 return errh->error(
                     "Flow Director: Failed to delete rule '%d' from port %d", rule_id, port_id
                 );
