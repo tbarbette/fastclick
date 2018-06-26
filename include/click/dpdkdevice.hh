@@ -117,6 +117,8 @@ public:
     );
 #endif
 
+    portid_t get_port_id() { return port_id; }
+
     int add_rx_queue(
         unsigned &queue_id, bool promisc,
         unsigned n_desc, ErrorHandler *errh

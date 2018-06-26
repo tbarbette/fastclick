@@ -531,47 +531,32 @@ int FromDPDKDevice::flow_handler(
         return -1;
     }
 
+    portid_t port_id = fd->get_device()->get_port_id();
+
     switch((uintptr_t) thunk) {
         case h_add_rule: {
-            uint32_t rule_id = FlowDirector::flow_rules_count(fd->_dev->port_id) + 1;
-            if (!FlowDirector::flow_rule_install(
-                fd->_dev->port_id, rule_id, input.c_str()
-            )) {
-                errh->message(
-                    "Flow Director: Failed to add rule '%s' to port %d",
-                    input.c_str(), fd->_dev->port_id
+            uint32_t rule_id = FlowDirector::flow_rules_count(port_id) + 1;
+            if (!FlowDirector::flow_rule_install(port_id, rule_id, input.c_str())) {
+                return errh->error(
+                    "Flow Director: Failed to add rule '%s' to port %d", input.c_str(), port_id
                 );
-                return -1;
             }
-            errh->message(
-                "Flow Director: %s added to port %d",
-                input.c_str(), fd->_dev->port_id
-            );
+            errh->message("Flow Director: Rule '%s' added to port %d", input.c_str(), port_id);
             return 0;
         }
         case h_del_rule: {
             uint32_t rule_id = atoi(input.c_str());
-            if (!FlowDirector::flow_rule_delete(fd->_dev->port_id, rule_id)) {
-                errh->message(
-                    "Flow Director: Failed to delete rule '%d' from port %d",
-                    rule_id, fd->_dev->port_id
+            if (!FlowDirector::flow_rule_delete(fd->get_device()->get_port_id(), rule_id)) {
+                return errh->error(
+                    "Flow Director: Failed to delete rule '%d' from port %d", rule_id, port_id
                 );
-                return -1;
             }
-            errh->message(
-                "Flow Director: %s deleted from port %d",
-                input.c_str(), fd->_dev->port_id
-            );
+            errh->message("Flow Director: Rule '%s' deleted from port %d", input.c_str(), port_id);
             return 0;
         }
         case h_flush_rules: {
-            uint32_t flows_flushed = FlowDirector::flow_rules_flush(
-                fd->_dev->port_id
-            );
-            errh->message(
-                "\nFlow Director: %d rules are deleted from port %d",
-                flows_flushed, fd->_dev->port_id
-            );
+            uint32_t flows_flushed = FlowDirector::flow_rules_flush(port_id);
+            errh->message("\nFlow Director: %d rules are deleted from port %d", flows_flushed, port_id);
             return 0;
         }
     }
