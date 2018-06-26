@@ -287,10 +287,12 @@ class NIC {
         Json to_json(RxFilterType rx_mode, bool stats = false);
 
         int queue_per_pool() {
+            int nb_vf_pools = atoi(call_read("nb_vf_pools").c_str());
+            if (nb_vf_pools == 0)
+                return 1;
             return atoi(
                 call_read("nb_rx_queues").c_str()) /
-                atoi(call_read("nb_vf_pools").c_str()
-            );
+                nb_vf_pools;
         }
 
         int cpu_to_queue(int id) {
