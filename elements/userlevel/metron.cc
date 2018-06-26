@@ -143,7 +143,7 @@ parse_vendor_info(String hw_info, String key)
  **************************************/
 Metron::Metron() :
     _timer(this), _core_id(0), _timing_stats(true),
-    _discovered(false), _rx_mode(FLOW)
+    _discovered(false), _rx_mode(FLOW), _discover_ip()
 {
 
 }
@@ -295,9 +295,9 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
         // TODO: Let the agent operate in standard FastClick mode using RSS
         if ((_rx_mode == RSS) && (fd_mode != "rss")) {
             return errh->error(
-                "RX_MODE %s is the default FastClick mode and requires FromDPDKDevice(%s) MODE rss",
+                "RX_MODE %s is the default FastClick mode and requires FromDPDKDevice(%s) MODE rss. Current mode is %s.",
                 rx_filter_type_enum_to_str(_rx_mode).c_str(),
-                nic.value().get_id().c_str()
+                nic.value().get_id().c_str(), fd_mode.c_str()
             );
         }
 
