@@ -1464,15 +1464,13 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
         }
     } else if (method == FLOW) {
         click_chatter("Rx filters in Flow Director mode");
-        // TODO
-        // Do we need anything else here?
+        // TODO: Do we need anything else here?
     } else if (method == VLAN) {
         click_chatter("Rx filters in VLAN-based VMDq mode");
         return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
     } else if (method == RSS) {
         click_chatter("Rx filters in RSS mode");
-        // TODO: This should be trivial to support
-        return errh->error("RSS-based dispatching is not implemented yet");
+        // TODO: Do we need anything else here?
     }
 
     return SUCCESS;
