@@ -1695,7 +1695,8 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
     // No controller
     if (!m->_discovered) {
         errh->error(
-            "Cannot reconfigure service chain: Metron agent is not associated with a controller"
+            "Cannot reconfigure service chain %s: Metron agent is not associated with a controller",
+            get_id().c_str()
         );
         return ERROR;
     }
@@ -1703,13 +1704,16 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
     RxFilterType rx_filter = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
     if (rx_filter != FLOW) {
         errh->error(
-            "Cannot install rules for service chain: "
+            "Cannot install rules for service chain %s: "
             "Invalid Rx filter mode %s is sent by the controller.",
+            get_id().c_str(),
             rx_filter_type_enum_to_str(rx_filter).c_str()
         );
         return ERROR;
     }
     click_chatter("       Rx Filter: %s", rx_filter_type_enum_to_str(rx_filter).c_str());
+
+    uint32_t rules_nb = 0;
 
     Json jnics = j.get("nics");
     for (auto jnic : jnics) {
@@ -1729,31 +1733,40 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 click_chatter("         Rule ID: %ld", rule_id);
                 click_chatter("            Rule: %s", rule.c_str());
 
-                // TODO: Store this rule when this method becomes non-static
-                // NIC *nic = this->get_nic_by_id(nic_id);
-                // if (!nic) {
-                //     return errh->error(
-                //         "Metron controller attempted to install rules on unknown NIC ID: %s",
-                //         nic_id.c_str()
-                //     );
-                // }
+                // Get the correct NIC
+                NIC *nic = this->get_nic_by_id(nic_id);
+                if (!nic) {
+                    return errh->error(
+                        "Metron controller attempted to install rules on unknown NIC ID: %s",
+                        nic_id.c_str()
+                    );
+                }
 
-                // if (!nic->add_rule(cpu_index, rule_id, rule)) {
-                //     return errh->error(
-                //         "Metron controller failed to store rule %ld for NIC %s and CPU core %d",
-                //         rule_id, nic_id.c_str(), cpu_index
-                //     );
-                // }
+                // Store this rule in its local cache
+                if (!nic->add_rule(cpu_index, rule_id, rule)) {
+                    return errh->error(
+                        "Metron controller failed to store rule %ld for NIC %s and CPU core %d",
+                        rule_id, nic_id.c_str(), cpu_index
+                    );
+                }
 
-                // if (!nic->install_rule(rule)) {
-                //     return errh->error(
-                //         "Metron controller failed to install rule %ld for NIC %s and CPU core %d",
-                //         rule_id, nic_id.c_str(), cpu_index
-                //     );
-                // }
+                // Install the rule in the hardware
+                if (!nic->install_rule(rule)) {
+                    return errh->error(
+                        "Metron controller failed to install rule %ld for NIC %s and CPU core %d",
+                        rule_id, nic_id.c_str(), cpu_index
+                    );
+                }
+
+                rules_nb++;
             }
         }
     }
+
+    click_chatter(
+        "Successfully installed %" PRIu32 " NIC rules for service chain %s",
+        rules_nb, get_id().c_str()
+    );
 
     return SUCCESS;
 }
@@ -1774,8 +1787,21 @@ ServiceChain::rules_to_json()
     j.set("method", rx_filter_type_enum_to_str(rx_filter->method));
     jsc.set("rxFilter", j);
 
-    Json jrules = Json::make_object();
     Json jnics_array = Json::make_array();
+
+    // Return an empty array if the Rx filter mode is not set properly
+    if (rx_filter->method != FLOW) {
+        click_chatter(
+            "Cannot report rules for service chain %s: "
+            "This service chain is in %s Rx filter mode.",
+            get_id().c_str(),
+            rx_filter_type_enum_to_str(rx_filter->method).upper().c_str()
+        );
+
+        jsc.set("nics", jnics_array);
+
+        return jsc;
+    }
 
     // All NICs
     for (int i = 0; i < get_nics_nb(); i++) {
@@ -1797,6 +1823,10 @@ ServiceChain::rules_to_json()
 
             // Fetch the rules for this NIC and this CPU core
             HashMap<long, String> *rules_map = nic->find_rules_by_core_id(j);
+            if (!rules_map) {
+                continue;
+            }
+
             auto begin = rules_map->begin();
             while (begin != rules_map->end()) {
                 long rule_id = begin.key();
