@@ -533,7 +533,6 @@ Metron::cleanup(CleanupStage)
     // Delete service chains
     auto begin = _scs.begin();
     while (begin != _scs.end()) {
-        // TODO: Fix
         delete begin.value();
         begin++;
     }
@@ -628,6 +627,7 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
     }
 
     unassign_cpus(sc);
+
     return ERROR;
 }
 
@@ -1454,7 +1454,6 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
         click_chatter("Rx filters in MAC-based VMDq mode");
 
         Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
-        // click_chatter("VF MAC addresses: %s", nic->call_read("vf_mac_addr").c_str());
 
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
             int available_pools = atoi(nic->call_read("nb_vf_pools").c_str());
@@ -1465,16 +1464,8 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
         }
     } else if (method == FLOW) {
         click_chatter("Rx filters in Flow Director mode");
-
-        int inic = _sc->get_nic_index(nic);
-        assert(inic >= 0);
-        if (values.size() <= _sc->get_nics_nb()) {
-            values.resize(_sc->get_nics_nb());
-        }
-        values[inic].resize(_sc->get_max_cpu_nb());
-
         // TODO
-        // Do we need anyhitng else here?
+        // Do we need anything else here?
     } else if (method == VLAN) {
         click_chatter("Rx filters in VLAN-based VMDq mode");
         return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
