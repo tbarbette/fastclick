@@ -194,8 +194,11 @@ FlowDirector::add_rules_from_file(
             continue;
         }
 
-        if (FlowDirector::flow_rule_install(port_id, rule_no++, line)) {
-            _rules_nb[port_id]++;
+        if (!FlowDirector::flow_rule_install(port_id, rule_no++, line)) {
+            _errh->error(
+                "Flow Director (port %u): "
+                "Failed to install rule '%s'", port_id, line
+            );
         }
     }
 
@@ -236,6 +239,7 @@ FlowDirector::flow_rule_install(
     // TODO: Fix DPDK to return proper status
     int res = flow_parser_parse(_parser, (char *) rule, _errh);
     if (res >= 0) {
+        _rules_nb[port_id]++;
         return true;
     }
 
