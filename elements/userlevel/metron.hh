@@ -257,7 +257,7 @@ class CPU {
 
 class NIC {
     public:
-        NIC() : _rules(), _verbose(true) {
+        NIC() : _rules(), _verbose(false) {
 
         }
 
@@ -280,7 +280,7 @@ class NIC {
         HashMap<long, String> *find_rules_by_core_id(const int core_id);
         Vector<String> rules_list_by_core_id(const int core_id);
         bool add_rule(const int core_id, const long rule_id, const String rule);
-        bool install_rule(String rule);
+        bool install_rule(const long rule_id, String rule);
         bool remove_rule(const int core_id, const long rule_id, const String rule);
         bool remove_rules();
 
@@ -333,6 +333,14 @@ class ServiceChain {
 
                 inline int cpu_to_queue(NIC *nic, int cpu_id) {
                     return nic->cpu_to_queue(cpu_id);
+                }
+
+                inline void setTagValue(
+                        const int nic_id, const int cpu_id, const String value) {
+                    assert(nic_id >= 0);
+                    assert(cpu_id >= 0);
+                    assert(!value.empty());
+                    values[nic_id][cpu_id] = value;
                 }
 
                 virtual int apply(NIC *nic, ErrorHandler *errh);
@@ -492,6 +500,7 @@ class ServiceChain {
         int _max_cpus_nb;
         bool _autoscale;
         Timestamp _last_autoscale;
+        bool _verbose;
 
         friend class Metron;
 };

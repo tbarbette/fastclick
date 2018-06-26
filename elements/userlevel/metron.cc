@@ -1400,7 +1400,7 @@ ServiceChain::RxFilter::from_json(
         rf->values[inic].resize(jnic.second.size());
         int j = 0;
         for (auto jchild : jnic.second) {
-            rf->values[inic][j++] = jchild.second.to_s();
+            rf->setTagValue(inic, j++, jchild.second.to_s());
         }
         inic++;
     }
@@ -1460,7 +1460,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
             if (available_pools <= _sc->get_cpu_map(i)) {
                 return errh->error("Not enough VF pools: %d are available", available_pools);
             }
-            values[inic][i] = jaddrs[_sc->get_cpu_map(i)].to_s();
+            setTagValue(inic, i, jaddrs[_sc->get_cpu_map(i)].to_s());
         }
     } else if (method == FLOW) {
         click_chatter("Rx filters in Flow Director mode");
@@ -1480,7 +1480,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
  * Service Chain
  ************************/
 ServiceChain::ServiceChain(Metron *m)
-    : rx_filter(0), _metron(m), _total_cpuload(0)
+    : rx_filter(0), _metron(m), _total_cpuload(0), _verbose(false)
 {
 
 }
@@ -1489,9 +1489,12 @@ ServiceChain::~ServiceChain()
 {
     // Do not delete NICs, we are not the owner of those pointers
     if (rx_filter) {
-        rx_filter->values.clear();
         delete rx_filter;
     }
+
+    _cpus.clear();
+    _nics.clear();
+    _cpuload.clear();
 }
 
 /**
@@ -1690,37 +1693,33 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         return ERROR;
     }
 
-    RxFilterType rx_filter = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
-    if (rx_filter != FLOW) {
+    RxFilterType rx_filter_type = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
+    if (rx_filter_type != FLOW) {
         errh->error(
             "Cannot install rules for service chain %s: "
             "Invalid Rx filter mode %s is sent by the controller.",
             get_id().c_str(),
-            rx_filter_type_enum_to_str(rx_filter).c_str()
+            rx_filter_type_enum_to_str(rx_filter_type).c_str()
         );
         return ERROR;
     }
-    click_chatter("       Rx Filter: %s", rx_filter_type_enum_to_str(rx_filter).c_str());
 
     uint32_t rules_nb = 0;
 
     Json jnics = j.get("nics");
+    int inic = 0;
     for (auto jnic : jnics) {
-        // TODO: This might become a simple integer
+        // TODO: This could become a simple integer
         String nic_id = jnic.second.get_s("nicId");
-        click_chatter("             NIC: %s", nic_id.c_str());
 
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
             int cpu_index = jcpu.second.get_i("cpuId");
-            click_chatter("             CPU: %d", cpu_index);
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
                 long rule_id = jrule.second.get_i("ruleId");
                 String rule = jrule.second.get_s("ruleContent");
-                click_chatter("         Rule ID: %ld", rule_id);
-                click_chatter("            Rule: %s", rule.c_str());
 
                 // Get the correct NIC
                 NIC *nic = this->get_nic_by_id(nic_id);
@@ -1740,22 +1739,29 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 }
 
                 // Install the rule in the hardware
-                if (!nic->install_rule(rule)) {
+                if (!nic->install_rule(rule_id, rule)) {
                     return errh->error(
                         "Metron controller failed to install rule %ld for NIC %s and CPU core %d",
                         rule_id, nic_id.c_str(), cpu_index
                     );
                 }
 
+                // Add this tag to the list of tags of this NIC
+                this->rx_filter->setTagValue(inic, cpu_index, String(cpu_index));
+
                 rules_nb++;
             }
         }
+
+        inic++;
     }
 
-    click_chatter(
-        "Successfully installed %" PRIu32 " NIC rules for service chain %s",
-        rules_nb, get_id().c_str()
-    );
+    if (_verbose) {
+        click_chatter(
+            "Successfully installed %" PRIu32 " NIC rules for service chain %s",
+            rules_nb, get_id().c_str()
+        );
+    }
 
     return SUCCESS;
 }
@@ -1798,23 +1804,23 @@ ServiceChain::rules_to_json()
         NIC *nic = _nics[i];
 
         Json jnic = Json::make_object();
-        // TODO: Why this should be idX? and not fdX? or simply X
-        jnic.set("nicId", "id" + nic_id);
+        // TODO: Why this should be fdX? and not simply X?
+        jnic.set("nicId", "fd" + nic_id);
 
         Json jcpus_array = Json::make_array();
 
         // One NIC can dispatch to multiple CPU cores
         for (int j = 0; j < get_max_cpu_nb(); j++) {
-            Json jcpu = Json::make_object();
-            jcpu.set("cpuId", j);
-
-            Json jrules = Json::make_array();
-
             // Fetch the rules for this NIC and this CPU core
             HashMap<long, String> *rules_map = nic->find_rules_by_core_id(j);
             if (!rules_map) {
                 continue;
             }
+
+            Json jcpu = Json::make_object();
+            jcpu.set("cpuId", j);
+
+            Json jrules = Json::make_array();
 
             auto begin = rules_map->begin();
             while (begin != rules_map->end()) {
@@ -2492,7 +2498,9 @@ NIC::add_rule(const int core_id, const long rule_id, const String rule)
 
     HashMap<long, String> *rules_map = find_rules_by_core_id(core_id);
     if (!rules_map) {
-        rules_map = new HashMap<long, String>();
+        _rules.insert(core_id, new HashMap<long, String>());
+        rules_map = find_rules_by_core_id(core_id);
+        assert(rules_map);
     }
 
     rules_map->insert(rule_id, rule);
@@ -2511,8 +2519,16 @@ NIC::add_rule(const int core_id, const long rule_id, const String rule)
  * Installs a new rule to a given NIC.
  */
 bool
-NIC::install_rule(String rule)
+NIC::install_rule(const long rule_id, String rule)
 {
+    if (rule_id < 0) {
+        click_chatter(
+            "Unable to install rule to NIC %s: Invalid rule ID %ld",
+            get_id().c_str(), rule_id
+        );
+        return false;
+    }
+
     if (rule.empty()) {
         click_chatter(
             "Unable to install rule to NIC %s: Empty rule",
@@ -2522,7 +2538,7 @@ NIC::install_rule(String rule)
     }
 
     // Rule needs to be prepended with the command type and port ID
-    rule = "flow create " + String(get_port_id()) + rule;
+    rule = "flow create " + String(get_port_id()) + " " + rule;
 
     // Calls FlowDirector using FromDPDKDevice's flow handler add_rule
     if (call_rx_write("add_rule", rule) != 0) {
@@ -2536,8 +2552,8 @@ NIC::install_rule(String rule)
 
     if (_verbose) {
         click_chatter(
-            "Rule '%s' installed to NIC %s",
-            rule.c_str(), get_id().c_str()
+            "Rule %ld installed to NIC %s",
+            rule_id, get_id().c_str()
         );
     }
 
