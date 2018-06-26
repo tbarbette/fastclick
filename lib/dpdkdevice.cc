@@ -271,12 +271,12 @@ int DPDKDevice::set_mode(
 
     enum rte_eth_rx_mq_mode m;
 
-    if (mode == "") {
-        return 0;
-    } else if (mode == "none") {
+    if (mode == "none") {
         m = ETH_MQ_RX_NONE;
-    } else if ((mode == "rss") || (mode == FlowDirector::FLOW_DIR_MODE)) {
+    } else if ((mode == "rss") || (mode == FlowDirector::FLOW_DIR_MODE) || (mode == "")) {
         m = ETH_MQ_RX_RSS;
+        if (mode == "")
+            mode = "rss";
     } else if (mode == "vmdq") {
         m = ETH_MQ_RX_VMDQ_ONLY;
     } else if (mode == "vmdq_rss") {
@@ -384,6 +384,10 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 "The number of VF Pools exceeds the hardware limit of %d",
                 dev_info.max_vmdq_pools
             );
+        }
+
+        if (info.num_pools == 0) {
+            return errh->error("VMDq mode requires a number of pool higher than 0. Set it with VF_POOLS.");
         }
 
         if (info.rx_queues.size() % info.num_pools != 0) {

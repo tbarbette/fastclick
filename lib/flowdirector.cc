@@ -127,7 +127,7 @@ FlowDirector::get_flow_director(
         ErrorHandler   *errh)
 {
     // Invalid port ID
-    if (port_id >= rte_eth_dev_count()) {
+    if (port_id >= DPDKDevice::dev_count()) {
         click_chatter(
             "Flow Director (port %u): Denied to create instance "
             "for invalid port", port_id
