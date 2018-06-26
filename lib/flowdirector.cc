@@ -215,7 +215,7 @@ FlowDirector::add_rules_from_file(
 
 /**
  * Translates a string-based rule into a flow rule
- * object and install it to a NIC.
+ * object and installs it to a NIC.
  *
  * @param port_id the ID of the NIC
  * @param rule_id a flow rule's ID
