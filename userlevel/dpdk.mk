@@ -302,10 +302,10 @@ _LDLIBS-y += $(EXECENV_LDLIBS)
 _LDLIBS-y += -Wl,--end-group
 _LDLIBS-y += -Wl,--no-whole-archive
 
-DPDK_LIB=$(_LDLIBS-y) $(CPU_LDLIBS) $(EXTRA_LDLIBS)
+DPDK_LIBS=$(_LDLIBS-y) $(CPU_LDLIBS) $(EXTRA_LDLIBS)
 
 # Eliminate duplicates without sorting
-DPDK_LIB := $(shell echo $(DPDK_LIB) | \
+DPDK_LIBS := $(shell echo $(DPDK_LIBS) | \
     awk '{for (i = 1; i <= NF; i++) { if (!seen[$$i]++) print $$i }}')
 
 RTE_SDK_FULL=`readlink -f $RTE_SDK`
@@ -318,4 +318,4 @@ CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
 include $(RTE_SDK)/mk/internal/rte.build-pre.mk
 
 
-override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIB)
+override LDFLAGS := $(DPDK_OLD_LDFLAGS)
