@@ -55,9 +55,9 @@ String DPDKInfo::read_handler(Element *e, void * thunk)
 {
     DPDKInfo *fd = static_cast<DPDKInfo *>(e);
 
+    StringAccum acc;
     switch((uintptr_t) thunk) {
         case h_pool_count:
-            StringAccum acc;
             for (unsigned i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++) {
 #if RTE_VERSION < RTE_VERSION_NUM(17,02,0,0)
                 int avail = rte_mempool_count(DPDKDevice::_pktmbuf_pools[i]);
@@ -66,14 +66,22 @@ String DPDKInfo::read_handler(Element *e, void * thunk)
 #endif
                 acc << "0 " << String(avail) << "\n";
             }
-            return acc.take_string();
+            break;
+        case h_pools:
+            for (unsigned i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++) {
+               acc << DPDKDevice::_pktmbuf_pools[i]->name << "\n";
+            }
+            break;
+        default:
+            acc << "<error>";
     }
 
-    return "<error>";
+    return acc.take_string();
 }
 
 void DPDKInfo::add_handlers() {
     add_read_handler("pool_count", read_handler, h_pool_count);
+    add_read_handler("pools", read_handler, h_pools);
 }
 
 DPDKInfo* DPDKInfo::instance = 0;
