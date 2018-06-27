@@ -142,10 +142,10 @@ parse_vendor_info(String hw_info, String key)
  * Metron
  **************************************/
 Metron::Metron() :
-    _timer(this), _core_id(0), _timing_stats(true),
+    _timer(this), _timing_stats(true),
     _discovered(false), _rx_mode(FLOW), _discover_ip()
 {
-
+    _core_id = click_max_cpu_ids() - 1;
 }
 
 Metron::~Metron()
