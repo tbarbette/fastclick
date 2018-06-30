@@ -279,9 +279,11 @@ class NIC {
 
         HashMap<long, String> *find_rules_by_core_id(const int core_id);
         Vector<String> rules_list_by_core_id(const int core_id);
+        Vector<int> cores_with_rules();
         bool add_rule(const int core_id, const long rule_id, const String rule);
         bool install_rule(const long rule_id, String rule);
-        bool remove_rule(const int core_id, const long rule_id, const String rule);
+        bool remove_rule(const long rule_id);
+        bool remove_rule(const int core_id, const long rule_id);
         bool remove_rules();
 
         Json to_json(RxFilterType rx_mode, bool stats = false);
@@ -391,6 +393,9 @@ class ServiceChain {
 
         Json rules_to_json();
         int rules_from_json(Json j, Metron *m, ErrorHandler *errh);
+        static int delete_rules_from_json(
+            const long rule_id, Metron *m, ErrorHandler *errh
+        );
 
         inline String get_id() {
             return id;
@@ -557,6 +562,10 @@ class Metron : public Element {
 
         int get_cpus_nb() {
             return click_max_cpu_ids();
+        }
+
+        int get_nics_nb() {
+            return _nics.size();
         }
 
         int get_service_chains_nb() {

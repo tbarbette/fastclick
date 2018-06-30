@@ -750,8 +750,10 @@ Metron::remove_service_chain(ServiceChain *sc, ErrorHandler *errh)
     }
 
     sc->control_send_command("WRITE stop");
-    _scs.remove(sc->get_id());
     unassign_cpus(sc);
+    if (!_scs.remove(sc->get_id())) {
+        return ERROR;
+    }
 
     return SUCCESS;
 }
@@ -837,23 +839,9 @@ Metron::write_handler(
             return m->delete_controller_from_json((const String &) data);
         }
         case h_delete_rules: {
-            ServiceChain *sc = m->find_service_chain_by_id(data);
-            if (!sc) {
-                return errh->error(
-                    "Cannot delete NIC rules: Unknown service chain ID %s",
-                    data.c_str()
-                );
-            }
+            long rule_id = atol(data.c_str());
 
-            click_chatter(
-                "Metron controller requested rule deletion for service chain %s",
-                sc->get_id().c_str()
-            );
-
-            // TODO
-            // Find the NIC and call nic->call_rx_write("flush_rules", "");
-
-            return SUCCESS;
+            return ServiceChain::delete_rules_from_json(rule_id, m, errh);
         }
         default: {
             errh->error("Unknown write handler: %d", what);
@@ -1813,7 +1801,7 @@ ServiceChain::rules_to_json()
         for (int j = 0; j < get_max_cpu_nb(); j++) {
             // Fetch the rules for this NIC and this CPU core
             HashMap<long, String> *rules_map = nic->find_rules_by_core_id(j);
-            if (!rules_map) {
+            if (!rules_map || rules_map->empty()) {
                 continue;
             }
 
@@ -1848,6 +1836,42 @@ ServiceChain::rules_to_json()
     jsc.set("nics", jnics_array);
 
     return jsc;
+}
+
+/**
+ * Decodes service chain rules from JSON
+ * and deletes the rules from the respective NIC.
+ */
+int
+ServiceChain::delete_rules_from_json(const long rule_id, Metron *m, ErrorHandler *errh)
+{
+    // No controller
+    if (!m->_discovered) {
+        errh->error(
+            "Cannot delete rule %ld: Metron agent is not associated with a controller",
+            rule_id
+        );
+        return ERROR;
+    }
+
+    // Traverse all service chains
+    auto begin = m->_scs.begin();
+    while (begin != m->_scs.end()) {
+        ServiceChain *sc = begin.value();
+
+        for (int i = 0; i < sc->get_nics_nb(); i++) {
+            NIC *nic = sc->get_nic_by_index(i);
+
+            // Remove rule from both the cache and the NIC
+            if (nic->remove_rule(rule_id)) {
+                return SUCCESS;
+            }
+        }
+
+        begin++;
+    }
+
+    return ERROR;
 }
 
 /**
@@ -2416,7 +2440,8 @@ NIC::get_device_id()
  * Returns a map of rule Is to rules for a given NIC.
  */
 HashMap<long, String> *
-NIC::find_rules_by_core_id(const int core_id) {
+NIC::find_rules_by_core_id(const int core_id)
+{
     if (core_id < 0) {
         click_chatter(
             "Unable to find rules for NIC %s: Invalid core ID %d",
@@ -2432,7 +2457,8 @@ NIC::find_rules_by_core_id(const int core_id) {
  * Returns a list of rules associated with a NIC.
  */
 Vector<String>
-NIC::rules_list_by_core_id(const int core_id) {
+NIC::rules_list_by_core_id(const int core_id)
+{
     Vector<String> rules;
 
     if (core_id < 0) {
@@ -2464,6 +2490,27 @@ NIC::rules_list_by_core_id(const int core_id) {
     }
 
     return rules;
+}
+
+/**
+ * Returns the number of CPU cores that have at least one rule each.
+ */
+Vector<int>
+NIC::cores_with_rules()
+{
+    Vector<int> cores_with_rules;
+
+    for (int i = 0; i < click_max_cpu_ids(); i++) {
+        Vector<String> core_rules = rules_list_by_core_id(i);
+
+        if (core_rules.empty()) {
+            continue;
+        }
+
+        cores_with_rules[i] = i;
+    }
+
+    return cores_with_rules;
 }
 
 /**
@@ -2561,10 +2608,63 @@ NIC::install_rule(const long rule_id, String rule)
 }
 
 /**
- * Removes a new rule from a given NIC.
+ * Removes a rule from a given NIC, by using
+ * only rule ID as an index.
  */
 bool
-NIC::remove_rule(const int core_id, const long rule_id, const String rule)
+NIC::remove_rule(const long rule_id)
+{
+    if (rule_id < 0) {
+        click_chatter(
+            "Unable to remove rule from NIC %s: Invalid rule ID %ld",
+            get_id().c_str(), rule_id
+        );
+        return false;
+    }
+
+    auto begin = _rules.begin();
+    while (begin != _rules.end()) {
+        int core_id = begin.key();
+        HashMap<long, String> *rules_map = begin.value();
+
+        // No rules for this CPU core
+        if (!rules_map || rules_map->empty()) {
+            continue;
+        }
+
+        // Successfully removed rule
+        if (rules_map->remove(rule_id)) {
+            call_rx_write("del_rule", String(rule_id));
+
+            if (_verbose) {
+                click_chatter(
+                    "Rule %ld removed from NIC %s and CPU core %d",
+                    rule_id, get_id().c_str(), core_id
+                );
+            }
+
+            return true;
+        }
+
+        begin++;
+    }
+
+    if (_verbose) {
+        click_chatter(
+            "Unable to remove rule %ld from NIC %s",
+            rule_id, get_id().c_str()
+        );
+    }
+
+    return false;
+}
+
+/**
+ * Removes a rule from a given NIC, by using
+ * both core and rule IDs as indices.
+ */
+bool
+NIC::remove_rule(const int core_id, const long rule_id)
 {
     if (core_id < 0) {
         click_chatter(
@@ -2583,7 +2683,9 @@ NIC::remove_rule(const int core_id, const long rule_id, const String rule)
     }
 
     HashMap<long, String> *rules_map = find_rules_by_core_id(core_id);
-    if (!rules_map) {
+
+    // No rules for this CPU core
+    if (!rules_map || rules_map->empty()) {
         click_chatter(
             "Unable to remove rule from NIC %s: Core ID %ld has no rules",
             get_id().c_str(), rule_id
@@ -2591,25 +2693,28 @@ NIC::remove_rule(const int core_id, const long rule_id, const String rule)
         return false;
     }
 
-    if (!rules_map->remove(rule_id)) {
+    // Successfully removed rule
+    if (rules_map->remove(rule_id)) {
+        call_rx_write("del_rule", String(rule_id));
+
         if (_verbose) {
             click_chatter(
-                "Failed to remove rule %ld from NIC %s and CPU core %d",
+                "Rule %ld removed from NIC %s and CPU core %d",
                 rule_id, get_id().c_str(), core_id
             );
         }
 
-        return false;
+        return true;
     }
 
     if (_verbose) {
         click_chatter(
-            "Rule %ld removed from NIC %s and CPU core %d",
+            "Unable to remove rule %ld from NIC %s and CPU core %d",
             rule_id, get_id().c_str(), core_id
         );
     }
 
-    return true;
+    return false;
 }
 
 /**
@@ -2620,14 +2725,17 @@ bool NIC::remove_rules()
     auto begin = _rules.begin();
     while (begin != _rules.end()) {
         int core_id = begin.key();
-        HashMap<long, String> *cpu_rules = begin.value();
+        HashMap<long, String> *rules_map = begin.value();
 
-        if (!cpu_rules) {
+        if (!rules_map || rules_map->empty()) {
             continue;
         }
 
-        cpu_rules->clear();
-        delete cpu_rules;
+        rules_map->clear();
+        delete rules_map;
+
+        // Flush all rules from this NIC
+        call_rx_write("flush_rules", "");
 
         begin++;
     }
