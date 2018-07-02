@@ -8,12 +8,17 @@
  * from the controller.
  */
 
+/**
+ * Deploy as follows:
+ * sudo bin/click --dpdk -c 0x03  -v -- metron-flow-director.click
+ */
+
 /* Configuration arguments */
 define(
 	$iface0       0,
 	$iface1       1,
 
-	$queues       32,
+	$queues       1,
 
 	$dpdkRxMode   flow_dir,
 	$metronRxMode flow,
@@ -21,7 +26,6 @@ define(
 	$agentId      "metron:nfv:000001",
 	$agentIp      127.0.0.1,
 	$agentPort    80,
-	$agentCore    7,
 
 	$discoverIp   127.0.0.1,
 	$discoverPort 8181,
@@ -29,10 +33,10 @@ define(
 	$discoverPass yourSecret
 );
 
-/* Instantiate the http server to access metron handlers */
+/* Instantiate the http server to access Metron's handlers */
 http :: HTTPServer(PORT 80);
 
-/* Metron master */
+/* Metron agent */
 metron :: Metron(
 	ID                $agentId,      /* Agent ID */
 	NIC               fd0,
@@ -40,7 +44,6 @@ metron :: Metron(
 	RX_MODE           $metronRxMode, /* Rx filter mode */
 	AGENT_IP          $agentIp,      /* Own IP address */
 	AGENT_PORT        $agentPort,    /* Own HTTP port  */
-	PIN_TO_CORE       $agentCore,    /* CPU core to pin the agent's management plane */
 	DISCOVER_IP       $discoverIp,   /* Controller's IP address */
 	DISCOVER_PORT     $discoverPort, /* Controller's port */
 	DISCOVER_USER     $discoverUser, /* ONOS' REST API username */
@@ -51,6 +54,7 @@ metron :: Metron(
 fd0 :: FromDPDKDevice($iface0, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE false)
 	-> Idle
 	-> ToDPDKDevice($iface0, N_QUEUES $queues);
+
 fd1 :: FromDPDKDevice($iface1, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE false)
 	-> Idle
 	-> ToDPDKDevice($iface1, N_QUEUES $queues);

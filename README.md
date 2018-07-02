@@ -41,17 +41,17 @@ Deployment Examples
 ----
 To deploy a Metron server in MAC-based VMDq mode, do:
 ```bash
-sudo bin/click --dpdk -c 0xffff -v -- conf/metron/metron-vmdq.conf
+sudo bin/click --dpdk -c 0xffff -v -- conf/metron/metron-vmdq.click
 ```
 
 To deploy a Metron server in Flow Director mode, do:
 ```bash
-sudo bin/click --dpdk -c 0xffff -v -- conf/metron/metron-flow-director.conf
+sudo bin/click --dpdk -c 0x03 -v -- conf/metron/metron-flow-director.click
 ```
 
 To test Metron's compatibility with regular FastClick deployments, you can also deploy a Metron server in RSS mode as follows:
 ```bash
-sudo bin/click --dpdk -c 0xffff -v -- conf/metron/metron-rss.conf
+sudo bin/click --dpdk -c 0xff -v -- conf/metron/metron-rss.click
 ```
 
 
