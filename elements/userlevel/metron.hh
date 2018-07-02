@@ -267,12 +267,17 @@ class NIC {
 
         Element *element;
 
+        inline bool is_ghost() {
+            return element == NULL;
+        }
+
         inline portid_t get_port_id() {
-            return static_cast<FromDPDKDevice *>(element)->get_device()->port_id;
+            return is_ghost() ? -1 :
+                static_cast<FromDPDKDevice *>(element)->get_device()->port_id;
         }
 
         inline String get_id() {
-            return element->name();
+            return is_ghost() ? "" : element->name();
         }
 
         String get_device_id();
@@ -280,6 +285,7 @@ class NIC {
         HashMap<long, String> *find_rules_by_core_id(const int core_id);
         Vector<String> rules_list_by_core_id(const int core_id);
         Vector<int> cores_with_rules();
+        bool has_rules() { return !_rules.empty(); }
         bool add_rule(const int core_id, const long rule_id, const String rule);
         bool install_rule(const long rule_id, String rule);
         bool remove_rule(const long rule_id);
@@ -306,7 +312,7 @@ class NIC {
         int    call_rx_write(String h, const String input);
 
     private:
-        // Maps CPU cores to a map of rules ID -> rules
+        // Maps CPU cores to a map of rules ID -> rule
         HashMap<int, HashMap<long, String> *> _rules;
 
         bool _verbose;

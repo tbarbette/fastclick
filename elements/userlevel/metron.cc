@@ -150,7 +150,11 @@ Metron::Metron() :
 
 Metron::~Metron()
 {
-
+    _args.clear();
+    _dpdk_args.clear();
+    _nics.clear();
+    _scs.clear();
+    _cpu_map.clear();
 }
 
 /**
@@ -1475,13 +1479,11 @@ ServiceChain::ServiceChain(Metron *m)
 
 ServiceChain::~ServiceChain()
 {
-    // Do not delete NICs, we are not the owner of those pointers
     if (rx_filter) {
         delete rx_filter;
     }
 
     _cpus.clear();
-    _nics.clear();
     _cpuload.clear();
 }
 
@@ -2629,6 +2631,7 @@ NIC::remove_rule(const long rule_id)
 
         // No rules for this CPU core
         if (!rules_map || rules_map->empty()) {
+            begin++;
             continue;
         }
 
@@ -2718,29 +2721,50 @@ NIC::remove_rule(const int core_id, const long rule_id)
 }
 
 /**
- * Removes all rules from a given NIC.
+ * Removes all rules from a given NIC's cache.
+ * FlowDirector element undertakes to flush the NIC
+ * on exit, thus we omit this step.
  */
 bool NIC::remove_rules()
 {
+    if (is_ghost()) {
+        return false;
+    }
+
+    if (!has_rules()) {
+        return true;
+    }
+
+    long rules_nb = 0;
+
     auto begin = _rules.begin();
     while (begin != _rules.end()) {
         int core_id = begin.key();
         HashMap<long, String> *rules_map = begin.value();
 
         if (!rules_map || rules_map->empty()) {
+            begin++;
             continue;
         }
 
+        rules_nb += rules_map->size();
+
         rules_map->clear();
         delete rules_map;
-
-        // Flush all rules from this NIC
-        call_rx_write("flush_rules", "");
 
         begin++;
     }
 
     _rules.clear();
+
+    if (rules_nb > 0) {
+        click_chatter(
+            "Successfully removed %ld rules from NIC %s cache",
+            rules_nb, get_id().c_str()
+        );
+    }
+
+    return true;
 }
 
 CLICK_ENDDECLS
