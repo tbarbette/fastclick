@@ -6,15 +6,17 @@ Metron
 About
 ----
 Metron's control plane is based on the [ONOS SDN controller][onos], which we extended with [southbound drivers][metron-driver] that allow Metron to monitor and configure commodity servers.
-Metron's data plane extends [FastClick][fastclick] (see the paper [here][fastclick-paper]), which in turn uses [DPDK][dpdk] as a high performance network I/O subsystem.
+Metron's data plane extends [FastClick][fastclick] (see the FastClick paper [here][fastclick-paper]), which in turn uses [DPDK][dpdk] as a high performance network I/O subsystem.
 The Metron data plane uses two features available in modern network interface cards (NICs) to achieve accurate dispatching of input traffic to the desired CPU core(s), thus eliminating inter-core communication.
 Specifically, the Metron data plane uses either:
   1. the Virtual Machine Device queues (VMDq) to implement hardware dispatching based on the values of input packets' destination MAC address or
-  2. DPDK's Flow Director library to classify and dispatch input traffic to available NIC queues (associated with CPU cores).
+  2. DPDK's Flow API library (i.e., Flow Director) to classify and dispatch input traffic to available NIC queues (associated with CPU cores).
 
-The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be matched by the NIC of the Metron data plane agnet to perform CPU core dispatching.
+The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be matched by the NIC of the Metron data plane agent to perform CPU core dispatching.
 This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch between a traffic source and the NFV server where the Metron agent is deployed.
 The Flow Director mode allows a Metron server to perform traffic classification and dispatching using its own NIC(s), without involving any prior network element in the path.
+
+For compatibility reasons with regular FastClick deployments, the Metron data plane also supports Receive-Side Scaling (RSS) dispatching, which however restricts packet dispatching accuracy.
 
 This repository provides the source code of Metron's high performance data plane.
 Metron controller's code has not been released yet, only the [southbound driver][metron-driver] is made public.
@@ -37,14 +39,19 @@ make -j <coresNb>
 
 Deployment Examples
 ----
-To deploy Metron server in VMDq mode, do:
+To deploy a Metron server in MAC-based VMDq mode, do:
 ```bash
-sudo bin/click --dpdk -c 0xffff -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-vmdq.conf
+sudo bin/click --dpdk -c 0xffff -v -- conf/metron/metron-vmdq.conf
 ```
 
-To deploy Metron server in Flow Director mode, do:
+To deploy a Metron server in Flow Director mode, do:
 ```bash
-sudo bin/click --dpdk -c 0xffff -w 01:00.0 -w 01:00.1 -v -- conf/metron/metron-master-flow-director.conf
+sudo bin/click --dpdk -c 0xffff -v -- conf/metron/metron-flow-director.conf
+```
+
+To test Metron's compatibility with regular FastClick deployments, you can also deploy a Metron server in RSS mode as follows:
+```bash
+sudo bin/click --dpdk -c 0xffff -v -- conf/metron/metron-rss.conf
 ```
 
 
