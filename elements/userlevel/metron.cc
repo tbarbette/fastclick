@@ -624,15 +624,15 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
     }
 
     int ret = run_service_chain(sc, errh);
-    if (ret == SUCCESS) {
-        sc->status = ServiceChain::SC_OK;
-        _scs.insert(sc->get_id(), sc);
-        return SUCCESS;
+    if (ret != SUCCESS) {
+        unassign_cpus(sc);
+        return ERROR;
     }
 
-    unassign_cpus(sc);
+    sc->status = ServiceChain::SC_OK;
+    _scs.insert(sc->get_id(), sc);
 
-    return ERROR;
+    return SUCCESS;
 }
 
 /**
@@ -1494,8 +1494,20 @@ ServiceChain *
 ServiceChain::from_json(
         Json j, Metron *m, ErrorHandler *errh)
 {
+    String new_sc_id = j.get_s("id");
+
+    if ((m->_rx_mode == RSS) && (m->get_service_chains_nb() == 1)) {
+        errh->error(
+            "Unable to deploy service chain %s: "
+            "Metron in RSS mode allows only one service chain per server. "
+            "Use RX_MODE flow or mac to run multiple service chains.",
+            new_sc_id.c_str()
+        );
+        return NULL;
+    }
+
     ServiceChain *sc = new ServiceChain(m);
-    sc->id = j.get_s("id");
+    sc->id = new_sc_id;
     if (sc->id == "") {
         sc->id = String(m->get_service_chains_nb());
     }
