@@ -343,12 +343,30 @@ class ServiceChain {
                     return nic->cpu_to_queue(cpu_id);
                 }
 
-                inline void setTagValue(
+                inline void set_tag_value(
                         const int nic_id, const int cpu_id, const String value) {
                     assert(nic_id >= 0);
                     assert(cpu_id >= 0);
                     assert(!value.empty());
+
                     values[nic_id][cpu_id] = value;
+
+                    click_chatter(
+                        "Tag %s is mapped to NIC %d and CPU core %d",
+                        value.c_str(), nic_id, cpu_id
+                    );
+                }
+
+                inline String get_tag_value(const int nic_id, const int cpu_id) {
+                    assert(nic_id >= 0);
+                    assert(cpu_id >= 0);
+
+                    return values[nic_id][cpu_id];
+                }
+
+                inline bool has_tag_value(const int nic_id, const int cpu_id) {
+                    String value = get_tag_value(nic_id, cpu_id);
+                    return (value && !value.empty());
                 }
 
                 virtual int apply(NIC *nic, ErrorHandler *errh);

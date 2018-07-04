@@ -845,6 +845,11 @@ Metron::write_handler(
         case h_delete_rules: {
             long rule_id = atol(data.c_str());
 
+            click_chatter(
+                "Metron controller requested the removal of rule %ld",
+                rule_id
+            );
+
             return ServiceChain::delete_rules_from_json(rule_id, m, errh);
         }
         default: {
@@ -1017,13 +1022,10 @@ Metron::param_handler(
                 return SUCCESS;
             }
             case h_chains_rules: {
-                click_chatter("Metron controller requested rule installation");
-
                 Json jroot = Json::parse(param);
                 Json jlist = jroot.get("rules");
                 for (auto jsc : jlist) {
                     String sc_id = jsc.second.get_s("id");
-                    click_chatter("Service chain ID: %s", sc_id.c_str());
 
                     ServiceChain *sc = m->find_service_chain_by_id(sc_id);
                     if (!sc) {
@@ -1033,11 +1035,16 @@ Metron::param_handler(
                         );
                     }
 
+                    click_chatter(
+                        "Metron controller requested rule installation for service chain %s",
+                        sc_id.c_str()
+                    );
+
                     // Parse
                     int ret =  sc->rules_from_json(jsc.second, m, errh);
                     if (ret != 0) {
                         return errh->error(
-                            "Cannot install NIC rules for service chain ID %s: Parse error",
+                            "Cannot install NIC rules for service chain %s: Parse error",
                             sc_id.c_str()
                         );
                     }
@@ -1392,7 +1399,7 @@ ServiceChain::RxFilter::from_json(
         rf->values[inic].resize(jnic.second.size());
         int j = 0;
         for (auto jchild : jnic.second) {
-            rf->setTagValue(inic, j++, jchild.second.to_s());
+            rf->set_tag_value(inic, j++, jchild.second.to_s());
         }
         inic++;
     }
@@ -1452,11 +1459,15 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
             if (available_pools <= _sc->get_cpu_map(i)) {
                 return errh->error("Not enough VF pools: %d are available", available_pools);
             }
-            setTagValue(inic, i, jaddrs[_sc->get_cpu_map(i)].to_s());
+            set_tag_value(inic, i, jaddrs[_sc->get_cpu_map(i)].to_s());
         }
     } else if (method == FLOW) {
         click_chatter("Rx filters in Flow Director mode");
-        // TODO: Do we need anything else here?
+
+        // Advertize the available CPU core IDs for the NIC rules
+        for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
+            set_tag_value(inic, i, String(_sc->get_cpu_map(i)));
+        }
     } else if (method == VLAN) {
         click_chatter("Rx filters in VLAN-based VMDq mode");
         return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
@@ -1585,6 +1596,7 @@ ServiceChain::to_json()
         jnics.push_back(Json::make_string(n->get_id()));
     }
     jsc.set("nics", jnics);
+
     return jsc;
 }
 
@@ -1749,7 +1761,9 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 }
 
                 // Add this tag to the list of tags of this NIC
-                this->rx_filter->setTagValue(inic, cpu_index, String(cpu_index));
+                if (!this->rx_filter->has_tag_value(inic, cpu_index)) {
+                    this->rx_filter->set_tag_value(inic, cpu_index, String(cpu_index));
+                }
 
                 rules_nb++;
             }
@@ -1758,7 +1772,8 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         inic++;
     }
 
-    if (_verbose) {
+
+    if (rules_nb > 0) {
         click_chatter(
             "Successfully installed %" PRIu32 " NIC rules for service chain %s",
             rules_nb, get_id().c_str()
