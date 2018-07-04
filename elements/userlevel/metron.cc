@@ -461,7 +461,7 @@ Metron::run_timer(Timer *t)
                assert(nic);
                int stat_idx = (j * sc->get_nics_nb()) + i;
 
-               String name = sc->generate_config_slave_fd_name(i, j);
+               String name = sc->generate_configuration_slave_fd_name(i, j);
                long long useless = atoll(sc->simple_call_read(name + ".useless").c_str());
                long long useful = atoll(sc->simple_call_read(name + ".useful").c_str());
                long long count = atoll(sc->simple_call_read(name + ".count").c_str());
@@ -564,13 +564,20 @@ Metron::get_assigned_cpus_nb()
 bool
 Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 {
-    if (this->get_assigned_cpus_nb() + sc->get_max_cpu_nb() >= this->get_cpus_nb()) {
+    short offer = this->get_cpus_nb();
+    short demand = this->get_assigned_cpus_nb() + sc->get_max_cpu_nb();
+
+    if (demand > offer) {
+        click_chatter(
+            "Asked for %d CPU cores, but available CPU cores are %d",
+            demand, offer
+        );
         return false;
     }
 
     int j = 0;
 
-    for (int i = 0; i < get_cpus_nb(); i++) {
+    for (int i = 0; i < offer; i++) {
         if (_cpu_map[i] == 0) {
             _cpu_map[i] = sc;
             map[j++] = i;
@@ -693,7 +700,7 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
                 return errh->error("%s", strerror(errno));
         }
         */
-        String conf = sc->generate_config();
+        String conf = sc->generate_configuration();
         click_chatter("Writing configuration %s", conf.c_str());
 
         int pos = 0;
@@ -1449,9 +1456,10 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     }
     values[inic].resize(_sc->get_max_cpu_nb());
 
-    if (method == MAC) {
-        click_chatter("Rx filters in MAC-based VMDq mode");
+    String method_str = rx_filter_type_enum_to_str(method).c_str();
+    click_chatter("Rx filters in mode: %s", method_str.c_str().upper());
 
+    if (method == MAC) {
         Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
 
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
@@ -1461,19 +1469,15 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
             }
             set_tag_value(inic, i, jaddrs[_sc->get_cpu_map(i)].to_s());
         }
-    } else if (method == FLOW) {
-        click_chatter("Rx filters in Flow Director mode");
-
-        // Advertize the available CPU core IDs for the NIC rules
+    } else if ((method == FLOW) || (method == RSS)) {
+        // Advertize the available CPU core IDs
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
             set_tag_value(inic, i, String(_sc->get_cpu_map(i)));
         }
     } else if (method == VLAN) {
-        click_chatter("Rx filters in VLAN-based VMDq mode");
         return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
-    } else if (method == RSS) {
-        click_chatter("Rx filters in RSS mode");
-        // TODO: Do we need anything else here?
+    } else {
+        return errh->error("Unsupported dispatching method %s", method_str.c_str().upper());
     }
 
     return SUCCESS;
@@ -1578,7 +1582,7 @@ ServiceChain::to_json()
     jsc.set("rxFilter", rx_filter->to_json());
     jsc.set("configType", sc_type_enum_to_str(config_type));
     jsc.set("config", config);
-    jsc.set("expandedConfig", generate_config());
+    jsc.set("expandedConfig", generate_configuration());
     Json jcpus = Json::make_array();
     for (int i = 0; i < get_used_cpu_nb(); i++) {
         jcpus.push_back(get_cpu_map(i));
@@ -1959,7 +1963,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                 for (int inic = 0; inic < get_nics_nb(); inic++) {
                     for (int i = get_used_cpu_nb(); i < new_cpus_nb; i++) {
                         ret = call_write(
-                            generate_config_slave_fd_name(
+                            generate_configuration_slave_fd_name(
                                 inic, get_cpu_map(i)
                             ) + ".active", response, "1"
                         );
@@ -1981,7 +1985,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                 for (int inic = 0; inic < get_nics_nb(); inic++) {
                     for (int i = new_cpus_nb; i < get_used_cpu_nb(); i++) {
                         int ret = call_write(
-                            generate_config_slave_fd_name(
+                            generate_configuration_slave_fd_name(
                                 inic, get_cpu_map(i)
                             ) + ".active", response, "0"
                         );
@@ -2062,7 +2066,7 @@ ServiceChain::do_autoscale(int n_cpu_change)
  * as received by the controller.
  */
 String
-ServiceChain::generate_config()
+ServiceChain::generate_configuration()
 {
     String newconf = "elementclass MetronSlave {\n" + config + "\n};\n\n";
     if (_autoscale) {
@@ -2100,7 +2104,7 @@ ServiceChain::generate_config()
            String active = (j < get_used_cpu_nb() ? "1":"0");
            int cpuid = get_cpu_map(j);
            int queue_no = rx_filter->cpu_to_queue(nic, cpuid);
-           String ename = generate_config_slave_fd_name(i, j);
+           String ename = generate_configuration_slave_fd_name(i, j);
            newconf += ename + " :: " + nic->element->class_name() +
                 "(" + nic->get_device_id() + ", QUEUE " + String(queue_no) +
                 ", N_QUEUES 1, MAXTHREADS 1, BURST 32, NUMA false, ACTIVE " +
