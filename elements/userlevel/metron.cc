@@ -1457,7 +1457,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     values[inic].resize(_sc->get_max_cpu_nb());
 
     String method_str = rx_filter_type_enum_to_str(method).c_str();
-    click_chatter("Rx filters in mode: %s", method_str.c_str().upper());
+    click_chatter("Rx filters in mode: %s", method_str.upper().c_str());
 
     if (method == MAC) {
         Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
@@ -1477,7 +1477,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     } else if (method == VLAN) {
         return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
     } else {
-        return errh->error("Unsupported dispatching method %s", method_str.c_str().upper());
+        return errh->error("Unsupported dispatching method %s", method_str.upper().c_str());
     }
 
     return SUCCESS;
