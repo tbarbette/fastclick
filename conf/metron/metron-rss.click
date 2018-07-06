@@ -49,10 +49,10 @@ metron :: Metron(
 );
 
 /* NICs are in RSS mode */
-fd0 :: FromDPDKDevice($iface0, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE false)
+fd0 :: FromDPDKDevice(PORT $iface0, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE false)
 	-> Idle
-	-> ToDPDKDevice($iface0, N_QUEUES $queues);
+	-> ToDPDKDevice(PORT $iface0, N_QUEUES $queues);
 
-fd1 :: FromDPDKDevice($iface1, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE false)
+fd1 :: FromDPDKDevice(PORT $iface1, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE false)
 	-> Idle
-	-> ToDPDKDevice($iface1, N_QUEUES $queues);
+	-> ToDPDKDevice(PORT $iface1, N_QUEUES $queues);
