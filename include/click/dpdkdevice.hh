@@ -278,8 +278,12 @@ private:
 
     static int alloc_pktmbufs() CLICK_COLD;
 
-    static DPDKDevice* get_device(const portid_t &port_id) {
+    static DPDKDevice *ensure_device(const portid_t &port_id) {
         return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
+    }
+
+    static DPDKDevice *get_device(const portid_t &port_id) {
+        return &(_devs.find(port_id).value());
     }
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)

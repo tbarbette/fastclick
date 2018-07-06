@@ -71,6 +71,7 @@ const char *DPDKDevice::get_device_driver()
  * Flow Director must be strictly invoked once for each port.
  *
  * @param port_id the ID of the device where Flow Director is invoked
+ * @param errh an error handler instance
  */
 void DPDKDevice::initialize_flow_director(
         const portid_t &port_id, ErrorHandler *errh)
@@ -81,7 +82,7 @@ void DPDKDevice::initialize_flow_director(
     }
 
     // Verify
-    const portid_t p_id = flow_dir->get_port_id();
+    const portid_t p_id = flow_dir->port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
@@ -324,8 +325,10 @@ int DPDKDevice::set_mode(
         flow_dir->set_active(true);
         flow_dir->set_rules_filename(rules_path);
         errh->message(
-            "Flow Director (port %u): State active - Source file '%s'",
-            port_id, rules_path.empty() ? "None" : rules_path.c_str()
+            "Flow Director (port %u): State %s - Source file '%s'",
+            port_id,
+            flow_dir->active() ? "active" : "inactive",
+            rules_path.empty() ? "None" : rules_path.c_str()
         );
     }
 #endif
@@ -697,8 +700,9 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 {
     int err = 0;
 
-    if (_is_initialized)
+    if (_is_initialized) {
         return 0;
+    }
 
     pool_addr_template.addr_bytes[2] = click_random();
     pool_addr_template.addr_bytes[3] = click_random();
@@ -710,6 +714,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 #if RTE_VERSION < RTE_VERSION_NUM(2,0,0,0)
     if (rte_eal_pci_probe())
         return errh->error("Cannot probe the PCI bus");
+
 #endif
 
     if (dev_count() == 0 && _devs.size() > 0)
@@ -742,11 +747,16 @@ int DPDKDevice::initialize(ErrorHandler *errh)
             it != FlowDirector::_dev_flow_dir.end(); ++it) {
         const portid_t port_id = it.key();
 
+        DPDKDevice *dev = get_device(port_id);
+        if (!dev) {
+            continue;
+        }
+
         // Only if the device is registered and has the correct mode
-        if (_devs[port_id].info.mq_mode_str == FlowDirector::FLOW_DIR_MODE) {
+        if (dev->get_mode_str() == FlowDirector::FLOW_DIR_MODE) {
             int err = DPDKDevice::configure_nic(port_id);
             if (err != 0) {
-                errh->error("Error %d while configuring FLowDirector", err);
+                errh->error("Error %d while configuring Flow Director", err);
                 return -1;
             }
         }
@@ -759,18 +769,24 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 int DPDKDevice::configure_nic(const portid_t &port_id)
 {
-    if (_is_initialized) {
-        // Invoke Flow Director only if active
-        if (FlowDirector::_dev_flow_dir[port_id]->get_active()) {
-            // Retrieve the file that contains the rules (if any)
-            String rules_file = FlowDirector::_dev_flow_dir[port_id]->get_rules_filename();
+    if (!_is_initialized) {
+        return -1;
+    }
 
-            // There is a file with rules (user-defined)
-            if (!rules_file.empty()) {
-                return FlowDirector::add_rules_from_file(port_id, rules_file);
-            }
+    FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id);
+    assert(flow_dir);
+
+    // Invoke Flow Director only if active
+    if (flow_dir->active()) {
+        // Retrieve the file that contains the rules (if any)
+        String rules_file = flow_dir->rules_filename();
+
+        // There is a file with (user-defined) rules
+        if (!rules_file.empty()) {
+            return flow_dir->add_rules_from_file(rules_file);
         }
     }
+
     return 0;
 }
 #endif
@@ -783,20 +799,22 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    HashTable<portid_t, FlowDirector *> map = FlowDirector::flow_director_map();
+
     for (HashTable<portid_t, FlowDirector *>::const_iterator
-            it = FlowDirector::_dev_flow_dir.begin();
-            it != FlowDirector::_dev_flow_dir.end(); ++it) {
+            it = map.begin(); it != map.end(); ++it) {
         if (it == NULL) {
             continue;
         }
 
         portid_t port_id = it.key();
+        FlowDirector *flow_dir = it.value();
 
         // Flush
-        uint32_t rules_flushed = FlowDirector::flow_rules_flush(port_id);
+        uint32_t rules_flushed = flow_dir->flow_rules_flush();
 
         // Delete this instance
-        delete it.value();
+        delete flow_dir;
 
         // Report
         if (rules_flushed > 0) {
@@ -808,7 +826,7 @@ void DPDKDevice::cleanup(ErrorHandler *errh)
     }
 
     // Clean up the table
-    FlowDirector::_dev_flow_dir.clear();
+    FlowDirector::clean_flow_director_map();
 #endif
 }
 
@@ -871,9 +889,8 @@ DPDKDeviceArg::parse(
     }
 
     if (port_id >= 0 && port_id < DPDKDevice::dev_count()) {
-        result = DPDKDevice::get_device(port_id);
-    }
-    else {
+        result = DPDKDevice::ensure_device(port_id);
+    } else {
         ctx.error("Cannot resolve PCI address to DPDK device");
         return false;
     }
