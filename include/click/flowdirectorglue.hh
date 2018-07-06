@@ -63,9 +63,22 @@ static struct rte_port *get_ports() {
  *  Returns the global instance for a given port.
  */
 static struct rte_port *get_port(const portid_t &port_id) {
-	if (!ports || (port_id < 0)) {
-		return NULL;
-	}
+    if (!ports) {
+        printf(
+            "Flow Director (port %u): Unallocated DPDK ports\n",
+            port_id
+        );
+        return NULL;
+    }
+
+    if (port_id < 0) {
+        printf(
+            "Flow Director (port %u): Invalid port identifier\n",
+            port_id
+        );
+        return NULL;
+    }
+
     return &ports[port_id];
 }
 
@@ -91,10 +104,10 @@ static cmdline_parse_ctx_t *cmdline_get_ctx() {
  * Requires: The object returned from cmdline_get_ctx() above as 1st argument
  */
 struct cmdline *cmdline_new(
-	cmdline_parse_ctx_t *ctx,
-	const char *prompt,
-	int s_in,
-	int s_out
+    cmdline_parse_ctx_t *ctx,
+    const char *prompt,
+    int s_in,
+    int s_out
 );
 
 /**
@@ -103,8 +116,8 @@ struct cmdline *cmdline_new(
  * Requires: The object returned from cmdline_new() above as 1st argument
  */
 int cmdline_parse(
-	struct cmdline *cl,
-	const char *buf
+    struct cmdline *cl,
+    const char *buf
 );
 
 #endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */

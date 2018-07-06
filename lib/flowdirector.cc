@@ -47,27 +47,28 @@ HashTable<portid_t, FlowDirector *> FlowDirector::_dev_flow_dir;
 // A unique parser
 struct cmdline *FlowDirector::_parser = NULL;
 
-// A unique error handler
-ErrorVeneer *FlowDirector::_errh;
+// Error handling
+int FlowDirector::ERROR = -1;
+int FlowDirector::SUCCESS = 0;
 
 FlowDirector::FlowDirector() :
         _port_id(-1), _active(false),
-        _verbose(DEF_VERBOSITY)
+        _verbose(DEF_VERBOSITY), _rules_filename("")
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
 }
 
 FlowDirector::FlowDirector(portid_t port_id, ErrorHandler *errh) :
         _port_id(port_id), _active(false),
-        _verbose(DEF_VERBOSITY)
+        _verbose(DEF_VERBOSITY), _rules_filename("")
 {
     _errh = new ErrorVeneer(errh);
-    _rules_nb[port_id] = 0;
+    _rules_nb[_port_id] = 0;
 
-    if (_verbose) {
+    if (verbose()) {
         _errh->message(
-            "Flow Director (port %u): Created (state inactive)",
-            _port_id
+            "Flow Director (port %u): Created (state %s)",
+            _port_id, _active ? "active" : "inactive"
         );
     }
 }
@@ -79,7 +80,7 @@ FlowDirector::~FlowDirector()
         cmdline_quit(_parser);
         delete _parser;
         _parser = NULL;
-        if (_verbose) {
+        if (verbose()) {
             _errh->message(
                 "Flow Director (port %u): Parser deleted", _port_id
             );
@@ -91,11 +92,13 @@ FlowDirector::~FlowDirector()
         _rules_nb.clear();
     }
 
-    if (_verbose) {
+    if (verbose()) {
         _errh->message(
             "Flow Director (port %u): Destroyed", _port_id
         );
     }
+
+    delete_error_handler();
 }
 
 /**
@@ -105,13 +108,37 @@ FlowDirector::~FlowDirector()
  * @return a Flow Director parser object
  */
 struct cmdline *
-FlowDirector::get_parser(ErrorHandler *errh)
+FlowDirector::parser(ErrorHandler *errh)
 {
     if (!_parser) {
         return flow_parser_init(errh);
     }
 
     return _parser;
+}
+
+/**
+ * Returns the global map of DPDK ports to
+ * their Flow Director instances.
+ *
+ * @return a Flow Director instance map
+ */
+HashTable<portid_t, FlowDirector *>
+FlowDirector::flow_director_map()
+{
+    return _dev_flow_dir;
+}
+
+/**
+ * Cleans the global map of DPDK ports to
+ * their Flow Director instances.
+ */
+void
+FlowDirector::clean_flow_director_map()
+{
+    if (!_dev_flow_dir.empty()) {
+        _dev_flow_dir.clear();
+    }
 }
 
 /**
@@ -126,13 +153,17 @@ FlowDirector::get_flow_director(
         const portid_t &port_id,
         ErrorHandler   *errh)
 {
+    if (!errh) {
+        errh = ErrorHandler::default_handler();
+    }
+
     // Invalid port ID
     if (port_id >= DPDKDevice::dev_count()) {
         click_chatter(
             "Flow Director (port %u): Denied to create instance "
             "for invalid port", port_id
         );
-        return 0;
+        return NULL;
     }
 
     // Get the Flow Director of the desired port
@@ -141,11 +172,12 @@ FlowDirector::get_flow_director(
     // Not there, let's created it
     if (!flow_dir) {
         flow_dir = new FlowDirector(port_id, errh);
+        assert(flow_dir);
         _dev_flow_dir[port_id] = flow_dir;
     }
 
     // Create a Flow Director parser
-    _parser = get_parser(errh);
+    _parser = parser(errh);
 
     // Ship it back
     return flow_dir;
@@ -155,26 +187,23 @@ FlowDirector::get_flow_director(
  * Installs a set of string-based rules read from a file.
  * Allowed rule types: create and delete.
  *
- * @param port_id the ID of the NIC
  * @param filename the file that contains the rules
  */
 int
-FlowDirector::add_rules_from_file(
-        const portid_t &port_id,
-        const String   &filename)
+FlowDirector::add_rules_from_file(const String &filename)
 {
-    uint32_t rule_no = 0;
+    uint32_t rule_no = flow_rules_count();
 
     FILE *fp = NULL;
     fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
         return _errh->error(
             "Flow Director (port %u): Failed to open file '%s'",
-            port_id, filename.c_str());
+            _port_id, filename.c_str());
     }
 
-    char  *line = NULL;
-    size_t  len = 0;
+    char *line = NULL;
+    size_t len = 0;
     const char ignore_chars[] = "\n\t ";
 
     // Read file line-by-line (or rule-by-rule)
@@ -189,17 +218,13 @@ FlowDirector::add_rules_from_file(
         if (!strstr(line, "create") && !strstr(line, "delete")) {
             _errh->warning(
                 "Flow Director (port %u): "
-                "Expects only create and/or delete rules", port_id
+                "Expects only create and/or delete rules", _port_id
             );
             continue;
         }
 
-        if (!FlowDirector::flow_rule_install(port_id, rule_no++, line)) {
-            _errh->error(
-                "Flow Director (port %u): "
-                "Failed to install rule '%s'", port_id, line
-            );
-        }
+        _errh->message("[NIC %u] About to install rule with ID %" PRIu32 "", _port_id, rule_no);
+        flow_rule_install(rule_no++, line);
     }
 
     // Close the file
@@ -212,35 +237,38 @@ FlowDirector::add_rules_from_file(
 
     _errh->message(
         "Flow Director (port %u): %u/%u rules are installed",
-        port_id, _rules_nb[port_id], rule_no
+        _port_id, _rules_nb[_port_id], rule_no
     );
+
+    return SUCCESS;
 }
 
 /**
  * Translates a string-based rule into a flow rule
- * object and installs it to a NIC.
+ * object and installs it in a NIC.
  *
- * @param port_id the ID of the NIC
  * @param rule_id a flow rule's ID
  * @param rule a flow rule as a string
  * @return a flow rule object
  */
-bool
-FlowDirector::flow_rule_install(
-        const portid_t &port_id,
-        const uint32_t &rule_id,
-        const char *rule)
+int
+FlowDirector::flow_rule_install(const uint32_t &rule_id, const char *rule)
 {
     // Only active instances can configure a NIC
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        return false;
+    if (!active()) {
+        _errh->error(
+            "Flow Director (port %u): Inactive instance cannot install rule #%4u",
+            _port_id, rule_id
+        );
+        return ERROR;
     }
+
 
     // TODO: Fix DPDK to return proper status
     int res = flow_parser_parse(_parser, (char *) rule, _errh);
     if (res >= 0) {
-        _rules_nb[port_id]++;
-        return true;
+        _rules_nb[_port_id]++;
+        return SUCCESS;
     }
 
     // Resolve the error
@@ -262,33 +290,27 @@ FlowDirector::flow_rule_install(
 
     _errh->error(
         "Flow Director (port %u): Failed to parse rule #%4u due to %s",
-        port_id, rule_id, error.c_str()
+        _port_id, rule_id, error.c_str()
     );
 
-    return false;
+    return ERROR;
 }
 
 /**
  * Returns a flow rule object of a specific port with a specific ID.
  *
- * @param port_id the ID of the NIC
  * @param rule_id a rule ID
  * @return a flow rule object
  */
 struct port_flow *
-FlowDirector::flow_rule_get(
-        const portid_t &port_id,
-        const uint32_t &rule_id)
+FlowDirector::flow_rule_get(const uint32_t &rule_id)
 {
-    struct rte_port  *port;
-    struct port_flow *pf;
-
-    port = get_port(port_id);
+    struct rte_port *port = get_port(_port_id);
     if (!port->flow_list) {
         return NULL;
     }
 
-    for (pf = port->flow_list; pf != NULL; pf = pf->next) {
+    for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
         if (pf->id == rule_id) {
             return pf;
         }
@@ -300,106 +322,103 @@ FlowDirector::flow_rule_get(
 /**
  * Removes a flow rule object from the NIC.
  *
- * @param port_id the ID of the NIC
  * @param rule_id a flow rule's ID
  * @return status
  */
-bool
-FlowDirector::flow_rule_delete(
-        const portid_t &port_id,
-        const uint32_t &rule_id)
+int
+FlowDirector::flow_rule_delete(const uint32_t &rule_id)
 {
     // Only active instances can configure a NIC
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        return false;
+    if (!active()) {
+        return ERROR;
     }
 
     const uint32_t rules_to_delete[] = {rule_id};
 
-    if (port_flow_destroy(port_id, 1, rules_to_delete) == FLOWDIR_SUCCESS) {
-        _rules_nb[port_id]--;
-        return true;
+    if (port_flow_destroy(_port_id, 1, rules_to_delete) == FLOWDIR_SUCCESS) {
+        _rules_nb[_port_id]--;
+        return SUCCESS;
     }
 
-    return false;
+    return ERROR;
 }
 
 /**
  * Return the explicit rule counter for a particular NIC.
  *
- * @param port_id the ID of the NIC
  * @return the number of rules being installed
  */
 uint32_t
-FlowDirector::flow_rules_count(const portid_t &port_id)
+FlowDirector::flow_rules_count()
 {
-    return _rules_nb[port_id];
+    return _rules_nb[_port_id];
 }
 
 /**
- * Counts all of the rules installed to a NIC
+ * Counts all of the rules installed in a NIC
  * by traversing the list of rules.
  *
- * @param port_id the ID of the NIC
  * @return the number of rules being installed
  */
 uint32_t
-FlowDirector::flow_rules_count_explicit(const portid_t &port_id)
+FlowDirector::flow_rules_count_explicit()
 {
     // Only active instances might have some rules
-    if (!_dev_flow_dir[port_id]->get_active()) {
+    if (!active()) {
         return 0;
     }
 
-    struct rte_port  *port;
-    struct port_flow *pf;
+    struct rte_port *port = get_port(_port_id);
+    if (!port->flow_list) {
+        if (verbose()) {
+            _errh->message("Flow Director (port %u): No flows", _port_id);
+        }
+        return 0;
+    }
+
     uint32_t rules_nb = 0;
 
-    port = get_port(port_id);
-    if (!port->flow_list) {
-        return 0;
-    }
-
-    /* Sort flows by group, priority and ID. */
-    for (pf = port->flow_list; pf != NULL; pf = pf->next) {
+    // Traverse the list of installed flow rules
+    for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
         rules_nb++;
     }
 
     // Consistency
-    assert(_rules_nb[port_id] == rules_nb);
+    assert(_rules_nb[_port_id] == rules_nb);
 
     return rules_nb;
 }
 
 /**
- * Flushes all of the rules from a NIC.
+ * Flushes all of the rules from a NIC associated with this
+ * Flow Director instance.
  *
- * @param port_id the ID of the NIC
  * @return the number of rules being flushed
  */
 uint32_t
-FlowDirector::flow_rules_flush(const portid_t &port_id)
+FlowDirector::flow_rules_flush()
 {
     // Only active instances can configure a NIC
-    if (!_dev_flow_dir[port_id]->get_active()) {
-        if (_dev_flow_dir[port_id]->get_verbose()) {
-            _errh->message(
-                "Flow Director (port %u): Nothing to flush", port_id
-            );
+    if (!active()) {
+        if (verbose()) {
+            _errh->message("Flow Director (port %u): Nothing to flush", _port_id);
         }
         return 0;
     }
 
-    uint32_t rules_before_flush = _rules_nb[port_id];
+    uint32_t rules_before_flush = flow_rules_count_explicit();
+    if (rules_before_flush == 0) {
+        return 0;
+    }
 
     // Successful flush means zero rules left
-    if (port_flow_flush(port_id) == FLOWDIR_SUCCESS) {
-        _rules_nb[port_id] = 0;
+    if (port_flow_flush(_port_id) == FLOWDIR_SUCCESS) {
+        _rules_nb[_port_id] = 0;
         return rules_before_flush;
     }
 
-    // Otherwise, count to see how many of them are there
-    return flow_rules_count_explicit(port_id);
+    // Now, count again to verify what is left
+    return flow_rules_count_explicit();
 }
 
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */

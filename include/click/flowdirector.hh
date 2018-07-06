@@ -41,6 +41,10 @@ public:
     FlowDirector(portid_t port_id, ErrorHandler *errh);
     ~FlowDirector();
 
+    // Return status
+    static int ERROR;
+    static int SUCCESS;
+
     // DPDKDevice mode is Flow Director
     static String FLOW_DIR_MODE;
 
@@ -56,71 +60,77 @@ public:
     // Global table of ports mapped to their Flow Director objects
     static HashTable<portid_t, FlowDirector *> _dev_flow_dir;
 
-    inline static void delete_error_handler() { delete _errh; };
+    // Map of ports to Flow Director instances
+    static HashTable<portid_t, FlowDirector *> flow_director_map();
+
+    // Cleans the mappings between ports and Flow Director instances
+    static void clean_flow_director_map();
+
+    // Acquires a Flow Director instance on a port
+    static FlowDirector *get_flow_director(
+        const portid_t &port_id,
+        ErrorHandler   *errh = NULL
+    );
+
+    // Parser initialization
+    static struct cmdline *parser(ErrorHandler *errh);
+
+    // Deletes the error handler of this element
+    inline void delete_error_handler() { if (_errh) delete _errh; };
 
     // Port ID handlers
     inline void set_port_id(const portid_t &port_id) {
         _port_id = port_id;
     };
-    inline portid_t get_port_id() { return _port_id; };
+    inline portid_t port_id() { return _port_id; };
 
     // Activation/deactivation handlers
     inline void set_active(const bool &active) {
         _active = active;
     };
-    inline bool get_active() { return _active; };
+    inline bool active() { return _active; };
 
     // Verbosity handlers
     inline void set_verbose(const bool &verbose) {
         _verbose = verbose;
     };
-    inline bool get_verbose() { return _verbose; };
+    inline bool verbose() { return _verbose; };
 
     // Rules' file handlers
     inline void set_rules_filename(const String &file) {
         _rules_filename = file;
     };
-    inline String get_rules_filename() { return _rules_filename; };
+    inline String rules_filename() { return _rules_filename; };
 
-    // Parser initialization
-    static struct cmdline *get_parser(ErrorHandler *errh);
-
-    // Manages the Flow Director instances
-    static FlowDirector *get_flow_director(
-        const portid_t &port_id,
-        ErrorHandler   *errh
-    );
-
-    // Add flow rules to a NIC from a file
-    static int add_rules_from_file(
-        const portid_t &port_id,
+    // Install flow rule in a NIC from a file
+    int add_rules_from_file(
         const String   &filename
     );
 
-    // Install a flow rule into a NIC
-    static bool flow_rule_install(
-        const portid_t &port_id,
+    // Install a flow rule in a NIC
+    int flow_rule_install(
         const uint32_t &rule_id,
         const char     *rule
     );
 
     // Return a flow rule object with a specific ID
-    static struct port_flow *flow_rule_get(
-        const portid_t &port_id,
+    struct port_flow *flow_rule_get(
         const uint32_t &rule_id
     );
 
     // Delete a flow rule from a NIC
-    static bool flow_rule_delete(
-        const portid_t &port_id,
+    int flow_rule_delete(
         const uint32_t &rule_id
     );
 
     // Counts the number of rules in a NIC
-    static uint32_t flow_rules_count(const portid_t &port_id);
+    // Local memory counter
+    uint32_t flow_rules_count();
+    // NIC counter
+    uint32_t flow_rules_count_explicit();
 
     // Flush all of the rules from a NIC
-    static uint32_t flow_rules_flush(const portid_t &port_id);
+    uint32_t flow_rules_flush();
 
 private:
 
@@ -136,18 +146,14 @@ private:
     // Filename that contains the rules to be installed
     String _rules_filename;
 
+    // A dedicated error handler
+    ErrorVeneer *_errh;
+
     // Flow rule commands' parser
     static struct cmdline *_parser;
 
     // Flow rule counter per device
     static HashTable<portid_t, uint32_t> _rules_nb;
-
-    // A unique error handler
-    static ErrorVeneer *_errh;
-
-    static uint32_t flow_rules_count_explicit(
-        const portid_t &port_id
-    );
 };
 
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
