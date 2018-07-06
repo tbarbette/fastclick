@@ -257,7 +257,7 @@ class CPU {
 
 class NIC {
     public:
-        NIC() : _rules(), _verbose(false) {
+        NIC() : _rules(), _internal_rule_map(), _verbose(false) {
 
         }
 
@@ -271,9 +271,9 @@ class NIC {
             return element == NULL;
         }
 
-        inline portid_t get_port_id() {
+        inline portid_t port_id() {
             return is_ghost() ? -1 :
-                static_cast<FromDPDKDevice *>(element)->get_device()->port_id;
+                static_cast<FromDPDKDevice *>(element)->get_device()->get_port_id();
         }
 
         inline String get_id() {
@@ -282,14 +282,15 @@ class NIC {
 
         String get_device_id();
 
-        HashMap<long, String> *find_rules_by_core_id(const int core_id);
-        Vector<String> rules_list_by_core_id(const int core_id);
+        HashMap<long, String> *find_rules_by_core_id(const int &core_id);
+        Vector<String> rules_list_by_core_id(const int &core_id);
         Vector<int> cores_with_rules();
         bool has_rules() { return !_rules.empty(); }
-        bool add_rule(const int core_id, const long rule_id, const String rule);
-        bool install_rule(const long rule_id, String rule);
-        bool remove_rule(const long rule_id);
-        bool remove_rule(const int core_id, const long rule_id);
+        bool insert_rule(const int &core_id, const long &rule_id, String &rule);
+        int install_rule(const long &rule_id, String &rule);
+        bool remove_rule(const long &rule_id);
+        bool remove_rule(const int &core_id, const long &rule_id);
+        bool update_rule(const int &core_id, const long &rule_id, String &rule);
         bool remove_rules();
 
         Json to_json(RxFilterType rx_mode, bool stats = false);
@@ -312,10 +313,19 @@ class NIC {
         int    call_rx_write(String h, const String input);
 
     private:
-        // Maps CPU cores to a map of rules ID -> rule
+        // Maps CPU cores to a map of rule ID -> rule
         HashMap<int, HashMap<long, String> *> _rules;
 
+        // Maps ONOS rule IDs (long) to NIC rule IDs (uint32_t)
+        HashMap<long, uint32_t> _internal_rule_map;
+
         bool _verbose;
+
+        // Methods that facilitate the mapping between ONOS and NIC rule IDs
+        uint32_t get_internal_rule_id(const long &rule_id);
+        bool verify_unique_rule_id_mapping(const uint32_t &int_rule_id);
+        bool store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_id);
+        bool delete_rule_id_mapping(const long &rule_id);
 
 };
 
@@ -423,6 +433,10 @@ class ServiceChain {
 
         inline String get_id() {
             return id;
+        }
+
+        inline RxFilterType get_rx_mode() {
+            return rx_filter->method;
         }
 
         inline int get_used_cpu_nb() {
