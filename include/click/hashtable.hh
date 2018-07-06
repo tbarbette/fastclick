@@ -223,7 +223,7 @@ class HashTable<T> {
     /** @brief Ensure an element with key @a key and return its iterator.
      *
      * If an element with @a key already exists in the table, then, like
-     * find(@a key), returns an iterator pointing at at element.  Otherwise,
+     * find(@a key), returns an iterator pointing at that element.  Otherwise,
      * find_insert adds a new value T(@a key) to the table and returns its
      * iterator.
      *
@@ -248,7 +248,7 @@ class HashTable<T> {
     /** @brief Ensure an element with key @a value.hashkey() and return its iterator.
      *
      * If an element with @a value.hashkey() already exists in the table,
-     * then, like find(), returns an iterator pointing at at element.
+     * then, like find(), returns an iterator pointing at that element.
      * Otherwise, find_insert adds a copy of @a value to the table and returns
      * its iterator.
      *
