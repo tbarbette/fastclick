@@ -1732,7 +1732,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
-            int cpu_index = jcpu.second.get_i("cpuId");
+            int core_id = jcpu.second.get_i("cpuId");
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
@@ -1743,30 +1743,22 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 NIC *nic = this->get_nic_by_id(nic_id);
                 if (!nic) {
                     return errh->error(
-                        "Metron controller attempted to install rules on unknown NIC ID: %s",
+                        "Metron controller attempted to install rules in unknown NIC: %s",
                         nic_id.c_str()
                     );
                 }
 
-                // Store this rule in its local cache
-                if (!nic->add_rule(cpu_index, rule_id, rule)) {
+                // Update the data plane with this new rule
+                if (!nic->update_rule(core_id, rule_id, rule)) {
                     return errh->error(
-                        "Metron controller failed to store rule %ld for NIC %s and CPU core %d",
-                        rule_id, nic_id.c_str(), cpu_index
-                    );
-                }
-
-                // Install the rule in the hardware
-                if (!nic->install_rule(rule_id, rule)) {
-                    return errh->error(
-                        "Metron controller failed to install rule %ld for NIC %s and CPU core %d",
-                        rule_id, nic_id.c_str(), cpu_index
+                        "Unable to insert rule %ld into NIC %s mapped to CPU core %d",
+                        rule_id, nic_id.c_str(), core_id
                     );
                 }
 
                 // Add this tag to the list of tags of this NIC
-                if (!this->rx_filter->has_tag_value(inic, cpu_index)) {
-                    this->rx_filter->set_tag_value(inic, cpu_index, String(cpu_index));
+                if (!this->rx_filter->has_tag_value(inic, core_id)) {
+                    this->rx_filter->set_tag_value(inic, core_id, String(core_id));
                 }
 
                 rules_nb++;
@@ -2096,30 +2088,34 @@ ServiceChain::generate_configuration()
         newconf += "slave :: MetronSlave();\n\n";
     }
 
+    // NICs require an additional parameter if in Flow Director mode
+    String rx_conf = (get_rx_mode() == FLOW) ? "MODE flow_dir, " : "";
+
     for (int i = 0; i < get_nics_nb(); i++) {
-       String is = String(i);
-       NIC *nic = get_nic_by_index(i);
-       for (int j = 0; j < get_max_cpu_nb(); j++) {
-           String js = String(j);
-           String active = (j < get_used_cpu_nb() ? "1":"0");
-           int cpuid = get_cpu_map(j);
-           int queue_no = rx_filter->cpu_to_queue(nic, cpuid);
-           String ename = generate_configuration_slave_fd_name(i, j);
-           newconf += ename + " :: " + nic->element->class_name() +
+        String is = String(i);
+        NIC *nic = get_nic_by_index(i);
+        for (int j = 0; j < get_max_cpu_nb(); j++) {
+            String js = String(j);
+            String active = (j < get_used_cpu_nb() ? "1":"0");
+            int cpuid = get_cpu_map(j);
+            int queue_no = rx_filter->cpu_to_queue(nic, cpuid);
+            String ename = generate_configuration_slave_fd_name(i, j);
+            newconf += ename + " :: " + nic->element->class_name() +
                 "(" + nic->get_device_id() + ", QUEUE " + String(queue_no) +
-                ", N_QUEUES 1, MAXTHREADS 1, BURST 32, NUMA false, ACTIVE " +
-                active + ", VERBOSE 99);\n";
-           newconf += "StaticThreadSched(" + ename + " " + String(cpuid) + ");";
-           newconf += ename + " " +
+                ", N_QUEUES 1, MAXTHREADS 1, BURST 32, NUMA false, ";
+            newconf += rx_conf;
+            newconf += "ACTIVE " + active + ", VERBOSE 99);\n";
+            newconf += "StaticThreadSched(" + ename + " " + String(cpuid) + ");";
+            newconf += ename + " " +
                 // " -> batchAvg" + is + "C" + js + " :: AverageBatchCounter() " +
                 " -> [" + is + "]slave;\n";
-          // newconf += "Script(label s, read batchAvg" + is + "C" + js +
-          //           ".average, wait 1s, goto s);\n";
-       }
+            // newconf += "Script(label s, read batchAvg" + is + "C" + js +
+            //            ".average, wait 1s, goto s);\n";
+        }
 
-       // TODO: Allowed CPU bitmap
-       newconf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_id() + ");";
-       newconf += "slave["  + is + "] -> slaveTD" + is + ";\n";
+        // TODO: Allowed CPU bitmap
+        newconf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_id() + ");";
+        newconf += "slave["  + is + "] -> slaveTD" + is + ";\n";
 
     }
     return newconf;
@@ -2420,7 +2416,7 @@ NIC::call_tx_read(String h)
     // TODO: Ensure element type
     ToDPDKDevice *td = dynamic_cast<FromDPDKDevice *>(element)->findOutputElement();
     if (!td) {
-        return "Could not find matching ToDPDKDevice for NIC %s" + get_id();
+        return "[NIC " + String(port_id()) + "] Could not find matching ToDPDKDevice";
     }
 
     const Handler *hc = Router::handler(td, h);
@@ -2439,10 +2435,7 @@ NIC::call_rx_write(String h, const String input)
 {
     FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(element);
     if (!fd) {
-        click_chatter(
-            "Could not find matching FromDPDKDevice for NIC %s",
-            get_id().c_str()
-        );
+        click_chatter("[NIC %u] Could not find matching FromDPDKDevice", port_id());
         return ERROR;
     }
 
@@ -2451,11 +2444,7 @@ NIC::call_rx_write(String h, const String input)
         return hc->call_write(input, fd, ErrorHandler::default_handler());
     }
 
-    click_chatter(
-        "Could not find matching handler %s for NIC %s",
-        h.c_str(),
-        get_id().c_str()
-    );
+    click_chatter("[NIC %u] Could not find matching handler %s", port_id(), h.c_str());
 
     return ERROR;
 }
@@ -2473,13 +2462,10 @@ NIC::get_device_id()
  * Returns a map of rule Is to rules for a given NIC.
  */
 HashMap<long, String> *
-NIC::find_rules_by_core_id(const int core_id)
+NIC::find_rules_by_core_id(const int &core_id)
 {
     if (core_id < 0) {
-        click_chatter(
-            "Unable to find rules for NIC %s: Invalid core ID %d",
-            get_id().c_str(), core_id
-        );
+        click_chatter("[NIC %u] Unable to find rules: Invalid core ID %d", port_id(), core_id);
         return NULL;
     }
 
@@ -2490,24 +2476,18 @@ NIC::find_rules_by_core_id(const int core_id)
  * Returns a list of rules associated with a NIC.
  */
 Vector<String>
-NIC::rules_list_by_core_id(const int core_id)
+NIC::rules_list_by_core_id(const int &core_id)
 {
     Vector<String> rules;
 
     if (core_id < 0) {
-        click_chatter(
-            "Unable to find rules for NIC %s: Invalid core ID %d",
-            get_id().c_str(), core_id
-        );
+        click_chatter("[NIC %u] Unable to find rules: Invalid core ID %d", port_id(), core_id);
         return rules;
     }
 
     HashMap<long, String> *rules_map = find_rules_by_core_id(core_id);
     if (!rules_map) {
-        click_chatter(
-            "No rules associated with NIC %s and CPU core %d",
-            get_id().c_str(), core_id
-        );
+        click_chatter("[NIC %u] No rules associated with CPU core %d", port_id(), core_id);
         return rules;
     }
 
@@ -2550,29 +2530,20 @@ NIC::cores_with_rules()
  * Adds a new rule to a given NIC's local cache.
  */
 bool
-NIC::add_rule(const int core_id, const long rule_id, const String rule)
+NIC::insert_rule(const int &core_id, const long &rule_id, String &rule)
 {
     if (core_id < 0) {
-        click_chatter(
-            "Unable to add rule to NIC %s: Invalid core ID %d",
-            get_id().c_str(), core_id
-        );
+        click_chatter("[NIC %u] Unable to add rule: Invalid core ID %d", port_id(), core_id);
         return false;
     }
 
     if (rule_id < 0) {
-        click_chatter(
-            "Unable to add rule to NIC %s: Invalid rule ID %ld",
-            get_id().c_str(), rule_id
-        );
+        click_chatter("[NIC %u] Unable to add rule: Invalid rule ID %ld", port_id(), rule_id);
         return false;
     }
 
     if (rule.empty()) {
-        click_chatter(
-            "Unable to add rule to NIC %s: Empty rule",
-            get_id().c_str()
-        );
+        click_chatter("[NIC %u] Unable to add rule: Empty rule", port_id());
         return false;
     }
 
@@ -2583,61 +2554,57 @@ NIC::add_rule(const int core_id, const long rule_id, const String rule)
         assert(rules_map);
     }
 
-    rules_map->insert(rule_id, rule);
+    if (!rules_map->insert(rule_id, rule)) {
+        click_chatter("[NIC %u] Unable to add rule: Cache failure", port_id());
+        return false;
+    }
+
+    int status = install_rule(rule_id, rule);
+    if (status < 0) {
+        return false;
+    }
+
+    uint32_t internal_rule_id = static_cast<uint32_t>(status);
 
     if (_verbose) {
         click_chatter(
-            "Rule %ld added to NIC %s and mapped with CPU core %d",
-            rule_id, get_id().c_str(), core_id
+            "[NIC %u] Rule %ld added and mapped with NIC rule ID %" PRIu32 " and CPU core %d",
+            port_id(), rule_id, internal_rule_id, core_id
         );
     }
 
-    return true;
+    return store_rule_id_mapping(rule_id, internal_rule_id);
 }
 
 /**
- * Installs a new rule to a given NIC.
+ * Installs a new rule in a given NIC.
+ * Returns a new NIC rule ID or error.
  */
-bool
-NIC::install_rule(const long rule_id, String rule)
+int
+NIC::install_rule(const long &rule_id, String &rule)
 {
-    if (rule_id < 0) {
-        click_chatter(
-            "Unable to install rule to NIC %s: Invalid rule ID %ld",
-            get_id().c_str(), rule_id
-        );
-        return false;
-    }
-
-    if (rule.empty()) {
-        click_chatter(
-            "Unable to install rule to NIC %s: Empty rule",
-            get_id().c_str()
-        );
-        return false;
-    }
-
     // Rule needs to be prepended with the command type and port ID
-    rule = "flow create " + String(get_port_id()) + " " + rule;
+    rule = "flow create " + String(port_id()) + " " + rule;
 
-    // Calls FlowDirector using FromDPDKDevice's flow handler add_rule
-    if (call_rx_write("add_rule", rule) != 0) {
-        click_chatter(
-            "Unable to install rule '%s' to NIC %s",
-            rule.c_str(), get_id().c_str()
-        );
-
-        return false;
+    /**
+     * Calls FlowDirector using FromDPDKDevice's flow handler add_rule.
+     * Upon successful invocation, Flow Director returns an internal
+     * rule ID which needs to be stored if rule deletion is required
+     * in the future. Otherwise, negative value is returned to indicate
+     * error during rule installation in the NIC.
+     */
+    int status = call_rx_write("add_rule", rule);
+    if (status < 0) {
+        click_chatter("[NIC %u] Unable to install rule '%s'", port_id(), rule.c_str());
+        return ERROR;
     }
 
+    uint32_t nic_rule_id =  static_cast<uint32_t>(status);
     if (_verbose) {
-        click_chatter(
-            "Rule %ld installed to NIC %s",
-            rule_id, get_id().c_str()
-        );
+        click_chatter("[NIC %u] Rule %ld installed with internal ID %" PRIu32, port_id(), rule_id, nic_rule_id);
     }
 
-    return true;
+    return static_cast<int>(nic_rule_id);
 }
 
 /**
@@ -2645,13 +2612,10 @@ NIC::install_rule(const long rule_id, String rule)
  * only rule ID as an index.
  */
 bool
-NIC::remove_rule(const long rule_id)
+NIC::remove_rule(const long &rule_id)
 {
     if (rule_id < 0) {
-        click_chatter(
-            "Unable to remove rule from NIC %s: Invalid rule ID %ld",
-            get_id().c_str(), rule_id
-        );
+        click_chatter("[NIC %u] Unable to remove rule: Invalid rule ID %ld", port_id(), rule_id);
         return false;
     }
 
@@ -2666,15 +2630,26 @@ NIC::remove_rule(const long rule_id)
             continue;
         }
 
-        // Successfully removed rule
+        // Remove rule from the cache and the NIC
         if (rules_map->remove(rule_id)) {
-            call_rx_write("del_rule", String(rule_id));
+            // Now fetch the mapping of the controller rule ID with the NIC ID
+            uint32_t internal_rule_id = get_internal_rule_id(rule_id);
+            if (internal_rule_id < 0) {
+                return false;
+            }
+
+            // Delete this rule from the NIC using the NIC ID
+            if (call_rx_write("del_rule", String(internal_rule_id)) != SUCCESS) {
+                return false;
+            }
+
+            // Also, delete the ID mapping for this rule
+            if (!delete_rule_id_mapping(rule_id)) {
+                return false;
+            }
 
             if (_verbose) {
-                click_chatter(
-                    "Rule %ld removed from NIC %s and CPU core %d",
-                    rule_id, get_id().c_str(), core_id
-                );
+                click_chatter("[NIC %u] Rule %ld removed from CPU core %d", port_id(), rule_id, core_id);
             }
 
             return true;
@@ -2684,10 +2659,7 @@ NIC::remove_rule(const long rule_id)
     }
 
     if (_verbose) {
-        click_chatter(
-            "Unable to remove rule %ld from NIC %s",
-            rule_id, get_id().c_str()
-        );
+        click_chatter("[NIC %u] Unable to remove rule %ld", port_id(), rule_id);
     }
 
     return false;
@@ -2698,21 +2670,15 @@ NIC::remove_rule(const long rule_id)
  * both core and rule IDs as indices.
  */
 bool
-NIC::remove_rule(const int core_id, const long rule_id)
+NIC::remove_rule(const int &core_id, const long &rule_id)
 {
     if (core_id < 0) {
-        click_chatter(
-            "Unable to remove rule from NIC %s: Invalid core ID %d",
-            get_id().c_str(), core_id
-        );
+        click_chatter("[NIC %u] Unable to remove rule: Invalid core ID %d", port_id(), core_id);
         return false;
     }
 
     if (rule_id < 0) {
-        click_chatter(
-            "Unable to remove rule from NIC %s: Invalid rule ID %ld",
-            get_id().c_str(), rule_id
-        );
+        click_chatter("[NIC %u] Unable to remove rule: Invalid rule ID %ld", port_id(), rule_id);
         return false;
     }
 
@@ -2720,35 +2686,55 @@ NIC::remove_rule(const int core_id, const long rule_id)
 
     // No rules for this CPU core
     if (!rules_map || rules_map->empty()) {
-        click_chatter(
-            "Unable to remove rule from NIC %s: Core ID %ld has no rules",
-            get_id().c_str(), rule_id
-        );
+        click_chatter("[NIC %u] Unable to remove rule: Core ID %ld has no rules", port_id(), rule_id);
         return false;
     }
 
-    // Successfully removed rule
+    // Remove rule from the cache and the NIC
     if (rules_map->remove(rule_id)) {
-        call_rx_write("del_rule", String(rule_id));
+        // Now fetch the mapping of the controller rule ID with the NIC ID
+        uint32_t internal_rule_id = get_internal_rule_id(rule_id);
+        if (internal_rule_id < 0) {
+            return false;
+        }
+
+        // Delete this rule from the NIC using the NIC ID
+        if (call_rx_write("del_rule", String(internal_rule_id)) != SUCCESS) {
+            return false;
+        }
+
+        // Also, delete the ID mapping for this rule
+        if (!delete_rule_id_mapping(rule_id)) {
+            return false;
+        }
 
         if (_verbose) {
-            click_chatter(
-                "Rule %ld removed from NIC %s and CPU core %d",
-                rule_id, get_id().c_str(), core_id
-            );
+            click_chatter("[NIC %u] Rule %ld removed from CPU core %d", port_id(), rule_id, core_id);
         }
 
         return true;
     }
 
     if (_verbose) {
-        click_chatter(
-            "Unable to remove rule %ld from NIC %s and CPU core %d",
-            rule_id, get_id().c_str(), core_id
-        );
+        click_chatter("[NIC %u] Unable to remove rule %ld mapped to CPU core %d", port_id(), rule_id, core_id);
     }
 
     return false;
+}
+
+/**
+ * Updates a rule using a two-phase commit.
+ * First checks if rule exists and removes it.
+ * Then, inserts the new rule.
+ */
+bool
+NIC::update_rule(const int &core_id, const long &rule_id, String &rule)
+{
+    // First try to remove this rule, if it exists
+    remove_rule(rule_id);
+
+    // Now, store this rule in this CPU core's local cache and the NIC
+    return insert_rule(core_id, rule_id, rule);
 }
 
 /**
@@ -2787,15 +2773,115 @@ bool NIC::remove_rules()
     }
 
     _rules.clear();
+    _internal_rule_map.clear();
 
     if (rules_nb > 0) {
-        click_chatter(
-            "Successfully removed %ld rules from NIC %s cache",
-            rules_nb, get_id().c_str()
-        );
+        click_chatter("[NIC %u] Successfully removed %ld rules from local cache", port_id(), rules_nb);
     }
 
     return true;
+}
+
+/**
+ * Keeps a mapping between controller and NIC rule IDs.
+ * This method should be called when a new rule is
+ * installed by the controller (see method install_rule).
+ */
+bool
+NIC::store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_id)
+{
+    if (rule_id < 0) {
+        click_chatter("[NIC %u] Unable to store mapping for invalid controller rule ID %ld", port_id(), rule_id);
+        return false;
+    }
+
+    /**
+     * Verify the uniqueness of this internal ID.
+     * TODO: The complexity of this method is O(#OfRules)!
+     * Consider removing this operation, thus assuming that the
+     * controller knows what it is doing.
+     */
+    if (!verify_unique_rule_id_mapping(int_rule_id)) {
+        return false;
+    }
+
+    if (_internal_rule_map.insert(rule_id, int_rule_id)) {
+        if (_verbose) {
+            click_chatter("[NIC %u] Successfully inserted rule mapping %ld <--> %" PRIu32, port_id(), rule_id, int_rule_id);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Traverses the map of controller rule IDs to internal NIC IDs,
+ * and verifies that there is no internal rule ID with the
+ * input value.
+ * This ensures that a future store operation will create a
+ * unique mapping.
+ */
+bool
+NIC::verify_unique_rule_id_mapping(const uint32_t &int_rule_id)
+{
+    if (int_rule_id < 0) {
+        click_chatter("[NIC %u] Unable to verify mapping for invalid NIC rule ID %" PRIu32, port_id(), int_rule_id);
+        return false;
+    }
+
+    auto begin = _internal_rule_map.begin();
+    while (begin != _internal_rule_map.end()) {
+        uint32_t r_id = begin.value();
+
+        if (r_id == int_rule_id) {
+            click_chatter("[NIC %u] Internal rule ID %" PRIu32 " already exists in rule map", port_id(), int_rule_id);
+            return false;
+        }
+
+        begin++;
+    }
+
+    return true;
+}
+
+/**
+ * Deletes a mapping between a controller and a NIC rule ID.
+ * This method should be called when an existing rule is
+ * deleted by the controller (see method remove_rule).
+ */
+bool
+NIC::delete_rule_id_mapping(const long &rule_id)
+{
+    if (rule_id < 0) {
+        click_chatter("[NIC %u] Unable to delete mapping for invalid controller rule ID %ld", port_id(), rule_id);
+        return false;
+    }
+
+    if (_internal_rule_map.remove(rule_id)) {
+        if (_verbose) {
+            click_chatter("[NIC %u] Successfully removed mapping for rule ID %ld", port_id(), rule_id);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Return a mapping between a controller and a NIC rule ID.
+ */
+uint32_t
+NIC::get_internal_rule_id(const long &rule_id)
+{
+    if (rule_id < 0) {
+        click_chatter("[NIC %u] Unable to store mapping for invalid controller rule ID %ld", port_id(), rule_id);
+        return ERROR;
+    }
+
+    return _internal_rule_map[rule_id];
 }
 
 CLICK_ENDDECLS
