@@ -1546,10 +1546,20 @@ ServiceChain::from_json(
         );
         return NULL;
     }
+
     sc->_autoscale = false;
     if (!j.get("autoscale", sc->_autoscale)) {
         errh->warning("Autoscale is not present or not boolean");
     }
+    if ((m->_rx_mode == RSS) && sc->_autoscale) {
+        errh->error(
+            "Unable to deploy service chain %s: "
+            "Metron in RSS mode does not allow autoscale.",
+            sc->id.c_str()
+        );
+        return NULL;
+    }
+
     sc->_cpus.resize(sc->_max_cpus_nb);
     sc->_cpuload.resize(sc->_max_cpus_nb, 0);
     Json jnics = j.get("nics");
