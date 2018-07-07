@@ -274,7 +274,11 @@ int DPDKDevice::set_mode(
 
     if (mode == "none") {
         m = ETH_MQ_RX_NONE;
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     } else if ((mode == "rss") || (mode == FlowDirector::FLOW_DIR_MODE) || (mode == "")) {
+#else
+    } else if ((mode == "rss") || (mode == "")) {
+#endif
         m = ETH_MQ_RX_RSS;
         if (mode == "")
             mode = "rss";
