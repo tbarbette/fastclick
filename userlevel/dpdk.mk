@@ -347,16 +347,21 @@ endif
 test-pmd/%.o:
 	$(CC) -o $@ -O3 -c $(RTE_SDK)/app/test-pmd/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
 
-# Object files present across all(?) DPDK versions
+# Object files present across all DPDK versions
 PARSE_OBJS = \
 	test-pmd/cmdline_flow.o \
 	test-pmd/macfwd.o test-pmd/cmdline.o test-pmd/txonly.o test-pmd/csumonly.o test-pmd/flowgen.o \
 	test-pmd/icmpecho.o test-pmd/ieee1588fwd.o test-pmd/iofwd.o test-pmd/macswap.o \
-	test-pmd/rxonly.o test-pmd/config.o test-pmd/bpf_cmd.o \
+	test-pmd/rxonly.o test-pmd/config.o \
 
 # Additional object files, present at or after DPDK v17.11
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/tm.o test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
+endif
+
+# Additional object files, present at or after DPDK v18.05
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) && echo true),true)
+PARSE_OBJS += test-pmd/bpf_cmd.o
 endif
 
 librte_parse.a: \
