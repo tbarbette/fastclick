@@ -335,7 +335,9 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
+#if RTE_VERSION <= RTE_VERSION_NUM(18,05,0,0)
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
+#endif
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
     for (unsigned i = 0; i < info.rx_queues.size(); ++i) {
