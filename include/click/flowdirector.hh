@@ -132,6 +132,10 @@ public:
     // Flush all of the rules from a NIC
     uint32_t flow_rules_flush();
 
+
+
+    // Current index for flow ids
+    int _unique_id;
 private:
 
     // Device ID
@@ -154,6 +158,7 @@ private:
 
     // Flow rule counter per device
     static HashTable<portid_t, uint32_t> _rules_nb;
+
 };
 
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */

@@ -53,7 +53,8 @@ int FlowDirector::SUCCESS = 0;
 
 FlowDirector::FlowDirector() :
         _port_id(-1), _active(false),
-        _verbose(DEF_VERBOSITY), _rules_filename("")
+        _verbose(DEF_VERBOSITY), _rules_filename(""),
+        _unique_id(0)
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
 }

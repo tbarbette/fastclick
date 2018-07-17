@@ -83,8 +83,8 @@ int DPDKDevice::set_rss_max(int max)
 	for (i = 0; i < reta_size; i++) {
 			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
 			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
-			uint32_t rss_qs_pos = i % max;
-			reta_conf[reta_id].reta[reta_pos] = rss_qs_pos;
+			uint32_t core_id = i % max;
+			reta_conf[reta_id].reta[reta_pos] = core_id;
 	}
 	/* RETA update */
 	status = rte_eth_dev_rss_reta_update(port_id,

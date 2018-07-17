@@ -553,7 +553,7 @@ int FromDPDKDevice::flow_handler(
                 rule += "\n";
             }
 
-            const uint32_t rule_id = flow_dir->flow_rules_count_explicit();
+            const uint32_t rule_id = flow_dir->_unique_id++;
             if (flow_dir->flow_rule_install(rule_id, rule.c_str()) != FlowDirector::SUCCESS) {
                 return -1;
             }
