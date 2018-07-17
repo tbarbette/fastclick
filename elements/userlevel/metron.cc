@@ -274,6 +274,9 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
     while (nic != _nics.end()) {
         // Cast input element
         FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(nic.value().element);
+
+        if (!fd->get_device())
+            continue;
         // Get its Rx mode
         String fd_mode = fd->get_device()->get_mode_str();
 
