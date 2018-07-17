@@ -143,7 +143,8 @@ parse_vendor_info(String hw_info, String key)
  **************************************/
 Metron::Metron() :
     _timer(this), _timing_stats(true),
-    _discovered(false), _rx_mode(FLOW), _discover_ip()
+    _discovered(false), _rx_mode(FLOW), _discover_ip(),
+    _verbose(false)
 {
     _core_id = click_max_cpu_ids() - 1;
 }
@@ -186,6 +187,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("DISCOVER_USER",     _discover_user)
         .read    ("DISCOVER_PASSWORD", _discover_password)
         .read    ("PIN_TO_CORE",       _core_id)
+        .read    ("VERBOSE",           _verbose)
         .complete() < 0)
         return ERROR;
 
@@ -252,7 +254,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 
     // Setup pointers with the underlying NICs
     for (Element *e : nics) {
-        NIC nic;
+        NIC nic(_verbose);
         nic.element = e;
         _nics.insert(nic.get_id(), nic);
     }

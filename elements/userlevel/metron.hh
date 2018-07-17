@@ -257,7 +257,7 @@ class CPU {
 
 class NIC {
     public:
-        NIC() : _rules(), _internal_rule_map(), _verbose(false) {
+        NIC(bool verbose = false) : _rules(), _internal_rule_map(), _verbose(verbose) {
 
         }
 
@@ -664,6 +664,9 @@ class Metron : public Element {
 
         /* Discovery status */
         bool _discovered;
+
+        /* Verbose */
+        bool _verbose;
 
         /* Rx filter mode */
         RxFilterType _rx_mode;
