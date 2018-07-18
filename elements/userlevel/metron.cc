@@ -1980,6 +1980,10 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         }
                         click_chatter("Response %d: %s", ret, response.c_str());
                     }
+                    //Actually use the new cores AFTER the secondary has been advertise
+                    if (_metron->_rx_mode == RSS) {
+                        _nics[inic]->call_rx_write("max_rss", String(new_cpus_nb));
+                    }
                 }
             } else { //Scale down
                 if (new_cpus_nb < 0) {
@@ -1988,6 +1992,10 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                     );
                 }
                 for (int inic = 0; inic < get_nics_nb(); inic++) {
+                    //Stop using the new cores BEFORE the secondary has been reduced
+                    if (_metron->_rx_mode  == RSS) {
+                        _nics[inic]->call_rx_write("max_rss", String(new_cpus_nb));
+                    }
                     for (int i = new_cpus_nb; i < get_used_cpu_nb(); i++) {
                         int ret = call_write(
                             generate_configuration_slave_fd_name(
