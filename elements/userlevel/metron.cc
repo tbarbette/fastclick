@@ -1957,7 +1957,8 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
             String response = "";
             if (new_cpus_nb == get_used_cpu_nb())
                 continue;
-            if (new_cpus_nb > get_used_cpu_nb()) {
+
+            if (new_cpus_nb > get_used_cpu_nb()) { //Scale up
                 if (new_cpus_nb > get_max_cpu_nb()) {
                     return errh->error(
                         "Number of used CPUs must be less or equal "
@@ -1980,7 +1981,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         click_chatter("Response %d: %s", ret, response.c_str());
                     }
                 }
-            } else {
+            } else { //Scale down
                 if (new_cpus_nb < 0) {
                     return errh->error(
                         "Number of used CPUs must be greater or equal than 0!"
