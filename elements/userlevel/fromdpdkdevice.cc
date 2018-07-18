@@ -520,6 +520,12 @@ int FromDPDKDevice::write_handler(
             }
             return 0;
         }
+        case h_rss: {
+            int max;
+            if (!IntArg().parse<int>(input,max))
+                return errh->error("Not a valid integer");
+            return fd->_dev->set_rss_max(max);
+        }
     }
     return -1;
 }
@@ -674,6 +680,8 @@ void FromDPDKDevice::add_handlers()
     add_write_handler("add_mac",write_handler, h_add_mac, 0);
     add_write_handler("remove_mac",write_handler, h_remove_mac, 0);
     add_read_handler("vf_mac_addr",read_handler, h_vf_mac);
+
+    add_write_handler("max_rss", write_handler, h_rss, 0);
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);

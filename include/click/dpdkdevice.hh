@@ -103,6 +103,7 @@ public:
         unsigned n_rx_descs;
         unsigned n_tx_descs;
         enum rte_eth_rx_mq_mode mq_mode;
+        uint16_t reta_size;
         String mq_mode_str;
         int num_pools;
         Vector<int> vf_vlan;
@@ -139,6 +140,7 @@ public:
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
+    int set_rss_max(int max);
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
