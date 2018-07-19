@@ -271,16 +271,9 @@ class NIC {
             return element == NULL;
         }
 
-        inline portid_t port_id() {
-            return is_ghost() ? -1 :
-                static_cast<FromDPDKDevice *>(element)->get_device()->get_port_id();
-        }
-
-        inline String get_id() {
-            return is_ghost() ? "" : element->name();
-        }
-
-        String get_device_id();
+        portid_t get_port_id();
+        String get_device_address();
+        String get_name();
 
         HashMap<long, String> *find_rules_by_core_id(const int &core_id);
         Vector<String> rules_list_by_core_id(const int &core_id);
@@ -456,9 +449,9 @@ class ServiceChain {
             return _nics.size();
         }
 
-        inline NIC *get_nic_by_id(String id) {
+        inline NIC *get_nic_by_name(String name) {
             for (NIC *nic : _nics) {
-                if (nic->get_id() == id)
+                if (nic->get_name() == name)
                     return nic;
             }
 
