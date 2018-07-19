@@ -140,7 +140,7 @@ endif
 
 # At of after DPDK 17.05, compile against an additional library librte_parse (flow director)
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 5 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
-$(DRIVER): Makefile modify_testpmd_h libclick.a modify_testpmd_c prepare_librte_parse librte_parse.a $(OBJS)
+$(DRIVER): Makefile librte_parse.a libclick.a $(OBJS)
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a librte_parse.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 else
@@ -189,7 +189,7 @@ uninstall:
 clean:
 	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 5 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
-	rm -rf test-pmd/ ../lib/librte_parse librte_parse.*
+	rm -rf test-pmd/ ../lib/librte_parse_* librte_parse.*
 endif
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
 clean-lib:
