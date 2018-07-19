@@ -40,8 +40,14 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_KNI)            += -lrte_kni
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IVSHMEM)        += -lrte_ivshmem
 endif
 
-ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL),yy)
-	_LDLIBS-y += -lrte_common_octeontx
+GCC_MAJOR = $(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
+GCC_MINOR = $(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+GCC_PATCHLEVEL = $(shell echo __GNUC_PATCHLEVEL__ | $(CC) -E -x c - | tail -n 1)
+GCC_VERSION = $(GCC_MAJOR)$(GCC_MINOR)
+
+
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL)$(shell test $(GCC_VERSION)$(GCC_PATCHLEVEL) -lt 486 && echo n),yy)
+_LDLIBS-y += -lrte_common_octeontx
 endif
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_FLOW_CLASSIFY)  += -lrte_flow_classify
