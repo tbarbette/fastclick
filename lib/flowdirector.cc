@@ -38,6 +38,9 @@ String FlowDirector::FLOW_RULE_FLUSH = "flush_rules";
 // Flow rule counter per device
 HashTable<portid_t, uint32_t> FlowDirector::_rules_nb;
 
+// Next rule ID per device
+HashTable<portid_t, uint32_t> FlowDirector::_next_rule_id;
+
 // Default verbosity setting
 bool FlowDirector::DEF_VERBOSITY = false;
 
@@ -53,8 +56,7 @@ int FlowDirector::SUCCESS = 0;
 
 FlowDirector::FlowDirector() :
         _port_id(-1), _active(false),
-        _verbose(DEF_VERBOSITY), _rules_filename(""),
-        _unique_id(0)
+        _verbose(DEF_VERBOSITY), _rules_filename("")
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
 }
@@ -65,6 +67,7 @@ FlowDirector::FlowDirector(portid_t port_id, ErrorHandler *errh) :
 {
     _errh = new ErrorVeneer(errh);
     _rules_nb[_port_id] = 0;
+    _next_rule_id[_port_id] = 0;
 
     if (verbose()) {
         _errh->message(
@@ -91,6 +94,10 @@ FlowDirector::~FlowDirector()
     // Clean up flow rule counters
     if (!_rules_nb.empty()) {
         _rules_nb.clear();
+    }
+
+    if (!_next_rule_id.empty()) {
+        _next_rule_id.clear();
     }
 
     if (verbose()) {
@@ -269,6 +276,7 @@ FlowDirector::flow_rule_install(const uint32_t &rule_id, const char *rule)
     int res = flow_parser_parse(_parser, (char *) rule, _errh);
     if (res >= 0) {
         _rules_nb[_port_id]++;
+        _next_rule_id[_port_id]++;
         return SUCCESS;
     }
 

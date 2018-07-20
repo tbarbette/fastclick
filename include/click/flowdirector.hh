@@ -102,6 +102,11 @@ public:
     };
     inline String rules_filename() { return _rules_filename; };
 
+    // Returns the next rule ID to use for insertion on a port
+    inline uint32_t next_unique_rule_id() {
+        return _next_rule_id[_port_id];
+    }
+
     // Install flow rule in a NIC from a file
     int add_rules_from_file(
         const String   &filename
@@ -132,10 +137,6 @@ public:
     // Flush all of the rules from a NIC
     uint32_t flow_rules_flush();
 
-
-
-    // Current index for flow ids
-    int _unique_id;
 private:
 
     // Device ID
@@ -158,6 +159,9 @@ private:
 
     // Flow rule counter per device
     static HashTable<portid_t, uint32_t> _rules_nb;
+
+    // Next rule ID per device
+    static HashTable<portid_t, uint32_t> _next_rule_id;
 
 };
 
