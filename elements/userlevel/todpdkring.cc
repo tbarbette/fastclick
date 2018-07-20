@@ -82,7 +82,8 @@ ToDPDKRing::initialize(ErrorHandler *errh)
     // If primary process, create the ring buffer and memory pool.
     // The primary process is responsible for managing the memory
     // and acting as a bridge to interconnect various secondary processes
-    if ( rte_eal_process_type() == RTE_PROC_PRIMARY ){
+    if (_force_create || (! _force_lookup && rte_eal_process_type() == RTE_PROC_PRIMARY)){
+
         _ring = rte_ring_create(
             _PROC_1.c_str(), DPDKDevice::RING_SIZE,
             rte_socket_id(), _flags

@@ -226,6 +226,10 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
                   return "undefined";
               else
                   return String((int) fd->_dev->port_id);
+        case h_nb_rx_queues:
+            return String(fd->_dev->nbRXQueues());
+        case h_nb_tx_queues:
+            return String(fd->_dev->nbTXQueues());
         case h_mac: {
             if (!fd->_dev)
                 return String::make_empty();
@@ -405,6 +409,9 @@ void FromDPDKDevice::add_handlers()
     add_write_handler("active", write_handler, h_active);
     add_read_handler("count", count_handler, h_count);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
+
+    add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);
+    add_read_handler("nb_tx_queues",read_handler, h_nb_tx_queues);
 
     add_read_handler("mac",read_handler, h_mac);
     add_read_handler("vendor", read_handler, h_vendor);

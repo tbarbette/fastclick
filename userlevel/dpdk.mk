@@ -266,19 +266,12 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_OCTEONTX_PMD) += -lrte_pmd_octeontx
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OPDL_EVENTDEV) += -lrte_pmd_opdl_event
 endif # CONFIG_RTE_LIBRTE_EVENTDEV
 
-
-endif # ! $(CONFIG_RTE_BUILD_SHARED_LIB)
-ifeq ($(CONFIG_RTE_LIBRTE_EVENTDEV),y)
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SKELETON_EVENTDEV) += -lrte_pmd_skeleton_event
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SW_EVENTDEV) += -lrte_pmd_sw_event
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF) += -lrte_pmd_octeontx_ssovf
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_EVENTDEV) += -lrte_pmd_dpaa2_event
-endif # CONFIG_RTE_LIBRTE_EVENTDEV
-
 ifeq ($(CONFIG_RTE_LIBRTE_DPAA2_PMD),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)      += -lrte_bus_fslmc
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)      += -lrte_mempool_dpaa2
 endif # CONFIG_RTE_LIBRTE_DPAA2_PMD
+
+endif # ! $(CONFIG_RTE_BUILD_SHARED_LIB)
 
 endif # ! CONFIG_RTE_BUILD_COMBINE_LIBS
 
@@ -292,7 +285,6 @@ DPDK_LIB=$(_LDLIBS-y) $(CPU_LDLIBS) $(EXTRA_LDLIBS)
 # Eliminate duplicates without sorting
 DPDK_LIB := $(shell echo $(DPDK_LIB) | \
     awk '{for (i = 1; i <= NF; i++) { if (!seen[$$i]++) print $$i }}')
-
 
 RTE_SDK_FULL=`readlink -f $RTE_SDK`
 

@@ -59,8 +59,13 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     //TODO : If user put multiple ToDPDKDevice with the same port and without the QUEUE parameter, try to share the available queues among them
     if (firstqueue == -1)
-        firstqueue = 0;
-    configure_tx(1,maxqueues,errh);
+       firstqueue = 0;
+    if (n_queues == -1) {
+	configure_tx(1,maxqueues,errh);
+    } else {
+        configure_tx(n_queues,n_queues,errh);
+    }
+
     return 0;
 }
 

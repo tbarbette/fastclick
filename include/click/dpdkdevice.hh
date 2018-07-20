@@ -191,6 +191,9 @@ public:
 
     static struct rte_mempool** _pktmbuf_pools;
 
+    inline int nbRXQueues();
+    inline int nbTXQueues();
+
     /*
     * TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
     * to be sent. It is used as an internal buffer to be passed to DPDK ring
@@ -280,6 +283,9 @@ class DPDKRing { public:
     struct rte_ring    *_ring;
     counter_t    _count;
 
+    bool _force_create;
+    bool _force_lookup;
+
 };
 
 /** @class DPDKDeviceArg
@@ -353,6 +359,14 @@ inline rte_mbuf* DPDKDevice::get_pkt(unsigned numa_node) {
 inline rte_mbuf* DPDKDevice::get_pkt() {
     return get_pkt(rte_socket_id());
 }
+
+int DPDKDevice::nbRXQueues() {
+    return info.rx_queues.size();
+};
+
+int DPDKDevice::nbTXQueues() {
+    return info.tx_queues.size();
+};
 
 CLICK_ENDDECLS
 
