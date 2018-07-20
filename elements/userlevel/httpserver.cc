@@ -174,7 +174,10 @@ int HTTPServer::ahc_echo(
         hname = path.substring(0,pos);
         param = path.substring(pos + 1);
     }
-    click_chatter("Element '%s', handler '%s', param '%s'",ename.c_str(), hname.c_str(),param.c_str());
+
+    if (server->_verbose) {
+        click_chatter("Element '%s', handler '%s', param '%s'",ename.c_str(), hname.c_str(),param.c_str());
+    }
 
     if (!e) {
         if (hname == "" || ename == "") {
