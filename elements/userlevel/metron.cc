@@ -253,8 +253,10 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
 
     // Setup pointers with the underlying NICs
+    int index = 0;
     for (Element *e : nics) {
         NIC nic(_verbose);
+        nic.set_index(index++);
         nic.element = e;
         _nics.insert(nic.get_name(), nic);
     }
@@ -1689,8 +1691,8 @@ ServiceChain::stats_to_json()
         // );
 
         Json jnic = Json::make_object();
-        jnic.set("name", get_nic_by_index(i)->get_name());
-        jnic.set("index", i);
+        jnic.set("name",      get_nic_by_index(i)->get_name());
+        jnic.set("index",     get_nic_by_index(i)->get_index());
         jnic.set("rxCount",   rx_count);
         jnic.set("rxBytes",   rx_bytes);
         jnic.set("rxDropped", rx_dropped);
@@ -1743,8 +1745,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
     Json jnics = j.get("nics");
     int inic = 0;
     for (auto jnic : jnics) {
-        // TODO: This could become a simple integer
-        String nic_id = jnic.second.get_s("nicId");
+        String nic_name = jnic.second.get_s("nicName");
 
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
@@ -1756,11 +1757,11 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 String rule = jrule.second.get_s("ruleContent");
 
                 // Get the correct NIC
-                NIC *nic = this->get_nic_by_name(nic_id);
+                NIC *nic = this->get_nic_by_name(nic_name);
                 if (!nic) {
                     return errh->error(
                         "Metron controller attempted to install rules in unknown NIC: %s",
-                        nic_id.c_str()
+                        nic_name.c_str()
                     );
                 }
 
@@ -1768,7 +1769,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 if (!nic->update_rule(core_id, rule_id, rule)) {
                     return errh->error(
                         "Unable to insert rule %ld into NIC %s mapped to CPU core %d",
-                        rule_id, nic_id.c_str(), core_id
+                        rule_id, nic_name.c_str(), core_id
                     );
                 }
 
@@ -1829,12 +1830,11 @@ ServiceChain::rules_to_json()
 
     // All NICs
     for (int i = 0; i < get_nics_nb(); i++) {
-        String nic_id = String(i);
         NIC *nic = _nics[i];
 
         Json jnic = Json::make_object();
 
-        jnic.set("nicId", nic->get_name());
+        jnic.set("nicName", nic->get_name());
 
         Json jcpus_array = Json::make_array();
 
@@ -2393,7 +2393,8 @@ NIC::to_json(RxFilterType rx_mode, bool stats)
 {
     Json nic = Json::make_object();
 
-    nic.set("name",get_name());
+    nic.set("name", get_name());
+    nic.set("index", get_index());
     if (!stats) {
         nic.set("vendor", call_read("vendor"));
         nic.set("driver", call_read("driver"));
@@ -2476,30 +2477,51 @@ NIC::call_rx_write(String h, const String input)
 
 
 /**
- * Return the DPDK port ID of a NIC
+ * Return the DPDK port ID of a NIC.
  */
 portid_t
-NIC::get_port_id() {
+NIC::get_port_id()
+{
     return is_ghost() ? -1 :
         static_cast<FromDPDKDevice *>(element)->get_device()->get_port_id();
 }
 
 /**
- * Return a device adress suitable to use as a FromDPDKDevice reference
- *
- * Actually this is still the port id, returning the PCI address would be better
+ * Return the device's adress suitable to use as a FromDPDKDevice reference.
+ * TODO: Actually this is still a port id, returning the PCI address would be better.
  */
 String
-NIC::get_device_address() {
+NIC::get_device_address()
+{
     return String(get_port_id());
 }
 
 /**
- * Return the device name
+ * Return the device's name.
  */
 String
-NIC::get_name() {
+NIC::get_name()
+{
     return is_ghost() ? "" : element->name();
+}
+
+/**
+ * Return the device's Click port index.
+ */
+int
+NIC::get_index()
+{
+    return is_ghost() ? -1 : _index;
+}
+
+/**
+ * Sets the device's Click port index.
+ */
+void
+NIC::set_index(const int &index)
+{
+    assert(index >= 0);
+    _index = index;
 }
 
 /**

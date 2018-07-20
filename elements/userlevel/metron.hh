@@ -257,7 +257,8 @@ class CPU {
 
 class NIC {
     public:
-        NIC(bool verbose = false) : _rules(), _internal_rule_map(), _verbose(verbose) {
+        NIC(bool verbose = false)
+            : _index(-1), _rules(), _internal_rule_map(), _verbose(verbose) {
 
         }
 
@@ -274,13 +275,15 @@ class NIC {
         portid_t get_port_id();
         String get_device_address();
         String get_name();
+        int get_index();
+        void set_index(const int &index);
 
         HashMap<long, String> *find_rules_by_core_id(const int &core_id);
         Vector<String> rules_list_by_core_id(const int &core_id);
         Vector<int> cores_with_rules();
         bool has_rules() { return !_rules.empty(); }
         bool insert_rule(const int &core_id, const long &rule_id, String &rule);
-        int install_rule(const long &rule_id, String &rule);
+        int  install_rule(const long &rule_id, String &rule);
         bool remove_rule(const long &rule_id);
         bool remove_rule(const int &core_id, const long &rule_id);
         bool update_rule(const int &core_id, const long &rule_id, String &rule);
@@ -311,6 +314,9 @@ class NIC {
 
         // Maps ONOS rule IDs (long) to NIC rule IDs (uint32_t)
         HashMap<long, uint32_t> _internal_rule_map;
+
+        // Click port index of this NIC
+        int _index;
 
         bool _verbose;
 
@@ -439,7 +445,6 @@ class ServiceChain {
         inline int get_max_cpu_nb() {
             return _max_cpus_nb;
         }
-
 
         inline int get_cpu_map(int i) {
             return _cpus[i];
