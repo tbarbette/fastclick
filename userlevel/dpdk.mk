@@ -40,8 +40,14 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_KNI)            += -lrte_kni
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IVSHMEM)        += -lrte_ivshmem
 endif
 
-ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL),yy)
-	_LDLIBS-y += -lrte_common_octeontx
+GCC_MAJOR = $(shell echo __GNUC__ | $(CC) -E -x c - | tail -n 1)
+GCC_MINOR = $(shell echo __GNUC_MINOR__ | $(CC) -E -x c - | tail -n 1)
+GCC_PATCHLEVEL = $(shell echo __GNUC_PATCHLEVEL__ | $(CC) -E -x c - | tail -n 1)
+GCC_VERSION = $(GCC_MAJOR)$(GCC_MINOR)
+
+
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL)$(shell test $(GCC_VERSION)$(GCC_PATCHLEVEL) -lt 486 && echo n),yy)
+_LDLIBS-y += -lrte_common_octeontx
 endif
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_FLOW_CLASSIFY)  += -lrte_flow_classify
@@ -288,7 +294,7 @@ DPDK_LIB := $(shell echo $(DPDK_LIB) | \
 
 RTE_SDK_FULL=`readlink -f $RTE_SDK`
 
-CFLAGS += -I$(DPDK_INCLUDE) -I$(RTE_SDK)/app/test-pmd/
+CFLAGS += -I$(DPDK_INCLUDE)
 
 # Merge and rename flags
 CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
@@ -304,48 +310,31 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ 
 
 $(debug LIBRTE_PARSE=YES)
 
-TEST_PMD_C_MODIFIED=$(shell grep -Fxc "uint8_t port_numa[RTE_MAX_ETHPORTS];" $(RTE_SDK)/app/test-pmd/testpmd.c)
+RTE_VERSION=$(RTE_VER_YEAR).$(RTE_VER_MONTH).$(RTE_VER_MINOR)
+PARSE_PATH=../lib/librte_parse_$(RTE_VERSION)/
 
-ifeq ($(TEST_PMD_C_MODIFIED),0)
-modify_testpmd_c:
-	sed -i '120i uint8_t port_numa[RTE_MAX_ETHPORTS];' $(RTE_SDK)/app/test-pmd/testpmd.c
-	sed -i '121i uint8_t rxring_numa[RTE_MAX_ETHPORTS];' $(RTE_SDK)/app/test-pmd/testpmd.c
-	sed -i '122i uint8_t txring_numa[RTE_MAX_ETHPORTS];' $(RTE_SDK)/app/test-pmd/testpmd.c
-else
-modify_testpmd_c: ;
-endif
-
-TEST_PMD_H_MODIFIED=$(shell grep -Fxc "extern uint8_t port_numa[RTE_MAX_ETHPORTS];" $(RTE_SDK)/app/test-pmd/testpmd.h)
-
-ifeq ($(TEST_PMD_H_MODIFIED),0)
-modify_testpmd_h:
-	sed -i 's/uint8_t\sport_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t port_numa[RTE_MAX_ETHPORTS];/g' $(RTE_SDK)/app/test-pmd/testpmd.h
-	sed -i 's/uint8_t\srxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t rxring_numa[RTE_MAX_ETHPORTS];/g' $(RTE_SDK)/app/test-pmd/testpmd.h
-	sed -i 's/uint8_t\stxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t txring_numa[RTE_MAX_ETHPORTS];/g' $(RTE_SDK)/app/test-pmd/testpmd.h
-	sed -i '/extern\senum\sdcb_queue_mapping_mode\sdcb_q_mapping\;/d' $(RTE_SDK)/app/test-pmd/testpmd.h
-else
-modify_testpmd_h: ;
-endif
-
-LIBRTE_PARSE_EXISTS=$(shell [ -d ../lib/librte_parse ] && echo "y"  || echo "n")
-
-ifeq ($(LIBRTE_PARSE_EXISTS),n)
-prepare_librte_parse:
+../lib/librte_parse_$(RTE_VERSION):
 	# Create the necessary folders for librte_parse
-	mkdir -p ../lib/librte_parse
+	mkdir -p $(PARSE_PATH)
 	mkdir -p test-pmd
 	# Copy testpmd.c of the target DPDK version
-	cp -u $(RTE_SDK)/app/test-pmd/testpmd.c ../lib/librte_parse/
+	cp -u $(RTE_SDK)/app/test-pmd/testpmd.c $(PARSE_PATH)
+	cp -u $(RTE_SDK)/app/test-pmd/testpmd.h $(PARSE_PATH)
 	# Strip the main function off to prevent complilation errors, while linking with Click
-	sed -i '/main(int/Q' ../lib/librte_parse/testpmd.c
-	head -n -1 ../lib/librte_parse/testpmd.c > ../lib/librte_parse/testpmd_t.c;
-	mv ../lib/librte_parse/testpmd_t.c ../lib/librte_parse/testpmd.c
-else
-prepare_librte_parse: ;
-endif
+	sed -i '/main(int/Q' $(PARSE_PATH)/testpmd.c
+	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
+	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c
+	sed -i '120i uint8_t port_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
+	sed -i '121i uint8_t rxring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
+	sed -i '122i uint8_t txring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
+	sed -i 's/^uint8_t\sport_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t port_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/^uint8_t\srxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t rxring_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/^uint8_t\stxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t txring_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
+	sed -i '/extern\senum\sdcb_queue_mapping_mode\sdcb_q_mapping\;/d' $(PARSE_PATH)/testpmd.h
 
-test-pmd/%.o:
-	$(CC) -o $@ -O3 -c $(RTE_SDK)/app/test-pmd/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
+test-pmd/%.o: ../lib/librte_parse_$(RTE_VERSION)
+	cp -u $(RTE_SDK)/app/test-pmd/$*.c $(PARSE_PATH)
+	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
 
 # Object files present across all DPDK versions
 PARSE_OBJS = \
@@ -364,19 +353,18 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(R
 PARSE_OBJS += test-pmd/bpf_cmd.o
 endif
 
-librte_parse.a: \
-	$(PARSE_OBJS) $(EXTRA_OBJS)
-	$(CC) -o librte_parse.o -O3 -c ../lib/librte_parse/testpmd.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
-	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $? librte_parse.o,AR librte_parse.a)
+
+CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
+CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
+
+librte_parse.a: $(PARSE_OBJS) ../lib/librte_parse_$(RTE_VERSION)
+	$(CC) -o librte_parse.o -O3 -c ../lib/librte_parse_$(RTE_VERSION)/testpmd.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
+	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $(PARSE_OBJS) librte_parse.o,AR librte_parse.a)
 	$(call verbose_cmd,$(RANLIB),RANLIB,librte_parse.a)
 
 else
 
 $(debug LIBRTE_PARSE=NO)
 
-modify_testpmd_c: ;
-modify_testpmd_h: ;
-prepare_librte_parse: ;
-librte_parse.a: ;
 
 endif # RTE_VERSION >= 17.05
