@@ -88,8 +88,6 @@ public:
 
     int configure_phase() const			{ return CONFIGURE_PHASE_PRIVILEGED - 5; }
     void* cast(const char*);
-
-
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
     int initialize(ErrorHandler*) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
