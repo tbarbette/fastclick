@@ -328,7 +328,7 @@ Metron::initialize(ErrorHandler *errh)
     _id = "metron:nfv:dataplane:";
     String uuid = shell_command_output_string("cat /proc/sys/kernel/random/uuid", "", errh);
     uuid = uuid.substring(0, uuid.find_left("\n"));
-    _id = (!uuid || uuid.empty())? _id + "00000000-0000-0000-0000-00000001" : _id + uuid;
+    _id = (!uuid || uuid.empty())? _id + "00000000-0000-0000-0000-000000000001" : _id + uuid;
 
     _cpu_map.resize(get_cpus_nb(), 0);
 
