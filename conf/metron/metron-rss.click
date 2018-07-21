@@ -21,7 +21,6 @@ define(
 	$dpdkRxMode   rss,
 	$metronRxMode rss,
 
-	$agentId     "metron:nfv:000001",
 	$agentIp      127.0.0.1,
 	$agentPort    80,
 
@@ -36,7 +35,6 @@ http :: HTTPServer(PORT 80);
 
 /* Metron agent */
 metron :: Metron(
-	ID                $agentId,      /* Agent ID */
 	NIC               fd0,
 	NIC               fd1,           /* NICs to use */
 	RX_MODE           $metronRxMode, /* Rx filter mode */

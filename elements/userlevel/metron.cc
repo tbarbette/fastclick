@@ -173,7 +173,6 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     _discover_path      = DEF_DISCOVER_PATH;
 
     if (Args(conf, this, errh)
-        .read_mp ("ID",                _id)
         .read_all("NIC",               nics)
         .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
         .read_all("SLAVE_ARGS",        _args)
@@ -325,6 +324,12 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
 int
 Metron::initialize(ErrorHandler *errh)
 {
+    // Generate a unique ID for this agent
+    _id = "metron:nfv:dataplane:";
+    String uuid = shell_command_output_string("cat /proc/sys/kernel/random/uuid", "", errh);
+    uuid = uuid.substring(0, uuid.find_left("\n"));
+    _id = (!uuid || uuid.empty())? _id + "00000000-0000-0000-0000-00000001" : _id + uuid;
+
     _cpu_map.resize(get_cpus_nb(), 0);
 
     String hw_info = file_string("/proc/cpuinfo");
