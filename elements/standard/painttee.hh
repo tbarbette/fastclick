@@ -1,6 +1,6 @@
 #ifndef CLICK_PAINTTEE_HH
 #define CLICK_PAINTTEE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -28,7 +28,7 @@ CLICK_DECLS
  * =a Paint, ICMPError
  */
 
-class PaintTee : public Element { public:
+class PaintTee : public BatchElement { public:
 
     PaintTee() CLICK_COLD;
 
@@ -40,6 +40,9 @@ class PaintTee : public Element { public:
     void add_handlers() CLICK_COLD;
 
     Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 
