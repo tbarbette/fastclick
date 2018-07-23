@@ -88,6 +88,21 @@ PullTee::pull(int)
   return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+PullTee::pull_batch(int, int max)
+{
+  PacketBatch *p = input(0).pull_batch(max);
+  if (p) {
+    int n = noutputs();
+    for (int i = 1; i < n; i++)
+      if (PacketBatch *q = p->clone_batch())
+        output_push_batch(i, q);
+  }
+  return p;
+}
+#endif
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(Tee PullTee)
 ELEMENT_MT_SAFE(Tee)
