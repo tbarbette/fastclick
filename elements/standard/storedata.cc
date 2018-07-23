@@ -42,8 +42,10 @@ StoreData::simple_action(Packet *p)
         return p;
     else if (WritablePacket *q = p->uniqueify()) {
         int len = q->length() - _offset;
-        if (_grow && _data.length() < len)
+        if (_grow && _data.length() > len) {
             q = q->put(_data.length() - len);
+            len = q->length() - _offset;
+        }
         memcpy(q->data() + _offset, _data.data(), (_data.length() < len ? _data.length() : len));
         return q;
     } else
