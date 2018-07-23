@@ -67,9 +67,9 @@ def dump_data_to_file(rule_list, target_nic, target_queues_nb, outfile, verbose=
 				if proto in rule:
 					rule_str += " / {} ".format(proto.lower())
 					for k, v in reversed(rule[proto].items()):
-						rule_str += "{} {} and ".format(k, v)
-					# Remove the last ' and'
-					rule_str = rule_str[0 : len(rule_str) - 4]
+						rule_str += "{} {} ".format(k, v)
+					# Remove the last ' '
+					rule_str = rule_str[0 : len(rule_str) - 1]
 
 			# Indicates end of matches
 			rule_str += " / end "
