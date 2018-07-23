@@ -72,14 +72,17 @@ const char *DPDKDevice::get_device_driver()
 int DPDKDevice::set_rss_max(int max)
 {
 	struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
+    struct rte_eth_dev_info dev_info;
 
-	uint16_t reta_size = info.reta_size;
+    rte_eth_dev_info_get(port_id, &dev_info);
+    uint16_t reta_size = dev_info.reta_size;
 	uint32_t i;
 	int status;
 	/* RETA setting */
 	memset(reta_conf, 0, sizeof(reta_conf));
-	for (i = 0; i < reta_size; i++)
+    for (i = 0; i < reta_size; i++) {
 			reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
+    }
 	for (i = 0; i < reta_size; i++) {
 			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
 			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
@@ -409,7 +412,6 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 #endif
 
     info.mq_mode = (info.mq_mode == -1? ETH_MQ_RX_RSS : info.mq_mode);
-    info.reta_size = dev_info.reta_size;
     dev_conf.rxmode.mq_mode = info.mq_mode;
     dev_conf.rxmode.hw_vlan_filter = 0;
 

@@ -103,7 +103,6 @@ public:
         unsigned n_rx_descs;
         unsigned n_tx_descs;
         enum rte_eth_rx_mq_mode mq_mode;
-        uint16_t reta_size;
         String mq_mode_str;
         int num_pools;
         Vector<int> vf_vlan;
