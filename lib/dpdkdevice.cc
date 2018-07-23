@@ -791,7 +791,6 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         if (dev->get_mode_str() == FlowDirector::FLOW_DIR_MODE) {
             int err = DPDKDevice::configure_nic(port_id);
             if (err != 0) {
-                errh->error("Error %d while configuring Flow Director", err);
                 return -1;
             }
         }

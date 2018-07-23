@@ -231,7 +231,9 @@ FlowDirector::add_rules_from_file(const String &filename)
             continue;
         }
 
-        _errh->message("[NIC %u] About to install rule with ID %" PRIu32 "", _port_id, rule_no);
+        if (_verbose) {
+            _errh->message("[NIC %u] About to install rule with ID %" PRIu32 "", _port_id, rule_no);
+        }
         flow_rule_install(rule_no++, line);
     }
 
