@@ -69,12 +69,37 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int ToDPDKDevice::thread_configure(ThreadReconfigurationStage stage, ErrorHandler*) {
-    if (stage != THREAD_INITIALIZE && stage != THREAD_RECONFIGURE_PRE) {
-        return 0;
+int ToDPDKDevice::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh) {
+    if (stage == THREAD_RECONFIGURE_PRE) {
+        int ret = 0;
+        ret = initialize_tx(errh);
+        if (ret != 0)
+            return ret;
+
     }
 
-    //TODO
+    if (stage == THREAD_INITIALIZE || stage == THREAD_RECONFIGURE_PRE) {
+        int ret = 0;
+        ret = initialize_tasks(false,errh);
+        if (ret != 0)
+            return ret;
+
+        for (unsigned i = 0; i < _iqueues.weight(); i++) {
+            if (!_iqueues.get_value(i).pkts) {
+                _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
+                _iqueues.get_value(i).timeout.assign(this);
+                _iqueues.get_value(i).timeout.initialize(this);
+                _iqueues.get_value(i).timeout.move_thread(i);
+            }
+        }
+
+        if (stage == THREAD_INITIALIZE && all_initialized()) {
+            int ret = DPDKDevice::initialize(errh);
+            if (ret != 0) return ret;
+        }
+        return ret;
+
+    }
     return 0;
 }
 
@@ -109,26 +134,12 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
         _timeout = -1;
     }
 
-    ret = initialize_tasks(false,errh);
-    if (ret != 0)
-        return ret;
-
-    for (unsigned i = 0; i < _iqueues.weight(); i++) {
-        _iqueues.get_value(i).pkts = new struct rte_mbuf *[_internal_tx_queue_size];
-        _iqueues.get_value(i).timeout.assign(this);
-        _iqueues.get_value(i).timeout.initialize(this);
-        _iqueues.get_value(i).timeout.move_thread(i);
-    }
 
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
     //To set is_fullpush, we need to compute passing threads
     get_passing_threads();
 
-    if (all_initialized()) {
-        int ret = DPDKDevice::initialize(errh);
-        if (ret != 0) return ret;
-    }
     return 0;
 }
 

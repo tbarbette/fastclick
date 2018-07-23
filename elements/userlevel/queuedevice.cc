@@ -121,7 +121,7 @@ int RXQueueDevice::configure_rx(int numa_node, int minqueues, int maxqueues, Err
 	return 0;
 }
 
-int TXQueueDevice::configure_tx(int minqueues, int maxqueues,ErrorHandler *) {
+int TXQueueDevice::configure_tx(int minqueues, int maxqueues, ErrorHandler *) {
 	_minqueues = minqueues;
 	_maxqueues = maxqueues;
 	return 0;
