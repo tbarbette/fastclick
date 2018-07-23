@@ -12,6 +12,16 @@ CLICK_DECLS
  *
  * Changes packet data starting at OFFSET to DATA.
  *
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item GROW
+ *
+ * When set to true and DATA exceeds past packet length,
+ * packet length will be extended. Otherwise, excessive data
+ * will not be stored. Default is false.
+ *
  * =a AlignmentInfo, click-align(1) */
 
 class StoreData : public BatchElement { public:
