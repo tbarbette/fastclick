@@ -41,7 +41,7 @@ class Tee : public BatchElement {
 
 };
 
-class PullTee : public Element {
+class PullTee : public BatchElement {
 
  public:
 
@@ -54,6 +54,9 @@ class PullTee : public Element {
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
   Packet *pull(int);
+  #if HAVE_BATCH
+  PacketBatch *pull_batch(int, int);
+  #endif
 
 };
 
