@@ -200,8 +200,8 @@ FlowDirector::get_flow_director(
 int
 FlowDirector::add_rules_from_file(const String &filename)
 {
-    uint32_t rules_nb = flow_rules_count();
-    uint32_t installed_rules_nb = rules_nb;
+    uint32_t rules_nb = 0;
+    uint32_t installed_rules_nb = flow_rules_count();
 
     FILE *fp = NULL;
     fp = fopen(filename.c_str(), "r");

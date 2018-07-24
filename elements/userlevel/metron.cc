@@ -176,6 +176,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("NIC",               nics)
         .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
         .read_all("SLAVE_ARGS",        _args)
+        .read    ("ID",                _id)
         .read    ("RX_MODE",           rx_mode)
         .read    ("TIMING_STATS",      _timing_stats)
         .read    ("AGENT_IP",          _agent_ip)
@@ -302,7 +303,6 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
             );
         }
 
-        // TODO: Let the agent operate in standard FastClick mode using RSS
         if ((_rx_mode == RSS) && (fd_mode != "rss")) {
             return errh->error(
                 "RX_MODE %s is the default FastClick mode and requires FromDPDKDevice(%s) MODE rss. Current mode is %s.",
@@ -324,11 +324,13 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
 int
 Metron::initialize(ErrorHandler *errh)
 {
-    // Generate a unique ID for this agent
-    _id = "metron:nfv:dataplane:";
-    String uuid = shell_command_output_string("cat /proc/sys/kernel/random/uuid", "", errh);
-    uuid = uuid.substring(0, uuid.find_left("\n"));
-    _id = (!uuid || uuid.empty())? _id + "00000000-0000-0000-0000-000000000001" : _id + uuid;
+    // Generate a unique ID for this agent, if not already given
+    if (_id.empty()) {
+        _id = "metron:nfv:dataplane:";
+        String uuid = shell_command_output_string("cat /proc/sys/kernel/random/uuid", "", errh);
+        uuid = uuid.substring(0, uuid.find_left("\n"));
+        _id = (!uuid || uuid.empty())? _id + "00000000-0000-0000-0000-000000000001" : _id + uuid;
+    }
 
     _cpu_map.resize(get_cpus_nb(), 0);
 
@@ -1563,6 +1565,7 @@ ServiceChain::from_json(
     if (!j.get("autoscale", sc->_autoscale)) {
         errh->warning("Autoscale is not present or not boolean");
     }
+    /*
     if ((m->_rx_mode == RSS) && sc->_autoscale) {
         errh->error(
             "Unable to deploy service chain %s: "
@@ -1571,6 +1574,7 @@ ServiceChain::from_json(
         );
         return NULL;
     }
+    */
 
     sc->_cpus.resize(sc->_max_cpus_nb);
     sc->_cpuload.resize(sc->_max_cpus_nb, 0);
@@ -1989,7 +1993,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         }
                         click_chatter("Response %d: %s", ret, response.c_str());
                     }
-                    //Actually use the new cores AFTER the secondary has been advertise
+                    // Actually use the new cores AFTER the secondary has been advertised
                     if (_metron->_rx_mode == RSS) {
                         _nics[inic]->call_rx_write("max_rss", String(new_cpus_nb));
                     }
@@ -2001,7 +2005,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                     );
                 }
                 for (int inic = 0; inic < get_nics_nb(); inic++) {
-                    //Stop using the new cores BEFORE the secondary has been reduced
+                    // Stop using the new cores BEFORE the secondary has been torn down
                     if (_metron->_rx_mode  == RSS) {
                         _nics[inic]->call_rx_write("max_rss", String(new_cpus_nb));
                     }
@@ -2212,7 +2216,7 @@ ServiceChain::check_alive()
     if (kill(_pid, 0) != 0) {
         _metron->remove_service_chain(this, ErrorHandler::default_handler());
     } else {
-        click_chatter("PID %d is alive", _pid);
+        click_chatter("Error: PID %d is still alive", _pid);
     }
 }
 
