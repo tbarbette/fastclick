@@ -193,14 +193,15 @@ FlowDirector::get_flow_director(
 
 /**
  * Installs a set of string-based rules read from a file.
- * Allowed rule types: create and delete.
+ * Allowed rule type is only a `create` rule.
  *
  * @param filename the file that contains the rules
  */
 int
 FlowDirector::add_rules_from_file(const String &filename)
 {
-    uint32_t rule_no = flow_rules_count();
+    uint32_t rules_nb = flow_rules_count();
+    uint32_t installed_rules_nb = rules_nb;
 
     FILE *fp = NULL;
     fp = fopen(filename.c_str(), "r");
@@ -210,44 +211,50 @@ FlowDirector::add_rules_from_file(const String &filename)
             _port_id, filename.c_str());
     }
 
-    char *line = NULL;
+    char *rule = NULL;
     size_t len = 0;
     const char ignore_chars[] = "\n\t ";
 
     // Read file line-by-line (or rule-by-rule)
-    while ((getline(&line, &len, fp)) != -1) {
-        // Skip empty lines or spaces
-        if ((strlen(line) == 0) ||
-            (strchr(ignore_chars, line[0]))) {
+    while ((getline(&rule, &len, fp)) != -1) {
+        // Skip empty lines or lines with only spaces/tabs
+        if (!rule || (strlen(rule) == 0) ||
+            (strchr(ignore_chars, rule[0]))) {
+            _errh->warning("Flow Director (port %u): Invalid rule #%" PRIu32, _port_id, rules_nb++);
             continue;
         }
 
         // Filter out irrelevant DPDK commands
-        if (!strstr(line, "create") && !strstr(line, "delete")) {
+        if (!strstr(rule, "create")) {
             _errh->warning(
                 "Flow Director (port %u): "
-                "Expects only create and/or delete rules", _port_id
+                "Rule #%" PRIu32 " does not contain create pattern", _port_id, rules_nb++
             );
             continue;
         }
 
         if (_verbose) {
-            _errh->message("[NIC %u] About to install rule with ID %" PRIu32 "", _port_id, rule_no);
+            _errh->message("[NIC %u] About to install rule #%" PRIu32 ": %s",
+                _port_id, rules_nb++, rule
+            );
         }
-        flow_rule_install(rule_no++, line);
+
+        if (flow_rule_install(installed_rules_nb, rule) == SUCCESS) {
+            installed_rules_nb++;
+        }
     }
 
     // Close the file
     fclose(fp);
 
     // Free memory
-    if (line) {
-        free(line);
+    if (rule) {
+        free(rule);
     }
 
     _errh->message(
-        "Flow Director (port %u): %u/%u rules are installed",
-        _port_id, _rules_nb[_port_id], rule_no
+        "Flow Director (port %u): %" PRIu32 "/%" PRIu32 " rules are installed",
+        _port_id, flow_rules_count(), rules_nb
     );
 
     return SUCCESS;
