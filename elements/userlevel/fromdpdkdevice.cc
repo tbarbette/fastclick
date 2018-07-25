@@ -475,7 +475,7 @@ int FromDPDKDevice::write_handler(
     switch((uintptr_t) thunk) {
         case h_add_mac: {
             EtherAddress mac;
-            int pool = 2;
+            int pool = 0;
             int ret;
             if (!EtherAddressArg().parse(input, mac)) {
                 return errh->error("Invalid MAC address %s",input.c_str());
