@@ -2128,6 +2128,9 @@ ServiceChain::generate_configuration()
     for (int i = 0; i < get_nics_nb(); i++) {
         String is = String(i);
         NIC *nic = get_nic_by_index(i);
+        if (_metron->_rx_mode == RSS) {
+            nic->call_rx_write("max_rss", String(get_used_cpu_nb()));
+        }
         for (int j = 0; j < get_max_cpu_nb(); j++) {
             String js = String(j);
             String active = (j < get_used_cpu_nb() ? "1":"0");

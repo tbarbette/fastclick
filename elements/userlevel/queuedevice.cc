@@ -60,6 +60,39 @@ Args& QueueDevice::parse(Args &args) {
     return args;
 }
 
+
+bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool)
+{
+    if (noutputs()) { //RX
+        if (_active) {
+            assert(thread_for_queue_available());
+            for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+                for (int j = 0; j < queue_share; j++) {
+                    bmk[thread_for_queue(i) - j] = 1;
+                }
+            }
+        }
+        return true;
+    } else { //TX
+        if (_active) {
+            if (input_is_pull(0)) {
+                bmk[router()->home_thread_id(this)] = 1;
+            }
+        }
+        return true;
+    }
+}
+
+void QueueDevice::cleanup_tasks() {
+    for (int i = 0; i < usable_threads.weight(); i++) {
+        if (_tasks[i]) {
+            delete _tasks[i];
+            _tasks[i] = 0;
+        }
+    }
+}
+
+
 Args& RXQueueDevice::parse(Args &args) {
 	args = QueueDevice::parse(args);
 
@@ -337,6 +370,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 				_locks[th_num] = 0;
 			}
 		} else {
+            assert(!_tasks[th_num]);
 			_tasks[th_num] = (new Task(this));
 			ScheduleInfo::initialize_task(this, _tasks[th_num], schedule, errh);
 			_tasks[th_num]->move_thread(th_id);

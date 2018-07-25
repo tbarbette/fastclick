@@ -67,6 +67,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     String mode = "";
     int num_pools = 0;
     Vector<int> vf_vlan;
+    int max_rss = 0;
+    bool has_rss = false;
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     String rules_filename;
 #endif
@@ -84,6 +86,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("VF_VLAN", vf_vlan)
         .read("MAXQUEUES",maxqueues)
         .read("RX_INTR", _rx_intr)
+        .read("MAX_RSS", max_rss).read_status(has_rss)
         .complete() < 0)
         return -1;
 
@@ -121,6 +124,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (has_mtu)
         _dev->set_init_mtu(mtu);
+
+    if (has_rss)
+        _dev->set_init_rss_max(max_rss);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     if ((mode == FlowDirector::FLOW_DIR_MODE) && (rules_filename.empty())) {

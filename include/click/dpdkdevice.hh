@@ -75,7 +75,7 @@ public:
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
             n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
             num_pools(0), vf_vlan(),
-            init_mac(), init_mtu(0) {
+            init_mac(), init_mtu(0), init_rss(-1) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -108,6 +108,7 @@ public:
         Vector<int> vf_vlan;
         EtherAddress init_mac;
         uint16_t init_mtu;
+        int init_rss;
     };
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -132,6 +133,7 @@ public:
     EtherAddress get_mac();
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
+    void set_init_rss_max(int rss_max);
 
     unsigned int get_nb_txdesc();
 

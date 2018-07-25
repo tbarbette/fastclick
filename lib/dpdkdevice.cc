@@ -578,6 +578,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         }
     }
 
+    if (info.init_rss > 0) {
+        if (set_rss_max(info.init_rss) != 0) {
+            return errh->error("Could not set RSS to %d queues",info.init_rss);
+        }
+    }
+
     int err = rte_eth_dev_start(port_id);
     if (err < 0)
         return errh->error(
@@ -626,6 +632,11 @@ void DPDKDevice::set_init_mac(EtherAddress mac) {
 void DPDKDevice::set_init_mtu(uint16_t mtu) {
     assert(!_is_initialized);
     info.init_mtu = mtu;
+}
+
+void DPDKDevice::set_init_rss_max(int rss_max) {
+    assert(!_is_initialized);
+    info.init_rss = rss_max;
 }
 
 EtherAddress DPDKDevice::get_mac() {
