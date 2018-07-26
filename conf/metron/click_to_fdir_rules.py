@@ -40,6 +40,8 @@ DST_SPEC   = "dst spec"
 DST_MASK   = "dst mask"
 ACTION_Q   = "actions queue index"
 
+NIC_INDEPENDENT = -1
+
 def dump_data_to_file(rule_list, target_nic, target_queues_nb, outfile, verbose=False):
 	"""
 	Writes the contents of a string into a file.
@@ -61,7 +63,11 @@ def dump_data_to_file(rule_list, target_nic, target_queues_nb, outfile, verbose=
 			if verbose:
 				print("Rule: {}".format(rule))
 
-			rule_str = "flow create {} ingress pattern eth".format(target_nic)
+			rule_str = ""
+			if target_nic >= 0:
+				rule_str = "flow create {} ingress pattern eth".format(target_nic)
+			else:
+				rule_str = "ingress pattern eth"
 
 			for proto in [IPVF, UDP, TCP]:
 				if proto in rule:
@@ -260,13 +266,13 @@ def ipfilter_to_json(input_file):
 
 	return rule_list
 
-### python click_to_fdir_rules.py --input-files test_click_rules --target-nic 0 --target-queues-nb 16
+### python click_to_fdir_rules.py --input-files test_click_rules --target-queues-nb 16
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser("Click IPFilter/IPLookup rules to DPDK Flow rule configurations")
 	parser.add_argument("--input-files", nargs='*', help="Set of space separated input files with IP-level Click rules")
 	parser.add_argument("--output-folder", type=str, default=".", help="Output folder where rules will be stored")
-	parser.add_argument("--target-nic", type=int, default=0, help="The DPDK port ID where the generated rules will be installed")
+	parser.add_argument("--target-nic", type=int, default=NIC_INDEPENDENT, help="The DPDK port ID where the generated rules will be installed or -1 for NIC independent rules")
 	parser.add_argument("--target-queues-nb", type=int, default=4, help="The number of hardware queues, to distribute the rules across")
 	parser.add_argument("--iterative", action="store_true", help="Executes this script for 1 to target-queues-nb")
 
@@ -280,8 +286,8 @@ if __name__ == "__main__":
 	if not os.path.isdir(output_folder):
 		raise RuntimeError("Invalid output folder: {}". format(output_folder))
 	target_nic = args.target_nic
-	if target_nic < 0:
-		raise RuntimeError("A target DPDK port ID is expected. Without this, we cannot generate NIC specific rules.")
+	if target_nic == NIC_INDEPENDENT:
+		print("Parameter --target-nic is set to -1. Rule generation will be NIC independent!")
 	target_queues_nb = args.target_queues_nb
 	if target_queues_nb <= 0:
 		raise RuntimeError("A target number of hardware queues must be positive.")
@@ -296,6 +302,6 @@ if __name__ == "__main__":
 		for q in range(start_queues_nb, target_queues_nb + 1):
 			out_file = os.path.join(
 				"{}".format(os.path.abspath(output_folder)),
-				get_substring_until_delimiter(in_file, ".") + "_port_{}_hw_queues_{}.fdir".format(target_nic, q)
+				get_substring_until_delimiter(in_file, ".") + "_hw_queues_{}.fdir".format(q)
 			)
 			dump_data_to_file(data, target_nic, q, out_file)

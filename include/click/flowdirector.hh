@@ -115,7 +115,7 @@ public:
     // Install a flow rule in a NIC
     int flow_rule_install(
         const uint32_t &rule_id,
-        const char     *rule
+        const String   rule
     );
 
     // Return a flow rule object with a specific ID
@@ -162,6 +162,9 @@ private:
 
     // Next rule ID per device
     static HashTable<portid_t, uint32_t> _next_rule_id;
+
+    // Filters unwanted components from rule
+    bool filter_rule(char **rule);
 
 };
 

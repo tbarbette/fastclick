@@ -105,11 +105,11 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (n_queues == -1) {
 	if (firstqueue == -1) {
 		firstqueue = 0;
-		//With DPDK we'll take as many queues as available threads
-		 r = configure_rx(numa_node,1,maxqueues,errh);
+		// With DPDK we'll take as many queues as available threads
+		r = configure_rx(numa_node, 1, maxqueues, errh);
 	} else {
-		//If a queue number is setted, user probably want only one queue
-		r = configure_rx(numa_node,1,1,errh);
+		// If a queue number is set, user probably wants only one queue
+		r = configure_rx(numa_node, 1, 1, errh);
 	}
     } else {
         if (firstqueue == -1)
@@ -492,7 +492,7 @@ int FromDPDKDevice::write_handler(
                 reinterpret_cast<ether_addr*>(mac.data()), pool
             );
             if (ret != 0) {
-                return errh->error("Could not add mac address !");
+                return errh->error("Could not add mac address!");
             }
             return 0;
         }
@@ -560,7 +560,7 @@ int FromDPDKDevice::flow_handler(
             }
 
             const uint32_t rule_id = flow_dir->next_unique_rule_id();
-            if (flow_dir->flow_rule_install(rule_id, rule.c_str()) != FlowDirector::SUCCESS) {
+            if (flow_dir->flow_rule_install(rule_id, rule) != FlowDirector::SUCCESS) {
                 return -1;
             }
 

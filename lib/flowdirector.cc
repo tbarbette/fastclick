@@ -211,31 +211,33 @@ FlowDirector::add_rules_from_file(const String &filename)
             _port_id, filename.c_str());
     }
 
-    char *rule = NULL;
+    char *line = NULL;
     size_t len = 0;
     const char ignore_chars[] = "\n\t ";
 
     // Read file line-by-line (or rule-by-rule)
-    while ((getline(&rule, &len, fp)) != -1) {
+    while ((getline(&line, &len, fp)) != -1) {
         // Skip empty lines or lines with only spaces/tabs
-        if (!rule || (strlen(rule) == 0) ||
-            (strchr(ignore_chars, rule[0]))) {
+        if (!line || (strlen(line) == 0) ||
+            (strchr(ignore_chars, line[0]))) {
             _errh->warning("Flow Director (port %u): Invalid rule #%" PRIu32, _port_id, rules_nb++);
             continue;
         }
 
-        // Filter out irrelevant DPDK commands
-        if (!strstr(rule, "create")) {
+        // Detect and remove unwanted components
+        if (!filter_rule(&line)) {
             _errh->warning(
-                "Flow Director (port %u): "
-                "Rule #%" PRIu32 " does not contain create pattern", _port_id, rules_nb++
+                "Flow Director (port %u): Invalid rule #%" PRIu32 ": %s", _port_id, rules_nb++, line
             );
             continue;
         }
 
+        // Compose rule
+        String rule = "flow create " + String(_port_id) + " " + String(line);
+
         if (_verbose) {
             _errh->message("[NIC %u] About to install rule #%" PRIu32 ": %s",
-                _port_id, rules_nb++, rule
+                _port_id, rules_nb++, rule.c_str()
             );
         }
 
@@ -246,11 +248,6 @@ FlowDirector::add_rules_from_file(const String &filename)
 
     // Close the file
     fclose(fp);
-
-    // Free memory
-    if (rule) {
-        free(rule);
-    }
 
     _errh->message(
         "Flow Director (port %u): %" PRIu32 "/%" PRIu32 " rules are installed",
@@ -269,7 +266,7 @@ FlowDirector::add_rules_from_file(const String &filename)
  * @return a flow rule object
  */
 int
-FlowDirector::flow_rule_install(const uint32_t &rule_id, const char *rule)
+FlowDirector::flow_rule_install(const uint32_t &rule_id, const String rule)
 {
     // Only active instances can configure a NIC
     if (!active()) {
@@ -282,7 +279,7 @@ FlowDirector::flow_rule_install(const uint32_t &rule_id, const char *rule)
 
 
     // TODO: Fix DPDK to return proper status
-    int res = flow_parser_parse(_parser, (char *) rule, _errh);
+    int res = flow_parser_parse(_parser, (char *) rule.c_str(), _errh);
     if (res >= 0) {
         _rules_nb[_port_id]++;
         _next_rule_id[_port_id]++;
@@ -307,7 +304,7 @@ FlowDirector::flow_rule_install(const uint32_t &rule_id, const char *rule)
     }
 
     _errh->error(
-        "Flow Director (port %u): Failed to parse rule #%4u due to %s",
+        "Flow Director (port %u): Failed to parse rule due to %s",
         _port_id, rule_id, error.c_str()
     );
 
@@ -437,6 +434,44 @@ FlowDirector::flow_rules_flush()
 
     // Now, count again to verify what is left
     return flow_rules_count_explicit();
+}
+
+/**
+ * Filters unwanted components from rule and
+ * returns an updated rule by reference.
+ *
+ */
+bool
+FlowDirector::filter_rule(char **rule)
+{
+    assert(rule);
+
+    const char *prefix = "flow create";
+    size_t prefix_len = strlen(prefix);
+    size_t rule_len = strlen(*rule);
+
+    // Fishy
+    if (rule_len <= prefix_len) {
+        return false;
+    }
+
+    // Rule starts with prefix
+    if (strncmp(prefix, *rule, prefix_len) == 0) {
+        // Skip the prefix
+        *rule += prefix_len;
+
+        // Remove a potential port ID and spaces before the actual rule
+        while (true) {
+            if (!isdigit(**rule) && (**rule != ' ')) {
+                break;
+            }
+            (*rule)++;
+        }
+
+        return (strlen(*rule) > 0) ? true : false;
+    }
+
+    return true;
 }
 
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
