@@ -402,6 +402,7 @@ Metron::discover()
             rest.set("protocol", DEF_AGENT_PROTO);
             rest.set("url", "");
             rest.set("testUrl", "");
+            rest.set("isProxy", false);
             hw_info_to_json(rest);
             device.set("rest", rest);
 
@@ -1143,14 +1144,6 @@ Json
 Metron::to_json()
 {
     Json jroot = Json::make_object();
-
-    // No controller
-    if (!_discovered) {
-        click_chatter(
-            "Cannot publish local resources: Metron agent is not associated with a controller"
-        );
-        return jroot;
-    }
 
     jroot.set("id", Json(_id));
     jroot.set("serial", Json(_serial));
