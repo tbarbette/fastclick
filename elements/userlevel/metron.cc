@@ -933,7 +933,7 @@ Metron::param_handler(
                     Json jscs = Json::make_array();
                     auto begin = m->_scs.begin();
                     while (begin != m->_scs.end()) {
-                        jscs.push_back(begin.value()->stats_to_json());
+                        jscs.push_back(begin.value()->stats_to_json(m->get_monitoring_mode()));
                         begin++;
                     }
                     jroot.set("servicechains", jscs);
@@ -945,7 +945,7 @@ Metron::param_handler(
                             param.c_str()
                         );
                     }
-                    jroot = sc->stats_to_json();
+                    jroot = sc->stats_to_json(m->get_monitoring_mode());
                 }
                 break;
             }
@@ -1298,11 +1298,6 @@ Metron::add_per_core_monitoring_data(
         const float min_latency,
         const float median_latency,
         const float max_latency) {
-    if (!_monitoring_mode) {
-        click_chatter("Cannot add per-core monitoring data, agent is not in monitoring mode");
-        return;
-    }
-
     if (!jobj) {
         click_chatter("Input JSON object is NULL. Cannot add per-core monitoring data");
         return;
@@ -1687,7 +1682,7 @@ ServiceChain::to_json()
  * Encodes service chain statistics to JSON.
  */
 Json
-ServiceChain::stats_to_json()
+ServiceChain::stats_to_json(bool monitoring_mode)
 {
     Json jsc = Json::make_object();
     jsc.set("id", get_id());
@@ -1707,6 +1702,10 @@ ServiceChain::stats_to_json()
         Json jcpu = Json::make_object();
         jcpu.set("id", get_cpu_map(j));
         jcpu.set("load", _cpuload[j]);
+        if (monitoring_mode) {
+            // TODO: replace 0s with real values
+            Metron::add_per_core_monitoring_data(&jcpu, 0, 0, 0, 0);
+        }
         jcpus.push_back(jcpu);
     }
     jsc.set("cpus", jcpus);

@@ -422,7 +422,7 @@ class ServiceChain {
         int reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh);
 
         Json to_json();
-        Json stats_to_json();
+        Json stats_to_json(bool monitoring_mode = false);
 
         Json rules_to_json();
         int rules_from_json(Json j, Metron *m, ErrorHandler *errh);
@@ -596,6 +596,10 @@ class Metron : public Element {
         int instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int remove_service_chain(ServiceChain *sc, ErrorHandler *errh);
 
+        bool get_monitoring_mode() {
+            return _monitoring_mode;
+        }
+
         int get_cpus_nb() {
             return click_max_cpu_ids();
         }
@@ -676,7 +680,7 @@ class Metron : public Element {
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int confirm_nic_mode(ErrorHandler *errh);
 
-        void add_per_core_monitoring_data(
+        static void add_per_core_monitoring_data(
             Json  *jobj,
             const float avg_throughput,
             const float min_latency,
