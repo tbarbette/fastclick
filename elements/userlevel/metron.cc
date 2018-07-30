@@ -143,7 +143,8 @@ parse_vendor_info(String hw_info, String key)
  **************************************/
 Metron::Metron() :
     _timer(this), _timing_stats(true),
-    _discovered(false), _rx_mode(FLOW), _discover_ip(),
+    _discover_ip(), _discovered(false),
+    _rx_mode(FLOW), _monitoring_mode(false),
     _verbose(false)
 {
     _core_id = click_max_cpu_ids() - 1;
@@ -187,6 +188,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("DISCOVER_USER",     _discover_user)
         .read    ("DISCOVER_PASSWORD", _discover_password)
         .read    ("PIN_TO_CORE",       _core_id)
+        .read    ("MONITORING",        _monitoring_mode)
         .read    ("VERBOSE",           _verbose)
         .complete() < 0)
         return ERROR;
@@ -251,6 +253,13 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("Invalid port number");
     }
 #endif
+
+    if (_monitoring_mode) {
+        errh->warning(
+            "Monitoring mode is likely to introduce performance degradation. "
+            "In this mode, rate counters and timestamping elements are deployed on a per-core basis."
+        );
+    }
 
     // Setup pointers with the underlying NICs
     int index = 0;
@@ -1221,6 +1230,12 @@ Metron::stats_to_json()
             jcpu.set("load", cpuload);
             jcpu.set("busy", true);      // This CPU core is busy
 
+            // Additional per-core statistics in monitoring mode
+            if (_monitoring_mode) {
+                // TODO: replace 0s with real values
+                add_per_core_monitoring_data(&jcpu, 0, 0, 0, 0);
+            }
+
             jcpus.push_back(jcpu);
 
             assigned_cpus++;
@@ -1242,6 +1257,11 @@ Metron::stats_to_json()
         jcpu.set("id", j);
         jcpu.set("load", 0);      // No load
         jcpu.set("busy", false);  // This CPU core is free
+
+        if (_monitoring_mode) {
+            add_per_core_monitoring_data(&jcpu, 0, 0, 0, 0);
+        }
+
         jcpus.push_back(jcpu);
     }
 
@@ -1264,6 +1284,42 @@ Metron::stats_to_json()
     jroot.set("nics", jnics);
 
     return jroot;
+}
+
+void
+Metron::add_per_core_monitoring_data(
+        Json *jobj,
+        const float avg_throughput,
+        const float min_latency,
+        const float median_latency,
+        const float max_latency) {
+    if (!_monitoring_mode) {
+        click_chatter("Cannot add per-core monitoring data, agent is not in monitoring mode");
+        return;
+    }
+
+    if (!jobj) {
+        click_chatter("Input JSON object is NULL. Cannot add per-core monitoring data");
+        return;
+    }
+
+    if ((avg_throughput < 0) || (min_latency < 0) || (median_latency < 0) || (max_latency < 0)) {
+        click_chatter("Invalid per-core monitoring data");
+        return;
+    }
+
+    Json jtput = Json::make_object();
+    jtput.set("average", avg_throughput);
+    jtput.set("unit", "mbps");
+    jobj->set("throughput", jtput);
+
+    Json jlat = Json::make_object();
+    jlat.set("min", min_latency);
+    jlat.set("median", median_latency);
+    jlat.set("max", max_latency);
+    jlat.set("unit", "us");
+    jobj->set("latency", jlat);
+
 }
 
 /**

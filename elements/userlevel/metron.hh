@@ -663,15 +663,26 @@ class Metron : public Element {
         /* Discovery status */
         bool _discovered;
 
-        /* Verbose */
-        bool _verbose;
-
         /* Rx filter mode */
         RxFilterType _rx_mode;
+
+        /* Monitoring mode */
+        bool _monitoring_mode;
+
+        /* Verbose */
+        bool _verbose;
 
         /* Private methods */
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int confirm_nic_mode(ErrorHandler *errh);
+
+        void add_per_core_monitoring_data(
+            Json  *jobj,
+            const float avg_throughput,
+            const float min_latency,
+            const float median_latency,
+            const float max_latency
+        );
 
         Timer _timer;
 
