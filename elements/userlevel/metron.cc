@@ -1286,6 +1286,11 @@ Metron::stats_to_json()
     return jroot;
 }
 
+/**
+ * Extends the input JSON object with additional fields.
+ * These fields contain per-core measurements, such as
+ * average throughput and several latency percentiles.
+ */
 void
 Metron::add_per_core_monitoring_data(
         Json *jobj,
@@ -1319,7 +1324,6 @@ Metron::add_per_core_monitoring_data(
     jlat.set("max", max_latency);
     jlat.set("unit", "us");
     jobj->set("latency", jlat);
-
 }
 
 /**
