@@ -650,8 +650,6 @@ class Metron : public Element {
         String _sw;
         String _serial;
 
-        bool _timing_stats;
-
         /* Agent's (local) information */
         String _agent_ip;
         int    _agent_port;

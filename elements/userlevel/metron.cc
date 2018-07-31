@@ -142,8 +142,7 @@ parse_vendor_info(String hw_info, String key)
  * Metron
  **************************************/
 Metron::Metron() :
-    _timer(this), _timing_stats(true),
-    _discover_ip(), _discovered(false),
+    _timer(this), _discover_ip(), _discovered(false),
     _rx_mode(FLOW), _monitoring_mode(false),
     _verbose(false)
 {
@@ -179,7 +178,6 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("SLAVE_ARGS",        _args)
         .read    ("ID",                _id)
         .read    ("RX_MODE",           rx_mode)
-        .read    ("TIMING_STATS",      _timing_stats)
         .read    ("AGENT_IP",          _agent_ip)
         .read    ("AGENT_PORT",        _agent_port)
         .read    ("DISCOVER_IP",       _discover_ip)
@@ -1012,9 +1010,7 @@ Metron::param_handler(
                 Json jlist = jroot.get("servicechains");
                 for (auto jsc : jlist) {
                     struct ServiceChain::timing_stats ts;
-                    if (m->_timing_stats) {
-                        ts.start = Timestamp::now_steady();
-                    }
+                    ts.start = Timestamp::now_steady();
 
                     // Parse
                     ServiceChain *sc = ServiceChain::from_json(jsc.second, m, errh);
@@ -1023,9 +1019,7 @@ Metron::param_handler(
                             "Could not instantiate a service chain"
                         );
                     }
-                    if (m->_timing_stats) {
-                        ts.parse = Timestamp::now_steady();
-                    }
+                    ts.parse = Timestamp::now_steady();
 
                     String sc_id = sc->get_id();
                     if (m->find_service_chain_by_id(sc_id) != 0) {
@@ -1044,10 +1038,8 @@ Metron::param_handler(
                             sc_id.c_str()
                         );
                     }
-                    if (m->_timing_stats) {
-                        ts.launch = Timestamp::now_steady();
-                        sc->set_timing_stats(ts);
-                    }
+                    ts.launch = Timestamp::now_steady();
+                    sc->set_timing_stats(ts);
                 }
 
                 return SUCCESS;
@@ -1610,7 +1602,7 @@ ServiceChain::from_json(
     }
 
     sc->_autoscale = false;
-    if (!j.get("autoscale", sc->_autoscale)) {
+    if (!j.get("autoScale", sc->_autoscale)) {
         errh->warning("Autoscale is not present or not boolean");
     }
     /*
@@ -1667,7 +1659,7 @@ ServiceChain::to_json()
         jmaxcpus.push_back(get_cpu_map(i));
     }
     jsc.set("maxCpus", jmaxcpus);
-    jsc.set("autoscale", _autoscale);
+    jsc.set("autoScale", _autoscale);
     jsc.set("status", status);
     Json jnics = Json::make_array();
     for (auto n : _nics) {
@@ -1766,10 +1758,8 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     }
     jsc.set("nics", jnics);
 
-    if (_metron->_timing_stats) {
-        jsc.set("timing_stats", _timing_stats.to_json());
-        jsc.set("autoscale_timing_stats", _as_timing_stats.to_json());
-    }
+    jsc.set("timingStats", _timing_stats.to_json());
+    jsc.set("autoScaleTimingStats", _as_timing_stats.to_json());
 
     return jsc;
 }
@@ -1983,9 +1973,10 @@ Json
 ServiceChain::timing_stats::to_json()
 {
     Json j = Json::make_object();
-    j.set("parse", (parse - start).nsecval());
-    j.set("launch", (launch - parse).nsecval());
-    j.set("total", (launch - start).nsecval());
+    j.set("unit", "ns");
+    j.set("parseTime",  (parse - start).nsecval());
+    j.set("launchTime", (launch - parse).nsecval());
+    j.set("totalTime",  (launch - start).nsecval());
     return j;
 }
 
@@ -1996,7 +1987,8 @@ Json
 ServiceChain::autoscale_timing_stats::to_json()
 {
     Json j = Json::make_object();
-    j.set("autoscale", (autoscale_end - autoscale_start).nsecval());
+    j.set("unit", "ns");
+    j.set("autoScaleTime", (autoscale_end - autoscale_start).nsecval());
     return j;
 }
 
