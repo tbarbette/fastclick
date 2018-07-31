@@ -64,6 +64,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     uint16_t mtu = 0;
     bool has_mac = false;
     bool has_mtu = false;
+    FlowControlMode fc_mode(FC_UNSET);
     String mode = "";
     int num_pools = 0;
     Vector<int> vf_vlan;
@@ -87,6 +88,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES",maxqueues)
         .read("RX_INTR", _rx_intr)
         .read("MAX_RSS", max_rss).read_status(has_rss)
+        .read("PAUSE", fc_mode)
         .complete() < 0)
         return -1;
 
@@ -124,6 +126,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (has_mtu)
         _dev->set_init_mtu(mtu);
+
+    if (fc_mode != FC_UNSET)
+        _dev->set_init_fc_mode(fc_mode);
 
     if (has_rss)
         _dev->set_init_rss_max(max_rss);
