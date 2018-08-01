@@ -674,6 +674,9 @@ class Metron : public Element {
         /* Verbose */
         bool _verbose;
 
+        /* Fail on service chain instanciation error */
+        bool _fail;
+
         /* Private methods */
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int confirm_nic_mode(ErrorHandler *errh);

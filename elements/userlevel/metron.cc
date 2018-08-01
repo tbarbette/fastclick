@@ -144,7 +144,7 @@ parse_vendor_info(String hw_info, String key)
 Metron::Metron() :
     _timer(this), _discover_ip(), _discovered(false),
     _rx_mode(FLOW), _monitoring_mode(false),
-    _verbose(false)
+    _verbose(false), _fail(false)
 {
     _core_id = click_max_cpu_ids() - 1;
 }
@@ -188,6 +188,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("PIN_TO_CORE",       _core_id)
         .read    ("MONITORING",        _monitoring_mode)
         .read    ("VERBOSE",           _verbose)
+        .read    ("FAIL",              _fail)
         .complete() < 0)
         return ERROR;
 
@@ -655,6 +656,8 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
     int ret = run_service_chain(sc, errh);
     if (ret != SUCCESS) {
         unassign_cpus(sc);
+        if (_fail)
+            abort();
         return ERROR;
     }
 
