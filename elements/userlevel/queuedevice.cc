@@ -60,18 +60,17 @@ Args& QueueDevice::parse(Args &args) {
     return args;
 }
 
-
 bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool)
 {
     if (noutputs()) { //RX
-        if (_active) {
+        //if (_active) { TODO
             assert(thread_for_queue_available());
             for (int i = firstqueue; i < firstqueue + n_queues; i++) {
                 for (int j = 0; j < queue_share; j++) {
                     bmk[thread_for_queue(i) - j] = 1;
                 }
             }
-        }
+        // }
         return true;
     } else { //TX
         if (_active) {
