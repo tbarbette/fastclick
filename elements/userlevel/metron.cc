@@ -1309,7 +1309,7 @@ Metron::add_per_core_monitoring_data(
     jlat.set("min", min_latency);
     jlat.set("median", median_latency);
     jlat.set("max", max_latency);
-    jlat.set("unit", "us");
+    jlat.set("unit", "ns");
     jobj->set("latency", jlat);
 }
 
@@ -1560,8 +1560,7 @@ ServiceChain::~ServiceChain()
  * Decodes service chain information from JSON.
  */
 ServiceChain *
-ServiceChain::from_json(
-        Json j, Metron *m, ErrorHandler *errh)
+ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
 {
     String new_sc_id = j.get_s("id");
 
@@ -1976,7 +1975,7 @@ ServiceChain::timing_stats::to_json()
     j.set("unit", "ns");
     j.set("parseTime",  (parse - start).nsecval());
     j.set("launchTime", (launch - parse).nsecval());
-    j.set("totalTime",  (launch - start).nsecval());
+    j.set("deployTime", (launch - start).nsecval());
     return j;
 }
 
