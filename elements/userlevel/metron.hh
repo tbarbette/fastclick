@@ -677,6 +677,9 @@ class Metron : public Element {
         /* Fail on service chain instanciation error */
         bool _fail;
 
+        /* Timer for load computation (msec) */
+        unsigned _load_timer;
+
         /* Private methods */
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int confirm_nic_mode(ErrorHandler *errh);

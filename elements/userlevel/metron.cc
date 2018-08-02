@@ -144,7 +144,7 @@ parse_vendor_info(String hw_info, String key)
 Metron::Metron() :
     _timer(this), _discover_ip(), _discovered(false),
     _rx_mode(FLOW), _monitoring_mode(false),
-    _verbose(false), _fail(false)
+    _verbose(false), _fail(false), _load_timer(1000)
 {
     _core_id = click_max_cpu_ids() - 1;
 }
@@ -189,6 +189,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("MONITORING",        _monitoring_mode)
         .read    ("VERBOSE",           _verbose)
         .read    ("FAIL",              _fail)
+        .read    ("LOAD_TIMER",        _load_timer)
         .complete() < 0)
         return ERROR;
 
@@ -368,7 +369,7 @@ Metron::initialize(ErrorHandler *errh)
 
     _timer.initialize(this);
     _timer.move_thread(_core_id);
-    _timer.schedule_after_sec(1);
+    _timer.schedule_after_msec(_load_timer);
 
     return SUCCESS;
 }
@@ -545,7 +546,7 @@ Metron::run_timer(Timer *t)
        sci++;
 
     }
-    _timer.reschedule_after_sec(1);
+    _timer.reschedule_after_msec(_load_timer);
 }
 
 /**
