@@ -694,6 +694,8 @@ class Metron : public Element {
 
         Timer _timer;
 
+
+        Spinlock _command_lock;
         friend class ServiceChain;
 };
 

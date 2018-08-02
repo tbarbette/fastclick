@@ -785,8 +785,9 @@ Metron::remove_service_chain(ServiceChain *sc, ErrorHandler *errh)
             sc->get_id().c_str()
         );
     }
-
+    _command_lock.acquire();
     sc->control_send_command("WRITE stop");
+    _command_lock.release();
     unassign_cpus(sc);
     if (!_scs.remove(sc->get_id())) {
         return ERROR;
@@ -2332,6 +2333,7 @@ ServiceChain::call(
         String fnt, bool has_response, String handler,
         String &response, String params)
 {
+    _metron->_command_lock.acquire();
     String ret = control_send_command(
         fnt + " " + handler + (params? " " + params : "")
     );
@@ -2343,11 +2345,16 @@ ServiceChain::call(
     int code = atoi(ret.substring(0, 3).c_str());
     if (code >= 500) {
         response = ret.substring(4);
+        _metron->_command_lock.release();
         return code;
     }
     if (has_response) {
         ret = ret.substring(ret.find_left("\r\n") + 2);
-        assert(ret.starts_with("DATA "));
+        if (!ret.starts_with("DATA ")) {
+            click_chatter("Got answer '%s' (code %d), that does not start with DATA !", ret.c_str(), code);
+            click_chatter("Command was %s %s %s", fnt.c_str(),handler.c_str(), params?params.c_str():"");
+            abort();
+        }
         ret = ret.substring(5);
         int eof = ret.find_left("\r\n");
         int n = atoi(ret.substring(0, eof).c_str());
@@ -2356,6 +2363,7 @@ ServiceChain::call(
         response = ret.substring(4);
     }
 
+    _metron->_command_lock.release();
     return code;
 }
 
