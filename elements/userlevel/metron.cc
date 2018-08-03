@@ -495,6 +495,7 @@ Metron::run_timer(Timer *t)
 
        for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
            float cpuload = 0;
+           float cpuqueue = 0;
            for (int i = 0; i < sc->get_nics_nb(); i++) {
                NIC *nic = sc->get_nic_by_index(i);
                assert(nic);
@@ -537,8 +538,13 @@ Metron::run_timer(Timer *t)
 
                if (sc->nic_stats[stat_idx].load > cpuload)
                    cpuload = sc->nic_stats[stat_idx].load;
+
+               float ncpuqueue = (float)atoi(sc->simple_call_read(name + ".queue_count "+String(nic->cpu_to_queue(sc->get_cpu_map(j)))).c_str()) / (float)(atoi(nic->call_tx_read("nb_rx_desc").c_str()));
+               if (ncpuqueue > cpuqueue)
+                   cpuqueue = ncpuqueue;
            }
            sc->_cpuload[j] = cpuload;
+           sc->_cpuqueue[j] = cpuqueue;
            total_cpuload += cpuload;
            if (cpuload > max_cpuload) {
                max_cpuload = cpuload;
@@ -1233,6 +1239,7 @@ Metron::stats_to_json()
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
             int cpu_id = sc->get_cpu_map(j);
             float cpuload = sc->_cpuload[j];
+            float cpuqueue = sc->_cpuqueue[j];
 
             /*
              * Replace the initialized values above
@@ -1241,6 +1248,7 @@ Metron::stats_to_json()
             Json jcpu = Json::make_object();
             jcpu.set("id",   cpu_id);
             jcpu.set("load", cpuload);
+            jcpu.set("queue", cpuqueue);
             jcpu.set("busy", true);      // This CPU core is busy
 
             // Additional per-core statistics in monitoring mode
@@ -1535,10 +1543,10 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     click_chatter("Rx filters in mode: %s", method_str.upper().c_str());
 
     if (method == MAC) {
-        Json jaddrs = Json::parse(nic->call_read("vf_mac_addr"));
+        Json jaddrs = Json::parse(nic->call_rx_read("vf_mac_addr"));
 
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
-            int available_pools = atoi(nic->call_read("nb_vf_pools").c_str());
+            int available_pools = atoi(nic->call_rx_read("nb_vf_pools").c_str());
             if (available_pools <= _sc->get_cpu_map(i)) {
                 return errh->error("Not enough VF pools: %d are available", available_pools);
             }
@@ -1575,6 +1583,7 @@ ServiceChain::~ServiceChain()
 
     _cpus.clear();
     _cpuload.clear();
+    _cpuqueue.clear();
 }
 
 /**
@@ -1638,6 +1647,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
 
     sc->_cpus.resize(sc->_max_cpus_nb);
     sc->_cpuload.resize(sc->_max_cpus_nb, 0);
+    sc->_cpuqueue.resize(sc->_max_cpus_nb, 0);
     Json jnics = j.get("nics");
     for (auto jnic : jnics) {
         NIC *nic = m->_nics.findp(jnic.second.as_s());
@@ -2478,20 +2488,20 @@ NIC::to_json(RxFilterType rx_mode, bool stats)
     nic.set("name", get_name());
     nic.set("index", get_index());
     if (!stats) {
-        nic.set("vendor", call_read("vendor"));
-        nic.set("driver", call_read("driver"));
-        nic.set("speed", call_read("speed"));
-        nic.set("status", call_read("carrier"));
-        nic.set("portType", call_read("type"));
-        nic.set("hwAddr", call_read("mac").replace('-',':'));
+        nic.set("vendor", call_rx_read("vendor"));
+        nic.set("driver", call_rx_read("driver"));
+        nic.set("speed", call_rx_read("speed"));
+        nic.set("status", call_rx_read("carrier"));
+        nic.set("portType", call_rx_read("type"));
+        nic.set("hwAddr", call_rx_read("mac").replace('-',':'));
         Json jtagging = Json::make_array();
         jtagging.push_back(rx_filter_type_enum_to_str(rx_mode));
         nic.set("rxFilter", jtagging);
     } else {
-        nic.set("rxCount", call_read("hw_count"));
-        nic.set("rxBytes", call_read("hw_bytes"));
-        nic.set("rxDropped", call_read("hw_dropped"));
-        nic.set("rxErrors", call_read("hw_errors"));
+        nic.set("rxCount", call_rx_read("hw_count"));
+        nic.set("rxBytes", call_rx_read("hw_bytes"));
+        nic.set("rxDropped", call_rx_read("hw_dropped"));
+        nic.set("rxErrors", call_rx_read("hw_errors"));
         nic.set("txCount", call_tx_read("hw_count"));
         nic.set("txBytes", call_tx_read("hw_bytes"));
         nic.set("txErrors", call_tx_read("hw_errors"));
@@ -2500,11 +2510,21 @@ NIC::to_json(RxFilterType rx_mode, bool stats)
     return nic;
 }
 
+int
+NIC::queue_per_pool() {
+    int nb_vf_pools = atoi(call_rx_read("nb_vf_pools").c_str());
+    if (nb_vf_pools == 0)
+        return 1;
+    return atoi(
+        call_rx_read("nb_rx_queues").c_str()) /
+        nb_vf_pools;
+}
+
 /**
  * Implements read handlers for a NIC.
  */
 String
-NIC::call_read(String h)
+NIC::call_rx_read(String h)
 {
     const Handler *hc = Router::handler(element, h);
 
@@ -2516,7 +2536,7 @@ NIC::call_read(String h)
 }
 
 /**
- * Relays handler calls to a NIC's underlying Tx element.
+ * Relays handler calls to a NIC's underlying TX element.
  */
 String
 NIC::call_tx_read(String h)

@@ -623,8 +623,11 @@ int FromDPDKDevice::xstats_handler(
     if (!fd->_dev)
         return -1;
 
+    switch ((intptr_t)handler->read_user_data()) {
+        case h_xstats: {
+
         struct rte_eth_xstat_name* names;
-#if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
         int len = rte_eth_xstats_get_names(fd->_dev->port_id, 0, 0);
         names = static_cast<struct rte_eth_xstat_name*>(
             malloc(sizeof(struct rte_eth_xstat_name) * len)
@@ -653,11 +656,27 @@ int FromDPDKDevice::xstats_handler(
             }
             return -1;
         }
-#else
+    #else
         input = "unsupported with DPDK < 16.07";
         return -1;
-#endif
-    return 0;
+    #endif
+        }
+    case h_queue_count:
+        if (input == "") {
+            StringAccum acc;
+            for (uint16_t i = 0; i < fd->_dev->nbRXQueues(); i++) {
+                int v = rte_eth_rx_queue_count(fd->_dev->get_port_id(), i);
+                acc << i << " = " <<
+                v << "\n";
+            }
+            input = acc.take_string();
+        } else {
+            int v = rte_eth_rx_queue_count(fd->_dev->get_port_id(), atoi(input.c_str()));
+            input = String(v);
+            return 0;
+        }
+    }
+    return -1;
 }
 
 void FromDPDKDevice::add_handlers()
@@ -672,7 +691,9 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("carrier",status_handler, h_carrier);
     add_read_handler("type",status_handler, h_type);
 
-    set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler);
+    set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler, h_xstats);
+    set_handler("queue_count", Handler::f_read | Handler::f_read_param, xstats_handler, h_queue_count);
+
 
     add_read_handler("active", read_handler, h_active);
     add_write_handler("active", write_handler, h_active);
@@ -684,6 +705,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);
     add_read_handler("nb_tx_queues",read_handler, h_nb_tx_queues);
     add_read_handler("nb_vf_pools",read_handler, h_nb_vf_pools);
+    add_data_handlers("nb_rx_desc", Handler::h_read, &ndesc);
 
     add_read_handler("mac",read_handler, h_mac);
     add_read_handler("vendor", read_handler, h_vendor);

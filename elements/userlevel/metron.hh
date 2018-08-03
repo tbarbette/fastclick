@@ -291,20 +291,13 @@ class NIC {
 
         Json to_json(RxFilterType rx_mode, bool stats = false);
 
-        int queue_per_pool() {
-            int nb_vf_pools = atoi(call_read("nb_vf_pools").c_str());
-            if (nb_vf_pools == 0)
-                return 1;
-            return atoi(
-                call_read("nb_rx_queues").c_str()) /
-                nb_vf_pools;
-        }
+        int queue_per_pool();
 
         int cpu_to_queue(int id) {
             return id * (queue_per_pool());
         }
 
-        String call_read(String h);
+        String call_rx_read(String h);
         String call_tx_read(String h);
         int    call_rx_write(String h, const String input);
 
@@ -532,6 +525,7 @@ class ServiceChain {
         Vector<int> _cpus;
         Vector<NIC *> _nics;
         Vector<float> _cpuload;
+        Vector<int> _cpuqueue;
         float _total_cpuload;
         int _socket;
         int _pid;
