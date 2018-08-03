@@ -228,6 +228,10 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         rx_filter_type_enum_to_str(_rx_mode).c_str()
     );
 
+    if (_load_timer <= 0) {
+        return errh->error("Set a positive scheduling frequency using LOAD_TIMER");
+    }
+
 #ifndef HAVE_CURL
     if (_discover_ip) {
         return errh->error(
@@ -657,8 +661,9 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
     int ret = run_service_chain(sc, errh);
     if (ret != SUCCESS) {
         unassign_cpus(sc);
-        if (_fail)
+        if (_fail) {
             abort();
+        }
         return ERROR;
     }
 
@@ -2334,11 +2339,10 @@ ServiceChain::call(
         String &response, String params)
 {
     _metron->_command_lock.acquire();
-    String ret = control_send_command(
-        fnt + " " + handler + (params? " " + params : "")
-    );
-    if (ret == "") {
+    String ret = control_send_command(fnt + " " + handler + (params? " " + params : ""));
+    if (ret.empty()) {
         check_alive();
+        _metron->_command_lock.release();
         return ERROR;
     }
 
