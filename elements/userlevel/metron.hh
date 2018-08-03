@@ -564,6 +564,7 @@ class Metron : public Element {
         bool discover();
         void cleanup(CleanupStage) CLICK_COLD;
 
+        static void discover_timer(Timer *timer, void *user_data);
         void run_timer(Timer *t) override;
 
         void add_handlers() CLICK_COLD;
@@ -632,7 +633,7 @@ class Metron : public Element {
         const String DEF_DISCOVER_PATH      = "/onos/v1/network/configuration/";
 
         /* Bound the discovery process */
-        const unsigned short DISCOVERY_ATTEMPTS = 3;
+        const unsigned DISCOVERY_WAIT = 5;
 
     private:
         String _id;
@@ -693,6 +694,7 @@ class Metron : public Element {
         );
 
         Timer _timer;
+        Timer _discover_timer;
 
 
         Spinlock _command_lock;

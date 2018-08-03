@@ -142,7 +142,7 @@ parse_vendor_info(String hw_info, String key)
  * Metron
  **************************************/
 Metron::Metron() :
-    _timer(this), _discover_ip(), _discovered(false),
+    _timer(this), _discover_timer(&discover_timer, 0), _discover_ip(), _discovered(false),
     _rx_mode(FLOW), _monitoring_mode(false),
     _verbose(false), _fail(false), _load_timer(1000)
 {
@@ -330,6 +330,14 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
     return SUCCESS;
 }
 
+void
+Metron::discover_timer(Timer *timer, void *user_data) {
+    Metron* m = (Metron*)user_data;
+    m->_discovered = m->discover();
+    if (!m->_discovered)
+        m->_discover_timer.schedule_after_sec(m->DISCOVERY_WAIT);
+}
+
 /**
  * Allocates memory resources before the start up
  * and performs controller discovery.
@@ -359,15 +367,18 @@ Metron::initialize(ErrorHandler *errh)
     // Only if user has requested discovery
     if (_discover_ip) {
         curl_global_init(CURL_GLOBAL_DEFAULT);
-        for (unsigned short i=0 ; i<DISCOVERY_ATTEMPTS ; i++) {
-            if ((_discovered = discover())) {
-                break;
-            }
-        }
+        _discovered = discover();
     }
 
     if (!_discovered) {
-        errh->warning("To proceed, Metron controller must initiate the discovery");
+        if (_discover_ip) {
+            _discover_timer.initialize(this);
+            _discover_timer.move_thread(_core_id);
+            _discover_timer.schedule_after_sec(DISCOVERY_WAIT);
+            errh->warning("Could not send discovery message to Metron. Discovery will be done in background. Alternatively, the Metron controller can initiate the discovery");
+        } else {
+            errh->warning("To proceed, Metron controller must initiate the discovery");
+        }
     }
 #endif
 
