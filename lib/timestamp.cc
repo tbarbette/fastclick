@@ -263,6 +263,7 @@ Timestamp::unparse_interval() const
 bool Timestamp::set_clock(user_clock_fct clock, void* user) {
 	_user_data = user;
 	_user_clock = clock;
+	return true;
 }
 
 
