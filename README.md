@@ -4,6 +4,9 @@ This is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It is the result of
 our ANCS paper available at http://hdl.handle.net/2268/181954 .
 
+The wiki provides documentation about the elements and how to use some FastClick features
+such as batching.
+
 Partial DPDK support is now reverted into vanilla Click (without support for 
 batching, auto-thread assignment, thread vector, ...).
 
@@ -62,47 +65,6 @@ The `--enable-dpdk-packet` option allows to use DPDK packet handling mechanism i
 Examples
 --------
 See conf/fastclick/README.md
-
-How to make an element batch-compatible
----------------------------------------
-FastClick is backward compatible with all vanilla element, and it should work 
-out of the box with your own library. However Click may un-batch and re-batch
-packets along the path. This is not an issue for most slow path elements such 
-as ICMP erros elements, where the development cost is not worth it. However, 
-you probably want to have only batch-compatible elements in your fast path as 
-this will be really faster.
-
-Batch-compatible element should extend the BatchElement instead of the Element 
-class. They also have to implement 
-a version of push receiving a PacketBatch\* argument instead of Packet\* called 
-push\_batch. 
-
-The reason why batch element must provide a good old push fonction is that
-it may be not worth it to rebuild a batch before your element, and then 
-unbatch-it because your element is betweem two vanilla elements. In this case
-the push version of your element will be used.
-
-To let click compile with `--disable-batch`, always enclose push\_batch prototype
-and implementation around #if HAVE\_BATCH .. #endif
-
-If your element must use batching, if only push\_batch is implemented or 
-your element always produces batches no matter the input, you
-will want to set batch\_mode=BATCH\_MODE\_YES in the constructor, to let know 
-the backward-compatibility manager that subsequent elements will receive 
-batches, and previous element must send batch or let the backward compatibility 
-manager rebuild a batch before passing it to your element. The default is 
-BATCH\_MODE\_IFPOSSIBLE, telling that it should run in batch mode if it can, and 
-vanilla element are fixed to BATCH\_MODE\_NO.
-
-If you provide `--enable-auto-batch`, the vanilla Elements will be set in mode 
-BATCH\_MODE\_IFPOSSIBLE, with a special push\_batch function which will simply
-call push() for each packets. However the push ports of the elements will
-rebuild batches instead of letting them go through.
-
-Without auto-batch, the batches will be un-batched before a vanilla Element and
-re-batched when hitting the next BatchElement. It is referenced as the "jump"
-mode as the batch "jump over" the vanilla Element. This is the behaviour
-described in the ANCS paper and still the default mode.
 
 Continuous integration and `make check`
 ---------------------------------------
