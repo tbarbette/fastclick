@@ -20,7 +20,11 @@ CLICK_DECLS
  *
  * FromNetmapDevice(DEVNAME [, QUEUE, NR_QUEUE, [, I<keywords> PROMISC, BURST])
  *
+ * Receives packets using Netmap
+ *
  * =s netdevices
+ *
+ * =d
  *
  * =item DEVNAME
  *

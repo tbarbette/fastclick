@@ -13,9 +13,12 @@ GTPLookup()
 
 =s gtp
 
-decapsulate the GTP packet and set the GTP TEID in the aggregate annotation
+Encapsulates packets in their intended GTP return id.
 
 =d
+
+Finds from the 5 tuple of a packet returning from the MEC the right
+GTP return ID.
 
 =a GTPEncap
 */

@@ -14,10 +14,16 @@ CLICK_DECLS
 
 Pipeliner
 
+=s storage
+
+=d
+
 Fast version of ThreadSafeQueue->Unqueue, allowing to offload processing
 of packets pushed to this element to another one, without the inherent
 scheduling cost of normal queues. Multiple thread can push packets to
 this queue, and the home thread of this element will push packet out.
+
+
 */
 
 

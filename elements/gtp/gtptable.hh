@@ -55,11 +55,16 @@ class GTPFlowIDMAP : public GTPFlowID{public:
 
 GTPTable()
 
+Find mapping of the GTP tunnel id return side
+
 =s gtp
 
-decapsulate the GTP packet and set the GTP TEID in the aggregate annotation
-
 =d
+
+Mark the mapping of the GTP ID to the inner 5 tuples in memory, and
+crafts a PING packet to some server. When the ping is received, the mapping
+is updated so packets from the TOF can be encapsulated with the right
+"return side" GTP ID.
 
 =a GTPEncap
 */

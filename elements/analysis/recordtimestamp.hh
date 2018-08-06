@@ -15,7 +15,11 @@ class NumberPacket;
 
 RecordTimestamp([I<keywords> N])
 
+Record timestamp in memory
+
 =s timestamps
+
+=d
 
 record current timestamp in a vector each time a packet is pushed through this
 element.

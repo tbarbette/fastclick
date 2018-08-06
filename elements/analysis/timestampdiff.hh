@@ -13,7 +13,11 @@ class RecordTimestamp;
 
 TimestampDiff()
 
+Compute the RTT of packets marked with RecordTimestamp
+
 =s timestamps
+
+=d
 
 Compute the difference between the recorded timestamp of a packet using
 RecordTimestamp and a fresh timestamp. Computations are performed only for
