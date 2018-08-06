@@ -4,7 +4,7 @@ This is an extended version of the Click Modular Router featuring an
 improved Netmap support and a new DPDK support. It is the result of
 our ANCS paper available at http://hdl.handle.net/2268/181954 .
 
-The wiki provides documentation about the elements and how to use some FastClick features
+The [Wiki](https://github.com/tbarbette/fastclick/wiki) provides documentation about the elements and how to use some FastClick features
 such as batching.
 
 Partial DPDK support is now reverted into vanilla Click (without support for 
