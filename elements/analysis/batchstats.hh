@@ -11,7 +11,7 @@ CLICK_DECLS
 
 BatchStats
 
-=s analysis
+=s counters
 
 keep statistics about batching
 
