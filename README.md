@@ -7,8 +7,15 @@ our ANCS paper available at http://hdl.handle.net/2268/181954 .
 The [Wiki](https://github.com/tbarbette/fastclick/wiki) provides documentation about the elements and how to use some FastClick features
 such as batching.
 
-Partial DPDK support is now reverted into vanilla Click (without support for 
-batching, auto-thread assignment, thread vector, ...).
+Contribution
+------------
+FastClick also aims at keeping a more up-to-date fork and welcomes
+contributions from anyone.
+
+Regular contributors will be given direct access to the repository.
+The general rule of thumb to accept a pull request is to involve
+two different entities. I.e. someone for company A make a PR and
+someone from another company/research unit merges it.
 
 Netmap
 ------
@@ -40,6 +47,9 @@ The `--enable-netmap-pool` option allows to use Netmap buffers instead of Click 
 
 DPDK
 ----
+Partial DPDK support is now reverted into vanilla Click (without support for
+batching, auto-thread assignment, thread vector, ...).
+
 Setup your DPDK environment (version 1.6 to 17.05 are supported), then configure with :
 ```bash
 ./configure --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-g -O3" CXXFLAGS="-g -std=gnu++11 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --enable-dpdk-pool --disable-dpdk-packet
@@ -98,7 +108,7 @@ force us to fetch a new cacheline.
 Getting help
 ------------
 Use the github issue tracker (https://github.com/tbarbette/fastclick/issues) or
-contact tom.barbette at ulg.ac.be if you encounter any problem.
+contact barbette at kth.se if you encounter any problem.
 
 Please do not ask FastClick-related problems on the vanilla Click mailing list.
 If you are sure that your problem is Click related, post it on vanilla Click's
