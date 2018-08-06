@@ -424,15 +424,7 @@ class CounterLockMP : public CounterBase { public:
     }
 
     inline void acquire() {
-loop:
         for (unsigned i = 0; i < _stats.weight(); i++) {
-/*            if (!_stats.get_value(i).lock.attempt()) {
-                for (unsigned j = 0; j < i; j++) {
-                    _stats.get_value(j).lock.release();
-                }
-                goto loop;
-            }*/
-
             _stats.get_value(i).lock.acquire();
         }
     }
@@ -539,7 +531,6 @@ class CounterRWMP : public CounterBase { public:
     }
 
     inline void acquire_read() {
-loop:
         for (unsigned i = 0; i < _stats.weight(); i++) {
             _stats.get_value(i).lock.read_begin();
         }
@@ -551,14 +542,7 @@ loop:
     }
 
     inline void acquire_write() {
-loop:
         for (unsigned i = 0; i < _stats.weight(); i++) {
-/*            if (!_stats.get_value(i).lock.write_attempt()) {
-                for (unsigned j = 0; j < i; j++) {
-                    _stats.get_value(j).lock.write_release();
-                }
-                goto loop;
-            }*/
             _stats.get_value(i).lock.write_begin();
         }
     }

@@ -47,6 +47,7 @@ AverageBatchCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 AverageBatchCounter::initialize(ErrorHandler *errh)
 {
+    (void)errh;
     _timer.initialize(this);
     _timer.schedule_after_msec(_interval);
     return 0;

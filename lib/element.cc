@@ -1716,6 +1716,7 @@ public:
  *  threads of the queue, not the one before.
  */
 bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
+    (void)isoutput;
     unsigned int thisthread = home_thread_id();
 
     if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) {
@@ -1787,6 +1788,7 @@ bool Element::is_mt_safe() {
 }
 
 bool Element::do_mt_safe_check(ErrorHandler* errh) {
+    (void)errh;
     Bitvector bmp = get_passing_threads();
     int n = bmp.weight();
 	if (n == 0) {

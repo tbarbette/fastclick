@@ -817,7 +817,7 @@ class rXwlock { public:
     }
 
     void set_max_writers(int32_t max_writers) {
-
+        (void)max_writers;
     }
 
 
@@ -1298,9 +1298,9 @@ protected:
         T v;
     } CLICK_CACHE_ALIGN AT;
 
+    volatile int _rcu_current;
     per_thread<volatile int> _epochs;
     AT _storage[2];
-    volatile int _rcu_current;
     volatile int _write_epoch;
     Spinlock _write_lock;
 

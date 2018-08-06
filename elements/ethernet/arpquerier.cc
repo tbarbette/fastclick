@@ -414,7 +414,7 @@ void
 ARPQuerier::push_batch(int port, PacketBatch *batch)
 {
     if (port == 0) {
-        EXECUTE_FOR_EACH_PACKET_DROPPABLE(handle_ip,batch,[](Packet*p){});
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(handle_ip,batch,[](Packet*){});
         if (batch)
             output(0).push_batch(batch);
     } else {
