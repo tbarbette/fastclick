@@ -4,7 +4,7 @@ Tests all the MP Counter elements
 With rate enabled
 
 %require
-click-buildtool provides umultithread
+click-buildtool provides umultithread research
 
 %script
 $VALGRIND click -j 8 -e '
