@@ -24,7 +24,7 @@
 
 CLICK_DECLS
 
-template class CounterMPBase<rXwlockPR>;
+template class CounterMPBase<nolock>;
 template class CounterRxWMPBase<rXwlock>;
 template class CounterRxWMPBase<rXwlockPR>;
 

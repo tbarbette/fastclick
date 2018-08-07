@@ -400,6 +400,8 @@ CounterMPBase<T>::reset()
 }
 
 
+template class CounterMPBase<nolock>;
+
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(Counter)

@@ -957,6 +957,8 @@ class nolock { public:
     inline void write_begin() {}
 
     inline void write_end() {}
+
+    inline void set_max_writers(int) {}
 };
 
 CLICK_ENDDECLS
