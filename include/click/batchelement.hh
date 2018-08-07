@@ -9,7 +9,6 @@
 #include <click/master.hh>
 #include <click/element.hh>
 #include <click/packet_anno.hh>
-#include <click/multithread.hh>
 #include <click/routervisitor.hh>
 
 CLICK_DECLS

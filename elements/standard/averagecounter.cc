@@ -42,13 +42,21 @@ AverageCounter::reset()
 int
 AverageCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+#if HAVE_FLOAT_TYPES
   double ignore = 0;
+#else
+  int ignore = 0;
+#endif
   if (Args(conf, this, errh)
           .read_p("IGNORE", ignore)
           .read_p("LINK_FCS", _link_fcs)
           .complete() < 0)
     return -1;
+#if HAVE_FLOAT_TYPES
+  _ignore = (double) ignore * CLICK_HZ;
+#else
   _ignore = ignore * CLICK_HZ;
+#endif
   return 0;
 }
 
@@ -121,13 +129,17 @@ averagecounter_read_rate_handler(Element *e, void *thunk)
   d -= c->ignore();
   if (d < 1) d = 1;
   uint64_t count = get_count(c, user_data);
-  if (user_data == 4) {
+
+#if CLICK_USERLEVEL
+  if (user_data == 4) { //time
       return String((double)d / CLICK_HZ);
   }
 
-#if CLICK_USERLEVEL
   return String(((double) count * CLICK_HZ) / d);
 #else
+  if (user_data == 4) { //time
+      return String(d / CLICK_HZ);
+  }
   uint32_t rate;
   if (count < (uint32_t) (0xFFFFFFFFU / CLICK_HZ))
       rate = (count * CLICK_HZ) / d;

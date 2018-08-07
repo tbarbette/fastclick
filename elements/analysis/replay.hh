@@ -6,6 +6,7 @@
 #include <click/ring.hh>
 #include <click/vector.hh>
 #include <click/notifier.hh>
+#include <strings.h>
 CLICK_DECLS
 
 class Args;

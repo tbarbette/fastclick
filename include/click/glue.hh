@@ -33,6 +33,7 @@ CLICK_CXX_PROTECT
 # include <linux/ctype.h>
 # include <linux/time.h>
 # include <linux/errno.h>
+# include <linux/delay.h>
 CLICK_CXX_UNPROTECT
 # include <click/cxxunprotect.h>
 
@@ -142,11 +143,13 @@ void click_lfree(volatile void *p, size_t size);
 #  define CLICK_ALIGNED_ALLOC(T,size) ((T*)(aligned_alloc(64, sizeof(T) * size)))
 #  define CLICK_ALIGNED_FREE(p,T,size) (free(p))
 # else
-#  warning Using normal allocation instead of aligned one, please use a compiler that supports aligned_alloc
+#  ifndef CLICK_LINUXMODULE
+#    warning Using normal allocation instead of aligned one, please use a compiler that supports aligned_alloc
+#  endif
 #  define CLICK_ALIGNED_ALLOC(T,size) CLICK_LALLOC(sizeof(T) * size)
 #  define CLICK_ALIGNED_FREE(p,T,size) CLICK_LFREE(p,sizeof(T) * size);
 # endif
-# define CLICK_ALIGNED_NEW(T,size) ({T* v = CLICK_ALIGNED_ALLOC(T,size);for (unsigned i = 0; i < size; i++) {new(&v[i]) T();};v;})
+# define CLICK_ALIGNED_NEW(T,size) ({T* v = (T*)CLICK_ALIGNED_ALLOC(T,size);for (unsigned i = 0; i < size; i++) {new(&v[i]) T();};v;})
 # define CLICK_ALIGNED_DELETE(p,T,size) {for (unsigned i = 0; i < size; i++) p[i].~T();CLICK_ALIGNED_FREE(p,T,size);}
 #endif
 

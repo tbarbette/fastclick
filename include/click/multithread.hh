@@ -9,6 +9,10 @@
 #include <click/machine.hh>
 #include <click/sync.hh>
 
+#if CLICK_LINUXMODULE
+# error This file is not meant for Kernel mode
+#endif
+
 CLICK_DECLS
 
 /*
@@ -151,51 +155,6 @@ public:
         return _size;
     }
 };
-
-#define PER_THREAD_SET(pt,value) \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        pt.set_value(i, value); \
-    }
-
-#define PER_THREAD_POINTER_SET(pt,member,value) \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        pt.get_value(i)->member = value; \
-    }
-
-#define PER_THREAD_MEMBER_SET(pt,member,value) \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        pt.get_value(i).member = value; \
-    }
-
-#define PER_THREAD_VECTOR_SET(pt,member,value) \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        for (int j = 0; j < pt.get_value(i).size(); j++) \
-            (pt.get_value(i))[j].member = value; \
-    }
-
-#define PER_THREAD_SUM(type, var, pt) \
-    type var = 0; \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        var += pt.get_value(i); \
-    }
-
-#define PER_THREAD_POINTER_SUM(type, var, pt, member) \
-    type var = 0; \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        var += pt.get_value(i)->member; \
-    }
-
-#define PER_THREAD_MEMBER_SUM(type, var, pt, member) \
-    type var = 0; \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        var += pt.get_value(i).member; \
-    }
-
-#define PER_THREAD_VECTOR_SUM(type, var, pt, index, member) \
-    type var = 0; \
-    for (unsigned i = 0; i < pt.weight(); i++) { \
-        var += pt.get_value(i)[index].member; \
-    }
 
 /**
  * Convenient class to have MP and non-MP version of the same thimg eg :

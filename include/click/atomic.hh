@@ -290,7 +290,7 @@ atomic_uint32_t::inc(volatile uint32_t &x)
 inline void
 atomic_uint32_t::nonatomic_inc()
 {
-    _val++;
+    CLICK_ATOMIC_VAL++;
 }
 
 /** @brief  Atomically increment the value. */
@@ -345,7 +345,7 @@ atomic_uint32_t::operator--()
 inline void
 atomic_uint32_t::nonatomic_dec()
 {
-    _val--;
+    CLICK_ATOMIC_VAL--;
 }
 
 /** @brief  Atomically decrement the value. */
@@ -602,8 +602,8 @@ atomic_uint32_t::dec_and_test()
 inline bool
 atomic_uint32_t::nonatomic_dec_and_test()
 {
-    --_val;
-    return _val == 0;
+    CLICK_ATOMIC_VAL--;
+    return CLICK_ATOMIC_VAL == 0;
 }
 
 /** @brief  Perform a compare-and-swap operation.
@@ -750,7 +750,7 @@ inline uint64_t
 atomic_uint64_t::value() const
 {
 #if CLICK_LINUXMODULE
-    return atomic_read(&_val);
+    return atomic64_read(&_val);
 #else
     return CLICK_ATOMIC_VAL;
 #endif
@@ -804,7 +804,7 @@ inline void
 atomic_uint64_t::add(volatile uint64_t &x, uint64_t delta)
 {
 #if CLICK_LINUXMODULE
-    atomic64_add(delta, x);
+    atomic64_add(delta, (atomic64_t*)&x);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
           : "=m" (x)
@@ -837,7 +837,7 @@ atomic_uint64_t::operator-=(int64_t delta)
 inline void
 atomic_uint64_t::nonatomic_inc()
 {
-    _val++;
+    CLICK_ATOMIC_VAL++;
 }
 
 /** @brief  Atomically increment the value. */
@@ -892,7 +892,7 @@ atomic_uint64_t::operator--()
 inline void
 atomic_uint64_t::nonatomic_dec()
 {
-    _val--;
+    CLICK_ATOMIC_VAL--;
 }
 
 /** @brief  Atomically decrement the value. */
@@ -957,7 +957,11 @@ atomic_uint64_t::compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t 
 
 inline uint64_t
 atomic_uint64_t::compare_swap(uint64_t expected, uint64_t desired) {
-    return compare_swap(CLICK_ATOMIC_VAL, expected, desired);
+#if CLICK_LINUXMODULE && defined(cmpxchg)
+    return atomic64_cmpxchg(&_val, expected, desired);
+#else
+    return atomic_uint64_t::compare_swap(*(volatile uint64_t*)&CLICK_ATOMIC_VAL, expected, desired);
+#endif
 }
 
 /** @brief  Atomically add @a delta to the value, returning the old value.

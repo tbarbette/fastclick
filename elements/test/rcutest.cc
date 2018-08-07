@@ -91,4 +91,5 @@ void RCUTest::add_handlers() {
 
 
 CLICK_ENDDECLS
+ELEMENT_REQUIRES(userlevel)
 EXPORT_ELEMENT(RCUTest)
