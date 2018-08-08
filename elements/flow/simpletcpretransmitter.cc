@@ -54,7 +54,7 @@ int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 int SimpleTCPRetransmitter::initialize(ErrorHandler *errh) {
     if (StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>::initialize(errh) != 0)
         return -1;
-    if (_in->getOutElement()->maxModificationLevel() & MODIFICATION_RESIZE) {
+    if (_in->getOutElement()->maxModificationLevel(0) & MODIFICATION_RESIZE) {
         _resize = true;
     }
     return 0;

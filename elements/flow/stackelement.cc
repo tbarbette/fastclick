@@ -199,12 +199,12 @@ bool StackElement::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlow
     return previousStackElement->registerConnectionClose(fcb_chain, fnt, thunk);
 }
 
-int StackElement::maxModificationLevel() {
+int StackElement::maxModificationLevel(Element* stop) {
     assert(router()->handlers_ready());
-    if(previousStackElement == NULL)
+    if(previousStackElement == stop || previousStackElement == 0)
         return 0;
 
-    return previousStackElement->maxModificationLevel();
+    return previousStackElement->maxModificationLevel(stop);
 }
 
 void StackElement::removeBytes(WritablePacket* packet, uint32_t position,
@@ -233,6 +233,7 @@ WritablePacket* StackElement::insertBytes(WritablePacket* packet,
     // Call the "insertBytes" method on every element in the stack
     if(previousStackElement == NULL) {
         uint32_t bytesAfter = packet->length() - position;
+//        click_chatter("bytes after %d, position %d, put %d", bytesAfter, position, length);
         WritablePacket *newPacket = packet->put(length);
         assert(newPacket != NULL);
         unsigned char *source = newPacket->data();

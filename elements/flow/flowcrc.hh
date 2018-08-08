@@ -24,8 +24,8 @@ class FlowCRC : public StackChunkBufferElement<FlowCRC,fcb_crc> { //Use CTRP to 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         int process_data(fcb_crc*, FlowBufferChunkIter&);
 
-        virtual int maxModificationLevel() override {
-            int r = StackChunkBufferElement<FlowCRC,fcb_crc>::maxModificationLevel();
+        virtual int maxModificationLevel(Element* stop) override {
+            int r = StackChunkBufferElement<FlowCRC,fcb_crc>::maxModificationLevel(stop);
             //return r | MODIFICATION_STALL;
             return r;
         }

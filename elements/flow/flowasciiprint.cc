@@ -12,7 +12,7 @@
 
 CLICK_DECLS
 
-FlowASCIIPrint::FlowASCIIPrint()
+FlowASCIIPrint::FlowASCIIPrint() : _active(true)
 {
 
 }
@@ -20,7 +20,8 @@ FlowASCIIPrint::FlowASCIIPrint()
 int FlowASCIIPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
-    .complete() < 0)
+        .read("ACTIVE", _active)
+            .complete() < 0)
         return -1;
 
     return 0;
@@ -28,6 +29,11 @@ int FlowASCIIPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void FlowASCIIPrint::push_batch(int port, fcb_FlowASCIIPrint* fcb, PacketBatch* flow)
 {
+    if (!_active) {
+        output_push_batch(0, flow);
+        return;
+    }
+
     fcb->flowBuffer.enqueueAll(flow);
     auto iter = fcb->flowBuffer.contentBegin();
     if (!iter.current()) {

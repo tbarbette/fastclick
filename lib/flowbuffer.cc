@@ -208,7 +208,7 @@ FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const c
         }
         i += 32;
         if (i + 32 + pattern_length >= n) {
-            if (start.lastChunk()) {
+            if (start.lastChunk() || next == 0) {
                 //We have to check if a pattern could start in the last part
                 uint32_t z = _mm256_movemask_epi8(eq_first);
                 if (z != 0) {
@@ -432,7 +432,7 @@ int FlowBuffer::replaceInFlow(FlowBufferContentIter iter, const int pattern_leng
 
             return 1;
     }
-    else
+    else if (offset < 0)
     {
             // We remove the next "-offset" (offset is negative) bytes in the flow
             remove(iter, -offset, owner);

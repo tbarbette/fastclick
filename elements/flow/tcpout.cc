@@ -26,7 +26,7 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 
 int
 TCPOut::initialize(ErrorHandler *errh) {
-    if (maxModificationLevel() & MODIFICATION_RESIZE) {
+    if (maxModificationLevel(0) & MODIFICATION_RESIZE) {
         click_chatter("%p{element} Flow resizing support enabled",this);
         _allow_resize = true;
         if (_readonly) {
@@ -61,6 +61,8 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             // Update the sequence number (according to the modifications made on previous packets)
             tcp_seq_t prevSeq = getSequenceNumber(packet);
             tcp_seq_t newSeq =  byteStreamMaintainer.mapSeq(prevSeq);
+            if (inElement->_verbose)
+                click_chatter("Map SEQ %lu -> %lu", prevSeq, newSeq);
             bool seqModified = false;
             bool ackModified = false;
             tcp_seq_t prevAck = getAckNumber(packet);
@@ -95,6 +97,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                 // This solves the following problem:
                 // - We ACK a packet manually for any reason
                 // -> The "manual" ACK is lost
+                //click_chatter("Ack %lu -> %lu", prevAck,  byteStreamMaintainer.getLastAckSent());
                 setAckNumber(packet, byteStreamMaintainer.getLastAckSent());
 
                 if(getAckNumber(packet) != prevAck)
@@ -149,13 +152,18 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                             // If this is not the case, drop the packet as it
                             // does not contain any relevant information
                             // (And anyway it would be considered as a duplicate ACK)
+                            click_chatter("Killing useless ACK");
                             packet->kill();
                             fcb_in->common->lock.release();
                             return NULL;
                         }
-                    }
+                    } 
                 }
             }
+
+/*                if(prevLastAckSet && SEQ_LEQ(prevAck, prevLastAck)) {
+                            click_chatter("ACK lower than already sent");
+                }*/
 
             fcb_in->common->lock.release();
 
@@ -210,14 +218,15 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     //click_chatter("Gen ack");
     if(noutputs() < 2)
     {
-        click_chatter("Warning: trying to send an ack on a TCPOut with only 1 output");
+        click_chatter("Warning: trying to send an ack on a TCPOut with only 1 output. How could I send an ACK to the source ?");
         return;
     }
 
 
     // Check if the ACK does not bring any additional information
     if(!force && maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent())) {
-        click_chatter("Ack not sent, no new knowledge");
+        if (inElement->_verbose)
+            click_chatter("Ack not sent, no new knowledge");
         return;
     }
 

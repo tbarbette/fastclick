@@ -37,8 +37,8 @@ class FlowIDSMatcher : public StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatch
 		void add_handlers() CLICK_COLD;
 		int process_data(fcb_FlowIDSMatcher*, FlowBufferContentIter&);
 
-        virtual int maxModificationLevel() override {
-            int r = StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatcher>::maxModificationLevel();
+        virtual int maxModificationLevel(Element* stop) override {
+            int r = StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatcher>::maxModificationLevel(stop);
             if (_stall) {
                 return r | MODIFICATION_STALL;
             } else {
@@ -67,8 +67,8 @@ class FlowIDSChunkMatcher : public StackChunkBufferElement<FlowIDSChunkMatcher,f
         void add_handlers() CLICK_COLD;
         int process_data(fcb_FlowIDSMatcher*, FlowBufferChunkIter&);
 
-        virtual int maxModificationLevel() override {
-            int r = StackChunkBufferElement<FlowIDSChunkMatcher,fcb_FlowIDSMatcher>::maxModificationLevel();
+        virtual int maxModificationLevel(Element* stop) override {
+            int r = StackChunkBufferElement<FlowIDSChunkMatcher,fcb_FlowIDSMatcher>::maxModificationLevel(stop);
             return r;
         }
     private:

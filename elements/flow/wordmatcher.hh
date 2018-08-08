@@ -22,6 +22,8 @@ struct fcb_WordMatcher
     }
 };
 
+enum DPIMode {ALERT, CLOSE, MASK, REPLACE, REMOVE, FULL};
+
 /*
 =c
 
@@ -68,14 +70,11 @@ public:
 
 protected:
 
-    virtual int maxModificationLevel() override;
+    virtual int maxModificationLevel(Element* stop) override;
 
     Vector<String> insults; // Vector containing the words to remove from the web pages
 
-    bool closeAfterInsults;
-    bool _mask;
-    bool _insert;
-    bool _full;
+    enum DPIMode _mode;
     bool _all;
     String _insert_msg;
 };

@@ -306,7 +306,7 @@ private:
 
     FlowBuffer *flowBuffer;
     Packet* entry;
-    uint32_t offsetInPacket; // Current offset in the current packet
+    uint32_t offsetInPacket; // Current offset in the current packet content
 };
 
 class Chunk { public:

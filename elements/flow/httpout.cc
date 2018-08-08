@@ -24,73 +24,141 @@ HTTPOut::HTTPOut()
 
 int HTTPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-        ElementCastTracker visitor(router(),"HTTPIn");
-        router()->visit_upstream(this, -1, &visitor);
-        if (visitor.size() != 1) {
-            return errh->error("Found no or more than 1 HTTPIn element. Specify which one to use with OUTNAME");
-        }
-        _in = static_cast<HTTPIn*>(visitor[0]);
+    ElementCastTracker visitor(router(),"HTTPIn");
+    router()->visit_upstream(this, -1, &visitor);
+    if (visitor.size() != 1) {
+        return errh->error("Found no or more than 1 HTTPIn element. Specify which one to use with OUTNAME");
+    }
+    _in = static_cast<HTTPIn*>(visitor[0]);
 
+    return 0;
+}
+
+int
+HTTPOut::maxModificationLevel(Element* stop) {
+    int r = StackSpaceElement<fcb_httpout>::maxModificationLevel(_in);
+    if (r >= MODIFICATION_RESIZE) {
+        _in->_resize = true;
+        click_chatter("HTTPOut in resize mode.");
+    }
+    return r | _in->maxModificationLevel(stop);
+}
+
+int HTTPOut::initialize(ErrorHandler *errh) {
+    maxModificationLevel(_in); //Force computation of resize if the further stack does not call maxMod
     return 0;
 }
 
 void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
 {
-    auto fnt = [this,fcb](Packet*p) -> Packet* {
+    Packet* lastPacket = 0;
+    bool doClose = false;
+
+    auto fnt = [this,fcb,&doClose,&lastPacket](Packet*p) -> Packet* {
 
         // Check that the packet contains HTTP content
         if(!p->isPacketContentEmpty() && _in->fcb_data()->contentLength > 0)
         {
-            WritablePacket *packet = p->uniqueify();
+            if (_in->_buffer > 0) {
+                    
+                WritablePacket *packet = p->uniqueify();
 
-            assert(packet != NULL);
-            FlowBuffer &flowBuffer = fcb->flowBuffer;
-            flowBuffer.enqueue(packet);
-            requestMorePackets(packet);
+                assert(packet != NULL);
+                FlowBuffer &flowBuffer = fcb->flowBuffer;
+                flowBuffer.enqueue(packet);
+                lastPacket = packet;
 
-            // Check if we have the whole content in the buffer
-            if(isLastUsefulPacket(packet))
-            {
-                // Compute the new Content-Length
-                FlowBufferIter it = flowBuffer.begin();
-
-                uint64_t newContentLength = 0;
-                while(it != flowBuffer.end())
+                // Check if we have the whole content in the buffer
+                if(isLastUsefulPacket(packet))
                 {
-                    newContentLength += (*it)->getPacketContentSize();
-                    ++it;
+                    click_chatter("Last usefull, flushing !");
+                    // Compute the new Content-Length
+                    FlowBufferIter it = flowBuffer.begin();
+
+                    uint64_t newContentLength = 0;
+                    while(it != flowBuffer.end())
+                    {
+                        newContentLength += (*it)->getPacketContentSize();
+                        ++it;
+                    }
+
+                    PacketBatch *toPush = flowBuffer.dequeueAll();
+
+                    int sz = toPush->count();
+                    Packet* next = toPush->next();
+                    Packet* tail = toPush->tail();
+                    char bufferHeader[25];
+
+                    sprintf(bufferHeader, "%lu", newContentLength);
+                    WritablePacket* newHead = setHeaderContent(fcb, toPush, "Content-Length", bufferHeader);
+                    if (newHead != toPush) {
+                        toPush = PacketBatch::start_head(newHead);
+                        toPush->set_next(next);
+                        toPush->set_count(sz);
+                        toPush->set_tail(tail);
+                    }
+
+                    // Flush the buffer
+                    output_push_batch(0, toPush);
+                } //TODO : when going out of max buffer size, jump to the "non-buffering" mode
+
+                return NULL;
+            } else { //Do not buffer, or buffer is exhausted (todo)
+                //TODO : Go to chunk if need be
+                if (isLastUsefulPacket(p) && _in->_fill == RESIZE_FILL_END) {
+                    if (_in->fcb_data()->contentRemoved > 0) {
+                        WritablePacket* packet = p->uniqueify();
+                        int am = _in->fcb_data()->contentRemoved;
+                        int pos = packet->getPacketContentSize() - 1;
+                        packet = insertBytes(packet, pos, _in->fcb_data()->contentRemoved);
+                        //click_chatter("%d %d %d",pos,packet->getPacketContent() - packet->data(), _in->fcb_data()->contentRemoved);
+                        memset(packet->getPacketContent() + pos + 1 , ' ',am);
+                        return packet; 
+                    } else if (_in->fcb_data()->contentRemoved < 0) {
+                        click_chatter("fill_end method does not work with HTTP payload that is growing after all modifications have been done. The transfer mode should have been changed to chunked, or the content buffered but it is too late for that.");
+                    }
                 }
-
-                PacketBatch *toPush = flowBuffer.dequeueAll();
-
-                int sz = toPush->count();
-                Packet* next = toPush->next();
-                Packet* tail = toPush->tail();
-                char bufferHeader[25];
-
-                sprintf(bufferHeader, "%lu", newContentLength);
-                WritablePacket* newHead = setHeaderContent(fcb, toPush, "Content-Length", bufferHeader);
-                if (newHead != toPush) {
-                    toPush = PacketBatch::start_head(newHead);
-                    toPush->set_next(next);
-                    toPush->set_count(sz);
-                    toPush->set_tail(tail);
+                
+                //THis needs to intercept and recreate the close also
+                //It will not work as it
+                //TODO : if keepalive was not specified, we can just close prematurely
+/*                if (_in->fcb_data()->CLRemoved) {
+                    fcb->seen += p->getPacketContentSize();
+                    click_chatter("Seen %d/%d",fcb->seen, _in->fcb_data()->contentLength);
+                    if (fcb->seen >= _in->fcb_data()->contentLength) {
+                        WritablePacket *packet = p->uniqueify();
+                        click_tcp* tcph = packet->tcp_header();
+                        // Change the flags of the packet
+//                        tcph->th_flags |= TH_FIN;
+//                        doClose = true;
+                        return packet;
+                    }
                 }
-
-                // Flush the buffer
-                output_push_batch(0, toPush);
+                */
+                    return p;
             }
-
-            return NULL;
-        }
-        else {
+        } else {
             return p;
         }
     };
 
+
+    if (!_in->_resize)
+        goto end;
+
     EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, [](Packet*){});
+    if (lastPacket)
+            requestMorePackets(lastPacket); 
+
+    if (doClose)
+        lastPacket = flow->tail()->clone(true);
+end:
     if (flow)
         output_push_batch(0,flow);
+    if (doClose) {
+        closeConnection(lastPacket, true);
+        lastPacket->kill();
+    }
 }
 
 WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacket* packet,

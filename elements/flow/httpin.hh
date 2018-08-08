@@ -16,6 +16,8 @@ struct fcb_httpin
     char method[16];
     uint64_t contentLength;
     uint64_t contentSeen;
+    int64_t contentRemoved;
+    bool CLRemoved;
     bool isRequest;
 
     fcb_httpin()
@@ -26,8 +28,12 @@ struct fcb_httpin
         url[0] = '\0';
         method[0] = '\0';
         isRequest = false;
+        CLRemoved = 0;
     }
 };
+
+
+enum fill_method{RESIZE_FILL_END, RESIZE_FILL, RESIZE_CHUNKED};
 
 /*
 =c
@@ -57,6 +63,19 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
+
+    virtual int maxModificationLevel(Element* stop) override;
+
+    virtual void removeBytes(WritablePacket*, uint32_t, uint32_t) override;
+
+    virtual WritablePacket* insertBytes(WritablePacket*, uint32_t, uint32_t) override;
+
+    bool _set10;
+    bool _remove_encoding;
+    int _buffer;
+
+    bool _resize;
+    enum fill_method _fill;
 protected:
 
     void push_batch(int port, fcb_httpin* fcb, PacketBatch* flow) override;
@@ -64,6 +83,8 @@ protected:
     virtual bool isLastUsefulPacket(Packet *packet);
 
 private:
+    bool _verbose;
+
     /** @brief Remove an HTTP header from a request or a response
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the header is located
@@ -79,7 +100,7 @@ private:
      * @param bufferSize Maximum size of the header (the content will be truncated if the buffer
      * is not large enough to contain it)
      */
-    void getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const char* headerName,
+    bool getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const char* headerName,
         char* buffer, uint32_t bufferSize);
 
     /** @brief Process the headers and set the URL and the method in the httpin part of the FCB
@@ -94,7 +115,6 @@ private:
      * @return The packet with the HTTP version modified
      */
     WritablePacket* setHTTP10(struct fcb_httpin *fcb, WritablePacket *packet) CLICK_WARN_UNUSED_RESULT;
-
 };
 
 CLICK_ENDDECLS

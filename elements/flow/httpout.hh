@@ -16,6 +16,7 @@ class HTTPIn;
 struct fcb_httpout
 {
     FlowBuffer flowBuffer;
+    long unsigned seen;
 };
 
 
@@ -51,7 +52,11 @@ public:
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+
+    virtual int maxModificationLevel(Element* stop) override;
+
+    int initialize(ErrorHandler *) override CLICK_COLD;
 
     void push_batch(int, struct fcb_httpout*, PacketBatch*) override;
 protected:

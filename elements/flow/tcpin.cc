@@ -283,6 +283,10 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
             // Map the ack number according to the ByteStreamMaintainer of the other direction
             ackNumber = getAckNumber(packet);
             newAckNumber = otherMaintainer.mapAck(ackNumber);
+            
+
+            if (_verbose)
+                click_chatter("Map ACK %lu -> %lu", ackNumber, newAckNumber);
 
             // Check the value of the previous ack received if it exists
             bool lastAckReceivedSet = fcb_in->common->lastAckReceivedSet();
@@ -573,7 +577,7 @@ int TCPIn::initialize(ErrorHandler *errh) {
     if (get_passing_threads(true).weight() <= 1) {
         tableFcbTcpCommon.disable_mt();
     }
-    _modification_level = outElement->maxModificationLevel();
+    _modification_level = outElement->maxModificationLevel(0);
     if (this->returnElement->getFlowDirection() != 1 - getFlowDirection()) {
         return errh->error("Bad flow direction between %p{element}=%d and %p{element}=%d",this,this->returnElement,getFlowDirection(),this->returnElement->getFlowDirection());
     }
@@ -678,7 +682,7 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
     else
         newFlag = TH_RST;
 
-
+    //Todo close also the source side in most cases
 
     click_tcp tcph = *packet->tcp_header();
 
@@ -782,7 +786,8 @@ void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t leng
     uint16_t tcpOffset = getPayloadOffset(packet);
 
     uint16_t contentOffset = packet->getContentOffset();
-        click_chatter("Adding modification at seq %d, seq+pos %d, removing %d bytes",seqNumber, seqNumber + (position + contentOffset) - tcpOffset, length);
+    if (_verbose)
+        click_chatter("Adding modification at seq %lu, pos in content %lu, seq+pos %lu, removing %d bytes",seqNumber, position, seqNumber + (position + contentOffset) - tcpOffset, length);
     list->addModification(seqNumber, seqNumber + (position + contentOffset) - tcpOffset, -((int)length));
 
     if(position + contentOffset > packet->length())
@@ -804,8 +809,9 @@ WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
 
     uint16_t tcpOffset = getPayloadOffset(packet);
     uint16_t contentOffset = packet->getContentOffset();
-
-    getModificationList(packet)->addModification(seqNumber, seqNumber + position + contentOffset - tcpOffset,
+    if (_verbose)
+        click_chatter("Adding modification at seq %lu, pos in content %lu, seq+pos %lu, adding %d bytes",seqNumber, position, seqNumber + ((position + contentOffset) - tcpOffset), length);
+    getModificationList(packet)->addModification(seqNumber, seqNumber + (position + contentOffset - tcpOffset),
          (int)length);
 
     return StackElement::insertBytes(packet, position, length);

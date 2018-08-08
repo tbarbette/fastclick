@@ -35,6 +35,9 @@ public:
 
     void push_batch(int port, fcb_FlowASCIIPrint* fcb, PacketBatch*) override;
 
+private:
+    bool _active;
+
 };
 
 CLICK_ENDDECLS

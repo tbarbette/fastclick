@@ -89,7 +89,7 @@ public:
      * @brief Tells the maximum level of modification up to this element.
      * E.g tell if removeBytes and insertBytes are allowed by the current stack
      */
-    virtual int maxModificationLevel();
+    virtual int maxModificationLevel(Element* stop);
 
 
 protected:

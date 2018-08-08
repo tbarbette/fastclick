@@ -227,6 +227,8 @@ void ModificationList::commit(ByteStreamMaintainer &maintainer)
         // counterbalance each other
         newOffsetAck = -(newOffsetAck);
 
+//        click_chatter("Commit %lu %lu %lu %lu",newPositionAck, newPositionSeq, newOffsetAck, newOffsetSeq);
+
         // Insert the node in the tree. In case of duplicates, keep only the
         // new value
         maintainer.insertInAckTree(newPositionAck, newOffsetAck);
