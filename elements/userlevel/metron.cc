@@ -142,7 +142,7 @@ parse_vendor_info(String hw_info, String key)
  * Metron
  **************************************/
 Metron::Metron() :
-    _timer(this), _discover_timer(&discover_timer, 0), _discover_ip(), _discovered(false),
+    _timer(this), _discover_timer(&discover_timer, this), _discover_ip(), _discovered(false),
     _rx_mode(FLOW), _monitoring_mode(false),
     _verbose(false), _fail(false), _load_timer(1000)
 {
