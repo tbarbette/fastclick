@@ -37,7 +37,7 @@ FromDPDKDevice::FromDPDKDevice() :
     in_batch_mode = BATCH_MODE_YES;
 #endif
     _burst = 32;
-    ndesc = DPDKDevice::DEF_DEV_RXDESC;
+    ndesc = 0;
 }
 
 FromDPDKDevice::~FromDPDKDevice()
