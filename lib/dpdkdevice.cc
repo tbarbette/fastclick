@@ -235,7 +235,9 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
+#endif
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
@@ -272,11 +274,20 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         info.tx_queues.resize(1);
     }
 
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     if (info.n_rx_descs == 0)
         info.n_rx_descs = dev_info.default_rxportconf.ring_size > 0? dev_info.default_rxportconf.ring_size : DEF_DEV_RXDESC;
 
     if (info.n_tx_descs == 0)
         info.n_tx_descs = dev_info.default_txportconf.ring_size > 0? dev_info.default_txportconf.ring_size : DEF_DEV_TXDESC;
+#else
+    if (info.n_rx_descs == 0)
+        info.n_rx_descs = DEF_DEV_RXDESC;
+
+    if (info.n_tx_descs == 0)
+        info.n_tx_descs = DEF_DEV_TXDESC;
+#endif
 
     if (info.rx_queues.size() > dev_info.max_rx_queues) {
         return errh->error("Port %d can only use %d RX queues (asked for %d), use MAXQUEUES to set the maximum "
@@ -297,9 +308,11 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         return errh->error("The number of transmit descriptors is %d but needs to be between %d and %d",info.n_tx_descs, dev_info.tx_desc_lim.nb_min, dev_info.tx_desc_lim.nb_max);
     }
 
+    /* TODO : Detect this if possible
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
             dev_conf.txmode.offloads |=
                 DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+    */
 
     int ret;
     if (ret = rte_eth_dev_configure(
@@ -337,7 +350,10 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     rx_conf.rx_thresh.hthresh = RX_HTHRESH;
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
 #endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     rx_conf.offloads = dev_conf.rxmode.offloads;
+#endif
 
     struct rte_eth_txconf tx_conf;
     tx_conf = dev_info.default_txconf;
@@ -347,14 +363,16 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     bzero(&tx_conf,sizeof tx_conf);
 #endif
 
-#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0) && RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
 #else
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
 #endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,i0)
     tx_conf.offloads = dev_conf.txmode.offloads;
+#endif
 #if RTE_VERSION <= RTE_VERSION_NUM(18,05,0,0)
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 #endif
