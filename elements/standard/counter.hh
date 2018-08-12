@@ -5,8 +5,9 @@
 #include <click/ewma.hh>
 #include <click/llrpc.h>
 #include <click/sync.hh>
+#include <click/handlercall.hh>
+
 CLICK_DECLS
-class HandlerCall;
 
 #ifdef HAVE_INT64_TYPES
 #define counter_int_type uint64_t
@@ -351,6 +352,98 @@ protected:
 class CounterMP : public CounterMPBase<nolock> { public:
 
 };
+
+inline void
+CounterBase::check_handlers(counter_int_type count, counter_int_type byte_count) {
+    if (count == _count_trigger && !_count_triggered) {
+        _count_triggered = true;
+        if (_count_trigger_h)
+            (void) _count_trigger_h->call_write();
+    }
+    if (byte_count == _byte_trigger && !_byte_triggered) {
+        _byte_triggered = true;
+        if (_byte_trigger_h)
+            (void) _byte_trigger_h->call_write();
+    }
+}
+
+template <typename T>
+CounterMPBase<T>::CounterMPBase()
+{
+}
+template <typename T>
+CounterMPBase<T>::~CounterMPBase()
+{
+}
+
+template <typename T>
+int
+CounterMPBase<T>::initialize(ErrorHandler *errh) {
+    if (CounterBase::initialize(errh) != 0)
+        return -1;
+    //If not in simple mode, we only allow one writer so we can sum up the total number of threads
+    if (!_simple)
+        _atomic_lock.set_max_writers(1);
+    return 0;
+}
+
+template <typename T>
+Packet*
+CounterMPBase<T>::simple_action(Packet *p)
+{
+    if (_atomic > 0)
+        _atomic_lock.write_begin();
+    _stats->_count++;
+    _stats->_byte_count += p->length();
+    if (unlikely(!_simple))
+        check_handlers(CounterMPBase<T>::count(), CounterMPBase<T>::byte_count()); //BUG : if not atomic, then handler may be called twice
+    if (_atomic > 0)
+        _atomic_lock.write_end();
+    return p;
+}
+
+#if HAVE_BATCH
+template <typename T>
+PacketBatch*
+CounterMPBase<T>::simple_action_batch(PacketBatch *batch)
+{
+    if (unlikely(_batch_precise)) {
+        FOR_EACH_PACKET(batch,p)
+                                CounterMPBase<T>::simple_action(p);
+        return batch;
+    }
+
+    counter_int_type bc = 0;
+    FOR_EACH_PACKET(batch,p) {
+        bc += p->length();
+    }
+    if (_atomic > 0)
+        _atomic_lock.write_begin();
+    _stats->_count += batch->count();
+    _stats->_byte_count += bc;
+    if (unlikely(!_simple))
+        check_handlers(CounterMPBase<T>::count(), CounterMPBase<T>::byte_count());
+    if (_atomic > 0)
+        _atomic_lock.write_end();
+    return batch;
+}
+#endif
+
+template <typename T>
+void
+CounterMPBase<T>::reset()
+{
+    if (_atomic  > 0)
+        _atomic_lock.write_begin();
+    for (unsigned i = 0; i < _stats.weight(); i++) { \
+        _stats.get_value(i)._count = 0;
+        _stats.get_value(i)._byte_count = 0;
+    }
+    CounterBase::reset();
+    if (_atomic  > 0)
+        _atomic_lock.write_end();
+}
+
 
 
 CLICK_ENDDECLS

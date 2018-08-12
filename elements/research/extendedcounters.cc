@@ -24,10 +24,6 @@
 
 CLICK_DECLS
 
-template class CounterMPBase<nolock>;
-template class CounterRxWMPBase<rXwlock>;
-template class CounterRxWMPBase<rXwlockPR>;
-
 CounterRxWMP::CounterRxWMP()
 {
     _atomic = 2;

@@ -5,6 +5,7 @@
 #include <click/ewma.hh>
 #include <click/llrpc.h>
 #include <click/sync.hh>
+#include <click/multithread.hh>
 #include "../standard/counter.hh"
 
 CLICK_DECLS
@@ -765,3 +766,5 @@ protected:
 };
 
 CLICK_ENDDECLS
+
+#endif
