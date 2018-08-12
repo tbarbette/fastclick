@@ -194,6 +194,10 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lmlx4
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lmlx5
 endif
+# DPDK 18.08 or beyond requires libmnl library for MLX5 NICs
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lmnl
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MVPP2_PMD)      += -lrte_pmd_mvpp2 -L$(LIBMUSDK_PATH)/lib -lmusdk
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MRVL_PMD)       += -lrte_pmd_mrvl -L$(LIBMUSDK_PATH)/lib -lmusdk
 _LDLIBS-$(CONFIG_RTE_LIBRTE_NFP_PMD)        += -lrte_pmd_nfp
