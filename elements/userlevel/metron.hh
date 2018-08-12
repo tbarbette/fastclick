@@ -345,11 +345,45 @@ class ServiceChain {
                     return nic->cpu_to_queue(cpu_id);
                 }
 
+                inline void allocate_nic_space_for_tags(const int size) {
+                    assert(size > 0);
+
+                    // Vector initialization
+                    if (values.size() == 0) {
+                        values.resize(size, Vector<String>());
+                        return;
+                    }
+
+                    // Grow the vector if not large enough
+                    if (values.size() < size) {
+                        values.resize(size);
+                    }
+                }
+
+                inline void allocate_tag_space_for_nic(const int nic_id, const int size) {
+                    assert(nic_id >= 0);
+                    assert(size > 0);
+
+                    // Vector initialization
+                    if (values[nic_id].size() == 0) {
+                        values[nic_id].resize(size, "");
+                        return;
+                    }
+
+                    // Grow the vector if not large enough
+                    if (values[nic_id].size() < size) {
+                        values[nic_id].resize(size);
+                    }
+                }
+
                 inline void set_tag_value(
                         const int nic_id, const int cpu_id, const String value) {
                     assert(nic_id >= 0);
                     assert(cpu_id >= 0);
                     assert(!value.empty());
+
+                    // Grow the vector according to the core index
+                    allocate_tag_space_for_nic(nic_id, cpu_id + 1);
 
                     values[nic_id][cpu_id] = value;
 
@@ -524,9 +558,9 @@ class ServiceChain {
         Metron *_metron;
         Vector<int> _cpus;
         Vector<NIC *> _nics;
-        Vector<float> _cpuload;
-        Vector<int> _cpuqueue;
-        float _total_cpuload;
+        Vector<float> _cpu_load;
+        Vector<int> _cpu_queue;
+        float _total_cpu_load;
         int _socket;
         int _pid;
         struct timing_stats _timing_stats;
