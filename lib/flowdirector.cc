@@ -217,17 +217,19 @@ FlowDirector::add_rules_from_file(const String &filename)
 
     // Read file line-by-line (or rule-by-rule)
     while ((getline(&line, &len, fp)) != -1) {
+        rules_nb++;
+
         // Skip empty lines or lines with only spaces/tabs
         if (!line || (strlen(line) == 0) ||
             (strchr(ignore_chars, line[0]))) {
-            _errh->warning("Flow Director (port %u): Invalid rule #%" PRIu32, _port_id, rules_nb++);
+            _errh->warning("Flow Director (port %u): Invalid rule #%" PRIu32, _port_id, rules_nb);
             continue;
         }
 
         // Detect and remove unwanted components
         if (!filter_rule(&line)) {
             _errh->warning(
-                "Flow Director (port %u): Invalid rule #%" PRIu32 ": %s", _port_id, rules_nb++, line
+                "Flow Director (port %u): Invalid rule #%" PRIu32 ": %s", _port_id, rules_nb, line
             );
             continue;
         }
@@ -237,7 +239,7 @@ FlowDirector::add_rules_from_file(const String &filename)
 
         if (_verbose) {
             _errh->message("[NIC %u] About to install rule #%" PRIu32 ": %s",
-                _port_id, rules_nb++, rule.c_str()
+                _port_id, rules_nb, rule.c_str()
             );
         }
 
