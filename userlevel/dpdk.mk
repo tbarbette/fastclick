@@ -384,7 +384,7 @@ endif
 
 # Additional object files, present at or after DPDK v18.08
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) && echo true),true)
-PARSE_OBJS += test-pmd/softnicfwd.o
+PARSE_OBJS += test-pmd/parameters.o test-pmd/softnicfwd.o
 endif
 
 
