@@ -40,7 +40,6 @@ return 0 (end-of-file) if the device is empty.  This can be particularly useful
 with the pcap format where the character device will appear to be a valid pcap
 file.
 
-=d
 Requires --enable-experimental.
 
 Keyword arguments are:

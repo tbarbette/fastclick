@@ -413,7 +413,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     info.mq_mode = (info.mq_mode == -1? ETH_MQ_RX_RSS : info.mq_mode);
     dev_conf.rxmode.mq_mode = info.mq_mode;
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
     dev_conf.rxmode.hw_vlan_filter = 0;
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
+#endif
 
     if (info.mq_mode & ETH_MQ_RX_VMDQ_FLAG) {
 
@@ -450,12 +455,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             dev_conf.rx_adv_conf.vmdq_rx_conf.rx_mode = ETH_VMDQ_ACCEPT_UNTAG;
             dev_conf.rx_adv_conf.vmdq_rx_conf.nb_pool_maps = 0;
         }
-
     }
+
     if (info.mq_mode & ETH_MQ_RX_RSS_FLAG) {
         dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
-        dev_conf.rx_adv_conf.rss_conf.rss_hf =
-            ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
+        dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
+        dev_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
     }
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
@@ -484,12 +489,25 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
         info.rx_queues.resize(1);
-        info.n_rx_descs = DEF_DEV_RXDESC;
     }
     if (info.tx_queues.size() == 0) {
         info.tx_queues.resize(1);
-        info.n_tx_descs = DEF_DEV_TXDESC;
     }
+
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    if (info.n_rx_descs == 0)
+        info.n_rx_descs = dev_info.default_rxportconf.ring_size > 0? dev_info.default_rxportconf.ring_size : DEF_DEV_RXDESC;
+
+    if (info.n_tx_descs == 0)
+        info.n_tx_descs = dev_info.default_txportconf.ring_size > 0? dev_info.default_txportconf.ring_size : DEF_DEV_TXDESC;
+#else
+    if (info.n_rx_descs == 0)
+        info.n_rx_descs = DEF_DEV_RXDESC;
+
+    if (info.n_tx_descs == 0)
+        info.n_tx_descs = DEF_DEV_TXDESC;
+#endif
 
     if (info.rx_queues.size() > dev_info.max_rx_queues) {
         return errh->error("Port %d can only use %d RX queues (asked for %d), use MAXQUEUES to set the maximum "
@@ -553,8 +571,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
-    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,8,0,0)
+    tx_conf.offloads = 0;
+#else
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
+#endif
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
     for (unsigned i = 0; i < info.rx_queues.size(); ++i) {
         if (rte_eth_rx_queue_setup(

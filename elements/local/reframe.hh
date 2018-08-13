@@ -8,7 +8,7 @@ CLICK_DECLS
 
 Reframe([I<keywords> FOFF, FLEN, NTOH, MUL, ALIGN, ADD])
 
-=s packet framing
+=s basicmod
 
 reframes a fragmented stream of packets
 

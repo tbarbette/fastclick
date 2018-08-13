@@ -12,7 +12,7 @@ CLICK_DECLS
 
 UMLSwitch([FILENAME])
 
-=s devices
+=s comm
 
 Connects to a UML switch daemon
 

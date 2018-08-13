@@ -13,9 +13,12 @@ GTPLookup()
 
 =s gtp
 
-decapsulate the GTP packet and set the GTP TEID in the aggregate annotation
+Encapsulates packets in their intended GTP return id.
 
 =d
+
+Finds from the 5 tuple of a packet returning from the MEC the right
+GTP return ID.
 
 =a GTPEncap
 */
@@ -35,15 +38,18 @@ class GTPLookup : public BatchElement { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     bool can_live_reconfigure() const	{ return true; }
 
+    bool run_task(Task*) override;
+
     int process(int, Packet*);
-    void push(int, Packet *);
+    void push(int, Packet *) override;
 #if HAVE_BATCH
-	void push_batch(int port, PacketBatch *);
+	void push_batch(int port, PacketBatch *) override;
 #endif
   private:
 	GTPTable *_table;
     bool _checksum;
     atomic_uint32_t _id;
+    per_thread<Packet*> _queue;
 
 
 };

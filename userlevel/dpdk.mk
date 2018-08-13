@@ -56,14 +56,15 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_TABLE)          += -lrte_table
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PORT)           += -lrte_port
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PDUMP)          += -lrte_pdump
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IP_FRAG)        += -lrte_ip_frag
-_LDLIBS-$(CONFIG_RTE_LIBRTE_GRO)            += -lrte_gro
-_LDLIBS-$(CONFIG_RTE_LIBRTE_GSO)            += -lrte_gso
 _LDLIBS-$(CONFIG_RTE_LIBRTE_TIMER)          += -lrte_timer
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EFD)            += -lrte_efd
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BPF)            += -lrte_bpf
 ifeq ($(CONFIG_RTE_LIBRTE_BPF_ELF),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BPF)            += -lelf
 endif
+_LDLIBS-$(CONFIG_RTE_LIBRTE_CFGFILE)        += -lrte_cfgfile
+_LDLIBS-$(CONFIG_RTE_LIBRTE_GRO)            += -lrte_gro
+_LDLIBS-$(CONFIG_RTE_LIBRTE_GSO)            += -lrte_gso
 _LDLIBS-$(CONFIG_RTE_LIBRTE_HASH)           += -lrte_hash
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MEMBER)         += -lrte_member
 _LDLIBS-$(CONFIG_RTE_LIBRTE_JOBSTATS)       += -lrte_jobstats
@@ -143,7 +144,6 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_RING)           += -lrte_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PCI)            += -lrte_pci
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EAL)            += -lrte_eal
 _LDLIBS-$(CONFIG_RTE_LIBRTE_CMDLINE)        += -lrte_cmdline
-_LDLIBS-$(CONFIG_RTE_LIBRTE_CFGFILE)        += -lrte_cfgfile
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PCI_BUS)        += -lrte_bus_pci
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VDEV_BUS)       += -lrte_bus_vdev
@@ -167,6 +167,7 @@ ifeq ($(CONFIG_RTE_LIBRTE_VHOST),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_VHOST)      += -lrte_pmd_vhost
 ifeq ($(CONFIG_RTE_EAL_VFIO),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IFCVF_VDPA_PMD) += -lrte_ifcvf_vdpa
+_LDLIBS-$(CONFIG_RTE_LIBRTE_IFC_PMD)        += -lrte_pmd_ifc
 endif # $(CONFIG_RTE_EAL_VFIO)
 endif # $(CONFIG_RTE_LIBRTE_VHOST)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_AXGBE_PMD)      += -lrte_pmd_axgbe
@@ -200,6 +201,10 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lmlx4
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lmlx5
 endif
+# DPDK 18.08 or beyond requires libmnl library for MLX5 NICs
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lmnl
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MVPP2_PMD)      += -lrte_pmd_mvpp2 -L$(LIBMUSDK_PATH)/lib -lmusdk
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MRVL_PMD)       += -lrte_pmd_mrvl -L$(LIBMUSDK_PATH)/lib -lmusdk
 _LDLIBS-$(CONFIG_RTE_LIBRTE_NFP_PMD)        += -lrte_pmd_nfp
@@ -223,6 +228,8 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_AVP_PMD)        += -lrte_pmd_avp
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NULL)       += -lrte_pmd_null
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VMXNET3_PMD)    += -lrte_pmd_vmxnet3_uio
 
+_LDLIBS-$(CONFIG_RTE_LIBRTE_VMBUS)          += -lrte_bus_vmbus
+_LDLIBS-$(CONFIG_RTE_LIBRTE_NETVSC_PMD)     += -lrte_pmd_netvsc
 
 ifeq ($(CONFIG_RTE_LIBRTE_CRYPTODEV),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_MB)   += -lrte_pmd_aesni_mb
@@ -231,7 +238,15 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_GCM)  += -lrte_pmd_aesni_gcm -lcrypto
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_GCM)  += -L$(AESNI_MULTI_BUFFER_LIB_PATH) -lIPSec_MB
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_CCP)         += -lrte_pmd_ccp -lcrypto
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NULL_CRYPTO) += -lrte_pmd_null_crypto
+
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_QAT),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT_SYM)     += -lrte_pmd_qat -lcrypto
+endif # CONFIG_RTE_LIBRTE_PMD_QAT
+else
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT)        += -lrte_pmd_qat -lcrypto
+endif
+
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SNOW3G)     += -lrte_pmd_snow3g
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SNOW3G)     += -L$(LIBSSO_SNOW3G_PATH)/build -lsso_snow3g
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI)     += -lrte_pmd_kasumi
@@ -253,6 +268,13 @@ endif # CONFIG_RTE_LIBRTE_CRYPTODEV
 ifeq ($(CONFIG_RTE_LIBRTE_COMPRESSDEV),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ISAL) += -lrte_pmd_isal_comp
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ISAL) += -lisal
++_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_ZIPVF) += -lrte_pmd_octeontx_zip
+# Link QAT driver if it has not been linked yet
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_QAT_SYM),n)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT)  += -lrte_pmd_qat
+endif # CONFIG_RTE_LIBRTE_PMD_QAT_SYM
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZLIB) += -lrte_pmd_zlib
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZLIB) += -lz
 endif # CONFIG_RTE_LIBRTE_COMPRESSDEV
 
 
@@ -331,6 +353,8 @@ PARSE_PATH=../lib/librte_parse_$(RTE_VERSION)/
 	sed -i 's/^uint8_t\srxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t rxring_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
 	sed -i 's/^uint8_t\stxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t txring_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
 	sed -i '/extern\senum\sdcb_queue_mapping_mode\sdcb_q_mapping\;/d' $(PARSE_PATH)/testpmd.h
+	sed -i 's/struct\snvgre_encap_conf\snvgre_encap_conf;/extern struct nvgre_encap_conf nvgre_encap_conf;/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/struct\svxlan_encap_conf\svxlan_encap_conf;/extern struct vxlan_encap_conf vxlan_encap_conf;/g' $(PARSE_PATH)/testpmd.h
 
 test-pmd/%.o: ../lib/librte_parse_$(RTE_VERSION)
 	cp -u $(RTE_SDK)/app/test-pmd/$*.c $(PARSE_PATH)
@@ -343,14 +367,24 @@ PARSE_OBJS = \
 	test-pmd/icmpecho.o test-pmd/ieee1588fwd.o test-pmd/iofwd.o test-pmd/macswap.o \
 	test-pmd/rxonly.o test-pmd/config.o \
 
+# Additional object files, present at or after DPDK v17.11 but not at or after 18.08
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || ( [ $(RTE_VER_YEAR) -ge 18 ] && [ $(RTE_VER_MONTH) -lt 08 ] ) ) && echo true),true)
+PARSE_OBJS += test-pmd/tm.o
+endif
+
 # Additional object files, present at or after DPDK v17.11
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
-PARSE_OBJS += test-pmd/tm.o test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
+PARSE_OBJS += test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
 endif
 
 # Additional object files, present at or after DPDK v18.05
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/bpf_cmd.o
+endif
+
+# Additional object files, present at or after DPDK v18.08
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) && echo true),true)
+PARSE_OBJS += test-pmd/softnicfwd.o
 endif
 
 

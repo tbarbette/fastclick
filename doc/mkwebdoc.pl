@@ -437,7 +437,7 @@ if ($DOC_TAR_GZ) {
 	close IN;
 	open(OUT, ">$DOCDIR/$f");
 	s{src='\.\./}{src='}g;
-	s{href='\.\./?'}{href='http://www.pdos.lcs.mit.edu/click/'}g;
+	s{href='\.\./?'}{href='https://github.com/tbarbette/fastclick/'}g;
 	print OUT;
 	close OUT;
     }

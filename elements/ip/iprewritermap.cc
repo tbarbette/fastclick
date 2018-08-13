@@ -81,7 +81,6 @@ IPRewriterMap::push(int port,Packet *b)
 	}
 	int d = _map.find(a,-1);
 	if (d == -1) {
-		assign_new:
 		int n_d = _current_dest.fetch_and_add(1);
 		_set_lock.acquire();
 		click_read_fence();

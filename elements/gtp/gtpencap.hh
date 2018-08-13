@@ -10,14 +10,16 @@ CLICK_DECLS
 
 GTPEncap(TEID eid)
 
+encapsulates GTP packets
+
 =s gtp
+
+=d
 
 encapsulates packets in static GPRS Tunneling Protocol header.
 This does not include UDP/IP Encapsulation, but GTP is usually over UDP/IP
 
 Does not support sequences or GTP-C.
-
-=d
 
 =a Strip, UDPIPEncap
 */

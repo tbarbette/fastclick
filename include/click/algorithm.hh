@@ -57,6 +57,7 @@ inline void assign_consume(T &x, const V &y)
     x = y;
 }
 
+#ifndef min
 /** @brief return the minimum of two values
  */
 template<typename _Tp>
@@ -78,6 +79,7 @@ template<typename _Tp>
 	return __b;
     return __a;
   }
+#endif
 
 template <typename T, typename U = void> struct do_nothing;
 

@@ -68,7 +68,7 @@
 CLICK_DECLS
 
 KernelTun::KernelTun()
-    : _fd(-1), _tap(false), _task(this), _ignore_q_errs(false),
+    : _fd(-1), _flags(0) ,_tap(false), _task(this), _ignore_q_errs(false),
       _printed_write_err(false), _printed_read_err(false),
       _selected_calls(0), _packets(0)
 {
@@ -91,7 +91,7 @@ KernelTun::cast(const char *n)
 }
 
 int
-KernelTun::configure(Vector<String> &conf, ErrorHandler *errh)
+KernelTun::configure_common(Args &args, ErrorHandler *errh)
 {
     _gw = IPAddress();
     _headroom = Packet::default_headroom;
@@ -99,7 +99,7 @@ KernelTun::configure(Vector<String> &conf, ErrorHandler *errh)
     _headroom += (4 - _headroom % 4) % 4; // default 4/0 alignment
     _mtu_out = DEFAULT_MTU;
     _burst = 1;
-    if (Args(conf, this, errh)
+    args
 	.read_mp("ADDR", IPPrefixArg(), _near, _mask)
 	.read_p("GATEWAY", _gw)
 	.read("TAP", _tap)
@@ -112,8 +112,7 @@ KernelTun::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("DEV_NAME", Args::deprecated, _dev_name)
 	.read("DEVNAME", _dev_name)
 #endif
-	.complete() < 0)
-	return -1;
+    ;
 
     if (_gw && !_gw.matches_prefix(_near, _mask))
 	return errh->error("bad GATEWAY");
@@ -127,6 +126,18 @@ KernelTun::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+int
+KernelTun::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    Args a(conf, this, errh);
+    int err = configure_common(a, errh);
+    if (err != 0)
+        return err;
+    if (a.complete() < 0)
+        return -1;
+    return 0;
+}
+
 #if KERNELTUN_LINUX
 int
 KernelTun::try_linux_universal()
@@ -134,7 +145,6 @@ KernelTun::try_linux_universal()
     int fd = open("/dev/net/tun", O_RDWR | O_NONBLOCK);
     if (fd < 0)
 	return -errno;
-
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = (_tap ? IFF_TAP : IFF_TUN);
@@ -176,7 +186,7 @@ int
 KernelTun::alloc_tun(ErrorHandler *errh)
 {
 #if !KERNELTUN_LINUX && !KERNELTUN_NET && !KERNELTUN_OSX && !KERNELTAP_NET
-    return errh->error("%s is not yet supported on this system.\n(Please report this message to click@librelist.com.)", class_name());
+    return errh->error("%s is not yet supported on this system.\n(Please report this message to http://github.com/kohler/click/.)", class_name());
 #endif
 
     int error, saved_error = 0;
@@ -388,7 +398,7 @@ KernelTun::updown(IPAddress addr, IPAddress mask, ErrorHandler *errh)
 }
 
 int
-KernelTun::setup_tun(ErrorHandler *errh)
+KernelTun::setup_tun(ErrorHandler *errh, int fd)
 {
 // #if defined(__OpenBSD__)  && !defined(TUNSIFMODE)
 //     /* see OpenBSD bug: http://cvs.openbsd.org/cgi-bin/wwwgnats.pl/full/782 */
@@ -397,7 +407,7 @@ KernelTun::setup_tun(ErrorHandler *errh)
 #if defined(TUNSIFMODE) || defined(__FreeBSD__)
     if (!_tap) {
 	int mode = IFF_BROADCAST;
-	if (ioctl(_fd, TUNSIFMODE, &mode) != 0)
+	if (ioctl(fd, TUNSIFMODE, &mode) != 0)
 	    return errh->error("TUNSIFMODE failed: %s", strerror(errno));
     }
 #endif
@@ -405,10 +415,10 @@ KernelTun::setup_tun(ErrorHandler *errh)
     if (!_tap) {
 	struct tuninfo ti;
 	memset(&ti, 0, sizeof(struct tuninfo));
-	if (ioctl(_fd, TUNGIFINFO, &ti) != 0)
+	if (ioctl(fd, TUNGIFINFO, &ti) != 0)
 	    return errh->error("TUNGIFINFO failed: %s", strerror(errno));
 	ti.flags &= IFF_BROADCAST;
-	if (ioctl(_fd, TUNSIFINFO, &ti) != 0)
+	if (ioctl(fd, TUNSIFINFO, &ti) != 0)
 	    return errh->error("TUNSIFINFO failed: %s", strerror(errno));
     }
 #endif
@@ -418,7 +428,7 @@ KernelTun::setup_tun(ErrorHandler *errh)
     // just as in OpenBSD.
     if (!_tap && _type == BSD_TUN) {
 	int yes = 1;
-	if (ioctl(_fd, TUNSIFHEAD, &yes) != 0)
+	if (ioctl(fd, TUNSIFHEAD, &yes) != 0)
 	    return errh->error("TUNSIFHEAD failed: %s", strerror(errno));
     }
 #endif
@@ -462,22 +472,33 @@ KernelTun::setup_tun(ErrorHandler *errh)
 }
 
 int
-KernelTun::initialize(ErrorHandler *errh)
+KernelTun::initialize_common(ErrorHandler *errh)
 {
-    if (alloc_tun(errh) < 0)
-	return -1;
-    if (setup_tun(errh) < 0)
-	return -1;
-    if (input_is_pull(0)) {
-	ScheduleInfo::join_scheduler(this, &_task, errh);
-	_signal = Notifier::upstream_empty_signal(this, 0, &_task);
-    }
     if (_adjust_headroom) {
 	if (_tap && _type == LINUX_UNIVERSAL)
 	    _headroom += (4 - (_headroom + 2) % 4) % 4; // default 4/2 alignment
 	else
 	    _headroom += (4 - _headroom % 4) % 4; // default 4/0 alignment
     }
+    return 0;
+}
+
+int
+KernelTun::initialize(ErrorHandler *errh)
+{
+    if (alloc_tun(errh) < 0)
+	return -1;
+    if (setup_tun(errh, _fd) < 0)
+	return -1;
+
+    if (input_is_pull(0)) {
+	ScheduleInfo::join_scheduler(this, &_task, errh);
+	_signal = Notifier::upstream_empty_signal(this, 0, &_task);
+    }
+
+    int err = initialize_common(errh);
+    if (err != 0)
+        return err;
     add_select(_fd, SELECT_READ);
     return 0;
 }
@@ -496,9 +517,6 @@ KernelTun::cleanup(CleanupStage)
 void
 KernelTun::selected(int fd, int)
 {
-    if (fd != _fd)
-	return;
-
     Timestamp now = Timestamp::now();
     ++_selected_calls;
     unsigned n = _burst;
@@ -507,7 +525,7 @@ KernelTun::selected(int fd, int)
 #endif
     while (n > 0) {
         WritablePacket* p = 0;
-        int o = one_selected(now, p);
+        int o = one_selected(now, p, fd);
         if (likely(o == 0)) {
 #if HAVE_BATCH
             BATCH_CREATE_APPEND(batch,p);
@@ -533,7 +551,7 @@ KernelTun::selected(int fd, int)
 }
 
 int
-KernelTun::one_selected(const Timestamp &now, WritablePacket* &p)
+KernelTun::one_selected(const Timestamp &now, WritablePacket* &p, int fd)
 {
     p = Packet::make(_headroom, 0, _mtu_in, 0);
     if (!p) {
@@ -541,7 +559,7 @@ KernelTun::one_selected(const Timestamp &now, WritablePacket* &p)
         return 2;
     }
 
-    int cc = read(_fd, p->data(), _mtu_in);
+    int cc = read(fd, p->data(), _mtu_in);
     if (cc > 0) {
         ++_packets;
         p->take(_mtu_in - cc);
@@ -633,7 +651,7 @@ KernelTun::run_task(Task *)
 }
 
 void
-KernelTun::process(Packet* p) {
+KernelTun::process(Packet* p, int fd) {
     const click_ip *iph = 0;
     int check_length;
 
@@ -711,7 +729,7 @@ KernelTun::process(Packet* p) {
     }
 
     if (p) {
-	int w = write(_fd, p->data(), p->length());
+	int w = write(fd, p->data(), p->length());
 	if (w != (int) p->length() && (errno != ENOBUFS || !_ignore_q_errs || !_printed_write_err)) {
 	    _printed_write_err = true;
 	    click_chatter("%s(%s): write failed: %s", class_name(), _dev_name.c_str(), strerror(errno));
@@ -724,14 +742,14 @@ KernelTun::process(Packet* p) {
 void
 KernelTun::push(int, Packet *p)
 {
-    process(p);
+    process(p, _fd);
 }
 
 #if HAVE_BATCH
 void
 KernelTun::push_batch(int, PacketBatch *batch) {
     FOR_EACH_PACKET_SAFE(batch, p)
-        process(p);
+        process(p, _fd);
 }
 #endif
 
@@ -754,6 +772,98 @@ KernelTun::get_spawning_threads(Bitvector& bmp, bool isoutput)
     return true;
 }
 
+KernelTunMP::KernelTunMP()
+{
+}
+
+KernelTunMP::~KernelTunMP()
+{
+}
+
+int
+KernelTunMP::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    Args a(conf, this, errh);
+    int err = configure_common(a, errh);
+    if (err != 0)
+        return err;
+    if (a.read_m("THREADS", _spawning)
+         .complete() < 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+
+int
+KernelTunMP::initialize(ErrorHandler *errh)
+{
+    _flags = IFF_MULTI_QUEUE;
+    int err = initialize_common(errh);
+    if (err != 0) {
+        click_chatter("Error %d",err);
+        return err;
+    }
+    Bitvector passing = get_passing_threads();
+    Bitvector rw_threads = _spawning | passing;
+    _state.initialize(rw_threads);
+    for (int i = 0; i < rw_threads.size(); i++) {
+        if (!rw_threads[i])
+            continue;
+        inputstate &s = _state.get_value_for_thread(i);
+        int fd = open("/dev/net/tun", O_RDWR | O_NONBLOCK);
+        if (fd < 0) {
+            return errh->error("Could not open tun, errno %d",errno);
+        }
+
+        struct ifreq ifr;
+        memset(&ifr, 0, sizeof(ifr));
+        ifr.ifr_flags = (_tap ? IFF_TAP : IFF_TUN) | _flags;
+        if (_dev_name)
+            strncpy(ifr.ifr_name, _dev_name.c_str(), sizeof(ifr.ifr_name));
+        int err = ioctl(fd, TUNSETIFF, (void *)&ifr);
+        if (err < 0) {
+          close(fd);
+          return errh->error("Could not TUNSETIFF, if %s, errno %d", _dev_name.c_str(), errno);
+        }
+        s.fd = fd;
+
+        if (_spawning[i])
+            master()->thread(i)->select_set().add_select(fd, this, SELECT_READ);
+
+
+        if (setup_tun(errh, fd) < 0)
+		return -1;
+    }
+    return 0;
+}
+
+bool
+KernelTunMP::get_spawning_threads(Bitvector& bmp, bool isoutput)
+{
+    if (isoutput)
+        bmp |= _spawning;
+
+    return true;
+}
+
+void
+KernelTunMP::push(int, Packet *p)
+{
+    process(p, _state->fd);
+}
+
+#if HAVE_BATCH
+void
+KernelTunMP::push_batch(int, PacketBatch *batch) {
+    FOR_EACH_PACKET_SAFE(batch, p)
+        process(p, _state->fd);
+}
+#endif
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel FakePcap)
 EXPORT_ELEMENT(KernelTun)
+EXPORT_ELEMENT(KernelTunMP)
+ELEMENT_MT_SAFE(KernelTunMP)

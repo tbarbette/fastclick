@@ -98,7 +98,9 @@ class Packet { public:
     inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
-#if CLICK_PACKET_USE_DPDK
+#if CLICK_LINUXMODULE
+    inline void get() {skb_get(skb());};
+#elif CLICK_PACKET_USE_DPDK
     inline void get() {rte_mbuf_refcnt_update(mb(), 1);};
 #else
     inline void get() {_use_count++;};
@@ -716,7 +718,7 @@ class Packet { public:
 	*reinterpret_cast<click_aliasable_void_pointer_t *>(xanno()->c + i) = const_cast<void *>(x);
     }
 
-#if !CLICK_PACKET_USE_DPDK
+#if !CLICK_PACKET_USE_DPDK && !CLICK_LINUXMODULE
     inline Packet* data_packet() {
     	return _data_packet;
     }
@@ -902,7 +904,9 @@ class WritablePacket : public Packet { public:
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
 
+#if !CLICK_LINUXMODULE
     inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
+#endif
 
 # if HAVE_CLICK_PACKET_POOL
     static PacketPool* make_local_packet_pool();
@@ -910,6 +914,7 @@ class WritablePacket : public Packet { public:
 
     static void pool_transfer(int from, int to);
 
+#if !CLICK_LINUXMODULE
     inline void set_buffer(unsigned char *data, uint32_t length) {
     	set_buffer(data,length,length);
     }
@@ -917,6 +922,7 @@ class WritablePacket : public Packet { public:
     inline void set_buffer(unsigned char *data) {
        	set_buffer(data,buffer_length());
     }
+#endif
 
     inline WritablePacket * unique_next() {
         if (!next()) return NULL;
@@ -2834,6 +2840,7 @@ WritablePacket::buffer_data() const
 }
 /** @endcond never */
 
+#if !CLICK_LINUXMODULE
 inline void
 WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length) {
 # if CLICK_PACKET_USE_DPDK
@@ -2844,6 +2851,7 @@ WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t
 	_end = data + buffer_length;
 # endif
 }
+#endif
 
 typedef Packet::PacketType PacketType;
 

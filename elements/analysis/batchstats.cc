@@ -129,5 +129,7 @@ BatchStats::add_handlers()
 
 
 CLICK_ENDDECLS
+
+ELEMENT_REQUIRES(batch)
 EXPORT_ELEMENT(BatchStats)
 ELEMENT_MT_SAFE(BatchStats)

@@ -11,4 +11,10 @@
 # undef false
 # undef true
 #endif
+
+#ifdef CLICK_CXX_PROTECTED
+# undef asmlinkage
+# define asmlinkage extern "C"
+#endif
+
 #undef CLICK_CXX_PROTECTED

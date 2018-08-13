@@ -10,11 +10,13 @@ CLICK_DECLS
 
 GTPDecap()
 
+decapsulates GTP packet
+
 =s gtp
 
-decapsulate the GTP packet and set the GTP TEID in the aggregate annotation
-
 =d
+
+decapsulates the GTP packet and set the GTP TEID in the aggregate annotation
 
 =a GTPEncap
 */
