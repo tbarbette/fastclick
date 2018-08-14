@@ -46,10 +46,6 @@ env:
     - FRAMEWORK=umultithread CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=17.11 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=18.02 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=18.05 CONFIG="--disable-batch"
 
 script:
@@ -60,6 +56,7 @@ script:
   - if [ $FRAMEWORK = "dpdk" ] ; then
       FRAMEWORK_FLAGS="--enable-user-multithread --enable-dpdk";
       export RTE_SDK=`pwd`/dpdk-$VERSION;
+      export RTE_MACHINE=default;
       export RTE_TARGET=x86_64-native-linuxapp-gcc;
       if [ ! -e "$RTE_SDK/$RTE_TARGET/include/rte_version.h" -o ! -e "$RTE_SDK/$RTE_TARGET/build/lib/librte_eal/linuxapp/eal/librte_eal.a" ]; then
             wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
