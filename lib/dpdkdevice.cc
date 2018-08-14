@@ -275,7 +275,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
     if (info.n_rx_descs == 0)
         info.n_rx_descs = dev_info.default_rxportconf.ring_size > 0? dev_info.default_rxportconf.ring_size : DEF_DEV_RXDESC;
 
