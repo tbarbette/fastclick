@@ -1522,6 +1522,10 @@ ServiceChain::RxFilter::to_json()
     return j;
 }
 
+String ServiceChain::generate_configuration_slave_fd_name(int nic_index, int cpu_index, String type) {
+            return "slave" + type + String(nic_index) + "C" + String(cpu_index);
+}
+
 /**
  * Applies an Rx filter configuration to a NIC
  * by allocating space for tags and then populating
@@ -2228,8 +2232,25 @@ ServiceChain::generate_configuration()
         }
 
         // TODO: Allowed CPU bitmap
-        newconf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_address() + ");";
-        newconf += "slave["  + is + "] -> slaveTD" + is + ";\n";
+        if (get_max_cpu_nb() == 1) {
+            int cpu_id = get_cpu_map(0);
+            int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
+            newconf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);";
+            newconf += "slave["  + is + "] -> slaveTD" + is + ";\n";
+        } else {
+            newconf += "slaveTD" + is + " :: ExactCPUSwitch();";
+            newconf += "slave["  + is + "] -> slaveTD" + is + ";\n";
+            for (int j = 0; j < get_max_cpu_nb(); j++) {
+                String js = String(j);
+
+                int cpu_id = get_cpu_map(j);
+                String ename = generate_configuration_slave_fd_name(i, cpu_id, "TD");
+                int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
+                newconf += ename + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);";
+
+                newconf += "slaveTD" + is + "["+js+"] -> " + ename + ";";
+            }
+        }
 
     }
     return newconf;

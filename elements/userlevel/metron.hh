@@ -506,9 +506,7 @@ class ServiceChain {
         Bitvector assigned_cpus();
 
         String generate_configuration();
-        String generate_configuration_slave_fd_name(int nic_index, int cpu_index) {
-            return "slaveFD" + String(nic_index) + "C" + String(cpu_index);
-        }
+        String generate_configuration_slave_fd_name(int nic_index, int cpu_index, String type = "FD" );
 
         Vector<String> build_cmd_line(int socketfd);
 
