@@ -42,8 +42,6 @@ env:
     - FRAMEWORK=umultithread CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=2.2.0 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--disable-batch"
-    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--disable-batch"
     - FRAMEWORK=dpdk VERSION=18.05 CONFIG="--disable-batch"
 
 script:
