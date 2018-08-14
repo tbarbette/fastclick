@@ -1023,6 +1023,7 @@ FlowControlModeArg::unparse(FlowControlMode mode) {
         case FC_NONE:
             return "none";
         case FC_UNSET:
+        default:
             return "unset";
     }
 }

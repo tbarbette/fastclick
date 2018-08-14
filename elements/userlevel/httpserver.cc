@@ -20,7 +20,7 @@ static int ahc_policy(void *cls, const struct sockaddr *addr, socklen_t addrlen)
     return MHD_YES;
 }
 
-HTTPServer::HTTPServer() : _verbose(false), _port(80), _daemon(0) {
+HTTPServer::HTTPServer() : _port(80), _verbose(false), _daemon(0) {
 }
 
 HTTPServer::~HTTPServer() {
@@ -240,7 +240,7 @@ int HTTPServer::ahc_echo(
               return MHD_YES;
           } else {
               String data = *static_cast<String*>(*con_cls);
-              click_chatter("Last call with data %s",data.c_str());
+              click_chatter("Last call to %s with data %s",path.c_str(), data.c_str());
               if (h->writable()) {
                   int ret;
                   if (isNotPost)
