@@ -183,7 +183,7 @@ int DPDKDevice::alloc_pktmbufs()
     if (max_socket == -1)
         max_socket = 0;
 
-    int n_pktmbuf_pools = max_socket + 1;
+    unsigned n_pktmbuf_pools = max_socket + 1;
 
     // Allocate pktmbuf_pool array
     typedef struct rte_mempool *rte_mempool_p;
@@ -191,12 +191,12 @@ int DPDKDevice::alloc_pktmbufs()
         auto pktmbuf_pools = new rte_mempool_p[n_pktmbuf_pools];
         if (!pktmbuf_pools)
             return false;
-        for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+        for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
             pktmbuf_pools[i] = _pktmbuf_pools[i];
         }
         if (_pktmbuf_pools)
             delete[] _pktmbuf_pools;
-        for (int i = _nr_pktmbuf_pools; i < n_pktmbuf_pools; i++) {
+        for (unsigned i = _nr_pktmbuf_pools; i < n_pktmbuf_pools; i++) {
             pktmbuf_pools[i] = 0;
         }
         _pktmbuf_pools = pktmbuf_pools;
@@ -205,7 +205,7 @@ int DPDKDevice::alloc_pktmbufs()
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         // Create a pktmbuf pool for each active socket
-        for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+        for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
                 if (!_pktmbuf_pools[i]) {
                         String mempool_name = DPDKDevice::MEMPOOL_PREFIX + String(i);
                         const char* name = mempool_name.c_str();
@@ -438,7 +438,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 ((info.rx_queues.size() / info.num_pools) + 1) * info.num_pools
             );
         }
-        dev_conf.rx_adv_conf.vmdq_rx_conf.nb_queue_pools = 
+        dev_conf.rx_adv_conf.vmdq_rx_conf.nb_queue_pools =
             (enum rte_eth_nb_pools) info.num_pools;
         dev_conf.rx_adv_conf.vmdq_rx_conf.enable_default_pool = 0;
         dev_conf.rx_adv_conf.vmdq_rx_conf.default_pool = 0;
@@ -528,10 +528,16 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         return errh->error("The number of transmit descriptors is %d but needs to be between %d and %d",info.n_tx_descs, dev_info.tx_desc_lim.nb_min, dev_info.tx_desc_lim.nb_max);
     }
 
+    /* TODO : Detect this if possible
+    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+            dev_conf.txmode.offloads |=
+                DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+                */
+
     int ret;
-    if (ret = rte_eth_dev_configure(
+    if ((ret = rte_eth_dev_configure(
             port_id, info.rx_queues.size(),
-            info.tx_queues.size(), &dev_conf) < 0)
+            info.tx_queues.size(), &dev_conf)) < 0)
         return errh->error(
             "Cannot initialize DPDK port %u with %u RX and %u TX queues\nError %d : %s",
             port_id, info.rx_queues.size(), info.tx_queues.size(),
@@ -578,7 +584,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 #endif
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
-    for (unsigned i = 0; i < info.rx_queues.size(); ++i) {
+    for (unsigned i = 0; i < (unsigned)info.rx_queues.size(); ++i) {
         if (rte_eth_rx_queue_setup(
                 port_id, i, info.n_rx_descs, numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
@@ -587,7 +593,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 i, port_id, numa_node, rte_strerror(rte_errno));
     }
 
-    for (unsigned i = 0; i < info.tx_queues.size(); ++i)
+    for (unsigned i = 0; i < (unsigned)info.tx_queues.size(); ++i)
         if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
                                    &tx_conf) != 0)
             return errh->error(
@@ -636,6 +642,8 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 conf.mode = RTE_FC_TX_PAUSE; break;
             case FC_NONE:
                 conf.mode = RTE_FC_NONE; break;
+            default:
+                return errh->error("Unknown flow mode !");
         }
         ret = rte_eth_dev_flow_ctrl_set(port_id, &conf);
         if (ret != 0)
@@ -702,15 +710,15 @@ EtherAddress DPDKDevice::get_mac() {
  */
 bool set_slot(Vector<bool> &v, unsigned &id) {
     if (id <= 0) {
-        int i;
-        for (i = 0; i < v.size(); i ++) {
+        unsigned i;
+        for (i = 0; i < (unsigned)v.size(); i ++) {
             if (!v[i]) break;
         }
         id = i;
-        if (id >= v.size())
+        if (id >= (unsigned)v.size())
             v.resize(id + 1, false);
     }
-    if (id >= v.size()) {
+    if (id >= (unsigned)v.size()) {
         v.resize(id + 1,false);
     }
     if (v[id])
@@ -1030,9 +1038,9 @@ FlowControlModeArg::unparse(FlowControlMode mode) {
 
 
 DPDKRing::DPDKRing() :
-    _message_pool(0),
-       _numa_zone(0), _burst_size(0), _flags(0), _ring(0), _force_create(false), _force_lookup(false),
-       _count(0), _MEM_POOL("") {
+    _message_pool(0), _MEM_POOL(""),
+    _burst_size(0),_numa_zone(0), _flags(0), _ring(0), _count(0),
+    _force_create(false), _force_lookup(false)  {
 }
 
 DPDKRing::~DPDKRing() {
@@ -1114,7 +1122,7 @@ int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE;
 #else
 int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM;
 #endif
-int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE 
+int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE
                           + sizeof (struct rte_mbuf);
 int DPDKDevice::MBUF_CACHE_SIZE = 256;
 int DPDKDevice::RX_PTHRESH = 8;

@@ -112,7 +112,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (unsigned i = 0; i < n_queues; i++) {
+    for (unsigned i = 0; i < (unsigned)n_queues; i++) {
         ret = _dev->add_tx_queue(i, ndesc , errh);
         if (ret != 0) return ret;    }
 
@@ -226,7 +226,7 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
 
     do {
         sub_burst = iqueue.nr_pending > 32 ? 32 : iqueue.nr_pending;
-        if (iqueue.index + sub_burst >= _internal_tx_queue_size)
+        if (iqueue.index + sub_burst >= (unsigned)_internal_tx_queue_size)
             // The sub_burst wraps around the ring
             sub_burst = _internal_tx_queue_size - iqueue.index;
         //Todo : if there is multiple queue assigned to this thread, send on all of them
@@ -235,7 +235,7 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
         iqueue.nr_pending -= r;
         iqueue.index += r;
 
-        if (iqueue.index >= _internal_tx_queue_size) // Wrapping around the ring
+        if (iqueue.index >= (unsigned)_internal_tx_queue_size) // Wrapping around the ring
             iqueue.index = 0;
 
         sent += r;
@@ -254,7 +254,7 @@ void ToDPDKDevice::push(int, Packet *p)
     do {
         congestioned = false;
 
-        if (iqueue.nr_pending == _internal_tx_queue_size) { // Internal queue is full
+        if (iqueue.nr_pending == (unsigned)_internal_tx_queue_size) { // Internal queue is full
             /* We just set the congestion flag. If we're in blocking mode,
              * we'll loop, else we'll drop this packet.*/
             congestioned = true;
@@ -317,7 +317,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
     do {
         congestioned = false;
         //First, place the packets in the queue
-        while (iqueue.nr_pending < _internal_tx_queue_size && p) { // Internal queue is full
+        while (iqueue.nr_pending < (unsigned)_internal_tx_queue_size && p) { // Internal queue is full
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
             if (mbuf != NULL) {
