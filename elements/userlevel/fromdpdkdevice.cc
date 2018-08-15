@@ -54,6 +54,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     uint16_t mtu = 0;
     bool has_mac = false;
     bool has_mtu = false;
+    FlowControlMode fc_mode(FC_UNSET);
+    String mode = "";
 
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
@@ -61,6 +63,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
         .read("MAXQUEUES",maxqueues)
+        .read("PAUSE", fc_mode)
         .complete() < 0)
         return -1;
 
@@ -79,11 +82,11 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (n_queues == -1) {
 	if (firstqueue == -1) {
 		firstqueue = 0;
-		//With DPDK we'll take as many queues as available threads
-		 r = configure_rx(numa_node,1,maxqueues,errh);
+		// With DPDK we'll take as many queues as available threads
+		r = configure_rx(numa_node, 1, maxqueues, errh);
 	} else {
-		//If a queue number is setted, user probably want only one queue
-		r = configure_rx(numa_node,1,1,errh);
+		// If a queue number is set, user probably wants only one queue
+		r = configure_rx(numa_node, 1, 1, errh);
 	}
     } else {
         if (firstqueue == -1)
@@ -98,6 +101,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (has_mtu)
         _dev->set_init_mtu(mtu);
+
+    if (fc_mode != FC_UNSET)
+        _dev->set_init_fc_mode(fc_mode);
 
     return 0;
 }
@@ -320,7 +326,7 @@ int FromDPDKDevice::write_handler(
                 reinterpret_cast<ether_addr*>(mac.data()), pool
             );
             if (ret != 0) {
-                return errh->error("Could not add mac address !");
+                return errh->error("Could not add mac address!");
             }
             return 0;
         }
