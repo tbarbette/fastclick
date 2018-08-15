@@ -88,6 +88,10 @@ Colon-separated string. The device's MAC address.
 
 Integer. The maximum transfer unit of the device.
 
+=item PAUSE
+
+String. Set the device pause mode. "full" to enable pause frame for both RX and TX, "rx" or "tx" to set one of them, and "none" to disable pause frames. Do not set or choose "unset" to keep device current state/default.
+
 =item ALLOW_NONEXISTENT
 
 Boolean.  Do not fail if the PORT does not exist. If it's the case the task
