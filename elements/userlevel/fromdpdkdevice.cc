@@ -55,7 +55,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     bool has_mac = false;
     bool has_mtu = false;
     FlowControlMode fc_mode(FC_UNSET);
-    String mode = "";
 
     if (parse(Args(conf, this, errh)
         .read_mp("PORT", dev))
