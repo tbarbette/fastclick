@@ -68,6 +68,8 @@ script:
       fi;
     fi
 
+  - if [ "$CXX" = "clang++" ]; then export CXXGLAGS="$CXXFLAGS -Wno-inconsistent-missing-override"; fi
+
   - if [ $FRAMEWORK = "umultithread" ] ; then
       FRAMEWORK_FLAGS="--enable-user-multithread";
     fi
