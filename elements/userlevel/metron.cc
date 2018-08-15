@@ -296,14 +296,14 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
         String fd_mode = fd->get_device()->get_mode_str();
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        if ((_rx_mode == FLOW) && (fd_mode != FlowDirector::FLOW_DIR_MODE)) {
+/*        if ((_rx_mode == FLOW) && (fd_mode != FlowDirector::FLOW_DIR_MODE)) {
             return errh->error(
                 "Metron RX_MODE %s requires FromDPDKDevice(%s) MODE %s",
                 rx_filter_type_enum_to_str(_rx_mode).c_str(),
                 nic.value().get_name().c_str(),
                 FlowDirector::FLOW_DIR_MODE.c_str()
             );
-        }
+        }*/
     #endif
 
         // TODO: What if _rx_mode = VLAN and fd_mode = vmdq?
