@@ -416,6 +416,26 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         }
     }
 
+    if (info.init_fc_mode != FC_UNSET) {
+        struct rte_eth_fc_conf conf;
+        ret = rte_eth_dev_flow_ctrl_get(port_id, &conf);
+        if (ret != 0)
+            return errh->error("Could not get flow control status !");
+        switch (info.init_fc_mode) {
+            case FC_FULL:
+                conf.mode = RTE_FC_FULL; break;
+            case FC_RX:
+                conf.mode = RTE_FC_RX_PAUSE; break;
+            case FC_TX:
+                conf.mode = RTE_FC_TX_PAUSE; break;
+            case FC_NONE:
+                conf.mode = RTE_FC_NONE; break;
+        }
+        ret = rte_eth_dev_flow_ctrl_set(port_id, &conf);
+        if (ret != 0)
+             return errh->error("Could not set flow control status !");
+    }
+
     return 0;
 }
 
@@ -428,6 +448,12 @@ void DPDKDevice::set_init_mtu(uint16_t mtu) {
     assert(!_is_initialized);
     info.init_mtu = mtu;
 }
+
+void DPDKDevice::set_init_fc_mode(FlowControlMode fc) {
+    assert(!_is_initialized);
+    info.init_fc_mode = fc;
+}
+
 
 EtherAddress DPDKDevice::get_mac() {
     assert(_is_initialized);
@@ -647,6 +673,43 @@ DPDKDeviceArg::parse(
 
     return true;
 }
+
+
+bool
+FlowControlModeArg::parse(
+    const String &str, FlowControlMode &result, const ArgContext &ctx) {
+    str.lower();
+    if (str == "full") {
+        result = FC_FULL;
+    } else if (str == "rx") {
+        result = FC_RX;
+    }else if (str == "tx") {
+        result = FC_TX;
+    } else if (str == "none") {
+        result = FC_NONE;
+    } else
+        return false;
+
+    return true;
+}
+
+
+String
+FlowControlModeArg::unparse(FlowControlMode mode) {
+    switch(mode) {
+        case FC_FULL:
+            return "full";
+        case FC_RX:
+            return "rx";
+        case FC_TX:
+            return "tx";
+        case FC_NONE:
+            return "none";
+        case FC_UNSET:
+            return "unset";
+    }
+}
+
 
 DPDKRing::DPDKRing() :
     _message_pool(0),

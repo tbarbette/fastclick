@@ -47,6 +47,9 @@
 #endif
 
 CLICK_DECLS
+
+enum FlowControlMode {FC_UNSET, FC_NONE, FC_RX, FC_TX, FC_FULL};
+
 class DPDKDeviceArg;
 
 #if HAVE_INT64_TYPES
@@ -70,7 +73,7 @@ public:
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
             rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
             n_tx_descs(0),
-            init_mac(), init_mtu(0) {
+            init_mac(), init_mtu(0), init_fc_mode(FC_UNSET) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -99,6 +102,7 @@ public:
         unsigned n_tx_descs;
         EtherAddress init_mac;
         uint16_t init_mtu;
+        FlowControlMode init_fc_mode;
     };
 
     int add_rx_queue(
@@ -114,6 +118,7 @@ public:
     EtherAddress get_mac();
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
+    void set_init_fc_mode(FlowControlMode fc);
 
     unsigned int get_nb_txdesc();
 
@@ -298,6 +303,15 @@ class DPDKDeviceArg { public:
 };
 
 template<> struct DefaultArg<DPDKDevice*> : public DPDKDeviceArg {};
+
+/** @class FlowControlModeArg
+  @brief Parser class for flow control mode. */
+class FlowControlModeArg { public:
+    static bool parse(const String &str, FlowControlMode &result, const ArgContext &args = ArgContext());
+    static String unparse(FlowControlMode mode);
+};
+
+template<> struct DefaultArg<FlowControlMode> : public FlowControlModeArg {};
 
 /**
  * Get a DPDK mbuf from a packet. If the packet buffer is a DPDK buffer, it will
