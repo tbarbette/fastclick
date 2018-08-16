@@ -167,6 +167,8 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
 void TimestampDiff::add_handlers()
 {
     set_handler("average", Handler::f_read | Handler::f_read_param, handler, TSD_AVG_HANDLER, 0);
+    set_handler("avg", Handler::f_read | Handler::f_read_param, handler, TSD_AVG_HANDLER, 0);
+
     set_handler("min", Handler::f_read | Handler::f_read_param, handler, TSD_MIN_HANDLER, 0);
     set_handler("max", Handler::f_read | Handler::f_read_param, handler, TSD_MAX_HANDLER, 0);
     set_handler("stddev", Handler::f_read | Handler::f_read_param, handler, TSD_STD_HANDLER, 0);
