@@ -264,7 +264,7 @@ TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t
         mean = 0.0;
         return;
     }
-    mean = sum / static_cast<double>(current_vector_length);
+    mean = sum / static_cast<double>(current_vector_length - begin);
 }
 
 double
