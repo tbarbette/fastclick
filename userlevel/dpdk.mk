@@ -342,10 +342,12 @@ PARSE_PATH=../lib/librte_parse_$(RTE_VERSION)/
 	# Copy testpmd.c of the target DPDK version
 	cp -u $(RTE_SDK)/app/test-pmd/testpmd.c $(PARSE_PATH)
 	cp -u $(RTE_SDK)/app/test-pmd/testpmd.h $(PARSE_PATH)
+	cp -u $(RTE_SDK)/app/test-pmd/config.c $(PARSE_PATH)
 	# Strip the main function off to prevent complilation errors, while linking with Click
 	sed -i '/main(int/Q' $(PARSE_PATH)/testpmd.c
 	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
 	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c
+	sed -i '/printf("Flow rule #\%u created\\n", pf->id);/d' $(PARSE_PATH)/config.c
 	sed -i '120i uint8_t port_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
 	sed -i '121i uint8_t rxring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
 	sed -i '122i uint8_t txring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
@@ -365,7 +367,7 @@ PARSE_OBJS = \
 	test-pmd/cmdline_flow.o \
 	test-pmd/macfwd.o test-pmd/cmdline.o test-pmd/txonly.o test-pmd/csumonly.o test-pmd/flowgen.o \
 	test-pmd/icmpecho.o test-pmd/ieee1588fwd.o test-pmd/iofwd.o test-pmd/macswap.o \
-	test-pmd/rxonly.o test-pmd/config.o \
+	test-pmd/rxonly.o \
 
 # Additional object files, present at or after DPDK v17.11 but not at or after 18.08
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || ( [ $(RTE_VER_YEAR) -ge 18 ] && [ $(RTE_VER_MONTH) -lt 08 ] ) ) && echo true),true)
@@ -391,9 +393,11 @@ endif
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 
-librte_parse.a: $(PARSE_OBJS) ../lib/librte_parse_$(RTE_VERSION)
-	$(CC) -o librte_parse.o -O3 -c ../lib/librte_parse_$(RTE_VERSION)/testpmd.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
-	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $(PARSE_OBJS) librte_parse.o,AR librte_parse.a)
+../lib/librte_parse_$(RTE_VERSION)/%.o: ../lib/librte_parse_$(RTE_VERSION)
+	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
+
+librte_parse.a: $(PARSE_OBJS) ../lib/librte_parse_$(RTE_VERSION) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o
+	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $(PARSE_OBJS) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o,AR librte_parse.a)
 	$(call verbose_cmd,$(RANLIB),RANLIB,librte_parse.a)
 
 else
