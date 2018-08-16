@@ -131,7 +131,7 @@ protected:
         thread_state->_dropped += n;
     }
 
-    bool get_spawning_threads(Bitvector& bmk, bool);
+    bool get_spawning_threads(Bitvector& bmk, bool isoutput, int port);
 
     /**
      * Common parsing for all kind of QueueDevice

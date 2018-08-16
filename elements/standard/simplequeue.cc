@@ -107,7 +107,7 @@ SimpleQueue::do_mt_safe_check(ErrorHandler* errh) {
 }
 
 bool
-SimpleQueue::get_spawning_threads(Bitvector& b, bool) {
+SimpleQueue::get_spawning_threads(Bitvector& b, bool, int port) {
     return false;
 }
 

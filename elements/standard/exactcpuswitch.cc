@@ -47,6 +47,19 @@ ExactCPUSwitch::thread_configure(ThreadReconfigurationStage, ErrorHandler* errh)
     return 0;
 }
 
+bool
+ExactCPUSwitch::get_spawning_threads(Bitvector& b, bool isoutput, int port) {
+    if (port == -1 || !isoutput)
+        return true;
+    b.clear();
+    for (unsigned i = 0; i < map.size(); i++) {
+        if (port == map[i]) {
+            b[i] = true;
+        }
+    }
+    return false;
+}
+
 void
 ExactCPUSwitch::push(int, Packet *p)
 {

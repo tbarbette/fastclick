@@ -123,7 +123,7 @@ class KernelTun : public BatchElement { public:
     void cleanup(CleanupStage) override CLICK_COLD;
     void add_handlers() override CLICK_COLD;
     
-    bool get_spawning_threads(Bitvector &, bool) override;
+    bool get_spawning_threads(Bitvector &, bool, int port) override;
 
     void selected(int fd, int mask) override;
 
@@ -201,7 +201,7 @@ class KernelTunMP : public KernelTun { public:
     void push_batch(int port, PacketBatch *) override;
 #endif
 
-    bool get_spawning_threads(Bitvector &, bool) override;
+    bool get_spawning_threads(Bitvector &, bool, int port) override;
 private:
     struct inputstate {
         int fd;

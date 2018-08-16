@@ -35,7 +35,7 @@ Pipeliner::~Pipeliner()
 }
 
 bool
-Pipeliner::get_spawning_threads(Bitvector& b, bool) {
+Pipeliner::get_spawning_threads(Bitvector& b, bool, int port) {
     unsigned int thisthread = router()->home_thread_id(this);
     b[thisthread] = 1;
     return false;

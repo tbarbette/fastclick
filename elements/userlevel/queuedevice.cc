@@ -60,7 +60,7 @@ Args& QueueDevice::parse(Args &args) {
     return args;
 }
 
-bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool)
+bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
 {
     if (noutputs()) { //RX
         //if (_active) { TODO

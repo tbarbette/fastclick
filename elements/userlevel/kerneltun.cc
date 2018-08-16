@@ -764,7 +764,7 @@ KernelTun::add_handlers()
 }
 
 bool 
-KernelTun::get_spawning_threads(Bitvector& bmp, bool isoutput)
+KernelTun::get_spawning_threads(Bitvector& bmp, bool isoutput, int port)
 {
     if (isoutput)
         bmp[home_thread_id()] = 1;
@@ -840,7 +840,7 @@ KernelTunMP::initialize(ErrorHandler *errh)
 }
 
 bool
-KernelTunMP::get_spawning_threads(Bitvector& bmp, bool isoutput)
+KernelTunMP::get_spawning_threads(Bitvector& bmp, bool isoutput, int port)
 {
     if (isoutput)
         bmp |= _spawning;
