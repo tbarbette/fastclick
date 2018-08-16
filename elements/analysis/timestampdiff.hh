@@ -60,7 +60,8 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
-    static String read_handler(Element *, void *) CLICK_COLD;
+    static int handler(int operation, String &data, Element *element,
+            const Handler *handler, ErrorHandler *errh) CLICK_COLD;
 
     void push(int, Packet *);
 #if HAVE_BATCH
@@ -74,6 +75,7 @@ private:
     bool _net_order;
     int _max_delay_ms;
     RecordTimestamp *_rt;
+    //Current index in the delays
     atomic_uint32_t _nd;
     bool _verbose;
 
@@ -84,10 +86,11 @@ private:
     void min_mean_max(
         unsigned &min,
         double   &mean,
-        unsigned &max
+        unsigned &max,
+        uint32_t begin = 0
     );
-    double standard_deviation(const double mean);
-    double percentile(const double percent);
+    double standard_deviation(const double mean, uint32_t begin = 0);
+    double percentile(const double percent, uint32_t begin = 0);
     unsigned last_value_seen();
 };
 
