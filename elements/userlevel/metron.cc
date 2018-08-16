@@ -899,14 +899,7 @@ Metron::write_handler(
             return m->delete_controller_from_json((const String &) data);
         }
         case h_delete_rules: {
-            long rule_id = atol(data.c_str());
-
-            click_chatter(
-                "Metron controller requested the removal of rule %ld",
-                rule_id
-            );
-
-            return ServiceChain::delete_rules_from_json(rule_id, m, errh);
+            return ServiceChain::delete_rule_batch_from_json(data, m, errh);
         }
         default: {
             errh->error("Unknown write handler: %d", what);
@@ -1966,11 +1959,11 @@ ServiceChain::rules_to_json()
 }
 
 /**
- * Decodes service chain rules from JSON
- * and deletes the rules from the respective NIC.
+ * Decodes service chain rule from JSON
+ * and deletes the rule from the respective NIC.
  */
 int
-ServiceChain::delete_rules_from_json(const long rule_id, Metron *m, ErrorHandler *errh)
+ServiceChain::delete_rule_from_json(const long rule_id, Metron *m, ErrorHandler *errh)
 {
     // No controller
     if (!m->_discovered) {
@@ -1981,24 +1974,57 @@ ServiceChain::delete_rules_from_json(const long rule_id, Metron *m, ErrorHandler
         return ERROR;
     }
 
-    // Traverse all service chains
-    auto begin = m->_scs.begin();
-    while (begin != m->_scs.end()) {
-        ServiceChain *sc = begin.value();
+    // Traverse all NICs
+    auto n = m->_nics.begin();
+    while (n != m->_nics.end()) {
+        NIC *nic = &n.value();
 
-        for (int i = 0; i < sc->get_nics_nb(); i++) {
-            NIC *nic = sc->get_nic_by_index(i);
-
-            // Remove rule from both the cache and the NIC
-            if (nic->remove_rule(rule_id)) {
-                return SUCCESS;
-            }
+        // Attempt to remove
+        if (nic->remove_rule(rule_id)) {
+            return SUCCESS;
         }
 
-        begin++;
+        n++;
     }
 
     return ERROR;
+}
+
+/**
+ * Decodes a batch of service chain rules from JSON
+ * and deletes these rules from the respective NIC.
+ */
+int
+ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandler *errh)
+{
+    // No controller
+    if (!m->_discovered) {
+        errh->error(
+            "Cannot delete rule batch %s: Metron agent is not associated with a controller",
+            rule_ids.c_str()
+        );
+        return ERROR;
+    }
+
+    int status = SUCCESS;
+    int current = 0;
+    int pos = -1;
+    while ((pos = rule_ids.find_left(',')) >= 0) {
+        // Keep a rule ID until the comma
+        const String rule_id_str = rule_ids.substring(0, pos);
+        const long rule_id = atol(rule_id_str.c_str());
+
+        // Delete this rule
+        status += delete_rule_from_json(rule_id, m, errh);
+
+        // Advance to the next rule ID
+        current = pos + 1;
+        rule_ids = rule_ids.substring(current, rule_ids.length() - 1);
+    }
+
+    // Last (or single) rule left
+    const long rule_id = atol(rule_ids.c_str());
+    return status + delete_rule_from_json(rule_id, m, errh);
 }
 
 /**
@@ -2827,6 +2853,7 @@ NIC::remove_rule(const long &rule_id)
             // Now fetch the mapping of the controller rule ID with the NIC ID
             uint32_t internal_rule_id = get_internal_rule_id(rule_id);
             if (internal_rule_id < 0) {
+                click_chatter("[NIC %u] Unable to remove rule %ld: No internal mapping", get_port_id(), rule_id);
                 return false;
             }
 
