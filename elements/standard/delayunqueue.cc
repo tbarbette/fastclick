@@ -32,7 +32,9 @@ DelayUnqueue::DelayUnqueue()
 int
 DelayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    return Args(conf, this, errh).read_mp("DELAY", _delay).complete();
+    return Args(conf, this, errh)
+            .read_mp("DELAY", _delay)
+            .complete();
 }
 
 int
