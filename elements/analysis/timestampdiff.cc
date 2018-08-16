@@ -96,83 +96,94 @@ enum {
     TSD_PERC_99_HANDLER,
     TSD_PERC_100_HANDLER,
     TSD_LAST_SEEN,
+    TSD_CURRENT_INDEX,
     TSD_DUMP_HANDLER
 };
 
-String TimestampDiff::read_handler(Element *e, void *arg)
+int TimestampDiff::handler(int operation, String &data, Element *e,
+        const Handler *handler, ErrorHandler *errh)
 {
     TimestampDiff *tsd = static_cast<TimestampDiff *>(e);
     unsigned min = UINT_MAX;
     double  mean = 0.0;
     unsigned max = 0;
+    unsigned begin = 0;
+
+    if (data != "")
+        begin = atoi(data.c_str());
 
     // Return updated min, mean, and max values
-    tsd->min_mean_max(min, mean, max);
+    tsd->min_mean_max(min, mean, max, begin);
 
-    switch (reinterpret_cast<intptr_t>(arg)) {
+    switch (reinterpret_cast<intptr_t>(handler->user_data(Handler::f_read))) {
         case TSD_MIN_HANDLER:
-            return String(min);
+            data = String(min); break;
         case TSD_AVG_HANDLER:
-            return String(mean);
+            data = String(mean); break;
         case TSD_MAX_HANDLER:
-            return String(max);
+            data = String(max); break;
         case TSD_STD_HANDLER:
-            return String(tsd->standard_deviation(mean));
+            data = String(tsd->standard_deviation(mean)); break;
         case TSD_PERC_00_HANDLER:
-            return String(min);
+            data = String(min); break;
         case TSD_PERC_01_HANDLER:
-            return String(tsd->percentile(1));
+            data = String(tsd->percentile(1)); break;
         case TSD_PERC_05_HANDLER:
-            return String(tsd->percentile(5));
+            data = String(tsd->percentile(5)); break;
         case TSD_PERC_10_HANDLER:
-            return String(tsd->percentile(10));
+            data = String(tsd->percentile(10)); break;
         case TSD_PERC_25_HANDLER:
-            return String(tsd->percentile(25));
+            data = String(tsd->percentile(25)); break;
         case TSD_MED_HANDLER:
-            return String(tsd->percentile(50));
+            data = String(tsd->percentile(50)); break;
         case TSD_PERC_75_HANDLER:
-            return String(tsd->percentile(75));
+            data = String(tsd->percentile(75)); break;
         case TSD_PERC_90_HANDLER:
-            return String(tsd->percentile(90));
+            data = String(tsd->percentile(90)); break;
         case TSD_PERC_95_HANDLER:
-            return String(tsd->percentile(95));
+            data = String(tsd->percentile(95)); break;
         case TSD_PERC_99_HANDLER:
-            return String(tsd->percentile(99));
+            data = String(tsd->percentile(99)); break;
         case TSD_PERC_100_HANDLER:
-            return String(max);
-        case TSD_LAST_SEEN: {
-            return String(tsd->last_value_seen());
+            data = String(max); break;
+        case TSD_LAST_SEEN:
+            data = String(tsd->last_value_seen()); break;
+        case TSD_CURRENT_INDEX: {
+            const int32_t last_vector_index = static_cast<const int32_t>(tsd->_nd.value() - 1);
+            data = String(last_vector_index); break;
         }
         case TSD_DUMP_HANDLER: {
             StringAccum s;
             for (size_t i = 0; i < tsd->_nd; ++i)
                 s << i << ": " << String(tsd->_delays[i]) << "\n";
-            return s.take_string();
+            data = s.take_string(); break;
         }
         default:
-            return String("Unknown read handler for TimestampDiff");
+            data = String("Unknown read handler for TimestampDiff"); break;
     }
+    return 0;
 }
 
 void TimestampDiff::add_handlers()
 {
-    add_read_handler("average", read_handler, TSD_AVG_HANDLER);
-    add_read_handler("min", read_handler, TSD_MIN_HANDLER);
-    add_read_handler("max", read_handler, TSD_MAX_HANDLER);
-    add_read_handler("stddev", read_handler, TSD_STD_HANDLER);
-    add_read_handler("perc00", read_handler, TSD_PERC_00_HANDLER);
-    add_read_handler("perc01", read_handler, TSD_PERC_01_HANDLER);
-    add_read_handler("perc05", read_handler, TSD_PERC_05_HANDLER);
-    add_read_handler("perc10", read_handler, TSD_PERC_10_HANDLER);
-    add_read_handler("perc25", read_handler, TSD_PERC_25_HANDLER);
-    add_read_handler("median", read_handler, TSD_MED_HANDLER);
-    add_read_handler("perc75", read_handler, TSD_PERC_75_HANDLER);
-    add_read_handler("perc90", read_handler, TSD_PERC_90_HANDLER);
-    add_read_handler("perc95", read_handler, TSD_PERC_95_HANDLER);
-    add_read_handler("perc99", read_handler, TSD_PERC_99_HANDLER);
-    add_read_handler("perc100", read_handler, TSD_PERC_100_HANDLER);
-    add_read_handler("last", read_handler, TSD_LAST_SEEN);
-    add_read_handler("dump", read_handler, TSD_DUMP_HANDLER);
+    set_handler("average", Handler::f_read | Handler::f_read_param, handler, TSD_AVG_HANDLER, 0);
+    set_handler("min", Handler::f_read | Handler::f_read_param, handler, TSD_MIN_HANDLER, 0);
+    set_handler("max", Handler::f_read | Handler::f_read_param, handler, TSD_MAX_HANDLER, 0);
+    set_handler("stddev", Handler::f_read | Handler::f_read_param, handler, TSD_STD_HANDLER, 0);
+    set_handler("perc00", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_00_HANDLER, 0);
+    set_handler("perc01", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_01_HANDLER, 0);
+    set_handler("perc05", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_05_HANDLER, 0);
+    set_handler("perc10", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_10_HANDLER, 0);
+    set_handler("perc25", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_25_HANDLER, 0);
+    set_handler("median", Handler::f_read | Handler::f_read_param, handler, TSD_MED_HANDLER, 0);
+    set_handler("perc75", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_75_HANDLER, 0);
+    set_handler("perc90", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_90_HANDLER, 0);
+    set_handler("perc95", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_95_HANDLER, 0);
+    set_handler("perc99", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_99_HANDLER, 0);
+    set_handler("perc100", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_100_HANDLER, 0);
+    set_handler("index", Handler::f_read, handler, TSD_CURRENT_INDEX, 0);
+    set_handler("last", Handler::f_read, handler, TSD_LAST_SEEN, 0);
+    set_handler("dump", Handler::f_read, handler, TSD_DUMP_HANDLER, 0);
 }
 
 inline int TimestampDiff::smaction(Packet *p)
@@ -225,12 +236,12 @@ RecordTimestamp* TimestampDiff::get_recordtimestamp_instance()
 }
 
 void
-TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max)
+TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t begin)
 {
     const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
     double sum = 0.0;
 
-    for (uint32_t i=0; i<current_vector_length; i++) {
+    for (uint32_t i=begin; i<current_vector_length; i++) {
         unsigned delay = _delays[i];
 
         sum += static_cast<double>(delay);
@@ -255,12 +266,12 @@ TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max)
 }
 
 double
-TimestampDiff::standard_deviation(const double mean)
+TimestampDiff::standard_deviation(const double mean, uint32_t begin)
 {
     const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
     double var = 0.0;
 
-    for (uint32_t i=0; i<current_vector_length; i++) {
+    for (uint32_t i=begin; i<current_vector_length; i++) {
         var += pow(_delays[i] - mean, 2);
     }
 
@@ -273,7 +284,7 @@ TimestampDiff::standard_deviation(const double mean)
 }
 
 double
-TimestampDiff::percentile(const double percent)
+TimestampDiff::percentile(const double percent, uint32_t begin)
 {
     double perc = 0;
 
@@ -283,23 +294,23 @@ TimestampDiff::percentile(const double percent)
     size_t idx = (percent * current_vector_length) / 100;
 
     // Implies empty vector, no percentile.
-    if ((idx == 0) && (current_vector_length == 0)) {
+    if ((idx == begin) && (current_vector_length == begin)) {
         return perc;
     }
     // Implies that user asked for the 0 percetile (i.e., min).
-    else if ((idx == 0) && (current_vector_length > 0)) {
+    else if ((idx == begin) && (current_vector_length > begin)) {
         std::sort(_delays.begin(), _delays.end());
-        perc = static_cast<double>(_delays[0]);
+        perc = static_cast<double>(_delays[begin]);
         return perc;
     // Implies that user asked for the 100 percetile (i.e., max).
     } else if (idx == current_vector_length) {
-        std::sort(_delays.begin(), _delays.end());
+        std::sort(_delays.begin() + begin, _delays.end());
         perc = static_cast<double>(_delays[current_vector_length - 1]);
         return perc;
     }
 
-    auto nth = _delays.begin() + idx;
-    std::nth_element(_delays.begin(), nth, _delays.begin() + current_vector_length);
+    auto nth = _delays.begin() + begin + idx;
+    std::nth_element(_delays.begin() + begin, nth, _delays.begin() + current_vector_length);
     perc = static_cast<double>(*nth);
 
     return perc;
