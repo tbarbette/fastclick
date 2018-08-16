@@ -82,6 +82,7 @@ CLICK_USING_DECLS
 #define SOCKET_OPT              318
 #define THREADS_AFF_OPT         319
 #define DPDK_OPT                320
+#define SIMTICK_OPT             321
 
 static const Clp_Option options[] = {
     { "allow-reconfigure", 'R', ALLOW_RECONFIG_OPT, 0, Clp_Negate },
@@ -97,6 +98,7 @@ static const Clp_Option options[] = {
     { "quit", 'q', QUIT_OPT, 0, 0 },
     { "simtime", 0, SIMTIME_OPT, Clp_ValDouble, Clp_Optional },
     { "simulation-time", 0, SIMTIME_OPT, Clp_ValDouble, Clp_Optional },
+    { "simtick", 0, SIMTICK_OPT, Clp_ValUnsignedLong, Clp_Mandatory },
     { "threads", 'j', THREADS_OPT, Clp_ValInt, 0 },
     { "cpu", 0, THREADS_AFF_OPT, Clp_ValInt, Clp_Optional | Clp_Negate },
     { "affinity", 'a', THREADS_AFF_OPT, Clp_ValInt, Clp_Optional | Clp_Negate },
@@ -153,6 +155,7 @@ Options:\n\
   -t, --time                    Print information on how long driver took.\n\
   -w, --no-warnings             Do not print warnings.\n\
       --simtime                 Run in simulation time.\n\
+      --simtick                 Amount of subseconds to add in warp time.\n\
   -C, --clickpath PATH          Use PATH for CLICKPATH.\n\
       --help                    Print this message and exit.\n\
   -v, --version                 Print version number and exit.\n\
@@ -667,7 +670,10 @@ main(int argc, char **argv)
         Timestamp::warp_set_now(simbegin, simbegin);
         break;
     }
-
+    case SIMTICK_OPT: {
+        Timestamp::set_warp_tick(clp->val.ul);
+        break;
+    }
      case CLICKPATH_OPT:
       set_clickpath(clp->vstr);
       break;

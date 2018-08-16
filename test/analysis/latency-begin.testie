@@ -2,9 +2,10 @@
 RecordTimestamp ecosystem
 
 Test the RecordTimestamp ecosystem (TimestampDiff, NumberPacket, ...)
+For some reason with clang the simtime is different.
 
 %script
-click -j 1 CONFIG
+click -j 1 CONFIG --simtime --simtick 1000
 
 %file IN1
 !data ts_sec len payload
@@ -35,14 +36,14 @@ FromIPSummaryDump(IN1, STOP false)
 -> Discard;
 
 double :: Script(TYPE PASSIVE, write du.delay 5)
-finished :: Script(TYPE PASSIVE, read diff.average, read diff.average 0, read diff.average 5, read counter.count, stop)
+finished :: Script(TYPE PASSIVE, wait 100ms, read diff.average, read diff.average 0, read diff.average 5, read counter.count, stop)
 
 %expect stderr
 diff.average:
-{{[0-9]{1,3}[.][0-9]+}}
+{{22.8|20.8}}
 diff.average:
-{{[0-9]{1,3}[.][0-9]+}}
+{{22.8|20.8}}
 diff.average:
-{{[0-9]{1,3}[.][0-9]+}}
+{{35|33}}
 counter.count:
 10
