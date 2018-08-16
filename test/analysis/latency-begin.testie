@@ -39,10 +39,10 @@ finished :: Script(TYPE PASSIVE, read diff.average, read diff.average 0, read di
 
 %expect stderr
 diff.average:
-{{[0-9]{1,2}[.][0-9]+}}
+{{[0-9]{1,3}[.][0-9]+}}
 diff.average:
-{{[0-9]{1,2}[.][0-9]+}}
+{{[0-9]{1,3}[.][0-9]+}}
 diff.average:
-{{[0-9]{1,2}[.][0-9]+}}
+{{[0-9]{1,3}[.][0-9]+}}
 counter.count:
 10
