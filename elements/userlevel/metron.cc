@@ -2272,7 +2272,7 @@ ServiceChain::generate_configuration()
                 int cpu_id = get_cpu_map(j);
                 String ename = generate_configuration_slave_fd_name(i, cpu_id, "TD");
                 int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
-                newconf += ename + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);";
+                newconf += ename + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99, MAXQUEUES 1);";
 
                 newconf += "slaveTD" + is + "["+js+"] -> " + ename + ";";
             }
