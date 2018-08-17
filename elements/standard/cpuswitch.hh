@@ -26,6 +26,9 @@ class CPUSwitch : public BatchElement {
   const char *port_count() const		{ return "1/1-"; }
   const char *processing() const		{ return PUSH; }
 
+
+  bool get_spawning_threads(Bitvector& b, bool, int port) override;
+
   void push(int port, Packet *);
 #if HAVE_BATCH
   void push_batch(int port, PacketBatch *);

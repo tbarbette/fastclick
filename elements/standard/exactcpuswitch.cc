@@ -31,11 +31,14 @@ ExactCPUSwitch::initialize(ErrorHandler* errh) {
     Bitvector b = get_passing_threads();
     if (b.weight() == 0)
         return errh->error("No threads passing by this element...?");
-    map.resize(b.weight());
+    map.resize(b.size());
     int j = 0;
-    for (int i = 0; i < b.weight(); i++) {
-        if (b[i] == false) continue;
-        map[j] = i % noutputs();
+    for (int i = 0; i < b.size(); i++) {
+        if (b[i] == false) {
+            map[i] = -1;
+            continue;
+        }
+        map[i] = j % noutputs();
         ++j;
     }
     return 0;
@@ -44,16 +47,16 @@ ExactCPUSwitch::initialize(ErrorHandler* errh) {
 
 int
 ExactCPUSwitch::thread_configure(ThreadReconfigurationStage, ErrorHandler* errh) {
-    return 0;
+    return initialize(errh);
 }
 
 bool
 ExactCPUSwitch::get_spawning_threads(Bitvector& b, bool isoutput, int port) {
     if (port == -1 || !isoutput)
         return true;
-    b.clear();
-    for (unsigned i = 0; i < map.size(); i++) {
-        if (port == map[i]) {
+
+    for (unsigned i = 0; i < (unsigned)map.size(); i++) {
+        if ((unsigned)port % noutputs() == map[i]) {
             b[i] = true;
         }
     }
