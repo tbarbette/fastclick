@@ -9,7 +9,7 @@ CLICK_DECLS
 /*
 =c
 
-IPRewriterMap([LABEL, I<KEYWORDS>])
+IPRewriterMap(BEGIN, END)
 
 =s ip
 
