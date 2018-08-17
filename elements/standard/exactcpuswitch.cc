@@ -26,11 +26,9 @@ ExactCPUSwitch::~ExactCPUSwitch()
 {
 }
 
-int
-ExactCPUSwitch::initialize(ErrorHandler* errh) {
-    Bitvector b = get_passing_threads();
-    if (b.weight() == 0)
-        return errh->error("No threads passing by this element...?");
+void
+ExactCPUSwitch::update_map() {
+    Bitvector b = get_pushing_threads();
     map.resize(b.size());
     int j = 0;
     for (int i = 0; i < b.size(); i++) {
@@ -41,17 +39,25 @@ ExactCPUSwitch::initialize(ErrorHandler* errh) {
         map[i] = j % noutputs();
         ++j;
     }
+}
+
+int
+ExactCPUSwitch::initialize(ErrorHandler* errh) {
+    update_map();
     return 0;
 }
 
 
 int
 ExactCPUSwitch::thread_configure(ThreadReconfigurationStage, ErrorHandler* errh) {
-    return initialize(errh);
+    update_map();
+    return 0;
 }
 
 bool
 ExactCPUSwitch::get_spawning_threads(Bitvector& b, bool isoutput, int port) {
+    if (map.size() == 0)
+        update_map();
     if (port == -1 || !isoutput)
         return true;
 

@@ -31,6 +31,8 @@ class ExactCPUSwitch : public BatchElement {
   int thread_configure(ThreadReconfigurationStage, ErrorHandler*) override CLICK_COLD;
   bool get_spawning_threads(Bitvector& b, bool, int) override;
 
+  void update_map();
+
   void push(int port, Packet *);
 #if HAVE_BATCH
   void push_batch(int port, PacketBatch *);

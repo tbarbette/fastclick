@@ -1758,6 +1758,16 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
     return b;
 }
 
+Bitvector Element::get_pushing_threads() {
+    Bitvector b(master()->nthreads());
+    bool is_fullpush;
+    for (int i = 0; i < ninputs(); i++) {
+        if (input_is_push(i))
+            b |= get_passing_threads(false, i, this, is_fullpush, 0);
+    }
+    return b;
+}
+
 Bitvector Element::get_passing_threads(Element*, int level) {
     bool is_fullpush = true;
     Bitvector b(master()->nthreads());

@@ -100,6 +100,7 @@ int
 Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh) {
     if (stage != THREAD_RECONFIGURE_PRE && stage != THREAD_INITIALIZE)
         return 0;
+    //Only handle first-configuration and pre-reconfiguration
 
     bool fp;
     Bitvector passing = get_passing_threads(false, -1, this, fp);
