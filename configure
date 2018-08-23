@@ -837,7 +837,6 @@ enable_aqm
 enable_ethernet
 enable_etherswitch
 enable_grid
-enable_gtp
 enable_icmp
 enable_ip
 enable_ip6
@@ -851,6 +850,7 @@ enable_standard
 enable_tcpudp
 enable_test
 enable_threads
+enable_tunnel
 enable_wifi
 enable_experimental
 enable_skip_elements
@@ -1542,7 +1542,6 @@ Optional Features:
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
   --enable-grid           include Grid elements (see FAQ)
-  --enable-gtp            include GTP elements
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
   --enable-ip6            include IPv6 elements
@@ -1556,6 +1555,7 @@ Optional Features:
   --disable-tcpudp        do not include TCP and UDP elements
   --disable-test          do not include regression test elements
   --disable-threads       do not include thread management elements
+  --enable-tunnel         include tunnelling elements
   --enable-wifi           include wifi elements and support
   --enable-experimental   enable experimental elements in normal groups
   --enable-skip-elements=ELTS
@@ -7401,17 +7401,6 @@ if test "x$enable_grid" = xyes; then
     :
 
 fi
-# Check whether --enable-gtp was given.
-if test "${enable_gtp+set}" = set; then :
-  enableval=$enable_gtp;
-else
-  enable_gtp=NO
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_gtp" = xNO -o "x$enable_gtp" = x \) && enable_gtp=yes
-if test "x$enable_gtp" = xyes; then
-    :
-
-fi
 # Check whether --enable-icmp was given.
 if test "${enable_icmp+set}" = set; then :
   enableval=$enable_icmp;
@@ -7555,6 +7544,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_threads" = xNO -o "x$enable_threads" = x \) && enable_threads=yes
 if test "x$enable_threads" = xyes; then
+    :
+
+fi
+# Check whether --enable-tunnel was given.
+if test "${enable_tunnel+set}" = set; then :
+  enableval=$enable_tunnel;
+else
+  enable_tunnel=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_tunnel" = xNO -o "x$enable_tunnel" = x \) && enable_tunnel=yes
+if test "x$enable_tunnel" = xyes; then
     :
 
 fi
