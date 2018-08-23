@@ -296,14 +296,13 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
         String fd_mode = fd->get_device()->get_mode_str();
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-/*        if ((_rx_mode == FLOW) && (fd_mode != FlowDirector::FLOW_DIR_MODE)) {
-            return errh->error(
-                "Metron RX_MODE %s requires FromDPDKDevice(%s) MODE %s",
-                rx_filter_type_enum_to_str(_rx_mode).c_str(),
-                nic.value().get_name().c_str(),
-                FlowDirector::FLOW_DIR_MODE.c_str()
+        // TODO: What if none of the NICs is in Metron mode?
+        if ((_rx_mode == FLOW) && (fd_mode != FlowDirector::FLOW_DIR_MODE)) {
+            errh->warning(
+                "[NIC %s] Configured in MODE %s, which is incompatible with Metron's accurate dispatching",
+                nic.value().get_name().c_str(), fd_mode.c_str()
             );
-        }*/
+        }
     #endif
 
         // TODO: What if _rx_mode = VLAN and fd_mode = vmdq?
@@ -331,11 +330,13 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
 }
 
 void
-Metron::discover_timer(Timer *timer, void *user_data) {
-    Metron* m = (Metron*)user_data;
+Metron::discover_timer(Timer *timer, void *user_data)
+{
+    Metron *m = (Metron *) user_data;
     m->_discovered = m->discover();
-    if (!m->_discovered)
+    if (!m->_discovered) {
         m->_discover_timer.schedule_after_sec(m->DISCOVERY_WAIT);
+    }
 }
 
 /**
@@ -758,9 +759,7 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
             );
             if (r == 0 || (r == -1 && errno != EAGAIN && errno != EINTR)) {
                 if (r == -1) {
-                    errh->message(
-                        "%s while writing configuration", strerror(errno)
-                    );
+                    errh->message("%s while writing configuration", strerror(errno));
                 }
                 break;
             } else if (r != -1) {
@@ -899,6 +898,7 @@ Metron::write_handler(
             return m->delete_controller_from_json((const String &) data);
         }
         case h_delete_rules: {
+            click_chatter("Metron controller requested rule deletion");
             return ServiceChain::delete_rule_batch_from_json(data, m, errh);
         }
         default: {
@@ -1820,6 +1820,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
     }
 
     uint32_t rules_nb = 0;
+    uint32_t inserted_rules_nb = 0;
 
     Json jnics = j.get("nics");
     int inic = 0;
@@ -1846,18 +1847,19 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 
                 // Update the data plane with this new rule
                 if (!nic->update_rule(core_id, rule_id, rule)) {
-                    return errh->error(
+                    errh->error(
                         "Unable to insert rule %ld into NIC %s mapped to CPU core %d",
                         rule_id, nic_name.c_str(), core_id
                     );
+                } else {
+                    inserted_rules_nb++;
                 }
+                rules_nb++;
 
                 // Add this tag to the list of tags of this NIC
                 if (!this->rx_filter->has_tag_value(inic, core_id)) {
                     this->rx_filter->set_tag_value(inic, core_id, String(core_id));
                 }
-
-                rules_nb++;
             }
         }
 
@@ -1867,8 +1869,8 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 
     if (rules_nb > 0) {
         click_chatter(
-            "Successfully installed %" PRIu32 " NIC rules for service chain %s",
-            rules_nb, get_id().c_str()
+            "Successfully installed %" PRIu32 "/%" PRIu32  " NIC rules for service chain %s",
+            inserted_rules_nb, rules_nb, get_id().c_str()
         );
     }
 
@@ -2009,6 +2011,8 @@ ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandl
     int status = SUCCESS;
     int current = 0;
     int pos = -1;
+    int deleted_rules = 0;
+    int all_rules = 0;
     while ((pos = rule_ids.find_left(',')) >= 0) {
         // Keep a rule ID until the comma
         const String rule_id_str = rule_ids.substring(0, pos);
@@ -2016,6 +2020,10 @@ ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandl
 
         // Delete this rule
         status += delete_rule_from_json(rule_id, m, errh);
+        if (status == SUCCESS) {
+            deleted_rules++;
+        }
+        all_rules++;
 
         // Advance to the next rule ID
         current = pos + 1;
@@ -2024,7 +2032,15 @@ ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandl
 
     // Last (or single) rule left
     const long rule_id = atol(rule_ids.c_str());
-    return status + delete_rule_from_json(rule_id, m, errh);
+    status += delete_rule_from_json(rule_id, m, errh);
+    if (status == SUCCESS) {
+        deleted_rules++;
+    }
+    all_rules++;
+
+    click_chatter("Successfully deleted %d/%d NIC rules", deleted_rules, all_rules);
+
+    return status;
 }
 
 /**
