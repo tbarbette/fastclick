@@ -51,6 +51,17 @@ SetIPAddress::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+SetIPAddress::simple_action_batch(PacketBatch *batch)
+{
+    FOR_EACH_PACKET(batch, p) {
+        p->set_anno_u32(_anno, _ip.addr());
+    }
+    return batch;
+}
+#endif
+
 void
 SetIPAddress::add_handlers()
 {
