@@ -398,7 +398,7 @@ CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 ../lib/librte_parse_$(RTE_VERSION)/%.o: ${PARSE_PATH}.sentinel
 	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
 
-librte_parse.a: $(PARSE_OBJS) ../lib/librte_parse_$(RTE_VERSION) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o
+librte_parse.a: $(PARSE_OBJS) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o
 	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $(PARSE_OBJS) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o,AR librte_parse.a)
 	$(call verbose_cmd,$(RANLIB),RANLIB,librte_parse.a)
 
