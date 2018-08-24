@@ -335,7 +335,7 @@ $(debug LIBRTE_PARSE=YES)
 RTE_VERSION=$(RTE_VER_YEAR).$(RTE_VER_MONTH).$(RTE_VER_MINOR)
 PARSE_PATH=../lib/librte_parse_$(RTE_VERSION)/
 
-../lib/librte_parse_$(RTE_VERSION):
+${PARSE_PATH}.sentinel:
 	# Create the necessary folders for librte_parse
 	mkdir -p $(PARSE_PATH)
 	mkdir -p test-pmd
@@ -348,6 +348,7 @@ PARSE_PATH=../lib/librte_parse_$(RTE_VERSION)/
 	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
 	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c
 	sed -i '/printf("Flow rule #\%u created\\n", pf->id);/d' $(PARSE_PATH)/config.c
+	sed -i '/printf("Flow rule #\%u destroyed\\n", pf->id);/d' $(PARSE_PATH)/config.c
 	sed -i '120i uint8_t port_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
 	sed -i '121i uint8_t rxring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
 	sed -i '122i uint8_t txring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
@@ -357,8 +358,9 @@ PARSE_PATH=../lib/librte_parse_$(RTE_VERSION)/
 	sed -i '/extern\senum\sdcb_queue_mapping_mode\sdcb_q_mapping\;/d' $(PARSE_PATH)/testpmd.h
 	sed -i 's/struct\snvgre_encap_conf\snvgre_encap_conf;/extern struct nvgre_encap_conf nvgre_encap_conf;/g' $(PARSE_PATH)/testpmd.h
 	sed -i 's/struct\svxlan_encap_conf\svxlan_encap_conf;/extern struct vxlan_encap_conf vxlan_encap_conf;/g' $(PARSE_PATH)/testpmd.h
+	touch $(PARSE_PATH)/.sentinel
 
-test-pmd/%.o: ../lib/librte_parse_$(RTE_VERSION)
+test-pmd/%.o: ${PARSE_PATH}.sentinel
 	cp -u $(RTE_SDK)/app/test-pmd/$*.c $(PARSE_PATH)
 	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
 
@@ -393,7 +395,7 @@ endif
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 
-../lib/librte_parse_$(RTE_VERSION)/%.o: ../lib/librte_parse_$(RTE_VERSION)
+../lib/librte_parse_$(RTE_VERSION)/%.o: ${PARSE_PATH}.sentinel
 	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
 
 librte_parse.a: $(PARSE_OBJS) ../lib/librte_parse_$(RTE_VERSION) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o
