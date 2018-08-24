@@ -1,6 +1,9 @@
 %info
 Test CPU switch threadvector
 
+%require
+click-buildtool provides umultithread
+
 %script
 click -j 4 CONFIG
 
