@@ -624,6 +624,8 @@ class Metron : public Element {
 
         ServiceChain *find_service_chain_by_id(String id);
         int instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh);
+
+        void kill_service_chain(ServiceChain *sc);
         int remove_service_chain(ServiceChain *sc, ErrorHandler *errh);
 
         bool get_monitoring_mode() {

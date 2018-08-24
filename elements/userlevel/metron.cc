@@ -383,6 +383,31 @@ Metron::initialize(ErrorHandler *errh)
     }
 #endif
 
+    click_chatter("Checking the ability to run slaves...");
+
+    ServiceChain sc(this);
+    sc.id = "slaveTest";
+    sc.config_type = CLICK;
+    sc.config = "";
+    sc._used_cpus_nb = 1;
+    sc._max_cpus_nb = 1;
+    sc._autoscale = false;
+    sc._cpus.resize(1);
+    sc._cpu_load.resize(1, 0);
+    sc._cpu_queue.resize(1, 0);
+    for (int i = 0; i < sc.get_nics_nb(); i++) {
+        NIC *nic = sc.get_nic_by_index(i);
+        sc._nics.push_back(nic);
+    }
+    sc.nic_stats.resize(sc._nics.size() * 1, ServiceChain::Stat());
+    sc.rx_filter = new ServiceChain::RxFilter(&sc);
+
+    if (run_service_chain(&sc, errh) != 0)
+        return -1;
+
+    kill_service_chain(&sc);
+    click_chatter("Service chain removed. Continuing initialization...");
+
     _timer.initialize(this);
     _timer.move_thread(_core_id);
     _timer.schedule_after_msec(_load_timer);
@@ -792,6 +817,17 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
     return ERROR;
 }
 
+
+/**
+ * Kill the service chain without cleaning any ressource
+ */
+void
+Metron::kill_service_chain(ServiceChain *sc) {
+    _command_lock.acquire();
+    sc->control_send_command("WRITE stop");
+    _command_lock.release();
+}
+
 /**
  * Stop and remove a chain from the internal list, then unassign CPUs.
  * It is the responsibility of the caller to delete the chain.
@@ -806,9 +842,7 @@ Metron::remove_service_chain(ServiceChain *sc, ErrorHandler *errh)
             sc->get_id().c_str()
         );
     }
-    _command_lock.acquire();
-    sc->control_send_command("WRITE stop");
-    _command_lock.release();
+    kill_service_chain(sc);
     unassign_cpus(sc);
     if (!_scs.remove(sc->get_id())) {
         return ERROR;
