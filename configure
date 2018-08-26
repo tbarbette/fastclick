@@ -15564,17 +15564,17 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 
-echo "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json"
-
 if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json" = yesyesyes; then
     have_metron="yes"
+    feedback="no"
 else
     have_metron="no"
+    feedback="Metron requires to configure with --enable-json and install libmicrohttpd."
 fi
 
 echo "
 
-Configuration:
+Configuration Summary:
     C Compiler:                  ${CC}
     C++ Compiler:                ${CXX}
 
@@ -15584,4 +15584,11 @@ Configuration:
     Metron support:              ${have_metron}
 "
 
-echo "Now type make to build FastClick..."
+if test "$feedback" != no; then
+    echo ""
+    echo $feedback
+    echo "To install libmicrohttpd in a Debian-based OS, type: sudo apt install libmicrohttpd-dev"
+    echo ""
+else
+    echo "Now type make to build FastClick..."
+fi
