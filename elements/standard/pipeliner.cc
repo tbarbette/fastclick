@@ -113,9 +113,8 @@ Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh
             storage.get_value(i).initialize(_ring_size);
     }
 
-
-    for (int i = 0; i < passing.weight(); i++) {
-        if (passing[i]) {
+    for (int i = 0; i < passing.size(); i++) {
+        if (passing[i] && i != _home_thread_id) {
             click_chatter("%p{element} : Pipeline from %d to %d", this, i, _home_thread_id);
             WritablePacket::pool_transfer(_home_thread_id,i);
         }
