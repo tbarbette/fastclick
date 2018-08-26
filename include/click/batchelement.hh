@@ -131,5 +131,127 @@ class BatchElement : public Element { public:
 };
 #endif
 
+/**
+ * Batch helper element.
+ *
+ * Implement a (batch-compatible) element only by providing a function that
+ *  returns a port index. It uses CRTP so no virtual call is added.
+ *
+ * Inherited class must implement int classify(Packet* p);
+ *
+ * The inherited element cannot be extended further because of CRTP !
+ */
+
+template <typename T>
+class ClassifyElement : public BatchElement { public:
+    void push(int, Packet *p)
+    {
+        checked_output_push(static_cast<T&>(*this).classify(p),p);
+    }
+
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *batch)
+    {
+          CLASSIFY_EACH_PACKET(noutputs() + 1, static_cast<T&>(*this).classify,batch,checked_output_push_batch);
+    }
+#endif
+
+    private:
+        ClassifyElement(){};
+        friend T;
+};
+
+
+/**
+ * Batch helper element.
+ *
+ * Allows the user to simply implement simple_action and simple_action_batch
+ *  but relying on CRTP instead of virtual, removing one virtual call.
+ *
+ * The inherited element cannot be extended further because of CRTP !
+ */
+template <typename T>
+class SimpleBatchElement : public BatchElement { public:
+
+    void push(int port, Packet *p)
+    {
+        p = T::simple_action(p);
+        if (p)
+		output(port).push(p);
+    }
+
+    Packet* pull(int port)
+    {
+        Packet *p = input(port).pull();
+        if (p)
+		p = T::simple_action(p);
+        return p;
+    }
+
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch* head) override final {
+        head = T::simple_action_batch(head);
+        if (head)
+            output_push_batch(port,head);
+    }
+
+    PacketBatch* pull_batch(int port, unsigned max) override final {
+        PacketBatch* head = input_pull_batch(port,max);
+        if (head) {
+            head = T::simple_action_batch(head);
+        }
+        return head;
+    }
+#endif
+
+    private:
+        SimpleBatchElement(){};
+        friend T;
+
+};
+
+
+/**
+ * Batch helper element
+ *
+ * Allows to make an element that implements only simple_action, and
+ * which does not call pull or push batch compatible by making it
+ * extend SimpleElement<T> where T is the element itself.
+ * It also avoids the virtual call, so actually a vanilla element using
+ * this version even without batching will run faster.
+ *
+ * The inherited element cannot be extended further because of CRTP !
+ */
+template <typename T>
+class SimpleElement : public SimpleBatchElement<T> { public:
+
+    inline PacketBatch* _sm_action_batch(int port, PacketBatch* batch) {
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(T::simple_action, batch, [](Packet*){});
+        return batch;
+    }
+
+#if HAVE_BATCH
+    void push_batch(int port, PacketBatch* head) override final {
+        head = _sm_action_batch(head);
+        if (head)
+            SimpleBatchElement<T>::output(port).push_batch(head);
+    }
+
+    PacketBatch* pull_batch(int port, unsigned max) override final {
+        PacketBatch* head = SimpleBatchElement<T>::input_pull_batch(port,max);
+        if (head) {
+            head = _sm_action_batch(head);
+        }
+        return head;
+    }
+#endif
+
+    private:
+        SimpleElement(){};
+        friend T;
+
+};
+
+
 CLICK_ENDDECLS
 #endif
