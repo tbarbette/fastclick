@@ -5,7 +5,7 @@ Metron
 
 About
 ----
-Metron's control plane is based on the [ONOS SDN controller][onos], which we extended with [southbound drivers][metron-driver] that allow Metron to monitor and configure commodity servers.
+Metron's control plane is based on the [ONOS SDN controller][onos], which we extended with [southbound drivers][metron-driver] that allow Metron to monitor and configure important resources (i.e., CPU cores and network cards) on commodity servers.
 Metron's data plane extends [FastClick][fastclick] (see the FastClick paper [here][fastclick-paper]), which in turn uses [DPDK][dpdk] as a high performance network I/O subsystem.
 The Metron data plane uses two features available in modern network interface cards (NICs) to achieve accurate dispatching of input traffic to the desired CPU core(s), thus eliminating inter-core communication.
 Specifically, the Metron data plane uses either:
@@ -20,6 +20,13 @@ For compatibility reasons with regular FastClick deployments, the Metron data pl
 
 This repository provides the source code of Metron's high performance data plane.
 Metron controller's code has not been released yet, only the [southbound driver][metron-driver] is made public.
+
+
+Metron Protocol
+----
+Metron agents are managed by the Metron controller via a REST-based protocol.
+The management operations include resource advertisement, monitoring, service chain deployment, service chain reconfiguration (i.e., for load balancing), service chain removal, as well as NIC rule management operations (i.e., NIC rule installation, reporting, and deletion).
+The protocol that prescribes this communication between the Metron controller and Metron agents is detailed in [this][metron-tutorial] tutorial.
 
 
 Configure
@@ -78,7 +85,7 @@ If you use Metron in your work, please cite our [paper][metron-paper]:
 
 Getting help
 ----
-Use the github [issue tracker][fastclick-issue-tracker] or contact tom.barbette at ulg.ac.be and/or
+Use the github [issue tracker][fastclick-issue-tracker] or contact barbette at kth.se and/or
 georgios.katsikas at ri.se if you encounter any problems with Metron.
 
 Please do not report Metron-related or FastClick-related problems on the vanilla Click mailing list.
@@ -90,6 +97,7 @@ The FastClick README is available [here][fastclick-readme], while the original C
 [metron-nsdi-page]: https://www.usenix.org/conference/nsdi18/presentation/katsikas
 [onos]: https://onosproject.org/
 [metron-driver]: https://github.com/opennetworkinglab/onos/tree/master/drivers/server
+[metron-tutorial]: https://wiki.onosproject.org/display/ONOS/Server+Device+Driver+Tutorial
 [fastclick]: https://github.com/tbarbette/fastclick
 [fastclick-paper]: https://orbi.uliege.be/bitstream/2268/181954/1/userspaceio.pdf
 [dpdk]: https://dpdk.org/
