@@ -6527,7 +6527,7 @@ else
         as_fn_error $? "
 =========================================
 
---enable-auto-batch only accepts jump, list or catch as modes
+--enable-auto-batch only accepts jump, list or port as modes
 
 =========================================" "$LINENO" 5
 fi
@@ -6811,6 +6811,88 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
     $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
 
 fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing PAPI_start_counters" >&5
+$as_echo_n "checking for library containing PAPI_start_counters... " >&6; }
+if ${ac_cv_search_PAPI_start_counters+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char PAPI_start_counters ();
+int
+main ()
+{
+return PAPI_start_counters ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' papi; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_search_PAPI_start_counters=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_PAPI_start_counters+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_PAPI_start_counters+:} false; then :
+
+else
+  ac_cv_search_PAPI_start_counters=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_PAPI_start_counters" >&5
+$as_echo "$ac_cv_search_PAPI_start_counters" >&6; }
+ac_res=$ac_cv_search_PAPI_start_counters
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  ac_have_papi=yes
+else
+  ac_have_papi=no
+fi
+
+for ac_header in papi.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "papi.h" "ac_cv_header_papi_h" "$ac_includes_default"
+if test "x$ac_cv_header_papi_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PAPI_H 1
+_ACEOF
+ ac_have_papi_h=yes
+else
+  ac_have_papi_h=no
+fi
+
+done
+
+if test "x$ac_have_papi_h" = "xyesyes"; then
+    $as_echo "#define HAVE_PAPI 1" >>confdefs.h
+
+    have_papi=yes
+else
+    have_papi=no
+fi
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing curl_global_init" >&5
 $as_echo_n "checking for library containing curl_global_init... " >&6; }
@@ -10975,6 +11057,8 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_working_pcap_h" >&5
 $as_echo "$ac_cv_working_pcap_h" >&6; }
         test "$ac_cv_working_pcap_h" != yes && HAVE_PCAP=
+    else
+        HAVE_PCAP=no
     fi
 
     if test "$HAVE_PCAP" = yes; then
@@ -14177,6 +14261,10 @@ if test "x$HAVE_NUMA" = xyes; then
     provisions="$provisions numa"
 fi
 
+if test "x$have_papi" = xyes; then
+    provisions="$provisions papi"
+fi
+
 if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
 fi
@@ -15580,8 +15668,11 @@ Configuration Summary:
 
     DPDK support:                ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
+    PCAP support:                ${HAVE_PCAP}
 
     Metron support:              ${have_metron}
+
+    PAPI support:                ${have_papi}
 "
 
 if test "$feedback" != no; then

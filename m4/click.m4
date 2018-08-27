@@ -357,6 +357,8 @@ AC_DEFUN([CLICK_CHECK_LIBPCAP], [
             AC_PREPROC_IFELSE([AC_LANG_SOURCE([[#include <pcap.h>]])], ac_cv_working_pcap_h=yes, ac_cv_working_pcap_h=no)
             CPPFLAGS="$saveflags"])
         test "$ac_cv_working_pcap_h" != yes && HAVE_PCAP=
+    else
+        HAVE_PCAP=no
     fi
 
     if test "$HAVE_PCAP" = yes; then
