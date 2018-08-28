@@ -11,6 +11,13 @@
 #include <click/packet_anno.hh>
 #include <click/routervisitor.hh>
 
+/**
+ * This file utilizes the Curiously Recurring Template Pattern (CRTP)
+ * to provide an effective way of implementing helper template in Click
+ * without adding costly virtual calls.
+ */
+
+
 CLICK_DECLS
 
 #ifdef HAVE_BATCH
@@ -137,21 +144,20 @@ class BatchElement : public Element { public:
  * Implement a (batch-compatible) element only by providing a function that
  *  returns a port index. It uses CRTP so no virtual call is added.
  *
- * Inherited class must implement int classify(Packet* p);
+ * Inherited class must implement inline int classify(Packet* p);
  *
  * The inherited element cannot be extended further because of CRTP !
  */
 
 template <typename T>
 class ClassifyElement : public BatchElement { public:
-    void push(int, Packet *p)
-    {
+
+    void push(int, Packet *p) {
         checked_output_push(static_cast<T&>(*this).classify(p),p);
     }
 
 #if HAVE_BATCH
-    void push_batch(int, PacketBatch *batch)
-    {
+    void push_batch(int, PacketBatch *batch) {
           CLASSIFY_EACH_PACKET(noutputs() + 1, static_cast<T&>(*this).classify,batch,checked_output_push_batch);
     }
 #endif
@@ -173,18 +179,16 @@ class ClassifyElement : public BatchElement { public:
 template <typename T>
 class SimpleBatchElement : public BatchElement { public:
 
-    void push(int port, Packet *p)
-    {
+    void push(int port, Packet *p) override final {
         p = T::simple_action(p);
         if (p)
-		output(port).push(p);
+            output(port).push(p);
     }
 
-    Packet* pull(int port)
-    {
+    Packet* pull(int port) override final {
         Packet *p = input(port).pull();
         if (p)
-		p = T::simple_action(p);
+            p = T::simple_action(p);
         return p;
     }
 
@@ -197,9 +201,8 @@ class SimpleBatchElement : public BatchElement { public:
 
     PacketBatch* pull_batch(int port, unsigned max) override final {
         PacketBatch* head = input_pull_batch(port,max);
-        if (head) {
+        if (head)
             head = T::simple_action_batch(head);
-        }
         return head;
     }
 #endif
@@ -212,7 +215,7 @@ class SimpleBatchElement : public BatchElement { public:
 
 
 /**
- * Batch helper element
+ * Batch helper element.
  *
  * Allows to make an element that implements only simple_action, and
  * which does not call pull or push batch compatible by making it
@@ -239,9 +242,8 @@ class SimpleElement : public SimpleBatchElement<T> { public:
 
     PacketBatch* pull_batch(int port, unsigned max) override final {
         PacketBatch* head = SimpleBatchElement<T>::input_pull_batch(port,max);
-        if (head) {
+        if (head)
             head = _sm_action_batch(head);
-        }
         return head;
     }
 #endif

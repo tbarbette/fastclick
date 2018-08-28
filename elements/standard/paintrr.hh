@@ -36,7 +36,7 @@ class PaintRR : public ClassifyElement<PaintRR> { public:
 
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
 
-    int classify(Packet *p);
+    inline int classify(Packet *p);
 
   private:
 
