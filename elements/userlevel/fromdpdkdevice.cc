@@ -299,6 +299,8 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
+        case h_nombufs:
+            return String(stats.rx_nombuf);
         default:
             return "<unknown>";
     }
@@ -428,6 +430,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
+    add_read_handler("nombufs",statistics_handler, h_nombufs);
 
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
