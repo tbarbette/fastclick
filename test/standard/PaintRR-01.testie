@@ -1,0 +1,28 @@
+%info
+Test PaintRR
+
+%script
+click CONFIG
+
+%file IN
+!data aggregate
+0
+1
+2
+3
+4
+
+%file CONFIG
+
+FromIPSummaryDump(IN, STOP true)
+-> pr :: PaintRR(20);
+
+pr[0] -> Print(1) -> Discard;
+pr[1] -> Print(2) -> Discard;
+pr[2] -> Print(3) -> Discard;
+%expect stderr
+1:    0
+2:    0
+3:    0
+1:    0
+2:    0
