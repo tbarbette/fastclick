@@ -105,14 +105,14 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int r;
     if (n_queues == -1) {
-	if (firstqueue == -1) {
-		firstqueue = 0;
-		// With DPDK we'll take as many queues as available threads
-		r = configure_rx(numa_node, 1, maxqueues, errh);
-	} else {
-		// If a queue number is set, user probably wants only one queue
-		r = configure_rx(numa_node, 1, 1, errh);
-	}
+    if (firstqueue == -1) {
+        firstqueue = 0;
+        // With DPDK we'll take as many queues as available threads
+        r = configure_rx(numa_node, 1, maxqueues, errh);
+    } else {
+        // If a queue number is set, user probably wants only one queue
+        r = configure_rx(numa_node, 1, 1, errh);
+    }
     } else {
         if (firstqueue == -1)
             firstqueue = 0;
@@ -656,7 +656,7 @@ int FromDPDKDevice::xstats_handler(
             }
             return -1;
         }
-	return 0;
+        return 0;
     #else
         input = "unsupported with DPDK < 16.07";
         return -1;
