@@ -656,6 +656,7 @@ int FromDPDKDevice::xstats_handler(
             }
             return -1;
         }
+	return 0;
     #else
         input = "unsupported with DPDK < 16.07";
         return -1;
