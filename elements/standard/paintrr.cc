@@ -1,9 +1,8 @@
 /*
- * paintswitch.{cc,hh} -- element routes packets to one output of several
- * Douglas S. J. De Couto.  Based on Switch element by Eddie Kohler
+ * paintrr.{cc,hh} -- element routes packets to one output of several
+ * Tom Barbette.  Based on PaintSwitch element
  *
- * Copyright (c) 2002 MIT
- * Copyright (c) 2008 Meraki, Inc.
+ * Copyright (c) 2018 KTH Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -38,7 +37,7 @@ PaintRR::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int
+inline int
 PaintRR::classify(Packet *p)
 {
     return static_cast<int>(p->anno_u8(_anno)) % noutputs();
