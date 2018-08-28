@@ -717,10 +717,8 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
     }
 
     if (_on_scale) {
-            if (_on_scale) {
-                _on_scale.set_value(String(sc->get_used_cpu_nb()) + " start " + sc->get_id());
-                _on_scale.call_write();
-            }
+        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " start " + sc->get_id());
+        _on_scale.call_write();
     }
 
 
