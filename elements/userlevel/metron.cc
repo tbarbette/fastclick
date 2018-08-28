@@ -190,6 +190,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("VERBOSE",           _verbose)
         .read    ("FAIL",              _fail)
         .read    ("LOAD_TIMER",        _load_timer)
+        .read    ("ON_SCALE", HandlerCallArg(HandlerCall::writable), _on_scale)
         .complete() < 0)
         return ERROR;
 
@@ -353,6 +354,11 @@ Metron::initialize(ErrorHandler *errh)
         uuid = uuid.substring(0, uuid.find_left("\n"));
         _id = (!uuid || uuid.empty())? _id + "00000000-0000-0000-0000-000000000001" : _id + uuid;
     }
+
+
+    if (_on_scale)
+        if (_on_scale.initialize_write(this, errh) < 0)
+            return -1;
 
     _cpu_map.resize(get_cpus_nb(), 0);
 
@@ -709,6 +715,14 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
         }
         return ERROR;
     }
+
+    if (_on_scale) {
+            if (_on_scale) {
+                _on_scale.set_value(String(sc->get_used_cpu_nb()) + " start " + sc->get_id());
+                _on_scale.call_write();
+            }
+    }
+
 
     sc->status = ServiceChain::SC_OK;
     _scs.insert(sc->get_id(), sc);
@@ -2125,6 +2139,11 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
             String response = "";
             if (new_cpus_nb == get_used_cpu_nb())
                 continue;
+
+            if (m->_on_scale) {
+                m->_on_scale.set_value(String(new_cpus_nb) + " scale " + get_id());
+                m->_on_scale.call_write();
+            }
 
             // Scale up
             if (new_cpus_nb > get_used_cpu_nb()) {

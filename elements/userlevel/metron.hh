@@ -9,7 +9,7 @@
 #include <click/notifier.hh>
 #include <click/hashmap.hh>
 #include <click/dpdkdevice.hh>
-
+#include <click/handlercall.hh>
 #include "../json/json.hh"
 
 /**
@@ -54,6 +54,7 @@ typedef enum { RX_FILTER_TYPES } RxFilterType;
 
 
 CLICK_DECLS
+
 
 /*
 =c
@@ -711,6 +712,9 @@ class Metron : public Element {
 
         /* Timer for load computation (msec) */
         unsigned _load_timer;
+
+        /* Handler to call on scaling of some service chains */
+        HandlerCall _on_scale;
 
         /* Private methods */
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
