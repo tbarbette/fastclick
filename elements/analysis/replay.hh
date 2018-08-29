@@ -28,6 +28,11 @@ protected:
     void add_handlers();
     void set_active(bool active);
 
+    void reset_time() {
+        _lastsent_p = _queue_current->timestamp_anno();
+        _lastsent_real = Timestamp::now_steady();
+    }
+
     struct s_input {
 		NotifierSignal signal;
     };
@@ -175,16 +180,14 @@ inline bool ReplayBase::load_packets() {
         }
         _loaded = true;
         _queue_current = _queue_head;
-        _lastsent_p = _queue_head->timestamp_anno();
-        _lastsent_real = Timestamp::now_steady();
+        reset_time();
         return true;
 }
 
 inline void ReplayBase::check_end_loop(Task* t) {
     if (unlikely(!_queue_current)) {
         _queue_current = _queue_head;
-        _lastsent_p = _queue_head->timestamp_anno();
-        _lastsent_real = Timestamp::now_steady();
+        reset_time();
         if (_stop > 0)
             _stop--;
         if (_stop == 0) {
