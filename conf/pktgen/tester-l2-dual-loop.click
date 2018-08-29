@@ -1,11 +1,12 @@
 /**
- * Repeat l2-dual for every 4 byte packet size up to 1500
+ * Repeat tester-l2-dual for every 4 byte packet size up to 1500.
+ * Read first tester-l2-dual for comprehension.
  */
 
 define($block true)
 
-replay0 :: MultiReplayUnqueue(STOP $S, QUICK_CLONE 0, ACTIVE false)
-replay1 :: MultiReplayUnqueue(STOP $S, QUICK_CLONE 0, ACTIVE false)
+replay0 :: ReplayUnqueue(STOP $S, QUICK_CLONE 0, ACTIVE false)
+replay1 :: ReplayUnqueue(STOP $S, QUICK_CLONE 0, ACTIVE false)
 
 DPDKInfo(65536)
 
