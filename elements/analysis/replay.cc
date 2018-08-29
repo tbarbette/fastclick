@@ -67,6 +67,7 @@ void ReplayBase::cleanup(CleanupStage) {
 void
 ReplayBase::set_active(bool active) {
     _active = active;
+    reset_time();
     if (active)
         _task.reschedule();
     else
