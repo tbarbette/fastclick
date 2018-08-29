@@ -282,8 +282,7 @@ ReplayUnqueue::run_task(Task* task)
                 Timestamp tdiff = p->timestamp_anno() - _lastsent_p;
                 long diff = tdiff.usecval();
                 long rdiff;
-                while (diff - (rdiff = (now - _lastsent_real).usecval() * _timing) > min_timing) {
-
+                while (diff - (rdiff = ((long)(now - _lastsent_real).usecval() * _timing)) > min_timing) {
 #if HAVE_BATCH
                     if (head) {
                         output_push_batch(0,head->make_tail(last,c));
