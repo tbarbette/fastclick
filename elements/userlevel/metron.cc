@@ -389,6 +389,24 @@ Metron::initialize(ErrorHandler *errh)
     }
 #endif
 
+    // if (try_slaves(errh) != SUCCESS) {
+    //     return ERROR;
+    // }
+
+    _timer.initialize(this);
+    _timer.move_thread(_core_id);
+    _timer.schedule_after_msec(_load_timer);
+
+    return SUCCESS;
+}
+
+/**
+ * Checks whether the system is able to deploy
+ * Metron slaves (i.e., secondary DPDK processes).
+ */
+int
+Metron::try_slaves(ErrorHandler *errh)
+{
     click_chatter("Checking the ability to run slaves...");
 
     ServiceChain sc(this);
@@ -408,15 +426,16 @@ Metron::initialize(ErrorHandler *errh)
     sc.nic_stats.resize(sc._nics.size() * 1, ServiceChain::Stat());
     sc.rx_filter = new ServiceChain::RxFilter(&sc);
 
-    if (run_service_chain(&sc, errh) != 0)
-        return -1;
+    if (run_service_chain(&sc, errh) != 0) {
+        return errh->error(
+            "Unable to deploy Metron slaves: "
+            "Please verify the compatibility of your NIC with DPDK secondary processes."
+        );
+    }
 
     kill_service_chain(&sc);
-    click_chatter("Service chain removed. Continuing initialization...");
 
-    _timer.initialize(this);
-    _timer.move_thread(_core_id);
-    _timer.schedule_after_msec(_load_timer);
+    click_chatter("Continuing initialization...");
 
     return SUCCESS;
 }
@@ -834,7 +853,8 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
  * Kill the service chain without cleaning any ressource
  */
 void
-Metron::kill_service_chain(ServiceChain *sc) {
+Metron::kill_service_chain(ServiceChain *sc)
+{
     _command_lock.acquire();
     sc->control_send_command("WRITE stop");
     _command_lock.release();

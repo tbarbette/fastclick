@@ -717,6 +717,7 @@ class Metron : public Element {
         HandlerCall _on_scale;
 
         /* Private methods */
+        int try_slaves(ErrorHandler *errh);
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int confirm_nic_mode(ErrorHandler *errh);
 
