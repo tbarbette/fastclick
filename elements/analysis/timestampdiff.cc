@@ -112,19 +112,20 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
     if (data != "")
         begin = atoi(data.c_str());
 
-    // Return updated min, mean, and max values
-    tsd->min_mean_max(min, mean, max, begin);
-
     switch (reinterpret_cast<intptr_t>(handler->user_data(Handler::f_read))) {
         case TSD_MIN_HANDLER:
+            tsd->min_mean_max(min, mean, max, begin);
             data = String(min); break;
         case TSD_AVG_HANDLER:
+            tsd->min_mean_max(min, mean, max, begin);
             data = String(mean); break;
         case TSD_MAX_HANDLER:
+            tsd->min_mean_max(min, mean, max, begin);
             data = String(max); break;
         case TSD_STD_HANDLER:
             data = String(tsd->standard_deviation(mean)); break;
         case TSD_PERC_00_HANDLER:
+            tsd->min_mean_max(min, mean, max, begin);
             data = String(min); break;
         case TSD_PERC_01_HANDLER:
             data = String(tsd->percentile(1)); break;
@@ -145,6 +146,7 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
         case TSD_PERC_99_HANDLER:
             data = String(tsd->percentile(99)); break;
         case TSD_PERC_100_HANDLER:
+            tsd->min_mean_max(min, mean, max, begin);
             data = String(max); break;
         case TSD_LAST_SEEN:
             data = String(tsd->last_value_seen()); break;
