@@ -48,6 +48,9 @@ protected:
     bool _use_signal;
     bool _verbose;
     bool _freeonterminate;
+    unsigned _timing;
+    Timestamp _lastsent_p;
+    Timestamp _lastsent_real;
 };
 
 
@@ -172,12 +175,16 @@ inline bool ReplayBase::load_packets() {
         }
         _loaded = true;
         _queue_current = _queue_head;
+        _lastsent_p = _queue_head->timestamp_anno();
+        _lastsent_real = Timestamp::now_steady();
         return true;
 }
 
 inline void ReplayBase::check_end_loop(Task* t) {
     if (unlikely(!_queue_current)) {
         _queue_current = _queue_head;
+        _lastsent_p = _queue_head->timestamp_anno();
+        _lastsent_real = Timestamp::now_steady();
         if (_stop > 0)
             _stop--;
         if (_stop == 0) {
