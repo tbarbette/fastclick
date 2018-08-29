@@ -48,6 +48,9 @@ protected:
     bool _use_signal;
     bool _verbose;
     bool _freeonterminate;
+    unsigned _timing;
+    Timestamp _lastsent_p;
+    Timestamp _lastsent_real;
 };
 
 
@@ -172,6 +175,7 @@ inline bool ReplayBase::load_packets() {
         }
         _loaded = true;
         _queue_current = _queue_head;
+        _lastsent_real = Timestamp::now_steady();
         return true;
 }
 
