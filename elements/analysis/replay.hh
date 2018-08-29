@@ -175,7 +175,7 @@ inline bool ReplayBase::load_packets() {
         }
         _loaded = true;
         _queue_current = _queue_head;
-        _lastsent_real = Timestamp::now_steady();
+        _lastsent_p = _queue_head->timestamp_anno();
         return true;
 }
 
