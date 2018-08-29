@@ -213,7 +213,7 @@ private:
                               const Handler *handler, ErrorHandler *errh);
     enum {
         h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
-        h_ipackets, h_ibytes, h_imissed, h_ierrors,
+        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
         h_active,
         h_xstats, h_queue_count,
         h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
