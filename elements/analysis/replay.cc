@@ -277,7 +277,7 @@ ReplayUnqueue::run_task(Task* task)
             //If timing is activated, wait for the amount of time or resched
             if (_timing > 0) {
                 const unsigned min_timing = 1; //Amount of us between packets to ignore and sent right away
-                const unsigned min_sched = 100; //Amount of us that leads to rescheduling
+                const unsigned min_sched = 10; //Amount of us that leads to rescheduling
 
                 Timestamp tdiff = p->timestamp_anno() - _lastsent_p;
                 long diff = tdiff.usecval();
@@ -296,8 +296,6 @@ ReplayUnqueue::run_task(Task* task)
                     now = Timestamp::now_steady();
                     click_relax_fence();
                 }
-                _lastsent_p = p->timestamp_anno();
-                _lastsent_real = now;
             }
 
             _queue_current = p->next();
