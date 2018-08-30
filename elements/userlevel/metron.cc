@@ -542,6 +542,7 @@ Metron::run_timer(Timer *t)
     while (sci != _scs.end()) {
         ServiceChain *sc = sci.value();
         float max_cpu_load = 0;
+        int max_cpu_load_index = 0;
         float total_cpu_load = 0;
 
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
@@ -599,6 +600,7 @@ Metron::run_timer(Timer *t)
             total_cpu_load += cpu_load;
             if (cpu_load > max_cpu_load) {
                max_cpu_load = cpu_load;
+               max_cpu_load_index = j;
             }
         }
 
@@ -614,6 +616,8 @@ Metron::run_timer(Timer *t)
             sc->_total_cpu_load = sc->_total_cpu_load * (1 - total_alpha) +
                                   (total_cpu_load / sc->get_used_cpu_nb()) * (total_alpha);
         }
+        sc->_max_cpu_load = max_cpu_load;
+        sc->_max_cpu_load_index = max_cpu_load_index;
         sn++;
         sci++;
 
@@ -709,6 +713,14 @@ Metron::find_service_chain_by_id(String id)
     return _scs.find(id);
 }
 
+void
+Metron::call_scale(ServiceChain* sc, String event) {
+    if (_on_scale) {
+        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " "+event+" " + sc->get_id() + " " + sc->_total_cpu_load + " " +sc->_max_cpu_load+ " "+sc->_max_cpu_load_index);
+        _on_scale.call_write();
+    }
+}
+
 /**
  * Assign CPUs to a service chain and run it.
  * If successful, the chain is added to the internal chains list.
@@ -735,11 +747,7 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
         return ERROR;
     }
 
-    if (_on_scale) {
-        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " start " + sc->get_id());
-        _on_scale.call_write();
-    }
-
+    call_scale(sc, "start");
 
     sc->status = ServiceChain::SC_OK;
     _scs.insert(sc->get_id(), sc);
@@ -2158,10 +2166,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
             if (new_cpus_nb == get_used_cpu_nb())
                 continue;
 
-            if (m->_on_scale) {
-                m->_on_scale.set_value(String(new_cpus_nb) + " scale " + get_id());
-                m->_on_scale.call_write();
-            }
+            m->call_scale(this, "scale");
 
             // Scale up
             if (new_cpus_nb > get_used_cpu_nb()) {

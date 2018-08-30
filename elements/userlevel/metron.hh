@@ -563,6 +563,8 @@ class ServiceChain {
         Vector<float> _cpu_load;
         Vector<int> _cpu_queue;
         float _total_cpu_load;
+        float _max_cpu_load;
+        int _max_cpu_load_index;
         int _socket;
         int _pid;
         struct timing_stats _timing_stats;
@@ -628,6 +630,7 @@ class Metron : public Element {
 
         void kill_service_chain(ServiceChain *sc);
         int remove_service_chain(ServiceChain *sc, ErrorHandler *errh);
+        void call_scale(ServiceChain*, String);
 
         bool get_monitoring_mode() {
             return _monitoring_mode;
