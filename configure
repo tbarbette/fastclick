@@ -705,11 +705,13 @@ minios_dir
 xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
+DPDK_INCLUDES
 USE_DPDK
 RTE_VER_MONTH
 RTE_VER_YEAR
 RTE_VER_MINOR
 RTE_VER_MAJOR
+RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
 PTHREAD_LIBS
@@ -6527,7 +6529,7 @@ else
         as_fn_error $? "
 =========================================
 
---enable-auto-batch only accepts jump, list or catch as modes
+--enable-auto-batch only accepts jump, list or port as modes
 
 =========================================" "$LINENO" 5
 fi
@@ -6882,6 +6884,15 @@ fi
 
 
 if test "x$enable_dpdk" = "xyes"; then
+
+    if test -z "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
+    fi
+
+    if test -z "$RTE_LIBNAME"; then
+        RTE_LIBNAME=dpdk
+    fi
+
     if test "x$enable_user_multithread" != "xyes"; then
         as_fn_error $? "
 =========================================
@@ -6890,19 +6901,20 @@ if test "x$enable_dpdk" = "xyes"; then
 
 =========================================" "$LINENO" 5
     fi
-    if test ! -f "$RTE_SDK/$RTE_TARGET/include/rte_eal.h"; then
+    if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
 =========================================
 
-Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for DPDK.
+Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi
-    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+
 
 
 
@@ -6916,7 +6928,10 @@ Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
+
     USE_DPDK=yes
+
+    DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
 
 fi
 

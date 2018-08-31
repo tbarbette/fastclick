@@ -53,7 +53,7 @@ class CycleCountAccum : public Element { public:
 
     void add_handlers() CLICK_COLD;
 
-    inline void smaction(Packet *);
+    inline void rmaction(Packet *);
     void push(int, Packet *p);
     Packet *pull(int);
 

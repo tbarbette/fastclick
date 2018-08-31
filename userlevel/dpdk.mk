@@ -14,8 +14,6 @@ DPDK_OLD_LDFLAGS := $(LDFLAGS)
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-DPDK_INCLUDE=$(RTE_SDK)/include
-
 # default path for libs
 _LDLIBS-y += -L$(RTE_SDK_BIN)/lib
 
@@ -309,8 +307,6 @@ DPDK_LIBS := $(shell echo $(DPDK_LIBS) | \
     awk '{for (i = 1; i <= NF; i++) { if (!seen[$$i]++) print $$i }}')
 
 RTE_SDK_FULL=`readlink -f $RTE_SDK`
-
-CFLAGS += -I$(DPDK_INCLUDE)
 
 # Merge and rename flags
 CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)

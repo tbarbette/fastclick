@@ -31,7 +31,7 @@ CycleCountAccum::~CycleCountAccum()
 }
 
 inline void
-CycleCountAccum::smaction(Packet *p)
+CycleCountAccum::rmaction(Packet *p)
 {
     if (PERFCTR_ANNO(p)) {
 	_accum += click_get_cycles() - PERFCTR_ANNO(p);
@@ -46,7 +46,7 @@ CycleCountAccum::smaction(Packet *p)
 void
 CycleCountAccum::push(int, Packet *p)
 {
-    smaction(p);
+    rmaction(p);
     output(0).push(p);
 }
 
@@ -55,7 +55,7 @@ CycleCountAccum::pull(int)
 {
     Packet *p = input(0).pull();
     if (p)
-	smaction(p);
+	rmaction(p);
     return p;
 }
 
