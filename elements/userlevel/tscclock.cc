@@ -25,7 +25,7 @@
 CLICK_DECLS
 
 TSCClock::TSCClock() :
-_verbose(1), _install(true),_allow_offset(false),_correction_timer(this), _sync_timers(0), _nowait(false), _base(0)
+_verbose(1), _install(true), _nowait(false), _allow_offset(false),_correction_timer(this), _sync_timers(0), _base(0)
 {
 
 }
@@ -380,7 +380,7 @@ void TSCClock::run_timer(Timer* timer) {
                 return;
             }
 
-            if (_synchronize_ok == master()->nthreads()) {
+            if (_synchronize_ok == (unsigned)master()->nthreads()) {
                 //Start using the clock !
                 _phase = RUNNING;
                 if (_verbose)
