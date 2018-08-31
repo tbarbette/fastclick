@@ -716,7 +716,7 @@ Metron::find_service_chain_by_id(String id)
 void
 Metron::call_scale(ServiceChain* sc, String event) {
     if (_on_scale) {
-        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " "+event+" " + sc->get_id() + " " + sc->_total_cpu_load + " " +sc->_max_cpu_load+ " "+sc->_max_cpu_load_index);
+        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " "+event+" " + sc->get_id() + " " + String(sc->_total_cpu_load) + " " +String(sc->_max_cpu_load)+ " "+String(sc->_max_cpu_load_index));
         _on_scale.call_write();
     }
 }
