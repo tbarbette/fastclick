@@ -245,10 +245,22 @@ Specializer::create_class(SpecializedClass &spc)
     (CxxFunction("output_push", false, "inline void",
 		 (_noutputs[eindex] ? "(int i, Packet *p) const" : "(int, Packet *p) const"),
 		 "", ""));
+#if HAVE_BATCH
+  new_cxxc->defun
+    (CxxFunction("output_push_batch", false, "inline void",
+		 (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBacth *p) const"),
+		 "", ""));
+#endif
   new_cxxc->defun
     (CxxFunction("output_push_checked", false, "inline void",
 		 (_noutputs[eindex] ? "(int i, Packet *p) const" : "(int, Packet *p) const"),
 		 "", ""));
+#if HAVE_BATCH
+  new_cxxc->defun
+    (CxxFunction("output_push_batch_checked", false, "inline void",
+		 (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBatch *p) const"),
+		 "", ""));
+#endif
   new_cxxc->defun
     (CxxFunction("never_devirtualize", true, "void", "()", "", ""));
 
@@ -261,8 +273,16 @@ Specializer::create_class(SpecializedClass &spc)
     String noutputs_repl = String(_noutputs[eindex]);
     String push_pat = compile_pattern("output(#0).push(#1)");
     String push_repl = "output_push(#0, #1)";
+#if HAVE_BATCH
+    String push_batch_pat = compile_pattern("output(#0).push_batch(#1)");
+    String push_batch_repl = "output_push_batch(#0, #1)";
+#endif
     String checked_push_pat = compile_pattern("checked_output_push(#0, #1)");
     String checked_push_repl = compile_pattern("output_push_checked(#0, #1)");
+#if HAVE_BATCH
+    String checked_push_batch_pat = compile_pattern("checked_output_push_batch(#0, #1)");
+    String checked_push_batch_repl = compile_pattern("output_push_batch_checked(#0, #1)");
+#endif
     String pull_pat = compile_pattern("input(#0).pull()");
     String pull_repl = "input_pull(#0)";
     bool any_checked_push = false, any_push = false, any_pull = false;
@@ -276,15 +296,31 @@ Specializer::create_class(SpecializedClass &spc)
 	while (new_fn.replace_expr(noutputs_pat, noutputs_repl)) ;
 	while (new_fn.replace_expr(push_pat, push_repl))
 	  any_push = true;
+#if HAVE_BATCH
+	while (new_fn.replace_expr(push_batch_pat, push_batch_repl))
+	  any_push = true;
+#endif
 	while (new_fn.replace_expr(checked_push_pat, checked_push_repl))
 	  any_checked_push = true;
+#if HAVE_BATCH
+	while (new_fn.replace_expr(checked_push_batch_pat, checked_push_batch_repl))
+	  any_checked_push = true;
+#endif
 	while (new_fn.replace_expr(pull_pat, pull_repl))
 	  any_pull = true;
       }
-    if (!any_push && !any_checked_push)
+    if (!any_push && !any_checked_push) {
       new_cxxc->find("output_push")->kill();
-    if (!any_checked_push)
+#if HAVE_BATCH
+      new_cxxc->find("output_push_batch")->kill();
+#endif
+    }
+    if (!any_checked_push) {
       new_cxxc->find("output_push_checked")->kill();
+#if HAVE_BATCH
+      new_cxxc->find("output_push_batch_checked")->kill();
+#endif
+    }
     if (!any_pull)
       new_cxxc->find("input_pull")->kill();
   }
@@ -298,6 +334,11 @@ Specializer::do_simple_action(SpecializedClass &spc)
   CxxFunction *simple_action = spc.cxxc->find("simple_action");
   assert(simple_action);
   simple_action->kill();
+#if HAVE_BATCH
+  CxxFunction *simple_action_batch = spc.cxxc->find("simple_action_batch");
+  assert(simple_action_batch);
+  simple_action_batch->kill();
+#endif
 
   spc.cxxc->defun
     (CxxFunction("smaction", false, "inline Packet *", simple_action->args(),
@@ -310,6 +351,18 @@ Specializer::do_simple_action(SpecializedClass &spc)
     (CxxFunction("pull", false, "Packet *", "(int port)",
 		 "\n  Packet *p = input_pull(port);\n\
   return (p ? smaction(p) : 0);\n", ""));
+
+#if HAVE_BATCH
+  spc.cxxc->defun
+    (CxxFunction("smactionbatch", false, "inline PacketBatch *", simple_action_batch->args(),
+		 simple_action_batch->body(), simple_action_batch->clean_body()));
+
+  spc.cxxc->defun
+    (CxxFunction("push_batch", false, "void", "(int port, PacketBatch *batch)",
+		 "\n  if (PacketBatch *nbatch = smactionbatch(batch))\n\
+    output_push_batch(port, nbatch);\n", ""));
+  spc.cxxc->find("output_push_batch")->unkill();
+#endif
   spc.cxxc->find("output_push")->unkill();
   spc.cxxc->find("input_pull")->unkill();
 }
@@ -414,6 +467,48 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 	sa << "\n  p->kill();\n";
     cxxc->find("output_push_checked")->set_body(sa.take_string());
   }
+
+#if HAVE_BATCH
+  // create output_push_batch
+  if (cxxc->find("output_push_batch")->alive()) {
+    StringAccum sa;
+    Vector<int> range1, range2;
+    for (int i = 0; i < _noutputs[eindex]; i++)
+      if (i > 0 && output_class[i] == output_class[i-1]
+	  && output_port[i] == output_port[i-1])
+	range2.back() = i;
+      else {
+	range1.push_back(i);
+	range2.push_back(i);
+      }
+    for (int i = 0; i < range1.size(); i++) {
+      int r1 = range1[i], r2 = range2[i];
+      if (!output_class[r1])
+	continue;
+      sa << "\n  ";
+      if (r1 == r2)
+	sa << "if (i == " << r1 << ") ";
+      else
+	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
+      sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
+	 << output_class[r1] << "::push_batch(" << output_port[r1]
+	 << ", p); return; }";
+    }
+    if (_noutputs[eindex])
+	sa << "\n  output(i).push_batch(p);\n";
+    else
+	sa << "\n  assert(0);\n";
+    cxxc->find("output_push_batch")->set_body(sa.take_string());
+
+    sa.clear();
+    if (_noutputs[eindex])
+	sa << "\n  if (i < " << _noutputs[eindex] << ")\n"
+	   << "    output_push_batch(i, p);\n  else\n    p->kill();\n";
+    else
+	sa << "\n  p->kill();\n";
+    cxxc->find("output_push_batch_checked")->set_body(sa.take_string());
+  }
+#endif
 }
 
 void

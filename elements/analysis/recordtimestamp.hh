@@ -67,7 +67,7 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    inline void smaction(Packet *);
+    inline void rmaction(Packet *);
     void push(int, Packet *);
 #if HAVE_BATCH
     void push_batch(int, PacketBatch *);

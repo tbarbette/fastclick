@@ -242,6 +242,15 @@ AC_ARG_ENABLE([dpdk-packet],
     [:], [enable_dpdk_packet=no])
 
 if test "x$enable_dpdk" = "xyes"; then
+
+    if test -z "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
+    fi
+
+    if test -z "$RTE_LIBNAME"; then
+        RTE_LIBNAME=dpdk
+    fi
+
     if test "x$enable_user_multithread" != "xyes"; then
         AC_MSG_ERROR([
 =========================================
@@ -250,28 +259,31 @@ if test "x$enable_dpdk" = "xyes"; then
 
 =========================================])
     fi
-    if test ! -f "$RTE_SDK/$RTE_TARGET/include/rte_eal.h"; then
+    if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         AC_MSG_ERROR([
 =========================================
 
-Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for DPDK.
+Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
 =========================================])
     fi
-    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
 
     AC_SUBST(RTE_SDK)
     AC_SUBST(RTE_TARGET)
+    AC_SUBST(RTE_SDK_BIN)
     AC_SUBST(RTE_VER_MAJOR, $rte_ver_major)
     AC_SUBST(RTE_VER_MINOR, $rte_ver_minor)
     AC_SUBST(RTE_VER_YEAR, $rte_ver_year)
     AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
     AC_DEFINE([HAVE_DPDK])
+
     AC_SUBST(USE_DPDK, yes)
+    AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
 fi
 
 if test "x$enable_dpdk_pool" = "xyes"; then

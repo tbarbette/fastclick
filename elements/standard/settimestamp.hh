@@ -52,7 +52,7 @@ class SetTimestamp : public BatchElement { public:
     bool _per_batch;
     Timestamp _tv;
 
-    inline void smaction(Packet *);
+    inline void rmaction(Packet *);
 
 };
 

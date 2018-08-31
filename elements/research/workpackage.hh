@@ -28,7 +28,7 @@ class WorkPackage : public BatchElement { public:
     const char *processing() const    { return PUSH; }
 
     int configure(Vector<String>&, ErrorHandler*) override;
-    void smaction(Packet* p, int&);
+    void rmaction(Packet* p, int&);
     void push(int, Packet* p) override;
 #if HAVE_BATCH
     void push_batch(int, PacketBatch* batch) override;

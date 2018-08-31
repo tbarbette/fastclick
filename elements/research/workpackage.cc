@@ -56,7 +56,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-WorkPackage::smaction(Packet* p, int &n_data) {
+WorkPackage::rmaction(Packet* p, int &n_data) {
     uint32_t sum = 0;
     unsigned r = 0;
     for (int i = 0; i < _w; i ++) {
@@ -81,7 +81,7 @@ void
 WorkPackage::push_batch(int port, PacketBatch* batch) {
     int n_data = 0;
     FOR_EACH_PACKET(batch, p)
-            smaction(p,n_data);
+            rmaction(p,n_data);
     output_push_batch(port, batch);
 }
 #endif
@@ -89,7 +89,7 @@ WorkPackage::push_batch(int port, PacketBatch* batch) {
 void
 WorkPackage::push(int port, Packet* p) {
     int n_data = 0;
-    smaction(p,n_data);
+    rmaction(p,n_data);
     output_push(port, p);
 }
 
