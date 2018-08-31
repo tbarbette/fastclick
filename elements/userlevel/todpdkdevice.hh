@@ -25,7 +25,7 @@ Sends packets to a network device with DPDK port identifier PORT. As DPDK does
 not support polling, this element only supports PUSH. It will build a batch of
 packets inside an internal queue (limited to IQUEUE packets) until it reaches
 BURST packets, and then send the batch to DPDK. If the batch is not ready after
-TIMEOUT ms, it will flush the batch of packets even if it doesn't cointain
+TIMEOUT us, it will flush the batch of packets even if it doesn't cointain
 BURST packets.
 
 Arguments:

@@ -197,15 +197,18 @@ inline void ToDPDKDevice::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue) {
                 if (_timeout <= 0)
                     iqueue.timeout.schedule_now();
                 else
-                    iqueue.timeout.schedule_after_msec(_timeout);
+                    iqueue.timeout.schedule_after(Timestamp::make_usec(_timeout));
             }
         }
     }
 }
 
-void ToDPDKDevice::run_timer(Timer *)
+void ToDPDKDevice::run_timer(Timer *t)
 {
-    flush_internal_tx_queue(_iqueues.get());
+    DPDKDevice::TXInternalQueue &iqueue = _iqueues.get();
+    flush_internal_tx_queue(iqueue);
+    if (iqueue.nr_pending > 0)
+        t->reschedule_after(Timestamp::make_usec(max(1,_timeout)));
 }
 
 /* Flush as much as possible packets from a given internal queue to the DPDK
