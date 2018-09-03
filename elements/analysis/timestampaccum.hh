@@ -2,6 +2,7 @@
 #ifndef CLICK_TIMESTAMPACCUM_HH
 #define CLICK_TIMESTAMPACCUM_HH
 #include <click/batchelement.hh>
+#include <click/straccum.hh>
 CLICK_DECLS
 
 /*
@@ -38,7 +39,7 @@ class TimestampAccumBase : public BatchElement { public:
     ~TimestampAccumBase() CLICK_COLD;
 
     const char *class_name() const	{ return "TimestampAccum"; }
-    const char *port_count() const	{ return PORTS_1_1; }
+    const char *port_count() const	{ return "1-/="; }
 
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
@@ -49,14 +50,16 @@ class TimestampAccumBase : public BatchElement { public:
     void push_batch(int, PacketBatch *);
 #endif
 
-  private:
+  protected:
 
     struct State {
-        State() : usec_accum(0), count(0) {
+        State() : usec_accum(0), count(0), usec_min(UINT32_MAX), usec_max(0) {
 
         };
-        double usec_accum;
+        uint32_t usec_accum;
         uint64_t count;
+        uint32_t usec_min;
+        uint32_t usec_max;
     };
     T<State> _state;
 
@@ -66,7 +69,15 @@ class TimestampAccumBase : public BatchElement { public:
 };
 
 typedef TimestampAccumBase<not_per_thread> TimestampAccum;
-typedef TimestampAccumBase<per_thread> TimestampAccumMP;
+
+class TimestampAccumMP : public TimestampAccumBase<per_thread> { public:
+
+    const char *class_name() const  { return "TimestampAccumMP"; }
+
+    void add_handlers() CLICK_COLD;
+    static String read_handler(Element *, void *) CLICK_COLD;
+
+};
 
 CLICK_ENDDECLS
 #endif
