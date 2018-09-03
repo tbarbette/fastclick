@@ -90,7 +90,7 @@ sc_type_str_to_enum(const String sc_type)
             return (ScType) i;
         }
     }
-    return UNKNOWN;
+    return CLICK;
 }
 
 /**
@@ -245,7 +245,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 #if HAVE_CURL
     // No discovery if key information is missing
     if (_discover_ip &&
-        (!_agent_ip) || (!_discover_user) || (!_discover_password)) {
+        ((!_agent_ip) || (!_discover_user) || (!_discover_password))) {
         return errh->error(
             "Provide your local IP and a username & password to "
             "access Metron controller's REST API"
@@ -1716,7 +1716,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
 
     sc->_autoscale = false;
     if (!j.get("autoScale", sc->_autoscale)) {
-        errh->warning("Autoscale is not present or not boolean");
+        errh->warning("Autoscale is not present or not boolean. Defaulting to false.");
     }
     /*
     if ((m->_rx_mode == RSS) && sc->_autoscale) {
@@ -1734,6 +1734,17 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     sc->_cpu_queue.resize(sc->_max_cpus_nb, 0);
     sc->_cpu_latency.resize(sc->_max_cpus_nb, LatencyInfo());
     Json jnics = j.get("nics");
+    if (!jnics.is_array()) {
+        if (jnics.is_string()) {
+            errh->warning("nics should be a JSON array. Assuming you passed one NIC named %s...", jnics.c_str());
+            Json ar = Json::make_array();
+            ar.push_back(jnics);
+            jnics = ar;
+        } else {
+            errh->error("nics is in an invalid format !");
+            return NULL;
+        }
+    }
     for (auto jnic : jnics) {
         NIC *nic = m->_nics.findp(jnic.second.as_s());
         if (!nic) {
@@ -1743,6 +1754,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
         }
         sc->_nics.push_back(nic);
     }
+
     sc->nic_stats.resize(sc->_nics.size() * sc->_max_cpus_nb,Stat());
     sc->rx_filter = ServiceChain::RxFilter::from_json(
         j.get("rxFilter"), sc, errh
