@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_TIMESTAMPACCUM_HH
 #define CLICK_TIMESTAMPACCUM_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -31,11 +31,11 @@ Returns the average timestamp difference over all passing packets.
 Resets C<count> and C<time> counters to zero when written.
 
 =a SetCycleCount, RoundTripCycleCount, SetPerfCount, PerfCountAccum */
+template <template <typename> class T>
+class TimestampAccumBase : public BatchElement { public:
 
-class TimestampAccum : public Element { public:
-
-    TimestampAccum() CLICK_COLD;
-    ~TimestampAccum() CLICK_COLD;
+    TimestampAccumBase() CLICK_COLD;
+    ~TimestampAccumBase() CLICK_COLD;
 
     const char *class_name() const	{ return "TimestampAccum"; }
     const char *port_count() const	{ return PORTS_1_1; }
@@ -43,17 +43,30 @@ class TimestampAccum : public Element { public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    Packet *simple_action(Packet *);
+    void push(int, Packet *);
+
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
 
   private:
 
-    double _usec_accum;
-    uint64_t _count;
+    struct State {
+        State() : usec_accum(0), count(0) {
+
+        };
+        double usec_accum;
+        uint64_t count;
+    };
+    T<State> _state;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int reset_handler(const String &, Element *, void *, ErrorHandler *);
 
 };
+
+typedef TimestampAccumBase<not_per_thread> TimestampAccum;
+typedef TimestampAccumBase<per_thread> TimestampAccumMP;
 
 CLICK_ENDDECLS
 #endif

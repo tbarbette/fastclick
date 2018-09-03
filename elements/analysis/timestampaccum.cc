@@ -2,8 +2,10 @@
 /*
  * timestampaccum.{cc,hh} -- accumulate cycle counter deltas
  * Eddie Kohler
+ * Tom Barbette
  *
  * Copyright (c) 2002 International Computer Science Institute
+ * Copyright (c) 2018 KTH Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,60 +21,88 @@
 #include <click/config.h>
 #include "timestampaccum.hh"
 #include <click/glue.hh>
+#include <click/sync.hh>
 CLICK_DECLS
 
-TimestampAccum::TimestampAccum()
+template <template <typename> class T>
+TimestampAccumBase<T>::TimestampAccumBase()
 {
 }
 
-TimestampAccum::~TimestampAccum()
+template <template <typename> class T>
+TimestampAccumBase<T>::~TimestampAccumBase()
 {
 }
 
-int
-TimestampAccum::initialize(ErrorHandler *)
+template <template <typename> class T> int
+TimestampAccumBase<T>::initialize(ErrorHandler *)
 {
-    _usec_accum = 0;
-    _count = 0;
+    PER_THREAD_MEMBER_SET(_state, usec_accum, 0);
+    PER_THREAD_MEMBER_SET(_state, count, 0);
     return 0;
 }
 
-inline Packet *
-TimestampAccum::simple_action(Packet *p)
+template <template <typename> class T> void
+TimestampAccumBase<T>::push(int, Packet *p)
 {
-    _usec_accum += (Timestamp::now() - p->timestamp_anno()).doubleval();
-    _count++;
-    return p;
+    State& state = *_state;
+    state.usec_accum += (Timestamp::now() - p->timestamp_anno()).usecval();
+    state.count++;
+    output(0).push(p);
 }
 
-String
-TimestampAccum::read_handler(Element *e, void *thunk)
+#if HAVE_BATCH
+template <template <typename> class T> void
+TimestampAccumBase<T>::push_batch(int, PacketBatch *b)
 {
-    TimestampAccum *ta = static_cast<TimestampAccum *>(e);
+    State& state = *_state;
+    unsigned c = 0;
+    double acc = 0;
+    Timestamp now = Timestamp::now();
+    FOR_EACH_PACKET(b, p) {
+        acc += (now - p->timestamp_anno()).usecval();
+        ++c;
+    }
+    state.count += c;
+    state.usec_accum += acc;
+    output(0).push_batch(b);
+}
+#endif
+
+template <template <typename> class T> String
+TimestampAccumBase<T>::read_handler(Element *e, void *thunk)
+{
+    State total;
+    TimestampAccumBase<T> *ta = static_cast<TimestampAccumBase<T> *>(e);
+    for (int i = 0; i < ta->_state.weight(); i++) {
+        State& state = ta->_state.get_value(i);
+        total.count += state.count;
+        total.usec_accum += state.usec_accum;
+    }
     int which = reinterpret_cast<intptr_t>(thunk);
     switch (which) {
       case 0:
-	return String(ta->_count);
+	return String(total.count);
       case 1:
-	return String(ta->_usec_accum);
+	return String(total.usec_accum);
       case 2:
-	return String(ta->_usec_accum / ta->_count);
+	return String(total.usec_accum / total.count);
       default:
 	return String();
     }
 }
 
-int
-TimestampAccum::reset_handler(const String &, Element *e, void *, ErrorHandler *)
+template <template <typename> class T> int
+TimestampAccumBase<T>::reset_handler(const String &, Element *e, void *, ErrorHandler *)
 {
-    TimestampAccum *ta = static_cast<TimestampAccum *>(e);
-    ta->_usec_accum = 0;
-    ta->_count = 0;
+    TimestampAccumBase<T> *ta = static_cast<TimestampAccumBase<T> *>(e);
+    PER_THREAD_MEMBER_SET(ta->_state, usec_accum, 0);
+    PER_THREAD_MEMBER_SET(ta->_state, count, 0);
     return 0;
 }
 
-void
-TimestampAccum::add_handlers()
+template <template <typename> class T> void
+TimestampAccumBase<T>::add_handlers()
 {
     add_read_handler("count", read_handler, 0);
     add_read_handler("time", read_handler, 1);
@@ -80,6 +110,12 @@ TimestampAccum::add_handlers()
     add_write_handler("reset_counts", reset_handler, 0, Handler::f_button);
 }
 
+template class TimestampAccumBase<per_thread>;
+template class TimestampAccumBase<not_per_thread>;
+
+
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel int64)
 EXPORT_ELEMENT(TimestampAccum)
+EXPORT_ELEMENT(TimestampAccumMP)
+ELEMENT_MT_SAFE(TimestampAccumMP)
