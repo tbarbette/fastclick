@@ -109,8 +109,16 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
     unsigned max = 0;
     unsigned begin = 0;
 
-    if (data != "")
+    if (data != "") {
         begin = atoi(data.c_str());
+        const uint32_t current_vector_length = static_cast<const uint32_t>(tsd->_nd.value());
+        double sum = 0.0;
+
+        if (current_vector_length < begin) {
+               data = 0;
+               return 1;
+        }
+    }
 
     switch (reinterpret_cast<intptr_t>(handler->user_data(Handler::f_read))) {
         case TSD_MIN_HANDLER:

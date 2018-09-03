@@ -92,13 +92,19 @@ private:
     NumberPacket *_np;
 };
 
+const Timestamp read_timestamp = Timestamp::make_sec(1);
+
 inline Timestamp RecordTimestamp::get(uint64_t i) {
-    if (i >= (unsigned)_timestamps.size())
+    if (i >= (unsigned)_timestamps.size()) {
+        click_chatter("Out of index !");
         return Timestamp::uninitialized_t();
+    }
     Timestamp t = _timestamps[i];
-    if (t == Timestamp::uninitialized_t())
+    if (t == read_timestamp) {
+        click_chatter("Timestamp read multiple times !");
         return Timestamp::uninitialized_t();
-    _timestamps[i] = Timestamp::uninitialized_t();
+    }
+    _timestamps[i] = read_timestamp;
     return t;
 }
 
