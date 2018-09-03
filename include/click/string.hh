@@ -3,6 +3,7 @@
 #define CLICK_STRING_HH
 #include <click/algorithm.hh>
 #include <click/atomic.hh>
+#include <click/vector.hh>
 #if HAVE_STRING_PROFILING
 # include <click/integers.hh>
 #endif
@@ -122,6 +123,7 @@ class String { public:
     // bool operator<=(const String &, const String &);
     // bool operator>(const String &, const String &);
     // bool operator>=(const String &, const String &);
+    Vector<String> split(char c) const;
 
     int find_left(char c, int start = 0) const;
     int find_left(const String &x, int start = 0) const;
