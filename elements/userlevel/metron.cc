@@ -1329,7 +1329,6 @@ Metron::stats_to_json()
 
             // Additional per-core statistics in monitoring mode
             if (_monitoring_mode) {
-                // TODO: replace 0s with real values
                 LatencyInfo lat = sc->_cpu_latency[j];
                 add_per_core_monitoring_data(&jcpu, lat);
             }
@@ -2360,7 +2359,7 @@ ServiceChain::generate_configuration()
 
     // If monitoring mode, we need packet to be timestamped
     if (_metron->_monitoring_mode) {
-        rx_conf += "SET_TIMESTAMP true, ";
+        //rx_conf += "SET_TIMESTAMP true, ";
     }
 
     for (int i = 0; i < get_nics_nb(); i++) {
@@ -2386,7 +2385,7 @@ ServiceChain::generate_configuration()
                 // " -> batchAvg" + is + "C" + js + " :: AverageBatchCounter() " +
                 " -> ";
             if (_metron->_monitoring_mode)
-                newconf += "monitoring_th_"+is+"_"+js+" :: AverageCounter -> ";
+                newconf += "SetTimestamp -> monitoring_th_"+is+"_"+js+" :: AverageCounter -> ";
             newconf += "[" + is + "]slave;\n";
             // newconf += "Script(label s, read batchAvg" + is + "C" + js +
             //            ".average, wait 1s, goto s);\n";
@@ -2410,7 +2409,7 @@ ServiceChain::generate_configuration()
                 newconf += "slaveTD" + is + "["+js+"] -> " + ename + ";\n";
             }
         }
-        newconf += "slave["  + is + "] -> " + (_metron->_monitoring_mode ? "["+is+"]monitoring["+is+"] " : "") + "  slaveTD" + is + ";\n\n";
+        newconf += "slave["  + is + "] -> " + (_metron->_monitoring_mode ? "["+is+"]monitoring_lat["+is+"] -> " : "") + "  slaveTD" + is + ";\n\n";
 
     }
     return newconf;
