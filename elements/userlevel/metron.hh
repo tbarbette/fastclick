@@ -322,6 +322,13 @@ class NIC {
 
 };
 
+struct LatencyInfo {
+    uint64_t avg_throughput;
+    float min_latency;
+    float median_latency;
+    float max_latency;
+};
+
 class ServiceChain {
     public:
         class RxFilter {
@@ -562,6 +569,7 @@ class ServiceChain {
         Vector<NIC *> _nics;
         Vector<float> _cpu_load;
         Vector<int> _cpu_queue;
+        Vector<LatencyInfo> _cpu_latency;
         float _total_cpu_load;
         float _max_cpu_load;
         int _max_cpu_load_index;
@@ -726,10 +734,7 @@ class Metron : public Element {
 
         static void add_per_core_monitoring_data(
             Json  *jobj,
-            const float avg_throughput,
-            const float min_latency,
-            const float median_latency,
-            const float max_latency
+            const LatencyInfo lat
         );
 
         Timer _timer;

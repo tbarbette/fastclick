@@ -419,6 +419,7 @@ Metron::try_slaves(ErrorHandler *errh)
     sc._cpus.resize(1);
     sc._cpu_load.resize(1, 0);
     sc._cpu_queue.resize(1, 0);
+    sc._cpu_latency.resize(1, LatencyInfo());
     for (int i = 0; i < sc.get_nics_nb(); i++) {
         NIC *nic = sc.get_nic_by_index(i);
         sc._nics.push_back(nic);
@@ -545,11 +546,19 @@ Metron::run_timer(Timer *t)
         int max_cpu_load_index = 0;
         float total_cpu_load = 0;
 
+        Vector<String> min = sc->simple_call_read("monitoring_lat.mp_min").split(' ');
+        Vector<String> max = sc->simple_call_read("monitoring_lat.mp_max").split(' ');
+        Vector<String> avg = sc->simple_call_read("monitoring_lat.mp_average_time").split(' ');
+
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
+
             const int cpu_id = sc->get_cpu_map(j);
+            String js = String(j);
             float cpu_load = 0;
             float cpu_queue = 0;
+            uint64_t throughput = 0;
             for (int i = 0; i < sc->get_nics_nb(); i++) {
+                String is = String(i);
                 NIC *nic = sc->get_nic_by_index(i);
                 assert(nic);
                 int stat_idx = (j * sc->get_nics_nb()) + i;
@@ -589,7 +598,7 @@ Metron::run_timer(Timer *t)
                 if (sc->nic_stats[stat_idx].load > cpu_load) {
                     cpu_load = sc->nic_stats[stat_idx].load;
                 }
-
+                throughput += atoll(sc->simple_call_read("monitoring_th_" + is + "_" + js + ".link_rate").c_str());
                 float ncpuqueue = (float)atoi(sc->simple_call_read(name + ".queue_count "+String(nic->cpu_to_queue(sc->get_cpu_map(j)))).c_str()) / (float)(atoi(nic->call_tx_read("nb_rx_desc").c_str()));
                 if (ncpuqueue > cpu_queue) {
                     cpu_queue = ncpuqueue;
@@ -597,6 +606,9 @@ Metron::run_timer(Timer *t)
             }
             sc->_cpu_load[j] = cpu_load;
             sc->_cpu_queue[j] = cpu_queue;
+            if (_monitoring_mode) {
+                sc->_cpu_latency[j].avg_throughput = throughput;
+            }
             total_cpu_load += cpu_load;
             if (cpu_load > max_cpu_load) {
                max_cpu_load = cpu_load;
@@ -618,6 +630,7 @@ Metron::run_timer(Timer *t)
         }
         sc->_max_cpu_load = max_cpu_load;
         sc->_max_cpu_load_index = max_cpu_load_index;
+
         sn++;
         sci++;
 
@@ -1317,7 +1330,8 @@ Metron::stats_to_json()
             // Additional per-core statistics in monitoring mode
             if (_monitoring_mode) {
                 // TODO: replace 0s with real values
-                add_per_core_monitoring_data(&jcpu, 0, 0, 0, 0);
+                LatencyInfo lat = sc->_cpu_latency[j];
+                add_per_core_monitoring_data(&jcpu, lat);
             }
 
             jcpus.push_back(jcpu);
@@ -1344,7 +1358,7 @@ Metron::stats_to_json()
         jcpu.set("busy", false);  // This CPU core is free
 
         if (_monitoring_mode) {
-            add_per_core_monitoring_data(&jcpu, 0, 0, 0, 0);
+            add_per_core_monitoring_data(&jcpu, LatencyInfo());
         }
 
         jcpus.push_back(jcpu);
@@ -1379,29 +1393,26 @@ Metron::stats_to_json()
 void
 Metron::add_per_core_monitoring_data(
         Json *jobj,
-        const float avg_throughput,
-        const float min_latency,
-        const float median_latency,
-        const float max_latency) {
+        const LatencyInfo lat) {
     if (!jobj) {
         click_chatter("Input JSON object is NULL. Cannot add per-core monitoring data");
         return;
     }
 
-    if ((avg_throughput < 0) || (min_latency < 0) || (median_latency < 0) || (max_latency < 0)) {
+    if ((lat.avg_throughput < 0) || (lat.min_latency < 0) || (lat.median_latency < 0) || (lat.max_latency < 0)) {
         click_chatter("Invalid per-core monitoring data");
         return;
     }
 
     Json jtput = Json::make_object();
-    jtput.set("average", avg_throughput);
+    jtput.set("average", lat.avg_throughput);
     jtput.set("unit", "mbps");
     jobj->set("throughput", jtput);
 
     Json jlat = Json::make_object();
-    jlat.set("min", min_latency);
-    jlat.set("median", median_latency);
-    jlat.set("max", max_latency);
+    jlat.set("min", lat.min_latency);
+    jlat.set("median", lat.median_latency);
+    jlat.set("max", lat.max_latency);
     jlat.set("unit", "ns");
     jobj->set("latency", jlat);
 }
@@ -1656,6 +1667,7 @@ ServiceChain::~ServiceChain()
     _cpus.clear();
     _cpu_load.clear();
     _cpu_queue.clear();
+    _cpu_latency.clear();
 }
 
 /**
@@ -1720,6 +1732,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     sc->_cpus.resize(sc->_max_cpus_nb);
     sc->_cpu_load.resize(sc->_max_cpus_nb, 0);
     sc->_cpu_queue.resize(sc->_max_cpus_nb, 0);
+    sc->_cpu_latency.resize(sc->_max_cpus_nb, LatencyInfo());
     Json jnics = j.get("nics");
     for (auto jnic : jnics) {
         NIC *nic = m->_nics.findp(jnic.second.as_s());
@@ -1798,7 +1811,7 @@ ServiceChain::stats_to_json(bool monitoring_mode)
         jcpu.set("load", _cpu_load[j]);
         if (monitoring_mode) {
             // TODO: replace 0s with real values
-            Metron::add_per_core_monitoring_data(&jcpu, 0, 0, 0, 0);
+            Metron::add_per_core_monitoring_data(&jcpu, LatencyInfo());
         }
         jcpus.push_back(jcpu);
     }
@@ -2321,8 +2334,22 @@ ServiceChain::generate_configuration()
         newconf += "slave :: MetronSlave();\n\n";
     }
 
+    if (_metron->_monitoring_mode) {
+        newconf+= "monitoring_lat :: TimestampAccumMP();\n\n";
+    }
+
+    //Common parameters
+    String rx_conf = "BURST 32, NUMA false, VERBOSE 99, ";
+
     // NICs require an additional parameter if in Flow Director mode
-    String rx_conf = (get_rx_mode() == FLOW) ? "MODE flow_dir, " : "";
+    if (get_rx_mode() == FLOW) {
+        rx_conf += "MODE flow_dir, ";
+    }
+
+    // If monitoring mode, we need packet to be timestamped
+    if (_metron->_monitoring_mode) {
+        rx_conf += "SET_TIMESTAMP true, ";
+    }
 
     for (int i = 0; i < get_nics_nb(); i++) {
         String is = String(i);
@@ -2330,6 +2357,7 @@ ServiceChain::generate_configuration()
         if (_metron->_rx_mode == RSS) {
             nic->call_rx_write("max_rss", String(get_used_cpu_nb()));
         }
+
         for (int j = 0; j < get_max_cpu_nb(); j++) {
             String js = String(j);
             String active = (j < get_used_cpu_nb() ? "1":"0");
@@ -2338,26 +2366,27 @@ ServiceChain::generate_configuration()
             String ename = generate_configuration_slave_fd_name(i, cpu_id);
             newconf += ename + " :: " + nic->element->class_name() +
                 "(" + nic->get_device_address() + ", QUEUE " + String(queue_no) +
-                ", N_QUEUES 1, MAXTHREADS 1, BURST 32, NUMA false, ";
+                ", N_QUEUES 1, MAXTHREADS 1, ";
             newconf += rx_conf;
-            newconf += "ACTIVE " + active + ", VERBOSE 99);\n";
-            newconf += "StaticThreadSched(" + ename + " " + String(cpu_id) + ");";
+            newconf += "ACTIVE " + active + ");\n";
+            newconf += "StaticThreadSched(" + ename + " " + String(cpu_id) + ");\n";
             newconf += ename + " " +
                 // " -> batchAvg" + is + "C" + js + " :: AverageBatchCounter() " +
-                " -> [" + is + "]slave;\n";
+                " -> ";
+            if (_metron->_monitoring_mode)
+                newconf += "monitoring_th_"+is+"_"+js+" :: AverageCounter -> ";
+            newconf += "[" + is + "]slave;\n";
             // newconf += "Script(label s, read batchAvg" + is + "C" + js +
             //            ".average, wait 1s, goto s);\n";
         }
+        newconf+= "\n";
 
-        // TODO: Allowed CPU bitmap
         if (get_max_cpu_nb() == 1) {
             int cpu_id = get_cpu_map(0);
             int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
-            newconf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);";
-            newconf += "slave["  + is + "] -> slaveTD" + is + ";\n";
+            newconf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);\n";
         } else {
-            newconf += "slaveTD" + is + " :: ExactCPUSwitch();";
-            newconf += "slave["  + is + "] -> slaveTD" + is + ";\n";
+            newconf += "slaveTD" + is + " :: ExactCPUSwitch();\n";
             for (int j = 0; j < get_max_cpu_nb(); j++) {
                 String js = String(j);
 
@@ -2366,9 +2395,10 @@ ServiceChain::generate_configuration()
                 int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
                 newconf += ename + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99, MAXQUEUES 1);";
 
-                newconf += "slaveTD" + is + "["+js+"] -> " + ename + ";";
+                newconf += "slaveTD" + is + "["+js+"] -> " + ename + ";\n";
             }
         }
+        newconf += "slave["  + is + "] -> " + (_metron->_monitoring_mode ? "["+is+"]monitoring["+is+"] " : "") + "  slaveTD" + is + ";\n\n";
 
     }
     return newconf;
