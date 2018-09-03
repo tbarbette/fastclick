@@ -268,6 +268,9 @@ public:
             Timer timeout;
     } __attribute__((aligned(64)));
 
+    static bool initialized() {
+        return _is_initialized;
+    }
 
 private:
 

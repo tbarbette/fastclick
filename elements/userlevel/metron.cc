@@ -389,9 +389,11 @@ Metron::initialize(ErrorHandler *errh)
     }
 #endif
 
-    // if (try_slaves(errh) != SUCCESS) {
-    //     return ERROR;
-    // }
+
+    assert(DPDKDevice::initialized());
+    if (try_slaves(errh) != SUCCESS) {
+        return ERROR;
+    }
 
     _timer.initialize(this);
     _timer.move_thread(_core_id);
