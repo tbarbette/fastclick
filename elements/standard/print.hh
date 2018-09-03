@@ -78,7 +78,7 @@ class Print : public BatchElement { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
-    void smaction(Packet *);
+    void rmaction(Packet *);
 #if HAVE_BATCH
     PacketBatch* simple_action_batch(PacketBatch *);
 #endif

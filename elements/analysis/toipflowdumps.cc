@@ -797,7 +797,7 @@ ToIPFlowDumps::find_aggregate(uint32_t agg, const Packet *p)
 }
 
 inline void
-ToIPFlowDumps::smaction(Packet *p)
+ToIPFlowDumps::rmaction(Packet *p)
 {
     if (Flow *f = find_aggregate(AGGREGATE_ANNO(p), p)) {
 	_nagg++;
@@ -809,7 +809,7 @@ ToIPFlowDumps::smaction(Packet *p)
 void
 ToIPFlowDumps::push(int, Packet *p)
 {
-    smaction(p);
+    rmaction(p);
     checked_output_push(0, p);
 }
 
@@ -817,7 +817,7 @@ Packet *
 ToIPFlowDumps::pull(int)
 {
     if (Packet *p = input(0).pull()) {
-	smaction(p);
+	rmaction(p);
 	return p;
     } else
 	return 0;
@@ -828,7 +828,7 @@ ToIPFlowDumps::run_task(Task *)
 {
     Packet *p = input(0).pull();
     if (p) {
-	smaction(p);
+	rmaction(p);
 	p->kill();
     } else if (!_signal)
 	return false;

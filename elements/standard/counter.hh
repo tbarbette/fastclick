@@ -334,9 +334,9 @@ protected:
 };
 
 /**
- * =c CounterMP
+ * =c
  *
- * Thread-safe counter duplicated per-thread
+ * CounterMP() Thread-safe counter duplicated per-thread
  *
  * =s counters
  *

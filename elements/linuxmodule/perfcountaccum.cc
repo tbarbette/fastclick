@@ -62,7 +62,7 @@ PerfCountAccum::initialize(ErrorHandler *errh)
 }
 
 inline void
-PerfCountAccum::smaction(Packet *p)
+PerfCountAccum::rmaction(Packet *p)
 {
   unsigned l, h;
   rdpmc(_which, l, h);
@@ -75,7 +75,7 @@ PerfCountAccum::smaction(Packet *p)
 void
 PerfCountAccum::push(int, Packet *p)
 {
-  smaction(p);
+  rmaction(p);
   output(0).push(p);
 }
 
@@ -84,7 +84,7 @@ PerfCountAccum::pull(int)
 {
   Packet *p = input(0).pull();
   if (p)
-    smaction(p);
+    rmaction(p);
   return p;
 }
 

@@ -66,13 +66,13 @@ canonical_handler_name(const String &n)
     return n;
 }
 
-static void
+static inline void
 int64_to_char(char buffer[], const int64_t number) {
     *(int64_t *)buffer = number;
 }
 
-static int64_t
-char_to_int64(char buffer[]) {
+static inline int64_t
+char_to_int64(char buffer[]){
     int64_t number = 0;
     memcpy(&number, buffer, sizeof(int64_t));
     return number;

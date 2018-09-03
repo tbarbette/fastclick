@@ -183,7 +183,7 @@ AggregatePacketCounter::find_flow(uint32_t agg)
 }
 
 inline void
-AggregatePacketCounter::smaction(int port, Packet *p)
+AggregatePacketCounter::rmaction(int port, Packet *p)
 {
     _total_packets++;
     if (Flow *f = find_flow(AGGREGATE_ANNO(p))) {
@@ -197,7 +197,7 @@ AggregatePacketCounter::smaction(int port, Packet *p)
 void
 AggregatePacketCounter::push(int port, Packet *p)
 {
-    smaction(port, p);
+    rmaction(port, p);
     output(port).push(p);
 }
 
@@ -205,7 +205,7 @@ Packet *
 AggregatePacketCounter::pull(int port)
 {
     if (Packet *p = input(port).pull()) {
-	smaction(port, p);
+	rmaction(port, p);
 	return p;
     } else
 	return 0;

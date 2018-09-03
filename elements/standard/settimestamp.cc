@@ -54,7 +54,7 @@ SetTimestamp::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 inline void
-SetTimestamp::smaction(Packet *p)
+SetTimestamp::rmaction(Packet *p)
 {
     if (_action == ACT_NOW)
     p->timestamp_anno().assign_now();
@@ -69,7 +69,7 @@ SetTimestamp::smaction(Packet *p)
 Packet *
 SetTimestamp::simple_action(Packet *p)
 {
-    smaction(p);
+    rmaction(p);
     return p;
 }
 
@@ -93,7 +93,7 @@ SetTimestamp::simple_action_batch(PacketBatch *batch)
         }
     } else {
         FOR_EACH_PACKET(batch, p)
-            smaction(p);
+            rmaction(p);
     }
 
     return batch;

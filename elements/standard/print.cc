@@ -86,7 +86,7 @@ Print::configure(Vector<String> &conf, ErrorHandler* errh)
 }
 
 inline void
-Print::smaction(Packet* p) {
+Print::rmaction(Packet* p) {
     if (!_active)
 	return;
 
@@ -176,7 +176,7 @@ PacketBatch*
 Print::simple_action_batch(PacketBatch* batch)
 {
 	FOR_EACH_PACKET(batch,p) {
-		smaction(p);
+		rmaction(p);
 	}
 	return batch;
 }
@@ -185,7 +185,7 @@ Print::simple_action_batch(PacketBatch* batch)
 Packet *
 Print::simple_action(Packet *p)
 {
-	smaction(p);
+	rmaction(p);
 	return p;
 }
 

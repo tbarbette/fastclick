@@ -179,13 +179,13 @@ class ClassifyElement : public BatchElement { public:
 template <typename T>
 class SimpleBatchElement : public BatchElement { public:
 
-    void push(int port, Packet *p) override final {
+    void push(int port, Packet *p) override {
         p = T::simple_action(p);
         if (p)
             output(port).push(p);
     }
 
-    Packet* pull(int port) override final {
+    Packet* pull(int port) override {
         Packet *p = input(port).pull();
         if (p)
             p = T::simple_action(p);
@@ -226,31 +226,45 @@ class SimpleBatchElement : public BatchElement { public:
  * The inherited element cannot be extended further because of CRTP !
  */
 template <typename T>
-class SimpleElement : public SimpleBatchElement<T> { public:
+class SimpleElement : public BatchElement { public:
 
-    inline PacketBatch* _sm_action_batch(int port, PacketBatch* batch) {
-        EXECUTE_FOR_EACH_PACKET_DROPPABLE(T::simple_action, batch, [](Packet*){});
-        return batch;
+    void push(int port, Packet *p) override final {
+        p = static_cast<T&>(*this).simple_action(p);
+        if (p)
+            output(port).push(p);
+    }
+
+    Packet* pull(int port) override final {
+        Packet *p = input(port).pull();
+        if (p)
+            p = static_cast<T&>(*this).simple_action(p);
+        return p;
     }
 
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch* head) override final {
         head = _sm_action_batch(head);
         if (head)
-            SimpleBatchElement<T>::output(port).push_batch(head);
+            output(port).push_batch(head);
     }
 
     PacketBatch* pull_batch(int port, unsigned max) override final {
-        PacketBatch* head = SimpleBatchElement<T>::input_pull_batch(port,max);
+        PacketBatch* head = input_pull_batch(port,max);
         if (head)
             head = _sm_action_batch(head);
         return head;
     }
 #endif
 
-    private:
-        SimpleElement(){};
-        friend T;
+  private:
+
+    inline PacketBatch* _sm_action_batch(PacketBatch* batch) {
+        EXECUTE_FOR_EACH_PACKET_DROPPABLE(static_cast<T&>(*this).simple_action, batch, [](Packet*){});
+        return batch;
+    }
+
+    SimpleElement(){};
+    friend T;
 
 };
 

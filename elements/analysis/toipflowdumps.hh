@@ -267,7 +267,7 @@ class ToIPFlowDumps : public Element, public AggregateListener { public:
     Flow *find_aggregate(uint32_t, const Packet * = 0);
     void end_flow(Flow *, ErrorHandler *);
     int add_compressable(const String &, ErrorHandler *);
-    inline void smaction(Packet *);
+    inline void rmaction(Packet *);
     static void gc_hook(Timer *, void *);
     static int write_handler(const String &, Element *, void *, ErrorHandler*) CLICK_COLD;
 

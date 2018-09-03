@@ -46,7 +46,7 @@ class PerfCountAccum : public PerfCountUser { public:
   int initialize(ErrorHandler *) CLICK_COLD;
   void add_handlers() CLICK_COLD;
 
-  inline void smaction(Packet *);
+  inline void rmaction(Packet *);
   void push(int, Packet *p);
   Packet *pull(int);
 

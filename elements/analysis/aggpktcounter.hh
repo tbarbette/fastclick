@@ -145,7 +145,7 @@ class AggregatePacketCounter : public Element { public:
 
     Flow *find_flow(uint32_t aggregate);
     void end_flow(Flow *, ErrorHandler *);
-    inline void smaction(int, Packet *);
+    inline void rmaction(int, Packet *);
 
     static String read_handler(Element *, void *) CLICK_COLD;
     typedef void (Flow::*FlowFunc)(Vector<uint32_t> &, const AggregatePacketCounter *) const;

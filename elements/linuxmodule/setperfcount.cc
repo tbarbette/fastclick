@@ -55,7 +55,7 @@ SetPerfCount::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 inline void
-SetPerfCount::smaction(Packet *p)
+SetPerfCount::rmaction(Packet *p)
 {
   unsigned l, h;
   rdpmc(_which, l, h);
@@ -66,7 +66,7 @@ SetPerfCount::smaction(Packet *p)
 void
 SetPerfCount::push(int, Packet *p)
 {
-  smaction(p);
+  rmaction(p);
   output(0).push(p);
 }
 
@@ -75,7 +75,7 @@ SetPerfCount::pull(int)
 {
   Packet *p = input(0).pull();
   if (p)
-    smaction(p);
+    rmaction(p);
   return p;
 }
 
