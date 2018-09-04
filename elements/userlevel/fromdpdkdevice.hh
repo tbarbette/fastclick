@@ -181,6 +181,7 @@ public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
+    void clear_buffers();
     bool run_task(Task *);
     void run_timer(Timer* t);
     void selected(int fd, int mask);
@@ -214,7 +215,7 @@ private:
     enum {
         h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
         h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
-        h_active,
+        h_active, h_safe_active,
         h_xstats, h_queue_count,
         h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
         h_rss,

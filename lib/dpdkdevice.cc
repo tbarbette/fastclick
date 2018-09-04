@@ -129,6 +129,11 @@ int DPDKDevice::get_port_numa_node(portid_t port_id)
     return (numa_node == -1) ? 0 : numa_node;
 }
 
+unsigned int DPDKDevice::get_nb_rxdesc()
+{
+    return info.n_rx_descs;
+}
+
 unsigned int DPDKDevice::get_nb_txdesc()
 {
     return info.n_tx_descs;

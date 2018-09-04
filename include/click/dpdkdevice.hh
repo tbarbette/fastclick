@@ -140,6 +140,8 @@ public:
     void set_init_rss_max(int rss_max);
     void set_init_fc_mode(FlowControlMode fc);
 
+
+    unsigned int get_nb_rxdesc();
     unsigned int get_nb_txdesc();
 
     uint16_t get_device_vendor_id();

@@ -293,6 +293,7 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
 
         if (!fd->get_device())
             continue;
+
         // Get its Rx mode
         String fd_mode = fd->get_device()->get_mode_str();
 
@@ -2207,7 +2208,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         ret = call_write(
                             generate_configuration_slave_fd_name(
                                 inic, get_cpu_map(i)
-                            ) + ".active", response, "1"
+                            ) + ".safe_active", response, "1"
                         );
                         if (ret < 200 || ret >= 300) {
                             return errh->error(
@@ -2238,7 +2239,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         int ret = call_write(
                             generate_configuration_slave_fd_name(
                                 inic, get_cpu_map(i)
-                            ) + ".active", response, "0"
+                            ) + ".safe_active", response, "0"
                         );
                         if (ret < 200 || ret >= 300) {
                             return errh->error(

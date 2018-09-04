@@ -216,6 +216,26 @@ void FromDPDKDevice::cleanup(CleanupStage)
     cleanup_tasks();
 }
 
+void FromDPDKDevice::clear_buffers() {
+    rte_mbuf* pkts[32];
+    for (int q = firstqueue; q <= lastqueue; q++) {
+        unsigned n;
+        int tot = 0;
+        do {
+            n = rte_eth_rx_burst(_dev->port_id, q, pkts, 32);
+            tot += n;
+            for (int i = 0; i < n; i ++) {
+                 rte_pktmbuf_free(pkts[i]);
+            }
+            if (tot > _dev->get_nb_rxdesc()) {
+                click_chatter("WARNING : Called clear_buffers while receiving packets !");
+                break;
+            }
+        } while (n > 0);
+        click_chatter("Cleared %d buffers for queue %d",tot,q);
+    }
+}
+
 bool FromDPDKDevice::run_task(Task *t)
 {
     struct rte_mbuf *pkts[_burst];
@@ -503,6 +523,7 @@ int FromDPDKDevice::write_handler(
             }
             return 0;
         }
+        case h_safe_active:
         case h_active: {
             bool active;
             if (!BoolArg::parse(input,active))
@@ -520,6 +541,10 @@ int FromDPDKDevice::write_handler(
                             fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
                     }
                 } else {
+                    if ((uintptr_t) thunk == h_safe_active) {
+                        fd->clear_buffers();
+                    }
+
                     for (int i = 0; i < fd->usable_threads.weight(); i++) {
                         fd->_tasks[i]->unschedule();
                     }
@@ -700,6 +725,7 @@ void FromDPDKDevice::add_handlers()
 
     add_read_handler("active", read_handler, h_active);
     add_write_handler("active", write_handler, h_active);
+    add_write_handler("safe_active", write_handler, h_safe_active);
     add_read_handler("count", count_handler, h_count);
     add_read_handler("useful", count_handler, h_useful);
     add_read_handler("useless", count_handler, h_useless);
