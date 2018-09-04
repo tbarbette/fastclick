@@ -204,6 +204,7 @@ AC_CHECK_LIB([re2], [main], [ac_have_re2=yes], [ac_have_re2=no])
 AC_CHECK_HEADERS([re2/re2.h], [ac_have_re2_h=yes], [ac_have_re2_h=no])
 if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
     have_re2=yes
+    LIBS="$LIBS -lre2"
     AC_DEFINE([HAVE_RE2])
 else
     have_re2=no

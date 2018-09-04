@@ -6876,6 +6876,7 @@ done
 
 if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
     have_re2=yes
+    LIBS="$LIBS -lre2"
     $as_echo "#define HAVE_RE2 1" >>confdefs.h
 
 else
