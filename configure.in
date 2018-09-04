@@ -196,10 +196,20 @@ fi
 
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
-if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
     AC_DEFINE([HAVE_MICROHTTPD])
 fi
 
+AC_CHECK_LIB([re2], [main], [ac_have_re2=yes], [ac_have_re2=no])
+AC_CHECK_HEADERS([re2/re2.h], [ac_have_re2_h=yes], [ac_have_re2_h=no])
+if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
+    have_re2=yes
+    AC_DEFINE([HAVE_RE2])
+else
+    have_re2=no
+
+    AC_MSG_ERROR([x-$ac_have_re2 - $ac_have_re2_h])
+fi
 
 AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
 AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
@@ -2312,6 +2322,11 @@ if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
 fi
 
+dnl add 're2' if re2 is available
+if test "x$have_re2" == xyes; then
+    provisions="$provisions re2"
+fi
+
 dnl add 'smpclick' if compiled with --enable-multithread > 1
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
@@ -2385,6 +2400,7 @@ Configuration Summary:
     Metron support:              ${have_metron}
 
     PAPI support:                ${have_papi}
+    RE2 support:                 ${have_re2}
 "
 
 if test "$feedback" != no; then

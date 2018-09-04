@@ -777,6 +777,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -925,6 +926,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -1177,6 +1179,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1314,7 +1325,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1467,6 +1478,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1512,16 +1524,14 @@ Optional Features:
                           disable warnings and information about batching
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
-    --enable-netmap-pool  use netmap buffers instead of standard Click
-                          malloc'ed buffers
+    --enable-netmap-pool  use netmap buffers instead of standard Click buffers
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use DPDK
-    --enable-dpdk-pool    use DPDK buffer instead of standard click malloc'ed
-                          buffer
+    --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
   --disable-linuxmodule   disable Linux kernel driver
@@ -6809,11 +6819,70 @@ fi
 
 done
 
-if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
     $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
 
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lre2" >&5
+$as_echo_n "checking for main in -lre2... " >&6; }
+if ${ac_cv_lib_re2_main+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lre2  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_re2_main=yes
+else
+  ac_cv_lib_re2_main=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_re2_main" >&5
+$as_echo "$ac_cv_lib_re2_main" >&6; }
+if test "x$ac_cv_lib_re2_main" = xyes; then :
+  ac_have_re2=yes
+else
+  ac_have_re2=no
+fi
+
+for ac_header in re2/re2.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "re2/re2.h" "ac_cv_header_re2_re2_h" "$ac_includes_default"
+if test "x$ac_cv_header_re2_re2_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_RE2_RE2_H 1
+_ACEOF
+ ac_have_re2_h=yes
+else
+  ac_have_re2_h=no
+fi
+
+done
+
+if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
+    have_re2=yes
+    $as_echo "#define HAVE_RE2 1" >>confdefs.h
+
+else
+    have_re2=no
+
+    as_fn_error $? "x-$ac_have_re2 - $ac_have_re2_h" "$LINENO" 5
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing PAPI_start_counters" >&5
 $as_echo_n "checking for library containing PAPI_start_counters... " >&6; }
@@ -14284,6 +14353,10 @@ if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
 fi
 
+if test "x$have_re2" == xyes; then
+    provisions="$provisions re2"
+fi
+
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
 fi
@@ -15688,6 +15761,7 @@ Configuration Summary:
     Metron support:              ${have_metron}
 
     PAPI support:                ${have_papi}
+    RE2 support:                 ${have_re2}
 "
 
 if test "$feedback" != no; then

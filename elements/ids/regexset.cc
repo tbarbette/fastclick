@@ -67,7 +67,6 @@ RegexSet::reset() {
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel)
+ELEMENT_REQUIRES(userlevel re2)
 ELEMENT_PROVIDES(RegexSet)
 ELEMENT_MT_SAFE(RegexSet)
-ELEMENT_LIBS((-L/usr/local/lib -lre2))
