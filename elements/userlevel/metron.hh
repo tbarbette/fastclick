@@ -60,33 +60,37 @@ CLICK_DECLS
 =c
 
 Metron(
-    ID, NIC, RX_MODE,
+    [ID, ] NIC, RX_MODE,
     AGENT_IP, AGENT_PORT,
     DISCOVER_IP, DISCOVER_PORT,
     DISCOVER_PATH, DISCOVER_USER,
-    DISCOVER_PASSWORD, TIMING_STATS,
-    SLAVE_DPDK_ARGS, SLAVE_ARGS,
-    PIN_TO_CORE
+    DISCOVER_PASSWORD, PIN_TO_CORE,
+    MONITORING, FAIL, LOAD_TIMER,
+    ON_SCALE, VERBOSE
+    [, SLAVE_DPDK_ARGS, SLAVE_ARGS]
 )
 
 =s userlevel
 
-Metron data plane agent for high performance service chaining
+Metron data plane agent for high performance service chaining.
 
 =d
 
 Receives and executes instructions from a remote Metron controller instance.
 These instructions are related to the management of high performance NFV
-service chains.
+service chains, including flow dispatching to specific CPU cores,
+instantiation of dedicated slave processes for flow processing, and NIC
+offloading & management operations.
 The Metron agent also reports monitoring statistics to the controller.
 
 Keyword arguments are:
 
-=over 14
+=over 18
 
 =item ID
 
 String. The ID of this Metron data plane agent.
+If no ID is given, the agent generates a random ID.
 
 =item NIC
 
@@ -158,10 +162,29 @@ Defaults to 'onos'.
 String. The password to access Metron controller's web services.
 Defaults to 'rocks'.
 
-=item TIMING_STATS
+=item PIN_TO_CORE
 
-Boolean. If true, the Metron data plane agent reports timing statistics
-related to the deployment of each service chain. Defaults to true.
+Integer. The CPU core to pin the Metron data plane agent. Defaults to 0.
+
+=item MONITORING
+
+Boolean. If true, the Metron data plane agent monitors throughput and
+latency statistics per-core, which are sent to the controller.
+Defaults to false.
+
+=item FAIL
+
+Boolean. If true, the Metron agent in allowed to fail.
+Defaults to false.
+
+=item LOAD_TIMER
+
+Integer. Specifies the frequency (in milliseconds) that the Metron agent
+is rescheduled. Defaults to 1000 ms.
+
+=item ON_SCALE
+
+Boolean. If true, a handler for scaling events is setup. Defaults to false.
 
 =item SLAVE_ARGS
 
@@ -175,9 +198,10 @@ which typically are secondary DPDK processes. For example, the following
 arguments could be passed: '-b 03:00.0' if you want a certain NIC to be
 blacklisted by a service chain.
 
-=item PIN_TO_CORE
+=item VERBOSE
 
-Integer. The CPU core to pin the Metron data plane agent. Defaults to 0.
+Boolean. If true, more detailed messages about Metron are printed.
+Defaults to false.
 
 =back
 
@@ -684,8 +708,6 @@ class Metron : public Element {
     private:
         String _id;
         int _core_id;
-        Vector<String> _args;
-        Vector<String> _dpdk_args;
 
         HashMap<String, NIC> _nics;
         HashMap<String, ServiceChain *> _scs;
@@ -696,6 +718,9 @@ class Metron : public Element {
         String _hw;
         String _sw;
         String _serial;
+
+        /* Rx filter mode */
+        RxFilterType _rx_mode;
 
         /* Agent's (local) information */
         String _agent_ip;
@@ -712,14 +737,8 @@ class Metron : public Element {
         /* Discovery status */
         bool _discovered;
 
-        /* Rx filter mode */
-        RxFilterType _rx_mode;
-
         /* Monitoring mode */
         bool _monitoring_mode;
-
-        /* Verbose */
-        bool _verbose;
 
         /* Fail on service chain instanciation error */
         bool _fail;
@@ -729,6 +748,13 @@ class Metron : public Element {
 
         /* Handler to call on scaling of some service chains */
         HandlerCall _on_scale;
+
+        /* DPDK arguments for slave processes */
+        Vector<String> _args;
+        Vector<String> _dpdk_args;
+
+        /* Verbose */
+        bool _verbose;
 
         /* Private methods */
         int try_slaves(ErrorHandler *errh);
@@ -742,7 +768,6 @@ class Metron : public Element {
 
         Timer _timer;
         Timer _discover_timer;
-
 
         Spinlock _command_lock;
         friend class ServiceChain;

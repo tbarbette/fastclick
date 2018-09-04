@@ -142,20 +142,20 @@ parse_vendor_info(String hw_info, String key)
  * Metron
  **************************************/
 Metron::Metron() :
-    _timer(this), _discover_timer(&discover_timer, this), _discover_ip(), _discovered(false),
-    _rx_mode(FLOW), _monitoring_mode(false),
-    _verbose(false), _fail(false), _load_timer(1000)
+    _timer(this), _rx_mode(FLOW), _discover_timer(&discover_timer, this),
+    _discover_ip(), _discovered(false), _monitoring_mode(false),
+    _fail(false), _load_timer(1000), _verbose(false)
 {
     _core_id = click_max_cpu_ids() - 1;
 }
 
 Metron::~Metron()
 {
-    _args.clear();
-    _dpdk_args.clear();
     _nics.clear();
     _scs.clear();
     _cpu_map.clear();
+    _args.clear();
+    _dpdk_args.clear();
 }
 
 /**
@@ -173,10 +173,8 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     _discover_path      = DEF_DISCOVER_PATH;
 
     if (Args(conf, this, errh)
-        .read_all("NIC",               nics)
-        .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
-        .read_all("SLAVE_ARGS",        _args)
         .read    ("ID",                _id)
+        .read_all("NIC",               nics)
         .read    ("RX_MODE",           rx_mode)
         .read    ("AGENT_IP",          _agent_ip)
         .read    ("AGENT_PORT",        _agent_port)
@@ -187,10 +185,12 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("DISCOVER_PASSWORD", _discover_password)
         .read    ("PIN_TO_CORE",       _core_id)
         .read    ("MONITORING",        _monitoring_mode)
-        .read    ("VERBOSE",           _verbose)
         .read    ("FAIL",              _fail)
         .read    ("LOAD_TIMER",        _load_timer)
         .read    ("ON_SCALE", HandlerCallArg(HandlerCall::writable), _on_scale)
+        .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
+        .read_all("SLAVE_ARGS",        _args)
+        .read    ("VERBOSE",           _verbose)
         .complete() < 0)
         return ERROR;
 
@@ -390,7 +390,6 @@ Metron::initialize(ErrorHandler *errh)
     }
 #endif
 
-
     assert(DPDKDevice::initialized());
     if (try_slaves(errh) != SUCCESS) {
         return ERROR;
@@ -399,6 +398,8 @@ Metron::initialize(ErrorHandler *errh)
     _timer.initialize(this);
     _timer.move_thread(_core_id);
     _timer.schedule_after_msec(_load_timer);
+
+    click_chatter("Successful initialization! \n\n");
 
     return SUCCESS;
 }
@@ -465,11 +466,11 @@ Metron::discover()
         headers = curl_slist_append(headers, "Content-Type: application/json");
         headers = curl_slist_append(headers, "charsets: utf-8");
 
-        /* Compose the URL */
+        // Compose the URL
         String url = "http://" + _discover_ip + ":" +
                     String(_discover_rest_port) + _discover_path;
 
-        /* Now specify the POST data */
+        // Now specify the POST data
         Json j = Json::make_object();
         Json device;
         {
@@ -494,7 +495,7 @@ Metron::discover()
         j.set("devices", devices);
         String s = j.unparse(true);
 
-        /* Curl settings */
+        // Curl settings
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, s.c_str());
@@ -506,10 +507,10 @@ Metron::discover()
             curl_easy_setopt(curl, CURLOPT_USERPWD, user_pass.c_str());
         }
 
-        /* Send the request and get the return code in res */
+        // Send the request and get the return code in res
         res = curl_easy_perform(curl);
 
-        /* Check for errors */
+        // Check for errors
         if(res != CURLE_OK) {
             click_chatter("Reattempting to connect to %s due to: %s\n",
                 url.c_str(), curl_easy_strerror(res));
@@ -521,7 +522,7 @@ Metron::discover()
             );
         }
 
-        /* Always cleanup */
+        // Always cleanup
         curl_easy_cleanup(curl);
 
         return (res == CURLE_OK);
@@ -733,10 +734,19 @@ Metron::find_service_chain_by_id(String id)
     return _scs.find(id);
 }
 
+/**
+ * Calls the handler responsible for advertizing scaling events.
+ * This occurs only when ON_SCALE parameter is set to true.
+ */
 void
-Metron::call_scale(ServiceChain* sc, String event) {
+Metron::call_scale(ServiceChain* sc, String event)
+{
     if (_on_scale) {
-        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " "+event+" " + sc->get_id() + " " + String(sc->_total_cpu_load) + " " +String(sc->_max_cpu_load)+ " "+String(sc->_max_cpu_load_index));
+        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " " +
+                  event + " " + sc->get_id() + " " +
+                  String(sc->_total_cpu_load) + " " +
+                  String(sc->_max_cpu_load) + " " +
+                  String(sc->_max_cpu_load_index));
         _on_scale.call_write();
     }
 }
@@ -1397,15 +1407,15 @@ Metron::stats_to_json()
  * average throughput and several latency percentiles.
  */
 void
-Metron::add_per_core_monitoring_data(
-        Json *jobj,
-        const LatencyInfo lat) {
+Metron::add_per_core_monitoring_data(Json *jobj, const LatencyInfo lat)
+{
     if (!jobj) {
         click_chatter("Input JSON object is NULL. Cannot add per-core monitoring data");
         return;
     }
 
-    if ((lat.avg_throughput < 0) || (lat.min_latency < 0) || (lat.median_latency < 0) || (lat.max_latency < 0)) {
+    if ((lat.avg_throughput < 0) || (lat.min_latency < 0) ||
+        (lat.median_latency < 0) || (lat.max_latency < 0)) {
         click_chatter("Invalid per-core monitoring data");
         return;
     }
@@ -2355,7 +2365,7 @@ ServiceChain::generate_configuration()
         newconf+= "monitoring_lat :: TimestampAccumMP();\n\n";
     }
 
-    //Common parameters
+    // Common parameters
     String rx_conf = "BURST 32, NUMA false, VERBOSE 99, ";
 
     // NICs require an additional parameter if in Flow Director mode
@@ -2365,7 +2375,7 @@ ServiceChain::generate_configuration()
 
     // If monitoring mode, we need packet to be timestamped
     if (_metron->_monitoring_mode) {
-        //rx_conf += "SET_TIMESTAMP true, ";
+        // rx_conf += "SET_TIMESTAMP true, ";
     }
 
     for (int i = 0; i < get_nics_nb(); i++) {
