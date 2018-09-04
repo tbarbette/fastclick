@@ -552,6 +552,7 @@ Metron::run_timer(Timer *t)
         Vector<String> min = sc->simple_call_read("monitoring_lat.mp_min").split(' ');
         Vector<String> max = sc->simple_call_read("monitoring_lat.mp_max").split(' ');
         Vector<String> avg = sc->simple_call_read("monitoring_lat.mp_average_time").split(' ');
+        sc->simple_call_write("monitoring_lat.reset");
 
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
 
@@ -611,6 +612,9 @@ Metron::run_timer(Timer *t)
             sc->_cpu_queue[j] = cpu_queue;
             if (_monitoring_mode) {
                 sc->_cpu_latency[j].avg_throughput = throughput;
+                sc->_cpu_latency[j].min_latency = atoll(min[j].c_str());
+                sc->_cpu_latency[j].max_latency = atoll(max[j].c_str());
+                sc->_cpu_latency[j].median_latency = atoll(avg[j].c_str());
             }
             total_cpu_load += cpu_load;
             if (cpu_load > max_cpu_load) {
@@ -1408,7 +1412,7 @@ Metron::add_per_core_monitoring_data(
 
     Json jtput = Json::make_object();
     jtput.set("average", lat.avg_throughput);
-    jtput.set("unit", "mbps");
+    jtput.set("unit", "bps");
     jobj->set("throughput", jtput);
 
     Json jlat = Json::make_object();
@@ -1824,8 +1828,7 @@ ServiceChain::stats_to_json(bool monitoring_mode)
         jcpu.set("id", get_cpu_map(j));
         jcpu.set("load", _cpu_load[j]);
         if (monitoring_mode) {
-            // TODO: replace 0s with real values
-            Metron::add_per_core_monitoring_data(&jcpu, LatencyInfo());
+            Metron::add_per_core_monitoring_data(&jcpu, _cpu_latency[j]);
         }
         jcpus.push_back(jcpu);
     }
@@ -2348,7 +2351,7 @@ ServiceChain::generate_configuration()
         newconf += "slave :: MetronSlave();\n\n";
     }
 
-    if (_metron->_monitoring_mode) {
+    if (_metron->_monitoring_mode && get_nics_nb() > 0) {
         newconf+= "monitoring_lat :: TimestampAccumMP();\n\n";
     }
 
@@ -2587,6 +2590,22 @@ ServiceChain::simple_call_read(String handler)
     String response;
 
     int code = call("READ", true, handler, response, "");
+    if (code >= 200 && code < 300) {
+        return response;
+    }
+
+    return "";
+}
+
+/**
+ * Implements simple write handlers for a service chain.
+ */
+String
+ServiceChain::simple_call_write(String handler)
+{
+    String response;
+
+    int code = call("WRITE", false, handler, response, "");
     if (code >= 200 && code < 300) {
         return response;
     }

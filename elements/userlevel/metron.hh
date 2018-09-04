@@ -324,9 +324,9 @@ class NIC {
 
 struct LatencyInfo {
     uint64_t avg_throughput;
-    float min_latency;
-    float median_latency;
-    float max_latency;
+    uint64_t min_latency;
+    uint64_t median_latency;
+    uint64_t max_latency;
 };
 
 class ServiceChain {
@@ -536,6 +536,7 @@ class ServiceChain {
             String &response, String params
         );
         String simple_call_read(String handler);
+        String simple_call_write(String handler);
         int call_read(String handler, String &response, String params = "");
         int call_write(String handler, String &response, String params = "");
 
