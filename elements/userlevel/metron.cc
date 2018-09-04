@@ -2569,10 +2569,10 @@ ServiceChain::call(
             click_chatter("Command was %s %s %s", fnt.c_str(),handler.c_str(), params?params.c_str():"");
             abort();
         }
-        ret = ret.substring(5);
+        ret = ret.substring(5); //Code + return
         int eof = ret.find_left("\r\n");
-        int n = atoi(ret.substring(0, eof).c_str());
-        response = ret.substring(3, n);
+        int n = atoi(ret.substring(0, eof).c_str()); //Data length
+        response = ret.substring(eof + 2, n);
     } else {
         response = ret.substring(4);
     }
