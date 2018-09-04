@@ -599,7 +599,7 @@ class Metron : public Element {
         const char *class_name() const  { return "Metron"; }
         const char *port_count() const  { return PORTS_0_0; }
 
-        int configure_phase() const { return CONFIGURE_PHASE_FIRST; }
+        int configure_phase() const { return CONFIGURE_PHASE_LAST; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         int initialize(ErrorHandler *) CLICK_COLD;

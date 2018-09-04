@@ -94,10 +94,9 @@ int ToDPDKDevice::thread_configure(ThreadReconfigurationStage stage, ErrorHandle
             }
         }
 
-        if (stage == THREAD_INITIALIZE && all_initialized()) {
-            int ret = DPDKDevice::initialize(errh);
-            if (ret != 0) return ret;
-        }
+        //To set is_fullpush, we need to compute passing threads
+        get_passing_threads();
+
         return ret;
 
     }
@@ -138,8 +137,10 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
     _this_node = DPDKDevice::get_port_numa_node(_dev->port_id);
 
-    //To set is_fullpush, we need to compute passing threads
-    get_passing_threads();
+    if (all_initialized()) {
+        int ret = DPDKDevice::initialize(errh);
+        if (ret != 0) return ret;
+    }
 
     return 0;
 }
