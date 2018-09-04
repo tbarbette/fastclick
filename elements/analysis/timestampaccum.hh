@@ -53,13 +53,13 @@ class TimestampAccumBase : public BatchElement { public:
   protected:
 
     struct State {
-        State() : usec_accum(0), count(0), usec_min(UINT32_MAX), usec_max(0) {
+        State() : nsec_accum(0), count(0), nsec_min(UINT64_MAX), nsec_max(0) {
 
         };
-        uint32_t usec_accum;
+        uint64_t nsec_accum;
         uint64_t count;
-        uint32_t usec_min;
-        uint32_t usec_max;
+        uint64_t nsec_min;
+        uint64_t nsec_max;
     };
     T<State> _state;
 

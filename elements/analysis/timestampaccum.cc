@@ -37,7 +37,7 @@ TimestampAccumBase<T>::~TimestampAccumBase()
 template <template <typename> class T> int
 TimestampAccumBase<T>::initialize(ErrorHandler *)
 {
-    PER_THREAD_MEMBER_SET(_state, usec_accum, 0);
+    PER_THREAD_MEMBER_SET(_state, nsec_accum, 0);
     PER_THREAD_MEMBER_SET(_state, count, 0);
     return 0;
 }
@@ -46,12 +46,12 @@ template <template <typename> class T> void
 TimestampAccumBase<T>::push(int port, Packet *p)
 {
     State& state = *_state;
-    uint32_t val = (Timestamp::now() - p->timestamp_anno()).usecval();
-    if (val > state.usec_max)
-        state.usec_max = val;
-    if (val < state.usec_min)
-        state.usec_min = val;
-    state.usec_accum += val;
+    uint64_t val = (Timestamp::now() - p->timestamp_anno()).nsecval();
+    if (val > state.nsec_max)
+        state.nsec_max = val;
+    if (val < state.nsec_min)
+        state.nsec_min = val;
+    state.nsec_accum += val;
     state.count++;
     output(port).push(p);
 }
@@ -65,16 +65,16 @@ TimestampAccumBase<T>::push_batch(int port, PacketBatch *b)
     double acc = 0;
     Timestamp now = Timestamp::now();
     FOR_EACH_PACKET(b, p) {
-        uint32_t val = (now - p->timestamp_anno()).usecval();
+        uint64_t val = (now - p->timestamp_anno()).nsecval();
         acc += val;
         ++c;
-        if (val > state.usec_max)
-            state.usec_max = val;
-        if (val < state.usec_min)
-            state.usec_min = val;
+        if (val > state.nsec_max)
+            state.nsec_max = val;
+        if (val < state.nsec_min)
+            state.nsec_min = val;
     }
     state.count += c;
-    state.usec_accum += acc;
+    state.nsec_accum += acc;
     output(port).push_batch(b);
 }
 #endif
@@ -87,24 +87,26 @@ TimestampAccumBase<T>::read_handler(Element *e, void *thunk)
     for (int i = 0; i < ta->_state.weight(); i++) {
         State& state = ta->_state.get_value(i);
         total.count += state.count;
-        total.usec_accum += state.usec_accum;
-        if (state.usec_min < total.usec_min)
-            total.usec_min = state.usec_min;
-        if (state.usec_max > total.usec_max)
-            total.usec_max = state.usec_max;
+        total.nsec_accum += state.nsec_accum;
+        if (state.nsec_min < total.nsec_min)
+            total.nsec_min = state.nsec_min;
+        if (state.nsec_max > total.nsec_max)
+            total.nsec_max = state.nsec_max;
     }
     int which = reinterpret_cast<intptr_t>(thunk);
     switch (which) {
       case 0:
           return String(total.count);
       case 1:
-          return String(total.usec_accum);
+          return String(total.nsec_accum);
       case 2:
-          return String((double)total.usec_accum / total.count);
+          return String((double)total.nsec_accum / total.count);
       case 3:
-        return String(total.usec_min);
+          if (total.nsec_min == UINT64_MAX)
+              return "0";
+        return String(total.nsec_min);
       case 4:
-        return String(total.usec_max);
+        return String(total.nsec_max);
       default:
 	return String();
     }
@@ -114,7 +116,7 @@ template <template <typename> class T> int
 TimestampAccumBase<T>::reset_handler(const String &, Element *e, void *, ErrorHandler *)
 {
     TimestampAccumBase<T> *ta = static_cast<TimestampAccumBase<T> *>(e);
-    PER_THREAD_MEMBER_SET(ta->_state, usec_accum, 0);
+    PER_THREAD_MEMBER_SET(ta->_state, nsec_accum, 0);
     PER_THREAD_MEMBER_SET(ta->_state, count, 0);
     return 0;
 }
@@ -151,13 +153,17 @@ TimestampAccumMP::read_handler(Element *e, void *thunk)
           case 5:
               accum << String(s.count); break;
           case 6:
-              accum << String(s.usec_accum); break;
+              accum << String(s.nsec_accum); break;
           case 7:
-              accum <<  String((double)s.usec_accum / s.count); break;
+              accum << String((double)s.nsec_accum / s.count); break;
           case 8:
-              accum << String(s.usec_min); break;
+              if (s.nsec_min == UINT64_MAX)
+                  accum << "0";
+              else
+                accum << String(s.nsec_min);
+              break;
           case 9:
-              accum << String(s.usec_max); break;
+              accum << String(s.nsec_max); break;
         }
     }
     return accum.take_string();
