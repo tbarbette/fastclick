@@ -530,31 +530,30 @@ int FromDPDKDevice::write_handler(
                 return errh->error("Not a valid boolean");
             if (fd->_active != active) {
                 fd->_active = active;
-                fd->trigger_thread_reconfiguration(THREAD_RECONFIGURE_PRE);
-                if (fd->_active) {
-                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
-                        fd->_tasks[i]->reschedule();
-                    }
-                    for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
-                        int i = fd->thread_for_queue(q);
-                        if (!fd->_fdstate.get_value(i).timer->scheduled())
-                            fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
-                    }
-                } else {
-                    if ((uintptr_t) thunk == h_safe_active) {
-                        fd->clear_buffers();
-                    }
+                if (fd->_active) { //Activating
+                    fd->trigger_thread_reconfiguration(true,[fd,thunk](){
+                        for (int i = 0; i < fd->usable_threads.weight(); i++) {
+                            fd->_tasks[i]->reschedule();
+                        }
+                        for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
+                            int i = fd->thread_for_queue(q);
+                            if (!fd->_fdstate.get_value(i).timer->scheduled())
+                                fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
+                        }
+                    });
+                } else { //Deactivating
+                    fd->trigger_thread_reconfiguration(false,[fd](){
+                        for (int i = 0; i < fd->usable_threads.weight(); i++) {
+                            fd->_tasks[i]->unschedule();
+                        }
 
-                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
-                        fd->_tasks[i]->unschedule();
-                    }
-                    for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
-                        int i = fd->thread_for_queue(q);
-                        if (fd->_fdstate.get_value(i).timer->scheduled())
-                            fd->_fdstate.get_value(i).timer->unschedule();
-                    }
+                        for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
+                            int i = fd->thread_for_queue(q);
+                            if (fd->_fdstate.get_value(i).timer->scheduled())
+                                fd->_fdstate.get_value(i).timer->unschedule();
+                        }
+                    });
                 }
-                fd->trigger_thread_reconfiguration(THREAD_RECONFIGURE_POST);
             }
             return 0;
         }

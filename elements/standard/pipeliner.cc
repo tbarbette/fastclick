@@ -98,9 +98,9 @@ Pipeliner::configure(Vector<String> & conf, ErrorHandler * errh)
 
 int
 Pipeliner::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh) {
-    if (stage != THREAD_RECONFIGURE_PRE && stage != THREAD_INITIALIZE)
+    if (stage != THREAD_RECONFIGURE_UP_PRE && stage != THREAD_RECONFIGURE_DOWN_POST && stage != THREAD_INITIALIZE)
         return 0;
-    //Only handle first-configuration and pre-reconfiguration
+    //Only handle first-configuration and pre-reconfiguration for up and post-configuration for down
 
     bool fp;
     Bitvector passing = get_passing_threads(false, -1, this, fp);

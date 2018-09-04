@@ -8,6 +8,8 @@
 #include <click/packetbatch.hh>
 #include <click/handler.hh>
 #include <click/sync.hh>
+#include <functional>
+
 CLICK_DECLS
 class Router;
 class Master;
@@ -180,12 +182,14 @@ class Element { public:
 
     enum ThreadReconfigurationStage {
         THREAD_INITIALIZE,
-        THREAD_RECONFIGURE_PRE,
-        THREAD_RECONFIGURE_POST
+        THREAD_RECONFIGURE_UP_PRE,
+        THREAD_RECONFIGURE_UP_POST,
+        THREAD_RECONFIGURE_DOWN_PRE,
+        THREAD_RECONFIGURE_DOWN_POST,
     };
 
     virtual int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh);
-    void trigger_thread_reconfiguration(ThreadReconfigurationStage);
+    void trigger_thread_reconfiguration(bool is_up, std::function<void()> ready);
 
     //Deprecated name, implement get_spawning_threads
     virtual bool get_runnable_threads(Bitvector&) final = delete;

@@ -1837,10 +1837,18 @@ public:
     }
 };
 
-void Element::trigger_thread_reconfiguration(ThreadReconfigurationStage stage) {
-    ThreadReconfigureVisitor tr(stage,ErrorHandler::default_handler());
-    router()->visit(this, true, -1, &tr);
-    router()->visit(this, false, -1, &tr);
+void Element::trigger_thread_reconfiguration(bool is_up, std::function<void()> ready) {
+
+    ThreadReconfigurationStage stage = is_up? THREAD_RECONFIGURE_UP_PRE : THREAD_RECONFIGURE_DOWN_PRE;
+    ThreadReconfigureVisitor trpre(stage,ErrorHandler::default_handler());
+    router()->visit(this, true, -1, &trpre);
+    router()->visit(this, false, -1, &trpre);
+    ready();
+
+    stage = is_up? THREAD_RECONFIGURE_UP_POST : THREAD_RECONFIGURE_DOWN_POST;
+    ThreadReconfigureVisitor trpost(stage,ErrorHandler::default_handler());
+    router()->visit(this, true, -1, &trpost);
+    router()->visit(this, false, -1, &trpost);
 }
 
 // SELECT
