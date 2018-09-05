@@ -25,8 +25,8 @@
 #include <click/standard/scheduleinfo.hh>
 #include <click/etheraddress.hh>
 #include <click/straccum.hh>
-
 #include "fromdpdkdevice.hh"
+#include "tscclock.hh"
 
 CLICK_DECLS
 
@@ -54,6 +54,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     uint16_t mtu = 0;
     bool has_mac = false;
     bool has_mtu = false;
+    bool set_timestamp = false;
     FlowControlMode fc_mode(FC_UNSET);
 
     if (Args(this, errh).bind(conf)
@@ -68,7 +69,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
-        .read("MAXQUEUES",maxqueues)
+        .read("MAXQUEUES", maxqueues)
+        .read("TIMESTAMP", set_timestamp)
         .read("PAUSE", fc_mode)
         .complete() < 0)
         return -1;
@@ -111,8 +113,38 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (fc_mode != FC_UNSET)
         _dev->set_init_fc_mode(fc_mode);
 
+    if (set_timestamp) {
+        _dev->set_offload(DEV_RX_OFFLOAD_TIMESTAMP);
+        _set_timestamp = true;
+    }
+
     return 0;
 }
+
+uint64_t FromDPDKDevice::read_clock(void* thunk) {
+    FromDPDKDevice* fd = (FromDPDKDevice*)thunk;
+    uint64_t clock;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    if (rte_eth_read_clock(fd->_dev->port_id, &clock) == 0)
+        return clock;
+#pragma GCC diagnostic pop
+    return -1;
+}
+
+
+struct UserClockSource dpdk_clock {
+    .get_current_tick = &FromDPDKDevice::read_clock,
+    .get_tick_hz = 0,
+};
+
+void* FromDPDKDevice::cast(const char* name) {
+    if (String(name) == "UserClockSource")
+        return &dpdk_clock;
+    return RXQueueDevice::cast(name);
+}
+
+
 
 int FromDPDKDevice::initialize(ErrorHandler *errh)
 {
@@ -143,6 +175,17 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (all_initialized()) {
         ret = DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
+    }
+
+    if (_set_timestamp) {
+        uint64_t t;
+        int err;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        if ((err = rte_eth_read_clock(_dev->port_id, &t)) != 0) {
+            return errh->error("Device does not support queryig internal time ! Disable hardware timestamping. Error %d", err);
+        }
+#pragma GCC diagnostic pop
     }
 
     return ret;
@@ -194,6 +237,10 @@ bool FromDPDKDevice::run_task(Task *t)
 #endif
             if (_set_paint_anno) {
                 SET_PAINT_ANNO(p, iqueue);
+            }
+
+            if (_set_timestamp && (pkts[i]->ol_flags & PKT_RX_TIMESTAMP)) {
+                p->timestamp_anno().assignlong(pkts[i]->timestamp);
             }
 #if HAVE_BATCH
             if (head == NULL)
@@ -470,6 +517,7 @@ void FromDPDKDevice::add_handlers()
 }
 
 CLICK_ENDDECLS
+
 ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
 EXPORT_ELEMENT(FromDPDKDevice)
 ELEMENT_MT_SAFE(FromDPDKDevice)
