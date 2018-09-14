@@ -21,13 +21,7 @@ someone from another company/research unit merges it.
 Examples
 --------
 See conf/fastclick/README.md
-The wiki provides more information about the I/O frameworks you should use for high speed, such as DPDK and Netmap, and how to configure them.
-
-Continuous integration and `make check`
----------------------------------------
-To ensure people not familiar with batching get warned about bad configuration including non-batch compatible element, some messages are printed to inform a potential slower configuration. However testies (used by `make check`) does not cope well with those message to stdout. To disable them and allow make check to run, you must pass `--disable-verbose-batch` to configure.
-
-This repository uses Travis CI for CI tests which run make check under various configure options combinations. We also have a Gitlab CI for internal tests.
+The wiki provides more information about the [I/O frameworks you should use for high speed](https://github.com/tbarbette/fastclick/wiki/High-speed-I-O), such as DPDK and Netmap, and how to configure them.
 
 Differences with the ANCS paper
 -------------------------------
