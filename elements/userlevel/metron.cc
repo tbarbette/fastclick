@@ -615,7 +615,7 @@ Metron::run_timer(Timer *t)
                 sc->_cpu_latency[j].avg_throughput = throughput;
                 sc->_cpu_latency[j].min_latency = atoll(min[j].c_str());
                 sc->_cpu_latency[j].max_latency = atoll(max[j].c_str());
-                sc->_cpu_latency[j].median_latency = atoll(avg[j].c_str());
+                sc->_cpu_latency[j].average_latency = atoll(avg[j].c_str());
             }
             total_cpu_load += cpu_load;
             if (cpu_load > max_cpu_load) {
@@ -1415,7 +1415,7 @@ Metron::add_per_core_monitoring_data(Json *jobj, const LatencyInfo lat)
     }
 
     if ((lat.avg_throughput < 0) || (lat.min_latency < 0) ||
-        (lat.median_latency < 0) || (lat.max_latency < 0)) {
+        (lat.average_latency < 0) || (lat.max_latency < 0)) {
         click_chatter("Invalid per-core monitoring data");
         return;
     }
@@ -1427,7 +1427,7 @@ Metron::add_per_core_monitoring_data(Json *jobj, const LatencyInfo lat)
 
     Json jlat = Json::make_object();
     jlat.set("min", lat.min_latency);
-    jlat.set("median", lat.median_latency);
+    jlat.set("average", lat.average_latency);
     jlat.set("max", lat.max_latency);
     jlat.set("unit", "ns");
     jobj->set("latency", jlat);

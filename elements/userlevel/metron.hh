@@ -349,7 +349,7 @@ class NIC {
 struct LatencyInfo {
     uint64_t avg_throughput;
     uint64_t min_latency;
-    uint64_t median_latency;
+    uint64_t average_latency;
     uint64_t max_latency;
 };
 
