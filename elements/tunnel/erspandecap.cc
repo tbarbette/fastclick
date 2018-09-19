@@ -54,6 +54,8 @@ ERSPANDecap::classify(Packet *p)
   int ret = 0;
   uint8_t ver = erspan->ver;
   if (ver == 0x01) {
+      if (_direction_anno)
+          SET_PAINT_ANNO(p, erspan->en);
   } else if (ver == 0x02) {
       const click_erspan3 *erspan3 = reinterpret_cast<const click_erspan3 *>(p->data());
       sz = sizeof(click_erspan3);
