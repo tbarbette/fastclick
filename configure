@@ -1512,16 +1512,14 @@ Optional Features:
                           disable warnings and information about batching
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
-    --enable-netmap-pool  use netmap buffers instead of standard Click
-                          malloc'ed buffers
+    --enable-netmap-pool  use netmap buffers instead of standard Click buffers
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use DPDK
-    --enable-dpdk-pool    use DPDK buffer instead of standard click malloc'ed
-                          buffer
+    --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
   --disable-linuxmodule   disable Linux kernel driver
