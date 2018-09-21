@@ -51,6 +51,8 @@ class Packet { public:
 	default_headroom = 48,		///< Increase headroom for improved performance.
 #elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL
 	default_headroom = RTE_PKTMBUF_HEADROOM,
+#elif HAVE_CLICK_PACKET_POOL
+	default_headroom = 64,
 #else
 	default_headroom = 28,		///< Default packet headroom() for
 					///  Packet::make().  4-byte aligned.
