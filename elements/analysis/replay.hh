@@ -28,10 +28,7 @@ protected:
     void add_handlers();
     void set_active(bool active);
 
-    void reset_time() {
-        _lastsent_p = _queue_current->timestamp_anno();
-        _lastsent_real = Timestamp::now_steady();
-    }
+    void reset_time();
 
     struct s_input {
 		NotifierSignal signal;

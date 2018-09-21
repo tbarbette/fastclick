@@ -52,6 +52,14 @@ int ReplayBase::parse(Args* args) {
     return 0;
 }
 
+
+void ReplayBase::reset_time() {
+    if (_queue_current) {
+        _lastsent_p = _queue_current->timestamp_anno();
+        _lastsent_real = Timestamp::now_steady();
+    }
+}
+
 void ReplayBase::cleanup_packets() {
     while (_queue_head) {
         Packet* next = _queue_head->next();
