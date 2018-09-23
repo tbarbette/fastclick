@@ -481,21 +481,17 @@ FromDump::read_packet(ErrorHandler *errh)
 
         // User asked for the real length of the packet
         if (_force_len == REAL_LEN) {
-            // desired_len = len;
             desired_len = (_linktype == FAKE_DLT_RAW) ? (len - 14) : len;
         // .. or a given legnth
         } else {
-            // Raw IP packets lack an Ethernet header
             desired_len = (_linktype == FAKE_DLT_RAW) ? (_force_len - 14) : _force_len;
         }
 
         // Need to enlarge the packet
         if (desired_len > caplen) {
-            // click_chatter(" Put: %d bytes", (desired_len - caplen));
             q = p->put((desired_len - caplen));
         // Need to chop the packet
-        } else if (desired_len <= caplen) {
-            // click_chatter("Take: %d bytes", (caplen - desired_len));
+        } else {
             q = p->uniqueify();
             q->take(caplen - desired_len);
         }
@@ -519,6 +515,7 @@ FromDump::read_packet(ErrorHandler *errh)
             _packet = 0;
             return false;
         }
+
         // Keep the old length for incremental IP checksum calculation
         uint16_t len_old = ip->ip_len;
 
