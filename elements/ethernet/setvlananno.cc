@@ -51,6 +51,15 @@ SetVLANAnno::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+SetVLANAnno::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET(SetVLANAnno::simple_action, batch);
+    return batch;
+}
+#endif
+
 String
 SetVLANAnno::read_handler(Element *e, void *user_data)
 {
