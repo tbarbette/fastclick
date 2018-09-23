@@ -1,6 +1,6 @@
 #ifndef CLICK_SETVLANANNO_HH
 #define CLICK_SETVLANANNO_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -34,7 +34,7 @@ Return or set the VLAN_PCP parameter.
 
 EtherVLANEncap */
 
-class SetVLANAnno : public Element { public:
+class SetVLANAnno : public BatchElement { public:
 
     SetVLANAnno() CLICK_COLD;
     ~SetVLANAnno() CLICK_COLD;
@@ -47,6 +47,9 @@ class SetVLANAnno : public Element { public:
     void add_handlers() CLICK_COLD;
 
     Packet *simple_action(Packet *p);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 

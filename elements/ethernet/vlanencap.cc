@@ -79,6 +79,15 @@ VLANEncap::simple_action(Packet *p)
 	return 0;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+VLANEncap::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(VLANEncap::simple_action, batch, [](Packet*){});
+    return batch;
+}
+#endif
+
 String
 VLANEncap::read_handler(Element *e, void *user_data)
 {
