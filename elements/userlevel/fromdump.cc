@@ -479,7 +479,8 @@ FromDump::read_packet(ErrorHandler *errh)
         WritablePacket *q = 0;
         int desired_len = -1;
 
-        // User asked for the real length of the packet
+        // User asked for the real length of the packet.
+        // In the case of raw IP packets we reduce the length as they lack an Ethernet header
         if (_force_len == REAL_LEN) {
             desired_len = (_linktype == FAKE_DLT_RAW) ? (len - 14) : len;
         // .. or a given legnth
