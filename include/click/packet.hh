@@ -2115,6 +2115,7 @@ Packet::set_dst_ip_anno(IPAddress a)
 inline void
 Packet::set_mac_header(const unsigned char *p)
 {
+    if (!p) return;
     assert(p >= buffer() && p <= end_buffer());
 #if CLICK_LINUXMODULE	/* Linux kernel module */
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
