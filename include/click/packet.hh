@@ -325,6 +325,7 @@ class Packet { public:
     inline void change_buffer_length(uint32_t length);
 #endif
     bool copy(Packet* p, int headroom=0);
+    static uint32_t max_buffer_length();
     //@}
 
     /** @name Header Pointers */

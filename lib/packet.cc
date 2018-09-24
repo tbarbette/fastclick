@@ -518,6 +518,12 @@ inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 
 }
 
+uint32_t
+Packet::max_buffer_length()
+{
+    return CLICK_PACKET_POOL_BUFSIZ;
+}
+
 /**
  * @Precond _use_count == 1
  */

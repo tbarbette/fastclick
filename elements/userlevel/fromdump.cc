@@ -497,7 +497,13 @@ FromDump::read_packet(ErrorHandler *errh)
             q->take(caplen - desired_len);
         }
 
-        if (!q) {
+        if (!q || (q->length() > Packet::max_buffer_length())) {
+            if (q) {
+                click_chatter(
+                    "Frame length (%" PRIu32 " bytes) exceeds the available buffer length (%" PRIu32 " bytes)",
+                    q->length(), Packet::max_buffer_length()
+                );
+            }
             _packet = 0;
             return false;
         }
