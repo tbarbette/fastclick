@@ -170,8 +170,7 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
         int i = 0;
         rte_mempool_walk(add_pool,(void*)&i);
         if (i == 0) {
-            errh->error("Could not get pools from the primary DPDK process");
-            return -1;
+            return errh->error("Could not get pools from the primary DPDK process");
         }
     }
 
