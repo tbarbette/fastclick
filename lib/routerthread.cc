@@ -486,10 +486,12 @@ RouterThread::run_tasks(int ntasks)
 }
 
 
+#if HAVE_CLICK_LOAD
 float
 RouterThread::load() {
   return (float) _load.unscaled_average() / 1024;
 }
+#endif
 
 inline void
 RouterThread::run_os()
