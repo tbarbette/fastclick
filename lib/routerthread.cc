@@ -67,7 +67,7 @@ static unsigned long greedy_schedule_jiffies;
  */
 
 RouterThread::RouterThread(Master *master, int id)
-    : _stop_flag(false), _master(master), _id(id), _driver_entered(false)
+    : _stop_flag(false), _master(master), _id(id), _driver_entered(false), _load()
 {
     _pending_head.x = 0;
     _pending_tail = &_pending_head;
@@ -369,6 +369,11 @@ RouterThread::run_tasks(int ntasks)
 #endif
     bool work_done;
 
+#if HAVE_CLICK_LOAD
+    click_cycles_t useful = 0;
+    click_cycles_t useless = 0;
+#endif
+
     for (; ntasks >= 0; --ntasks) {
         t = task_begin();
         if (t == task_end() || _stop_flag)
@@ -382,7 +387,12 @@ RouterThread::run_tasks(int ntasks)
             continue;
         }
 
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS && HAVE_CLICK_LOAD
+    runs = t->cycle_runs();
+    cycles = click_get_cycles();
+#elif HAVE_CLICK_LOAD
+    cycles = click_get_cycles();
+#elif HAVE_TASK_STATS
         runs = t->cycle_runs();
         if (runs > PROFILE_ELEMENT)
             cycles = click_get_cycles();
@@ -391,7 +401,15 @@ RouterThread::run_tasks(int ntasks)
         t->_status.is_scheduled = false;
         work_done = t->fire();
 
-#if HAVE_MULTITHREAD
+#if HAVE_CLICK_LOAD
+        if (work_done) {
+            useful += click_get_cycles() - cycles;
+        } else {
+            useless += click_get_cycles() - cycles;
+        }
+#endif
+
+#if HAVE_TASK_STATS
         if (runs > PROFILE_ELEMENT) {
             unsigned delta = click_get_cycles() - cycles;
             t->update_cycles(delta/32 + (t->cycles()*31)/32);
@@ -448,9 +466,16 @@ RouterThread::run_tasks(int ntasks)
                 n->_prev = t;
             }
 #endif
-        } else
+        } else {
             t->remove_from_scheduled_list();
+        }
     }
+
+#if HAVE_CLICK_LOAD
+    if (useless > 0 || useful > 0) {
+        _load.update((useful << 10) / (useless + useful));
+    }
+#endif
 
 #if CLICK_BSDMODULE && !BSD_NETISRSCHED
     splx(bsd_spl);
@@ -458,6 +483,12 @@ RouterThread::run_tasks(int ntasks)
 #if HAVE_ADAPTIVE_SCHEDULER
     client_update_pass(C_CLICK, t_before);
 #endif
+}
+
+
+float
+RouterThread::load() {
+  return (float) _load.unscaled_average() / 1024;
 }
 
 inline void

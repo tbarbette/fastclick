@@ -198,7 +198,9 @@ public:
     }
 
 private:
-
+    static int reset_load_handler(
+        const String &, Element *, void *, ErrorHandler *
+    ) CLICK_COLD;
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(
         const String &, Element *, void *, ErrorHandler *

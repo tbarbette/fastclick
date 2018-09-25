@@ -578,6 +578,7 @@ Metron::run_timer(Timer *t)
                 sc->nic_stats[stat_idx].useless = useless;
                 sc->nic_stats[stat_idx].useful = useful;
                 sc->nic_stats[stat_idx].count = count;
+//                long long count = atoll(sc->simple_call_write(name + ".reset_load").c_str());
                 if (useful_diff + useless_diff == 0) {
                     sc->nic_stats[stat_idx].load = 0;
                     // click_chatter(
@@ -1825,15 +1826,15 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     Json jcpus = Json::make_array();
     for (int j = 0; j < get_max_cpu_nb(); j++) {
         String js = String(j);
-        int avg_max = 0;
-        for (int i = 0; i < get_nics_nb(); i++) {
+/*        int avg_max = 0;
+          for (int i = 0; i < get_nics_nb(); i++) {
             String is = String(i);
             int avg = atoi(
                 simple_call_read("batchAvg" + is + "C" + js + ".average").c_str()
             );
             if (avg > avg_max)
                 avg_max = avg;
-        }
+        }*/
         Json jcpu = Json::make_object();
         jcpu.set("id", get_cpu_map(j));
         jcpu.set("load", _cpu_load[j]);

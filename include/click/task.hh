@@ -289,7 +289,7 @@ class Task : private TaskLink { public:
     inline unsigned utilization() const;
     inline void clear_runs();
 #endif
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
     inline int cycles() const;
     inline unsigned cycle_runs() const;
     inline void update_cycles(unsigned c);
@@ -327,7 +327,7 @@ class Task : private TaskLink { public:
     unsigned _runs;
     unsigned _work_done;
 #endif
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
     DirectEWMA _cycles;
     unsigned _cycle_runs;
 #endif
@@ -390,7 +390,7 @@ Task::Task(TaskCallback f, void *user_data)
 #if HAVE_ADAPTIVE_SCHEDULER
       _runs(0), _work_done(0),
 #endif
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
       _cycle_runs(0),
 #endif
       _thread(0), _owner(0)
@@ -413,7 +413,7 @@ Task::Task(Element* e)
 #if HAVE_ADAPTIVE_SCHEDULER
       _runs(0), _work_done(0),
 #endif
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
       _cycle_runs(0),
 #endif
       _thread(0), _owner(0)
@@ -568,7 +568,7 @@ Task::adjust_tickets(int delta)
  *
  * This function is generally called by the RouterThread implementation; there
  * should be no need to call it yourself.
- */
+*/
 inline bool
 Task::fire()
 {
@@ -576,7 +576,7 @@ Task::fire()
     click_cycles_t start_cycles = click_get_cycles(),
         start_child_cycles = _owner->_child_cycles;
 #endif
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
     _cycle_runs++;
 #endif
     bool work_done;
@@ -623,7 +623,7 @@ Task::clear_runs()
 }
 #endif
 
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
 inline int
 Task::cycles() const
 {

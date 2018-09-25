@@ -69,6 +69,10 @@ class RouterThread { public:
     void set_cpu_share(unsigned min_share, unsigned max_share);
 #endif
 
+#if HAVE_CLICK_LOAD
+    float load();
+#endif
+
 #if CLICK_LINUXMODULE || CLICK_BSDMODULE
     bool greedy() const                 { return _greedy; }
     void set_greedy(bool g)             { _greedy = g; }
@@ -143,6 +147,9 @@ class RouterThread { public:
     Timestamp _adaptive_restride_timestamp;
     int _adaptive_restride_iter;
 #endif
+
+
+    DirectEWMA _load;
 
     // EXTERNAL STATE GROUP
     Spinlock _task_lock CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);

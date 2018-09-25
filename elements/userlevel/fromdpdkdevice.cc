@@ -705,6 +705,17 @@ int FromDPDKDevice::xstats_handler(
     return -1;
 }
 
+int FromDPDKDevice::reset_load_handler(
+        const String &input, Element *e, void *thunk, ErrorHandler *errh)
+{
+
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    for (unsigned int i = 0; i < fd->thread_state.weight(); i ++) {
+        fd->thread_state.get_value(i)._useless = 0;
+        fd->thread_state.get_value(i)._useful = 0;
+    }
+    return 0;
+}
 
 void FromDPDKDevice::add_handlers()
 {
@@ -729,6 +740,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("useful", count_handler, h_useful);
     add_read_handler("useless", count_handler, h_useless);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
+    add_write_handler("reset_load", reset_load_handler, 0, Handler::BUTTON);
 
     add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);
     add_read_handler("nb_tx_queues",read_handler, h_nb_tx_queues);

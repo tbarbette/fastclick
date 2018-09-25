@@ -866,6 +866,8 @@ enable_dynamic_linking
 enable_stats
 enable_stride
 enable_task_heap
+enable_task_stats
+enable_cpu_load
 enable_dmalloc
 enable_valgrind
 enable_schedule_debugging
@@ -1584,6 +1586,10 @@ Optional Features:
   --enable-stats[=LEVEL]  enable statistics collection
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
+  --enable-task-stats     Keep track of task statistics, used for automatic
+                          balancing of tasks among threads
+  --enable-cpu-load       Keep track of CPU usage using an approximation.
+                          Useful when using polling keeping the CPU at 100%
   --enable-dmalloc        enable debugging malloc
   --enable-valgrind       extra support for debugging with valgrind
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
@@ -10900,6 +10906,30 @@ Ignoring --enable-task-heap, which is incompatible with --disable-stride.
 fi
 
 
+# Check whether --enable-task-stats was given.
+if test "${enable_task_stats+set}" = set; then :
+  enableval=$enable_task_stats; :
+else
+  enable_task_stats=no
+fi
+
+if test "x$enable_task_stats" = xyes; then
+    $as_echo "#define HAVE_TASK_STATS 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-cpu-load was given.
+if test "${enable_cpu_load+set}" = set; then :
+  enableval=$enable_cpu_load; :
+else
+  enable_cpu_load=no
+fi
+
+if test "x$enable_cpu_load" = xyes; then
+    $as_echo "#define HAVE_CLICK_LOAD 1" >>confdefs.h
+
+fi
+
 
 # Check whether --enable-dmalloc was given.
 if test "${enable_dmalloc+set}" = set; then :
@@ -14360,6 +14390,10 @@ fi
 
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
+fi
+
+if test "x$enable_task_stats" = xyes; then
+    provisions="$provisions taskstats"
 fi
 
 if test "x$enable_user_multithread" = xyes; then
