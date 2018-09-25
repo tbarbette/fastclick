@@ -115,14 +115,14 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
     if (data != "") {
         if (opt == TSD_PERC_HANDLER) {
             int pos = data.find_left(' ');
-            if (pos == -1) pos = data.length();
+            if (pos == -1) pos = data.length() - 1;
             perc = atoi(data.substring(0,pos).c_str());
             data = data.substring(pos);
         }
         begin = atoi(data.c_str());
         const uint32_t current_vector_length = static_cast<const uint32_t>(tsd->_nd.value());
 
-        if (current_vector_length < begin) {
+        if (begin >= current_vector_length) {
                data = 0;
                return 1;
         }
