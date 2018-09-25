@@ -488,22 +488,24 @@ FromDump::read_packet(ErrorHandler *errh)
             desired_len = (_linktype == FAKE_DLT_RAW) ? (_force_len - 14) : _force_len;
         }
 
+        // TODO: Fix this issue
+        if (desired_len > 2048) {
+            click_chatter("Drop frame with length %d bytes as it exceeds the available buffer length", desired_len);
+            p->kill();
+            _packet = 0;
+            return false;
+        }
+
         // Need to enlarge the packet
         if (desired_len > caplen) {
-            q = p->put((desired_len - caplen));
+            q = p->put(desired_len - caplen);
         // Need to chop the packet
         } else {
             q = p->uniqueify();
             q->take(caplen - desired_len);
         }
 
-        if (!q || (q->length() > Packet::max_buffer_length())) {
-            if (q) {
-                click_chatter(
-                    "Frame length (%" PRIu32 " bytes) exceeds the available buffer length (%" PRIu32 " bytes)",
-                    q->length(), Packet::max_buffer_length()
-                );
-            }
+        if (!q) {
             _packet = 0;
             return false;
         }
