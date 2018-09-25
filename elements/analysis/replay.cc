@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true),_timing(0), _lastsent_p(), _lastsent_real() {
+ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _lastsent_p(), _lastsent_real() {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
@@ -44,7 +44,6 @@ int ReplayBase::parse(Args* args) {
              .read("FREEONTERMINATE", _freeonterminate)
              .read("LIMIT", _limit)
              .read("ACTIVE",_active)
-             .read("TIMING", _timing)
              .execute() < 0) {
         return -1;
     }
@@ -114,7 +113,6 @@ ReplayBase::add_handlers()
     add_write_handler("reset", write_handler, 1, Handler::BUTTON);
     add_data_handlers("loaded", Handler::OP_READ, &_loaded);
     add_data_handlers("active", Handler::OP_READ, &_active);
-    add_data_handlers("timing", Handler::OP_READ | Handler::OP_WRITE, &_timing);
     add_data_handlers("stop", Handler::OP_READ | Handler::OP_WRITE, &_stop);
 }
 
@@ -149,9 +147,6 @@ Replay::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("USE_SIGNAL",_use_signal)
     .complete() < 0)
         return -1;
-
-    if (_timing > 0)
-        errh->error("Only ReplayUnqueue supports timing");
 
     return 0;
 }
@@ -226,7 +221,7 @@ Replay::run_task(Task* task)
 }
 
 
-ReplayUnqueue::ReplayUnqueue()
+ReplayUnqueue::ReplayUnqueue() : _timing(0)
 {
 
 }
@@ -243,6 +238,7 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
     if (args
         .read("USE_SIGNAL",_use_signal)
+        .read("TIMING", _timing)
         .complete() < 0)
         return -1;
     return 0;
@@ -343,6 +339,12 @@ end:
     check_end_loop(task);
 
     return n > 0;
+}
+
+void
+ReplayUnqueue::add_handlers() {
+    ReplayBase::add_handlers();
+    add_data_handlers("timing", Handler::OP_READ | Handler::OP_WRITE, &_timing);
 }
 
 
