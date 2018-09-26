@@ -208,8 +208,6 @@ if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
     AC_DEFINE([HAVE_RE2])
 else
     have_re2=no
-
-    AC_MSG_ERROR([x-$ac_have_re2 - $ac_have_re2_h])
 fi
 
 AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
