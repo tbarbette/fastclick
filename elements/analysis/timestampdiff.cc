@@ -115,8 +115,11 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
     if (data != "") {
         if (opt == TSD_PERC_HANDLER) {
             int pos = data.find_left(' ');
-            if (pos == -1) pos = data.length() - 1;
-            perc = atoi(data.substring(0,pos).c_str());
+            if (pos == -1) pos = data.length();
+            if (!DoubleArg().parse(data.substring(0, pos), perc)) {
+                data = "<error>";
+                return -1;
+            }
             data = data.substring(pos);
         }
         begin = atoi(data.c_str());
