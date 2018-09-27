@@ -25,8 +25,10 @@ protected:
     void cleanup_packets();
     inline void check_end_loop(Task* t);
     static int write_handler(const String &, Element *e, void *thunk, ErrorHandler *errh);
-    void add_handlers();
+    void add_handlers() override;
     void set_active(bool active);
+
+    void reset_time();
 
     struct s_input {
 		NotifierSignal signal;
@@ -48,6 +50,8 @@ protected:
     bool _use_signal;
     bool _verbose;
     bool _freeonterminate;
+    Timestamp _lastsent_p;
+    Timestamp _lastsent_real;
 };
 
 
@@ -104,6 +108,13 @@ class ReplayUnqueue : public ReplayBase { public:
     }
 
     bool run_task(Task*);
+
+
+    void add_handlers() override;
+
+private:
+
+    unsigned _timing;
 
 };
 
@@ -172,12 +183,14 @@ inline bool ReplayBase::load_packets() {
         }
         _loaded = true;
         _queue_current = _queue_head;
+        reset_time();
         return true;
 }
 
 inline void ReplayBase::check_end_loop(Task* t) {
     if (unlikely(!_queue_current)) {
         _queue_current = _queue_head;
+        reset_time();
         if (_stop > 0)
             _stop--;
         if (_stop == 0) {

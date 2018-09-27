@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true) {
+ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _lastsent_p(), _lastsent_real() {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
@@ -51,6 +51,14 @@ int ReplayBase::parse(Args* args) {
     return 0;
 }
 
+
+void ReplayBase::reset_time() {
+    if (_queue_current) {
+        _lastsent_p = _queue_current->timestamp_anno();
+        _lastsent_real = Timestamp::now_steady();
+    }
+}
+
 void ReplayBase::cleanup_packets() {
     while (_queue_head) {
         Packet* next = _queue_head->next();
@@ -66,6 +74,7 @@ void ReplayBase::cleanup(CleanupStage) {
 void
 ReplayBase::set_active(bool active) {
     _active = active;
+    reset_time();
     if (active)
         _task.reschedule();
     else
@@ -212,7 +221,7 @@ Replay::run_task(Task* task)
 }
 
 
-ReplayUnqueue::ReplayUnqueue()
+ReplayUnqueue::ReplayUnqueue() : _timing(0)
 {
 
 }
@@ -220,7 +229,6 @@ ReplayUnqueue::ReplayUnqueue()
 ReplayUnqueue::~ReplayUnqueue()
 {
 }
-
 
 int
 ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -230,6 +238,7 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
     if (args
         .read("USE_SIGNAL",_use_signal)
+        .read("TIMING", _timing)
         .complete() < 0)
         return -1;
     return 0;
@@ -258,6 +267,9 @@ ReplayUnqueue::run_task(Task* task)
         return false;
     }
 
+    Timestamp now;
+    if (_timing > 0)
+        now = Timestamp::now_steady();
     unsigned int n = 0;
 #if HAVE_BATCH
     unsigned int c = 0;
@@ -265,7 +277,31 @@ ReplayUnqueue::run_task(Task* task)
     Packet* last = 0;
 #endif
     while (_queue_current != 0 && n < _burst) {
-        Packet* p = _queue_current;
+            Packet* p = _queue_current;
+
+            //If timing is activated, wait for the amount of time or resched
+            if (_timing > 0) {
+                const unsigned min_timing = 1; //Amount of us between packets to ignore and sent right away
+                const unsigned min_sched = 10; //Amount of us that leads to rescheduling
+
+                Timestamp tdiff = p->timestamp_anno() - _lastsent_p;
+                long diff = tdiff.usecval();
+                long rdiff;
+                while (diff - (rdiff = ((long)(now - _lastsent_real).usecval() * _timing)) > min_timing) {
+#if HAVE_BATCH
+                    if (head) {
+                        output_push_batch(0,head->make_tail(last,c));
+                        head = 0;
+                        c = 0;
+                    }
+#endif
+                    if (diff - rdiff > min_sched) {
+                        goto end;
+                    }
+                    now = Timestamp::now_steady();
+                    click_relax_fence();
+                }
+            }
 
             _queue_current = p->next();
             Packet* q;
@@ -275,6 +311,7 @@ ReplayUnqueue::run_task(Task* task)
                 q = p;
                 _queue_head = _queue_current;
             }
+
 #if HAVE_BATCH
             if (head == 0) {
                 head = PacketBatch::start_head(q);
@@ -298,10 +335,16 @@ ReplayUnqueue::run_task(Task* task)
         output_push_batch(0,head->make_tail(last,c));
 #endif
 
-
+end:
     check_end_loop(task);
 
     return n > 0;
+}
+
+void
+ReplayUnqueue::add_handlers() {
+    ReplayBase::add_handlers();
+    add_data_handlers("timing", Handler::OP_READ | Handler::OP_WRITE, &_timing);
 }
 
 

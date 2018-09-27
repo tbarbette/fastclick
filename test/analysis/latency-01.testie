@@ -17,10 +17,17 @@ InfiniteSource(LENGTH 64, LIMIT 10000, STOP true)
 -> diff :: TimestampDiff(RECORDER record)
 -> Discard
 
-DriverManager(wait,read diff.average, read counter.count)
+DriverManager(wait,read diff.average, read diff.perc100, read diff.perc 100,  print "$(eq $(diff.perc100) $(diff.perc 100))", read counter.count)
+
+%expect stdout
+true
 
 %expect stderr
 diff.average:
 {{[0-9]{1,2}[.][0-9]+}}
+diff.perc100:
+{{[0-9]+}}
+diff.perc:
+{{[0-9]+}}
 counter.count:
 10000

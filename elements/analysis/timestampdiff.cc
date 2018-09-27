@@ -95,6 +95,7 @@ enum {
     TSD_PERC_95_HANDLER,
     TSD_PERC_99_HANDLER,
     TSD_PERC_100_HANDLER,
+    TSD_PERC_HANDLER,
     TSD_LAST_SEEN,
     TSD_CURRENT_INDEX,
     TSD_DUMP_HANDLER
@@ -108,11 +109,29 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
     double  mean = 0.0;
     unsigned max = 0;
     unsigned begin = 0;
+    double perc = 0;
+    int opt = reinterpret_cast<intptr_t>(handler->user_data(Handler::f_read));
 
-    if (data != "")
+    if (data != "") {
+        if (opt == TSD_PERC_HANDLER) {
+            int pos = data.find_left(' ');
+            if (pos == -1) pos = data.length();
+            if (!DoubleArg().parse(data.substring(0, pos), perc)) {
+                data = "<error>";
+                return -1;
+            }
+            data = data.substring(pos);
+        }
         begin = atoi(data.c_str());
+        const uint32_t current_vector_length = static_cast<const uint32_t>(tsd->_nd.value());
 
-    switch (reinterpret_cast<intptr_t>(handler->user_data(Handler::f_read))) {
+        if (begin >= current_vector_length) {
+               data = 0;
+               return 1;
+        }
+    }
+
+    switch (opt) {
         case TSD_MIN_HANDLER:
             tsd->min_mean_max(min, mean, max, begin);
             data = String(min); break;
@@ -148,6 +167,8 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
         case TSD_PERC_100_HANDLER:
             tsd->min_mean_max(min, mean, max, begin);
             data = String(max); break;
+        case TSD_PERC_HANDLER:
+            data = String(tsd->percentile(perc)); break;
         case TSD_LAST_SEEN:
             data = String(tsd->last_value_seen()); break;
         case TSD_CURRENT_INDEX: {
@@ -185,6 +206,7 @@ void TimestampDiff::add_handlers()
     set_handler("perc95", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_95_HANDLER, 0);
     set_handler("perc99", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_99_HANDLER, 0);
     set_handler("perc100", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_100_HANDLER, 0);
+    set_handler("perc", Handler::f_read | Handler::f_read_param, handler, TSD_PERC_HANDLER, 0);
     set_handler("index", Handler::f_read, handler, TSD_CURRENT_INDEX, 0);
     set_handler("last", Handler::f_read, handler, TSD_LAST_SEEN, 0);
     set_handler("dump", Handler::f_read, handler, TSD_DUMP_HANDLER, 0);
