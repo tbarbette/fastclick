@@ -6887,8 +6887,6 @@ if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
 
 else
     have_re2=no
-
-    as_fn_error $? "x-$ac_have_re2 - $ac_have_re2_h" "$LINENO" 5
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing PAPI_start_counters" >&5
