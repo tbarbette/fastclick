@@ -488,14 +488,6 @@ FromDump::read_packet(ErrorHandler *errh)
             desired_len = (_linktype == FAKE_DLT_RAW) ? (_force_len - 14) : _force_len;
         }
 
-        // TODO: Fix this issue
-        if (desired_len > 2048) {
-            click_chatter("Drop frame with length %d bytes as it exceeds the available buffer length", desired_len);
-            p->kill();
-            _packet = 0;
-            return false;
-        }
-
         // Need to enlarge the packet
         if (desired_len > caplen) {
             q = p->put(desired_len - caplen);
@@ -506,6 +498,7 @@ FromDump::read_packet(ErrorHandler *errh)
         }
 
         if (!q) {
+            p->kill();
             _packet = 0;
             return false;
         }
@@ -521,6 +514,7 @@ FromDump::read_packet(ErrorHandler *errh)
         }
 
         if (!ip) {
+            q->kill();
             _packet = 0;
             return false;
         }
