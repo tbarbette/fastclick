@@ -19,6 +19,9 @@ CLICK_CXX_UNPROTECT
 #elif CLICK_USERLEVEL
 # include <click/selectset.hh>
 #endif
+#if HAVE_CLICK_LOAD
+# include <click/ewma.hh>
+#endif
 
 // NB: user must #include <click/task.hh> before <click/routerthread.hh>.
 // We cannot #include <click/task.hh> ourselves because of circular #include
@@ -148,8 +151,9 @@ class RouterThread { public:
     int _adaptive_restride_iter;
 #endif
 
-
+#if HAVE_CLICK_LOAD
     DirectEWMA _load;
+#endif
 
     // EXTERNAL STATE GROUP
     Spinlock _task_lock CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);

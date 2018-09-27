@@ -67,7 +67,10 @@ static unsigned long greedy_schedule_jiffies;
  */
 
 RouterThread::RouterThread(Master *master, int id)
-    : _stop_flag(false), _master(master), _id(id), _driver_entered(false), _load()
+    : _stop_flag(false), _master(master), _id(id), _driver_entered(false)
+#if HAVE_CLICK_LOAD
+    , _load()
+#endif
 {
     _pending_head.x = 0;
     _pending_tail = &_pending_head;
