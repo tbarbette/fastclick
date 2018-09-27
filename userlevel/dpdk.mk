@@ -313,12 +313,16 @@ CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
 
 include $(RTE_SDK)/mk/internal/rte.build-pre.mk
 
-override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIBS)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 16 ] && [ "$(RTE_VER_MONTH)" -ge 07 ] ) || [ $(RTE_VER_YEAR) -ge 17 ] ) && echo true),true)
+	override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIBS)
+else
+	override LDFLAGS := $(DPDK_OLD_LDFLAGS)
+endif
 
 ############################################################
 ## Flow director library available at or after DPDK v17.05
 ############################################################
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 5 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
 
 $(debug LIBRTE_PARSE=YES)
 
