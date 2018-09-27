@@ -40,7 +40,7 @@ EtherEncap::configure(Vector<String> &conf, ErrorHandler *errh)
     .read_mp("SRC", EtherAddressArg(), ethh.ether_shost)
     .read_mp("DST", EtherAddressArg(), ethh.ether_dhost)
     .complete() < 0)
-    return -1;
+        return -1;
     ethh.ether_type = htons(ether_type);
     _ethh = ethh;
     return 0;
@@ -53,6 +53,7 @@ EtherEncap::smaction(Packet *p)
         memcpy(q->data(), &_ethh, 14);
         return q;
     }
+
     return 0;
 }
 
@@ -65,47 +66,18 @@ EtherEncap::push(int, Packet *p)
 
 #if HAVE_BATCH
 void
-EtherEncap::push_batch(int, PacketBatch *batch) {
-    Packet *head     = NULL;
-    Packet *previous = NULL;
-    Packet *current  = batch;
-    int count = 0;
-
-    while (current != NULL) {
-        Packet *next = current->next();
-
-        current = smaction(current);
-        if (current == NULL) {
-            click_chatter("%s : could not set ethernet header !",name().c_str());
-            current = next;
-            continue;
-        }
-
-        if (previous == NULL)
-            head = current;
-        else
-            previous->set_next(current);
-
-        current->set_next(next);
-        previous = current;
-        current  = next;
-        count++;
-
-    }
-    if (head != NULL) {
-        if (batch == head)
-            output_push_batch(0, PacketBatch::make_from_list(batch, count));
-        else {
-            output_push_batch(0, PacketBatch::make_from_list(head, count));
-        }
-    }
+EtherEncap::push_batch(int, PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet *){});
+    if (batch)
+        output(0).push_batch(batch);
 }
 
 PacketBatch *
 EtherEncap::pull_batch(int port, unsigned max)
 {
-	PacketBatch* batch;
-    MAKE_BATCH(EtherEncap::pull(port),batch,max);
+	PacketBatch *batch;
+    MAKE_BATCH(EtherEncap::pull(port), batch, max);
     return batch;
 }
 

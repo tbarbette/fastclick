@@ -99,6 +99,24 @@ EtherVLANEncap::pull(int)
 	return 0;
 }
 
+#if HAVE_BATCH
+void
+EtherVLANEncap::push_batch(int, PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet *){});
+    if (batch)
+        output(0).push_batch(batch);
+}
+
+PacketBatch *
+EtherVLANEncap::pull_batch(int port, unsigned max)
+{
+    PacketBatch *batch;
+    MAKE_BATCH(EtherVLANEncap::pull(port), batch, max);
+    return batch;
+}
+#endif
+
 String
 EtherVLANEncap::read_handler(Element *e, void *user_data)
 {

@@ -1,6 +1,6 @@
 #ifndef CLICK_ENSUREETHER_HH
 #define CLICK_ENSUREETHER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <clicknet/ether.h>
 CLICK_DECLS
 
@@ -34,23 +34,27 @@ destination address 2:2:2:2:2:2:
 
 EtherEncap, EtherRewrite */
 
-class EnsureEther : public Element { public:
+class EnsureEther : public BatchElement { public:
 
-  EnsureEther() CLICK_COLD;
-  ~EnsureEther() CLICK_COLD;
+    EnsureEther() CLICK_COLD;
+    ~EnsureEther() CLICK_COLD;
 
-  const char *class_name() const	{ return "EnsureEther"; }
-  const char *port_count() const	{ return PORTS_1_1; }
+    const char *class_name() const    { return "EnsureEther"; }
+    const char *port_count() const    { return PORTS_1_1; }
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  Packet *smaction(Packet *);
-  void push(int, Packet *);
-  Packet *pull(int);
+    Packet *smaction(Packet *);
+    void push(int, Packet *);
+    Packet *pull(int);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch*) override;
+    PacketBatch *pull_batch(int,unsigned) override;
+#endif
 
- private:
+  private:
 
-  click_ether _ethh;
+    click_ether _ethh;
 
 };
 

@@ -33,7 +33,7 @@ Configure
 ----
 First, setup your DPDK environment (version 17.05 or later) and then configure Metron with:
 ```bash
-./configure RTE_SDK=path-to-dpdk RTE_TARGET=dpdk-target --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-std=gnu11 -O3" CXXFLAGS="-std=gnu++14 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --enable-dpdk-pool --disable-dpdk-packet --enable-nanotimestamp --enable-all-elements --enable-json
+./configure RTE_SDK=path-to-dpdk RTE_TARGET=dpdk-target --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-std=gnu11 -O3" CXXFLAGS="-std=gnu++14 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --enable-dpdk-pool --disable-dpdk-packet --enable-nanotimestamp --enable-all-elements --enable-json --enable-cpu-load --enable-task-stats
 ```
 
 
@@ -77,7 +77,6 @@ If you use Metron in your work, please cite our [paper][metron-paper]:
 	numpages     = {16},
 	url          = {https://www.usenix.org/system/files/conference/nsdi18/nsdi18-katsikas.pdf},
 	address      = {Renton, WA},
-	acmid        = {},
 	publisher    = {USENIX Association}
 }
 ```
@@ -85,8 +84,8 @@ If you use Metron in your work, please cite our [paper][metron-paper]:
 
 Getting help
 ----
-Use the github [issue tracker][fastclick-issue-tracker] or contact barbette at kth.se and/or
-georgios.katsikas at ri.se if you encounter any problems with Metron.
+Use the github [issue tracker][fastclick-issue-tracker] or contact Tom Barbette (barbette at kth.se) and/or
+Georgios Katsikas (katsikas.gp at gmail.com) if you encounter any problems with Metron.
 
 Please do not report Metron-related or FastClick-related problems on the vanilla Click mailing list.
 If you are sure that your problem is Click related, post it on vanilla Click's [issue tracker][click-issue-tracker].

@@ -61,5 +61,14 @@ StripEtherVLANHeader::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
+PacketBatch *
+StripEtherVLANHeader::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(StripEtherVLANHeader::simple_action, batch, [](Packet*){});
+    return batch;
+}
+#endif
+
 CLICK_ENDDECLS
 EXPORT_ELEMENT(StripEtherVLANHeader StripEtherVLANHeader-StripEtherVlanHeader)

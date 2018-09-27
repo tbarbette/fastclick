@@ -31,6 +31,7 @@
 # include <unistd.h>
 #endif
 #if HAVE_DPDK
+# include <rte_malloc.h>
 # include <click/dpdkdevice.hh>
 #endif
 #if CLICK_PACKET_USE_DPDK
@@ -605,11 +606,16 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
     d = NetmapBufQ::local_pool()->extract_p();
 #  endif
     } else {
-#if HAVE_DPDK_PACKET_POOL
+# if HAVE_DPDK_PACKET_POOL
         click_chatter("Warning : buffer of size %d bigger than DPDK buffer size", n);
-#endif
+# endif
     }
     if (!d) {
+# if HAVE_DPDK
+      if (dpdk_enabled)
+          d = (unsigned char*)rte_malloc(0, n, 64);
+      else
+# endif
       d = new unsigned char[n];
     }
     if (!d)
@@ -1257,7 +1263,12 @@ cleanup_pool(PacketPool *pp, int global)
 #elif HAVE_NETMAP_PACKET_POOL
     NetmapBufQ::local_pool()->insert_p(pd->buffer());
 #else
-	delete[] reinterpret_cast<unsigned char *>(pd->buffer());
+# if HAVE_DPDK
+    if (dpdk_enabled)
+        rte_free(reinterpret_cast<unsigned char *>(pd->buffer()));
+    else
+# endif
+        delete[] reinterpret_cast<unsigned char *>(pd->buffer());
 #endif
     ::operator delete((void *) pd);
     }

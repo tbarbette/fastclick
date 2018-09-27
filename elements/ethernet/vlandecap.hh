@@ -1,6 +1,6 @@
 #ifndef CLICK_VLANDECAP_HH
 #define CLICK_VLANDECAP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 
 CLICK_DECLS
 
@@ -37,7 +37,7 @@ Specifies the ethertype designating VLAN encapsulated packets. The default is
 VLANEncap
 */
 
-class VLANDecap : public Element { public:
+class VLANDecap : public BatchElement { public:
 
     VLANDecap() CLICK_COLD;
     ~VLANDecap() CLICK_COLD;
@@ -47,6 +47,9 @@ class VLANDecap : public Element { public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
 private:
 
