@@ -153,6 +153,10 @@ class RouterThread { public:
 
 #if HAVE_CLICK_LOAD
     DirectEWMA _load;
+    uint64_t _useful;
+    uint64_t _useless;
+    click_cycles_t _last_update;
+    click_cycles_t UPDATE_TIME;
 #endif
 
     // EXTERNAL STATE GROUP

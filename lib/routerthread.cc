@@ -69,7 +69,7 @@ static unsigned long greedy_schedule_jiffies;
 RouterThread::RouterThread(Master *master, int id)
     : _stop_flag(false), _master(master), _id(id), _driver_entered(false)
 #if HAVE_CLICK_LOAD
-    , _load()
+    , _load(), _useless(0), _useful(0), _last_update(0)
 #endif
 {
     _pending_head.x = 0;
@@ -129,6 +129,9 @@ RouterThread::RouterThread(Master *master, int id)
 # endif
 #endif
 
+#if HAVE_CLICK_LOAD
+    UPDATE_TIME = cycles_hz() / 10;
+#endif
     static_assert(THREAD_QUIESCENT == (int) ThreadSched::THREAD_QUIESCENT
                   && THREAD_UNKNOWN == (int) ThreadSched::THREAD_UNKNOWN,
                   "Thread constants screwup.");
@@ -391,10 +394,10 @@ RouterThread::run_tasks(int ntasks)
         }
 
 #if HAVE_TASK_STATS && HAVE_CLICK_LOAD
-    runs = t->cycle_runs();
-    cycles = click_get_cycles();
+        runs = t->cycle_runs();
+        cycles = click_get_cycles();
 #elif HAVE_CLICK_LOAD
-    cycles = click_get_cycles();
+        cycles = click_get_cycles();
 #elif HAVE_TASK_STATS
         runs = t->cycle_runs();
         if (runs > PROFILE_ELEMENT)
@@ -476,7 +479,16 @@ RouterThread::run_tasks(int ntasks)
 
 #if HAVE_CLICK_LOAD
     if (useless > 0 || useful > 0) {
-        _load.update((useful << 10) / (useless + useful));
+        _useless += useless;
+        _useful += useful;
+
+        if (cycles - _last_update > UPDATE_TIME) {
+            //click_chatter("[%d] %lu %lu %lu, %lu %lu",thread_id(), _useful, _useless, (_useful << 10) / (_useless + _useful), cycles - _last_update, UPDATE_TIME);
+            _load.update((_useful << 10) / (_useless + _useful));
+            _last_update = cycles;
+            _useless = 0;
+            _useful = 0;
+        }
     }
 #endif
 
@@ -601,6 +613,10 @@ RouterThread::driver()
     click_current_thread_id = _id | 0x40000000;
 #  endif
 # endif
+#endif
+
+#if HAVE_CLICK_LOAD
+    _last_update = click_get_cycles();
 #endif
 
 #if CLICK_NS

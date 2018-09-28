@@ -554,6 +554,8 @@ Metron::run_timer(Timer *t)
         Vector<String> max = sc->simple_call_read("monitoring_lat.mp_max").split(' ');
         Vector<String> avg = sc->simple_call_read("monitoring_lat.mp_average_time").split(' ');
         sc->simple_call_write("monitoring_lat.reset");
+        Vector<String> load = sc->simple_call_read("load").split(' ');
+
 
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
 
@@ -575,19 +577,19 @@ Metron::run_timer(Timer *t)
                 long long useless_diff = useless - sc->nic_stats[stat_idx].useless;
                 long long useful_diff = useful - sc->nic_stats[stat_idx].useful;
                 long long count_diff = count - sc->nic_stats[stat_idx].count;
-                sc->nic_stats[stat_idx].useless = useless;
-                sc->nic_stats[stat_idx].useful = useful;
+//                sc->nic_stats[stat_idx].useless = useless;
+//                sc->nic_stats[stat_idx].useful = useful;
                 sc->nic_stats[stat_idx].count = count;
 //                long long count = atoll(sc->simple_call_write(name + ".reset_load").c_str());
-                if (useful_diff + useless_diff == 0) {
-                    sc->nic_stats[stat_idx].load = 0;
+//                if (useful_diff + useless_diff == 0) {
+//                    sc->nic_stats[stat_idx].load = 0;
                     // click_chatter(
                     //      "[SC %d] Load NIC %d CPU %d - %f: No data yet",
                     //      sn, i, j, sc->nic_stats[stat_idx].load
                     //  );
-                    continue;
-                }
-                double load = (double)useful_diff / (double)(useful_diff + useless_diff);
+//                    continue;
+//                }
+/*                double load = (double)useful_diff / (double)(useful_diff + useless_diff);
                 double alpha;
                 if (load > sc->nic_stats[stat_idx].load) {
                     alpha = alpha_up;
@@ -595,21 +597,23 @@ Metron::run_timer(Timer *t)
                     alpha = alpha_down;
                 }
                 sc->nic_stats[stat_idx].load = (sc->nic_stats[stat_idx].load * (1-alpha)) + ((alpha) * load);
-
+*/
+                //sc->nic_stats[stat_idx].load = sc->simple_call_read(
                 // click_chatter(
                 //      "[SC %d] Load NIC %d CPU %d - %f %f - diff usefull %lld useless %lld",
                 //      sn, i, j, load, sc->nic_stats[stat_idx].load, useful_diff, useless_diff
                 //  );
 
-                if (sc->nic_stats[stat_idx].load > cpu_load) {
+               /* if (sc->nic_stats[stat_idx].load > cpu_load) {
                     cpu_load = sc->nic_stats[stat_idx].load;
-                }
+                }*/
                 throughput += atoll(sc->simple_call_read("monitoring_th_" + is + "_" + js + ".link_rate").c_str());
                 float ncpuqueue = (float)atoi(sc->simple_call_read(name + ".queue_count "+String(nic->cpu_to_queue(sc->get_cpu_map(j)))).c_str()) / (float)(atoi(nic->call_tx_read("nb_rx_desc").c_str()));
                 if (ncpuqueue > cpu_queue) {
                     cpu_queue = ncpuqueue;
                 }
             }
+            cpu_load =  atof(load[j].c_str());
             sc->_cpu_load[j] = cpu_load;
             sc->_cpu_queue[j] = cpu_queue;
             if (_monitoring_mode) {
