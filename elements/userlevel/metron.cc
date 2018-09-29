@@ -571,11 +571,11 @@ Metron::run_timer(Timer *t)
                 int stat_idx = (j * sc->get_nics_nb()) + i;
 
                 String name = sc->generate_configuration_slave_fd_name(i, cpu_id);
-                long long useless = atoll(sc->simple_call_read(name + ".useless").c_str());
-                long long useful = atoll(sc->simple_call_read(name + ".useful").c_str());
+//                long long useless = atoll(sc->simple_call_read(name + ".useless").c_str());
+//                long long useful = atoll(sc->simple_call_read(name + ".useful").c_str());
                 long long count = atoll(sc->simple_call_read(name + ".count").c_str());
-                long long useless_diff = useless - sc->nic_stats[stat_idx].useless;
-                long long useful_diff = useful - sc->nic_stats[stat_idx].useful;
+//                long long useless_diff = useless - sc->nic_stats[stat_idx].useless;
+//                long long useful_diff = useful - sc->nic_stats[stat_idx].useful;
                 long long count_diff = count - sc->nic_stats[stat_idx].count;
 //                sc->nic_stats[stat_idx].useless = useless;
 //                sc->nic_stats[stat_idx].useful = useful;

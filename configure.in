@@ -2399,12 +2399,12 @@ done
 
 AC_OUTPUT
 
-if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json" = yesyesyes; then
+if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json$enable_cpu_load" = yesyesyesyes; then
     have_metron="yes"
     feedback="no"
 else
     have_metron="no"
-    feedback="Metron requires to configure with --enable-json and install libmicrohttpd."
+    feedback="Metron requires to configure with --enable-json and --enable-cpu-load and install libmicrohttpd."
 fi
 
 echo "
