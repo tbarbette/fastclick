@@ -975,7 +975,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
 
     npkt->shift_header_annotations(buffer(), extra_headroom);
 
-    click_chatter("HEadroom %d %d",headroom(),npkt->headroom());
+    click_chatter("Headroom %d %d",headroom(),npkt->headroom());
     click_chatter("Tailroom %d %d",tailroom(),npkt->tailroom());
     click_chatter("Length %d %d",length(),npkt->length());
     click_chatter("Shared %d %d",shared(),npkt->shared());
