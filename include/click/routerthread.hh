@@ -152,7 +152,7 @@ class RouterThread { public:
 #endif
 
 #if HAVE_CLICK_LOAD
-    DirectEWMA _load;
+    EXPSMOOTH<128,10> _load;
     uint64_t _useful;
     uint64_t _useless;
     click_cycles_t _last_update;

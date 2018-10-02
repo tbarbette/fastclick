@@ -4,6 +4,25 @@
 #include <click/confparse.hh>
 CLICK_DECLS
 
+template <unsigned alpha, unsigned shift>
+class EXPSMOOTH {
+    public:
+    unsigned val;
+
+    void update(unsigned obs) {
+        val = (obs * alpha + ((1 << shift) - alpha) * obs) >> shift;
+    }
+
+
+    unsigned unscaled_average() const {
+        return val;
+    }
+
+    unsigned average() const {
+        return val;
+    }
+};
+
 /** @file <click/ewma.hh>
  *  @brief  Click's classes for supporting exponentially weighted moving
  *  averages.
