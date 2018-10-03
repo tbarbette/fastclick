@@ -75,7 +75,7 @@ Used for interprocess communication. Defaults to 1024.
 
 =item DEF_BURST_SIZE
 
-Integer.  Number of frames to read/write from/to a DPDK device. 
+Integer.  Number of frames to read/write from/to a DPDK device.
 Defaults to 32.
 
 =item RING_FLAGS
