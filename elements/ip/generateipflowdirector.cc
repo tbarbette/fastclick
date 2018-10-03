@@ -322,55 +322,18 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
 
         uint64_t i = 0;
         for (auto flow : g->_map) {
-
-            // Duplicate this map
-            HashTable<IPFlow> map_copy = g->_map;
-
-            // Aggregate this flow by one bit
-            uint32_t init_flow_size = flow.flow_size();
+            // Check if we already have such a flow
             flow.set_mask(g->_mask);
-            flow.set_proto(0);
-            flow.update_flow_size(0);
+            IPFlow *found = new_map.find(flow.flowid()).get();
 
-            uint64_t m = 0;
-            // Go through the old flows and see how many of them match
-            for (auto int_flow : map_copy) {
-                bool src_match = int_flow.flowid().saddr().matches_prefix(
-                    flow.flowid().saddr(), g->_mask.saddr()
-                );
-                bool dst_match = int_flow.flowid().daddr().matches_prefix(
-                    flow.flowid().daddr(), g->_mask.daddr()
-                );
-                // This is optional
-                bool proto_match = true;
-                if ((g->_keep_sport) || (g->_keep_dport)) {
-                    proto_match = int_flow.flow_proto() == flow.flow_proto();
-                }
-
-                // Matches the aggregate rule
-                if (src_match && dst_match && proto_match) {
-                    m++;
-                    // This flow is now a little heavier
-                    flow.update_flow_size(int_flow.flow_size());
-                    flow.set_proto(int_flow.flow_proto());
-                }
+            // New flow
+            if (!found) {
+                // Insert this new flow into the flow map
+                new_map.find_insert(flow);
+            } else {
+                // Aggregate
+                found->update_flow_size(flow.flow_size());
             }
-
-            // Watch out, a lot of prints!!
-            if (VERBOSE) {
-                click_chatter(
-                    "New flow %5" PRIu64 ": %15s --> %15s matches %3" PRIu64 " flows. "
-                    "Previous size %12" PRIu32 " -- New size %12" PRIu32,
-                    i,
-                    flow.flowid().saddr().s().c_str(),
-                    flow.flowid().daddr().s().c_str(),
-                    m,
-                    init_flow_size,
-                    flow.flow_size()
-                );
-            }
-
-            new_map.find_insert(flow);
 
             i++;
         }

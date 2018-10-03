@@ -92,7 +92,7 @@ class GenerateIPPacket : public BatchElement {
                     return _flow_proto;
                 }
 
-                uint32_t flow_size() {
+                uint64_t flow_size() {
                     return _flow_size_bytes;
                 }
 
@@ -104,11 +104,11 @@ class GenerateIPPacket : public BatchElement {
                     _flow_proto += proto;
                 }
 
-                void set_flow_size(const uint32_t flow_size) {
+                void set_flow_size(const uint64_t flow_size) {
                     _flow_size_bytes = flow_size;
                 }
 
-                void update_flow_size(const uint32_t extra_size) {
+                void update_flow_size(const uint64_t extra_size) {
                     _flow_size_bytes += extra_size;
                 }
 
@@ -120,7 +120,7 @@ class GenerateIPPacket : public BatchElement {
 
                 IPFlowID _flowid;
                 uint8_t  _flow_proto;
-                uint32_t _flow_size_bytes;
+                uint64_t _flow_size_bytes;
         };
 
         IPFlowID build_mask(bool ks, bool kd, int prefix);
