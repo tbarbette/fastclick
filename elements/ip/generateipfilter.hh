@@ -123,9 +123,12 @@ class GenerateIPPacket : public BatchElement {
                 uint32_t _flow_size_bytes;
         };
 
+        IPFlowID build_mask(bool ks, bool kd, int prefix);
+
         int _nrules;
         HashTable<IPFlow> _map;
         IPFlowID _mask;
+        int _prefix;
 
         static const int DEF_NB_RULES;
 

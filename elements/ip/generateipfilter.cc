@@ -34,7 +34,7 @@ const int GenerateIPPacket::DEF_NB_RULES = 8000;
 /**
  * Base class for pattern generation out of incoming traffic.
  */
-GenerateIPPacket::GenerateIPPacket() : _nrules(DEF_NB_RULES)
+GenerateIPPacket::GenerateIPPacket() : _nrules(DEF_NB_RULES), _prefix(32)
 {
 }
 
@@ -57,6 +57,11 @@ int
 GenerateIPPacket::initialize(ErrorHandler *errh)
 {
     return 0;
+}
+
+IPFlowID
+GenerateIPPacket::build_mask(bool ks, bool kd, int prefix) {
+    return IPFlowID(IPAddress::make_prefix(prefix), (ks?0xffff:0), IPAddress::make_prefix(prefix), (kd?0xffff:0));
 }
 
 void
@@ -93,10 +98,11 @@ GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("KEEP_SPORT", _keep_sport)
             .read("KEEP_DPORT", _keep_dport)
             .read("PATTERN_TYPE", pattern_type)
+            .read("PREFIX", _prefix)
             .consume() < 0)
         return -1;
 
-    _mask = IPFlowID(0xffffffff, (_keep_sport?0xffff:0), 0xffffffff, (_keep_dport?0xffff:0));
+    _mask = build_mask(_keep_sport, _keep_dport, _prefix);
 
     /**
      * Sub-classes of GenerateIPFilter have this member already set.
@@ -191,9 +197,10 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
 
     assert(g->_pattern_type == IPFILTER || g->_pattern_type == IPCLASSIFIER);
 
-    uint8_t n = 0;
-    while (g->_map.size() > g->_nrules) {
+    uint8_t n = 32 - g->_prefix;
+    while (g->_map.size() > (unsigned)g->_nrules) {
         HashTable<IPFlow> new_map;
+        click_chatter("%d rules with prefix /%d, continuing with /%d",g->_map.size(), 32-n, 32-n-1);
         ++n;
         g->_mask = IPFlowID(
             IPAddress::make_prefix(32 - n), g->_mask.sport(),

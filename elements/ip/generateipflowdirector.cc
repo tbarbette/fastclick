@@ -66,6 +66,7 @@ GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_mp("PORT", _port)
             .read_p("NB_QUEUES", _nb_queues)
             .read("POLICY", policy)
+            .read("PREFIX", _prefix)
             .consume() < 0)
         return -1;
 
@@ -85,8 +86,7 @@ GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
     }
 
-    // Default mask
-    _mask = IPFlowID(0xffffffff, (_keep_sport ? 0xffff:0), 0xffffffff, (_keep_dport ? 0xffff:0));
+    _mask = build_mask(_keep_sport, _keep_dport, _prefix);
 
     return GenerateIPFilter::configure(conf, errh);
 }
@@ -310,8 +310,9 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
 
     Timestamp before = Timestamp::now();
 
-    uint8_t n = 0;
+    uint8_t n = 32 - g->_prefix;
     while (g->_map.size() > g->_nrules) {
+        click_chatter("%d rules with prefix /%d, continuing with /%d",g->_map.size(), 32-n, 32-n-1);
         HashTable<IPFlow> new_map;
         ++n;
         g->_mask = IPFlowID(
