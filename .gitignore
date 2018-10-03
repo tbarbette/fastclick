@@ -4,6 +4,7 @@
 .idea
 .*.cmd
 .dotest
+.vimhistory
 Makefile
 autom4te*
 bin
