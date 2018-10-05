@@ -387,6 +387,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 			qu_share_idx++;
 			if (qu_share_idx % queue_share == 0)
 				qu_num++;
+
 			if (qu_num == firstqueue + n_queues) break;
 		}
 
@@ -394,6 +395,8 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 			_locks[th_num] = 0;
 		}
 
+
+		if (qu_num == firstqueue + n_queues) break;
 		++th_num;
 	}
 
