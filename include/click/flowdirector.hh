@@ -19,6 +19,7 @@
 #define CLICK_FLOWDIRECTOR_H
 
 #include <click/error.hh>
+#include <click/hashmap.hh>
 #include <click/hashtable.hh>
 #include <click/dpdkdevice.hh>
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -51,13 +52,21 @@ public:
     // Supported flow director handlers (called from FromDPDKDevice)
     static String FLOW_RULE_ADD;
     static String FLOW_RULE_DEL;
+    static String FLOW_RULE_STATS;
     static String FLOW_RULE_LIST;
+    static String FLOW_RULE_COUNT;
     static String FLOW_RULE_FLUSH;
 
     // For debugging
     static bool DEF_VERBOSITY;
 
-    // Global table of ports mapped to their Flow Director objects
+    // Set of flow rule items supported by the Flow API
+    static HashMap<int, String> _flow_item;
+
+    // Set of flow rule actions supported by the Flow API
+    static HashMap<int, String> _flow_action;
+
+    // Global table of DPDK ports mapped to their Flow Director objects
     static HashTable<portid_t, FlowDirector *> _dev_flow_dir;
 
     // Map of ports to Flow Director instances
@@ -108,31 +117,31 @@ public:
     }
 
     // Install flow rule in a NIC from a file
-    int add_rules_from_file(
-        const String   &filename
-    );
+    int add_rules_from_file(const String &filename);
 
     // Install a flow rule in a NIC
-    int flow_rule_install(
-        const uint32_t &rule_id,
-        const String   rule
-    );
+    int flow_rule_install(const uint32_t &rule_id, const String rule);
 
     // Return a flow rule object with a specific ID
-    struct port_flow *flow_rule_get(
-        const uint32_t &rule_id
-    );
+    struct port_flow *flow_rule_get(const uint32_t &rule_id);
 
     // Delete a flow rule from a NIC
-    int flow_rule_delete(
-        const uint32_t &rule_id
-    );
+    int flow_rule_delete(const uint32_t &rule_id);
+
+    // Query flow rule statistics
+    String flow_rule_query(const uint32_t &rule_id);
+    int64_t flow_rule_pkt_stats(const uint32_t &rule_id);
+    int64_t flow_rule_byte_stats(const uint32_t &rule_id);
+    String flow_rule_aggregate_stats();
 
     // Counts the number of rules in a NIC
     // Local memory counter
     uint32_t flow_rules_count();
     // NIC counter
     uint32_t flow_rules_count_explicit();
+
+    // Lists all NIC rules
+    String flow_rules_list();
 
     // Flush all of the rules from a NIC
     uint32_t flow_rules_flush();
@@ -163,8 +172,18 @@ private:
     // Next rule ID per device
     static HashTable<portid_t, uint32_t> _next_rule_id;
 
+    // Matched packets and bytes per rule ID per device
+    static HashTable<portid_t, HashTable<uint32_t, uint64_t>> _matched_pkts;
+    static HashTable<portid_t, HashTable<uint32_t, uint64_t>> _matched_bytes;
+
+    // Pre-populate the supported matches and actions on relevant maps
+    void populate_supported_flow_items_and_actions();
+
     // Filters unwanted components from rule
     bool filter_rule(char **rule);
+
+    // Reset the flow rule counters on a given port
+    bool flush_rule_counters_on_port();
 
 };
 

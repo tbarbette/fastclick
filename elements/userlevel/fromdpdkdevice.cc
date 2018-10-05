@@ -486,7 +486,11 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
         case h_ierrors:
             return String(stats.ierrors);
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        case h_count_rules: {
+        case h_rules_list: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDirector::get_flow_director(port_id)->flow_rules_list();
+        }
+        case h_rules_count: {
             portid_t port_id = fd->get_device()->get_port_id();
             return String(FlowDirector::get_flow_director(port_id)->flow_rules_count_explicit());
         }
@@ -581,7 +585,7 @@ int FromDPDKDevice::flow_handler(
     assert(flow_dir);
 
     switch((uintptr_t) thunk) {
-        case h_add_rule: {
+        case h_rule_add: {
             String rule = input;
 
             // A '\n' must be appended at the end of this rule, if not there
@@ -597,11 +601,11 @@ int FromDPDKDevice::flow_handler(
 
             return static_cast<int>(rule_id);
         }
-        case h_del_rule: {
+        case h_rule_del: {
             const uint32_t rule_id = atoi(input.c_str());
             return flow_dir->flow_rule_delete(rule_id);
         }
-        case h_flush_rules: {
+        case h_rules_flush: {
             flow_dir->flow_rules_flush();
             return 0;
         }
@@ -700,6 +704,34 @@ int FromDPDKDevice::xstats_handler(
                 input = String(v);
                 return 0;
             }
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        case h_rule_bytes: {
+        case h_rule_packets:
+            portid_t port_id = fd->get_device()->get_port_id();
+            FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
+            assert(flow_dir);
+            if (input == "") {
+                return errh->error("Aggregate flow rule counters are not supported");
+            } else {
+                const uint32_t rule_id = atoi(input.c_str());
+                int64_t counter = -1;
+                if ((intptr_t)handler->read_user_data() == (intptr_t)h_rule_packets) {
+                    counter = flow_dir->flow_rule_pkt_stats(rule_id);
+                } else {
+                    counter = flow_dir->flow_rule_byte_stats(rule_id);
+                }
+                input = String(counter);
+                return 0;
+            }
+        }
+        case h_rules_aggr_stats: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
+            assert(flow_dir);
+            input = flow_dir->flow_rule_aggregate_stats();
+            return 0;
+        }
+    #endif
     }
 
     return -1;
@@ -731,6 +763,11 @@ void FromDPDKDevice::add_handlers()
 
     set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler, h_xstats);
     set_handler("queue_count", Handler::f_read | Handler::f_read_param, xstats_handler, h_queue_count);
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    set_handler("rule_packets", Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_packets);
+    set_handler("rule_bytes", Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_bytes);
+    set_handler("rules_aggr_stats", Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
+#endif
 
 
     add_read_handler("active", read_handler, h_active);
@@ -763,10 +800,11 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("nombufs",statistics_handler, h_nombufs);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    add_read_handler (FlowDirector::FLOW_RULE_LIST,  statistics_handler, h_count_rules);
-    add_write_handler(FlowDirector::FLOW_RULE_ADD,   flow_handler, h_add_rule,    0);
-    add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_del_rule,    0);
-    add_write_handler(FlowDirector::FLOW_RULE_FLUSH, flow_handler, h_flush_rules, 0);
+    add_write_handler(FlowDirector::FLOW_RULE_ADD,   flow_handler, h_rule_add,    0);
+    add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_rule_del,    0);
+    add_write_handler(FlowDirector::FLOW_RULE_FLUSH, flow_handler, h_rules_flush, 0);
+    add_read_handler(FlowDirector::FLOW_RULE_LIST,  statistics_handler, h_rules_list);
+    add_read_handler(FlowDirector::FLOW_RULE_COUNT, statistics_handler, h_rules_count);
 #endif
 
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);

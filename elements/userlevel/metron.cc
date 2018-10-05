@@ -2975,13 +2975,13 @@ NIC::install_rule(const long &rule_id, String &rule)
     rule = "flow create " + String(get_port_id()) + " " + rule;
 
     /**
-     * Calls FlowDirector using FromDPDKDevice's flow handler add_rule.
+     * Calls FlowDirector using FromDPDKDevice's flow handler rule_add.
      * Upon successful invocation, Flow Director returns an internal
      * rule ID which needs to be stored if rule deletion is required
      * in the future. Otherwise, negative value is returned to indicate
      * error during rule installation in the NIC.
      */
-    int status = call_rx_write("add_rule", rule);
+    int status = call_rx_write(FlowDirector::FLOW_RULE_ADD, rule);
     if (status < 0) {
         click_chatter("[NIC %u] Unable to install rule '%s'", get_port_id(), rule.c_str());
         return ERROR;
@@ -3028,7 +3028,7 @@ NIC::remove_rule(const long &rule_id)
             }
 
             // Delete this rule from the NIC using the NIC ID
-            if (call_rx_write("del_rule", String(internal_rule_id)) != SUCCESS) {
+            if (call_rx_write(FlowDirector::FLOW_RULE_DEL, String(internal_rule_id)) != SUCCESS) {
                 return false;
             }
 

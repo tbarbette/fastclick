@@ -224,7 +224,9 @@ private:
         h_mac, h_add_mac, h_remove_mac, h_vf_mac,
         h_device,
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        h_add_rule, h_del_rule, h_flush_rules, h_count_rules
+        h_rule_add, h_rule_del,
+        h_rule_packets, h_rule_bytes, h_rules_aggr_stats,
+        h_rules_list, h_rules_count, h_rules_flush
     #endif
     };
 
