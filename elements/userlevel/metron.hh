@@ -346,6 +346,12 @@ class NIC {
 
 };
 
+
+struct CpuInfo {
+    float load;
+    Timestamp start_time;
+};
+
 struct LatencyInfo {
     uint64_t avg_throughput;
     uint64_t min_latency;
@@ -480,6 +486,7 @@ class ServiceChain {
         static ServiceChain *from_json(Json j, Metron *m, ErrorHandler *errh);
         int reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh);
 
+        Json get_cpu_stats(int j);
         Json to_json();
         Json stats_to_json(bool monitoring_mode = false);
 
@@ -592,7 +599,7 @@ class ServiceChain {
         Metron *_metron;
         Vector<int> _cpus;
         Vector<NIC *> _nics;
-        Vector<float> _cpu_load;
+        Vector<CpuInfo> _cpu_load;
         Vector<int> _cpu_queue;
         Vector<LatencyInfo> _cpu_latency;
         float _total_cpu_load;

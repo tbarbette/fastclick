@@ -421,7 +421,7 @@ Metron::try_slaves(ErrorHandler *errh)
     sc._max_cpus_nb = 1;
     sc._autoscale = false;
     sc._cpus.resize(1);
-    sc._cpu_load.resize(1, 0);
+    sc._cpu_load.resize(1, CpuInfo());
     sc._cpu_queue.resize(1, 0);
     sc._cpu_latency.resize(1, LatencyInfo());
     for (int i = 0; i < sc.get_nics_nb(); i++) {
@@ -614,7 +614,7 @@ Metron::run_timer(Timer *t)
                 }
             }
             cpu_load =  atof(load[j].c_str());
-            sc->_cpu_load[j] = cpu_load;
+            sc->_cpu_load[j].load = cpu_load;
             sc->_cpu_queue[j] = cpu_queue;
             if (_monitoring_mode) {
                 sc->_cpu_latency[j].avg_throughput = throughput;
@@ -884,6 +884,11 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
             kill(pid, SIGKILL);
             return errh->error("Unexpected ControlSocket command");
         }
+
+        for (int i = 0 ; i < sc->get_used_cpu_nb(); i++) {
+            sc->_cpu_load[i].start_time = Timestamp::now();
+        }
+
         return SUCCESS;
     }
 
@@ -974,18 +979,6 @@ Metron::write_handler(
     switch (what) {
         case h_controllers: {
             return m->controllers_from_json(Json::parse(data));
-        }
-        case h_put_chains: {
-            String id = data.substring(0, data.find_left('\n'));
-            String changes = data.substring(id.length() + 1);
-            ServiceChain *sc = m->find_service_chain_by_id(id);
-            if (!sc) {
-                return errh->error(
-                    "Cannot reconfigure service chain: Unknown service chain ID %s",
-                    id.c_str()
-                );
-            }
-            return sc->reconfigure_from_json(Json::parse(changes), m, errh);
         }
         case h_delete_chains: {
             ServiceChain *sc = m->find_service_chain_by_id(data);
@@ -1173,6 +1166,25 @@ Metron::param_handler(
 
                 return SUCCESS;
             }
+            case h_put_chains: {
+                String id = param.substring(0, param.find_left('\n'));
+                String changes = param.substring(id.length() + 1);
+                ServiceChain *sc = m->find_service_chain_by_id(id);
+                if (!sc) {
+                    return errh->error(
+                        "Cannot reconfigure service chain: Unknown service chain ID %s",
+                        id.c_str()
+                    );
+                }
+                int cpu = sc->reconfigure_from_json(Json::parse(changes), m, errh);
+                if (cpu < 0)
+                    return -1;
+
+                Json ar = Json::make_array();
+                ar.push_back(String(cpu));
+                param = ar.unparse();
+                return SUCCESS;
+            }
             case h_chains_rules: {
                 Json jroot = Json::parse(param);
                 Json jlist = jroot.get("rules");
@@ -1229,7 +1241,12 @@ Metron::add_handlers()
 
     // HTTP post handlers
     add_write_handler("controllers",        write_handler, h_controllers);
-    add_write_handler("put_chains",         write_handler, h_put_chains);
+
+    // Put handlers
+    set_handler(
+        "put_chains",
+        Handler::f_write,
+        param_handler, h_put_chains, h_put_chains);
 
     // Get and POST HTTP handlers with parameters
     set_handler(
@@ -1304,6 +1321,32 @@ Metron::to_json()
     return jroot;
 }
 
+
+Json
+ServiceChain::get_cpu_stats(int j) {
+            ServiceChain* sc = this;
+            int cpu_id = sc->get_cpu_map(j);
+            float cpu_load = sc->_cpu_load[j].load;
+            float cpu_queue = sc->_cpu_queue[j];
+            int cpu_time;
+            if (sc->_cpu_load[j].start_time)
+                cpu_time = (Timestamp::now() - sc->_cpu_load[j].start_time).msecval();
+            else
+                cpu_time = -1;
+            Json jcpu = Json::make_object();
+            jcpu.set("id",   cpu_id);
+            jcpu.set("load", cpu_load);
+            jcpu.set("queue", cpu_queue);
+            jcpu.set("busy", cpu_time);      // This CPU core is busy
+
+            // Additional per-core statistics in monitoring mode
+            if (sc->_metron->_monitoring_mode) {
+                LatencyInfo lat = sc->_cpu_latency[j];
+                sc->_metron->add_per_core_monitoring_data(&jcpu, lat);
+            }
+            return jcpu;
+}
+
 /**
  * Encodes global Metron statistics to JSON.
  */
@@ -1339,26 +1382,11 @@ Metron::stats_to_json()
         ServiceChain *sc = sci.value();
 
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
-            int cpu_id = sc->get_cpu_map(j);
-            float cpu_load = sc->_cpu_load[j];
-            float cpu_queue = sc->_cpu_queue[j];
-
-            Json jcpu = Json::make_object();
-            jcpu.set("id",   cpu_id);
-            jcpu.set("load", cpu_load);
-            jcpu.set("queue", cpu_queue);
-            jcpu.set("busy", true);      // This CPU core is busy
-
-            // Additional per-core statistics in monitoring mode
-            if (_monitoring_mode) {
-                LatencyInfo lat = sc->_cpu_latency[j];
-                add_per_core_monitoring_data(&jcpu, lat);
-            }
-
+            Json jcpu = sc->get_cpu_stats(j);
             jcpus.push_back(jcpu);
 
             assigned_cpus++;
-            busy_cpus.push_back(cpu_id);
+            busy_cpus.push_back(sc->get_cpu_map(j));
         }
 
         sci++;
@@ -1376,7 +1404,7 @@ Metron::stats_to_json()
         jcpu.set("id", j);
         jcpu.set("load", 0);      // No load
         jcpu.set("queue", -1);
-        jcpu.set("busy", false);  // This CPU core is free
+        jcpu.set("busy", -1);  // This CPU core is free
 
         if (_monitoring_mode) {
             add_per_core_monitoring_data(&jcpu, LatencyInfo());
@@ -1751,7 +1779,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     */
 
     sc->_cpus.resize(sc->_max_cpus_nb);
-    sc->_cpu_load.resize(sc->_max_cpus_nb, 0);
+    sc->_cpu_load.resize(sc->_max_cpus_nb, CpuInfo());
     sc->_cpu_queue.resize(sc->_max_cpus_nb, 0);
     sc->_cpu_latency.resize(sc->_max_cpus_nb, LatencyInfo());
     Json jnics = j.get("nics");
@@ -1839,12 +1867,8 @@ ServiceChain::stats_to_json(bool monitoring_mode)
             if (avg > avg_max)
                 avg_max = avg;
         }*/
-        Json jcpu = Json::make_object();
-        jcpu.set("id", get_cpu_map(j));
-        jcpu.set("load", _cpu_load[j]);
-        if (monitoring_mode) {
-            Metron::add_per_core_monitoring_data(&jcpu, _cpu_latency[j]);
-        }
+
+        Json jcpu = get_cpu_stats(j);
         jcpus.push_back(jcpu);
     }
     jsc.set("cpus", jcpus);
@@ -2213,6 +2237,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
             m->call_scale(this, "scale");
 
+            int newCpu = new_cpus_nb - 1;
             // Scale up
             if (new_cpus_nb > get_used_cpu_nb()) {
                 if (new_cpus_nb > get_max_cpu_nb()) {
@@ -2241,6 +2266,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         _nics[inic]->call_rx_write("max_rss", String(new_cpus_nb));
                     }
                 }
+                _cpu_load[newCpu].start_time = Timestamp::now();
             // Scale down
             } else {
                 if (new_cpus_nb < 0) {
@@ -2267,11 +2293,11 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         }
                     }
                 }
+                _cpu_load[newCpu].start_time = Timestamp();
             }
-
             click_chatter("Number of used CPUs is now: %d", new_cpus_nb);
             _used_cpus_nb = new_cpus_nb;
-            return SUCCESS;
+            return newCpu;
         } else {
             return errh->error(
                 "Unsupported reconfiguration option: %s",
