@@ -6,6 +6,7 @@
 #include <click/ring.hh>
 #include <click/vector.hh>
 #include <click/notifier.hh>
+#include <click/tinyexpr.hh>
 #include <strings.h>
 CLICK_DECLS
 
@@ -40,6 +41,7 @@ protected:
 
     unsigned int _burst;
     int _stop;
+    int _stop_time;
     bool _quick_clone;
     Task _task;
     int _limit;
@@ -50,8 +52,12 @@ protected:
     bool _use_signal;
     bool _verbose;
     bool _freeonterminate;
-    Timestamp _lastsent_p;
+    Timestamp _timing_packet;
+    Timestamp _timing_real;
+    Timestamp _lastsent_packet;
     Timestamp _lastsent_real;
+    Timestamp _startsent;
+    TinyExpr _fnt_expr;
 };
 
 
@@ -191,11 +197,18 @@ inline void ReplayBase::check_end_loop(Task* t) {
     if (unlikely(!_queue_current)) {
         _queue_current = _queue_head;
         reset_time();
-        if (_stop > 0)
-            _stop--;
+        if (_stop_time == 0) {
+            if (_stop > 0)
+                _stop--;
+        } else {
+            if ((Timestamp::now_steady() - _startsent).msecval() / 1000 >= _stop_time) {
+                _stop = 0;
+            }
+        }
         if (_stop == 0) {
             router()->please_stop_driver();
             _active = false;
+            _startsent = Timestamp();
             return;
         }
         if (_verbose)
