@@ -129,9 +129,7 @@ public:
     int flow_rule_delete(const uint32_t &rule_id);
 
     // Query flow rule statistics
-    String flow_rule_query(const uint32_t &rule_id);
-    int64_t flow_rule_pkt_stats(const uint32_t &rule_id);
-    int64_t flow_rule_byte_stats(const uint32_t &rule_id);
+    String flow_rule_query(const uint32_t &rule_id, int64_t &matched_pkts, int64_t &matched_bytes);
     String flow_rule_aggregate_stats();
 
     // Counts the number of rules in a NIC

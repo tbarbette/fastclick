@@ -448,6 +448,10 @@ FlowDirector::flow_rule_delete(const uint32_t &rule_id)
 {
     // Only active instances can configure a NIC
     if (!active()) {
+        _errh->error(
+            "Flow Director (port %u): Inactive instance cannot remove rule #%" PRIu32,
+            _port_id, rule_id
+        );
         return ERROR;
     }
 
@@ -467,13 +471,19 @@ FlowDirector::flow_rule_delete(const uint32_t &rule_id)
  * Queries the statistics of a NIC flow rule.
  *
  * @param rule_id a flow rule's ID
+ * @param matched_pkts a reference for a flow rule's number of matched packets
+ * @param matched_bytes a reference for a flow rule's number of matched bytes
  * @return flow rule statistics as a string
  */
 String
-FlowDirector::flow_rule_query(const uint32_t &rule_id)
+FlowDirector::flow_rule_query(const uint32_t &rule_id, int64_t &matched_pkts, int64_t &matched_bytes)
 {
     // Only active instances can query a NIC
     if (!active()) {
+        _errh->error(
+            "Flow Director (port %u): Inactive instance cannot query rule #%" PRIu32,
+            _port_id, rule_id
+        );
         return "";
     }
 
@@ -537,9 +547,11 @@ FlowDirector::flow_rule_query(const uint32_t &rule_id)
 
     if (query.hits_set == 1) {
         _matched_pkts[_port_id][rule_id] = query.hits;
+        matched_pkts = query.hits;
     }
     if (query.bytes_set == 1) {
         _matched_bytes[_port_id][rule_id] = query.bytes;
+        matched_bytes = query.bytes;
     }
 
     StringAccum stats;
@@ -550,40 +562,6 @@ FlowDirector::flow_rule_query(const uint32_t &rule_id)
           << "bytes: " << query.bytes;
 
     return stats.take_string();
-}
-
-/**
- * Reports a flow rule's packet counter.
- *
- * @param rule_id a flow rule's ID
- * @return reference to a flow's packet counter
- */
-int64_t
-FlowDirector::flow_rule_pkt_stats(const uint32_t &rule_id)
-{
-    // Prevent access to invalid indices
-    if (_matched_pkts[_port_id].find(rule_id) != _matched_pkts[_port_id].end()) {
-        return (int64_t) _matched_pkts[_port_id][rule_id];
-    }
-
-    return (int64_t) -1;
-}
-
-/**
- * Reports a flow rule's byte counter.
- *
- * @param rule_id a flow rule's ID
- * @return reference to a flow's byte counter
- */
-int64_t
-FlowDirector::flow_rule_byte_stats(const uint32_t &rule_id)
-{
-    // Prevent access to invalid indices
-    if (_matched_bytes[_port_id].find(rule_id) != _matched_bytes[_port_id].end()) {
-        return (int64_t) _matched_bytes[_port_id][rule_id];
-    }
-
-    return (int64_t) -1;
 }
 
 /**

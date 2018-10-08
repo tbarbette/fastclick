@@ -714,13 +714,14 @@ int FromDPDKDevice::xstats_handler(
                 return errh->error("Aggregate flow rule counters are not supported");
             } else {
                 const uint32_t rule_id = atoi(input.c_str());
-                int64_t counter = -1;
+                int64_t matched_pkts = -1;
+                int64_t matched_bytes = -1;
+                flow_dir->flow_rule_query(rule_id, matched_pkts, matched_bytes);
                 if ((intptr_t)handler->read_user_data() == (intptr_t)h_rule_packets) {
-                    counter = flow_dir->flow_rule_pkt_stats(rule_id);
+                    input = String(matched_pkts);
                 } else {
-                    counter = flow_dir->flow_rule_byte_stats(rule_id);
+                    input = String(matched_bytes);
                 }
-                input = String(counter);
                 return 0;
             }
         }
