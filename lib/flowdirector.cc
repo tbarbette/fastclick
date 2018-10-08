@@ -136,8 +136,10 @@ FlowDirector::populate_supported_flow_items_and_actions()
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_VOID, "VOID");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_INVERT, "INVERT");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_VF, "VF");
+#if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_PHY_PORT, "PHY_PORT");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_PORT_ID, "PORT_ID");
+#endif
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_RAW, "RAW");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_ETH, "ETH");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_VLAN, "VLAN");
@@ -151,11 +153,18 @@ FlowDirector::populate_supported_flow_items_and_actions()
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_NVGRE, "NVGRE");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_MPLS, "MPLS");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_GRE, "GRE");
+#if RTE_VERSION >= RTE_VERSION_NUM(17,8,0,0)
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_FUZZY, "FUZZY");
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_GTP, "GTP");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_GTPC, "GTPC");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_GTPU, "GTPU");
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,2,0,0)
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_GENEVE, "GENEVE");
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_VXLAN_GPE, "VXLAN_GPE");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_ARP_ETH_IPV4, "ARP_ETH_IPV4");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_IPV6_EXT, "IPV6_EXT");
@@ -165,6 +174,7 @@ FlowDirector::populate_supported_flow_items_and_actions()
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_ICMP6_ND_OPT, "ICMP6_ND_OPT");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_ICMP6_ND_OPT_SLA_ETH, "ICMP6_ND_OPT_SLA_ETH");
     _flow_item.insert((int) RTE_FLOW_ITEM_TYPE_ICMP6_ND_OPT_TLA_ETH, "ICMP6_ND_OPT_TLA_ETH");
+#endif
 
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_END, "END");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_VOID, "VOID");
@@ -177,9 +187,12 @@ FlowDirector::populate_supported_flow_items_and_actions()
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_RSS, "RSS");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_PF, "PF");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_VF, "VF");
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+    _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_METER, "METER");
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_PHY_PORT, "PHY_PORT");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_PORT_ID, "PORT_ID");
-    _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_METER, "METER");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_SET_MPLS_TTL, "OF_SET_MPLS_TTL");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_DEC_MPLS_TTL, "OF_DEC_MPLS_TTL");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_SET_NW_TTL, "OF_SET_NW_TTL");
@@ -192,6 +205,7 @@ FlowDirector::populate_supported_flow_items_and_actions()
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_SET_VLAN_PCP, "OF_SET_VLAN_PCP");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_POP_MPLS, "OF_POP_MPLS");
     _flow_action.insert((int) RTE_FLOW_ACTION_TYPE_OF_PUSH_MPLS, "OF_PUSH_MPLS");
+#endif
 }
 
 /**
@@ -509,7 +523,11 @@ FlowDirector::flow_rule_query(const uint32_t &rule_id)
     memset(&error, 0x55, sizeof(error));
     memset(&query, 0, sizeof(query));
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
     if (rte_flow_query(_port_id, pf->flow, action, &query, &error) < 0) {
+#else
+    if (rte_flow_query(_port_id, pf->flow, action->type, &query, &error) < 0) {
+#endif
         _errh->message(
             "Flow Director (port %u): Failed to query stats for flow rule #%" PRIu32,
             _port_id, rule_id
@@ -747,7 +765,9 @@ FlowDirector::flow_rules_list()
         rules_list << "Group: " << pf->attr.group << ", Prio: " << pf->attr.priority << ", ";
         rules_list << "Scope: " << (pf->attr.ingress == 1 ? "ingress" : "-");
         rules_list << "/" << (pf->attr.egress == 1 ? "egress" : "-");
+    #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
         rules_list << "/" << (pf->attr.transfer == 1 ? "transfer" : "-");
+    #endif
         rules_list << ", ";
         rules_list << "Matches:";
 

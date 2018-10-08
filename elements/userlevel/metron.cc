@@ -999,10 +999,12 @@ Metron::write_handler(
         case h_delete_controllers: {
             return m->delete_controller_from_json((const String &) data);
         }
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         case h_delete_rules: {
             click_chatter("Metron controller requested rule deletion");
             return ServiceChain::delete_rule_batch_from_json(data, m, errh);
         }
+    #endif
         default: {
             errh->error("Unknown write handler: %d", what);
         }
@@ -1069,6 +1071,7 @@ Metron::param_handler(
                 }
                 break;
             }
+        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
             case h_chains_rules: {
                 if (param == "") {
                     click_chatter("Metron controller requested local rules for all service chains");
@@ -1098,6 +1101,7 @@ Metron::param_handler(
                 }
                 break;
             }
+        #endif
             case h_chains_proxy: {
                 int pos = param.find_left("/");
                 if (pos <= 0) {
@@ -1185,6 +1189,7 @@ Metron::param_handler(
                 param = ar.unparse();
                 return SUCCESS;
             }
+        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
             case h_chains_rules: {
                 Json jroot = Json::parse(param);
                 Json jlist = jroot.get("rules");
@@ -1216,6 +1221,7 @@ Metron::param_handler(
 
                 return SUCCESS;
             }
+        #endif
             default: {
                 return errh->error("Invalid write operation in param handler");
             }
@@ -1258,10 +1264,12 @@ Metron::add_handlers()
         "chains_stats", Handler::f_read | Handler::f_read_param,
         param_handler, h_chains_stats
     );
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     set_handler(
         "rules", Handler::f_write | Handler::f_read | Handler::f_read_param,
         param_handler, h_chains_rules, h_chains_rules
     );
+#endif
     set_handler(
         "chains_proxy", Handler::f_read | Handler::f_read_param,
         param_handler, h_chains_proxy
@@ -1269,7 +1277,9 @@ Metron::add_handlers()
 
     // HTTP delete handlers
     add_write_handler("delete_chains",      write_handler, h_delete_chains);
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     add_write_handler("delete_rules",       write_handler, h_delete_rules);
+#endif
     add_write_handler("delete_controllers", write_handler, h_delete_controllers);
 }
 
@@ -1935,6 +1945,7 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     return jsc;
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
  * Decodes service chain rules from JSON
  * and applies the rules to the respective NIC.
@@ -2185,6 +2196,7 @@ ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandl
 
     return status;
 }
+#endif
 
 /**
  * Encodes service chain's timing statistics to JSON.
@@ -2873,6 +2885,11 @@ NIC::set_index(const int &index)
 }
 
 /**
+ * NIC rules' management is provided via DPDK's Flow API.
+ * This API is avaialable since v17.05.
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+/**
  * Returns a map of rule Is to rules for a given NIC.
  */
 HashMap<long, String> *
@@ -3298,6 +3315,7 @@ NIC::get_internal_rule_id(const long &rule_id)
 
     return _internal_rule_map[rule_id];
 }
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk Json)

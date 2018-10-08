@@ -80,7 +80,7 @@ Receives and executes instructions from a remote Metron controller instance.
 These instructions are related to the management of high performance NFV
 service chains, including flow dispatching to specific CPU cores,
 instantiation of dedicated slave processes for flow processing, and NIC
-offloading & management operations.
+offloading, monitoring, and management operations.
 The Metron agent also reports monitoring statistics to the controller.
 
 Keyword arguments are:
@@ -105,10 +105,10 @@ Three modes are supported as follows:
 1) FLOW: The NIC utilizes DPDK's Flow API to classify and
 dispatch input flows to the system's CPU cores. FromDPDKDevice
 elements must be configured with MODE flow_dir.
-The Metron controller sends the rules to be installed to the NIC.
-There rules ressemble a typical match-action API, where the action
-is to dispatch the matched flow to a certain hardware queue, where
-a CPU core is waiting for additional processing.
+The Metron controller sends the rules to be installed in the NIC.
+There rules ressemble a typical match-action API, where one of the
+actions is to dispatch the matched flow to a certain hardware queue,
+where a CPU core is waiting for additional processing.
 2) MAC: The NIC utilizes the destination MAC address of incoming
 packets for dispatching to the correct CPU core, using Virtual
 Machine Device queues (VMDq). FromDPDKDevice elements must be
@@ -283,12 +283,18 @@ class CPU {
 class NIC {
     public:
         NIC(bool verbose = false)
-            : _index(-1), _rules(), _internal_rule_map(), _verbose(verbose) {
+            : _index(-1),
+        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+            _rules(), _internal_rule_map(),
+        #endif
+            _verbose(verbose) {
 
         }
 
         ~NIC() {
+        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
             remove_rules();
+        #endif
         }
 
         Element *element;
@@ -303,6 +309,7 @@ class NIC {
         int get_index();
         void set_index(const int &index);
 
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         HashMap<long, String> *find_rules_by_core_id(const int &core_id);
         Vector<String> rules_list_by_core_id(const int &core_id);
         Vector<int> cores_with_rules();
@@ -313,6 +320,7 @@ class NIC {
         bool remove_rule(const int &core_id, const long &rule_id);
         bool update_rule(const int &core_id, const long &rule_id, String &rule);
         bool remove_rules();
+    #endif
 
         Json to_json(RxFilterType rx_mode, bool stats = false);
 
@@ -327,22 +335,26 @@ class NIC {
         int    call_rx_write(String h, const String input);
 
     private:
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         // Maps CPU cores to a map of rule ID -> rule
         HashMap<int, HashMap<long, String> *> _rules;
 
         // Maps ONOS rule IDs (long) to NIC rule IDs (uint32_t)
         HashMap<long, uint32_t> _internal_rule_map;
+    #endif
 
         // Click port index of this NIC
         int _index;
 
         bool _verbose;
 
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         // Methods that facilitate the mapping between ONOS and NIC rule IDs
         uint32_t get_internal_rule_id(const long &rule_id);
         bool verify_unique_rule_id_mapping(const uint32_t &int_rule_id);
         bool store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_id);
         bool delete_rule_id_mapping(const long &rule_id);
+    #endif
 
 };
 
@@ -490,6 +502,7 @@ class ServiceChain {
         Json to_json();
         Json stats_to_json(bool monitoring_mode = false);
 
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         Json rules_to_json();
         int rules_from_json(Json j, Metron *m, ErrorHandler *errh);
         static int delete_rule_from_json(
@@ -498,6 +511,7 @@ class ServiceChain {
         static int delete_rule_batch_from_json(
             String rule_ids, Metron *m, ErrorHandler *errh
         );
+    #endif
 
         inline String get_id() {
             return id;
@@ -663,8 +677,14 @@ class Metron : public Element {
         // Read and write handlers
         enum {
             h_discovered, h_resources, h_controllers, h_stats,
-            h_put_chains, h_chains, h_chains_stats, h_chains_rules, h_chains_proxy,
-            h_delete_chains, h_delete_controllers, h_delete_rules
+            h_put_chains, h_chains, h_chains_stats, h_chains_proxy,
+        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+            h_chains_rules,
+        #endif
+            h_delete_chains, h_delete_controllers,
+        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+            h_delete_rules
+        #endif
         };
 
         ServiceChain *find_service_chain_by_id(String id);
