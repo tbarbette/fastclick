@@ -26,10 +26,14 @@ my(%processing_constants) =
 my(%flow_code_constants) =
     ('COMPLETE_FLOW' => 'x/x');
 my(@source_file, @header_file, @click_name, @cxx_name, @doc_name,
-   @parents, @port_count, @processing, @flow_code, @flags, @requirements,
-   @element_methods, @element_libs, @provisions, @noexports,
+   @parents, @port_count, @processing, @flow_code, @flags, @batching,
+   @requirements, @element_methods, @element_libs, @provisions, @noexports,
    %click_name_to_id, %cxx_name_to_id, $verbose);
 my(@includes) = ( );
+
+my(@base_elements) = ( 'Element', 'BatchElement', 'SimpleElement', 'ClassifyElement', 'SimpleBatchElement' );
+
+my(@batch_elements) = ( 'BatchElement', 'SimpleElement', 'ClassifyElement', 'SimpleBatchElement' );
 
 sub driver_mask ($) {
     my($m) = 0;
@@ -214,6 +218,7 @@ sub process_file ($) {
 		push @processing, $processing[$i];
 		push @flow_code, $flow_code[$i];
 		push @flags, $flags[$i];
+		push @batching, $batching[$i];
 		push @element_methods, $element_methods[$i];
 		push @noexports, 0;
 		last;
@@ -233,6 +238,7 @@ sub process_file ($) {
 	push @processing, "";
 	push @flow_code, "";
 	push @flags, undef;
+    push @batching, "";
 	push @element_methods, "";
 	push @noexports, 1;
     }
@@ -267,7 +273,7 @@ sub parents_port_count ($) {
     if (!$port_count[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
+	    if ($parent ~~ @base_elements) {
 		$port_count[$classid] = '0/0';
 		last;
 	    } elsif ($parent ne '') {
@@ -285,7 +291,7 @@ sub parents_processing ($) {
     if (!$processing[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
+	    if ($parent ~~ @base_elements) {
 		$processing[$classid] = 'a/a';
 		last;
 	    } elsif ($parent ne '') {
@@ -303,7 +309,7 @@ sub parents_flow_code ($) {
     if (!$flow_code[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
+	    if ($parent ~~ @base_elements) {
 		$flow_code[$classid] = 'x/x';
 		last;
 	    } elsif ($parent ne '') {
@@ -321,7 +327,7 @@ sub parents_flags ($) {
     if (!defined $flags[$classid]) {
 	my($parent);
 	foreach $parent (@{$parents[$classid]}) {
-	    if ($parent eq 'Element' || $parent eq 'BatchElement') {
+	    if ($parent ~~ @base_elements) {
 		last;
 	    } elsif ($parent ne '') {
 		$flags[$classid] = &parents_flags($cxx_name_to_id{$parent});
@@ -330,6 +336,24 @@ sub parents_flags ($) {
 	}
     }
     return $flags[$classid];
+}
+
+sub parents_batching ($) {
+    my($classid) = @_;
+    return undef if !defined $classid;
+    if (!$batching[$classid]) {
+	my($parent);
+	foreach $parent (@{$parents[$classid]}) {
+	    if ($parent ~~ @batch_elements) {
+		$batching[$classid] = 1;
+		last;
+	    } elsif ($parent ne '') {
+		$batching[$classid] = &parents_batching($cxx_name_to_id{$parent});
+		last if $batching[$classid];
+	    }
+	}
+    }
+    return $batching[$classid];
 }
 
 sub xml_quote ($) {
@@ -546,6 +570,11 @@ foreach $id (sort sorter 0..$#click_name) {
     my($flags) = $flags[$id];
     $flags = parents_flags($id) if !defined($flags);
     print OUT " flags=\"", $flags, "\"" if defined($flags);
+
+    my($b) = $batching[$id];
+    $b = parents_batching($id) if !$b;
+    print OUT " batching=\"", $b, "\"" if $b;
+
 
     print OUT " methods=\"", $element_methods[$id], "\"" if $element_methods[$id];
 
