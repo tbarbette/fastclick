@@ -779,6 +779,7 @@ class Metron : public Element {
         /* DPDK arguments for slave processes */
         Vector<String> _args;
         Vector<String> _dpdk_args;
+        String _slave_extra;
 
         /* Verbose */
         bool _verbose;

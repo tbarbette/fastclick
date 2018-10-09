@@ -190,6 +190,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("ON_SCALE", HandlerCallArg(HandlerCall::writable), _on_scale)
         .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
         .read_all("SLAVE_ARGS",        _args)
+        .read    ("SLAVE_EXTRA",       _slave_extra)
         .read    ("VERBOSE",           _verbose)
         .complete() < 0)
         return ERROR;
@@ -2471,6 +2472,7 @@ ServiceChain::generate_configuration()
         newconf += "slave["  + is + "] -> " + (_metron->_monitoring_mode ? "["+is+"]monitoring_lat["+is+"] -> " : "") + "  slaveTD" + is + ";\n\n";
 
     }
+    newconf += _metron->_slave_extra;
     return newconf;
 }
 
