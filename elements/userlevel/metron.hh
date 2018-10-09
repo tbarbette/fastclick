@@ -326,8 +326,9 @@ class NIC {
 
         int queue_per_pool();
 
-        int cpu_to_queue(int id) {
-            return id * (queue_per_pool());
+        int phys_cpu_to_queue(int phys_cpu_id) {
+		assert(phys_cpu_id >= 0);
+            return phys_cpu_id * (queue_per_pool());
         }
 
         String call_rx_read(String h);
@@ -358,12 +359,6 @@ class NIC {
 
 };
 
-
-struct CpuInfo {
-    float load;
-    Timestamp start_time;
-};
-
 struct LatencyInfo {
     uint64_t avg_throughput;
     uint64_t min_latency;
@@ -371,93 +366,93 @@ struct LatencyInfo {
     uint64_t max_latency;
 };
 
+class CpuInfo {
+public:
+	CpuInfo() : cpuPhysId(-1),load(0),maxNicQueue(0),latency(),_active(false),_active_time() {
+
+	}
+
+	int cpuPhysId;
+    float load;
+    int maxNicQueue;
+
+    LatencyInfo latency;
+
+    bool assigned() {
+	return cpuPhysId >= 0;
+    }
+
+    void set_active(bool active) {
+	_active = active;
+	_active_time = Timestamp::now();
+    }
+
+    bool active() {
+	return _active;
+    }
+
+    int activeSince() {
+	int cpu_time;
+        if (_active)
+            cpu_time = (Timestamp::now() - _active_time).msecval();
+        else
+            cpu_time = -(Timestamp::now() - _active_time).msecval();
+        return cpu_time;
+    }
+
+private:
+    bool _active;
+    Timestamp _active_time;
+
+};
+
+class NicStat {
+  public:
+	long long useless;
+	long long useful;
+	long long count;
+	float load;
+
+	NicStat() : useless(0), useful(0), count(0), load(0) {
+	}
+};
+
+
+
 class ServiceChain {
     public:
         class RxFilter {
-            public:
+          public:
 
-                RxFilter(ServiceChain *sc) : _sc(sc) {
+			RxFilter(ServiceChain *sc);
+			~RxFilter();
 
-                }
-                ~RxFilter() {
-                    values.clear();
-                }
+			RxFilterType method;
+			ServiceChain *_sc;
 
-                RxFilterType method;
-                ServiceChain *_sc;
+			static RxFilter *from_json(
+				Json j, ServiceChain *sc, ErrorHandler *errh
+			);
+			Json to_json();
 
-                static RxFilter *from_json(
-                    Json j, ServiceChain *sc, ErrorHandler *errh
-                );
-                Json to_json();
+			inline int phys_cpu_to_queue(NIC *nic, int phys_cpu_id) {
+				return nic->phys_cpu_to_queue(phys_cpu_id);
+			}
 
-                inline int cpu_to_queue(NIC *nic, int cpu_id) {
-                    return nic->cpu_to_queue(cpu_id);
-                }
+			inline void allocate_nic_space_for_tags(const int size);
 
-                inline void allocate_nic_space_for_tags(const int size) {
-                    assert(size > 0);
+			inline void allocate_tag_space_for_nic(const int nic_id, const int size);
 
-                    // Vector initialization
-                    if (values.size() == 0) {
-                        values.resize(size, Vector<String>());
-                        return;
-                    }
+			inline void set_tag_value(
+					const int nic_id, const int cpu_id, const String value);
 
-                    // Grow the vector if not large enough
-                    if (values.size() < size) {
-                        values.resize(size);
-                    }
-                }
+			inline String get_tag_value(const int nic_id, const int cpu_id);
 
-                inline void allocate_tag_space_for_nic(const int nic_id, const int size) {
-                    assert(nic_id >= 0);
-                    assert(size > 0);
+			inline bool has_tag_value(const int nic_id, const int cpu_id);
 
-                    // Vector initialization
-                    if (values[nic_id].size() == 0) {
-                        values[nic_id].resize(size, "");
-                        return;
-                    }
+			virtual int apply(NIC *nic, ErrorHandler *errh);
 
-                    // Grow the vector if not large enough
-                    if (values[nic_id].size() < size) {
-                        values[nic_id].resize(size);
-                    }
-                }
-
-                inline void set_tag_value(
-                        const int nic_id, const int cpu_id, const String value) {
-                    assert(nic_id >= 0);
-                    assert(cpu_id >= 0);
-                    assert(!value.empty());
-
-                    // Grow the vector according to the core index
-                    allocate_tag_space_for_nic(nic_id, cpu_id + 1);
-
-                    values[nic_id][cpu_id] = value;
-
-                    click_chatter(
-                        "Tag %s is mapped to NIC %d and CPU core %d",
-                        value.c_str(), nic_id, cpu_id
-                    );
-                }
-
-                inline String get_tag_value(const int nic_id, const int cpu_id) {
-                    assert(nic_id >= 0);
-                    assert(cpu_id >= 0);
-
-                    return values[nic_id][cpu_id];
-                }
-
-                inline bool has_tag_value(const int nic_id, const int cpu_id) {
-                    String value = get_tag_value(nic_id, cpu_id);
-                    return (value && !value.empty());
-                }
-
-                virtual int apply(NIC *nic, ErrorHandler *errh);
-
-                Vector<Vector<String>> values;
+			Vector<Vector<String>> values;
         };
 
         /**
@@ -476,24 +471,13 @@ class ServiceChain {
         };
         enum ScStatus status;
 
-        class Stat {
-            public:
-                long long useless;
-                long long useful;
-                long long count;
-                float load;
-
-                Stat() : useless(0), useful(0), count(0), load(0) {
-
-                }
-        };
-        Vector<Stat> nic_stats;
-
         /**
          * Service chain methods.
          */
         ServiceChain(Metron *m);
         ~ServiceChain();
+
+        void initializeCpus(int initialCpuNb, int maxCpuNb);
 
         static ServiceChain *from_json(Json j, Metron *m, ErrorHandler *errh);
         int reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh);
@@ -521,16 +505,26 @@ class ServiceChain {
             return rx_filter->method;
         }
 
-        inline int get_used_cpu_nb() {
-            return _used_cpus_nb;
+        inline int get_active_cpu_nb() {
+            int nb = 0;
+            for (int i = 0; i < get_max_cpu_nb(); i++) {
+                if (get_cpu_info(i).active()) {
+                    nb++;
+                }
+            }
+            return nb;
         }
 
         inline int get_max_cpu_nb() {
             return _max_cpus_nb;
         }
 
-        inline int get_cpu_map(int i) {
-            return _cpus[i];
+        inline CpuInfo& get_cpu_info(int cpu_id) {
+            return _cpus[cpu_id];
+        }
+
+        inline int get_cpu_phys_id(int cpu_id) {
+            return _cpus[cpu_id].cpuPhysId;
         }
 
         inline int get_nics_nb() {
@@ -559,7 +553,8 @@ class ServiceChain {
             return _nics[i];
         }
 
-        Bitvector assigned_cpus();
+       // Bitvector assigned_cpus();
+        Bitvector active_cpus();
 
         String generate_configuration();
         String generate_configuration_slave_fd_name(int nic_index, int cpu_index, String type = "FD" );
@@ -585,10 +580,6 @@ class ServiceChain {
         int call_read(String handler, String &response, String params = "");
         int call_write(String handler, String &response, String params = "");
 
-        Vector<int> &get_cpu_map_ref() {
-            return _cpus;
-        }
-
         struct timing_stats {
             Timestamp start, parse, launch;
             Json to_json();
@@ -611,11 +602,9 @@ class ServiceChain {
 
     private:
         Metron *_metron;
-        Vector<int> _cpus;
         Vector<NIC *> _nics;
-        Vector<CpuInfo> _cpu_load;
-        Vector<int> _cpu_queue;
-        Vector<LatencyInfo> _cpu_latency;
+        Vector<CpuInfo> _cpus;
+        Vector<NicStat> _nic_stats;
         float _total_cpu_load;
         float _max_cpu_load;
         int _max_cpu_load_index;
@@ -623,7 +612,7 @@ class ServiceChain {
         int _pid;
         struct timing_stats _timing_stats;
         struct autoscale_timing_stats _as_timing_stats;
-        int _used_cpus_nb;
+        int _initial_cpus_nb;
         int _max_cpus_nb;
         bool _autoscale;
         Timestamp _last_autoscale;

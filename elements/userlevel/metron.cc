@@ -418,20 +418,19 @@ Metron::try_slaves(ErrorHandler *errh)
     sc.id = "slaveTest";
     sc.config_type = CLICK;
     sc.config = "";
-    sc._used_cpus_nb = 1;
-    sc._max_cpus_nb = 1;
-    sc._autoscale = false;
-    sc._cpus.resize(1);
-    sc._cpu_load.resize(1, CpuInfo());
-    sc._cpu_queue.resize(1, 0);
-    sc._cpu_latency.resize(1, LatencyInfo());
+    sc.initializeCpus(1,1);
     for (int i = 0; i < sc.get_nics_nb(); i++) {
         NIC *nic = sc.get_nic_by_index(i);
         sc._nics.push_back(nic);
     }
-    sc.nic_stats.resize(sc._nics.size() * 1, ServiceChain::Stat());
+    sc._nic_stats.resize(sc._nics.size() * 1, NicStat());
     sc.rx_filter = new ServiceChain::RxFilter(&sc);
-
+    Vector<int> cpu_phys_map;
+    cpu_phys_map.resize(1);
+    assign_cpus(&sc, cpu_phys_map);
+    assert(cpu_phys_map[0] >= 0);
+    sc.get_cpu_info(0).cpuPhysId = cpu_phys_map[0];
+    sc.get_cpu_info(0).set_active(true);
     if (run_service_chain(&sc, errh) != 0) {
         return errh->error(
             "Unable to deploy Metron slaves: "
@@ -440,6 +439,7 @@ Metron::try_slaves(ErrorHandler *errh)
     }
 
     kill_service_chain(&sc);
+    unassign_cpus(&sc);
 
     click_chatter("Continuing initialization...");
 
@@ -560,7 +560,7 @@ Metron::run_timer(Timer *t)
 
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
 
-            const int cpu_id = sc->get_cpu_map(j);
+            const int cpu_id = sc->get_cpu_phys_id(j);
             String js = String(j);
             float cpu_load = 0;
             float cpu_queue = 0;
@@ -577,10 +577,10 @@ Metron::run_timer(Timer *t)
                 long long count = atoll(sc->simple_call_read(name + ".count").c_str());
 //                long long useless_diff = useless - sc->nic_stats[stat_idx].useless;
 //                long long useful_diff = useful - sc->nic_stats[stat_idx].useful;
-                long long count_diff = count - sc->nic_stats[stat_idx].count;
+                long long count_diff = count - sc->_nic_stats[stat_idx].count;
 //                sc->nic_stats[stat_idx].useless = useless;
 //                sc->nic_stats[stat_idx].useful = useful;
-                sc->nic_stats[stat_idx].count = count;
+                sc->_nic_stats[stat_idx].count = count;
 //                long long count = atoll(sc->simple_call_write(name + ".reset_load").c_str());
 //                if (useful_diff + useless_diff == 0) {
 //                    sc->nic_stats[stat_idx].load = 0;
@@ -609,19 +609,20 @@ Metron::run_timer(Timer *t)
                     cpu_load = sc->nic_stats[stat_idx].load;
                 }*/
                 throughput += atoll(sc->simple_call_read("monitoring_th_" + is + "_" + js + ".link_rate").c_str());
-                float ncpuqueue = (float)atoi(sc->simple_call_read(name + ".queue_count "+String(nic->cpu_to_queue(sc->get_cpu_map(j)))).c_str()) / (float)(atoi(nic->call_tx_read("nb_rx_desc").c_str()));
+                assert(sc->get_cpu_info(j).assigned());
+                float ncpuqueue = (float)atoi(sc->simple_call_read(name + ".queue_count "+String(nic->phys_cpu_to_queue(sc->get_cpu_phys_id(j)))).c_str()) / (float)(atoi(nic->call_tx_read("nb_rx_desc").c_str()));
                 if (ncpuqueue > cpu_queue) {
                     cpu_queue = ncpuqueue;
                 }
             }
             cpu_load =  atof(load[j].c_str());
-            sc->_cpu_load[j].load = cpu_load;
-            sc->_cpu_queue[j] = cpu_queue;
+            sc->_cpus[j].load = cpu_load;
+            sc->_cpus[j].maxNicQueue = cpu_queue;
             if (_monitoring_mode) {
-                sc->_cpu_latency[j].avg_throughput = throughput;
-                sc->_cpu_latency[j].min_latency = atoll(min[j].c_str());
-                sc->_cpu_latency[j].max_latency = atoll(max[j].c_str());
-                sc->_cpu_latency[j].average_latency = atoll(avg[j].c_str());
+                sc->_cpus[j].latency.avg_throughput = throughput;
+                sc->_cpus[j].latency.min_latency = atoll(min[j].c_str());
+                sc->_cpus[j].latency.max_latency = atoll(max[j].c_str());
+                sc->_cpus[j].latency.average_latency = atoll(avg[j].c_str());
             }
             total_cpu_load += cpu_load;
             if (cpu_load > max_cpu_load) {
@@ -640,7 +641,7 @@ Metron::run_timer(Timer *t)
             }
         } else {
             sc->_total_cpu_load = sc->_total_cpu_load * (1 - total_alpha) +
-                                  (total_cpu_load / sc->get_used_cpu_nb()) * (total_alpha);
+                                  (total_cpu_load / sc->get_active_cpu_nb()) * (total_alpha);
         }
         sc->_max_cpu_load = max_cpu_load;
         sc->_max_cpu_load_index = max_cpu_load_index;
@@ -687,12 +688,16 @@ Metron::get_assigned_cpus_nb()
 
 /**
  * Sets the CPU map of a given service chain.
+ * @args map : A map to be filled with assigned cpu. The number of CPU asked for will be the map size
+ * @args sc : Service chain owner
+ *
+ * @return true on success
  */
 bool
-Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
+Metron::assign_cpus(ServiceChain* sc, Vector<int> &map)
 {
     short offer = this->get_cpus_nb();
-    short demand = this->get_assigned_cpus_nb() + sc->get_max_cpu_nb();
+    short demand = this->get_assigned_cpus_nb() + map.size();
 
     if (demand > offer) {
         click_chatter(
@@ -704,14 +709,14 @@ Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 
     int j = 0;
 
-    for (int i = 0; i < offer; i++) {
-        if (_cpu_map[i] == 0) {
-            _cpu_map[i] = sc;
-            map[j++] = i;
-            if (j == sc->get_max_cpu_nb()) {
-                return true;
-            }
-        }
+    for (int i = 0; i < _cpu_map.size(); i++) {
+	if (_cpu_map[i] == 0) {
+			_cpu_map[i] = sc;
+			map[j++] = i;
+			if (j == map.size()) {
+				return true;
+			}
+	}
     }
 
     return false;
@@ -748,7 +753,7 @@ void
 Metron::call_scale(ServiceChain* sc, String event)
 {
     if (_on_scale) {
-        _on_scale.set_value(String(sc->get_used_cpu_nb()) + " " +
+        _on_scale.set_value(String(sc->get_active_cpu_nb()) + " " +
                   event + " " + sc->get_id() + " " +
                   String(sc->_total_cpu_load) + " " +
                   String(sc->_max_cpu_load) + " " +
@@ -766,12 +771,23 @@ Metron::call_scale(ServiceChain* sc, String event)
 int
 Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
-    if (!assign_cpus(sc, sc->get_cpu_map_ref())) {
+	Vector<int> cpu_phys_map;
+	cpu_phys_map.resize(sc->get_max_cpu_nb());
+
+    if (!assign_cpus(sc, cpu_phys_map)) {
         errh->error(
             "Cannot instantiate service chain %s: Not enough CPUs",
             sc->get_id().c_str()
         );
         return ERROR;
+    }
+
+    for (int i = 0; i < cpu_phys_map.size(); i++) {
+	assert(cpu_phys_map[i] >= 0);
+	sc->get_cpu_info(i).cpuPhysId = cpu_phys_map[i];
+    }
+    for (int i = 0; i < sc->_initial_cpus_nb; i++) {
+	sc->get_cpu_info(i).set_active(true);
     }
 
     int ret = run_service_chain(sc, errh);
@@ -850,6 +866,7 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
         }
         */
         String conf = sc->generate_configuration();
+
         click_chatter("Writing configuration %s", conf.c_str());
 
         int pos = 0;
@@ -879,15 +896,11 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
         String s;
         int v = sc->control_read_line(s);
         if (v <= 0) {
-            return errh->error("Could not read from control socket: Error %d", v);
+            return errh->error("_assignedCould not read from control socket: Error %d", v);
         }
         if (!s.starts_with("Click::ControlSocket/1.")) {
             kill(pid, SIGKILL);
             return errh->error("Unexpected ControlSocket command");
-        }
-
-        for (int i = 0 ; i < sc->get_used_cpu_nb(); i++) {
-            sc->_cpu_load[i].start_time = Timestamp::now();
         }
 
         return SUCCESS;
@@ -1333,26 +1346,31 @@ Metron::to_json()
 }
 
 
+void ServiceChain::initializeCpus(int initialCpuNb, int maxCpuNb) {
+    _initial_cpus_nb = initialCpuNb;
+	_max_cpus_nb = maxCpuNb;
+    _autoscale = false;
+    _cpus.resize(maxCpuNb,CpuInfo());
+    for (int i = 0; i < maxCpuNb; i++) {
+	_cpus[i].cpuPhysId = -1;
+    }
+}
+
+
 Json
 ServiceChain::get_cpu_stats(int j) {
             ServiceChain* sc = this;
-            int cpu_id = sc->get_cpu_map(j);
-            float cpu_load = sc->_cpu_load[j].load;
-            float cpu_queue = sc->_cpu_queue[j];
-            int cpu_time;
-            if (sc->_cpu_load[j].start_time)
-                cpu_time = (Timestamp::now() - sc->_cpu_load[j].start_time).msecval();
-            else
-                cpu_time = -1;
+            CpuInfo& cpu = sc->get_cpu_info(j);
+            int cpu_id = sc->get_cpu_phys_id(j);
             Json jcpu = Json::make_object();
             jcpu.set("id",   cpu_id);
-            jcpu.set("load", cpu_load);
-            jcpu.set("queue", cpu_queue);
-            jcpu.set("busy", cpu_time);      // This CPU core is busy
+            jcpu.set("queue", cpu.maxNicQueue);
+            jcpu.set("load", cpu.load);
+            jcpu.set("busy", cpu.activeSince());      // This CPU core is busy
 
             // Additional per-core statistics in monitoring mode
             if (sc->_metron->_monitoring_mode) {
-                LatencyInfo lat = sc->_cpu_latency[j];
+                LatencyInfo lat = sc->get_cpu_info(j).latency;
                 sc->_metron->add_per_core_monitoring_data(&jcpu, lat);
             }
             return jcpu;
@@ -1397,7 +1415,7 @@ Metron::stats_to_json()
             jcpus.push_back(jcpu);
 
             assigned_cpus++;
-            busy_cpus.push_back(sc->get_cpu_map(j));
+            busy_cpus.push_back(sc->get_cpu_phys_id(j));
         }
 
         sci++;
@@ -1595,6 +1613,73 @@ Metron::delete_controller_from_json(const String &ip)
 /***************************************
  * RxFilter
  **************************************/
+ServiceChain::RxFilter::RxFilter(ServiceChain *sc) : _sc(sc) {
+
+}
+ServiceChain::RxFilter::~RxFilter() {
+	values.clear();
+}
+
+
+inline void ServiceChain::RxFilter::allocate_nic_space_for_tags(const int size) {
+	assert(size > 0);
+
+	// Vector initialization
+	if (values.size() == 0) {
+		values.resize(size, Vector<String>());
+		return;
+	}
+
+	// Grow the vector if not large enough
+	if (values.size() < size) {
+		values.resize(size);
+	}
+}
+
+inline void ServiceChain::RxFilter::allocate_tag_space_for_nic(const int nic_id, const int size) {
+	assert(nic_id >= 0);
+	assert(size > 0);
+
+	// Vector initialization
+	if (values[nic_id].size() == 0) {
+		values[nic_id].resize(size, "");
+		return;
+	}
+
+	// Grow the vector if not large enough
+	if (values[nic_id].size() < size) {
+		values[nic_id].resize(size);
+	}
+}
+
+inline void ServiceChain::RxFilter::set_tag_value(
+		const int nic_id, const int cpu_id, const String value) {
+	assert(nic_id >= 0);
+	assert(cpu_id >= 0);
+	assert(!value.empty());
+
+	// Grow the vector according to the core index
+	allocate_tag_space_for_nic(nic_id, cpu_id + 1);
+
+	values[nic_id][cpu_id] = value;
+
+	click_chatter(
+		"Tag %s is mapped to NIC %d and CPU core %d",
+		value.c_str(), nic_id, cpu_id
+	);
+}
+
+inline String ServiceChain::RxFilter::get_tag_value(const int nic_id, const int cpu_id) {
+	assert(nic_id >= 0);
+	assert(cpu_id >= 0);
+
+	return values[nic_id][cpu_id];
+}
+
+inline bool ServiceChain::RxFilter::has_tag_value(const int nic_id, const int cpu_id) {
+	String value = get_tag_value(nic_id, cpu_id);
+	return (value && !value.empty());
+}
 /**
  * Converts JSON object to Rx filter configuration.
  */
@@ -1624,7 +1709,7 @@ ServiceChain::RxFilter::from_json(
         rf->allocate_tag_space_for_nic(inic, jnic.second.size());
         int j = 0;
         for (auto jtag : jnic.second) {
-            const int core_id = sc->get_cpu_map(j++);
+            const int core_id = j++;
             rf->set_tag_value(inic, core_id, jtag.second.to_s());
         }
         inic++;
@@ -1648,7 +1733,7 @@ ServiceChain::RxFilter::to_json()
         NIC *nic = _sc->get_nic_by_index(nic_id);
         Json jaddrs = Json::make_array();
         for (int j = 0; j < _sc->get_max_cpu_nb(); j++) {
-            const int core_id = _sc->get_cpu_map(j);
+            const int core_id = _sc->get_cpu_phys_id(j);
             const String tag = get_tag_value(nic_id, core_id);
             assert(!tag.empty());
             jaddrs.push_back(tag);
@@ -1688,7 +1773,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
 
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
             int available_pools = atoi(nic->call_rx_read("nb_vf_pools").c_str());
-            const int core_id = _sc->get_cpu_map(i);
+            const int core_id = i;
             if (available_pools <= core_id) {
                 return errh->error("Not enough VF pools: %d are available", available_pools);
             }
@@ -1697,7 +1782,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     } else if ((method == FLOW) || (method == RSS)) {
         // Advertize the available CPU core IDs
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
-            const int core_id = _sc->get_cpu_map(i);
+            const int core_id = i;
             set_tag_value(inic, core_id, String(core_id));
         }
     } else if (method == VLAN) {
@@ -1725,9 +1810,6 @@ ServiceChain::~ServiceChain()
     }
 
     _cpus.clear();
-    _cpu_load.clear();
-    _cpu_queue.clear();
-    _cpu_latency.clear();
 }
 
 /**
@@ -1765,14 +1847,17 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     }
     sc->config_type = sc_type;
     sc->config = j.get_s("config");
-    sc->_used_cpus_nb = j.get_i("cpus");
-    sc->_max_cpus_nb = j.get_i("maxCpus");
-    if (sc->_used_cpus_nb > sc->_max_cpus_nb) {
+    int initialCpuNb = j.get_i("cpus");
+    int maxCpuNb = j.get_i("maxCpus");
+
+    if (initialCpuNb > maxCpuNb) {
         errh->error(
             "Max number of CPUs must be greater than the number of used CPUs"
         );
-        return NULL;
+        return 0;
     }
+    sc->initializeCpus(initialCpuNb, maxCpuNb);
+
 
     sc->_autoscale = false;
     if (!j.get("autoScale", sc->_autoscale)) {
@@ -1789,10 +1874,6 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     }
     */
 
-    sc->_cpus.resize(sc->_max_cpus_nb);
-    sc->_cpu_load.resize(sc->_max_cpus_nb, CpuInfo());
-    sc->_cpu_queue.resize(sc->_max_cpus_nb, 0);
-    sc->_cpu_latency.resize(sc->_max_cpus_nb, LatencyInfo());
     Json jnics = j.get("nics");
     if (!jnics.is_array()) {
         if (jnics.is_string()) {
@@ -1815,7 +1896,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
         sc->_nics.push_back(nic);
     }
 
-    sc->nic_stats.resize(sc->_nics.size() * sc->_max_cpus_nb,Stat());
+    sc->_nic_stats.resize(sc->_nics.size() * sc->_max_cpus_nb,NicStat());
     sc->rx_filter = ServiceChain::RxFilter::from_json(
         j.get("rxFilter"), sc, errh
     );
@@ -1837,15 +1918,15 @@ ServiceChain::to_json()
     jsc.set("config", config);
     jsc.set("expandedConfig", generate_configuration());
     Json jcpus = Json::make_array();
-    for (int i = 0; i < get_used_cpu_nb(); i++) {
-        jcpus.push_back(get_cpu_map(i));
+    for (int i = 0; i < get_max_cpu_nb(); i++) {
+        jcpus.push_back(i); //TODO :: phys ids ?
     }
     jsc.set("cpus", jcpus);
-    Json jmaxcpus = Json::make_array();
+    /*Json jmaxcpus = Json::make_array();
     for (int i = 0; i < get_max_cpu_nb(); i++) {
-        jmaxcpus.push_back(get_cpu_map(i));
-    }
-    jsc.set("maxCpus", jmaxcpus);
+        jmaxcpus.push_back(get_cpu_phys_id(i));
+    }*/
+    jsc.set("maxCpus", get_max_cpu_nb());
     jsc.set("autoScale", _autoscale);
     jsc.set("status", status);
     Json jnics = Json::make_array();
@@ -1985,6 +2066,8 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
             int core_id = jcpu.second.get_i("cpuId");
+            click_chatter("Adding rules for CPU %d", core_id);
+            assert(get_cpu_info(core_id).active());
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
@@ -2242,75 +2325,82 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
     for (auto jfield : j) {
         if (jfield.first == "cpus") {
-            int new_cpus_nb = jfield.second.to_i();
+		Bitvector oldMap = active_cpus();
+		Bitvector newMap(get_max_cpu_nb(), false);
+
+		for (int i = 0; jfield.second.size(); i++) {
+			if (jfield.second[i].as_i() >  get_max_cpu_nb()) {
+					return errh->error(
+						"Number of used CPUs must be less or equal "
+						"than the maximum number of CPUs!"
+					);
+			}
+			newMap[jfield.second[i].as_i()] = true;
+		}
+
             int ret;
             String response = "";
-            if (new_cpus_nb == get_used_cpu_nb())
-                continue;
+            bool did_scale = false;
 
-            m->call_scale(this, "scale");
-
-            int newCpu = new_cpus_nb - 1;
-            // Scale up
-            if (new_cpus_nb > get_used_cpu_nb()) {
-                if (new_cpus_nb > get_max_cpu_nb()) {
-                    return errh->error(
-                        "Number of used CPUs must be less or equal "
-                        "than the maximum number of CPUs!"
-                    );
-                }
-                for (int inic = 0; inic < get_nics_nb(); inic++) {
-                    for (int i = get_used_cpu_nb(); i < new_cpus_nb; i++) {
-                        ret = call_write(
-                            generate_configuration_slave_fd_name(
-                                inic, get_cpu_map(i)
-                            ) + ".safe_active", response, "1"
-                        );
-                        if (ret < 200 || ret >= 300) {
-                            return errh->error(
-                                "Response to activate input was %d: %s",
-                                ret, response.c_str()
-                            );
-                        }
-                        click_chatter("Response %d: %s", ret, response.c_str());
-                    }
-                    // Actually use the new cores AFTER the secondary has been advertised
-                    if (_metron->_rx_mode == RSS) {
-                        _nics[inic]->call_rx_write("max_rss", String(new_cpus_nb));
-                    }
-                }
-                _cpu_load[newCpu].start_time = Timestamp::now();
-            // Scale down
-            } else {
-                if (new_cpus_nb < 0) {
-                    return errh->error(
-                        "Number of used CPUs must be greater or equal than 0!"
-                    );
-                }
-                for (int inic = 0; inic < get_nics_nb(); inic++) {
-                    // Stop using the new cores BEFORE the secondary has been torn down
-                    if (_metron->_rx_mode  == RSS) {
-                        _nics[inic]->call_rx_write("max_rss", String(new_cpus_nb));
-                    }
-                    for (int i = new_cpus_nb; i < get_used_cpu_nb(); i++) {
-                        int ret = call_write(
-                            generate_configuration_slave_fd_name(
-                                inic, get_cpu_map(i)
-                            ) + ".safe_active", response, "0"
-                        );
-                        if (ret < 200 || ret >= 300) {
-                            return errh->error(
-                                "Response to activate input was %d: %s",
-                                ret, response.c_str()
-                            );
-                        }
-                    }
-                }
-                _cpu_load[newCpu].start_time = Timestamp();
+            if (_metron->_rx_mode == RSS) {
+		for (int i = 0; i < newMap.size(); i++) {
+			if (!newMap[i] && i < newMap.weight()) {
+				return errh->error("RSS must allocate CPUs without holes !");
+			}
+		}
             }
-            click_chatter("Number of used CPUs is now: %d", new_cpus_nb);
-            _used_cpus_nb = new_cpus_nb;
-            return newCpu;
+
+            for (int newCpuId = 0; newCpuId < get_max_cpu_nb(); newCpuId++) {
+		if (oldMap[newCpuId] == newMap[newCpuId])
+			continue;
+		did_scale = true;
+
+				// Activating core
+		get_cpu_info(newCpuId).set_active(newMap[newCpuId]);
+				if (newMap[newCpuId]) {
+					for (int inic = 0; inic < get_nics_nb(); inic++) {
+						ret = call_write(
+							generate_configuration_slave_fd_name(
+								inic, get_cpu_phys_id(newCpuId)
+							) + ".safe_active", response, "1"
+						);
+						if (ret < 200 || ret >= 300) {
+							return errh->error(
+								"Response to activate input was %d: %s",
+								ret, response.c_str()
+							);
+						}
+						click_chatter("Response %d: %s", ret, response.c_str());
+						// Actually use the new cores AFTER the secondary has been advertised
+						if (_metron->_rx_mode == RSS) {
+							_nics[inic]->call_rx_write("max_rss", String(newCpuId + 1));
+						}
+					}
+				// Scale down
+				} else {
+					for (int inic = 0; inic < get_nics_nb(); inic++) {
+						// Stop using the new cores BEFORE the secondary has been torn down
+						if (_metron->_rx_mode  == RSS) {
+							_nics[inic]->call_rx_write("max_rss", String(newCpuId + 1));
+						}
+						int ret = call_write(
+							generate_configuration_slave_fd_name(
+								inic, get_cpu_phys_id(newCpuId)
+							) + ".safe_active", response, "0"
+						);
+						if (ret < 200 || ret >= 300) {
+							return errh->error(
+								"Response to activate input was %d: %s",
+								ret, response.c_str()
+							);
+						}
+					}
+				}
+            }
+            if (did_scale)
+		m->call_scale(this, "scale");
+            click_chatter("Number of active CPUs is now: %d", get_active_cpu_nb());
+            return 0;
         } else {
             return errh->error(
                 "Unsupported reconfiguration option: %s",
@@ -2336,7 +2426,9 @@ ServiceChain::do_autoscale(int n_cpu_change)
     }
 
     _last_autoscale = Timestamp::now();
-    int nnew = _used_cpus_nb + n_cpu_change;
+    if (n_cpu_change == 0)
+	return;
+    int nnew = get_active_cpu_nb() + n_cpu_change;
     if (nnew <= 0 || nnew > get_max_cpu_nb()) {
         return;
     }
@@ -2345,14 +2437,17 @@ ServiceChain::do_autoscale(int n_cpu_change)
     struct ServiceChain::autoscale_timing_stats ts;
     ts.autoscale_start = Timestamp::now_steady();
 
-    _used_cpus_nb = nnew;
+    int lastidx = get_active_cpu_nb() - 1;
+    for (int i = 0; i < abs(n_cpu_change); i++) {
+	get_cpu_info(lastidx + (n_cpu_change>0?i:-1)).set_active(n_cpu_change > 0);
+    }
     click_chatter(
         "Autoscale: Service chain %s uses %d CPU(s)",
-        this->get_id().c_str(), _used_cpus_nb
+        this->get_id().c_str(), get_active_cpu_nb()
     );
 
     String response;
-    int ret = call_write("slave/rrs.max", response, String(_used_cpus_nb));
+    int ret = call_write("slave/rrs.max", response, String(get_active_cpu_nb()));
     if (ret < 200 || ret >= 300) {
         errh->error(
             "Response to change the number of CPU core %d: %s",
@@ -2381,14 +2476,14 @@ ServiceChain::generate_configuration()
     if (_autoscale) {
         newconf += "slave :: {\n";
 
-        newconf += "rrs :: RoundRobinSwitch(MAX " + String(get_used_cpu_nb()) + ");\n";
+        newconf += "rrs :: RoundRobinSwitch(MAX " + String(get_active_cpu_nb()) + ");\n";
         newconf += "ps :: PaintSwitch();\n\n";
 
         for (int i = 0 ; i < get_max_cpu_nb(); i++) {
             newconf += "rrs[" + String(i) + "] -> slavep" + String(i) +
                        " :: Pipeliner(CAPACITY 8, BLOCKING false) -> "
                        "[0]ps; StaticThreadSched(slavep" +
-                       String(i) + " " + String(get_cpu_map(i)) + ");\n";
+                       String(i) + " " + String(get_cpu_phys_id(i)) + ");\n";
         }
         newconf+="\n";
 
@@ -2426,21 +2521,22 @@ ServiceChain::generate_configuration()
         String is = String(i);
         NIC *nic = get_nic_by_index(i);
         if (_metron->_rx_mode == RSS) {
-            nic->call_rx_write("max_rss", String(get_used_cpu_nb()));
+            nic->call_rx_write("max_rss", String(get_active_cpu_nb()));
         }
 
         for (int j = 0; j < get_max_cpu_nb(); j++) {
+            assert(get_cpu_info(j).assigned());
             String js = String(j);
-            String active = (j < get_used_cpu_nb() ? "1":"0");
-            int cpu_id = get_cpu_map(j);
-            int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
-            String ename = generate_configuration_slave_fd_name(i, cpu_id);
+            String active = (j < get_cpu_info(j).active() ? "1":"0");
+            int phys_cpu_id = get_cpu_phys_id(j);
+            int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
+            String ename = generate_configuration_slave_fd_name(i, j);
             newconf += ename + " :: " + nic->element->class_name() +
                 "(" + nic->get_device_address() + ", QUEUE " + String(queue_no) +
                 ", N_QUEUES 1, MAXTHREADS 1, ";
             newconf += rx_conf;
             newconf += "ACTIVE " + active + ");\n";
-            newconf += "StaticThreadSched(" + ename + " " + String(cpu_id) + ");\n";
+            newconf += "StaticThreadSched(" + ename + " " + String(phys_cpu_id) + ");\n";
             newconf += ename + " " +
                 // " -> batchAvg" + is + "C" + js + " :: AverageBatchCounter() " +
                 " -> ";
@@ -2453,24 +2549,24 @@ ServiceChain::generate_configuration()
         newconf+= "\n";
 
         if (get_max_cpu_nb() == 1) {
-            int cpu_id = get_cpu_map(0);
-            int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
+		assert(get_cpu_info(0).assigned());
+            int phys_cpu_id = get_cpu_phys_id(0);
+            int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
             newconf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);\n";
         } else {
             newconf += "slaveTD" + is + " :: ExactCPUSwitch();\n";
             for (int j = 0; j < get_max_cpu_nb(); j++) {
                 String js = String(j);
-
-                int cpu_id = get_cpu_map(j);
-                String ename = generate_configuration_slave_fd_name(i, cpu_id, "TD");
-                int queue_no = rx_filter->cpu_to_queue(nic, cpu_id);
+                assert(get_cpu_info(j).assigned());
+                int phys_cpu_id = get_cpu_phys_id(j);
+                String ename = generate_configuration_slave_fd_name(i, j, "TD");
+                int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
                 newconf += ename + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99, MAXQUEUES 1);";
 
                 newconf += "slaveTD" + is + "["+js+"] -> " + ename + ";\n";
             }
         }
         newconf += "slave["  + is + "] -> " + (_metron->_monitoring_mode ? "["+is+"]monitoring_lat["+is+"] -> " : "") + "  slaveTD" + is + ";\n\n";
-
     }
     newconf += _metron->_slave_extra;
     return newconf;
@@ -2518,15 +2614,16 @@ ServiceChain::build_cmd_line(int socketfd)
  * Returns a bit map with the CPU core assignment of a service chain.
  */
 Bitvector
-ServiceChain::assigned_cpus()
+ServiceChain::active_cpus()
 {
     Bitvector b;
-    b.resize(_metron->_cpu_map.size());
+    b.resize(get_max_cpu_nb());
     for (int i = 0; i < b.size(); i++) {
-        b[i] = _metron->_cpu_map[i] == this;
+        b[i] = _cpus[i].active();
     }
     return b;
 }
+
 
 /**
  * Checks whether a service chain is alive or not.
