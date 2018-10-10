@@ -254,19 +254,17 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
 
     for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
         // This is the distance from the ideal load (assuming optimal load balancing)
-        double load_distance_from_ideal = std::abs((double) g->_queue_load_map[i] - (double) balance_point_per_queue);
+        double load_distance_from_ideal = (double) g->_queue_load_map[i] - (double) balance_point_per_queue;
         // Normalize this distance
         double load_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
         // Make percentage
         load_imbalance_ratio *= 100;
-        // Imbalance ratio can be > 100, if load balancing is skewed
-        assert(load_imbalance_ratio >= 0);
 
         // This is the load imbalance ratio of this queue
         g->_queue_load_imbalance.insert(i, load_imbalance_ratio);
 
         // Update the average imbalance ratio
-        avg_total_load_imbalance_ratio += load_imbalance_ratio;
+        avg_total_load_imbalance_ratio += std::abs(load_imbalance_ratio);
 
         acc << "NIC queue ";
         acc.snprintf(2, "%2d", i);
@@ -424,6 +422,11 @@ GenerateIPFlowDirector::param_handler(
         case h_queue_imbalance_ratio: {
             if (input == "") {
                 return errh->error("Parameter handler 'queue_imbalance_ratio' requires a queue index");
+            }
+
+            // Force to compute the ratios if not already computed
+            if (g->_avg_total_load_imbalance_ratio == -1) {
+                dump_stats(g);
             }
 
             const uint16_t queue_id = atoi(input.c_str());
