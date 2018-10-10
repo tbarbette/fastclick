@@ -30,7 +30,6 @@
 
 CLICK_DECLS
 
-static const bool VERBOSE = false;
 static const uint16_t DEF_NB_QUEUES = 16;
 
 /**
@@ -40,6 +39,8 @@ GenerateIPFlowDirector::GenerateIPFlowDirector() :
         _port(0), _nb_queues(DEF_NB_QUEUES),
         _queue_load_map(),
         _queue_alloc_policy(LOAD_AWARE),
+        _queue_load_imbalance(),
+        _avg_total_load_imbalance_ratio(NO_LOAD),
         GenerateIPFilter(FLOW_DIRECTOR)
 {
     _keep_dport = false;
@@ -47,6 +48,13 @@ GenerateIPFlowDirector::GenerateIPFlowDirector() :
 
 GenerateIPFlowDirector::~GenerateIPFlowDirector()
 {
+    if (!_queue_load_map.empty()) {
+        _queue_load_map.clear();
+    }
+
+    if (!_queue_load_imbalance.empty()) {
+        _queue_load_imbalance.clear();
+    }
 }
 
 void
@@ -54,6 +62,7 @@ GenerateIPFlowDirector::init_queue_load_map(uint16_t queues_nb)
 {
     for (uint16_t i = 0; i < queues_nb; i++) {
         _queue_load_map.insert(i, 0);
+        _queue_load_imbalance.insert(i, NO_LOAD);
     }
 }
 
@@ -135,13 +144,13 @@ static void
 print_queue_load_map(const HashMap<uint16_t, uint64_t> queue_load_map)
 {
     for (uint16_t i = 0; i < queue_load_map.size(); i++) {
-        click_chatter("NIC queue %2d has load: %15" PRIu64, i, queue_load_map[i]);
+        click_chatter("NIC queue %02d has load: %15" PRIu64, i, queue_load_map[i]);
     }
 }
 
 String
 GenerateIPFlowDirector::policy_based_rule_generation(
-        GenerateIPFlowDirector *g, const uint8_t aggregation_prefix, Timestamp elapsed)
+        GenerateIPFlowDirector *g, const uint8_t aggregation_prefix)
 {
     if (!g) {
         return "";
@@ -157,16 +166,15 @@ GenerateIPFlowDirector::policy_based_rule_generation(
             continue;
         }
 
-        acc << "flow create "<< String(g->_port);
-        acc << " ingress pattern eth /";
+        acc << "ingress pattern eth /";
         acc << " ipv4 src spec ";
-        acc.snprintf(15, "%15s", flow.flowid().saddr().unparse().c_str());
+        acc << flow.flowid().saddr().unparse();
         acc << " src mask ";
-        acc.snprintf(15, "%15s", IPAddress::make_prefix(32 - aggregation_prefix).unparse().c_str());
+        acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse();
         acc << " dst spec ";
-        acc.snprintf(15, "%15s", flow.flowid().daddr().unparse().c_str());
+        acc << flow.flowid().daddr().unparse();
         acc << " dst mask ";
-        acc.snprintf(15, "%15s", IPAddress::make_prefix(32 - aggregation_prefix).unparse().c_str());
+        acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse().c_str();
         acc << " /";
 
         /**
@@ -177,11 +185,11 @@ GenerateIPFlowDirector::policy_based_rule_generation(
 
             if (g->_keep_sport) {
                 acc << " " << proto_str << " src is ";
-                acc.snprintf(5, "%5d", flow.flowid().sport());
+                acc << flow.flowid().sport();
             }
             if (g->_keep_dport) {
                 acc << " " << proto_str << " dst is ";
-                acc.snprintf(5, "%5d", flow.flowid().dport());
+                acc << flow.flowid().dport();
             }
             if ((g->_keep_sport) || (g->_keep_dport))
                 acc << " / ";
@@ -202,8 +210,8 @@ GenerateIPFlowDirector::policy_based_rule_generation(
         }
         assert((chosen_queue >= 0) && (chosen_queue < g->_nb_queues));
         acc << " end actions queue index ";
-        acc.snprintf(2, "%2d", chosen_queue);
-        acc << " / end\n";
+        acc << chosen_queue;
+        acc << " / count / end\n";
 
         // Update the queue load map
         uint64_t current_load = g->_queue_load_map[chosen_queue];
@@ -212,15 +220,6 @@ GenerateIPFlowDirector::policy_based_rule_generation(
 
         i++;
     }
-
-    uint32_t elapsed_sec = elapsed.sec();
-
-    acc << "\n";
-    acc << "Time to create the flow map: ";
-    acc.snprintf(9, "%" PRIu32, elapsed_sec);
-    acc << " seconds (";
-    acc.snprintf(5, "%.2f", (float) elapsed_sec / (float) 60);
-    acc << " minutes)\n";
 
     return acc.take_string();
 }
@@ -232,46 +231,59 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
         return "";
     }
 
-    StringAccum acc;
-
     uint64_t total_load = 0;
     for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
         total_load += g->_queue_load_map[i];
     }
 
+    StringAccum acc;
     double balance_point_per_queue = (double) total_load / (double) g->_nb_queues;
+    double avg_total_load_imbalance_ratio = 0;
+
+    if (balance_point_per_queue == 0) {
+        g->_avg_total_load_imbalance_ratio = 0;
+        click_chatter("No load in the system!");
+
+        acc << "Average load imbalance ratio: " << avg_total_load_imbalance_ratio << "\n";
+        return acc.take_string();
+    }
+
     acc << "Ideal load per queue: ";
     acc.snprintf(15, "%.0f", balance_point_per_queue);
     acc << " bytes \n";
-
-    double total_load_imbalance_ratio = 0;
 
     for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
         // This is the distance from the ideal load (assuming optimal load balancing)
         double load_distance_from_ideal = std::abs((double) g->_queue_load_map[i] - (double) balance_point_per_queue);
         // Normalize this distance
         double load_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
-        // Imbalance ratio can be > 1, if load balancing is skewed
+        // Make percentage
+        load_imbalance_ratio *= 100;
+        // Imbalance ratio can be > 100, if load balancing is skewed
         assert(load_imbalance_ratio >= 0);
 
-        // Update the total imbalance ratio
-        total_load_imbalance_ratio += load_imbalance_ratio;
+        // This is the load imbalance ratio of this queue
+        g->_queue_load_imbalance.insert(i, load_imbalance_ratio);
+
+        // Update the average imbalance ratio
+        avg_total_load_imbalance_ratio += load_imbalance_ratio;
 
         acc << "NIC queue ";
         acc.snprintf(2, "%2d", i);
         acc << " distance from ideal load: ";
         acc.snprintf(15, "%15.0f", load_distance_from_ideal);
         acc << " bytes (load imbalance ratio ";
-        acc.snprintf(9, "%8.4f", load_imbalance_ratio * 100);
+        acc.snprintf(9, "%8.4f", load_imbalance_ratio);
         acc << "%)\n";
     }
-    // Average imbalance ratio
-    total_load_imbalance_ratio /= g->_nb_queues;
-    // Total imbalance ratio can be > 1, if load balancing is skewed
-    assert(total_load_imbalance_ratio >= 0);
 
-    acc << "Total load imbalance ratio: ";
-    acc.snprintf(8, "%.4f", total_load_imbalance_ratio * 100);
+    // Average imbalance ratio
+    avg_total_load_imbalance_ratio /= g->_nb_queues;
+    assert(avg_total_load_imbalance_ratio >= 0);
+    g->_avg_total_load_imbalance_ratio = avg_total_load_imbalance_ratio;
+
+    acc << "Average load imbalance ratio: ";
+    acc.snprintf(8, "%.4f", avg_total_load_imbalance_ratio);
     acc << "%\n";
 
     return acc.take_string();
@@ -288,7 +300,7 @@ GenerateIPFlowDirector::dump_load(GenerateIPFlowDirector *g)
 
     for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
         acc << "NIC queue ";
-        acc.snprintf(2, "%2d", i);
+        acc.snprintf(2, "%02d", i);
         acc << " load: ";
         acc.snprintf(15, "%15" PRIu64, g->_queue_load_map[i]);
         acc << " bytes\n";
@@ -301,7 +313,7 @@ GenerateIPFlowDirector::dump_load(GenerateIPFlowDirector *g)
 }
 
 String
-GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
+GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g, bool verbose)
 {
     if (!g) {
         return "GenerateIPFlowDirector element not found";
@@ -312,7 +324,10 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
 
     uint8_t n = 32 - g->_prefix;
     while (g->_map.size() > g->_nrules) {
-        click_chatter("%d rules with prefix /%d, continuing with /%d",g->_map.size(), 32-n, 32-n-1);
+        if (verbose) {
+            click_chatter("%8d rules with prefix /%02d, continuing with /%02d",g->_map.size(), 32-n, 32-n-1);
+        }
+
         HashTable<IPFlow> new_map;
         ++n;
         g->_mask = IPFlowID(
@@ -345,8 +360,17 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g)
     }
 
     Timestamp after = Timestamp::now();
+    uint32_t elapsed_sec = (after - before).sec();
 
-    return policy_based_rule_generation(g, n, after - before);
+    if (verbose) {
+        click_chatter("\n");
+        click_chatter(
+            "Time to create the flow map: %" PRIu32 " seconds (%.4f minutes)",
+            elapsed_sec, (float) elapsed_sec / (float) 60
+        );
+    }
+
+    return policy_based_rule_generation(g, n);
 }
 
 String
@@ -360,13 +384,25 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
 
     switch (what) {
         case h_dump: {
-            return dump_rules(g);
+            return dump_rules(g, true);
         }
         case h_load: {
             return dump_load(g);
         }
         case h_stats: {
             return dump_stats(g);
+        }
+        case h_rules_nb: {
+            if (g->_map.size() == 0) {
+                dump_rules(g);
+            }
+            return String(g->_map.size());
+        }
+        case h_avg_imbalance_ratio: {
+            if (g->_avg_total_load_imbalance_ratio == -1) {
+                dump_stats(g);
+            }
+            return String(g->_avg_total_load_imbalance_ratio);
         }
         default: {
             click_chatter("Unknown read handler: %d", what);
@@ -375,12 +411,47 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
     }
 }
 
+int
+GenerateIPFlowDirector::param_handler(
+        int operation, String &input, Element *e,
+        const Handler *handler, ErrorHandler *errh) {
+    GenerateIPFlowDirector *g = static_cast<GenerateIPFlowDirector *>(e);
+    if (!g) {
+        return errh->error("GenerateIPFlowDirector element not found");
+    }
+
+    switch ((intptr_t)handler->read_user_data()) {
+        case h_queue_imbalance_ratio: {
+            if (input == "") {
+                return errh->error("Parameter handler 'queue_imbalance_ratio' requires a queue index");
+            }
+
+            const uint16_t queue_id = atoi(input.c_str());
+            if (queue_id < g->_queue_load_imbalance.size()) {
+                input = String(g->_queue_load_imbalance[queue_id]);
+            } else {
+                input = "0";
+            }
+
+            return 0;
+        }
+        default:
+            return errh->error("Invalid operation in parameter handler");
+    }
+
+    return -1;
+}
+
 void
 GenerateIPFlowDirector::add_handlers()
 {
     add_read_handler("dump",  read_handler, h_dump);
     add_read_handler("load",  read_handler, h_load);
     add_read_handler("stats", read_handler, h_stats);
+    add_read_handler("rules_nb", read_handler, h_rules_nb);
+    add_read_handler("avg_imbalance_ratio", read_handler, h_avg_imbalance_ratio);
+
+    set_handler("queue_imbalance_ratio", Handler::f_read | Handler::f_read_param, param_handler, h_queue_imbalance_ratio);
 }
 
 CLICK_ENDDECLS

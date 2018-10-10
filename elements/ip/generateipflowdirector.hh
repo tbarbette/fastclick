@@ -81,6 +81,10 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
         void add_handlers() CLICK_COLD;
 
         static String read_handler(Element *handler, void *user_data);
+        static int param_handler(
+            int operation, String &param, Element *e,
+            const Handler *, ErrorHandler *errh
+        ) CLICK_COLD;
 
     private:
         /**
@@ -106,6 +110,19 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
         QueueAllocPolicy _queue_alloc_policy;
 
         /**
+         * Load imbalance per NIC queue.
+         */
+        enum {
+            NO_LOAD = -1
+        };
+        HashMap<uint16_t, double> _queue_load_imbalance;
+
+        /**
+         * Quantifies the average load imbalance across all queues.
+         */
+        double _avg_total_load_imbalance_ratio;
+
+        /**
          * Allocate a load counter per NIC queue,
          * according to the number of NIC queues
          * requested by the user.
@@ -115,7 +132,7 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
         /**
          * Dumps rules to stdout (called by read handler dump).
          */
-        static String dump_rules(GenerateIPFlowDirector *g);
+        static String dump_rules(GenerateIPFlowDirector *g, bool verbose = false);
 
         /**
          * Dumps load per queue to stdout (called by read handler load).
@@ -132,17 +149,19 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
          */
         static String policy_based_rule_generation(
             GenerateIPFlowDirector *g,
-            const uint8_t aggregation_prefix,
-            Timestamp elapsed
+            const uint8_t aggregation_prefix
         );
 
         /**
-         * Read handlers.
+         * Handlers.
          */
         enum {
             h_dump,
             h_load,
-            h_stats
+            h_stats,
+            h_rules_nb,
+            h_avg_imbalance_ratio,
+            h_queue_imbalance_ratio
         };
 
 };
