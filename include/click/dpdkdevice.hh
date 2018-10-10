@@ -240,10 +240,10 @@ public:
 
     static struct rte_mempool** _pktmbuf_pools;
 
-    inline struct DevInfo getInfo() { return info; };
-    inline int nbRXQueues();
-    inline int nbTXQueues();
-    inline int nbVFPools();
+    inline struct DevInfo get_info() { return info; };
+    inline int nb_rx_queues();
+    inline int nb_tx_queues();
+    inline int nb_vf_pools();
 
     struct ether_addr gen_mac(int a, int b);
 
@@ -337,13 +337,13 @@ class DPDKRing { public:
     String _PROC_1;
     String _PROC_2;
 
-    unsigned     _ndesc;
-    unsigned     _burst_size;
-    short        _numa_zone;
+    unsigned _ndesc;
+    unsigned _burst_size;
+    short _numa_zone;
     int _flags;
 
-    struct rte_ring    *_ring;
-    counter_t    _count;
+    struct rte_ring *_ring;
+    counter_t _count;
 
     bool _force_create;
     bool _force_lookup;
@@ -431,15 +431,15 @@ inline rte_mbuf* DPDKDevice::get_pkt() {
     return get_pkt(rte_socket_id());
 }
 
-int DPDKDevice::nbRXQueues() {
+int DPDKDevice::nb_rx_queues() {
     return info.rx_queues.size();
 };
 
-int DPDKDevice::nbTXQueues() {
+int DPDKDevice::nb_tx_queues() {
     return info.tx_queues.size();
 };
 
-int DPDKDevice::nbVFPools() {
+int DPDKDevice::nb_vf_pools() {
     return info.num_pools;
 };
 

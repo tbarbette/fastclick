@@ -388,11 +388,11 @@ int DPDKDevice::set_mode(
 }
 
 rte_eth_rx_mq_mode DPDKDevice::get_mode() {
-    return getInfo().mq_mode;
+    return get_info().mq_mode;
 }
 
 String DPDKDevice::get_mode_str() {
-    return getInfo().mq_mode_str;
+    return get_info().mq_mode_str;
 }
 
 static struct ether_addr pool_addr_template = {
