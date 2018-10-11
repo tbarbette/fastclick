@@ -85,7 +85,7 @@ The Metron agent also reports monitoring statistics to the controller.
 
 Keyword arguments are:
 
-=over 18
+=over 19
 
 =item ID
 
@@ -197,6 +197,11 @@ String. DPDK arguments to pass to the deployed service chain instances,
 which typically are secondary DPDK processes. For example, the following
 arguments could be passed: '-b 03:00.0' if you want a certain NIC to be
 blacklisted by a service chain.
+
+=item SLAVE_EXTRA
+
+String. Additional arguments for DPDK slave processes.
+Default is no additional argument.
 
 =item VERBOSE
 
