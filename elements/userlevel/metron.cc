@@ -28,6 +28,7 @@
 #include <sys/fcntl.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <limits>
 
 #include "fromdpdkdevice.hh"
 #include "todpdkdevice.hh"
@@ -42,6 +43,11 @@
 #endif
 
 CLICK_DECLS
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+HashMap<uint32_t, struct Metron::rule_timing_stats> Metron::_rule_inst_stats_map;
+HashMap<uint32_t, struct Metron::rule_timing_stats> Metron::_rule_del_stats_map;
+#endif
 
 /***************************************
  * Helper functions
@@ -332,6 +338,9 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
     return SUCCESS;
 }
 
+/**
+ * Schedules periodic Metron controller discovery.
+ */
 void
 Metron::discover_timer(Timer *timer, void *user_data)
 {
@@ -406,6 +415,18 @@ Metron::initialize(ErrorHandler *errh)
 }
 
 /**
+ * Cleans up static resources for service chains.
+ */
+int
+Metron::static_cleanup()
+{
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    _rule_inst_stats_map.clear();
+    _rule_del_stats_map.clear();
+#endif
+}
+
+/**
  * Checks whether the system is able to deploy
  * Metron slaves (i.e., secondary DPDK processes).
  */
@@ -415,16 +436,16 @@ Metron::try_slaves(ErrorHandler *errh)
     click_chatter("Checking the ability to run slaves...");
 
     ServiceChain sc(this);
-    sc.id = "slaveTest";
-    sc.config_type = CLICK;
-    sc.config = "";
+    sc._id = "slaveTest";
+    sc._config_type = CLICK;
+    sc._config = "";
     sc.initialize_cpus(1,1);
     for (int i = 0; i < sc.get_nics_nb(); i++) {
         NIC *nic = sc.get_nic_by_index(i);
         sc._nics.push_back(nic);
     }
     sc._nic_stats.resize(sc._nics.size() * 1, NicStat());
-    sc.rx_filter = new ServiceChain::RxFilter(&sc);
+    sc._rx_filter = new ServiceChain::RxFilter(&sc);
     Vector<int> cpu_phys_map;
     cpu_phys_map.resize(1);
     assign_cpus(&sc, cpu_phys_map);
@@ -816,7 +837,7 @@ int
 Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     for (int i = 0; i < sc->get_nics_nb(); i++) {
-        if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
+        if (sc->_rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
             return errh->error("Could not apply Rx filter");
         }
     }
@@ -1016,7 +1037,30 @@ Metron::write_handler(
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         case h_delete_rules: {
             click_chatter("Metron controller requested rule deletion");
-            return ServiceChain::delete_rule_batch_from_json(data, m, errh);
+
+            struct Metron::rule_timing_stats rdts;
+            rdts.start = Timestamp::now_steady();
+
+            int32_t deleted_rules = ServiceChain::delete_rule_batch_from_json(data, m, errh);
+            if (deleted_rules < 0) {
+                return ERROR;
+            }
+
+            rdts.end = Timestamp::now_steady();
+
+            // Divide by the number of deleted rules to calculate the rule deletion rate
+            rdts.rules_per_sec = (float) ((rdts.end - rdts.start).msecval() * 1000) /
+                                 (float) deleted_rules;
+            Metron::add_rule_del_stats(rdts);
+
+            if (m->_verbose) {
+                click_chatter(
+                    "Deleted %" PRId32 " rules at the rate of %.3f rules/sec",
+                    deleted_rules, rdts.rules_per_sec
+                );
+            }
+
+            return SUCCESS;
         }
     #endif
         default: {
@@ -1155,9 +1199,7 @@ Metron::param_handler(
                     // Parse
                     ServiceChain *sc = ServiceChain::from_json(jsc.second, m, errh);
                     if (!sc) {
-                        return errh->error(
-                            "Could not instantiate a service chain"
-                        );
+                        return errh->error("Could not instantiate a service chain");
                     }
                     ts.parse = Timestamp::now_steady();
 
@@ -1165,8 +1207,8 @@ Metron::param_handler(
                     if (m->find_service_chain_by_id(sc_id) != 0) {
                         delete sc;
                         return errh->error(
-                            "A service chain with ID %s already exists. "
-                            "Delete it first.", sc_id.c_str());
+                            "A service chain with ID %s already exists. Delete it first.", sc_id.c_str()
+                        );
                     }
 
                     // Instantiate
@@ -1174,8 +1216,7 @@ Metron::param_handler(
                     if (ret != 0) {
                         delete sc;
                         return errh->error(
-                            "Cannot instantiate service chain with ID %s",
-                            sc_id.c_str()
+                            "Cannot instantiate service chain with ID %s", sc_id.c_str()
                         );
                     }
                     ts.launch = Timestamp::now_steady();
@@ -1213,8 +1254,7 @@ Metron::param_handler(
                     ServiceChain *sc = m->find_service_chain_by_id(sc_id);
                     if (!sc) {
                         return errh->error(
-                            "Cannot install NIC rules: Unknown service chain ID %s",
-                            sc_id.c_str()
+                            "Cannot install NIC rules: Unknown service chain ID %s", sc_id.c_str()
                         );
                     }
 
@@ -1223,12 +1263,29 @@ Metron::param_handler(
                         sc_id.c_str()
                     );
 
+                    struct Metron::rule_timing_stats rits;
+                    rits.start = Timestamp::now_steady();
+
                     // Parse
-                    int ret =  sc->rules_from_json(jsc.second, m, errh);
-                    if (ret != 0) {
+                    int32_t installed_rules =  sc->rules_from_json(jsc.second, m, errh);
+                    if (installed_rules < 0) {
                         return errh->error(
                             "Cannot install NIC rules for service chain %s: Parse error",
                             sc_id.c_str()
+                        );
+                    }
+
+                    rits.end = Timestamp::now_steady();
+
+                    // Divide by the number of installed rules to calculate the rule installation rate
+                    rits.rules_per_sec = (float) ((rits.end - rits.start).msecval() * 1000) /
+                                         (float) installed_rules;
+                    Metron::add_rule_inst_stats(rits);
+
+                    if (sc->_verbose) {
+                        click_chatter(
+                            "Installed %" PRId32 " rules at the rate of %.3f rules/sec",
+                            installed_rules, rits.rules_per_sec
                         );
                     }
                 }
@@ -1247,6 +1304,55 @@ Metron::param_handler(
     }
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+/**
+ * Metron agent's rule statistics handlers.
+ */
+String
+Metron::rule_stats_handler(Element *e, void *user_data)
+{
+    Metron *m = static_cast<Metron *>(e);
+    intptr_t what = reinterpret_cast<intptr_t>(user_data);
+
+    float min = std::numeric_limits<float>::max();
+    float avg = 0;
+    float max = 0;
+
+    switch (what) {
+        case h_rule_inst_min:
+        case h_rule_inst_avg:
+        case h_rule_inst_max: {
+            m->min_avg_max(Metron::_rule_inst_stats_map, min, avg, max);
+            if ((intptr_t) what == h_rule_inst_min) {
+                return String(min);
+            } else if ((intptr_t) what == h_rule_inst_avg) {
+                return String(avg);
+            } else {
+                return String(max);
+            }
+        }
+        case h_rule_del_min:
+        case h_rule_del_avg:
+        case h_rule_del_max: {
+            m->min_avg_max(Metron::_rule_del_stats_map, min, avg, max);
+            if ((intptr_t) what == h_rule_del_min) {
+                return String(min);
+            } else if ((intptr_t) what == h_rule_del_avg) {
+                return String(avg);
+            } else {
+                return String(max);
+            }
+        }
+        default: {
+            click_chatter("Unknown rule statistics handler: %d", what);
+            return "";
+        }
+    }
+
+    return "";
+}
+#endif
+
 /**
  * Creates Metron agent's handlers.
  */
@@ -1258,6 +1364,15 @@ Metron::add_handlers()
     add_read_handler ("resources",          read_handler,  h_resources);
     add_read_handler ("controllers",        read_handler,  h_controllers);
     add_read_handler ("stats",              read_handler,  h_stats);
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    add_read_handler ("rule_installation_rate_min", rule_stats_handler, h_rule_inst_min);
+    add_read_handler ("rule_installation_rate_avg", rule_stats_handler, h_rule_inst_avg);
+    add_read_handler ("rule_installation_rate_max", rule_stats_handler, h_rule_inst_max);
+
+    add_read_handler ("rule_deletion_rate_min", rule_stats_handler, h_rule_del_min);
+    add_read_handler ("rule_deletion_rate_avg", rule_stats_handler, h_rule_del_avg);
+    add_read_handler ("rule_deletion_rate_max", rule_stats_handler, h_rule_del_max);
+#endif
 
     // HTTP post handlers
     add_write_handler("controllers",        write_handler, h_controllers);
@@ -1343,6 +1458,44 @@ Metron::to_json()
 
     return jroot;
 }
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+void
+Metron::min_avg_max(
+    HashMap<uint32_t, struct rule_timing_stats> &rule_stats_map, float &min, float &mean, float &max)
+{
+    auto it = rule_stats_map.begin();
+    int len = rule_stats_map.size();
+
+    float sum = 0.0;
+
+    while (it != rule_stats_map.end()) {
+        struct rule_timing_stats stats = it.value();
+
+        float rate = stats.rules_per_sec;
+        if (rate < min) {
+            min = rate;
+        }
+        if (rate > max) {
+            max = rate;
+        }
+        sum += rate;
+
+        it++;
+    }
+
+    // Set minimum properly if not updated above
+    if (min == std::numeric_limits<float>::max()) {
+        min = 0;
+    }
+
+    if (len == 0) {
+        mean = 0;
+    } else {
+        mean = sum / static_cast<float>(len);
+    }
+}
+#endif
 
 /**
  * Initializes CPU information for a service chain.
@@ -1675,8 +1828,7 @@ ServiceChain::RxFilter::allocate_tag_space_for_nic(const int &nic_id, const int 
  * Associates a NIC with a tag and a CPU core.
  */
 inline void
-ServiceChain::RxFilter::set_tag_value(
-        const int &nic_id, const int &cpu_id, const String &value)
+ServiceChain::RxFilter::set_tag_value(const int &nic_id, const int &cpu_id, const String &value)
 {
     assert(nic_id >= 0);
     assert(cpu_id >= 0);
@@ -1687,10 +1839,7 @@ ServiceChain::RxFilter::set_tag_value(
 
     values[nic_id][cpu_id] = value;
 
-    click_chatter(
-        "Tag %s is mapped to NIC %d and CPU core %d",
-        value.c_str(), nic_id, cpu_id
-    );
+    click_chatter("Tag %s is mapped to NIC %d and CPU core %d", value.c_str(), nic_id, cpu_id);
 }
 
 /**
@@ -1718,8 +1867,7 @@ ServiceChain::RxFilter::has_tag_value(const int &nic_id, const int &cpu_id)
  * Converts JSON object to Rx filter configuration.
  */
 ServiceChain::RxFilter *
-ServiceChain::RxFilter::from_json(
-        Json j, ServiceChain *sc, ErrorHandler *errh)
+ServiceChain::RxFilter::from_json(const Json &j, ServiceChain *sc, ErrorHandler *errh)
 {
     ServiceChain::RxFilter *rf = new RxFilter(sc);
 
@@ -1727,12 +1875,12 @@ ServiceChain::RxFilter::from_json(
     if (rf_type == NONE) {
         errh->error(
             "Unsupported Rx filter mode for service chain: %s\n"
-            "Supported Rx filter modes are: %s", sc->id.c_str(),
+            "Supported Rx filter modes are: %s", sc->_id.c_str(),
             supported_types(RX_FILTER_TYPES_STR_ARRAY).c_str()
         );
         return NULL;
     }
-    rf->method = rf_type;
+    rf->_method = rf_type;
 
     rf->allocate_nic_space_for_tags(sc->get_nics_nb());
     Json jnic_values = j.get("values");
@@ -1760,7 +1908,7 @@ ServiceChain::RxFilter::to_json()
 {
     Json j;
 
-    j.set("method", rx_filter_type_enum_to_str(method));
+    j.set("method", rx_filter_type_enum_to_str(_method));
 
     Json jnic_values = Json::make_object();
     for (int nic_id = 0; nic_id < _sc->get_nics_nb(); nic_id++) {
@@ -1805,10 +1953,10 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     allocate_nic_space_for_tags(_sc->get_nics_nb());
     allocate_tag_space_for_nic(inic, _sc->get_max_cpu_nb());
 
-    String method_str = rx_filter_type_enum_to_str(method).c_str();
+    String method_str = rx_filter_type_enum_to_str(_method).c_str();
     click_chatter("Rx filters in mode: %s", method_str.upper().c_str());
 
-    if (method == MAC) {
+    if (_method == MAC) {
         Json jaddrs = Json::parse(nic->call_rx_read("vf_mac_addr"));
 
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
@@ -1819,13 +1967,13 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
             }
             set_tag_value(inic, core_id, jaddrs[core_id].to_s());
         }
-    } else if ((method == FLOW) || (method == RSS)) {
+    } else if ((_method == FLOW) || (_method == RSS)) {
         // Advertize the available CPU core IDs
         for (int i = 0; i < _sc->get_max_cpu_nb(); i++) {
             const int core_id = i;
             set_tag_value(inic, core_id, String(core_id));
         }
-    } else if (method == VLAN) {
+    } else if (_method == VLAN) {
         return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
     } else {
         return errh->error("Unsupported dispatching method %s", method_str.upper().c_str());
@@ -1838,25 +1986,31 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
  * Service Chain
  ************************/
 ServiceChain::ServiceChain(Metron *m)
-    : rx_filter(0), _metron(m), _total_cpu_load(0), _verbose(false)
+    : _id(), _rx_filter(0), _config(), _config_type(UNKNOWN),
+      _metron(m), _nics(), _cpus(), _nic_stats(),
+      _initial_cpus_nb(0), _max_cpus_nb(0),
+      _total_cpu_load(0), _max_cpu_load(0), _max_cpu_load_index(0),
+      _socket(-1), _pid(-1), _timing_stats(), _as_timing_stats(),
+      _autoscale(false), _last_autoscale()
 {
-
+    _verbose = m->_verbose;
 }
 
 ServiceChain::~ServiceChain()
 {
-    if (rx_filter) {
-        delete rx_filter;
+    if (_rx_filter) {
+        delete _rx_filter;
     }
 
     _cpus.clear();
+    _nic_stats.clear();
 }
 
 /**
  * Decodes service chain information from JSON.
  */
 ServiceChain *
-ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
+ServiceChain::from_json(const Json &j, Metron *m, ErrorHandler *errh)
 {
     String new_sc_id = j.get_s("id");
 
@@ -1871,33 +2025,31 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     }
 
     ServiceChain *sc = new ServiceChain(m);
-    sc->id = new_sc_id;
-    if (sc->id == "") {
-        sc->id = String(m->get_service_chains_nb());
+    sc->_id = new_sc_id;
+    if (sc->_id == "") {
+        sc->_id = String(m->get_service_chains_nb());
     }
     String sc_type_str = j.get_s("configType");
     ScType sc_type = sc_type_str_to_enum(sc_type_str.upper());
     if (sc_type == UNKNOWN) {
         errh->error(
             "Unsupported configuration type for service chain: %s\n"
-            "Supported types are: %s",
-            sc->id.c_str(), supported_types(SC_TYPES_STR_ARRAY).c_str()
+            "Supported types are: %s", sc->_id.c_str(), supported_types(SC_TYPES_STR_ARRAY).c_str()
         );
+        delete sc;
         return NULL;
     }
-    sc->config_type = sc_type;
-    sc->config = j.get_s("config");
+    sc->_config_type = sc_type;
+    sc->_config = j.get_s("config");
     int initial_cpu_nb = j.get_i("cpus");
     int max_cpu_nb = j.get_i("maxCpus");
 
     if (initial_cpu_nb > max_cpu_nb) {
-        errh->error(
-            "Max number of CPUs must be greater than the number of used CPUs"
-        );
-        return 0;
+        errh->error("Max number of CPUs must be greater than the number of used CPUs");
+        delete sc;
+        return NULL;
     }
     sc->initialize_cpus(initial_cpu_nb, max_cpu_nb);
-
 
     sc->_autoscale = false;
     if (!j.get("autoScale", sc->_autoscale)) {
@@ -1908,7 +2060,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
         errh->error(
             "Unable to deploy service chain %s: "
             "Metron in RSS mode does not allow autoscale.",
-            sc->id.c_str()
+            sc->_id.c_str()
         );
         return NULL;
     }
@@ -1917,12 +2069,13 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     Json jnics = j.get("nics");
     if (!jnics.is_array()) {
         if (jnics.is_string()) {
-            errh->warning("nics should be a JSON array. Assuming you passed one NIC named %s...", jnics.c_str());
+            errh->warning("NICs should be a JSON array. Assuming you passed one NIC named %s...", jnics.c_str());
             Json ar = Json::make_array();
             ar.push_back(jnics);
             jnics = ar;
         } else {
-            errh->error("nics is in an invalid format !");
+            errh->error("Invalid JSON format for NICs!");
+            delete sc;
             return NULL;
         }
     }
@@ -1937,9 +2090,7 @@ ServiceChain::from_json(Json j, Metron *m, ErrorHandler *errh)
     }
 
     sc->_nic_stats.resize(sc->_nics.size() * sc->_max_cpus_nb,NicStat());
-    sc->rx_filter = ServiceChain::RxFilter::from_json(
-        j.get("rxFilter"), sc, errh
-    );
+    sc->_rx_filter = ServiceChain::RxFilter::from_json(j.get("rxFilter"), sc, errh);
 
     return sc;
 }
@@ -1953,9 +2104,9 @@ ServiceChain::to_json()
     Json jsc = Json::make_object();
 
     jsc.set("id", get_id());
-    jsc.set("rxFilter", rx_filter->to_json());
-    jsc.set("configType", sc_type_enum_to_str(config_type));
-    jsc.set("config", config);
+    jsc.set("rxFilter", _rx_filter->to_json());
+    jsc.set("configType", sc_type_enum_to_str(_config_type));
+    jsc.set("config", _config);
     jsc.set("expandedConfig", generate_configuration());
     Json jcpus = Json::make_array();
     for (int i = 0; i < get_max_cpu_nb(); i++) {
@@ -2070,9 +2221,11 @@ ServiceChain::stats_to_json(bool monitoring_mode)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
  * Decodes service chain rules from JSON
- * and applies the rules to the respective NIC.
+ * and installs the rules in the respective NIC.
+ * Returns the number of installed rules on success,
+ * otherwise a negative integer.
  */
-int
+int32_t
 ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 {
     // No controller
@@ -2081,7 +2234,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             "Cannot reconfigure service chain %s: Metron agent is not associated with a controller",
             get_id().c_str()
         );
-        return ERROR;
+        return (int32_t) ERROR;
     }
 
     RxFilterType rx_filter_type = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
@@ -2092,7 +2245,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             get_id().c_str(),
             rx_filter_type_enum_to_str(rx_filter_type).c_str()
         );
-        return ERROR;
+        return (int32_t) ERROR;
     }
 
     uint32_t rules_nb = 0;
@@ -2117,7 +2270,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 // Get the correct NIC
                 NIC *nic = this->get_nic_by_name(nic_name);
                 if (!nic) {
-                    return errh->error(
+                    return (int32_t) errh->error(
                         "Metron controller attempted to install rules in unknown NIC: %s",
                         nic_name.c_str()
                     );
@@ -2135,8 +2288,8 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 rules_nb++;
 
                 // Add this tag to the list of tags of this NIC
-                if (!this->rx_filter->has_tag_value(inic, core_id)) {
-                    this->rx_filter->set_tag_value(inic, core_id, String(core_id));
+                if (!this->_rx_filter->has_tag_value(inic, core_id)) {
+                    this->_rx_filter->set_tag_value(inic, core_id, String(core_id));
                 }
             }
         }
@@ -2152,7 +2305,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         );
     }
 
-    return SUCCESS;
+    return (int32_t) inserted_rules_nb;
 }
 
 /**
@@ -2168,18 +2321,18 @@ ServiceChain::rules_to_json()
 
     // Service chain's Rx filter method
     Json j;
-    j.set("method", rx_filter_type_enum_to_str(rx_filter->method));
+    j.set("method", rx_filter_type_enum_to_str(_rx_filter->_method));
     jsc.set("rxFilter", j);
 
     Json jnics_array = Json::make_array();
 
     // Return an empty array if the Rx filter mode is not set properly
-    if (rx_filter->method != FLOW) {
+    if (_rx_filter->_method != FLOW) {
         click_chatter(
             "Cannot report rules for service chain %s: "
             "This service chain is in %s Rx filter mode.",
             get_id().c_str(),
-            rx_filter_type_enum_to_str(rx_filter->method).upper().c_str()
+            rx_filter_type_enum_to_str(_rx_filter->_method).upper().c_str()
         );
 
         jsc.set("nics", jnics_array);
@@ -2273,8 +2426,10 @@ ServiceChain::delete_rule_from_json(const long rule_id, Metron *m, ErrorHandler 
 /**
  * Decodes a batch of service chain rules from JSON
  * and deletes these rules from the respective NIC.
+ * Returns the number of successfully deleted rules on success,
+ * otherwise a negative integer.
  */
-int
+int32_t
 ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandler *errh)
 {
     // No controller
@@ -2283,14 +2438,14 @@ ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandl
             "Cannot delete rule batch %s: Metron agent is not associated with a controller",
             rule_ids.c_str()
         );
-        return ERROR;
+        return (int32_t) ERROR;
     }
 
     int status = SUCCESS;
     int current = 0;
     int pos = -1;
-    int deleted_rules = 0;
-    int all_rules = 0;
+    uint32_t deleted_rules = 0;
+    uint32_t all_rules = 0;
     while ((pos = rule_ids.find_left(',')) >= 0) {
         // Keep a rule ID until the comma
         const String rule_id_str = rule_ids.substring(0, pos);
@@ -2318,7 +2473,7 @@ ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandl
 
     click_chatter("Successfully deleted %d/%d NIC rules", deleted_rules, all_rules);
 
-    return status;
+    return (status == 0) ? (int32_t) deleted_rules : (int32_t) ERROR;
 }
 #endif
 
@@ -2520,7 +2675,7 @@ ServiceChain::do_autoscale(int n_cpu_change)
 String
 ServiceChain::generate_configuration()
 {
-    String new_conf = "elementclass MetronSlave {\n" + config + "\n};\n\n";
+    String new_conf = "elementclass MetronSlave {\n" + _config + "\n};\n\n";
     if (_autoscale) {
         new_conf += "slave :: {\n";
 
@@ -2572,7 +2727,7 @@ ServiceChain::generate_configuration()
             String js = String(j);
             String active = (j < get_cpu_info(j).active() ? "1":"0");
             int phys_cpu_id = get_cpu_phys_id(j);
-            int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
+            int queue_no = _rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
             String ename = generate_configuration_slave_fd_name(i, j);
             new_conf += ename + " :: " + nic->element->class_name() +
                 "(" + nic->get_device_address() + ", QUEUE " + String(queue_no) +
@@ -2591,7 +2746,7 @@ ServiceChain::generate_configuration()
         if (get_max_cpu_nb() == 1) {
         assert(get_cpu_info(0).assigned());
             int phys_cpu_id = get_cpu_phys_id(0);
-            int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
+            int queue_no = _rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
             new_conf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);\n";
         } else {
             new_conf += "slaveTD" + is + " :: ExactCPUSwitch();\n";
@@ -2600,7 +2755,7 @@ ServiceChain::generate_configuration()
                 assert(get_cpu_info(j).assigned());
                 int phys_cpu_id = get_cpu_phys_id(j);
                 String ename = generate_configuration_slave_fd_name(i, j, "TD");
-                int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
+                int queue_no = _rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
                 new_conf += ename + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99, MAXQUEUES 1);";
 
                 new_conf += "slaveTD" + is + "["+js+"] -> " + ename + ";\n";
@@ -2760,7 +2915,7 @@ ServiceChain::call(
         ret = ret.substring(ret.find_left("\r\n") + 2);
         if (!ret.starts_with("DATA ")) {
             click_chatter("Got answer '%s' (code %d), that does not start with DATA !", ret.c_str(), code);
-            click_chatter("Command was %s %s %s", fnt.c_str(),handler.c_str(), params?params.c_str():"");
+            click_chatter("Command was %s %s %s", fnt.c_str(), handler.c_str(), params ? params.c_str() : "");
             abort();
         }
         ret = ret.substring(5); //Code + return
@@ -2784,7 +2939,7 @@ ServiceChain::simple_call_read(String handler)
     String response;
 
     int code = call("READ", true, handler, response, "");
-    if (code >= 200 && code < 300) {
+    if ((code >= 200) && (code < 300)) {
         return response;
     }
 
@@ -2800,7 +2955,7 @@ ServiceChain::simple_call_write(String handler)
     String response;
 
     int code = call("WRITE", false, handler, response, "");
-    if (code >= 200 && code < 300) {
+    if ((code >= 200) && (code < 300)) {
         return response;
     }
 
@@ -2993,7 +3148,7 @@ NIC::get_port_id()
 
 /**
  * Return the device's adress suitable to use as a FromDPDKDevice reference.
- * TODO: Actually this is still a port id, returning the PCI address would be better.
+ * TODO: Actually this is still a port ID, returning the PCI address would be better.
  */
 String
 NIC::get_device_address()

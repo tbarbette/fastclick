@@ -423,12 +423,10 @@ class ServiceChain {
                 RxFilter(ServiceChain *sc);
                 ~RxFilter();
 
-                RxFilterType method;
+                RxFilterType _method;
                 ServiceChain *_sc;
 
-                static RxFilter *from_json(
-                    Json j, ServiceChain *sc, ErrorHandler *errh
-                );
+                static RxFilter *from_json(const Json &j, ServiceChain *sc, ErrorHandler *errh);
                 Json to_json();
 
                 inline int phys_cpu_to_queue(NIC *nic, const int &phys_cpu_id) {
@@ -454,12 +452,12 @@ class ServiceChain {
         /**
          * Service chain public attributes.
          */
-        String id;
-        RxFilter *rx_filter;
-        String config;
+        String _id;
+        RxFilter *_rx_filter;
+        String _config;
 
         // Service chain type
-        ScType config_type;
+        ScType _config_type;
 
         enum ScStatus {
             SC_FAILED,
@@ -475,7 +473,7 @@ class ServiceChain {
 
         void initialize_cpus(int initial_cpu_nb, int max_cpu_nb);
 
-        static ServiceChain *from_json(Json j, Metron *m, ErrorHandler *errh);
+        static ServiceChain *from_json(const Json &j, Metron *m, ErrorHandler *errh);
         int reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh);
 
         Json get_cpu_stats(int j);
@@ -484,21 +482,17 @@ class ServiceChain {
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         Json rules_to_json();
-        int rules_from_json(Json j, Metron *m, ErrorHandler *errh);
-        static int delete_rule_from_json(
-            const long rule_id, Metron *m, ErrorHandler *errh
-        );
-        static int delete_rule_batch_from_json(
-            String rule_ids, Metron *m, ErrorHandler *errh
-        );
+        int32_t rules_from_json(Json j, Metron *m, ErrorHandler *errh);
+        static int delete_rule_from_json(const long rule_id, Metron *m, ErrorHandler *errh);
+        static int32_t delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandler *errh);
     #endif
 
         inline String get_id() {
-            return id;
+            return _id;
         }
 
         inline RxFilterType get_rx_mode() {
-            return rx_filter->method;
+            return _rx_filter->_method;
         }
 
         inline int get_active_cpu_nb() {
@@ -515,7 +509,7 @@ class ServiceChain {
             return _max_cpus_nb;
         }
 
-        inline CpuInfo& get_cpu_info(int cpu_id) {
+        inline CpuInfo &get_cpu_info(int cpu_id) {
             return _cpus[cpu_id];
         }
 
@@ -602,6 +596,8 @@ class ServiceChain {
         Vector<NIC *> _nics;
         Vector<CpuInfo> _cpus;
         Vector<NicStat> _nic_stats;
+        int _initial_cpus_nb;
+        int _max_cpus_nb;
         float _total_cpu_load;
         float _max_cpu_load;
         int _max_cpu_load_index;
@@ -609,8 +605,6 @@ class ServiceChain {
         int _pid;
         struct timing_stats _timing_stats;
         struct autoscale_timing_stats _as_timing_stats;
-        int _initial_cpus_nb;
-        int _max_cpus_nb;
         bool _autoscale;
         Timestamp _last_autoscale;
         bool _verbose;
@@ -637,6 +631,7 @@ class Metron : public Element {
         int initialize(ErrorHandler *) CLICK_COLD;
         bool discover();
         void cleanup(CleanupStage) CLICK_COLD;
+        static int static_cleanup();
 
         static void discover_timer(Timer *timer, void *user_data);
         void run_timer(Timer *t) override;
@@ -651,6 +646,9 @@ class Metron : public Element {
             const String &data, Element *e, void *user_data,
             ErrorHandler *errh
         ) CLICK_COLD;
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        static String rule_stats_handler(Element *e, void *user_data) CLICK_COLD;
+    #endif
 
         void hw_info_to_json(Json &j);
 
@@ -663,6 +661,10 @@ class Metron : public Element {
         // Read and write handlers
         enum {
             h_discovered, h_resources, h_controllers, h_stats,
+        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+            h_rule_inst_min, h_rule_inst_avg, h_rule_inst_max,
+            h_rule_del_min,  h_rule_del_avg,  h_rule_del_max,
+        #endif
             h_put_chains, h_chains, h_chains_stats, h_chains_proxy,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
             h_chains_rules,
@@ -700,6 +702,27 @@ class Metron : public Element {
 
         bool assign_cpus(ServiceChain *sc, Vector<int> &map);
         void unassign_cpus(ServiceChain *sc);
+
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        struct rule_timing_stats {
+            float rules_per_sec;   // Measure rule installation/deletion rate
+            Timestamp start, end;
+        };
+        static inline void add_rule_inst_stats(const struct rule_timing_stats &rits) {
+            _rule_inst_stats_map.insert(rits.start.nsec(), rits);
+        }
+        static inline void add_rule_del_stats(const struct rule_timing_stats &rdts) {
+            _rule_del_stats_map.insert(rdts.start.nsec(), rdts);
+        }
+
+        static HashMap<uint32_t, struct rule_timing_stats> _rule_inst_stats_map;
+        static HashMap<uint32_t, struct rule_timing_stats> _rule_del_stats_map;
+
+        void min_avg_max(
+            HashMap<uint32_t, struct rule_timing_stats> &rule_stats_map,
+            float &min, float &mean, float &max
+        );
+    #endif
 
         const float CPU_OVERLOAD_LIMIT = (float) 0.7;
         const float CPU_UNERLOAD_LIMIT = (float) 0.4;
@@ -776,7 +799,7 @@ class Metron : public Element {
         int confirm_nic_mode(ErrorHandler *errh);
 
         static void add_per_core_monitoring_data(
-            Json  *jobj, const LatencyInfo &lat
+            Json *jobj, const LatencyInfo &lat
         );
 
         Timer _timer;

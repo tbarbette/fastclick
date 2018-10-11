@@ -367,7 +367,7 @@ FlowDirector::add_rules_from_file(const String &filename)
  * @return a flow rule object
  */
 int
-FlowDirector::flow_rule_install(const uint32_t &rule_id, const String rule)
+FlowDirector::flow_rule_install(const uint32_t &rule_id, const String &rule)
 {
     // Only active instances can configure a NIC
     if (!active()) {

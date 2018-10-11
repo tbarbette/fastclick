@@ -120,7 +120,7 @@ public:
     int add_rules_from_file(const String &filename);
 
     // Install a flow rule in a NIC
-    int flow_rule_install(const uint32_t &rule_id, const String rule);
+    int flow_rule_install(const uint32_t &rule_id, const String &rule);
 
     // Return a flow rule object with a specific ID
     struct port_flow *flow_rule_get(const uint32_t &rule_id);

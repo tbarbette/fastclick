@@ -595,7 +595,7 @@ int FromDPDKDevice::flow_handler(
             }
 
             const uint32_t rule_id = flow_dir->next_unique_rule_id();
-            if (flow_dir->flow_rule_install(rule_id, rule) != FlowDirector::SUCCESS) {
+            if (flow_dir->flow_rule_install(rule_id, (const String &) rule) != FlowDirector::SUCCESS) {
                 return -1;
             }
 
