@@ -217,6 +217,30 @@ Returns a JSON object with information about the Metron agent.
 
 Returns a JSON object with global statistics about the Metron agent.
 
+=h rule_installation_rate_min
+
+Returns the minimum rate to install DPDK-based NIC rules.
+
+=h rule_installation_rate_avg
+
+Returns the average rate to install DPDK-based NIC rules.
+
+=h rule_installation_rate_max
+
+Returns the maximum rate to install DPDK-based NIC rules.
+
+=h rule_deletion_rate_min
+
+Returns the minimum rate to remove DPDK-based NIC rules.
+
+=h rule_deletion_rate_avg
+
+Returns the average rate to remove DPDK-based NIC rules.
+
+=h rule_deletion_rate_max
+
+Returns the maximum rate to remove DPDK-based NIC rules.
+
 =h controllers read/write
 
 Returns or sets the conteoller instance associated with this Metron agent.
