@@ -282,13 +282,11 @@ class CPU {
 
 class NIC {
     public:
-        NIC(bool verbose = false)
-            : _index(-1),
+        NIC(bool verbose = false) : _index(-1),
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
             _rules(), _internal_rule_map(),
         #endif
             _verbose(verbose) {
-
         }
 
         ~NIC() {
@@ -322,12 +320,12 @@ class NIC {
         bool remove_rules();
     #endif
 
-        Json to_json(RxFilterType rx_mode, bool stats = false);
+        Json to_json(const RxFilterType &rx_mode, const bool &stats = false);
 
         int queue_per_pool();
 
         int phys_cpu_to_queue(int phys_cpu_id) {
-		assert(phys_cpu_id >= 0);
+            assert(phys_cpu_id >= 0);
             return phys_cpu_id * (queue_per_pool());
         }
 
@@ -367,92 +365,90 @@ struct LatencyInfo {
 };
 
 class CpuInfo {
-public:
-	CpuInfo() : cpuPhysId(-1),load(0),maxNicQueue(0),latency(),_active(false),_active_time() {
+    public:
+        CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0),
+        latency(), _active(false), _active_time() {
+        }
 
-	}
+        int cpu_phys_id;
+        float load;
+        int max_nic_queue;
 
-	int cpuPhysId;
-    float load;
-    int maxNicQueue;
+        LatencyInfo latency;
 
-    LatencyInfo latency;
+        bool assigned() {
+           return cpu_phys_id >= 0;
+        }
 
-    bool assigned() {
-	return cpuPhysId >= 0;
-    }
+        void set_active(bool active) {
+            _active = active;
+            _active_time = Timestamp::now();
+        }
 
-    void set_active(bool active) {
-	_active = active;
-	_active_time = Timestamp::now();
-    }
+        bool active() {
+            return _active;
+        }
 
-    bool active() {
-	return _active;
-    }
+        int active_since() {
+            int cpu_time;
+            if (_active)
+                cpu_time = (Timestamp::now() - _active_time).msecval();
+            else
+                cpu_time = -(Timestamp::now() - _active_time).msecval();
+            return cpu_time;
+        }
 
-    int activeSince() {
-	int cpu_time;
-        if (_active)
-            cpu_time = (Timestamp::now() - _active_time).msecval();
-        else
-            cpu_time = -(Timestamp::now() - _active_time).msecval();
-        return cpu_time;
-    }
-
-private:
-    bool _active;
-    Timestamp _active_time;
+    private:
+        bool _active;
+        Timestamp _active_time;
 
 };
 
 class NicStat {
-  public:
-	long long useless;
-	long long useful;
-	long long count;
-	float load;
+    public:
+        long long useless;
+        long long useful;
+        long long count;
+        float load;
 
-	NicStat() : useless(0), useful(0), count(0), load(0) {
-	}
+        NicStat() : useless(0), useful(0), count(0), load(0) {
+        }
 };
-
-
 
 class ServiceChain {
     public:
+
         class RxFilter {
-          public:
+            public:
+                RxFilter(ServiceChain *sc);
+                ~RxFilter();
 
-			RxFilter(ServiceChain *sc);
-			~RxFilter();
+                RxFilterType method;
+                ServiceChain *_sc;
 
-			RxFilterType method;
-			ServiceChain *_sc;
+                static RxFilter *from_json(
+                    Json j, ServiceChain *sc, ErrorHandler *errh
+                );
+                Json to_json();
 
-			static RxFilter *from_json(
-				Json j, ServiceChain *sc, ErrorHandler *errh
-			);
-			Json to_json();
+                inline int phys_cpu_to_queue(NIC *nic, const int &phys_cpu_id) {
+                    return nic->phys_cpu_to_queue(phys_cpu_id);
+                }
 
-			inline int phys_cpu_to_queue(NIC *nic, int phys_cpu_id) {
-				return nic->phys_cpu_to_queue(phys_cpu_id);
-			}
+                inline void allocate_nic_space_for_tags(const int &size);
 
-			inline void allocate_nic_space_for_tags(const int size);
+                inline void allocate_tag_space_for_nic(const int &nic_id, const int &size);
 
-			inline void allocate_tag_space_for_nic(const int nic_id, const int size);
+                inline void set_tag_value(
+                        const int &nic_id, const int &cpu_id, const String &value);
 
-			inline void set_tag_value(
-					const int nic_id, const int cpu_id, const String value);
+                inline String get_tag_value(const int &nic_id, const int &cpu_id);
 
-			inline String get_tag_value(const int nic_id, const int cpu_id);
+                inline bool has_tag_value(const int &nic_id, const int &cpu_id);
 
-			inline bool has_tag_value(const int nic_id, const int cpu_id);
+                virtual int apply(NIC *nic, ErrorHandler *errh);
 
-			virtual int apply(NIC *nic, ErrorHandler *errh);
-
-			Vector<Vector<String>> values;
+                Vector<Vector<String>> values;
         };
 
         /**
@@ -477,7 +473,7 @@ class ServiceChain {
         ServiceChain(Metron *m);
         ~ServiceChain();
 
-        void initializeCpus(int initialCpuNb, int maxCpuNb);
+        void initialize_cpus(int initial_cpu_nb, int max_cpu_nb);
 
         static ServiceChain *from_json(Json j, Metron *m, ErrorHandler *errh);
         int reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh);
@@ -524,7 +520,7 @@ class ServiceChain {
         }
 
         inline int get_cpu_phys_id(int cpu_id) {
-            return _cpus[cpu_id].cpuPhysId;
+            return _cpus[cpu_id].cpu_phys_id;
         }
 
         inline int get_nics_nb() {
@@ -553,11 +549,12 @@ class ServiceChain {
             return _nics[i];
         }
 
-       // Bitvector assigned_cpus();
         Bitvector active_cpus();
 
         String generate_configuration();
-        String generate_configuration_slave_fd_name(int nic_index, int cpu_index, String type = "FD" );
+        String generate_configuration_slave_fd_name(
+            const int &nic_index, const int &cpu_index, const String &type = "FD"
+        );
 
         Vector<String> build_cmd_line(int socketfd);
 
@@ -596,7 +593,7 @@ class ServiceChain {
             _as_timing_stats = ts;
         }
 
-        void do_autoscale(int nCpuChange);
+        void do_autoscale(int n_cpu_change);
 
         const unsigned short AUTOSCALE_WINDOW = 5000;
 
@@ -660,7 +657,7 @@ class Metron : public Element {
         Json to_json();
         Json stats_to_json();
         Json controllers_to_json();
-        int  controllers_from_json(Json j);
+        int  controllers_from_json(const Json &j);
         int  delete_controller_from_json(const String &ip);
 
         // Read and write handlers
@@ -676,12 +673,12 @@ class Metron : public Element {
         #endif
         };
 
-        ServiceChain *find_service_chain_by_id(String id);
+        ServiceChain *find_service_chain_by_id(const String &id);
         int instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh);
 
         void kill_service_chain(ServiceChain *sc);
         int remove_service_chain(ServiceChain *sc, ErrorHandler *errh);
-        void call_scale(ServiceChain*, String);
+        void call_scale(ServiceChain *sc, const String &event);
 
         bool get_monitoring_mode() {
             return _monitoring_mode;
@@ -779,8 +776,7 @@ class Metron : public Element {
         int confirm_nic_mode(ErrorHandler *errh);
 
         static void add_per_core_monitoring_data(
-            Json  *jobj,
-            const LatencyInfo lat
+            Json  *jobj, const LatencyInfo &lat
         );
 
         Timer _timer;

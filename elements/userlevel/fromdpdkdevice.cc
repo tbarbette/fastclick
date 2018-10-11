@@ -770,7 +770,6 @@ void FromDPDKDevice::add_handlers()
     set_handler("rules_aggr_stats", Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
 #endif
 
-
     add_read_handler("active", read_handler, h_active);
     add_write_handler("active", write_handler, h_active);
     add_write_handler("safe_active", write_handler, h_safe_active);
