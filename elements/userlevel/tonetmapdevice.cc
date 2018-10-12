@@ -44,9 +44,9 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     String ifname;
     int burst = -1;
 
-    if (parse(Args(conf, this, errh)
-    .read_mp("DEVNAME", ifname), errh)
-    .complete() < 0)
+    if (Args(this, errh).bind(conf)
+            .read_mp("DEVNAME", ifname)
+            .complete() < 0)
     	return -1;
 
     if (_internal_tx_queue_size < _burst * 2) {

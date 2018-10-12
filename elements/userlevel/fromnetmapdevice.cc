@@ -57,10 +57,17 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 	int thisnode = 0;
 
-    if (parse(Args(conf, this, errh)
-    .read_mp("DEVNAME", ifname))
-  	.read("KEEPHAND",_keephand)
-  	.complete() < 0)
+	if (Args(this, errh).bind(conf)
+            .read_mp("DEVNAME", ifname)
+            .consume() < 0)
+        return -1;
+	int err = parse(conf, errh);
+	if (err != 0)
+		return err;
+
+    if (Args(conf, this, errh)
+		.read("KEEPHAND",_keephand)
+		.complete() < 0)
     	return -1;
 #if HAVE_NUMA
     if (_use_numa) {
