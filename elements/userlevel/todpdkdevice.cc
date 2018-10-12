@@ -42,9 +42,16 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     int maxqueues = 128;
     String dev;
+    if (Args(conf, this, errh)
+            .read_mp("PORT", dev)
+            .consume() < 0)
+        return -1;
 
-    if (parse(Args(conf, this, errh)
-        .read_mp("PORT", dev), errh)
+
+    if (parse(conf, errh) != 0)
+        return -1;
+
+    if (Args(conf, this, errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
         .read("MAXQUEUES", maxqueues)

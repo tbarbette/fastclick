@@ -46,25 +46,32 @@ void QueueDevice::static_initialize() {
     shared_offset.fill(0);
 }
 
-Args& QueueDevice::parse(Args &args) {
-    args.read_p("QUEUE", firstqueue)
+int QueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
+
+    if (Args(this, errh).bind(conf)
+            .read_p("QUEUE", firstqueue)
             .read("N_QUEUES",n_queues)
             .read("MAXTHREADS", _maxthreads)
             .read("BURST", _burst)
             .read("VERBOSE", _verbose)
             .read("ACTIVE", _active)
-            .read("ALLOW_NONEXISTENT", allow_nonexistent);
+            .read("ALLOW_NONEXISTENT", allow_nonexistent)
+            .consume() < 0)
+        return -1;
 
     n_elements ++;
 
-    return args;
+    return 0;
 }
 
-Args& RXQueueDevice::parse(Args &args) {
-	args = QueueDevice::parse(args);
+int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
+	QueueDevice::parse(conf, errh);
 
 	_promisc = true;
-	args.read_p("PROMISC", _promisc);
+    if (Args(this, errh).bind(conf)
+	.read_p("PROMISC", _promisc)
+        .consume() < 0)
+        return -1;
 
 #if HAVE_NUMA
 	_use_numa = true;
@@ -74,11 +81,28 @@ Args& RXQueueDevice::parse(Args &args) {
 	_threadoffset = -1;
 	_set_rss_aggregate = false;
 	_set_paint_anno = false;
+	String scale;
+	bool has_scale = false;
+	_scale_parallel = false;
 
-	args.read("RSS_AGGREGATE", _set_rss_aggregate)
+    if (Args(this, errh).bind(conf)
+            .read("RSS_AGGREGATE", _set_rss_aggregate)
             .read("PAINT_QUEUE", _set_paint_anno)
             .read("NUMA", _use_numa)
-            .read("THREADOFFSET", _threadoffset);
+			.read("SCALE", scale).read_status(has_scale)
+            .read("THREADOFFSET", _threadoffset)
+            .consume() < 0)
+        return -1;
+
+	if (has_scale) {
+		if (scale.lower() == "parallel") {
+			_scale_parallel = true;
+		} else if (scale.lower() == "share") {
+			_scale_parallel = false;
+		} else {
+			return errh->error("Unknown scaling mode %s !",scale.c_str());
+		}
+	}
 
 #if !HAVE_NUMA
 	if (_use_numa) {
@@ -86,17 +110,20 @@ Args& RXQueueDevice::parse(Args &args) {
 	}
 	_use_numa = false;
 #endif
-	return args;
+	return 0;
 }
 
-Args& TXQueueDevice::parse(Args &args, ErrorHandler* errh) {
-        QueueDevice::parse(args);
-        args.read("IQUEUE", _internal_tx_queue_size)
-            .read("BLOCKING", _blocking);
+int TXQueueDevice::parse(Vector<String> &conf, ErrorHandler* errh) {
+        QueueDevice::parse(conf, errh);
+        Args args(this, errh);
+        if (args.bind(conf).read("IQUEUE", _internal_tx_queue_size)
+            .read("BLOCKING", _blocking)
+            .consume() < 0)
+            return -1;
         if ((_internal_tx_queue_size & (_internal_tx_queue_size - 1)) != 0) {
             errh->error("IQUEUE must be a power of 2");
         }
-        return args;
+        return 0;
 }
 
 int RXQueueDevice::configure_rx(int numa_node, int minqueues, int maxqueues, ErrorHandler *) {
@@ -237,7 +264,10 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 
        //click_chatter("_maxthreads %d, cores_in_node %d, nthreads() %d, use_nodes %d, _this_node %d, inputs_count %d",_maxthreads,cores_in_node,master()->nthreads(),use_nodes,_this_node,inputs_count[_this_node]);
        if (_maxthreads == -1) {
-           n_threads = min(cores_in_node,master()->nthreads() / use_nodes) / inputs_count[_this_node];
+           if (_scale_parallel)
+               n_threads = min(cores_in_node,master()->nthreads() / use_nodes);
+           else
+               n_threads = min(cores_in_node,master()->nthreads() / use_nodes) / inputs_count[_this_node];
        } else {
            n_threads = min(cores_in_node,_maxthreads);
        }
@@ -251,7 +281,10 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
                if (use_nodes > 1)
                    use_nodes = 1;
            }
-           thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
+           if (!_scale_parallel)
+		   thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
+           else
+		   thread_share = min(cores_in_node,master()->nthreads());
        }
 
        if (n_threads > _maxqueues) {
@@ -259,15 +292,20 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
        }
 
        if (_threadoffset == -1) {
-           _threadoffset = shared_offset[_this_node];
-           shared_offset[_this_node] += n_threads;
+           if (!_scale_parallel) {
+               _threadoffset = shared_offset[_this_node];
+               shared_offset[_this_node] += n_threads;
+           } else {
+                _threadoffset = 0;
+           }
        }
 
        if (thread_share > 1) {
            if (_threadoffset != -1) {
                errh->warning("Thread offset %d will be ignored because the numa node has not enough cores.",_threadoffset);
            }
-           _threadoffset = _threadoffset % (inputs_count[_this_node] / thread_share);
+           if (!_scale_parallel)
+		   _threadoffset = _threadoffset % (inputs_count[_this_node] / thread_share);
        } else
            if (n_threads + _threadoffset > master()->nthreads())
                _threadoffset = master()->nthreads() - n_threads;
