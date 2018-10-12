@@ -2442,7 +2442,7 @@ ServiceChain::rules_to_json()
  * and deletes the rule from the respective NIC.
  */
 int
-ServiceChain::delete_rule_from_json(const long rule_id, Metron *m, ErrorHandler *errh)
+ServiceChain::delete_rule_from_json(const long &rule_id, Metron *m, ErrorHandler *errh)
 {
     // No controller
     if (!m->_discovered) {
@@ -2457,6 +2457,11 @@ ServiceChain::delete_rule_from_json(const long rule_id, Metron *m, ErrorHandler 
     auto n = m->_nics.begin();
     while (n != m->_nics.end()) {
         NIC *nic = &n.value();
+
+        if (!nic->has_rules()) {
+            n++;
+            continue;
+        }
 
         // Attempt to remove
         if (nic->remove_rule(rule_id)) {

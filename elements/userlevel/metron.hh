@@ -515,7 +515,7 @@ class ServiceChain {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         Json rules_to_json();
         int32_t rules_from_json(Json j, Metron *m, ErrorHandler *errh);
-        static int delete_rule_from_json(const long rule_id, Metron *m, ErrorHandler *errh);
+        static int delete_rule_from_json(const long &rule_id, Metron *m, ErrorHandler *errh);
         static int32_t delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandler *errh);
     #endif
 
