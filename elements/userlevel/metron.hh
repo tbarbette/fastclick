@@ -275,7 +275,11 @@ Tears down a deployed service chain.
 
 =h delete_rules write
 
-Removes the rules associated with a service chain or all service chains.
+Removes a given list of rules associated with (a) service chain(s).
+
+=h delete_rules_all write
+
+Flushes all Metron NICs.
 
 =h delete_controllers write
 
@@ -347,6 +351,7 @@ class NIC {
         bool remove_rule(const int &core_id, const long &rule_id);
         bool update_rule(const int &core_id, const long &rule_id, String &rule);
         bool remove_rules();
+        uint32_t flush_rules();
     #endif
 
         Json to_json(const RxFilterType &rx_mode, const bool &stats = false);
@@ -363,20 +368,18 @@ class NIC {
         int    call_rx_write(String h, const String input);
 
     private:
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        // Maps CPU cores to a map of rule ID -> rule
-        HashMap<int, HashMap<long, String> *> _rules;
-
-        // Maps ONOS rule IDs (long) to NIC rule IDs (uint32_t)
-        HashMap<long, uint32_t> _internal_rule_map;
-    #endif
-
         // Click port index of this NIC
         int _index;
 
         bool _verbose;
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        // Maps CPU cores to a map of rule ID -> rule
+        HashMap<int, HashMap<long, String> *> _rules;
+
+        // Maps ONOS rule IDs (long) to NIC rule IDs (uint32_t)
+        HashMap<long, uint32_t> _internal_rule_map;
+
         // Methods that facilitate the mapping between ONOS and NIC rule IDs
         uint32_t get_internal_rule_id(const long &rule_id);
         bool verify_unique_rule_id_mapping(const uint32_t &int_rule_id);
@@ -492,7 +495,7 @@ class ServiceChain {
             SC_FAILED,
             SC_OK = 1
         };
-        enum ScStatus status;
+        enum ScStatus _status;
 
         /**
          * Service chain methods.
@@ -555,7 +558,6 @@ class ServiceChain {
                 if (nic->get_name() == name)
                     return nic;
             }
-
             return NULL;
         }
 
@@ -564,7 +566,6 @@ class ServiceChain {
                 if (_nics[i] == nic)
                     return i;
             }
-
             return ERROR;
         }
 
@@ -700,7 +701,7 @@ class Metron : public Element {
         #endif
             h_delete_chains, h_delete_controllers,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            h_delete_rules
+            h_delete_rules, h_delete_rules_all
         #endif
         };
 
@@ -826,6 +827,7 @@ class Metron : public Element {
         int try_slaves(ErrorHandler *errh);
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
         int confirm_nic_mode(ErrorHandler *errh);
+        int flush_nics();
 
         static void add_per_core_monitoring_data(
             Json *jobj, const LatencyInfo &lat
