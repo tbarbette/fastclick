@@ -399,7 +399,7 @@ struct LatencyInfo {
 class CpuInfo {
     public:
         CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0),
-        latency(), _active(false), _active_time() {
+                    latency(), _active(false), _active_time() {
         }
 
         int cpu_phys_id;
@@ -455,8 +455,8 @@ class ServiceChain {
                 RxFilter(ServiceChain *sc);
                 ~RxFilter();
 
-                RxFilterType _method;
-                ServiceChain *_sc;
+                RxFilterType method;
+                ServiceChain *sc;
 
                 static RxFilter *from_json(const Json &j, ServiceChain *sc, ErrorHandler *errh);
                 Json to_json();
@@ -484,18 +484,18 @@ class ServiceChain {
         /**
          * Service chain public attributes.
          */
-        String _id;
-        RxFilter *_rx_filter;
-        String _config;
+        String id;
+        RxFilter *rx_filter;
+        String config;
 
         // Service chain type
-        ScType _config_type;
+        ScType config_type;
 
         enum ScStatus {
             SC_FAILED,
             SC_OK = 1
         };
-        enum ScStatus _status;
+        enum ScStatus status;
 
         /**
          * Service chain methods.
@@ -520,11 +520,11 @@ class ServiceChain {
     #endif
 
         inline String get_id() {
-            return _id;
+            return id;
         }
 
         inline RxFilterType get_rx_mode() {
-            return _rx_filter->_method;
+            return rx_filter->method;
         }
 
         inline int get_active_cpu_nb() {
@@ -735,7 +735,8 @@ class Metron : public Element {
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         struct rule_timing_stats {
-            float rules_per_sec;   // Measure rule installation/deletion rate
+            uint32_t rules_nb;      // Log the number of rules being installed/deleted
+            float rules_per_sec;    // Measure rule installation/deletion rate
             Timestamp start, end;
         };
         static inline void add_rule_inst_stats(const struct rule_timing_stats &rits) {
