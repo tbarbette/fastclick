@@ -1422,7 +1422,9 @@ Metron::add_handlers()
 
     // HTTP post handlers
     add_write_handler("controllers",     write_handler, h_controllers);
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     add_write_handler("rules_from_file", write_handler, h_rules_from_file);
+#endif
 
     // Get and POST HTTP handlers with parameters
     set_handler(
