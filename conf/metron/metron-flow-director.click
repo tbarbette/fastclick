@@ -56,3 +56,22 @@ fd0 :: FromDPDKDevice(PORT $iface0, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE f
 fd1 :: FromDPDKDevice(PORT $iface1, MODE $dpdkRxMode, N_QUEUES $queues, ACTIVE false)
 	-> Idle
 	-> ToDPDKDevice(PORT $iface1, N_QUEUES $queues);
+
+DriverManager(
+	wait,
+	print "",
+	print $(fd0.rules_aggr_stats),
+	print "",
+	print "Flushing rules...",
+	write metron.delete_rules_all,
+	print "    Done!",
+	print "",
+	print "Minimum rule installation rate: "$(metron.rule_installation_rate_min)" rules/sec",
+	print "Average rule installation rate: "$(metron.rule_installation_rate_avg)" rules/sec",
+	print "Maximum rule installation rate: "$(metron.rule_installation_rate_max)" rules/sec",
+	print "",
+	print "Minimum rule     deletion rate: "$(metron.rule_deletion_rate_min)" rules/sec",
+	print "Average rule     deletion rate: "$(metron.rule_deletion_rate_avg)" rules/sec",
+	print "Maximum rule     deletion rate: "$(metron.rule_deletion_rate_max)" rules/sec",
+	stop
+);
