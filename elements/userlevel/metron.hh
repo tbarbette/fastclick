@@ -269,6 +269,10 @@ Reconfigures a set of already deployed service chains encoded as a JSON object.
 Returns or sets the rules associated with either all deployed service chains or a specific
 service chain.
 
+=h rules_from_file write
+
+Installs a set of NIC rules from file.
+
 =h delete_chains write
 
 Tears down a deployed service chain.
@@ -697,7 +701,7 @@ class Metron : public Element {
         #endif
             h_put_chains, h_chains, h_chains_stats, h_chains_proxy,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            h_chains_rules,
+            h_chains_rules, h_rules_from_file,
         #endif
             h_delete_chains, h_delete_controllers,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -718,6 +722,30 @@ class Metron : public Element {
 
         int get_cpus_nb() {
             return click_max_cpu_ids();
+        }
+
+        NIC *get_nic_by_index(int i) {
+            auto it = _nics.begin();
+            while (it != _nics.end()) {
+                NIC *nic = &it.value();
+                if (nic->get_port_id() == (portid_t) i) {
+                    return nic;
+                }
+                it++;
+            }
+            return NULL;
+        }
+
+        NIC *get_nic_by_name(String name) {
+            auto it = _nics.begin();
+            while (it != _nics.end()) {
+                NIC *nic = &it.value();
+                if (nic->get_name() == name) {
+                    return nic;
+                }
+                it++;
+            }
+            return NULL;
         }
 
         int get_nics_nb() {

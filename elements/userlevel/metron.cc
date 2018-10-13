@@ -1035,6 +1035,46 @@ Metron::write_handler(
             return m->delete_controller_from_json((const String &) data);
         }
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        case h_rules_from_file: {
+            int delim = data.find_left(' ');
+            String nic_name = data.substring(0, delim).trim_space_left();
+            String filename = data.substring(delim + 1).trim_space_left();
+
+            NIC *nic = m->get_nic_by_name(nic_name);
+            if (!nic) {
+                return errh->error("Invalid NIC %s", nic_name.c_str());
+            }
+            FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(nic->element);
+            if (!fd) {
+                return errh->error("Invalid NIC %s", nic_name.c_str());
+            }
+            portid_t port_id = fd->get_device()->get_port_id();
+
+            click_chatter("[NIC %d] Rule installation from file: %s", port_id, filename.c_str());
+
+            struct Metron::rule_timing_stats rits;
+            rits.start = Timestamp::now_steady();
+
+            int status = FlowDirector::get_flow_director(port_id)->add_rules_from_file(filename);
+
+            rits.end = Timestamp::now_steady();
+
+            uint32_t installed_rules = FlowDirector::get_flow_director(port_id)->flow_rules_count_explicit();
+
+            rits.rules_nb = (uint32_t) installed_rules;
+            rits.rules_per_sec = (float) ((rits.end - rits.start).msecval() * 1000) /
+                                 (float) installed_rules;
+            Metron::add_rule_inst_stats(rits);
+
+            if (m->_verbose) {
+                click_chatter(
+                    "Installed %" PRId32 " rules at the rate of %.3f rules/sec",
+                    installed_rules, rits.rules_per_sec
+                );
+            }
+
+            return status;
+        }
         case h_delete_rules: {
             click_chatter("Metron controller requested rule deletion");
 
@@ -1381,7 +1421,8 @@ Metron::add_handlers()
 #endif
 
     // HTTP post handlers
-    add_write_handler("controllers", write_handler, h_controllers);
+    add_write_handler("controllers",     write_handler, h_controllers);
+    add_write_handler("rules_from_file", write_handler, h_rules_from_file);
 
     // Get and POST HTTP handlers with parameters
     set_handler(
