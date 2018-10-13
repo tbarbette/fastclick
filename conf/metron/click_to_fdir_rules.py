@@ -41,7 +41,8 @@ SRC_MASK    = "src mask"
 DST_EXACT   = "dst is"
 DST_SPEC    = "dst spec"
 DST_MASK    = "dst mask"
-ACTION_Q    = "actions queue index"
+ACTION_Q    = "queue index"
+ACTION_CNT  = "count"
 
 ETHERNET_RULE_PREF = "ingress pattern eth"
 
@@ -97,9 +98,15 @@ def dump_flow_director(rule_list, target_nic, target_queues_nb, outfile, verbose
 			rule_str += " / end "
 
 			# Time to append the actions
+			rule_str += "actions "
+			# Queue dispatching
 			next_queue = (curr_queue % target_queues_nb)
 			curr_queue += 1
-			rule_str += "{} {} / end".format(ACTION_Q, next_queue)
+			rule_str += "{} {}".format(ACTION_Q, next_queue)
+			rule_str += " / "
+			# Monitoring
+			rule_str += "{}".format(ACTION_CNT)
+			rule_str += " / end "
 
 			print("DPDK Flow rule #{0:>4}: {1}".format(rule_nb, rule_str))
 			rule_nb += 1
