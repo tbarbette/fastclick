@@ -234,6 +234,18 @@ Returns the average rate to install DPDK-based NIC rules.
 
 Returns the maximum rate to install DPDK-based NIC rules.
 
+=h rule_installation_lat_min
+
+Returns the minimum latency (ms) to install a given set of DPDK-based NIC rules.
+
+=h rule_installation_lat_avg
+
+Returns the average latency (ms) to install a given set of DPDK-based NIC rules.
+
+=h rule_installation_lat_max
+
+Returns the maximum latency (ms) to install a given set of DPDK-based NIC rules.
+
 =h rule_deletion_rate_min
 
 Returns the minimum rate to remove DPDK-based NIC rules.
@@ -245,6 +257,18 @@ Returns the average rate to remove DPDK-based NIC rules.
 =h rule_deletion_rate_max
 
 Returns the maximum rate to remove DPDK-based NIC rules.
+
+=h rule_deletion_lat_min
+
+Returns the minimum latency (ms) to remove a given set of DPDK-based NIC rules.
+
+=h rule_deletion_lat_avg
+
+Returns the average latency (ms) to remove a given set of DPDK-based NIC rules.
+
+=h rule_deletion_lat_max
+
+Returns the maximum latency (ms) to remove a given set of DPDK-based NIC rules.
 
 =h controllers read/write
 
@@ -696,8 +720,10 @@ class Metron : public Element {
         enum {
             h_discovered, h_resources, h_controllers, h_stats,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            h_rule_inst_min, h_rule_inst_avg, h_rule_inst_max,
-            h_rule_del_min,  h_rule_del_avg,  h_rule_del_max,
+            h_rule_inst_lat_min,  h_rule_inst_lat_avg,  h_rule_inst_lat_max,
+            h_rule_del_lat_min,   h_rule_del_lat_avg,   h_rule_del_lat_max,
+            h_rule_inst_rate_min, h_rule_inst_rate_avg, h_rule_inst_rate_max,
+            h_rule_del_rate_min,  h_rule_del_rate_avg,  h_rule_del_rate_max,
         #endif
             h_put_chains, h_chains, h_chains_stats, h_chains_proxy,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -764,7 +790,8 @@ class Metron : public Element {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         struct rule_timing_stats {
             uint32_t rules_nb;      // Log the number of rules being installed/deleted
-            float rules_per_sec;    // Measure rule installation/deletion rate
+            float latency_ms;       // Measure rule installation/deletion latency (ms)
+            float rules_per_sec;    // Measure rule installation/deletion rate (rules/sec)
             Timestamp start, end;
         };
         static inline void add_rule_inst_stats(const struct rule_timing_stats &rits) {
@@ -779,7 +806,7 @@ class Metron : public Element {
 
         void min_avg_max(
             HashMap<uint32_t, struct rule_timing_stats> &rule_stats_map,
-            float &min, float &mean, float &max
+            float &min, float &mean, float &max, const bool &latency
         );
     #endif
 

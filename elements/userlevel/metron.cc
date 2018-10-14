@@ -1062,14 +1062,15 @@ Metron::write_handler(
             uint32_t installed_rules = FlowDirector::get_flow_director(port_id)->flow_rules_count_explicit();
 
             rits.rules_nb = (uint32_t) installed_rules;
-            rits.rules_per_sec = (float) ((rits.end - rits.start).msecval() * 1000) /
-                                 (float) installed_rules;
+            rits.latency_ms = (float) (rits.end - rits.start).msecval();
+            rits.rules_per_sec = (float) (installed_rules * 1000) / rits.latency_ms;
+
             Metron::add_rule_inst_stats(rits);
 
             if (m->_verbose) {
                 click_chatter(
-                    "Installed %" PRId32 " rules at the rate of %.3f rules/sec",
-                    installed_rules, rits.rules_per_sec
+                    "Installed %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
+                    installed_rules, rits.latency_ms, rits.rules_per_sec
                 );
             }
 
@@ -1088,16 +1089,16 @@ Metron::write_handler(
 
             rdts.end = Timestamp::now_steady();
 
-            // Divide by the number of deleted rules to calculate the rule deletion rate
             rdts.rules_nb = (uint32_t) deleted_rules;
-            rdts.rules_per_sec = (float) ((rdts.end - rdts.start).msecval() * 1000) /
-                                 (float) deleted_rules;
+            rdts.latency_ms = (float) (rdts.end - rdts.start).msecval();
+            rdts.rules_per_sec = (float) (deleted_rules * 1000) / rdts.latency_ms;
+
             Metron::add_rule_del_stats(rdts);
 
             if (m->_verbose) {
                 click_chatter(
-                    "Deleted %" PRId32 " rules at the rate of %.3f rules/sec",
-                    deleted_rules, rdts.rules_per_sec
+                    "Deleted %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
+                    deleted_rules, rdts.latency_ms, rdts.rules_per_sec
                 );
             }
 
@@ -1312,7 +1313,7 @@ Metron::param_handler(
                     struct Metron::rule_timing_stats rits;
                     rits.start = Timestamp::now_steady();
 
-                    // Parse
+                    // Parse rules from JSON
                     int32_t installed_rules =  sc->rules_from_json(jsc.second, m, errh);
                     if (installed_rules < 0) {
                         return errh->error(
@@ -1324,14 +1325,15 @@ Metron::param_handler(
                     rits.end = Timestamp::now_steady();
 
                     rits.rules_nb = (uint32_t) installed_rules;
-                    rits.rules_per_sec = (float) ((rits.end - rits.start).msecval() * 1000) /
-                                         (float) installed_rules;
+                    rits.latency_ms = (float) (rits.end - rits.start).msecval();
+                    rits.rules_per_sec = (float) (installed_rules * 1000) / rits.latency_ms;
+
                     Metron::add_rule_inst_stats(rits);
 
                     if (sc->_verbose) {
                         click_chatter(
-                            "Installed %" PRId32 " rules at the rate of %.3f rules/sec",
-                            installed_rules, rits.rules_per_sec
+                            "Installed %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
+                            installed_rules, rits.latency_ms, rits.rules_per_sec
                         );
                     }
                 }
@@ -1365,25 +1367,49 @@ Metron::rule_stats_handler(Element *e, void *user_data)
     float max = 0;
 
     switch (what) {
-        case h_rule_inst_min:
-        case h_rule_inst_avg:
-        case h_rule_inst_max: {
-            m->min_avg_max(Metron::_rule_inst_stats_map, min, avg, max);
-            if ((intptr_t) what == h_rule_inst_min) {
+        case h_rule_inst_lat_min:
+        case h_rule_inst_lat_avg:
+        case h_rule_inst_lat_max: {
+            m->min_avg_max(Metron::_rule_inst_stats_map, min, avg, max, true);
+            if ((intptr_t) what == h_rule_inst_lat_min) {
                 return String(min);
-            } else if ((intptr_t) what == h_rule_inst_avg) {
+            } else if ((intptr_t) what == h_rule_inst_lat_avg) {
                 return String(avg);
             } else {
                 return String(max);
             }
         }
-        case h_rule_del_min:
-        case h_rule_del_avg:
-        case h_rule_del_max: {
-            m->min_avg_max(Metron::_rule_del_stats_map, min, avg, max);
-            if ((intptr_t) what == h_rule_del_min) {
+        case h_rule_inst_rate_min:
+        case h_rule_inst_rate_avg:
+        case h_rule_inst_rate_max: {
+            m->min_avg_max(Metron::_rule_inst_stats_map, min, avg, max, false);
+            if ((intptr_t) what == h_rule_inst_rate_min) {
                 return String(min);
-            } else if ((intptr_t) what == h_rule_del_avg) {
+            } else if ((intptr_t) what == h_rule_inst_rate_avg) {
+                return String(avg);
+            } else {
+                return String(max);
+            }
+        }
+        case h_rule_del_lat_min:
+        case h_rule_del_lat_avg:
+        case h_rule_del_lat_max: {
+            m->min_avg_max(Metron::_rule_del_stats_map, min, avg, max, true);
+            if ((intptr_t) what == h_rule_del_lat_min) {
+                return String(min);
+            } else if ((intptr_t) what == h_rule_del_lat_avg) {
+                return String(avg);
+            } else {
+                return String(max);
+            }
+        }
+        case h_rule_del_rate_min:
+        case h_rule_del_rate_avg:
+        case h_rule_del_rate_max: {
+            m->min_avg_max(Metron::_rule_del_stats_map, min, avg, max, false);
+            if ((intptr_t) what == h_rule_del_rate_min) {
+                return String(min);
+            } else if ((intptr_t) what == h_rule_del_rate_avg) {
                 return String(avg);
             } else {
                 return String(max);
@@ -1411,13 +1437,21 @@ Metron::add_handlers()
     add_read_handler ("controllers", read_handler,  h_controllers);
     add_read_handler ("stats",       read_handler,  h_stats);
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    add_read_handler ("rule_installation_rate_min", rule_stats_handler, h_rule_inst_min);
-    add_read_handler ("rule_installation_rate_avg", rule_stats_handler, h_rule_inst_avg);
-    add_read_handler ("rule_installation_rate_max", rule_stats_handler, h_rule_inst_max);
+    add_read_handler ("rule_installation_lat_min",  rule_stats_handler, h_rule_inst_lat_min);
+    add_read_handler ("rule_installation_lat_avg",  rule_stats_handler, h_rule_inst_lat_avg);
+    add_read_handler ("rule_installation_lat_max",  rule_stats_handler, h_rule_inst_lat_max);
 
-    add_read_handler ("rule_deletion_rate_min", rule_stats_handler, h_rule_del_min);
-    add_read_handler ("rule_deletion_rate_avg", rule_stats_handler, h_rule_del_avg);
-    add_read_handler ("rule_deletion_rate_max", rule_stats_handler, h_rule_del_max);
+    add_read_handler ("rule_installation_rate_min", rule_stats_handler, h_rule_inst_rate_min);
+    add_read_handler ("rule_installation_rate_avg", rule_stats_handler, h_rule_inst_rate_avg);
+    add_read_handler ("rule_installation_rate_max", rule_stats_handler, h_rule_inst_rate_max);
+
+    add_read_handler ("rule_deletion_lat_min",  rule_stats_handler, h_rule_del_lat_min);
+    add_read_handler ("rule_deletion_lat_avg",  rule_stats_handler, h_rule_del_lat_avg);
+    add_read_handler ("rule_deletion_lat_max",  rule_stats_handler, h_rule_del_lat_max);
+
+    add_read_handler ("rule_deletion_rate_min", rule_stats_handler, h_rule_del_rate_min);
+    add_read_handler ("rule_deletion_rate_avg", rule_stats_handler, h_rule_del_rate_avg);
+    add_read_handler ("rule_deletion_rate_max", rule_stats_handler, h_rule_del_rate_max);
 #endif
 
     // HTTP post handlers
@@ -1512,12 +1546,14 @@ Metron::to_json()
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
  * Computes the minimum, average, and maximum rule
- * installation/deletion rate across the entire set of
- * such operations.
+ * installation/deletion rate (rules/sec) or latency (ms)\
+ * across the entire set of such operations.
+ * The last argument denotes whether to compute latency or rate.
  */
 void
 Metron::min_avg_max(
-    HashMap<uint32_t, struct rule_timing_stats> &rule_stats_map, float &min, float &mean, float &max)
+    HashMap<uint32_t, struct rule_timing_stats> &rule_stats_map,
+    float &min, float &mean, float &max, const bool &latency)
 {
     auto it = rule_stats_map.begin();
     int len = rule_stats_map.size();
@@ -1527,14 +1563,20 @@ Metron::min_avg_max(
     while (it != rule_stats_map.end()) {
         struct rule_timing_stats stats = it.value();
 
-        float rate = stats.rules_per_sec;
-        if (rate < min) {
-            min = rate;
+        float value = 0.0;
+        if (latency) {
+            value = stats.latency_ms;
+        } else {
+            value = stats.rules_per_sec;
         }
-        if (rate > max) {
-            max = rate;
+
+        if (value < min) {
+            min = value;
         }
-        sum += rate;
+        if (value > max) {
+            max = value;
+        }
+        sum += value;
 
         it++;
     }
@@ -1562,10 +1604,10 @@ Metron::flush_nics()
     while (it != _nics.end()) {
         NIC *nic = &it.value();
 
+        uint32_t nic_rules_nb = 0;
+
         struct Metron::rule_timing_stats rdts;
         rdts.start = Timestamp::now_steady();
-
-        uint32_t nic_rules_nb = 0;
 
         // Skip empty NICs
         if ((nic_rules_nb = nic->flush_rules()) == 0) {
@@ -1576,14 +1618,15 @@ Metron::flush_nics()
         rdts.end = Timestamp::now_steady();
 
         rdts.rules_nb = nic_rules_nb;
-        rdts.rules_per_sec = (float) ((rdts.end - rdts.start).msecval() * 1000) /
-                             (float) nic_rules_nb;
+        rdts.latency_ms = (float) (rdts.end - rdts.start).msecval();
+        rdts.rules_per_sec = (float) (nic_rules_nb * 1000) / rdts.latency_ms;
+
         Metron::add_rule_del_stats(rdts);
 
         if (_verbose) {
             click_chatter(
-                "[NIC %s] Deleted %" PRId32 " rules at the rate of %.3f rules/sec",
-                nic->get_device_address().c_str(), nic_rules_nb, rdts.rules_per_sec
+                "Deleted %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
+                nic_rules_nb, rdts.latency_ms, rdts.rules_per_sec
             );
         }
 
