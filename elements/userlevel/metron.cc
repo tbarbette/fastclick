@@ -1238,7 +1238,7 @@ Metron::param_handler(
         switch (what) {
             case h_chains: {
                 Json jroot = Json::parse(param);
-                Json jlist = jroot.get("servicechains");
+                Json jlist = jroot.get("serviceChains");
                 for (auto jsc : jlist) {
                     struct ServiceChain::timing_stats ts;
                     ts.start = Timestamp::now_steady();
