@@ -603,7 +603,7 @@ class ServiceChain {
 
         Bitvector active_cpus();
 
-        String generate_configuration();
+        String generate_configuration(bool add_extra);
         String generate_configuration_slave_fd_name(
             const int &nic_index, const int &cpu_index, const String &type = "FD"
         );
@@ -881,7 +881,7 @@ class Metron : public Element {
 
         /* Private methods */
         int try_slaves(ErrorHandler *errh);
-        int run_service_chain(ServiceChain *sc, ErrorHandler *errh);
+        int run_service_chain(ServiceChain *sc, ErrorHandler *errh, bool add_extra);
         int confirm_nic_mode(ErrorHandler *errh);
         int flush_nics();
 

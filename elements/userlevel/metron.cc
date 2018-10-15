@@ -452,7 +452,7 @@ Metron::try_slaves(ErrorHandler *errh)
     assert(cpu_phys_map[0] >= 0);
     sc.get_cpu_info(0).cpu_phys_id = cpu_phys_map[0];
     sc.get_cpu_info(0).set_active(true);
-    if (run_service_chain(&sc, errh) != 0) {
+    if (run_service_chain(&sc, errh, false) != 0) {
         return errh->error(
             "Unable to deploy Metron slaves: "
             "Please verify the compatibility of your NIC with DPDK secondary processes."
@@ -812,7 +812,7 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
         sc->get_cpu_info(i).set_active(true);
     }
 
-    int ret = run_service_chain(sc, errh);
+    int ret = run_service_chain(sc, errh, true);
     if (ret != SUCCESS) {
         unassign_cpus(sc);
         if (_fail) {
@@ -834,7 +834,7 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
  * CPU cores must already be assigned by assign_cpus().
  */
 int
-Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
+Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh, bool add_extra)
 {
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
@@ -887,7 +887,7 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh)
                 return errh->error("%s", strerror(errno));
         }
         */
-        String conf = sc->generate_configuration();
+        String conf = sc->generate_configuration(add_extra);
 
         click_chatter("Writing configuration %s", conf.c_str());
 
@@ -1238,11 +1238,10 @@ Metron::param_handler(
         switch (what) {
             case h_chains: {
                 Json jroot = Json::parse(param);
-                Json jlist = jroot.get("serviceChains");
+                Json jlist = jroot.get("servicechains");
                 for (auto jsc : jlist) {
                     struct ServiceChain::timing_stats ts;
                     ts.start = Timestamp::now_steady();
-
                     // Parse
                     ServiceChain *sc = ServiceChain::from_json(jsc.second, m, errh);
                     if (!sc) {
@@ -2247,7 +2246,7 @@ ServiceChain::to_json()
     jsc.set("rxFilter", rx_filter->to_json());
     jsc.set("configType", sc_type_enum_to_str(config_type));
     jsc.set("config", config);
-    jsc.set("expandedConfig", generate_configuration());
+    jsc.set("expandedConfig", generate_configuration(true));
     Json jcpus = Json::make_array();
     for (int i = 0; i < get_max_cpu_nb(); i++) {
         jcpus.push_back(i); //TODO :: phys ids ?
@@ -2661,41 +2660,47 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
     for (auto jfield : j) {
         if (jfield.first == "cpus") {
-            Bitvector old_map = active_cpus();
-            Bitvector new_map(get_max_cpu_nb(), false);
+            Bitvector oldMap = active_cpus();
+            Bitvector newMap(get_max_cpu_nb(), false);
 
-            for (int i = 0; jfield.second.size(); i++) {
-                if (jfield.second[i].as_i() >  get_max_cpu_nb()) {
-                    return errh->error(
-                        "Number of used CPUs must be less or equal "
-                        "than the maximum number of CPUs!"
-                    );
+            if (jfield.second.is_array()) {
+                for (int i = 0; i < jfield.second.size(); i++) {
+
+                    int cpuId = jfield.second[i].to_i();
+                    newMap[cpuId] = true;
+                    if (cpuId >  get_max_cpu_nb()) {
+                            return errh->error(
+                                "Number of used CPUs must be less or equal "
+                                "than the maximum number of CPUs!"
+                            );
+                    }
+
                 }
-                new_map[jfield.second[i].as_i()] = true;
+            } else {
+                click_chatter("Unknown cpu map %s !",jfield.second);
             }
-
             int ret;
             String response = "";
             bool did_scale = false;
 
             if (_metron->_rx_mode == RSS) {
-                for (int i = 0; i < new_map.size(); i++) {
-                    if (!new_map[i] && i < new_map.weight()) {
+                for (int i = 0; i < newMap.size(); i++) {
+                    if (!newMap[i] && i < newMap.weight()) {
                         return errh->error("RSS must allocate CPUs without holes !");
                     }
                 }
             }
 
             for (int new_cpu_id = 0; new_cpu_id < get_max_cpu_nb(); new_cpu_id++) {
-                if (old_map[new_cpu_id] == new_map[new_cpu_id]) {
+                if (oldMap[new_cpu_id] == newMap[new_cpu_id]) {
                     continue;
                 }
 
                 did_scale = true;
 
                 // Activating core
-                get_cpu_info(new_cpu_id).set_active(new_map[new_cpu_id]);
-                if (new_map[new_cpu_id]) {
+                get_cpu_info(new_cpu_id).set_active(newMap[new_cpu_id]);
+                if (newMap[new_cpu_id]) {
                     for (int inic = 0; inic < get_nics_nb(); inic++) {
                         ret = call_write(
                             generate_configuration_slave_fd_name(
@@ -2814,7 +2819,7 @@ ServiceChain::do_autoscale(int n_cpu_change)
  * as received by the controller.
  */
 String
-ServiceChain::generate_configuration()
+ServiceChain::generate_configuration(bool add_extra)
 {
     String new_conf = "elementclass MetronSlave {\n" + config + "\n};\n\n";
     if (_autoscale) {
@@ -2905,7 +2910,8 @@ ServiceChain::generate_configuration()
         new_conf += "slave[" + is + "] -> " + (_metron->_monitoring_mode ? "[" + is + "]monitoring_lat[" + is + "] -> " : "") + "  slaveTD" + is + ";\n\n";
     }
 
-    new_conf += _metron->_slave_extra;
+    if (add_extra)
+        new_conf += _metron->_slave_extra;
 
     return new_conf;
 }
