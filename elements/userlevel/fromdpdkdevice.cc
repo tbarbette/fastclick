@@ -242,6 +242,12 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             return String(fd->_dev->nbRXQueues());
         case h_nb_tx_queues:
             return String(fd->_dev->nbTXQueues());
+        case h_mtu: {
+            uint16_t mtu;
+            if (rte_eth_dev_get_mtu(fd->_dev->port_id, &mtu) != 0)
+                return String("<error>");
+            return String(mtu);
+                    }
         case h_mac: {
             if (!fd->_dev)
                 return String::make_empty();
@@ -439,6 +445,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
     add_read_handler("nombufs",statistics_handler, h_nombufs);
 
+    add_read_handler("mtu",read_handler, h_mtu);
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
 

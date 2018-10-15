@@ -178,6 +178,7 @@ private:
         h_active,
         h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
         h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+        h_mtu,
         h_device,
     };
 
