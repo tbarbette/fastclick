@@ -2677,7 +2677,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
                 }
             } else {
-                click_chatter("Unknown cpu map %s !",jfield.second);
+                click_chatter("Unknown cpu map %s !",jfield.second.c_str());
             }
             int ret;
             String response = "";
