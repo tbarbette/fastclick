@@ -857,8 +857,8 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     // Configure Flow Director
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     for (HashTable<portid_t, FlowDirector *>::iterator
-            it = FlowDirector::_dev_flow_dir.begin();
-            it != FlowDirector::_dev_flow_dir.end(); ++it) {
+            it = FlowDirector::dev_flow_dir.begin();
+            it != FlowDirector::dev_flow_dir.end(); ++it) {
         const portid_t port_id = it.key();
 
         DPDKDevice *dev = get_device(port_id);

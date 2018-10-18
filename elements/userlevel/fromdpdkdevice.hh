@@ -188,11 +188,6 @@ public:
 
     ToDPDKDevice* findOutputElement();
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    String flow_director_read(const String &h);
-    int flow_director_write(const String &h, const String &flow);
-#endif
-
     inline DPDKDevice *get_device() {
         return _dev;
     }
@@ -224,9 +219,9 @@ private:
         h_mac, h_add_mac, h_remove_mac, h_vf_mac,
         h_device,
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        h_rule_add, h_rule_del,
-        h_rule_packets, h_rule_bytes, h_rules_aggr_stats,
-        h_rules_list, h_rules_count, h_rules_flush
+        h_rule_add, h_rules_del, h_rules_flush,
+        h_rules_list, h_rules_ids, h_rules_count,
+        h_rule_packet_hits, h_rule_byte_count, h_rules_aggr_stats
     #endif
     };
 

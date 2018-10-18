@@ -12,6 +12,10 @@
 #include <click/handlercall.hh>
 #include "../json/json.hh"
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+ #include <click/flowdirector.hh>
+#endif
+
 /**
  * The service chain types supported by Metron:
  * |-> Click-based
@@ -305,7 +309,7 @@ Tears down a deployed service chain.
 
 Removes a given list of rules associated with (a) service chain(s).
 
-=h delete_rules_all write
+=h flush_nics write
 
 Flushes all Metron NICs.
 
@@ -343,17 +347,10 @@ class CPU {
 
 class NIC {
     public:
-        NIC(bool verbose = false) : _index(-1),
-        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            _rules(), _internal_rule_map(),
-        #endif
-            _verbose(verbose) {
+        NIC(bool verbose = false) : _index(-1), _verbose(verbose) {
         }
 
         ~NIC() {
-        #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            remove_rules();
-        #endif
         }
 
         Element *element;
@@ -363,33 +360,26 @@ class NIC {
         }
 
         portid_t get_port_id();
-        String get_device_address();
         String get_name();
+        String get_device_address();
         int get_index();
         void set_index(const int &index);
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        HashMap<long, String> *find_rules_by_core_id(const int &core_id);
-        Vector<String> rules_list_by_core_id(const int &core_id);
-        Vector<int> cores_with_rules();
-        bool has_rules() { return !_rules.empty(); }
-        bool insert_rule(const int &core_id, const long &rule_id, String &rule);
-        int  install_rule(const long &rule_id, String &rule);
-        bool remove_rule(const long &rule_id);
-        bool remove_rule(const int &core_id, const long &rule_id);
-        bool update_rule(const int &core_id, const long &rule_id, String &rule);
-        bool remove_rules();
-        uint32_t flush_rules();
+        FlowDirector *get_flow_director() { return FlowDirector::get_flow_director(get_port_id()); };
+        FlowCache *get_flow_cache() { return get_flow_director()->get_flow_cache(); };
+        int32_t insert_rule_in_nic(const long &rule_id, String &rule);
+        int32_t delete_rules_from_nic(String rule_ids);
+        int32_t delete_rules_from_nic(Vector<String> rules_vec);
     #endif
 
-        Json to_json(const RxFilterType &rx_mode, const bool &stats = false);
-
         int queue_per_pool();
-
         int phys_cpu_to_queue(int phys_cpu_id) {
             assert(phys_cpu_id >= 0);
             return phys_cpu_id * (queue_per_pool());
         }
+
+        Json to_json(const RxFilterType &rx_mode, const bool &stats = false);
 
         String call_rx_read(String h);
         String call_tx_read(String h);
@@ -398,23 +388,8 @@ class NIC {
     private:
         // Click port index of this NIC
         int _index;
-
+        // Verbosity flag
         bool _verbose;
-
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        // Maps CPU cores to a map of rule ID -> rule
-        HashMap<int, HashMap<long, String> *> _rules;
-
-        // Maps ONOS rule IDs (long) to NIC rule IDs (uint32_t)
-        HashMap<long, uint32_t> _internal_rule_map;
-
-        // Methods that facilitate the mapping between ONOS and NIC rule IDs
-        uint32_t get_internal_rule_id(const long &rule_id);
-        bool verify_unique_rule_id_mapping(const uint32_t &int_rule_id);
-        bool store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_id);
-        bool delete_rule_id_mapping(const long &rule_id);
-    #endif
-
 };
 
 struct LatencyInfo {
@@ -543,7 +518,8 @@ class ServiceChain {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         Json rules_to_json();
         int32_t rules_from_json(Json j, Metron *m, ErrorHandler *errh);
-        static int delete_rule_from_json(const long &rule_id, Metron *m, ErrorHandler *errh);
+        static int     delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh);
+        static int32_t delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHandler *errh);
         static int32_t delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandler *errh);
     #endif
 
@@ -727,11 +703,11 @@ class Metron : public Element {
         #endif
             h_put_chains, h_chains, h_chains_stats, h_chains_proxy,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            h_chains_rules, h_rules_from_file,
+            h_chains_rules, h_add_rules_from_file,
         #endif
             h_delete_chains, h_delete_controllers,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            h_delete_rules, h_delete_rules_all
+            h_delete_rules, h_flush_nics
         #endif
         };
 
@@ -739,7 +715,7 @@ class Metron : public Element {
         int instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh);
 
         void kill_service_chain(ServiceChain *sc);
-        int remove_service_chain(ServiceChain *sc, ErrorHandler *errh);
+        int delete_service_chain(ServiceChain *sc, ErrorHandler *errh);
         void call_scale(ServiceChain *sc, const String &event);
 
         bool get_monitoring_mode() {
@@ -793,6 +769,12 @@ class Metron : public Element {
             float latency_ms;       // Measure rule installation/deletion latency (ms)
             float rules_per_sec;    // Measure rule installation/deletion rate (rules/sec)
             Timestamp start, end;
+
+            void update(const uint32_t &rules_nb) {
+                this->rules_nb = rules_nb;
+                this->latency_ms = (float) (end - start).msecval();
+                this->rules_per_sec = (rules_nb > 0) ? (float) (rules_nb * 1000) / this->latency_ms : 0;
+            }
         };
         static inline void add_rule_inst_stats(const struct rule_timing_stats &rits) {
             _rule_inst_stats_map.insert(rits.start.nsec(), rits);
@@ -883,7 +865,9 @@ class Metron : public Element {
         int try_slaves(ErrorHandler *errh);
         int run_service_chain(ServiceChain *sc, ErrorHandler *errh, bool add_extra);
         int confirm_nic_mode(ErrorHandler *errh);
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         int flush_nics();
+    #endif
 
         static void add_per_core_monitoring_data(
             Json *jobj, const LatencyInfo &lat

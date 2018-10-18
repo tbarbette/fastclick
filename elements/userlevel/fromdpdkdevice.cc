@@ -490,6 +490,10 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             portid_t port_id = fd->get_device()->get_port_id();
             return FlowDirector::get_flow_director(port_id)->flow_rules_list();
         }
+        case h_rules_ids: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDirector::get_flow_director(port_id)->flow_rule_ids();
+        }
         case h_rules_count: {
             portid_t port_id = fd->get_device()->get_port_id();
             return String(FlowDirector::get_flow_director(port_id)->flow_rules_count_explicit());
@@ -586,7 +590,8 @@ int FromDPDKDevice::flow_handler(
 
     switch((uintptr_t) thunk) {
         case h_rule_add: {
-            String rule = input;
+            // Trim spaces left and right
+            String rule = input.trim_space().trim_space_left();
 
             // A '\n' must be appended at the end of this rule, if not there
             int eor_pos = rule.find_right('\n');
@@ -594,55 +599,42 @@ int FromDPDKDevice::flow_handler(
                 rule += "\n";
             }
 
-            const uint32_t rule_id = flow_dir->next_unique_rule_id();
-            if (flow_dir->flow_rule_install(rule_id, (const String &) rule) != FlowDirector::SUCCESS) {
+            const uint32_t rule_id = flow_dir->get_flow_cache()->next_internal_rule_id();
+            if (flow_dir->flow_rule_install(rule_id, rule.mutable_c_str()) != FlowDirector::SUCCESS) {
                 return -1;
             }
 
             return static_cast<int>(rule_id);
         }
-        case h_rule_del: {
-            const uint32_t rule_id = atoi(input.c_str());
-            return flow_dir->flow_rule_delete(rule_id);
+        case h_rules_del: {
+            // Trim spaces left and right
+            String rule_ids_str = input.trim_space().trim_space_left();
+
+            // Split space-separated rule IDs
+            Vector<String> rules_vec = rule_ids_str.split(' ');
+            const uint32_t rules_nb = rules_vec.size();
+            if (rules_nb == 0) {
+                return -1;
+            }
+
+            // Store these rules IDs in an array
+            uint32_t rule_ids[rules_nb];
+            uint32_t i = 0;
+            auto it = rules_vec.begin();
+            while (it != rules_vec.end()) {
+                rule_ids[i++] = (uint32_t) atoi(it->c_str());
+                it++;
+            }
+
+            // Batch deletion
+            return flow_dir->flow_rules_delete((uint32_t *) rule_ids, rules_nb);
         }
         case h_rules_flush: {
-            flow_dir->flow_rules_flush();
-            return 0;
+            return flow_dir->flow_rules_flush();
         }
     }
 
     return -1;
-}
-
-/**
- * Interact with flow director by calling its write handlers.
- */
-int FromDPDKDevice::flow_director_write(const String &h, const String &flow) {
-    const Handler *hC = Router::handler(this, h);
-
-    if (hC && hC->visible()) {
-        return hC->call_write(flow, this, ErrorHandler::default_handler());
-    }
-
-    click_chatter(
-        "Handler '%s' is unavailable for flow: %s",
-        h.c_str(), flow.c_str()
-    );
-
-    return -1;
-}
-
-/**
- * Interact with flow director by calling its read handlers.
- */
-String FromDPDKDevice::flow_director_read(const String &h) {
-    const Handler *hC = Router::handler(this, h);
-
-    if (hC && hC->visible()) {
-        return hC->call_read(this, ErrorHandler::default_handler());
-    }
-
-    return String::make_empty();
 }
 #endif
 
@@ -705,8 +697,8 @@ int FromDPDKDevice::xstats_handler(
                 return 0;
             }
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        case h_rule_bytes: {
-        case h_rule_packets:
+        case h_rule_byte_count: {
+        case h_rule_packet_hits:
             portid_t port_id = fd->get_device()->get_port_id();
             FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
             assert(flow_dir);
@@ -717,7 +709,7 @@ int FromDPDKDevice::xstats_handler(
                 int64_t matched_pkts = -1;
                 int64_t matched_bytes = -1;
                 flow_dir->flow_rule_query(rule_id, matched_pkts, matched_bytes);
-                if ((intptr_t)handler->read_user_data() == (intptr_t)h_rule_packets) {
+                if ((intptr_t)handler->read_user_data() == (intptr_t)h_rule_packet_hits) {
                     input = String(matched_pkts);
                 } else {
                     input = String(matched_bytes);
@@ -765,9 +757,9 @@ void FromDPDKDevice::add_handlers()
     set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler, h_xstats);
     set_handler("queue_count", Handler::f_read | Handler::f_read_param, xstats_handler, h_queue_count);
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    set_handler("rule_packets", Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_packets);
-    set_handler("rule_bytes", Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_bytes);
-    set_handler("rules_aggr_stats", Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
+    set_handler(FlowDirector::FLOW_RULE_PACKET_HITS, Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_packet_hits);
+    set_handler(FlowDirector::FLOW_RULE_BYTE_COUNT,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_byte_count);
+    set_handler(FlowDirector::FLOW_RULE_AGGR_STATS,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
 #endif
 
     add_read_handler("active", read_handler, h_active);
@@ -801,9 +793,10 @@ void FromDPDKDevice::add_handlers()
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     add_write_handler(FlowDirector::FLOW_RULE_ADD,   flow_handler, h_rule_add,    0);
-    add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_rule_del,    0);
+    add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_rules_del,   0);
     add_write_handler(FlowDirector::FLOW_RULE_FLUSH, flow_handler, h_rules_flush, 0);
     add_read_handler(FlowDirector::FLOW_RULE_LIST,  statistics_handler, h_rules_list);
+    add_read_handler(FlowDirector::FLOW_RULE_IDS,   statistics_handler, h_rules_ids);
     add_read_handler(FlowDirector::FLOW_RULE_COUNT, statistics_handler, h_rules_count);
 #endif
 
