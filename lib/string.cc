@@ -851,7 +851,7 @@ String::trim_space() const
 String
 String::trim_space_left() const
 {
-    for (int i = 0 ; i <= _r.length - 1; i++)
+    for (int i = 0; i < _r.length; i++)
         if (!isspace((unsigned char) _r.data[i]))
             return substring(i);
     return String();
