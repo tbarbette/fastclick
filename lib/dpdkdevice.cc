@@ -25,6 +25,19 @@
 
 CLICK_DECLS
 
+#if CLICK_DYNAMIC_RX_BURST
+/* Dynamic RX burst size which is between [0,1]
+ * Default value for dynamic RX burst size is 1
+ */
+__thread double dynamic_rx_burst=1.0;
+
+/* Status of dynamic RX burst size
+ * Will be set to true whenever it has been changed
+ * After one use it will be changed to false and the value will be reset to 1
+ */
+__thread bool rx_burst_changed=false;
+#endif
+
 DPDKDevice::DPDKDevice() : port_id(-1), info() {
 }
 

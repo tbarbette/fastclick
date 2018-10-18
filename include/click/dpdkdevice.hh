@@ -60,6 +60,42 @@ typedef uint32_t counter_t;
 
 extern bool dpdk_enabled;
 
+#if CLICK_DYNAMIC_RX_BURST
+/* Variables for dynamic RX change based on the TX burst size */
+extern __thread double dynamic_rx_burst; /* Will be set according to TX side */
+extern __thread bool rx_burst_changed; /* Will be set in dpdkdevice.hh */
+
+/* Get dynamic RX burst size */
+inline double
+click_get_dynamic_rx_burst()
+{
+	/* Return the latest value only once*/
+	if(rx_burst_changed) {
+		rx_burst_changed=false;
+		return dynamic_rx_burst;
+	} else {
+		/* Reset the value to 1 if it has changed */
+		if(dynamic_rx_burst != 1.0) {
+			/* TODO: Reduce/Improve the speed of getting back to 1.0 */
+			dynamic_rx_burst=1.0;
+		}
+		return dynamic_rx_burst;
+	}
+}
+
+/* Set dynamic RX burst size */
+inline void
+click_set_dynamic_rx_burst(double _dynamic_burst)
+{
+	/* Set rx_burst_changed value to true if the value is in valid range */
+	if(likely(_dynamic_burst >=0 && _dynamic_burst <1)) {
+		dynamic_rx_burst = _dynamic_burst;
+		rx_burst_changed=true;
+	}
+}
+
+#endif
+
 class DPDKDevice {
 public:
 

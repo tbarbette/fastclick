@@ -164,7 +164,13 @@ bool FromDPDKDevice::run_task(Task *t)
          PacketBatch* head = 0;
          WritablePacket *last;
 #endif
+#if CLICK_DYNAMIC_RX_BURST
+	/* Calculate the RX burst size based on the dynamic RX burst value */
+	unsigned int dynamic_burst = (int)(click_get_dynamic_rx_burst()*_burst);
+        unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, dynamic_burst);
+#else
         unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
+#endif
         for (unsigned i = 0; i < n; ++i) {
             unsigned char* data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
             rte_prefetch0(data);

@@ -218,6 +218,13 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
         //Todo : if there is multiple queue assigned to this thread, send on all of them
         r = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
                              sub_burst);
+#if CLICK_DYNAMIC_RX_BURST
+	/* Calculate the success TX rate and pass it to dynamic RX burst size */
+	if(unlikely(r!=sub_burst)) {
+		double burst_success_rate= (double)((double)r/sub_burst);
+		click_set_dynamic_rx_burst(burst_success_rate);
+	}
+#endif
         iqueue.nr_pending -= r;
         iqueue.index += r;
 

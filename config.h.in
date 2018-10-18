@@ -95,6 +95,9 @@
 /* Define if 64-bit integer types are enabled. */
 #undef HAVE_INT64_TYPES
 
+/* Define if dynamic rx burst is enabled. */
+#undef CLICK_DYNAMIC_RX_BURST
+
 /* Define if Batching support is enabled. */
 #undef HAVE_BATCH
 
