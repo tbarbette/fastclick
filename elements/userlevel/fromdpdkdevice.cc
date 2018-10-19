@@ -490,9 +490,13 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             portid_t port_id = fd->get_device()->get_port_id();
             return FlowDirector::get_flow_director(port_id)->flow_rules_list();
         }
-        case h_rules_ids: {
+        case h_rules_ids_global: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return FlowDirector::get_flow_director(port_id)->flow_rule_ids();
+            return FlowDirector::get_flow_director(port_id)->flow_rule_ids_global();
+        }
+        case h_rules_ids_internal: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDirector::get_flow_director(port_id)->flow_rule_ids_internal();
         }
         case h_rules_count: {
             portid_t port_id = fd->get_device()->get_port_id();
@@ -599,12 +603,24 @@ int FromDPDKDevice::flow_handler(
                 rule += "\n";
             }
 
-            const uint32_t rule_id = flow_dir->get_flow_cache()->next_internal_rule_id();
-            if (flow_dir->flow_rule_install(rule_id, rule.mutable_c_str()) != FlowDirector::SUCCESS) {
+            // Detect and remove unwanted components
+            char *buf = rule.mutable_c_str();
+            if (!FlowDirector::filter_rule(&buf)) {
+                return errh->error("Flow Director (port %u): Invalid rule '%s'", port_id, buf);
+            }
+
+            rule = "flow create " + String(port_id) + " " + String(buf);
+
+            // Parse the queue index to infer the CPU core
+            String queue_index_str = FlowDirector::fetch_token_after_keyword((char *) rule.c_str(), "queue index");
+            int core_id = atoi(queue_index_str.c_str());
+
+            const uint32_t int_rule_id = flow_dir->get_flow_cache()->next_internal_rule_id();
+            if (flow_dir->flow_rule_install(int_rule_id, rule, (long) int_rule_id, core_id) != FlowDirector::SUCCESS) {
                 return -1;
             }
 
-            return static_cast<int>(rule_id);
+            return static_cast<int>(int_rule_id);
         }
         case h_rules_del: {
             // Trim spaces left and right
@@ -796,8 +812,9 @@ void FromDPDKDevice::add_handlers()
     add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_rules_del,   0);
     add_write_handler(FlowDirector::FLOW_RULE_FLUSH, flow_handler, h_rules_flush, 0);
     add_read_handler(FlowDirector::FLOW_RULE_LIST,  statistics_handler, h_rules_list);
-    add_read_handler(FlowDirector::FLOW_RULE_IDS,   statistics_handler, h_rules_ids);
-    add_read_handler(FlowDirector::FLOW_RULE_COUNT, statistics_handler, h_rules_count);
+    add_read_handler(FlowDirector::FLOW_RULE_IDS_GLB, statistics_handler, h_rules_ids_global);
+    add_read_handler(FlowDirector::FLOW_RULE_IDS_INT, statistics_handler, h_rules_ids_internal);
+    add_read_handler(FlowDirector::FLOW_RULE_COUNT,   statistics_handler, h_rules_count);
 #endif
 
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);

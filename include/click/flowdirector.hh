@@ -64,6 +64,7 @@ class FlowCache {
         bool internal_rule_id_exists(const uint32_t &int_rule_id);
         long global_from_internal_rule_id(const uint32_t &int_rule_id);
         int32_t internal_from_global_rule_id(const long &rule_id);
+        String global_rule_ids();
         HashMap<long, String> *rules_map_by_core_id(const int &core_id);
         Vector<String> rules_list_by_core_id(const int &core_id);
         Vector<int> cores_with_rules();
@@ -141,7 +142,8 @@ public:
     // Supported flow director handlers (called from FromDPDKDevice)
     static String FLOW_RULE_ADD;
     static String FLOW_RULE_DEL;
-    static String FLOW_RULE_IDS;
+    static String FLOW_RULE_IDS_GLB;
+    static String FLOW_RULE_IDS_INT;
     static String FLOW_RULE_PACKET_HITS;
     static String FLOW_RULE_BYTE_COUNT;
     static String FLOW_RULE_STATS;
@@ -208,16 +210,19 @@ public:
     int32_t add_rules_from_file(const String &filename);
 
     // Install a flow rule in a NIC
-    int flow_rule_install(const uint32_t &rule_id, char *rule);
+    int flow_rule_install(
+        const uint32_t &int_rule_id, const String &rule,
+        long rule_id = -1, int core_id = -1
+    );
 
     // Return a flow rule object with a specific ID
-    struct port_flow *flow_rule_get(const uint32_t &rule_id);
+    struct port_flow *flow_rule_get(const uint32_t &int_rule_id);
 
     // Delete a batch of flow rules from a NIC
-    int flow_rules_delete(uint32_t *rule_id, const uint32_t &rules_nb);
+    int flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache=true);
 
     // Query flow rule statistics
-    String flow_rule_query(const uint32_t &rule_id, int64_t &matched_pkts, int64_t &matched_bytes);
+    String flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, int64_t &matched_bytes);
 
     // Query aggregate flow rule statistics
     String flow_rule_aggregate_stats();
@@ -231,11 +236,18 @@ public:
     // Lists all NIC flow rules
     String flow_rules_list();
 
-    // Lists all installed flow rule IDs
-    String flow_rule_ids();
+    // Lists all installed (internal + global) flow rule IDs
+    String flow_rule_ids_internal();
+    String flow_rule_ids_global();
 
     // Flush all of the rules from a NIC
     uint32_t flow_rules_flush();
+
+    // Filters unwanted components from rule
+    static bool filter_rule(char **rule);
+
+    // Returns a rule token after an input keyword
+    static String fetch_token_after_keyword(char *rule, const String &keyword);
 
 private:
 
@@ -265,12 +277,6 @@ private:
 
     // Sorts a list of flow rules by group, priority, and ID
     void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);
-
-    // Filters unwanted components from rule
-    bool filter_rule(char **rule);
-
-    // Returns a rule token after an input keyword
-    String fetch_token_after_keyword(char *rule, const String &keyword);
 
 };
 

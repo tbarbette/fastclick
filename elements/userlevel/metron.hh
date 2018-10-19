@@ -353,6 +353,12 @@ class NIC {
         ~NIC() {
         }
 
+        NIC(const NIC &n) {
+            _index = n._index;
+            _verbose = n._verbose;
+            element = n.element;
+        }
+
         Element *element;
 
         inline bool is_ghost() {
@@ -368,9 +374,11 @@ class NIC {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         FlowDirector *get_flow_director() { return FlowDirector::get_flow_director(get_port_id()); };
         FlowCache *get_flow_cache() { return get_flow_director()->get_flow_cache(); };
-        int32_t insert_rule_in_nic(const long &rule_id, String &rule);
-        int32_t delete_rules_from_nic(String rule_ids);
-        int32_t delete_rules_from_nic(Vector<String> rules_vec);
+        bool insert_rule_in_nic(
+            const uint32_t &int_rule_id, String &rule,
+            const long &rule_id, const int &core_id
+        );
+        bool delete_rules_from_nic(uint32_t *rule_ids, uint32_t rules_nb);
     #endif
 
         int queue_per_pool();

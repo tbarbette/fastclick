@@ -1018,10 +1018,7 @@ Metron::write_handler(
         case h_delete_chains: {
             ServiceChain *sc = m->find_service_chain_by_id(data);
             if (!sc) {
-                return errh->error(
-                    "Cannot delete service chain: Unknown service chain ID %s",
-                    data.c_str()
-                );
+                return errh->error("Cannot delete service chain: Unknown service chain ID %s", data.c_str());
             }
 
             int ret = m->delete_service_chain(sc, errh);
@@ -1056,6 +1053,9 @@ Metron::write_handler(
             rits.start = Timestamp::now_steady();
 
             int32_t installed_rules = FlowDirector::get_flow_director(port_id)->add_rules_from_file(filename);
+            if (installed_rules < 0) {
+                return errh->error("Failed to insert NIC flow rules from file %s", filename.c_str());
+            }
 
             rits.end = Timestamp::now_steady();
 
@@ -1304,7 +1304,7 @@ Metron::param_handler(
                     rits.start = Timestamp::now_steady();
 
                     // Parse rules from JSON
-                    int32_t installed_rules =  sc->rules_from_json(jsc.second, m, errh);
+                    int32_t installed_rules = sc->rules_from_json(jsc.second, m, errh);
                     if (installed_rules < 0) {
                         return errh->error(
                             "Cannot install NIC rules for service chain %s: Parse error",
@@ -1314,12 +1314,12 @@ Metron::param_handler(
 
                     rits.end = Timestamp::now_steady();
 
-                    rits.update(installed_rules);
+                    rits.update((const uint32_t) installed_rules);
                     Metron::add_rule_inst_stats(rits);
 
                     if (sc->_verbose) {
                         click_chatter(
-                            "Installed %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
+                            "Installed %" PRId32 " rules in %.1f ms at the rate of %.3f rules/sec",
                             installed_rules, rits.latency_ms, rits.rules_per_sec
                         );
                     }
@@ -2349,22 +2349,20 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 {
     // No controller
     if (!m->_discovered) {
-        errh->error(
+        return errh->error(
             "Cannot reconfigure service chain %s: Metron agent is not associated with a controller",
             get_id().c_str()
         );
-        return (int32_t) ERROR;
     }
 
     RxFilterType rx_filter_type = rx_filter_type_str_to_enum(j.get("rxFilter").get_s("method").upper());
     if (rx_filter_type != FLOW) {
-        errh->error(
+        return errh->error(
             "Cannot install rules for service chain %s: "
             "Invalid Rx filter mode %s is sent by the controller.",
             get_id().c_str(),
             rx_filter_type_enum_to_str(rx_filter_type).c_str()
         );
-        return (int32_t) ERROR;
     }
 
     uint32_t rules_nb = 0;
@@ -2378,13 +2376,13 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
             int core_id = jcpu.second.get_i("cpuId");
-            click_chatter("Adding rules for CPU %d", core_id);
             assert(get_cpu_info(core_id).active());
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
                 long rule_id = jrule.second.get_i("ruleId");
                 String rule = jrule.second.get_s("ruleContent");
+                rules_nb++;
 
                 // Get the correct NIC
                 NIC *nic = this->get_nic_by_name(nic_name);
@@ -2395,19 +2393,28 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                     );
                 }
 
-                // Insert in hardware
-                uint32_t int_rule_id = (uint32_t) nic->insert_rule_in_nic(rule_id, rule);
-
-                // Update the data plane with this new rule
-                if (!nic->get_flow_cache()->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
-                    errh->error(
-                        "Unable to insert rule %ld into NIC %s mapped to CPU core %d",
-                        rule_id, nic_name.c_str(), core_id
-                    );
-                } else {
-                    inserted_rules_nb++;
+                // A '\n' must be appended at the end of this rule, if not there
+                int eor_pos = rule.find_right('\n');
+                if ((eor_pos < 0) || (eor_pos != rule.length() - 1)) {
+                    rule += "\n";
                 }
-                rules_nb++;
+
+                // Fetch the internal rule ID for this rule
+                uint32_t int_rule_id = nic->get_flow_cache()->next_internal_rule_id();
+
+                // Update the flow cache
+                if (!nic->get_flow_cache()->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
+                    errh->error("Unable to install rule %ld in NIC %s mapped to CPU core %d", rule_id, nic_name.c_str(), core_id);
+                    continue;
+                }
+
+                // Insert in hardware
+                if (!nic->insert_rule_in_nic(int_rule_id, rule, -1, -1)) {
+                    errh->error("Unable to install rule %" PRIu32 " into NIC %s", int_rule_id, nic_name.c_str());
+                    continue;
+                }
+
+                inserted_rules_nb++;
 
                 // Add this tag to the list of tags of this NIC
                 if (!this->rx_filter->has_tag_value(inic, core_id)) {
@@ -2541,7 +2548,8 @@ ServiceChain::delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh)
         int32_t int_rule_id = nic->get_flow_cache()->delete_rule_by_global_id(rule_id);
         // Deleted
         if (int_rule_id >= 0) {
-            return (int) nic->delete_rules_from_nic(String(int_rule_id));
+            uint32_t rules_ids[1] = {(uint32_t) int_rule_id};
+            return nic->delete_rules_from_nic(rules_ids, 1) ? SUCCESS : ERROR;
         }
 
         it++;
@@ -2566,6 +2574,11 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
         return SUCCESS;
     }
 
+    NIC n;
+    uint32_t rules_nb = 0;
+    uint32_t rules_to_delete = rules_vec.size();
+    uint32_t rule_ids[rules_to_delete];
+
     // Traverse all NICs
     auto it = m->_nics.begin();
     while (it != m->_nics.end()) {
@@ -2576,15 +2589,35 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
             continue;
         }
 
-        // The existence of the first rule implies that we are in the right core
-        if (nic->get_flow_cache()->global_rule_id_exists((const long) atol(rules_vec[0].c_str()))) {
-            return (nic->delete_rules_from_nic(rules_vec) == SUCCESS) ? rules_vec.size() : -1;
+        bool nic_found = false;
+        for (int i = 0; i < rules_vec.size(); i++) {
+            long rule_id = atol(rules_vec[i].c_str());
+            int32_t int_rule_id = nic->get_flow_cache()->delete_rule_by_global_id(rule_id);
+            // Mapping not deleted/found
+            if (int_rule_id < 0) {
+                continue;
+            }
+
+            rule_ids[rules_nb++] = (uint32_t) int_rule_id;
+            nic_found = true;
+        }
+
+        if (nic_found)
+            n = *nic;
+
+        if (rules_nb == rules_to_delete) {
+            break;
         }
 
         it++;
     }
 
-    return ERROR;
+    if (rules_nb == 0) {
+        return errh->error("Cannot delete rules: The provided rule IDs are not present in any NIC");
+    }
+
+    // Delete from hardware
+    return n.delete_rules_from_nic(rule_ids, rules_nb) ? rules_nb : ERROR;
 }
 
 /**
@@ -3334,70 +3367,39 @@ NIC::call_rx_write(String h, const String input)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
  * Inserts a rule in this NIC via Flow Director.
- * Calls FlowDirector using FromDPDKDevice's flow handler rule_add.
- * Upon successful invocation, Flow Director returns an internal
- * rule ID which needs to be stored if rule deletion is required
- * in the future. Otherwise, a negative integer is returned to indicate
- * error during rule installation in the NIC.
  *
- * @args rule_id: the rule ID of the rule to be inserted
+ * @args int_rule_id: the internal rule ID of the rule to be inserted
  * @args rule: the actual rule to be inserted
- * @return a new internal NIC rule ID upon success, otherwise a negative integer
+ * @args rule_id: the global rule ID of the rule to be inserted
+ * @args core_id: the CPU core ID associated with the rule to be inserted
+ * @return boolean status
  */
-int32_t
-NIC::insert_rule_in_nic(const long &rule_id, String &rule)
+bool
+NIC::insert_rule_in_nic(const uint32_t &int_rule_id, String &rule, const long &rule_id, const int &core_id)
 {
     // Rule needs to be prepended with the command type and port ID
     rule = "flow create " + String(get_port_id()) + " " + rule;
 
-    // Relay the call to Flow Director
-    int status = call_rx_write(FlowDirector::FLOW_RULE_ADD, rule);
-    if (status < 0) {
-        click_chatter("[NIC %s] Unable to install rule '%s'", get_device_address().c_str(), rule.c_str());
-        return ERROR;
+    int status = this->get_flow_director()->flow_rule_install(int_rule_id, rule, rule_id, core_id);
+    if (status != SUCCESS) {
+        click_chatter("[NIC %u] Unable to install rule %ld: '%s'", get_port_id(), rule_id, rule.c_str());
+        return false;
     }
 
-    int32_t nic_rule_id =  static_cast<int32_t>(status);
-
-    if (_verbose) {
-        click_chatter("[NIC %s] Rule %ld installed with internal ID %" PRId32, get_device_address().c_str(), rule_id, nic_rule_id);
-    }
-
-    return nic_rule_id;
+    return true;
 }
 
 /**
- * Deletes a vector of rule IDs from this NIC via Flow Director.
+ * Deletes an array of rules from this NIC via Flow Director.
  *
- * @args rules_vec: a vector of rule IDs to be deleted
- * @return 0 upon success, otherwise a negative integer
+ * @args rule_ids: an array of rule IDs to be deleted
+ * @args rules_nb: the number of rules to be deleted
+ * @return boolean status
  */
-int32_t
-NIC::delete_rules_from_nic(Vector<String> rules_vec)
+bool
+NIC::delete_rules_from_nic(uint32_t *rule_ids, uint32_t rules_nb)
 {
-    String rule_ids = "";
-    for (int i = 0 ; i < rules_vec.size() ; i++) {
-        rule_ids += String(rules_vec[i]) + " ";
-    }
-
-    return delete_rules_from_nic(rule_ids.trim_space());
-}
-
-/**
- * Deletes a space-separated list of rules from this NIC via Flow Director.
- *
- * @args rule_ids: a string of space-separated rule IDs to be deleted
- * @return 0 upon success, otherwise a negative integer
- */
-int32_t
-NIC::delete_rules_from_nic(String rule_ids)
-{
-    // Delete this rule from the NIC using the NIC ID
-    if (call_rx_write(FlowDirector::FLOW_RULE_DEL, rule_ids) != SUCCESS) {
-        return (int32_t) ERROR;
-    }
-
-    return (int32_t) SUCCESS;
+    return (this->get_flow_director()->flow_rules_delete(rule_ids, rules_nb, false) == SUCCESS) ? true : false;
 }
 #endif
 
