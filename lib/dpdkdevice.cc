@@ -688,13 +688,13 @@ bool
 FlowControlModeArg::parse(
     const String &str, FlowControlMode &result, const ArgContext &ctx) {
     str.lower();
-    if (str == "full") {
+    if (str == "full" || str == "on") {
         result = FC_FULL;
     } else if (str == "rx") {
         result = FC_RX;
     }else if (str == "tx") {
         result = FC_TX;
-    } else if (str == "none") {
+    } else if (str == "none" || str == "off") {
         result = FC_NONE;
     } else
         return false;
