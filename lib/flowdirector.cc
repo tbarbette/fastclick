@@ -733,7 +733,7 @@ HashMap<int, String> FlowDirector::flow_item;
 HashMap<int, String> FlowDirector::flow_action;
 
 // Default verbosity setting
-bool FlowDirector::DEF_VERBOSITY = true;
+bool FlowDirector::DEF_VERBOSITY = false;
 
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<portid_t, FlowDirector *> FlowDirector::dev_flow_dir;
@@ -1039,7 +1039,6 @@ FlowDirector::add_rules_from_file(const String &filename)
     // First load the rules from disk to memory
     Vector<String> rules_vec = load_rules_from_file(filename);
     if (rules_vec.size() == 0) {
-        _errh->warning("Flow Director (port %u): No rules in file '%s'", _port_id, filename);
         return (int32_t) 0;
     }
 
@@ -1210,6 +1209,7 @@ FlowDirector::flow_rule_get(const uint32_t &int_rule_id)
  *
  * @args int_rule_ids: an array of internal flow rule IDs
  * @args rules_nb: the number of rules to delete
+ * @args with_cache: if true, the flow cache is updated accordingly (defaults to true)
  * @return the number of deleted rules upon success, otherwise a negative integer
  */
 int32_t
