@@ -35,6 +35,27 @@ CLICK_DECLS
 
 class DPDKDevice;
 
+class RuleTiming {
+    public:
+        RuleTiming(portid_t pt_id) : port_id(pt_id) {
+        }
+
+        ~RuleTiming() {
+        }
+
+        portid_t port_id;       // The NIC to measure
+        uint32_t rules_nb;      // Log the number of rules being installed/deleted
+        float latency_ms;       // Measure rule installation/deletion latency (ms)
+        float rules_per_sec;    // Measure rule installation/deletion rate (rules/sec)
+        Timestamp start, end;
+
+        void update(const uint32_t &rules_nb) {
+            this->rules_nb = rules_nb;
+            this->latency_ms = (float) (end - start).msecval();
+            this->rules_per_sec = (rules_nb > 0) ? (float) (rules_nb * 1000) / this->latency_ms : 0;
+        }
+};
+
 class FlowCache {
     public:
         FlowCache(portid_t port_id, bool verbose, ErrorHandler *errh)
@@ -49,10 +70,6 @@ class FlowCache {
         ~FlowCache() {
             flush_rules_from_cache();
         }
-
-        // Return status
-        static int ERROR;
-        static int SUCCESS;
 
         // Device methods
         portid_t get_port_id();
@@ -80,18 +97,18 @@ class FlowCache {
             const uint32_t &int_rule_id, String rule
         );
         int32_t delete_rule_by_global_id(const long &rule_id);
-        String delete_rules_by_internal_id(const uint32_t *rule_ids, const uint32_t &rules_nb);
+        String delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
         String delete_rules_by_internal_id(const Vector<String> &rules_vec);
         int32_t flush_rules_from_cache();
 
         // Flow Cache monitoring methods
-        void set_matched_packets(const uint32_t &rule_id, uint64_t value);
-        uint64_t get_matched_packets(const uint32_t &rule_id);
-        void set_matched_bytes(const uint32_t &rule_id, uint64_t value);
-        uint64_t get_matched_bytes(const uint32_t &rule_id);
+        void set_matched_packets(const uint32_t &int_rule_id, uint64_t value);
+        uint64_t get_matched_packets(const uint32_t &int_rule_id);
+        void set_matched_bytes(const uint32_t &int_rule_id, uint64_t value);
+        uint64_t get_matched_bytes(const uint32_t &int_rule_id);
         inline uint32_t get_rule_counter() { return _rules_nb; };
-        void initialize_rule_counters(uint32_t *rule_ids, const uint32_t &rules_nb);
-        void delete_rule_counters(uint32_t *rule_ids, const uint32_t &rules_nb);
+        void initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
+        void delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
         void flush_rule_counters();
 
     private:
@@ -126,157 +143,184 @@ class FlowCache {
 };
 
 class FlowDirector {
+    public:
+        FlowDirector();
+        FlowDirector(portid_t port_id, ErrorHandler *errh);
+        ~FlowDirector();
 
-public:
-    FlowDirector();
-    FlowDirector(portid_t port_id, ErrorHandler *errh);
-    ~FlowDirector();
+        // DPDKDevice mode is Flow Director
+        static String FLOW_DIR_MODE;
 
-    // Return status
-    static int ERROR;
-    static int SUCCESS;
+        // Supported flow director handlers (called from FromDPDKDevice)
+        static String FLOW_RULE_ADD;
+        static String FLOW_RULE_DEL;
+        static String FLOW_RULE_IDS_GLB;
+        static String FLOW_RULE_IDS_INT;
+        static String FLOW_RULE_PACKET_HITS;
+        static String FLOW_RULE_BYTE_COUNT;
+        static String FLOW_RULE_STATS;
+        static String FLOW_RULE_AGGR_STATS;
+        static String FLOW_RULE_LIST;
+        static String FLOW_RULE_COUNT;
+        static String FLOW_RULE_FLUSH;
 
-    // DPDKDevice mode is Flow Director
-    static String FLOW_DIR_MODE;
+        // For debugging
+        static bool DEF_VERBOSITY;
 
-    // Supported flow director handlers (called from FromDPDKDevice)
-    static String FLOW_RULE_ADD;
-    static String FLOW_RULE_DEL;
-    static String FLOW_RULE_IDS_GLB;
-    static String FLOW_RULE_IDS_INT;
-    static String FLOW_RULE_PACKET_HITS;
-    static String FLOW_RULE_BYTE_COUNT;
-    static String FLOW_RULE_STATS;
-    static String FLOW_RULE_AGGR_STATS;
-    static String FLOW_RULE_LIST;
-    static String FLOW_RULE_COUNT;
-    static String FLOW_RULE_FLUSH;
+        // Set of flow rule items supported by the Flow API
+        static HashMap<int, String> flow_item;
 
-    // For debugging
-    static bool DEF_VERBOSITY;
+        // Set of flow rule actions supported by the Flow API
+        static HashMap<int, String> flow_action;
 
-    // Set of flow rule items supported by the Flow API
-    static HashMap<int, String> flow_item;
+        // Global table of DPDK ports mapped to their Flow Director objects
+        static HashTable<portid_t, FlowDirector *> dev_flow_dir;
 
-    // Set of flow rule actions supported by the Flow API
-    static HashMap<int, String> flow_action;
+        // Map of ports to Flow Director instances
+        static HashTable<portid_t, FlowDirector *> flow_director_map();
 
-    // Global table of DPDK ports mapped to their Flow Director objects
-    static HashTable<portid_t, FlowDirector *> dev_flow_dir;
+        // Cleans the mappings between ports and Flow Director instances
+        static void clean_flow_director_map();
 
-    // Map of ports to Flow Director instances
-    static HashTable<portid_t, FlowDirector *> flow_director_map();
+        // Acquires a Flow Director instance on a port
+        static FlowDirector *get_flow_director(const portid_t &port_id, ErrorHandler *errh = NULL);
 
-    // Cleans the mappings between ports and Flow Director instances
-    static void clean_flow_director_map();
+        // Parser initialization
+        static struct cmdline *parser(ErrorHandler *errh);
 
-    // Acquires a Flow Director instance on a port
-    static FlowDirector *get_flow_director(const portid_t &port_id, ErrorHandler *errh = NULL);
+        // Get the flow cache associated with a Flow Director
+        FlowCache *get_flow_cache();
 
-    // Parser initialization
-    static struct cmdline *parser(ErrorHandler *errh);
+        // Deletes the error handler of this element
+        inline void delete_error_handler() { if (_errh) delete _errh; };
 
-    // Get the flow cache associated with a Flow Director
-    FlowCache *get_flow_cache();
+        // Port ID handlers
+        inline void set_port_id(const portid_t &port_id) {
+            _port_id = port_id;
+        };
+        inline portid_t port_id() { return _port_id; };
 
-    // Deletes the error handler of this element
-    inline void delete_error_handler() { if (_errh) delete _errh; };
+        // Activation/deactivation handlers
+        inline void set_active(const bool &active) {
+            _active = active;
+        };
+        inline bool active() { return _active; };
 
-    // Port ID handlers
-    inline void set_port_id(const portid_t &port_id) {
-        _port_id = port_id;
-    };
-    inline portid_t port_id() { return _port_id; };
+        // Verbosity handlers
+        inline void set_verbose(const bool &verbose) {
+            _verbose = verbose;
+        };
+        inline bool verbose() { return _verbose; };
 
-    // Activation/deactivation handlers
-    inline void set_active(const bool &active) {
-        _active = active;
-    };
-    inline bool active() { return _active; };
+        // Rules' file handlers
+        inline void set_rules_filename(const String &file) {
+            _rules_filename = file;
+        };
+        inline String rules_filename() { return _rules_filename; };
 
-    // Verbosity handlers
-    inline void set_verbose(const bool &verbose) {
-        _verbose = verbose;
-    };
-    inline bool verbose() { return _verbose; };
+        // Install NIC flow rules from a file
+        int32_t add_rules_from_file(const String &filename);
 
-    // Rules' file handlers
-    inline void set_rules_filename(const String &file) {
-        _rules_filename = file;
-    };
-    inline String rules_filename() { return _rules_filename; };
+        // Loads a set of rules from a file to memory
+        Vector<String> load_rules_from_file(const String &filename);
 
-    // Install NIC flow rules from a file
-    int32_t add_rules_from_file(const String &filename);
+        // Install flow rule(s) in a NIC
+        int flow_rules_install(const HashMap<long, String> rules_map, int core_id);
+        int flow_rule_install(
+            const uint32_t &int_rule_id, const String &rule,
+            long rule_id = -1, int core_id = -1
+        );
 
-    // Install a flow rule in a NIC
-    int flow_rule_install(
-        const uint32_t &int_rule_id, const String &rule,
-        long rule_id = -1, int core_id = -1
-    );
+        // Return a flow rule object with a specific ID
+        struct port_flow *flow_rule_get(const uint32_t &int_rule_id);
 
-    // Return a flow rule object with a specific ID
-    struct port_flow *flow_rule_get(const uint32_t &int_rule_id);
+        // Delete a batch of flow rules from a NIC
+        int flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache=true);
 
-    // Delete a batch of flow rules from a NIC
-    int flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache=true);
+        // Query flow rule statistics
+        String flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, int64_t &matched_bytes);
 
-    // Query flow rule statistics
-    String flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, int64_t &matched_bytes);
+        // Query aggregate flow rule statistics
+        String flow_rule_aggregate_stats();
 
-    // Query aggregate flow rule statistics
-    String flow_rule_aggregate_stats();
+        // Counts the number of rules in a NIC (localy)
+        uint32_t flow_rules_count();
 
-    // Counts the number of rules in a NIC (localy)
-    uint32_t flow_rules_count();
+        // Counts the number of rules in a NIC (in hardware)
+        uint32_t flow_rules_count_explicit();
 
-    // Counts the number of rules in a NIC (in hardware)
-    uint32_t flow_rules_count_explicit();
+        // Lists all NIC flow rules
+        String flow_rules_list();
 
-    // Lists all NIC flow rules
-    String flow_rules_list();
+    // Lists all installed (internal + global flow rule IDs
+        String flow_rule_ids_internal();
+        String flow_rule_ids_global();
 
-    // Lists all installed (internal + global) flow rule IDs
-    String flow_rule_ids_internal();
-    String flow_rule_ids_global();
+        // Flush all of the rules from a NIC
+        uint32_t flow_rules_flush();
 
-    // Flush all of the rules from a NIC
-    uint32_t flow_rules_flush();
+        // Filters unwanted components from rule
+        static bool filter_rule(char **rule);
 
-    // Filters unwanted components from rule
-    static bool filter_rule(char **rule);
+        // Returns a rule token after an input keyword
+        static String fetch_token_after_keyword(char *rule, const String &keyword);
 
-    // Returns a rule token after an input keyword
-    static String fetch_token_after_keyword(char *rule, const String &keyword);
+        // Returns statistics related to rule installation/deletion
+        void min_avg_max(float &min, float &mean, float &max, const bool install=true, const bool latency=true);
 
-private:
+        // Methods to access per port rule installation/deletion statistics
+        static inline void add_rule_inst_stats(const RuleTiming &rits) {
+            Vector<RuleTiming> *rule_stats_vec = _rule_inst_stats_map.findp(rits.port_id);
+            if (!rule_stats_vec) {
+                Vector<RuleTiming> new_vec;
+                new_vec.push_back(rits);
+                _rule_inst_stats_map.insert(rits.port_id, new_vec);
+            } else {
+                rule_stats_vec->push_back(rits);
+            }
+        }
+        static inline void add_rule_del_stats(const RuleTiming &rdts) {
+            Vector<RuleTiming> *rule_stats_vec = _rule_del_stats_map.findp(rdts.port_id);
+            if (!rule_stats_vec) {
+                Vector<RuleTiming> new_vec;
+                new_vec.push_back(rdts);
+                _rule_del_stats_map.insert(rdts.port_id, new_vec);
+            } else {
+                rule_stats_vec->push_back(rdts);
+            }
+        }
 
-    // Device ID
-    portid_t _port_id;
+    private:
+        // Device ID
+        portid_t _port_id;
 
-    // Indicates whether Flow Director is active for a given device
-    bool _active;
+        // Indicates whether Flow Director is active for a given device
+        bool _active;
 
-    // Set stdout verbosity
-    bool _verbose;
+        // Set stdout verbosity
+        bool _verbose;
 
-    // Filename that contains the rules to be installed
-    String _rules_filename;
+        // Filename that contains the rules to be installed
+        String _rules_filename;
 
-    // A dedicated error handler
-    ErrorVeneer *_errh;
+        // A dedicated error handler
+        ErrorVeneer *_errh;
 
-    // A low rule cache associated with the port of this Flow Director
-    FlowCache *_flow_cache;
+        // A low rule cache associated with the port of this Flow Director
+        FlowCache *_flow_cache;
 
-    // Flow rule commands' parser
-    static struct cmdline *_parser;
+        // Flow rule commands' parser
+        static struct cmdline *_parser;
 
-    // Pre-populate the supported matches and actions on relevant maps
-    void populate_supported_flow_items_and_actions();
+        // Map of ports to their rule installation/deletion statistics
+        static HashMap<portid_t, Vector<RuleTiming>> _rule_inst_stats_map;
+        static HashMap<portid_t, Vector<RuleTiming>> _rule_del_stats_map;
 
-    // Sorts a list of flow rules by group, priority, and ID
-    void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);
+        // Pre-populate the supported matches and actions on relevant maps
+        void populate_supported_flow_items_and_actions();
+
+        // Sorts a list of flow rules by group, priority, and ID
+        void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);
 
 };
 

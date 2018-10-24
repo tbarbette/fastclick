@@ -44,11 +44,6 @@
 
 CLICK_DECLS
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-HashMap<uint32_t, struct Metron::rule_timing_stats> Metron::_rule_inst_stats_map;
-HashMap<uint32_t, struct Metron::rule_timing_stats> Metron::_rule_del_stats_map;
-#endif
-
 /***************************************
  * Helper functions
  **************************************/
@@ -420,10 +415,7 @@ Metron::initialize(ErrorHandler *errh)
 int
 Metron::static_cleanup()
 {
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    _rule_inst_stats_map.clear();
-    _rule_del_stats_map.clear();
-#endif
+    return SUCCESS;
 }
 
 /**
@@ -1049,24 +1041,9 @@ Metron::write_handler(
 
             click_chatter("[NIC %d] Rule installation from file: %s", port_id, filename.c_str());
 
-            struct Metron::rule_timing_stats rits;
-            rits.start = Timestamp::now_steady();
-
             int32_t installed_rules = FlowDirector::get_flow_director(port_id)->add_rules_from_file(filename);
             if (installed_rules < 0) {
                 return errh->error("Failed to insert NIC flow rules from file %s", filename.c_str());
-            }
-
-            rits.end = Timestamp::now_steady();
-
-            rits.update(installed_rules);
-            Metron::add_rule_inst_stats(rits);
-
-            if (m->_verbose) {
-                click_chatter(
-                    "Installed %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
-                    installed_rules, rits.latency_ms, rits.rules_per_sec
-                );
             }
 
             return SUCCESS;
@@ -1074,24 +1051,9 @@ Metron::write_handler(
         case h_delete_rules: {
             click_chatter("Metron controller requested rule deletion");
 
-            struct Metron::rule_timing_stats rdts;
-            rdts.start = Timestamp::now_steady();
-
             int32_t deleted_rules = ServiceChain::delete_rule_batch_from_json(data, m, errh);
             if (deleted_rules < 0) {
                 return ERROR;
-            }
-
-            rdts.end = Timestamp::now_steady();
-
-            rdts.update((uint32_t) deleted_rules);
-            Metron::add_rule_del_stats(rdts);
-
-            if (m->_verbose) {
-                click_chatter(
-                    "Deleted %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
-                    deleted_rules, rdts.latency_ms, rdts.rules_per_sec
-                );
             }
 
             return SUCCESS;
@@ -1300,27 +1262,12 @@ Metron::param_handler(
                         sc_id.c_str()
                     );
 
-                    struct Metron::rule_timing_stats rits;
-                    rits.start = Timestamp::now_steady();
-
                     // Parse rules from JSON
                     int32_t installed_rules = sc->rules_from_json(jsc.second, m, errh);
                     if (installed_rules < 0) {
                         return errh->error(
                             "Cannot install NIC rules for service chain %s: Parse error",
                             sc_id.c_str()
-                        );
-                    }
-
-                    rits.end = Timestamp::now_steady();
-
-                    rits.update((const uint32_t) installed_rules);
-                    Metron::add_rule_inst_stats(rits);
-
-                    if (sc->_verbose) {
-                        click_chatter(
-                            "Installed %" PRId32 " rules in %.1f ms at the rate of %.3f rules/sec",
-                            installed_rules, rits.latency_ms, rits.rules_per_sec
                         );
                     }
                 }
@@ -1343,72 +1290,95 @@ Metron::param_handler(
 /**
  * Metron agent's rule statistics handlers.
  */
-String
-Metron::rule_stats_handler(Element *e, void *user_data)
+int
+Metron::rule_stats_handler(int operation, String &param, Element *e, const Handler *h, ErrorHandler *errh)
 {
     Metron *m = static_cast<Metron *>(e);
-    intptr_t what = reinterpret_cast<intptr_t>(user_data);
+
+    if (operation != Handler::f_read) {
+        return errh->error("Handler %s is a read handler", h->name().c_str());
+    }
+
+    if (param == "") {
+        return errh->error("Handler %s requires a NIC instance as input parameter", h->name().c_str());
+    }
+
+    NIC *nic = m->get_nic_by_name(param);
+    if (!nic) {
+        return errh->error("Handler %s requires a valid NIC instance as input parameter", h->name().c_str());
+    }
+    FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(nic->element);
+    if (!fd) {
+        return errh->error("Handler %s requires a valid NIC instance as input parameter", h->name().c_str());
+    }
+    portid_t port_id = fd->get_device()->get_port_id();
 
     float min = std::numeric_limits<float>::max();
     float avg = 0;
     float max = 0;
 
+    intptr_t what = reinterpret_cast<intptr_t>(h->read_user_data());
     switch (what) {
         case h_rule_inst_lat_min:
         case h_rule_inst_lat_avg:
         case h_rule_inst_lat_max: {
-            m->min_avg_max(Metron::_rule_inst_stats_map, min, avg, max, true);
+            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, true, true);
             if ((intptr_t) what == h_rule_inst_lat_min) {
-                return String(min);
+                param = String(min);
             } else if ((intptr_t) what == h_rule_inst_lat_avg) {
-                return String(avg);
+                param = String(avg);
             } else {
-                return String(max);
+                param = String(max);
             }
+            return SUCCESS;
         }
         case h_rule_inst_rate_min:
         case h_rule_inst_rate_avg:
         case h_rule_inst_rate_max: {
-            m->min_avg_max(Metron::_rule_inst_stats_map, min, avg, max, false);
+            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, true, false);
             if ((intptr_t) what == h_rule_inst_rate_min) {
-                return String(min);
+                param = String(min);
             } else if ((intptr_t) what == h_rule_inst_rate_avg) {
-                return String(avg);
+                param = String(avg);
             } else {
-                return String(max);
+                param = String(max);
             }
+            return SUCCESS;
         }
         case h_rule_del_lat_min:
         case h_rule_del_lat_avg:
         case h_rule_del_lat_max: {
-            m->min_avg_max(Metron::_rule_del_stats_map, min, avg, max, true);
+            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, false, true);
             if ((intptr_t) what == h_rule_del_lat_min) {
-                return String(min);
+                param = String(min);
             } else if ((intptr_t) what == h_rule_del_lat_avg) {
-                return String(avg);
+                param = String(avg);
             } else {
-                return String(max);
+                param = String(max);
             }
+            return SUCCESS;
         }
         case h_rule_del_rate_min:
         case h_rule_del_rate_avg:
         case h_rule_del_rate_max: {
-            m->min_avg_max(Metron::_rule_del_stats_map, min, avg, max, false);
+            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, false, false);
             if ((intptr_t) what == h_rule_del_rate_min) {
-                return String(min);
+                param = String(min);
             } else if ((intptr_t) what == h_rule_del_rate_avg) {
-                return String(avg);
+                param = String(avg);
             } else {
-                return String(max);
+                param = String(max);
             }
+            return SUCCESS;
         }
         default: {
             click_chatter("Unknown rule statistics handler: %d", what);
-            return "";
+            param = "";
+            break;
         }
     }
 
-    return "";
+    return ERROR;
 }
 #endif
 
@@ -1423,23 +1393,6 @@ Metron::add_handlers()
     add_read_handler ("resources",   read_handler,  h_resources);
     add_read_handler ("controllers", read_handler,  h_controllers);
     add_read_handler ("stats",       read_handler,  h_stats);
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    add_read_handler ("rule_installation_lat_min",  rule_stats_handler, h_rule_inst_lat_min);
-    add_read_handler ("rule_installation_lat_avg",  rule_stats_handler, h_rule_inst_lat_avg);
-    add_read_handler ("rule_installation_lat_max",  rule_stats_handler, h_rule_inst_lat_max);
-
-    add_read_handler ("rule_installation_rate_min", rule_stats_handler, h_rule_inst_rate_min);
-    add_read_handler ("rule_installation_rate_avg", rule_stats_handler, h_rule_inst_rate_avg);
-    add_read_handler ("rule_installation_rate_max", rule_stats_handler, h_rule_inst_rate_max);
-
-    add_read_handler ("rule_deletion_lat_min",  rule_stats_handler, h_rule_del_lat_min);
-    add_read_handler ("rule_deletion_lat_avg",  rule_stats_handler, h_rule_del_lat_avg);
-    add_read_handler ("rule_deletion_lat_max",  rule_stats_handler, h_rule_del_lat_max);
-
-    add_read_handler ("rule_deletion_rate_min", rule_stats_handler, h_rule_del_rate_min);
-    add_read_handler ("rule_deletion_rate_avg", rule_stats_handler, h_rule_del_rate_avg);
-    add_read_handler ("rule_deletion_rate_max", rule_stats_handler, h_rule_del_rate_max);
-#endif
 
     // HTTP post handlers
     add_write_handler("controllers",     write_handler, h_controllers);
@@ -1466,6 +1419,56 @@ Metron::add_handlers()
     set_handler(
         "rules", Handler::f_write | Handler::f_read | Handler::f_read_param,
         param_handler, h_chains_rules, h_chains_rules
+    );
+
+    set_handler(
+        "rule_installation_lat_min", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_inst_lat_min, h_rule_inst_lat_min
+    );
+    set_handler(
+        "rule_installation_lat_avg", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_inst_lat_avg, h_rule_inst_lat_avg
+    );
+    set_handler(
+        "rule_installation_lat_max", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_inst_lat_max, h_rule_inst_lat_max
+    );
+    set_handler(
+        "rule_installation_rate_min", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_inst_rate_min, h_rule_inst_rate_min
+    );
+    set_handler(
+        "rule_installation_rate_avg", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_inst_rate_avg, h_rule_inst_rate_avg
+    );
+    set_handler(
+        "rule_installation_rate_max", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_inst_rate_max, h_rule_inst_rate_max
+    );
+
+    set_handler(
+        "rule_deletion_lat_min", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_del_lat_min, h_rule_del_lat_min
+    );
+    set_handler(
+        "rule_deletion_lat_avg", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_del_lat_avg, h_rule_del_lat_avg
+    );
+    set_handler(
+        "rule_deletion_lat_max", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_del_lat_max, h_rule_del_lat_max
+    );
+    set_handler(
+        "rule_deletion_rate_min", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_del_rate_min, h_rule_del_rate_min
+    );
+    set_handler(
+        "rule_deletion_rate_avg", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_del_rate_avg, h_rule_del_rate_avg
+    );
+    set_handler(
+        "rule_deletion_rate_max", Handler::f_read | Handler::f_read_param,
+        rule_stats_handler, h_rule_del_rate_max, h_rule_del_rate_max
     );
 #endif
     set_handler(
@@ -1532,55 +1535,6 @@ Metron::to_json()
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
- * Computes the minimum, average, and maximum rule
- * installation/deletion rate (rules/sec) or latency (ms)\
- * across the entire set of such operations.
- * The last argument denotes whether to compute latency or rate.
- */
-void
-Metron::min_avg_max(
-    HashMap<uint32_t, struct rule_timing_stats> &rule_stats_map,
-    float &min, float &mean, float &max, const bool &latency)
-{
-    auto it = rule_stats_map.begin();
-    int len = rule_stats_map.size();
-
-    float sum = 0.0;
-
-    while (it != rule_stats_map.end()) {
-        struct rule_timing_stats stats = it.value();
-
-        float value = 0.0;
-        if (latency) {
-            value = stats.latency_ms;
-        } else {
-            value = stats.rules_per_sec;
-        }
-
-        if (value < min) {
-            min = value;
-        }
-        if (value > max) {
-            max = value;
-        }
-        sum += value;
-
-        it++;
-    }
-
-    // Set minimum properly if not updated above
-    if (min == std::numeric_limits<float>::max()) {
-        min = 0;
-    }
-
-    if (len == 0) {
-        mean = 0;
-    } else {
-        mean = sum / static_cast<float>(len);
-    }
-}
-
-/**
  * Flushes all rules from all Metron NICs.
  */
 int
@@ -1590,28 +1544,7 @@ Metron::flush_nics()
     while (it != _nics.end()) {
         NIC *nic = &it.value();
 
-        struct Metron::rule_timing_stats rdts;
-        rdts.start = Timestamp::now_steady();
-
-        int32_t flushed_rules_nb = FlowDirector::get_flow_director(nic->get_port_id())->flow_rules_flush();
-
-        // Skip empty NICs
-        if (flushed_rules_nb == 0) {
-            it++;
-            continue;
-        }
-
-        rdts.end = Timestamp::now_steady();
-
-        rdts.update((uint32_t) flushed_rules_nb);
-        Metron::add_rule_del_stats(rdts);
-
-        if (_verbose) {
-            click_chatter(
-                "[NIC %s] Flushed %" PRId32 " rules in %.0f ms at the rate of %.3f rules/sec",
-                nic->get_device_address().c_str(), flushed_rules_nb, rdts.latency_ms, rdts.rules_per_sec
-            );
-        }
+        FlowDirector::get_flow_director(nic->get_port_id())->flow_rules_flush();
 
         it++;
     }
@@ -2373,10 +2306,21 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
     for (auto jnic : jnics) {
         String nic_name = jnic.second.get_s("nicName");
 
+        // Get the correct NIC
+        NIC *nic = this->get_nic_by_name(nic_name);
+        if (!nic) {
+            return (int32_t) errh->error(
+                "Metron controller attempted to install rules in unknown NIC: %s",
+                nic_name.c_str()
+            );
+        }
+
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
             int core_id = jcpu.second.get_i("cpuId");
             assert(get_cpu_info(core_id).active());
+
+            HashMap<long, String> rules_map;
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
@@ -2384,42 +2328,25 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 String rule = jrule.second.get_s("ruleContent");
                 rules_nb++;
 
-                // Get the correct NIC
-                NIC *nic = this->get_nic_by_name(nic_name);
-                if (!nic) {
-                    return (int32_t) errh->error(
-                        "Metron controller attempted to install rules in unknown NIC: %s",
-                        nic_name.c_str()
-                    );
-                }
-
                 // A '\n' must be appended at the end of this rule, if not there
                 int eor_pos = rule.find_right('\n');
                 if ((eor_pos < 0) || (eor_pos != rule.length() - 1)) {
                     rule += "\n";
                 }
 
-                // Fetch the internal rule ID for this rule
-                uint32_t int_rule_id = nic->get_flow_cache()->next_internal_rule_id();
+                // Store this rule
+                rules_map.insert(rule_id, rule);
+            }
 
-                // Update the flow cache
-                if (!nic->get_flow_cache()->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
-                    errh->error("Unable to install rule %ld in NIC %s mapped to CPU core %d", rule_id, nic_name.c_str(), core_id);
-                    continue;
-                }
+            // Install a batch of rules associated with this CPU core ID
+            int status = nic->get_flow_director()->flow_rules_install(rules_map, core_id);
+            if (status >= 0) {
+                inserted_rules_nb += status;
+            }
 
-                // Insert in hardware
-                if (!nic->insert_rule_in_nic(int_rule_id, rule, -1, -1)) {
-                    errh->error("Unable to install rule %" PRIu32 " into NIC %s", int_rule_id, nic_name.c_str());
-                    continue;
-                }
-
-                inserted_rules_nb++;
-
-                // Add this tag to the list of tags of this NIC
-                if (!this->rx_filter->has_tag_value(inic, core_id)) {
-                    this->rx_filter->set_tag_value(inic, core_id, String(core_id));
-                }
+            // Add this tag to the list of tags of this NIC
+            if (!this->rx_filter->has_tag_value(inic, core_id)) {
+                this->rx_filter->set_tag_value(inic, core_id, String(core_id));
             }
         }
 
@@ -2548,8 +2475,8 @@ ServiceChain::delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh)
         int32_t int_rule_id = nic->get_flow_cache()->delete_rule_by_global_id(rule_id);
         // Deleted
         if (int_rule_id >= 0) {
-            uint32_t rules_ids[1] = {(uint32_t) int_rule_id};
-            return nic->delete_rules_from_nic(rules_ids, 1) ? SUCCESS : ERROR;
+            uint32_t rule_ids[1] = {(uint32_t) int_rule_id};
+            return (nic->get_flow_director()->flow_rules_delete(rule_ids, 1, false) == 1)? SUCCESS : ERROR;
         }
 
         it++;
@@ -2593,6 +2520,7 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
         for (int i = 0; i < rules_vec.size(); i++) {
             long rule_id = atol(rules_vec[i].c_str());
             int32_t int_rule_id = nic->get_flow_cache()->delete_rule_by_global_id(rule_id);
+
             // Mapping not deleted/found
             if (int_rule_id < 0) {
                 continue;
@@ -2617,7 +2545,7 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
     }
 
     // Delete from hardware
-    return n.delete_rules_from_nic(rule_ids, rules_nb) ? rules_nb : ERROR;
+    return n.get_flow_director()->flow_rules_delete(rule_ids, rules_nb, false);
 }
 
 /**
@@ -3359,49 +3287,6 @@ NIC::call_rx_write(String h, const String input)
 
     return ERROR;
 }
-
-/**
- * NIC rules' management is provided via DPDK's Flow API.
- * This API is avaialable since v17.05.
- */
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-/**
- * Inserts a rule in this NIC via Flow Director.
- *
- * @args int_rule_id: the internal rule ID of the rule to be inserted
- * @args rule: the actual rule to be inserted
- * @args rule_id: the global rule ID of the rule to be inserted
- * @args core_id: the CPU core ID associated with the rule to be inserted
- * @return boolean status
- */
-bool
-NIC::insert_rule_in_nic(const uint32_t &int_rule_id, String &rule, const long &rule_id, const int &core_id)
-{
-    // Rule needs to be prepended with the command type and port ID
-    rule = "flow create " + String(get_port_id()) + " " + rule;
-
-    int status = this->get_flow_director()->flow_rule_install(int_rule_id, rule, rule_id, core_id);
-    if (status != SUCCESS) {
-        click_chatter("[NIC %u] Unable to install rule %ld: '%s'", get_port_id(), rule_id, rule.c_str());
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * Deletes an array of rules from this NIC via Flow Director.
- *
- * @args rule_ids: an array of rule IDs to be deleted
- * @args rules_nb: the number of rules to be deleted
- * @return boolean status
- */
-bool
-NIC::delete_rules_from_nic(uint32_t *rule_ids, uint32_t rules_nb)
-{
-    return (this->get_flow_director()->flow_rules_delete(rule_ids, rules_nb, false) == SUCCESS) ? true : false;
-}
-#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel dpdk Json)

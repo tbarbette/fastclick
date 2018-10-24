@@ -15,6 +15,8 @@
  * legally binding.
  */
 
+#include <limits>
+
 #include <click/config.h>
 #include <click/straccum.hh>
 #include <click/flowdirector.hh>
@@ -28,9 +30,6 @@ CLICK_DECLS
 /**
  * Flow Cache implementation.
  */
-// Error handling
-int FlowCache::ERROR = -1;
-int FlowCache::SUCCESS = 0;
 
 /**
  * Return the NIC port ID associated with this flow cache.
@@ -125,7 +124,7 @@ FlowCache::global_from_internal_rule_id(const uint32_t &int_rule_id)
         _errh->message("Flow Cache (port %u): Internal rule ID %" PRIu32 " does not exist in the flow cache", get_port_id(), int_rule_id);
     }
 
-    return (long) ERROR;
+    return (long) FLOWDIR_ERROR;
 }
 
 /**
@@ -148,7 +147,7 @@ FlowCache::internal_from_global_rule_id(const long &rule_id)
         if (_verbose) {
             _errh->message("Flow Cache (port %u): Global rule ID %ld does not exist in the flow cache", get_port_id(), rule_id);
         }
-        return (int32_t) ERROR;
+        return (int32_t) FLOWDIR_ERROR;
     }
 
     if (_verbose) {
@@ -276,7 +275,7 @@ FlowCache::cores_with_rules()
 /**
  * Keeps a mapping between global and internal NIC rule IDs.
  *
- * @args rule_id: a rule ID
+ * @args rule_id: a global rule ID
  * @args int_rule_id: an internal rule ID mapped to rule_id
  * @return boolean status
  */
@@ -311,9 +310,9 @@ FlowCache::store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_i
 }
 
 /**
- * Deletes a mapping between a global and an internal NIC rule ID.
+ * Deletes a mapping between a global and an internal NIC rule IDs.
  *
- * @args rule_id: a rule ID for which an internal ID mapping is requested
+ * @args rule_id: a global rule ID to delete its mapping
  * @return boolean status
  */
 bool
@@ -336,9 +335,9 @@ FlowCache::delete_rule_id_mapping(const long &rule_id)
 }
 
 /**
- * Returns the next rule ID to use for insertion.
+ * Returns the next internal rule ID to use for insertion.
  *
- * @return next available rule ID
+ * @return next available internal rule ID
  */
 uint32_t
 FlowCache::next_internal_rule_id()
@@ -350,10 +349,10 @@ FlowCache::next_internal_rule_id()
  * Adds a new rule to this flow cache.
  *
  * @args core_id: a CPU core ID associated with the rule
- * @args rule_id: a rule ID associated with the rule
+ * @args rule_id: a global rule ID associated with the rule
  * @args int_rule_id: an internal rule ID associated with the rule
  * @args rule: the actual rule
- * @return true upon success, otherwise false
+ * @return 0 upon success, otherwise a negative integer
  */
 int
 FlowCache::insert_rule_in_flow_cache(const int &core_id, const long &rule_id, const uint32_t &int_rule_id, const String rule)
@@ -396,7 +395,7 @@ FlowCache::insert_rule_in_flow_cache(const int &core_id, const long &rule_id, co
         );
     }
 
-    return SUCCESS;
+    return FLOWDIR_SUCCESS;
 }
 
 /**
@@ -420,13 +419,13 @@ FlowCache::update_rule_in_flow_cache(const int &core_id, const long &rule_id, co
     }
 
     // Now, store this rule in this CPU core's flow cache
-    return (insert_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule) == SUCCESS);
+    return (insert_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule) == FLOWDIR_SUCCESS);
 }
 
 /**
  * Deletes a rule from this flow cache using its global ID as an index.
  *
- * @args rule_id: the rule ID of the rule to be deleted
+ * @args rule_id: the global rule ID of the rule to be deleted
  * @return the internal rule ID being deleted upon success, otherwise a negative integer
  */
 int32_t
@@ -450,14 +449,14 @@ FlowCache::delete_rule_by_global_id(const long &rule_id)
         // Remove rule from the cache
         if (rules_map->remove(rule_id)) {
             // Fetch the mapping of the global rule ID with the internal rule ID
-            int32_t internal_rule_id = internal_from_global_rule_id(rule_id);
-            if (internal_rule_id < 0) {
+            int32_t int_rule_id = internal_from_global_rule_id(rule_id);
+            if (int_rule_id < 0) {
                 return _errh->error("Flow Cache (port %u): Unable to delete rule %ld due to no internal mapping", get_port_id(), rule_id);
             }
 
             // Now delete this mapping
             if (!delete_rule_id_mapping(rule_id)) {
-                return ERROR;
+                return FLOWDIR_ERROR;
             }
 
             if (_verbose) {
@@ -465,10 +464,10 @@ FlowCache::delete_rule_by_global_id(const long &rule_id)
             }
 
             // Update counters
-            uint32_t internal_rule_ids[1] = {(uint32_t) internal_rule_id};
-            delete_rule_counters(internal_rule_ids, 1);
+            uint32_t int_rule_ids[1] = {(uint32_t) int_rule_id};
+            delete_rule_counters(int_rule_ids, 1);
 
-            return internal_rule_id;
+            return int_rule_id;
         }
 
         it++;
@@ -478,27 +477,25 @@ FlowCache::delete_rule_by_global_id(const long &rule_id)
         click_chatter("Flow Cache (port %u): Unable to delete rule %ld due to cache miss", get_port_id(), rule_id);
     }
 
-    return ERROR;
+    return FLOWDIR_ERROR;
 }
 
 /**
  * Deletes a list of rules from this flow cache.
  *
- * @args rule_ids: an array of rule IDs to be deleted
+ * @args int_rule_ids: an array of internal rule IDs to be deleted
  * @args rules_nb: the number of rule IDs to be deleted
  * @return a space-separated list of deleted internal rule IDs upon success, otherwise an empty string
  */
 String
-FlowCache::delete_rules_by_internal_id(const uint32_t *rule_ids, const uint32_t &rules_nb)
+FlowCache::delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint32_t &rules_nb)
 {
-    String rule_ids_str = "";
+    String int_rule_ids_str = "";
     for (uint32_t i = 0; i < rules_nb; i++) {
-        rule_ids_str += String(rule_ids[i]) + " ";
+        int_rule_ids_str += String(int_rule_ids[i]) + " ";
     }
 
-    rule_ids_str = rule_ids_str.trim_space();
-
-    return delete_rules_by_internal_id(rule_ids_str.split(' '));
+    return delete_rules_by_internal_id(int_rule_ids_str.trim_space().split(' '));
 }
 
 /**
@@ -516,9 +513,8 @@ FlowCache::delete_rules_by_internal_id(const Vector<String> &rules_vec)
     }
 
     uint32_t rules_to_delete = rules_vec.size();
-    uint32_t internal_rule_ids[rules_to_delete];
-    String rule_ids_str = "";
     uint32_t deleted_rules = 0;
+    String rule_ids_str = "";
 
     auto it = rules_vec.begin();
     while (it != rules_vec.end()) {
@@ -526,12 +522,12 @@ FlowCache::delete_rules_by_internal_id(const Vector<String> &rules_vec)
         long rule_id = global_from_internal_rule_id(int_rule_id);
         if (delete_rule_by_global_id(rule_id) < 0) {
             _errh->error("Flow Cache (port %u): Unable to delete rule's %ld mapping", get_port_id(), rule_id);
-            return rule_ids_str;
+            return rule_ids_str.trim_space();
         }
 
-        internal_rule_ids[deleted_rules++] = int_rule_id;
         rule_ids_str += String(int_rule_id) + " ";
 
+        deleted_rules++;
         it++;
     }
 
@@ -545,7 +541,7 @@ FlowCache::delete_rules_by_internal_id(const Vector<String> &rules_vec)
 /**
  * Deletes all rules from this flow cache.
  *
- * @return the number of deleted rules upon success, otherwise a negative integer
+ * @return the number of flushed rules upon success, otherwise a negative integer
  */
 int32_t
 FlowCache::flush_rules_from_cache()
@@ -589,83 +585,83 @@ FlowCache::flush_rules_from_cache()
 /**
  * Sets a flow rule's packet counter.
  *
- * @args rule_id: a rule ID
- * @args value: a value to set the counter with
+ * @args int_rule_id: an internal rule ID
+ * @args value: a value to set the counter
  */
 void
-FlowCache::set_matched_packets(const uint32_t &rule_id, uint64_t value)
+FlowCache::set_matched_packets(const uint32_t &int_rule_id, uint64_t value)
 {
-    if (rule_id < 0) {
-        _errh->error("Flow Cache (port %u): Cannot update packet counters of invalid rule ID %ld", get_port_id(), rule_id);
+    if (int_rule_id < 0) {
+        _errh->error("Flow Cache (port %u): Cannot update packet counters of invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    _matched_pkts[rule_id] = value;
+    _matched_pkts[int_rule_id] = value;
 }
 
 /**
  * Gets the packet counter of a flow rule.
  *
- * @args rule_id: a rule ID
+ * @args int_rule_id: an internal rule ID
  * @return packet counter of flow rule
  */
 uint64_t
-FlowCache::get_matched_packets(const uint32_t &rule_id)
+FlowCache::get_matched_packets(const uint32_t &int_rule_id)
 {
-    if (rule_id < 0) {
-        _errh->error("Flow Cache (port %u): No packet counters for invalid rule ID %ld", get_port_id(), rule_id);
+    if (int_rule_id < 0) {
+        _errh->error("Flow Cache (port %u): No packet counters for invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    return _matched_pkts[rule_id];
+    return _matched_pkts[int_rule_id];
 }
 
 /**
  * Sets a flow rule's byte counter.
  *
- * @args rule_id: a rule ID
- * @args value: a value to set the counter with
+ * @args int_rule_id: an internal rule ID
+ * @args value: a value to set the counter
  */
 void
-FlowCache::set_matched_bytes(const uint32_t &rule_id, uint64_t value)
+FlowCache::set_matched_bytes(const uint32_t &int_rule_id, uint64_t value)
 {
-    if (rule_id < 0) {
-        _errh->error("Flow Cache (port %u): Cannot update byte counters of invalid rule ID %ld", get_port_id(), rule_id);
+    if (int_rule_id < 0) {
+        _errh->error("Flow Cache (port %u): Cannot update byte counters of invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    _matched_bytes[rule_id] = value;
+    _matched_bytes[int_rule_id] = value;
 }
 
 /**
  * Gets the byte counter of a flow rule.
  *
- * @args rule_id: a rule ID
+ * @args int_rule_id: an internal rule ID
  * @return byte counter of flow rule
  */
 uint64_t
-FlowCache::get_matched_bytes(const uint32_t &rule_id)
+FlowCache::get_matched_bytes(const uint32_t &int_rule_id)
 {
-    if (rule_id < 0) {
-        _errh->error("Flow Cache (port %u): No byte counters for invalid rule ID %ld", get_port_id(), rule_id);
+    if (int_rule_id < 0) {
+        _errh->error("Flow Cache (port %u): No byte counters for invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    return _matched_bytes[rule_id];
+    return _matched_bytes[int_rule_id];
 }
 
 /**
  * Initializes a set of rules in the packet and byte counters' memory,
  * increments the rule counter and the next rule ID accordingly.
  *
- * @args rule_ids: an array of rule IDs to be initialized
+ * @args int_rule_ids: an array of internal rule IDs to be initialized
  * @args rules_nb: the number of rules to be initialized
  */
 void
-FlowCache::initialize_rule_counters(uint32_t *rule_ids, const uint32_t &rules_nb)
+FlowCache::initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb)
 {
-    if (!rule_ids || (rules_nb <= 0)) {
+    if (!int_rule_ids || (rules_nb <= 0)) {
         _errh->error("Flow Cache (port %u): Cannot initialize flow counters; no rule IDs provided", get_port_id());
         return;
     }
 
     for (uint32_t i = 0; i < rules_nb; i++) {
-        _matched_pkts[rule_ids[i]] = 0;
-        _matched_bytes[rule_ids[i]] = 0;
+        _matched_pkts[int_rule_ids[i]] = 0;
+        _matched_bytes[int_rule_ids[i]] = 0;
         if (_verbose) {
-            _errh->message("Flow Cache (port %u): Initialized counters for rule with internal ID %" PRIu32, get_port_id(), rule_ids[i]);
+            _errh->message("Flow Cache (port %u): Initialized counters for rule with internal ID %" PRIu32, get_port_id(), int_rule_ids[i]);
         }
     }
 
@@ -677,22 +673,22 @@ FlowCache::initialize_rule_counters(uint32_t *rule_ids, const uint32_t &rules_nb
  * Deletes a set of rules from the packet and byte counters' memory
  * and decrements the rule counter accordingly.
  *
- * @args rule_ids: an array of rule IDs to be removed
+ * @args int_rule_ids: an array of internal rule IDs to be removed
  * @args rules_nb: the number of rules to be removed
  */
 void
-FlowCache::delete_rule_counters(uint32_t *rule_ids, const uint32_t &rules_nb)
+FlowCache::delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb)
 {
-    if (!rule_ids || (rules_nb <= 0)) {
+    if (!int_rule_ids || (rules_nb <= 0)) {
         _errh->error("Flow Cache (port %u): Cannot delete flow counters; no rule IDs provided", get_port_id());
         return;
     }
 
     for (uint32_t i = 0; i < rules_nb; i++) {
-        _matched_pkts.erase(rule_ids[i]);
-        _matched_bytes.erase(rule_ids[i]);
+        _matched_pkts.erase(int_rule_ids[i]);
+        _matched_bytes.erase(int_rule_ids[i]);
         if (_verbose) {
-            _errh->message("Flow Cache (port %u): Deleted counters for rule with internal ID %" PRIu32, get_port_id(), rule_ids[i]);
+            _errh->message("Flow Cache (port %u): Deleted counters for rule with internal ID %" PRIu32, get_port_id(), int_rule_ids[i]);
         }
     }
 
@@ -737,17 +733,17 @@ HashMap<int, String> FlowDirector::flow_item;
 HashMap<int, String> FlowDirector::flow_action;
 
 // Default verbosity setting
-bool FlowDirector::DEF_VERBOSITY = false;
+bool FlowDirector::DEF_VERBOSITY = true;
 
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<portid_t, FlowDirector *> FlowDirector::dev_flow_dir;
 
+// Map of ports to their rule installation/deletion statistics
+HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_inst_stats_map;
+HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_del_stats_map;
+
 // A unique parser
 struct cmdline *FlowDirector::_parser = NULL;
-
-// Error handling
-int FlowDirector::ERROR = -1;
-int FlowDirector::SUCCESS = 0;
 
 FlowDirector::FlowDirector() :
         _port_id(-1), _active(false), _verbose(DEF_VERBOSITY), _rules_filename("")
@@ -790,6 +786,14 @@ FlowDirector::~FlowDirector()
 
     if (verbose()) {
         _errh->message("Flow Director (port %u): Destroyed", _port_id);
+    }
+
+    if (_rule_inst_stats_map.size() > 0) {
+        _rule_inst_stats_map.clear();
+    }
+
+    if (_rule_del_stats_map.size() > 0) {
+        _rule_del_stats_map.clear();
     }
 
     delete_error_handler();
@@ -963,26 +967,29 @@ FlowDirector::get_flow_director(const portid_t &port_id, ErrorHandler *errh)
 }
 
 /**
- * Installs a set of string-based rules read from a file.
+ * Returns a set of string-based rules read from a file.
  *
  * @args filename: the file that contains the rules
- * @return the number of rules being installed, otherwise a negative integer
+ * @return a set of rules in memory
  */
-int32_t
-FlowDirector::add_rules_from_file(const String &filename)
+Vector<String>
+FlowDirector::load_rules_from_file(const String &filename)
 {
+    Vector<String> rules_vec;
+
     if (filename.empty()) {
-        return _errh->warning("Flow Director (port %u): No file provided", _port_id);
+        _errh->warning("Flow Director (port %u): No file provided", _port_id);
+        return rules_vec;
     }
 
     FILE *fp = NULL;
     fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
-        return _errh->error("Flow Director (port %u): Failed to open file '%s'", _port_id, filename.c_str());
+        _errh->error("Flow Director (port %u): Failed to open file '%s'", _port_id, filename.c_str());
+        return rules_vec;
     }
 
     uint32_t rules_nb = 0;
-    uint32_t installed_rules_nb = 0;
 
     char *line = NULL;
     size_t len = 0;
@@ -1001,33 +1008,123 @@ FlowDirector::add_rules_from_file(const String &filename)
 
         // Detect and remove unwanted components
         if (!filter_rule(&line)) {
-            return _errh->error("Flow Director (port %u): Invalid rule '%s'", _port_id, line);
+            _errh->error("Flow Director (port %u): Invalid rule '%s'", _port_id, line);
+            continue;
         }
 
         // Compose rule for the right NIC
         String rule = "flow create " + String(_port_id) + " " + String(line);
+
+        // Add it to the vector
+        rules_vec.push_back(rule);
+    }
+
+    // Close the file
+    fclose(fp);
+
+    _errh->message("Flow Director (port %u): Loaded %" PRIu32 "/%d rules", _port_id, rules_nb, rules_vec.size());
+
+    return rules_vec;
+}
+
+/**
+ * Installs a set of string-based rules read from a file.
+ *
+ * @args filename: the file that contains the rules
+ * @return the number of rules being installed, otherwise a negative integer
+ */
+int32_t
+FlowDirector::add_rules_from_file(const String &filename)
+{
+    // First load the rules from disk to memory
+    Vector<String> rules_vec = load_rules_from_file(filename);
+    if (rules_vec.size() == 0) {
+        _errh->warning("Flow Director (port %u): No rules in file '%s'", _port_id, filename);
+        return (int32_t) 0;
+    }
+
+    uint32_t installed_rules_nb = 0;
+
+    RuleTiming rits(_port_id);
+    rits.start = Timestamp::now_steady();
+
+    // Read file line-by-line (or rule-by-rule)
+    for (uint32_t i = 0; i < rules_vec.size(); i++) {
+        String rule = rules_vec[i];
 
         // Parse the queue index to infer the CPU core
         String queue_index_str = fetch_token_after_keyword((char *) rule.c_str(), "queue index");
         int core_id = atoi(queue_index_str.c_str());
 
         if (_verbose) {
-            _errh->message("Flow Director (port %u): About to install rule #%" PRIu32 ": %s", _port_id, rules_nb, line);
+            _errh->message("Flow Director (port %u): About to install rule #%" PRIu32 ": %s", _port_id, i, rule.c_str());
         }
 
         uint32_t next_int_rule_id = _flow_cache->next_internal_rule_id();
 
-        if (flow_rule_install(next_int_rule_id, rule, (long) next_int_rule_id, core_id) == SUCCESS) {
+        if (flow_rule_install(next_int_rule_id, rule, (long) next_int_rule_id, core_id) == FLOWDIR_SUCCESS) {
             installed_rules_nb++;
         }
     }
 
-    // Close the file
-    fclose(fp);
+    rits.end = Timestamp::now_steady();
 
-    _errh->message("Flow Director (port %u): %" PRIu32 "/%" PRIu32 " rules are installed", _port_id, flow_rules_count(), rules_nb);
+    rits.update(installed_rules_nb);
+    add_rule_inst_stats(rits);
+
+    _errh->message(
+        "Flow Director (port %u): %" PRIu32 "/%" PRIu32 " rules are installed in %.0f ms at the rate of %.3f rules/sec",
+        _port_id, installed_rules_nb, rules_vec.size(), rits.latency_ms, rits.rules_per_sec
+    );
 
     return (int32_t) installed_rules_nb;
+}
+
+/**
+ * Installs a set of flow rules in a NIC.
+ *
+ * @args rules_map: a map of global flow rule IDs to rules
+ * @args core_id: a CPU core ID associated with this set of flow rules
+ * @return the number of rules being installed upon success, otherwise a negative integer
+ */
+int
+FlowDirector::flow_rules_install(const HashMap<long, String> rules_map, int core_id)
+{
+    // Only active instances can configure a NIC
+    if (!active()) {
+        _errh->error("Flow Director (port %u): Inactive instance cannot install rules", _port_id);
+        return FLOWDIR_ERROR;
+    }
+
+    uint32_t installed_rules_nb = 0;
+
+    RuleTiming rits(_port_id);
+    rits.start = Timestamp::now_steady();
+
+    auto it = rules_map.begin();
+    while (it != rules_map.end()) {
+        long rule_id = it.key();
+        String rule = it.value();
+        uint32_t int_rule_id = _flow_cache->next_internal_rule_id();
+
+        if (flow_rule_install(int_rule_id, rule, rule_id, core_id) == FLOWDIR_SUCCESS) {
+            installed_rules_nb++;
+        }
+
+        it++;
+    }
+
+    rits.end = Timestamp::now_steady();
+
+    rits.update(installed_rules_nb);
+    add_rule_inst_stats(rits);
+
+    _errh->message(
+        "Flow Director (port %u): Successfully installed %" PRIu32 "/%" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
+        _port_id, installed_rules_nb, rules_map.size(), rits.latency_ms, rits.rules_per_sec
+    );
+
+    return installed_rules_nb;
 }
 
 /**
@@ -1039,9 +1136,9 @@ FlowDirector::add_rules_from_file(const String &filename)
  *
  * @args int_rule_id: a flow rule's internal ID
  * @args rule: a flow rule as a string
- * @args rule_id: a flow rule's global ID (optional)
- * @args core_id: a CPU core ID associated with this flow rule (optional)
- * @return a flow rule object
+ * @args rule_id: a flow rule's global ID
+ * @args core_id: a CPU core ID associated with this flow rule
+ * @return status
  */
 int
 FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule, long rule_id, int core_id)
@@ -1049,24 +1146,18 @@ FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule,
     // Only active instances can configure a NIC
     if (!active()) {
         _errh->error("Flow Director (port %u): Inactive instance cannot install rule #%" PRIu32, _port_id, int_rule_id);
-        return ERROR;
+        return FLOWDIR_ERROR;
     }
 
     // TODO: Fix DPDK to return proper status
     int res = flow_parser_parse(_parser, (char *) rule.c_str(), _errh);
     if (res >= 0) {
-        // Some parameters must be inferred
-        if ((rule_id < 0) && (core_id < 0)) {
-            return SUCCESS;
-        }
-
         // Update flow cache
         if (_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
-            if (_verbose) {
-                _errh->message("Flow Director (port %u): Successfully installed rule with internal ID %" PRIu32, _port_id, int_rule_id);
-            }
-            return SUCCESS;
+            return FLOWDIR_SUCCESS;
         }
+
+        return FLOWDIR_ERROR;
     }
 
     // Resolve the error
@@ -1088,7 +1179,7 @@ FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule,
 
     _errh->error("Flow Director (port %u): Failed to parse rule '%s' due to %s", _port_id, rule.c_str(), error.c_str());
 
-    return ERROR;
+    return FLOWDIR_ERROR;
 }
 
 /**
@@ -1119,9 +1210,9 @@ FlowDirector::flow_rule_get(const uint32_t &int_rule_id)
  *
  * @args int_rule_ids: an array of internal flow rule IDs
  * @args rules_nb: the number of rules to delete
- * @return status
+ * @return the number of deleted rules upon success, otherwise a negative integer
  */
-int
+int32_t
 FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache)
 {
     // Only active instances can configure a NIC
@@ -1134,6 +1225,9 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
         return _errh->error("Flow Director (port %u): No rules to remove", _port_id);
     }
 
+    RuleTiming rdts(_port_id);
+    rdts.start = Timestamp::now_steady();
+
     // TODO: For N rules, port_flow_destroy calls rte_flow_destroy N times.
     //       DPDK must act upon this.
     if (port_flow_destroy(_port_id, rules_nb, int_rule_ids) != FLOWDIR_SUCCESS) {
@@ -1143,19 +1237,27 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
         );
     }
 
+    rdts.end = Timestamp::now_steady();
+
+    rdts.update((uint32_t) rules_nb);
+    add_rule_del_stats(rdts);
+
     // Update flow cache
     if (with_cache) {
         String rule_ids_str = _flow_cache->delete_rules_by_internal_id(int_rule_ids, rules_nb);
         if (rule_ids_str.empty()) {
-            return ERROR;
+            return FLOWDIR_ERROR;
         }
     }
 
     if (_verbose) {
-        _errh->message("Flow Director (port %u): Successfully deleted %" PRIu32 " rules", _port_id, rules_nb);
+        _errh->message(
+            "Flow Director (port %u): Successfully deleted %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
+            _port_id, rules_nb, rdts.latency_ms, rdts.rules_per_sec
+        );
     }
 
-    return SUCCESS;
+    return rules_nb;
 }
 
 /**
@@ -1367,7 +1469,7 @@ FlowDirector::flow_rules_count_explicit()
     struct rte_port *port = get_port(_port_id);
     if (!port->flow_list) {
         if (verbose()) {
-            _errh->message("Flow Director (port %u): No flow rules to count", _port_id);
+            _errh->message("Flow Director (port %u): No flow rules", _port_id);
         }
         return 0;
     }
@@ -1560,19 +1662,37 @@ FlowDirector::flow_rules_flush()
         return 0;
     }
 
+    RuleTiming rdts(_port_id);
+    rdts.start = Timestamp::now_steady();
+
     uint32_t rules_before_flush = flow_rules_count_explicit();
     if (rules_before_flush == 0) {
         return 0;
     }
 
     // Successful flush means zero rules left
-    if (port_flow_flush(_port_id) == FLOWDIR_SUCCESS) {
-        _flow_cache->flush_rules_from_cache();
-        return rules_before_flush;
+    if (port_flow_flush(_port_id) != FLOWDIR_SUCCESS) {
+        uint32_t rules_after_flush = flow_rules_count_explicit();
+        _errh->warning("Flow Director (port %u): Flushed only %" PRIu32 " rules", _port_id, (rules_before_flush - rules_after_flush));
+        return (rules_before_flush - rules_after_flush);
     }
 
-    // Now, count again to verify what is left
-    return flow_rules_count_explicit();
+    rdts.end = Timestamp::now_steady();
+
+    rdts.update(rules_before_flush);
+    add_rule_del_stats(rdts);
+
+    // Successful flush, now flush also the cache
+    _flow_cache->flush_rules_from_cache();
+
+    if (_verbose) {
+        _errh->message(
+            "Flow Director (port %u): Successfully flushed %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
+            _port_id, rules_before_flush, rdts.latency_ms, rdts.rules_per_sec
+        );
+    }
+
+    return rules_before_flush;
 }
 
 /**
@@ -1641,6 +1761,67 @@ FlowDirector::fetch_token_after_keyword(char *rule, const String &keyword)
 
     // Return first token after the keyword
     return String(p).trim_space().trim_space_left().split(' ')[0];
+}
+
+/**
+ * Computes the minimum, average, and maximum rule
+ * installation/deletion rate (rules/sec) or latency (ms)
+ * across the entire set of such operations.
+ * The last argument denotes whether to compute latency or rate.
+ *
+ * @args min: variable to store the minimum installation/deletion rate
+ * @args mean: variable to store the average installation/deletion rate
+ * @args max: variable to store the maximum installation/deletion rate
+ * @args install: if true, rule installation values are returned, otherwise deletion values are returned (default is true)
+ * @args latency: if true, latency values are returned, otherwise rate values are returned (default is true)
+ */
+void
+FlowDirector::min_avg_max(float &min, float &mean, float &max, const bool install, const bool latency)
+{
+    const Vector<RuleTiming> *rule_stats_vec = 0;
+    if (install) {
+        rule_stats_vec = &_rule_inst_stats_map[_port_id];
+    } else {
+        rule_stats_vec = &_rule_del_stats_map[_port_id];
+    }
+
+    if (!rule_stats_vec) {
+        click_chatter("Flow Director (port %u): No rule statistics available", _port_id);
+        return;
+    }
+
+    float sum = 0.0;
+    int len = rule_stats_vec->size();
+    auto it = rule_stats_vec->begin();
+    while (it != rule_stats_vec->end()) {
+        float value = 0.0;
+        if (latency) {
+            value = it->latency_ms;
+        } else {
+            value = it->rules_per_sec;
+        }
+
+        if (value < min) {
+            min = value;
+        }
+        if (value > max) {
+            max = value;
+        }
+        sum += value;
+
+        it++;
+    }
+
+    // Set minimum properly if not updated above
+    if (min == std::numeric_limits<float>::max()) {
+        min = 0;
+    }
+
+    if (len == 0) {
+        mean = 0;
+    } else {
+        mean = sum / static_cast<float>(len);
+    }
 }
 
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */

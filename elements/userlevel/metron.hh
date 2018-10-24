@@ -226,53 +226,53 @@ Returns a JSON object with information about the Metron agent.
 
 Returns a JSON object with global statistics about the Metron agent.
 
-=h rule_installation_rate_min
+=h rule_installation_rate_min read-only
 
-Returns the minimum rate to install DPDK-based NIC rules.
+Returns the minimum rate to install rules in the input DPDK-based NIC.
 
-=h rule_installation_rate_avg
+=h rule_installation_rate_avg read-only
 
-Returns the average rate to install DPDK-based NIC rules.
+Returns the average rate to install rules in the input DPDK-based NIC.
 
-=h rule_installation_rate_max
+=h rule_installation_rate_max read-only
 
-Returns the maximum rate to install DPDK-based NIC rules.
+Returns the maximum rate to install rules in the input DPDK-based NIC.
 
-=h rule_installation_lat_min
+=h rule_installation_lat_min read-only
 
-Returns the minimum latency (ms) to install a given set of DPDK-based NIC rules.
+Returns the minimum latency (ms) to install rules in the input DPDK-based NIC.
 
-=h rule_installation_lat_avg
+=h rule_installation_lat_avg read-only
 
-Returns the average latency (ms) to install a given set of DPDK-based NIC rules.
+Returns the average latency (ms) to install rules in the input DPDK-based NIC.
 
-=h rule_installation_lat_max
+=h rule_installation_lat_max read-only
 
-Returns the maximum latency (ms) to install a given set of DPDK-based NIC rules.
+Returns the maximum latency (ms) to install rules in the input DPDK-based NIC.
 
-=h rule_deletion_rate_min
+=h rule_deletion_rate_min read-only
 
-Returns the minimum rate to remove DPDK-based NIC rules.
+Returns the minimum rate to remove rules from the input DPDK-based NIC.
 
-=h rule_deletion_rate_avg
+=h rule_deletion_rate_avg read-only
 
-Returns the average rate to remove DPDK-based NIC rules.
+Returns the average rate to remove rules from the input DPDK-based NIC.
 
-=h rule_deletion_rate_max
+=h rule_deletion_rate_max read-only
 
-Returns the maximum rate to remove DPDK-based NIC rules.
+Returns the maximum rate to remove rules from the input DPDK-based NIC.
 
-=h rule_deletion_lat_min
+=h rule_deletion_lat_min read-only
 
-Returns the minimum latency (ms) to remove a given set of DPDK-based NIC rules.
+Returns the minimum latency (ms) to remove rules from the input DPDK-based NIC.
 
-=h rule_deletion_lat_avg
+=h rule_deletion_lat_avg read-only
 
-Returns the average latency (ms) to remove a given set of DPDK-based NIC rules.
+Returns the average latency (ms) to remove rules from the input DPDK-based NIC.
 
-=h rule_deletion_lat_max
+=h rule_deletion_lat_max read-only
 
-Returns the maximum latency (ms) to remove a given set of DPDK-based NIC rules.
+Returns the maximum latency (ms) to remove rules from the input DPDK-based NIC.
 
 =h controllers read/write
 
@@ -283,12 +283,12 @@ Returns or sets the conteoller instance associated with this Metron agent.
 Returns the currently deployed service chains or instantiates a set of new
 service chains encoded as a JSON object.
 
-=h chains_stats read
+=h chains_stats read-only
 
 Returns a JSON object with either all service chain-level statistics of the
 deployed service chains or statistics only for a desired service chain.
 
-=h put_chains write
+=h put_chains write-only
 
 Reconfigures a set of already deployed service chains encoded as a JSON object.
 
@@ -297,23 +297,23 @@ Reconfigures a set of already deployed service chains encoded as a JSON object.
 Returns or sets the rules associated with either all deployed service chains or a specific
 service chain.
 
-=h rules_from_file write
+=h rules_from_file write-only
 
 Installs a set of NIC rules from file.
 
-=h delete_chains write
+=h delete_chains write-only
 
 Tears down a deployed service chain.
 
-=h delete_rules write
+=h delete_rules write-only
 
 Removes a given list of rules associated with (a) service chain(s).
 
-=h flush_nics write
+=h flush_nics write-only
 
 Flushes all Metron NICs.
 
-=h delete_controllers write
+=h delete_controllers write-only
 
 Disassociates this Metron agent from a Metron controller instance.
 
@@ -374,11 +374,6 @@ class NIC {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         FlowDirector *get_flow_director() { return FlowDirector::get_flow_director(get_port_id()); };
         FlowCache *get_flow_cache() { return get_flow_director()->get_flow_cache(); };
-        bool insert_rule_in_nic(
-            const uint32_t &int_rule_id, String &rule,
-            const long &rule_id, const int &core_id
-        );
-        bool delete_rules_from_nic(uint32_t *rule_ids, uint32_t rules_nb);
     #endif
 
         int queue_per_pool();
@@ -689,7 +684,7 @@ class Metron : public Element {
             ErrorHandler *errh
         ) CLICK_COLD;
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        static String rule_stats_handler(Element *e, void *user_data) CLICK_COLD;
+        static int rule_stats_handler(int operation, String &param, Element *e, const Handler *h, ErrorHandler *errh);
     #endif
 
         void hw_info_to_json(Json &j);
@@ -770,35 +765,6 @@ class Metron : public Element {
 
         bool assign_cpus(ServiceChain *sc, Vector<int> &map);
         void unassign_cpus(ServiceChain *sc);
-
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        struct rule_timing_stats {
-            uint32_t rules_nb;      // Log the number of rules being installed/deleted
-            float latency_ms;       // Measure rule installation/deletion latency (ms)
-            float rules_per_sec;    // Measure rule installation/deletion rate (rules/sec)
-            Timestamp start, end;
-
-            void update(const uint32_t &rules_nb) {
-                this->rules_nb = rules_nb;
-                this->latency_ms = (float) (end - start).msecval();
-                this->rules_per_sec = (rules_nb > 0) ? (float) (rules_nb * 1000) / this->latency_ms : 0;
-            }
-        };
-        static inline void add_rule_inst_stats(const struct rule_timing_stats &rits) {
-            _rule_inst_stats_map.insert(rits.start.nsec(), rits);
-        }
-        static inline void add_rule_del_stats(const struct rule_timing_stats &rdts) {
-            _rule_del_stats_map.insert(rdts.start.nsec(), rdts);
-        }
-
-        static HashMap<uint32_t, struct rule_timing_stats> _rule_inst_stats_map;
-        static HashMap<uint32_t, struct rule_timing_stats> _rule_del_stats_map;
-
-        void min_avg_max(
-            HashMap<uint32_t, struct rule_timing_stats> &rule_stats_map,
-            float &min, float &mean, float &max, const bool &latency
-        );
-    #endif
 
         const float CPU_OVERLOAD_LIMIT = (float) 0.7;
         const float CPU_UNERLOAD_LIMIT = (float) 0.4;
