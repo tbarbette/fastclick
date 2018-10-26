@@ -807,6 +807,7 @@ enable_batch
 enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
+enable_dynamic_rxburst
 enable_select
 enable_poll
 enable_kqueue
@@ -846,7 +847,6 @@ enable_json
 enable_local
 enable_radio
 enable_research
-enable_dynamic_rxburst
 enable_simple
 enable_standard
 enable_tcpudp
@@ -1526,6 +1526,8 @@ Optional Features:
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
+    --enable-dynamic-rxburst
+                          enable dynamic burst size
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
@@ -1563,7 +1565,6 @@ Optional Features:
   --enable-local          include local elements
   --enable-radio          include radio elements
   --enable-research       include research elements
-  --enable-dynamic-rxburs include dynamic-rxburst elements
   --disable-simple        do not include simple versions of other elements
   --disable-standard      do not include standard elements
   --disable-tcpudp        do not include TCP and UDP elements
@@ -6554,6 +6555,20 @@ else
 fi
 
 
+# Check whether --enable-dynamic-rxburst was given.
+if test "${enable_dynamic_rxburst+set}" = set; then :
+  enableval=$enable_dynamic_rxburst; :
+else
+  enable_dynamic_rxburst=no
+fi
+
+
+if test "x$enable_dynamic_rxburst" = xyes; then
+    $as_echo "#define CLICK_DYNAMIC_RX_BURST 1" >>confdefs.h
+
+fi
+
+
 PTHREAD_LIBS=""
 
 
@@ -7504,18 +7519,6 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_research" = xNO -o "x$enable_research" = x \) && enable_research=yes
 if test "x$enable_research" = xyes; then
     :
-
-fi
-# Check whether --enable-dynamic-rxburst was given.
-if test "${enable_dynamic_rxburst+set}" = set; then :
-  enableval=$enable_dynamic_rxburst;
-else
-  enable_dynamic_rxburst=NO
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_dynamic_rxburst" = xNO -o "x$enable_dynamic_rxburst" = x \) && enable_dynamic_rxburst=yes
-if test "x$enable_dynamic_rxburst" = xyes; then
-    :
-    $as_echo "#define CLICK_DYNAMIC_RX_BURST 1" >>confdefs.h
 
 fi
 # Check whether --enable-simple was given.

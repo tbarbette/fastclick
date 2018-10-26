@@ -153,6 +153,15 @@ AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [use netmap buffers instead of standard Click buffers])],
     [:], [enable_netmap_pool=no])
 
+AC_ARG_ENABLE([dynamic-rxburst],
+    [AS_HELP_STRING([  --enable-dynamic-rxburst], [enable dynamic burst size])],
+    [:], [enable_dynamic_rxburst=no])
+
+if test "x$enable_dynamic_rxburst" = xyes; then
+    AC_DEFINE([CLICK_DYNAMIC_RX_BURST])
+fi
+
+
 PTHREAD_LIBS=""
 AC_SUBST(PTHREAD_LIBS)
 
@@ -627,7 +636,6 @@ ELEMENTS_ARG_ENABLE(json, [include JSON helpers], NO, AC_DEFINE(HAVE_JSON))
 ELEMENTS_ARG_ENABLE(local, [include local elements], NO)
 ELEMENTS_ARG_ENABLE(radio, [include radio elements], NO)
 ELEMENTS_ARG_ENABLE(research, [include research elements], NO)
-ELEMENTS_ARG_ENABLE(dynamic-rxburst, [include dynamic-rxburst elements], NO, AC_DEFINE(CLICK_DYNAMIC_RX_BURST))
 ELEMENTS_ARG_ENABLE(simple, [include simple versions of other elements], yes)
 dnl ELEMENTS_ARG_ENABLE(snmp, [include SNMP elements], NO)
 ELEMENTS_ARG_ENABLE(standard, [include standard elements], yes)
