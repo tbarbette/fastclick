@@ -611,6 +611,34 @@ String::find_left(char c, int start) const
     return -1;
 }
 
+/** @brief Search for a character in a string.
+ * @param c character to search for
+ * @param start initial search position
+ *
+ * Return the index of the leftmost occurence of @a c, starting at index
+ * @a start and working up to the end of the string.  Returns -1 if @a c
+ * is not found. */
+Vector<String>
+String::split(char c) const
+{
+    Vector<String> res;
+    int pos = 0;
+    const char *x = _r.data;
+    while (pos < _r.length) {
+        x = (const char *)
+            memchr(_r.data + pos, c, _r.length - pos);
+        if (x) {
+            int len = (x - _r.data) - pos;
+            res.push_back(String(_r.data + pos, len, _r.memo));
+            pos += len + 1;
+        } else {
+            break;
+        }
+    }
+    res.push_back(String(_r.data + pos, _r.length - pos, _r.memo));
+    return res;
+}
+
 /** @brief Search for a substring in a string.
  * @param x substring to search for
  * @param start initial search position
@@ -823,7 +851,7 @@ String::trim_space() const
 String
 String::trim_space_left() const
 {
-    for (int i = 0 ; i <= _r.length - 1; i++)
+    for (int i = 0; i < _r.length; i++)
         if (!isspace((unsigned char) _r.data[i]))
             return substring(i);
     return String();
