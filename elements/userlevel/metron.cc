@@ -2320,7 +2320,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             int core_id = jcpu.second.get_i("cpuId");
             assert(get_cpu_info(core_id).active());
 
-            HashMap<long, String> rules_map;
+            String rules_str = "";
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
@@ -2335,11 +2335,11 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 }
 
                 // Store this rule
-                rules_map.insert(rule_id, rule);
+                rules_str += rule;
             }
 
             // Install a batch of rules associated with this CPU core ID
-            int status = nic->get_flow_director()->flow_rules_install(rules_map, core_id);
+            int status = nic->get_flow_director()->add_rules_from_string(rules_str);
             if (status >= 0) {
                 inserted_rules_nb += status;
             }
@@ -2471,12 +2471,13 @@ ServiceChain::delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh)
             continue;
         }
 
-        // Delete from flow cache
-        int32_t int_rule_id = nic->get_flow_cache()->delete_rule_by_global_id(rule_id);
-        // Deleted
+        // Get the internal rule ID from the flow cache
+        int32_t int_rule_id = nic->get_flow_cache()->internal_from_global_rule_id(rule_id);
+
+        // This internal rule ID exists, we can proceed with the deletion
         if (int_rule_id >= 0) {
             uint32_t rule_ids[1] = {(uint32_t) int_rule_id};
-            return (nic->get_flow_director()->flow_rules_delete(rule_ids, 1, false) == 1)? SUCCESS : ERROR;
+            return (nic->get_flow_director()->flow_rules_delete(rule_ids, 1) == 1)? SUCCESS : ERROR;
         }
 
         it++;
@@ -2519,9 +2520,9 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
         bool nic_found = false;
         for (int i = 0; i < rules_vec.size(); i++) {
             long rule_id = atol(rules_vec[i].c_str());
-            int32_t int_rule_id = nic->get_flow_cache()->delete_rule_by_global_id(rule_id);
+            int32_t int_rule_id = nic->get_flow_cache()->internal_from_global_rule_id(rule_id);
 
-            // Mapping not deleted/found
+            // Mapping not found
             if (int_rule_id < 0) {
                 continue;
             }
@@ -2544,8 +2545,8 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
         return errh->error("Cannot delete rules: The provided rule IDs are not present in any NIC");
     }
 
-    // Delete from hardware
-    return n.get_flow_director()->flow_rules_delete(rule_ids, rules_nb, false);
+    // Delete the flow rules
+    return n.get_flow_director()->flow_rules_delete(rule_ids, rules_nb);
 }
 
 /**
@@ -2560,7 +2561,7 @@ ServiceChain::delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandl
     // No controller
     if (!m->_discovered) {
         errh->error(
-            "Cannot delete rule batch %s: Metron agent is not associated with a controller",
+            "Cannot delete rule batch with IDs %s: Metron agent is not associated with a controller",
             rule_ids.c_str()
         );
         return (int32_t) ERROR;

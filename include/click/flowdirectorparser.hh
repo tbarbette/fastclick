@@ -47,16 +47,14 @@ init_port(void)
 			    sizeof(struct rte_port) * RTE_MAX_ETHPORTS,
 			    RTE_CACHE_LINE_SIZE);
 	if (ports == NULL) {
-		rte_exit(EXIT_FAILURE,
-				"rte_zmalloc(%d struct rte_port) failed\n",
-				RTE_MAX_ETHPORTS);
+		rte_exit(EXIT_FAILURE, "rte_zmalloc(%d struct rte_port) failed\n", RTE_MAX_ETHPORTS);
 	}
 }
 
 /**
  * Obtains an instance of the Flow Director parser.
  *
- * @param errh an instance of the error handler
+ * @args errh: an instance of the error handler
  * @return a parser object
  */
 struct cmdline *flow_parser_init(
@@ -68,8 +66,8 @@ struct cmdline *flow_parser_init(
  * on a given context of instructions, obtained
  * from DPDK.
  *
- * @param prompt a user prompt message
- * @param errh an instance of the error handler
+ * @args prompt: a user prompt message
+ * @args errh: an instance of the error handler
  * @return a command line object
  */
 struct cmdline *flow_parser_alloc(
@@ -77,19 +75,27 @@ struct cmdline *flow_parser_alloc(
 	ErrorHandler *errh
 );
 
+
 /**
- * Parses a given command.
+ * Parses a new line.
  *
- * @param cl the command line instance
- * @param input_cmd the input commandto be parsed
- * @param errh an instance of the error handler
- * @return the status of the parsing
+ * @args line: a buffer to store the newly-parsed line
+ * @args n: the length of the line buffer
+ * @args input_cmd: the input command to parse
+ * @return the number of characters read
  */
-int flow_parser_parse(
-	struct cmdline *cl,
-	char *input_cmd,
-	ErrorHandler *errh
-);
+char *flow_parser_parse_new_line(char *line, int n, const char **input_cmd);
+
+/**
+ * Splits a given command into multiple newline-separated tokens
+ * and parses each token at a time.
+ *
+ * @args cl: a flow parser instance
+ * @args input_cmd: the input command to parse
+ * @args errh: an instance of the error handler
+ * @return the number of characters read in total
+ */
+int flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh);
 
 CLICK_ENDDECLS
 

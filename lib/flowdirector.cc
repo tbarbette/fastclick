@@ -56,9 +56,9 @@ FlowCache::get_device_address()
 }
 
 /**
- * Checks whether this flow cache contains any rules or not.
+ * Checks whether this flow cache contains any flow rules or not.
  *
- * @return true if at least one rule is in the cache, otherwise false
+ * @return true if at least one flow rule is in the cache, otherwise false
  */
 bool
 FlowCache::has_rules()
@@ -67,9 +67,9 @@ FlowCache::has_rules()
 }
 
 /**
- * Checks whether a given global rule ID is present or not.
+ * Checks whether a given global flow rule ID is present or not.
  *
- * @args rule_id: a global rule ID to find
+ * @args rule_id: a global flow rule ID to find
  * @return true if rule_id exists, otherwise false
  */
 bool
@@ -79,9 +79,9 @@ FlowCache::global_rule_id_exists(const long &rule_id)
 }
 
 /**
- * Checks whether an internal rule ID is present or not.
+ * Checks whether an internal flow rule ID is present or not.
  *
- * @args int_rule_id: an internal rule ID to find
+ * @args int_rule_id: an internal flow rule ID to find
  * @return true if int_rule_id exists, otherwise false
  */
 bool
@@ -91,11 +91,11 @@ FlowCache::internal_rule_id_exists(const uint32_t &int_rule_id)
 }
 
 /**
- * Traverses the map of global rule IDs to internal NIC IDs,
- * and checks whether an internal rule ID is present or not.
+ * Traverses the map of global flow rule IDs to internal NIC IDs,
+ * and checks whether an internal flow rule ID is present or not.
  *
- * @args int_rule_id: an internal rule ID to find
- * @return the global rule ID mapped to the input internal rule ID upon success,
+ * @args int_rule_id: an internal flow rule ID to find
+ * @return the global flow rule ID mapped to the input internal flow rule ID upon success,
  *         otherwise a negative integer
  */
 long
@@ -128,11 +128,11 @@ FlowCache::global_from_internal_rule_id(const uint32_t &int_rule_id)
 }
 
 /**
- * Queries the map of global rule IDs to internal NIC IDs,
- * and checks whether a global rule ID is present or not.
+ * Queries the map of global flow rule IDs to internal NIC IDs,
+ * and checks whether a global flow rule ID is present or not.
  *
- * @args rule_id: a global rule ID to find
- * @return the internal rule ID mapped to the input global rule ID upon success,
+ * @args rule_id: a global flow rule ID to find
+ * @return the internal flow rule ID mapped to the input global flow rule ID upon success,
  *         otherwise a negative integer
  */
 int32_t
@@ -158,9 +158,9 @@ FlowCache::internal_from_global_rule_id(const long &rule_id)
 }
 
 /**
- * Returns a string with all space-separated global rules IDs in this flow cache.
+ * Returns a string with all space-separated global flow rules IDs in this flow cache.
  *
- * @return string with all space-separated global rules IDs, otherwise a relevant message
+ * @return string with all space-separated global flow rules IDs, otherwise a relevant message
  */
 String
 FlowCache::global_rule_ids()
@@ -197,10 +197,10 @@ FlowCache::global_rule_ids()
 }
 
 /**
- * Returns a map of rule IDs to rules.
+ * Returns a map of flow rule IDs to flow rules.
  *
  * @args core_id: a CPU core ID
- * @return a map of rule IDs to rules associated with this core
+ * @return a map of flow rule IDs to flow rules associated with this core
  */
 HashMap<long, String> *
 FlowCache::rules_map_by_core_id(const int &core_id)
@@ -214,10 +214,10 @@ FlowCache::rules_map_by_core_id(const int &core_id)
 }
 
 /**
- * Returns a list of rules associated with a CPU core.
+ * Returns a list of flow rules associated with a CPU core.
  *
  * @args core_id: a CPU core ID
- * @return a list of rules associated with this core
+ * @return a list of flow rules associated with this core
  */
 Vector<String>
 FlowCache::rules_list_by_core_id(const int &core_id)
@@ -250,9 +250,9 @@ FlowCache::rules_list_by_core_id(const int &core_id)
 }
 
 /**
- * Returns the number of CPU cores that have at least one rule each.
+ * Returns the number of CPU cores that have at least one flow rule each.
  *
- * @return a list CPU cores that have associated rules
+ * @return a list CPU cores that have associated flow rules
  */
 Vector<int>
 FlowCache::cores_with_rules()
@@ -273,10 +273,10 @@ FlowCache::cores_with_rules()
 }
 
 /**
- * Keeps a mapping between global and internal NIC rule IDs.
+ * Keeps a mapping between global and internal NIC flow rule IDs.
  *
- * @args rule_id: a global rule ID
- * @args int_rule_id: an internal rule ID mapped to rule_id
+ * @args rule_id: a global flow rule ID
+ * @args int_rule_id: an internal flow rule ID mapped to rule_id
  * @return boolean status
  */
 bool
@@ -310,9 +310,9 @@ FlowCache::store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_i
 }
 
 /**
- * Deletes a mapping between a global and an internal NIC rule IDs.
+ * Deletes a mapping between a global and an internal NIC flow rule IDs.
  *
- * @args rule_id: a global rule ID to delete its mapping
+ * @args rule_id: a global flow rule ID to delete its mapping
  * @return boolean status
  */
 bool
@@ -335,9 +335,9 @@ FlowCache::delete_rule_id_mapping(const long &rule_id)
 }
 
 /**
- * Returns the next internal rule ID to use for insertion.
+ * Returns the next internal flow rule ID to use for insertion.
  *
- * @return next available internal rule ID
+ * @return next available internal flow rule ID
  */
 uint32_t
 FlowCache::next_internal_rule_id()
@@ -346,12 +346,12 @@ FlowCache::next_internal_rule_id()
 }
 
 /**
- * Adds a new rule to this flow cache.
+ * Adds a new flow rule to this flow cache.
  *
- * @args core_id: a CPU core ID associated with the rule
- * @args rule_id: a global rule ID associated with the rule
- * @args int_rule_id: an internal rule ID associated with the rule
- * @args rule: the actual rule
+ * @args core_id: a CPU core ID associated with the flow rule
+ * @args rule_id: a global rule ID associated with the flow rule
+ * @args int_rule_id: an internal flow rule ID associated with the flow rule
+ * @args rule: the actual flow rule
  * @return 0 upon success, otherwise a negative integer
  */
 int
@@ -399,13 +399,13 @@ FlowCache::insert_rule_in_flow_cache(const int &core_id, const long &rule_id, co
 }
 
 /**
- * Updates a rule using a two-phase commit.
- * First checks if rule exists and if so deletes it.
- * Then, inserts the new rule.
+ * Updates a flow rule using a two-phase commit.
+ * First checks if flow rule exists and if so deletes it.
+ * Then, inserts the new flow rule.
  *
- * @args core_id: a CPU core ID associated with the rule
- * @args rule_id: the rule ID of the rule to be updated
- * @args rule: the actual rule to be updated
+ * @args core_id: a CPU core ID associated with the flow rule
+ * @args rule_id: the flow rule ID of the flow rule to be updated
+ * @args rule: the actual flow rule to be updated
  * @return true upon success, otherwise false
  */
 bool
@@ -423,10 +423,10 @@ FlowCache::update_rule_in_flow_cache(const int &core_id, const long &rule_id, co
 }
 
 /**
- * Deletes a rule from this flow cache using its global ID as an index.
+ * Deletes a flow rule from this flow cache using its global ID as an index.
  *
- * @args rule_id: the global rule ID of the rule to be deleted
- * @return the internal rule ID being deleted upon success, otherwise a negative integer
+ * @args rule_id: the global flow rule ID of the flow rule to be deleted
+ * @return the internal flow rule ID being deleted upon success, otherwise a negative integer
  */
 int32_t
 FlowCache::delete_rule_by_global_id(const long &rule_id)
@@ -481,11 +481,11 @@ FlowCache::delete_rule_by_global_id(const long &rule_id)
 }
 
 /**
- * Deletes a list of rules from this flow cache.
+ * Deletes a list of flow ules from this flow cache.
  *
- * @args int_rule_ids: an array of internal rule IDs to be deleted
- * @args rules_nb: the number of rule IDs to be deleted
- * @return a space-separated list of deleted internal rule IDs upon success, otherwise an empty string
+ * @args int_rule_ids: an array of internal flow rule IDs to be deleted
+ * @args rules_nb: the number of flow rule IDs to be deleted
+ * @return a space-separated list of deleted internal flow rule IDs upon success, otherwise an empty string
  */
 String
 FlowCache::delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint32_t &rules_nb)
@@ -499,10 +499,10 @@ FlowCache::delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint3
 }
 
 /**
- * Deletes a list of rules from this flow cache.
+ * Deletes a list of flow rules from this flow cache.
  *
- * @args rules_vec: a vector of rule IDs to be deleted
- * @return a space-separated list of deleted internal rule IDs upon success, otherwise an empty string
+ * @args rules_vec: a vector of flow rule IDs to be deleted
+ * @return a space-separated list of deleted internal flow rule IDs upon success, otherwise an empty string
  */
 String
 FlowCache::delete_rules_by_internal_id(const Vector<String> &rules_vec)
@@ -520,8 +520,13 @@ FlowCache::delete_rules_by_internal_id(const Vector<String> &rules_vec)
     while (it != rules_vec.end()) {
         uint32_t int_rule_id = atoi(it->c_str());
         long rule_id = global_from_internal_rule_id(int_rule_id);
+        if (rule_id < 0) {
+            _errh->error("Flow Cache (port %u): Unable to delete mapping for rule with internal ID %" PRIu32, get_port_id(), int_rule_id);
+            return rule_ids_str.trim_space();
+        }
+
         if (delete_rule_by_global_id(rule_id) < 0) {
-            _errh->error("Flow Cache (port %u): Unable to delete rule's %ld mapping", get_port_id(), rule_id);
+            _errh->error("Flow Cache (port %u): Unable to delete mapping for rule with global ID %ld", get_port_id(), rule_id);
             return rule_ids_str.trim_space();
         }
 
@@ -539,9 +544,9 @@ FlowCache::delete_rules_by_internal_id(const Vector<String> &rules_vec)
 }
 
 /**
- * Deletes all rules from this flow cache.
+ * Deletes all flow rules from this flow cache.
  *
- * @return the number of flushed rules upon success, otherwise a negative integer
+ * @return the number of flushed flow rules upon success, otherwise a negative integer
  */
 int32_t
 FlowCache::flush_rules_from_cache()
@@ -585,7 +590,7 @@ FlowCache::flush_rules_from_cache()
 /**
  * Sets a flow rule's packet counter.
  *
- * @args int_rule_id: an internal rule ID
+ * @args int_rule_id: an internal flow rule ID
  * @args value: a value to set the counter
  */
 void
@@ -600,7 +605,7 @@ FlowCache::set_matched_packets(const uint32_t &int_rule_id, uint64_t value)
 /**
  * Gets the packet counter of a flow rule.
  *
- * @args int_rule_id: an internal rule ID
+ * @args int_rule_id: an internal flow rule ID
  * @return packet counter of flow rule
  */
 uint64_t
@@ -615,7 +620,7 @@ FlowCache::get_matched_packets(const uint32_t &int_rule_id)
 /**
  * Sets a flow rule's byte counter.
  *
- * @args int_rule_id: an internal rule ID
+ * @args int_rule_id: an internal flow rule ID
  * @args value: a value to set the counter
  */
 void
@@ -630,7 +635,7 @@ FlowCache::set_matched_bytes(const uint32_t &int_rule_id, uint64_t value)
 /**
  * Gets the byte counter of a flow rule.
  *
- * @args int_rule_id: an internal rule ID
+ * @args int_rule_id: an internal flow rule ID
  * @return byte counter of flow rule
  */
 uint64_t
@@ -643,11 +648,11 @@ FlowCache::get_matched_bytes(const uint32_t &int_rule_id)
 }
 
 /**
- * Initializes a set of rules in the packet and byte counters' memory,
- * increments the rule counter and the next rule ID accordingly.
+ * Initializes a set of flow rules in the packet and byte counters' memory,
+ * increments the flow rule counter and the next flow rule ID accordingly.
  *
- * @args int_rule_ids: an array of internal rule IDs to be initialized
- * @args rules_nb: the number of rules to be initialized
+ * @args int_rule_ids: an array of internal flow rule IDs to be initialized
+ * @args rules_nb: the number of flow rules to be initialized
  */
 void
 FlowCache::initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb)
@@ -670,11 +675,11 @@ FlowCache::initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rule
 }
 
 /**
- * Deletes a set of rules from the packet and byte counters' memory
- * and decrements the rule counter accordingly.
+ * Deletes a set of flow rules from the packet and byte counters' memory
+ * and decrements the flow rule counter accordingly.
  *
- * @args int_rule_ids: an array of internal rule IDs to be removed
- * @args rules_nb: the number of rules to be removed
+ * @args int_rule_ids: an array of internal flow rule IDs to be removed
+ * @args rules_nb: the number of flow rules to be removed
  */
 void
 FlowCache::delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb)
@@ -738,7 +743,7 @@ bool FlowDirector::DEF_VERBOSITY = false;
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<portid_t, FlowDirector *> FlowDirector::dev_flow_dir;
 
-// Map of ports to their rule installation/deletion statistics
+// Map of ports to their flow rule installation/deletion statistics
 HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_inst_stats_map;
 HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_del_stats_map;
 
@@ -967,29 +972,30 @@ FlowDirector::get_flow_director(const portid_t &port_id, ErrorHandler *errh)
 }
 
 /**
- * Returns a set of string-based rules read from a file.
+ * Returns a set of string-based flow rules read from a file.
  *
- * @args filename: the file that contains the rules
- * @return a set of rules in memory
+ * @args filename: the file that contains the flow rules
+ * @return a string of newline-separated flow rules in memory
  */
-Vector<String>
-FlowDirector::load_rules_from_file(const String &filename)
+String
+FlowDirector::load_rules_from_file_to_string(const String &filename)
 {
-    Vector<String> rules_vec;
+    String rules_str = "";
 
     if (filename.empty()) {
         _errh->warning("Flow Director (port %u): No file provided", _port_id);
-        return rules_vec;
+        return rules_str;
     }
 
     FILE *fp = NULL;
     fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
         _errh->error("Flow Director (port %u): Failed to open file '%s'", _port_id, filename.c_str());
-        return rules_vec;
+        return rules_str;
     }
 
     uint32_t rules_nb = 0;
+    uint32_t loaded_rules_nb = 0;
 
     char *line = NULL;
     size_t len = 0;
@@ -1015,64 +1021,79 @@ FlowDirector::load_rules_from_file(const String &filename)
         // Compose rule for the right NIC
         String rule = "flow create " + String(_port_id) + " " + String(line);
 
-        // Add it to the vector
-        rules_vec.push_back(rule);
+        // Append this rule to a string
+        rules_str += rule;
+
+        loaded_rules_nb++;
     }
 
     // Close the file
     fclose(fp);
 
-    _errh->message("Flow Director (port %u): Loaded %" PRIu32 "/%d rules", _port_id, rules_nb, rules_vec.size());
+    _errh->message("Flow Director (port %u): Loaded %" PRIu32 "/%" PRIu32 " rules", _port_id, loaded_rules_nb, rules_nb);
 
-    return rules_vec;
+    return rules_str;
 }
 
 /**
- * Installs a set of string-based rules read from a file.
+ * Installs a set of flow rules from a string.
  *
- * @args filename: the file that contains the rules
- * @return the number of rules being installed, otherwise a negative integer
+ * @args rules_str: a (st of) newline-separated flow rules as a single string
+ * @return the number of flow rules being installed, otherwise a negative integer
  */
 int32_t
-FlowDirector::add_rules_from_file(const String &filename)
+FlowDirector::add_rules_from_string(const String &rules_str)
 {
-    // First load the rules from disk to memory
-    Vector<String> rules_vec = load_rules_from_file(filename);
-    if (rules_vec.size() == 0) {
-        return (int32_t) 0;
+    if (rules_str.empty()) {
+        return (int32_t) _errh->error("Flow Director (port %u): Failed to add rules due to empty input string", _port_id);
     }
 
-    uint32_t installed_rules_nb = 0;
+    // Tokenize them to facilitate the insertion in the flow cache
+    Vector<String> rules_vec = rules_str.trim_space().split('\n');
+    uint32_t rules_to_install = rules_vec.size();
+    if (rules_to_install == 0) {
+        return (int32_t) 0;
+    }
 
     RuleTiming rits(_port_id);
     rits.start = Timestamp::now_steady();
 
-    // Read file line-by-line (or rule-by-rule)
+    // Install in the NIC as a batch
+    if (flow_rules_install(rules_str, rules_to_install) != FLOWDIR_SUCCESS) {
+        return FLOWDIR_ERROR;
+    }
+
+    rits.end = Timestamp::now_steady();
+
+    uint32_t installed_rules_nb = 0;
+
+    // Now insert each rule in the flow cache
     for (uint32_t i = 0; i < rules_vec.size(); i++) {
         String rule = rules_vec[i];
+        if (rule.empty()) {
+            continue;
+        }
 
         // Parse the queue index to infer the CPU core
         String queue_index_str = fetch_token_after_keyword((char *) rule.c_str(), "queue index");
         int core_id = atoi(queue_index_str.c_str());
 
-        if (_verbose) {
-            _errh->message("Flow Director (port %u): About to install rule #%" PRIu32 ": %s", _port_id, i, rule.c_str());
-        }
-
+        // Get the next internal rule ID
         uint32_t next_int_rule_id = _flow_cache->next_internal_rule_id();
 
-        if (flow_rule_install(next_int_rule_id, rule, (long) next_int_rule_id, core_id) == FLOWDIR_SUCCESS) {
-            installed_rules_nb++;
+        // Insert into the flow cache
+        if (!_flow_cache->update_rule_in_flow_cache(core_id, (long) next_int_rule_id, next_int_rule_id, rule)) {
+            return FLOWDIR_ERROR;
         }
-    }
 
-    rits.end = Timestamp::now_steady();
+        installed_rules_nb++;
+    }
 
     rits.update(installed_rules_nb);
     add_rule_inst_stats(rits);
 
     _errh->message(
-        "Flow Director (port %u): %" PRIu32 "/%" PRIu32 " rules are installed in %.0f ms at the rate of %.3f rules/sec",
+        "Flow Director (port %u): Successfully installed %" PRIu32 "/%" PRIu32 " rules in %.1f ms at the rate of %.3f rules/sec",
         _port_id, installed_rules_nb, rules_vec.size(), rits.latency_ms, rits.rules_per_sec
     );
 
@@ -1080,14 +1101,28 @@ FlowDirector::add_rules_from_file(const String &filename)
 }
 
 /**
- * Installs a set of flow rules in a NIC.
+ * Installs a set of flow rules read from a file.
+ * First the flow rules are parsed and inserted as a single string;
+ * Then the flow rules are tokenized to facilitate their insertion in the flow cache.
  *
- * @args rules_map: a map of global flow rule IDs to rules
- * @args core_id: a CPU core ID associated with this set of flow rules
- * @return the number of rules being installed upon success, otherwise a negative integer
+ * @args filename: the file that contains the flow rules
+ * @return the number of flow rules being installed, otherwise a negative integer
+ */
+int32_t
+FlowDirector::add_rules_from_file(const String &filename)
+{
+    return add_rules_from_string((const String) load_rules_from_file_to_string(filename));
+}
+
+/**
+ * Translates a set of newline-separated flow rules into flow rule objects and installs them in a NIC.
+ *
+ * @args rules: a string of newline-separated flow rules
+ * @args rules_nb: the number of flow rules to install
+ * @return installation status
  */
 int
-FlowDirector::flow_rules_install(const HashMap<long, String> rules_map, int core_id)
+FlowDirector::flow_rules_install(const String &rules, const uint32_t &rules_nb)
 {
     // Only active instances can configure a NIC
     if (!active()) {
@@ -1095,68 +1130,11 @@ FlowDirector::flow_rules_install(const HashMap<long, String> rules_map, int core
         return FLOWDIR_ERROR;
     }
 
-    uint32_t installed_rules_nb = 0;
-
-    RuleTiming rits(_port_id);
-    rits.start = Timestamp::now_steady();
-
-    auto it = rules_map.begin();
-    while (it != rules_map.end()) {
-        long rule_id = it.key();
-        String rule = it.value();
-        uint32_t int_rule_id = _flow_cache->next_internal_rule_id();
-
-        if (flow_rule_install(int_rule_id, rule, rule_id, core_id) == FLOWDIR_SUCCESS) {
-            installed_rules_nb++;
-        }
-
-        it++;
-    }
-
-    rits.end = Timestamp::now_steady();
-
-    rits.update(installed_rules_nb);
-    add_rule_inst_stats(rits);
-
-    _errh->message(
-        "Flow Director (port %u): Successfully installed %" PRIu32 "/%" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
-        _port_id, installed_rules_nb, rules_map.size(), rits.latency_ms, rits.rules_per_sec
-    );
-
-    return installed_rules_nb;
-}
-
-/**
- * Translates a string-based rule into a flow rule
- * object and installs it in a NIC.
- * If no global rule and CPU core IDs are given ,then
- * we return without interacting with Flow Cache
- * (the caller must have done this already).
- *
- * @args int_rule_id: a flow rule's internal ID
- * @args rule: a flow rule as a string
- * @args rule_id: a flow rule's global ID
- * @args core_id: a CPU core ID associated with this flow rule
- * @return status
- */
-int
-FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule, long rule_id, int core_id)
-{
-    // Only active instances can configure a NIC
-    if (!active()) {
-        _errh->error("Flow Director (port %u): Inactive instance cannot install rule #%" PRIu32, _port_id, int_rule_id);
-        return FLOWDIR_ERROR;
-    }
-
     // TODO: Fix DPDK to return proper status
-    int res = flow_parser_parse(_parser, (char *) rule.c_str(), _errh);
+    int res = flow_parser_parse(_parser, (const char *) rules.c_str(), _errh);
     if (res >= 0) {
-        // Update flow cache
-        if (_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
-            return FLOWDIR_SUCCESS;
-        }
-
-        return FLOWDIR_ERROR;
+        _errh->error("Flow Director (port %u): Parsed and installed a batch of %d rules", _port_id, rules_nb);
+        return FLOWDIR_SUCCESS;
     }
 
     // Resolve the error
@@ -1176,15 +1154,46 @@ FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule,
             break;
     }
 
-    _errh->error("Flow Director (port %u): Failed to parse rule '%s' due to %s", _port_id, rule.c_str(), error.c_str());
+    _errh->error("Flow Director (port %u): Failed to parse rules due to %s", _port_id, error.c_str());
 
     return FLOWDIR_ERROR;
 }
 
 /**
- * Returns a flow rule object of a specific NIC with specific rule ID.
+ * Translates a flow rule into a flow rule object and installs it in a NIC.
+ * If with_cache is false, then it returns without interacting with Flow Cache.
  *
- * @args int_rule_id: an internal rule ID
+ * @args int_rule_id: a flow rule's internal ID
+ * @args rule: a flow rule as a string
+ * @args rule_id: a flow rule's global ID
+ * @args core_id: a CPU core ID associated with this flow rule
+ * @args with_cache: if true, the flow cache is updated accordingly (defaults to true)
+ * @return status
+ */
+int
+FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule, long rule_id, int core_id, const bool with_cache)
+{
+    // Insert in NIC
+    if (flow_rules_install(rule, 1) != FLOWDIR_SUCCESS) {
+        return FLOWDIR_ERROR;
+    }
+
+    // Update flow cache, If asked to do so
+    if (with_cache) {
+        if (_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
+            return FLOWDIR_SUCCESS;
+        }
+
+        return FLOWDIR_ERROR;
+    }
+
+    return FLOWDIR_SUCCESS;
+}
+
+/**
+ * Returns a flow rule object of a specific NIC with specific internal flow rule ID.
+ *
+ * @args int_rule_id: an internal flow rule ID
  * @return a flow rule object
  */
 struct port_flow *
@@ -1206,11 +1215,12 @@ FlowDirector::flow_rule_get(const uint32_t &int_rule_id)
 
 /**
  * Removes a batch of flow rule objects from a NIC.
+ * If with_cache is true, then this batch of flow rules is also deleted from the flow cache.
  *
  * @args int_rule_ids: an array of internal flow rule IDs
- * @args rules_nb: the number of rules to delete
+ * @args rules_nb: the number of flow rules to delete
  * @args with_cache: if true, the flow cache is updated accordingly (defaults to true)
- * @return the number of deleted rules upon success, otherwise a negative integer
+ * @return the number of deleted flow rules upon success, otherwise a negative integer
  */
 int32_t
 FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache)
@@ -1225,11 +1235,15 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
         return _errh->error("Flow Director (port %u): No rules to remove", _port_id);
     }
 
+    // TODO: No need for counting, if DPDK's port_flow_destroy could return the number of deleted rules..
+    uint32_t rules_before_delete = flow_rules_count_explicit();
+
     RuleTiming rdts(_port_id);
     rdts.start = Timestamp::now_steady();
 
     // TODO: For N rules, port_flow_destroy calls rte_flow_destroy N times.
     //       DPDK must act upon this.
+    // TODO: If one of the rule IDs in this array is invalid, port_flow_destroy still succeeds
     if (port_flow_destroy(_port_id, rules_nb, int_rule_ids) != FLOWDIR_SUCCESS) {
         return _errh->error(
             "Flow Director (port %u): Failed to remove a batch of %" PRIu32 " rules",
@@ -1250,14 +1264,18 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
         }
     }
 
+    // Count how many rules we really deleted
+    uint32_t rules_after_delete = flow_rules_count_explicit();
+    uint32_t rules_deleted = (rules_before_delete - rules_after_delete);
+
     if (_verbose) {
         _errh->message(
             "Flow Director (port %u): Successfully deleted %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
-            _port_id, rules_nb, rdts.latency_ms, rdts.rules_per_sec
+            _port_id, rules_deleted, rdts.latency_ms, rdts.rules_per_sec
         );
     }
 
-    return rules_nb;
+    return rules_deleted;
 }
 
 /**
@@ -1442,9 +1460,9 @@ FlowDirector::flow_rule_aggregate_stats()
 }
 
 /**
- * Return the explicit rule counter for a particular NIC.
+ * Return the explicit flow rule counter for a particular NIC.
  *
- * @return the number of rules being installed
+ * @return the number of flow rules being installed
  */
 uint32_t
 FlowDirector::flow_rules_count()
@@ -1453,10 +1471,10 @@ FlowDirector::flow_rules_count()
 }
 
 /**
- * Counts all of the rules installed in a NIC
- * by traversing the list of rules.
+ * Counts all of the flow rules installed in a NIC
+ * by traversing the list of flow rules.
  *
- * @return the number of rules being installed
+ * @return the number of flow rules being installed
  */
 uint32_t
 FlowDirector::flow_rules_count_explicit()
@@ -1488,7 +1506,7 @@ FlowDirector::flow_rules_count_explicit()
 }
 
 /**
- * Lists all of a NIC's rules.
+ * Lists all of a NIC's flow rules.
  *
  * @return a string of NIC flow rules (each on a different line)
  */
@@ -1565,7 +1583,7 @@ FlowDirector::flow_rules_list()
 }
 
 /**
- * Lists all of a NIC's internal rule IDs.
+ * Lists all of a NIC's internal flow rule IDs.
  *
  * @return a string of space-separated internal flow rule IDs, otherwise a relevant message
  */
@@ -1603,7 +1621,7 @@ FlowDirector::flow_rule_ids_internal()
 }
 
 /**
- * Lists all of a NIC's global rule IDs.
+ * Lists all of a NIC's global flow rule IDs.
  *
  * @return a string of space-separated global flow rule IDs
  */
@@ -1649,9 +1667,9 @@ FlowDirector::flow_rules_sort(struct rte_port *port, struct port_flow **sorted_r
 }
 
 /**
- * Flushes all of the rules from a NIC associated with this Flow Director instance.
+ * Flushes all of the flow rules from a NIC associated with this Flow Director instance.
  *
- * @return the number of rules being flushed
+ * @return the number of flow rules being flushed
  */
 uint32_t
 FlowDirector::flow_rules_flush()
@@ -1696,11 +1714,9 @@ FlowDirector::flow_rules_flush()
 }
 
 /**
- * Filters unwanted components from rule and returns an updated rule by reference.
- * If a rule is composed for the wrong port ID, this method strips it off and later
- * flow_rule_install prepends a correct port ID.
+ * Filters unwanted components from a flow rule and returns an updated flow rule by reference.
  *
- * @args rule: a rule to filter
+ * @args rule: a flow rule to filter
  * @return boolean status
  */
 bool
@@ -1737,9 +1753,9 @@ FlowDirector::filter_rule(char **rule)
 }
 
 /**
- * Returns a rule token after an input keyword.
+ * Returns a flow rule token after an input keyword.
  *
- * @args rule: a rule to parse
+ * @args rule: a flow rule to parse
  * @args keyword: a keyword to match before the token
  * @return rule token after keyword upon success, otherwise empty string
  */
@@ -1764,10 +1780,8 @@ FlowDirector::fetch_token_after_keyword(char *rule, const String &keyword)
 }
 
 /**
- * Computes the minimum, average, and maximum rule
- * installation/deletion rate (rules/sec) or latency (ms)
- * across the entire set of such operations.
- * The last argument denotes whether to compute latency or rate.
+ * Computes the minimum, average, and maximum flow rule installation/deletion rate (rules/sec) or latency (ms)
+ * across the entire set of such operations. The last argument denotes whether to compute latency or rate.
  *
  * @args min: variable to store the minimum installation/deletion rate
  * @args mean: variable to store the average installation/deletion rate

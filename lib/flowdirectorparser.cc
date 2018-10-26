@@ -30,37 +30,82 @@ CLICK_DECLS
 struct cmdline *
 flow_parser_init(ErrorHandler *errh)
 {
-	errh->message("Initializing flow parser...");
-	init_port();
-	return flow_parser_alloc("", errh);
+    errh->message("Initializing flow parser...");
+    init_port();
+    return flow_parser_alloc("", errh);
 }
 
 struct cmdline *
 flow_parser_alloc(const char *prompt, ErrorHandler *errh)
 {
-	if (!prompt) {
-		errh->error("Flow parser prompt not provided");
-		return NULL;
-	}
+    if (!prompt) {
+        errh->error("Flow parser prompt not provided");
+        return NULL;
+    }
 
-	cmdline_parse_ctx_t *ctx = cmdline_get_ctx();
-	if (!ctx) {
-		errh->error("Flow parser context not obtained");
-		return NULL;
-	}
+    cmdline_parse_ctx_t *ctx = cmdline_get_ctx();
+    if (!ctx) {
+        errh->error("Flow parser context not obtained");
+        return NULL;
+    }
 
-	return cmdline_new(ctx, prompt, 0, 1);
+    return cmdline_new(ctx, prompt, 0, 1);
+}
+
+char *
+flow_parser_parse_new_line(char *line, int n, const char **input_cmd)
+{
+    // End of input
+    if(**input_cmd == '\0') {
+        return NULL;
+    }
+
+    int i;
+    for(i=0; i < n-1; ++i, ++(*input_cmd)) {
+        line[i] = **input_cmd;
+        if (**input_cmd == '\0') {
+            break;
+        }
+
+        // End of line
+        if (**input_cmd == '\n') {
+            line[i+1] = '\0';
+            ++(*input_cmd);
+            break;
+        }
+    }
+
+    if (i == n-1) {
+        line[i] = '\0';
+    }
+
+    return line;
 }
 
 int
-flow_parser_parse(struct cmdline *cl, char *input_cmd, ErrorHandler *errh)
+flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
 {
-	if (!cl) {
-		errh->error("Flow parser is not initialized");
-		return FLOWDIR_ERROR;
-	}
+    if (!cl) {
+        errh->error("Flow parser is not initialized");
+        return FLOWDIR_ERROR;
+    }
 
-	return cmdline_parse(cl, input_cmd);
+    char buff[512];
+    const char **p = &input_cmd;
+    int tot_line_len = 0;
+
+    // Split the input command in lines
+    while (flow_parser_parse_new_line(buff, sizeof(buff), p) != NULL) {
+        int line_len;
+        if ((line_len = cmdline_parse(cl, buff)) < 0) {
+            errh->error("Flow parser failed to parse input line: %s\n", buff);
+            return FLOWDIR_ERROR;
+        }
+        tot_line_len += line_len;
+    }
+
+    // This is the last line to parse
+    return tot_line_len;
 }
 
 #endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */

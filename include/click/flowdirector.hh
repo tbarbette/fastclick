@@ -51,7 +51,7 @@ class RuleTiming {
 
         void update(const uint32_t &rules_nb) {
             this->rules_nb = rules_nb;
-            this->latency_ms = (float) (end - start).msecval();
+            this->latency_ms = (float) (end - start).usecval() / (float) 1000;
             this->rules_per_sec = (rules_nb > 0) ? (float) (rules_nb * 1000) / this->latency_ms : 0;
         }
 };
@@ -221,21 +221,24 @@ class FlowDirector {
         // Install NIC flow rules from a file
         int32_t add_rules_from_file(const String &filename);
 
+        // Install NIC flow rules from a string
+        int32_t add_rules_from_string(const String &rules_str);
+
         // Loads a set of rules from a file to memory
-        Vector<String> load_rules_from_file(const String &filename);
+        String load_rules_from_file_to_string(const String &filename);
 
         // Install flow rule(s) in a NIC
-        int flow_rules_install(const HashMap<long, String> rules_map, int core_id);
+        int flow_rules_install(const String &rules, const uint32_t &rules_nb);
         int flow_rule_install(
             const uint32_t &int_rule_id, const String &rule,
-            long rule_id = -1, int core_id = -1
+            long rule_id, int core_id, const bool with_cache = true
         );
 
         // Return a flow rule object with a specific ID
         struct port_flow *flow_rule_get(const uint32_t &int_rule_id);
 
         // Delete a batch of flow rules from a NIC
-        int flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache=true);
+        int flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache = true);
 
         // Query flow rule statistics
         String flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, int64_t &matched_bytes);
@@ -266,7 +269,7 @@ class FlowDirector {
         static String fetch_token_after_keyword(char *rule, const String &keyword);
 
         // Returns statistics related to rule installation/deletion
-        void min_avg_max(float &min, float &mean, float &max, const bool install=true, const bool latency=true);
+        void min_avg_max(float &min, float &mean, float &max, const bool install = true, const bool latency = true);
 
         // Methods to access per port rule installation/deletion statistics
         static inline void add_rule_inst_stats(const RuleTiming &rits) {
