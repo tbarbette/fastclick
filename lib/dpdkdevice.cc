@@ -243,7 +243,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,11,0,0)
     dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
 #endif
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
