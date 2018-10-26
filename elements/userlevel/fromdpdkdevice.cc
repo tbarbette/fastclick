@@ -73,9 +73,16 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     String rules_filename;
 #endif
+    if (Args(this, errh).bind(conf)
+        .read_mp("PORT", dev)
+        .consume() < 0)
+        return -1;
 
-    if (parse(Args(conf, this, errh)
-        .read_mp("PORT", dev))
+    if (parse(conf, errh) != 0)
+        return -1;
+
+    if (Args(conf, this, errh)
+        .read_mp("PORT", dev)
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
@@ -396,6 +403,12 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             return String(fd->_dev->nb_tx_queues());
         case h_nb_vf_pools:
             return String(fd->_dev->nb_vf_pools());
+        case h_mtu: {
+            uint16_t mtu;
+            if (rte_eth_dev_get_mtu(fd->_dev->port_id, &mtu) != 0)
+                return String("<error>");
+            return String(mtu);
+                    }
         case h_mac: {
             if (!fd->_dev)
                 return String::make_empty();
@@ -817,6 +830,7 @@ void FromDPDKDevice::add_handlers()
     add_read_handler(FlowDirector::FLOW_RULE_COUNT,   statistics_handler, h_rules_count);
 #endif
 
+    add_read_handler("mtu",read_handler, h_mtu);
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);
 }
 

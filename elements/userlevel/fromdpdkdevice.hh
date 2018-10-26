@@ -217,6 +217,7 @@ private:
         h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
         h_rss,
         h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+        h_mtu,
         h_device,
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         h_rule_add, h_rules_del, h_rules_flush,

@@ -30,7 +30,7 @@ matrix:
 
 env:
   global:
-    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule --enable-gtp"
+    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule --enable-tunnel"
     - CXXFLAGS="-std=gnu++11"
     - GCC_VERSION="4.8"
   matrix:

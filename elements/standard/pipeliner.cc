@@ -17,12 +17,12 @@ CLICK_DECLS
 //#define PS_BATCH_SIZE 1024
 
 Pipeliner::Pipeliner()
-    :   _ring_size(-1),_burst(32),_block(false),
+    :   _ring_size(-1),_burst(32),
+        _home_thread_id(0), _block(false),
         _active(true),_nouseless(false),_always_up(false),
         _allow_direct_traversal(true), _verbose(true),
         sleepiness(0),_sleep_threshold(0),
-        _task(this),
-        _home_thread_id(0), _last_start(0)
+        _task(this), _last_start(0)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -175,14 +175,14 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
             if (!_always_up && sleepiness >= _sleep_threshold)
                 _task.reschedule();
             stats->dropped++;
-            if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+            if (_verbose && ((stats->dropped < 10) || ((stats->dropped & 0xffffffff) == 1)))
                 click_chatter("%p{element} : congestion", this);
             goto retry;
         }
         int c = head->count();
         head->kill();
         stats->dropped+=c;
-        if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+        if (_verbose && ((stats->dropped < 10) || ((stats->dropped & 0xffffffff) == 1)))
             click_chatter("%p{element} : Dropped %lu packets : have %u packets in ring", this, stats->dropped, c);
     }
 }

@@ -429,7 +429,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 #if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
     dev_conf.rxmode.hw_vlan_filter = 0;
 #endif
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,11,0,0)
     dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
 #endif
 
@@ -577,16 +577,25 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 #else
     bzero(&rx_conf,sizeof rx_conf);
 #endif
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
     rx_conf.rx_thresh.pthresh = RX_PTHRESH;
     rx_conf.rx_thresh.hthresh = RX_HTHRESH;
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
+#endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    rx_conf.offloads = dev_conf.rxmode.offloads;
+#endif
 
     struct rte_eth_txconf tx_conf;
+    tx_conf = dev_info.default_txconf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&tx_conf, &dev_info.default_txconf, sizeof tx_conf);
 #else
     bzero(&tx_conf,sizeof tx_conf);
 #endif
+
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
@@ -596,6 +605,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 #else
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 #endif
+
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
     for (unsigned i = 0; i < (unsigned)info.rx_queues.size(); ++i) {
         if (rte_eth_rx_queue_setup(
@@ -828,7 +838,6 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 #if RTE_VERSION < RTE_VERSION_NUM(2,0,0,0)
     if (rte_eal_pci_probe())
         return errh->error("Cannot probe the PCI bus");
-
 #endif
 
     if (dev_count() == 0 && _devs.size() > 0)
@@ -1016,13 +1025,13 @@ bool
 FlowControlModeArg::parse(
     const String &str, FlowControlMode &result, const ArgContext &ctx) {
     str.lower();
-    if (str == "full") {
+    if (str == "full" || str == "on") {
         result = FC_FULL;
     } else if (str == "rx") {
         result = FC_RX;
     }else if (str == "tx") {
         result = FC_TX;
-    } else if (str == "none") {
+    } else if (str == "none" || str == "off") {
         result = FC_NONE;
     } else
         return false;

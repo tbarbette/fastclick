@@ -136,7 +136,7 @@ protected:
     /**
      * Common parsing for all kind of QueueDevice
      */
-    Args& parse(Args &args);
+    int parse(Vector<String> &conf, ErrorHandler *errh);
 
 
     bool all_initialized() {
@@ -207,11 +207,12 @@ protected:
 	bool _set_paint_anno;
 	int _threadoffset;
 	bool _use_numa;
+	bool _scale_parallel;
 
     /**
      * Common parsing for all RXQueueDevice
      */
-    Args& parse(Args &args);
+	int parse(Vector<String> &conf, ErrorHandler *errh);
 
     /*
      * Configure a RX side of a queuedevice. Take cares of setting user max
@@ -232,7 +233,7 @@ protected:
     /**
      * Common parsing for all RXQueueDevice
      */
-    Args& parse(Args &args, ErrorHandler* errh);
+    int parse(Vector<String> &conf, ErrorHandler *errh);
 
     int configure_tx(int hardminqueues, int hardmaxqueues, ErrorHandler *errh);
     int initialize_tx(ErrorHandler *errh);
