@@ -65,7 +65,7 @@ class Replay : public ReplayBase { public:
     const char *flow_code() const   { return "#/#"; }
     const char *processing() const	{ return PULL; }
 
-    bool get_spawning_threads(Bitvector&, bool) override {
+    bool get_spawning_threads(Bitvector&, bool, int) override {
         return false;
     }
 
@@ -102,7 +102,7 @@ class ReplayUnqueue : public ReplayBase { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
-    bool get_spawning_threads(Bitvector& bmp, bool) override {
+    bool get_spawning_threads(Bitvector& bmp, bool, int) override {
         bmp[router()->home_thread_id(this)] = true;
         return false;
     }

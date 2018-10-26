@@ -26,6 +26,21 @@ CPUSwitch::~CPUSwitch()
 {
 }
 
+bool
+CPUSwitch::get_spawning_threads(Bitvector& b, bool isoutput, int port) {
+    if (port == -1 || !isoutput)
+        return true;
+
+    for (unsigned i = 0; i < (unsigned)b.size(); i++) {
+        if ((unsigned)port == (i % noutputs())) {
+            b[i] = true;
+        } else {
+            b[i] = false;
+        }
+    }
+    return false;
+}
+
 void
 CPUSwitch::push(int, Packet *p)
 {

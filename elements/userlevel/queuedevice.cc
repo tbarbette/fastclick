@@ -64,8 +64,39 @@ int QueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
+bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
+{
+    if (noutputs()) { //RX
+        //if (_active) { TODO
+            assert(thread_for_queue_available());
+            for (int i = firstqueue; i < firstqueue + n_queues; i++) {
+                for (int j = 0; j < queue_share; j++) {
+                    bmk[thread_for_queue(i) - j] = 1;
+                }
+            }
+        // }
+        return true;
+    } else { //TX
+        if (_active) {
+            if (input_is_pull(0)) {
+                bmk[router()->home_thread_id(this)] = 1;
+            }
+        }
+        return true;
+    }
+}
+
+void QueueDevice::cleanup_tasks() {
+    for (int i = 0; i < usable_threads.weight(); i++) {
+        if (_tasks[i]) {
+            delete _tasks[i];
+            _tasks[i] = 0;
+        }
+    }
+}
+
 int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
-	QueueDevice::parse(conf, errh);
+    QueueDevice::parse(conf, errh);
 
 	_promisc = true;
     if (Args(this, errh).bind(conf)
