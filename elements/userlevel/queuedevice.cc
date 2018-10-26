@@ -431,6 +431,8 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 			_locks[th_num] = 0;
 		}
 
+
+		if (qu_num == firstqueue + n_queues) break;
 		++th_num;
 	}
 
