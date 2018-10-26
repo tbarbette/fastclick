@@ -122,8 +122,9 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
             .read("NUMA", _use_numa)
 			.read("SCALE", scale).read_status(has_scale)
             .read("THREADOFFSET", _threadoffset)
-            .consume() < 0)
+            .consume() < 0) {
         return -1;
+    }
 
 	if (has_scale) {
 		if (scale.lower() == "parallel") {

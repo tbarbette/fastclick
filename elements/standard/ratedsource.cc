@@ -82,7 +82,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
 #if HAVE_BATCH
-    if ( burst < _batch_size ) {
+    if ( burst < (int)_batch_size ) {
         _batch_size = burst;
     }
 #endif
@@ -163,7 +163,7 @@ RatedSource::run_task(Task *)
         n = _limit - _count;
 
     // Create a batch
-    for (int i=0 ; i<n; i++) {
+    for (int i=0 ; i<(int)n; i++) {
         if (_tb.remove_if(1)) {
             Packet *p = _packet->clone();
             p->set_timestamp_anno(Timestamp::now());
