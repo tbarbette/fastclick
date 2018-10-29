@@ -842,6 +842,9 @@ Packet::copy(Packet* p, int headroom)
 Packet *
 Packet::clone(bool fast)
 {
+#ifdef CLICK_FLAKY_PACKETS
+    if (0 == click_random(0, 10)) { return NULL; }
+#endif
 #if CLICK_LINUXMODULE
     struct sk_buff *nskb = skb_clone(skb(), GFP_ATOMIC);
     return reinterpret_cast<Packet *>(nskb);
@@ -904,6 +907,9 @@ Packet::clone(bool fast)
         } else
 #endif
         {
+#ifdef CLICK_FLAKY_PACKETS
+    if (0 == click_random(0, 10)) { return NULL; }
+#endif
         p->_destructor = empty_destructor;
         }
         p->_data_packet = 0;
@@ -967,6 +973,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
             kill();
         return 0;
     }
+#ifdef CLICK_FLAKY_PACKETS
+    if (0 == click_random(0, 10)) { return NULL; }
+#endif
     nmb->data_off = mb->data_off + extra_headroom;
 
     rte_pktmbuf_data_len(nmb) = length();
@@ -1032,6 +1041,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
     // free old data
+#ifdef CLICK_FLAKY_PACKETS
+    if (0 == click_random(0, 10)) { kill(); return NULL; }
+#endif
     if (_data_packet) {
       _data_packet->kill();
     }

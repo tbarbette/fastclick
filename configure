@@ -867,6 +867,7 @@ enable_stride
 enable_task_heap
 enable_dmalloc
 enable_force_expensive
+enable_flaky_packets
 enable_valgrind
 enable_schedule_debugging
 enable_intel_cpu
@@ -1576,6 +1577,7 @@ Optional Features:
   --enable-dmalloc        enable debugging malloc
   --enable-force-expensive
                           force expensive packet operations
+  --enable-flaky-packets  flaky packets packet operations
   --enable-valgrind       extra support for debugging with valgrind
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
                           (no/yes/extra) [yes]
@@ -10699,6 +10701,21 @@ fi
 if test $enable_force_expensive = yes; then
 
 $as_echo "#define CLICK_FORCE_EXPENSIVE 1" >>confdefs.h
+
+fi
+
+
+
+# Check whether --enable-flaky-packets was given.
+if test "${enable_flaky_packets+set}" = set; then :
+  enableval=$enable_flaky_packets; :
+else
+  enable_flaky_packets=no
+fi
+
+if test $enable_flaky_packets = yes; then
+
+$as_echo "#define CLICK_FLAKY_PACKETS 1" >>confdefs.h
 
 fi
 

@@ -1249,6 +1249,14 @@ if test $enable_force_expensive = yes; then
 fi
 
 
+dnl debug by making packet allocations fail randomly
+
+AC_ARG_ENABLE([flaky-packets], [AS_HELP_STRING([--enable-flaky-packets], [flaky packets packet operations])], :, enable_flaky_packets=no)
+if test $enable_flaky_packets = yes; then
+    AC_DEFINE([CLICK_FLAKY_PACKETS], [1], [Define for making packet allocations fail randomly])
+fi
+
+
 dnl valgrind debugging support
 
 AC_ARG_ENABLE([valgrind], [AS_HELP_STRING([--enable-valgrind], [extra support for debugging with valgrind])], :, enable_valgrind=no)

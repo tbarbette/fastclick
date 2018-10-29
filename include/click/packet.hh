@@ -1694,7 +1694,7 @@ Packet::kill()
     #elif CLICK_PACKET_USE_DPDK
 		//Dpdk takes care of indirect and related things
         rte_pktmbuf_free(mb());
-	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
+	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE) && !defined(CLICK_FLAKY_PACKETS)
 		if (_use_count.dec_and_test()) {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
@@ -1893,9 +1893,11 @@ Packet::uniqueify()
 #ifdef CLICK_FORCE_EXPENSIVE
     PacketRef r(this);
 #endif
+#ifndef CLICK_FLAKY_PACKETS
     if (!shared())
 	return static_cast<WritablePacket *>(this);
     else
+#endif
 	return expensive_uniqueify(0, 0, true);
 }
 
