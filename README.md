@@ -3,4 +3,4 @@ MiddleClick
 
 Tutorial in progress...
 
-Contact tom.barbette@uliege.be for more informations.
+Contact barbette@@kth.se for more informations.
