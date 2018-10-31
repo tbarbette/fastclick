@@ -76,6 +76,7 @@ protected:
 
     enum DPIMode _mode;
     bool _all;
+    bool _quiet;
     String _insert_msg;
 };
 

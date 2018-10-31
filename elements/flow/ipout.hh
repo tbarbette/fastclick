@@ -39,6 +39,7 @@ public:
     void push_batch(int, PacketBatch*) override;
 protected:
     bool _readonly;
+    bool _checksum;
 };
 
 CLICK_ENDDECLS

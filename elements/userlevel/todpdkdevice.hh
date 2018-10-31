@@ -148,6 +148,9 @@ public:
 
 private:
 
+
+    inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p);
+
     inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
     void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
 
@@ -158,6 +161,8 @@ private:
     bool _congestion_warning_printed;
     bool _create;
     bool _vlan;
+    uint32_t _tso;
+    bool _tco;
 
     friend class FromDPDKDevice;
 };

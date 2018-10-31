@@ -118,7 +118,7 @@ public:
      * 0 if the pattern has not been found but the pattern could start at the end of the last
      * packet in the buffer and thus enqueuing the next packet could result in a match.
      */
-    int replaceInFlow(FlowBufferContentIter pos, const int pattern_length, const char *replacement, const int replacement_length, StackElement* owner);
+    int replaceInFlow(FlowBufferContentIter pos, const int pattern_length, const char *replacement, const int replacement_length, const bool repeast, StackElement* owner);
 
     /** @brief Return a content iterator pointing to the first byte of content in the buffer
      * @return A content iterator pointing to the first byte of content in the buffer

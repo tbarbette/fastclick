@@ -115,7 +115,7 @@ int DPDKDevice::alloc_pktmbufs()
     if (max_socket == -1)
         max_socket = 0;
 
-    int n_pktmbuf_pools = max_socket + 1;
+    unsigned n_pktmbuf_pools = max_socket + 1;
 
     // Allocate pktmbuf_pool array
     typedef struct rte_mempool *rte_mempool_p;
@@ -123,12 +123,12 @@ int DPDKDevice::alloc_pktmbufs()
         auto pktmbuf_pools = new rte_mempool_p[n_pktmbuf_pools];
         if (!pktmbuf_pools)
             return false;
-        for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+        for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
             pktmbuf_pools[i] = _pktmbuf_pools[i];
         }
         if (_pktmbuf_pools)
             delete[] _pktmbuf_pools;
-        for (int i = _nr_pktmbuf_pools; i < n_pktmbuf_pools; i++) {
+        for (unsigned i = _nr_pktmbuf_pools; i < n_pktmbuf_pools; i++) {
             pktmbuf_pools[i] = 0;
         }
         _pktmbuf_pools = pktmbuf_pools;
@@ -137,7 +137,7 @@ int DPDKDevice::alloc_pktmbufs()
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         // Create a pktmbuf pool for each active socket
-        for (int i = 0; i < _nr_pktmbuf_pools; i++) {
+        for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
                 if (!_pktmbuf_pools[i]) {
                         String mempool_name = DPDKDevice::MEMPOOL_PREFIX + String(i);
                         const char* name = mempool_name.c_str();
@@ -235,10 +235,46 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
+    dev_conf.txmode.offloads = 0;
+#endif
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
     dev_conf.rx_adv_conf.rss_conf.rss_key = NULL;
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
+    dev_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 
+    if (info.rx_offload & DEV_RX_OFFLOAD_TIMESTAMP) {
+        if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TIMESTAMP)) {
+            return errh->error("Hardware timestamp offloading is not supported by this device !");
+        } else {
+            dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TIMESTAMP;
+        }
+    }
+
+    if (info.tx_offload & DEV_TX_OFFLOAD_IPV4_CKSUM) {
+        if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM)) {
+            return errh->error("Hardware IPv4 checksum offloading is not supported by this device !");
+        } else {
+            dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
+        }
+    }
+
+    if (info.tx_offload & DEV_TX_OFFLOAD_TCP_CKSUM) {
+        if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM)) {
+            return errh->error("Hardware TCP checksum offloading is not supported by this device !");
+        } else {
+            dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_CKSUM;
+        }
+    }
+
+    if (info.tx_offload & DEV_TX_OFFLOAD_TCP_TSO) {
+        if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_TCP_TSO)) {
+            return errh->error("Hardware TCP Segmentation Offloading is not supported by this device !");
+        } else {
+            dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_TSO;
+        }
+    }
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
@@ -270,8 +306,22 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
     if (info.tx_queues.size() == 0) {
         info.tx_queues.resize(1);
-        info.n_tx_descs = DEF_DEV_TXDESC;
     }
+
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
+    if (info.n_rx_descs == 0)
+        info.n_rx_descs = dev_info.default_rxportconf.ring_size > 0? dev_info.default_rxportconf.ring_size : DEF_DEV_RXDESC;
+
+    if (info.n_tx_descs == 0)
+        info.n_tx_descs = dev_info.default_txportconf.ring_size > 0? dev_info.default_txportconf.ring_size : DEF_DEV_TXDESC;
+#else
+    if (info.n_rx_descs == 0)
+        info.n_rx_descs = DEF_DEV_RXDESC;
+
+    if (info.n_tx_descs == 0)
+        info.n_tx_descs = DEF_DEV_TXDESC;
+#endif
 
     if (info.rx_queues.size() > dev_info.max_rx_queues) {
         return errh->error("Port %d can only use %d RX queues (asked for %d), use MAXQUEUES to set the maximum "
@@ -292,10 +342,17 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         return errh->error("The number of transmit descriptors is %d but needs to be between %d and %d",info.n_tx_descs, dev_info.tx_desc_lim.nb_min, dev_info.tx_desc_lim.nb_max);
     }
 
+    /* TODO : Detect this if possible
+    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+            dev_conf.txmode.offloads |=
+                DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+also                ETH_TXQ_FLAGS_NOMULTMEMP
+                */
+
     int ret;
-    if (ret = rte_eth_dev_configure(
+    if ((ret = rte_eth_dev_configure(
             port_id, info.rx_queues.size(),
-            info.tx_queues.size(), &dev_conf) < 0)
+            info.tx_queues.size(), &dev_conf)) < 0)
         return errh->error(
             "Cannot initialize DPDK port %u with %u RX and %u TX queues\nError %d : %s",
             port_id, info.rx_queues.size(), info.tx_queues.size(),
@@ -322,23 +379,41 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 #else
     bzero(&rx_conf,sizeof rx_conf);
 #endif
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
     rx_conf.rx_thresh.pthresh = RX_PTHRESH;
     rx_conf.rx_thresh.hthresh = RX_HTHRESH;
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
+#endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    rx_conf.offloads = dev_conf.rxmode.offloads;
+#endif
 
     struct rte_eth_txconf tx_conf;
+    tx_conf = dev_info.default_txconf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
     memcpy(&tx_conf, &dev_info.default_txconf, sizeof tx_conf);
 #else
     bzero(&tx_conf,sizeof tx_conf);
 #endif
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0) && RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
+#else
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
-    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,i0)
+    tx_conf.offloads = dev_conf.txmode.offloads;
+#endif
+#if RTE_VERSION <= RTE_VERSION_NUM(18,05,0,0)
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOVLANOFFL ;
+#endif
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
-    for (unsigned i = 0; i < info.rx_queues.size(); ++i) {
+    for (unsigned i = 0; i < (unsigned)info.rx_queues.size(); ++i) {
         if (rte_eth_rx_queue_setup(
                 port_id, i, info.n_rx_descs, numa_node, &rx_conf,
                 _pktmbuf_pools[numa_node]) != 0)
@@ -347,7 +422,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
                 i, port_id, numa_node, rte_strerror(rte_errno));
     }
 
-    for (unsigned i = 0; i < info.tx_queues.size(); ++i)
+    for (unsigned i = 0; i < (unsigned)info.tx_queues.size(); ++i)
         if (rte_eth_tx_queue_setup(port_id, i, info.n_tx_descs, numa_node,
                                    &tx_conf) != 0)
             return errh->error(
@@ -376,6 +451,28 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         }
     }
 
+    if (info.init_fc_mode != FC_UNSET) {
+        struct rte_eth_fc_conf conf;
+        ret = rte_eth_dev_flow_ctrl_get(port_id, &conf);
+        if (ret != 0)
+            return errh->error("Could not get flow control status !");
+        switch (info.init_fc_mode) {
+            case FC_FULL:
+                conf.mode = RTE_FC_FULL; break;
+            case FC_RX:
+                conf.mode = RTE_FC_RX_PAUSE; break;
+            case FC_TX:
+                conf.mode = RTE_FC_TX_PAUSE; break;
+            case FC_NONE:
+                conf.mode = RTE_FC_NONE; break;
+            default:
+                return errh->error("Unknown flow mode !");
+        }
+        ret = rte_eth_dev_flow_ctrl_set(port_id, &conf);
+        if (ret != 0)
+             return errh->error("Could not set flow control status !");
+    }
+
     return 0;
 }
 
@@ -387,6 +484,21 @@ void DPDKDevice::set_init_mac(EtherAddress mac) {
 void DPDKDevice::set_init_mtu(uint16_t mtu) {
     assert(!_is_initialized);
     info.init_mtu = mtu;
+}
+
+void DPDKDevice::set_init_fc_mode(FlowControlMode fc) {
+    assert(!_is_initialized);
+    info.init_fc_mode = fc;
+}
+
+void DPDKDevice::set_rx_offload(uint64_t offload) {
+    assert(!_is_initialized);
+    info.rx_offload |= offload;
+}
+
+void DPDKDevice::set_tx_offload(uint64_t offload) {
+    assert(!_is_initialized);
+    info.tx_offload |= offload;
 }
 
 EtherAddress DPDKDevice::get_mac() {
@@ -404,15 +516,15 @@ EtherAddress DPDKDevice::get_mac() {
  */
 bool set_slot(Vector<bool> &v, unsigned &id) {
     if (id <= 0) {
-        int i;
-        for (i = 0; i < v.size(); i ++) {
+        unsigned i;
+        for (i = 0; i < (unsigned)v.size(); i ++) {
             if (!v[i]) break;
         }
         id = i;
-        if (id >= v.size())
+        if (id >= (unsigned)v.size())
             v.resize(id + 1, false);
     }
-    if (id >= v.size()) {
+    if (id >= (unsigned)v.size()) {
         v.resize(id + 1,false);
     }
     if (v[id])
@@ -607,6 +719,44 @@ DPDKDeviceArg::parse(
 
     return true;
 }
+
+
+bool
+FlowControlModeArg::parse(
+    const String &str, FlowControlMode &result, const ArgContext &ctx) {
+    str.lower();
+    if (str == "full") {
+        result = FC_FULL;
+    } else if (str == "rx") {
+        result = FC_RX;
+    }else if (str == "tx") {
+        result = FC_TX;
+    } else if (str == "none") {
+        result = FC_NONE;
+    } else
+        return false;
+
+    return true;
+}
+
+
+String
+FlowControlModeArg::unparse(FlowControlMode mode) {
+    switch(mode) {
+        case FC_FULL:
+            return "full";
+        case FC_RX:
+            return "rx";
+        case FC_TX:
+            return "tx";
+        case FC_NONE:
+            return "none";
+        case FC_UNSET:
+        default:
+            return "unset";
+    }
+}
+
 
 DPDKRing::DPDKRing() :
     _message_pool(0),

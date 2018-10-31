@@ -121,6 +121,7 @@ private:
     unsigned int flowDirection;
     bool _readonly;
     bool _allow_resize;
+    bool _checksum;
 };
 
 CLICK_ENDDECLS

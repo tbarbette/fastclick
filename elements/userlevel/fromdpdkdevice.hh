@@ -154,6 +154,7 @@ private:
     };
 
     DPDKDevice* _dev;
+    bool _set_timestamp;
 };
 
 CLICK_ENDDECLS

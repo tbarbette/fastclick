@@ -13,7 +13,9 @@
 #include <clicknet/ip.h>
 #include <click/element.hh>
 #include <click/flowelement.hh>
+#include <click/dpdkdevice.hh>
 #include "ipelement.hh"
+#include <rte_ip.h>
 
 CLICK_DECLS
 
@@ -202,6 +204,12 @@ public:
      */
     void computeTCPChecksum(WritablePacket* packet) const;
 
+    /**
+     * @brief Reset the TCP checksum of a packet and set it in its header
+     * @param packet The packet
+     */
+    void resetTCPChecksum(WritablePacket* packet) const;
+
     /*Element responsible of the timeout management.
      * to allow for a unique per-flow acquire/release and timeout management
      * elements that can be used without a real tcp context (such as TCPReorder)
@@ -234,6 +242,27 @@ inline void TCPElement::computeTCPChecksum(WritablePacket *packet) const
     tcph->th_sum = 0;
     unsigned csum = click_in_cksum((unsigned char *)tcph, plen);
     tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
+}
+
+inline void TCPElement::resetTCPChecksum(WritablePacket *packet) const
+{
+    click_ip *iph = packet->ip_header();
+    click_tcp *tcph = packet->tcp_header();
+
+
+        iph->ip_sum = 0;
+        tcph->th_sum = 0;
+        if (!DPDKDevice::is_dpdk_buffer(packet)) {
+            click_chatter("Not a DPDK buffer");
+            computeTCPChecksum(packet);
+            return;
+        }
+        rte_mbuf* mbuf = (struct rte_mbuf *) packet->destructor_argument();
+        mbuf->l2_len = packet->mac_header_length();
+        mbuf->l3_len = packet->network_header_length();
+        mbuf->l4_len = tcph->th_off << 2;
+            mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+        tcph->th_sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
 }
 
 inline void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq) const

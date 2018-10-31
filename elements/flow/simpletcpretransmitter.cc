@@ -120,6 +120,8 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
         if ((fcb_in->common->state < TCPState::OPEN) && isSyn(batch->first()) || isRst(batch->first())) {
             if (_verbose)
                 click_chatter("Unestablished connection, letting the rt packet go through");
+
+            //TODO : it should go through the options removal again !
             if (batch->count() > 1) {
                 Packet* packet = batch->first();
                 batch = batch->pop_front();
@@ -175,7 +177,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                 FOR_EACH_PACKET_SAFE(fcb->first_unacked, pr) {
                     if (getSequenceNumber(pr) == mappedSeq) {
                         if (lastretransmit == pr) { //Avoid double retransmission
-                            //TODO : do we want to do that?
+                            //TODO : do we always want to do that?
                             if (_verbose)
                                 click_chatter("Avoid double retransmit");
                         } else {

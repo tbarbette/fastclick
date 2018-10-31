@@ -13,7 +13,7 @@
 
 CLICK_DECLS
 
-WordMatcher::WordMatcher() : insults(), _mode(ALERT)
+WordMatcher::WordMatcher() : insults(), _mode(ALERT), _quiet(false)
 {
     _all = false;
 }
@@ -28,7 +28,8 @@ int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_all("WORD", insults)
             .read_p("MODE", mode)
             .read_p("MSG", _insert_msg)
-            .read("ALL",all)
+            .read("ALL", all)
+            .read("QUIET", _quiet)
     .complete() < 0)
         return -1;
 
@@ -63,13 +64,15 @@ int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 
 int
 WordMatcher::maxModificationLevel(Element* stop) {
-    int mod = StackSpaceElement<fcb_WordMatcher>::maxModificationLevel(stop) | MODIFICATION_WRITABLE | MODIFICATION_STALL;
+    int mod = StackSpaceElement<fcb_WordMatcher>::maxModificationLevel(stop) | MODIFICATION_STALL;
     if (_mode == FULL || _mode == REMOVE) {
         mod |= MODIFICATION_RESIZE;
     }
     if (_mode == MASK || _mode == REPLACE) {
         mod |= MODIFICATION_REPLACE;
     }
+    if (_mode != ALERT && _mode != CLOSE)
+        mod |= MODIFICATION_WRITABLE;
     return mod;
 }
 
@@ -83,14 +86,12 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
         goto finished;
     }
 
-    /**
-     * This is mostly an example element. We have two modes for demo:
-     * - Replacement, done inline using the iterator directly in this element
-     * - Removing, done calling iterator.remove
-     */
+
     for(int i = 0; i < insults.size(); ++i)
     {
         const char* insult = insults[i].c_str();
+    /*
+     The following is left for reference on how to do a byte-to-byte matching, that is obviously not very efficient
         if (_mode == MASK) { //Masking mode
             auto end = WordMatcher->flowBuffer.contentEnd();
 
@@ -127,7 +128,9 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                 }
                 ++iter;
             }
-        } else {
+        }
+*/
+        {
             int result;
             do {
                 //iter = WordMatcher->flowBuffer.search(iter, insult, &result);
@@ -137,14 +140,18 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                         WordMatcher->flowBuffer.remove(iter,insults[i].length(), this);
                         while (iter.leftInChunk() == 0 && iter)
                             iter.moveToNextChunk();
+                    } else if (_mode == MASK) {
+                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), "*", 1, true, this);
                     } else if (_mode == REPLACE) {
-                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), insults[i].length(), this);
+                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), insults[i].length(), false, this);
                     } else if (_mode == FULL) {
-                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), _insert_msg.length(), this);
+                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), _insert_msg.length(), false, this);
                     } else if (_mode == CLOSE) {
                         goto closeconn; 
-                    } else //Alert
-                        click_chatter("Attack found !");
+                    } else { //Alert
+                        if (!_quiet)
+                            click_chatter("Attack found !");
+                    }
 
                     WordMatcher->counterRemoved += 1;
                 }

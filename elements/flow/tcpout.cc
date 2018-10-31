@@ -10,7 +10,7 @@
 
 CLICK_DECLS
 
-TCPOut::TCPOut() : inElement(NULL),_readonly(false), _allow_resize(false)
+TCPOut::TCPOut() : inElement(NULL),_readonly(false), _allow_resize(false),_checksum(true)
 {
 
 }
@@ -19,6 +19,7 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
         .read_p("READONLY", _readonly)
+        .read("CHECKSUM", _checksum)
         .complete() < 0)
             return -1;
     return 0;
@@ -167,7 +168,10 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
 
             fcb_in->common->lock.release();
 
-            computeTCPChecksum(packet);
+            if (!_checksum)
+                resetTCPChecksum(packet);
+            else
+                computeTCPChecksum(packet);
             return packet;
         } else {
             tcp_seq_t seq = getSequenceNumber(p);
@@ -194,7 +198,10 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                 // Recompute the checksum
                 WritablePacket *packet = p->uniqueify();
                 p = packet;
-                computeTCPChecksum(packet);
+                if (!_checksum)
+                    resetTCPChecksum(packet);
+                else
+                    computeTCPChecksum(packet);
             }
             return p;
         }

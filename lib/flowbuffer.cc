@@ -389,24 +389,24 @@ void FlowBuffer::remove(const FlowBufferContentIter start, uint32_t length, Stac
     }
 }
 
-int FlowBuffer::replaceInFlow(FlowBufferContentIter iter, const int pattern_length, const char *replacement, const int replacement_length, StackElement* owner)
+int FlowBuffer::replaceInFlow(FlowBufferContentIter iter, const int pattern_length, const char *replacement, const int replacement_length, const bool repeat, StackElement* owner)
 {
     int feedback = -1;
     if(iter == contentEnd())
         return feedback;
 
-    // We compute the difference between the size of the previous content and the new one
-    long offset = replacement_length - pattern_length;
-
     // We compute how many bytes of the old content will be replaced by the new content
-    uint32_t toReplace = pattern_length;
-    if(toReplace > replacement_length)
+    uint32_t toReplace = max(pattern_length, replacement_length);
+    if(!repeat && toReplace > replacement_length)
         toReplace = replacement_length;
 
+    // We compute the difference between the size of the previous content and the new one
+    long offset = toReplace - pattern_length;
+    click_chatter("Offset %d %d", offset,toReplace);
     // Replace pattern by "replacement" until we reach the end of one of the two strings
     for(int i = 0; i < toReplace; ++i)
     {
-        *iter = replacement[i];
+        *iter = replacement[i % replacement_length];
         ++iter;
     }
 
