@@ -82,7 +82,6 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     if (Args(conf, this, errh)
-        .read_mp("PORT", dev)
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
