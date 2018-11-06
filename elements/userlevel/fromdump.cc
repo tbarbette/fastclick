@@ -519,15 +519,11 @@ FromDump::read_packet(ErrorHandler *errh)
             return false;
         }
 
-        // Keep the old length for incremental IP checksum calculation
-        uint16_t len_old = ip->ip_len;
-
-        // Update the IP header
+        // Update the IP header's length
         ip->ip_len = htons(q->length() - offset);
-        // and don't forget the checksum
-        if (len_old != ip->ip_len) {
-            click_update_in_cksum(&ip->ip_sum, len_old, ip->ip_len);
-        }
+
+        // Checksum must be recomputed as a whole, as anonymized traces might have issues with partial checksum updates
+        ip->ip_sum = click_in_cksum((unsigned char *) ip, sizeof(click_ip));
 
         p = q;
 
