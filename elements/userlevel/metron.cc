@@ -804,6 +804,8 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
         sc->get_cpu_info(i).set_active(true);
     }
 
+    assert(sc->get_active_cpu_nb() == sc->_initial_cpus_nb);
+
     int ret = run_service_chain(sc, errh, true);
     if (ret != SUCCESS) {
         unassign_cpus(sc);
@@ -1010,7 +1012,10 @@ Metron::write_handler(
         case h_delete_chains: {
             ServiceChain *sc = m->find_service_chain_by_id(data);
             if (!sc) {
-                return errh->error("Cannot delete service chain: Unknown service chain ID %s", data.c_str());
+                return errh->error(
+                    "Cannot delete service chain: Unknown service chain ID %s",
+                    data.c_str()
+                );
             }
 
             int ret = m->delete_service_chain(sc, errh);
@@ -2318,6 +2323,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
             int core_id = jcpu.second.get_i("cpuId");
+            click_chatter("Adding rules for CPU %d, physId %d", core_id,get_cpu_phys_id(core_id));
             assert(get_cpu_info(core_id).active());
 
             String rules_str = "";
@@ -2339,6 +2345,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             }
 
             // Install a batch of rules associated with this CPU core ID
+            int phys_core_id = get_cpu_phys_id(core_id);
             int status = nic->get_flow_director()->add_rules_from_string(rules_str);
             if (status >= 0) {
                 inserted_rules_nb += status;
@@ -2346,7 +2353,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 
             // Add this tag to the list of tags of this NIC
             if (!this->rx_filter->has_tag_value(inic, core_id)) {
-                this->rx_filter->set_tag_value(inic, core_id, String(core_id));
+                this->rx_filter->set_tag_value(inic, core_id, String(phys_core_id));
             }
         }
 
@@ -2622,15 +2629,15 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
     for (auto jfield : j) {
         if (jfield.first == "cpus") {
-            Bitvector old_map = active_cpus();
-            Bitvector new_map(get_max_cpu_nb(), false);
+            Bitvector oldMap = active_cpus();
+            Bitvector newMap(get_max_cpu_nb(), false);
 
             if (jfield.second.is_array()) {
                 for (int i = 0; i < jfield.second.size(); i++) {
 
-                    int cpu_id = jfield.second[i].to_i();
-                    new_map[cpu_id] = true;
-                    if (cpu_id >  get_max_cpu_nb()) {
+                    int cpuId = jfield.second[i].to_i();
+                    newMap[cpuId] = true;
+                    if (cpuId >  get_max_cpu_nb()) {
                             return errh->error(
                                 "Number of used CPUs must be less or equal "
                                 "than the maximum number of CPUs!"
@@ -2639,30 +2646,30 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
                 }
             } else {
-                click_chatter("Unknown cpu map %s!", jfield.second.c_str());
+                click_chatter("Unknown cpu map %s !",jfield.second.c_str());
             }
             int ret;
             String response = "";
             bool did_scale = false;
 
             if (_metron->_rx_mode == RSS) {
-                for (int i = 0; i < new_map.size(); i++) {
-                    if (!new_map[i] && i < new_map.weight()) {
+                for (int i = 0; i < newMap.size(); i++) {
+                    if (!newMap[i] && i < newMap.weight()) {
                         return errh->error("RSS must allocate CPUs without holes !");
                     }
                 }
             }
 
             for (int new_cpu_id = 0; new_cpu_id < get_max_cpu_nb(); new_cpu_id++) {
-                if (old_map[new_cpu_id] == new_map[new_cpu_id]) {
+                if (oldMap[new_cpu_id] == newMap[new_cpu_id]) {
                     continue;
                 }
 
                 did_scale = true;
 
                 // Activating core
-                get_cpu_info(new_cpu_id).set_active(new_map[new_cpu_id]);
-                if (new_map[new_cpu_id]) {
+                get_cpu_info(new_cpu_id).set_active(newMap[new_cpu_id]);
+                if (newMap[new_cpu_id]) {
                     for (int inic = 0; inic < get_nics_nb(); inic++) {
                         ret = call_write(
                             generate_configuration_slave_fd_name(
@@ -2711,7 +2718,10 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
             return 0;
         } else {
-            return errh->error("Unsupported reconfiguration option: %s", jfield.first.c_str());
+            return errh->error(
+                "Unsupported reconfiguration option: %s",
+                jfield.first.c_str()
+            );
         }
     }
 

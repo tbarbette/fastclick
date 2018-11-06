@@ -405,7 +405,8 @@ struct LatencyInfo {
 class CpuInfo {
     public:
         CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0),
-                    latency(), _active(false), _active_time() {
+                    latency(), _active(false) {
+            _active_time = Timestamp::now_steady();
         }
 
         int cpu_phys_id;
@@ -420,7 +421,7 @@ class CpuInfo {
 
         void set_active(bool active) {
             _active = active;
-            _active_time = Timestamp::now();
+            _active_time = Timestamp::now_steady();
         }
 
         bool active() {
@@ -430,9 +431,9 @@ class CpuInfo {
         int active_since() {
             int cpu_time;
             if (_active)
-                cpu_time = (Timestamp::now() - _active_time).msecval();
+                cpu_time = (Timestamp::now_steady() - _active_time).msecval();
             else
-                cpu_time = -(Timestamp::now() - _active_time).msecval();
+                cpu_time = -(Timestamp::now_steady() - _active_time).msecval();
             return cpu_time;
         }
 
