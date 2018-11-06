@@ -13,36 +13,10 @@ from os.path import abspath, isfile, join, dirname
 from IPy import IP, _prefixlenToNetmask
 from random import randint
 
+from common import *
+
 STRATEGY_FILE = "file"
 STRATEGY_RAND = "random"
-
-ALLOW = "allow"
-DROP  = "drop"
-DENY  = "deny"
-
-IPFILTER = "IPFilter"
-IPLOOKUP = "Lookup"
-UNKNOWN  = "Unknown"
-
-ENTRIES_ELEMENT = "entries"
-TRAFFIC_CLASS_ELEMENT = "trafficClass"
-OUTPUT_PORT_ELEMENT = "outputPort"
-PRIORITY_ELEMENT = "priority"
-ACTION_ELEMENT = "action"
-ETHERNET    = "eth"
-IPVF        = "ipv4"
-IPVS        = "ipv6"
-UDP         = "udp"
-TCP         = "tcp"
-PROTO_EXACT = "proto is"
-SRC_EXACT   = "src is"
-SRC_SPEC    = "src spec"
-SRC_MASK    = "src mask"
-DST_EXACT   = "dst is"
-DST_SPEC    = "dst spec"
-DST_MASK    = "dst mask"
-ACTION_Q    = "queue index"
-ACTION_CNT  = "count"
 
 ETHERNET_RULE_PREF = "ingress pattern eth"
 
