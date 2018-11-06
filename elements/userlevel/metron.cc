@@ -1976,8 +1976,7 @@ ServiceChain::RxFilter::to_json()
         NIC *nic = sc->get_nic_by_index(nic_id);
         Json jaddrs = Json::make_array();
         for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
-            const int core_id = sc->get_cpu_phys_id(j);
-            const String tag = get_tag_value(nic_id, core_id);
+            const String tag = get_tag_value(nic_id, j);
             assert(!tag.empty());
             jaddrs.push_back(tag);
         }
