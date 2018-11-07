@@ -1036,41 +1036,30 @@ FlowDirector::load_rules_from_file_to_string(const String &filename)
 }
 
 /**
- * Installs a set of flow rules from a string.
+ * Installs a set of flow rules from a map.
  *
- * @args rules_str: a (st of) newline-separated flow rules as a single string
+ * @args rules_map: a map of global rule IDs to their rules
+ * @args by_controller: boolean flag that denotes that rule installation is driven by a controller
  * @return the number of flow rules being installed, otherwise a negative integer
  */
 int32_t
-FlowDirector::add_rules_from_string(const String &rules_str)
+FlowDirector::add_rules(HashMap<long, String> &rules_map, bool by_controller)
 {
-    if (rules_str.empty()) {
-        return (int32_t) _errh->error("Flow Director (port %u): Failed to add rules due to empty input string", _port_id);
-    }
-
-    // Tokenize them to facilitate the insertion in the flow cache
-    Vector<String> rules_vec = rules_str.trim_space().split('\n');
-    uint32_t rules_to_install = rules_vec.size();
+    uint32_t rules_to_install = rules_map.size();
     if (rules_to_install == 0) {
-        return (int32_t) 0;
+        return (int32_t) _errh->error("Flow Director (port %u): Failed to add rules due to empty input map", _port_id);
     }
 
-    RuleTiming rits(_port_id);
-    rits.start = Timestamp::now_steady();
-
-    // Install in the NIC as a batch
-    if (flow_rules_install(rules_str, rules_to_install) != FLOWDIR_SUCCESS) {
-        return FLOWDIR_ERROR;
-    }
-
-    rits.end = Timestamp::now_steady();
-
+    String rules_str = "";
     uint32_t installed_rules_nb = 0;
 
     // Now insert each rule in the flow cache
-    for (uint32_t i = 0; i < rules_vec.size(); i++) {
-        String rule = rules_vec[i];
+    auto it = rules_map.begin();
+    while (it != rules_map.end()) {
+        long rule_id = it.key();
+        String rule = it.value();
         if (rule.empty()) {
+            it++;
             continue;
         }
 
@@ -1078,23 +1067,49 @@ FlowDirector::add_rules_from_string(const String &rules_str)
         String queue_index_str = fetch_token_after_keyword((char *) rule.c_str(), "queue index");
         int core_id = atoi(queue_index_str.c_str());
 
-        // Get the next internal rule ID
-        uint32_t next_int_rule_id = _flow_cache->next_internal_rule_id();
+        // Get the right internal rule ID
+        uint32_t int_rule_id = 0;
+        if (by_controller) {
+            int_rule_id = _flow_cache->next_internal_rule_id();
+        } else {
+            int_rule_id = (uint32_t) rule_id;
+        }
+
+        if (_verbose) {
+            _errh->message(
+                "Flow Director (port %u): About to install rule with global ID %ld and internal ID %" PRIu32 " on core %d: %s",
+                _port_id, rule_id, int_rule_id, core_id, rule.c_str()
+            );
+        }
 
         // Insert into the flow cache
-        if (!_flow_cache->update_rule_in_flow_cache(core_id, (long) next_int_rule_id, next_int_rule_id, rule)) {
+        if (!_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
             return FLOWDIR_ERROR;
         }
 
+        // Now it is safe to append this rule for installation
+        rules_str += rule;
+
         installed_rules_nb++;
+        it++;
     }
+
+    RuleTiming rits(_port_id);
+    rits.start = Timestamp::now_steady();
+
+    // Install in the NIC as a batch
+    if (flow_rules_install(rules_str, installed_rules_nb) != FLOWDIR_SUCCESS) {
+        return FLOWDIR_ERROR;
+    }
+
+    rits.end = Timestamp::now_steady();
 
     rits.update(installed_rules_nb);
     add_rule_inst_stats(rits);
 
     _errh->message(
-        "Flow Director (port %u): Successfully installed %" PRIu32 "/%" PRIu32 " rules in %.1f ms at the rate of %.3f rules/sec",
-        _port_id, installed_rules_nb, rules_vec.size(), rits.latency_ms, rits.rules_per_sec
+        "Flow Director (port %u): Successfully installed %" PRIu32 "/%" PRIu32 " rules in %.2f ms at the rate of %.3f rules/sec",
+        _port_id, installed_rules_nb, rules_to_install, rits.latency_ms, rits.rules_per_sec
     );
 
     return (int32_t) installed_rules_nb;
@@ -1111,7 +1126,27 @@ FlowDirector::add_rules_from_string(const String &rules_str)
 int32_t
 FlowDirector::add_rules_from_file(const String &filename)
 {
-    return add_rules_from_string((const String) load_rules_from_file_to_string(filename));
+    HashMap<long, String> rules_map;
+    const String rules_str = (const String) load_rules_from_file_to_string(filename);
+
+    if (rules_str.empty()) {
+        return (int32_t) _errh->error("Flow Director (port %u): Failed to add rules due to empty input from file", _port_id);
+    }
+
+    // Start with the right internal rule ID
+    uint32_t next_int_rule_id = _flow_cache->next_internal_rule_id();
+
+    // Tokenize them to facilitate the insertion in the flow cache
+    Vector<String> rules_vec = rules_str.trim_space().split('\n');
+
+    for (uint32_t i = 0; i < rules_vec.size(); i++) {
+        String rule = rules_vec[i] + "\n";
+
+        // Add rule to the map
+        rules_map.insert((long) next_int_rule_id++, rule);
+    }
+
+    return add_rules(rules_map, false);
 }
 
 /**

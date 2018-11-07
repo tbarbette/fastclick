@@ -221,8 +221,8 @@ class FlowDirector {
         // Install NIC flow rules from a file
         int32_t add_rules_from_file(const String &filename);
 
-        // Install NIC flow rules from a string
-        int32_t add_rules_from_string(const String &rules_str);
+        // Install NIC flow rules
+        int32_t add_rules(HashMap<long, String> &rules_map, bool by_controller = true);
 
         // Loads a set of rules from a file to memory
         String load_rules_from_file_to_string(const String &filename);

@@ -2322,10 +2322,10 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
             int core_id = jcpu.second.get_i("cpuId");
-            click_chatter("Adding rules for CPU %d, physId %d", core_id,get_cpu_phys_id(core_id));
+            click_chatter("Adding rules for CPU %d with physical ID %d", core_id, get_cpu_phys_id(core_id));
             assert(get_cpu_info(core_id).active());
 
-            String rules_str = "";
+            HashMap<long, String> rules_map;
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
@@ -2339,13 +2339,16 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                     rule += "\n";
                 }
 
+                // Compose rule for the right NIC
+                rule = "flow create " + String(nic->get_port_id()) + " " + rule;
+
                 // Store this rule
-                rules_str += rule;
+                rules_map.insert(rule_id, rule);
             }
 
             // Install a batch of rules associated with this CPU core ID
             int phys_core_id = get_cpu_phys_id(core_id);
-            int status = nic->get_flow_director()->add_rules_from_string(rules_str);
+            int status = nic->get_flow_director()->add_rules(rules_map, true);
             if (status >= 0) {
                 inserted_rules_nb += status;
             }
