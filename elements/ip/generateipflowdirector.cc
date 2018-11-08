@@ -165,14 +165,18 @@ GenerateIPFlowDirector::policy_based_rule_generation(const uint8_t aggregation_p
 
         acc << "ingress pattern eth /";
 
+        bool with_ipv4 = false;
         if (flow.flowid().saddr().s() != "0.0.0.0") {
             acc << " ipv4 src spec ";
             acc << flow.flowid().saddr().unparse();
             acc << " src mask ";
             acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse();
+            with_ipv4 = true;
         }
 
         if (flow.flowid().daddr().s() != "0.0.0.0") {
+            if (!with_ipv4)
+                acc << " ipv4";
             acc << " dst spec ";
             acc << flow.flowid().daddr().unparse();
             acc << " dst mask ";
