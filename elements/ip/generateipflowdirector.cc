@@ -75,9 +75,13 @@ GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_mp("PORT", _port)
             .read_p("NB_QUEUES", _nb_queues)
             .read("POLICY", policy)
-            .read("PREFIX", _prefix)
             .consume() < 0)
         return -1;
+
+    int status = build_mask(_mask, _keep_saddr, _keep_daddr, _keep_sport, _keep_dport, _prefix);
+    if (status != 0) {
+        return errh->error("Cannot continue with empty mask");
+    }
 
     if (_nb_queues == 0) {
         errh->error("NB_QUEUES must be a positive integer");
@@ -86,16 +90,14 @@ GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
     // Initialize the load per NIC queue
     init_queue_load_map(_nb_queues);
 
-    if (policy.upper() == "ROUND_ROBIN") {
+    if ((policy.upper() == "ROUND_ROBIN") || (policy.upper() == "ROUND-ROBIN")) {
         _queue_alloc_policy = ROUND_ROBIN;
-    } else if (policy.upper() == "LOAD_AWARE") {
+    } else if ((policy.upper() == "LOAD_AWARE") || (policy.upper() == "LOAD-AWARE")) {
         _queue_alloc_policy = LOAD_AWARE;
     } else {
         errh->error("Invalid POLICY. Select in [ROUND_ROBIN, LOAD_AWARE]");
         return -1;
     }
-
-    _mask = build_mask(_keep_sport, _keep_dport, _prefix);
 
     return GenerateIPFilter::configure(conf, errh);
 }
@@ -141,7 +143,7 @@ find_less_loaded_queue(const HashMap<uint16_t, uint64_t> queue_load_map)
 }
 
 static void
-print_queue_load_map(const HashMap<uint16_t, uint64_t> queue_load_map)
+print_queue_load_map(const HashMap<uint16_t, uint64_t> &queue_load_map)
 {
     for (uint16_t i = 0; i < queue_load_map.size(); i++) {
         click_chatter("NIC queue %02d has load: %15" PRIu64, i, queue_load_map[i]);
@@ -149,74 +151,73 @@ print_queue_load_map(const HashMap<uint16_t, uint64_t> queue_load_map)
 }
 
 String
-GenerateIPFlowDirector::policy_based_rule_generation(
-        GenerateIPFlowDirector *g, const uint8_t aggregation_prefix)
+GenerateIPFlowDirector::policy_based_rule_generation(const uint8_t aggregation_prefix)
 {
-    if (!g) {
-        return "";
-    }
-
     StringAccum acc;
 
     uint32_t i = 0;
-    for (auto flow : g->_map) {
+    for (auto flow : _map) {
         // Wildcards are intentionally excluded
-        if ((flow.flowid().saddr().s() == "0.0.0.0") ||
+        if ((flow.flowid().saddr().s() == "0.0.0.0") &&
             (flow.flowid().daddr().s() == "0.0.0.0")) {
             continue;
         }
 
         acc << "ingress pattern eth /";
-        acc << " ipv4 src spec ";
-        acc << flow.flowid().saddr().unparse();
-        acc << " src mask ";
-        acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse();
-        acc << " dst spec ";
-        acc << flow.flowid().daddr().unparse();
-        acc << " dst mask ";
-        acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse().c_str();
+
+        if (flow.flowid().saddr().s() != "0.0.0.0") {
+            acc << " ipv4 src spec ";
+            acc << flow.flowid().saddr().unparse();
+            acc << " src mask ";
+            acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse();
+        }
+
+        if (flow.flowid().daddr().s() != "0.0.0.0") {
+            acc << " dst spec ";
+            acc << flow.flowid().daddr().unparse();
+            acc << " dst mask ";
+            acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse();
+        }
         acc << " /";
 
-        /**
-         * Incorporate transport layer ports if asked
-         */
+        // Incorporate transport layer ports if asked
         if (flow.flow_proto() != 0) {
             String proto_str = flow.flow_proto() == 6 ? "tcp" : "udp";
 
-            if (g->_keep_sport) {
+            if (_keep_sport) {
                 acc << " " << proto_str << " src is ";
                 acc << flow.flowid().sport();
             }
-            if (g->_keep_dport) {
+            if (_keep_dport) {
                 acc << " " << proto_str << " dst is ";
                 acc << flow.flowid().dport();
             }
-            if ((g->_keep_sport) || (g->_keep_dport))
+            if ((_keep_sport) || (_keep_dport))
                 acc << " / ";
         }
 
 
         // Select a NIC queue according to the input policy
         uint16_t chosen_queue = -1;
-        switch (g->_queue_alloc_policy) {
+        switch (_queue_alloc_policy) {
             case ROUND_ROBIN:
-               chosen_queue = round_robin(i, g->_nb_queues);
+               chosen_queue = round_robin(i, _nb_queues);
                break;
             case LOAD_AWARE:
-               chosen_queue = find_less_loaded_queue(g->_queue_load_map);
+               chosen_queue = find_less_loaded_queue(_queue_load_map);
                break;
             default:
                 return "";
         }
-        assert((chosen_queue >= 0) && (chosen_queue < g->_nb_queues));
+        assert((chosen_queue >= 0) && (chosen_queue < _nb_queues));
         acc << " end actions queue index ";
         acc << chosen_queue;
         acc << " / count / end\n";
 
         // Update the queue load map
-        uint64_t current_load = g->_queue_load_map[chosen_queue];
+        uint64_t current_load = _queue_load_map[chosen_queue];
         uint64_t additional_load = flow.flow_size();
-        g->_queue_load_map.insert(chosen_queue, current_load + additional_load);
+        _queue_load_map.insert(chosen_queue, current_load + additional_load);
 
         i++;
     }
@@ -225,23 +226,19 @@ GenerateIPFlowDirector::policy_based_rule_generation(
 }
 
 String
-GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
+GenerateIPFlowDirector::dump_stats()
 {
-    if (!g) {
-        return "";
-    }
-
     uint64_t total_load = 0;
-    for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
-        total_load += g->_queue_load_map[i];
+    for (uint16_t i = 0; i < _queue_load_map.size(); i++) {
+        total_load += _queue_load_map[i];
     }
 
     StringAccum acc;
-    double balance_point_per_queue = (double) total_load / (double) g->_nb_queues;
+    double balance_point_per_queue = (double) total_load / (double) _nb_queues;
     double avg_total_load_imbalance_ratio = 0;
 
     if (balance_point_per_queue == 0) {
-        g->_avg_total_load_imbalance_ratio = 0;
+        _avg_total_load_imbalance_ratio = 0;
         click_chatter("No load in the system!");
 
         acc << "Average load imbalance ratio: " << avg_total_load_imbalance_ratio << "\n";
@@ -252,16 +249,16 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
     acc.snprintf(15, "%.0f", balance_point_per_queue);
     acc << " bytes \n";
 
-    for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
+    for (uint16_t i = 0; i < _queue_load_map.size(); i++) {
         // This is the distance from the ideal load (assuming optimal load balancing)
-        double load_distance_from_ideal = (double) g->_queue_load_map[i] - (double) balance_point_per_queue;
+        double load_distance_from_ideal = (double) _queue_load_map[i] - (double) balance_point_per_queue;
         // Normalize this distance
         double load_imbalance_ratio = (double) load_distance_from_ideal / (double) balance_point_per_queue;
         // Make percentage
         load_imbalance_ratio *= 100;
 
         // This is the load imbalance ratio of this queue
-        g->_queue_load_imbalance.insert(i, load_imbalance_ratio);
+        _queue_load_imbalance.insert(i, load_imbalance_ratio);
 
         // Update the average imbalance ratio
         avg_total_load_imbalance_ratio += std::abs(load_imbalance_ratio);
@@ -276,9 +273,9 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
     }
 
     // Average imbalance ratio
-    avg_total_load_imbalance_ratio /= g->_nb_queues;
+    avg_total_load_imbalance_ratio /= _nb_queues;
     assert(avg_total_load_imbalance_ratio >= 0);
-    g->_avg_total_load_imbalance_ratio = avg_total_load_imbalance_ratio;
+    _avg_total_load_imbalance_ratio = avg_total_load_imbalance_ratio;
 
     acc << "Average load imbalance ratio: ";
     acc.snprintf(8, "%.4f", avg_total_load_imbalance_ratio);
@@ -288,55 +285,45 @@ GenerateIPFlowDirector::dump_stats(GenerateIPFlowDirector *g)
 }
 
 String
-GenerateIPFlowDirector::dump_load(GenerateIPFlowDirector *g)
+GenerateIPFlowDirector::dump_load()
 {
-    if (!g) {
-        return "";
-    }
-
     StringAccum acc;
 
-    for (uint16_t i = 0; i < g->_queue_load_map.size(); i++) {
+    for (uint16_t i = 0; i < _queue_load_map.size(); i++) {
         acc << "NIC queue ";
         acc.snprintf(2, "%02d", i);
         acc << " load: ";
-        acc.snprintf(15, "%15" PRIu64, g->_queue_load_map[i]);
+        acc.snprintf(15, "%15" PRIu64, _queue_load_map[i]);
         acc << " bytes\n";
     }
 
     acc << "\n";
-    acc << "Total number of flows: " << g->_map.size() << "\n";
+    acc << "Total number of flows: " << _map.size() << "\n";
 
     return acc.take_string();
 }
 
 String
-GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g, bool verbose)
+GenerateIPFlowDirector::dump_rules(bool verbose)
 {
-    if (!g) {
-        return "GenerateIPFlowDirector element not found";
-    }
-    assert(g->_pattern_type == FLOW_DIRECTOR);
+    assert(_pattern_type == FLOW_DIRECTOR);
 
     Timestamp before = Timestamp::now();
 
-    uint8_t n = 32 - g->_prefix;
-    while (g->_map.size() > g->_nrules) {
+    uint8_t n = 32 - _prefix;
+    while (_map.size() > _nrules) {
         if (verbose) {
-            click_chatter("%8d rules with prefix /%02d, continuing with /%02d",g->_map.size(), 32-n, 32-n-1);
+            click_chatter("%8d rules with prefix /%02d, continuing with /%02d", _map.size(), 32-n, 32-n-1);
         }
 
         HashTable<IPFlow> new_map;
         ++n;
-        g->_mask = IPFlowID(
-            IPAddress::make_prefix(32 - n), g->_mask.sport(),
-            IPAddress::make_prefix(32 - n), g->_mask.dport()
-        );
+        _mask = IPFlowID(IPAddress::make_prefix(32 - n), _mask.sport(), IPAddress::make_prefix(32 - n), _mask.dport());
 
         uint64_t i = 0;
-        for (auto flow : g->_map) {
+        for (auto flow : _map) {
             // Check if we already have such a flow
-            flow.set_mask(g->_mask);
+            flow.set_mask(_mask);
             IPFlow *found = new_map.find(flow.flowid()).get();
 
             // New flow
@@ -351,10 +338,14 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g, bool verbose)
             i++;
         }
 
-        g->_map = new_map;
+        _map = new_map;
         if (n == 32) {
-            return "Impossible to reduce the number of rules below: " + String(g->_map.size());
+            return "Impossible to reduce the number of rules below: " + String(_map.size());
         }
+    }
+
+    if (verbose) {
+        click_chatter("%8d rules with prefix /%02d", _map.size(), 32-n);
     }
 
     Timestamp after = Timestamp::now();
@@ -368,7 +359,7 @@ GenerateIPFlowDirector::dump_rules(GenerateIPFlowDirector *g, bool verbose)
         );
     }
 
-    return policy_based_rule_generation(g, n);
+    return policy_based_rule_generation(n);
 }
 
 String
@@ -382,23 +373,23 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
 
     switch (what) {
         case h_dump: {
-            return dump_rules(g, true);
+            return g->dump_rules(true);
         }
         case h_load: {
-            return dump_load(g);
+            return g->dump_load();
         }
         case h_stats: {
-            return dump_stats(g);
+            return g->dump_stats();
         }
         case h_rules_nb: {
             if (g->_map.size() == 0) {
-                dump_rules(g);
+                g->dump_rules();
             }
             return String(g->_map.size());
         }
         case h_avg_imbalance_ratio: {
             if (g->_avg_total_load_imbalance_ratio == -1) {
-                dump_stats(g);
+                g->dump_stats();
             }
             return String(g->_avg_total_load_imbalance_ratio);
         }
@@ -426,7 +417,7 @@ GenerateIPFlowDirector::param_handler(
 
             // Force to compute the ratios if not already computed
             if (g->_avg_total_load_imbalance_ratio == -1) {
-                dump_stats(g);
+                g->dump_stats();
             }
 
             const uint16_t queue_id = atoi(input.c_str());

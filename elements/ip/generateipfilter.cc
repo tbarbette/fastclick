@@ -59,9 +59,21 @@ GenerateIPPacket::initialize(ErrorHandler *errh)
     return 0;
 }
 
-IPFlowID
-GenerateIPPacket::build_mask(bool ks, bool kd, int prefix) {
-    return IPFlowID(IPAddress::make_prefix(prefix), (ks?0xffff:0), IPAddress::make_prefix(prefix), (kd?0xffff:0));
+int
+GenerateIPPacket::build_mask(IPFlowID &mask, bool keep_saddr, bool keep_daddr, bool keep_sport, bool keep_dport, int prefix)
+{
+    if (!keep_saddr && !keep_daddr && !keep_sport && !keep_dport) {
+        return -1;
+    }
+
+     mask = IPFlowID(
+        (keep_saddr ? IPAddress::make_prefix(prefix) : IPAddress("")),
+        (keep_sport ? 0xffff : 0),
+        (keep_daddr ? IPAddress::make_prefix(prefix) : IPAddress("")),
+        (keep_dport ? 0xffff : 0)
+    );
+
+     return 0;
 }
 
 void
@@ -74,13 +86,13 @@ GenerateIPPacket::cleanup(CleanupStage)
  * IP FIlter rules' generator out of incoming traffic.
  */
 GenerateIPFilter::GenerateIPFilter() :
-    GenerateIPPacket(), _keep_sport(false), _keep_dport(true),
+    GenerateIPPacket(), _keep_saddr(true), _keep_daddr(true), _keep_sport(false), _keep_dport(true),
     _pattern_type(NONE)
 {
 }
 
 GenerateIPFilter::GenerateIPFilter(RulePattern pattern_type) :
-    GenerateIPPacket(), _keep_sport(false), _keep_dport(true)
+    GenerateIPPacket(), _keep_saddr(true), _keep_daddr(true), _keep_sport(false), _keep_dport(true)
 {
     _pattern_type = pattern_type;
 }
@@ -95,6 +107,8 @@ GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
     String pattern_type = "IPFILTER";
 
     if (Args(conf, this, errh)
+            .read("KEEP_SADDR", _keep_saddr)
+            .read("KEEP_DADDR", _keep_daddr)
             .read("KEEP_SPORT", _keep_sport)
             .read("KEEP_DPORT", _keep_dport)
             .read("PATTERN_TYPE", pattern_type)
@@ -102,7 +116,10 @@ GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
             .consume() < 0)
         return -1;
 
-    _mask = build_mask(_keep_sport, _keep_dport, _prefix);
+    int status = build_mask(_mask, _keep_saddr, _keep_daddr, _keep_sport, _keep_dport, _prefix);
+    if (status != 0) {
+        return errh->error("Cannot continue with empty mask");
+    }
 
     /**
      * Sub-classes of GenerateIPFilter have this member already set.
@@ -188,6 +205,61 @@ GenerateIPFilter::simple_action_batch(PacketBatch *batch)
 #endif
 
 String
+GenerateIPFilter::dump_rules(bool verbose)
+{
+    uint8_t n = 32 - _prefix;
+    while (_map.size() > (unsigned)_nrules) {
+        HashTable<IPFlow> new_map;
+
+        if (verbose) {
+            click_chatter("%8d rules with prefix /%02d, continuing with /%02d", _map.size(), 32-n, 32-n-1);
+        }
+
+        ++n;
+        _mask = IPFlowID(IPAddress::make_prefix(32 - n), _mask.sport(), IPAddress::make_prefix(32 - n), _mask.dport());
+
+        for (auto flow : _map) {
+            // Wildcards are intentionally excluded
+            if ((flow.flowid().saddr().s() == "0.0.0.0") ||
+                (flow.flowid().daddr().s() == "0.0.0.0")) {
+                continue;
+            }
+
+            flow.set_mask(_mask);
+            new_map.find_insert(flow);
+        }
+
+        _map = new_map;
+        if (n == 32) {
+            return "Impossible to reduce the number of rules below: " + String(_map.size());
+        }
+    }
+
+    if (verbose) {
+        click_chatter("%8d rules with prefix /%02d", _map.size(), 32-n);
+    }
+
+    StringAccum acc;
+
+    for (auto flow : _map) {
+        if (_pattern_type == IPFILTER) {
+            acc << "allow ";
+        }
+
+        acc << "src net " << flow.flowid().saddr() << '/' << String(32-n) << " && "
+            << "dst net " << flow.flowid().daddr() << '/' << String(32-n);
+        if (_keep_sport)
+            acc << " && src port " << flow.flowid().sport();
+        if (_keep_dport) {
+            acc << " && dst port " << flow.flowid().dport();
+        }
+        acc << ",\n";
+    }
+
+    return acc.take_string();
+}
+
+String
 GenerateIPFilter::read_handler(Element *e, void *user_data)
 {
     GenerateIPFilter *g = static_cast<GenerateIPFilter *>(e);
@@ -197,63 +269,30 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
 
     assert(g->_pattern_type == IPFILTER || g->_pattern_type == IPCLASSIFIER);
 
-    uint8_t n = 32 - g->_prefix;
-    while (g->_map.size() > (unsigned)g->_nrules) {
-        HashTable<IPFlow> new_map;
-        click_chatter("%d rules with prefix /%d, continuing with /%d",g->_map.size(), 32-n, 32-n-1);
-        ++n;
-        g->_mask = IPFlowID(
-            IPAddress::make_prefix(32 - n), g->_mask.sport(),
-            IPAddress::make_prefix(32 - n), g->_mask.dport()
-        );
-        for (auto flow : g->_map) {
-            // Wildcards are intentionally excluded
-            if ((flow.flowid().saddr().s() == "0.0.0.0") ||
-                (flow.flowid().daddr().s() == "0.0.0.0")) {
-                continue;
+    intptr_t what = reinterpret_cast<intptr_t>(user_data);
+
+    switch (what) {
+        case h_dump: {
+            return g->dump_rules(true);
+        }
+        case h_rules_nb: {
+            if (g->_map.size() == 0) {
+                g->dump_rules();
             }
-
-            flow.set_mask(g->_mask);
-            new_map.find_insert(flow);
+            return String(g->_map.size());
         }
-        g->_map = new_map;
-        if (n == 32) {
-            return "Impossible to reduce the number of rules below: " + String(g->_map.size());
+        default: {
+            click_chatter("Unknown read handler: %d", what);
+            return "";
         }
     }
-
-    uint64_t rules_nb = 0;
-    StringAccum acc;
-
-    for (auto flow : g->_map) {
-        if (g->_pattern_type == IPFILTER) {
-            acc << "allow ";
-        }
-
-        acc << "src net " << flow.flowid().saddr() << '/' << String(32-n) << " && "
-                 << " dst net " << flow.flowid().daddr() << '/' << String(32-n);
-        if (g->_keep_sport)
-            acc << " && src port " << flow.flowid().sport();
-        if (g->_keep_dport) {
-            acc << " && dst port " << flow.flowid().dport();
-        }
-        acc << ",\n";
-
-        rules_nb++;
-    }
-
-    acc << "\n";
-    acc << "# of Rules: ";
-    acc.snprintf(12, "%" PRIu64, rules_nb);
-    acc << "\n";
-
-    return acc.take_string();
 }
 
 void
 GenerateIPFilter::add_handlers()
 {
-    add_read_handler("dump", read_handler);
+    add_read_handler("dump", read_handler, h_dump);
+    add_read_handler("rules_nb", read_handler, h_rules_nb);
 }
 
 CLICK_ENDDECLS

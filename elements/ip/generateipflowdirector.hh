@@ -132,34 +132,29 @@ class GenerateIPFlowDirector : public GenerateIPFilter {
         /**
          * Dumps rules to stdout (called by read handler dump).
          */
-        static String dump_rules(GenerateIPFlowDirector *g, bool verbose = false);
+        virtual String dump_rules(bool verbose = false) override;
 
         /**
          * Dumps load per queue to stdout (called by read handler load).
          */
-        static String dump_load(GenerateIPFlowDirector *g);
+        String dump_load();
 
         /**
          * Dumps load statistics to stdout (called by read handler stats).
          */
-        static String dump_stats(GenerateIPFlowDirector *g);
+        String dump_stats();
 
         /**
          * Assign rules to NIC queues according to a policy.
          */
-        static String policy_based_rule_generation(
-            GenerateIPFlowDirector *g,
-            const uint8_t aggregation_prefix
-        );
+        String policy_based_rule_generation(const uint8_t aggregation_prefix);
 
         /**
-         * Handlers.
+         * Additional handlers.
          */
         enum {
-            h_dump,
-            h_load,
+            h_load = 2,
             h_stats,
-            h_rules_nb,
             h_avg_imbalance_ratio,
             h_queue_imbalance_ratio
         };

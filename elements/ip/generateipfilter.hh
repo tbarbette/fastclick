@@ -123,7 +123,7 @@ class GenerateIPPacket : public BatchElement {
                 uint64_t _flow_size_bytes;
         };
 
-        IPFlowID build_mask(bool ks, bool kd, int prefix);
+        int build_mask(IPFlowID &mask, bool keep_saddr, bool keep_daddr, bool keep_sport, bool keep_dport, int prefix);
 
         int _nrules;
         HashTable<IPFlow> _map;
@@ -131,6 +131,9 @@ class GenerateIPPacket : public BatchElement {
         int _prefix;
 
         static const int DEF_NB_RULES;
+
+        // Deriving classes must be able to dump rules
+        virtual String dump_rules(bool verbose = false) = 0;
 
 };
 
@@ -163,19 +166,31 @@ class GenerateIPFilter : public GenerateIPPacket {
         void cleanup(CleanupStage) CLICK_COLD;
         void add_handlers() CLICK_COLD;
 
-        static String read_handler(Element *handler, void *user_data);
-
         virtual Packet *simple_action(Packet *p) override;
     #if HAVE_BATCH
         virtual PacketBatch *simple_action_batch(PacketBatch *batch) override;
     #endif
 
+        static String read_handler(Element *handler, void *user_data);
+
     protected:
 
+        bool _keep_saddr;
+        bool _keep_daddr;
         bool _keep_sport;
         bool _keep_dport;
 
         RulePattern _pattern_type;
+
+        /**
+         * Handlers.
+         */
+        enum {
+            h_dump = 0,
+            h_rules_nb
+        };
+
+        virtual String dump_rules(bool verbose = false) override;
 
 };
 

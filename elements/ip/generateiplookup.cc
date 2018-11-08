@@ -35,6 +35,7 @@ static const uint8_t DEF_OUT_PORT = 1;
 GenerateIPLookup::GenerateIPLookup() :
         _out_port(DEF_OUT_PORT), GenerateIPFilter(IPLOOKUP)
 {
+    _keep_saddr = false;
     _keep_sport = false;
     _keep_dport = false;
 }
@@ -56,8 +57,10 @@ GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
     }
 
-    // Routers care about destination IP addresses
-    _mask = IPFlowID(0, 0, 0xffffffff, 0);
+    int status = build_mask(_mask, _keep_saddr, _keep_daddr, _keep_sport, _keep_dport, _prefix);
+    if (status != 0) {
+        return errh->error("Cannot continue with empty mask");
+    }
 
     return GenerateIPPacket::configure(conf, errh);
 }
@@ -74,6 +77,49 @@ GenerateIPLookup::cleanup(CleanupStage)
 }
 
 String
+GenerateIPLookup::dump_rules(bool verbose)
+{
+    uint8_t n = 0;
+    while (_map.size() > _nrules) {
+        HashTable<IPFlow> new_map;
+
+        if (verbose) {
+            click_chatter("%8d rules with prefix /%02d, continuing with /%02d", _map.size(), 32-n, 32-n-1);
+        }
+
+        ++n;
+        _mask = IPFlowID(0, 0, IPAddress::make_prefix(32 - n), 0);
+
+        for (auto flow : _map) {
+            // Wildcards are intentionally excluded
+            if ((flow.flowid().daddr().s() == "0.0.0.0")) {
+                continue;
+            }
+
+            flow.set_mask(_mask);
+            new_map.find_insert(flow);
+        }
+
+        _map = new_map;
+        if (n == 32) {
+            return "Impossible to reduce the number of rules below: " + String(_map.size());
+        }
+    }
+
+    if (verbose) {
+        click_chatter("%8d rules with prefix /%02d", _map.size(), 32-n);
+    }
+
+    StringAccum acc;
+
+    for (auto flow : _map) {
+        acc << flow.flowid().daddr() << '/' << String(32 - n) << " " << (int) _out_port << ",\n";
+    }
+
+    return acc.take_string();
+}
+
+String
 GenerateIPLookup::read_handler(Element *e, void *user_data)
 {
     GenerateIPLookup *g = static_cast<GenerateIPLookup *>(e);
@@ -84,48 +130,30 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
     assert(g->_pattern_type == IPLOOKUP);
     assert(g->_out_port >= 0);
 
-    uint8_t n = 0;
-    while (g->_map.size() > g->_nrules) {
-        HashTable<IPFlow> new_map;
-        ++n;
-        g->_mask = IPFlowID(0, 0, IPAddress::make_prefix(32 - n), 0);
+    intptr_t what = reinterpret_cast<intptr_t>(user_data);
 
-        for (auto flow : g->_map) {
-            // Wildcards are intentionally excluded
-            if ((flow.flowid().daddr().s() == "0.0.0.0")) {
-                continue;
+    switch (what) {
+        case h_dump: {
+            return g->dump_rules(true);
+        }
+        case h_rules_nb: {
+            if (g->_map.size() == 0) {
+                g->dump_rules();
             }
-
-            flow.set_mask(g->_mask);
-            new_map.find_insert(flow);
+            return String(g->_map.size());
         }
-
-        g->_map = new_map;
-        if (n == 32) {
-            return "Impossible to reduce the number of rules below: " + String(g->_map.size());
+        default: {
+            click_chatter("Unknown read handler: %d", what);
+            return "";
         }
     }
-
-    uint64_t rules_nb = 0;
-    StringAccum acc;
-
-    for (auto flow : g->_map) {
-        acc << flow.flowid().daddr() << '/' << String(32 - n) << " " << (int) g->_out_port << ",\n";
-        rules_nb++;
-    }
-
-    acc << "\n";
-    acc << "# of Rules: ";
-    acc.snprintf(12, "%" PRIu64, rules_nb);
-    acc << "\n";
-
-    return acc.take_string();
 }
 
 void
 GenerateIPLookup::add_handlers()
 {
-    add_read_handler("dump", read_handler);
+    add_read_handler("dump", read_handler, h_dump);
+    add_read_handler("rules_nb", read_handler, h_rules_nb);
 }
 
 CLICK_ENDDECLS

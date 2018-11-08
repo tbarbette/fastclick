@@ -69,6 +69,8 @@ class GenerateIPLookup : public GenerateIPFilter {
          */
         uint8_t _out_port;
 
+        virtual String dump_rules(bool verbose = false) override;
+
 };
 
 CLICK_ENDDECLS
