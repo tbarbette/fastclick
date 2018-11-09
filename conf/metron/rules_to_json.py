@@ -38,7 +38,7 @@ def dump_string_to_file(data, outfile):
 	@param outfile the output file where the data is written
 	"""
 
-	assert data, "String is NULL"
+	assert data, "No rules are generated"
 	assert outfile, "Filename is NULL"
 
 	with open(outfile, 'w') as f:
@@ -57,7 +57,7 @@ def get_files_from_folder(folder):
 
 def get_substring_until_delimiter(string, delimiter):
 	if string.rfind(delimiter) > 1:
-		return string.split(delimiter)[0]
+		return string.rsplit(delimiter)[0]
 	return string
 
 def clean_line(line):
@@ -131,6 +131,17 @@ def parse_transport(layer, tp_dir):
 
 	return ""
 
+def get_click_traffic_class(rule, classifier_type, output_format):
+	if (classifier_type == IPLOOKUP) and (output_format != RULE_FORMAT_IP_LOOKUP):
+		ip = rule.split(" ")[0]
+		with_mask = True if "/" in ip else False
+		return "dst host " + ip if with_mask else "dst net " + ip
+	elif (classifier_type == IPFILTER) and (output_format != RULE_FORMAT_IP_FILTER):
+		print("IPFilter rule cannot be translated to IPLookup rule due to missing output port")
+		return "ambiguous"
+
+	return rule
+
 def get_flowdir_traffic_class(rule, output_format):
 	if IPVF in rule:
 		return get_flowdir_ipv4_traffic_class(rule, output_format)
@@ -142,6 +153,10 @@ def get_flowdir_traffic_class(rule, output_format):
 def get_flowdir_ipv4_traffic_class(rule, output_format):
 	tc = ""
 
+	# Flow Director does not support deny rules
+	if DENY in rule:
+		return ""
+
 	layers = rule.split("/")
 	for layer in layers:
 		layer = layer.strip()
@@ -149,6 +164,7 @@ def get_flowdir_ipv4_traffic_class(rule, output_format):
 		if IPVF in layer:
 			# IPLookup format has only destination IP addresses
 			if output_format == RULE_FORMAT_IP_FILTER:
+				tc += "allow "
 				src = parse_ip(layer, SRC)
 				tc += src + "&& " if src else ""
 
@@ -211,9 +227,12 @@ def to_json(input_file, output_format=RULE_FORMAT_IP_FILTER):
 				else:
 					line = "dst net " + line
 
-			tc = line if classifier_type in [IPFILTER, IPLOOKUP] else get_flowdir_traffic_class(line, output_format)
+			tc = get_click_traffic_class(line, classifier_type, output_format) if classifier_type in [IPFILTER, IPLOOKUP] \
+			                                                  else get_flowdir_traffic_class(line, output_format)
 			if not tc:
 				print("Skipping invalid rule: {}".format(line))
+				continue
+			if tc == "ambiguous":
 				continue
 
 			if tc in TC_LIST:
@@ -232,6 +251,9 @@ def to_json(input_file, output_format=RULE_FORMAT_IP_FILTER):
 			rule_list.append(rule_map)
 			rule_nb += 1
 
+		if not rule_list:
+			return ""
+
 		# Build a big JSON wrapper
 		data[ENTRIES_ELEMENT] = rule_list
 
@@ -241,13 +263,13 @@ def to_json(input_file, output_format=RULE_FORMAT_IP_FILTER):
 		return json_data
 
 ### Execution examples
-###     python rules_to_json.py --input-files ~/nfv/metron-testbed/metron-blackbox-metron/load-imbalance/kth/nic_rules/round_robin/100g_offl_round_robin_queues_1 --output-format iplookup
-###     python rules_to_json.py --input-folder ~/nfv/metron-testbed/metron-blackbox-metron/load-imbalance/kth/nic_rules/round_robin/ --output-format iplookup
+###     python rules_to_json.py --input-files test_click_rules --output-format ipfilter
+###     python rules_to_json.py --input-files test_click_rules --output-format iplookup
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser("Click IPFilter/IPClassifier/Lookup to JSON configuration")
-	parser.add_argument("--input-files", nargs='*', help="Set of space separated input files with IP-level Click rules")
-	parser.add_argument("--input-folder", default=None, help="Folder that contains a set of input files with IP-level Click rules")
+	parser = argparse.ArgumentParser("Click IPFilter/IPLookup/FlowDirector to JSON configuration")
+	parser.add_argument("--input-files", nargs='*', help="Set of space separated input files with IP-based rules")
+	parser.add_argument("--input-folder", default=None, help="Folder that contains a set of input files with IP-based rules")
 	parser.add_argument("--output-format", type=str, default=RULE_FORMAT_IP_FILTER, choices=['ipfilter', 'iplookup'], help="Format of output rules in the JSON file. Can be [ipfilter, iplookup]")
 
 	args = parser.parse_args()
@@ -265,5 +287,5 @@ if __name__ == "__main__":
 		input_file_list = get_files_from_folder(input_folder)
 
 	for in_file in input_file_list:
-		out_file = get_substring_until_delimiter(in_file, ".") + ".json"
+		out_file = in_file + ".json" if output_format in in_file else in_file + "-" + output_format + ".json"
 		dump_string_to_file(to_json(in_file, output_format), out_file)

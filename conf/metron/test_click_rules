@@ -1,5 +1,5 @@
 allow src host 192.168.1.7 and dst host 192.168.2.7 and udp src port 53
 allow src host 192.168.10.7 and dst host 192.168.20.7 and dst port 80
-allow ip proto tcp src net 192.168.100.0/24 and dst host 192.168.200.7 and tcp dst port 80
+allow ip proto tcp and src net 192.168.100.0/24 and dst host 192.168.200.7 and tcp dst port 80
 deny src host 192.168.100.7
 allow ip6 src net 192.168.200.0/24 and dst host 192.168.20.7
