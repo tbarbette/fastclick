@@ -40,6 +40,11 @@ Integer. If set, the outgoing packet will have this length.
 
 Integer. Same as the LIMIT argument.
 
+=item HEADROOM
+
+Integer. Sets the amount of headroom on generated packets. Default is
+the default packet headroom.
+
 =item BURST
 
 Integer. Same as the BURST argument.
