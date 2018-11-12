@@ -31,13 +31,13 @@ class_left :: Classifier(12/0806 20/0001,  //ARP query
                          12/0806 20/0002,  // ARP response
                          12/0800); //IP
 
-arpq_left :: ARPQuerier(left_interface) -> nicOut0; //The packet will go to lan interface
+arpq_left :: ARPQuerier(lan_interface) -> nicOut0; //The packet will go to lan interface
 
 class_right :: Classifier(12/0806 20/0001,  //ARP query
                          12/0806 20/0002,  // ARP response
                          12/0800); //IP
 
-arpq_right :: ARPQuerier(right_interface) -> nicOut1; //The packet will go to wan interface
+arpq_right :: ARPQuerier(wan_interface) -> nicOut1; //The packet will go to wan interface
 
 ip_rw_l :: IPClassifier(proto tcp, proto udp, -);
 ip_rw_r :: IPClassifier(proto tcp, proto udp, -);
