@@ -1,7 +1,7 @@
 /*
- * This is a script based on Thomar NAT and with DPDK enabled. Also you can  
- * just replace the FromDPDKDevice and ToDPDKDevice with FromDevice and ToDevice
- * if you don't want to implement DPDK.
+ * This is a script based on Thomar NAT and with DPDK enabled. Also you  
+ * can just replace the FromDPDKDevice and ToDPDKDevice with FromDevice 
+ * and Queue -> ToDevice if you don't want to use DPDK.
  *
  * See also thomer-nat.click and mazu-nat.click
  *
