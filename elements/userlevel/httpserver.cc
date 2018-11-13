@@ -183,9 +183,7 @@ int HTTPServer::ahc_echo(
         if (hname == "" || ename == "") {
             e = server->router()->root_element();
         } else {
-            body =  "No element named '" + ename + "'";
-            status = 404;
-            goto send;
+		goto e404;
         }
     }
 
@@ -287,9 +285,22 @@ int HTTPServer::ahc_echo(
     assert(false);
 
     bad_handler:
-        body = "Invalid path '" + String(url) + "' or no " + hname + " in " + ename;
-        status = 404;
-        goto send;
+	body = "Invalid path '" + String(url);
+	if (ename)
+		body += "' or no " + hname + " in " + ename;
+	else
+		body += "' or no " + hname + " in root";
+	status = 404;
+    if (server->_verbose)
+	click_chatter(("404 : " + body).c_str());
+	goto send;
+
+	e404:
+    body =  "No element named '" + ename + "'";
+    status = 404;
+    if (server->_verbose)
+	click_chatter(("404 : " + body).c_str());
+    goto send;
 
     send:
     response = MHD_create_response_from_buffer (body.length(),

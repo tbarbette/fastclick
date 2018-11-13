@@ -34,6 +34,8 @@
 #include "todpdkdevice.hh"
 #include "metron.hh"
 
+#include <metron/servicechain.hh>
+
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     #include <click/flowdirector.hh>
 #endif
@@ -395,7 +397,8 @@ Metron::initialize(ErrorHandler *errh)
     }
 #endif
 
-    assert(DPDKDevice::initialized());
+    if (_nics.size() > 0)
+	assert(DPDKDevice::initialized());
     if (try_slaves(errh) != SUCCESS) {
         return ERROR;
     }
@@ -444,7 +447,9 @@ Metron::try_slaves(ErrorHandler *errh)
     assert(cpu_phys_map[0] >= 0);
     sc.get_cpu_info(0).cpu_phys_id = cpu_phys_map[0];
     sc.get_cpu_info(0).set_active(true);
-    if (run_service_chain(&sc, errh, false) != 0) {
+    sc._manager = new ClickSCManager(&sc, false);
+
+    if (sc._manager->run_service_chain(errh) != 0) {
         return errh->error(
             "Unable to deploy Metron slaves: "
             "Please verify the compatibility of your NIC with DPDK secondary processes."
@@ -553,115 +558,12 @@ void
 Metron::run_timer(Timer *t)
 {
     auto sci = _scs.begin();
-    double alpha_up = 0.5;
-    double alpha_down = 0.3;
-    double total_alpha = 0.5;
 
-    int sn = 0;
     while (sci != _scs.end()) {
         ServiceChain *sc = sci.value();
-        float max_cpu_load = 0;
-        int max_cpu_load_index = 0;
-        float total_cpu_load = 0;
-
-        Vector<String> min = sc->simple_call_read("monitoring_lat.mp_min").split(' ');
-        Vector<String> max = sc->simple_call_read("monitoring_lat.mp_max").split(' ');
-        Vector<String> avg = sc->simple_call_read("monitoring_lat.mp_average_time").split(' ');
-        sc->simple_call_write("monitoring_lat.reset");
-        Vector<String> load = sc->simple_call_read("load").split(' ');
-
-
-        for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
-
-            const int cpu_id = sc->get_cpu_phys_id(j);
-            String js = String(j);
-            float cpu_load = 0;
-            float cpu_queue = 0;
-            uint64_t throughput = 0;
-            for (int i = 0; i < sc->get_nics_nb(); i++) {
-                String is = String(i);
-                NIC *nic = sc->get_nic_by_index(i);
-                assert(nic);
-                int stat_idx = (j * sc->get_nics_nb()) + i;
-
-                String name = sc->generate_configuration_slave_fd_name(i, cpu_id);
-//                long long useless = atoll(sc->simple_call_read(name + ".useless").c_str());
-//                long long useful = atoll(sc->simple_call_read(name + ".useful").c_str());
-                long long count = atoll(sc->simple_call_read(name + ".count").c_str());
-//                long long useless_diff = useless - sc->nic_stats[stat_idx].useless;
-//                long long useful_diff = useful - sc->nic_stats[stat_idx].useful;
-                long long count_diff = count - sc->_nic_stats[stat_idx].count;
-//                sc->nic_stats[stat_idx].useless = useless;
-//                sc->nic_stats[stat_idx].useful = useful;
-                sc->_nic_stats[stat_idx].count = count;
-//                long long count = atoll(sc->simple_call_write(name + ".reset_load").c_str());
-//                if (useful_diff + useless_diff == 0) {
-//                    sc->nic_stats[stat_idx].load = 0;
-                    // click_chatter(
-                    //      "[SC %d] Load NIC %d CPU %d - %f: No data yet",
-                    //      sn, i, j, sc->nic_stats[stat_idx].load
-                    //  );
-//                    continue;
-//                }
-/*                double load = (double)useful_diff / (double)(useful_diff + useless_diff);
-                double alpha;
-                if (load > sc->nic_stats[stat_idx].load) {
-                    alpha = alpha_up;
-                } else {
-                    alpha = alpha_down;
-                }
-                sc->nic_stats[stat_idx].load = (sc->nic_stats[stat_idx].load * (1-alpha)) + ((alpha) * load);
-*/
-                //sc->nic_stats[stat_idx].load = sc->simple_call_read(
-                // click_chatter(
-                //      "[SC %d] Load NIC %d CPU %d - %f %f - diff usefull %lld useless %lld",
-                //      sn, i, j, load, sc->nic_stats[stat_idx].load, useful_diff, useless_diff
-                //  );
-
-               /* if (sc->nic_stats[stat_idx].load > cpu_load) {
-                    cpu_load = sc->nic_stats[stat_idx].load;
-                }*/
-                throughput += atoll(sc->simple_call_read("monitoring_th_" + is + "_" + js + ".link_rate").c_str());
-                assert(sc->get_cpu_info(j).assigned());
-                float ncpuqueue = (float)atoi(sc->simple_call_read(name + ".queue_count "+String(nic->phys_cpu_to_queue(sc->get_cpu_phys_id(j)))).c_str()) / (float)(atoi(nic->call_tx_read("nb_rx_desc").c_str()));
-                if (ncpuqueue > cpu_queue) {
-                    cpu_queue = ncpuqueue;
-                }
-            }
-            cpu_load = atof(load[j].c_str());
-            sc->_cpus[j].load = cpu_load;
-            sc->_cpus[j].max_nic_queue = cpu_queue;
-            if (_monitoring_mode) {
-                sc->_cpus[j].latency.avg_throughput = throughput;
-                sc->_cpus[j].latency.min_latency = atoll(min[j].c_str());
-                sc->_cpus[j].latency.max_latency = atoll(max[j].c_str());
-                sc->_cpus[j].latency.average_latency = atoll(avg[j].c_str());
-            }
-            total_cpu_load += cpu_load;
-            if (cpu_load > max_cpu_load) {
-               max_cpu_load = cpu_load;
-               max_cpu_load_index = j;
-            }
-        }
-
-        if (sc->_autoscale) {
-            sc->_total_cpu_load = sc->_total_cpu_load *
-                                  (1 - total_alpha) + max_cpu_load * (total_alpha);
-            if (sc->_total_cpu_load > CPU_OVERLOAD_LIMIT) {
-                sc->do_autoscale(1);
-            } else if (sc->_total_cpu_load < CPU_UNERLOAD_LIMIT) {
-                sc->do_autoscale(-1);
-            }
-        } else {
-            sc->_total_cpu_load = sc->_total_cpu_load * (1 - total_alpha) +
-                                  (total_cpu_load / sc->get_active_cpu_nb()) * (total_alpha);
-        }
-        sc->_max_cpu_load = max_cpu_load;
-        sc->_max_cpu_load_index = max_cpu_load_index;
-
-        sn++;
+        if (sc && sc->_manager)
+		sc->_manager->run_load_timer();
         sci++;
-
     }
     _timer.reschedule_after_msec(_load_timer);
 }
@@ -787,7 +689,6 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
 {
     Vector<int> cpu_phys_map;
     cpu_phys_map.resize(sc->get_max_cpu_nb());
-
     if (!assign_cpus(sc, cpu_phys_map)) {
         errh->error(
             "Cannot instantiate service chain %s: Not enough CPUs",
@@ -806,13 +707,23 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
 
     assert(sc->get_active_cpu_nb() == sc->_initial_cpus_nb);
 
-    int ret = run_service_chain(sc, errh, true);
+    int ret;
+    if (sc->config_type == MIXED || sc->config_type == CLICK || sc->config_type == UNKNOWN) {
+	sc->_manager = new ClickSCManager(sc, true);
+
+    } else {
+	sc->_manager = new StandaloneSCManager(sc);
+    }
+    ret = sc->_manager->run_service_chain(errh);
     if (ret != SUCCESS) {
+	click_chatter("Could not launch service chain...");
         unassign_cpus(sc);
         if (_fail) {
             abort();
         }
         return ERROR;
+    } else {
+	click_chatter("Service chain launched successfully !");
     }
 
     call_scale(sc, "start");
@@ -823,108 +734,6 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
     return SUCCESS;
 }
 
-/**
- * Run a service chain and keep a control socket to it.
- * CPU cores must already be assigned by assign_cpus().
- */
-int
-Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh, bool add_extra)
-{
-    for (int i = 0; i < sc->get_nics_nb(); i++) {
-        if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
-            return errh->error("Could not apply Rx filter");
-        }
-    }
-
-    int config_pipe[2], ctl_socket[2];
-    if (pipe(config_pipe) == -1)
-        return errh->error("Could not create pipe");
-    if (socketpair(PF_UNIX, SOCK_STREAM, 0, ctl_socket) == -1)
-        return errh->error("Could not create socket");
-
-    // Launch slave
-    int pid = fork();
-    if (pid == -1) {
-        return errh->error("Fork error. Too many processes?");
-    }
-    if (pid == 0) {
-        int i, ret;
-
-        close(0);
-        dup2(config_pipe[0], 0);
-        close(config_pipe[0]);
-        close(config_pipe[1]);
-        close(ctl_socket[0]);
-
-        Vector<String> argv = sc->build_cmd_line(ctl_socket[1]);
-
-        char *argv_char[argv.size() + 1];
-        for (int i = 0; i < argv.size(); i++) {
-            // click_chatter("Cmd line arg: %s", argv[i].c_str());
-            argv_char[i] = strdup(argv[i].c_str());
-        }
-        argv_char[argv.size()] = 0;
-        if ((ret = execv(argv_char[0], argv_char))) {
-            errh->message("Could not launch slave process: %d %d", ret, errno);
-        }
-
-        exit(1);
-    } else {
-        click_chatter("Child %d launched successfully", pid);
-        close(config_pipe[0]);
-        close(ctl_socket[1]);
-        int flags = 1;
-        /*int fd = ctl_socket[0];
-        if (ioctl(fd, FIONBIO, &flags) != 0) {
-            flags = fcntl(fd, F_GETFL);
-            if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
-                return errh->error("%s", strerror(errno));
-        }
-        */
-        String conf = sc->generate_configuration(add_extra);
-
-        click_chatter("Writing configuration %s", conf.c_str());
-
-        int pos = 0;
-        while (pos != conf.length()) {
-            ssize_t r = write(
-                config_pipe[1], conf.begin() + pos, conf.length() - pos
-            );
-            if (r == 0 || (r == -1 && errno != EAGAIN && errno != EINTR)) {
-                if (r == -1) {
-                    errh->message("%s while writing configuration", strerror(errno));
-                }
-                break;
-            } else if (r != -1) {
-                pos += r;
-            }
-        }
-
-        if (pos != conf.length()) {
-            close(config_pipe[1]);
-            close(ctl_socket[0]);
-            return ERROR;
-        } else {
-            close(config_pipe[1]);
-            sc->control_init(ctl_socket[0], pid);
-        }
-
-        String s;
-        int v = sc->control_read_line(s);
-        if (v <= 0) {
-            return errh->error("_assignedCould not read from control socket: Error %d", v);
-        }
-        if (!s.starts_with("Click::ControlSocket/1.")) {
-            kill(pid, SIGKILL);
-            return errh->error("Unexpected ControlSocket command");
-        }
-
-        return SUCCESS;
-    }
-
-    assert(0);
-    return ERROR;
-}
 
 /**
  * Kill the service chain without cleaning any ressource
@@ -932,9 +741,7 @@ Metron::run_service_chain(ServiceChain *sc, ErrorHandler *errh, bool add_extra)
 void
 Metron::kill_service_chain(ServiceChain *sc)
 {
-    _command_lock.acquire();
-    sc->control_send_command("WRITE stop");
-    _command_lock.release();
+	sc->_manager->kill_service_chain();
 }
 
 /**
@@ -1179,7 +986,7 @@ Metron::param_handler(
                         ids.c_str()
                     );
                 }
-                param = sc->simple_call_read(param.substring(pos + 1));
+                param = sc->_manager->command(param.substring(pos + 1));
                 return SUCCESS;
             }
             default: {
@@ -1197,6 +1004,10 @@ Metron::param_handler(
             case h_chains: {
                 Json jroot = Json::parse(param);
                 Json jlist = jroot.get("serviceChains");
+                if (jlist.size() == 0) {
+			return errh->error("Invalid call to rules with no valid 'serviceChains' array");
+                }
+
                 for (auto jsc : jlist) {
                     struct ServiceChain::timing_stats ts;
                     ts.start = Timestamp::now_steady();
@@ -1831,6 +1642,8 @@ Metron::delete_controller_from_json(const String &ip)
     return SUCCESS;
 }
 
+
+
 /***************************************
  * RxFilter
  **************************************/
@@ -1943,7 +1756,8 @@ ServiceChain::RxFilter::from_json(const Json &j, ServiceChain *sc, ErrorHandler 
     }
     rf->method = rf_type;
 
-    rf->allocate_nic_space_for_tags(sc->get_nics_nb());
+    if (sc->get_nics_nb() > 0)
+	rf->allocate_nic_space_for_tags(sc->get_nics_nb());
     Json jnic_values = j.get("values");
 
     int inic = 0;
@@ -2050,7 +1864,7 @@ ServiceChain::ServiceChain(Metron *m)
       _metron(m), _nics(), _cpus(), _nic_stats(),
       _initial_cpus_nb(0), _max_cpus_nb(0),
       _total_cpu_load(0), _max_cpu_load(0), _max_cpu_load_index(0),
-      _socket(-1), _pid(-1), _timing_stats(), _as_timing_stats(),
+      _timing_stats(), _as_timing_stats(),
       _autoscale(false), _last_autoscale()
 {
     _verbose = m->_verbose;
@@ -2212,61 +2026,8 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     }
     jsc.set("cpus", jcpus);
 
-    Json jnics = Json::make_array();
-    for (int i = 0; i < get_nics_nb(); i++) {
-        String is = String(i);
-        uint64_t rx_count   = 0;
-        uint64_t rx_bytes   = 0;
-        uint64_t rx_dropped = 0;
-        uint64_t rx_errors  = 0;
-        uint64_t tx_count   = 0;
-        uint64_t tx_bytes   = 0;
-        uint64_t tx_dropped = 0;
-        uint64_t tx_errors  = 0;
 
-        for (int j = 0; j < get_max_cpu_nb(); j++) {
-            String js = String(j);
-            rx_count += atol(
-                simple_call_read("slaveFD" + is + "C" + js + ".count").c_str()
-            );
-            // rx_bytes += atol(
-            //     simple_call_read( "slaveFD" + is + "C" + js + ".bytes").c_str()
-            // );
-            rx_dropped += atol(
-                simple_call_read("slaveFD" + is + "C" + js + ".dropped").c_str()
-            );
-            // rx_errors += atol(
-            //     simple_call_read( "slaveFD" + is + "C" + js + ".errors").c_str()
-            // );
-
-        }
-        tx_count += atol(
-            simple_call_read("slaveTD" + is + ".count").c_str()
-        );
-        // tx_bytes += atol(
-        //     simple_call_read("slaveTD" + is + ".bytes").c_str()
-        // );
-        tx_dropped += atol(
-            simple_call_read("slaveTD" + is + ".dropped").c_str()
-        );
-        // tx_errors += atol(
-        //     simple_call_read("slaveTD" + is + ".errors").c_str()
-        // );
-
-        Json jnic = Json::make_object();
-        jnic.set("name",      get_nic_by_index(i)->get_name());
-        jnic.set("index",     get_nic_by_index(i)->get_index());
-        jnic.set("rxCount",   rx_count);
-        jnic.set("rxBytes",   rx_bytes);
-        jnic.set("rxDropped", rx_dropped);
-        jnic.set("rxErrors",  rx_errors);
-        jnic.set("txCount",   tx_count);
-        jnic.set("txBytes",   tx_bytes);
-        jnic.set("txDropped", tx_dropped);
-        jnic.set("txErrors",  tx_errors);
-        jnics.push_back(jnic);
-    }
-    jsc.set("nics", jnics);
+    jsc.set("nics", _manager->get_nic_stats());
 
     jsc.set("timingStats", _timing_stats.to_json());
     jsc.set("autoScaleTimingStats", _as_timing_stats.to_json());
@@ -2672,43 +2433,10 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                 // Activating core
                 get_cpu_info(new_cpu_id).set_active(newMap[new_cpu_id]);
                 if (newMap[new_cpu_id]) {
-                    for (int inic = 0; inic < get_nics_nb(); inic++) {
-                        ret = call_write(
-                            generate_configuration_slave_fd_name(
-                                inic, get_cpu_phys_id(new_cpu_id)
-                            ) + ".safe_active", response, "1"
-                        );
-                        if ((ret < 200) || (ret >= 300)) {
-                            return errh->error(
-                                "Response to activate input was %d: %s",
-                                ret, response.c_str()
-                            );
-                        }
-                        click_chatter("Response %d: %s", ret, response.c_str());
-                        // Actually use the new cores AFTER the secondary has been advertised
-                        if (_metron->_rx_mode == RSS) {
-                            _nics[inic]->call_rx_write("max_rss", String(new_cpu_id + 1));
-                        }
-                    }
+                    ret = _manager->activate_core(new_cpu_id, errh);
                 // Scale down
                 } else {
-                    for (int inic = 0; inic < get_nics_nb(); inic++) {
-                        // Stop using the new cores BEFORE the secondary has been torn down
-                        if (_metron->_rx_mode == RSS) {
-                            _nics[inic]->call_rx_write("max_rss", String(new_cpu_id + 1));
-                        }
-                        int ret = call_write(
-                            generate_configuration_slave_fd_name(
-                                inic, get_cpu_phys_id(new_cpu_id)
-                            ) + ".safe_active", response, "0"
-                        );
-                        if ((ret < 200) || (ret >= 300)) {
-                            return errh->error(
-                                "Response to activate input was %d: %s",
-                                ret, response.c_str()
-                            );
-                        }
-                    }
+			ret = _manager->deactivate_core(new_cpu_id, errh);
                 }
             }
 
@@ -2766,15 +2494,7 @@ ServiceChain::do_autoscale(int n_cpu_change)
         this->get_id().c_str(), get_active_cpu_nb()
     );
 
-    String response;
-    int ret = call_write("slave/rrs.max", response, String(get_active_cpu_nb()));
-    if ((ret < 200) || (ret >= 300)) {
-        errh->error(
-            "Response to change the number of CPU core %d: %s",
-            ret, response.c_str()
-        );
-        return;
-    }
+    _manager->do_autoscale(errh);
 
     // Measure again
     ts.autoscale_end = Timestamp::now_steady();
@@ -2888,44 +2608,6 @@ ServiceChain::generate_configuration(bool add_extra)
 }
 
 /**
- * Generates the necessary DPDK arguments for the deployment
- * of a service chain as a secondary DPDK process.
- */
-Vector<String>
-ServiceChain::build_cmd_line(int socketfd)
-{
-    int i;
-    Vector<String> argv;
-
-    String cpu_list = "";
-
-    for (i = 0; i < click_max_cpu_ids(); i++) {
-        cpu_list += String(i) + (i < click_max_cpu_ids() -1? "," : "");
-    }
-
-    argv.push_back(click_path);
-    argv.push_back("--dpdk");
-    argv.push_back("-l");
-    argv.push_back(cpu_list);
-    argv.push_back("--proc-type=secondary");
-
-    for (i = 0; i < _metron->_dpdk_args.size(); i++) {
-        argv.push_back(_metron->_dpdk_args[i]);
-    }
-    argv.push_back("--");
-    argv.push_back("--socket");
-    argv.push_back(String(socketfd));
-    for (i = 0; i < _metron->_args.size(); i++) {
-        argv.push_back(_metron->_args[i]);
-    }
-
-    for (i = 0; i < argv.size(); i++)  {
-        click_chatter("ARG %s", argv[i].c_str());
-    }
-    return argv;
-}
-
-/**
  * Returns a bit map with the CPU core assignment of a service chain.
  */
 Bitvector
@@ -2940,163 +2622,6 @@ ServiceChain::active_cpus()
 }
 
 
-/**
- * Checks whether a service chain is alive or not.
- */
-void
-ServiceChain::check_alive()
-{
-    if (kill(_pid, 0) != 0) {
-        _metron->delete_service_chain(this, ErrorHandler::default_handler());
-    } else {
-        click_chatter("Error: PID %d is still alive", _pid);
-    }
-}
-
-/**
- * Initializes the control socket of a service chain.
- */
-void
-ServiceChain::control_init(int fd, int pid)
-{
-    _socket = fd;
-    _pid = pid;
-}
-
-/**
- * Reads a control message from the control socket of a service chain.
- */
-int
-ServiceChain::control_read_line(String &line)
-{
-    char buf[1024];
-    int n = read(_socket, &buf, 1024);
-    if (n <= 0) {
-        return n;
-    }
-
-    line = String(buf, n);
-    while (n == 1024) {
-        n = read(_socket, &buf, 1024);
-        line += String(buf, n);
-    }
-
-    return line.length();
-}
-
-/**
- * Writes a control message to the control socket of a service chain.
- */
-void
-ServiceChain::control_write_line(String cmd)
-{
-    int n = write(_socket, (cmd + "\r\n").c_str(),cmd.length() + 1);
-}
-
-/**
- * Passes a control message through the control socket and gets
- * a response.
- */
-String
-ServiceChain::control_send_command(String cmd)
-{
-    control_write_line(cmd);
-    String ret;
-    control_read_line(ret);
-
-    return ret;
-}
-
-/**
- * Implements handlers for a service chain using the control socket.
- */
-int
-ServiceChain::call(
-        String fnt, bool has_response, String handler,
-        String &response, String params)
-{
-    _metron->_command_lock.acquire();
-    String ret = control_send_command(fnt + " " + handler + (params? " " + params : ""));
-    if (ret.empty()) {
-        check_alive();
-        _metron->_command_lock.release();
-        return ERROR;
-    }
-
-    int code = atoi(ret.substring(0, 3).c_str());
-    if (code >= 500) {
-        response = ret.substring(4);
-        _metron->_command_lock.release();
-        return code;
-    }
-    if (has_response) {
-        ret = ret.substring(ret.find_left("\r\n") + 2);
-        if (!ret.starts_with("DATA ")) {
-            click_chatter("Got answer '%s' (code %d), that does not start with DATA !", ret.c_str(), code);
-            click_chatter("Command was %s %s %s", fnt.c_str(), handler.c_str(), params ? params.c_str() : "");
-            abort();
-        }
-        ret = ret.substring(5); //Code + return
-        int eof = ret.find_left("\r\n");
-        int n = atoi(ret.substring(0, eof).c_str()); //Data length
-        response = ret.substring(eof + 2, n);
-    } else {
-        response = ret.substring(4);
-    }
-
-    _metron->_command_lock.release();
-    return code;
-}
-
-/**
- * Implements simple read handlers for a service chain.
- */
-String
-ServiceChain::simple_call_read(String handler)
-{
-    String response;
-
-    int code = call("READ", true, handler, response, "");
-    if ((code >= 200) && (code < 300)) {
-        return response;
-    }
-
-    return "";
-}
-
-/**
- * Implements simple write handlers for a service chain.
- */
-String
-ServiceChain::simple_call_write(String handler)
-{
-    String response;
-
-    int code = call("WRITE", false, handler, response, "");
-    if ((code >= 200) && (code < 300)) {
-        return response;
-    }
-
-    return "";
-}
-
-/**
- * Implements read handlers for a service chain.
- */
-int
-ServiceChain::call_read(String handler, String &response, String params)
-{
-    return call("READ", true, handler, response, params);
-}
-
-/**
- * Implements write handlers for a service chain.
- */
-int
-ServiceChain::call_write(String handler, String &response, String params)
-{
-    return call("WRITE", false, handler, response, params);
-}
 
 /******************************
  * CPU

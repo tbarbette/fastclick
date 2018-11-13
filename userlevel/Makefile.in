@@ -13,7 +13,7 @@ bindir = @bindir@
 sbindir = @sbindir@
 libdir = @libdir@
 
-VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
+VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/lib/metron:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
 
 CC = @CC@
 CPP = @CPP@
@@ -68,7 +68,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	packet.o packetbatch.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
 	element.o batchelement.o \
-	allocator.o \
+	allocator.o servicechain.o \
 	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \

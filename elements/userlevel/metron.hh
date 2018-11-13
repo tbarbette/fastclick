@@ -16,6 +16,8 @@
  #include <click/flowdirector.hh>
 #endif
 
+class ServiceChainManager;
+
 /**
  * The service chain types supported by Metron:
  * |-> Click-based
@@ -454,9 +456,11 @@ class NicStat {
         }
 };
 
-class ServiceChain {
-    public:
 
+class ServiceChain {
+
+
+    public:
         class RxFilter {
             public:
                 RxFilter(ServiceChain *sc);
@@ -588,27 +592,6 @@ class ServiceChain {
             const int &nic_index, const int &cpu_index, const String &type = "FD"
         );
 
-        Vector<String> build_cmd_line(int socketfd);
-
-        void control_init(int fd, int pid);
-
-        int control_read_line(String &line);
-
-        void control_write_line(String cmd);
-
-        String control_send_command(String cmd);
-
-        void check_alive();
-
-        int call(
-            String fnt, bool has_response, String handler,
-            String &response, String params
-        );
-        String simple_call_read(String handler);
-        String simple_call_write(String handler);
-        int call_read(String handler, String &response, String params = "");
-        int call_write(String handler, String &response, String params = "");
-
         struct timing_stats {
             Timestamp start, parse, launch;
             Json to_json();
@@ -631,6 +614,7 @@ class ServiceChain {
 
     private:
         Metron *_metron;
+        ServiceChainManager* _manager;
         Vector<NIC *> _nics;
         Vector<CpuInfo> _cpus;
         Vector<NicStat> _nic_stats;
@@ -639,8 +623,7 @@ class ServiceChain {
         float _total_cpu_load;
         float _max_cpu_load;
         int _max_cpu_load_index;
-        int _socket;
-        int _pid;
+
         struct timing_stats _timing_stats;
         struct autoscale_timing_stats _as_timing_stats;
         bool _autoscale;
@@ -648,6 +631,8 @@ class ServiceChain {
         bool _verbose;
 
         friend class Metron;
+        friend class ServiceChainManager;
+        friend class ClickSCManager;
 };
 
 /*
@@ -768,7 +753,7 @@ class Metron : public Element {
         void unassign_cpus(ServiceChain *sc);
 
         const float CPU_OVERLOAD_LIMIT = (float) 0.7;
-        const float CPU_UNERLOAD_LIMIT = (float) 0.4;
+        const float CPU_UNDERLOAD_LIMIT = (float) 0.4;
 
         /* Agent's default REST configuration */
         const int    DEF_AGENT_PORT  = 80;
@@ -838,7 +823,7 @@ class Metron : public Element {
 
         /* Private methods */
         int try_slaves(ErrorHandler *errh);
-        int run_service_chain(ServiceChain *sc, ErrorHandler *errh, bool add_extra);
+
         int confirm_nic_mode(ErrorHandler *errh);
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         int flush_nics();
@@ -853,6 +838,7 @@ class Metron : public Element {
 
         Spinlock _command_lock;
         friend class ServiceChain;
+        friend class ClickSCManager;
 };
 
 CLICK_ENDDECLS

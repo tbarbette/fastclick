@@ -179,8 +179,10 @@ BlackboxNF::initialize(ErrorHandler *errh)
     // Schedule the element
     ScheduleInfo::initialize_task(this, &_task, true, errh);
 
-
-    runSlave();
+    Bitvector cpu;
+    cpu.resize(click_max_cpu_ids());
+    cpu[home_thread_id()] = true;
+    int pid = runSlave(_exec, _args, _manual, cpu, _MEM_POOL);
 
     return 0;
 }
@@ -192,76 +194,86 @@ BlackboxNF::cleanup(CleanupStage)
         delete[] _iqueue.pkts;
 }
 
-void
-BlackboxNF::runSlave() {
+int
+BlackboxNF::runSlave(String exec, String args, bool manual, Bitvector cpus, String pool) {
     click_chatter("Launching slave!");
+
+    Vector<char*> chars;
+    chars.push_back(const_cast<char*>(exec.c_str()));
+    click_chatter("Building cmdline");
+    char buff[1024];
+    char* a = buff;
+    strcpy(a,args.c_str());
+    char* begin = a;
+    bool quote = false;
+    String tmp;
+    while (*a != 0) {
+        if (!quote && *a == ' ') {
+            *a = '\0';
+
+            char* cpy = (char*)malloc((strlen(begin) + 1) * sizeof(char));
+            strcpy(cpy, begin);
+            chars.push_back(cpy);
+            click_chatter("%s",begin);
+            begin = a + 1;
+        }
+        if (*a == '$') {
+            if (strncmp(a + 1,"POOL",4) == 0) {
+		if (!pool) {
+			click_chatter("$POOL variable used but this method does not use memory pools !");
+			return -1;
+		}
+                int cur = a-begin;
+                *a = '\0';
+                tmp = String(begin) + pool + String(a+5);
+                begin = const_cast<char*>(tmp.c_str());
+                a = begin + cur + pool.length() - 1;
+            } else if (strncmp(a + 1,"CPU_RANGE", 9) == 0) {
+                int cur = a-begin;
+                *a = '\0';
+                String s = cpus.unparse();
+                tmp = String(begin) + s + String(a + 10);
+                begin = const_cast<char*>(tmp.c_str());
+                a = begin + cur + s.length() - 1;
+            }
+
+        }
+        if (*a == '"') {
+            quote = !quote;
+            memmove(a, a+1, strlen(a));
+        } else {
+            a++;
+        }
+    }
+
+    if (begin != a)
+        chars.push_back(begin);
+    chars.push_back(0);
+
+    if (manual) {
+        String s ="";
+        for (int i = 0; i < chars.size(); i++) {
+            s = s + chars[i] + " ";
+        }
+        click_chatter("Command line : %s", s.c_str());
+    }
+
     // Launch slave
     int pid = fork();
     if (pid == -1) {
-        // errh->error("Fork error. Too many processes?");
+        click_chatter("Fork error. Too many processes?");
+        return -1;
     }
+
     if (pid == 0) {
-        Vector<char*> chars;
-        chars.push_back(const_cast<char*>(_exec.c_str()));
-
-        char* a = const_cast<char*>(_args.c_str());
-        char* begin = a;
-        bool quote = false;
-        String tmp;
-        while (*a != 0) {
-            if (!quote && *a == ' ') {
-                *a = '\0';
-
-                char* cpy = (char*)malloc((strlen(begin) + 1) * sizeof(char));
-                strcpy(cpy, begin);
-                chars.push_back(cpy);
-                click_chatter("%s",begin);
-                begin = a + 1;
-            }
-            if (*a == '$') {
-                if (strncmp(a + 1,"POOL",4) == 0) {
-                    int cur = a-begin;
-                    *a = '\0';
-                    tmp = String(begin) + _MEM_POOL + String(a+5);
-                    begin = const_cast<char*>(tmp.c_str());
-                    a = begin + cur + _MEM_POOL.length() - 1;
-                } else if (strncmp(a + 1,"CPU_RANGE", 9) == 0) {
-                    int cur = a-begin;
-                    *a = '\0';
-                    String s = String(home_thread_id()) + "-" + String(home_thread_id());
-                    tmp = String(begin) + s + String(a + 10);
-                    begin = const_cast<char*>(tmp.c_str());
-                    a = begin + cur + s.length() - 1;
-                }
-
-            }
-            if (*a == '"') {
-                quote = !quote;
-                memmove(a, a+1, strlen(a));
-            } else {
-                a++;
-            }
-        }
-        if (begin != a)
-            chars.push_back(begin);
-        chars.push_back(0);
         int ret;
-        if (_manual) {
-            String s ="";
-            for (int i = 0; i < chars.size(); i++) {
-                s = s + chars[i] + " ";
-            }
-            click_chatter("%s", s.c_str());
-            exit(1);
-        }
         if ((ret = execvp(chars[0], chars.data()))) {
             click_chatter("Could not launch slave process: %d %d", ret, errno);
         }
         exit(1);
     } else {
-        //_pid = pid;
+        return pid;
     }
-
 }
 
 bool
