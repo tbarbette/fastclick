@@ -1691,9 +1691,9 @@ Packet::kill()
 			b->list = 0;
 		# endif
 		skbmgr_recycle_skbs(b);
-    #elif CLICK_PACKET_USE_DPDK
+	#elif CLICK_PACKET_USE_DPDK
 		//Dpdk takes care of indirect and related things
-        rte_pktmbuf_free(mb());
+		rte_pktmbuf_free(mb());
 	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
 		if (_use_count.dec_and_test()) {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
