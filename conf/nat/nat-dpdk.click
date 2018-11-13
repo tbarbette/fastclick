@@ -1,7 +1,7 @@
 /*
- * This is a script based on Thomar NAT and with DPDK enabled. Also you  
- * can just replace the FromDPDKDevice and ToDPDKDevice with FromDevice 
- * and Queue -> ToDevice if you don't want to use DPDK.
+ * This is a script based on Thomar NAT and using DPDK for I/O. One  
+ * can replace the FromDPDKDevice and ToDPDKDevice with FromDevice 
+ * and Queue -> ToDevice to use standard I/O.
  *
  * See also thomer-nat.click and mazu-nat.click
  *
@@ -16,8 +16,8 @@ define(
 );
 
 AddressInfo(
-    lan_interface     192.168.56.128     00:0c:29:64:de:a1,
-    wan_interface    10.1.0.128     00:0c:29:64:de:ab
+    lan_interface    192.168.56.128     00:0c:29:64:de:a1,
+    wan_interface    10.1.0.128         00:0c:29:64:de:ab
 );
 
 // Module's I/O
