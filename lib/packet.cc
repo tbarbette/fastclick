@@ -889,7 +889,7 @@ Packet::clone(bool fast)
         p->_data = _data;
         p->_tail = _tail;
 #ifdef CLICK_FORCE_EXPENSIVE
-    PacketRef r(this);
+        PacketRef r(this);
 #endif
         p->_end = _end;
 #if HAVE_DPDK
