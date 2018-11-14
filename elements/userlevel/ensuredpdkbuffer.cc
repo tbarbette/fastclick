@@ -82,7 +82,7 @@ EnsureDPDKBuffer::smaction(Packet* p) {
                 (void*)mbuf);
         if (!q) {
             p->kill();
-            DPDKDevice::free_pkt(mbuf);
+            DPDKDevice::free_pkt(p);
             return 0;
         } else if (q->copy(p,rte_pktmbuf_headroom(mbuf) + _extra_headroom)) {
             p->kill();
