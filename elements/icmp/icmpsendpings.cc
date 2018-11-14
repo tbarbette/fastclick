@@ -154,7 +154,7 @@ ICMPPingSource::make_packet(WritablePacket *q)
     q->set_ip_header(nip, sizeof(click_ip));
     q->timestamp_anno().assign_now();
 
-    if (_receiver)
+    if (p && _receiver)
 	_receiver->send_timestamp[icp->icmp_sequence] = q->timestamp_anno();
 
     return q;
