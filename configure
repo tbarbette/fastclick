@@ -620,7 +620,8 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='LTLIBOBJS
+ac_subst_vars='EXTRA_TOOL_OBJS
+LTLIBOBJS
 provisions
 clickbuild_sbindir
 clickbuild_libdir
@@ -662,6 +663,7 @@ XML2CLICK
 PROPER_LIBS
 PROPER_INCLUDES
 HAVE_NETMAP_PACKET_POOL
+EXTRA_DRIVER_OBJS
 NETMAP_INCLUDES
 NUMA_INCLUDES
 PCAP_LIBS
@@ -676,8 +678,6 @@ HAVE_USERLEVEL_DRIVER
 DRIVERS
 POSSIBLE_DRIVERS
 LINUXMODULE_2_6
-EXTRA_TOOL_OBJS
-EXTRA_DRIVER_OBJS
 SOCKET_LIBS
 BUILD_DL_LIBS
 BUILD_DL_LDFLAGS
@@ -10420,8 +10420,6 @@ fi
 
 
 
-
-
 if test $ac_have_linux_kernel = y; then
 
 
@@ -15834,6 +15832,7 @@ fi
 if test "$ac_have_curl_h$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json$enable_cpu_load" = yesyesyesyesyes; then
     have_metron="yes"
     feedback="no"
+    EXTRA_DRIVER_OBJS="servicechain.o $EXTRA_DRIVER_OBJS"
 else
     have_metron="no"
     feedback="Metron requires to configure with --enable-json and --enable-cpu-load and install libcurl and libmicrohttpd."
