@@ -80,11 +80,16 @@ EnsureDPDKBuffer::smaction(Packet* p) {
                 DPDKDevice::MBUF_DATA_SIZE,
                 DPDKDevice::free_pkt,
                 (void*)mbuf);
-        if (q->copy(p,rte_pktmbuf_headroom(mbuf) + _extra_headroom)) {
+        if (!q) {
+            p->kill();
+            rte_pktmbuf_free(mbuf);
+            return 0;
+        } else if (q->copy(p,rte_pktmbuf_headroom(mbuf) + _extra_headroom)) {
             p->kill();
             return q;
         } else {
             p->kill();
+            q->kill();
             return 0;
         }
     }
