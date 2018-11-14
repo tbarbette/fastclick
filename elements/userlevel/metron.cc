@@ -2458,7 +2458,10 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
 
             return 0;
         } else {
-            return errh->error("Unsupported reconfiguration option: %s", jfield.first.c_str());
+            return errh->error(
+                "Unsupported reconfiguration option: %s",
+                jfield.first.c_str()
+            );
         }
     }
 

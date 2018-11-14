@@ -19,6 +19,7 @@
 #include <click/config.h>
 
 #include <click/string.hh>
+#include <click/args.hh>
 #include <metron/servicechain.hh>
 #include <stdlib.h>
 #include <signal.h>
@@ -648,9 +649,16 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         }
     }
 
-    // TODO: Generalize
-    String exec = "snort";
-    String args = "--daq dpdk --daq-var -l $CPU_RANGE --daq-mode inline -Q -c snort.conf";
+    String exec;
+    String args = "";
+    Vector<String> conf;
+    cp_argvec(sc->config, conf);
+    if (Args(conf, errh)
+        .read_mp("EXEC", exec)
+        .read("ARGS", args)
+        .consume() < 0)
+        return errh->error("Could not parse configuration string !");
+
     Bitvector cpu;
     cpu.resize(click_max_cpu_ids());
     for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
@@ -658,14 +666,17 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         cpu[sc->get_cpu_phys_id(j)] = true;
     }
 
-    int pid = pid = BlackboxNF::run_slave(exec, args, true, cpu, "");
-
-    if (pid <= 0) {
-        return ERROR;
-    } else {
-        _pid = pid;
+    if (exec == "" || exec == "0") {
+        click_chatter("Launching a ghost service chain");
+        _pid = -1;
+        return SUCCESS;
     }
 
+    int pid = BlackboxNF::run_slave(exec, args, true, cpu, "");
+    if (pid <= 0)
+    	return ERROR;
+    else
+    	_pid = pid;
     return SUCCESS;
 #else
     return errh->error("Standalone service chains can only run in batch mode");
