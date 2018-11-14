@@ -41,7 +41,7 @@ class BlackboxNF : public BatchElement {
         bool run_task(Task *);
         void run_timer(Timer *);
         void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
-        static int runSlave(String exec, String args, bool manual, Bitvector cpus, String _pool);
+        static int run_slave(String exec, String args, bool manual, Bitvector cpus, String _pool);
 
     private:
         Task _task;

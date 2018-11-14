@@ -182,7 +182,7 @@ BlackboxNF::initialize(ErrorHandler *errh)
     Bitvector cpu;
     cpu.resize(click_max_cpu_ids());
     cpu[home_thread_id()] = true;
-    int pid = runSlave(_exec, _args, _manual, cpu, _MEM_POOL);
+    int pid = run_slave(_exec, _args, _manual, cpu, _MEM_POOL);
 
     return 0;
 }
@@ -190,12 +190,14 @@ BlackboxNF::initialize(ErrorHandler *errh)
 void
 BlackboxNF::cleanup(CleanupStage)
 {
-    if ( _iqueue.pkts )
+    if ( _iqueue.pkts ) {
         delete[] _iqueue.pkts;
+    }
 }
 
 int
-BlackboxNF::runSlave(String exec, String args, bool manual, Bitvector cpus, String pool) {
+BlackboxNF::run_slave(String exec, String args, bool manual, Bitvector cpus, String pool)
+{
     click_chatter("Launching slave!");
 
     Vector<char*> chars;
@@ -477,7 +479,6 @@ BlackboxNF::push_batch(int, PacketBatch *head)
 #endif
 
 }
-
 
 String
 BlackboxNF::read_handler(Element *e, void *thunk)

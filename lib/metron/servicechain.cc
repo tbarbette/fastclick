@@ -23,30 +23,31 @@
 
 #include "../elements/userlevel/blackboxnf.hh"
 
-
-
-
-/**************************************
- * ServiceChainManagers
- */
-
-ServiceChainManager::ServiceChainManager(ServiceChain* sc) {
+/****************************************/
+/* Service Chain Manager
+/****************************************/
+ServiceChainManager::ServiceChainManager(ServiceChain *sc)
+{
 	_sc = sc;
+    assert(_sc);
 }
-ServiceChainManager::~ServiceChainManager() {
-
+ServiceChainManager::~ServiceChainManager()
+{
 }
 
-/**************************************
- * Click SC Manager
+/****************************************/
+/* Click Service Chain Manager
+/****************************************/
+/**
+ * Kill a Click-based service chain.
  */
-
-void ClickSCManager::kill_service_chain() {
+void
+ClickSCManager::kill_service_chain()
+{
     metron()->_command_lock.acquire();
     control_send_command("WRITE stop");
     metron()->_command_lock.release();
 }
-
 
 /**
  * Run a service chain and keep a control socket to it.
@@ -55,7 +56,8 @@ void ClickSCManager::kill_service_chain() {
 int
 ClickSCManager::run_service_chain(ErrorHandler *errh)
 {
-	ServiceChain* sc = _sc;
+	ServiceChain *sc = _sc;
+
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
             return errh->error("Could not apply Rx filter");
@@ -152,8 +154,12 @@ ClickSCManager::run_service_chain(ErrorHandler *errh)
     return ERROR;
 }
 
+/**
+ * Associates a CPU core with a service chain.
+ */
 int
-ClickSCManager::activate_core(int new_cpu_id, ErrorHandler* errh) {
+ClickSCManager::activate_core(int new_cpu_id, ErrorHandler *errh)
+{
 	int ret = 0;
 	String response = "";
 	for (int inic = 0; inic < metron()->get_nics_nb(); inic++) {
@@ -177,8 +183,12 @@ ClickSCManager::activate_core(int new_cpu_id, ErrorHandler* errh) {
 	return ret;
 };
 
+/**
+ * Tears down a CPU core associated with a service chain.
+ */
 int
-ClickSCManager::deactivate_core(int new_cpu_id, ErrorHandler* errh) {
+ClickSCManager::deactivate_core(int new_cpu_id, ErrorHandler *errh)
+{
 	String response = "";
 	int ret = 0;
 	for (int inic = 0; inic < _sc->get_nics_nb(); inic++) {
@@ -211,8 +221,6 @@ ClickSCManager::control_init(int fd, int pid)
     _pid = pid;
 }
 
-
-
 /**
  * Reads a control message from the control socket of a service chain.
  */
@@ -240,7 +248,7 @@ ClickSCManager::control_read_line(String &line)
 void
 ClickSCManager::control_write_line(String cmd)
 {
-    int n = write(_socket, (cmd + "\r\n").c_str(),cmd.length() + 1);
+    int n = write(_socket, (cmd + "\r\n").c_str(), cmd.length() + 1);
 }
 
 /**
@@ -348,9 +356,14 @@ ClickSCManager::call_write(String handler, String &response, String params)
     return call("WRITE", false, handler, response, params);
 }
 
+/**
+ * Returns NIC statistics related to a service chain in JSON format.
+ */
 Json
-ClickSCManager::get_nic_stats() {
+ClickSCManager::nic_stats_to_json()
+{
     Json jnics = Json::make_array();
+
     for (int i = 0; i < _sc->get_nics_nb(); i++) {
         String is = String(i);
         uint64_t rx_count   = 0;
@@ -404,8 +417,9 @@ ClickSCManager::get_nic_stats() {
         jnic.set("txErrors",  tx_errors);
         jnics.push_back(jnic);
     }
-}
 
+    return jnics;
+}
 
 /**
  * Generates the necessary DPDK arguments for the deployment
@@ -445,7 +459,12 @@ ClickSCManager::build_cmd_line(int socketfd)
     return argv;
 }
 
-void ClickSCManager::do_autoscale(ErrorHandler* errh) {
+/**
+ * Auto-scales a Click-based service chain.
+ */
+void
+ClickSCManager::do_autoscale(ErrorHandler *errh)
+{
     String response;
     int ret = call_write("slave/rrs.max", response, String(_sc->get_active_cpu_nb()));
     if ((ret < 200) || (ret >= 300)) {
@@ -457,13 +476,21 @@ void ClickSCManager::do_autoscale(ErrorHandler* errh) {
     }
 };
 
-
-String ClickSCManager::command(String cmd) {
+/**
+ * Issues a read command ro a service chain's control socket.
+ */
+String
+ClickSCManager::command(String cmd)
+{
 	return simple_call_read(cmd);
 };
 
-void ClickSCManager::run_load_timer() {
-
+/**
+ * Runs a monitoring task for a service chain.
+ */
+void
+ClickSCManager::run_load_timer()
+{
     double alpha_up = 0.5;
     double alpha_down = 0.3;
     double total_alpha = 0.5;
@@ -477,7 +504,6 @@ void ClickSCManager::run_load_timer() {
     Vector<String> avg = simple_call_read("monitoring_lat.mp_average_time").split(' ');
     simple_call_write("monitoring_lat.reset");
     Vector<String> load = simple_call_read("load").split(' ');
-
 
     for (int j = 0; j < _sc->get_max_cpu_nb(); j++) {
 
@@ -569,10 +595,9 @@ void ClickSCManager::run_load_timer() {
 }
 
 
-/**************************************
- * PidServiceChainManagers
- */
-
+/****************************************/
+/* PID-based Service Chain Manager
+/****************************************/
 /**
  * Checks whether a service chain is alive or not.
  */
@@ -586,15 +611,17 @@ PidSCManager::check_alive()
     }
 }
 
-
-
-/**************************************
- * ServiceChainManagers
+/****************************************/
+/* Standalone Service Chain Manager
+/****************************************/
+/**
+ * Kills a standalone service chain.
  */
-void StandaloneSCManager::kill_service_chain() {
+void
+StandaloneSCManager::kill_service_chain()
+{
 	kill(_pid, SIGKILL);
 }
-
 
 /**
  * Run a standalone service chain
@@ -602,13 +629,15 @@ void StandaloneSCManager::kill_service_chain() {
 int
 StandaloneSCManager::run_service_chain(ErrorHandler *errh)
 {
-	ServiceChain* sc = _sc;
+	ServiceChain *sc = _sc;
+
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
             return errh->error("Could not apply Rx filter");
         }
     }
 
+    // TODO: Generalize
     String exec = "snort";
     String args = "--daq dpdk --daq-var -l $CPU_RANGE --daq-mode inline -Q -c snort.conf";
     Bitvector cpu;
@@ -618,10 +647,12 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         cpu[sc->get_cpu_phys_id(j)] = true;
     }
 
-    int pid = BlackboxNF::runSlave(exec, args, true, cpu, "");
-    if (pid <= 0)
+    int pid = BlackboxNF::run_slave(exec, args, true, cpu, "");
+    if (pid <= 0) {
     	return ERROR;
-    else
+    } else {
     	_pid = pid;
+    }
+
     return SUCCESS;
 }

@@ -406,8 +406,7 @@ struct LatencyInfo {
 
 class CpuInfo {
     public:
-        CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0),
-                    latency(), _active(false) {
+        CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0), latency(), _active(false) {
             _active_time = Timestamp::now_steady();
         }
 
@@ -432,10 +431,11 @@ class CpuInfo {
 
         int active_since() {
             int cpu_time;
-            if (_active)
+            if (_active) {
                 cpu_time = (Timestamp::now_steady() - _active_time).msecval();
-            else
+            } else {
                 cpu_time = -(Timestamp::now_steady() - _active_time).msecval();
+            }
             return cpu_time;
         }
 
@@ -458,8 +458,6 @@ class NicStat {
 
 
 class ServiceChain {
-
-
     public:
         class RxFilter {
             public:
@@ -614,7 +612,7 @@ class ServiceChain {
 
     private:
         Metron *_metron;
-        ServiceChainManager* _manager;
+        ServiceChainManager *_manager;
         Vector<NIC *> _nics;
         Vector<CpuInfo> _cpus;
         Vector<NicStat> _nic_stats;
