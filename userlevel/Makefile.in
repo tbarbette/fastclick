@@ -68,7 +68,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	packet.o packetbatch.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
 	element.o batchelement.o \
-	allocator.o servicechain.o \
+	allocator.o \
 	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
@@ -110,7 +110,7 @@ RTE_VER_MINOR = @RTE_VER_MINOR@
 RTE_VER_YEAR = @RTE_VER_YEAR@
 RTE_VER_MONTH = @RTE_VER_MONTH@
 include dpdk.mk
-EXTRA_DRIVER_OBJS := dpdkdevice.o flowdirector.o flowdirectorparser.o $(EXTRA_DRIVER_OBJS)
+EXTRA_DRIVER_OBJS := dpdkdevice.o flowdirector.o flowdirectorparser.o servicechain.o $(EXTRA_DRIVER_OBJS)
 endif
 
 ifndef MINDRIVER
