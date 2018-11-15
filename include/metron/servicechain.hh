@@ -10,7 +10,6 @@
 
 class ServiceChainManager {
     public:
-
         ServiceChainManager(ServiceChain *sc);
         virtual ~ServiceChainManager();
 
@@ -108,4 +107,4 @@ class StandaloneSCManager : public PidSCManager {
 
 };
 
-#endif
+#endif // CLICK_METRON_SC_HH

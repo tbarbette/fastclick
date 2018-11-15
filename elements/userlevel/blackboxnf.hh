@@ -13,7 +13,7 @@ CLICK_DECLS
 
 =c
 
-BlackboxNF(MEMPOOL [, I<keywords> BURST, NDESC])
+BlackboxNF(EXEC, ARGS, [, I<keywords> BURST, NDESC, NUMA_ZONE, POOL, MANUAL, TO_RING, TO_REVERSE_RING, FROM_RING, SP_ENQ, SP_DEQ, BLOCKING])
 
 =s netdevices
 
@@ -28,20 +28,26 @@ class BlackboxNF : public BatchElement {
         const char    *class_name() const { return "BlackboxNF"; }
         const char    *port_count() const { return PORTS_1_1X2; }
         const char    *processing() const { return PUSH; }
-        const char    *flow() const { return "x/y"; }
+        const char    *flow()       const { return "x/y"; }
         int       configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 5; }
         bool can_live_reconfigure() const { return false; }
 
         int  configure   (Vector<String> &, ErrorHandler *) CLICK_COLD;
-        int  initialize  (ErrorHandler *)           CLICK_COLD;
-        void add_handlers()                 CLICK_COLD;
-        void cleanup     (CleanupStage)             CLICK_COLD;
+        int  initialize  (ErrorHandler *) CLICK_COLD;
+        void add_handlers()               CLICK_COLD;
+        void cleanup     (CleanupStage)   CLICK_COLD;
 
         // Calls either push_packet or push_batch
         bool run_task(Task *);
         void run_timer(Timer *);
         void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
-        static int run_slave(String exec, String args, bool manual, Bitvector cpus, String _pool);
+        static int run_slave(String exec, String args, bool manual, Bitvector cpus, String pool);
+
+        enum {
+            h_rx_count,
+            h_tx_count,
+            h_drop
+        };
 
     private:
         Task _task;
@@ -57,13 +63,12 @@ class BlackboxNF : public BatchElement {
         String _PROC_REVERSE;
         String _PROC_2;
 
-        String _exec;
-        String _args;
+        String       _exec;
+        String       _args;
         unsigned     _ndesc;
         unsigned     _burst_size;
-        unsigned int _iqueue_size;
         short        _numa_zone;
-        bool _manual;
+        bool         _manual;
 
         unsigned int _internal_tx_queue_size;
 
@@ -71,11 +76,12 @@ class BlackboxNF : public BatchElement {
         bool         _blocking;
         bool         _congestion_warning_printed;
 
+        counter_t    _n_recv;
         counter_t    _n_sent;
         counter_t    _n_dropped;
-	int _flags;
+        int          _flags;
 
-        static String read_handler(Element*, void*) CLICK_COLD;
+        static String read_handler(Element *, void *) CLICK_COLD;
         void push_batch(int, PacketBatch *head);
         void flush_internal_tx_ring(DPDKDevice::TXInternalQueue &iqueue);
 };

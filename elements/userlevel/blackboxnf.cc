@@ -1,10 +1,10 @@
 // -*- c-basic-offset: 4; related-file-name: "BlackboxNF.hh" -*-
 /*
- * BlackboxNF.{cc,hh} -- element that reads packets from a circular
- * ring buffer using DPDK.
- * Georgios Katsikas
+ * BlackboxNF.{cc,hh} -- element that establishes communication between Click
+ * and standalone processes using DPDK ring buffers.
  *
- * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2018 Tom Barbette, KTH Royal Institute of Technology
+ * Copyright (c) 2018 Georgios Katsikas, KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,15 +29,12 @@
 CLICK_DECLS
 
 BlackboxNF::BlackboxNF() :
-    _task(this), _message_pool(0), _recv_ring(0), _send_ring(0), _recv_ring_reverse(0),
-    _numa_zone(0), _burst_size(0), _exec(""), _args(""), _manual(false),
-    _internal_tx_queue_size(1024),
-    _timeout(0),_blocking(false),
-    _flags(0)
+    _task(this), _message_pool(0), _recv_ring(0), _recv_ring_reverse(0), _send_ring(0),
+    _iqueue(), _exec(""), _args(""), _ndesc(DPDKDevice::DEF_RING_NDESC), _burst_size(0),
+    _numa_zone(0), _manual(false), _internal_tx_queue_size(1024), _timeout(0), _blocking(false),
+    _congestion_warning_printed(false), _n_recv(0), _n_sent(0), _n_dropped(0), _flags(0)
 {
     in_batch_mode = BATCH_MODE_NEEDED;
-
-    _ndesc = DPDKDevice::DEF_RING_NDESC;
 }
 
 BlackboxNF::~BlackboxNF()
@@ -61,46 +58,45 @@ BlackboxNF::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
         .read_mp("EXEC", _exec)
         .read_p("ARGS", _args)
-        .read("BURST",        _burst_size)
-        .read("NDESC",        _ndesc)
-        .read("NUMA_ZONE",    _numa_zone)
-        .read("POOL",         _MEM_POOL)
-        .read("MANUAL",       _manual)
-        .read("TO_RING",      _PROC_1)
+        .read("BURST", _burst_size)
+        .read("NDESC", _ndesc)
+        .read("NUMA_ZONE", _numa_zone)
+        .read("POOL", _MEM_POOL)
+        .read("MANUAL", _manual)
+        .read("TO_RING", _PROC_1)
         .read("TO_REVERSE_RING", _PROC_REVERSE)
-        .read("FROM_RING",    _PROC_2)
+        .read("FROM_RING", _PROC_2)
         .read("SP_ENQ", spenq)
-        .read("SC_DEQ", spdeq)
+        .read("SP_DEQ", spdeq)
         .read("BLOCKING", _blocking)
         .complete() < 0)
         return -1;
 
-    if (spenq)
+    if (spenq) {
         _flags |= RING_F_SP_ENQ;
-    if (spdeq)
+    }
+    if (spdeq) {
         _flags |= RING_F_SC_DEQ;
+    }
 
-    if (_MEM_POOL == "")
+    if (_MEM_POOL == "") {
         _MEM_POOL = "ring_" + _origin;
+    }
 
-    if ( _MEM_POOL.empty() || (_MEM_POOL.length() == 0) ) {
+    if (_MEM_POOL.empty() || (_MEM_POOL.length() == 0)) {
         return errh->error("[%s] Enter MEM_POOL name", name().c_str());
     } else {
         _MEM_POOL = DPDKDevice::MEMPOOL_PREFIX + _MEM_POOL;
         click_chatter("Mempool name is %s", _MEM_POOL.c_str());
     }
 
-
-    if ( _ndesc == 0 ) {
+    if (_ndesc == 0) {
         _ndesc = DPDKDevice::DEF_RING_NDESC;
-        click_chatter("[%s] Default number of descriptors is set (%d)\n",
-                        name().c_str(), _ndesc);
+        click_chatter("[%s] Default number of descriptors is set (%d)\n", name().c_str(), _ndesc);
     }
 
-    // If user does not specify the port number
-    // we assume that the process belongs to the
-    // memory zone of device 0.
-    if ( _numa_zone < 0 ) {
+    // If zone number not given, assume that this process belongs to the memory zone of device 0
+    if (_numa_zone < 0) {
         click_chatter("[%s] Assuming NUMA zone 0\n", name().c_str());
         _numa_zone = 0;
     }
@@ -111,37 +107,24 @@ BlackboxNF::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 BlackboxNF::initialize(ErrorHandler *errh)
 {
-    if ( _burst_size == 0 ) {
+    if (_burst_size == 0) {
         _burst_size = DPDKDevice::DEF_BURST_SIZE;
-        errh->warning("[%s] Non-positive BURST number. Setting default (%d)\n",
-                        name().c_str(), _burst_size);
+        errh->warning("[%s] Non-positive BURST number. Setting default (%d)\n", name().c_str(), _burst_size);
     }
 
-    if ( (_ndesc > 0) && ((unsigned)_burst_size > _ndesc / 2) ) {
-        errh->warning("[%s] BURST should not be greater than half the number of descriptors (%d)\n",
-                        name().c_str(), _ndesc);
-    }
-    else if (_burst_size > DPDKDevice::DEF_BURST_SIZE) {
-        errh->warning("[%s] BURST should not be greater than 32 as DPDK won't send more packets at once\n",
-                        name().c_str());
+    if ((_ndesc > 0) && ((unsigned)_burst_size > _ndesc / 2)) {
+        errh->warning("[%s] BURST should not be greater than half the number of descriptors (%d)\n", name().c_str(), _ndesc);
+    } else if (_burst_size > DPDKDevice::DEF_BURST_SIZE) {
+        errh->warning("[%s] BURST should not be greater than %d as DPDK won't send more packets at once\n", name().c_str(), DPDKDevice::DEF_BURST_SIZE);
     }
 
-    _recv_ring = rte_ring_create(
-        _PROC_1.c_str(), DPDKDevice::RING_SIZE,
-        rte_socket_id(), _flags
-    );
+    _recv_ring = rte_ring_create(_PROC_1.c_str(), DPDKDevice::RING_SIZE, rte_socket_id(), _flags);
 
     if (_PROC_REVERSE) {
-        _recv_ring_reverse = rte_ring_create(
-            _PROC_REVERSE.c_str(), DPDKDevice::RING_SIZE,
-            rte_socket_id(), _flags
-        );
+        _recv_ring_reverse = rte_ring_create(_PROC_REVERSE.c_str(), DPDKDevice::RING_SIZE, rte_socket_id(), _flags);
     }
 
-    _send_ring = rte_ring_create(
-        _PROC_2.c_str(), DPDKDevice::RING_SIZE,
-        rte_socket_id(), _flags
-    );
+    _send_ring = rte_ring_create(_PROC_2.c_str(), DPDKDevice::RING_SIZE, rte_socket_id(), _flags);
 
     _message_pool = rte_mempool_lookup(_MEM_POOL.c_str());
     if (!_message_pool) {
@@ -158,23 +141,25 @@ BlackboxNF::initialize(ErrorHandler *errh)
     // Initialize the internal queue
     _iqueue.pkts = new struct rte_mbuf *[_internal_tx_queue_size];
     if (_timeout >= 0) {
-        _iqueue.timeout.assign     (this);
-        _iqueue.timeout.initialize (this);
+        _iqueue.timeout.assign(this);
+        _iqueue.timeout.initialize(this);
         _iqueue.timeout.move_thread(click_current_cpu_id());
     }
 
-    if ( !_recv_ring )
+    if (!_recv_ring) {
         return errh->error("[%s] Problem getting Rx ring. "
-                    "Make sure that the involved processes have a correct ring configuration\n",
-                    name().c_str());
-    if ( !_send_ring )
+                    "Make sure that the involved processes have a correct ring configuration\n", name().c_str());
+    }
+
+    if (!_send_ring) {
         return errh->error("[%s] Problem getting Tx ring. "
-                    "Make sure that the involved processes have a correct ring configuration\n",
-                    name().c_str());
-    if ( !_message_pool )
+                    "Make sure that the involved processes have a correct ring configuration\n", name().c_str());
+    }
+
+    if (!_message_pool) {
         return errh->error("[%s] Problem getting message pool %s. "
-                    "Make sure that the involved processes have a correct ring configuration\n",
-                    name().c_str(), _MEM_POOL.c_str());
+                    "Make sure that the involved processes have a correct ring configuration\n", name().c_str(), _MEM_POOL.c_str());
+    }
 
     // Schedule the element
     ScheduleInfo::initialize_task(this, &_task, true, errh);
@@ -190,7 +175,7 @@ BlackboxNF::initialize(ErrorHandler *errh)
 void
 BlackboxNF::cleanup(CleanupStage)
 {
-    if ( _iqueue.pkts ) {
+    if (_iqueue.pkts) {
         delete[] _iqueue.pkts;
     }
 }
@@ -220,17 +205,17 @@ BlackboxNF::run_slave(String exec, String args, bool manual, Bitvector cpus, Str
             begin = a + 1;
         }
         if (*a == '$') {
-            if (strncmp(a + 1,"POOL",4) == 0) {
-		if (!pool) {
-			click_chatter("$POOL variable used but this method does not use memory pools !");
-			return -1;
-		}
+            if (strncmp(a + 1, "POOL", 4) == 0) {
+                if (!pool) {
+                    click_chatter("$POOL variable used but this method does not use memory pools!");
+                    return -1;
+                }
                 int cur = a-begin;
                 *a = '\0';
                 tmp = String(begin) + pool + String(a+5);
                 begin = const_cast<char*>(tmp.c_str());
                 a = begin + cur + pool.length() - 1;
-            } else if (strncmp(a + 1,"CPU_RANGE", 9) == 0) {
+            } else if (strncmp(a + 1, "CPU_RANGE", 9) == 0) {
                 int cur = a-begin;
                 *a = '\0';
                 String s = cpus.unparse();
@@ -248,8 +233,9 @@ BlackboxNF::run_slave(String exec, String args, bool manual, Bitvector cpus, Str
         }
     }
 
-    if (begin != a)
+    if (begin != a) {
         chars.push_back(begin);
+    }
     chars.push_back(0);
 
     if (manual) {
@@ -291,7 +277,7 @@ BlackboxNF::run_task(Task *t)
 #else
     int n = rte_ring_dequeue_burst(_recv_ring, (void **)pkts, _burst_size);
 #endif
-    if ( n < 0 ) {
+    if (n < 0) {
         click_chatter("[%s] Couldn't read from the Rx rings\n", name().c_str());
         return false;
     }
@@ -315,12 +301,12 @@ BlackboxNF::run_task(Task *t)
         else
             last->set_next(p);
         last = p;
-
     }
 
     if (head) {
         head->make_tail  (last, n);
         output_push_batch(0, head);
+        _n_recv += n;
     }
 
     _task.fast_reschedule();
@@ -337,25 +323,27 @@ BlackboxNF::run_timer(Timer *)
 inline void
 BlackboxNF::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue)
 {
-    if ( _timeout >= 0 ) {
-        if ( iqueue.timeout.scheduled() ) {
+    if (_timeout >= 0) {
+        if (iqueue.timeout.scheduled()) {
             // No more pending packets, remove timer
             if ( iqueue.nr_pending == 0 )
                 iqueue.timeout.unschedule();
         }
         else {
-            if ( iqueue.nr_pending > 0 )
-                // Pending packets, set timeout to flush packets
-                // after a while even without burst
-                if ( _timeout == 0 )
+            if (iqueue.nr_pending > 0)
+                // Pending packets, set timeout to flush packets after a while even without burst
+                if (_timeout == 0) {
                     iqueue.timeout.schedule_now();
-                else
+                } else {
                     iqueue.timeout.schedule_after_msec(_timeout);
+                }
         }
     }
 }
 
-/* Flush as many packets as possible from the internal queue of the DPDK ring. */
+/**
+ * Flush as many packets as possible from the internal queue of the DPDK ring.
+ */
 void
 BlackboxNF::flush_internal_tx_ring(DPDKDevice::TXInternalQueue &iqueue)
 {
@@ -399,13 +387,14 @@ BlackboxNF::flush_internal_tx_ring(DPDKDevice::TXInternalQueue &iqueue)
             iqueue.index = 0;
 
         sent += n;
-    } while ( (n == sub_burst) && (iqueue.nr_pending > 0) );
+    } while ((n == sub_burst) && (iqueue.nr_pending > 0));
 
     _n_sent += sent;
 
     // If ring is empty, reset the index to avoid wrap ups
-    if (iqueue.nr_pending == 0)
+    if (iqueue.nr_pending == 0) {
         iqueue.index = 0;
+    }
 }
 
 
@@ -428,9 +417,9 @@ BlackboxNF::push_batch(int, PacketBatch *head)
         congestioned = false;
 
         // First, place the packets in the queue, while there is still place there
-        while ( iqueue.nr_pending < _internal_tx_queue_size && p ) {
+        while (iqueue.nr_pending < _internal_tx_queue_size && p) {
             struct rte_mbuf *mbuf = DPDKDevice::get_mbuf(p, true, _numa_zone);
-            if ( mbuf != NULL ) {
+            if (mbuf != NULL) {
                 iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size] = mbuf;
                 iqueue.nr_pending++;
             }
@@ -444,7 +433,7 @@ BlackboxNF::push_batch(int, PacketBatch *head)
         }
 
         // There are packets not pushed into the queue, congestion is very likely!
-        if ( p != 0 ) {
+        if (p != 0) {
             congestioned = true;
             if ( !_congestion_warning_printed ) {
                 if ( !_blocking )
@@ -456,13 +445,13 @@ BlackboxNF::push_batch(int, PacketBatch *head)
         }
 
         // Flush the queue if we have pending packets
-        if ( (int) iqueue.nr_pending > 0 ) {
+        if ((int) iqueue.nr_pending > 0) {
             flush_internal_tx_ring(iqueue);
         }
         set_flush_timer(iqueue);
 
         // If we're in blocking mode, we loop until we can put p in the iqueue
-    } while ( unlikely(_blocking && congestioned) );
+    } while (unlikely(_blocking && congestioned));
 
 #if !CLICK_PACKET_USE_DPDK
     // If non-blocking, drop all packets that could not be sent
@@ -481,19 +470,32 @@ BlackboxNF::push_batch(int, PacketBatch *head)
 }
 
 String
-BlackboxNF::read_handler(Element *e, void *thunk)
+BlackboxNF::read_handler(Element *e, void *user_data)
 {
     BlackboxNF *fr = static_cast<BlackboxNF*>(e);
-/*
-    if ( thunk == (void *) 0 )
-        return String(fr->_pkts_recv);
-    else
-        return String(fr->_bytes_recv);*/
+    if (!fr) {
+        return "Blackbox instance unavailable";
+    }
+
+    intptr_t what = reinterpret_cast<intptr_t>(user_data);
+    switch (what) {
+        case h_rx_count:
+            return String(fr->_n_recv);
+        case h_tx_count:
+            return String(fr->_n_sent);
+        case h_drop:
+            return String(fr->_n_dropped);
+        default:
+            return "<undefined>";
+    }
 }
 
 void
 BlackboxNF::add_handlers()
 {
+    add_read_handler("recv", read_handler, h_rx_count);
+    add_read_handler("sent", read_handler, h_tx_count);
+    add_read_handler("drop", read_handler, h_drop);
 }
 
 CLICK_ENDDECLS

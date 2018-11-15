@@ -1,6 +1,10 @@
 // -*- c-basic-offset: 4; related-file-name: "servicechain.hh" -*-
 /*
- * servicechain.{cc,hh}
+ * servicechain.{cc,hh} -- library to manage various types of service chains,
+ * including Click-based and standalone ones.
+ *
+ * Copyright (c) 2018 Tom Barbette, KTH Royal Institute of Technology
+ * Copyright (c) 2018 Georgios Katsikas, KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,9 +32,10 @@
 /****************************************/
 ServiceChainManager::ServiceChainManager(ServiceChain *sc)
 {
-	_sc = sc;
+    _sc = sc;
     assert(_sc);
 }
+
 ServiceChainManager::~ServiceChainManager()
 {
 }
@@ -56,7 +61,7 @@ ClickSCManager::kill_service_chain()
 int
 ClickSCManager::run_service_chain(ErrorHandler *errh)
 {
-	ServiceChain *sc = _sc;
+    ServiceChain *sc = _sc;
 
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
@@ -160,27 +165,27 @@ ClickSCManager::run_service_chain(ErrorHandler *errh)
 int
 ClickSCManager::activate_core(int new_cpu_id, ErrorHandler *errh)
 {
-	int ret = 0;
-	String response = "";
-	for (int inic = 0; inic < metron()->get_nics_nb(); inic++) {
-		ret = call_write(
-			_sc->generate_configuration_slave_fd_name(
-				inic, _sc->get_cpu_phys_id(new_cpu_id)
-			) + ".safe_active", response, "1"
-		);
-		if ((ret < 200) || (ret >= 300)) {
-			return errh->error(
-				"Response to activate input was %d: %s",
-				ret, response.c_str()
-			);
-		}
-		click_chatter("Response %d: %s", ret, response.c_str());
-		// Actually use the new cores AFTER the secondary has been advertised
-		if (metron()->_rx_mode == RSS) {
-			_sc->_nics[inic]->call_rx_write("max_rss", String(new_cpu_id + 1));
-		}
-	}
-	return ret;
+    int ret = 0;
+    String response = "";
+    for (int inic = 0; inic < metron()->get_nics_nb(); inic++) {
+        ret = call_write(
+            _sc->generate_configuration_slave_fd_name(
+                inic, _sc->get_cpu_phys_id(new_cpu_id)
+            ) + ".safe_active", response, "1"
+        );
+        if ((ret < 200) || (ret >= 300)) {
+            return errh->error(
+                "Response to activate input was %d: %s",
+                ret, response.c_str()
+            );
+        }
+        click_chatter("Response %d: %s", ret, response.c_str());
+        // Actually use the new cores AFTER the secondary has been advertised
+        if (metron()->_rx_mode == RSS) {
+            _sc->_nics[inic]->call_rx_write("max_rss", String(new_cpu_id + 1));
+        }
+    }
+    return ret;
 };
 
 /**
@@ -189,26 +194,26 @@ ClickSCManager::activate_core(int new_cpu_id, ErrorHandler *errh)
 int
 ClickSCManager::deactivate_core(int new_cpu_id, ErrorHandler *errh)
 {
-	String response = "";
-	int ret = 0;
-	for (int inic = 0; inic < _sc->get_nics_nb(); inic++) {
-		// Stop using the new cores BEFORE the secondary has been torn down
-		if (metron()->_rx_mode == RSS) {
-			_sc->_nics[inic]->call_rx_write("max_rss", String(new_cpu_id + 1));
-		}
-		int ret = call_write(
-				_sc->generate_configuration_slave_fd_name(
-				inic, _sc->get_cpu_phys_id(new_cpu_id)
-			) + ".safe_active", response, "0"
-		);
-		if ((ret < 200) || (ret >= 300)) {
-			return errh->error(
-				"Response to activate input was %d: %s",
-				ret, response.c_str()
-			);
-		}
-	}
-	return ret;
+    String response = "";
+    int ret = 0;
+    for (int inic = 0; inic < _sc->get_nics_nb(); inic++) {
+        // Stop using the new cores BEFORE the secondary has been torn down
+        if (metron()->_rx_mode == RSS) {
+            _sc->_nics[inic]->call_rx_write("max_rss", String(new_cpu_id + 1));
+        }
+        int ret = call_write(
+                _sc->generate_configuration_slave_fd_name(
+                inic, _sc->get_cpu_phys_id(new_cpu_id)
+            ) + ".safe_active", response, "0"
+        );
+        if ((ret < 200) || (ret >= 300)) {
+            return errh->error(
+                "Response to activate input was %d: %s",
+                ret, response.c_str()
+            );
+        }
+    }
+    return ret;
 }
 
 /**
@@ -482,7 +487,7 @@ ClickSCManager::do_autoscale(ErrorHandler *errh)
 String
 ClickSCManager::command(String cmd)
 {
-	return simple_call_read(cmd);
+    return simple_call_read(cmd);
 };
 
 /**
@@ -566,10 +571,10 @@ ClickSCManager::run_load_timer()
         _sc->_cpus[j].load = cpu_load;
         _sc->_cpus[j].max_nic_queue = cpu_queue;
         if (metron()->_monitoring_mode) {
-        	_sc->_cpus[j].latency.avg_throughput = throughput;
-        	_sc->_cpus[j].latency.min_latency = atoll(min[j].c_str());
-        	_sc->_cpus[j].latency.max_latency = atoll(max[j].c_str());
-        	_sc->_cpus[j].latency.average_latency = atoll(avg[j].c_str());
+            _sc->_cpus[j].latency.avg_throughput = throughput;
+            _sc->_cpus[j].latency.min_latency = atoll(min[j].c_str());
+            _sc->_cpus[j].latency.max_latency = atoll(max[j].c_str());
+            _sc->_cpus[j].latency.average_latency = atoll(avg[j].c_str());
         }
         total_cpu_load += cpu_load;
         if (cpu_load > max_cpu_load) {
@@ -579,15 +584,15 @@ ClickSCManager::run_load_timer()
     }
 
     if (_sc->_autoscale) {
-    	_sc->_total_cpu_load = _sc->_total_cpu_load *
+        _sc->_total_cpu_load = _sc->_total_cpu_load *
                               (1 - total_alpha) + max_cpu_load * (total_alpha);
         if (_sc->_total_cpu_load > metron()->CPU_OVERLOAD_LIMIT) {
-        	_sc->do_autoscale(1);
+            _sc->do_autoscale(1);
         } else if (_sc->_total_cpu_load < metron()->CPU_UNDERLOAD_LIMIT) {
-        	_sc->do_autoscale(-1);
+            _sc->do_autoscale(-1);
         }
     } else {
-    	_sc->_total_cpu_load = _sc->_total_cpu_load * (1 - total_alpha) +
+        _sc->_total_cpu_load = _sc->_total_cpu_load * (1 - total_alpha) +
                               (total_cpu_load / _sc->get_active_cpu_nb()) * (total_alpha);
     }
     _sc->_max_cpu_load = max_cpu_load;
@@ -620,7 +625,12 @@ PidSCManager::check_alive()
 void
 StandaloneSCManager::kill_service_chain()
 {
-	kill(_pid, SIGKILL);
+#if HAVE_BATCH
+    kill(_pid, SIGKILL);
+#else
+    click_chatter("Standalone service chains can only be killed in batch mode");
+    return;
+#endif
 }
 
 /**
@@ -629,7 +639,8 @@ StandaloneSCManager::kill_service_chain()
 int
 StandaloneSCManager::run_service_chain(ErrorHandler *errh)
 {
-	ServiceChain *sc = _sc;
+#if HAVE_BATCH
+    ServiceChain *sc = _sc;
 
     for (int i = 0; i < sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
@@ -647,12 +658,16 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         cpu[sc->get_cpu_phys_id(j)] = true;
     }
 
-    int pid = BlackboxNF::run_slave(exec, args, true, cpu, "");
+    int pid = pid = BlackboxNF::run_slave(exec, args, true, cpu, "");
+
     if (pid <= 0) {
-    	return ERROR;
+        return ERROR;
     } else {
-    	_pid = pid;
+        _pid = pid;
     }
 
     return SUCCESS;
+#else
+    return errh->error("Standalone service chains can only run in batch mode");
+#endif
 }
