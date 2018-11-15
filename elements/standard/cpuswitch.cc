@@ -31,11 +31,13 @@ CPUSwitch::get_spawning_threads(Bitvector& b, bool isoutput, int port) {
     if (port == -1 || !isoutput)
         return true;
 
+    Bitvector m = get_passing_threads();
+    
     for (unsigned i = 0; i < (unsigned)b.size(); i++) {
+	if (!m[i])
+		continue;
         if ((unsigned)port == (i % noutputs())) {
             b[i] = true;
-        } else {
-            b[i] = false;
         }
     }
     return false;
