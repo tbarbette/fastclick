@@ -9,7 +9,7 @@
 
 define($L 60, $N 100, $S 100000);
 define($block true);
-define($ring_size -1); //virtio needs a direct assignation of 512, use -1 for automatic
+define($ring_size 0); //virtio needs a direct assignation of 512, use 0 for automatic
 define($dstmac 52:54:00:1e:4f:f3);
 
 define($srcmac 52:54:00:ef:81:e0);

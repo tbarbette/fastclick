@@ -11,6 +11,8 @@
 
 /*You do not need to change the mac address as we run in promisc, but you need
  to set the srcip, gateway ip and dstip correctly */
+define($L 60, $N 100, $S 100000);
+
 define($smac 90:e2:ba:c3:79:66)
 define($dmac 90:e2:ba:c3:79:68)
 define($srcip 192.168.130.4)
