@@ -24,6 +24,8 @@ class ServiceChainManager {
 
         virtual void do_autoscale(ErrorHandler *errh) {};
 
+        virtual String fix_rule(NIC *nic, String rule);
+
         /**
          * Send a command to the thing managed. The operator obiously has to know the
          * underlying implementation
@@ -97,14 +99,15 @@ class ClickSCManager : public PidSCManager {
 
 class StandaloneSCManager : public PidSCManager {
     public:
-        StandaloneSCManager(ServiceChain *sc) : PidSCManager(sc) {};
+        StandaloneSCManager(ServiceChain *sc) : PidSCManager(sc), _sriov(-1)  {};
         ~StandaloneSCManager() {};
 
         void kill_service_chain();
         int run_service_chain(ErrorHandler *errh);
 
-    private:
-
+        virtual String fix_rule(NIC* nic, String rule);
+private:
+        int _sriov;
 };
 
 #endif // CLICK_METRON_SC_HH

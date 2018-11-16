@@ -2110,8 +2110,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                     rule += "\n";
                 }
 
-                // Compose rule for the right NIC
-                rule = "flow create " + String(nic->get_port_id()) + " " + rule;
+                rule = _manager->fix_rule(nic, rule);
 
                 // Store this rule
                 rules_map.insert(rule_id, rule);

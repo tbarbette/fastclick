@@ -44,6 +44,17 @@ ServiceChainManager::~ServiceChainManager()
 /****************************************/
 /* Click Service Chain Manager
 /****************************************/
+
+/**
+ * Fix rule sent by the controller according to dataplane informations
+ */
+String
+ServiceChainManager::fix_rule(NIC *nic, String rule) {
+    // compose rule for the right nic
+    rule = "flow create " + String(nic->get_port_id()) + " " + rule;
+    return rule;
+}
+
 /**
  * Kill a Click-based service chain.
  */
@@ -620,6 +631,26 @@ PidSCManager::check_alive()
 /****************************************/
 /* Standalone Service Chain Manager
 /****************************************/
+
+/**
+ * Fix the rule sent by the controller according to dataplane informations
+ */
+String
+StandaloneSCManager::fix_rule(NIC *nic, String rule) {
+    if (_sriov < 0) {
+        // compose rule for the right nic
+        rule = "flow create " + String(nic->get_port_id()) + " " + rule;
+    } else {
+        // compose rule for the right nic
+        rule = "flow create " + String(nic->get_port_id()) + " transfer " + rule;
+        int pos = rule.find_left("queue ");
+        rule = rule.substring(0,pos) + " port_id id " + String(_sriov) + " / end";
+        click_chatter("%s", rule.c_str());
+
+    }
+    return rule;
+}
+
 /**
  * Kills a standalone service chain.
  */
