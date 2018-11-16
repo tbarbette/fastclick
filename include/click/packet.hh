@@ -90,6 +90,8 @@ class Packet { public:
                                 void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
 #endif //CLICK_USERLEVEL || CLICK_MINIOS
 
+
+    static int max_data_pool_size();
     static void static_cleanup();
 
     inline void kill();
