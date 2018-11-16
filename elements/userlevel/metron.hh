@@ -374,8 +374,8 @@ class NIC {
         void set_index(const int &index);
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        FlowDirector *get_flow_director() { return FlowDirector::get_flow_director(get_port_id()); };
-        FlowCache *get_flow_cache() { return get_flow_director()->get_flow_cache(); };
+        FlowDirector *get_flow_director(int sriov = 0) { return FlowDirector::get_flow_director(get_port_id() + sriov); };
+        FlowCache *get_flow_cache(int sriov = 0) { return get_flow_director(sriov)->get_flow_cache(); };
     #endif
 
         int queue_per_pool();

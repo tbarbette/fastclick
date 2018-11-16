@@ -725,6 +725,7 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
         click_chatter("Could not launch service chain...");
         unassign_cpus(sc);
         if (_fail) {
+            click_chatter("Metron is in fail mode... It is going to abort due to a major error !");
             abort();
         }
         return ERROR;

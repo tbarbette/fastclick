@@ -28,9 +28,9 @@
 
 #include "../elements/userlevel/blackboxnf.hh"
 
-/****************************************/
-/* Service Chain Manager
-/****************************************/
+/****************************************
+ * Service Chain Manager
+ ****************************************/
 ServiceChainManager::ServiceChainManager(ServiceChain *sc)
 {
     _sc = sc;
@@ -41,9 +41,9 @@ ServiceChainManager::~ServiceChainManager()
 {
 }
 
-/****************************************/
-/* Click Service Chain Manager
-/****************************************/
+/****************************************
+ * Click Service Chain Manager
+ ****************************************/
 
 /**
  * Fix rule sent by the controller according to dataplane informations
@@ -612,9 +612,9 @@ ClickSCManager::run_load_timer()
 }
 
 
-/****************************************/
-/* PID-based Service Chain Manager
-/****************************************/
+/****************************************
+ * PID-based Service Chain Manager
+ ****************************************/
 /**
  * Checks whether a service chain is alive or not.
  */
@@ -628,9 +628,9 @@ PidSCManager::check_alive()
     }
 }
 
-/****************************************/
-/* Standalone Service Chain Manager
-/****************************************/
+/****************************************
+ * Standalone Service Chain Manager
+ ****************************************/
 
 /**
  * Fix the rule sent by the controller according to dataplane informations
@@ -690,6 +690,26 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         .read("SRIOV", _sriov)
         .consume() < 0)
         return errh->error("Could not parse configuration string !");
+
+
+    if (_sriov >= 0) {
+    int idx = 0;
+            for (int i = 0; i < sc->get_nics_nb(); i++) {
+                //Insert VF->PF traffic return rules
+                HashMap<long, String> rules_map;
+
+                NIC* nic = sc->get_nic_by_index(i);
+
+                int pindex = nic->get_port_id();
+
+                rules_map.insert(0, "flow create " + String(_sriov + pindex) + " transfer ingress pattern eth type is 2048 / end actions port_id id "+String(pindex)+" / end\n");
+                int status = nic->get_flow_director(_sriov)->add_rules(rules_map, false);
+                if (status < 0) {
+                    return errh->error("Could not insert SRIOV revert rule");
+                }
+
+            }
+    }
 
     Bitvector cpu;
     cpu.resize(click_max_cpu_ids());
