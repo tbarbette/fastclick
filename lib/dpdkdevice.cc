@@ -150,7 +150,7 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
 
 	if (Packet::max_data_pool_size() > 0) {
 		if (Packet::max_data_pool_size() + 8192 > total) {
-			return errh->error("--enable-dpdk-packet-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more DPDK buffers or compile without --enable-dpdk-pool");
+			return errh->error("--enable-dpdk-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more than %d DPDK buffers or compile without --enable-dpdk-pool", Packet::max_data_pool_size() + 8192);
 		}
 	}
 #endif
