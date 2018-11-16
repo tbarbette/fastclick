@@ -687,6 +687,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
     if (Args(conf, errh)
         .read_mp("EXEC", exec)
         .read("ARGS", args)
+        .read("SRIOV", _sriov)
         .consume() < 0)
         return errh->error("Could not parse configuration string !");
 
