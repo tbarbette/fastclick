@@ -255,7 +255,7 @@ class FlowDirector {
         // Lists all NIC flow rules
         String flow_rules_list();
 
-    // Lists all installed (internal + global flow rule IDs
+        // Lists all installed (internal + global flow rule IDs
         String flow_rule_ids_internal();
         String flow_rule_ids_global();
 

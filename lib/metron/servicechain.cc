@@ -44,7 +44,6 @@ ServiceChainManager::~ServiceChainManager()
 /****************************************
  * Click Service Chain Manager
  ****************************************/
-
 /**
  * Fix rule sent by the controller according to dataplane informations
  */
@@ -631,23 +630,21 @@ PidSCManager::check_alive()
 /****************************************
  * Standalone Service Chain Manager
  ****************************************/
-
 /**
- * Fix the rule sent by the controller according to dataplane informations
+ * Fix the rule sent by the controller according to data plane information.
  */
 String
 StandaloneSCManager::fix_rule(NIC *nic, String rule) {
+    // Compose rule for the right NIC
     if (_sriov < 0) {
-        // compose rule for the right nic
         rule = "flow create " + String(nic->get_port_id()) + " " + rule;
     } else {
-        // compose rule for the right nic
         rule = "flow create " + String(nic->get_port_id()) + " transfer " + rule;
         int pos = rule.find_left("queue ");
         rule = rule.substring(0,pos) + " port_id id " + String(_sriov) + " / end";
         click_chatter("%s", rule.c_str());
-
     }
+
     return rule;
 }
 
@@ -688,27 +685,30 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         .read_mp("EXEC", exec)
         .read("ARGS", args)
         .read("SRIOV", _sriov)
-        .consume() < 0)
-        return errh->error("Could not parse configuration string !");
-
+        .consume() < 0) {
+        return errh->error("Could not parse configuration string!");
+    }
 
     if (_sriov >= 0) {
-    int idx = 0;
-            for (int i = 0; i < sc->get_nics_nb(); i++) {
-                //Insert VF->PF traffic return rules
-                HashMap<long, String> rules_map;
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        int idx = 0;
+        for (int i = 0; i < sc->get_nics_nb(); i++) {
+            // Insert VF->PF traffic return rules
+            HashMap<long, String> rules_map;
 
-                NIC* nic = sc->get_nic_by_index(i);
+            NIC *nic = sc->get_nic_by_index(i);
 
-                int pindex = nic->get_port_id();
+            int pindex = nic->get_port_id();
 
-                rules_map.insert(0, "flow create " + String(_sriov + pindex) + " transfer ingress pattern eth type is 2048 / end actions port_id id "+String(pindex)+" / end\n");
-                int status = nic->get_flow_director(_sriov)->add_rules(rules_map, false);
-                if (status < 0) {
-                    return errh->error("Could not insert SRIOV revert rule");
-                }
-
+            rules_map.insert(0, "flow create " + String(_sriov + pindex) + " transfer ingress pattern eth type is 2048 / end actions port_id id " + String(pindex) + " / end\n");
+            int status = nic->get_flow_director(_sriov)->add_rules(rules_map, false);
+            if (status < 0) {
+                return errh->error("Could not insert SRIOV revert rule");
             }
+        }
+    #else
+        return errh->error("SRIOV rules are not supported by this DPDK version");
+    #endif
     }
 
     Bitvector cpu;
@@ -725,10 +725,11 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
     }
 
     int pid = BlackboxNF::run_slave(exec, args, true, cpu, "");
-    if (pid <= 0)
-    	return ERROR;
-    else
-    	_pid = pid;
+    if (pid <= 0) {
+        return ERROR;
+    } else {
+        _pid = pid;
+    }
     return SUCCESS;
 #else
     return errh->error("Standalone service chains can only run in batch mode");
