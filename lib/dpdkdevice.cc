@@ -905,7 +905,10 @@ int DPDKDevice::configure_nic(const portid_t &port_id)
 
         // There is a file with (user-defined) rules
         if (!rules_file.empty()) {
-            return flow_dir->add_rules_from_file(rules_file) > 0;
+            if (flow_dir->add_rules_from_file(rules_file) >= 0)
+                return 0;
+            else
+                return -1;
         }
     }
 
