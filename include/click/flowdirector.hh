@@ -263,7 +263,7 @@ class FlowDirector {
         uint32_t flow_rules_flush();
 
         // Filters unwanted components from rule
-        static bool filter_rule(char **rule);
+        static bool filter_rule(String &rule);
 
         // Returns a rule token after an input keyword
         static String fetch_token_after_keyword(char *rule, const String &keyword);

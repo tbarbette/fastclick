@@ -169,7 +169,6 @@ FlowCache::global_rule_ids()
 
     auto ext_it = _rules.begin();
     while (ext_it != _rules.end()) {
-        int core_id = ext_it.key();
         HashMap<long, String> *rules_map = ext_it.value();
 
         // No rules associated with this CPU core
@@ -259,7 +258,7 @@ FlowCache::cores_with_rules()
 {
     Vector<int> cores_with_rules;
 
-    for (int i = 0; i < click_max_cpu_ids(); i++) {
+    for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
         Vector<String> core_rules = rules_list_by_core_id(i);
 
         if (core_rules.empty()) {
@@ -1013,13 +1012,14 @@ FlowDirector::load_rules_from_file_to_string(const String &filename)
         }
 
         // Detect and remove unwanted components
-        if (!filter_rule(&line)) {
+        String rule = String(line);
+        if (!filter_rule(rule)) {
             _errh->error("Flow Director (port %u): Invalid rule '%s'", _port_id, line);
             continue;
         }
 
         // Compose rule for the right NIC
-        String rule = "flow create " + String(_port_id) + " " + String(line);
+        rule = "flow create " + String(_port_id) + " " + rule;
 
         // Append this rule to a string
         rules_str += rule;
@@ -1755,13 +1755,11 @@ FlowDirector::flow_rules_flush()
  * @return boolean status
  */
 bool
-FlowDirector::filter_rule(char **rule)
+FlowDirector::filter_rule(String &rule)
 {
-    assert(rule);
-
     const char *prefix = "flow create";
     size_t prefix_len = strlen(prefix);
-    size_t rule_len = strlen(*rule);
+    size_t rule_len = rule.length();
 
     // Fishy
     if (rule_len <= prefix_len) {
@@ -1769,19 +1767,19 @@ FlowDirector::filter_rule(char **rule)
     }
 
     // Rule starts with prefix
-    if (strncmp(prefix, *rule, prefix_len) == 0) {
+    if (strncmp(prefix, rule.c_str(), prefix_len) == 0) {
         // Skip the prefix
-        *rule += prefix_len;
+        rule = rule.substring(prefix_len + 1);
 
         // Remove a potential port ID and spaces before the actual rule
         while (true) {
-            if (!isdigit(**rule) && (**rule != ' ')) {
+            if (!isdigit(rule[0]) && (rule[0] != ' ')) {
                 break;
             }
-            (*rule)++;
+            rule = rule.substring(1);
         }
 
-        return (strlen(*rule) > 0) ? true : false;
+        return (rule.length() > 0) ? true : false;
     }
 
     return true;

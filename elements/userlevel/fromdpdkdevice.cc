@@ -616,12 +616,11 @@ int FromDPDKDevice::flow_handler(
             }
 
             // Detect and remove unwanted components
-            char *buf = rule.mutable_c_str();
-            if (!FlowDirector::filter_rule(&buf)) {
-                return errh->error("Flow Director (port %u): Invalid rule '%s'", port_id, buf);
+            if (!FlowDirector::filter_rule(rule)) {
+                return errh->error("Flow Director (port %u): Invalid rule '%s'", port_id, rule.c_str());
             }
 
-            rule = "flow create " + String(port_id) + " " + String(buf);
+            rule = "flow create " + String(port_id) + " " + rule;
 
             // Parse the queue index to infer the CPU core
             String queue_index_str = FlowDirector::fetch_token_after_keyword((char *) rule.c_str(), "queue index");
