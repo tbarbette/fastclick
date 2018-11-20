@@ -879,7 +879,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         if (dev->get_mode_str() == FlowDirector::FLOW_DIR_MODE) {
             int err = DPDKDevice::configure_nic(port_id);
             if (err != 0) {
-                return -1;
+                return errh->error("Could not configure all rules for device %d", port_id);
             }
         }
     }
@@ -905,7 +905,7 @@ int DPDKDevice::configure_nic(const portid_t &port_id)
 
         // There is a file with (user-defined) rules
         if (!rules_file.empty()) {
-            return flow_dir->add_rules_from_file(rules_file);
+            return flow_dir->add_rules_from_file(rules_file) > 0;
         }
     }
 

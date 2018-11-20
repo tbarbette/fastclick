@@ -145,7 +145,8 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
 
     if (all_initialized()) {
         int ret = DPDKDevice::initialize(errh);
-        if (ret != 0) return ret;
+        if (ret != 0)
+            return ret;
     }
 
     return 0;
