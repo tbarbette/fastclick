@@ -15775,12 +15775,12 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 
-if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json$enable_cpu_load" = yesyesyesyes; then
+if test "$ac_have_curl_h$ac_have_libmicrohttpd$ac_have_microhttpd_h$enable_json$enable_cpu_load" = yesyesyesyesyes; then
     have_metron="yes"
     feedback="no"
 else
     have_metron="no"
-    feedback="Metron requires to configure with --enable-json and --enable-cpu-load and install libmicrohttpd."
+    feedback="Metron requires to configure with --enable-json and --enable-cpu-load and install libcurl and libmicrohttpd."
 fi
 
 echo "
@@ -15803,6 +15803,7 @@ if test "$feedback" != no; then
     echo ""
     echo $feedback
     echo "To install libmicrohttpd in a Debian-based OS, type: sudo apt install libmicrohttpd-dev"
+    echo "To install libcurl in a Debian-based OS, type: sudo apt install libcurl4-openssl-dev"
     echo ""
 else
     echo "Now type make to build FastClick..."
