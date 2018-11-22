@@ -30,7 +30,7 @@
 
 CLICK_DECLS
 
-FromNetmapDevice::FromNetmapDevice() : _device(NULL),_keephand(false)
+FromNetmapDevice::FromNetmapDevice() : _device(NULL), _keephand(false)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -69,6 +69,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("KEEPHAND",_keephand)
             .complete() < 0)
         return -1;
+
 #if HAVE_NUMA
     if (_use_numa) {
         const char* device = ifname.c_str();
@@ -99,7 +100,6 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
             return errh->error("You asked for %d queues after queue %d but device only have %d.",n_queues,firstqueue,_device->n_queues);
         r = configure_rx(thisnode,n_queues,n_queues,errh);
     }
-
 
     if (r != 0) return r;
 
@@ -184,12 +184,14 @@ FromNetmapDevice::initialize(ErrorHandler *errh)
 }
 
 inline bool
-FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask) {
+FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
+{
     unsigned nr_pending = 0;
 
     int sent = 0;
 
     for (int i = begin; i <= end; i++) {
+
         lock();
 
         struct nm_desc* nmd = _device->nmds[i];
@@ -201,8 +203,8 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
         cur = rxring->cur;
 
         n = nm_ring_space(rxring);
-        if (_burst > 0 && n > (int)_burst) {
-            nr_pending += n - (int)_burst;
+        if (_burst > 0 && (int) n > _burst) {
+            nr_pending += n - _burst;
             n = _burst;
         }
 
@@ -211,8 +213,6 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
             continue;
         }
 
-        Timestamp ts = Timestamp::make_usec(nmd->hdr.ts.tv_sec, nmd->hdr.ts.tv_usec);
-
         sent+=n;
 
 #if HAVE_NETMAP_PACKET_POOL && HAVE_BATCH
@@ -220,11 +220,14 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
         if (!batch_head) goto error;
 #else
 
+        Timestamp ts = Timestamp::make_usec(rxring->ts.tv_sec, rxring->ts.tv_usec);
+
     #if HAVE_BATCH
         PacketBatch *batch_head = NULL;
         Packet* last = NULL;
         unsigned int count = n;
     #endif
+
         while (n > 0) {
 
             struct netmap_slot* slot = &rxring->slot[cur];
@@ -261,7 +264,7 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
     #endif
             p->set_packet_type_anno(Packet::HOST);
             p->set_mac_header(p->data());
-
+            p->set_timestamp_anno(ts);
     #if HAVE_BATCH
             if (batch_head == NULL) {
                 batch_head = PacketBatch::start_head(p);
@@ -270,7 +273,6 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
             }
             last = p;
     #else
-            p->set_timestamp_anno(ts);
             output(0).push(p);
     #endif
             cur = nm_ring_next(rxring, cur);
@@ -286,30 +288,26 @@ FromNetmapDevice::receive_packets(Task* task, int begin, int end, bool fromtask)
         rxring->head = rxring->cur = cur;
         unlock();
 #if HAVE_BATCH
-        batch_head->set_timestamp_anno(ts);
         output_push_batch(0,batch_head);
 #endif
-
     }
 
     if ((int) nr_pending > _burst) { //TODO size/4 or something
         if (fromtask) {
             task->fast_reschedule();
         } else {
-
             task->reschedule();
         }
     }
 
     add_count(sent);
     return sent;
+
 error: //No more buffer
 
     click_chatter("No more buffers !");
     router()->master()->kill_router(router());
     return 0;
-
-
 }
 
 void
@@ -338,8 +336,6 @@ void FromNetmapDevice::add_handlers()
     add_read_handler("dropped", dropped_handler, 0);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
 }
-
-
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel netmap QueueDevice)

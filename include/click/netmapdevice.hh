@@ -167,7 +167,7 @@ class NetmapDevice {
 #if HAVE_NETMAP_PACKET_POOL
     static WritablePacket* make_netmap(unsigned char* data, struct netmap_ring* rxring, struct netmap_slot* slot);
 # if HAVE_BATCH
-    static PacketBatch* make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur);
+    static PacketBatch* make_netmap_batch(unsigned int n, struct netmap_ring* rxring, unsigned int &cur);
 # endif
 #endif
 	static NetmapDevice* open(String ifname);
