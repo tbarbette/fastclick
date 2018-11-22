@@ -20,6 +20,9 @@
 /* Define for Click memory allocation debugging. */
 #undef CLICK_DMALLOC
 
+/* Define to add epoch tracking to hash iterators. */
+#undef CLICK_HASH_ITERATOR_EPOCHS
+
 /* Define to generate smaller object files. */
 #undef CLICK_OPTIMIZE_SIZE
 

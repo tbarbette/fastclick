@@ -866,6 +866,7 @@ enable_stats
 enable_stride
 enable_task_heap
 enable_dmalloc
+enable_hash_iterator_epochs
 enable_valgrind
 enable_schedule_debugging
 enable_intel_cpu
@@ -1573,6 +1574,8 @@ Optional Features:
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
   --enable-dmalloc        enable debugging malloc
+  --enable-hash-iterator-epochs
+                          hash iterator epochs
   --enable-valgrind       extra support for debugging with valgrind
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
                           (no/yes/extra) [yes]
@@ -10681,6 +10684,21 @@ fi
 if test $enable_dmalloc = yes; then
 
 $as_echo "#define CLICK_DMALLOC 1" >>confdefs.h
+
+fi
+
+
+
+# Check whether --enable-hash-iterator-epochs was given.
+if test "${enable_hash_iterator_epochs+set}" = set; then :
+  enableval=$enable_hash_iterator_epochs; :
+else
+  enable_hash_iterator_epochs=no
+fi
+
+if test $enable_hash_iterator_epochs = yes; then
+
+$as_echo "#define CLICK_HASH_ITERATOR_EPOCHS 1" >>confdefs.h
 
 fi
 
