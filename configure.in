@@ -2427,6 +2427,7 @@ if test "$feedback" != no; then
     echo ""
     echo $feedback
     echo "To install libmicrohttpd in a Debian-based OS, type: sudo apt install libmicrohttpd-dev"
+    echo "To install libcurl in a Debian-based OS, type: sudo apt install libcurl4-openssl-dev"
     echo ""
 else
     echo "Now type make to build FastClick..."
