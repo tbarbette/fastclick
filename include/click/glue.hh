@@ -99,7 +99,9 @@ extern "C" int simclick_gettimeofday(struct timeval *);
 # endif
 
 #if HAVE_DPDK && !CLICK_TOOL
-#include <rte_cycles.h>
+extern "C" {
+    #include <rte_cycles.h>
+}
 #endif
 
 #endif

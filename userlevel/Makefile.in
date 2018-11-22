@@ -140,7 +140,9 @@ endif
 
 # At of after DPDK 17.05, compile against an additional library librte_parse (flow director)
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 5 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
-$(DRIVER): Makefile librte_parse.a libclick.a $(OBJS)
+ddeps: Makefile librte_parse.a libclick.a $(OBJS)
+
+$(DRIVER): ${PARSE_PATH}.sentinel ddeps
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a librte_parse.a $(LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
 else
