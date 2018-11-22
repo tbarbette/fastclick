@@ -72,8 +72,6 @@ CLICK_DECLS
  *
  */
 
-
-
 class FromNetmapDevice: public RXQueueDevice {
 
 public:

@@ -211,10 +211,12 @@ WritablePacket* NetmapDevice::make_netmap(unsigned char* data, struct netmap_rin
 /**
  * Creates a batch of packet directly from a netmap ring.
  */
-PacketBatch* NetmapDevice::make_netmap_batch(unsigned int n, struct netmap_ring* rxring,unsigned int &cur) {
+PacketBatch* NetmapDevice::make_netmap_batch(unsigned int n, struct netmap_ring* rxring, unsigned int &cur) {
     if (n <= 0) return NULL;
     struct netmap_slot* slot;
     WritablePacket* last = 0;
+
+    Timestamp ts = Timestamp::make_usec(rxring->ts.tv_sec, rxring->ts.tv_usec);
 
     PacketPool& packet_pool = *WritablePacket::make_local_packet_pool();
 
@@ -262,6 +264,9 @@ PacketBatch* NetmapDevice::make_netmap_batch(unsigned int n, struct netmap_ring*
         }
         last->set_next(next);
 
+        last->set_packet_type_anno(Packet::HOST);
+        last->set_mac_header(last->data());
+        last->set_timestamp_anno(ts);
     }
 
     _head = static_cast<WritablePacket*>(next);
