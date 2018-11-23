@@ -385,6 +385,11 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(R
 PARSE_OBJS += test-pmd/parameters.o test-pmd/softnicfwd.o
 endif
 
+# Additional object files, present at or after DPDK v18.11
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+PARSE_OBJS += test-pmd/noisy_vnf.o test-pmd/util.o
+endif
+
 
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
