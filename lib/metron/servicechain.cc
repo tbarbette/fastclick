@@ -620,10 +620,12 @@ ClickSCManager::run_load_timer()
 void
 PidSCManager::check_alive()
 {
-    if (kill(_pid, 0) != 0) {
-        metron()->delete_service_chain(_sc, ErrorHandler::default_handler());
-    } else {
-        click_chatter("Error: PID %d is still alive", _pid);
+    if (_pid >0) {
+        if (kill(_pid, 0) != 0) {
+            metron()->delete_service_chain(_sc, ErrorHandler::default_handler());
+        } else {
+            click_chatter("Error: PID %d is still alive", _pid);
+        }
     }
 }
 
@@ -639,10 +641,14 @@ StandaloneSCManager::fix_rule(NIC *nic, String rule) {
     if (_sriov < 0) {
         rule = "flow create " + String(nic->get_port_id()) + " " + rule;
     } else {
+        int pindex = nic->get_port_id() + 1;
         rule = "flow create " + String(nic->get_port_id()) + " transfer " + rule;
-        int pos = rule.find_left("queue ");
-        rule = rule.substring(0,pos) + " port_id id " + String(_sriov) + " / end";
-        click_chatter("%s", rule.c_str());
+        int pos = rule.find_left("queue index ");
+        String qid = rule.substring(pos + 12);
+        //click_chatter("qid %s", qid.c_str());
+        int queue = atoi(qid.substring(0, qid.find_left(' ')).c_str());
+        rule = rule.substring(0,pos) + "port_id id " + String(pindex + queue % _sriov) + " / end\n";
+        //click_chatter("%s", rule.c_str());
     }
 
     return rule;
@@ -655,7 +661,8 @@ void
 StandaloneSCManager::kill_service_chain()
 {
 #if HAVE_BATCH
-    kill(_pid, SIGKILL);
+    if (_pid > 0)
+        kill(_pid, SIGKILL);
 #else
     click_chatter("Standalone service chains can only be killed in batch mode");
     return;
@@ -706,6 +713,24 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
                 return errh->error("Could not insert SRIOV revert rule");
             }
         }
+        /*
+for (int i = 0; i < sc->get_nics_nb(); i++) {
+            // Insert VF->PF traffic return rules
+            HashMap<long, String> rules_map;
+
+            NIC *nic = sc->get_nic_by_index(i);
+
+            int pindex = nic->get_port_id();
+
+            rules_map.insert(0, "flow create 0 transfer ingress pattern eth type is 2048 / ipv4 src spec 49.192.0.0 src prefix 10 dst spec 223.0.0.0 dst prefix 10 / end actions port_id id 1 / end\n");
+            int status = nic->get_flow_director(pindex)->add_rules(rules_map, false);
+            if (status < 0) {
+                return errh->error("Could not insert SRIOV revert rule");
+            }
+
+
+
+        }*/
     #else
         return errh->error("SRIOV rules are not supported by this DPDK version");
     #endif

@@ -175,6 +175,8 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     _discover_user      = DEF_DISCOVER_USER;
     _discover_path      = DEF_DISCOVER_PATH;
 
+    bool nodiscovery = false;
+
     if (Args(conf, this, errh)
         .read    ("ID",                _id)
         .read_all("NIC",               nics)
@@ -194,6 +196,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
         .read_all("SLAVE_ARGS",        _args)
         .read    ("SLAVE_EXTRA",       _slave_extra)
+        .read    ("NODISCOVERY",       nodiscovery)
         .read    ("VERBOSE",           _verbose)
         .complete() < 0)
         return ERROR;
@@ -237,6 +240,10 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("Set a positive scheduling frequency using LOAD_TIMER");
     }
 
+    if (nodiscovery) {
+        _discovered = true;
+    } else {
+
 #ifndef HAVE_CURL
     if (_discover_ip) {
         return errh->error(
@@ -262,6 +269,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("Invalid port number");
     }
 #endif
+    }
 
     if (_monitoring_mode) {
         errh->warning(
