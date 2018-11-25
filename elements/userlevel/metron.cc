@@ -1821,7 +1821,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
         // Advertize the available CPU core IDs
         for (int i = 0; i < sc->get_max_cpu_nb(); i++) {
             const int core_id = i;
-            set_tag_value(inic, core_id, String(core_id));
+            set_tag_value(inic, core_id, String(sc->get_cpu_phys_id(core_id)));
         }
     } else if (method == VLAN) {
         return errh->error("VLAN-based dispatching with VMDq is not implemented yet");
