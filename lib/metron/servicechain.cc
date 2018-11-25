@@ -647,7 +647,7 @@ StandaloneSCManager::fix_rule(NIC *nic, String rule) {
         String qid = rule.substring(pos + 12);
         //click_chatter("qid %s", qid.c_str());
         int queue = atoi(qid.substring(0, qid.find_left(' ')).c_str());
-        rule = rule.substring(0,pos) + "port_id id " + String(pindex + queue % _sriov) + " / end\n";
+        rule = rule.substring(0,rule.find_left("actions")) + "actions port_id id " + String(pindex + queue % _sriov) + " / end\n";
         //click_chatter("%s", rule.c_str());
     }
 
