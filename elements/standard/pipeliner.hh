@@ -51,7 +51,7 @@ public:
         return _block;
     }
 
-    bool get_spawning_threads(Bitvector& b, bool isoutput) override;
+    bool get_spawning_threads(Bitvector& b, bool isoutput, int port) override;
 
 #if HAVE_BATCH
     void push_batch(int,PacketBatch*);

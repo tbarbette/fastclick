@@ -142,6 +142,19 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
         _nr_pktmbuf_pools = n_pktmbuf_pools;
     }
 
+#if HAVE_DPDK_PACKET_POOL
+	int total = 0;
+	for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
+		total += get_nb_mbuf(i);
+	}
+
+	if (Packet::max_data_pool_size() > 0) {
+		if (Packet::max_data_pool_size() + 8192 > total) {
+			return errh->error("--enable-dpdk-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more than %d DPDK buffers or compile without --enable-dpdk-pool", Packet::max_data_pool_size() + 8192);
+		}
+	}
+#endif
+
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         // Create a pktmbuf pool for each active socket
         for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
@@ -243,7 +256,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,11,0,0)
     dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
 #endif
     dev_conf.rxmode.mq_mode = ETH_MQ_RX_RSS;
@@ -688,13 +701,13 @@ bool
 FlowControlModeArg::parse(
     const String &str, FlowControlMode &result, const ArgContext &ctx) {
     str.lower();
-    if (str == "full") {
+    if (str == "full" || str == "on") {
         result = FC_FULL;
     } else if (str == "rx") {
         result = FC_RX;
     }else if (str == "tx") {
         result = FC_TX;
-    } else if (str == "none") {
+    } else if (str == "none" || str == "off") {
         result = FC_NONE;
     } else
         return false;

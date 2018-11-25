@@ -26,8 +26,6 @@ MinBatch::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
 
-    int n = 1;
-
     if (_timeout >= 0) {
         for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
             State &s = _state.get_value_for_thread(i);

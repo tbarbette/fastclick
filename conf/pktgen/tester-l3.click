@@ -1,39 +1,53 @@
 /*
- * This is a L3 version of tester. Port 0 is expected to be attached to the
- * same switch than the WAN port of the DUT, and port 1 to LAN. You could 
- * attach port0 to the WAN port of the DUT directly, but you would loose the
- * WAN connection as this configuration does not include a NAT or router, 
- * or DHCP.
- *
- * This configuration will send one UDP flow from LAN to WAN at max rate and
- * will print statistics about the throughput and loss of the DUT.
+ * This is a L3 version of tester. Port 0 and 1 are expected to be attached to the
+ * two interface of your DUT.
+ * Port 0 will only generate packets while port 1 expects to receive packets back.
+ * Both ports will respond to ARP queries.
+ * 
+ * Author: Tom Barbette <barbette@kth.se>, Lida Liu <lidal@kth.se>
  */
 
-define($block true)
-define($wanmac 00:18:0A:12:14:28)
-define($lanmac 00:18:0A:12:14:29)
-define($wanip 192.168.128.50)
-define($lanip 192.168.129.50)
+define($L 60, $N 100, $S 100000);
+define($block true);
+define($ring_size 0); //virtio needs a direct assignation of 512, use 0 for automatic
+define($dstmac 52:54:00:1e:4f:f3);
 
-replay0 :: MultiReplayUnqueue(STOP $S, QUICK_CLONE 0)
-replay1 :: MultiReplayUnqueue(STOP $S, QUICK_CLONE 0)
+define($srcmac 52:54:00:ef:81:e0);
 
-DPDKInfo(65536)
+AddressInfo(
+    lan_interface    192.168.100.166     52:54:00:ef:81:e0,
+    wan_interface    192.168.200.219     52:54:00:50:07:4b
+);
 
-is0 :: FastUDPFlows(RATE 0, LIMIT $N, LENGTH $L, SRCETH 90:e2:ba:c3:77:d2, DSTETH $wanmac, SRCIP 10.0.0.100, DSTIP 192.168.0.100, FLOWS 1, FLOWSIZE $N)
--> MarkMACHeader
+DPDKInfo(65536);
+
+replay0 :: ReplayUnqueue(STOP $S, QUICK_CLONE 0);
+
+td0 :: ToDPDKDevice(0, NDESC $ring_size, BLOCKING $block);
+td1 :: ToDPDKDevice(1, NDESC $ring_size, BLOCKING $block);
+
+class_left  :: Classifier(12/0806 20/0001, -);
+class_right :: Classifier(12/0806 20/0001, -);
+
+is0 :: FastUDPFlows(RATE 0, LIMIT $N, LENGTH $L, SRCETH 52:54:00:ef:81:e0, DSTETH $dstmac, SRCIP 192.168.100.166, DSTIP 192.168.200.219, FLOWS 1, FLOWSIZE $N);
+
+StaticThreadSched(replay0 0);
+
+is0 -> MarkMACHeader
 -> EnsureDPDKBuffer
 -> replay0
 -> ic0 :: AverageCounter()
--> ToDPDKDevice(0, BLOCKING $block)
+-> td0;
 
-fd0 :: FromDPDKDevice(0) -> oc0 :: AverageCounter() -> Discard
-fd1 :: FromDPDKDevice(1) -> oc1 :: AverageCounter() -> Discard
-
-StaticThreadSched(is0 0, is1 1)
-StaticThreadSched(replay0 0, replay1 1)
-StaticThreadSched(fd0 2, fd1 3)
+fd0 :: FromDPDKDevice(0, NDESC 512) -> class_left;
+fd1 :: FromDPDKDevice(1, NDESC 512) -> class_right;
 
 
-DriverManager(wait, wait, wait 10ms, print $(ic0.count), print $(oc0.count), print $(ic1.count), print $(oc1.count),
-							 print $(ic0.link_rate), print $(oc0.link_rate), print $(ic1.link_rate), print $(oc1.link_rate))
+class_left[0] -> ARPResponder(lan_interface) -> td0;     //ARP Requests
+class_left[1] -> oc0 :: AverageCounter() -> Discard;     // Others Counting
+
+class_right[0] -> ARPResponder(wan_interface) -> td1;     //ARP Requests
+class_right[1] -> oc1 :: AverageCounter() -> Discard;     // Others Counting
+
+
+DriverManager(wait, wait 10ms, print $(ic0.count), print $(oc1.count), print $(ic0.link_rate), print $(oc1.link_rate));

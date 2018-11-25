@@ -1,4 +1,4 @@
-// Run: sudo bin/click --dpdk -c 0x55 -n 4 --proc-type primary -v -- conf/dpdk/dpdk-primary.click
+// Run: sudo bin/click --dpdk -c 0x55 -n 4 --proc-type primary -v -- conf/dpdk/dpdk-ring-primary.click
 
 define(
 	$iface0    0,

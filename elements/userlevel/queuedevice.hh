@@ -127,32 +127,12 @@ protected:
         thread_state->_dropped += n;
     }
 
-    bool get_spawning_threads(Bitvector& bmk, bool)
-    {
-    	if (noutputs()) { //RX
-            if (_active) {
-                assert(thread_for_queue_available());
-                for (int i = 0; i < n_queues; i++) {
-                    for (int j = 0; j < queue_share; j++) {
-                        bmk[thread_for_queue(i) - j] = 1;
-                    }
-                }
-            }
-            return true;
-    	} else { //TX
-            if (_active) {
-                if (input_is_pull(0)) {
-                    bmk[router()->home_thread_id(this)] = 1;
-                }
-            }
-    		return true;
-    	}
-    }
+    bool get_spawning_threads(Bitvector& bmk, bool isoutput, int port);
 
     /**
      * Common parsing for all kind of QueueDevice
      */
-    Args& parse(Args &args);
+    int parse(Vector<String> &conf, ErrorHandler *errh);
 
 
     bool all_initialized() {
@@ -161,12 +141,7 @@ protected:
 
     int initialize_tasks(bool schedule, ErrorHandler *errh);
 
-    void cleanup_tasks() {
-        for (int i = 0; i < usable_threads.weight(); i++) {
-            if (_tasks[i])
-                delete _tasks[i];
-        }
-    }
+    void cleanup_tasks();
 
     inline int queue_for_thread_begin(int tid) {
         return _thread_to_firstqueue[tid];
@@ -228,11 +203,12 @@ protected:
 	bool _set_paint_anno;
 	int _threadoffset;
 	bool _use_numa;
+	bool _scale_parallel;
 
     /**
      * Common parsing for all RXQueueDevice
      */
-    Args& parse(Args &args);
+	int parse(Vector<String> &conf, ErrorHandler *errh);
 
     /*
      * Configure a RX side of a queuedevice. Take cares of setting user max
@@ -253,7 +229,7 @@ protected:
     /**
      * Common parsing for all RXQueueDevice
      */
-    Args& parse(Args &args, ErrorHandler* errh);
+    int parse(Vector<String> &conf, ErrorHandler *errh);
 
     int configure_tx(int hardminqueues, int hardmaxqueues, ErrorHandler *errh);
     int initialize_tx(ErrorHandler *errh);

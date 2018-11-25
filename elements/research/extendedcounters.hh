@@ -11,9 +11,6 @@
 CLICK_DECLS
 class HandlerCall;
 
-/**
- *
- */
 template <typename T>
 class CounterRxWMPBase : public CounterMPBase<T> { public:
 
@@ -31,13 +28,15 @@ class CounterRxWMPBase : public CounterMPBase<T> { public:
  *
  * =c
  *
- * CounterRxWMP
+ * CounterRxWMP()
  *
  * Counter duplicated per-thread, protected by a RxW lock
  *
  * =s research
  *
- * =d The RxW lock allows either multiple writers or multiple readers, so this
+ * =d
+ *
+ * The RxW lock allows either multiple writers or multiple readers, so this
  * counter has the ability to give an atomic view of the aggregated state.
  *
  * The CounterRxWMPPR and CounterRxWMPW respectively prefer reads and writes,
@@ -80,7 +79,8 @@ class CounterRxWMPPW : public CounterRxWMPBase<rXwlockPW> { public:
 
 /*
  * =c
- * CounterLockMP
+ *
+ * CounterLockMP()
  *
  * Counter duplicated per-thread, with a per-thread lock
  *
@@ -197,7 +197,7 @@ class CounterPLockMP : public CounterLockMP { public:
 /*
  * =c
  *
- * CounterRWMP
+ * CounterRWMP()
  *
  * Counter duplicated per-thread, with a global RW lock
  *
@@ -391,7 +391,8 @@ protected:
 
 /**
  * =c
- * CounterRCU
+ *
+ * CounterRCU()
  *
  * Local EBSR RCU-based counter
  *
@@ -477,8 +478,9 @@ protected:
 };
 
 /**
+ * =c
  *
- * =c CounterAtomic
+ * CounterAtomic()
  *
  * Counter based on atomic operations
  *

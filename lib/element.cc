@@ -1692,9 +1692,10 @@ public:
 
      InputThreadVisitor(Bitvector& b, Element* o): bitmask(b), fullpush(true), origin(o) {}
 
-     virtual bool visit(Element *e, bool isoutput, int,
+     virtual bool visit(Element *e, bool isoutput, int port,
                    Element *, int, int) {
-         bool ret = e->get_spawning_threads(bitmask, isoutput);
+         bool ret = e->get_spawning_threads(bitmask, isoutput, port);
+         //TODO : the case of CPUswitch keeps fullpush but returns false...
          if (ret == false)
              fullpush = false;
          return ret;
@@ -1715,8 +1716,9 @@ public:
  *  for example as an element after the queue will only be traversed by the
  *  threads of the queue, not the one before.
  */
-bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
+bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput, int port) {
     (void)isoutput;
+    (void)port;
     unsigned int thisthread = home_thread_id();
 
     if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) {
@@ -1756,6 +1758,16 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
     return b;
 }
 
+Bitvector Element::get_pushing_threads() {
+    Bitvector b(master()->nthreads());
+    bool is_fullpush;
+    for (int i = 0; i < ninputs(); i++) {
+        if (input_is_push(i))
+            b |= get_passing_threads(false, i, this, is_fullpush, 0);
+    }
+    return b;
+}
+
 Bitvector Element::get_passing_threads(Element*, int level) {
     bool is_fullpush = true;
     Bitvector b(master()->nthreads());
@@ -1771,8 +1783,8 @@ Bitvector Element::get_passing_threads(Element*, int level) {
     }
     //Add ourself to the bitmap, but the user must know if his element
     // should keep is_fullpush or not
-    get_spawning_threads(b, false);
-    get_spawning_threads(b, true);
+    get_spawning_threads(b, false, -1);
+    get_spawning_threads(b, true, -1);
 #if HAVE_FULLPUSH_NONATOMIC
     this->_is_fullpush = is_fullpush;
 #endif
@@ -2151,8 +2163,8 @@ read_threads_handler(Element *e, void * thunk)
       case 0:
         return e->get_passing_threads().unparse();
       case 1:
-        e->get_spawning_threads(b, false);
-        e->get_spawning_threads(b, true);
+        e->get_spawning_threads(b, false, -1);
+        e->get_spawning_threads(b, true, -1);
         return b.unparse();
       case 2:
         return String(e->router()->home_thread_id(e));

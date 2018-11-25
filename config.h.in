@@ -23,6 +23,9 @@
 /* Define to add epoch tracking to hash iterators. */
 #undef CLICK_HASH_ITERATOR_EPOCHS
 
+/* Define for forcing expensive packet operations. */
+#undef CLICK_FORCE_EXPENSIVE
+
 /* Define to generate smaller object files. */
 #undef CLICK_OPTIMIZE_SIZE
 

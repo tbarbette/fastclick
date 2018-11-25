@@ -1,4 +1,4 @@
-// Run: sudo bin/click --dpdk -c 0x4 -n 4 --proc-type secondary -v -- conf/dpdk/dpdk-secondary.click
+// Run: sudo bin/click --dpdk -c 0x4 -n 4 --proc-type secondary -v -- conf/dpdk/dpdk-ring-secondary.click
 
 define(
 	$queueSize 1024

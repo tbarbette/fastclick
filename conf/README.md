@@ -15,6 +15,7 @@ Folders are organised by demonstrated feature. But some example of course
  * grid        Grid
  * ip6         IPv6
  * kernel      Kernel-specific feature
+ * lib         Library of elementclass. Include them with require(library conf/lib/*.click)
  * nat         NAT and LB
  * pktgen      Packet generation
  * proxy       Proxy
