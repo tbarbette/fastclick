@@ -1348,10 +1348,10 @@ FlowDirector::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts
     // Find the desired flow rule
     for (pf = port->flow_list; pf; pf = pf->next) {
         if (pf->id == int_rule_id) {
-        #if RTE_VERSION <= RTE_VERSION_NUM(18,8,0,0)
-            action = pf->actions;
-        #else
+        #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
             action = pf->rule.actions;
+        #else
+            action = pf->actions;
         #endif
             break;
         }
@@ -1440,10 +1440,10 @@ FlowDirector::flow_rule_aggregate_stats()
 
     // Traverse the list of installed flow rules
     for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
-    #if RTE_VERSION <= RTE_VERSION_NUM(18,8,0,0)
-        const struct rte_flow_action *action = pf->actions;
-    #else
+    #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         const struct rte_flow_action *action = pf->rule.actions;
+    #else
+        const struct rte_flow_action *action = pf->actions;
     #endif
 
         int queue = -1;
@@ -1574,27 +1574,27 @@ FlowDirector::flow_rules_list()
 
     // Traverse and print the sorted list of installed flow rules
     for (struct port_flow *pf = sorted_rules; pf != NULL; pf = pf->tmp) {
-    #if RTE_VERSION <= RTE_VERSION_NUM(18,8,0,0)
-        const struct rte_flow_item *item = pf->pattern;
-        const struct rte_flow_action *action = pf->actions;
-    #else
+    #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         const struct rte_flow_item *item = pf->rule.pattern;
         const struct rte_flow_action *action = pf->rule.actions;
+    #else
+        const struct rte_flow_item *item = pf->pattern;
+        const struct rte_flow_action *action = pf->actions;
     #endif
 
         rules_list << "Flow rule #" << pf->id << ": [";
-    #if RTE_VERSION <= RTE_VERSION_NUM(18,8,0,0)
-        rules_list << "Group: " << pf->attr.group << ", Prio: " << pf->attr.priority << ", ";
-        rules_list << "Scope: " << (pf->attr.ingress == 1 ? "ingress" : "-");
-        rules_list << "/" << (pf->attr.egress == 1 ? "egress" : "-");
-    #else
+    #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         rules_list << "Group: " << pf->rule.attr->group << ", Prio: " << pf->rule.attr->priority << ", ";
         rules_list << "Scope: " << (pf->rule.attr->ingress == 1 ? "ingress" : "-");
         rules_list << "/" << (pf->rule.attr->egress == 1 ? "egress" : "-");
-    #endif
-    #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0) && RTE_VERSION <= RTE_VERSION_NUM(18,8,0,0)
-        rules_list << "/" << (pf->attr.transfer == 1 ? "transfer" : "-");
     #else
+        rules_list << "Group: " << pf->attr.group << ", Prio: " << pf->attr.priority << ", ";
+        rules_list << "Scope: " << (pf->attr.ingress == 1 ? "ingress" : "-");
+        rules_list << "/" << (pf->attr.egress == 1 ? "egress" : "-");
+    #endif
+    #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,11,0,0)
+        rules_list << "/" << (pf->attr.transfer == 1 ? "transfer" : "-");
+    #elif RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         rules_list << "/" << (pf->rule.attr->transfer == 1 ? "transfer" : "-");
     #endif
         rules_list << ", ";
@@ -1709,21 +1709,21 @@ FlowDirector::flow_rules_sort(struct rte_port *port, struct port_flow **sorted_r
         struct port_flow **tmp;
 
         tmp = sorted_rules;
-    #if RTE_VERSION <= RTE_VERSION_NUM(18,8,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         while (*tmp &&
-            (pf->attr.group > (*tmp)->attr.group ||
-            (pf->attr.group == (*tmp)->attr.group &&
-             pf->attr.priority > (*tmp)->attr.priority) ||
-            (pf->attr.group == (*tmp)->attr.group &&
-             pf->attr.priority == (*tmp)->attr.priority &&
-             pf->id > (*tmp)->id))) {
-    #else
-         while (*tmp &&
             (pf->rule.attr->group > (*tmp)->rule.attr->group ||
             (pf->rule.attr->group == (*tmp)->rule.attr->group &&
              pf->rule.attr->priority > (*tmp)->rule.attr->priority) ||
             (pf->rule.attr->group == (*tmp)->rule.attr->group &&
              pf->rule.attr->priority == (*tmp)->rule.attr->priority &&
+             pf->id > (*tmp)->id))) {
+    #else
+         while (*tmp &&
+            (pf->attr.group > (*tmp)->attr.group ||
+            (pf->attr.group == (*tmp)->attr.group &&
+             pf->attr.priority > (*tmp)->attr.priority) ||
+            (pf->attr.group == (*tmp)->attr.group &&
+             pf->attr.priority == (*tmp)->attr.priority &&
              pf->id > (*tmp)->id))) {
     #endif
             tmp = &(*tmp)->tmp;
