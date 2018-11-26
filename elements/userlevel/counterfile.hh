@@ -28,12 +28,21 @@ Keyword arguments are:
 =item FILENAME
 
 Path to the file which stats will be written into. If the file does not exist,
-it will be created. Parent directory of the file must exist. File format is:
+it will be created. Parent directory of the file must exist. The file format is:
 
     struct stats {
         uint64_t _count;
         uint64_t _byte_count;
     };
+
+Outside readers should mmap this file and access uint64_t fields of the structure.
+They do not need to use atomic type (atomic_uint64_t) operations to access
+variables, as they do not change them. Reading or writing a quadword (uint64_t)
+aligned on a 64-bit boundary is guaranteed to be atomic on x86 and x64 since the
+Pentium processor (1993). This may not be the case on other than x86 32-bit
+architectures.
+
+Reading using read() syscall instead of mmap is NOT guaranteed to be atomic.
 
 If click is compiled with HAVE_MULTITHREAD, fields are 16-byte aligned.
 
