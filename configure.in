@@ -1251,6 +1251,14 @@ if test $enable_dmalloc = yes; then
 fi
 
 
+
+dnl debug by tracking hash iterator lifetimes via epoch
+
+AC_ARG_ENABLE([hash-iterator-epochs], [AS_HELP_STRING([--enable-hash-iterator-epochs], [hash iterator epochs])], :, enable_hash_iterator_epochs=no)
+if test $enable_hash_iterator_epochs = yes; then
+    AC_DEFINE([CLICK_HASH_ITERATOR_EPOCHS], [1], [Define to add epoch tracking to hash iterators])
+fi
+
 dnl debug by forcing expensive operations
 
 AC_ARG_ENABLE([force-expensive], [AS_HELP_STRING([--enable-force-expensive], [force expensive packet operations])], :, enable_force_expensive=no)

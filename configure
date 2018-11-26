@@ -866,6 +866,7 @@ enable_stats
 enable_stride
 enable_task_heap
 enable_dmalloc
+enable_hash_iterator_epochs
 enable_force_expensive
 enable_valgrind
 enable_schedule_debugging
@@ -1574,6 +1575,8 @@ Optional Features:
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
   --enable-dmalloc        enable debugging malloc
+  --enable-hash-iterator-epochs
+                          hash iterator epoch
   --enable-force-expensive
                           force expensive packet operations
   --enable-valgrind       extra support for debugging with valgrind
@@ -10634,7 +10637,6 @@ else
 =========================================" "$LINENO" 5
 fi
 
-
 # Check whether --enable-stride was given.
 if test "${enable_stride+set}" = set; then :
   enableval=$enable_stride; :
@@ -10686,22 +10688,6 @@ if test $enable_dmalloc = yes; then
 $as_echo "#define CLICK_DMALLOC 1" >>confdefs.h
 
 fi
-
-
-
-# Check whether --enable-force-expensive was given.
-if test "${enable_force_expensive+set}" = set; then :
-  enableval=$enable_force_expensive; :
-else
-  enable_force_expensive=no
-fi
-
-if test $enable_force_expensive = yes; then
-
-$as_echo "#define CLICK_FORCE_EXPENSIVE 1" >>confdefs.h
-
-fi
-
 
 
 # Check whether --enable-valgrind was given.
