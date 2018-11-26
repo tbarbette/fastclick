@@ -447,11 +447,7 @@ ClickSCManager::build_cmd_line(int socketfd)
     int i;
     Vector<String> argv;
 
-    String cpu_list = "";
-
-    for (i = 0; i < click_max_cpu_ids(); i++) {
-        cpu_list += String(i) + (i < click_max_cpu_ids() -1? "," : "");
-    }
+    String cpu_list = _sc->assigned_phys_cpus().unparse().c_str();
 
     argv.push_back(click_path);
     argv.push_back("--dpdk");
@@ -624,7 +620,7 @@ PidSCManager::check_alive()
         if (kill(_pid, 0) != 0) {
             metron()->delete_service_chain(_sc, ErrorHandler::default_handler());
         } else {
-            click_chatter("Error: PID %d is still alive", _pid);
+            click_chatter("Error: PID %d is still alive. Service chain %s", _pid, _sc->id.c_str());
         }
     }
 }

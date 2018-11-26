@@ -583,6 +583,7 @@ class ServiceChain {
             return _nics[i];
         }
 
+        Bitvector assigned_phys_cpus();
         Bitvector active_cpus();
 
         String generate_configuration(bool add_extra);

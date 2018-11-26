@@ -2640,7 +2640,21 @@ ServiceChain::active_cpus()
     return b;
 }
 
-
+/**
+ * Returns a bit map with the CPU core assignment of a service chain.
+ */
+Bitvector
+ServiceChain::assigned_phys_cpus()
+{
+    Bitvector b;
+    b.resize(click_max_cpu_ids());
+    for (int i = 0; i < get_max_cpu_nb(); i++) {
+        int pid = _cpus[i].cpu_phys_id;
+        if (pid >= 0)
+            b[pid] = true;
+    }
+    return b;
+}
 
 /******************************
  * CPU
