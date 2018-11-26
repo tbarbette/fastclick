@@ -638,7 +638,7 @@ PidSCManager::check_alive()
 String
 StandaloneSCManager::fix_rule(NIC *nic, String rule) {
     // Compose rule for the right NIC
-    if (_sriov < 0) {
+    if (_sriov <= 0) {
         rule = "flow create " + String(nic->get_port_id()) + " " + rule;
     } else {
         int pindex = nic->get_port_id() + 1;
