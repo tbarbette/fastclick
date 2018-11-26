@@ -366,12 +366,12 @@ PARSE_OBJS = \
 	test-pmd/rxonly.o \
 
 # Additional object files, present at or after DPDK v17.11 but not at or after 18.08
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || ( [ $(RTE_VER_YEAR) -ge 18 ] && [ $(RTE_VER_MONTH) -lt 08 ] ) ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -eq 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || ( [ $(RTE_VER_YEAR) -ge 18 ] && [ $(RTE_VER_MONTH) -lt 08 ] ) ) && echo true),true)
 PARSE_OBJS += test-pmd/tm.o
 endif
 
 # Additional object files, present at or after DPDK v17.11
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -eq 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
 endif
 
