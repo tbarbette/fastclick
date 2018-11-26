@@ -696,7 +696,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         return errh->error("Could not parse configuration string!");
     }
 
-    if (_sriov >= 0) {
+    if (_sriov > 0) {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         int idx = 0;
         for (int i = 0; i < sc->get_nics_nb(); i++) {
@@ -713,24 +713,6 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
                 return errh->error("Could not insert SRIOV revert rule");
             }
         }
-        /*
-for (int i = 0; i < sc->get_nics_nb(); i++) {
-            // Insert VF->PF traffic return rules
-            HashMap<long, String> rules_map;
-
-            NIC *nic = sc->get_nic_by_index(i);
-
-            int pindex = nic->get_port_id();
-
-            rules_map.insert(0, "flow create 0 transfer ingress pattern eth type is 2048 / ipv4 src spec 49.192.0.0 src prefix 10 dst spec 223.0.0.0 dst prefix 10 / end actions port_id id 1 / end\n");
-            int status = nic->get_flow_director(pindex)->add_rules(rules_map, false);
-            if (status < 0) {
-                return errh->error("Could not insert SRIOV revert rule");
-            }
-
-
-
-        }*/
     #else
         return errh->error("SRIOV rules are not supported by this DPDK version");
     #endif
