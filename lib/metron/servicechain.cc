@@ -704,7 +704,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
             int pindex = nic->get_port_id();
 
             rules_map.insert(0, "flow create " + String(_sriov + pindex) + " transfer ingress pattern eth type is 2048 / end actions port_id id " + String(pindex) + " / end\n");
-            int status = nic->get_flow_director(_sriov)->add_rules(rules_map, false);
+            int status = nic->get_flow_director(_sriov)->update_rules(rules_map, false);
             if (status < 0) {
                 return errh->error("Could not insert SRIOV revert rule");
             }

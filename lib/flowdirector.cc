@@ -402,17 +402,22 @@ FlowCache::insert_rule_in_flow_cache(const int &core_id, const long &rule_id, co
  * First checks if flow rule exists and if so deletes it.
  * Then, inserts the new flow rule.
  *
- * @args core_id: a CPU core ID associated with the flow rule
- * @args rule_id: the flow rule ID of the flow rule to be updated
+ * @args core_id: a new CPU core ID associated with this flow rule
+ * @args rule_id: the global flow rule ID of the flow rule to be updated
+ * @args int_rule_id: a new internal flow rule ID to be associated with this flow rule
+ * @args old_int_rule_id: buffer to store a potentially old internal flow rule ID,
+ *                        already associated with this flow rule if the rule exists
  * @args rule: the actual flow rule to be updated
  * @return true upon success, otherwise false
  */
 bool
-FlowCache::update_rule_in_flow_cache(const int &core_id, const long &rule_id, const uint32_t &int_rule_id, String rule)
+FlowCache::update_rule_in_flow_cache(const int &core_id, const long &rule_id, const uint32_t &int_rule_id, int32_t &old_int_rule_id, String rule)
 {
     // First try to delete this rule, if it exists
-    if (delete_rule_by_global_id(rule_id) < 0) {
-        // Rule did not exist before, so initialize it now
+    old_int_rule_id = delete_rule_by_global_id(rule_id);
+
+    // Rule did not exist before, so initialize its counters based on the new internal rule ID
+    if (old_int_rule_id < 0) {
         uint32_t int_rule_ids[1] = {int_rule_id};
         initialize_rule_counters(int_rule_ids, (const uint32_t) 1);
     }
@@ -1035,14 +1040,14 @@ FlowDirector::load_rules_from_file_to_string(const String &filename)
 }
 
 /**
- * Installs a set of flow rules from a map.
+ * Updates a set of flow rules from a map.
  *
  * @args rules_map: a map of global rule IDs to their rules
  * @args by_controller: boolean flag that denotes that rule installation is driven by a controller
- * @return the number of flow rules being installed, otherwise a negative integer
+ * @return the number of flow rules being installed/updated, otherwise a negative integer
  */
 int32_t
-FlowDirector::add_rules(HashMap<long, String> &rules_map, bool by_controller)
+FlowDirector::update_rules(HashMap<long, String> &rules_map, bool by_controller)
 {
     uint32_t rules_to_install = rules_map.size();
     if (rules_to_install == 0) {
@@ -1051,6 +1056,8 @@ FlowDirector::add_rules(HashMap<long, String> &rules_map, bool by_controller)
 
     String rules_str = "";
     uint32_t installed_rules_nb = 0;
+
+    Vector<uint32_t> old_int_rule_ids_vec;
 
     // Now insert each rule in the flow cache
     auto it = rules_map.begin();
@@ -1081,9 +1088,15 @@ FlowDirector::add_rules(HashMap<long, String> &rules_map, bool by_controller)
             );
         }
 
-        // Insert into the flow cache
-        if (!_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
+        // Update the flow cache
+        int32_t old_int_rule_id = -1;
+        if (!_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, old_int_rule_id, rule)) {
             return FLOWDIR_ERROR;
+        }
+
+        // Mark this rule for deletion
+        if (old_int_rule_id >= 0) {
+            old_int_rule_ids_vec.push_back((uint32_t) old_int_rule_id);
         }
 
         // Now it is safe to append this rule for installation
@@ -1095,6 +1108,13 @@ FlowDirector::add_rules(HashMap<long, String> &rules_map, bool by_controller)
 
     RuleTiming rits(_port_id);
     rits.start = Timestamp::now_steady();
+
+    uint32_t old_rules_to_delete = old_int_rule_ids_vec.size();
+
+    // First delete existing rules (if any)
+    if (flow_rules_delete(old_int_rule_ids_vec, false) != old_rules_to_delete) {
+        return FLOWDIR_ERROR;
+    }
 
     // Install in the NIC as a batch
     if (flow_rules_install(rules_str, installed_rules_nb) != FLOWDIR_SUCCESS) {
@@ -1145,7 +1165,7 @@ FlowDirector::add_rules_from_file(const String &filename)
         rules_map.insert((long) next_int_rule_id++, rule);
     }
 
-    return add_rules(rules_map, false);
+    return update_rules(rules_map, false);
 }
 
 /**
@@ -1214,11 +1234,15 @@ FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule,
 
     // Update flow cache, If asked to do so
     if (with_cache) {
-        if (_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule)) {
-            return FLOWDIR_SUCCESS;
+        int32_t old_int_rule_id = -1;
+        if (!_flow_cache->update_rule_in_flow_cache(core_id, rule_id, int_rule_id, old_int_rule_id, rule)) {
+            return FLOWDIR_ERROR;
         }
-
-        return FLOWDIR_ERROR;
+        if (old_int_rule_id >= 0) {
+            uint32_t old_int_rule_ids[1] = {(uint32_t) old_int_rule_id};
+            return (flow_rules_delete(old_int_rule_ids, 1) == 1);
+        }
+        return FLOWDIR_SUCCESS;
     }
 
     return FLOWDIR_SUCCESS;
@@ -1248,6 +1272,34 @@ FlowDirector::flow_rule_get(const uint32_t &int_rule_id)
 }
 
 /**
+ * Removes a vector-based batch of flow rule objects from a NIC.
+ * If with_cache is true, then this batch of flow rules is also deleted from the flow cache.
+ *
+ * @args old_int_rule_ids_vec: a vector of internal flow rule IDs
+ * @args with_cache: if true, the flow cache is updated accordingly (defaults to true)
+ * @return the number of deleted flow rules upon success, otherwise a negative integer
+ */
+int32_t
+FlowDirector::flow_rules_delete(const Vector<uint32_t> &old_int_rule_ids_vec, const bool with_cache)
+{
+    int rules_to_delete = old_int_rule_ids_vec.size();
+    if (rules_to_delete == 0) {
+        return rules_to_delete;
+    }
+
+    uint32_t rules_nb = 0;
+    uint32_t int_rule_ids[rules_to_delete];
+
+    auto it = old_int_rule_ids_vec.begin();
+    while (it != old_int_rule_ids_vec.end()) {
+        int_rule_ids[rules_nb++] = (uint32_t) *it;
+        it++;
+    }
+
+    return flow_rules_delete(int_rule_ids, rules_nb, with_cache);
+}
+
+/**
  * Removes a batch of flow rule objects from a NIC.
  * If with_cache is true, then this batch of flow rules is also deleted from the flow cache.
  *
@@ -1268,9 +1320,6 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
     if ((!int_rule_ids) || (rules_nb == 0)) {
         return _errh->error("Flow Director (port %u): No rules to remove", _port_id);
     }
-
-    // TODO: No need for counting, if DPDK's port_flow_destroy could return the number of deleted rules..
-    uint32_t rules_before_delete = flow_rules_count_explicit();
 
     RuleTiming rdts(_port_id);
     rdts.start = Timestamp::now_steady();
@@ -1298,18 +1347,12 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
         }
     }
 
-    // Count how many rules we really deleted
-    uint32_t rules_after_delete = flow_rules_count_explicit();
-    uint32_t rules_deleted = (rules_before_delete - rules_after_delete);
+    _errh->message(
+        "Flow Director (port %u): Successfully deleted %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
+        _port_id, rules_nb, rdts.latency_ms, rdts.rules_per_sec
+    );
 
-    if (_verbose) {
-        _errh->message(
-            "Flow Director (port %u): Successfully deleted %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
-            _port_id, rules_deleted, rdts.latency_ms, rdts.rules_per_sec
-        );
-    }
-
-    return rules_deleted;
+    return rules_nb;
 }
 
 /**

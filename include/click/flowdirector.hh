@@ -94,7 +94,8 @@ class FlowCache {
         );
         bool update_rule_in_flow_cache(
             const int &core_id, const long &rule_id,
-            const uint32_t &int_rule_id, String rule
+            const uint32_t &int_rule_id, int32_t &old_int_rule_id,
+            String rule
         );
         int32_t delete_rule_by_global_id(const long &rule_id);
         String delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
@@ -221,8 +222,8 @@ class FlowDirector {
         // Install NIC flow rules from a file
         int32_t add_rules_from_file(const String &filename);
 
-        // Install NIC flow rules
-        int32_t add_rules(HashMap<long, String> &rules_map, bool by_controller = true);
+        // Update NIC flow rules
+        int32_t update_rules(HashMap<long, String> &rules_map, bool by_controller = true);
 
         // Loads a set of rules from a file to memory
         String load_rules_from_file_to_string(const String &filename);
@@ -238,7 +239,8 @@ class FlowDirector {
         struct port_flow *flow_rule_get(const uint32_t &int_rule_id);
 
         // Delete a batch of flow rules from a NIC
-        int flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache = true);
+        int32_t flow_rules_delete(const Vector<uint32_t> &old_int_rule_ids_vec, const bool with_cache = true);
+        int32_t flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, const bool with_cache = true);
 
         // Query flow rule statistics
         String flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, int64_t &matched_bytes);

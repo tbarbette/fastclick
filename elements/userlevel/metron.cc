@@ -2125,9 +2125,9 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 rules_map.insert(rule_id, rule);
             }
 
-            // Install a batch of rules associated with this CPU core ID
+            // Update a batch of rules associated with this CPU core ID
             int phys_core_id = get_cpu_phys_id(core_id);
-            int status = nic->get_flow_director()->add_rules(rules_map, true);
+            int status = nic->get_flow_director()->update_rules(rules_map, true);
             if (status >= 0) {
                 inserted_rules_nb += status;
             }
