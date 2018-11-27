@@ -350,12 +350,28 @@ ${PARSE_PATH}.sentinel:
 	sed -i '120i uint8_t port_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
 	sed -i '121i uint8_t rxring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
 	sed -i '122i uint8_t txring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+	sed -i '123i struct l2_decap_conf l2_decap_conf;' $(PARSE_PATH)/testpmd.c
+	sed -i '124i struct l2_encap_conf l2_encap_conf;' $(PARSE_PATH)/testpmd.c
+	sed -i '125i struct mplsogre_decap_conf mplsogre_decap_conf;' $(PARSE_PATH)/testpmd.c
+	sed -i '126i struct mplsogre_encap_conf mplsogre_encap_conf;' $(PARSE_PATH)/testpmd.c
+	sed -i '127i struct mplsoudp_decap_conf mplsoudp_decap_conf;' $(PARSE_PATH)/testpmd.c
+	sed -i '128i struct mplsoudp_encap_conf mplsoudp_encap_conf;' $(PARSE_PATH)/testpmd.c
+endif
 	sed -i 's/^uint8_t\sport_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t port_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
 	sed -i 's/^uint8_t\srxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t rxring_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
 	sed -i 's/^uint8_t\stxring_numa\[RTE_MAX_ETHPORTS\]\;/extern uint8_t txring_numa[RTE_MAX_ETHPORTS];/g' $(PARSE_PATH)/testpmd.h
 	sed -i '/extern\senum\sdcb_queue_mapping_mode\sdcb_q_mapping\;/d' $(PARSE_PATH)/testpmd.h
 	sed -i 's/struct\snvgre_encap_conf\snvgre_encap_conf;/extern struct nvgre_encap_conf nvgre_encap_conf;/g' $(PARSE_PATH)/testpmd.h
 	sed -i 's/struct\svxlan_encap_conf\svxlan_encap_conf;/extern struct vxlan_encap_conf vxlan_encap_conf;/g' $(PARSE_PATH)/testpmd.h
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+	sed -i 's/struct\sl2_decap_conf\sl2_decap_conf;/extern struct l2_decap_conf l2_decap_conf;/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/struct\sl2_encap_conf\sl2_encap_conf;/extern struct l2_encap_conf l2_encap_conf;/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/struct\smplsogre_decap_conf\smplsogre_decap_conf;/extern struct mplsogre_decap_conf mplsogre_decap_conf;/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/struct\smplsogre_encap_conf\smplsogre_encap_conf;/extern struct mplsogre_encap_conf mplsogre_encap_conf;/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/struct\smplsoudp_decap_conf\smplsoudp_decap_conf;/extern struct mplsoudp_decap_conf mplsoudp_decap_conf;/g' $(PARSE_PATH)/testpmd.h
+	sed -i 's/struct\smplsoudp_encap_conf\smplsoudp_encap_conf;/extern struct mplsoudp_encap_conf mplsoudp_encap_conf;/g' $(PARSE_PATH)/testpmd.h
+endif
 	touch $(PARSE_PATH)/.sentinel
 
 test-pmd/%.o: ${PARSE_PATH}.sentinel
