@@ -341,7 +341,7 @@ FlowCache::delete_rule_id_mapping(const long &rule_id)
 uint32_t
 FlowCache::next_internal_rule_id()
 {
-    return _next_rule_id;
+    return _next_rule_id++;
 }
 
 /**
@@ -670,7 +670,6 @@ FlowCache::initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rule
     }
 
     _rules_nb += rules_nb;
-    _next_rule_id += rules_nb;
 }
 
 /**
