@@ -643,7 +643,8 @@ StandaloneSCManager::fix_rule(NIC *nic, String rule) {
         String qid = rule.substring(pos + 12);
         //click_chatter("qid %s", qid.c_str());
         int queue = atoi(qid.substring(0, qid.find_left(' ')).c_str());
-        rule = rule.substring(0,rule.find_left("actions")) + "actions port_id id " + String(pindex + queue % _sriov) + " / end\n";
+        rule = rule.substring(0,rule.find_left("actions")) + "actions port_id id " + String(pindex + (queue % _sriov)) + " / end\n";
+
         //click_chatter("%s", rule.c_str());
     }
 
@@ -702,8 +703,10 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
             NIC *nic = sc->get_nic_by_index(i);
 
             int pindex = nic->get_port_id();
-
-            rules_map.insert(0, "flow create " + String(_sriov + pindex) + " transfer ingress pattern eth type is 2048 / end actions port_id id " + String(pindex) + " / end\n");
+            for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
+                int cpid = sc->get_cpu_phys_id(j);
+                rules_map.insert(2093323+ i * 128 * 128 + pindex * 128 + cpid, "flow create " + String((cpid % _sriov) + 1 + pindex) + " transfer ingress pattern eth type is 2048 / end actions port_id id " + String(pindex) + " / end\n");
+            }
             int status = nic->get_flow_director(_sriov)->update_rules(rules_map, false);
             if (status < 0) {
                 return errh->error("Could not insert SRIOV revert rule");
