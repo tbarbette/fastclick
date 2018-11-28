@@ -112,7 +112,7 @@ FlowCache::global_from_internal_rule_id(const uint32_t &int_rule_id)
 
         if (int_r_id == int_rule_id) {
             if (_verbose) {
-                _errh->message("Flow Cache (port %u): Internal rule ID %" PRIu32 " is mapped to global rule ID %ld", get_port_id(), int_rule_id, r_id);
+                // _errh->message("Flow Cache (port %u): Internal rule ID %" PRIu32 " is mapped to global rule ID %ld", get_port_id(), int_rule_id, r_id);
             }
             return r_id;
         }
@@ -416,13 +416,11 @@ FlowCache::update_rule_in_flow_cache(const int &core_id, const long &rule_id, co
     // First try to delete this rule, if it exists
     old_int_rule_id = delete_rule_by_global_id(rule_id);
 
-    // Rule did not exist before, so initialize its counters based on the new internal rule ID
-    if (old_int_rule_id < 0) {
-        uint32_t int_rule_ids[1] = {int_rule_id};
-        initialize_rule_counters(int_rule_ids, (const uint32_t) 1);
-    }
+    // Initialize the counters for the new internal rule ID
+    uint32_t int_rule_ids[1] = {int_rule_id};
+    initialize_rule_counters(int_rule_ids, (const uint32_t) 1);
 
-    // Now, store this rule in this CPU core's flow cache
+    // Now, store this new rule in this CPU core's flow cache
     return (insert_rule_in_flow_cache(core_id, rule_id, int_rule_id, rule) == FLOWDIR_SUCCESS);
 }
 
@@ -464,7 +462,10 @@ FlowCache::delete_rule_by_global_id(const long &rule_id)
             }
 
             if (_verbose) {
-                click_chatter("Flow Cache (port %u): Rule with ID %ld deleted from queue %d", get_port_id(), rule_id, core_id);
+                click_chatter(
+                    "Flow Cache (port %u): Rule with global ID %ld and internal rule ID %" PRIu32 " deleted from queue %d",
+                    get_port_id(), rule_id, int_rule_id, core_id
+                );
             }
 
             // Update counters
@@ -603,7 +604,7 @@ FlowCache::set_matched_packets(const uint32_t &int_rule_id, uint64_t value)
     if (int_rule_id < 0) {
         _errh->error("Flow Cache (port %u): Cannot update packet counters of invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    _matched_pkts[int_rule_id] = value;
+    _matched_pkts.insert(int_rule_id, value);
 }
 
 /**
@@ -618,7 +619,7 @@ FlowCache::get_matched_packets(const uint32_t &int_rule_id)
     if (int_rule_id < 0) {
         _errh->error("Flow Cache (port %u): No packet counters for invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    return _matched_pkts[int_rule_id];
+    return _matched_pkts.find(int_rule_id);
 }
 
 /**
@@ -633,7 +634,7 @@ FlowCache::set_matched_bytes(const uint32_t &int_rule_id, uint64_t value)
     if (int_rule_id < 0) {
         _errh->error("Flow Cache (port %u): Cannot update byte counters of invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    _matched_bytes[int_rule_id] = value;
+    _matched_bytes.insert(int_rule_id, value);
 }
 
 /**
@@ -648,7 +649,7 @@ FlowCache::get_matched_bytes(const uint32_t &int_rule_id)
     if (int_rule_id < 0) {
         _errh->error("Flow Cache (port %u): No byte counters for invalid rule ID %ld", get_port_id(), int_rule_id);
     }
-    return _matched_bytes[int_rule_id];
+    return _matched_bytes.find(int_rule_id);
 }
 
 /**
@@ -667,8 +668,8 @@ FlowCache::initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rule
     }
 
     for (uint32_t i = 0; i < rules_nb; i++) {
-        _matched_pkts[int_rule_ids[i]] = 0;
-        _matched_bytes[int_rule_ids[i]] = 0;
+        _matched_pkts.insert(int_rule_ids[i], 0);
+        _matched_bytes.insert(int_rule_ids[i], 0);
         if (_verbose) {
             _errh->message("Flow Cache (port %u): Initialized counters for rule with internal ID %" PRIu32, get_port_id(), int_rule_ids[i]);
         }
@@ -701,6 +702,58 @@ FlowCache::delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb
     }
 
     _rules_nb -= rules_nb;
+}
+
+/**
+ * Performs a run-time consistency check with respect to the desired occupancy of the flow rule cache.
+ *
+ * @args target_number_of_rules: desired flow rule occupancy
+ */
+void
+FlowCache::cache_consistency_check(const int32_t &target_number_of_rules)
+{
+    if (target_number_of_rules < 0) {
+        _errh->error(
+            "Flow Cache (port %u): Cannot verify consistency with a negative target number of rules",
+            get_port_id(), target_number_of_rules
+        );
+        return;
+    }
+
+    // Assertions alone are not as descriptive as prints :p
+    if (_internal_rule_map.size() != target_number_of_rules) {
+        _errh->error(
+            "Flow Cache (port %u): Number of rules in the flow cache's internal map %" PRIu32 " does not agree with target rules %" PRId32,
+            get_port_id(), _internal_rule_map.size(), target_number_of_rules
+        );
+    }
+
+    if (_matched_pkts.size() != target_number_of_rules) {
+        _errh->error(
+            "Flow Cache (port %u): Number of rules in the flow cache's packet counters %" PRIu32 " does not agree with target rules %" PRId32,
+            get_port_id(), _matched_pkts.size(), target_number_of_rules
+        );
+    }
+
+    if (_matched_bytes.size() != target_number_of_rules) {
+        _errh->error(
+            "Flow Cache (port %u): Number of rules in the flow cache's byte counters %" PRIu32 " does not agree with target rules %" PRId32,
+            get_port_id(), _matched_bytes.size(), target_number_of_rules
+        );
+    }
+
+    if (_rules_nb != target_number_of_rules) {
+        _errh->error(
+            "Flow Cache (port %u): Number of rules in the flow cache %" PRIu32 " does not agree with target rules %" PRId32,
+            get_port_id(), _rules_nb, target_number_of_rules
+        );
+    }
+
+    // Now that we know the state of the cache, assert!
+    assert(_internal_rule_map.size() == target_number_of_rules);
+    assert(_matched_pkts.size() == target_number_of_rules);
+    assert(_matched_bytes.size() == target_number_of_rules);
+    assert(_rules_nb == target_number_of_rules);
 }
 
 /**
@@ -1083,7 +1136,7 @@ FlowDirector::update_rules(HashMap<long, String> &rules_map, bool by_controller)
 
         if (_verbose) {
             _errh->message(
-                "Flow Director (port %u): About to install rule with global ID %ld and internal ID %" PRIu32 " on core %d: %s",
+                "\nFlow Director (port %u): About to install rule with global ID %ld and internal ID %" PRIu32 " on core %d: %s",
                 _port_id, rule_id, int_rule_id, core_id, rule.c_str()
             );
         }
@@ -1348,7 +1401,7 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
     }
 
     _errh->message(
-        "Flow Director (port %u): Successfully deleted %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
+        "Flow Director (port %u): Successfully deleted %" PRIu32 " rules in %.2f ms at the rate of %.3f rules/sec",
         _port_id, rules_nb, rdts.latency_ms, rdts.rules_per_sec
     );
 
@@ -1582,6 +1635,10 @@ FlowDirector::flow_rules_count_explicit()
     // Traverse the list of installed flow rules
     for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
         rules_nb++;
+    }
+
+    if (_verbose) {
+        _errh->message("Flushing NIC with %" PRIu32 " rules and Flow Cache with %" PRIu32 " rules", rules_nb, flow_rules_count());
     }
 
     // Consistency
@@ -1942,6 +1999,36 @@ FlowDirector::min_avg_max(float &min, float &mean, float &max, const bool instal
         mean = 0;
     } else {
         mean = sum / static_cast<float>(len);
+    }
+}
+
+/**
+ * Performs a run-time consistency check with respect to the desired occupancy of the NIC.
+ *
+ * @args target_number_of_rules: desired NIC occupancy
+ */
+void
+FlowDirector::nic_consistency_check(const int32_t &target_number_of_rules)
+{
+    if (target_number_of_rules < 0) {
+        _errh->error(
+            "Flow Cache (port %u): Cannot verify consistency with a negative target number of rules",
+            get_port_id(), target_number_of_rules
+        );
+        return;
+    }
+
+    // First check the flow rule cache
+    _flow_cache->cache_consistency_check(target_number_of_rules);
+
+    // Now the NIC
+    uint32_t nic_rules = flow_rules_count_explicit();
+    if (nic_rules != target_number_of_rules) {
+        _errh->error(
+            "Flow Cache (port %u): Number of rules in the NIC %" PRIu32 " does not agree with target rules %" PRId32,
+            get_port_id(), nic_rules, target_number_of_rules
+        );
+        assert(nic_rules == target_number_of_rules);
     }
 }
 

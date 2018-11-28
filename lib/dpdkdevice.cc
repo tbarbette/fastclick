@@ -113,7 +113,7 @@ void DPDKDevice::initialize_flow_director(
     }
 
     // Verify
-    const portid_t p_id = flow_dir->port_id();
+    const portid_t p_id = flow_dir->get_port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */

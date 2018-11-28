@@ -110,6 +110,7 @@ class FlowCache {
         inline uint32_t get_rule_counter() { return _rules_nb; };
         void initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
         void delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
+        void cache_consistency_check(const int32_t &target_number_of_rules);
         void flush_rule_counters();
 
     private:
@@ -129,8 +130,8 @@ class FlowCache {
         HashMap<long, uint32_t> _internal_rule_map;
 
         // Matched packets and bytes per rule ID
-        HashTable<uint32_t, uint64_t> _matched_pkts;
-        HashTable<uint32_t, uint64_t> _matched_bytes;
+        HashMap<uint32_t, uint64_t> _matched_pkts;
+        HashMap<uint32_t, uint64_t> _matched_bytes;
 
         // An error handler
         ErrorVeneer *_errh;
@@ -199,7 +200,7 @@ class FlowDirector {
         inline void set_port_id(const portid_t &port_id) {
             _port_id = port_id;
         };
-        inline portid_t port_id() { return _port_id; };
+        inline portid_t get_port_id() { return _port_id; };
 
         // Activation/deactivation handlers
         inline void set_active(const bool &active) {
@@ -326,6 +327,9 @@ class FlowDirector {
 
         // Sorts a list of flow rules by group, priority, and ID
         void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);
+
+        // Verify that the NIC has the right number of rules
+        void nic_consistency_check(const int32_t &target_number_of_rules);
 
 };
 
