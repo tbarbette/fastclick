@@ -251,14 +251,17 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
 
     if (timing_fnt != "" && _stop_time > 0) {
-        float max = _timing; //Max replay timing
-        float min = 1; //Min replay timing
-        float time = _stop_time;
-        //A sinwave that starts at -1 and does one wave in ~12
-        float exp ; //Exp will make the first waves longer
-        float accel; //Divison of X before exp, to avoid stretch the graph horizontally
-//  1 : (sin(-pi/2 + (x/10)^2.5) * (-x/45 + 1) + 1) * ((200 - 1) / 2) + 1)
-//  2 : (squarewave(((x + 20 / 2) * 1/20) ^ 2.5) * (-x / 45 + 1) + 1) * ((200 -1) / 2) + 1
+        String max = String(_timing); //Max replay timing
+        String min = "1"; //Min replay timing
+        String time = String(_stop_time);
+
+        if (timing_fnt == "@0")
+            return 0; //Contant, no fnt
+        if (timing_fnt == "@1") {
+            timing_fnt = "(sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+            click_chatter("Using function '%s'", timing_fnt.c_str());
+        } else if (timing_fnt == "@2")
+            timing_fnt = "(squarewave(((x + 20 / 2) * 1/20) ^ 2.5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
         _fnt_expr = TinyExpr::compile(timing_fnt, 1);
 
     }
