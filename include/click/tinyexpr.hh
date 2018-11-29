@@ -13,9 +13,10 @@ static double square_wave(double x) {
 }
 
 class TinyExpr { public:
-    static constexpr const char* var_names[3] = {"x", "y", "z"};
 
     static TinyExpr compile(String expr, int n_vars) {
+
+        static constexpr const char* const var_names[] = {"x", "y", "z"};
         TinyExpr e;
         assert(n_vars < 4);
         e._n_vars = n_vars + 1;
