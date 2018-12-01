@@ -2102,7 +2102,6 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
         Json jcpus = jnic.second.get("cpus");
         for (auto jcpu : jcpus) {
             int core_id = jcpu.second.get_i("cpuId");
-            click_chatter("Adding rules for CPU %d with physical ID %d", core_id, get_cpu_phys_id(core_id));
             assert(get_cpu_info(core_id).active());
 
             HashMap<long, String> rules_map;
@@ -2124,6 +2123,8 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 // Store this rule
                 rules_map.insert(rule_id, rule);
             }
+
+            click_chatter("Adding %4d rules for CPU %d with physical ID %d", rules_map.size(), core_id, get_cpu_phys_id(core_id));
 
             // Update a batch of rules associated with this CPU core ID
             int phys_core_id = get_cpu_phys_id(core_id);

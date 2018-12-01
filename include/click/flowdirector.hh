@@ -81,21 +81,28 @@ class FlowCache {
         bool internal_rule_id_exists(const uint32_t &int_rule_id);
         long global_from_internal_rule_id(const uint32_t &int_rule_id);
         int32_t internal_from_global_rule_id(const long &rule_id);
-        String global_rule_ids();
+        template<typename T> void sort_rule_ids_inc(Vector<T> &rule_ids_vec);
+        template<typename T> void sort_rule_ids_dec(Vector<T> &rule_ids_vec);
+        Vector<long> global_rule_ids(const bool increasing = true);
+        Vector<uint32_t> internal_rule_ids(const bool increasing = true);
+        Vector<uint32_t> internal_rule_ids_counters(const bool increasing = true);
         HashMap<long, String> *rules_map_by_core_id(const int &core_id);
         Vector<String> rules_list_by_core_id(const int &core_id);
         Vector<int> cores_with_rules();
+        String get_rule_by_global_id(const long &rule_id);
+        String get_rule_by_internal_id(const uint32_t &int_rule_id);
 
         // Flow Cache methods
+        int32_t currently_max_internal_rule_id();
         uint32_t next_internal_rule_id();
+        void set_next_internal_rule_id(uint32_t next_id);
         int insert_rule_in_flow_cache(
             const int &core_id, const long &rule_id,
             const uint32_t &int_rule_id, const String rule
         );
         bool update_rule_in_flow_cache(
             const int &core_id, const long &rule_id,
-            const uint32_t &int_rule_id, int32_t &old_int_rule_id,
-            String rule
+            const uint32_t &int_rule_id, String rule
         );
         int32_t delete_rule_by_global_id(const long &rule_id);
         String delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
@@ -110,7 +117,8 @@ class FlowCache {
         inline uint32_t get_rule_counter() { return _rules_nb; };
         void initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
         void delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
-        void cache_consistency_check(const int32_t &target_number_of_rules);
+        void cache_consistency_check(const int32_t &target_number_of_rules, const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec);
+        void correlate_candidate_id_with_cache(int32_t &candidate);
         void flush_rule_counters();
 
     private:
@@ -142,6 +150,9 @@ class FlowCache {
         // Methods to facilitate the mapping between ONOS and NIC rule IDs
         bool store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_id);
         bool delete_rule_id_mapping(const long &rule_id);
+
+        // Methods to verify cache consistency
+        bool verify_transactions(const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec);
 };
 
 class FlowDirector {
@@ -220,11 +231,17 @@ class FlowDirector {
         };
         inline String rules_filename() { return _rules_filename; };
 
+        // Calibrates flow rule cache before inserting new rules
+        void calibrate_cache(const HashMap<long, String> &rules_map, bool debug_mode = false);
+
+        // Updates the internal ID for the next rule to be allocated
+        void update_internal_rule_id();
+
         // Install NIC flow rules from a file
         int32_t add_rules_from_file(const String &filename);
 
         // Update NIC flow rules
-        int32_t update_rules(HashMap<long, String> &rules_map, bool by_controller = true);
+        int32_t update_rules(const HashMap<long, String> &rules_map, bool by_controller = true, bool debug_mode = false);
 
         // Loads a set of rules from a file to memory
         String load_rules_from_file_to_string(const String &filename);
@@ -235,6 +252,11 @@ class FlowDirector {
             const uint32_t &int_rule_id, const String &rule,
             long rule_id, int core_id, const bool with_cache = true
         );
+
+        // Verify the presence/absence of a list of rules in/from the NIC
+        int flow_rules_verify(const Vector<uint32_t> &int_rule_ids_vec, const Vector<uint32_t> &old_int_rule_ids_vec);
+        int flow_rules_verify_presence(const Vector<uint32_t> &int_rule_ids_vec);
+        int flow_rules_verify_absence(const Vector<uint32_t> &old_int_rule_ids_vec);
 
         // Return a flow rule object with a specific ID
         struct port_flow *flow_rule_get(const uint32_t &int_rule_id);
@@ -255,11 +277,17 @@ class FlowDirector {
         // Counts the number of rules in a NIC (in hardware)
         uint32_t flow_rules_count_explicit();
 
+        // Compares NIC and cache rule counts and asserts inconsistency
+        void nic_and_cache_counts_agree();
+
         // Lists all NIC flow rules
         String flow_rules_list();
 
-        // Lists all installed (internal + global flow rule IDs
-        String flow_rule_ids_internal();
+        // Lists all installed (internal + global flow rule IDs along with counters
+        String flow_rule_ids_internal_counters();
+        String flow_rule_ids_internal_cache();
+        String flow_rule_ids_internal_nic();
+        String flow_rule_ids_internal(const bool from_nic = true);
         String flow_rule_ids_global();
 
         // Flush all of the rules from a NIC
@@ -329,6 +357,7 @@ class FlowDirector {
         void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);
 
         // Verify that the NIC has the right number of rules
+        void rule_consistency_check(const int32_t &target_number_of_rules, const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec);
         void nic_consistency_check(const int32_t &target_number_of_rules);
 
 };
