@@ -58,13 +58,14 @@ class RuleTiming {
 
 class FlowCache {
     public:
-        FlowCache(portid_t port_id, bool verbose, ErrorHandler *errh)
+        FlowCache(portid_t port_id, bool verbose, bool debug_mode, ErrorHandler *errh)
             : _port_id(port_id), _rules_nb(0), _next_rule_id(0),
               _rules(), _internal_rule_map(), _matched_pkts(), _matched_bytes() {
             assert(_port_id >= 0);
             _errh = new ErrorVeneer(errh);
             assert(_errh);
             _verbose = verbose;
+            _debug_mode = debug_mode;
         }
 
         ~FlowCache() {
@@ -146,6 +147,7 @@ class FlowCache {
 
         // Set stdout verbosity
         bool _verbose;
+        bool _debug_mode;
 
         // Methods to facilitate the mapping between ONOS and NIC rule IDs
         bool store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_id);
@@ -179,6 +181,7 @@ class FlowDirector {
 
         // For debugging
         static bool DEF_VERBOSITY;
+        static bool DEF_DEBUG_MODE;
 
         // Set of flow rule items supported by the Flow API
         static HashMap<int, String> flow_item;
@@ -225,6 +228,11 @@ class FlowDirector {
         };
         inline bool verbose() { return _verbose; };
 
+        inline void set_debug_mode(const bool &debug_mode) {
+            _debug_mode = debug_mode;
+        };
+        inline bool debug_mode() { return _debug_mode; };
+
         // Rules' file handlers
         inline void set_rules_filename(const String &file) {
             _rules_filename = file;
@@ -232,7 +240,7 @@ class FlowDirector {
         inline String rules_filename() { return _rules_filename; };
 
         // Calibrates flow rule cache before inserting new rules
-        void calibrate_cache(const HashMap<long, String> &rules_map, bool debug_mode = false);
+        void calibrate_cache(const HashMap<long, String> &rules_map);
 
         // Updates the internal ID for the next rule to be allocated
         void update_internal_rule_id();
@@ -241,7 +249,7 @@ class FlowDirector {
         int32_t add_rules_from_file(const String &filename);
 
         // Update NIC flow rules
-        int32_t update_rules(const HashMap<long, String> &rules_map, bool by_controller = true, bool debug_mode = false);
+        int32_t update_rules(const HashMap<long, String> &rules_map, bool by_controller = true);
 
         // Loads a set of rules from a file to memory
         String load_rules_from_file_to_string(const String &filename);
@@ -333,6 +341,7 @@ class FlowDirector {
 
         // Set stdout verbosity
         bool _verbose;
+        bool _debug_mode;
 
         // Filename that contains the rules to be installed
         String _rules_filename;

@@ -1010,11 +1010,8 @@ FlowCache::correlate_candidate_id_with_cache(int32_t &candidate)
         _errh->message("Correlating with flow cache - Candidate next internal rule ID is %" PRIu32, candidate);
     }
 
-    _errh->message("Internal IDs: ");
-
     int index = 0;
     for (auto i : int_rule_ids) {
-        _errh->message("%" PRIu32, i);
         if (i == candidate) {
             break;
         }
@@ -1083,8 +1080,9 @@ HashMap<int, String> FlowDirector::flow_item;
 // Set of flow rule actions supported by the Flow API
 HashMap<int, String> FlowDirector::flow_action;
 
-// Default verbosity setting
+// Default verbosity settings
 bool FlowDirector::DEF_VERBOSITY = false;
+bool FlowDirector::DEF_DEBUG_MODE = false;
 
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<portid_t, FlowDirector *> FlowDirector::dev_flow_dir;
@@ -1097,17 +1095,17 @@ HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_del_stats_map;
 struct cmdline *FlowDirector::_parser = NULL;
 
 FlowDirector::FlowDirector() :
-        _port_id(-1), _active(false), _verbose(DEF_VERBOSITY), _rules_filename("")
+        _port_id(-1), _active(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
     _flow_cache = 0;
 }
 
 FlowDirector::FlowDirector(portid_t port_id, ErrorHandler *errh) :
-        _port_id(port_id), _active(false), _verbose(DEF_VERBOSITY), _rules_filename("")
+        _port_id(port_id), _active(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
 {
     _errh = new ErrorVeneer(errh);
-    _flow_cache = new FlowCache(port_id, _verbose, _errh);
+    _flow_cache = new FlowCache(port_id, _verbose, _debug_mode, _errh);
 
     populate_supported_flow_items_and_actions();
 
@@ -1335,10 +1333,9 @@ FlowDirector::get_flow_director(const portid_t &port_id, ErrorHandler *errh)
  * This is crazy but it's how DPDK works at the moment ;(
  *
  * @args rules_map: a map of global rule IDs to their values be inserted
- * @args debug_mode: boolean flag for debugging this method (defaults to false)
  */
 void
-FlowDirector::calibrate_cache(const HashMap<long, String> &rules_map, bool debug_mode)
+FlowDirector::calibrate_cache(const HashMap<long, String> &rules_map)
 {
     bool calibrate = false;
     Vector<uint32_t> candidates;
@@ -1375,7 +1372,7 @@ FlowDirector::calibrate_cache(const HashMap<long, String> &rules_map, bool debug
     // Sort the list of candidates by decreasing order
     _flow_cache->sort_rule_ids_dec(candidates);
 
-    if (debug_mode) {
+    if (_debug_mode) {
         String c_str = "";
         for (auto c : candidates) {
             c_str += String(c) + " ";
@@ -1474,11 +1471,10 @@ FlowDirector::load_rules_from_file_to_string(const String &filename)
  *
  * @args rules_map: a map of global rule IDs to their rules
  * @args by_controller: boolean flag that denotes that rule installation is driven by a controller (defaults to true)
- * @args debug_mode: boolean flag for debugging this method (defaults to false)
  * @return the number of flow rules being installed/updated, otherwise a negative integer
  */
 int32_t
-FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_controller, bool debug_mode)
+FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_controller)
 {
     uint32_t rules_to_install = rules_map.size();
     if (rules_to_install == 0) {
@@ -1489,7 +1485,7 @@ FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_contr
     int32_t capacity = (int32_t) flow_rules_count();
 
     // Prepare the cache counter for new deletions and insertions
-    calibrate_cache(rules_map, debug_mode);
+    calibrate_cache(rules_map);
 
     String rules_str = "";
     uint32_t installed_rules_nb = 0;
@@ -1572,7 +1568,7 @@ FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_contr
         return FLOWDIR_ERROR;
     }
 
-    if (debug_mode) {
+    if (_debug_mode) {
         // Verify that what we deleted is not in the flow cache anynore
         assert(flow_rules_verify_absence(old_int_rule_ids_vec) == FLOWDIR_SUCCESS);
     }
@@ -1590,13 +1586,13 @@ FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_contr
     rits.update(installed_rules_nb);
     add_rule_inst_stats(rits);
 
-    if (debug_mode) {
+    if (_debug_mode) {
         // Verify that what we inserted is in the flow cache
         assert(flow_rules_verify_presence(int_rule_ids_vec) == FLOWDIR_SUCCESS);
     }
 
     // Debugging stuff
-    if (debug_mode || _verbose) {
+    if (_debug_mode || _verbose) {
         capacity = (capacity == 0) ? (int32_t) flow_rules_count() : capacity;
         rule_consistency_check(capacity, int_rule_ids_vec, glb_rule_ids_vec);
     }
