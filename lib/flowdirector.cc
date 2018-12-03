@@ -866,7 +866,7 @@ FlowCache::delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb
  * @args glb_vec: list of global rule IDs to insert
  */
 void
-FlowCache::cache_consistency_check(const int32_t &target_number_of_rules, const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec)
+FlowCache::cache_consistency_check(const int32_t &target_number_of_rules)
 {
     if (target_number_of_rules < 0) {
         _errh->error(
@@ -934,9 +934,6 @@ FlowCache::cache_consistency_check(const int32_t &target_number_of_rules, const 
 
         it++;
     }
-
-    // Verify that the new rule IDs exist in the cache
-    consistent &= verify_transactions(int_vec, glb_vec);
 
     // Now that we know the state of the cache, assert!
     assert(_internal_rule_map.size() == target_number_of_rules);
@@ -1081,8 +1078,8 @@ HashMap<int, String> FlowDirector::flow_item;
 HashMap<int, String> FlowDirector::flow_action;
 
 // Default verbosity settings
-bool FlowDirector::DEF_VERBOSITY = false;
-bool FlowDirector::DEF_DEBUG_MODE = false;
+bool FlowDirector::DEF_VERBOSITY = true;
+bool FlowDirector::DEF_DEBUG_MODE = true;
 
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<portid_t, FlowDirector *> FlowDirector::dev_flow_dir;
@@ -1317,6 +1314,25 @@ FlowDirector::get_flow_director(const portid_t &port_id, ErrorHandler *errh)
 
 /**
  * Calibrates the flow rule cache before new rule(s) are inserted.
+ * Transforms the input array into a map and calls an overloaded calibrate_cache.
+ *
+ * @arg int_rule_ids: an array of internal flow rule IDs to be deleted
+ * @arg rules_nb: the number of flow rules to be deleted
+ */
+void
+FlowDirector::calibrate_cache(const uint32_t *int_rule_ids, const uint32_t &rules_nb)
+{
+    HashMap<long, String> rules_map;
+    for (uint32_t i = 0; i < rules_nb ; i++) {
+        long rule_id = _flow_cache->global_from_internal_rule_id(int_rule_ids[i]);
+        // We only need the rule IDs, not the actual rules
+        rules_map.insert(rule_id, "");
+    }
+    calibrate_cache(rules_map);
+}
+
+/**
+ * Calibrates the flow rule cache before new rule(s) are inserted.
  * This method helps to understand how DPDK's flow API allocates internal rule IDs.
  * Normally these IDs are ever increasing integers.
  * For example:
@@ -1363,9 +1379,6 @@ FlowDirector::calibrate_cache(const HashMap<long, String> &rules_map)
     }
 
     if (!calibrate) {
-        if (_verbose) {
-            _errh->message("Next internal rule ID: %u", _flow_cache->currently_max_internal_rule_id() + 1);
-        }
         return;
     }
 
@@ -1594,7 +1607,7 @@ FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_contr
     // Debugging stuff
     if (_debug_mode || _verbose) {
         capacity = (capacity == 0) ? (int32_t) flow_rules_count() : capacity;
-        rule_consistency_check(capacity, int_rule_ids_vec, glb_rule_ids_vec);
+        rule_consistency_check(capacity);
     }
 
     _errh->message(
@@ -1623,17 +1636,17 @@ FlowDirector::add_rules_from_file(const String &filename)
         return (int32_t) _errh->error("Flow Director (port %u): Failed to add rules due to empty input from file", _port_id);
     }
 
-    // Start with the right internal rule ID
-    uint32_t next_int_rule_id = _flow_cache->next_internal_rule_id();
-
     // Tokenize them to facilitate the insertion in the flow cache
     Vector<String> rules_vec = rules_str.trim_space().split('\n');
 
     for (uint32_t i = 0; i < rules_vec.size(); i++) {
         String rule = rules_vec[i] + "\n";
 
+        // Obtain the right internal rule ID
+        uint32_t next_int_rule_id = _flow_cache->next_internal_rule_id();
+
         // Add rule to the map
-        rules_map.insert((long) next_int_rule_id++, rule);
+        rules_map.insert((long) next_int_rule_id, rule);
     }
 
     return update_rules(rules_map, false);
@@ -1703,14 +1716,14 @@ FlowDirector::flow_rules_install(const String &rules, const uint32_t &rules_nb)
  * If with_cache is false, then it returns without interacting with Flow Cache.
  *
  * @args int_rule_id: a flow rule's internal ID
- * @args rule: a flow rule as a string
  * @args rule_id: a flow rule's global ID
  * @args core_id: a CPU core ID associated with this flow rule
+ * @args rule: a flow rule as a string
  * @args with_cache: if true, the flow cache is updated accordingly (defaults to true)
  * @return status
  */
 int
-FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule, long rule_id, int core_id, const bool with_cache)
+FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const long &rule_id, const int &core_id, const String &rule, const bool with_cache)
 {
     // Insert in NIC
     if (flow_rules_install(rule, 1) != FLOWDIR_SUCCESS) {
@@ -1742,7 +1755,7 @@ FlowDirector::flow_rule_install(const uint32_t &int_rule_id, const String &rule,
  *
  * @args int_rule_ids_vec: a list of new flow rules to verify their presence
  * @args old_int_rule_ids_vec: a list of old flow rules to verify their absense
- * @return presence status
+ * @return verification status
  */
 int
 FlowDirector::flow_rules_verify(const Vector<uint32_t> &int_rule_ids_vec, const Vector<uint32_t> &old_int_rule_ids_vec)
@@ -1870,7 +1883,7 @@ FlowDirector::flow_rules_delete(const Vector<uint32_t> &old_int_rule_ids_vec, co
  * Removes a batch of flow rule objects from a NIC.
  * If with_cache is true, then this batch of flow rules is also deleted from the flow cache.
  *
- * @args int_rule_ids: an array of internal flow rule IDs
+ * @args int_rule_ids: an array of internal flow rule IDs to delete
  * @args rules_nb: the number of flow rules to delete
  * @args with_cache: if true, the flow cache is updated accordingly (defaults to true)
  * @return the number of deleted flow rules upon success, otherwise a negative integer
@@ -1908,6 +1921,9 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
 
     // Update flow cache
     if (with_cache) {
+        // First calibrate the cache
+        calibrate_cache(int_rule_ids, rules_nb);
+
         String rule_ids_str = _flow_cache->delete_rules_by_internal_id(int_rule_ids, rules_nb);
         if (rule_ids_str.empty()) {
             return FLOWDIR_ERROR;
@@ -2289,7 +2305,7 @@ FlowDirector::flow_rule_ids_internal_nic()
     struct rte_port *port = get_port(_port_id);
     if (!port->flow_list || (flow_rules_count() == 0)) {
         _errh->error("Flow Director (port %u): No flow rule IDs to list", _port_id);
-        return "No flow rules";
+        return "";
     }
 
     struct port_flow *list = NULL;
@@ -2307,7 +2323,7 @@ FlowDirector::flow_rule_ids_internal_nic()
     }
 
     if (rule_ids_str.empty()) {
-        return "No flow rules";
+        return "";
     }
 
     return rule_ids_str.trim_space();
@@ -2331,6 +2347,10 @@ FlowDirector::flow_rule_ids_internal_cache()
 
     for (int i = 0; i < rule_ids.size(); ++i) {
         rule_ids_str += String(rule_ids[i]) + " ";
+    }
+
+    if (rule_ids_str.empty()) {
+        return "";
     }
 
     return rule_ids_str.trim_space();
@@ -2598,11 +2618,9 @@ FlowDirector::min_avg_max(float &min, float &mean, float &max, const bool instal
  * Performs a run-time consistency check with respect to the desired occupancy of the NIC.
  *
  * @args target_number_of_rules: desired NIC occupancy
- * @args int_vec: list of internal rule IDs to insert
- * @args glb_vec: list of global rule IDs to insert
  */
 void
-FlowDirector::rule_consistency_check(const int32_t &target_number_of_rules, const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec)
+FlowDirector::rule_consistency_check(const int32_t &target_number_of_rules)
 {
     if (target_number_of_rules < 0) {
         _errh->error(
@@ -2613,7 +2631,7 @@ FlowDirector::rule_consistency_check(const int32_t &target_number_of_rules, cons
     }
 
     // First check the flow rule cache
-    _flow_cache->cache_consistency_check(target_number_of_rules, int_vec, glb_vec);
+    _flow_cache->cache_consistency_check(target_number_of_rules);
 
     // Then the NIC with respect to the cache
     nic_consistency_check(target_number_of_rules);
@@ -2637,8 +2655,8 @@ FlowDirector::nic_consistency_check(const int32_t &target_number_of_rules)
     Vector<String> int_counters_vec = int_counters_str.split(' ');
     Vector<String> glb_vec = glb_str.split(' ');
 
-    _errh->message("%2d [CACHE] Internal rule IDs: %s", int_cache_vec.size(), flow_rule_ids_internal(false).c_str());
-    _errh->message("%2d   [NIC] Internal rule IDs: %s", int_vec.size(), flow_rule_ids_internal(true).c_str());
+    _errh->message("%2d [CACHE] Internal rule IDs: %s", int_cache_vec.size(), int_cache_str.c_str());
+    _errh->message("%2d   [NIC] Internal rule IDs: %s", int_vec.size(), int_str.c_str());
     _errh->message("%2d [COUNT] Internal rule IDs: %s", int_counters_vec.size(), int_counters_str.c_str());
     _errh->message("%2d [CACHE]   Global rule IDs: %s", glb_vec.size(), glb_str.c_str());
 

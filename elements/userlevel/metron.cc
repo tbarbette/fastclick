@@ -853,8 +853,13 @@ Metron::write_handler(
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         case h_add_rules_from_file: {
             int delim = data.find_left(' ');
+            // Only one argument was given
+            if (delim < 0) {
+                return errh->error("Handler add_rules_from_file requires 2 arguments <nic> <file-with-rules>");
+            }
+
+            // Parse and verify the first argument
             String nic_name = data.substring(0, delim).trim_space_left();
-            String filename = data.substring(delim + 1).trim_space_left();
 
             NIC *nic = m->get_nic_by_name(nic_name);
             if (!nic) {
@@ -865,6 +870,9 @@ Metron::write_handler(
                 return errh->error("Invalid NIC %s", nic_name.c_str());
             }
             portid_t port_id = fd->get_device()->get_port_id();
+
+            // NIC is valid, now parse the second argument
+            String filename = data.substring(delim + 1).trim_space_left();
 
             click_chatter("[NIC %d] Rule installation from file: %s", port_id, filename.c_str());
 
@@ -883,6 +891,46 @@ Metron::write_handler(
                 return ERROR;
             }
 
+            return SUCCESS;
+        }
+        case h_verify_nic: {
+            // Split input arguments
+            int delim = data.find_left(' ');
+            if (delim < 0) {
+                // Only one argument was given
+                delim = data.length();
+            }
+
+            // Parse and verify the first argument
+            String nic_name = data.substring(0, delim).trim_space_left();
+
+            NIC *nic = m->get_nic_by_name(nic_name);
+            if (!nic) {
+                return errh->error("Invalid NIC %s", nic_name.c_str());
+            }
+            FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(nic->element);
+            if (!fd) {
+                return errh->error("Invalid NIC %s", nic_name.c_str());
+            }
+            portid_t port_id = fd->get_device()->get_port_id();
+
+            // NIC is valid, now parse and verify the second argument
+            uint32_t rules_present = 0;
+            String sec_arg = data.substring(delim + 1).trim_space_left();
+            if (sec_arg.empty()) {
+                // User did not specify the number of rules, infer it automatically
+                rules_present = FlowDirector::get_flow_director(port_id)->flow_rules_count_explicit();
+            } else {
+                // User want to enforce the desired number of rules (assuming that he/she knows..)
+                rules_present = atoi(sec_arg.c_str());
+            }
+
+            click_chatter(
+                "Metron controller requested to verify the consistency of NIC %s (port %d) with %u rules present",
+                nic_name.c_str(), port_id, rules_present
+            );
+
+            FlowDirector::get_flow_director(port_id)->rule_consistency_check(rules_present);
             return SUCCESS;
         }
         case h_flush_nics: {
@@ -1311,6 +1359,7 @@ Metron::add_handlers()
     add_write_handler("delete_chains", write_handler, h_delete_chains);
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     add_write_handler("delete_rules",  write_handler, h_delete_rules);
+    add_write_handler("verify_nic",    write_handler, h_verify_nic);
     add_write_handler("flush_nics",    write_handler, h_flush_nics);
 #endif
     add_write_handler("delete_controllers", write_handler, h_delete_controllers);

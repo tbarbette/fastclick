@@ -627,7 +627,7 @@ int FromDPDKDevice::flow_handler(
             int core_id = atoi(queue_index_str.c_str());
 
             const uint32_t int_rule_id = flow_dir->get_flow_cache()->next_internal_rule_id();
-            if (flow_dir->flow_rule_install(int_rule_id, rule, (long) int_rule_id, core_id) != 0) {
+            if (flow_dir->flow_rule_install(int_rule_id, (long) int_rule_id, core_id, rule) != 0) {
                 return -1;
             }
 

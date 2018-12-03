@@ -691,7 +691,7 @@ class Metron : public Element {
         #endif
             h_put_chains, h_chains, h_chains_stats, h_chains_proxy,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-            h_chains_rules, h_add_rules_from_file,
+            h_chains_rules, h_add_rules_from_file, h_verify_nic,
         #endif
             h_delete_chains, h_delete_controllers,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)

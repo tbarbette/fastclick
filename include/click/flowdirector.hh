@@ -118,7 +118,7 @@ class FlowCache {
         inline uint32_t get_rule_counter() { return _rules_nb; };
         void initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
         void delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
-        void cache_consistency_check(const int32_t &target_number_of_rules, const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec);
+        void cache_consistency_check(const int32_t &target_number_of_rules);
         void correlate_candidate_id_with_cache(int32_t &candidate);
         void flush_rule_counters();
 
@@ -240,6 +240,7 @@ class FlowDirector {
         inline String rules_filename() { return _rules_filename; };
 
         // Calibrates flow rule cache before inserting new rules
+        void calibrate_cache(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
         void calibrate_cache(const HashMap<long, String> &rules_map);
 
         // Updates the internal ID for the next rule to be allocated
@@ -257,8 +258,9 @@ class FlowDirector {
         // Install flow rule(s) in a NIC
         int flow_rules_install(const String &rules, const uint32_t &rules_nb);
         int flow_rule_install(
-            const uint32_t &int_rule_id, const String &rule,
-            long rule_id, int core_id, const bool with_cache = true
+            const uint32_t &int_rule_id, const long &rule_id,
+            const int &core_id, const String &rule,
+            const bool with_cache = true
         );
 
         // Verify the presence/absence of a list of rules in/from the NIC
@@ -300,6 +302,9 @@ class FlowDirector {
 
         // Flush all of the rules from a NIC
         uint32_t flow_rules_flush();
+
+        // Verify the consistency of the NIC and Flow Cache upon a rule update
+        void rule_consistency_check(const int32_t &target_number_of_rules);
 
         // Filters unwanted components from rule
         static bool filter_rule(String &rule);
@@ -366,7 +371,6 @@ class FlowDirector {
         void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);
 
         // Verify that the NIC has the right number of rules
-        void rule_consistency_check(const int32_t &target_number_of_rules, const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec);
         void nic_consistency_check(const int32_t &target_number_of_rules);
 
 };
