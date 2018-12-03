@@ -620,6 +620,10 @@ Vector<String>
 String::split(char c) const
 {
     Vector<String> res;
+    if (empty()) {
+        return res;
+    }
+
     int pos = 0;
     const char *x = _r.data;
     while (pos < _r.length) {
@@ -633,9 +637,8 @@ String::split(char c) const
             break;
         }
     }
-    if (_r.length > 0) {
-        res.push_back(String(_r.data + pos, _r.length - pos, _r.memo));
-    }
+    res.push_back(String(_r.data + pos, _r.length - pos, _r.memo));
+
     return res;
 }
 

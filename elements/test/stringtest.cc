@@ -41,6 +41,7 @@ StringTest::initialize(ErrorHandler *errh)
     CHECK(String("HELLO").split(';').size() == 1);
     CHECK(String("HELLO").split(';')[0] == "HELLO");
     CHECK(String("HELLO;YOU").split(';').size() == 2);
+    CHECK(String("HELLO;YOU").split(';')[0] == "HELLO");
     CHECK(String("HELLO;YOU").split(';')[1] == "YOU");
 
     if (!errh->nerrors()) {
