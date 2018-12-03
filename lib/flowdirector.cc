@@ -2655,10 +2655,10 @@ FlowDirector::nic_consistency_check(const int32_t &target_number_of_rules)
     Vector<String> int_counters_vec = int_counters_str.split(' ');
     Vector<String> glb_vec = glb_str.split(' ');
 
-    _errh->message("%2d [CACHE] Internal rule IDs: %s", int_cache_vec.size(), int_cache_str.c_str());
-    _errh->message("%2d   [NIC] Internal rule IDs: %s", int_vec.size(), int_str.c_str());
-    _errh->message("%2d [COUNT] Internal rule IDs: %s", int_counters_vec.size(), int_counters_str.c_str());
-    _errh->message("%2d [CACHE]   Global rule IDs: %s", glb_vec.size(), glb_str.c_str());
+    _errh->message("[CACHE] %4d Internal rule IDs: %s", int_cache_vec.size(), int_cache_str.c_str());
+    _errh->message("  [NIC] %4d Internal rule IDs: %s", int_vec.size(), int_str.c_str());
+    _errh->message("[COUNT] %4d Internal rule IDs: %s", int_counters_vec.size(), int_counters_str.c_str());
+    _errh->message("[CACHE] %4d   Global rule IDs: %s", glb_vec.size(), glb_str.c_str());
 
     // Now the NIC
     uint32_t nic_rules = flow_rules_count_explicit();
