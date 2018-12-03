@@ -1078,8 +1078,8 @@ HashMap<int, String> FlowDirector::flow_item;
 HashMap<int, String> FlowDirector::flow_action;
 
 // Default verbosity settings
-bool FlowDirector::DEF_VERBOSITY = true;
-bool FlowDirector::DEF_DEBUG_MODE = true;
+bool FlowDirector::DEF_VERBOSITY = false;
+bool FlowDirector::DEF_DEBUG_MODE = false;
 
 // Global table of DPDK ports mapped to their Flow Director objects
 HashTable<portid_t, FlowDirector *> FlowDirector::dev_flow_dir;
