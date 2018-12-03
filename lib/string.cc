@@ -635,7 +635,9 @@ String::split(char c) const
             break;
         }
     }
-    res.push_back(String(_r.data + pos, _r.length - pos, _r.memo));
+    if (_r.length > 0) {
+        res.push_back(String(_r.data + pos, _r.length - pos, _r.memo));
+    }
     return res;
 }
 
