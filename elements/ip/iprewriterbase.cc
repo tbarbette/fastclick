@@ -71,14 +71,13 @@ IPMapper::rewrite_flowid(IPRewriterInput *, const IPFlowID &, IPFlowID &,
 //
 
 IPRewriterBase::IPRewriterBase()
-    : _gc_timer(), _set_aggregate(false)
+    : _state(), _set_aggregate(false)
 {
     _gc_interval_sec = default_gc_interval;
 
     _mem_units_no = (click_max_cpu_ids() == 0)? 1 : click_max_cpu_ids();
 
     // One heap and map per core
-    _map  = new Map[_mem_units_no];
     _heap = new IPRewriterHeap*[_mem_units_no];
     _timeouts  = new uint32_t*[_mem_units_no];
     for (unsigned i=0; i<_mem_units_no; i++) {
@@ -96,10 +95,6 @@ IPRewriterBase::~IPRewriterBase()
             _heap[i]->unuse();
         }
         delete [] _heap;
-    }
-
-    if (_map) {
-        delete [] _map;
     }
 
     if (_timeouts) {
@@ -251,11 +246,13 @@ IPRewriterBase::initialize(ErrorHandler *errh)
 	if (_input_specs[i].kind == IPRewriterInput::i_mapper)
 	    _input_specs[i].u.mapper->notify_rewriter(this, &_input_specs[i], &cerrh);
     }
-    for (int i = 0; i < _gc_timer.weight(); i ++) {
-        Timer& gc_timer = _gc_timer.get_value(i);
+
+    for (int i = 0; i < _state.weight(); i ++) {
+	    IPRewriterState &state = _state.get_value(i);
+        Timer& gc_timer = state.gc_timer;
         new(&gc_timer) Timer(gc_timer_hook, this); //Reconstruct as Timer does not allow assignment
         gc_timer.initialize(this);
-        gc_timer.move_thread(_gc_timer.get_mapping(i));
+        gc_timer.move_thread(_state.get_mapping(i));
         if (_gc_interval_sec)
             gc_timer.schedule_after_sec(_gc_interval_sec);
     }
@@ -276,7 +273,7 @@ IPRewriterBase::cleanup(CleanupStage)
 IPRewriterEntry *
 IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 {
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = _state->map.get(flowid);
     if (m && ip_p && m->flow()->ip_p() && m->flow()->ip_p() != ip_p)
 	return 0;
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
@@ -292,11 +289,12 @@ IPRewriterEntry *
 IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 			   Map &map, Map *reply_map_ptr)
 {
+	IPRewriterState &state = *_state;
     IPRewriterBase *reply_element = _input_specs[input].reply_element;
     if ((unsigned) flow->entry(false).output() >= (unsigned) noutputs()
 	|| (unsigned) flow->entry(true).output() >= (unsigned) reply_element->noutputs()) {
-	flow->owner()->owner->destroy_flow(flow);
-	return 0;
+	    flow->owner()->owner->destroy_flow(flow);
+	    return 0;
     }
 
     IPRewriterEntry *old = map.set(&flow->entry(false));
@@ -305,7 +303,7 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
     auto &heap = _heap[click_current_cpu_id()];
 
     if (!reply_map_ptr)
-	reply_map_ptr = &reply_element->_map[click_current_cpu_id()];
+	reply_map_ptr = &reply_element->_state->map;
     old = reply_map_ptr->set(&flow->entry(true));
     if (unlikely(old)) {		// Assume every map has the same heap.
 	if (likely(old->flow() != flow))

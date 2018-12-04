@@ -5,6 +5,7 @@
 #include "elements/ip/iprwmapping.hh"
 #include <click/batchelement.hh>
 #include <click/bitvector.hh>
+#include <click/multithread.hh>
 
 CLICK_DECLS
 class IPMapper;
@@ -80,6 +81,12 @@ class IPRewriterHeap { public:
 
 };
 
+/**
+ * Base for Rewriter elements
+ *
+ * Flows are kept in a Map, implemented by y a hashtable. That is for efficient flow lookup.
+ * For expiration, flows are kept in a heap.
+ */
 class IPRewriterBase : public BatchElement { public:
 
     typedef HashContainer<IPRewriterEntry> Map;
@@ -114,7 +121,7 @@ class IPRewriterBase : public BatchElement { public:
     }
     virtual HashContainer<IPRewriterEntry> *get_map(int mapid) {
 	return likely(mapid == IPRewriterInput::mapid_default) ?
-               &_map[click_current_cpu_id()] : 0;
+               &_state->map : 0;
     }
 
     enum {
@@ -138,13 +145,23 @@ class IPRewriterBase : public BatchElement { public:
 
     unsigned _mem_units_no;
 
-    Map *_map;
+    struct IPRewriterState {
+	IPRewriterState() : gc_timer(), rebalance(0), map_lock(), map() {
+
+	}
+	Timer gc_timer;
+	click_jiffies_t rebalance;
+	RWLock map_lock;
+	Map map;
+    };
+
+
     Vector<IPRewriterInput> _input_specs;
     IPRewriterHeap **_heap;
     uint32_t **_timeouts;
 
     uint32_t _gc_interval_sec;
-    per_thread<Timer> _gc_timer;
+    per_thread<IPRewriterState> _state;
 
     bool _set_aggregate;
 
@@ -220,7 +237,7 @@ IPRewriterInput::rewrite_flowid(const IPFlowID &flowid,
     case i_pattern: {
 	HashContainer<IPRewriterEntry> *reply_map;
 	if (likely(mapid == mapid_default))
-	    reply_map = &reply_element->_map[click_current_cpu_id()];
+	    reply_map = &reply_element->_state->map;
 	else
 	    reply_map = reply_element->get_map(mapid);
 	i = u.pattern->rewrite_flowid(flowid, rewritten_flowid, *reply_map);
@@ -242,9 +259,8 @@ inline void
 IPRewriterBase::unmap_flow(IPRewriterFlow *flow, Map &map,
 			   Map *reply_map_ptr)
 {
-    //click_chatter("kill %s", hashkey().s().c_str());
     if (!reply_map_ptr)
-	reply_map_ptr = &flow->owner()->reply_element->_map[click_current_cpu_id()];
+	reply_map_ptr = &flow->owner()->reply_element->_state->map;
 
     Map::iterator it = map.find(flow->entry(0).hashkey());
     if (it.get() == &flow->entry(0))

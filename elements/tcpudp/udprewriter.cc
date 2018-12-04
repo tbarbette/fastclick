@@ -6,7 +6,7 @@
  *
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2008-2010 Meraki, Inc.
- * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2016-2018 KTH Royal Institute of Technology
  * Copyright (c) 2017 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -139,7 +139,7 @@ UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
          relevant_timeout(_timeouts[click_current_cpu_id()]));
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, _state->map);
 }
 
 int
@@ -165,7 +165,8 @@ UDPRewriter::process(int port, Packet *p_in)
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+
+    IPRewriterEntry *m = _state->map.get(flowid);
 
     if (!m) {			// create new mapping
         IPRewriterInput &is = _input_specs.unchecked_at(port);
@@ -224,7 +225,7 @@ UDPRewriter::dump_mappings_handler(Element *e, void *)
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
     for (int i = 0; i < rw->_mem_units_no; i++) {
-        for (Map::iterator iter = rw->_map[i].begin(); iter.live(); ++iter) {
+        for (Map::iterator iter = rw->_state.get_value(i).map.begin(); iter.live(); ++iter) {
             iter->flow()->unparse(sa, iter->direction(), now);
             sa << '\n';
         }

@@ -136,7 +136,7 @@ class ICMPPingRewriter : public IPRewriterBase { public:
 inline void
 ICMPPingRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, _state->map);
     static_cast<ICMPPingFlow *>(flow)->~ICMPPingFlow();
     _allocator[click_current_cpu_id()].deallocate(flow);
 }

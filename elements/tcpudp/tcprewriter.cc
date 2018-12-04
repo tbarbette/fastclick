@@ -306,7 +306,7 @@ TCPRewriter::add_flow(int /*ip_p*/, const IPFlowID &flowid,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
          relevant_timeout(_timeouts[click_current_cpu_id()]));
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, _state->map);
 }
 
 int
@@ -331,7 +331,7 @@ TCPRewriter::process(int port, Packet *p_in)
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = _state->map.get(flowid);
 
     if (!m) {			// create new mapping
 	IPRewriterInput &is = _input_specs.unchecked_at(port);
@@ -388,7 +388,7 @@ TCPRewriter::tcp_mappings_handler(Element *e, void *)
     TCPRewriter *rw = (TCPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); ++iter) {
+    for (Map::iterator iter = rw->_state->map.begin(); iter.live(); ++iter) {
 	TCPFlow *f = static_cast<TCPFlow *>(iter->flow());
 	f->unparse(sa, iter->direction(), now);
 	sa << '\n';

@@ -172,7 +172,7 @@ class IPAddrRewriter : public IPRewriterBase { public:
 inline void
 IPAddrRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, _state->map);
     static_cast<IPAddrFlow *>(flow)->~IPAddrFlow();
     _allocator[click_current_cpu_id()].deallocate(flow);
 }

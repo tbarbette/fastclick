@@ -207,7 +207,7 @@ class TCPRewriter : public IPRewriterBase { public:
 inline void
 TCPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, _state->map);
     static_cast<TCPFlow *>(flow)->~TCPFlow();
     _allocator->deallocate(flow);
 }

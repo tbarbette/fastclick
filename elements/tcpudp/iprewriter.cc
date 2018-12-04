@@ -33,7 +33,7 @@
 #include <click/router.hh>
 CLICK_DECLS
 
-IPRewriter::IPRewriter() : _state()
+IPRewriter::IPRewriter() : _ipstate()
 {
 }
 
@@ -76,8 +76,8 @@ IPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     udp_timeouts[1] *= CLICK_HZ;
     udp_streaming_timeout *= CLICK_HZ; // IPRewriterBase handles the others
 
-    for (unsigned i=0; i<_state.weight(); i++) {
-        IPState& state = _state.get_value(i);
+    for (unsigned i=0; i<_ipstate.weight(); i++) {
+        IPState& state = _ipstate.get_value(i);
         state._udp_timeouts[0] = udp_timeouts[0];
         state._udp_timeouts[1] = udp_timeouts[1];
         state._udp_streaming_timeout = udp_streaming_timeout;
@@ -93,7 +93,7 @@ IPRewriter::get_entry(int ip_p, const IPFlowID &flowid, int input)
 	return TCPRewriter::get_entry(ip_p, flowid, input);
     if (ip_p != IP_PROTO_UDP)
 	return 0;
-    IPRewriterEntry *m = _state->_udp_map.get(flowid);
+    IPRewriterEntry *m = _ipstate->_udp_map.get(flowid);
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
 	IPRewriterInput &is = _input_specs[input];
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
@@ -110,7 +110,7 @@ IPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
     if (ip_p == IP_PROTO_TCP)
 	return TCPRewriter::add_flow(ip_p, flowid, rewritten_flowid, input);
 
-    void *data = _state->_udp_allocator.allocate();
+    void *data = _ipstate->_udp_allocator.allocate();
     if (!data) {
         click_chatter("[%s] [Core %d]: UDP Allocator failed", class_name(), click_current_cpu_id());
 	return 0;
@@ -119,10 +119,10 @@ IPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
     IPRewriterInput *rwinput = &_input_specs[input];
     IPRewriterFlow *flow = new(data) IPRewriterFlow
 	(rwinput, flowid, rewritten_flowid, ip_p,
-	 !!_state->_udp_timeouts[1],
-         click_jiffies() + relevant_timeout(_state->_udp_timeouts));
+	 !!_ipstate->_udp_timeouts[1],
+         click_jiffies() + relevant_timeout(_ipstate->_udp_timeouts));
 
-    return store_flow(flow, input, _state->_udp_map, &reply_udp_map(rwinput));
+    return store_flow(flow, input, _ipstate->_udp_map, &reply_udp_map(rwinput));
 }
 
 int
@@ -130,7 +130,7 @@ IPRewriter::process(int port, Packet *p_in)
 {
     WritablePacket *p = p_in->uniqueify();
     click_ip *iph = p->ip_header();
-    IPState &state = _state.get();
+    IPState &state = _ipstate.get();
 
     // handle non-first fragments
     if ((iph->ip_p != IP_PROTO_TCP && iph->ip_p != IP_PROTO_UDP)
@@ -145,7 +145,7 @@ IPRewriter::process(int port, Packet *p_in)
 
     IPFlowID flowid(p);
     HashContainer<IPRewriterEntry> *map = (iph->ip_p == IP_PROTO_TCP ?
-        &_map[click_current_cpu_id()] : &state._udp_map);
+        &_state->map : &state._udp_map);
     if ( !map ) {
         click_chatter("[%s] [Core %d]: UDP Map is NULL", class_name(), click_current_cpu_id());
     }
@@ -176,7 +176,7 @@ IPRewriter::process(int port, Packet *p_in)
     } else {
 	UDPFlow *udpmf = static_cast<UDPFlow *>(mf);
 	udpmf->apply(p, m->direction(), _annos);
-	if (_state->_udp_timeouts[1])
+	if (_ipstate->_udp_timeouts[1])
 	    udpmf->change_expiry(_heap[click_current_cpu_id()], true, now_j + state._udp_timeouts[1]);
 	else
 	    udpmf->change_expiry(_heap[click_current_cpu_id()], false, now_j + udp_flow_timeout(udpmf, state));
@@ -215,8 +215,8 @@ IPRewriter::udp_mappings_handler(Element *e, void *)
     IPRewriter *rw = (IPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (int i = 0; i < rw->_state.weight(); i++) {
-        for (Map::iterator iter = rw->_state.get_value(i)._udp_map.begin(); iter.live(); ++iter) {
+    for (int i = 0; i < rw->_ipstate.weight(); i++) {
+        for (Map::iterator iter = rw->_ipstate.get_value(i)._udp_map.begin(); iter.live(); ++iter) {
         iter->flow()->unparse(sa, iter->direction(), now);
         sa << '\n';
         }

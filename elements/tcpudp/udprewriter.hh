@@ -232,7 +232,7 @@ class UDPRewriter : public IPRewriterBase { public:
 inline void
 UDPRewriter::destroy_flow(IPRewriterFlow *flow)
 {
-    unmap_flow(flow, _map[click_current_cpu_id()]);
+    unmap_flow(flow, _state->map);
     flow->~IPRewriterFlow();
     _allocator->deallocate(flow);
 }

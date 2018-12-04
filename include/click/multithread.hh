@@ -645,7 +645,9 @@ class __rwlock : public RWLock { public:
 };
 
 /**
- * Read XOR Write lock. Allow either multiple reader or multiple
+ * Read XOR Write lock, "prefer read" variant
+ *
+ * Allow either multiple reader or multiple
  * writer. When a reader arrives, writers stop taking the usecount. The reader
  * has access once all writer finish.
  *
@@ -729,13 +731,15 @@ private:
 } CLICK_CACHE_ALIGN;
 
 /**
- * Read XOR Write lock. Allow either multiple reader or multiple
+ * Read XOR Write lock, "prefer write" variant
+ *
+ * Allow either multiple reader or multiple
  * writer. When a reader arrives, writers stop taking the usecount. The reader
  * has access once all writer finish.
  *
  * To stop writer from locking, the reader will CAS a very low value.
  *
- * If max_writer is 1, this becomes rwlock, but with a priority on the reads
+ * If max_writer is 1, this becomes rwlock, but with a priority on the write
  */
 
 class rXwlockPW { public:

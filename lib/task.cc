@@ -140,14 +140,14 @@ void
 Task::reschedule_notify(Element* e) {
     Bitvector b(_thread->master()->nthreads());
     b[_thread->thread_id()] = true;
-    e->trigger_thread_reconfiguration(true,[this](){this->reschedule();}, b);
+    e->trigger_thread_reconfiguration(true,[this](){this->reschedule();});
 }
 
 void
 Task::unschedule_notify(Element* e) {
     Bitvector b(_thread->master()->nthreads());
     b[_thread->thread_id()] = true;
-    e->trigger_thread_reconfiguration(false,[this](){unschedule();}, b);
+    e->trigger_thread_reconfiguration(false,[this](){unschedule();});
 }
 
 void

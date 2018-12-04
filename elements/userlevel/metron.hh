@@ -407,7 +407,8 @@ struct LatencyInfo {
 
 class CpuInfo {
     public:
-        CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0), latency(), _active(false) {
+        CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0),
+                    latency(), _active(false) {
             _active_time = Timestamp::now_steady();
         }
 

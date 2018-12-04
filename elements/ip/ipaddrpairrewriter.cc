@@ -120,7 +120,7 @@ IPRewriterEntry *
 IPAddrPairRewriter::get_entry(int, const IPFlowID &xflowid, int input)
 {
     IPFlowID flowid(xflowid.saddr(), 0, xflowid.daddr(), 0);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = _state->map.get(flowid);
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
 	IPRewriterInput &is = _input_specs[input];
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
@@ -145,7 +145,7 @@ IPAddrPairRewriter::add_flow(int, const IPFlowID &flowid,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
          relevant_timeout(_timeouts[click_current_cpu_id()]));
 
-    return store_flow(flow, input, _map[click_current_cpu_id()]);
+    return store_flow(flow, input, _state->map);
 }
 
 int
@@ -159,7 +159,7 @@ IPAddrPairRewriter::process(int port, Packet *p_in)
     click_ip *iph = p->ip_header();
 
     IPFlowID flowid(iph->ip_src, 0, iph->ip_dst, 0);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m = _state->map.get(flowid);
 
     if (!m) {			// create new mapping
 	IPRewriterInput &is = _input_specs.unchecked_at(port);
@@ -265,7 +265,7 @@ IPAddrPairRewriter::dump_mappings_handler(Element *e, void *)
     IPAddrPairRewriter *rw = (IPAddrPairRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (Map::iterator iter = rw->_map[click_current_cpu_id()].begin(); iter.live(); iter++) {
+    for (Map::iterator iter = rw->_state->map.begin(); iter.live(); iter++) {
 	IPAddrPairFlow *f = static_cast<IPAddrPairFlow *>(iter->flow());
 	f->unparse(sa, iter->direction(), now);
 	sa << '\n';
