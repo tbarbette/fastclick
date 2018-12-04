@@ -191,6 +191,11 @@ class Task : private TaskLink { public:
         _status.is_scheduled = false;
     }
 
+    /** @brief Unschedule the task, sending a notification
+     */
+
+    void unschedule_notify(Element* e);
+
     /** @brief Reschedule the task.
      *
      * The task is rescheduled on its home thread. It will eventually run,
@@ -204,6 +209,11 @@ class Task : private TaskLink { public:
         if (_pending_nextptr.x < 2)
             complete_schedule(0);
     }
+
+    /**
+     * @brief Reschedule the task, sending thread migration messages
+     */
+    void reschedule_notify(Element* e);
 
     /** @brief Reschedule a task from the task's callback function.
      *

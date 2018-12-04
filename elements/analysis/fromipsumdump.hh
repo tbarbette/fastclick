@@ -203,6 +203,7 @@ class FromIPSummaryDump : public BatchElement, public IPSummaryDumpInfo { public
     bool _timing : 1;
     bool _have_timing : 1;
     bool _allow_nonexistent : 1;
+    bool _migrate : 1;
     Packet *_work_packet;
     uint32_t _multipacket_length;
     Timestamp _multipacket_timestamp_delta;

@@ -76,6 +76,7 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _sampling_prob = (1 << SAMPLING_SHIFT);
     String default_contents, default_flowid, data;
     unsigned burst = 1;
+    bool migrate = false;
 
     if (Args(conf, this, errh)
         .read_p("FILENAME", FilenameArg(), _ff.filename())
@@ -96,6 +97,7 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("ALLOW_NONEXISTENT", allow_nonexistent)
         .read("DATA", data)
         .read("BURST", burst)
+        .read("MIGRATE", migrate)
     .complete() < 0)
     return -1;
     if (_sampling_prob > (1 << SAMPLING_SHIFT)) {
@@ -115,6 +117,7 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _multipacket = multipacket;
     _have_flowid = _have_aggregate = _binary = false;
     _burst = burst;
+    _migrate = migrate;
     if (default_contents)
     bang_data(default_contents, errh);
     if (default_flowid)
@@ -798,9 +801,18 @@ FromIPSummaryDump::write_handler(const String &s_in, Element *e, void *thunk, Er
       bool active;
       if (BoolArg().parse(s, active)) {
           fd->_active = active;
-          if (fd->output_is_push(0) && active && !fd->_task.scheduled())
-          fd->_task.reschedule();
-          else if (!fd->output_is_push(0))
+          if (fd->output_is_push(0)) {
+              if (active) {
+                  if (fd->_migrate)
+                      fd->_task.reschedule_notify(fd);
+                   else if (!fd->_task.scheduled())
+                      fd->_task.reschedule();
+              } else {
+                  if (fd->_migrate) {
+                      fd->_task.unschedule_notify(fd);
+                  }
+              }
+          } else if (!fd->output_is_push(0))
           fd->_notifier.set_active(active, true);
           return 0;
       } else
