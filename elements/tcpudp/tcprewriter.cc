@@ -331,7 +331,7 @@ TCPRewriter::process(int port, Packet *p_in)
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m = _state->map.get(flowid);
+    IPRewriterEntry *m = search_entry(flowid);
 
     if (!m) {			// create new mapping
 	IPRewriterInput &is = _input_specs.unchecked_at(port);

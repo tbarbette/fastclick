@@ -96,6 +96,7 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 	has_udp_streaming_timeout, has_streaming_timeout;
     int reply_anno;
     uint32_t timeouts[2];
+    bool handle_migration = false;
     timeouts[0] = 300;		// 5 minutes
     timeouts[1] = default_guarantee;
 
@@ -107,6 +108,7 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("UDP_STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_udp_streaming_timeout)
 	.read("STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_streaming_timeout)
 	.read("UDP_GUARANTEE", SecondsArg(), timeouts[1])
+    .read("HANDLE_MIGRATION", handle_migration)
 	.consume() < 0)
 	return -1;
 
@@ -122,6 +124,8 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
         }
     }
     _udp_streaming_timeout *= CLICK_HZ; // IPRewriterBase handles the others
+
+    _handle_migration = handle_migration;
 
     return IPRewriterBase::configure(conf, errh);
 }
@@ -166,7 +170,7 @@ UDPRewriter::process(int port, Packet *p_in)
 
     IPFlowID flowid(p);
 
-    IPRewriterEntry *m = _state->map.get(flowid);
+    IPRewriterEntry *m = search_entry(flowid);
 
     if (!m) {			// create new mapping
         IPRewriterInput &is = _input_specs.unchecked_at(port);

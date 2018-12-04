@@ -1278,7 +1278,7 @@ Router::initialize(ErrorHandler *errh)
             assert(element_stage[i] == Element::CLEANUP_INITIALIZED);
             RouterContextErrh cerrh(errh, "While thread initalizing", element(i));
             assert(!cerrh.nerrors());
-            if (_elements[i]->thread_configure(Element::THREAD_INITIALIZE, &cerrh) >= 0) {
+            if (_elements[i]->thread_configure(Element::THREAD_INITIALIZE, &cerrh, Bitvector(master()->nthreads())) >= 0) {
                 element_stage[i] = Element::CLEANUP_THREAD_INITIALIZED;
             } else {
                 // don't report 'unspecified error' for ErrorElements:

@@ -71,7 +71,7 @@ IPMapper::rewrite_flowid(IPRewriterInput *, const IPFlowID &, IPFlowID &,
 //
 
 IPRewriterBase::IPRewriterBase()
-    : _state(), _set_aggregate(false)
+    : _state(), _set_aggregate(false), _handle_migration(false)
 {
     _gc_interval_sec = default_gc_interval;
 
@@ -273,13 +273,28 @@ IPRewriterBase::cleanup(CleanupStage)
 IPRewriterEntry *
 IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 {
-    IPRewriterEntry *m = _state->map.get(flowid);
+    //We do not need to get a reference because we are the only writer
+    IPRewriterEntry *m = search_entry(flowid);
+
+
     if (m && ip_p && m->flow()->ip_p() && m->flow()->ip_p() != ip_p)
 	return 0;
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
-	IPRewriterInput &is = _input_specs[input];
-	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
-	if (is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap)
+
+	    IPFlowID rewritten_flowid;
+
+        if (_handle_migration)
+            m = search_migrate_entry(flowid);
+
+        if (m) {
+            rewritten_flowid = m->rewritten_flowid();
+        } else {
+	        IPRewriterInput &is = _input_specs[input];
+            rewritten_flowid = IPFlowID::uninitialized_t();
+	        if (!is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap) {
+                return 0;
+            }
+        }
 	    m = add_flow(ip_p, flowid, rewritten_flowid, input);
     }
     return m;
@@ -297,7 +312,9 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 	    return 0;
     }
 
+	state.map_lock.write_begin();
     IPRewriterEntry *old = map.set(&flow->entry(false));
+	state.map_lock.write_end();
     assert(!old);
 
     auto &heap = _heap[click_current_cpu_id()];
@@ -331,10 +348,17 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 	}
     }
 
-    if (map.unbalanced())
-	map.rehash(map.bucket_count() + 1);
-    if (reply_map_ptr != &map && reply_map_ptr->unbalanced())
-	reply_map_ptr->rehash(reply_map_ptr->bucket_count() + 1);
+    if (map.unbalanced()) {
+              state.map_lock.write_begin();
+              map.rehash(map.bucket_count() + 1);
+              state.map_lock.write_end();
+    }
+    if (reply_map_ptr != &map && reply_map_ptr->unbalanced()) {
+              state.map_lock.write_begin();
+          reply_map_ptr->rehash(reply_map_ptr->bucket_count() + 1);
+              state.map_lock.write_begin();
+    }
+
     return &flow->entry(false);
 }
 
@@ -348,6 +372,30 @@ IPRewriterBase::shift_heap_best_effort(click_jiffies_t now_j)
 	click_jiffies_t new_expiry = mf->owner()->owner->best_effort_expiry(mf);
 	mf->change_expiry(_heap[click_current_cpu_id()], false, new_expiry);
     }
+}
+
+int IPRewriterBase::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
+	click_jiffies_t jiffies = click_jiffies();
+	if (stage == THREAD_RECONFIGURE_UP_PRE) {
+		for (int i = 0; i < threads.size(); i++) {
+			if (!threads[i])
+				continue;
+            click_chatter("NAT : thread %d now activated. It will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
+			IPRewriterState &tstate = _state.get_value_for_thread(i);
+			tstate.rebalance = jiffies;
+		}
+	} else if (stage == THREAD_RECONFIGURE_DOWN_PRE){
+		for (int i = 0; i < threads.size(); i++) {
+			IPRewriterState &tstate = _state.get_value_for_thread(i);
+			if (threads[i]) {
+                click_chatter("NAT : thread %d now deactivated");
+            } else {
+                click_chatter("NAT : thread %d will fetch unknown flows from neighbour for %sms", THREAD_MIGRATION_TIMEOUT);
+            }
+			tstate.rebalance = jiffies;
+		}
+	}
+	return 0;
 }
 
 bool

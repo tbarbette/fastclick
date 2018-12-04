@@ -49,7 +49,7 @@ ExactCPUSwitch::initialize(ErrorHandler* errh) {
 
 
 int
-ExactCPUSwitch::thread_configure(ThreadReconfigurationStage, ErrorHandler* errh) {
+ExactCPUSwitch::thread_configure(ThreadReconfigurationStage, ErrorHandler* errh, Bitvector threads) {
     update_map();
     return 0;
 }

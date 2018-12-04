@@ -61,7 +61,7 @@ class IPRewriterHeap { public:
     }
 
     Vector<IPRewriterFlow *>::size_type size() const {
-	return _heaps[0].size() + _heaps[1].size();
+	    return _heaps[0].size() + _heaps[1].size();
     }
     int32_t capacity() const {
 	return _capacity;
@@ -80,6 +80,8 @@ class IPRewriterHeap { public:
     friend class IPRewriterFlow;
 
 };
+
+#define THREAD_MIGRATION_TIMEOUT 10000
 
 /**
  * Base for Rewriter elements
@@ -107,6 +109,8 @@ class IPRewriterBase : public BatchElement { public:
     const char *port_count() const	{ return "1-/1-"; }
     const char *processing() const	{ return PUSH; }
 
+    int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) override;
+
     int configure_phase() const		{ return CONFIGURE_PHASE_REWRITER; }
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
@@ -127,8 +131,14 @@ class IPRewriterBase : public BatchElement { public:
     enum {
 	get_entry_check = -1, get_entry_reply = -2
     };
+
+    inline IPRewriterEntry *search_entry(const IPFlowID &flowid);
+    inline IPRewriterEntry *search_migrate_entry(const IPFlowID &flowid);
+
     virtual IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid,
 				       int input);
+
+    inline void add_flow_timeout(IPRewriterFlow *flow);
     virtual IPRewriterEntry *add_flow(int ip_p, const IPFlowID &flowid,
 				      const IPFlowID &rewritten_flowid,
 				      int input) = 0;
@@ -147,12 +157,11 @@ class IPRewriterBase : public BatchElement { public:
 
     struct IPRewriterState {
 	IPRewriterState() : gc_timer(), rebalance(0), map_lock(), map() {
-
-	}
-	Timer gc_timer;
-	click_jiffies_t rebalance;
-	RWLock map_lock;
-	Map map;
+	    }
+	    Timer gc_timer;
+	    click_jiffies_t rebalance;
+	    RWLock map_lock;
+	    Map map;
     };
 
 
@@ -164,6 +173,7 @@ class IPRewriterBase : public BatchElement { public:
     per_thread<IPRewriterState> _state;
 
     bool _set_aggregate;
+    bool _handle_migration;
 
     enum {
 	default_timeout = 300,	   // 5 minutes
@@ -269,6 +279,35 @@ IPRewriterBase::unmap_flow(IPRewriterFlow *flow, Map &map,
     it = reply_map_ptr->find(flow->entry(1).hashkey());
     if (it.get() == &flow->entry(1))
 	reply_map_ptr->erase(it);
+}
+
+inline IPRewriterEntry *
+IPRewriterBase::search_entry(const IPFlowID &flowid)
+{
+    return _state->map.get(flowid);
+}
+
+inline IPRewriterEntry *
+IPRewriterBase::search_migrate_entry(const IPFlowID &flowid)
+{
+    //If the flow does not exist, it may be in other thread's stack if there was a migration
+    if (_state->rebalance > 0 && click_jiffies() - _state->rebalance < THREAD_MIGRATION_TIMEOUT * CLICK_HZ ) {
+        //Search in other thread's stacks for the flow
+        for (int i = 0; i < _state.weight(); i++) {
+            if (_state.get_mapping(i) == click_current_cpu_id())
+                continue;
+            IPRewriterState* tstate = &_state.get_value(i);
+            tstate->map_lock.read_begin();
+            IPRewriterEntry *m = tstate->map.get(flowid);
+            tstate->map_lock.read_end();
+            if (m) {
+                click_chatter("Recovered flow from stack of thread %d", i);
+                //add_flow_timeout(m):
+                return m;
+            }
+        }
+    }
+    return 0;
 }
 
 CLICK_ENDDECLS

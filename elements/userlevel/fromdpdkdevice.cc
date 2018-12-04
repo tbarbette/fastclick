@@ -554,6 +554,8 @@ int FromDPDKDevice::write_handler(
                 return errh->error("Not a valid boolean");
             if (fd->_active != active) {
                 fd->_active = active;
+                Bitvector b(fd->router()->master()->nthreads());
+                fd->get_spawning_threads(b, true, -1);
                 if (fd->_active) { //Activating
                     fd->trigger_thread_reconfiguration(true,[fd,thunk](){
                         for (int i = 0; i < fd->usable_threads.weight(); i++) {
@@ -564,7 +566,7 @@ int FromDPDKDevice::write_handler(
                             if (!fd->_fdstate.get_value(i).timer->scheduled())
                                 fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
                         }
-                    });
+                    }, b);
                 } else { //Deactivating
                     fd->trigger_thread_reconfiguration(false,[fd](){
                         for (int i = 0; i < fd->usable_threads.weight(); i++) {
@@ -576,7 +578,7 @@ int FromDPDKDevice::write_handler(
                             if (fd->_fdstate.get_value(i).timer->scheduled())
                                 fd->_fdstate.get_value(i).timer->unschedule();
                         }
-                    });
+                    }, b);
                 }
             }
             return 0;

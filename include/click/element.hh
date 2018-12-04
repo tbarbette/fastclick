@@ -175,6 +175,8 @@ class Element { public:
     Bitvector get_passing_threads(Element* origin, int level = 0);
     Bitvector get_passing_threads();
 
+    Bitvector get_spawning_threads();
+
     int home_thread_id() const;
     virtual bool is_mt_safe();
     virtual bool do_mt_safe_check(ErrorHandler*);
@@ -188,8 +190,8 @@ class Element { public:
         THREAD_RECONFIGURE_DOWN_POST,
     };
 
-    virtual int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh);
-    void trigger_thread_reconfiguration(bool is_up, std::function<void()> ready);
+    virtual int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads);
+    void trigger_thread_reconfiguration(bool is_up, std::function<void()> ready, Bitvector threads);
 
     //Deprecated name, implement get_spawning_threads
     virtual bool get_runnable_threads(Bitvector&) final = delete;

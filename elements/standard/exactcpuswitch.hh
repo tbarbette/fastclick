@@ -28,7 +28,7 @@ class ExactCPUSwitch : public BatchElement {
   const char *processing() const		{ return PUSH; }
 
   int initialize(ErrorHandler* errh) override CLICK_COLD;
-  int thread_configure(ThreadReconfigurationStage, ErrorHandler*) override CLICK_COLD;
+  int thread_configure(ThreadReconfigurationStage, ErrorHandler*, Bitvector threads) override CLICK_COLD;
   bool get_spawning_threads(Bitvector& b, bool, int) override;
 
   void update_map();

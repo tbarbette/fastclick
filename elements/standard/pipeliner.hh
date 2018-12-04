@@ -42,7 +42,7 @@ public:
     const char *processing() const      { return PUSH; }
 
     int configure(Vector<String>&, ErrorHandler*) override CLICK_COLD;
-    int thread_configure(ThreadReconfigurationStage, ErrorHandler*) override CLICK_COLD;
+    int thread_configure(ThreadReconfigurationStage, ErrorHandler*, Bitvector threads) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;
 
     void cleanup(CleanupStage);
