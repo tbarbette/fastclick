@@ -301,8 +301,7 @@ IPRewriterBase::search_migrate_entry(const IPFlowID &flowid)
             IPRewriterEntry *m = tstate->map.get(flowid);
             tstate->map_lock.read_end();
             if (m) {
-                click_chatter("Recovered flow from stack of thread %d", i);
-                //add_flow_timeout(m):
+                //click_chatter("Recovered flow from stack of thread %d", i);
                 return m;
             }
         }
