@@ -3,6 +3,9 @@ Test UDPRewriter support for state migration
 
 Packets are handled on thread 0, the thread 1 starts sending the same set of packet. Normally, in the normal IMP version the packets would be handled as new packets. With thread migration, before activating on thread 1, the source will send a message to downstream elements to prepare for migration. UDPRewriter should therefore find the mapping of thread 0 even on thread 1.
 
+%require
+click-buildtool provides umultithread
+
 %script
 
 $VALGRIND click -j 2 -e "

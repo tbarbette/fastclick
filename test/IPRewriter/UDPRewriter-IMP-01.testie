@@ -3,6 +3,11 @@ Test that UDPRewriter in its IMP version is isolated between threads
 
 This configuration is not practical. The same pattern is used for all threads, so it's impossible to find which threads should handle the return packet. See ThreadIPMapper for a realistic version.
 
+%require
+click-buildtool provides umultithread
+
+
+
 %script
 
 $VALGRIND click -j 2 -e "

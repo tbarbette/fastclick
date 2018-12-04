@@ -2,6 +2,9 @@
 
 TCPRewriter state migration
 
+%require
+click-buildtool provides umultithread
+
 %script
 $VALGRIND click -j 2 -e "
 rw :: TCPRewriter(pattern 1.0.0.24 1044-65535# - - 0 0, HANDLE_MIGRATION true)
