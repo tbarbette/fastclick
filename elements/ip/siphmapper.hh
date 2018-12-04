@@ -19,7 +19,7 @@ CLICK_DECLS
  * IPMapper interface.
  *
  * Like RoundRobinIPMapper, but also uses consistent hashing to map
- * map elements by source IP to the same node in the cluster, even
+ * elements by source IP to the same node in the cluster, even
  * if nodes are added or removed.
  *
  *
