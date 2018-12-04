@@ -1678,7 +1678,7 @@ FlowDirector::flow_rules_install(const String &rules, const uint32_t &rules_nb)
     if (res >= 0) {
         // Workaround DPDK's deficiency to report rule installation issues
         if ((rules_before + rules_nb) != rules_after) {
-            _errh->message("Flow installation FAILED : Has %d rules, expected %d", rules_after, rules_before + rules_nb);
+            _errh->message("Flow Director (port %u): Flow installation failed - Has %" PRIu32 ", but expected %" PRIu32 " rules", _port_id, rules_after, rules_before + rules_nb);
             return FLOWDIR_ERROR;
         } else {
             _errh->message("Flow Director (port %u): Parsed and installed a batch of %d rules", _port_id, rules_nb);
@@ -1703,12 +1703,12 @@ FlowDirector::flow_rules_install(const String &rules, const uint32_t &rules_nb)
             break;
     }
 
-    // Kill the agent even if 1 rule failed to be installed
     if ((rules_before + rules_nb) != rules_after) {
         _errh->error("Flow Director (port %u): Partially installed %" PRIu32 "/%" PRIu32 " rules", _port_id, (rules_after - rules_before), rules_nb);
     }
     _errh->error("Flow Director (port %u): Failed to parse rules due to %s", _port_id, error.c_str());
-    assert((rules_before + rules_nb) == rules_after);
+
+    return FLOWDIR_ERROR;
 }
 
 /**
