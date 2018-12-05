@@ -15,7 +15,7 @@ rw :: UDPRewriter(pattern 1.0.0.1 1024-65535# - - 0 1, drop);
 f1 :: FromIPSummaryDump(IN1, STOP true)
 	-> [0]rw;
 
-f2 :: FromIPSummaryDump(IN1, STOP true)
+f2 :: FromIPSummaryDump(IN1, STOP true, ACTIVE false)
 	-> [0]rw;
 
 ret1 :: FromIPSummaryDump(IN2, STOP true, ACTIVE false)
@@ -29,7 +29,7 @@ rw[1] -> ToIPSummaryDump(OUT2, FIELDS thread src sport dst dport proto);
 
 StaticThreadSched(f1 0, f2 1, ret1 0, ret2 1);
 
-DriverManager(pause, pause, write ret1.active true, pause, write ret2.active true, pause);
+DriverManager(pause, write f2.active true, pause, write ret1.active true, pause, write ret2.active true, pause);
 "
 
 %file IN1
