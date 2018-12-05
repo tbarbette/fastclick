@@ -90,6 +90,8 @@ class Packet { public:
                                 void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
 #endif //CLICK_USERLEVEL || CLICK_MINIOS
 
+
+    static int max_data_pool_size();
     static void static_cleanup();
 
     inline void kill();
@@ -1691,10 +1693,10 @@ Packet::kill()
 			b->list = 0;
 		# endif
 		skbmgr_recycle_skbs(b);
-    #elif CLICK_PACKET_USE_DPDK
+	#elif CLICK_PACKET_USE_DPDK
 		//Dpdk takes care of indirect and related things
-        rte_pktmbuf_free(mb());
-	#elif HAVE_CLICK_PACKET_POOL
+		rte_pktmbuf_free(mb());
+	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
 		if (_use_count.dec_and_test()) {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
@@ -1851,6 +1853,19 @@ Packet::shared_nonatomic() const
 }
 
 
+class PacketRef {
+public:
+    PacketRef(Packet* p) : _p(p->clone()) { }
+    ~PacketRef() { if (_p) _p->kill(); }
+    Packet* release() {
+        Packet* tmp = _p;
+        _p = NULL;
+        return tmp;
+    }
+private:
+    Packet* _p;
+};
+
 /** @brief Return an unshared packet containing this packet's data.
  * @return the unshared packet, which is writable
  *
@@ -1877,6 +1892,9 @@ Packet::shared_nonatomic() const
 inline WritablePacket *
 Packet::uniqueify()
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     if (!shared())
 	return static_cast<WritablePacket *>(this);
     else
@@ -1886,6 +1904,9 @@ Packet::uniqueify()
 inline WritablePacket *
 Packet::push(uint32_t len)
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     if (headroom() >= len && !shared()) {
         WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
@@ -1952,6 +1973,9 @@ Packet::pull(uint32_t len)
 inline WritablePacket *
 Packet::put(uint32_t len)
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     if (tailroom() >= len && !shared()) {
 	WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
@@ -2189,6 +2213,9 @@ Packet::clear_mac_header()
 inline WritablePacket *
 Packet::push_mac_header(uint32_t len)
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     WritablePacket *q;
     if (headroom() >= len && !shared()) {
 	q = (WritablePacket *)this;

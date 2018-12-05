@@ -9,6 +9,11 @@
  *   sudo bin/click -c 0x1 -n 4 -- conf/fastclick/pktgen-l3.click L=60 S=1000000 N=100
  */
 
+//Default values for packet length, number of packets and amountfs of time to replay them
+define($L 60, $N 100, $S 100000);
+
+
+
 /*You do not need to change the mac address as we run in promisc, but you need
  to set the srcip, gateway ip and dstip correctly */
 define($smac 90:e2:ba:c3:79:66)

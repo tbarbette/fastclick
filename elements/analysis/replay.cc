@@ -23,7 +23,7 @@
 #include <click/standard/scheduleinfo.hh>
 CLICK_DECLS
 
-ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1), _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _lastsent_p(), _lastsent_real() {
+ReplayBase::ReplayBase() : _active(true), _loaded(false), _burst(64), _stop(-1),_stop_time(0),  _quick_clone(false), _task(this), _limit(-1), _queue_head(0), _queue_current(0), _use_signal(false),_verbose(false),_freeonterminate(true), _timing_packet(), _timing_real(), _startsent(), _fnt_expr() {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
 #endif
@@ -38,6 +38,7 @@ ReplayBase::~ReplayBase()
  */
 int ReplayBase::parse(Args* args) {
     if (args->read("STOP", _stop)
+             .read("STOP_TIME", _stop_time)
              .read("QUICK_CLONE", _quick_clone)
              .read("BURST", _burst)
              .read("VERBOSE", _verbose)
@@ -54,8 +55,12 @@ int ReplayBase::parse(Args* args) {
 
 void ReplayBase::reset_time() {
     if (_queue_current) {
-        _lastsent_p = _queue_current->timestamp_anno();
-        _lastsent_real = Timestamp::now_steady();
+        _timing_packet = _queue_current->timestamp_anno();
+        _timing_real = Timestamp::now_steady();
+        _lastsent_packet = _timing_packet;
+        _lastsent_real = _timing_real;
+        if (!_startsent)
+            _startsent = _timing_real;
     }
 }
 
@@ -190,6 +195,7 @@ Replay::run_task(Task* task)
     if (_stop == 0) {
         router()->please_stop_driver();
         _active = false;
+        _startsent = Timestamp();
         return false;
     }
 
@@ -233,14 +239,34 @@ ReplayUnqueue::~ReplayUnqueue()
 int
 ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    String timing_fnt = "";
     Args args(conf, this, errh);
     if (ReplayBase::parse(&args) != 0)
         return -1;
     if (args
         .read("USE_SIGNAL",_use_signal)
         .read("TIMING", _timing)
+        .read("TIMING_FNT", timing_fnt)
         .complete() < 0)
         return -1;
+
+    if (timing_fnt != "" && _stop_time > 0) {
+        String max = String(_timing); //Max replay timing
+        String min = "1"; //Min replay timing
+        String time = String(_stop_time);
+
+        if (timing_fnt == "@0")
+            return 0; //Contant, no fnt
+        if (timing_fnt == "@1") {
+            timing_fnt = "(sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+            click_chatter("Using function '%s'", timing_fnt.c_str());
+        } else if (timing_fnt == "@2")
+            timing_fnt = "(squarewave(((x + 20 / 2) * 1/20) ^ 2.5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+        _fnt_expr = TinyExpr::compile(timing_fnt, 1);
+
+    }
+
+
     return 0;
 }
 
@@ -249,6 +275,11 @@ ReplayUnqueue::initialize(ErrorHandler * errh) {
     _input.resize(1);
     _input[0].signal = Notifier::upstream_empty_signal(this, 0, (Task*)NULL);
     ScheduleInfo::initialize_task(this,&_task,true,errh);
+
+    if (_fnt_expr) {
+        _timing = _fnt_expr.eval(0);
+    }
+
     return 0;
 }
 
@@ -264,6 +295,7 @@ ReplayUnqueue::run_task(Task* task)
     if (_stop == 0) {
         router()->please_stop_driver();
         _active = false;
+        _startsent = Timestamp();
         return false;
     }
 
@@ -284,10 +316,9 @@ ReplayUnqueue::run_task(Task* task)
                 const unsigned min_timing = 1; //Amount of us between packets to ignore and sent right away
                 const unsigned min_sched = 10; //Amount of us that leads to rescheduling
 
-                Timestamp tdiff = p->timestamp_anno() - _lastsent_p;
-                long diff = tdiff.usecval();
+                long diff;
                 long rdiff;
-                while (diff - (rdiff = ((long)(now - _lastsent_real).usecval() * _timing)) > min_timing) {
+                while ((diff = (p->timestamp_anno() - _timing_packet).usecval()) - (rdiff = ((long)(now - _timing_real).usecval() * _timing)) > min_timing) {
 #if HAVE_BATCH
                     if (head) {
                         output_push_batch(0,head->make_tail(last,c));
@@ -295,9 +326,22 @@ ReplayUnqueue::run_task(Task* task)
                         c = 0;
                     }
 #endif
-                    if (diff - rdiff > min_sched) {
-                        goto end;
+                    if (_fnt_expr != 0) {
+                        Timestamp diff_s = now - _startsent; //x is the seconds since the beginning of the sending
+                        float nt = _fnt_expr.eval((float)diff_s.msecval() / 1000);
+                        if (_timing != (unsigned)nt) {
+                            _timing = nt;
+                            _timing_packet = _lastsent_packet;
+                            _timing_real = _lastsent_real;
+                            click_chatter("Timing is %f -> %d", nt, _timing);
+                        } else {
+                            goto loop;
+                        }
                     }
+                    if (diff - rdiff > min_sched) {
+                            goto end;
+                    }
+loop:
                     now = Timestamp::now_steady();
                     click_relax_fence();
                 }
@@ -311,7 +355,8 @@ ReplayUnqueue::run_task(Task* task)
                 q = p;
                 _queue_head = _queue_current;
             }
-
+            _lastsent_packet = p->timestamp_anno();
+            _lastsent_real = now;
 #if HAVE_BATCH
             if (head == 0) {
                 head = PacketBatch::start_head(q);

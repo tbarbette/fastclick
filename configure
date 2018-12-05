@@ -869,6 +869,8 @@ enable_task_heap
 enable_task_stats
 enable_cpu_load
 enable_dmalloc
+enable_hash_iterator_epochs
+enable_force_expensive
 enable_valgrind
 enable_schedule_debugging
 enable_intel_cpu
@@ -1591,6 +1593,10 @@ Optional Features:
   --enable-cpu-load       Keep track of CPU usage using an approximation.
                           Useful when using polling keeping the CPU at 100%
   --enable-dmalloc        enable debugging malloc
+  --enable-hash-iterator-epochs
+                          hash iterator epoch
+  --enable-force-expensive
+                          force expensive packet operations
   --enable-valgrind       extra support for debugging with valgrind
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
                           (no/yes/extra) [yes]
@@ -10867,7 +10873,6 @@ else
 =========================================" "$LINENO" 5
 fi
 
-
 # Check whether --enable-stride was given.
 if test "${enable_stride+set}" = set; then :
   enableval=$enable_stride; :
@@ -10943,7 +10948,6 @@ if test $enable_dmalloc = yes; then
 $as_echo "#define CLICK_DMALLOC 1" >>confdefs.h
 
 fi
-
 
 
 # Check whether --enable-valgrind was given.

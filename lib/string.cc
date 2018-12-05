@@ -611,17 +611,19 @@ String::find_left(char c, int start) const
     return -1;
 }
 
-/** @brief Search for a character in a string.
- * @param c character to search for
- * @param start initial search position
+/** @brief Split a string using an input character as a delimiter.
+ * The outcome of the split is a vector of tokens.
+ * @param c character to use as a delimiter
  *
- * Return the index of the leftmost occurence of @a c, starting at index
- * @a start and working up to the end of the string.  Returns -1 if @a c
- * is not found. */
+ * Return a vector of tokens or an empty vector if no such delimiter exists. */
 Vector<String>
 String::split(char c) const
 {
     Vector<String> res;
+    if (empty()) {
+        return res;
+    }
+
     int pos = 0;
     const char *x = _r.data;
     while (pos < _r.length) {
@@ -636,6 +638,7 @@ String::split(char c) const
         }
     }
     res.push_back(String(_r.data + pos, _r.length - pos, _r.memo));
+
     return res;
 }
 

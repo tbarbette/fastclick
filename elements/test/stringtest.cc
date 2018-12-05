@@ -1,9 +1,9 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * bitvectortest.{cc,hh} -- regression test element for Bitvector
- * Eddie Kohler
+ * stringtest.{cc,hh} -- regression test element for String
+ * Tom Barbette
  *
- * Copyright (c) 2012 Eddie Kohler
+ * Copyright (c) 2018 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -18,33 +18,39 @@
 
 #include <click/config.h>
 #include "stringtest.hh"
-#include <click/string.hh>
+#include <click/glue.hh>
+#include <click/straccum.hh>
 #include <click/error.hh>
-#include <click/vector.hh>
 CLICK_DECLS
+
 
 StringTest::StringTest()
 {
 }
 
-#define CHECK(x) if (!(x)) return errh->error("%s:%d: test %<%s%> failed", __FILE__, __LINE__, #x);
+#define CHECK(x) if (!(x)) return errh->error("%s:%d: test `%s' failed", __FILE__, __LINE__, #x);
 
 int
 StringTest::initialize(ErrorHandler *errh)
 {
-    String s;
-    CHECK(s.length() == 0);
+    String empty = "";
+    CHECK(empty == String::make_empty());
 
-    s = "a simple string";
-    Vector<String> v = s.split(' ');
-    CHECK(v.size() == 3);
-    CHECK(v[0] == "a");
-    CHECK(v[1] == "simple");
-    CHECK(v[2] == "string");
+    //Split test
+    CHECK(empty.split(';').size() == 0);
+    CHECK(String("HELLO").split(';').size() == 1);
+    CHECK(String("HELLO").split(';')[0] == "HELLO");
+    CHECK(String("HELLO;YOU").split(';').size() == 2);
+    CHECK(String("HELLO;YOU").split(';')[0] == "HELLO");
+    CHECK(String("HELLO;YOU").split(';')[1] == "YOU");
 
-    errh->message("All tests pass!");
-    return 0;
+    if (!errh->nerrors()) {
+    	errh->message("All tests pass!");
+		return 0;
+    } else
+    	return -1;
 }
 
 EXPORT_ELEMENT(StringTest)
+ELEMENT_REQUIRES(userlevel)
 CLICK_ENDDECLS

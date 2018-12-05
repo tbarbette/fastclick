@@ -23,6 +23,9 @@ class HashContainer_rep : public A {
     mutable uint32_t first_bucket;
     size_t size;
     libdivide_u32_t bucket_divider;
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    unsigned epoch;
+#endif
     friend class HashContainer<T, A>;
     friend class HashContainer_const_iterator<T, A>;
     friend class HashContainer_iterator<T, A>;
@@ -310,28 +313,43 @@ class HashContainer_const_iterator { public:
 
     /** @brief Return a pointer to the element, null if *this == end(). */
     T *get() const {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	assert(!_element || _hc->_rep.epoch == _epoch);
+#endif
 	return _element;
     }
 
     /** @brief Return a pointer to the element, null if *this == end(). */
     T *operator->() const {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	assert(!_element || _hc->_rep.epoch == _epoch);
+#endif
 	return _element;
     }
 
     /** @brief Return a reference to the element.
      * @pre *this != end() */
     T &operator*() const {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	assert(!_element || _hc->_rep.epoch == _epoch);
+#endif
 	return *_element;
     }
 
     /** @brief Return true iff *this != end(). */
     inline bool live() const {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	assert(!_element || _hc->_rep.epoch == _epoch);
+#endif
 	return _element;
     }
 
     typedef T *(HashContainer_const_iterator::*unspecified_bool_type)() const;
     /** @brief Return true iff *this != end(). */
     inline operator unspecified_bool_type() const {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	assert(!_element || _hc->_rep.epoch == _epoch);
+#endif
 	return _element ? &HashContainer_const_iterator::get : 0;
     }
 
@@ -347,6 +365,9 @@ class HashContainer_const_iterator { public:
 
     /** @brief Advance this iterator to the next element. */
     void operator++() {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	assert(!_element || _hc->_rep.epoch == _epoch);
+#endif
 	if (_element && _hc->_rep.hashnext(_element)) {
 	    _pprev = &_hc->_rep.hashnext(_element);
 	    _element = *_pprev;
@@ -371,11 +392,17 @@ class HashContainer_const_iterator { public:
     T **_pprev;
     bucket_count_type _bucket;
     const HashContainer<T, A> *_hc;
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    unsigned _epoch;
+#endif
 
     inline HashContainer_const_iterator(const HashContainer<T, A> *hc)
 	: _hc(hc) {
 	_bucket = hc->_rep.first_bucket;
 	_pprev = &hc->_rep.buckets[_bucket];
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	_epoch = hc->_rep.epoch;
+#endif
 	if (unlikely(_bucket == hc->_rep.nbuckets))
 	    _element = 0;
 	else if (!(_element = *_pprev)) {
@@ -385,7 +412,11 @@ class HashContainer_const_iterator { public:
     }
 
     inline HashContainer_const_iterator(const HashContainer<T, A> *hc, bucket_count_type b, T **pprev, T *element)
-	: _element(element), _pprev(pprev), _bucket(b), _hc(hc) {
+	: _element(element), _pprev(pprev), _bucket(b), _hc(hc)
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	, _epoch(hc->_rep.epoch)
+#endif
+	{
 	click_hash_assert((!_pprev && !_element) || *_pprev == _element);
     }
 
@@ -443,6 +474,9 @@ HashContainer<T, A>::HashContainer()
     _rep.first_bucket = _rep.nbuckets;
     _rep.bucket_divider = libdivide_u32_gen(_rep.nbuckets);
     click_hash_assert(_rep.nbuckets == libdivide_u32_recover(&_rep.bucket_divider));
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    _rep.epoch = 0;
+#endif
     for (bucket_count_type b = 0; b < _rep.nbuckets; ++b)
 	_rep.buckets[b] = 0;
 }
@@ -459,6 +493,9 @@ HashContainer<T, A>::HashContainer(bucket_count_type nb)
     _rep.first_bucket = _rep.nbuckets;
     _rep.bucket_divider = libdivide_u32_gen(_rep.nbuckets);
     click_hash_assert(_rep.nbuckets == libdivide_u32_recover(&_rep.bucket_divider));
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    _rep.epoch = 0;
+#endif
     for (b = 0; b < _rep.nbuckets; ++b)
 	_rep.buckets[b] = 0;
 }
@@ -579,6 +616,9 @@ HashContainer<T, A>::find_prefer(const key_type &key)
 	    *pprev = _rep.hashnext(element);
 	    _rep.hashnext(element) = _rep.buckets[b];
 	    _rep.buckets[b] = element;
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+	    ++_rep.epoch;
+#endif
 	    return iterator(this, b, &_rep.buckets[b], element);
 	}
     return iterator(this, b, &_rep.buckets[b], 0);
@@ -603,6 +643,10 @@ T *HashContainer<T, A>::set(iterator &it, T *element, bool balance)
 	--_rep.size;
 	if (!(*it._pprev = it._element = _rep.hashnext(old)))
 	    ++it;
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+        ++_rep.epoch;
+        it._epoch = _rep.epoch;
+#endif
 	return old;
     }
     if (old)
@@ -618,6 +662,10 @@ T *HashContainer<T, A>::set(iterator &it, T *element, bool balance)
 	    _rep.first_bucket = 0;
     }
     *it._pprev = it._element = element;
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    ++_rep.epoch;
+    it._epoch = _rep.epoch;
+#endif
     return old;
 }
 
@@ -627,10 +675,16 @@ inline void HashContainer<T, A>::insert_at(iterator &it, T *element)
     click_hash_assert(it._hc == this && it._bucket < _rep.nbuckets);
     click_hash_assert(bucket(_rep.hashkey(element)) == it._bucket);
     ++_rep.size;
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    ++_rep.epoch;
+#endif
     if (!(_rep.hashnext(element) = *it._pprev))
 	_rep.first_bucket = 0;
     *it._pprev = element;
     it._pprev = &_rep.hashnext(element);
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    it._epoch = _rep.epoch;
+#endif
 }
 
 template <typename T, typename A>
@@ -657,6 +711,9 @@ inline T *HashContainer<T, A>::erase(const key_type &key)
 template <typename T, typename A>
 inline void HashContainer<T, A>::clear()
 {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    ++_rep.epoch;
+#endif
     for (bucket_count_type b = 0; b < _rep.nbuckets; ++b)
 	_rep.buckets[b] = 0;
     _rep.size = 0;
@@ -673,6 +730,9 @@ inline void HashContainer<T, A>::swap(HashContainer<T, A> &o)
 template <typename T, typename A>
 void HashContainer<T, A>::rehash(bucket_count_type n)
 {
+#if defined(CLICK_HASH_ITERATOR_EPOCHS)
+    ++_rep.epoch;
+#endif
     bucket_count_type new_nbuckets = 1;
     while (new_nbuckets < n && new_nbuckets < max_bucket_count)
 	new_nbuckets = ((new_nbuckets + 1) << 1) - 1;

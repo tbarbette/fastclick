@@ -24,6 +24,7 @@
 # include <click/userutils.hh>
 #endif
 #include <click/error.hh>
+#include <click/tinyexpr.hh>
 CLICK_DECLS
 
 FunctionTest::FunctionTest()
@@ -89,6 +90,25 @@ FunctionTest::initialize(ErrorHandler *errh)
     CHECK(!glob_match("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaacba", "*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*aa*b*c*"));
 #endif
 
+    String expr_s = "((sin(-pi/2 + (x/10)^2.5) * (-x/45 + 1) + 1) * ((200 - 1) / 2) + 1)";
+
+    TinyExpr expr = TinyExpr::compile(expr_s, 1);
+    CHECK(expr.eval(0) == 1);
+    CHECK(abs(expr.eval(5)  - 13.4339) < 0.01);
+    CHECK(abs(expr.eval(45)  - 100.5) < 0.01);
+
+    CHECK(TinyExpr::compile("squarewave(0.0)",0).eval() == 1);
+    CHECK(TinyExpr::compile("squarewave(0.49)",0).eval() == 1);
+    CHECK(TinyExpr::compile("squarewave(0.5)",0).eval() == -1);
+    CHECK(TinyExpr::compile("squarewave(0.89)",0).eval() == -1);
+    CHECK(TinyExpr::compile("squarewave(1)",0).eval() == 1);
+    CHECK(TinyExpr::compile("squarewave(1.21)",0).eval() == 1);
+    CHECK(TinyExpr::compile("squarewave(1.5)",0).eval() == -1);
+
+    expr = TinyExpr::compile("(squarewave(((x + 20 / 2) * 1/20) ^ 2.5) * (-x / 45 + 1) + 1) * ((200 -1) / 2) + 1", 1);
+    CHECK(abs(expr.eval(0) - 200) < 0.01);
+    CHECK(abs(expr.eval(5)  - 3401.0/18) < 0.01);
+    CHECK(abs(expr.eval(45)  - 201.0/2) < 0.01);
     errh->message("All tests pass!");
     return 0;
 }

@@ -147,7 +147,7 @@ KernelTun::try_linux_universal()
 	return -errno;
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    ifr.ifr_flags = (_tap ? IFF_TAP : IFF_TUN);
+    ifr.ifr_flags = (_tap ? IFF_TAP : IFF_TUN) | IFF_NO_PI;
     if (_dev_name)
 	// Setting ifr_name allows us to select an arbitrary interface name.
 	strncpy(ifr.ifr_name, _dev_name.c_str(), sizeof(ifr.ifr_name));
@@ -202,24 +202,20 @@ KernelTun::alloc_tun(ErrorHandler *errh)
 	    saved_message = "\n(Perhaps you need to enable tun in your kernel or load the 'tun' module.)";
     }
     tried << "/dev/net/tun, ";
-#endif
-
+#else
     String dev_prefix;
-#ifdef __linux__
-    _type = LINUX_ETHERTAP;
-    dev_prefix = "tap";
-#elif defined(KERNELTUN_OSX)
+# if defined(KERNELTUN_OSX)
     _type = OSX_TUN;
     dev_prefix = "tun";
-#elif defined(__NetBSD__) && !defined(TUNSIFHEAD)
+# elif defined(__NetBSD__) && !defined(TUNSIFHEAD)
     _type = (_tap ? NETBSD_TAP : NETBSD_TUN);
     dev_prefix = (_tap ? "tap" : "tun");
-#else
+# else
     _type = (_tap ? BSD_TAP : BSD_TUN);
     dev_prefix = (_tap ? "tap" : "tun");
-#endif
+# endif
 
-#if defined(__NetBSD__) && !defined(TUNSIFHEAD)
+# if defined(__NetBSD__) && !defined(TUNSIFHEAD)
     if (_type == NETBSD_TAP) {
 	// In NetBSD, two ways to create a tap:
 	// 1. open /dev/tap cloning interface.
@@ -237,7 +233,7 @@ KernelTun::alloc_tun(ErrorHandler *errh)
 	tried << "/dev/" << dev_prefix;
 	goto error_out;
     }
-#endif
+# endif
 
     for (int i = 0; i < 6; i++) {
 	if ((error = try_tun(dev_prefix + String(i), errh)) >= 0)
@@ -247,9 +243,12 @@ KernelTun::alloc_tun(ErrorHandler *errh)
 	tried << "/dev/" << dev_prefix << i << ", ";
     }
 
-#if defined(__NetBSD__) && !defined(TUNSIFHEAD)
+# if defined(__NetBSD__) && !defined(TUNSIFHEAD)
  error_out:
+# endif
+
 #endif
+
     if (saved_error == -ENOENT) {
 	tried.pop_back(2);
 	return errh->error("could not find a tap device\n(checked %s)\nYou may need to load a kernel module to support tap.", tried.c_str());
@@ -451,22 +450,11 @@ KernelTun::setup_tun(ErrorHandler *errh, int fd)
     // calculate maximum packet size needed to receive data from
     // tun/tap.
     if (_tap) {
-	if (_type == LINUX_UNIVERSAL)
-	    _mtu_in = _mtu_out + 18;
-	else if (_type == LINUX_ETHERTAP)
-	    _mtu_in = _mtu_out + 16;
-	else
-	    _mtu_in = _mtu_out + 14;
-    } else if (_type == LINUX_UNIVERSAL)
+	_mtu_in = _mtu_out + 14;
+    } else if (_type == BSD_TUN)
 	_mtu_in = _mtu_out + 4;
-    else if (_type == BSD_TUN)
-	_mtu_in = _mtu_out + 4;
-    else if (_type == BSD_TAP || _type == NETBSD_TAP || _type == NETBSD_TUN)
+    else
 	_mtu_in = _mtu_out;
-    else if (_type == OSX_TUN)
-	_mtu_in = _mtu_out + 4; // + 0?
-    else /* _type == LINUX_ETHERTAP */
-	_mtu_in = _mtu_out + 16;
 
     return 0;
 }
@@ -475,10 +463,7 @@ int
 KernelTun::initialize_common(ErrorHandler *errh)
 {
     if (_adjust_headroom) {
-	if (_tap && _type == LINUX_UNIVERSAL)
-	    _headroom += (4 - (_headroom + 2) % 4) % 4; // default 4/2 alignment
-	else
-	    _headroom += (4 - _headroom % 4) % 4; // default 4/0 alignment
+	_headroom += (4 - _headroom % 4) % 4; // default 4/0 alignment
     }
     return 0;
 }
@@ -566,25 +551,7 @@ KernelTun::one_selected(const Timestamp &now, WritablePacket* &p, int fd)
         bool ok = false;
 
         if (_tap) {
-            if (_type == LINUX_UNIVERSAL)
-            // 2-byte padding, 2-byte Ethernet type, then Ethernet header
-            p->pull(4);
-            else if (_type == LINUX_ETHERTAP)
-            // 2-byte padding, then Ethernet header
-            p->pull(2);
             ok = true;
-        } else if (_type == LINUX_UNIVERSAL) {
-            // 2-byte padding followed by an Ethernet type
-            uint16_t etype = *(uint16_t *)(p->data() + 2);
-            p->pull(4);
-            if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6)) {
-#if HAVE_BATCH
-                checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
-#else
-                checked_output_push(1, p->clone());
-#endif
-            } else
-                ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
         } else if (_type == BSD_TUN) {
             // 4-byte address family followed by IP header
             int af = ntohl(*(unsigned *)p->data());
@@ -598,20 +565,8 @@ KernelTun::one_selected(const Timestamp &now, WritablePacket* &p, int fd)
 #endif
             } else
                 ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
-        } else if (_type == OSX_TUN || _type == NETBSD_TUN) {
+        } else {
             ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
-        } else { /* _type == LINUX_ETHERTAP */
-            // 2-byte padding followed by a mostly-useless Ethernet header
-            uint16_t etype = *(uint16_t *)(p->data() + 14);
-            p->pull(16);
-            if (etype != htons(ETHERTYPE_IP) && etype != htons(ETHERTYPE_IP6))
-#if HAVE_BATCH
-                checked_output_push_batch(1, PacketBatch::make_from_packet(p->clone()));
-#else
-                checked_output_push(1, p->clone());
-#endif
-            else
-                ok = fake_pcap_force_ip(p, FAKE_DLT_RAW);
         }
 
         if (ok) {
@@ -690,39 +645,11 @@ KernelTun::process(Packet* p, int fd) {
 
     WritablePacket *q;
     if (_tap) {
-	if (_type == LINUX_UNIVERSAL) {
-	    // 2-byte padding, 2-byte Ethernet type, then Ethernet header
-	    uint16_t ethertype = ((const click_ether *) p->data())->ether_type;
-	    if ((q = p->push(4)))
-		((uint16_t *) q->data())[1] = ethertype;
-	    p = q;
-	} else if (_type == LINUX_ETHERTAP) {
-	    // 2-byte padding, then Ethernet header
-	    p = p->push(2);
-	} else {
-	    /* existing packet is OK */;
-	}
-    } else if (_type == LINUX_UNIVERSAL) {
-	// 2-byte padding followed by an Ethernet type
-	uint32_t ethertype = (iph->ip_v == 4 ? htonl(ETHERTYPE_IP) : htonl(ETHERTYPE_IP6));
-	if ((q = p->push(4)))
-	    *(uint32_t *)(q->data()) = ethertype;
-	p = q;
+	/* existing packet is OK */;
     } else if (_type == BSD_TUN) {
 	uint32_t af = (iph->ip_v == 4 ? htonl(AF_INET) : htonl(AF_INET6));
 	if ((q = p->push(4)))
 	    *(uint32_t *)(q->data()) = af;
-	p = q;
-    } else if (_type == LINUX_ETHERTAP) {
-	uint16_t ethertype = (iph->ip_v == 4 ? htons(ETHERTYPE_IP) : htons(ETHERTYPE_IP6));
-	if ((q = p->push(16))) {
-	    /* ethertap driver is very picky about what address we use
-	     * here. e.g. if we have the wrong address, linux might ignore
-	     * all the packets, or accept udp or icmp, but ignore tcp.
-	     * aaarrrgh, well this works. -ddc */
-	    memcpy(q->data(), "\x00\x00\xFE\xFD\x00\x00\x00\x00\xFE\xFD\x00\x00\x00\x00", 14);
-	    *(uint16_t *)(q->data() + 14) = ethertype;
-	}
 	p = q;
     } else {
 	/* existing packet is OK */;
@@ -763,12 +690,12 @@ KernelTun::add_handlers()
     add_data_handlers("packets", Handler::OP_READ, &_packets);
 }
 
-bool 
+bool
 KernelTun::get_spawning_threads(Bitvector& bmp, bool isoutput, int port)
 {
     if (isoutput)
         bmp[home_thread_id()] = 1;
-	
+
     return true;
 }
 

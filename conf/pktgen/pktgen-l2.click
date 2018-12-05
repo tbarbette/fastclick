@@ -8,6 +8,9 @@
  *   sudo bin/click -c 0x1 -n 4 -- conf/fastclick/pktgen-l2.click L=60 S=1000000 N=100
  */
 
+//Default values for packet length, number of packets and amountfs of time to replay them
+define($L 60, $N 100, $S 100000);
+
 //You do not need to change these to the real ones, just have the dmac match the receiver's one
 define($mymac 90:e2:ba:c3:79:66)
 define($dmac 90:e2:ba:c3:76:6e)

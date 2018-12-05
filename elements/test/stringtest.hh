@@ -7,15 +7,15 @@ CLICK_DECLS
 /*
 =c
 
-StringTest()
+StringTest([keywords])
 
 =s test
 
-runs regression tests for Bitvector
+runs regression tests for String
 
 =d
 
-StringTest runs Bitvector regression tests at initialization time. It
+StringTest runs String regression tests at initialization time. It
 does not route packets.
 
 */

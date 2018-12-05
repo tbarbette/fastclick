@@ -51,7 +51,7 @@ inline int IPOutputCombo::action(Packet* p_in, bool color) {
 
 	  // PaintTee
 	  if (color && PAINT_ANNO(p_in) == _color) {
-		  click_chatter("Paint out %d %p ip 0x%08x -> 0x%08x, shared() = %d",_color, p_in,p_in->ip_header()->ip_src,p_in->ip_header()->ip_dst,p_in->shared());
+		  // click_chatter("Paint out %d %p ip 0x%08x -> 0x%08x, shared() = %d",_color, p_in,p_in->ip_header()->ip_src,p_in->ip_header()->ip_dst,p_in->shared());
 		  return 1;
 	  }
 

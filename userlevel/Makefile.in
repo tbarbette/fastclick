@@ -13,7 +13,7 @@ bindir = @bindir@
 sbindir = @sbindir@
 libdir = @libdir@
 
-VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/lib/metron:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
+VPATH = .:$(top_srcdir)/lib:$(top_srcdir)/vendor/tinyexpr:$(top_srcdir)/lib/metron:$(top_srcdir)/$(subdir):$(top_srcdir)/elements/standard
 
 CC = @CC@
 CPP = @CPP@
@@ -72,7 +72,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
 	integers.o md5.o crc32.o in_cksum.o iptable.o \
-	archive.o userutils.o driver.o \
+	archive.o userutils.o driver.o tinyexpr.o \
 	$(EXTRA_DRIVER_OBJS)
 
 EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
@@ -87,7 +87,7 @@ CFLAGS = @CFLAGS@
 CXXFLAGS = @CXXFLAGS@
 
 DEFS = @DEFS@
-INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include \
+INCLUDES = -I$(top_builddir)/include -I$(top_builddir)/vendor -I$(top_srcdir)/include \
 	-I$(srcdir) -I$(top_srcdir) \
 	@PROPER_INCLUDES@ @PCAP_INCLUDES@ @DPDK_INCLUDES@ @NETMAP_INCLUDES@ @NUMA_INCLUDES@
 LDFLAGS = @LDFLAGS@

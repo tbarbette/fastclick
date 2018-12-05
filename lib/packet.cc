@@ -260,18 +260,27 @@ Packet::~Packet()
 #else
 #  define CLICK_PACKET_POOL_BUFSIZ		2048
 #endif
-#  define CLICK_PACKET_POOL_SIZE		4096 // see LIMIT in packetpool-01.testie
+// see LIMIT in packetpool-01.testie
+#  define CLICK_PACKET_POOL_SIZE		4096 
+#  define CLICK_PACKET_DATA_POOL_SIZE		4096
 #  define CLICK_GLOBAL_PACKET_POOL_COUNT	32
+#if HAVE_DPDK_PACKET_POOL || HAVE_NETMAP_PACKET_POOL
+#  define CLICK_GLOBAL_PACKET_DATA_POOL_COUNT	8
+#else 
+#  define CLICK_GLOBAL_PACKET_DATA_POOL_COUNT	32
+#endif
+
 
 #  if HAVE_MULTITHREAD
 static __thread PacketPool *thread_packet_pool;
 
-typedef MPMCRing<WritablePacket*,CLICK_GLOBAL_PACKET_POOL_COUNT> BatchRing;
+typedef MPMCRing<WritablePacket*,CLICK_GLOBAL_PACKET_POOL_COUNT> BatchPRing;
+typedef MPMCRing<WritablePacket*,CLICK_GLOBAL_PACKET_DATA_POOL_COUNT> BatchPDRing;
 
 struct GlobalPacketPool {
-    BatchRing pbatch;     // batches of free packets, linked by p->prev()
+    BatchPRing pbatch;     // batches of free packets, linked by p->prev()
                                 //   p->anno_u32(0) is # packets in batch
-    BatchRing pdbatch;        // batches of packet with data buffers
+    BatchPDRing pdbatch;        // batches of packet with data buffers
 
     PacketPool* thread_pools;   // all thread packet pools
 
@@ -463,7 +472,7 @@ WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
 inline void
 WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
 #  if HAVE_MULTITHREAD
-    if (unlikely(packet_pool.pd && packet_pool.pdcount >= CLICK_PACKET_POOL_SIZE)) {
+    if (unlikely(packet_pool.pd && packet_pool.pdcount >= CLICK_PACKET_DATA_POOL_SIZE)) {
         packet_pool.pd->set_anno_u32(0, packet_pool.pdcount);
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
@@ -488,7 +497,7 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
     }
 
 #  else /* !HAVE_MULTITHREAD */
-    if (packet_pool.pdcount == CLICK_PACKET_POOL_SIZE) {
+    if (packet_pool.pdcount == CLICK_PACKET_DATA_POOL_SIZE) {
         WritablePacket* tmp = (WritablePacket*)packet_pool.pd->next();
         ::operator delete((void *) packet_pool.pd);
         packet_pool.pd = tmp;
@@ -533,9 +542,10 @@ WritablePacket::recycle(WritablePacket *p)
         p->set_next(packet_pool.pd);
         packet_pool.pd = p;
 #if !HAVE_BATCH_RECYCLE
-        assert(packet_pool.pdcount <= CLICK_PACKET_POOL_SIZE);
+        assert(packet_pool.pdcount <= CLICK_PACKET_DATA_POOL_SIZE);
 #endif
     } else {
+
         p->~WritablePacket();
         check_packet_pool_size(packet_pool);
         ++packet_pool.pcount;
@@ -592,7 +602,7 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
     }
 # if CLICK_USERLEVEL || CLICK_MINIOS
     unsigned char *d = 0;
-    if (n <= CLICK_PACKET_POOL_SIZE) {
+    if (n <= CLICK_PACKET_DATA_POOL_SIZE) {
 #  if HAVE_DPDK_PACKET_POOL
         struct rte_mbuf *mb = DPDKDevice::get_pkt();
         if (likely(mb)) {
@@ -888,6 +898,9 @@ Packet::clone(bool fast)
         p->_head = _head;
         p->_data = _data;
         p->_tail = _tail;
+#ifdef CLICK_FORCE_EXPENSIVE
+        PacketRef r(this);
+#endif
         p->_end = _end;
 #if HAVE_DPDK
         if (DPDKDevice::is_dpdk_packet(this)) {
@@ -997,8 +1010,8 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     uint8_t* new_head = p->_head;
     uint8_t* new_end = p->_end;
 #if HAVE_DPDK_PACKET_POOL
-        buffer_destructor_type desc = p->_destructor;
-        void* arg = p->_destructor_argument;
+    buffer_destructor_type desc = p->_destructor;
+    void* arg = p->_destructor_argument;
 #endif
     if (_use_count > 1) {
         memcpy(p, this, sizeof(Packet));
@@ -1274,11 +1287,21 @@ cleanup_pool(PacketPool *pp, int global)
     }
 #if !HAVE_BATCH_RECYCLE
     assert(pcount <= CLICK_PACKET_POOL_SIZE);
-    assert(pdcount <= CLICK_PACKET_POOL_SIZE);
+    assert(pdcount <= CLICK_PACKET_DATA_POOL_SIZE);
 #endif
     assert(global || (pcount == pp->pcount && pdcount == pp->pdcount));
 }
 #endif
+
+int
+Packet::max_data_pool_size()
+{
+#if HAVE_CLICK_PACKET_POOL
+	return CLICK_GLOBAL_PACKET_DATA_POOL_COUNT * CLICK_PACKET_DATA_POOL_SIZE;
+#else
+	return 0;
+#endif
+}
 
 void
 Packet::static_cleanup()

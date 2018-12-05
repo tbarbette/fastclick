@@ -9,7 +9,7 @@ msleep () {
    click -e "DriverManager(wait $1ms)"
 }
 
-(while [ ! -f PORT ]; do msleep 1; done && cat CSIN | nc localhost `cat PORT` >CSOUT) &
+(while [ ! -f PORT ]; do msleep 1; done && msleep 200 && cat CSIN | nc localhost `cat PORT` >CSOUT) &
 click -e 'cs :: ControlSocket(tcp, 41930+);
 s :: Script(print >PORT $(cs.port),
 	    print "SCARY => $(cat SCARY)",

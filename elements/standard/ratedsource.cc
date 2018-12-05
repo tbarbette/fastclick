@@ -54,6 +54,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
     int limit = -1;
     int datasize = -1;
     bool active = true, stop = false;
+    _headroom = Packet::default_headroom;
     HandlerCall end_h;
 
     if (Args(conf, this, errh)
@@ -61,6 +62,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_p("RATE", rate)
         .read_p("LIMIT", limit)
         .read_p("ACTIVE", active)
+	  .read("HEADROOM", _headroom)
         .read("LENGTH", datasize)
         .read("DATASIZE", datasize) // deprecated
         .read("STOP", stop)
@@ -252,19 +254,16 @@ RatedSource::setup_packet()
     if (_packet)
         _packet->kill();
 
-    // note: if you change `headroom', change `click-align'
-    unsigned int headroom = 16+20+24;
-
     if (_datasize < 0) {
-        _packet = Packet::make(headroom, _data.data(), _data.length(), 0);
+        _packet = Packet::make(_headroom, _data.data(), _data.length(), 0);
     } else if (_datasize <= _data.length()) {
-        _packet = Packet::make(headroom, _data.data(), _datasize, 0);
+        _packet = Packet::make(_headroom, _data.data(), _datasize, 0);
     } else {
         // make up some data to fill extra space
         StringAccum sa;
         while (sa.length() < _datasize)
             sa << _data;
-        _packet = Packet::make(headroom, sa.data(), _datasize, 0);
+        _packet = Packet::make(_headroom, sa.data(), _datasize, 0);
     }
 }
 
