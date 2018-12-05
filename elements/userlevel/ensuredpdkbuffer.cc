@@ -65,14 +65,14 @@ EnsureDPDKBuffer::smaction(Packet* p) {
     } else if (_noalloc) {
         p->kill();
         if (_warn_count++ < 5)
-            click_chatter("%p{element} : Not a DPDK packet",this);
+            click_chatter("%p{element}: Not a DPDK packet", this);
         return 0;
     } else {
         struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
         if (!mbuf) {
             p->kill();
             if (_warn_count++ < 5)
-                click_chatter("%s : No more DPDK Buffer ! Dropping packet.",name().c_str());
+                click_chatter("%s: No more DPDK buffer! Dropping packet.", name().c_str());
             return 0;
         }
         WritablePacket* q = WritablePacket::make(
@@ -103,7 +103,7 @@ PacketBatch*
 EnsureDPDKBuffer::simple_action_batch(PacketBatch *head)
 {
 #if HAVE_ZEROCOPY
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction,head,[](Packet* p) {click_chatter("No more DPDK buffer ! Dropping packet %p !",p);});
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction,head,[](Packet* p) {click_chatter("No more DPDK buffer! Dropping packet %p!", p);});
 #endif
     return head;
 }
