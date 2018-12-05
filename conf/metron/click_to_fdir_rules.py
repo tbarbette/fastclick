@@ -76,11 +76,10 @@ def dump_flow_director(rule_list, target_nic, target_queues_nb, outfile, verbose
 			# Queue dispatching
 			next_queue = (curr_queue % target_queues_nb)
 			curr_queue += 1
-			rule_str += "{} {}".format(ACTION_Q, next_queue)
-			rule_str += " / "
+			rule_str += "{} {} / ".format(ACTION_Q, next_queue)
 			# Monitoring
-			rule_str += "{}".format(ACTION_CNT)
-			rule_str += " / end "
+			# rule_str += "{} / ".format(ACTION_CNT)
+			rule_str += "end "
 
 			print("DPDK Flow rule #{0:>4}: {1}".format(rule_nb, rule_str))
 			rule_nb += 1
