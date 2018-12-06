@@ -296,10 +296,13 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 
        //click_chatter("_maxthreads %d, cores_in_node %d, nthreads() %d, use_nodes %d, _this_node %d, inputs_count %d",_maxthreads,cores_in_node,master()->nthreads(),use_nodes,_this_node,inputs_count[_this_node]);
        if (_maxthreads == -1) {
+           assert(use_nodes > 0);
            if (_scale_parallel)
                n_threads = min(cores_in_node,master()->nthreads() / use_nodes);
-           else
+           else {
+               assert(inputs_count[_this_node] > 0);
                n_threads = min(cores_in_node,master()->nthreads() / use_nodes) / inputs_count[_this_node];
+           }
        } else {
            n_threads = min(cores_in_node,_maxthreads);
        }
@@ -314,12 +317,13 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
                    use_nodes = 1;
            }
            if (!_scale_parallel)
-		   thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
+		       thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
            else
-		   thread_share = min(cores_in_node,master()->nthreads());
+		       thread_share = min(cores_in_node,master()->nthreads());
        }
 
        if (n_threads > _maxqueues) {
+           assert(_maxqueues > 0);
            queue_share = n_threads / _maxqueues;
        }
 
@@ -336,8 +340,10 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
            if (_threadoffset != -1) {
                errh->warning("Thread offset %d will be ignored because the numa node has not enough cores.",_threadoffset);
            }
-           if (!_scale_parallel)
-		   _threadoffset = _threadoffset % (inputs_count[_this_node] / thread_share);
+           if (!_scale_parallel) {
+               assert(thread_share > 0);
+		       _threadoffset = _threadoffset % (inputs_count[_this_node] / thread_share);
+           }
        } else
            if (n_threads + _threadoffset > master()->nthreads())
                _threadoffset = master()->nthreads() - n_threads;
@@ -347,6 +353,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
        else
            n_queues = max(_minqueues,n_threads);
 
+       assert(n_threads > 0);
        queue_per_threads = n_queues / n_threads;
 
        if (queue_per_threads * n_threads < n_queues) queue_per_threads ++;

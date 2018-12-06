@@ -261,7 +261,7 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
             timing_fnt = "(sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
             click_chatter("Using function '%s'", timing_fnt.c_str());
         } else if (timing_fnt == "@2")
-            timing_fnt = "(squarewave(((x + 20 / 2) * 1/20) ^ 2.5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+            timing_fnt = "(-squarewave(((x + 40) * 1/50) ^ 5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
         _fnt_expr = TinyExpr::compile(timing_fnt, 1);
 
     }
