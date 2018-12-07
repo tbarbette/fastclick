@@ -1487,7 +1487,7 @@ FlowDirector::load_rules_from_file_to_string(const String &filename)
  * @return the number of flow rules being installed/updated, otherwise a negative integer
  */
 int32_t
-FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_controller)
+FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_controller, int core_id)
 {
     uint32_t rules_to_install = rules_map.size();
     if (rules_to_install == 0) {
@@ -1521,8 +1521,10 @@ FlowDirector::update_rules(const HashMap<long, String> &rules_map, bool by_contr
         }
 
         // Parse the queue index to infer the CPU core
-        String queue_index_str = fetch_token_after_keyword((char *) rule.c_str(), "queue index");
-        int core_id = atoi(queue_index_str.c_str());
+        if (core_id < 0) {
+            String queue_index_str = fetch_token_after_keyword((char *) rule.c_str(), "queue index");
+            core_id = atoi(queue_index_str.c_str());
+        }
 
         // Fetch the old internal rule ID associated with this global rule ID
         int32_t old_int_rule_id = _flow_cache->internal_from_global_rule_id(rule_id);

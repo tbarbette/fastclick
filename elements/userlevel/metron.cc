@@ -2185,11 +2185,11 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 rules_map.insert(rule_id, rule);
             }
 
-            click_chatter("Adding %4d rules for CPU %d with physical ID %d", rules_map.size(), core_id, get_cpu_phys_id(core_id));
+            int phys_core_id = get_cpu_phys_id(core_id);
+            click_chatter("Adding %4d rules for CPU %d with physical ID %d", rules_map.size(), core_id, phys_core_id);
 
             // Update a batch of rules associated with this CPU core ID
-            int phys_core_id = get_cpu_phys_id(core_id);
-            int status = nic->get_flow_director()->update_rules(rules_map, true);
+            int status = nic->get_flow_director()->update_rules(rules_map, true, phys_core_id);
             if (status >= 0) {
                 inserted_rules_nb += status;
             }
@@ -2219,10 +2219,10 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                     mirror_rules_map.insert(rule_id, rule);
             }
 
-            click_chatter("Adding %4d MIRROR rules for CPU %d with physical ID %d", mirror_rules_map.size(), core_id, get_cpu_phys_id(core_id));
+            click_chatter("Adding %4d MIRROR rules for CPU %d with physical ID %d", mirror_rules_map.size(), core_id, phys_core_id);
 
 
-                status = nic->mirror->get_flow_director()->update_rules(mirror_rules_map, true);
+                status = nic->mirror->get_flow_director()->update_rules(mirror_rules_map, true, phys_core_id);
                 if (status >= 0) {
                     inserted_rules_nb += status;
                 }

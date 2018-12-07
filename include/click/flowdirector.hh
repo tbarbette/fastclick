@@ -250,7 +250,8 @@ class FlowDirector {
         int32_t add_rules_from_file(const String &filename);
 
         // Update NIC flow rules
-        int32_t update_rules(const HashMap<long, String> &rules_map, bool by_controller = true);
+        int32_t update_rules(const HashMap<long, String> &rules_map,
+                    bool by_controller = true, int core_id = -1);
 
         // Loads a set of rules from a file to memory
         String load_rules_from_file_to_string(const String &filename);
