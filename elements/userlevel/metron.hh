@@ -817,6 +817,7 @@ class Metron : public Element {
         Vector<String> _args;
         Vector<String> _dpdk_args;
         String _slave_extra;
+        String _slave_td_args;
 
         /* Verbose */
         bool _verbose;

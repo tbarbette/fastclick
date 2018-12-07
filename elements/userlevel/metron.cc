@@ -175,6 +175,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     _discover_user      = DEF_DISCOVER_USER;
     _discover_path      = DEF_DISCOVER_PATH;
     _mirror = false;
+    _slave_td_args = "";
 
     bool nodiscovery = false;
 
@@ -197,6 +198,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("SLAVE_DPDK_ARGS",   _dpdk_args)
         .read_all("SLAVE_ARGS",        _args)
         .read    ("SLAVE_EXTRA",       _slave_extra)
+        .read    ("SLAVE_TD_EXTRA",    _slave_td_args)
         .read    ("NODISCOVERY",       nodiscovery)
         .read    ("MIRROR",            _mirror)
         .read    ("VERBOSE",           _verbose)
@@ -2694,10 +2696,10 @@ ServiceChain::generate_configuration(bool add_extra)
         new_conf += "\n";
 
         if (get_max_cpu_nb() == 1) {
-        assert(get_cpu_info(0).assigned());
+            assert(get_cpu_info(0).assigned());
             int phys_cpu_id = get_cpu_phys_id(0);
             int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
-            new_conf += "slaveTD" + is + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);\n";
+            new_conf += "slaveTD" + is + " :: Null -> " + _metron->_slave_td_args + "ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);\n";
         } else {
             new_conf += "slaveTD" + is + " :: ExactCPUSwitch();\n";
             for (int j = 0; j < get_max_cpu_nb(); j++) {
@@ -2708,7 +2710,7 @@ ServiceChain::generate_configuration(bool add_extra)
                 int queue_no = rx_filter->phys_cpu_to_queue(nic, phys_cpu_id);
                 new_conf += ename + " :: ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99, MAXQUEUES 1);";
 
-                new_conf += "slaveTD" + is + "["+js+"] -> " + ename + ";\n";
+                new_conf += "slaveTD" + is + "["+js+"] -> "+ _metron->_slave_td_args + " " + ename + ";\n";
             }
         }
         new_conf += "slave[" + is + "] -> " + (_metron->_monitoring_mode ? "[" + is + "]monitoring_lat[" + is + "] -> " : "") + "  slaveTD" + is + ";\n\n";
