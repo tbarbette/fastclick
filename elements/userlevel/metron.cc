@@ -174,6 +174,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     _discover_rest_port = DEF_DISCOVER_REST_PORT;
     _discover_user      = DEF_DISCOVER_USER;
     _discover_path      = DEF_DISCOVER_PATH;
+    _mirror = false;
 
     bool nodiscovery = false;
 
@@ -197,6 +198,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("SLAVE_ARGS",        _args)
         .read    ("SLAVE_EXTRA",       _slave_extra)
         .read    ("NODISCOVERY",       nodiscovery)
+        .read    ("MIRROR",            _mirror)
         .read    ("VERBOSE",           _verbose)
         .complete() < 0)
         return ERROR;
@@ -2031,6 +2033,14 @@ ServiceChain::from_json(const Json &j, Metron *m, ErrorHandler *errh)
         sc->_nics.push_back(nic);
     }
 
+    if (m->_mirror) {
+        for (int i = 0; i < sc->_nics.size(); i+=2) {
+            if (i + 1 < sc->_nics.size()) {
+                sc->_nics[i]->mirror = sc->_nics[i + 1];
+            }
+        }
+    }
+
     sc->_nic_stats.resize(sc->_nics.size() * sc->_max_cpus_nb,NicStat());
     sc->rx_filter = ServiceChain::RxFilter::from_json(j.get("rxFilter"), sc, errh);
 
@@ -2180,6 +2190,40 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             int status = nic->get_flow_director()->update_rules(rules_map, true);
             if (status >= 0) {
                 inserted_rules_nb += status;
+            }
+
+            if (nic->mirror) {
+                click_chatter("Device has mirror NIC");
+                HashMap<long, String> mirror_rules_map;
+
+                for (auto jrule : jrules) {
+                    long rule_id = jrule.second.get_i("ruleId");
+                    String rule = jrule.second.get_s("ruleContent");
+                    rules_nb++;
+
+                    // A '\n' must be appended at the end of this rule, if not there
+                    int eor_pos = rule.find_right('\n');
+                    if ((eor_pos < 0) || (eor_pos != rule.length() - 1)) {
+                        rule += "\n";
+                    }
+
+                    rule = rule.replace("src", "TOKEN_SRC");
+                    rule = rule.replace("dst", "TOKEN_DST");
+                    rule = rule.replace("TOKEN_SRC", "dst");
+                    rule = rule.replace("TOKEN_DST", "src");
+                    rule = _manager->fix_rule(nic->mirror, rule);
+
+                    // Store this rule
+                    mirror_rules_map.insert(rule_id, rule);
+            }
+
+            click_chatter("Adding %4d MIRROR rules for CPU %d with physical ID %d", mirror_rules_map.size(), core_id, get_cpu_phys_id(core_id));
+
+
+                status = nic->mirror->get_flow_director()->update_rules(mirror_rules_map, true);
+                if (status >= 0) {
+                    inserted_rules_nb += status;
+                }
             }
 
             // Add this tag to the list of tags of this NIC

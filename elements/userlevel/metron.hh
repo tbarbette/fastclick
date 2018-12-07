@@ -362,6 +362,7 @@ class NIC {
         }
 
         Element *element;
+        NIC* mirror;
 
         inline bool is_ghost() {
             return element == NULL;
@@ -819,6 +820,9 @@ class Metron : public Element {
 
         /* Verbose */
         bool _verbose;
+
+        /* Mirror */
+        bool _mirror;
 
         /* Private methods */
         int try_slaves(ErrorHandler *errh);

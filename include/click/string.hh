@@ -103,6 +103,7 @@ class String { public:
     String trim_space() const;
     String trim_space_left() const;
     String replace(char from, char to) const;
+    String replace(String from, String to) const;
 
     inline bool equals(const String &x) const;
     inline bool equals(const char *s, int len) const;
