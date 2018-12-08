@@ -643,7 +643,15 @@ StandaloneSCManager::fix_rule(NIC *nic, String rule) {
         String qid = rule.substring(pos + 12);
         //click_chatter("qid %s", qid.c_str());
         int queue = atoi(qid.substring(0, qid.find_left(' ')).c_str());
+#if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
+        char porthex[3];
+        char corehex[3];
+        sprintf(porthex, "%02x", pindex);
+        sprintf(corehex, "%02x", queue);
+        rule = rule.substring(0,rule.find_left("actions")) + "actions set_mac_dst mac_addr 98:03:9b:33:" + porthex  + ":" + corehex + " / port_id id " + String(pindex + (queue % _sriov)) + " / end\n";
+#else
         rule = rule.substring(0,rule.find_left("actions")) + "actions port_id id " + String(pindex + (queue % _sriov)) + " / end\n";
+#endif
 
         click_chatter("Rewrited rule : %s", rule.c_str());
     }
