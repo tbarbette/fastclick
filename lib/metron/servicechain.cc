@@ -17,7 +17,7 @@
  * legally binding.
  */
 #include <click/config.h>
-
+#include <click/glue.hh>
 #include <click/string.hh>
 #include <click/args.hh>
 #include <metron/servicechain.hh>
@@ -753,4 +753,73 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
 #else
     return errh->error("Standalone service chains can only run in batch mode");
 #endif
+}
+
+StandaloneSCManager::StandaloneSCManager(ServiceChain *sc) : PidSCManager(sc), _sriov(-1), _cpustats(click_max_cpu_ids(), {0,0})  {
+
+};
+
+Vector<float> StandaloneSCManager::updateLoad(Vector<CPUStat> &v) {
+    Vector<float> load(v.size(), 0);
+    unsigned long long totalUser, totalUserLow, totalSys, totalIdle;
+    int cpuId;
+    FILE* file = fopen("/proc/stat", "r");
+    char buffer[1024];
+    fgets(buffer, 1024, file);
+    while (fscanf(file, "cpu%d %llu %llu %llu %llu", &cpuId, &totalUser, &totalUserLow, &totalSys, &totalIdle) > 0) {
+        if (cpuId < load.size()) {
+            unsigned long long newTotal = totalUser + totalUserLow + totalSys;
+            unsigned long long tdiff =  (newTotal - v[cpuId].lastTotal);
+            unsigned long long idiff =  (totalIdle - v[cpuId].lastIdle);
+            if (tdiff + idiff > 0)
+                load[cpuId] =  tdiff / (tdiff + idiff);
+            v[cpuId].lastTotal = newTotal;
+            v[cpuId].lastIdle = totalIdle;
+
+            fgets(buffer, 1024, file);
+        }
+    }
+    fclose(file);
+    return load;
+}
+
+/**
+ * Runs a monitoring task for a service chain.
+ */
+void
+StandaloneSCManager::run_load_timer()
+{
+    float max_cpu_load = 0;
+    int max_cpu_load_index = 0;
+    float total_cpu_load = 0;
+    Vector<float> load = updateLoad(_cpustats);
+    for (int j = 0; j < _sc->get_max_cpu_nb(); j++) {
+
+        const int cpu_id = _sc->get_cpu_phys_id(j);
+        String js = String(j);
+        float cpu_load = 0;
+        float cpu_queue = 0;
+        uint64_t throughput = 0;
+        for (int i = 0; i < _sc->get_nics_nb(); i++) {
+            String is = String(i);
+            NIC *nic = _sc->get_nic_by_index(i);
+            assert(nic);
+            assert(_sc->get_cpu_info(j).assigned());
+            /*if (ncpuqueue > cpu_queue) {
+                cpu_queue = ncpuqueue;
+            }*/
+        }
+
+        cpu_load = load[cpu_id];
+        //click_chatter("Load %d %f",cpu_id,cpu_load);
+        _sc->_cpus[j].load = cpu_load;
+        _sc->_cpus[j].max_nic_queue = cpu_queue;
+        //total_cpu_load += cpu_load;
+        if (cpu_load > max_cpu_load) {
+           max_cpu_load = cpu_load;
+           max_cpu_load_index = j;
+        }
+    }
+    _sc->_max_cpu_load = max_cpu_load;
+    _sc->_max_cpu_load_index = max_cpu_load_index;
 }

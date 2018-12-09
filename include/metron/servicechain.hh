@@ -99,15 +99,26 @@ class ClickSCManager : public PidSCManager {
 
 class StandaloneSCManager : public PidSCManager {
     public:
-        StandaloneSCManager(ServiceChain *sc) : PidSCManager(sc), _sriov(-1)  {};
+        StandaloneSCManager(ServiceChain *sc);
         ~StandaloneSCManager() {};
 
         void kill_service_chain();
+
+        void run_load_timer();
         int run_service_chain(ErrorHandler *errh);
 
         virtual String fix_rule(NIC* nic, String rule);
 private:
+
+struct CPUStat {
+    unsigned long long lastTotal;
+    unsigned long long lastIdle;
+};
+
+
+Vector<float> updateLoad(Vector<CPUStat> &v);
         int _sriov;
+        Vector<CPUStat> _cpustats;
 };
 
 #endif // CLICK_METRON_SC_HH

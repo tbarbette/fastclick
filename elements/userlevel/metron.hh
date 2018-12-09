@@ -633,6 +633,7 @@ class ServiceChain {
         friend class Metron;
         friend class ServiceChainManager;
         friend class ClickSCManager;
+        friend class StandaloneSCManager;
 };
 
 /*
