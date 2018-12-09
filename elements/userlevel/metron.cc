@@ -2532,13 +2532,35 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
         if (jfield.first == "cpus") {
             Bitvector old_map = active_cpus();
             Bitvector new_map(get_max_cpu_nb(), false);
-
+            HashTable<int,Bitvector> migration;
             if (jfield.second.is_array()) {
                 for (int i = 0; i < jfield.second.size(); i++) {
+                    if (jfield.second[i].is_object()) {
+                        cpuId = jfield.second[i].first.to_i();
+                        if (cpuId == 0) {
+                            return errh->error("State migration cpu map have indexes starting at 1 !");
+                        }
+                        Json s = jfield.second[i].second;
+                        Bitvector state(get_max_cpu_nb());
+                        for (int j = 0; j < s; j++) {
+                            state[s[j].to_i()] = true;
+                        }
+                        if (cpuId < 0) {
+                            cpuId = -cpuId - 1;
+                            migration[cpuId] = state;
+                            new_map[cpuId] = false;
+                        } else {
+                            cpuId = cpuId - 1;
+                            new_map[cpuId] = true;
+                            migration[cpuId] = state;
+                        }
+                        click_chatter("CPU %d is migrating with %s", state.unparse.c_str());
+                    } else {
+                        cpuId = jfield.second[i].to_i();
+                        new_map[cpuId] = true;
+                    }
 
-                    int cpuId = jfield.second[i].to_i();
-                    new_map[cpuId] = true;
-                    if (cpuId >  get_max_cpu_nb()) {
+                    if (abs(cpuId) >  get_max_cpu_nb()) {
                             return errh->error(
                                 "Number of used CPUs must be less or equal "
                                 "than the maximum number of CPUs!"
