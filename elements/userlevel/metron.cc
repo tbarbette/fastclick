@@ -2535,14 +2535,17 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
             HashTable<int,Bitvector> migration;
             if (jfield.second.is_array()) {
                 for (int i = 0; i < jfield.second.size(); i++) {
+                    int cpuId;
                     if (jfield.second[i].is_object()) {
-                        cpuId = jfield.second[i].first.to_i();
+                        Json jcpustate = jfield.second[i];
+                        Json::object_iterator it = jcpustate.obegin();
+                        cpuId = atoi(it.key().c_str());
                         if (cpuId == 0) {
                             return errh->error("State migration cpu map have indexes starting at 1 !");
                         }
-                        Json s = jfield.second[i].second;
+                        Json s = it.value();
                         Bitvector state(get_max_cpu_nb());
-                        for (int j = 0; j < s; j++) {
+                        for (int j = 0; j < s.size(); j++) {
                             state[s[j].to_i()] = true;
                         }
                         if (cpuId < 0) {
@@ -2554,7 +2557,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                             new_map[cpuId] = true;
                             migration[cpuId] = state;
                         }
-                        click_chatter("CPU %d is migrating with %s", state.unparse.c_str());
+                        click_chatter("CPU %d is migrating with %s", state.unparse().c_str());
                     } else {
                         cpuId = jfield.second[i].to_i();
                         new_map[cpuId] = true;
