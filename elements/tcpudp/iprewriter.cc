@@ -86,19 +86,45 @@ IPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     return TCPRewriter::configure(conf, errh);
 }
 
-inline IPRewriterEntry *
+
+int IPRewriter::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
+	click_jiffies_t jiffies = click_jiffies();
+	if (stage == THREAD_RECONFIGURE_UP_PRE) {
+        set_migration(true, threads, _state);
+        set_migration<IPState>(true, threads, _ipstate);
+	} else if (stage == THREAD_RECONFIGURE_DOWN_PRE){
+        set_migration(false, threads, _state);
+        set_migration<IPState>(false, threads, _ipstate);
+	}
+	return 0;
+}
+
+
+
+IPRewriterEntry *
 IPRewriter::get_entry(int ip_p, const IPFlowID &flowid, int input)
 {
     if (ip_p == IP_PROTO_TCP)
-	return TCPRewriter::get_entry(ip_p, flowid, input);
+	return TCPRewriter::get_entry(ip_p, flowid, input); //Migration handled upstream
     if (ip_p != IP_PROTO_UDP)
 	return 0;
-    IPRewriterEntry *m = _ipstate->_udp_map.get(flowid);
+
+    IPRewriterEntry *m = _ipstate->map.get(flowid);
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
-	IPRewriterInput &is = _input_specs[input];
-	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
-	if (is.rewrite_flowid(flowid, rewritten_flowid, 0, IPRewriterInput::mapid_iprewriter_udp) == rw_addmap)
-	    m = IPRewriter::add_flow(0, flowid, rewritten_flowid, input);
+        IPFlowID rewritten_flowid;
+        if (_handle_migration)
+            m = search_migrate_entry<IPState>(flowid, _ipstate);
+
+        if (m) {
+            rewritten_flowid = m->rewritten_flowid();
+        } else {
+	        IPRewriterInput &is = _input_specs[input];
+            rewritten_flowid = IPFlowID::uninitialized_t();
+	        if (is.rewrite_flowid(flowid, rewritten_flowid, 0) != rw_addmap) {
+                return 0;
+            }
+        }
+	    m = add_flow(0, flowid, rewritten_flowid, input);
     }
     return m;
 }
@@ -122,7 +148,7 @@ IPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
 	 !!_ipstate->_udp_timeouts[1],
          click_jiffies() + relevant_timeout(_ipstate->_udp_timeouts));
 
-    return store_flow(flow, input, _ipstate->_udp_map, &reply_udp_map(rwinput));
+    return store_flow(flow, input, _ipstate->map, &reply_udp_map(rwinput));
 }
 
 int
@@ -145,10 +171,11 @@ IPRewriter::process(int port, Packet *p_in)
 
     IPFlowID flowid(p);
     HashContainer<IPRewriterEntry> *map = (iph->ip_p == IP_PROTO_TCP ?
-        &_state->map : &state._udp_map);
+        &_state->map : &state.map);
     if ( !map ) {
         click_chatter("[%s] [Core %d]: UDP Map is NULL", class_name(), click_current_cpu_id());
     }
+    //No lock access because we are the only writer
     IPRewriterEntry *m = map->get(flowid);
 
     if (!m) {			// create new mapping
@@ -216,7 +243,7 @@ IPRewriter::udp_mappings_handler(Element *e, void *)
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
     for (int i = 0; i < rw->_ipstate.weight(); i++) {
-        for (Map::iterator iter = rw->_ipstate.get_value(i)._udp_map.begin(); iter.live(); ++iter) {
+        for (Map::iterator iter = rw->_ipstate.get_value(i).map.begin(); iter.live(); ++iter) {
         iter->flow()->unparse(sa, iter->direction(), now);
         sa << '\n';
         }

@@ -284,7 +284,7 @@ IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 	    IPFlowID rewritten_flowid;
 
         if (_handle_migration)
-            m = search_migrate_entry(flowid);
+            m = search_migrate_entry(flowid, _state);
 
         if (m) {
             rewritten_flowid = m->rewritten_flowid();
@@ -375,25 +375,10 @@ IPRewriterBase::shift_heap_best_effort(click_jiffies_t now_j)
 }
 
 int IPRewriterBase::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
-	click_jiffies_t jiffies = click_jiffies();
 	if (stage == THREAD_RECONFIGURE_UP_PRE) {
-		for (int i = 0; i < threads.size(); i++) {
-			if (!threads[i])
-				continue;
-            click_chatter("NAT : thread %d now activated. It will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
-			IPRewriterState &tstate = _state.get_value_for_thread(i);
-			tstate.rebalance = jiffies;
-		}
+        set_migration(true, threads, _state);
 	} else if (stage == THREAD_RECONFIGURE_DOWN_PRE){
-		for (int i = 0; i < threads.size(); i++) {
-			IPRewriterState &tstate = _state.get_value_for_thread(i);
-			if (threads[i]) {
-                click_chatter("NAT : thread %d now deactivated");
-            } else {
-                click_chatter("NAT : thread %d will fetch unknown flows from neighbour for %sms", THREAD_MIGRATION_TIMEOUT);
-            }
-			tstate.rebalance = jiffies;
-		}
+        set_migration(false, threads, _state);
 	}
 	return 0;
 }

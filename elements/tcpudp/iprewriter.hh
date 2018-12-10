@@ -228,12 +228,15 @@ class IPRewriter : public TCPRewriter { public:
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input);
+
+    int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) override;
+
+    virtual IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid, int input) override;
     HashContainer<IPRewriterEntry> *get_map(int mapid) {
 	if (mapid == IPRewriterInput::mapid_default)
 	    return &(_state->map);
 	else if (mapid == IPRewriterInput::mapid_iprewriter_udp)
-	    return &_ipstate->_udp_map;
+	    return &_ipstate->map;
 	else
 	    return 0;
     }
@@ -256,10 +259,9 @@ class IPRewriter : public TCPRewriter { public:
     void add_handlers() CLICK_COLD;
 
   private:
-    class IPState { public:
-        IPState() : _udp_map(0) {
+    class IPState : public IPRewriterMapState { public:
+        IPState() : IPRewriterMapState() {
         }
-        Map                                 _udp_map;
         SizedHashAllocator<sizeof(UDPFlow)> _udp_allocator;
         uint32_t                            _udp_timeouts[2];
         uint32_t                            _udp_streaming_timeout;
@@ -278,7 +280,7 @@ class IPRewriter : public TCPRewriter { public:
 
     static inline Map &reply_udp_map(IPRewriterInput *rwinput) {
 	IPRewriter *x = static_cast<IPRewriter *>(rwinput->reply_element);
-	return x->_ipstate->_udp_map;
+	return x->_ipstate->map;
     }
     static String udp_mappings_handler(Element *e, void *user_data);
 
@@ -291,7 +293,7 @@ IPRewriter::destroy_flow(IPRewriterFlow *flow)
     if (flow->ip_p() == IP_PROTO_TCP)
 	TCPRewriter::destroy_flow(flow);
     else {
-	unmap_flow(flow, _ipstate->_udp_map, &reply_udp_map(flow->owner()));
+	unmap_flow(flow, _ipstate->map, &reply_udp_map(flow->owner()));
 	flow->~IPRewriterFlow();
 	_ipstate->_udp_allocator.deallocate(flow);
     }

@@ -205,6 +205,18 @@ JsonTest::initialize(ErrorHandler *errh)
 	CHECK(j.unparse() == "{\"foo\":\"\360\237\222\243ENOMEM\360\237\222\243\",\"\360\237\222\243ENOMEM\360\237\222\243\":2}");
     }
 
+    {
+        Json j = Json::parse("{[{'1':[0,2,4]}]}");
+        for (int i=0; i < j.size(); i++) {
+            Json o = j[i];
+            CHECK(o.is_object());
+            Json::object_iterator it = o.obegin();
+            CHECK(atoi(it.key().c_str()) == 1);
+            CHECK(it.value().size() == 3);
+        }
+    }
+
+
     errh->message("All tests pass!");
     return 0;
 }

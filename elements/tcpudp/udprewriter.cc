@@ -177,7 +177,7 @@ UDPRewriter::process(int port, Packet *p_in)
         IPFlowID rewritten_flowid;
 
         if (_handle_migration) {
-            m = search_migrate_entry(flowid);
+            m = search_migrate_entry(flowid, _state);
             if (m) {
                 m = UDPRewriter::add_flow(ip_p, flowid, m->rewritten_flowid(), port);
                 goto flow_added;

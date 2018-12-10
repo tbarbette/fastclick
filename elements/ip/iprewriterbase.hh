@@ -133,8 +133,8 @@ class IPRewriterBase : public BatchElement { public:
     };
 
     inline IPRewriterEntry *search_entry(const IPFlowID &flowid);
-    inline IPRewriterEntry *search_migrate_entry(const IPFlowID &flowid);
 
+    //Search a flow, adding it in the map if necessary
     virtual IPRewriterEntry *get_entry(int ip_p, const IPFlowID &flowid,
 				       int input);
 
@@ -155,15 +155,22 @@ class IPRewriterBase : public BatchElement { public:
 
     unsigned _mem_units_no;
 
-    struct IPRewriterState {
-	IPRewriterState() : gc_timer(), rebalance(0), map_lock(), map() {
-	    }
-	    Timer gc_timer;
+    struct IPRewriterMapState {
+	IPRewriterMapState() : rebalance(0), map_lock(), map() {
+        }
 	    click_jiffies_t rebalance;
 	    RWLock map_lock;
 	    Map map;
     };
+    struct IPRewriterState : public IPRewriterMapState {
+	IPRewriterState() : IPRewriterMapState() {
+	    }
+	    Timer gc_timer;
+    };
 
+    template<class T = IPRewriterState> static inline IPRewriterEntry *search_migrate_entry(const IPFlowID &flowid, per_thread<T> &vstate);
+
+    template <class T = IPRewriterState> static inline void set_migration(const bool &up, const Bitvector& threads, per_thread<T> &vstate);
 
     Vector<IPRewriterInput> _input_specs;
     IPRewriterHeap **_heap;
@@ -287,16 +294,48 @@ IPRewriterBase::search_entry(const IPFlowID &flowid)
     return _state->map.get(flowid);
 }
 
-inline IPRewriterEntry *
-IPRewriterBase::search_migrate_entry(const IPFlowID &flowid)
+const bool precopy = false;
+
+template <class T> inline void
+IPRewriterBase::set_migration(const bool &up, const Bitvector& threads, per_thread<T> &vstate) {
+
+	click_jiffies_t jiffies = click_jiffies();
+    if (up) {
+		for (int i = 0; i < threads.size(); i++) {
+            if (precopy) {
+                click_chatter("NAT : copying state of thread %d to thread %d. It will fetch unknown flows from neighbour for %dms", i, );
+            } else {
+			    if (!threads[i])
+                    continue;
+                click_chatter("NAT : thread %d now activated. It will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
+			T &tstate = vstate.get_value_for_thread(i);
+			tstate.rebalance = jiffies;
+            }
+		}
+    } else {
+		for (int i = 0; i < threads.size(); i++) {
+			T &tstate = vstate.get_value_for_thread(i);
+			if (threads[i]) {
+                click_chatter("NAT : thread %d now deactivated", i);
+            } else {
+                click_chatter("NAT : thread %d will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
+            }
+			tstate.rebalance = jiffies;
+		}
+    }
+}
+
+
+template<class T> inline IPRewriterEntry *
+IPRewriterBase::search_migrate_entry(const IPFlowID &flowid, per_thread<T> &vstate)
 {
     //If the flow does not exist, it may be in other thread's stack if there was a migration
-    if (_state->rebalance > 0 && click_jiffies() - _state->rebalance < THREAD_MIGRATION_TIMEOUT * CLICK_HZ ) {
+    if (vstate->rebalance > 0 && click_jiffies() - vstate->rebalance < THREAD_MIGRATION_TIMEOUT * CLICK_HZ ) {
         //Search in other thread's stacks for the flow
-        for (int i = 0; i < _state.weight(); i++) {
-            if (_state.get_mapping(i) == click_current_cpu_id())
+        for (int i = 0; i < vstate.weight(); i++) {
+            if (vstate.get_mapping(i) == click_current_cpu_id())
                 continue;
-            IPRewriterState* tstate = &_state.get_value(i);
+            T* tstate = &vstate.get_value(i);
             tstate->map_lock.read_begin();
             IPRewriterEntry *m = tstate->map.get(flowid);
             tstate->map_lock.read_end();

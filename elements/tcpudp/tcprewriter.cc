@@ -340,7 +340,7 @@ TCPRewriter::process(int port, Packet *p_in)
     if (!m) {			// create new mapping
 
         if (_handle_migration) {
-            m = search_migrate_entry(flowid);
+            m = search_migrate_entry(flowid, _state);
             if (m) {
                 m = TCPRewriter::add_flow(IP_PROTO_TCP, flowid, m->rewritten_flowid(), port);
                 goto flow_added;
