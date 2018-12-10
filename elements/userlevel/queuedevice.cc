@@ -28,7 +28,7 @@ Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
 QueueDevice::QueueDevice() : _minqueues(0),_maxqueues(128), usable_threads(),
-	queue_per_threads(1), queue_share(1), ndesc(0), allow_nonexistent(false), _maxthreads(-1),firstqueue(-1),lastqueue(-1),n_queues(-1),thread_share(1),
+	queue_per_threads(1), queue_share(1), ndesc(0), allow_nonexistent(false), _maxthreads(-1),_minthreads(0),firstqueue(-1),lastqueue(-1),n_queues(-1),thread_share(1),
 	_this_node(0), _active(true) {
 	_verbose = 1;
 }
@@ -51,6 +51,7 @@ int QueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(this, errh).bind(conf)
             .read_p("QUEUE", firstqueue)
             .read("N_QUEUES",n_queues)
+            .read("MINTHREADS", _minthreads)
             .read("MAXTHREADS", _maxthreads)
             .read("BURST", _burst)
             .read("VERBOSE", _verbose)
@@ -274,6 +275,18 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
     {
         usable_threads.negate();
     }
+    }
+    if (usable_threads.weight() < _minthreads) {
+        int miss = _minthreads -usable_threads.weight();
+        int i = 0;
+        while (miss > 0 && i < usable_threads.size()) {
+            if (!usable_threads[i]) {
+                miss--;
+                usable_threads[i] = true;
+            }
+            i++;
+
+        }
     }
        for (int i = click_max_cpu_ids(); i < usable_threads.size(); i++)
            usable_threads[i] = 0;
