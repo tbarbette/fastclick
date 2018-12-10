@@ -276,6 +276,24 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
         usable_threads.negate();
     }
     }
+
+    for (int i = click_max_cpu_ids(); i < usable_threads.size(); i++)
+       usable_threads[i] = 0;
+
+    if (router()->thread_sched()) {
+       Bitvector v = router()->thread_sched()->assigned_thread();
+       if (v.size() < usable_threads.size())
+           v.resize(usable_threads.size());
+       if (v.weight() == usable_threads.weight()) {
+           if (_verbose > 0)
+               click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
+       } else
+           usable_threads &= (~v);
+       if (_threadoffset != -1 && !usable_threads[_threadoffset]) {
+           click_chatter("WARNING : The THREADOFFSET parameter will be ignored because that thread is not usable / assigned to another element.");
+       }
+    }
+
     if (usable_threads.weight() < _minthreads) {
         int miss = _minthreads -usable_threads.weight();
         int i = 0;
@@ -288,22 +306,6 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 
         }
     }
-       for (int i = click_max_cpu_ids(); i < usable_threads.size(); i++)
-           usable_threads[i] = 0;
-
-       if (router()->thread_sched()) {
-           Bitvector v = router()->thread_sched()->assigned_thread();
-           if (v.size() < usable_threads.size())
-               v.resize(usable_threads.size());
-           if (v.weight() == usable_threads.weight()) {
-               if (_verbose > 0)
-                   click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
-           } else
-               usable_threads &= (~v);
-           if (_threadoffset != -1 && !usable_threads[_threadoffset]) {
-               click_chatter("WARNING : The THREADOFFSET parameter will be ignored because that thread is not usable / assigned to another element.");
-           }
-       }
 
        cores_in_node = usable_threads.weight();
 
@@ -311,7 +313,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
        if (_maxthreads == -1) {
            assert(use_nodes > 0);
            if (_scale_parallel)
-               n_threads = min(cores_in_node,master()->nthreads() / use_nodes);
+               n_threads = cores_in_node;
            else {
                assert(inputs_count[_this_node] > 0);
                n_threads = min(cores_in_node,master()->nthreads() / use_nodes) / inputs_count[_this_node];
