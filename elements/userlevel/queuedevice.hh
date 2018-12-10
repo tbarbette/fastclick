@@ -46,6 +46,7 @@ protected:
     bool allow_nonexistent;
 
     int _maxthreads;
+    int _minthreads;
     int firstqueue;
     int lastqueue;
 
