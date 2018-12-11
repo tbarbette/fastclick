@@ -182,6 +182,7 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
     uint32_t timeouts[2];
     bool has_timeout[2] = {false,false};
     int32_t heapcap;
+    bool _handle_migration; //TODO Temp placeholder
 
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", AnyArg(), capacity_word)
@@ -191,6 +192,7 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("REAP_INTERVAL", SecondsArg(), _gc_interval_sec)
 	.read("REAP_TIME", Args::deprecated, SecondsArg(), _gc_interval_sec)
 	.read("SET_AGGREGATE", _set_aggregate)
+    .read("HANDLE_MIGRATION", _handle_migration)
 	.consume() < 0)
 	return -1;
 
