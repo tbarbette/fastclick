@@ -109,14 +109,14 @@ def get_action(rule, classifier_type):
 	else:
 		return ALLOW
 
-def get_click_port(classifier_type, action):
+def get_click_port(rule, classifier_type, action):
 	# The action defines the port
 	if (classifier_type == IPFILTER and action == ALLOW):
 		return 0
 	elif (classifier_type == IPFILTER and action == DENY):
 		return 1
 	else:
-		return int(line.split(" ")[1])
+		return int(rule.split(" ")[1])
 
 def get_proto_str(rule):
 	if UDP in rule:
@@ -179,7 +179,7 @@ def parse_ipfilter(input_file):
 			action = get_action(line, classifier_type)
 
 			# Get the right Click port
-			click_port = get_click_port(classifier_type, action)
+			click_port = get_click_port(line, classifier_type, action)
 
 			if (classifier_type == IPLOOKUP) and (not line.startswith("dst")):
 				# Strip out the port as we already stored this information
