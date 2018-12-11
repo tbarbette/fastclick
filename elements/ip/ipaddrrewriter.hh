@@ -119,9 +119,9 @@ class IPAddrRewriter : public IPRewriterBase { public:
 
 	IPAddrFlow(IPRewriterInput *owner, const IPFlowID &flowid,
 		   const IPFlowID &rewritten_flowid,
-		   bool guaranteed, click_jiffies_t expiry_j)
+		   bool guaranteed, click_jiffies_t expiry_j, uint8_t input)
 	    : IPRewriterFlow(owner, flowid, rewritten_flowid,
-			     0, guaranteed, expiry_j) {
+			     0, guaranteed, expiry_j, input) {
 	}
 
 	void apply(WritablePacket *p, bool direction, unsigned annos);

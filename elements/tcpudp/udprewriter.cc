@@ -141,7 +141,7 @@ UDPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
     UDPFlow *flow = new(data) UDPFlow
 	(&_input_specs[input], flowid, rewritten_flowid, ip_p,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-         relevant_timeout(_timeouts[click_current_cpu_id()]));
+         relevant_timeout(_timeouts[click_current_cpu_id()]), input);
 
     return store_flow(flow, input, _state->map);
 }
@@ -176,7 +176,7 @@ UDPRewriter::process(int port, Packet *p_in)
         IPRewriterInput &is = _input_specs.unchecked_at(port);
         IPFlowID rewritten_flowid;
 
-        if (_handle_migration) {
+        if (_handle_migration && !precopy) {
             m = search_migrate_entry(flowid, _state);
             if (m) {
                 m = UDPRewriter::add_flow(ip_p, flowid, m->rewritten_flowid(), port);

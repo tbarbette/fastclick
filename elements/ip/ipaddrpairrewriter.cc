@@ -143,7 +143,7 @@ IPAddrPairRewriter::add_flow(int, const IPFlowID &flowid,
     IPAddrPairFlow *flow = new(data) IPAddrPairFlow
 	(&_input_specs[input], flowid, rewritten_flowid,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-         relevant_timeout(_timeouts[click_current_cpu_id()]));
+         relevant_timeout(_timeouts[click_current_cpu_id()]), input);
 
     return store_flow(flow, input, _state->map);
 }

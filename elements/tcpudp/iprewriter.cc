@@ -112,7 +112,7 @@ IPRewriter::get_entry(int ip_p, const IPFlowID &flowid, int input)
     IPRewriterEntry *m = _ipstate->map.get(flowid);
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
         IPFlowID rewritten_flowid;
-        if (_handle_migration)
+        if (_handle_migration && !precopy)
             m = search_migrate_entry<IPState>(flowid, _ipstate);
 
         if (m) {
@@ -146,7 +146,7 @@ IPRewriter::add_flow(int ip_p, const IPFlowID &flowid,
     IPRewriterFlow *flow = new(data) IPRewriterFlow
 	(rwinput, flowid, rewritten_flowid, ip_p,
 	 !!_ipstate->_udp_timeouts[1],
-         click_jiffies() + relevant_timeout(_ipstate->_udp_timeouts));
+         click_jiffies() + relevant_timeout(_ipstate->_udp_timeouts), input);
 
     return store_flow(flow, input, _ipstate->map, &reply_udp_map(rwinput));
 }

@@ -308,7 +308,7 @@ TCPRewriter::add_flow(int /*ip_p*/, const IPFlowID &flowid,
     TCPFlow *flow = new(data) TCPFlow
 	(&_input_specs[input], flowid, rewritten_flowid,
 	 !!_timeouts[click_current_cpu_id()][1], click_jiffies() +
-         relevant_timeout(_timeouts[click_current_cpu_id()]));
+         relevant_timeout(_timeouts[click_current_cpu_id()]), input);
 
     return store_flow(flow, input, _state->map);
 }
@@ -339,7 +339,7 @@ TCPRewriter::process(int port, Packet *p_in)
 
     if (!m) {			// create new mapping
 
-        if (_handle_migration) {
+        if (_handle_migration && !precopy) {
             m = search_migrate_entry(flowid, _state);
             if (m) {
                 m = TCPRewriter::add_flow(IP_PROTO_TCP, flowid, m->rewritten_flowid(), port);

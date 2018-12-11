@@ -6,6 +6,8 @@
 #include <click/batchelement.hh>
 #include <click/bitvector.hh>
 #include <click/multithread.hh>
+#include <click/error.hh>
+#include <click/standard/scheduleinfo.hh>
 
 CLICK_DECLS
 class IPMapper;
@@ -170,7 +172,7 @@ class IPRewriterBase : public BatchElement { public:
 
     template<class T = IPRewriterState> static inline IPRewriterEntry *search_migrate_entry(const IPFlowID &flowid, per_thread<T> &vstate);
 
-    template <class T = IPRewriterState> static inline void set_migration(const bool &up, const Bitvector& threads, per_thread<T> &vstate);
+    template <class T = IPRewriterState> inline void set_migration(const bool &up, const Bitvector& threads, per_thread<T> &vstate);
 
     Vector<IPRewriterInput> _input_specs;
     IPRewriterHeap **_heap;
@@ -294,7 +296,62 @@ IPRewriterBase::search_entry(const IPFlowID &flowid)
     return _state->map.get(flowid);
 }
 
-const bool precopy = false;
+const bool precopy = true;
+
+template <class T>
+struct MigrationInfo {
+	bool up;
+	per_thread<T> *vstate;
+	int from_cpu;
+	IPRewriterBase* e;
+};
+
+template <class T>
+bool doMigrate(Task *, void * obj) {
+	click_jiffies_t jiffies = click_jiffies();
+	struct MigrationInfo<T> *info = (struct MigrationInfo<T>*)obj;
+	T &tstate = info->vstate->get_value_for_thread(info->from_cpu);
+	T &jstate = info->vstate->get();
+	click_chatter("Starting migration '%s' from core %d to core %d", (info->up?"up":"down"), info->from_cpu, click_current_cpu_id());
+	if (info->up) {
+		tstate.map_lock.read_begin();
+
+		auto begin = tstate.map.begin();
+		auto end = tstate.map.end();
+		//jstate is not running, we do not need to acquire a lock
+		for (;begin != end; begin++) {
+			IPRewriterFlow *mf = static_cast<IPRewriterFlow *>(begin->flow());
+			if (!begin->direction() && !mf->expired(jiffies)) {
+				/*{
+					auto begine = jstate.map.begin();
+							auto ende = jstate.map.end();
+							//jstate is not running, we do not need to acquire a lock
+							for (;begine != ende; begine++) {
+								click_chatter("Existing %s", begine->flowid().unparse().c_str());
+							}
+				}
+				click_chatter("Add %s -> %s", begin->flowid().unparse().c_str(), begin->rewritten_flowid().unparse().c_str() );
+				*/
+				info->e->add_flow(mf->ip_p(), begin->flowid(), begin->rewritten_flowid(), mf->input());
+			}
+		}
+		tstate.map_lock.read_end();
+	} else {
+		tstate.map_lock.read_begin(); //Deactivating core may be still running
+		//jstate.map_lock.write_begin();
+		auto begin = jstate.map.begin();
+		auto end = jstate.map.end();
+		for (;begin != end; begin++) {
+			IPRewriterFlow *mf = static_cast<IPRewriterFlow *>(begin->flow());
+			if (!begin->direction() && !mf->expired(jiffies)) {
+				info->e->add_flow(mf->ip_p(), begin->flowid(), begin->rewritten_flowid(), mf->input());
+			}
+			//jstate.map_lock.write_relax();
+		}
+		//jstate.map_lock.write_end();
+		tstate.map_lock.read_end();
+	}
+};
 
 template <class T> inline void
 IPRewriterBase::set_migration(const bool &up, const Bitvector& threads, per_thread<T> &vstate) {
@@ -302,25 +359,64 @@ IPRewriterBase::set_migration(const bool &up, const Bitvector& threads, per_thre
 	click_jiffies_t jiffies = click_jiffies();
     if (up) {
 		for (int i = 0; i < threads.size(); i++) {
+			T &tstate = vstate.get_value_for_thread(i);
             if (precopy) {
-                click_chatter("NAT : copying state of thread %d to thread %d. It will fetch unknown flows from neighbour for %dms", i, );
+		//TODO have a task that delays the effective migration
+		if (threads[i]) //For each existing core
+			continue;
+		if (tstate.map.empty())
+		    continue;
+		//Copy state from i to j
+		for (int j = 0; j < threads.size(); j++) {
+			if (!threads[j]) //Copy to now activating core
+				continue;
+			click_chatter("Asking core %d to copying state of core %d to core %d",j, i, j);
+			MigrationInfo<T> *info = new MigrationInfo<T>();
+			info->from_cpu = i;
+			info->up = up;
+			info->vstate = &vstate;
+			info->e = this;
+			Task* t = new Task(doMigrate<T>, info, j);
+			ScheduleInfo::initialize_task(this, t, ErrorHandler::default_handler());
+		}
             } else {
 			    if (!threads[i])
                     continue;
                 click_chatter("NAT : thread %d now activated. It will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
-			T &tstate = vstate.get_value_for_thread(i);
-			tstate.rebalance = jiffies;
+                tstate.rebalance = jiffies;
             }
 		}
     } else {
 		for (int i = 0; i < threads.size(); i++) {
 			T &tstate = vstate.get_value_for_thread(i);
-			if (threads[i]) {
-                click_chatter("NAT : thread %d now deactivated", i);
+            if (precopy) {
+		//In pre-copy, we copy all state of the deactivated core to the other cores
+		//TODO have a task that delays the effective migration on the deactivated CPU, as they have nothing to do
+		if (!threads[i]) //For each deactivating core
+		    continue;
+		if (tstate.map.empty())
+		    continue;
+		//Copy state from i to j
+		for (int j = 0; j < threads.size(); j++) {
+			if (threads[j]) //copy to all non-deactivating core
+				continue;
+			click_chatter("Asking core %d to copying state of core %d to core %d", j, i, j);
+			MigrationInfo<T> *info = new MigrationInfo<T>();
+			info->from_cpu = i;
+			info->up = up;
+			info->vstate = &vstate;
+			info->e = this;
+			Task* t = new Task(doMigrate<T>, info, j);
+			ScheduleInfo::initialize_task(this, t, ErrorHandler::default_handler());
+		}
             } else {
-                click_chatter("NAT : thread %d will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
+		if (threads[i]) {
+				click_chatter("NAT : thread %d now deactivated", i);
+		} else {
+			click_chatter("NAT : thread %d will fetch unknown flows from neighbour for %dms", i, THREAD_MIGRATION_TIMEOUT);
+		}
+				tstate.rebalance = jiffies;
             }
-			tstate.rebalance = jiffies;
 		}
     }
 }

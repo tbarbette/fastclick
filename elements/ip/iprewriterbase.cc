@@ -283,7 +283,7 @@ IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 
 	    IPFlowID rewritten_flowid;
 
-        if (_handle_migration)
+        if (_handle_migration && !precopy)
             m = search_migrate_entry(flowid, _state);
 
         if (m) {
@@ -315,7 +315,12 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 	state.map_lock.write_begin();
     IPRewriterEntry *old = map.set(&flow->entry(false));
 	state.map_lock.write_end();
-    assert(!old);
+	if (old) {
+		if (_handle_migration)
+			return old; //TODO : an old flow is back. Change expiry
+		else
+			assert(!old);
+	}
 
     auto &heap = _heap[click_current_cpu_id()];
 
@@ -324,7 +329,7 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
     old = reply_map_ptr->set(&flow->entry(true));
     if (unlikely(old)) {		// Assume every map has the same heap.
 	if (likely(old->flow() != flow))
-	    old->flow()->destroy(heap);
+		old->flow()->destroy(heap);
     }
 
     Vector<IPRewriterFlow *> &myheap = heap->_heaps[flow->guaranteed()];
