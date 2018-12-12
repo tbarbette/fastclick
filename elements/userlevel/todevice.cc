@@ -68,6 +68,9 @@ ToDevice::ToDevice()
     _fd = -1;
     _my_fd = false;
 #endif
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 ToDevice::~ToDevice()
@@ -294,10 +297,40 @@ ToDevice::send_packet(Packet *p)
 bool
 ToDevice::run_task(Task *)
 {
+    unsigned count = 0;
+    int r = 0;
+
+#if HAVE_BATCH
+    PacketBatch *p = _q;
+    Packet* last_ok = 0;
+    PacketBatch *batch_error = 0;
+    _q = 0;
+    if (!p) {
+        ++_pulls;
+        p = input(0).pull_batch(_burst);
+    }
+    if (p) {
+        FOR_EACH_PACKET(p, z) {
+            if ((r = send_packet(z)) >= 0) {
+                _backoff = 0;
+                last_ok = z;
+                ++count;
+            } else
+                break;
+        }
+        if (count == p->count()) {
+            checked_output_push_batch(0, p);
+            p = 0;
+        } else if (count > 0) {
+            p->cut(last_ok, count, batch_error);
+            checked_output_push_batch(0, p);
+            p = batch_error;
+            batch_error = 0;
+        }
+    }
+#else
     Packet *p = _q;
     _q = 0;
-    int count = 0, r = 0;
-
     do {
         if (!p) {
             ++_pulls;
@@ -312,6 +345,7 @@ ToDevice::run_task(Task *)
         } else
             break;
     } while (count < _burst);
+#endif
 
     if (r == -ENOBUFS || r == -EAGAIN) {
         assert(!_q);
@@ -332,7 +366,11 @@ ToDevice::run_task(Task *)
         return count > 0;
     } else if (r < 0) {
         click_chatter("ToDevice(%s): %s", _ifname.c_str(), strerror(-r));
+#if HAVE_BATCH
+        checked_output_push_batch(1, p);
+#else
         checked_output_push(1, p);
+#endif
     }
 
     if (p || _signal)
