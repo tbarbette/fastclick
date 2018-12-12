@@ -334,11 +334,7 @@ Specializer::do_simple_action(SpecializedClass &spc)
   CxxFunction *simple_action = spc.cxxc->find("simple_action");
   assert(simple_action);
   simple_action->kill();
-#if HAVE_BATCH
-  CxxFunction *simple_action_batch = spc.cxxc->find("simple_action_batch");
-  assert(simple_action_batch);
-  simple_action_batch->kill();
-#endif
+
 
   spc.cxxc->defun
     (CxxFunction("smaction", false, "inline Packet *", simple_action->args(),
@@ -353,9 +349,18 @@ Specializer::do_simple_action(SpecializedClass &spc)
   return (p ? smaction(p) : 0);\n", ""));
 
 #if HAVE_BATCH
-  spc.cxxc->defun
-    (CxxFunction("smactionbatch", false, "inline PacketBatch *", simple_action_batch->args(),
+  CxxFunction *simple_action_batch = spc.cxxc->find("simple_action_batch");
+  if (!simple_action_batch) {
+     click_chatter("Auto-generating simple_action_batch for class %s", spc.old_click_name.c_str());
+     spc.cxxc->defun
+	   (CxxFunction("smactionbatch", false, "inline PacketBatch *", "(PacketBatch *batch)",
+		 "EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet*){});return batch;", ""));
+  } else {
+	  simple_action_batch->kill();
+	  spc.cxxc->defun
+	    (CxxFunction("smactionbatch", false, "inline PacketBatch *", simple_action_batch->args(),
 		 simple_action_batch->body(), simple_action_batch->clean_body()));
+  }
 
   spc.cxxc->defun
     (CxxFunction("push_batch", false, "void", "(int port, PacketBatch *batch)",
