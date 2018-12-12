@@ -150,6 +150,16 @@ Metron::Metron() :
     _fail(false), _load_timer(1000), _verbose(false)
 {
     _core_id = click_max_cpu_ids() - 1;
+    _cpu_allowed = Bitvector(click_max_cpu_ids(), true);
+#if HAVE_DPDK
+    if (dpdk_enabled) {
+        for (int i = 0; i < _cpu_allowed.size(); i++) {
+            if (!rte_lcore_is_enabled(i)) {
+                _cpu_allowed[i]=false;
+            }
+        }
+    }
+#endif
 }
 
 Metron::~Metron()
@@ -202,6 +212,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("NODISCOVERY",       nodiscovery)
         .read    ("MIRROR",            _mirror)
         .read    ("VERBOSE",           _verbose)
+        .read    ("COREMAP",           _cpu_allowed)
         .complete() < 0)
         return ERROR;
 
@@ -641,7 +652,7 @@ Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
     int j = 0;
 
     for (int i = 0; i < _cpu_map.size(); i++) {
-        if (_cpu_map[i] == 0) {
+        if (_cpu_map[i] == 0 && _cpu_allowed[i]) {
             _cpu_map[i] = sc;
             map[j++] = i;
             if (j == map.size()) {

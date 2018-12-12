@@ -826,6 +826,8 @@ class Metron : public Element {
         /* Mirror */
         bool _mirror;
 
+        Bitvector _cpu_allowed;
+
         /* Private methods */
         int try_slaves(ErrorHandler *errh);
 
