@@ -74,6 +74,9 @@ FromDevice::FromDevice()
 #if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP
     _fd = -1;
 #endif
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 FromDevice::~FromDevice()
@@ -380,6 +383,7 @@ FromDevice::initialize(ErrorHandler *errh)
     }
 #endif
 
+
 #if FROMDEVICE_ALLOW_LINUX
     if (_method == method_default || _method == method_linux) {
         _fd = open_packet_socket(_ifname, errh);
@@ -438,9 +442,36 @@ FromDevice::cleanup(CleanupStage stage)
 }
 
 #if FROMDEVICE_ALLOW_PCAP
+struct my_pcap_data {
+    FromDevice* fd;
+    PacketBatch* batch;
+    PacketBatch* batch_err;
+    Packet* batch_last;
+    Packet* batch_err_last;
+    int batch_count;
+    int batch_err_count;
+};
+#endif
+
+#if FROMDEVICE_ALLOW_PCAP
+CLICK_ENDDECLS
+extern "C" {
 void
-FromDevice::emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts)
+FromDevice_get_packet(u_char* clientdata,
+                      const struct pcap_pkthdr* pkthdr,
+                      const u_char* data)
 {
+    struct my_pcap_data *md = (struct my_pcap_data *) clientdata;
+    FromDevice *fd = md->fd;
+    WritablePacket *p = Packet::make(fd->_headroom, data, pkthdr->caplen, 0);
+    Timestamp ts = Timestamp::uninitialized_t();
+#if TIMESTAMP_NANOSEC && defined(PCAP_TSTAMP_PRECISION_NANO)
+    if (fd->_pcap_nanosec)
+        ts = Timestamp::make_nsec(pkthdr->ts.tv_sec, pkthdr->ts.tv_usec);
+    else
+#endif
+        ts = Timestamp::make_usec(pkthdr->ts.tv_sec, pkthdr->ts.tv_usec);
+
     // set packet type annotation
     if (p->data()[0] & 1) {
         if (EtherAddress::is_broadcast(p->data()))
@@ -452,82 +483,111 @@ FromDevice::emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts)
     // set annotations
     p->set_timestamp_anno(ts);
     p->set_mac_header(p->data());
-    SET_EXTRA_LENGTH_ANNO(p, extra_len);
+    SET_EXTRA_LENGTH_ANNO(p, pkthdr->len - pkthdr->caplen);
 
-    if (!_force_ip || fake_pcap_force_ip(p, _datalink))
-        output(0).push(p);
+#if HAVE_BATCH
+    if (!fd->_force_ip || fake_pcap_force_ip(p, fd->_datalink)) {
+        if (md->batch)
+            md->batch_last->set_next(p);
+        else
+            md->batch = PacketBatch::start_head(p);
+        md->batch_last = p;
+        md->batch_count++;
+    } else {
+        if (md->batch_err)
+            md->batch_err_last->set_next(p);
+        else
+            md->batch_err = PacketBatch::start_head(p);
+        md->batch_err_last = p;
+        md->batch_err_count++;
+    }
+#else
+    if (!fd->_force_ip || fake_pcap_force_ip(p, fd->_datalink))
+        fd->output(0).push(p);
     else
-        checked_output_push(1, p);
-}
+        fd->checked_output_push(1, p);
 #endif
-
-#if FROMDEVICE_ALLOW_PCAP
-CLICK_ENDDECLS
-extern "C" {
-void
-FromDevice_get_packet(u_char* clientdata,
-                      const struct pcap_pkthdr* pkthdr,
-                      const u_char* data)
-{
-    FromDevice *fd = (FromDevice *) clientdata;
-    WritablePacket *p = Packet::make(fd->_headroom, data, pkthdr->caplen, 0);
-    Timestamp ts = Timestamp::uninitialized_t();
-#if TIMESTAMP_NANOSEC && defined(PCAP_TSTAMP_PRECISION_NANO)
-    if (fd->_pcap_nanosec)
-        ts = Timestamp::make_nsec(pkthdr->ts.tv_sec, pkthdr->ts.tv_usec);
-    else
-#endif
-        ts = Timestamp::make_usec(pkthdr->ts.tv_sec, pkthdr->ts.tv_usec);
-    fd->emit_packet(p, pkthdr->len - pkthdr->caplen, ts);
 }
 }
 CLICK_DECLS
 #endif
-
 
 void
 FromDevice::selected(int, int)
 {
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_pcap) {
+        struct my_pcap_data md = {this, 0, 0, 0, 0, 0, 0};
         // Read and push() at most one burst of packets.
-        int r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) this);
+        int r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) &md);
         if (r > 0) {
             _count += r;
             _task.reschedule();
+#if HAVE_BATCH
+            if (md.batch) {
+                md.batch->make_tail(md.batch_last, md.batch_count);
+                output(0).push_batch(md.batch);
+            }
+            if (md.batch_err) {
+                md.batch_err->make_tail(md.batch_err_last, md.batch_err_count);
+                checked_output_push_batch(1, md.batch_err);
+            }
+#endif
         } else if (r < 0 && ++_pcap_complaints < 5)
             ErrorHandler::default_handler()->error("%p{element}: %s", this, pcap_geterr(_pcap));
     }
 #endif
 #if FROMDEVICE_ALLOW_LINUX
-    int nlinux = 0;
-    while (_method == method_linux && nlinux < _burst) {
-        struct sockaddr_ll sa;
-        socklen_t fromlen = sizeof(sa);
-        WritablePacket *p = Packet::make(_headroom, 0, _snaplen, 0);
-        int len = recvfrom(_fd, p->data(), p->length(), MSG_TRUNC, (sockaddr *)&sa, &fromlen);
-        if (len > 0 && (sa.sll_pkttype != PACKET_OUTGOING || _outbound)
-            && (_protocol == 0 || _protocol == sa.sll_protocol)) {
-            if (len > _snaplen) {
-                assert(p->length() == (uint32_t)_snaplen);
-                SET_EXTRA_LENGTH_ANNO(p, len - _snaplen);
-            } else
-                p->take(_snaplen - len);
-            p->set_packet_type_anno((Packet::PacketType)sa.sll_pkttype);
-            p->timestamp_anno().set_timeval_ioctl(_fd, SIOCGSTAMP);
-            p->set_mac_header(p->data());
-            ++nlinux;
-            ++_count;
-            if (!_force_ip || fake_pcap_force_ip(p, _datalink))
-                output(0).push(p);
-            else
-                checked_output_push(1, p);
-        } else {
-            p->kill();
-            if (len <= 0 && errno != EAGAIN)
-                click_chatter("FromDevice(%s): recvfrom: %s", _ifname.c_str(), strerror(errno));
-            break;
+    if (_method == method_linux) {
+# if HAVE_BATCH
+        BATCH_CREATE_INIT(batch);
+        BATCH_CREATE_INIT(batch_err);
+# endif
+        int nlinux = 0;
+        while (nlinux < _burst) {
+            struct sockaddr_ll sa;
+            socklen_t fromlen = sizeof(sa);
+            WritablePacket *p = Packet::make(_headroom, 0, _snaplen, 0);
+            int len = recvfrom(_fd, p->data(), p->length(), MSG_TRUNC, (sockaddr *)&sa, &fromlen);
+            if (len > 0 && (sa.sll_pkttype != PACKET_OUTGOING || _outbound)
+                && (_protocol == 0 || _protocol == sa.sll_protocol)) {
+                if (len > _snaplen) {
+                    assert(p->length() == (uint32_t)_snaplen);
+                    SET_EXTRA_LENGTH_ANNO(p, len - _snaplen);
+                } else
+                    p->take(_snaplen - len);
+                p->set_packet_type_anno((Packet::PacketType)sa.sll_pkttype);
+                p->timestamp_anno().set_timeval_ioctl(_fd, SIOCGSTAMP);
+                p->set_mac_header(p->data());
+                ++nlinux;
+                ++_count;
+# if HAVE_BATCH
+                if (!_force_ip || fake_pcap_force_ip(p, _datalink)) {
+                    BATCH_CREATE_APPEND(batch, p);
+                } else {
+                    BATCH_CREATE_APPEND(batch_err, p);
+                }
+# else
+                if (!_force_ip || fake_pcap_force_ip(p, _datalink))
+                    output(0).push(p);
+                else
+                    checked_output_push(1, p);
+# endif
+            } else {
+                p->kill();
+                if (len <= 0 && errno != EAGAIN)
+                    click_chatter("FromDevice(%s): recvfrom: %s", _ifname.c_str(), strerror(errno));
+                break;
+            }
         }
+# if HAVE_BATCH
+        BATCH_CREATE_FINISH(batch);
+        BATCH_CREATE_FINISH(batch_err);
+        if (batch)
+            output(0).push_batch(batch);
+        if (batch_err)
+            checked_output_push_batch(1, batch_err);
+# endif
     }
 #endif
 }
@@ -538,14 +598,25 @@ FromDevice::run_task(Task *)
 {
     // Read and push() at most one burst of packets.
     int r = 0;
+    struct my_pcap_data md = {this, 0, 0, 0, 0, 0, 0};
     if (_method == method_pcap) {
-        r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) this);
+        r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) &md);
         if (r < 0 && ++_pcap_complaints < 5)
             ErrorHandler::default_handler()->error("%p{element}: %s", this, pcap_geterr(_pcap));
     }
     if (r > 0) {
         _count += r;
         _task.fast_reschedule();
+#if HAVE_BATCH
+        if (md.batch) {
+            md.batch->make_tail(md.batch_last, md.batch_count);
+            output(0).push_batch(md.batch);
+        }
+        if (md.batch_err) {
+            md.batch_err->make_tail(md.batch_err_last, md.batch_err_count);
+            checked_output_push_batch(1, md.batch_err);
+        }
+#endif
         return true;
     } else
         return false;
