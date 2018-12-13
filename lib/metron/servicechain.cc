@@ -447,7 +447,16 @@ ClickSCManager::build_cmd_line(int socketfd)
     int i;
     Vector<String> argv;
 
-    String cpu_list = _sc->assigned_phys_cpus().unparse().c_str();
+    Bitvector lcore_cpu_list(RTE_MAX_LCORE, false);
+    Bitvector sccpus = _sc->assigned_phys_cpus();
+    click_chatter("Launching slave on CPUs %s", sccpus.unparse().c_str());
+    for (int i = 0; i < sccpus.size(); i++) {
+        if (sccpus[i]) {
+            click_chatter("Assigning %d -> %d", i, _sc->_metron->_cpu_click_to_phys[i]);
+            lcore_cpu_list[_sc->_metron->_cpu_click_to_phys[i]] = true;
+        }
+    }
+    String cpu_list = lcore_cpu_list.unparse().c_str();
 
     argv.push_back(click_path);
     argv.push_back("--dpdk");

@@ -150,16 +150,26 @@ Metron::Metron() :
     _fail(false), _load_timer(1000), _verbose(false)
 {
     _core_id = click_max_cpu_ids() - 1;
-    _cpu_allowed = Bitvector(click_max_cpu_ids(), true);
+    _cpu_click_to_phys.resize(click_max_cpu_ids(), 0);
 #if HAVE_DPDK
     if (dpdk_enabled) {
-        for (int i = 0; i < _cpu_allowed.size(); i++) {
-            if (!rte_lcore_is_enabled(i)) {
-                _cpu_allowed[i]=false;
+        int id = 0;
+        for (int i = 0; i < RTE_MAX_LCORE; i++) {
+            if (rte_lcore_is_enabled(i)) {
+
+                click_chatter("CPU %d to %d",id,i);
+                _cpu_click_to_phys[id++]=i;
+            } else {
+                click_chatter("lcore %d deactivated",i);
             }
         }
-    }
+    } else
 #endif
+    {
+        for (int i = 0; i < _cpu_click_to_phys.size(); i++) {
+            _cpu_click_to_phys[i] = i;
+        }
+    }
 }
 
 Metron::~Metron()
@@ -212,7 +222,6 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read    ("NODISCOVERY",       nodiscovery)
         .read    ("MIRROR",            _mirror)
         .read    ("VERBOSE",           _verbose)
-        .read    ("COREMAP",           _cpu_allowed)
         .complete() < 0)
         return ERROR;
 
@@ -459,7 +468,7 @@ Metron::try_slaves(ErrorHandler *errh)
     sc.id = "slaveTest";
     sc.config_type = CLICK;
     sc.config = "";
-    sc.initialize_cpus(1,1);
+    sc.initialize_cpus(click_max_cpu_ids(),click_max_cpu_ids());
     for (int i = 0; i < sc.get_nics_nb(); i++) {
         NIC *nic = sc.get_nic_by_index(i);
         sc._nics.push_back(nic);
@@ -467,11 +476,13 @@ Metron::try_slaves(ErrorHandler *errh)
     sc._nic_stats.resize(sc._nics.size() * 1, NicStat());
     sc.rx_filter = new ServiceChain::RxFilter(&sc);
     Vector<int> cpu_phys_map;
-    cpu_phys_map.resize(1);
+    cpu_phys_map.resize(click_max_cpu_ids());
     assign_cpus(&sc, cpu_phys_map);
     assert(cpu_phys_map[0] >= 0);
-    sc.get_cpu_info(0).cpu_phys_id = cpu_phys_map[0];
-    sc.get_cpu_info(0).set_active(true);
+    for (int i = 0; i < click_max_cpu_ids(); i++) {
+        sc.get_cpu_info(i).cpu_phys_id = cpu_phys_map[i];
+        sc.get_cpu_info(i).set_active(true);
+    }
     sc._manager = new ClickSCManager(&sc, false);
 
     if (sc._manager->run_service_chain(errh) != SUCCESS) {
@@ -652,7 +663,7 @@ Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
     int j = 0;
 
     for (int i = 0; i < _cpu_map.size(); i++) {
-        if (_cpu_map[i] == 0 && _cpu_allowed[i]) {
+        if (_cpu_map[i] == 0) {
             _cpu_map[i] = sc;
             map[j++] = i;
             if (j == map.size()) {
@@ -719,8 +730,9 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
     cpu_phys_map.resize(sc->get_max_cpu_nb());
     if (!assign_cpus(sc, cpu_phys_map)) {
         errh->error(
-            "Cannot instantiate service chain %s: Not enough CPUs",
-            sc->get_id().c_str()
+            "Cannot instantiate service chain %s: Not enough CPUs (SC wants %d cpus, Metron has %d left)",
+            sc->get_id().c_str(),
+            sc->get_max_cpu_nb(), get_assigned_cpus_nb()
         );
         return ERROR;
     }

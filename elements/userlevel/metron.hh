@@ -826,7 +826,8 @@ class Metron : public Element {
         /* Mirror */
         bool _mirror;
 
-        Bitvector _cpu_allowed;
+        /* Click IDs to Physical ids. Important when launching DPDK slaves as we must not use unallowed CPUs. */
+        Vector<int> _cpu_click_to_phys;
 
         /* Private methods */
         int try_slaves(ErrorHandler *errh);
