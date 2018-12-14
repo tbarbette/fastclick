@@ -31,6 +31,8 @@ class Signatures { public:
   const Vector<int> &signature_ids() const	{ return _sigid; }
   int nsignatures() const			{ return _sigs.size(); }
 
+  const RouterT* router() const { return _router; }
+
  private:
 
   const RouterT *_router;

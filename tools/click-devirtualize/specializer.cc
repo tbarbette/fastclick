@@ -531,6 +531,20 @@ bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to) {
 	 cxxc->defun(fnt);
   return found;
 }
+
+static String
+trim_quotes(String s) {
+	int b = 0;
+	int e = s.length() - 1;
+	while (b <= e && s[b] == '"') {
+		b++;
+	}
+	while (e >=b && s[e] == '"') {
+		e--;
+	}
+	return s.substring(b, e);
+}
+
 void
 Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 {
@@ -554,12 +568,34 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 	if (configure) {
 		Vector<String> args;
 		//click_chatter("Configure found  %s!",configure->body().c_str());
-
-		while (configure->replace_call("read_or_set_p(#0,#1,#2)","validate_p(#0,#1,#2)",args)) {
-				  for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
-					  CxxFunction &fnt = _specials[s].cxxc->function(f);
-					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), args[2].trim());
+		String configline = sigs.router()->element(_specials[s].eindex)->config();
+		while (configure->replace_call("read_or_set_p(#0,#1,#2)","validate_p(#0,#1,!TEMPVAL!-#2)",args)) {
+				  String value = args[2].trim();
+				  String param =  trim_quotes(args[0].trim());
+				  int pos = configline.find_left(param);
+				  if (pos >= 0) {
+					  pos += param.length();
+					  while (configline[pos] == ' ')
+						  pos++;
+					  int end = pos + 1;
+					  while (configline[end] != ',' && configline[end] != ')') end++;
+					  end -= 1;
+					  while (configline[end] == ' ') end--;
+					  value = configline.substring(pos,end+1);
+					  click_chatter("Config value is %s",value.c_str());
+				  } else {
+					  click_chatter("User did not overwrite %s", param.c_str());
 				  }
+				  configure->replace_expr("!TEMPVAL!-"+args[2], value);
+
+
+				  //Replace in specialized code
+			  for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
+					  CxxFunction &fnt = _specials[s].cxxc->function(f);
+					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
+				  }
+
+			  //Replace in original class code
 				  for (int f = 0; f < original->nfunctions(); f++) {
 					  CxxFunction &fnt = original->function(f);
 					  if (&fnt == configure)
@@ -567,7 +603,7 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 					  CxxFunction *overriden = 0;
 					  if ((overriden = _specials[s].cxxc->find(fnt.name())))
 						  fnt = *overriden;
-					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), args[2].trim());
+					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
 				  }
 		}
 		_specials[s].cxxc->defun(*configure);
