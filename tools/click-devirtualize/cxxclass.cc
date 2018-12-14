@@ -96,7 +96,7 @@ compile_pattern(const String &pattern0)
  */
 bool
 CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
-		       int match_pos[10], int match_len[10], bool allow_call) const
+		       int match_pos[10], int match_len[10], bool allow_call, bool full_symbol) const
 {
   const char *ps = pattern.data();
   int plen = pattern.length();
@@ -164,6 +164,8 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
       int p = tpos1 - 1;
       while (p >= 0 && isspace((unsigned char) ts[p]))
 	p--;
+      if (full_symbol && isalnum(ts[p]))
+	  continue;
       if (allow_call || p < 0
 	  || (ts[p] != '.'
 	      && (p == 0 || ts[p-1] != ':' || ts[p] != ':')
@@ -189,10 +191,10 @@ CxxFunction::find_expr(const String &pattern) const
 }
 
 bool
-CxxFunction::replace_expr(const String &pattern, const String &replacement)
+CxxFunction::replace_expr(const String &pattern, const String &replacement, bool full_symbol)
 {
   int pos1, pos2, match_pos[10], match_len[10];
-  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, false))
+  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, false, full_symbol))
     return false;
 
   //fprintf(stderr, ":::::: %s\n", _body.c_str());
@@ -229,9 +231,15 @@ CxxFunction::replace_expr(const String &pattern, const String &replacement)
 bool
 CxxFunction::replace_call(const String &pattern, const String &replacement, Vector<String> &args) {
 
-	  int pos1, pos2, match_pos[10], match_len[10];
+	  int pos1, pos2, match_pos[10], match_len[10] = {-1};
 	  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true))
 	    return false;
+
+	  int i = 0;
+	  while (match_len[i] > -1) {
+	      args.push_back(_body.substring(match_pos[i], match_len[i]));
+	      i++;
+	  }
 
 	  click_chatter("Found %s pos %d pos %d match %d %d",pattern.c_str(), pos1, pos2, match_pos[0], match_len[0]);
 	  //fprintf(stderr, ":::::: %s\n", _body.c_str());
@@ -243,7 +251,6 @@ CxxFunction::replace_call(const String &pattern, const String &replacement, Vect
 	    if (*s == '#') {
 	      assert(s < end_s - 1 && isdigit((unsigned char) s[1]));
 	      int which = s[1] - '0';
-	      args.push_back(_body.substring(match_pos[which], match_len[which]));
 	      sa << _body.substring(match_pos[which], match_len[which]);
 	      clean_sa << _clean_body.substring(match_pos[which], match_len[which]);
 	      s += 2;
@@ -286,7 +293,13 @@ CxxClass::add_parent(CxxClass *cxx)
 CxxFunction &
 CxxClass::defun(const CxxFunction &fn)
 {
-  int which = _functions.size();
+	for (int i = 0; i < _functions.size(); i++) {
+		if (_functions[i].name() == fn.name()) {
+			_functions[i] = fn;
+			return _functions[i];
+		}
+	}
+	int which = _functions.size();
   _functions.push_back(fn);
   _fn_map.set(fn.name(), which);
   _functions.back().unkill();

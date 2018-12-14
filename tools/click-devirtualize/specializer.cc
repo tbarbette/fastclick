@@ -28,6 +28,8 @@
 #include "signature.hh"
 #include <ctype.h>
 
+Vector<Pair<String,String>> patterns;
+
 Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
@@ -39,6 +41,9 @@ Specializer::Specializer(RouterT *router, const ElementMap &em)
     _noutputs[x->eindex()] = x->noutputs();
     _ninputs[x->eindex()] = x->ninputs();
   }
+
+  patterns.push_back(Pair<String,String>("read_or_set(#0,#1,#2)","validate(#0,#1,!TEMPVAL!)"));
+  patterns.push_back(Pair<String,String>("read_or_set_p(#0,#1,#2)","validate_p(#0,#1,!TEMPVAL!)"));
 
   // prepare from element map
   for (ElementMap::TraitsIterator x = em.begin_elements(); x; x++) {
@@ -521,9 +526,11 @@ static
 bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to) {
   if (!fnt.alive())
 	  return false;
+  if (fnt.name() == "add_handlers" ||fnt.name() == "configure")
+	  return false;
   bool found = false;
-  click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
-  if (fnt.replace_expr(from, to)) {
+  //click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
+  if (fnt.replace_expr(from, to, true)) {
 	  found = true;
 	  click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
   }
@@ -544,6 +551,7 @@ trim_quotes(String s) {
 	}
 	return s.substring(b, e);
 }
+
 
 void
 Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
@@ -569,46 +577,55 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 		Vector<String> args;
 		//click_chatter("Configure found  %s!",configure->body().c_str());
 		String configline = sigs.router()->element(_specials[s].eindex)->config();
-		while (configure->replace_call("read_or_set_p(#0,#1,#2)","validate_p(#0,#1,!TEMPVAL!-#2)",args)) {
-				  String value = args[2].trim();
-				  String param =  trim_quotes(args[0].trim());
-				  int pos = configline.find_left(param);
-				  if (pos >= 0) {
-					  pos += param.length();
-					  while (configline[pos] == ' ')
-						  pos++;
-					  int end = pos + 1;
-					  while (configline[end] != ',' && configline[end] != ')') end++;
-					  end -= 1;
-					  while (configline[end] == ' ') end--;
-					  value = configline.substring(pos,end+1);
-					  click_chatter("Config value is %s",value.c_str());
-				  } else {
-					  click_chatter("User did not overwrite %s", param.c_str());
-				  }
-				  configure->replace_expr("!TEMPVAL!-"+args[2], value);
+		for (int p =0; p < patterns.size(); p++) {
+				while (configure->replace_call(patterns[p].first, patterns[p].second,args)) {
+					  String value;
+					  String param =  trim_quotes(args[0].trim());
+					  int pos = configline.find_left(param);
+					  if (pos >= 0) {
+						  pos += param.length();
+						  while (configline[pos] == ' ')
+							  pos++;
+						  int end = pos + 1;
+						  while (configline[end] != ',' && configline[end] != ')') end++;
+						  end -= 1;
+						  while (configline[end] == ' ') end--;
+						  value = configline.substring(pos,end+1);
+						  click_chatter("Config value is %s",value.c_str());
+					  } else {
+						  if (args.size() > 2) {
+							  value=args[2].trim();
+						  } else {
+							  click_chatter("Unknown value for %s", param.c_str());
+							  continue;
+						  }
+
+						  click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
+					  }
+					  configure->replace_expr("!TEMPVAL!", value);
 
 
-				  //Replace in specialized code
-			  for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
-					  CxxFunction &fnt = _specials[s].cxxc->function(f);
-					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
-				  }
+					  //Replace in specialized code
+					  for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
+						  CxxFunction &fnt = _specials[s].cxxc->function(f);
+						  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
+					  }
 
-			  //Replace in original class code
-				  for (int f = 0; f < original->nfunctions(); f++) {
-					  CxxFunction &fnt = original->function(f);
-					  if (&fnt == configure)
-						  continue;
-					  CxxFunction *overriden = 0;
-					  if ((overriden = _specials[s].cxxc->find(fnt.name())))
-						  fnt = *overriden;
-					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
-				  }
+					  //Replace in original class code
+					  for (int f = 0; f < original->nfunctions(); f++) {
+						  CxxFunction &fnt = original->function(f);
+						  if (&fnt == configure)
+							  continue;
+						  CxxFunction *overriden = 0;
+						  if ((overriden = _specials[s].cxxc->find(fnt.name())))
+							  fnt = *overriden;
+						  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
+					  }
+					  args.clear();
+				}
+				_specials[s].cxxc->defun(*configure);
+				//click_chatter("Configure changed  %s!",configure->body().c_str());
 		}
-		_specials[s].cxxc->defun(*configure);
-		//click_chatter("Configure changed  %s!",configure->body().c_str());
-
 	}
 	if (_specials[s].cxxc->find("simple_action"))
 		do_simple_action(_specials[s]);
