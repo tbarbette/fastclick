@@ -87,9 +87,16 @@ compile_pattern(const String &pattern0)
   return sa.take_string();
 }
 
+/**
+ * Find an expression in the function
+ * @args pattern A symbol to search for
+ * @args pos1 Start position of the pattern if found
+ * @arfs pos2 End position of the pattern if found
+ *
+ */
 bool
 CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
-		       int match_pos[10], int match_len[10]) const
+		       int match_pos[10], int match_len[10], bool allow_call) const
 {
   const char *ps = pattern.data();
   int plen = pattern.length();
@@ -157,7 +164,7 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
       int p = tpos1 - 1;
       while (p >= 0 && isspace((unsigned char) ts[p]))
 	p--;
-      if (p < 0
+      if (allow_call || p < 0
 	  || (ts[p] != '.'
 	      && (p == 0 || ts[p-1] != ':' || ts[p] != ':')
 	      && (p == 0 || ts[p-1] != '-' || ts[p] != '>'))) {
@@ -185,7 +192,7 @@ bool
 CxxFunction::replace_expr(const String &pattern, const String &replacement)
 {
   int pos1, pos2, match_pos[10], match_len[10];
-  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len))
+  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, false))
     return false;
 
   //fprintf(stderr, ":::::: %s\n", _body.c_str());
@@ -217,6 +224,46 @@ CxxFunction::replace_expr(const String &pattern, const String &replacement)
 
   //fprintf(stderr, ">>>>>> %s\n", _body.c_str());
   return true;
+}
+
+bool
+CxxFunction::replace_call(const String &pattern, const String &replacement, Vector<String> &args) {
+
+	  int pos1, pos2, match_pos[10], match_len[10];
+	  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true))
+	    return false;
+
+	  click_chatter("Found %s pos %d pos %d match %d %d",pattern.c_str(), pos1, pos2, match_pos[0], match_len[0]);
+	  //fprintf(stderr, ":::::: %s\n", _body.c_str());
+
+	  StringAccum sa, clean_sa;
+	  const char *s = replacement.data();
+	  const char *end_s = s + replacement.length();
+	  while (s < end_s) {
+	    if (*s == '#') {
+	      assert(s < end_s - 1 && isdigit((unsigned char) s[1]));
+	      int which = s[1] - '0';
+	      args.push_back(_body.substring(match_pos[which], match_len[which]));
+	      sa << _body.substring(match_pos[which], match_len[which]);
+	      clean_sa << _clean_body.substring(match_pos[which], match_len[which]);
+	      s += 2;
+	    } else {
+	      sa << *s;
+	      clean_sa << *s;
+	      s++;
+	    }
+	  }
+
+	  String new_body =
+	    _body.substring(0, pos1) + sa.take_string() + _body.substring(pos2);
+	  String new_clean_body =
+	    _clean_body.substring(0, pos1) + clean_sa.take_string()
+	    + _clean_body.substring(pos2);
+	  _body = new_body;
+	  _clean_body = new_clean_body;
+
+	  //fprintf(stderr, ">>>>>> %s\n", _body.c_str());
+	  return true;
 }
 
 

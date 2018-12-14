@@ -115,6 +115,7 @@ Specializer::parse_source_file(ElementTypeInfo &etinfo,
       if (do_header)
 	etinfo.found_header_file = found;
     }
+
     _cxxinfo.parse_file(text, do_header, includes);
     _parsed_sources.set(fn, 1);
   }
@@ -516,6 +517,20 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 #endif
 }
 
+static
+bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to) {
+  if (!fnt.alive())
+	  return false;
+  bool found = false;
+  click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
+  if (fnt.replace_expr(from, to)) {
+	  found = true;
+	  click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
+  }
+  if (found)
+	 cxxc->defun(fnt);
+  return found;
+}
 void
 Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 {
@@ -530,8 +545,38 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 
   // actually do the work
   for (int s = 0; s < _specials.size(); s++) {
-    if (create_class(_specials[s]) && _specials[s].cxxc->find("simple_action"))
-      do_simple_action(_specials[s]);
+    if (create_class(_specials[s])) {
+	CxxClass* original = _specials[s].cxxc->parent(0);
+	/*for (int j = 0; j < original->nfunctions(); j++) {
+		click_chatter("CLass %s fnt %s",original->name().c_str(), original->function(j).name().c_str());
+	}*/
+	CxxFunction* configure = original->find("configure");
+	if (configure) {
+		Vector<String> args;
+		//click_chatter("Configure found  %s!",configure->body().c_str());
+
+		while (configure->replace_call("read_or_set_p(#0,#1,#2)","validate_p(#0,#1,#2)",args)) {
+				  for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
+					  CxxFunction &fnt = _specials[s].cxxc->function(f);
+					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), args[2].trim());
+				  }
+				  for (int f = 0; f < original->nfunctions(); f++) {
+					  CxxFunction &fnt = original->function(f);
+					  if (&fnt == configure)
+						  continue;
+					  CxxFunction *overriden = 0;
+					  if ((overriden = _specials[s].cxxc->find(fnt.name())))
+						  fnt = *overriden;
+					  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), args[2].trim());
+				  }
+		}
+		_specials[s].cxxc->defun(*configure);
+		//click_chatter("Configure changed  %s!",configure->body().c_str());
+
+	}
+	if (_specials[s].cxxc->find("simple_action"))
+		do_simple_action(_specials[s]);
+    }
   }
 
   for (int s = 0; s < _specials.size(); s++)

@@ -839,6 +839,12 @@ String::encode_json() const
     } else
         return *this;
 }
+/** @brief Return a substring with spaces trimmed from both sides. */
+String
+String::trim() const
+{
+    return trim_space().trim_space_left();
+}
 
 /** @brief Return a substring with spaces trimmed from the end. */
 String

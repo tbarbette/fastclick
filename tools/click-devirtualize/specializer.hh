@@ -72,6 +72,7 @@ class Specializer { public:
   HashTable<String, int> _header_file_map;
   HashTable<String, int> _parsed_sources;
 
+  //List of specialized class, populated by specialize()
   Vector<SpecializedClass> _specials;
 
   CxxInfo _cxxinfo;

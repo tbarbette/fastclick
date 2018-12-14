@@ -412,6 +412,23 @@ class Args : public ArgContext {
         return *this;
     }
 
+    template <typename T, typename V>
+    Args &validate_p(const char *keyword, T &x, const V &static_value) {
+	//Todo : cleaner
+
+        Slot *slot_status;
+        String str = find(keyword, positional, slot_status);
+        if (!str) {
+		return *this;
+        } else {
+		T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
+		postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
+		assert(x == static_value);
+        }
+        return *this;
+
+    }
+
     /** @brief Read an argument using a specified parser.
      * @param keyword argument name
      * @param parser parser object
