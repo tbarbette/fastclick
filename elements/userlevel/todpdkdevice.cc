@@ -30,7 +30,6 @@ ToDPDKDevice::ToDPDKDevice() :
     _tso(0), _tco(false), _ipco(false)
 {
      _blocking = false;
-     _burst = -1;
      _internal_tx_queue_size = 1024;
      ndesc = 0;
 }

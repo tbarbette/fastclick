@@ -66,6 +66,7 @@ FromNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         return err;
 
     if (Args(conf, this, errh)
+		.read("BURST", _burst)
             .read("KEEPHAND",_keephand)
             .complete() < 0)
         return -1;
