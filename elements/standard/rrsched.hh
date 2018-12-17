@@ -40,7 +40,7 @@ class RRSched : public Element { public:
 
     Packet *pull(int port);
 
-  private:
+  protected:
 
     int _next;
     NotifierSignal *_signals;
