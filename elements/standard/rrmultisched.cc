@@ -49,12 +49,16 @@ RRMultiSched::pull(int)
 		_n_cur++;
 		if (_n_cur == _n) {
 			i++;
+			if (i == _max)
+				i = 0;
 			_n_cur = 0;
 		}
 	    _next = i;
 	    return p;
 	} else {
 		i++;
+		if (i == _max)
+			i = 0;
 		_n_cur = 0;
 	}
     }
