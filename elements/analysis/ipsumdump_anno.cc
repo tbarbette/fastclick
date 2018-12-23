@@ -27,7 +27,7 @@ CLICK_DECLS
 
 enum { T_TIMESTAMP, T_TIMESTAMP_SEC, T_TIMESTAMP_USEC, T_TIMESTAMP_USEC1,
        T_FIRST_TIMESTAMP, T_COUNT, T_LINK, T_DIRECTION, T_AGGREGATE,
-       T_WIRE_LEN };
+       T_WIRE_LEN, T_THREAD };
 
 namespace IPSummaryDump {
 
@@ -74,6 +74,8 @@ static bool anno_extract(PacketDesc& d, const FieldWriter *f)
 	return true;
     case T_WIRE_LEN:
 	d.v = p->length();
+    case T_THREAD:
+    d.v = click_current_cpu_id();
 	return true;
       default:
 	return false;
@@ -218,6 +220,8 @@ static const IPSummaryDump::FieldWriter anno_writers[] = {
     { "aggregate", B_4, T_AGGREGATE,
       0, anno_extract, num_outa, outb },
     { "wire_len", B_4, T_WIRE_LEN,
+      0, anno_extract, num_outa, outb },
+    { "thread", B_4, T_THREAD,
       0, anno_extract, num_outa, outb }
 };
 

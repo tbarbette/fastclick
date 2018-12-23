@@ -1,0 +1,78 @@
+%info
+Test that UDPRewriter in its IMP version is isolated between threads and that ThreadIPMapper is actually using a per-thread pattern.
+
+This configuration is what should be used for parallel independent (shareded) implementation of NAT.
+
+On top of this configuration, one must arrange that packets from the given per-thread range arrive on the right thread.
+
+%require
+click-buildtool provides umultithread
+
+%script
+
+$VALGRIND click -j 2 -e "
+tmapper :: ThreadIPMapper(1.0.0.1 1024-30000# - - 0 1,
+                          1.0.0.1 30001-65535# - - 0 1)
+rw :: UDPRewriter(tmapper, drop);
+
+f1 :: FromIPSummaryDump(IN1, STOP true)
+	-> [0]rw;
+f2 :: FromIPSummaryDump(IN1, STOP true, ACTIVE false)
+	-> [0]rw;
+
+
+ret1 :: FromIPSummaryDump(IN2, STOP true, ACTIVE false)
+	-> [1]rw;
+
+ret2 :: FromIPSummaryDump(IN2-2, STOP true, ACTIVE false)
+	-> [1]rw;
+
+
+rw[0] -> PathSpinlock -> ToIPSummaryDump(OUT1, FIELDS thread src sport dst dport proto);
+rw[1] -> PathSpinlock -> ToIPSummaryDump(OUT2, FIELDS thread src sport dst dport proto);
+
+StaticThreadSched(f1 0, f2 1, ret1 0, ret2 1);
+
+DriverManager(pause, write f2.active true, pause, write ret1.active true, pause, write ret2.active true, pause);
+"
+
+%file IN1
+!data src sport dst dport proto
+18.26.4.44 30 10.0.0.4 40 T
+18.26.4.44 30 10.0.0.4 40 T
+18.26.4.44 20 10.0.0.8 80 T
+
+%file IN2
+!data src sport dst dport proto
+10.0.0.4 40 1.0.0.1 1024 T
+10.0.0.4 40 1.0.0.1 1024 T
+10.0.0.8 80 1.0.0.1 1025 T
+10.0.0.8 80 1.0.0.1 1026 T
+
+
+%file IN2-2
+!data src sport dst dport proto
+10.0.0.4 40 1.0.0.1 30001 T
+10.0.0.4 40 1.0.0.1 30001 T
+10.0.0.8 80 1.0.0.1 30002 T
+10.0.0.8 80 1.0.0.1 30003 T
+
+%ignorex
+!.*
+
+%expect OUT1
+0 1.0.0.1 1024 10.0.0.4 40 T
+0 1.0.0.1 1024 10.0.0.4 40 T
+0 1.0.0.1 1025 10.0.0.8 80 T
+1 1.0.0.1 30001 10.0.0.4 40 T
+1 1.0.0.1 30001 10.0.0.4 40 T
+1 1.0.0.1 30002 10.0.0.8 80 T
+
+
+%expect OUT2
+0 10.0.0.4 40 18.26.4.44 30 T
+0 10.0.0.4 40 18.26.4.44 30 T
+0 10.0.0.8 80 18.26.4.44 20 T
+1 10.0.0.4 40 18.26.4.44 30 T
+1 10.0.0.4 40 18.26.4.44 30 T
+1 10.0.0.8 80 18.26.4.44 20 T

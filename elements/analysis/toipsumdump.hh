@@ -107,6 +107,7 @@ contain those fields. Valid field names, with examples, are:
    eth_src      Ethernet source: '00-0A-95-A6-D9-BC'
    eth_dst      Ethernet source: '00-0A-95-A6-D9-BC'
    wire_len     Packet wire length: '54'
+   thread       Current thread id: '0'
 
 If a field does not apply to a particular packet -- for example, 'C<sport>' on
 an ICMP packet -- ToIPSummaryDump prints a single dash for that value.
