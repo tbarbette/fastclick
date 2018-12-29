@@ -72,6 +72,7 @@ class RatedUnqueue : public BatchElement { public:
     uint32_t _pushes;
     uint32_t _failed_pulls;
     uint32_t _empty_runs;
+    uint32_t _burst;
 
     enum { h_calls, h_rate };
 

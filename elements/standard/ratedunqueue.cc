@@ -27,7 +27,7 @@
 CLICK_DECLS
 
 RatedUnqueue::RatedUnqueue()
-    : _task(this), _timer(&_task), _runs(0), _packets(0), _pushes(0), _failed_pulls(0), _empty_runs(0), _active(true)
+    : _task(this), _timer(&_task), _runs(0), _packets(0), _pushes(0), _failed_pulls(0), _empty_runs(0), _burst(32), _active(true)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -37,6 +37,10 @@ RatedUnqueue::RatedUnqueue()
 int
 RatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    if (Args(this, errh).bind(conf)
+	    .read_or_set("BURST", _burst, 32)
+        .consume() < 0)
+        return -1;
     return configure_helper(&_tb, is_bandwidth(), this, conf, errh);
 }
 
@@ -99,8 +103,8 @@ RatedUnqueue::run_task(Task *)
     if (_tb.contains(1)) {
 #if HAVE_BATCH
             int burst = _tb.size();
-            if (burst > 32)
-                burst = 32;
+            if (burst > (int)_burst)
+                burst = _burst;
             PacketBatch* batch = input(0).pull_batch(burst);
             if (batch) {
                 int c = batch->count();
