@@ -44,10 +44,13 @@ ToNetmapDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     String ifname;
     int burst = -1;
 
-    if (parse(Args(conf, this, errh)
-    .read_mp("DEVNAME", ifname), errh)
-    .complete() < 0)
+    if (Args(this, errh).bind(conf)
+            .read_mp("DEVNAME", ifname)
+            .consume() < 0)
     	return -1;
+
+    if (parse(conf, errh) != 0)
+        return -1;
 
     if (_internal_tx_queue_size < _burst * 2) {
         return errh->error("IQUEUE (%d) must be at least twice the size of BURST (%d)!",_internal_tx_queue_size, _burst);

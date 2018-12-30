@@ -15,13 +15,17 @@
 CLICK_DECLS
 
 /*
- * =title ToDPDKDevice
+ * =title ToNetmapDevice
  *
  * =c
  *
  * ToNetmapDevice(DEVNAME [, QUEUE, N_QUEUES, [, I<keywords> PROMISC, BURST])
  *
+ * Sends packets using Netmap
+ *
  * =s comm
+ *
+ * =d
  *
  * Send packets through a Netmap device, optionnaly specifying a queue number.
  * This element is NOT thread safe. This element supports both push and pull.

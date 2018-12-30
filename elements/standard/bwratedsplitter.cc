@@ -26,16 +26,31 @@ BandwidthRatedSplitter::BandwidthRatedSplitter()
 {
 }
 
+inline int
+BandwidthRatedSplitter::smaction(Packet *p)
+{
+    if (_tb.contains(RatedUnqueue::tb_bandwidth_thresh)) {
+        _tb.remove(p->length());
+        return 0;
+    } else
+        return 1;
+}
+
 void
 BandwidthRatedSplitter::push(int, Packet *p)
 {
     _tb.refill();
-    if (_tb.contains(RatedUnqueue::tb_bandwidth_thresh)) {
-	_tb.remove(p->length());
-	output(0).push(p);
-    } else
-	checked_output_push(1, p);
+    checked_output_push(smaction(p), p);
 }
+
+#if HAVE_BATCH
+void
+BandwidthRatedSplitter::push_batch(int, PacketBatch *batch)
+{
+    _tb.refill();
+    CLASSIFY_EACH_PACKET(2, smaction, batch, checked_output_push_batch);
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(RatedSplitter)

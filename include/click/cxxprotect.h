@@ -10,6 +10,8 @@
 # define namespace	linux_namespace
 # define false		linux_false
 # define true		linux_true
+# undef asmlinkage
+# define asmlinkage
 #endif
 
 #ifndef CLICK_CXX_PROTECT

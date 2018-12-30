@@ -30,7 +30,8 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
     }
     instance = this;
     if (Args(conf, this, errh)
-        .read_p("NB_MBUF", DPDKDevice::NB_MBUF)
+        .read_p("NB_MBUF", DPDKDevice::DEFAULT_NB_MBUF)
+        .read_all("NB_SOCKET_MBUF", DPDKDevice::NB_MBUF)
         .read("MBUF_SIZE", DPDKDevice::MBUF_DATA_SIZE)
         .read("MBUF_CACHE_SIZE", DPDKDevice::MBUF_CACHE_SIZE)
         .read("RX_PTHRESH", DPDKDevice::RX_PTHRESH)
@@ -55,10 +56,10 @@ String DPDKInfo::read_handler(Element *e, void * thunk)
 {
     DPDKInfo *fd = static_cast<DPDKInfo *>(e);
 
+    StringAccum acc;
     switch((uintptr_t) thunk) {
         case h_pool_count:
-            StringAccum acc;
-            for (int i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++) {
+            for (unsigned i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++) {
 #if RTE_VERSION < RTE_VERSION_NUM(17,02,0,0)
                 int avail = rte_mempool_count(DPDKDevice::_pktmbuf_pools[i]);
 #else
@@ -66,14 +67,22 @@ String DPDKInfo::read_handler(Element *e, void * thunk)
 #endif
                 acc << "0 " << String(avail) << "\n";
             }
-            return acc.take_string();
+            break;
+        case h_pools:
+            for (unsigned i = 0; i < DPDKDevice::_nr_pktmbuf_pools; i++) {
+               acc << DPDKDevice::_pktmbuf_pools[i]->name << "\n";
+            }
+            break;
+        default:
+            acc << "<error>";
     }
 
-    return "<error>";
+    return acc.take_string();
 }
 
 void DPDKInfo::add_handlers() {
     add_read_handler("pool_count", read_handler, h_pool_count);
+    add_read_handler("pools", read_handler, h_pools);
 }
 
 DPDKInfo* DPDKInfo::instance = 0;

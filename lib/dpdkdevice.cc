@@ -92,7 +92,14 @@ int core_to_numa_node(unsigned lcore_id) {
        return (numa_node < 0) ? 0 : numa_node;
 }
 
-int DPDKDevice::alloc_pktmbufs()
+int DPDKDevice::get_nb_mbuf(int socket) {
+    if (NB_MBUF.size() == 0)
+        return DEFAULT_NB_MBUF;
+    else
+        return NB_MBUF[socket % NB_MBUF.size()];
+}
+
+int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
 {
     /* Count NUMA sockets for each device and each node, we do not want to
      * allocate a unused pool
@@ -135,6 +142,19 @@ int DPDKDevice::alloc_pktmbufs()
         _nr_pktmbuf_pools = n_pktmbuf_pools;
     }
 
+#if HAVE_DPDK_PACKET_POOL
+	int total = 0;
+	for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
+		total += get_nb_mbuf(i);
+	}
+
+	if (Packet::max_data_pool_size() > 0) {
+		if (Packet::max_data_pool_size() + 8192 > total) {
+			return errh->error("--enable-dpdk-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more than %d DPDK buffers or compile without --enable-dpdk-pool", Packet::max_data_pool_size() + 8192);
+		}
+	}
+#endif
+
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
         // Create a pktmbuf pool for each active socket
         for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
@@ -143,26 +163,27 @@ int DPDKDevice::alloc_pktmbufs()
                         const char* name = mempool_name.c_str();
                         _pktmbuf_pools[i] =
 #if RTE_VERSION >= RTE_VERSION_NUM(2,2,0,0)
-                        rte_pktmbuf_pool_create(name, NB_MBUF,
+                        rte_pktmbuf_pool_create(name, get_nb_mbuf(i),
                                                 MBUF_CACHE_SIZE, 0, MBUF_DATA_SIZE, i);
 #else
                         rte_mempool_create(
-                                        name, NB_MBUF, MBUF_SIZE, MBUF_CACHE_SIZE,
+                                        name, get_nb_mbuf(i), MBUF_SIZE, MBUF_CACHE_SIZE,
                                         sizeof (struct rte_pktmbuf_pool_private),
                                         rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
                                         i, 0);
 #endif
 
-                        if (!_pktmbuf_pools[i])
+                        if (!_pktmbuf_pools[i]) {
+                                errh->error("Could not allocate packet MBuf pools %d with %d buffers : error %d (%s)",i, get_nb_mbuf(i), rte_errno,rte_strerror(rte_errno));
                                 return rte_errno;
+                        }
                 }
         }
     } else {
         int i = 0;
         rte_mempool_walk(add_pool,(void*)&i);
         if (i == 0) {
-            click_chatter("Could not get pools from the primary DPDK process");
-            return -1;
+            return errh->error("Could not get pools from the primary DPDK process");
         }
     }
 
@@ -235,7 +256,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,11,0,0)
     dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
     dev_conf.txmode.offloads = 0;
 #endif
@@ -409,7 +430,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     tx_conf.offloads = dev_conf.txmode.offloads;
 #endif
 #if RTE_VERSION <= RTE_VERSION_NUM(18,05,0,0)
-    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOVLANOFFL ;
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 #endif
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
@@ -594,8 +615,7 @@ int DPDKDevice::static_initialize(ErrorHandler* errh) {
         return errh->error("You must start Click with --dpdk option when compiling with --enable-dpdk-pool");
     }
 #endif
-    if (alloc_pktmbufs()) {
-        errh->error("Could not allocate packet MBuf pools : error %d (%s)",rte_errno,rte_strerror(rte_errno));
+    if (alloc_pktmbufs(errh)) {
         if (rte_errno == 12) {
             errh->error("Maybe try to allocate less buffers with DPDKInfo(X) or allocate more memory to DPDK by giving/increasing the -m parameter or allocate more hugepages.");
         }
@@ -725,13 +745,13 @@ bool
 FlowControlModeArg::parse(
     const String &str, FlowControlMode &result, const ArgContext &ctx) {
     str.lower();
-    if (str == "full") {
+    if (str == "full" || str == "on") {
         result = FC_FULL;
     } else if (str == "rx") {
         result = FC_RX;
     }else if (str == "tx") {
         result = FC_TX;
-    } else if (str == "none") {
+    } else if (str == "none" || str == "off") {
         result = FC_NONE;
     } else
         return false;
@@ -759,9 +779,9 @@ FlowControlModeArg::unparse(FlowControlMode mode) {
 
 
 DPDKRing::DPDKRing() :
-    _message_pool(0),
-       _numa_zone(0), _burst_size(0), _flags(0), _ring(0),
-       _count(0), _MEM_POOL("") {
+    _message_pool(0), _MEM_POOL(""),
+    _burst_size(0),_numa_zone(0), _flags(0), _ring(0), _count(0),
+    _force_create(false), _force_lookup(false)  {
 }
 
 DPDKRing::~DPDKRing() {
@@ -786,6 +806,8 @@ DPDKRing::parse(Args* args) {
             .read("NUMA_ZONE",    _numa_zone)
             .read("SP_ENQ", spenq)
             .read("SC_DEQ", spdeq)
+            .read("FORCE_LOOKUP", _force_lookup)
+            .read("FORCE_CREATE", _force_create)
             .execute() < 0)
         return -1;
 
@@ -832,10 +854,11 @@ DPDKRing::parse(Args* args) {
  * Must be able to fill the packet data pool,
  * and then have some packets for I/O.
  */
-int DPDKDevice::NB_MBUF = 32*4096*2;
+int DPDKDevice::DEFAULT_NB_MBUF = 32*4096*2;
 #else
-int DPDKDevice::NB_MBUF = 65536;
+int DPDKDevice::DEFAULT_NB_MBUF = 65536;
 #endif
+Vector<int> DPDKDevice::NB_MBUF;
 #ifdef RTE_MBUF_DEFAULT_BUF_SIZE
 int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE;
 #else

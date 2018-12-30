@@ -20,7 +20,11 @@ CLICK_DECLS
  *
  * FromNetmapDevice(DEVNAME [, QUEUE, NR_QUEUE, [, I<keywords> PROMISC, BURST])
  *
+ * Receives packets using Netmap
+ *
  * =s netdevices
+ *
+ * =d
  *
  * =item DEVNAME
  *
@@ -68,8 +72,6 @@ CLICK_DECLS
  *
  */
 
-
-
 class FromNetmapDevice: public RXQueueDevice {
 
 public:
@@ -84,8 +86,6 @@ public:
 
     int configure_phase() const			{ return CONFIGURE_PHASE_PRIVILEGED - 5; }
     void* cast(const char*);
-
-
     int configure(Vector<String>&, ErrorHandler*) CLICK_COLD;
     int initialize(ErrorHandler*) CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;

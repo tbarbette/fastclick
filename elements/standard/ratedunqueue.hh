@@ -68,6 +68,7 @@ class RatedUnqueue : public BatchElement { public:
     Timer _timer;
     NotifierSignal _signal;
     uint32_t _runs;
+    uint32_t _packets;
     uint32_t _pushes;
     uint32_t _failed_pulls;
     uint32_t _empty_runs;

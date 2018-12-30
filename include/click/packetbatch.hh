@@ -9,7 +9,7 @@ CLICK_DECLS
  * Iterate over all packets of a batch. The batch cannot be modified during
  *   iteration. Use _SAFE version if you want to modify it on the fly.
  */
-#define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != NULL;p=p->next())
+#define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != 0;p=p->next())
 
 /**
  * Iterate over a simply linked packet a batch. The current packet can be modified
@@ -17,9 +17,9 @@ CLICK_DECLS
  *  the loop.
  */
 #define FOR_EACH_PACKET_SAFE(batch,p) \
-                Packet* fep_next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* fep_next = ((batch != 0)? batch->next() : 0 );\
                 Packet* p = batch;\
-                for (;p != NULL;p=fep_next,fep_next=(p==0?0:p->next()))
+                for (;p != 0;p=fep_next,fep_next=(p==0?0:p->next()))
 
 /**
  * Execute a function on each packets of a batch. The function may return
@@ -27,10 +27,10 @@ CLICK_DECLS
  * Use _DROPPABLE version if the function could return null.
  */
 #define EXECUTE_FOR_EACH_PACKET(fnt,batch) \
-                Packet* efep_next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* efep_next = ((batch != 0)? batch->next() : 0 );\
                 Packet* p = batch;\
-                Packet* last = NULL;\
-                for (;p != NULL;p=efep_next,efep_next=(p==0?0:p->next())) {\
+                Packet* last = 0;\
+                for (;p != 0;p=efep_next,efep_next=(p==0?0:p->next())) {\
             Packet* q = fnt(p);\
                     if (q != p) {\
                         if (last) {\
@@ -49,11 +49,11 @@ CLICK_DECLS
  * that one, or null if the packet is to be dropped.
  */
 #define EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt,batch,on_drop) {\
-                Packet* efepd_next = ((batch != NULL)? batch->next() : NULL );\
+                Packet* efepd_next = ((batch != 0)? batch->next() : 0 );\
                 Packet* p = batch;\
-                Packet* last = NULL;\
+                Packet* last = 0;\
                 int count = batch->count();\
-                for (;p != NULL;p=efepd_next,efepd_next=(p==0?0:p->next())) {\
+                for (;p != 0;p=efepd_next,efepd_next=(p==0?0:p->next())) {\
             Packet* q = fnt(p);\
             if (q == 0) {\
                 on_drop(p);\
@@ -107,11 +107,11 @@ CLICK_DECLS
  * On_flush is always called on the batch after the last packet.
  */
 #define EXECUTE_FOR_EACH_PACKET_SPLITTABLE(fnt,batch,on_drop,on_flush) {\
-            Packet* next = ((batch != NULL)? batch->next() : NULL );\
+            Packet* next = ((batch != 0)? batch->next() : 0 );\
             Packet* p = batch;\
-            Packet* last = NULL;\
+            Packet* last = 0;\
             int count = 0;\
-            for (;p != NULL;p=next,next=(p==0?0:p->next())) {\
+            for (;p != 0;p=next,next=(p==0?0:p->next())) {\
                 Packet* q = (fnt(p));\
                 if (q == 0) {\
                     if (last) {\
@@ -164,18 +164,18 @@ CLICK_DECLS
     {\
         PacketBatch* out[(nbatches)];\
         bzero(out,sizeof(PacketBatch*)*(nbatches));\
-        PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
+        PacketBatch* cep_next = ((cep_batch != 0)? static_cast<PacketBatch*>(cep_batch->next()) : 0 );\
         PacketBatch* p = cep_batch;\
-        PacketBatch* last = NULL;\
+        PacketBatch* last = 0;\
         int last_o = -1;\
         int passed = 0;\
-        for (;p != NULL;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
+        for (;p != 0;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
             if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
             if (o == last_o) {\
                 passed ++;\
             } else {\
-                if (last == NULL) {\
+                if (last == 0) {\
                     out[o] = p;\
                     p->set_count(1);\
                     p->set_tail(p);\
@@ -204,7 +204,7 @@ CLICK_DECLS
         int i = 0;\
         for (; i < (nbatches); i++) {\
             if (out[i]) {\
-                out[i]->tail()->set_next(NULL);\
+                out[i]->tail()->set_next(0);\
                 (on_finish(i,out[i]));\
             }\
         }\
@@ -218,18 +218,18 @@ CLICK_DECLS
     {\
         PacketBatch* out[(nbatches)];\
         bzero(out,sizeof(PacketBatch*)*(nbatches));\
-        PacketBatch* cep_next = ((cep_batch != NULL)? static_cast<PacketBatch*>(cep_batch->next()) : NULL );\
+        PacketBatch* cep_next = ((cep_batch != 0)? static_cast<PacketBatch*>(cep_batch->next()) : 0 );\
         Packet* p = cep_batch;\
-        Packet* last = NULL;\
+        Packet* last = 0;\
         int last_o = -1;\
         int passed = 0;\
-        for (;p != NULL;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
+        for (;p != 0;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
             if (o>=(nbatches)) o = (nbatches - 1);\
             if (o == last_o) {\
                 passed ++;\
             } else {\
-                if (last == NULL) {\
+                if (last == 0) {\
                     if (o == -1) continue;\
                     out[o] = static_cast<PacketBatch*>(p);\
                     out[o]->set_count(1);\
@@ -263,7 +263,7 @@ CLICK_DECLS
         int i = 0;\
         for (; i < (nbatches); i++) {\
             if (out[i]) {\
-                out[i]->tail()->set_next(NULL);\
+                out[i]->tail()->set_next(0);\
                 (on_finish(i,out[i]));\
             }\
         }\
@@ -286,18 +286,18 @@ CLICK_DECLS
 #define MAKE_BATCH(fnt,head,max) {\
         head = PacketBatch::start_head(fnt);\
         Packet* last = head;\
-        if (head != NULL) {\
+        if (head != 0) {\
             unsigned int count = 1;\
             while (count < (unsigned)(max>0?max:BATCH_MAX_PULL)) {\
                 Packet* current = fnt;\
-                if (current == NULL)\
+                if (current == 0)\
                     break;\
                 last->set_next(current);\
                 last = current;\
                 count++;\
             }\
             head->make_tail(last,count);\
-        } else head = NULL;\
+        } else head = 0;\
 }
 
 /**
@@ -377,14 +377,14 @@ public :
      */
     inline PacketBatch* make_tail(Packet* last, unsigned int count) {
         set_count(count);
-        if (last == NULL) {
+        if (last == 0) {
             if (count != 1)
                 click_chatter("BUG in make_tail : last packet is the head, but count is %u",count);
             set_tail(this);
-            set_next(NULL);
+            set_next(0);
         } else {
             set_tail(last);
-            last->set_next(NULL);
+            last->set_next(0);
         }
         return this;
     }
@@ -404,21 +404,21 @@ public :
      * @param second Reference to set the head of the second batch
      */
     inline void cut(Packet* middle, int first_batch_count, PacketBatch* &second) {
-        if (middle == NULL) {
-            second = NULL;
+        if (middle == 0) {
+            second = 0;
             click_chatter("BUG Warning : cutting a batch without a location to cut !");
             return;
         }
 
         if (middle == tail()) {
-            second = NULL;
+            second = 0;
             return;
         }
 
         int total_count = count();
 
         second = static_cast<PacketBatch*>(middle->next());
-        middle->set_next(NULL);
+        middle->set_next(0);
 
         Packet* second_tail = tail();
         set_tail(middle);
@@ -480,9 +480,11 @@ public :
         return b;
     }
 
+#if !CLICK_LINUXMODULE
     static PacketBatch *make_batch(unsigned char *data, uint16_t count, uint16_t *length,
                     buffer_destructor_type destructor,
                                     void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+#endif
 
     /**
      * Return the first packet of this batch
@@ -552,15 +554,15 @@ inline void PacketBatch::kill() {
 
 #if HAVE_BATCH_RECYCLE
 #define BATCH_RECYCLE_START() \
-	WritablePacket* head_packet = NULL;\
-	WritablePacket* head_data = NULL;\
-	WritablePacket* last_packet = NULL;\
-	WritablePacket* last_data = NULL;\
+	WritablePacket* head_packet = 0;\
+	WritablePacket* head_data = 0;\
+	WritablePacket* last_packet = 0;\
+	WritablePacket* last_data = 0;\
 	unsigned int n_packet = 0;\
 	unsigned int n_data = 0;
 
 #define BATCH_RECYCLE_ADD_PACKET(p) {\
-	if (head_packet == NULL) {\
+	if (head_packet == 0) {\
 		head_packet = static_cast<WritablePacket*>(p);\
 		last_packet = static_cast<WritablePacket*>(p);\
 	} else {\
@@ -570,7 +572,7 @@ inline void PacketBatch::kill() {
 	n_packet++;}
 
 #define BATCH_RECYCLE_ADD_DATA_PACKET(p) {\
-	if (head_data == NULL) {\
+	if (head_data == 0) {\
 		head_data = static_cast<WritablePacket*>(p);\
 		last_data = static_cast<WritablePacket*>(p);\
 	} else {\

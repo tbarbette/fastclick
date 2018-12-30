@@ -1,6 +1,6 @@
 #ifndef CLICK_STRIPETHERVLANHEADER_HH
 #define CLICK_STRIPETHERVLANHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <clicknet/ether.h>
 CLICK_DECLS
 
@@ -30,7 +30,7 @@ emitted from output 1).  NATIVE_VLAN defaults to 0.
 
 EtherVLANEncap */
 
-class StripEtherVLANHeader : public Element { public:
+class StripEtherVLANHeader : public BatchElement { public:
 
     StripEtherVLANHeader() CLICK_COLD;
     ~StripEtherVLANHeader() CLICK_COLD;
@@ -43,6 +43,9 @@ class StripEtherVLANHeader : public Element { public:
     bool can_live_reconfigure() const	{ return true; }
 
     Packet *simple_action(Packet *p);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 

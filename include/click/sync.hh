@@ -56,9 +56,11 @@ template <typename T>
 class per_thread
 {
 private:
-    typedef struct {
+    struct A_t{
         T v;
-    } CLICK_CACHE_ALIGN AT;
+    } CLICK_CACHE_ALIGN;
+
+    typedef struct A_t AT;
 
     void initialize(unsigned int n, T v) {
         _size = n;
@@ -353,6 +355,53 @@ public:
 private:
     T v;
 };
+
+
+#define PER_THREAD_SET(pt,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        pt.set_value(i, value); \
+    }
+
+#define PER_THREAD_POINTER_SET(pt,member,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        pt.get_value(i)->member = value; \
+    }
+
+#define PER_THREAD_MEMBER_SET(pt,member,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        pt.get_value(i).member = value; \
+    }
+
+#define PER_THREAD_VECTOR_SET(pt,member,value) \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        for (int j = 0; j < pt.get_value(i).size(); j++) \
+            (pt.get_value(i))[j].member = value; \
+    }
+
+#define PER_THREAD_SUM(type, var, pt) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i); \
+    }
+
+#define PER_THREAD_POINTER_SUM(type, var, pt, member) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i)->member; \
+    }
+
+#define PER_THREAD_MEMBER_SUM(type, var, pt, member) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i).member; \
+    }
+
+#define PER_THREAD_VECTOR_SUM(type, var, pt, index, member) \
+    type var = 0; \
+    for (unsigned i = 0; i < pt.weight(); i++) { \
+        var += pt.get_value(i)[index].member; \
+    }
+
 
 
 /** @file <click/sync.hh>
@@ -890,6 +939,27 @@ ReadWriteLock::release_write()
         _l.get_value(i).release();
 #endif
 }
+
+/**
+ * Fake lock
+ *
+ * Usefull for templating differently protected structure
+ */
+class nolock { public:
+    nolock() {}
+
+    inline void read_begin() {}
+
+    inline void read_end() {}
+
+    inline void read_get() {}
+
+    inline void write_begin() {}
+
+    inline void write_end() {}
+
+    inline void set_max_writers(int) {}
+};
 
 CLICK_ENDDECLS
 #undef SPINLOCK_ASSERTLEVEL

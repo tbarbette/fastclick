@@ -6,6 +6,8 @@
 #include <click/ring.hh>
 #include <click/vector.hh>
 #include <click/notifier.hh>
+#include <click/tinyexpr.hh>
+#include <strings.h>
 CLICK_DECLS
 
 class Args;
@@ -24,8 +26,10 @@ protected:
     void cleanup_packets();
     inline void check_end_loop(Task* t);
     static int write_handler(const String &, Element *e, void *thunk, ErrorHandler *errh);
-    void add_handlers();
+    void add_handlers() override;
     void set_active(bool active);
+
+    void reset_time();
 
     struct s_input {
 		NotifierSignal signal;
@@ -37,6 +41,7 @@ protected:
 
     unsigned int _burst;
     int _stop;
+    int _stop_time;
     bool _quick_clone;
     Task _task;
     int _limit;
@@ -47,6 +52,12 @@ protected:
     bool _use_signal;
     bool _verbose;
     bool _freeonterminate;
+    Timestamp _timing_packet;
+    Timestamp _timing_real;
+    Timestamp _lastsent_packet;
+    Timestamp _lastsent_real;
+    Timestamp _startsent;
+    TinyExpr _fnt_expr;
 };
 
 
@@ -60,7 +71,7 @@ class Replay : public ReplayBase { public:
     const char *flow_code() const   { return "#/#"; }
     const char *processing() const	{ return PULL; }
 
-    bool get_spawning_threads(Bitvector&, bool) override {
+    bool get_spawning_threads(Bitvector&, bool, int) override {
         return false;
     }
 
@@ -97,12 +108,19 @@ class ReplayUnqueue : public ReplayBase { public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
 
-    bool get_spawning_threads(Bitvector& bmp, bool) override {
+    bool get_spawning_threads(Bitvector& bmp, bool, int) override {
         bmp[router()->home_thread_id(this)] = true;
         return false;
     }
 
     bool run_task(Task*);
+
+
+    void add_handlers() override;
+
+private:
+
+    unsigned _timing;
 
 };
 
@@ -171,17 +189,26 @@ inline bool ReplayBase::load_packets() {
         }
         _loaded = true;
         _queue_current = _queue_head;
+        reset_time();
         return true;
 }
 
 inline void ReplayBase::check_end_loop(Task* t) {
     if (unlikely(!_queue_current)) {
         _queue_current = _queue_head;
-        if (_stop > 0)
-            _stop--;
+        reset_time();
+        if (_stop_time == 0) {
+            if (_stop > 0)
+                _stop--;
+        } else {
+            if ((Timestamp::now_steady() - _startsent).msecval() / 1000 >= _stop_time) {
+                _stop = 0;
+            }
+        }
         if (_stop == 0) {
             router()->please_stop_driver();
             _active = false;
+            _startsent = Timestamp();
             return;
         }
         if (_verbose)

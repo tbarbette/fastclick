@@ -14,10 +14,16 @@ CLICK_DECLS
 
 Pipeliner
 
+=s storage
+
+=d
+
 Fast version of ThreadSafeQueue->Unqueue, allowing to offload processing
 of packets pushed to this element to another one, without the inherent
 scheduling cost of normal queues. Multiple thread can push packets to
 this queue, and the home thread of this element will push packet out.
+
+
 */
 
 
@@ -45,7 +51,7 @@ public:
         return _block;
     }
 
-    bool get_spawning_threads(Bitvector& b, bool isoutput) override;
+    bool get_spawning_threads(Bitvector& b, bool isoutput, int port) override;
 
 #if HAVE_BATCH
     void push_batch(int,PacketBatch*);

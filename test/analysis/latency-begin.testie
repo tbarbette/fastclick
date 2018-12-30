@@ -1,0 +1,49 @@
+%info
+RecordTimestamp ecosystem
+
+Test the RecordTimestamp ecosystem (TimestampDiff, NumberPacket, ...)
+For some reason with clang the simtime is different.
+
+%script
+click -j 1 CONFIG --simtime --simtick 1000
+
+%file IN1
+!data ts_sec len payload
+1 60 A
+2 60 B
+3 60 C
+4 60 D
+5 60 E
+10 60 F
+15 60 1
+20 60 2
+25 60 3
+30 60 4
+
+%file CONFIG
+FromIPSummaryDump(IN1, STOP false)
+-> SetTimestamp
+-> MarkMACHeader
+-> NumberPacket
+-> record:: RecordTimestamp()
+-> Queue
+-> DelayUnqueue(1)
+-> counter :: AverageCounter()
+-> CheckNumberPacket(OFFSET 40, COUNT 10)
+-> diff :: TimestampDiff(RECORDER record)
+-> Counter(COUNT_CALL 5 double.run)
+-> Counter(COUNT_CALL 10 finished.run)
+-> Discard;
+
+double :: Script(TYPE PASSIVE, write du.delay 5)
+finished :: Script(TYPE PASSIVE, wait 100ms, read diff.average, read diff.average 0, read diff.average 5, read counter.count, stop)
+
+%expect stderr
+diff.average:
+{{22.8|20.8}}
+diff.average:
+{{22.8|20.8}}
+diff.average:
+{{35|33}}
+counter.count:
+10

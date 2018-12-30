@@ -61,6 +61,7 @@ Timestamp::warp_class_type TimestampWarp::kind = Timestamp::warp_none;
 double TimestampWarp::speed = 1.0;
 Timestamp TimestampWarp::flat_offset[2];
 double TimestampWarp::offset[2] = { 0.0, 0.0 };
+unsigned long warp_tick = 1;
 
 void
 Timestamp::warp(bool steady, bool from_now)
@@ -70,9 +71,9 @@ Timestamp::warp(bool steady, bool from_now)
         if (from_now)
             for (int i = 0; i < 2; ++i) {
 # if TIMESTAMP_REP_FLAT64 || TIMESTAMP_MATH_FLAT64
-                ++TimestampWarp::flat_offset[i]._t.x;
+                TimestampWarp::flat_offset[i]._t.x += warp_tick;
 # else
-                ++TimestampWarp::flat_offset[i]._t.subsec;
+                TimestampWarp::flat_offset[i]._t.subsec += warp_tick;
 # endif
                 TimestampWarp::flat_offset[i].add_fix();
             }
@@ -143,6 +144,15 @@ Timestamp::warp_jump_steady(const Timestamp &expiry)
             warp_adjust(true, now_steady_raw, expiry);
         }
     }
+}
+
+void
+Timestamp::set_warp_tick(unsigned long tick)
+{
+#if !TIMESTAMP_NANOSEC
+    tick /= 1000;
+#endif
+    warp_tick = tick;
 }
 #endif
 
@@ -263,6 +273,7 @@ Timestamp::unparse_interval() const
 bool Timestamp::set_clock(user_clock_fct clock, void* user) {
 	_user_data = user;
 	_user_clock = clock;
+    return true;
 }
 
 

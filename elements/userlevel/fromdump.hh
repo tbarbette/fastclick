@@ -56,6 +56,15 @@ Boolean. If true, then FromDump will emit only IP packets with their IP header
 annotations correctly set. (If FromDump has two outputs, non-IP packets are
 pushed out on output 1; otherwise, they are dropped.) Default is false.
 
+=item FORCE_LEN
+
+Integer. This parameter allows to force a desired frame length for all the frames
+of a trace, given that this length is in [MIN_MTU, MAX_MTU] range.
+To replay a trace with the real frame sizes (not the captured ones), set value to
+0. Otherwise, set value to -1 to disable this feature (default case).
+When FORCE_LEN is 0 or in [MIN_MTU, MAX_MTU], expensive packet operations might be
+applied, therefore it is likely to experience lower traffic injection throughput.
+
 =item START
 
 Absolute time in seconds since the epoch. FromDump will output packets with
@@ -213,6 +222,8 @@ class FromDump : public Element { public:
   private:
 
     enum { BUFFER_SIZE = 32768, SAMPLING_SHIFT = 28 };
+
+    enum { DISABLED = -1, REAL_LEN = 0};
 
     FromFile _ff;
 

@@ -2,6 +2,7 @@
 #ifndef CLICK_RATEDSPLITTER_HH
 #define CLICK_RATEDSPLITTER_HH
 #include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/tokenbucket.hh>
 CLICK_DECLS
 
@@ -62,7 +63,7 @@ CLICK_DECLS
  *
  * =a BandwidthRatedSplitter, ProbSplitter, Meter, Shaper, RatedUnqueue, Tee */
 
-class RatedSplitter : public Element { public:
+class RatedSplitter : public BatchElement { public:
 
     RatedSplitter() CLICK_COLD;
 
@@ -77,11 +78,19 @@ class RatedSplitter : public Element { public:
 
     void push(int port, Packet *);
 
- protected:
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch *);
+#endif
+
+  protected:
 
     TokenBucket _tb;
 
     static String read_handler(Element *, void *) CLICK_COLD;
+
+  private:
+
+    inline int smaction(Packet *p) CLICK_WARN_UNUSED_RESULT;
 
 };
 

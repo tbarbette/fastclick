@@ -51,6 +51,7 @@ CLICK_CXX_UNPROTECT
 
 // Include header structures so we can check their sizes with static_assert.
 #include <clicknet/ether.h>
+#include <clicknet/erspan.h>
 #include <clicknet/fddi.h>
 #include <clicknet/gtp.h>
 #include <clicknet/ip.h>
@@ -100,7 +101,16 @@ click_check_header_sizes()
     static_assert(sizeof(click_nd_adv) == 32, "click_nd_adv has the wrong size.");
     static_assert(sizeof(click_nd_adv2) == 24, "click_nd_adv2 has the wrong size.");
 
-    // <clicknet/ip.h>
+    // <clicknet/erspan.h>
+    static_assert(sizeof(click_erspan) == 8, "click_erspan has the wrong size.");
+    static_assert(sizeof(click_erspan3) == 12, "click_erspan3 has the wrong size.");
+    static_assert(sizeof(click_erspan3_platform) == 8, "click_erspan3_platform has the wrong size.");
+    static_assert(sizeof(click_erspan3_platform1) == 8, "click_erspan3_platform1 has the wrong size.");
+    static_assert(sizeof(click_erspan3_platform3) == 8, "click_erspan3_platform3 has the wrong size.");
+    static_assert(sizeof(click_erspan3_platform4) == 8, "click_erspan3_platform4 has the wrong size.");
+    static_assert(sizeof(click_erspan3_platform56) == 8, "click_erspan3_platform56 has the wrong size.");
+
+    // <clicknet/gtp.h>
     static_assert(sizeof(click_gtp) == 8, "click_gtp has the wrong size.");
 
     // <clicknet/ip.h>

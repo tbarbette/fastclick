@@ -36,7 +36,7 @@ class SetPerfCount : public PerfCountUser { public:
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  inline void smaction(Packet *);
+  inline void rmaction(Packet *);
   void push(int, Packet *p);
   Packet *pull(int);
 

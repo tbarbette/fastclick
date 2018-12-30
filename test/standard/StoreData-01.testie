@@ -1,0 +1,46 @@
+%info
+Test that StoreData works correctly.
+
+%script
+click CONFIG
+
+%file CONFIG
+RatedSource(DATA "AAAA", LIMIT 1, STOP true)
+-> Print(CONTENTS ascii)
+-> StoreData(0, B)
+-> Print(CONTENTS ascii)
+-> StoreData(1, CC)
+-> Print(CONTENTS ascii)
+-> StoreData(3, DD)
+-> Print(CONTENTS ascii)
+-> StoreData(3, EE, GROW true)
+-> Print(CONTENTS ascii)
+-> StoreData(3, F, GROW false)
+-> Print(CONTENTS ascii)
+-> StoreData(20, G, GROW false)
+-> Print(CONTENTS ascii)
+-> StoreData(0, \<00 00 00 00 00>)
+-> Print()
+-> StoreData(1, \<F1>)
+-> Print()
+-> StoreData(1, \<FF>, MASK \<02>)
+-> Print()
+-> StoreData(0, \<FF FF FF FF FF>, MASK \<01 01 01 01>)
+-> Print()
+-> StoreData(4, \<18 18>, MASK \<1212>, GROW true)
+-> Print()
+-> Discard();
+
+%expect stderr
+   4 |  AAAA
+   4 |  BAAA
+   4 |  BCCA
+   4 |  BCCD
+   5 |  BCCEE
+   5 |  BCCFE
+   5 |  BCCFE
+   5 | 00000000 00
+   5 | 00f10000 00
+   5 | 00f30000 00
+   5 | 01f30101 ff
+   6 | 01f30101 fd10

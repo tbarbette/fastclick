@@ -332,8 +332,17 @@ CxxClass::find_should_rewrite()
   static String push_pattern = compile_pattern("output(#0).push(#1)");
   static String pull_pattern = compile_pattern("input(#0).pull()");
   static String checked_push_pattern = compile_pattern("checked_output_push(#0,#1)");
+
+#if HAVE_BATCH
+  static String push_batch_pattern = compile_pattern("output(#0).push_batch(#1)");
+  static String checked_push_batch_pattern = compile_pattern("checked_output_push_batch(#0,#1)");
+#endif
   for (int i = 0; i < nfunctions(); i++) {
     if (_functions[i].find_expr(push_pattern)
+#if HAVE_BATCH
+    || _functions[i].find_expr(push_batch_pattern)
+    || _functions[i].find_expr(checked_push_batch_pattern)
+#endif
 	|| _functions[i].find_expr(checked_push_pattern))
       _has_push[i] = 1;
     if (_functions[i].find_expr(pull_pattern))
@@ -342,6 +351,9 @@ CxxClass::find_should_rewrite()
 
   Vector<int> reached(nfunctions(), 0);
   bool any = reach(_fn_map.get("push"), reached);
+#if HAVE_BATCH
+  any |= reach(_fn_map.get("push_batch"), reached);
+#endif
   any |= reach(_fn_map.get("pull"), reached);
   any |= reach(_fn_map.get("run_task"), reached);
   any |= reach(_fn_map.get("run_timer"), reached);
@@ -351,6 +363,13 @@ CxxClass::find_should_rewrite()
     reach(simple_action, reached);
     _should_rewrite[simple_action] = any = true;
   }
+#if HAVE_BATCH
+  int simple_action_batch = _fn_map.get("simple_action_batch");
+  if (simple_action_batch >= 0) {
+    reach(simple_action_batch, reached);
+    _should_rewrite[simple_action_batch] = any = true;
+  }
+#endif
   if (_fn_map.get("devirtualize_all") >= 0) {
     for (int i = 0; i < nfunctions(); i++) {
       const String &n = _functions[i].name();

@@ -1,6 +1,6 @@
 #ifndef CLICK_FROMDEVICE_USERLEVEL_HH
 #define CLICK_FROMDEVICE_USERLEVEL_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include "elements/userlevel/kernelfilter.hh"
 
 #ifdef __linux__
@@ -160,7 +160,7 @@ Returns a string indicating the encapsulation type on this link. Can be
 
 =a ToDevice.u, FromDump, ToDump, KernelFilter, FromDevice(n) */
 
-class FromDevice : public Element { public:
+class FromDevice : public BatchElement { public:
 
     FromDevice() CLICK_COLD;
     ~FromDevice() CLICK_COLD;
@@ -210,11 +210,8 @@ class FromDevice : public Element { public:
 #endif
 #if FROMDEVICE_ALLOW_PCAP
     Task _task;
-    void emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts);
     pcap_t *_pcap;
     int _pcap_complaints;
-#endif
-#if FROMDEVICE_ALLOW_PCAP
     friend void FromDevice_get_packet(u_char*, const struct pcap_pkthdr*,
                                       const u_char*);
 #endif

@@ -51,6 +51,11 @@ and a target bandwdith.
 
 Integer. Same as the LIMIT argument.
 
+=item HEADROOM
+
+Integer. Sets the amount of headroom on generated packets. Default is
+the default packet headroom.
+
 =item ACTIVE
 
 Boolean. Same as the ACTIVE? argument.
@@ -133,6 +138,7 @@ class RatedSource : public BatchElement, public ActiveNotifier {
         bool   _active;
         bool   _stop;
         Packet *_packet;
+        int _headroom;
         Task   _task;
         Timer  _timer;
         String _data;

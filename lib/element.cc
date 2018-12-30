@@ -1729,9 +1729,10 @@ public:
 
      InputThreadVisitor(Bitvector& b, Element* o): bitmask(b), fullpush(true), origin(o) {}
 
-     virtual bool visit(Element *e, bool isoutput, int,
+     virtual bool visit(Element *e, bool isoutput, int port,
                    Element *, int, int) {
-         bool ret = e->get_spawning_threads(bitmask, isoutput);
+         bool ret = e->get_spawning_threads(bitmask, isoutput, port);
+         //TODO : the case of CPUswitch keeps fullpush but returns false...
          if (ret == false)
              fullpush = false;
          return ret;
@@ -1752,7 +1753,9 @@ public:
  *  for example as an element after the queue will only be traversed by the
  *  threads of the queue, not the one before.
  */
-bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput) {
+bool Element::get_spawning_threads(Bitvector& bmp, bool isoutput, int port) {
+    (void)isoutput;
+    (void)port;
     unsigned int thisthread = home_thread_id();
 
     if (ninputs() > 0 && noutputs() > 0 && input_is_push(0) && output_is_pull(0)) {
@@ -1781,14 +1784,16 @@ Bitvector Element::get_passing_threads(bool forward, int port, Element* origin, 
             origin = this;
         for (int i = 0; i < _remote_elements.size() ; i++) {
             click_chatter("%s has remote %s!",name().c_str(),_remote_elements[i]->name().c_str());
-            b |= _remote_elements[i]->get_passing_threads(origin, level + 1, touching);
+            b |= _remote_elements[i]->get_passing_threads(origin, level + 1);
         }
     } else {
         if (origin != 0 && level > 0)
             click_chatter("loop avoided for %s",name().c_str());
     }
+
     if (!visitor.fullpush)
         is_fullpush = false;
+
     return b;
 }
 
@@ -1807,8 +1812,8 @@ Bitvector Element::get_passing_threads(Element*, int level, bool touching) {
     }
     //Add ourself to the bitmap, but the user must know if his element
     // should keep is_fullpush or not
-    get_spawning_threads(b, false);
-    get_spawning_threads(b, true);
+    get_spawning_threads(b, false, touching);
+    get_spawning_threads(b, true, touching);
 
 #if HAVE_FULLPUSH_NONATOMIC
     this->_is_fullpush = is_fullpush;
@@ -1831,6 +1836,7 @@ bool Element::is_mt_safe() {
 }
 
 bool Element::do_mt_safe_check(ErrorHandler* errh) {
+    (void)errh;
     Bitvector bmp = get_passing_threads();
     int n = bmp.weight();
 	if (n == 0) {
@@ -2193,8 +2199,8 @@ read_threads_handler(Element *e, void * thunk)
       case 0:
         return e->get_passing_threads().unparse();
       case 1:
-        e->get_spawning_threads(b, false);
-        e->get_spawning_threads(b, true);
+        e->get_spawning_threads(b, false, -1);
+        e->get_spawning_threads(b, true, -1);
         return b.unparse();
       case 2:
         return String(e->router()->home_thread_id(e));

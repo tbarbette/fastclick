@@ -706,11 +706,13 @@ minios_dir
 xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
+DPDK_INCLUDES
 USE_DPDK
 RTE_VER_MONTH
 RTE_VER_YEAR
 RTE_VER_MINOR
 RTE_VER_MAJOR
+RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
 PTHREAD_LIBS
@@ -841,7 +843,6 @@ enable_ethernet
 enable_etherswitch
 enable_flow
 enable_grid
-enable_gtp
 enable_icmp
 enable_ids
 enable_ip
@@ -856,6 +857,7 @@ enable_standard
 enable_tcpudp
 enable_test
 enable_threads
+enable_tunnel
 enable_wifi
 enable_experimental
 enable_skip_elements
@@ -871,6 +873,8 @@ enable_stats
 enable_stride
 enable_task_heap
 enable_dmalloc
+enable_hash_iterator_epochs
+enable_force_expensive
 enable_valgrind
 enable_schedule_debugging
 enable_intel_cpu
@@ -1517,16 +1521,14 @@ Optional Features:
                           disable warnings and information about batching
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
-    --enable-netmap-pool  use netmap buffers instead of standard Click
-                          malloc'ed buffers
+    --enable-netmap-pool  use netmap buffers instead of standard Click buffers
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
     --enable-dpdk         use DPDK
-    --enable-dpdk-pool    use DPDK buffer instead of standard click malloc'ed
-                          buffer
+    --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
     --disable-zerocopy    disable Zero Copy
     --disable-sloppy      disable Sloppy flow timeouts
@@ -1558,7 +1560,6 @@ Optional Features:
   --enable-etherswitch    include Ethernet switch elements
   --enable-flow           include Enable flow system and elements
   --enable-grid           include Grid elements (see FAQ)
-  --enable-gtp            include GTP elements
   --disable-icmp          do not include ICMP elements
   --disable-ids           do not include IDS elements from OpenBox
   --disable-ip            do not include IP elements
@@ -1573,6 +1574,7 @@ Optional Features:
   --disable-tcpudp        do not include TCP and UDP elements
   --disable-test          do not include regression test elements
   --disable-threads       do not include thread management elements
+  --enable-tunnel         include tunnelling elements
   --enable-wifi           include wifi elements and support
   --enable-experimental   enable experimental elements in normal groups
   --enable-skip-elements=ELTS
@@ -1590,6 +1592,10 @@ Optional Features:
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
   --enable-dmalloc        enable debugging malloc
+  --enable-hash-iterator-epochs
+                          hash iterator epoch
+  --enable-force-expensive
+                          force expensive packet operations
   --enable-valgrind       extra support for debugging with valgrind
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
                           (no/yes/extra) [yes]
@@ -6485,7 +6491,7 @@ fi
 if test "${enable_batch+set}" = set; then :
   enableval=$enable_batch; :
 else
-  enable_batch=yes
+  enable_batch=$enable_userlevel
 fi
 
 
@@ -6544,7 +6550,7 @@ else
         as_fn_error $? "
 =========================================
 
---enable-auto-batch only accepts jump, list or catch as modes
+--enable-auto-batch only accepts jump, list or port as modes
 
 =========================================" "$LINENO" 5
 fi
@@ -6899,6 +6905,15 @@ fi
 
 
 if test "x$enable_dpdk" = "xyes"; then
+
+    if test -z "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
+    fi
+
+    if test -z "$RTE_LIBNAME"; then
+        RTE_LIBNAME=dpdk
+    fi
+
     if test "x$enable_user_multithread" != "xyes"; then
         as_fn_error $? "
 =========================================
@@ -6907,19 +6922,20 @@ if test "x$enable_dpdk" = "xyes"; then
 
 =========================================" "$LINENO" 5
     fi
-    if test ! -f "$RTE_SDK/$RTE_TARGET/include/rte_eal.h"; then
+    if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
 =========================================
 
-Cannot find \$RTE_SDK/\$RTE_TARGET/include/rte_eal.h for DPDK.
+Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi
-    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK/$RTE_TARGET/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+
 
 
 
@@ -6933,7 +6949,10 @@ Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
+
     USE_DPDK=yes
+
+    DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
 
 fi
 
@@ -7485,17 +7504,6 @@ if test "x$enable_grid" = xyes; then
     :
 
 fi
-# Check whether --enable-gtp was given.
-if test "${enable_gtp+set}" = set; then :
-  enableval=$enable_gtp;
-else
-  enable_gtp=NO
-fi
-test "x$enable_all_elements" = xyes -a \( "x$enable_gtp" = xNO -o "x$enable_gtp" = x \) && enable_gtp=yes
-if test "x$enable_gtp" = xyes; then
-    :
-
-fi
 # Check whether --enable-icmp was given.
 if test "${enable_icmp+set}" = set; then :
   enableval=$enable_icmp;
@@ -7650,6 +7658,17 @@ else
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_threads" = xNO -o "x$enable_threads" = x \) && enable_threads=yes
 if test "x$enable_threads" = xyes; then
+    :
+
+fi
+# Check whether --enable-tunnel was given.
+if test "${enable_tunnel+set}" = set; then :
+  enableval=$enable_tunnel;
+else
+  enable_tunnel=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_tunnel" = xNO -o "x$enable_tunnel" = x \) && enable_tunnel=yes
+if test "x$enable_tunnel" = xyes; then
     :
 
 fi
@@ -10726,7 +10745,6 @@ else
 =========================================" "$LINENO" 5
 fi
 
-
 # Check whether --enable-stride was given.
 if test "${enable_stride+set}" = set; then :
   enableval=$enable_stride; :
@@ -10778,7 +10796,6 @@ if test $enable_dmalloc = yes; then
 $as_echo "#define CLICK_DMALLOC 1" >>confdefs.h
 
 fi
-
 
 
 # Check whether --enable-valgrind was given.

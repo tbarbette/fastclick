@@ -19,6 +19,7 @@
 #include <click/config.h>
 #include "storedata.hh"
 #include <click/args.hh>
+#include <click/error.hh>
 CLICK_DECLS
 
 StoreData::StoreData() : _grow(false)
@@ -28,11 +29,29 @@ StoreData::StoreData() : _grow(false)
 int
 StoreData::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    return Args(conf, this, errh)
+    if (Args(conf, this, errh)
         .read_mp("OFFSET", _offset)
         .read_mp("DATA", _data)
+        .read_p("MASK", _mask)
         .read("GROW", _grow)
-        .complete();
+        .complete() < 0)
+        return -1;
+
+    if (_mask && _mask.length() > _data.length())
+        return errh->error("MASK must be no longer than DATA");
+
+    return 0;
+}
+
+int
+StoreData::initialize(ErrorHandler *)
+{
+    if (_mask) {
+        auto md = _data.mutable_data();
+        for (int i = 0; i < _mask.length(); i++)
+            md[i] = md[i] & _mask[i];
+    }
+    return 0;
 }
 
 Packet *
@@ -42,9 +61,21 @@ StoreData::simple_action(Packet *p)
         return p;
     else if (WritablePacket *q = p->uniqueify()) {
         int len = q->length() - _offset;
-        if (_grow && _data.length() < len)
+        if (_grow && _data.length() > len) {
             q = q->put(_data.length() - len);
-        memcpy(q->data() + _offset, _data.data(), (_data.length() < len ? _data.length() : len));
+            len = q->length() - _offset;
+        }
+        if (_mask) {
+            auto qd = q->data();
+            for (int i = 0; i < (_data.length() < len ? _data.length() : len); i++) {
+                if (i < _mask.length())
+                    qd[_offset + i] = (qd[_offset + i] & ~_mask[i]) | _data[i];
+                else
+                    qd[_offset + i] = _data[i];
+            }
+        }
+        else
+            memcpy(q->data() + _offset, _data.data(), (_data.length() < len ? _data.length() : len));
         return q;
     } else
         return 0;

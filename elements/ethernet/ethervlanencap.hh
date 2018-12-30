@@ -1,6 +1,6 @@
 #ifndef CLICK_ETHERVLANENCAP_HH
 #define CLICK_ETHERVLANENCAP_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <clicknet/ether.h>
 CLICK_DECLS
 
@@ -87,7 +87,7 @@ Return or set the NATIVE_VLAN parameter.
 VLANEncap, StripEtherVLANHeader, SetVLANAnno, EtherEncap, ARPQuerier,
 EnsureEther, StoreEtherAddress */
 
-class EtherVLANEncap : public Element { public:
+class EtherVLANEncap : public BatchElement { public:
 
     EtherVLANEncap() CLICK_COLD;
     ~EtherVLANEncap() CLICK_COLD;
@@ -102,6 +102,10 @@ class EtherVLANEncap : public Element { public:
     Packet *smaction(Packet *p);
     void push(int port, Packet *p);
     Packet *pull(int port);
+#if HAVE_BATCH
+     void push_batch(int, PacketBatch*) override;
+     PacketBatch *pull_batch(int,unsigned) override;
+ #endif
 
   private:
 

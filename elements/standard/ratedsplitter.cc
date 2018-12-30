@@ -35,16 +35,30 @@ RatedSplitter::configure(Vector<String> &conf, ErrorHandler *errh)
     return RatedUnqueue::configure_helper(&_tb, is_bandwidth(), this, conf, errh);
 }
 
+inline int
+RatedSplitter::smaction(Packet *)
+{
+    if (_tb.remove_if(1))
+        return 0;
+    else
+        return 1;
+}
+
 void
 RatedSplitter::push(int, Packet *p)
 {
     _tb.refill();
-    if (_tb.remove_if(1))
-	output(0).push(p);
-    else
-	checked_output_push(1, p);
+    checked_output_push(smaction(p), p);
 }
 
+#if HAVE_BATCH
+void
+RatedSplitter::push_batch(int, PacketBatch *batch)
+{
+    _tb.refill();
+    CLASSIFY_EACH_PACKET(2, smaction, batch, checked_output_push_batch);
+}
+#endif
 
 // HANDLERS
 

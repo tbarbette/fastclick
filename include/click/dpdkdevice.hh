@@ -175,7 +175,8 @@ public:
 
     static unsigned int get_nb_txdesc(const portid_t &port_id);
 
-    static int NB_MBUF;
+    static Vector<int> NB_MBUF;
+    static int DEFAULT_NB_MBUF;
     static int MBUF_DATA_SIZE;
     static int MBUF_SIZE;
     static int MBUF_CACHE_SIZE;
@@ -234,6 +235,8 @@ private:
 
     struct DevInfo info;
 
+
+    static int get_nb_mbuf(int socket);
     static bool _is_initialized;
     static HashTable<portid_t, DPDKDevice> _devs;
     static unsigned _nr_pktmbuf_pools;
@@ -243,7 +246,7 @@ private:
     int add_queue(Dir dir, unsigned &queue_id, bool promisc,
                    unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
-    static int alloc_pktmbufs() CLICK_COLD;
+    static int alloc_pktmbufs(ErrorHandler* errh) CLICK_COLD;
 
     static DPDKDevice* get_device(const portid_t &port_id) {
         return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
@@ -291,6 +294,9 @@ class DPDKRing { public:
 
     struct rte_ring    *_ring;
     counter_t    _count;
+
+    bool _force_create;
+    bool _force_lookup;
 
 };
 

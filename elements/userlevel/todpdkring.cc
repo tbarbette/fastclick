@@ -82,7 +82,8 @@ ToDPDKRing::initialize(ErrorHandler *errh)
     // If primary process, create the ring buffer and memory pool.
     // The primary process is responsible for managing the memory
     // and acting as a bridge to interconnect various secondary processes
-    if ( rte_eal_process_type() == RTE_PROC_PRIMARY ){
+    if (_force_create || (! _force_lookup && rte_eal_process_type() == RTE_PROC_PRIMARY)){
+
         _ring = rte_ring_create(
             _PROC_1.c_str(), DPDKDevice::RING_SIZE,
             rte_socket_id(), _flags
@@ -149,13 +150,14 @@ ToDPDKRing::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue)
                 iqueue.timeout.unschedule();
         }
         else {
-            if ( iqueue.nr_pending > 0 )
+            if ( iqueue.nr_pending > 0 ) {
                 // Pending packets, set timeout to flush packets
                 // after a while even without burst
                 if ( _timeout == 0 )
                     iqueue.timeout.schedule_now();
                 else
                     iqueue.timeout.schedule_after_msec(_timeout);
+            }
         }
     }
 }

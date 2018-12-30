@@ -107,9 +107,7 @@ SimpleQueue::do_mt_safe_check(ErrorHandler* errh) {
 }
 
 bool
-SimpleQueue::get_spawning_threads(Bitvector& b, bool) {
-    unsigned int thisthread = router()->home_thread_id(this);
-    b[thisthread] = 1;
+SimpleQueue::get_spawning_threads(Bitvector& b, bool, int port) {
     return false;
 }
 

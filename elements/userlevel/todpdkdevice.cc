@@ -31,7 +31,7 @@ ToDPDKDevice::ToDPDKDevice() :
      _blocking = false;
      _burst = -1;
      _internal_tx_queue_size = 1024;
-     ndesc = DPDKDevice::DEF_DEV_TXDESC;
+     ndesc = 0;
 }
 
 ToDPDKDevice::~ToDPDKDevice()
@@ -42,11 +42,19 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     int maxqueues = 128;
     String dev;
+    if (Args(this, errh).bind(conf)
+            .read_mp("PORT", dev)
+            .consume() < 0)
+        return -1;
 
-    if (parse(Args(conf, this, errh)
-        .read_mp("PORT", dev), errh)
+
+    if (parse(conf, errh) != 0)
+        return -1;
+
+    if (Args(conf, this, errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
+        .read("MAXQUEUES", maxqueues)
         .read("ALLOC",_create)
         .read("TSO", _tso)
         .read("TCO", _tco)
@@ -61,8 +69,12 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     //TODO : If user put multiple ToDPDKDevice with the same port and without the QUEUE parameter, try to share the available queues among them
     if (firstqueue == -1)
-        firstqueue = 0;
-    configure_tx(1,maxqueues,errh);
+       firstqueue = 0;
+    if (n_queues == -1) {
+	configure_tx(1,maxqueues,errh);
+    } else {
+        configure_tx(n_queues,n_queues,errh);
+    }
 
     if (_tso)
         _dev->set_tx_offload(DEV_TX_OFFLOAD_TCP_TSO);
@@ -81,7 +93,7 @@ int ToDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0)
         return ret;
 
-    for (unsigned i = 0; i < n_queues; i++) {
+    for (unsigned i = 0; i < (unsigned)n_queues; i++) {
         ret = _dev->add_tx_queue(i, ndesc , errh);
         if (ret != 0) return ret;    }
 
@@ -237,7 +249,7 @@ void ToDPDKDevice::push(int, Packet *p)
     do {
         congestioned = false;
 
-        if (iqueue.nr_pending == _internal_tx_queue_size) { // Internal queue is full
+        if (iqueue.nr_pending == (unsigned)_internal_tx_queue_size) { // Internal queue is full
             /* We just set the congestion flag. If we're in blocking mode,
              * we'll loop, else we'll drop this packet.*/
             congestioned = true;
@@ -309,7 +321,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
     do {
         congestioned = false;
         //First, place the packets in the queue
-        while (iqueue.nr_pending < _internal_tx_queue_size && p) { // Internal queue is full
+        while (iqueue.nr_pending < (unsigned)_internal_tx_queue_size && p) { // Internal queue is full
             // While there is still place in the iqueue
             struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
             if (mbuf != NULL) {

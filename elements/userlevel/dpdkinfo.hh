@@ -75,7 +75,7 @@ Used for interprocess communication. Defaults to 1024.
 
 =item DEF_BURST_SIZE
 
-Integer.  Number of frames to read/write from/to a DPDK device. 
+Integer.  Number of frames to read/write from/to a DPDK device.
 Defaults to 32.
 
 =item RING_FLAGS
@@ -118,7 +118,7 @@ public:
 
     int configure(Vector<String> &conf, ErrorHandler *errh);
 
-    enum {h_pool_count};
+    enum {h_pool_count, h_pools};
     static String read_handler(Element *e, void * thunk);
     void add_handlers() override;
 

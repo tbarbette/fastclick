@@ -260,7 +260,7 @@ process(const char *infile, bool file_is_expr, bool flatten,
     ElementMap::push_default(&emap);
 
     fprintf(outf, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n\
-<!DOCTYPE configuration SYSTEM \"http://www.pdos.lcs.mit.edu/click/clickconfig.dtd\">\n\
+<!DOCTYPE configuration SYSTEM \"https://raw.githubusercontent.com/tbarbette/fastclick/master/tools/click2xml/clickconfig.dtd\">\n\
 <configuration xmlns=\"http://www.lcdf.org/click/xml/\">\n");
     generate_router(r, outf, "", errh);
     fprintf(outf, "</configuration>\n");

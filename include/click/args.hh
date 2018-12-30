@@ -6,6 +6,7 @@
 #include <click/string.hh>
 #include <click/confparse.hh>
 #include <click/timestamp.hh>
+#include <click/bitvector.hh>
 #if CLICK_BSDMODULE
 # include <machine/stdarg.h>
 #else
@@ -1286,6 +1287,21 @@ class BandwidthArg : public NumArg { public:
     static String unparse(uint32_t x);
     int status;
 };
+
+
+/** @class BitvectorArg **/
+class BitvectorArg { public:
+    static bool parse(const String &str, Bitvector &result, const ArgContext & = blank_args) {
+        if (!result.parse(str, 0, 64)) {
+            blank_args.error("%s is not a bitvecotr",str.c_str());
+            return false;
+        }
+        return true;
+    }
+};
+
+template<> struct DefaultArg<Bitvector> : public BitvectorArg {};
+
 
 
 #if !CLICK_TOOL

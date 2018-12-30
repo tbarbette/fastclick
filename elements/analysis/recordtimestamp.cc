@@ -59,7 +59,7 @@ int RecordTimestamp::configure(Vector<String> &conf, ErrorHandler *errh) {
 }
 
 inline void
-RecordTimestamp::smaction(Packet *p) {
+RecordTimestamp::rmaction(Packet *p) {
     uint64_t i;
     if (_offset >= 0) {
         i = get_numberpacket(p, _offset, _net_order);
@@ -78,14 +78,14 @@ RecordTimestamp::smaction(Packet *p) {
 }
 
 void RecordTimestamp::push(int, Packet *p) {
-    smaction(p);
+    rmaction(p);
     output(0).push(p);
 }
 
 #if HAVE_BATCH
 void RecordTimestamp::push_batch(int, PacketBatch *batch) {
     FOR_EACH_PACKET(batch, p) {
-        smaction(p);
+        rmaction(p);
     }
     output(0).push_batch(batch);
 }

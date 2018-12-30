@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_PAD_HH
 #define CLICK_PAD_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -36,7 +36,7 @@ problem). Default is true.
 =a Truncate
 */
 
-class Pad : public Element { public:
+class Pad : public SimpleElement<Pad> { public:
 
     Pad() CLICK_COLD;
 

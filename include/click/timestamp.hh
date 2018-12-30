@@ -678,6 +678,11 @@ class Timestamp { public:
      * @sa assign_now_steady(), now_steady_unwarped() */
     inline void assign_now_steady_unwarped();
     //@}
+
+
+    /** @brief set amounts of ticks to warp
+     */
+    static void set_warp_tick(unsigned long tick);
 #endif
 
 #if HAVE_USER_TIMING

@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_RANDOMSAMPLE_HH
 #define CLICK_RANDOMSAMPLE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -62,7 +62,7 @@ CLICK_DECLS
  *
  * =a RandomBitErrors */
 
-class RandomSample : public Element { public:
+class RandomSample : public BatchElement { public:
 
     RandomSample() CLICK_COLD;
 
@@ -75,8 +75,10 @@ class RandomSample : public Element { public:
     bool can_live_reconfigure() const		{ return true; }
     void add_handlers() CLICK_COLD;
 
-    void push(int port, Packet *);
-    Packet *pull(int port);
+    Packet *simple_action(Packet *);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
   private:
 
@@ -88,6 +90,8 @@ class RandomSample : public Element { public:
     uint32_t _sampling_prob;		// out of (1<<SAMPLING_SHIFT)
     bool _active;
     atomic_uint32_t _drops;
+
+    inline Packet *smaction(Packet *);
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;

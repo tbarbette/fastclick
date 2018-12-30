@@ -57,6 +57,8 @@ class Packet { public:
 	default_headroom = 48,		///< Increase headroom for improved performance.
 #elif CLICK_PACKET_USE_DPDK || HAVE_DPDK_PACKET_POOL
 	default_headroom = RTE_PKTMBUF_HEADROOM,
+#elif HAVE_CLICK_PACKET_POOL
+	default_headroom = 64,
 #else
 	default_headroom = 28,		///< Default packet headroom() for
 					///  Packet::make().  4-byte aligned.
@@ -94,6 +96,8 @@ class Packet { public:
                                 void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
 #endif //CLICK_USERLEVEL || CLICK_MINIOS
 
+
+    static int max_data_pool_size();
     static void static_cleanup();
 
     inline void kill();
@@ -104,7 +108,9 @@ class Packet { public:
     inline bool shared_nonatomic() const;
     Packet *clone(bool fast = false) CLICK_WARN_UNUSED_RESULT;
     inline WritablePacket *uniqueify() CLICK_WARN_UNUSED_RESULT;
-#if CLICK_PACKET_USE_DPDK
+#if CLICK_LINUXMODULE
+    inline void get() {skb_get(skb());};
+#elif CLICK_PACKET_USE_DPDK
     inline void get() {rte_mbuf_refcnt_update(mb(), 1);};
 #else
     inline void get() {_use_count++;};
@@ -166,6 +172,7 @@ class Packet { public:
 	_destructor = 0;
     }
 #endif
+
 
     /** @brief Add space for a header before the packet.
      * @param len amount of space to add
@@ -728,7 +735,7 @@ class Packet { public:
 	*reinterpret_cast<click_aliasable_void_pointer_t *>(xanno()->c + i) = const_cast<void *>(x);
     }
 
-#if !CLICK_PACKET_USE_DPDK
+#if !CLICK_PACKET_USE_DPDK && !CLICK_LINUXMODULE
     inline Packet* data_packet() {
     	return _data_packet;
     }
@@ -925,7 +932,9 @@ class WritablePacket : public Packet { public:
     inline void rewrite_ipport(IPAddress ip, uint16_t port, const int shift, bool is_tcp = true);
     inline void rewrite_ip(IPAddress ip, const int shift, bool is_tcp = true);
 
+#if !CLICK_LINUXMODULE
     inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
+#endif
 
 # if HAVE_CLICK_PACKET_POOL
     static PacketPool* make_local_packet_pool();
@@ -933,6 +942,7 @@ class WritablePacket : public Packet { public:
 
     static void pool_transfer(int from, int to);
 
+#if !CLICK_LINUXMODULE
     inline void set_buffer(unsigned char *data, uint32_t length) {
     	set_buffer(data,length,length);
     }
@@ -940,6 +950,7 @@ class WritablePacket : public Packet { public:
     inline void set_buffer(unsigned char *data) {
        	set_buffer(data,buffer_length());
     }
+#endif
 
     inline WritablePacket * unique_next() {
         if (!next()) return NULL;
@@ -1718,8 +1729,8 @@ Packet::kill()
         }
 #endif
 		//Dpdk takes care of indirect and related things
-        rte_pktmbuf_free(mb());
-	#elif HAVE_CLICK_PACKET_POOL
+		rte_pktmbuf_free(mb());
+	#elif HAVE_CLICK_PACKET_POOL && !defined(CLICK_FORCE_EXPENSIVE)
 		if (_use_count.dec_and_test()) {
 			WritablePacket::recycle(static_cast<WritablePacket *>(this));
 		}
@@ -1881,6 +1892,19 @@ Packet::shared_nonatomic() const
 }
 
 
+class PacketRef {
+public:
+    PacketRef(Packet* p) : _p(p->clone()) { }
+    ~PacketRef() { if (_p) _p->kill(); }
+    Packet* release() {
+        Packet* tmp = _p;
+        _p = NULL;
+        return tmp;
+    }
+private:
+    Packet* _p;
+};
+
 /** @brief Return an unshared packet containing this packet's data.
  * @return the unshared packet, which is writable
  *
@@ -1907,6 +1931,9 @@ Packet::shared_nonatomic() const
 inline WritablePacket *
 Packet::uniqueify()
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     if (!shared())
 	return static_cast<WritablePacket *>(this);
     else
@@ -1916,6 +1943,9 @@ Packet::uniqueify()
 inline WritablePacket *
 Packet::push(uint32_t len)
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     if (headroom() >= len && !shared()) {
         WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
@@ -1982,6 +2012,9 @@ Packet::pull(uint32_t len)
 inline WritablePacket *
 Packet::put(uint32_t len)
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     if (tailroom() >= len && !shared()) {
 	WritablePacket *q = (WritablePacket *)this;
 #if CLICK_LINUXMODULE	/* Linux kernel module */
@@ -2219,6 +2252,9 @@ Packet::clear_mac_header()
 inline WritablePacket *
 Packet::push_mac_header(uint32_t len)
 {
+#ifdef CLICK_FORCE_EXPENSIVE
+    PacketRef r(this);
+#endif
     WritablePacket *q;
     if (headroom() >= len && !shared()) {
 	q = (WritablePacket *)this;
@@ -2872,6 +2908,7 @@ WritablePacket::buffer_data() const
 }
 /** @endcond never */
 
+#if !CLICK_LINUXMODULE
 inline void
 WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length) {
 # if CLICK_PACKET_USE_DPDK
@@ -2882,6 +2919,7 @@ WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t
 	_end = data + buffer_length;
 # endif
 }
+#endif
 
 inline void
 WritablePacket::rewrite_ips(IPPair pair, bool is_tcp) {

@@ -17,12 +17,12 @@ CLICK_DECLS
 //#define PS_BATCH_SIZE 1024
 
 Pipeliner::Pipeliner()
-    :   _ring_size(-1),_burst(32),_block(false),
+    :   _ring_size(-1),_burst(32),
+        _home_thread_id(0), _block(false),
         _active(true),_nouseless(false),_always_up(false),
         _allow_direct_traversal(true), _verbose(true),
         sleepiness(0),_sleep_threshold(0),
-        _task(this),
-        _home_thread_id(0), _last_start(0)
+        _task(this), _last_start(0)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -35,7 +35,7 @@ Pipeliner::~Pipeliner()
 }
 
 bool
-Pipeliner::get_spawning_threads(Bitvector& b, bool) {
+Pipeliner::get_spawning_threads(Bitvector& b, bool, int port) {
     unsigned int thisthread = router()->home_thread_id(this);
     b[thisthread] = 1;
     return false;
@@ -111,9 +111,8 @@ Pipeliner::initialize(ErrorHandler *errh)
             storage.get_value(i).initialize(_ring_size);
     }
 
-
-    for (int i = 0; i < passing.weight(); i++) {
-        if (passing[i]) {
+    for (int i = 0; i < passing.size(); i++) {
+        if (passing[i] && i != _home_thread_id) {
             click_chatter("%p{element} : Pipeline from %d to %d", this, i, _home_thread_id);
             WritablePacket::pool_transfer(_home_thread_id,i);
         }
@@ -157,14 +156,14 @@ void Pipeliner::push_batch(int,PacketBatch* head) {
             if (!_always_up && sleepiness >= _sleep_threshold)
                 _task.reschedule();
             stats->dropped++;
-            if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+            if (_verbose && ((stats->dropped < 10) || ((stats->dropped & 0xffffffff) == 1)))
                 click_chatter("%p{element} : congestion", this);
             goto retry;
         }
         int c = head->count();
         head->kill();
         stats->dropped+=c;
-        if (_verbose && stats->dropped < 10 || ((stats->dropped & 0xffffffff) == 1))
+        if (_verbose && ((stats->dropped < 10) || ((stats->dropped & 0xffffffff) == 1)))
             click_chatter("%p{element} : Dropped %lu packets : have %u packets in ring", this, stats->dropped, c);
     }
 }
