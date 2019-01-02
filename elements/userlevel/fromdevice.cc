@@ -74,6 +74,9 @@ FromDevice::FromDevice()
 #if FROMDEVICE_ALLOW_LINUX || FROMDEVICE_ALLOW_PCAP
     _fd = -1;
 #endif
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 FromDevice::~FromDevice()
@@ -93,28 +96,28 @@ FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     String bpf_filter, capture, encap_type;
     bool has_encap;
     if (Args(conf, this, errh)
-	.read_mp("DEVNAME", _ifname)
-	.read_p("PROMISC", promisc)
-	.read_p("SNAPLEN", _snaplen)
-	.read("SNIFFER", sniffer)
-	.read("FORCE_IP", _force_ip)
-	.read("METHOD", WordArg(), capture)
-	.read("CAPTURE", WordArg(), capture) // deprecated
-	.read("BPF_FILTER", bpf_filter)
-	.read("PROTOCOL", _protocol)
-	.read("OUTBOUND", outbound)
-	.read("HEADROOM", _headroom)
-	.read("ENCAP", WordArg(), encap_type).read_status(has_encap)
-	.read("BURST", _burst)
-	.read("TIMESTAMP", timestamp)
-	.complete() < 0)
-	return -1;
+        .read_mp("DEVNAME", _ifname)
+        .read_p("PROMISC", promisc)
+        .read_p("SNAPLEN", _snaplen)
+        .read("SNIFFER", sniffer)
+        .read("FORCE_IP", _force_ip)
+        .read("METHOD", WordArg(), capture)
+        .read("CAPTURE", WordArg(), capture) // deprecated
+        .read("BPF_FILTER", bpf_filter)
+        .read("PROTOCOL", _protocol)
+        .read("OUTBOUND", outbound)
+        .read("HEADROOM", _headroom)
+        .read("ENCAP", WordArg(), encap_type).read_status(has_encap)
+        .read("BURST", _burst)
+        .read("TIMESTAMP", timestamp)
+        .complete() < 0)
+        return -1;
     if (_snaplen > 65535 || _snaplen < 14)
-	return errh->error("SNAPLEN out of range");
+        return errh->error("SNAPLEN out of range");
     if (_headroom > 8190)
-	return errh->error("HEADROOM out of range");
+        return errh->error("HEADROOM out of range");
     if (_burst <= 0)
-	return errh->error("BURST out of range");
+        return errh->error("BURST out of range");
     _protocol = htons(_protocol);
 
 #if FROMDEVICE_ALLOW_PCAP
@@ -130,27 +133,27 @@ FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (capture == "") {
 #if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
 # if FROMDEVICE_ALLOW_PCAP
-	_method = _bpf_filter ? method_pcap : method_default;
+        _method = _bpf_filter ? method_pcap : method_default;
 # else
-	_method = method_default;
+        _method = method_default;
 # endif
 #else
-	return errh->error("cannot receive packets on this platform");
+        return errh->error("cannot receive packets on this platform");
 #endif
     }
 #if FROMDEVICE_ALLOW_LINUX
     else if (capture == "LINUX")
-	_method = method_linux;
+        _method = method_linux;
 #endif
 #if FROMDEVICE_ALLOW_PCAP
     else if (capture == "PCAP")
-	_method = method_pcap;
+        _method = method_pcap;
 #endif
     else
-	return errh->error("bad METHOD");
+        return errh->error("bad METHOD");
 
     if (bpf_filter && _method != method_pcap)
-	errh->warning("not using METHOD PCAP, BPF filter ignored");
+        errh->warning("not using METHOD PCAP, BPF filter ignored");
 
     _sniffer = sniffer;
     _promisc = promisc;
@@ -165,7 +168,7 @@ FromDevice::open_packet_socket(String ifname, ErrorHandler *errh)
 {
     int fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (fd == -1)
-	return errh->error("%s: socket: %s", ifname.c_str(), strerror(errno));
+        return errh->error("%s: socket: %s", ifname.c_str(), strerror(errno));
 
     // get interface index
     struct ifreq ifr;
@@ -173,8 +176,8 @@ FromDevice::open_packet_socket(String ifname, ErrorHandler *errh)
     strncpy(ifr.ifr_name, ifname.c_str(), sizeof(ifr.ifr_name));
     int res = ioctl(fd, SIOCGIFINDEX, &ifr);
     if (res != 0) {
-	close(fd);
-	return errh->error("%s: SIOCGIFINDEX: %s", ifname.c_str(), strerror(errno));
+        close(fd);
+        return errh->error("%s: SIOCGIFINDEX: %s", ifname.c_str(), strerror(errno));
     }
     int ifindex = ifr.ifr_ifindex;
 
@@ -188,8 +191,8 @@ FromDevice::open_packet_socket(String ifname, ErrorHandler *errh)
     sa.sll_ifindex = ifindex;
     res = bind(fd, (struct sockaddr *)&sa, sizeof(sa));
     if (res != 0) {
-	close(fd);
-	return errh->error("%s: bind: %s", ifname.c_str(), strerror(errno));
+        close(fd);
+        return errh->error("%s: bind: %s", ifname.c_str(), strerror(errno));
     }
 
     // nonblocking I/O on the packet socket so we can poll
@@ -206,24 +209,24 @@ FromDevice::set_promiscuous(int fd, String ifname, bool promisc)
     memset(&ifr, 0, sizeof(ifr));
     strncpy(ifr.ifr_name, ifname.c_str(), sizeof(ifr.ifr_name));
     if (ioctl(fd, SIOCGIFFLAGS, &ifr) != 0)
-	return -2;
+        return -2;
     int was_promisc = (ifr.ifr_flags & IFF_PROMISC ? 1 : 0);
 
     // set or reset promiscuous flag
 #ifdef SOL_PACKET
     if (ioctl(fd, SIOCGIFINDEX, &ifr) != 0)
-	return -2;
+        return -2;
     struct packet_mreq mr;
     memset(&mr, 0, sizeof(mr));
     mr.mr_ifindex = ifr.ifr_ifindex;
     mr.mr_type = (promisc ? PACKET_MR_PROMISC : PACKET_MR_ALLMULTI);
     if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mr, sizeof(mr)) < 0)
-	return -3;
+        return -3;
 #else
     if (was_promisc != promisc) {
-	ifr.ifr_flags = (promisc ? ifr.ifr_flags | IFF_PROMISC : ifr.ifr_flags & ~IFF_PROMISC);
-	if (ioctl(fd, SIOCSIFFLAGS, &ifr) < 0)
-	    return -3;
+        ifr.ifr_flags = (promisc ? ifr.ifr_flags | IFF_PROMISC : ifr.ifr_flags & ~IFF_PROMISC);
+        if (ioctl(fd, SIOCSIFFLAGS, &ifr) < 0)
+            return -3;
     }
 #endif
 
@@ -236,16 +239,16 @@ const char*
 FromDevice::fetch_pcap_error(pcap_t* pcap, const char *ebuf)
 {
     if ((!ebuf || !ebuf[0]) && pcap)
-	ebuf = pcap_geterr(pcap);
+        ebuf = pcap_geterr(pcap);
     if (!ebuf || !ebuf[0])
-	return "unknown error";
+        return "unknown error";
     else
-	return ebuf;
+        return ebuf;
 }
 
 pcap_t *
 FromDevice::open_pcap(String ifname, int snaplen, bool promisc,
-		      ErrorHandler *errh)
+                      ErrorHandler *errh)
 {
     // create pcap
     char ebuf[PCAP_ERRBUF_SIZE];
@@ -294,10 +297,10 @@ FromDevice::open_pcap(String ifname, int snaplen, bool promisc,
     // set nonblocking
 # if HAVE_PCAP_SETNONBLOCK
     if (pcap_setnonblock(p, 1, ebuf) < 0)
-	errh->warning("nonblocking %s: %s", ifname.c_str(), fetch_pcap_error(p, ebuf));
+        errh->warning("nonblocking %s: %s", ifname.c_str(), fetch_pcap_error(p, ebuf));
 # else
     if (fcntl(pcap_fileno(p), F_SETFL, O_NONBLOCK) < 0)
-	errh->warning("nonblocking %s: %s", ifname.c_str(), strerror(errno));
+        errh->warning("nonblocking %s: %s", ifname.c_str(), strerror(errno));
 # endif
 
     return p;
@@ -308,16 +311,16 @@ int
 FromDevice::initialize(ErrorHandler *errh)
 {
     if (!_ifname)
-	return errh->error("interface not set");
+        return errh->error("interface not set");
 
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_default || _method == method_pcap) {
-	assert(!_pcap);
-	_pcap = open_pcap(_ifname, _snaplen, _promisc, errh);
-	if (!_pcap)
-	    return -1;
-	_fd = pcap_fileno(_pcap);
-	char *ifname = _ifname.mutable_c_str();
+        assert(!_pcap);
+        _pcap = open_pcap(_ifname, _snaplen, _promisc, errh);
+        if (!_pcap)
+            return -1;
+        _fd = pcap_fileno(_pcap);
+        char *ifname = _ifname.mutable_c_str();
 
 # if TIMESTAMP_NANOSEC && defined(PCAP_TSTAMP_PRECISION_NANO)
         _pcap_nanosec = false;
@@ -326,25 +329,25 @@ FromDevice::initialize(ErrorHandler *errh)
 # endif
 
 # if HAVE_PCAP_SETDIRECTION
-	pcap_setdirection(_pcap, _outbound ? PCAP_D_INOUT : PCAP_D_IN);
+        pcap_setdirection(_pcap, _outbound ? PCAP_D_INOUT : PCAP_D_IN);
 # elif defined(BIOCSSEESENT)
-	{
-	    int r, accept = _outbound;
-	    if ((r = ioctl(_fd, BIOCSSEESENT, &accept)) == -1)
-		return errh->error("%s: BIOCSSEESENT: %s", ifname, strerror(errno));
-	    else if (r != 0)
-		errh->warning("%s: BIOCSSEESENT returns %d", ifname, r);
-	}
+        {
+            int r, accept = _outbound;
+            if ((r = ioctl(_fd, BIOCSSEESENT, &accept)) == -1)
+                return errh->error("%s: BIOCSSEESENT: %s", ifname, strerror(errno));
+            else if (r != 0)
+                errh->warning("%s: BIOCSSEESENT returns %d", ifname, r);
+        }
 # endif
 
 # if defined(BIOCIMMEDIATE) && !defined(__sun) // pcap/bpf ioctl, not in DLPI/bufmod
-	{
-	    int r, yes = 1;
-	    if ((r = ioctl(_fd, BIOCIMMEDIATE, &yes)) == -1)
-		return errh->error("%s: BIOCIMMEDIATE: %s", ifname, strerror(errno));
-	    else if (r != 0)
-		errh->warning("%s: BIOCIMMEDIATE returns %d", ifname, r);
-	}
+        {
+            int r, yes = 1;
+            if ((r = ioctl(_fd, BIOCIMMEDIATE, &yes)) == -1)
+                return errh->error("%s: BIOCIMMEDIATE: %s", ifname, strerror(errno));
+            else if (r != 0)
+                errh->warning("%s: BIOCIMMEDIATE returns %d", ifname, r);
+        }
 # endif
 
         if (_datalink == -1) {  // no ENCAP specified in configure()
@@ -354,63 +357,64 @@ FromDevice::initialize(ErrorHandler *errh)
                 return errh->error("%s: pcap_set_datalink: %s", ifname, pcap_geterr(_pcap));
         }
 
-	bpf_u_int32 netmask;
-	bpf_u_int32 localnet;
-	char ebuf[PCAP_ERRBUF_SIZE];
-	ebuf[0] = 0;
-	if (pcap_lookupnet(ifname, &localnet, &netmask, ebuf) < 0 || ebuf[0] != 0)
-	    errh->warning("%s", fetch_pcap_error(0, ebuf));
+        bpf_u_int32 netmask;
+        bpf_u_int32 localnet;
+        char ebuf[PCAP_ERRBUF_SIZE];
+        ebuf[0] = 0;
+        if (pcap_lookupnet(ifname, &localnet, &netmask, ebuf) < 0 || ebuf[0] != 0)
+            errh->warning("%s", fetch_pcap_error(0, ebuf));
 
-	// Later versions of pcap distributed with linux (e.g. the redhat
-	// linux pcap-0.4-16) want to have a filter installed before they
-	// will pick up any packets.
+        // Later versions of pcap distributed with linux (e.g. the redhat
+        // linux pcap-0.4-16) want to have a filter installed before they
+        // will pick up any packets.
 
-	// compile the BPF filter
-	struct bpf_program fcode;
-	if (pcap_compile(_pcap, &fcode, _bpf_filter.mutable_c_str(), 0, netmask) < 0)
-	    return errh->error("%s: %s", ifname, fetch_pcap_error(_pcap, 0));
-	if (pcap_setfilter(_pcap, &fcode) < 0)
-	    return errh->error("%s: %s", ifname, fetch_pcap_error(_pcap, 0));
+        // compile the BPF filter
+        struct bpf_program fcode;
+        if (pcap_compile(_pcap, &fcode, _bpf_filter.mutable_c_str(), 0, netmask) < 0)
+            return errh->error("%s: %s", ifname, fetch_pcap_error(_pcap, 0));
+        if (pcap_setfilter(_pcap, &fcode) < 0)
+            return errh->error("%s: %s", ifname, fetch_pcap_error(_pcap, 0));
 
-	_datalink = pcap_datalink(_pcap);
-	if (_force_ip && !fake_pcap_dlt_force_ipable(_datalink))
-	    errh->warning("%s: strange data link type %d, FORCE_IP will not work", ifname, _datalink);
+        _datalink = pcap_datalink(_pcap);
+        if (_force_ip && !fake_pcap_dlt_force_ipable(_datalink))
+            errh->warning("%s: strange data link type %d, FORCE_IP will not work", ifname, _datalink);
 
-	_method = method_pcap;
+        _method = method_pcap;
     }
 #endif
 
+
 #if FROMDEVICE_ALLOW_LINUX
     if (_method == method_default || _method == method_linux) {
-	_fd = open_packet_socket(_ifname, errh);
-	if (_fd < 0)
-	    return -1;
+        _fd = open_packet_socket(_ifname, errh);
+        if (_fd < 0)
+            return -1;
 
-	int promisc_ok = set_promiscuous(_fd, _ifname, _promisc);
-	if (promisc_ok < 0) {
-	    if (_promisc)
-		errh->warning("cannot set promiscuous mode");
-	    _was_promisc = -1;
-	} else
-	    _was_promisc = promisc_ok;
+        int promisc_ok = set_promiscuous(_fd, _ifname, _promisc);
+        if (promisc_ok < 0) {
+            if (_promisc)
+                errh->warning("cannot set promiscuous mode");
+            _was_promisc = -1;
+        } else
+            _was_promisc = promisc_ok;
 
-	_datalink = FAKE_DLT_EN10MB;
-	_method = method_linux;
+        _datalink = FAKE_DLT_EN10MB;
+        _method = method_linux;
     }
 #endif
 
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_pcap)
-	ScheduleInfo::initialize_task(this, &_task, false, errh);
+        ScheduleInfo::initialize_task(this, &_task, false, errh);
 #endif
 #if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
     if (_fd >= 0)
-	add_select(_fd, SELECT_READ);
+        add_select(_fd, SELECT_READ);
 #endif
 
     if (!_sniffer)
-	if (KernelFilter::device_filter(_ifname, true, errh) < 0)
-	    _sniffer = true;
+        if (KernelFilter::device_filter(_ifname, true, errh) < 0)
+            _sniffer = true;
 
     return 0;
 }
@@ -419,17 +423,17 @@ void
 FromDevice::cleanup(CleanupStage stage)
 {
     if (stage >= CLEANUP_INITIALIZED && !_sniffer)
-	KernelFilter::device_filter(_ifname, false, ErrorHandler::default_handler());
+        KernelFilter::device_filter(_ifname, false, ErrorHandler::default_handler());
 #if FROMDEVICE_ALLOW_LINUX
     if (_fd >= 0 && _method == method_linux) {
-	if (_was_promisc >= 0)
-	    set_promiscuous(_fd, _ifname, _was_promisc);
-	close(_fd);
+        if (_was_promisc >= 0)
+            set_promiscuous(_fd, _ifname, _was_promisc);
+        close(_fd);
     }
 #endif
 #if FROMDEVICE_ALLOW_PCAP
     if (_pcap)
-	pcap_close(_pcap);
+        pcap_close(_pcap);
     _pcap = 0;
 #endif
 #if FROMDEVICE_ALLOW_PCAP || FROMDEVICE_ALLOW_LINUX
@@ -438,27 +442,15 @@ FromDevice::cleanup(CleanupStage stage)
 }
 
 #if FROMDEVICE_ALLOW_PCAP
-void
-FromDevice::emit_packet(WritablePacket *p, int extra_len, const Timestamp &ts)
-{
-    // set packet type annotation
-    if (p->data()[0] & 1) {
-	if (EtherAddress::is_broadcast(p->data()))
-	    p->set_packet_type_anno(Packet::BROADCAST);
-	else
-	    p->set_packet_type_anno(Packet::MULTICAST);
-    }
-
-    // set annotations
-    p->set_timestamp_anno(ts);
-    p->set_mac_header(p->data());
-    SET_EXTRA_LENGTH_ANNO(p, extra_len);
-
-    if (!_force_ip || fake_pcap_force_ip(p, _datalink))
-	output(0).push(p);
-    else
-	checked_output_push(1, p);
-}
+struct my_pcap_data {
+    FromDevice* fd;
+    PacketBatch* batch;
+    PacketBatch* batch_err;
+    Packet* batch_last;
+    Packet* batch_err_last;
+    int batch_count;
+    int batch_err_count;
+};
 #endif
 
 #if FROMDEVICE_ALLOW_PCAP
@@ -466,10 +458,11 @@ CLICK_ENDDECLS
 extern "C" {
 void
 FromDevice_get_packet(u_char* clientdata,
-		      const struct pcap_pkthdr* pkthdr,
-		      const u_char* data)
+                      const struct pcap_pkthdr* pkthdr,
+                      const u_char* data)
 {
-    FromDevice *fd = (FromDevice *) clientdata;
+    struct my_pcap_data *md = (struct my_pcap_data *) clientdata;
+    FromDevice *fd = md->fd;
     WritablePacket *p = Packet::make(fd->_headroom, data, pkthdr->caplen, 0);
     Timestamp ts = Timestamp::uninitialized_t();
 #if TIMESTAMP_NANOSEC && defined(PCAP_TSTAMP_PRECISION_NANO)
@@ -478,56 +471,123 @@ FromDevice_get_packet(u_char* clientdata,
     else
 #endif
         ts = Timestamp::make_usec(pkthdr->ts.tv_sec, pkthdr->ts.tv_usec);
-    fd->emit_packet(p, pkthdr->len - pkthdr->caplen, ts);
+
+    // set packet type annotation
+    if (p->data()[0] & 1) {
+        if (EtherAddress::is_broadcast(p->data()))
+            p->set_packet_type_anno(Packet::BROADCAST);
+        else
+            p->set_packet_type_anno(Packet::MULTICAST);
+    }
+
+    // set annotations
+    p->set_timestamp_anno(ts);
+    p->set_mac_header(p->data());
+    SET_EXTRA_LENGTH_ANNO(p, pkthdr->len - pkthdr->caplen);
+
+#if HAVE_BATCH
+    if (!fd->_force_ip || fake_pcap_force_ip(p, fd->_datalink)) {
+        if (md->batch)
+            md->batch_last->set_next(p);
+        else
+            md->batch = PacketBatch::start_head(p);
+        md->batch_last = p;
+        md->batch_count++;
+    } else {
+        if (md->batch_err)
+            md->batch_err_last->set_next(p);
+        else
+            md->batch_err = PacketBatch::start_head(p);
+        md->batch_err_last = p;
+        md->batch_err_count++;
+    }
+#else
+    if (!fd->_force_ip || fake_pcap_force_ip(p, fd->_datalink))
+        fd->output(0).push(p);
+    else
+        fd->checked_output_push(1, p);
+#endif
 }
 }
 CLICK_DECLS
 #endif
-
 
 void
 FromDevice::selected(int, int)
 {
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_pcap) {
-	// Read and push() at most one burst of packets.
-	int r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) this);
-	if (r > 0) {
-	    _count += r;
-	    _task.reschedule();
-	} else if (r < 0 && ++_pcap_complaints < 5)
-	    ErrorHandler::default_handler()->error("%p{element}: %s", this, pcap_geterr(_pcap));
+        struct my_pcap_data md = {this, 0, 0, 0, 0, 0, 0};
+        // Read and push() at most one burst of packets.
+        int r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) &md);
+        if (r > 0) {
+            _count += r;
+            _task.reschedule();
+#if HAVE_BATCH
+            if (md.batch) {
+                md.batch->make_tail(md.batch_last, md.batch_count);
+                output(0).push_batch(md.batch);
+            }
+            if (md.batch_err) {
+                md.batch_err->make_tail(md.batch_err_last, md.batch_err_count);
+                checked_output_push_batch(1, md.batch_err);
+            }
+#endif
+        } else if (r < 0 && ++_pcap_complaints < 5)
+            ErrorHandler::default_handler()->error("%p{element}: %s", this, pcap_geterr(_pcap));
     }
 #endif
 #if FROMDEVICE_ALLOW_LINUX
-    int nlinux = 0;
-    while (_method == method_linux && nlinux < _burst) {
-	struct sockaddr_ll sa;
-	socklen_t fromlen = sizeof(sa);
-	WritablePacket *p = Packet::make(_headroom, 0, _snaplen, 0);
-	int len = recvfrom(_fd, p->data(), p->length(), MSG_TRUNC, (sockaddr *)&sa, &fromlen);
-	if (len > 0 && (sa.sll_pkttype != PACKET_OUTGOING || _outbound)
-            && (_protocol == 0 || _protocol == sa.sll_protocol)) {
-	    if (len > _snaplen) {
-		assert(p->length() == (uint32_t)_snaplen);
-		SET_EXTRA_LENGTH_ANNO(p, len - _snaplen);
-	    } else
-		p->take(_snaplen - len);
-	    p->set_packet_type_anno((Packet::PacketType)sa.sll_pkttype);
-	    p->timestamp_anno().set_timeval_ioctl(_fd, SIOCGSTAMP);
-	    p->set_mac_header(p->data());
-	    ++nlinux;
-	    ++_count;
-	    if (!_force_ip || fake_pcap_force_ip(p, _datalink))
-		output(0).push(p);
-	    else
-		checked_output_push(1, p);
-	} else {
-	    p->kill();
-	    if (len <= 0 && errno != EAGAIN)
-		click_chatter("FromDevice(%s): recvfrom: %s", _ifname.c_str(), strerror(errno));
-	    break;
-	}
+    if (_method == method_linux) {
+# if HAVE_BATCH
+        BATCH_CREATE_INIT(batch);
+        BATCH_CREATE_INIT(batch_err);
+# endif
+        int nlinux = 0;
+        while (nlinux < _burst) {
+            struct sockaddr_ll sa;
+            socklen_t fromlen = sizeof(sa);
+            WritablePacket *p = Packet::make(_headroom, 0, _snaplen, 0);
+            int len = recvfrom(_fd, p->data(), p->length(), MSG_TRUNC, (sockaddr *)&sa, &fromlen);
+            if (len > 0 && (sa.sll_pkttype != PACKET_OUTGOING || _outbound)
+                && (_protocol == 0 || _protocol == sa.sll_protocol)) {
+                if (len > _snaplen) {
+                    assert(p->length() == (uint32_t)_snaplen);
+                    SET_EXTRA_LENGTH_ANNO(p, len - _snaplen);
+                } else
+                    p->take(_snaplen - len);
+                p->set_packet_type_anno((Packet::PacketType)sa.sll_pkttype);
+                p->timestamp_anno().set_timeval_ioctl(_fd, SIOCGSTAMP);
+                p->set_mac_header(p->data());
+                ++nlinux;
+                ++_count;
+# if HAVE_BATCH
+                if (!_force_ip || fake_pcap_force_ip(p, _datalink)) {
+                    BATCH_CREATE_APPEND(batch, p);
+                } else {
+                    BATCH_CREATE_APPEND(batch_err, p);
+                }
+# else
+                if (!_force_ip || fake_pcap_force_ip(p, _datalink))
+                    output(0).push(p);
+                else
+                    checked_output_push(1, p);
+# endif
+            } else {
+                p->kill();
+                if (len <= 0 && errno != EAGAIN)
+                    click_chatter("FromDevice(%s): recvfrom: %s", _ifname.c_str(), strerror(errno));
+                break;
+            }
+        }
+# if HAVE_BATCH
+        BATCH_CREATE_FINISH(batch);
+        BATCH_CREATE_FINISH(batch_err);
+        if (batch)
+            output(0).push_batch(batch);
+        if (batch_err)
+            checked_output_push_batch(1, batch_err);
+# endif
     }
 #endif
 }
@@ -538,17 +598,28 @@ FromDevice::run_task(Task *)
 {
     // Read and push() at most one burst of packets.
     int r = 0;
+    struct my_pcap_data md = {this, 0, 0, 0, 0, 0, 0};
     if (_method == method_pcap) {
-	r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) this);
-	if (r < 0 && ++_pcap_complaints < 5)
-	    ErrorHandler::default_handler()->error("%p{element}: %s", this, pcap_geterr(_pcap));
+        r = pcap_dispatch(_pcap, _burst, FromDevice_get_packet, (u_char *) &md);
+        if (r < 0 && ++_pcap_complaints < 5)
+            ErrorHandler::default_handler()->error("%p{element}: %s", this, pcap_geterr(_pcap));
     }
     if (r > 0) {
-	_count += r;
-	_task.fast_reschedule();
-	return true;
+        _count += r;
+        _task.fast_reschedule();
+#if HAVE_BATCH
+        if (md.batch) {
+            md.batch->make_tail(md.batch_last, md.batch_count);
+            output(0).push_batch(md.batch);
+        }
+        if (md.batch_err) {
+            md.batch_err->make_tail(md.batch_err_last, md.batch_err_count);
+            checked_output_push_batch(1, md.batch_err);
+        }
+#endif
+        return true;
     } else
-	return false;
+        return false;
 }
 #endif
 
@@ -558,9 +629,9 @@ FromDevice::kernel_drops(bool& known, int& max_drops) const
     known = false, max_drops = -1;
 #if FROMDEVICE_ALLOW_PCAP
     if (_method == method_pcap) {
-	struct pcap_stat stats;
-	if (pcap_stats(_pcap, &stats) >= 0)
-	    known = true, max_drops = stats.ps_drop;
+        struct pcap_stat stats;
+        if (pcap_stats(_pcap, &stats) >= 0)
+            known = true, max_drops = stats.ps_drop;
     }
 #endif
 #if FROMDEVICE_ALLOW_LINUX && defined(PACKET_STATISTICS)
@@ -578,19 +649,19 @@ FromDevice::read_handler(Element* e, void *thunk)
 {
     FromDevice* fd = static_cast<FromDevice*>(e);
     if (thunk == (void *) 0) {
-	int max_drops;
-	bool known;
-	fd->kernel_drops(known, max_drops);
-	if (known)
-	    return String(max_drops);
-	else if (max_drops >= 0)
-	    return "<" + String(max_drops);
-	else
-	    return "??";
+        int max_drops;
+        bool known;
+        fd->kernel_drops(known, max_drops);
+        if (known)
+            return String(max_drops);
+        else if (max_drops >= 0)
+            return "<" + String(max_drops);
+        else
+            return "??";
     } else if (thunk == (void *) 1)
-	return String(fake_pcap_unparse_dlt(fd->_datalink));
+        return String(fake_pcap_unparse_dlt(fd->_datalink));
     else
-	return String(fd->_count);
+        return String(fd->_count);
 }
 
 int

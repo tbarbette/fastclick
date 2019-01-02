@@ -62,31 +62,38 @@ RandomSample::initialize(ErrorHandler *)
     return 0;
 }
 
-void
-RandomSample::push(int, Packet *p)
+inline Packet *
+RandomSample::smaction(Packet *p)
 {
     if (!_active || (click_random() & SAMPLING_MASK) < _sampling_prob)
-	output(0).push(p);
+        return p;
     else {
-	checked_output_push(1, p);
-	_drops++;
+        _drops++;
+        return 0;
     }
 }
 
 Packet *
-RandomSample::pull(int)
+RandomSample::simple_action(Packet *p)
 {
-    Packet *p = input(0).pull();
-    if (!p)
-	return 0;
-    else if (!_active || (click_random() & SAMPLING_MASK) < _sampling_prob)
-	return p;
-    else {
-	checked_output_push(1, p);
-	_drops++;
-	return 0;
-    }
+    Packet* q = smaction(p);
+    if (q == 0) {
+        checked_output_push(1, p);
+        return 0;
+    } else
+        return q;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+RandomSample::simple_action_batch(PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROP_LIST(smaction, batch, drop_batch);
+    if (drop_batch != 0)
+        checked_output_push_batch(1, drop_batch);
+    return batch;
+}
+#endif
 
 String
 RandomSample::read_handler(Element *e, void *thunk)

@@ -1,6 +1,6 @@
 #ifndef CLICK_TODEVICE_USERLEVEL_HH
 #define CLICK_TODEVICE_USERLEVEL_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/string.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
@@ -80,7 +80,7 @@ extern "C" {
 # define TODEVICE_ALLOW_PCAPFD 1
 #endif
 
-class ToDevice : public Element { public:
+class ToDevice : public BatchElement { public:
 
     ToDevice() CLICK_COLD;
     ~ToDevice() CLICK_COLD;
@@ -118,7 +118,11 @@ class ToDevice : public Element { public:
     int _method;
     NotifierSignal _signal;
 
+#if HAVE_BATCH
+    PacketBatch *_q;
+#else
     Packet *_q;
+#endif
     int _burst;
 
     bool _debug;

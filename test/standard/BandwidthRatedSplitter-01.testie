@@ -27,7 +27,7 @@ InfiniteSource(LENGTH 100)
 	-> Discard;
 
 InfiniteSource(LENGTH 100)
-	-> Queue(10)
+	-> Queue(1)  // Low burst values do not play well with batching. Set Queue(1) to disable batching.
 	-> u4 :: BandwidthRatedUnqueue(RATE 20000Bps)
 	-> s4 :: BandwidthRatedSplitter(RATE 10000Bps, BURST_BYTES 100)
 	-> c4 :: Counter
