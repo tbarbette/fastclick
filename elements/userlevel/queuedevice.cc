@@ -23,6 +23,8 @@ CLICK_DECLS
 int QueueDevice::n_initialized = 0;
 int QueueDevice::n_elements = 0;
 int QueueDevice::n_inputs = 0;
+
+//Number of nodes using automatic thread assignment
 int QueueDevice::use_nodes = 0;
 Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
@@ -174,8 +176,9 @@ int RXQueueDevice::configure_rx(int numa_node, int minqueues, int maxqueues, Err
 
 	if (_maxthreads == -1 || _threadoffset == -1) {
 		inputs_count[_this_node] ++;
-		if (inputs_count[_this_node] == 1)
+		if (inputs_count[_this_node] == 1) {
 			use_nodes++;
+        }
 	}
 
 	return 0;
@@ -331,10 +334,14 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
                if (use_nodes > 1)
                    use_nodes = 1;
            }
-           if (!_scale_parallel)
+           if (!_scale_parallel) {
+               if (use_nodes == 0)
+                   use_nodes = 1;
 		       thread_share = inputs_count[_this_node] / min(cores_in_node,master()->nthreads() / use_nodes);
-           else
+           } else
 		       thread_share = min(cores_in_node,master()->nthreads());
+           if (thread_share == 0)
+               thread_share = 1;
        }
 
        if (n_threads > _maxqueues) {
