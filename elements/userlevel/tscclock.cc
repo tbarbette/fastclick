@@ -128,10 +128,26 @@ TSCClock::initialize(ErrorHandler*) {
     _correction_timer.initialize(this);
     _correction_timer.schedule_now();
 
-    if (_install && _nowait)
+    if (_install && _nowait) {
+        initialize_clock();
+        if (_verbose)
+            click_chatter("Installing TSC clock right away");
+
         Timestamp::set_clock(&now,(void*)this);
+    }
 
     return 0;
+}
+
+void TSCClock::initialize_clock() {
+            //Initialize steady clock
+            steady_timestamp[current_clock] = get_real_timestamp(true);
+            steady_cycle[current_clock] = click_get_cycles();
+            steady_cycles_per_subsec_mult = cycles_per_subsec_mult[current_clock];
+
+            //Initialize wall clock
+            last_cycles[current_clock] = click_get_cycles();
+            last_timestamp[current_clock] = get_real_timestamp(false);
 }
 
 /**
@@ -342,15 +358,7 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
 void TSCClock::run_timer(Timer* timer) {
     if (unlikely(_phase == STABILIZE)) {
         if (stabilize_tick()) {
-            //Initialize steady clock
-            steady_timestamp[current_clock] = get_real_timestamp(true);
-            steady_cycle[current_clock] = click_get_cycles();
-            steady_cycles_per_subsec_mult = cycles_per_subsec_mult[current_clock];
-
-            //Initialize wall clock
-            last_cycles[current_clock] = click_get_cycles();
-            last_timestamp[current_clock] = get_real_timestamp(false);
-
+            initialize_clock();
             alpha = 0.5;
             _phase = SYNCHRONIZE;
         }
