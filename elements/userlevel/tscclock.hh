@@ -98,7 +98,6 @@ private:
   Timer** _sync_timers;
 
   UserClock* _base;
-  bool _installed;
 
   inline int64_t tick_to_subsec(int64_t delta, int64_t mult);
   inline int64_t tick_to_subsec_wall(int64_t delta);
@@ -119,6 +118,7 @@ private:
       return compute_now_wall(current_clock);
   }
 
+  void initialize_clock();
   bool stabilize_tick();
   bool accumulate_tick(Timer*);
 
