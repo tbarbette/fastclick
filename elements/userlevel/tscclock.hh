@@ -118,6 +118,7 @@ private:
       return compute_now_wall(current_clock);
   }
 
+  void initialize_clock();
   bool stabilize_tick();
   bool accumulate_tick(Timer*);
 
