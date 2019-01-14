@@ -1,3 +1,9 @@
+/**
+ * Outdated configuration from Romain Gaillard's Thesis. Mostly parameters changed though.
+ *
+ * See the MiddleClick folder for up-to-date configuration
+ */
+
 // Left side of the connection
 define($leftMac 08:00:27:db:83:16)
 ipINLeft :: IPIn();
