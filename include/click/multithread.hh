@@ -493,18 +493,29 @@ private:
 };
 
 /**
- * Inherit this class to allow multiple reader or a single write access
- * to the inherited class by enclosing data access by read_begin()/read_end()
- * and write_begin()/write_end()
+ * Multiple reader / single writer lock
  *
- * Carefull : calling write_begin while read is held or vice versa will end up in deadlock
+ * Enclose read critical section with read_begin()/read_end()
+ * and write critical section with write_begin()/write_end()
+ *
+ * The lock is based on an atomic counter.
+ * The lock is NOT reentrant.
+ *
+ * Carefull : calling write_begin while read is held or vice versa will end up in a deadlock
  */
-
 class RWLock { public:
+
     RWLock() {
         _refcnt = 0;
     }
 
+    /**
+     * Start a read critical section
+     *
+     * You MUST call read_end() after calling read_begin(). You may also
+     * call read_to_write(), but see read_to_write documentation for
+     * specificities to use, as it may fail.
+     */
     inline void read_begin() {
         uint32_t current_refcnt;
         do {
@@ -512,20 +523,37 @@ class RWLock { public:
         } while ((int32_t)current_refcnt < 0 || (_refcnt.compare_swap(current_refcnt,current_refcnt+1) != current_refcnt));
     }
 
+    /**
+     * Finish a read critical section
+     */
     inline void read_end() {
         click_read_fence();
         _refcnt--;
     }
 
+    /**
+     * Add one more reader.
+     *
+     * You MUST have called read_begin() before this.
+     * You MUST call as many time read_end as you called read_get + read_begin().
+     */
     inline void read_get() {
         _refcnt++;
     }
 
+    /**
+     * Start a write critical section.
+     *
+     * This function will spin loop while readers have the lock.
+     */
     inline void write_begin() {
         while (_refcnt.compare_swap(0,-1) != 0) click_relax_fence();
     }
 
-    inline bool write_attempt() {
+    /**
+     * Start a write critical section only if nobody has the lock.
+     */
+    inline bool write_attempt() CLICK_WARN_UNUSED_RESULT {
         return (_refcnt.compare_swap(0,-1) == 0);
     }
 
@@ -538,11 +566,17 @@ class RWLock { public:
         _refcnt--;
     }
 
+    /**
+     * Release a write reference.
+     */
     inline void write_end() {
         click_write_fence();
         _refcnt++;
     }
 
+    /**
+     * Convert a write lock to a read lock.
+     */
     inline void write_to_read() {
         click_write_fence();
         assert(_refcnt == (uint32_t)-1);
@@ -557,7 +591,24 @@ class RWLock { public:
      * The unlikeliness of this event makes this function worth it,
      * if this is unacceptable, directly grab a write reference.
      * TLDR : if false, you have loosed your read lock and neither
-     * acquired the write
+     * acquired the write.
+     * NEVER have read_to_write in a loop. The correct usage is :
+     *
+     * retry:
+     * read_begin();
+     * //read_something
+     * //compute something
+     * if (read_to_write())
+     *      //write result
+     * else
+     *     goto retry;
+     *
+     * One may think that if read_to_write() fail, you could call
+     * write_begin(). Actually this is wrong, as another writer
+     * may have taken the lock while calling read_to_write(), and
+     * changed the value. The whole computation would therefore not
+     * be atomic anymore. Instead of the "goto retry", one
+     * may check the read value has not changed after doing a write_begin()
      */
     inline bool read_to_write() CLICK_WARN_UNUSED_RESULT;
 
@@ -571,6 +622,9 @@ private:
 };
 
 
+/**
+ * A template to protect an object with RWLock.
+ */
 template <class V>
 class __rwlock : public RWLock { public:
     __rwlock() : _v(){
