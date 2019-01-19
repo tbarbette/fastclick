@@ -392,30 +392,29 @@ PARSE_OBJS = \
 	test-pmd/rxonly.o \
 
 # Additional object files, present at or after DPDK v17.11 but not at or after 18.08
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -eq 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || ( [ $(RTE_VER_YEAR) -ge 18 ] && [ $(RTE_VER_MONTH) -lt 08 ] ) ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ $(RTE_VER_YEAR) -eq 17 ] && [ $(RTE_VER_MONTH) -ge 11 ] ) || ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -lt 08 ] ) ) && echo true),true)
 PARSE_OBJS += test-pmd/tm.o
 endif
 
 # Additional object files, present at or after DPDK v17.11
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -eq 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ $(RTE_VER_YEAR) -eq 17 ] && [ $(RTE_VER_MONTH) -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
 endif
 
 # Additional object files, present at or after DPDK v18.05
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/bpf_cmd.o
 endif
 
 # Additional object files, present at or after DPDK v18.08
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/parameters.o test-pmd/softnicfwd.o
 endif
 
 # Additional object files, present at or after DPDK v18.11
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/noisy_vnf.o test-pmd/util.o
 endif
-
 
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
