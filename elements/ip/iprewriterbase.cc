@@ -1,28 +1,7 @@
-// -*- mode: c++; c-basic-offset: 4 -*-
-/*
- * iprewriterbase.{cc,hh} -- rewrites packet source and destination
- * Eddie Kohler
- * original versions by Eddie Kohler and Max Poletto
- *
- * Per-core, thread safe data structures by Georgios Katsikas
- *
- * Copyright (c) 2000 Massachusetts Institute of Technology
- * Copyright (c) 2001 International Computer Science Institute
- * Copyright (c) 2008-2010 Meraki, Inc.
- * Copyright (c) 2016 KTH Royal Institute of Technology
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, subject to the conditions
- * listed in the Click LICENSE file. These conditions include: you must
- * preserve this copyright notice, and you cannot mention the copyright
- * holders in advertising related to the Software without their permission.
- * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
- * notice is a summary of the Click LICENSE file; the license in that file is
- * legally binding.
- */
+
 
 #include <click/config.h>
+#include <click/multithread.hh>
 #include "iprewriterbase.hh"
 #include "elements/ip/iprwpatterns.hh"
 #include "elements/ip/iprwmapping.hh"
@@ -55,12 +34,12 @@ CLICK_DECLS
 //
 
 void
-IPMapper::notify_rewriter(IPRewriterBase *, IPRewriterInput *, ErrorHandler *)
+IPMapper::notify_rewriter(IPRewriterBaseAncestor *, IPRewriterInput *, ErrorHandler *)
 {
 }
 
 int
-IPMapper::rewrite_flowid(IPRewriterInput *, const IPFlowID &, IPFlowID &,
+IPMapper::rewrite_flowid(IPRewriterInputAncestor *, const IPFlowID &, IPFlowID &,
 			 Packet *, int)
 {
     return IPRewriterBase::rw_drop;
@@ -70,44 +49,28 @@ IPMapper::rewrite_flowid(IPRewriterInput *, const IPFlowID &, IPFlowID &,
 // IPRewriterBase
 //
 
-IPRewriterBase::IPRewriterBase()
-    : _gc_timer(), _set_aggregate(false)
+IPRewriterBaseAncestor::IPRewriterBaseAncestor() : _set_aggregate(false) 
 {
+
+}
+
+IPRewriterBaseAncestor::~IPRewriterBaseAncestor()
+{
+
+}
+
+IPRewriterBase::IPRewriterBase()
+    : _map(0), _heap(new IPRewriterHeap), _gc_timer(gc_timer_hook, this)
+{
+    _timeouts[0] = default_timeout;
+    _timeouts[1] = default_guarantee;
     _gc_interval_sec = default_gc_interval;
-
-    _mem_units_no = (click_max_cpu_ids() == 0)? 1 : click_max_cpu_ids();
-
-    // One heap and map per core
-    _map  = new Map[_mem_units_no];
-    _heap = new IPRewriterHeap*[_mem_units_no];
-    _timeouts  = new uint32_t*[_mem_units_no];
-    for (unsigned i=0; i<_mem_units_no; i++) {
-        _heap[i] = new IPRewriterHeap;
-        _timeouts[i] = new uint32_t[2];
-        _timeouts[i][0] = default_timeout;
-        _timeouts[i][1] = default_guarantee;
-    }
 }
 
 IPRewriterBase::~IPRewriterBase()
 {
-    if (_heap) {
-        for (unsigned i=0; i<_mem_units_no; i++) {
-            _heap[i]->unuse();
-        }
-        delete [] _heap;
-    }
-
-    if (_map) {
-        delete [] _map;
-    }
-
-    if (_timeouts) {
-        for (unsigned i=0; i<_mem_units_no; i++) {
-            delete _timeouts[i];
-        }
-        delete [] _timeouts;
-    }
+    if (_heap)
+    	_heap->unuse();
 }
 
 
@@ -124,7 +87,7 @@ IPRewriterBase::parse_input_spec(const String &line, IPRewriterInput &is,
     is.kind = IPRewriterInput::i_drop;
     is.owner = this;
     is.owner_input = input_number;
-    is.reply_element = this;
+    is.set_reply_element(this);
 
     if (word == "pass" || word == "passthrough" || word == "nochange") {
 	int32_t outnum = 0;
@@ -141,7 +104,7 @@ IPRewriterBase::parse_input_spec(const String &line, IPRewriterInput &is,
 	if (!IPRewriterPattern::parse_ports(words, &is, this, &cerrh))
 	    return -1;
 	if ((unsigned) is.foutput >= (unsigned) noutputs()
-	    || (unsigned) is.routput >= (unsigned) is.reply_element->noutputs())
+	    || (unsigned) is.routput >= (unsigned) is.reply_element()->noutputs())
 	    return cerrh.error("output port out of range");
 	is.kind = IPRewriterInput::i_keep;
 
@@ -153,7 +116,7 @@ IPRewriterBase::parse_input_spec(const String &line, IPRewriterInput &is,
 	if (!IPRewriterPattern::parse_with_ports(rest, &is, this, &cerrh))
 	    return -1;
 	if ((unsigned) is.foutput >= (unsigned) noutputs()
-	    || (unsigned) is.routput >= (unsigned) is.reply_element->noutputs())
+	    || (unsigned) is.routput >= (unsigned) is.reply_element()->noutputs())
 	    return cerrh.error("output port out of range");
 	is.u.pattern->use();
 	is.kind = IPRewriterInput::i_pattern;
@@ -179,56 +142,37 @@ int
 IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String capacity_word;
-    uint32_t timeouts[2];
-    bool has_timeout[2] = {false,false};
-    int32_t heapcap;
 
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", AnyArg(), capacity_word)
 	.read("MAPPING_CAPACITY", AnyArg(), capacity_word)
-	.read("TIMEOUT", SecondsArg(), timeouts[0]).read_status(has_timeout[0])
-	.read("GUARANTEE", SecondsArg(), timeouts[1]).read_status(has_timeout[1])
+	.read("TIMEOUT", SecondsArg(), _timeouts[0])
+	.read("GUARANTEE", SecondsArg(), _timeouts[1])
 	.read("REAP_INTERVAL", SecondsArg(), _gc_interval_sec)
 	.read("REAP_TIME", Args::deprecated, SecondsArg(), _gc_interval_sec)
 	.read("SET_AGGREGATE", _set_aggregate)
-	.consume() < 0)
+    .consume() < 0)
 	return -1;
 
-
-    for (unsigned i=0; i<_mem_units_no; i++) {
-        if (has_timeout[0])
-            _timeouts[i][0] = timeouts[0];
-        if (has_timeout[1])
-            _timeouts[i][1] = timeouts[1];
-    }
-
     if (capacity_word) {
-        Element *e;
-        IPRewriterBase *rwb;
-        if (IntArg().parse(capacity_word, heapcap)) {
-            for (int i = 0; i < _mem_units_no; i++) {
-                _heap[i]->_capacity = heapcap;
-            }
-        } else if ((e = cp_element(capacity_word, this))
-             && (rwb = (IPRewriterBase *) e->cast("IPRewriterBase"))) {
-            for (int i = 0; i < _mem_units_no; i++) {
-                rwb->_heap[i]->use();
-                _heap[i]->unuse();
-                _heap[i] = rwb->_heap[i];
-            }
-        } else
-            return errh->error("bad MAPPING_CAPACITY");
+		Element *e;
+		IPRewriterBase *rwb;
+		if (IntArg().parse(capacity_word, _heap->_capacity))
+			/* OK */;
+		else if ((e = cp_element(capacity_word, this))
+			 && (rwb = (IPRewriterBase *) e->cast("IPRewriterBase"))) {
+			rwb->_heap->use();
+			_heap->unuse();
+			_heap = rwb->_heap;
+		} else
+			return errh->error("bad MAPPING_CAPACITY");
     }
-
-
 
     if (conf.size() != ninputs())
 	return errh->error("need %d arguments, one per input port", ninputs());
 
-    for (unsigned i=0; i<_mem_units_no; i++) {
-        _timeouts[i][0] *= CLICK_HZ;    // _timeouts is measured in jiffies
-        _timeouts[i][1] *= CLICK_HZ;
-    }
+    _timeouts[0] *= CLICK_HZ;	// _timeouts is measured in jiffies
+    _timeouts[1] *= CLICK_HZ;
 
     for (int i = 0; i < conf.size(); ++i) {
 	IPRewriterInput is;
@@ -236,36 +180,30 @@ IPRewriterBase::configure(Vector<String> &conf, ErrorHandler *errh)
 	    _input_specs.push_back(is);
     }
 
-    return _input_specs.size() == ninputs() ? 0 : -1;
+    return input_specs_size() == ninputs() ? 0 : -1;
 }
 
 int
 IPRewriterBase::initialize(ErrorHandler *errh)
 {
-    for (int i = 0; i < _input_specs.size(); ++i) {
+    for (int i = 0; i < input_specs_size(); ++i) {
 	PrefixErrorHandler cerrh(errh, "input spec " + String(i) + ": ");
-	if (_input_specs[i].reply_element->_heap != _heap)
-	    cerrh.error("reply element %<%s%> must share this MAPPING_CAPACITY", i, _input_specs[i].reply_element->name().c_str());
+	if (_input_specs[i].reply_element()->_heap != _heap)
+	    cerrh.error("reply element %<%s%> must share this MAPPING_CAPACITY", i, _input_specs[i].reply_element()->name().c_str());
 	if (_input_specs[i].kind == IPRewriterInput::i_mapper)
 	    _input_specs[i].u.mapper->notify_rewriter(this, &_input_specs[i], &cerrh);
     }
-    for (int i = 0; i < _gc_timer.weight(); i ++) {
-        Timer& gc_timer = _gc_timer.get_value(i);
-        new(&gc_timer) Timer(gc_timer_hook, this); //Reconstruct as Timer does not allow assignment
-        gc_timer.initialize(this);
-        gc_timer.move_thread(_gc_timer.get_mapping(i));
-        if (_gc_interval_sec)
-            gc_timer.schedule_after_sec(_gc_interval_sec);
-    }
+    _gc_timer.initialize(this);
+    if (_gc_interval_sec)
+	_gc_timer.schedule_after_sec(_gc_interval_sec);
     return errh->nerrors() ? -1 : 0;
 }
 
 void
 IPRewriterBase::cleanup(CleanupStage)
 {
-    for (int i = 0; i < _mem_units_no; i++)
-        shrink_heap(true, i);
-    for (int i = 0; i < _input_specs.size(); ++i)
+    shrink_heap(true);
+    for (int i = 0; i < input_specs_size(); ++i)
 	if (_input_specs[i].kind == IPRewriterInput::i_pattern)
 	    _input_specs[i].u.pattern->unuse();
     _input_specs.clear();
@@ -274,15 +212,22 @@ IPRewriterBase::cleanup(CleanupStage)
 IPRewriterEntry *
 IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 {
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+	_lock.read_begin();
+    IPRewriterEntry *m = _map.get(flowid);
+	_lock.read_end();
     if (m && ip_p && m->flow()->ip_p() && m->flow()->ip_p() != ip_p)
-	return 0;
-    if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
-	IPRewriterInput &is = _input_specs[input];
+    {	
+    	return 0;
+    }
+    if (!m && (unsigned) input < (unsigned) input_specs_size()) {
+	IPRewriterInput &is = input_specs(input);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 	if (is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap)
+		_lock.write_begin();
 	    m = add_flow(ip_p, flowid, rewritten_flowid, input);
+	    _lock.write_end();
     }
+
     return m;
 }
 
@@ -290,33 +235,33 @@ IPRewriterEntry *
 IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 			   Map &map, Map *reply_map_ptr)
 {
-    IPRewriterBase *reply_element = _input_specs[input].reply_element;
+	_lock.write_begin();
+    IPRewriterBase *reply_element = input_specs(input).reply_element();
     if ((unsigned) flow->entry(false).output() >= (unsigned) noutputs()
 	|| (unsigned) flow->entry(true).output() >= (unsigned) reply_element->noutputs()) {
 	flow->owner()->owner->destroy_flow(flow);
+	_lock.write_end();
 	return 0;
     }
 
     IPRewriterEntry *old = map.set(&flow->entry(false));
     assert(!old);
 
-    auto &heap = _heap[click_current_cpu_id()];
-
     if (!reply_map_ptr)
-	reply_map_ptr = &reply_element->_map[click_current_cpu_id()];
+	reply_map_ptr = &reply_element->_map;
     old = reply_map_ptr->set(&flow->entry(true));
     if (unlikely(old)) {		// Assume every map has the same heap.
 	if (likely(old->flow() != flow))
-	    old->flow()->destroy(heap);
+	    old->flow()->destroy(_heap);
     }
 
-    Vector<IPRewriterFlow *> &myheap = heap->_heaps[flow->guaranteed()];
+    Vector<IPRewriterFlow *> &myheap = _heap->_heaps[flow->guaranteed()];
     myheap.push_back(flow);
     push_heap(myheap.begin(), myheap.end(),
 	      IPRewriterFlow::heap_less(), IPRewriterFlow::heap_place());
-    ++_input_specs[input].count;
+    ++input_specs(input).count;
 
-    if (unlikely(heap->size() > heap->capacity())) {
+    if (unlikely(_heap->size() > _heap->capacity())) {
 	// This may destroy the newly added mapping, if it has the lowest
 	// expiration time.  How can we tell?  If (1) flows are added to the
 	// heap one at a time, so the heap was formerly no bigger than the
@@ -324,9 +269,10 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 	// destroy 'flow' if it's the top of the heap.
 	click_jiffies_t now_j = click_jiffies();
 	assert(click_jiffies_less(now_j, flow->expiry())
-	       && heap->size() == heap->capacity() + 1);
+	       && _heap->size() == _heap->capacity() + 1);
 	if (shrink_heap_for_new_flow(flow, now_j)) {
-	    ++_input_specs[input].failures;
+	    ++input_specs(input).failures;
+		_lock.write_end();
 	    return 0;
 	}
     }
@@ -335,63 +281,72 @@ IPRewriterBase::store_flow(IPRewriterFlow *flow, int input,
 	map.rehash(map.bucket_count() + 1);
     if (reply_map_ptr != &map && reply_map_ptr->unbalanced())
 	reply_map_ptr->rehash(reply_map_ptr->bucket_count() + 1);
-    return &flow->entry(false);
+    IPRewriterEntry *lo = &flow->entry(false);
+	_lock.write_end();
+    return lo;
 }
-
 void
 IPRewriterBase::shift_heap_best_effort(click_jiffies_t now_j)
 {
     // Shift flows with expired guarantees to the best-effort heap.
-    Vector<IPRewriterFlow *> &guaranteed_heap = _heap[click_current_cpu_id()]->_heaps[1];
+	_lock.write_begin();
+    Vector<IPRewriterFlow *> &guaranteed_heap = _heap->_heaps[1];
     while (guaranteed_heap.size() && guaranteed_heap[0]->expired(now_j)) {
 	IPRewriterFlow *mf = guaranteed_heap[0];
 	click_jiffies_t new_expiry = mf->owner()->owner->best_effort_expiry(mf);
-	mf->change_expiry(_heap[click_current_cpu_id()], false, new_expiry);
+	mf->change_expiry(_heap, false, new_expiry);
     }
+    _lock.write_end();
 }
 
 bool
 IPRewriterBase::shrink_heap_for_new_flow(IPRewriterFlow *flow,
 					 click_jiffies_t now_j)
 {
+	_lock.write_begin();
     shift_heap_best_effort(now_j);
     // At this point, all flows in the guarantee heap expire in the future.
     // So remove the next-to-expire best-effort flow, unless there are none.
     // In that case we always remove the current flow to honor previous
     // guarantees (= admission control).
     IPRewriterFlow *deadf;
-    if (_heap[click_current_cpu_id()]->_heaps[0].empty()) {
+    if (_heap->_heaps[0].empty()) {
 	assert(flow->guaranteed());
 	deadf = flow;
     } else
-	deadf = _heap[click_current_cpu_id()]->_heaps[0][0];
-    deadf->destroy(_heap[click_current_cpu_id()]);
+	deadf = _heap->_heaps[0][0];
+    deadf->destroy(_heap);
+    _lock.write_end();
     return deadf == flow;
 }
 
 void
-IPRewriterBase::shrink_heap(bool clear_all, int thid)
+IPRewriterBase::shrink_heap(bool clear_all)
 {
+	_lock.write_begin);
     click_jiffies_t now_j = click_jiffies();
     shift_heap_best_effort(now_j);
-    Vector<IPRewriterFlow *> &best_effort_heap = _heap[thid]->_heaps[0];
+    Vector<IPRewriterFlow *> &best_effort_heap = _heap->_heaps[0];
     while (best_effort_heap.size() && best_effort_heap[0]->expired(now_j))
-	best_effort_heap[0]->destroy(_heap[thid]);
+	best_effort_heap[0]->destroy(_heap);
 
-    int32_t capacity = clear_all ? 0 : _heap[thid]->_capacity;
-    while (_heap[thid]->size() > capacity) {
-	IPRewriterFlow *deadf = _heap[thid]->_heaps[_heap[thid]->_heaps[0].empty()][0];
-	deadf->destroy(_heap[thid]);
+    int32_t capacity = clear_all ? 0 : _heap->_capacity;
+    while (_heap->size() > capacity) {
+	IPRewriterFlow *deadf = _heap->_heaps[_heap->_heaps[0].empty()][0];
+	deadf->destroy(_heap);
     }
+    _lock.write_end();
 }
 
 void
 IPRewriterBase::gc_timer_hook(Timer *t, void *user_data)
 {
     IPRewriterBase *rw = static_cast<IPRewriterBase *>(user_data);
-    rw->shrink_heap(false, click_current_cpu_id());
+    rw->shrink_heap(false);
     if (rw->_gc_interval_sec)
-        t->reschedule_after_sec(rw->_gc_interval_sec);
+    {
+    	t->reschedule_after_sec(rw->_gc_interval_sec);
+    }
 }
 
 String
@@ -404,26 +359,26 @@ IPRewriterBase::read_handler(Element *e, void *user_data)
     switch (what) {
     case h_nmappings: {
 	uint32_t count = 0;
-	for (int i = 0; i < rw->_input_specs.size(); ++i)
+	for (int i = 0; i < rw->input_specs_size(); ++i)
 	    count += rw->_input_specs[i].count;
 	sa << count;
 	break;
     }
     case h_mapping_failures: {
 	uint32_t count = 0;
-	for (int i = 0; i < rw->_input_specs.size(); ++i)
+	for (int i = 0; i < rw->input_specs_size(); ++i)
 	    count += rw->_input_specs[i].failures;
 	sa << count;
 	break;
     }
     case h_size:
-	sa << rw->_heap[click_current_cpu_id()]->size(); //TODO : In mt context, we must pass the sum as the handler is called by one "random" thread
+	sa << rw->_heap->size();
 	break;
     case h_capacity:
-	sa << rw->_heap[click_current_cpu_id()]->_capacity;
+	sa << rw->_heap->_capacity;
 	break;
     default:
-	for (int i = 0; i < rw->_input_specs.size(); ++i) {
+	for (int i = 0; i < rw->input_specs_size(); ++i) {
 	    if (what != h_patterns && what != i)
 		continue;
 	    switch (rw->_input_specs[i].kind) {
@@ -458,19 +413,21 @@ IPRewriterBase::write_handler(const String &str, Element *e, void *user_data, Er
     IPRewriterBase *rw = static_cast<IPRewriterBase *>(e);
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
     if (what == h_capacity) {
-
-    assert(click_current_cpu_id() == 0); //MT to be reviewed
 	if (Args(e, errh).push_back_words(str)
-	    .read_mp("CAPACITY", rw->_heap[click_current_cpu_id()]->_capacity) //TODO : Same comments about MT
+	    .read_mp("CAPACITY", rw->_heap->_capacity)
 	    .complete() < 0)
-	    return -1;
-	rw->shrink_heap(false, click_current_cpu_id());
+		{
+	    		return -1;
+		}
+	rw->shrink_heap(false);
 	return 0;
     } else if (what == h_clear) {
-	rw->shrink_heap(true, click_current_cpu_id());
+	rw->shrink_heap(true);
 	return 0;
     } else
-	return -1;
+    {
+    	return -1;
+    }
 }
 
 int
@@ -482,15 +439,12 @@ IPRewriterBase::pattern_write_handler(const String &str, Element *e, void *user_
     int r = rw->parse_input_spec(str, is, what, errh);
     if (r >= 0) {
 	IPRewriterInput *spec = &rw->_input_specs[what];
-
-    assert(click_current_cpu_id() == 0); //MT to be reviewed
-
 	// remove all existing flows created by this input
 	for (int which_heap = 0; which_heap < 2; ++which_heap) {
-	    Vector<IPRewriterFlow *> &myheap = rw->_heap[click_current_cpu_id()]->_heaps[which_heap]; //TODO : Same comment about MT
+	    Vector<IPRewriterFlow *> &myheap = rw->_heap->_heaps[which_heap];
 	    for (int i = myheap.size() - 1; i >= 0; --i)
 		if (myheap[i]->owner() == spec) {
-		    myheap[i]->destroy(rw->_heap[click_current_cpu_id()]);  //TODO : Same comment about MT
+		    myheap[i]->destroy(rw->_heap);
 		    if (i < myheap.size())
 			++i;
 		}
@@ -498,7 +452,7 @@ IPRewriterBase::pattern_write_handler(const String &str, Element *e, void *user_
 
 	// change pattern
 	if (spec->kind == IPRewriterInput::i_pattern)
-	    spec->u.pattern->unuse(); //TODO : Ensure MT safeness
+	    spec->u.pattern->unuse();
 	*spec = is;
     }
     return 0;
@@ -558,6 +512,3 @@ IPRewriterBase::llrpc(unsigned command, void *data)
 	return Element::llrpc(command, data);
 }
 
-ELEMENT_REQUIRES(IPRewriterMapping IPRewriterPattern)
-ELEMENT_PROVIDES(IPRewriterBase)
-CLICK_ENDDECLS
