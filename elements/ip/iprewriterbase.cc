@@ -214,16 +214,18 @@ IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
 {
 	_lock.read_begin();
     IPRewriterEntry *m = _map.get(flowid);
-	_lock.read_end();
+	//_lock.read_end();
     if (m && ip_p && m->flow()->ip_p() && m->flow()->ip_p() != ip_p)
     {	
+	    _lock.read_end();
     	return 0;
     }
     if (!m && (unsigned) input < (unsigned) input_specs_size()) {
 	IPRewriterInput &is = input_specs(input);
 	IPFlowID rewritten_flowid = IPFlowID::uninitialized_t();
 	if (is.rewrite_flowid(flowid, rewritten_flowid, 0) == rw_addmap)
-		_lock.write_begin();
+	    _lock.read_end();
+	    _lock.write_begin();
 	    m = add_flow(ip_p, flowid, rewritten_flowid, input);
 	    _lock.write_end();
     }
