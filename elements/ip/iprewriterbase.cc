@@ -325,7 +325,7 @@ IPRewriterBase::shrink_heap_for_new_flow(IPRewriterFlow *flow,
 void
 IPRewriterBase::shrink_heap(bool clear_all)
 {
-	_lock.write_begin);
+	_lock.write_begin();
     click_jiffies_t now_j = click_jiffies();
     shift_heap_best_effort(now_j);
     Vector<IPRewriterFlow *> &best_effort_heap = _heap->_heaps[0];
