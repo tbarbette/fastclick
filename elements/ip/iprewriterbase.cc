@@ -279,7 +279,7 @@ IPRewriterBase::get_entry(int ip_p, const IPFlowID &flowid, int input)
     IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
     if (m && ip_p && m->flow()->ip_p() && m->flow()->ip_p() != ip_p)
     {
-	_lock.read.end();
+	_lock.read_end();
 	return 0;
     }
     if (!m && (unsigned) input < (unsigned) _input_specs.size()) {
