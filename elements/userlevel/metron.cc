@@ -868,7 +868,8 @@ Metron::write_handler(
             }
 
             int ret = m->delete_service_chain(sc, errh);
-            if (ret == 0) {
+            if (ret == SUCCESS) {
+                errh->message("Deleted service chain with ID: %s", sc->get_id().c_str());
                 delete(sc);
             }
 
