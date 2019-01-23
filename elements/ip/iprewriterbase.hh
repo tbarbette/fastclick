@@ -1,79 +1,46 @@
-
+// -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_IPREWRITERBASE_HH
 #define CLICK_IPREWRITERBASE_HH
 #include <click/timer.hh>
 #include "elements/ip/iprwmapping.hh"
-#include "elements/ip/iprwpattern.hh"
-#include <click/multithread.hh>
 #include <click/batchelement.hh>
 #include <click/bitvector.hh>
+#include <click/multithread.hh>
+
 CLICK_DECLS
 class IPMapper;
-class IPMapperIMP;
 class IPRewriterPattern;
-class IPRewriterBase;
-class IPMapperIMP;
-class IPRewriterPatternIMP;
-class IPRewriterBaseIMP;
 
-class IPRewriterInputAncestor {
-public:
-	IPRewriterInputAncestor() : foutput(-1),routput(-1),_reply_element(0) {
-
-	}
-
-	enum {
-		i_drop, i_nochange, i_keep, i_pattern, i_mapper
-	};
-	int foutput;
-	int routput;
-protected:
-	Element *_reply_element;
-
-};
-
-class IPRewriterInputBase : public IPRewriterInputAncestor { public:
-
-	union {
-		IPRewriterBase *owner;
-		IPRewriterBaseIMP *owner_imp;
-	};
+class IPRewriterInput { public:
+    enum {
+	i_drop, i_nochange, i_keep, i_pattern, i_mapper
+    };
+    IPRewriterBase *owner;
     int owner_input;
     int kind;
-    IPRewriterBase* reply_element() {
-    	return (IPRewriterBase*)_reply_element;
-    }
-    void set_reply_element(IPRewriterBase* element) {
-    	_reply_element = (Element*)element;
-    }
+    int foutput;
+    IPRewriterBase *reply_element;
+    int routput;
     uint32_t count;
     uint32_t failures;
     union {
-    	IPRewriterPattern *pattern;
-    	IPRewriterPatternIMP *pattern_imp;
-		IPMapper *mapper;
-		IPMapperIMP *mapper_imp;
+	IPRewriterPattern *pattern;
+	IPMapper *mapper;
     } u;
 
-    IPRewriterInputBase()
-	: owner(0), owner_input(0), kind(i_drop),
-	   count(0), failures(0) {
-    	u.pattern = 0;
+    IPRewriterInput()
+	: kind(i_drop), foutput(-1), routput(-1), count(0), failures(0) {
+	u.pattern = 0;
     }
 
     enum {
-    	mapid_default = 0, mapid_iprewriter_udp = 1
+	mapid_default = 0, mapid_iprewriter_udp = 1
     };
 
+    inline int rewrite_flowid(const IPFlowID &flowid,
+			      IPFlowID &rewritten_flowid,
+			      Packet *p, int mapid = mapid_default);
 };
-
-class IPRewriterInput : public IPRewriterInputBase { public:
-	inline int rewrite_flowid(const IPFlowID &flowid,
-					IPFlowID &rewritten_flowid,
-					Packet *p, int mapid = mapid_default);
-};
-
-
 
 class IPRewriterHeap { public:
 
@@ -114,11 +81,18 @@ class IPRewriterHeap { public:
 
 };
 
-class IPRewriterBaseAncestor : public BatchElement { public:
-	IPRewriterBaseAncestor() CLICK_COLD;
-    ~IPRewriterBaseAncestor() CLICK_COLD;
+class IPRewriterBase : public BatchElement { public:
 
     typedef HashContainer<IPRewriterEntry> Map;
+    enum {
+	rw_drop = -1, rw_addmap = -2
+    };
+
+    IPRewriterBase() CLICK_COLD;
+    ~IPRewriterBase() CLICK_COLD;
+				
+     RWLock _lock;
+
     enum ConfigurePhase {
 	CONFIGURE_PHASE_PATTERNS = CONFIGURE_PHASE_INFO,
 	CONFIGURE_PHASE_REWRITER = CONFIGURE_PHASE_DEFAULT,
@@ -126,41 +100,24 @@ class IPRewriterBaseAncestor : public BatchElement { public:
 	CONFIGURE_PHASE_USER = CONFIGURE_PHASE_REWRITER + 1
     };
 
-    enum {
-    rw_drop = -1, rw_addmap = -2
-    };
-
     const char *port_count() const	{ return "1-/1-"; }
     const char *processing() const	{ return PUSH; }
 
     int configure_phase() const		{ return CONFIGURE_PHASE_REWRITER; }
-
-    virtual click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) = 0;
-
-  protected:
-    bool _set_aggregate;
-};
-
-class IPRewriterBase : public IPRewriterBaseAncestor { public:
-
-    IPRewriterBase() CLICK_COLD;
-    ~IPRewriterBase() CLICK_COLD;
-    
-    RWLock _lock;
-
     int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
     void add_rewriter_handlers(bool writable_patterns);
     void cleanup(CleanupStage) CLICK_COLD;
 
     const IPRewriterHeap *flow_heap() const {
-	return _heap;
+	return _heap[click_current_cpu_id()];
     }
     IPRewriterBase *reply_element(int input) const {
-    	return input_specs(input).reply_element();
+	return _input_specs[input].reply_element;
     }
     virtual HashContainer<IPRewriterEntry> *get_map(int mapid) {
-	return likely(mapid == IPRewriterInput::mapid_default) ? &_map : 0;
+	return likely(mapid == IPRewriterInput::mapid_default) ?
+               &_map[click_current_cpu_id()] : 0;
     }
 
     enum {
@@ -173,53 +130,26 @@ class IPRewriterBase : public IPRewriterBaseAncestor { public:
 				      int input) = 0;
     virtual void destroy_flow(IPRewriterFlow *flow) = 0;
     virtual click_jiffies_t best_effort_expiry(const IPRewriterFlow *flow) {
-	return flow->expiry() + _timeouts[0] - _timeouts[1];
+	return flow->expiry() +
+               _timeouts[click_current_cpu_id()][0] -
+               _timeouts[click_current_cpu_id()][1];
     }
 
     int llrpc(unsigned command, void *data);
 
   protected:
 
+    unsigned _mem_units_no;
 
-    inline unsigned mem_units_no() {
-    	return 1;
-    }
-
-    inline Map& map() {
-    	return _map;
-    }
-
-    inline IPRewriterInput& input_specs(int input) const {
-    	return (IPRewriterInput&)_input_specs[input];
-    }
-
-    inline IPRewriterInput& input_specs_unchecked(int input) const {
-    	return (IPRewriterInput&)_input_specs.unchecked_at(input);
-    }
-
-    inline int input_specs_size() const {
-    	return _input_specs.size();
-    }
-
+    Map *_map;
     Vector<IPRewriterInput> _input_specs;
-
-
-    IPRewriterHeap*& heap() {
-    	return _heap;
-    }
-
-    uint32_t _timeouts[2];
-
-    inline const uint32_t* timeouts() const {
-    	return _timeouts;
-    }
-
-    void initialize_timeout(int idx, uint32_t val) {
-    	_timeouts[idx] = val;
-    }
+    IPRewriterHeap **_heap;
+    uint32_t **_timeouts;
 
     uint32_t _gc_interval_sec;
-    Timer _gc_timer;
+    per_thread<Timer> _gc_timer;
+
+    bool _set_aggregate;
 
     enum {
 	default_timeout = 300,	   // 5 minutes
@@ -254,17 +184,13 @@ class IPRewriterBase : public IPRewriterBaseAncestor { public:
 
   private:
 
-    Map _map;
-    IPRewriterHeap *_heap;
-
     void shift_heap_best_effort(click_jiffies_t now_j);
     bool shrink_heap_for_new_flow(IPRewriterFlow *flow, click_jiffies_t now_j);
-    void shrink_heap(bool clear_all);
+    void shrink_heap(bool clear_all, int thid);
 
     friend class IPRewriterFlow;
 
 };
-
 
 
 class IPMapper { public:
@@ -272,9 +198,9 @@ class IPMapper { public:
     IPMapper()				{ }
     virtual ~IPMapper()			{ }
 
-    virtual void notify_rewriter(IPRewriterBaseAncestor *user, IPRewriterInput *input,
+    virtual void notify_rewriter(IPRewriterBase *user, IPRewriterInput *input,
 				 ErrorHandler *errh);
-    virtual int rewrite_flowid(IPRewriterInputAncestor *input,
+    virtual int rewrite_flowid(IPRewriterInput *input,
 			       const IPFlowID &flowid,
 			       IPFlowID &rewritten_flowid,
 			       Packet *p, int mapid);
@@ -297,9 +223,9 @@ IPRewriterInput::rewrite_flowid(const IPFlowID &flowid,
     case i_pattern: {
 	HashContainer<IPRewriterEntry> *reply_map;
 	if (likely(mapid == mapid_default))
-	    reply_map = &reply_element()->_map;
+	    reply_map = &reply_element->_map[click_current_cpu_id()];
 	else
-	    reply_map = reply_element()->get_map(mapid);
+	    reply_map = reply_element->get_map(mapid);
 	i = u.pattern->rewrite_flowid(flowid, rewritten_flowid, *reply_map);
 	goto check_for_failure;
     }
@@ -315,19 +241,22 @@ IPRewriterInput::rewrite_flowid(const IPFlowID &flowid,
     }
 }
 
-
 inline void
 IPRewriterBase::unmap_flow(IPRewriterFlow *flow, Map &map,
 			   Map *reply_map_ptr)
 {
     //click_chatter("kill %s", hashkey().s().c_str());
     if (!reply_map_ptr)
-	reply_map_ptr = &flow->owner()->reply_element()->_map;
+	reply_map_ptr = &flow->owner()->reply_element->_map[click_current_cpu_id()];
+
     Map::iterator it = map.find(flow->entry(0).hashkey());
     if (it.get() == &flow->entry(0))
 	map.erase(it);
+
     it = reply_map_ptr->find(flow->entry(1).hashkey());
     if (it.get() == &flow->entry(1))
 	reply_map_ptr->erase(it);
 }
 
+CLICK_ENDDECLS
+#endif
