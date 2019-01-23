@@ -187,7 +187,7 @@ UDPRewriter::process(int port, Packet *p_in)
             m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
         }
     }
- _lock.read_end()();
+ _lock.read_end();
 
   _lock.read_begin();
     UDPFlow *mf = static_cast<UDPFlow *>(m->flow());
