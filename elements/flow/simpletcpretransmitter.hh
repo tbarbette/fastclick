@@ -96,6 +96,7 @@ protected:
     bool _proack;
     TCPIn* _in;
     bool _resize;
+    bool _readonly;
 };
 
 CLICK_ENDDECLS

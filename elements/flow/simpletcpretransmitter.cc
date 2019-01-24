@@ -14,10 +14,9 @@
 #include "simpletcpretransmitter.hh"
 
 
-SimpleTCPRetransmitter::SimpleTCPRetransmitter()
+SimpleTCPRetransmitter::SimpleTCPRetransmitter() : _verbose(false), _proack(false), _resize(false), _readonly(false)
 {
-    _verbose = false;
-    _proack = true;
+
 }
 
 SimpleTCPRetransmitter::~SimpleTCPRetransmitter()
@@ -37,6 +36,7 @@ int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
     if(Args(conf, this, errh)
             .read("PROACK",_proack)
             .read("VERBOSE", _verbose)
+            .read("READONLY", _readonly)
             .complete() < 0)
         return -1;
 
@@ -136,7 +136,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
          * The retransmission happens because the ack was never received.
          * There are two cases :
          * - The ack was sent by the dest but did not reach the source. If this
-         *   is the case we know the other's side last ACK. I
+         *   is the case we know the other's side last ACK.
          *   In which case we drop the packet and re-ack ourselves.
          * - This packet never reached the end host. We retransmit the
          * equivalent packet in the buffer. We cannot retransmit the same packet
@@ -151,10 +151,11 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
         FOR_EACH_PACKET_SAFE(batch, packet) {
             uint32_t seq = getSequenceNumber(packet);
             uint32_t mappedSeq;
-            if (_resize)
+            if (_resize) {
                 mappedSeq = maintainer.mapSeq(seq);
-            else
+            } else {
                 mappedSeq = seq;
+            }
 
             if (_proack && fcb_in->common->lastAckReceivedSet() && SEQ_LT(mappedSeq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()))) {
                 if (_verbose)
