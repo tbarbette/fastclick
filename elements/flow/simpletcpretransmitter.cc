@@ -55,7 +55,11 @@ int SimpleTCPRetransmitter::initialize(ErrorHandler *errh) {
     if (StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>::initialize(errh) != 0)
         return -1;
     if (_in->getOutElement()->maxModificationLevel(0) & MODIFICATION_RESIZE) {
+        if (_readonly) {
+            return errh->error("READONLY is set but some elements want to modify packets !");
+        }
         _resize = true;
+
     }
     return 0;
 }
