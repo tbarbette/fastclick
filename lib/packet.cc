@@ -935,13 +935,10 @@ Packet::clone(bool fast)
 	return 0;
     if (unlikely(fast)) {
         p->_use_count = 1;
-        p->_head = _head;
-        p->_data = _data;
-        p->_tail = _tail;
+        memcpy(p, this, sizeof(Packet));
 #ifdef CLICK_FORCE_EXPENSIVE
         PacketRef r(this);
 #endif
-        p->_end = _end;
 #if HAVE_DPDK
         if (DPDKDevice::is_dpdk_packet(this)) {
           p->_destructor = DPDKDevice::free_pkt;
