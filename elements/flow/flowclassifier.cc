@@ -594,7 +594,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             fcb_stack = fcb;
             awaiting_batch = PacketBatch::start_head(p);
         } else {
-            if (_nocut || fcb == fcb_stack) {
+            if ((_nocut && fcb_stack) || fcb == fcb_stack) {
 #if DEBUG_CLASSIFIER > 1
         click_chatter("Same fcb %p",fcb);
 #endif
@@ -667,7 +667,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
         if (!get_fcb_for(p,fcb,lastagg,last,next,now))
             continue;
-        if (_nocut || lastfcb == fcb) {
+        if ((_nocut && lastfcb) || lastfcb == fcb) {
             //Just continue as they are still linked
         } else {
 
