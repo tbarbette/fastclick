@@ -15,6 +15,12 @@ BatchStats
 
 keep statistics about batching
 
+handlers
+
+* average : Average batch size
+* median : Median batch size
+* dump : Print the number of batches for each size seen
+
  */
 
 class BatchStats : public BatchElement { public:

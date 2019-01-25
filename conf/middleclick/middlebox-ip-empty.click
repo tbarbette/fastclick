@@ -87,7 +87,7 @@ r2 :: Receiver(0000:82:00.1,$MAC2,$IP2,$IP2);
 //Idle -> host :: Null;
 
 r1
-//Eelements on the forward path
+//Elements on the forward path
  -> r2;
 
 r2
