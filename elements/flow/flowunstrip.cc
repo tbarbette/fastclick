@@ -18,6 +18,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/glue.hh>
+#include <click/packetbatch.hh>
 #include "flowunstrip.hh"
 CLICK_DECLS
 
@@ -35,25 +36,7 @@ FlowUnstrip::configure(Vector<String> &conf, ErrorHandler *errh)
 PacketBatch *
 FlowUnstrip::simple_action_batch(PacketBatch *head)
 {
-	EXECUTE_FOR_EACH_PACKET([this](Packet* p){return p->push(_nbytes);},head)
-			/*
-	Packet* current = head;
-	Packet* last = NULL;
-	while (current != NULL) {
-	    Packet* pkt = current->push(_nbytes);
-	    if (pkt != current) {
-	        click_chatter("Warning : had not enough bytes to FlowUnstrip. Allocate more headroom !");
-            if (last) {
-                last->set_next(pkt);
-            } else {
-                head= static_cast<PacketBatch*>(pkt);
-            }
-            current = pkt;
-        }
-        last = current;
-
-		current = current->next();
-	}*/
+	EXECUTE_FOR_EACH_PACKET_DROPPABLE([this](Packet* p){return p->push(_nbytes);},head,[](Packet* p){})
 	return head;
 }
 

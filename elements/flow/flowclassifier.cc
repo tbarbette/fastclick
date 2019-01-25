@@ -16,7 +16,7 @@
 
 CLICK_DECLS
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true), _do_release(true),_ordered(true) {
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true), _do_release(true),_ordered(true),_nocut(false) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
@@ -53,6 +53,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
             .read("EARLYDROP",_early_drop)
             .read("ORDERED", _ordered)
+            .read("NOCUT", _nocut)
             .complete() < 0)
         return -1;
 
@@ -236,6 +237,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     }
     FCBPool::initialized --;
 
+    //Replace FCBs by the final run-time ones
     _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
         FlowControlBlock* nfcb = _table.get_pool()->allocate();
         FlowNode* p = ptr->parent();
@@ -248,6 +250,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         ptr->leaf = nfcb;
     }, true, true);
 
+    //If aggcache is enabled, initialize the cache
     if (_aggcache && _cache_size > 0) {
         for (unsigned i = 0; i < _cache.weight(); i++) {
             _cache.get_value(i) = (FlowCache*)CLICK_LALLOC(sizeof(FlowCache) * _cache_size * _cache_ring_size);
@@ -591,7 +594,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
             fcb_stack = fcb;
             awaiting_batch = PacketBatch::start_head(p);
         } else {
-            if (fcb == fcb_stack) {
+            if (_nocut || fcb == fcb_stack) {
 #if DEBUG_CLASSIFIER > 1
         click_chatter("Same fcb %p",fcb);
 #endif
@@ -664,7 +667,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 
         if (!get_fcb_for(p,fcb,lastagg,last,next,now))
             continue;
-        if (lastfcb == fcb) {
+        if (_nocut || lastfcb == fcb) {
             //Just continue as they are still linked
         } else {
 

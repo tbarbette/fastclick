@@ -54,6 +54,12 @@ class FlowIDSMatcher : public StackBufferElement<FlowIDSMatcher,fcb_FlowIDSMatch
 		atomic_uint32_t _matched;
 };
 
+
+/**
+ * Identical to FlowIDSMatcher but gives chunks to the iterator
+ *
+ * To be tested
+ */
 class FlowIDSChunkMatcher : public StackChunkBufferElement<FlowIDSChunkMatcher,fcb_FlowIDSMatcher> { //Use CTRP to avoid virtual
     public:
 

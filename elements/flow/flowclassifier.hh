@@ -42,6 +42,7 @@ class FlowClassifier: public FlowElement {
     FlowType _context;
     const bool _do_release;
     bool _ordered;
+    bool _nocut;
 
     per_thread<FlowBatch*> _builder_batch;
     static int _n_classifiers;
