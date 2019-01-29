@@ -42,7 +42,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 		if (_verbose)
 			click_chatter("Line : %s",s.c_str());
 
-		rules[i] = FlowClassificationTable::parse(s, _verbose);
+		rules[i] = FlowClassificationTable::parse(s, _verbose, true);
 		if (rules[i].output == INT_MAX) {
 		    rules[i].output = defaultOutput++;
 		    if (rules[i].output >= noutputs()) {
@@ -65,7 +65,7 @@ FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 	}
 	if (rules.size() == 0) {
 	    if (noutputs() == 1)
-	        rules.push_back(FlowClassificationTable::parse("- 0"));
+	        rules.push_back(FlowClassificationTable::parse("- 0", _verbose, true));
 	    else
 	        return errh->error("Invalid rule set. There is no rule and not a single output.");
 	} else if (!rules[rules.size() -1].is_default || _children_merge) {
@@ -85,7 +85,7 @@ FlowNode* FlowDispatcher::get_child(int output, bool append_drop,Vector<FlowElem
         return 0;
     child_table->check();
     if (!child_table->has_no_default() && append_drop) {
-        if (_verbose > 1)
+        if (_verbose)
            click_chatter("Child has default values : appending drop rule");
         child_table = child_table->combine(FlowClassificationTable::parse("- drop").root, false, true);
     }
@@ -113,6 +113,30 @@ bool FlowDispatcher::attach_children(FlowNodePtr* ptr, int output, bool append_d
 
 FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 	if (!_table) {
+        //Set the output leafs
+/*        Vector<FlowControlBlock*> output_fcb;
+        output_fcb.resize(noutputs() + 1);
+        for (int i = 0; i <= noutputs(); i++) {
+            FlowControlBlock* fcb = FCBPool::init_allocate();
+            fcb->acquire(1);
+            output_fcb[i] = fcb;
+            fcb->parent = 0;
+            fcb_set_init_data(fcb, i);
+        }
+        output_fcb[noutputs()]->set_early_drop();
+		for (int i = 0; i < rules.size() ; ++i) {
+            auto fnt = [this,i,output_fcb](FlowNodePtr* ptr) {
+                assert(ptr->ptr == (FlowControlBlock*) -1);
+                if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's not a real output, set drop flag
+                    ptr->set_leaf(output_fcb[noutputs()]);
+                }
+                else
+                    ptr->set_leaf(output_fcb[rules[i].output]);
+                assert(ptr->parent() == 0);
+            };
+            rules[i].root->traverse_all_leaves(fnt, true, true);
+        }
+*/
 		if (_verbose) {
 			click_chatter("%s : Computing table with %d rules :",name().c_str(),rules.size());
 			for (int i = 0; i < rules.size(); ++i) {
@@ -120,12 +144,13 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 				rules[i].root->print(_flow_data_offset);
 			}
 		}
+
 		FlowNode* merged = 0;
 #if DEBUG_CLASSIFIER
 		//Copy the rules to check that all path indeed lead to the correct output afterwards
 		Vector<FlowClassificationTable::Rule> rules_copy = rules;
 		for (int i = 0; i < rules.size() ; ++i) {
-		    rules_copy[i].root = rules[i].root->duplicate(true, 1);
+		    rules_copy[i].root = rules[i].root->duplicate(true, 1, true);
 		}
 #endif
 
@@ -141,7 +166,8 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                 bool changed = false;
                 if (child_table) {
                     child_table->check();
-                    rules[i].root = rules[i].root->combine(child_table, true, true);
+                    click_chatter("flat combine");
+                    rules[i].root = rules[i].root->combine(child_table, true, true, false);
                 } else {
                     //Just keep the root
                 }
@@ -149,7 +175,7 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 
             assert(rules[i].root);
 
-            //Now set data for all leaf of the rule
+  //Now set data for all leaf of the rule
             auto fnt = [this,i](FlowNodePtr* ptr) {
                 fcb_set_init_data(ptr->leaf, rules[i].output);
                 if (rules[i].output < 0 || rules[i].output >= noutputs()) { //If it's not a real output, set drop flag
@@ -157,7 +183,6 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                 }
             };
             rules[i].root->traverse_all_leaves(fnt, true, true);
-
             if (rules[i].root->is_dummy() && rules[i].root->default_ptr()->is_node()) {
                 FlowNode* tmp = rules[i].root;
                 rules[i].root = rules[i].root->default_ptr()->node;
@@ -183,7 +208,7 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 				merged = rules[i].root;
 			} else {
 			    //We must replace all default path per the new rule
-				merged = merged->combine(rules[i].root, false, !_children_merge && (i > 0 && rules[i - 1].output != rules[i].output));
+				merged = merged->combine(rules[i].root, false, !_children_merge && (i > 0 && rules[i - 1].output != rules[i].output), false);
 			}
 			merged->check();
 
@@ -229,7 +254,8 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                 FlowNode* child_table = get_child(output,true,context);
 
                 if (child_table) {
-                    merged = merged->combine(child_table, true, true);
+                    click_chatter("Children combine");
+                    merged = merged->combine(child_table, true, false);
                 }
 
                 auto fnt = [this,output](FlowNodePtr* ptr) {
@@ -347,7 +373,7 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
     }
 	//click_chatter("Table before duplicate : ");
 
-	FlowNode* tmp = _table->duplicate(true,1);
+	FlowNode* tmp = _table->duplicate(true,1, true);
 	tmp->check();
 	assert(tmp->has_no_default());
 	return tmp;

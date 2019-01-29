@@ -37,7 +37,7 @@ public:
         int output;
         bool is_default;
     } Rule;
-    static Rule parse(String s, bool verbose = false);
+    static Rule parse(String s, bool verbose = false, bool add_leaf=true);
     static Rule make_drop_rule(bool ed = false) {
         Rule r = parse("- drop");
         if (ed)

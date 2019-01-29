@@ -38,28 +38,38 @@ protected:
 
     FindFn _find;
 
-    void duplicate_internal(FlowNode* node, bool recursive, int use_count) {
+    void duplicate_internal(FlowNode* node, bool recursive, int use_count, bool duplicate_leaf) {
         assign(node);
         if (unlikely(recursive)) {
             this->_level = node->level()->duplicate();
             if (_default.ptr) {
                 if ( _default.is_node()) {
-                    _default.set_node(node->_default.node->duplicate(recursive, use_count));
+                    _default.set_node(node->_default.node->duplicate(recursive, use_count, duplicate_leaf));
+
+                    _default.set_parent(this);
                 } else {
-                    _default.set_leaf(_default.leaf->duplicate(use_count));
+                    if (duplicate_leaf) {
+                        _default.set_leaf(_default.leaf->duplicate(use_count));
+                        _default.set_parent(this);
+                    } else {
+                        _default.set_leaf(_default.leaf);
+                     }
                 }
-                _default.set_parent(this);
             }
 
             NodeIterator it = node->iterator();
             FlowNodePtr* child;
             while ((child = it.next()) != 0) {
                 if (child->is_leaf()) {
-                    FlowControlBlock* new_leaf = child->leaf->duplicate(use_count);
-                    new_leaf->parent = this;
-                    add_leaf(child->data(),new_leaf);
+                    if (duplicate_leaf) {
+                        FlowControlBlock* new_leaf = child->leaf->duplicate(use_count);
+                        new_leaf->parent = this;
+                        add_leaf(child->data(),new_leaf);
+                    } else {
+                        add_leaf(child->data(),child->leaf);
+                    }
                 } else {
-                    FlowNode* new_node = child->node->duplicate(recursive, use_count);
+                    FlowNode* new_node = child->node->duplicate(recursive, use_count, duplicate_leaf);
                     new_node->set_parent(this);
                     add_node(child->data(),new_node);
                 }
@@ -169,14 +179,14 @@ public:
      */
     void apply_default(std::function<void(FlowNodePtr*)> fnt);
 
-    FlowNode* combine(FlowNode* other, bool as_child, bool priority) CLICK_WARN_UNUSED_RESULT;
-    void __combine_child(FlowNode* other, bool priority);
-    void __combine_else(FlowNode* other, bool priority);
+    FlowNode* combine(FlowNode* other, bool as_child, bool priority, bool duplicate_leaf = true) CLICK_WARN_UNUSED_RESULT;
+    void __combine_child(FlowNode* other, bool priority, bool duplicate_leaf);
+    void __combine_else(FlowNode* other, bool priority, bool duplicate_leaf);
     FlowNodePtr prune(FlowLevel* level,FlowNodeData data, bool inverted, bool &changed) CLICK_WARN_UNUSED_RESULT;
 
     FlowNode* find_node(FlowNode* other);
 
-    virtual FlowNode* duplicate(bool recursive,int use_count) = 0;
+    virtual FlowNode* duplicate(bool recursive, int use_count, bool duplicate_leaf) = 0;
 
     void assign(FlowNode* node) {
         _level = node->_level;
@@ -489,7 +499,7 @@ public:
 
     ~FlowNodeHeap();
 
-    FlowNode* duplicate(bool recursive,int use_count) override;
+    FlowNode* duplicate(bool recursive, int use_count, bool duplicate_leaf) override;
 
     class HeapNodeIterator : public NodeIteratorBase {
         FlowNodeHeap* _node;
@@ -565,7 +575,7 @@ public:
 
     ~FlowNodeArray();
 
-    FlowNode* duplicate(bool recursive,int use_count) override;
+    FlowNode* duplicate(bool recursive, int use_count, bool duplicate_leaf) override;
 
     class ArrayNodeIterator : public NodeIteratorBase {
         FlowNodeArray* _node;
@@ -758,7 +768,7 @@ class FlowNodeHash : public FlowNode  {
         }
 #endif
     };
-    virtual FlowNode* duplicate(bool recursive,int use_count) override;
+    virtual FlowNode* duplicate(bool recursive, int use_count, bool duplicate_leaf) override;
 
     FLOW_NODE_DEFINE(FlowNodeHash,find_hash);
 
@@ -804,9 +814,9 @@ class FlowNodeDummy : public FlowNode {
         return "DUMMY";
     }
 
-    FlowNode* duplicate(bool recursive,int use_count) override {
+    FlowNode* duplicate(bool recursive, int use_count, bool duplicate_leaf) override {
         FlowNodeDummy* fh = new FlowNodeDummy();
-        fh->duplicate_internal(this,recursive,use_count);
+        fh->duplicate_internal(this,recursive,use_count, duplicate_leaf);
         return fh;
     }
 
@@ -859,9 +869,9 @@ class FlowNodeTwoCase : public FlowNode  {
         return "TWOCASE";
     }
 
-    FlowNode* duplicate(bool recursive,int use_count) override {
+    FlowNode* duplicate(bool recursive, int use_count, bool duplicate_leaf) override {
         FlowNodeTwoCase* fh = new FlowNodeTwoCase(child);
-        fh->duplicate_internal(this,recursive,use_count);
+        fh->duplicate_internal(this,recursive,use_count, duplicate_leaf);
         return fh;
     }
 
@@ -936,9 +946,9 @@ class FlowNodeThreeCase : public FlowNode  {
         return "THREECASE";
     }
 
-    FlowNode* duplicate(bool recursive,int use_count) override {
+    FlowNode* duplicate(bool recursive, int use_count, bool duplicate_leaf) override {
         FlowNodeThreeCase* fh = new FlowNodeThreeCase(childA,childB);
-        fh->duplicate_internal(this,recursive,use_count);
+        fh->duplicate_internal(this,recursive,use_count, duplicate_leaf);
         return fh;
     }
 
@@ -1000,7 +1010,7 @@ class FlowNodeDefinition : public FlowNodeHash<HASH_SIZES_NR - 1> { public:
         return String("DEFINITION") + (_else_drop?"!":"");
     }
 
-    FlowNodeDefinition* duplicate(bool recursive,int use_count) override;
+    FlowNodeDefinition* duplicate(bool recursive,int use_count, bool duplicate_leaf) override;
 
     FlowNode* create_final(bool mt_safe);
 };

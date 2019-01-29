@@ -208,7 +208,9 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
 
 
 /**
- * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
+ * Call fnt on all pointer to leaf of the tree
+ * If do_final is true, call on normal leaf
+ * If do_default is true, call fnt on default path leaf
  */
 void  FlowNode::traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool do_final, bool do_default) {
     NodeIterator it = this->iterator();
@@ -234,7 +236,7 @@ void  FlowNode::traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool 
 }
 
 /**
- * Call fnt on all pointer to leaf of the tree. If do_empty is true, also call on null default ptr.
+ * Call fnt on all pointer to leaf of the tree and empty defaults
  */
 void  FlowNode::traverse_all_leaves_and_empty_default(std::function<void(FlowNodePtr*,FlowNode*)> fnt, bool do_final, bool do_default) {
     NodeIterator it = this->iterator();
@@ -290,7 +292,7 @@ bool  FlowNode::traverse_all_default_leaf(std::function<bool(FlowNode*)> fnt) {
 
 
 /**
- * Call fnt on all children nodes of the tree, including default ones, but not self. If FNT return false, traversal is stopped
+ * Call fnt on all children nodes of the tree, including default ones, but not self. If FNT return false, traversal is stopped for the children
  */
 bool  FlowNode::traverse_all_nodes(std::function<bool(FlowNode*)> fnt) {
     NodeIterator it = this->iterator();
@@ -400,11 +402,11 @@ FlowNode* FlowNode::create_hash(int l) {
  *************************************/
 
 FlowNodeDefinition*
-FlowNodeDefinition::duplicate(bool recursive,int use_count) {
+FlowNodeDefinition::duplicate(bool recursive,int use_count, bool duplicate_leaf) {
     FlowNodeDefinition* fh = new FlowNodeDefinition();
     fh->_else_drop = _else_drop;
     fh->_hint = _hint;
-    fh->duplicate_internal(this,recursive,use_count);
+    fh->duplicate_internal(this,recursive,use_count, duplicate_leaf);
     return fh;
 }
 
@@ -543,10 +545,10 @@ FlowNodeHeap::~FlowNodeHeap() {
         }
     }
 }
-FlowNode* FlowNodeHeap::duplicate(bool recursive,int use_count) {
+FlowNode* FlowNodeHeap::duplicate(bool recursive,int use_count, bool duplicate_leaf) {
     FlowNodeHeap* fa = FlowAllocator<FlowNodeHeap>::allocate();
     fa->initialize(this);
-    fa->duplicate_internal(this,recursive,use_count);
+    fa->duplicate_internal(this,recursive,use_count, duplicate_leaf);
     return fa;
 }
 
@@ -578,10 +580,10 @@ FlowNodeArray::~FlowNodeArray() {
         }
     }
 }
-FlowNode* FlowNodeArray::duplicate(bool recursive,int use_count) {
+FlowNode* FlowNodeArray::duplicate(bool recursive,int use_count, bool duplicate_leaf) {
     FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
     fa->initialize(childs.size());
-    fa->duplicate_internal(this,recursive,use_count);
+    fa->duplicate_internal(this,recursive,use_count, duplicate_leaf);
     return fa;
 }
 
@@ -642,13 +644,13 @@ FlowNodeHash<capacity_n>::~FlowNodeHash() {
 
 template<int capacity_n>
 FlowNode*
-FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count) {
+FlowNodeHash<capacity_n>::duplicate(bool recursive,int use_count, bool duplicate_leaf) {
     FlowNodeHash* fh = FlowAllocator<FlowNodeHash<capacity_n>>::allocate();
 #if DEBUG_CLASSIFIER_CHECK
     assert(fh->getNum() == 0);
     fh->check();
 #endif
-    fh->duplicate_internal(this,recursive,use_count);
+    fh->duplicate_internal(this,recursive,use_count,duplicate_leaf);
     return fh;
 }
 
