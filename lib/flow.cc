@@ -319,19 +319,24 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
             is_default = true;
         }
 
-        if (add_leaf) {
-            FlowControlBlock* fcb = FCBPool::init_allocate();
-            parent_ptr->set_leaf(fcb);
-            parent_ptr->leaf->parent = parent;
-            parent_ptr->leaf->acquire(1);
-        } else {
-            FlowLevel*  f = new FlowLevelDummy();
-            FlowNodeDefinition* fl = new FlowNodeDefinition();
-            fl->_level = f;
-            fl->set_parent(parent);
-            parent_ptr->set_node(fl);
-            fl->default_ptr()->set_leaf((FlowControlBlock*)-1);
+        if (!add_leaf) {
+            if (dynamic_cast<FlowLevelDummy*>(parent->level()) == 0) {
+                FlowLevel*  f = new FlowLevelDummy();
+                FlowNodeDefinition* fl = new FlowNodeDefinition();
+                fl->_level = f;
+                fl->_parent = parent;
+                parent_ptr->set_node(fl);
+                //fl->default_ptr()->set_leaf((FlowControlBlock*)-1);
+                parent_ptr->set_data(lastvalue);
+                parent = fl;
+                parent_ptr = fl->default_ptr();
+            }
         }
+
+        FlowControlBlock* fcb = FCBPool::init_allocate();
+        parent_ptr->set_leaf(fcb);
+        parent_ptr->leaf->parent = parent;
+        parent_ptr->leaf->acquire(1);
         parent_ptr->set_data(lastvalue);
 
 
@@ -1409,6 +1414,43 @@ FlowNode* FlowControlBlock::find_root() {
     return p;
 }
 
+int FlowControlBlock::hashcode() const {
+        int code = flags;
+        for (int i = 0; i < (get_pool()->data_size() - sizeof(FlowNodeData)) / 4; i ++) {
+            code += *(((uint32_t*)&node_data[1].data_32) + i);
+        }
+        return code;
+}
+
+
+bool operator==(const FlowControlBlockRef &ar, const FlowControlBlockRef &br) {
+    FlowControlBlock &a = *ar._ref;
+
+    FlowControlBlock &b = *br._ref;
+    if (a.flags != b.flags) {
+        click_chatter("diff flags");
+        return false;
+    }
+
+    if (a.get_pool() != b.get_pool()) {
+        click_chatter("diff pool");
+        return false;
+    }
+
+    if (memcmp(&(a.node_data[1].data_32),&(b.node_data[1].data_32), a.get_pool()->data_size() - sizeof(FlowNodeData)) != 0) {
+        click_chatter("diff content %d", a.get_pool()->data_size());
+        a.print("");
+        b.print("");
+        return false;
+    }
+    return true;
+}
+
+
+/*FlowControlBlock::FlowControlBlock(const FlowControlBlock &c) {
+    click_chatter("copy const");
+    memcpy(&node_data, &c.node_data, get_pool()->data_size());
+}*/
 
 void FlowNodePtr::print(int data_offset) const{
 	if (is_leaf())

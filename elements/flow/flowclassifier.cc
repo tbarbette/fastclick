@@ -238,15 +238,44 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     FCBPool::initialized --;
 
     //Replace FCBs by the final run-time ones
-    _table.get_root()->traverse_all_leaves([this](FlowNodePtr* ptr) {
-        FlowControlBlock* nfcb = _table.get_pool()->allocate();
-        FlowNode* p = ptr->parent();
-        memcpy(nfcb->data, ptr->leaf->data, _table.get_pool()->data_size());
-        nfcb->parent = ptr->leaf->parent;
-        nfcb->flags = ptr->leaf->flags;
+    //Also have common static FCBs
+    HashTable<FlowControlBlockRef, FlowControlBlock*> known_static_fcbs;
+    _table.get_root()->traverse_all_leaves([this,&known_static_fcbs](FlowNodePtr* ptr) {
+
+        FlowControlBlock* nfcb;
+
+        auto it = known_static_fcbs.find(FlowControlBlockRef(ptr->leaf));
+        if (!ptr->parent()->level()->is_dynamic() && it) {
+            nfcb = it->second;
+            if (ptr->parent()->default_ptr()->leaf != ptr->leaf && !nfcb->get_data().equals(ptr->leaf->get_data())) {
+                //The data is not the same, we need to change the FCB by a classification node with the right data
+                click_chatter("Need a new node to keep data");
+                ptr->leaf->print("");
+                nfcb->print("");
+                FlowNode* n = new FlowNodeDummy();
+                n->set_parent(ptr->parent());
+                n->set_level(new FlowLevelDummy());
+                n->node_data = ptr->data();
+                delete ptr->leaf;
+                ptr->set_node(n);
+                ptr = n->default_ptr();
+            } else
+                delete ptr->leaf;
+            //Delete parent to specify this FCB has multiple parents
+            if (nfcb->parent)
+                nfcb->parent = 0;
+         } else {
+            nfcb = _table.get_pool()->allocate();
+            FlowNode* p = ptr->parent();
+            memcpy(nfcb->data, ptr->leaf->data, _table.get_pool()->data_size());
+            nfcb->parent = ptr->leaf->parent;
+            nfcb->flags = ptr->leaf->flags;
+            known_static_fcbs.set(FlowControlBlockRef(nfcb), nfcb);
+            assert(known_static_fcbs.find(FlowControlBlockRef(nfcb)));
+            delete ptr->leaf;
+        }
         nfcb->acquire(1);
         nfcb->release_fnt = 0;
-        delete ptr->leaf;
         ptr->leaf = nfcb;
     }, true, true);
 
@@ -410,7 +439,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
                 return set_fcb_cache(c,p,agg);
             } else { //Non empty slot
                 if (likely(c->agg == agg)) { //Good agg
-                    if (likely(_collision_is_life || _table.reverse_match(c->fcb, p))) {
+                    if (likely(_collision_is_life || (c->fcb->parent && _table.reverse_match(c->fcb, p)))) {
         #if DEBUG_CLASSIFIER > 1
                         click_chatter("Cache hit");
         #endif
@@ -528,7 +557,7 @@ static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
 inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, Timestamp &now) {
     if (_aggcache) {
         uint32_t agg = AGGREGATE_ANNO(p);
-        if (!(lastagg == agg && fcb && likely(_table.reverse_match(fcb,p)))) {
+        if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p)))) {
             if (_cache_size > 0)
                 fcb = get_cache_fcb(p,agg);
             else

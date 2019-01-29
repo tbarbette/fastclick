@@ -205,7 +205,31 @@ private:
 		void check() {
 		}
 
+    int hashcode() const;
+
 };
+
+class FlowControlBlockRef { public:
+
+    FlowControlBlock* _ref;
+
+    FlowControlBlockRef(FlowControlBlock* ref) {
+        _ref = ref;
+    }
+
+    typedef FlowControlBlockRef key_type;
+    typedef const FlowControlBlockRef &key_const_reference;
+
+    key_const_reference hashkey() const {
+	return const_cast<key_const_reference>(*this);
+    }
+
+    inline int hashcode() const {
+        return _ref->hashcode();
+    }
+};
+
+bool operator==(const FlowControlBlockRef &ra, const FlowControlBlockRef &rb);
 
 class FlowTableHolder;
 

@@ -152,10 +152,20 @@ public:
     FlowLevel* level() const {
         return _level;
     }
+
+    void set_level(FlowLevel* level) {
+        _level = level;
+    }
+
     inline void add_node(FlowNodeData data, FlowNode* node) {
         bool need_grow;
         FlowNodePtr* ptr = _find(this,data,need_grow);
-        assert(ptr->ptr == 0);
+        if (ptr->ptr != 0) {
+            click_chatter("FATAL ERROR : Adding node to an existing node");
+            print();
+            node->print();
+            assert(ptr->ptr == 0);
+        }
         inc_num();
         ptr->set_node(node);
         ptr->set_data(data);
