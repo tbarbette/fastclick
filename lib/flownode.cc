@@ -496,7 +496,7 @@ FlowNodeHeap::append_heap(FlowNode* fn,Vector<uint32_t>& vls, int i, int v_left,
         return;
     int middle;
     middle = (v_left + v_right) / 2;
-    if (childs.size() <= right_idx(i+1))
+    if (childs.size() <= right_idx(i))
         childs.resize(right_idx(i) + 1);
     childs[i] = *fn->find(FlowNodeData((uint32_t)vls[v_left]), need_grow);
     inc_num();
@@ -528,8 +528,10 @@ FlowNodeHeap::initialize(FlowNode* fn) {
     for (int i = 0 ; i < childs.size(); i ++) {
         click_chatter("[%d] %u ; L:%d R:%d",i,childs[i].ptr?childs[i].data().data_32:0,left_idx(i),right_idx(i));
         bool need_grow;
-        if (childs[i].ptr)
+        if (childs[i].ptr) {
             assert(find_heap(childs[i].data(),need_grow) == &childs[i]);
+            assert(right_idx(i) < childs.size());
+        }
     }
 }
 
