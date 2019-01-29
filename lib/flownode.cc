@@ -498,7 +498,7 @@ FlowNodeHeap::append_heap(FlowNode* fn,Vector<uint32_t>& vls, int i, int v_left,
     middle = (v_left + v_right) / 2;
     if (childs.size() <= right_idx(i))
         childs.resize(right_idx(i) + 1);
-    childs[i] = *fn->find(FlowNodeData((uint32_t)vls[v_left]), need_grow);
+    childs[i] = *fn->find(FlowNodeData((uint32_t)vls[middle]), need_grow);
     inc_num();
 
     append_heap(fn, vls,left_idx(i),v_left,middle -1);
@@ -526,10 +526,14 @@ FlowNodeHeap::initialize(FlowNode* fn) {
     append_heap(fn, vls,left_idx(0),0,middle -1);
     append_heap(fn, vls,right_idx(0),middle + 1, vls.size() - 1);
     for (int i = 0 ; i < childs.size(); i ++) {
-        click_chatter("[%d] %u ; L:%d R:%d",i,childs[i].ptr?childs[i].data().data_32:0,left_idx(i),right_idx(i));
+        debug_flow("[%d] %u ; L:%d R:%d",i,childs[i].ptr?childs[i].data().data_32:0,left_idx(i),right_idx(i));
         bool need_grow;
         if (childs[i].ptr) {
-            assert(find_heap(childs[i].data(),need_grow) == &childs[i]);
+            if (find_heap(childs[i].data(),need_grow) != &childs[i]) {
+                click_chatter("HEAP is wrong, cannot find %d", childs[i].data());
+                fn->print();
+                assert(false);
+            }
             assert(right_idx(i) < childs.size());
         }
     }
