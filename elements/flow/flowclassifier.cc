@@ -277,7 +277,9 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
             assert(known_static_fcbs.find(FlowControlBlockRef(nfcb)));
             delete ptr->leaf;
         }
+#if HAVE_FLOW_DYNAMIC
         nfcb->acquire(1);
+#endif
         nfcb->release_fnt = 0;
         ptr->set_leaf(nfcb);
     }, true, true);
@@ -668,7 +670,9 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
 #if DEBUG_CLASSIFIER > 1
         click_chatter("Different fcb %p, last was %p",fcb,fcb_stack);
 #endif
+#if HAVE_FLOW_DYNAMIC
                 fcb_stack->acquire(count);
+#endif
                 last->set_next(0);
                 awaiting_batch->set_tail(last);
                 awaiting_batch->set_count(count);
@@ -687,7 +691,9 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
     }
 
     if (awaiting_batch) {
+#if HAVE_FLOW_DYNAMIC
         fcb_stack->acquire(count);
+#endif
         fcb_stack->lastseen = now;
         last->set_next(0);
         awaiting_batch->set_tail(last);
@@ -765,7 +771,9 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
                     }
                     //Ring full, process batch NOW
                     fcb_stack = b.fcb;
+#if HAVE_FLOW_DYNAMIC
                     fcb_stack->acquire(b.batch->count());
+#endif
                     fcb_stack->lastseen = now;
                     //click_chatter("FPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
                     output_push_batch(port,b.batch);
@@ -798,7 +806,10 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
     for (;tail < head;) {
         auto &b = batches[tail % RING_SIZE];
         fcb_stack = b.fcb;
+
+#if HAVE_FLOW_DYNAMIC
         fcb_stack->acquire(b.batch->count());
+#endif
         fcb_stack->lastseen = now;
         //click_chatter("EPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
         output_push_batch(port,b.batch);
@@ -866,7 +877,9 @@ String FlowClassifier::read_handler(Element* e, void* thunk) {
         case 0: {
             int n = 0;
             fc->_table.get_root()->traverse_all_leaves([&n](FlowNodePtr* ptr) {
+                #if HAVE_FLOW_DYNAMIC
                 click_chatter("%d",ptr->leaf->count());
+                #endif
                 n++;
             },true,true);
             fcb_table = 0;

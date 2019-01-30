@@ -62,7 +62,7 @@ public:
 	int configure_phase() const		{ return CONFIGURE_PHASE_DEFAULT + 5; }
 
 	void *cast(const char *name) override;
-
+#if HAVE_FLOW_DYNAMIC
     inline void fcb_acquire(int count = 1) {
         fcb_stack->acquire(count);
     }
@@ -76,6 +76,15 @@ public:
     inline void fcb_release(int count = 1) {
         fcb_stack->release(count);
     }
+#else
+    inline void fcb_acquire(int count = 1) {
+        (void)count;
+    }
+    inline void fcb_update(int) {}
+    inline void fcb_release(int count = 1) {
+        (void)count;
+    }
+#endif
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
     inline void fcb_acquire_timeout(int nmsec) {

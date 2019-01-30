@@ -97,10 +97,12 @@ struct FlowReleaseChain {
 class FlowControlBlock {
 
 private:
-#ifdef FLOW_ATOMIC_USE_COUNT
-    atomic_uint32_t use_count;
-#else
-	int use_count;
+#if HAVE_FLOW_DYNAMIC
+    #ifdef FLOW_ATOMIC_USE_COUNT
+        atomic_uint32_t use_count;
+    #else
+	    int use_count;
+    #endif
 #endif
 
 	public:
@@ -165,7 +167,9 @@ private:
 
         void combine_data(uint8_t* data);
 		inline void initialize() {
+#if HAVE_FLOW_DYNAMIC
 			use_count = 0;
+#endif
             flags = 0;
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
             release_fnt = 0;
@@ -176,20 +180,16 @@ private:
 #endif
 		}
 
+#if HAVE_FLOW_DYNAMIC
 		inline void acquire(int packets_nr = 1);
 		inline void release(int packets_nr = 1);
 
 		inline void _do_release();
 
-/*
-		inline bool released() {
-			return use_count == 0;
-		}*/
-
-		inline int count() const {
+        inline int count() const {
 			return use_count;
 		}
-
+#endif
 		FlowControlBlock* duplicate(int use_count);
         inline FCBPool* get_pool() const;
 
@@ -503,6 +503,7 @@ extern __thread FlowTableHolder* fcb_table;
         }
 //#endif
 
+#if HAVE_FLOW_DYNAMIC
  void FlowControlBlock::acquire(int packets_nr) {
             use_count+=packets_nr;
 #if DEBUG_CLASSIFIER_RELEASE > 1
@@ -582,7 +583,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 	}
 #endif
 }
-
+#endif
 
 #else
 #define SFCB_STACK(fnt) \

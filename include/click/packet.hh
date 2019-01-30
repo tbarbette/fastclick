@@ -1723,7 +1723,7 @@ Packet::kill()
 		# endif
 		skbmgr_recycle_skbs(b);
     #elif CLICK_PACKET_USE_DPDK
-#if HAVE_FLOW
+#if HAVE_FLOW && HAVE_FLOW_DYNAMIC
         if (fcb_stack) {
             fcb_stack->release(1);
         }
@@ -1759,7 +1759,7 @@ Packet::kill_nonatomic()
     # endif
         skbmgr_recycle_skbs(b);
 #elif CLICK_PACKET_USE_DPDK
-#if HAVE_FLOW
+#if HAVE_FLOW && HAVE_FLOW_DYNAMIC
         if (fcb_stack) {
             fcb_stack->release(1);
         }
