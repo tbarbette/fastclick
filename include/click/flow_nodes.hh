@@ -634,9 +634,9 @@ class FlowNodeHash : public FlowNode  {
 #else
     #define IS_EMPTY_PTR(ptr,parent)  (ptr == 0)
 # if HAVE_FLOW_DYNAMIC
-    #define DESTRUCTED_NODE (void*)-1
+    #define DESTRUCTED_NODE (void*)1
     #define IS_FREE_PTR(ptr,parent) (IS_EMPTY_PTR(ptr,parent) || IS_DESTRUCTED_PTR(ptr,parent))
-    #define IS_FREE_PTR_ANY(ptr)    (ptr == 0 || ptr == DESTRUCTED_NODE)
+    #define IS_FREE_PTR_ANY(ptr)    ((uintptr_t)ptr & (uintptr_t)-2)
 # else
     #define DESTRUCTED_NODE (void*)0
     #define IS_FREE_PTR(ptr,parent) (IS_EMPTY_PTR(ptr,parent))
