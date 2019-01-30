@@ -1105,3 +1105,6 @@ Vector<FlowClassifier *> FlowClassifier::_classifiers;
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)
 EXPORT_ELEMENT(FlowClassifier)
+EXPORT_ELEMENT(FlowClassifierStatic)
+ELEMENT_MT_SAFE(FlowClassifier)
+ELEMENT_MT_SAFE(FlowClassifierStatic)
