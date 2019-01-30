@@ -16,7 +16,7 @@
 
 CLICK_DECLS
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true), _do_release(true),_ordered(true),_nocut(false) {
+FlowClassifier::FlowClassifier(bool allow_dynamic): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true), _do_release(allow_dynamic),_ordered(true),_nocut(false) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
@@ -52,7 +52,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("CLEAN_TIMER",_clean_timer)
 #endif
             .read("EARLYDROP",_early_drop)
-            .read("ORDERED", _ordered)
+            .read("ORDERED", _ordered) //Enforce FCB order of access
             .read("NOCUT", _nocut)
             .complete() < 0)
         return -1;
@@ -211,7 +211,7 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
 }
 
 
-int FlowClassifier::initialize(ErrorHandler *errh) {
+int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
     if (input_is_pull(0)) {
         assert(input(0).element());
     }
@@ -236,7 +236,10 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         _table.get_root()->print(-1,false);
     }
     FCBPool::initialized --;
+    return 0;
+}
 
+int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
     //Replace FCBs by the final run-time ones
     //Also have common static FCBs
     HashTable<FlowControlBlockRef, FlowControlBlock*> known_static_fcbs;
@@ -276,8 +279,28 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
         }
         nfcb->acquire(1);
         nfcb->release_fnt = 0;
-        ptr->leaf = nfcb;
+        ptr->set_leaf(nfcb);
     }, true, true);
+
+    if (_verbose) {
+        click_chatter("Table of %s after replacing nodes :",name().c_str());
+        _table.get_root()->print(-1,false);
+    }
+
+
+    bool have_dynamic = false;
+
+    _table.get_root()->traverse_all_nodes([this,&have_dynamic](FlowNode* n) {
+            if (n->level()->is_dynamic()) {
+                have_dynamic = true;
+                return false;
+            }
+            return true;
+    });
+    if (!have_dynamic && _do_release) {
+        click_chatter("FlowClassifier is fully static, disabling release, consider using FlowClassifierStatic");
+    }
+
 
     //If aggcache is enabled, initialize the cache
     if (_aggcache && _cache_size > 0) {
@@ -286,7 +309,10 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
             bzero(_cache.get_value(i), sizeof(FlowCache) * _cache_size * _cache_ring_size);
         }
     }
+    return 0;
+}
 
+int FlowClassifier::_initialize_timers(ErrorHandler *errh) {
     if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
         for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
@@ -298,6 +324,16 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     }
 
     assert(one_upstream_classifier() != this);
+    return 0;
+}
+
+int FlowClassifier::initialize(ErrorHandler *errh) {
+    if (_initialize_classifier(errh) != 0)
+        return -1;
+    if (_replace_leafs(errh) != 0)
+        return -1;
+    if (_initialize_timers(errh) != 0)
+        return -1;
     return 0;
 }
 

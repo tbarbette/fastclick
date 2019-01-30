@@ -1,5 +1,7 @@
 #ifndef CLICK_FLOW_LEVEL_HH
 #define CLICK_FLOW_LEVEL_HH 1
+#include <click/flow_common.hh>
+#include <click/packet.hh>
 
 #define FLOW_LEVEL_DEFINE(T,fnt) \
         static FlowNodeData get_data_ptr(void* thunk, Packet* p) {\
@@ -203,8 +205,9 @@ public:
     }
 
     inline FlowNodeData get_data_dummy(Packet* packet) {
-        click_chatter("FlowLevelDummy should be stripped !");
-        abort();
+/*        click_chatter("FlowLevelDummy should be stripped !");
+        abort();*/
+        //Return garbage on purpose
     }
 
     String print() {

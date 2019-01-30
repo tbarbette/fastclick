@@ -1,6 +1,6 @@
 #ifndef CLICK_FLOWCLASSIFIER_HH
 #define CLICK_FLOWCLASSIFIER_HH
-#include <click/batchelement.hh>
+#include <click/flowelement.hh>
 #include <click/string.hh>
 #include <click/timer.hh>
 #include <click/flow.hh>
@@ -21,6 +21,7 @@ typedef struct FlowCache_t{
 } FlowCache;
 
 class FlowClassifier: public FlowElement {
+protected:
     FlowClassificationTable _table;
     per_thread<FlowCache*> _cache;
     int _cache_size;
@@ -57,7 +58,7 @@ class FlowClassifier: public FlowElement {
     void build_fcb();
 public:
 
-    FlowClassifier() CLICK_COLD;
+    FlowClassifier(bool allow_dynamic = true) CLICK_COLD;
 
 	~FlowClassifier() CLICK_COLD;
 
@@ -103,6 +104,20 @@ public:
 	FlowClassificationTable& table() {
 		return _table;
 	}
+
+protected:
+    int _initialize_timers(ErrorHandler *errh);
+    int _replace_leafs(ErrorHandler *errh);
+    int _initialize_classifier(ErrorHandler *errh);
+
+};
+
+class FlowClassifierStatic : public FlowClassifier { public:
+    FlowClassifierStatic() : FlowClassifier(false) {
+    }
+
+
+    const char *class_name() const		{ return "FlowClassifierStatic"; }
 };
 
 CLICK_ENDDECLS
