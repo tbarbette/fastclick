@@ -165,6 +165,8 @@ public:
 #if HAVE_BATCH
     PacketBatch* pull_batch(int,int);
 #endif
+
+    portid_t port_id();
     
 private:
 

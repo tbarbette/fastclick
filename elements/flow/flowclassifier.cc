@@ -659,53 +659,14 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
         if (!get_fcb_for(p,fcb,lastagg,last,next,now)) {
             continue;
         }
-        if (awaiting_batch == NULL) {
-#if DEBUG_CLASSIFIER > 1
-            click_chatter("New fcb %p",fcb);
-#endif
-            fcb_stack = fcb;
-            awaiting_batch = PacketBatch::start_head(p);
-        } else {
-            if ((_nocut && fcb_stack) || fcb == fcb_stack) {
-#if DEBUG_CLASSIFIER > 1
-        click_chatter("Same fcb %p",fcb);
-#endif
-                //Do nothing as we follow the LL
-            } else {
-#if DEBUG_CLASSIFIER > 1
-        click_chatter("Different fcb %p, last was %p",fcb,fcb_stack);
-#endif
-#if HAVE_FLOW_DYNAMIC
-                fcb_stack->acquire(count);
-#endif
-                last->set_next(0);
-                awaiting_batch->set_tail(last);
-                awaiting_batch->set_count(count);
-                fcb_stack->lastseen = now;
-                output_push_batch(port,awaiting_batch);
-                awaiting_batch = PacketBatch::start_head(p);
-                fcb_stack = fcb;
-                count = 0;
-            }
-        }
 
-        count ++;
+        handle_simple(p, last, fcb, awaiting_batch, count, now);
 
         last = p;
         p = next;
     }
 
-    if (awaiting_batch) {
-#if HAVE_FLOW_DYNAMIC
-        fcb_stack->acquire(count);
-#endif
-        fcb_stack->lastseen = now;
-        last->set_next(0);
-        awaiting_batch->set_tail(last);
-        awaiting_batch->set_count(count);
-        output_push_batch(port,awaiting_batch);
-        fcb_stack = 0;
-    }
+    flush_simple(last, awaiting_batch, count,  now);
 }
 
 
@@ -716,7 +677,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
  * Push_batch_builder use double connection to build a ring and process packets trying to reconcile flows more
  *
  */
-inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
+inline void FlowClassifier::push_batch_builder(int, PacketBatch* batch) {
     Packet* p = batch;
     int curbatch = -1;
     Packet* last = NULL;
@@ -781,7 +742,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 #endif
                     fcb_stack->lastseen = now;
                     //click_chatter("FPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-                    output_push_batch(port,b.batch);
+                    output_push_batch(0,b.batch);
                     tail++;
                 }
                 //click_chatter("batches[%d].batch = %p",curbatch,batch);
@@ -817,7 +778,7 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 #endif
         fcb_stack->lastseen = now;
         //click_chatter("EPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-        output_push_batch(port,b.batch);
+        output_push_batch(0,b.batch);
 
         curbatch = -1;
         lastfcb = 0;
@@ -839,16 +800,16 @@ inline void FlowClassifier::push_batch_builder(int port, PacketBatch* batch) {
 }
 
 
-void FlowClassifier::push_batch(int port, PacketBatch* batch) {
+void FlowClassifier::push_batch(int, PacketBatch* batch) {
     FlowControlBlock* tmp_stack = fcb_stack;
     FlowTableHolder* tmp_table = fcb_table;
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = &_table;
 //#endif
     if (_builder)
-        push_batch_builder(port,batch);
+        push_batch_builder(0,batch);
     else
-        push_batch_simple(port,batch);
+        push_batch_simple(0,batch);
 
     if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT

@@ -113,7 +113,61 @@ protected:
     int _replace_leafs(ErrorHandler *errh);
     int _initialize_classifier(ErrorHandler *errh);
 
+inline void flush_simple(Packet* &last, PacketBatch* awaiting_batch, int &count, const Timestamp &now);
+inline void handle_simple(Packet* &p, Packet* &last, FlowControlBlock* &fcb, PacketBatch* &awaiting_batch, int &count, const Timestamp &now);
+
 };
+
+inline void FlowClassifier::handle_simple(Packet* &p, Packet* &last, FlowControlBlock* &fcb, PacketBatch* &awaiting_batch, int &count, const Timestamp &now) {
+        if (awaiting_batch == NULL) {
+#if DEBUG_CLASSIFIER > 1
+            click_chatter("New fcb %p",fcb);
+#endif
+            fcb_stack = fcb;
+            awaiting_batch = PacketBatch::start_head(p);
+        } else {
+            if ((_nocut && fcb_stack) || fcb == fcb_stack) {
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("Same fcb %p",fcb);
+#endif
+                //Do nothing as we follow the LL
+            } else {
+#if DEBUG_CLASSIFIER > 1
+        click_chatter("Different fcb %p, last was %p",fcb,fcb_stack);
+#endif
+#if HAVE_FLOW_DYNAMIC
+                fcb_stack->acquire(count);
+#endif
+                last->set_next(0);
+                awaiting_batch->set_tail(last);
+                awaiting_batch->set_count(count);
+                fcb_stack->lastseen = now;
+                output_push_batch(0, awaiting_batch);
+                awaiting_batch = PacketBatch::start_head(p);
+                fcb_stack = fcb;
+                count = 0;
+            }
+        }
+
+        count ++;
+}
+
+inline void FlowClassifier::flush_simple(Packet* &last, PacketBatch* awaiting_batch, int &count, const Timestamp &now) {
+    if (awaiting_batch) {
+#if HAVE_FLOW_DYNAMIC
+        fcb_stack->acquire(count);
+#endif
+        fcb_stack->lastseen = now;
+        last->set_next(0);
+        awaiting_batch->set_tail(last);
+        awaiting_batch->set_count(count);
+        output_push_batch(0,awaiting_batch);
+        fcb_stack = 0;
+    }
+
+}
+
+
 
 CLICK_ENDDECLS
 #endif

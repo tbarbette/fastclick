@@ -2,6 +2,7 @@
 #define CLICK_FLOW_LEVEL_HH 1
 #include <click/flow_common.hh>
 #include <click/packet.hh>
+#include <rte_flow.h>
 
 #define FLOW_LEVEL_DEFINE(T,fnt) \
         static FlowNodeData get_data_ptr(void* thunk, Packet* p) {\
@@ -186,6 +187,12 @@ public:
     virtual FlowLevel *optimize() {
         return this;
     }
+
+
+    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, rte_flow_item &pat, bool is_default) {
+        return -1;
+    }
+
 };
 
 
@@ -315,6 +322,8 @@ public:
     bool equals(FlowLevel* level) {
         return ((FlowLevel::equals(level))&& (_offset == dynamic_cast<FlowLevelOffset*>(level)->_offset));
     }
+
+    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, rte_flow_item &pat, bool is_default);
 
 };
 

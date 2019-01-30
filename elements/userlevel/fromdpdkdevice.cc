@@ -186,12 +186,17 @@ bool FromDPDKDevice::run_task(Task *t)
 #endif
             p->set_packet_type_anno(Packet::HOST);
             p->set_mac_header(data);
-            if (_set_rss_aggregate)
+            if (_set_rss_aggregate) {
 #if RTE_VERSION > RTE_VERSION_NUM(1,7,0,0)
-                SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
+            if (pkts[i]->ol_flags & PKT_RX_FDIR_ID) {
+                SET_AGGREGATE_ANNO(p,pkts[i]->hash.fdir.hi);
+            } else {
+                SET_AGGREGATE_ANNO(p,0);
+            }
 #else
                 SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
 #endif
+            }
             if (_set_paint_anno) {
                 SET_PAINT_ANNO(p, iqueue);
             }
@@ -285,6 +290,10 @@ PacketBatch* FromDPDKDevice::pull_batch(int, int max) {
 
 }
 #endif
+
+portid_t FromDPDKDevice::port_id() {
+    return _dev->port_id;
+}
 
 String FromDPDKDevice::read_handler(Element *e, void * thunk)
 {

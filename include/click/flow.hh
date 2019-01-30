@@ -29,7 +29,11 @@ public:
     void set_root(FlowNode* node);
     FlowNode* get_root();
 
-    inline FlowControlBlock* match(Packet* p);
+    inline FlowControlBlock* match(Packet* p, FlowNode* parent);
+
+    inline FlowControlBlock* match(Packet* p) {
+        return match(p, _root);
+    }
     inline bool reverse_match(FlowControlBlock* sfcb, Packet* p);
 
     typedef struct {
@@ -99,9 +103,8 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 }
 
 
-FlowControlBlock* FlowClassificationTable::match(Packet* p) {
+FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
     const bool always_dup = false;
-    FlowNode* parent = _root;
     FlowNodePtr* child_ptr = 0;
 #if DEBUG_CLASSIFIER_MATCH > 1
     int level_nr = 0;
