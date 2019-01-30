@@ -16,7 +16,8 @@
 
 CLICK_DECLS
 
-FlowClassifier::FlowClassifier(bool allow_dynamic): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true), _do_release(allow_dynamic),_ordered(true),_nocut(false) {
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true),
+    _ordered(true),_nocut(false) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
@@ -303,7 +304,11 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
         click_chatter("FlowClassifier is fully static, disabling release, consider using FlowClassifierStatic");
     }
 
-
+#ifndef HAVE_FLOW_DYNAMIC
+    if (have_dynamic) {
+        return errh->error("You have dynamic flow elements, but this was build without dynamic support. Rebuild with --enable-flow-dynamic.");
+    }
+#endif
     //If aggcache is enabled, initialize the cache
     if (_aggcache && _cache_size > 0) {
         for (unsigned i = 0; i < _cache.weight(); i++) {
@@ -1118,6 +1123,4 @@ Vector<FlowClassifier *> FlowClassifier::_classifiers;
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)
 EXPORT_ELEMENT(FlowClassifier)
-EXPORT_ELEMENT(FlowClassifierStatic)
 ELEMENT_MT_SAFE(FlowClassifier)
-ELEMENT_MT_SAFE(FlowClassifierStatic)

@@ -79,7 +79,9 @@ FlowTableHolder::delete_all_flows() {
             b->flags = 0;
             *prev = b->next;
             head._count--;
+#if HAVE_FLOW_DYNAMIC
             b->_do_release();
+#endif
             b = next;
         }
     }
@@ -124,7 +126,9 @@ FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress ds
     parent_ptr->set_leaf(fcb);
     parent_ptr->set_data(ip);
     parent_ptr->leaf->parent = node;
+#if HAVE_FLOW_DYNAMIC
     parent_ptr->leaf->acquire(1);
+#endif
     node->inc_num();
     return Rule{.root=node};
 
@@ -336,7 +340,9 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
         FlowControlBlock* fcb = FCBPool::init_allocate();
         parent_ptr->set_leaf(fcb);
         parent_ptr->leaf->parent = parent;
+#if HAVE_FLOW_DYNAMIC
         parent_ptr->leaf->acquire(1);
+#endif
         parent_ptr->set_data(lastvalue);
 
 
@@ -409,7 +415,9 @@ bool FlowTableHolder::check_release() {
             b->flags = 0;
             *prev = b->next;
             head._count--;
+#if HAVE_FLOW_DYNAMIC
             b->_do_release();
+#endif
         } else {
             unsigned t = (b->flags >> FLOW_TIMEOUT_SHIFT);
 #if DEBUG_CLASSIFIER_TIMEOUT > 1
@@ -441,7 +449,9 @@ void FlowNodePtr::node_combine_ptr(FlowNode* parent, FlowNodePtr other, bool as_
             } else {
                 if (as_child || !priority) {
                     FlowNodeData data = parent->default_ptr()->data();
+#if HAVE_FLOW_DYNAMIC
                     parent->default_ptr()->leaf->release();
+#endif
                     parent->default_ptr()->set_leaf(other.leaf->duplicate(1));
                     parent->default_ptr()->leaf->parent = parent;
                     parent->default_ptr()->set_data(data);
@@ -1549,7 +1559,9 @@ FlowControlBlock* FlowControlBlock::duplicate(int use_count) {
     //fcb->release_ptr = release_ptr;
     //fcb->release_fnt = release_fnt;
     memcpy(fcb, this ,sizeof(FlowControlBlock) + (get_pool()->data_size() * 2));
+#if HAVE_FLOW_DYNAMIC
     fcb->use_count = use_count;
+#endif
     return fcb;
 }
 

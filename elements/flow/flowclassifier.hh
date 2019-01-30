@@ -41,7 +41,11 @@ protected:
     Timer _timer;
     bool _early_drop;
     FlowType _context;
-    const bool _do_release;
+#if HAVE_FLOW_DYNAMIC
+    static constexpr bool _do_release = true;
+#else
+    static constexpr bool _do_release = false;
+#endif
     bool _ordered;
     bool _nocut;
 
@@ -57,8 +61,7 @@ protected:
 
     void build_fcb();
 public:
-
-    FlowClassifier(bool allow_dynamic = true) CLICK_COLD;
+    FlowClassifier() CLICK_COLD;
 
 	~FlowClassifier() CLICK_COLD;
 
@@ -110,14 +113,6 @@ protected:
     int _replace_leafs(ErrorHandler *errh);
     int _initialize_classifier(ErrorHandler *errh);
 
-};
-
-class FlowClassifierStatic : public FlowClassifier { public:
-    FlowClassifierStatic() : FlowClassifier(false) {
-    }
-
-
-    const char *class_name() const		{ return "FlowClassifierStatic"; }
 };
 
 CLICK_ENDDECLS

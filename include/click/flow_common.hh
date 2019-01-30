@@ -189,6 +189,16 @@ private:
         inline int count() const {
 			return use_count;
 		}
+#else
+		inline void acquire(int packets_nr = 1) {
+            (void)packets_nr;
+        }
+		inline void release(int packets_nr = 1) {
+            (void)packets_nr;
+        }
+        inline int count() const {
+			return 0;
+		}
 #endif
 		FlowControlBlock* duplicate(int use_count);
         inline FCBPool* get_pool() const;

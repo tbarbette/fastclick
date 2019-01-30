@@ -778,6 +778,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -816,6 +817,7 @@ enable_dpdk_packet
 enable_zerocopy
 enable_sloppy
 enable_flow_atomic
+enable_flow_dynamic
 enable_flow_structure
 enable_flow_hash
 enable_linuxmodule
@@ -934,6 +936,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -1186,6 +1189,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1323,7 +1335,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1476,6 +1488,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -1533,6 +1546,8 @@ Optional Features:
     --disable-zerocopy    disable Zero Copy
     --disable-sloppy      disable Sloppy flow timeouts
     --disable-flow-atomic use non-atomic flow reference counting
+    --disable-flow-dynamic
+                          allow dynamic flow system
     --disable-flow-structure
                           do not free classifier nodes in pool, mark them as
                           released to somehow keep the receive strucutre
@@ -1593,7 +1608,7 @@ Optional Features:
   --enable-task-heap      use heap for task list
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
-                          hash iterator epoch
+                          hash iterator epochs
   --enable-force-expensive
                           force expensive packet operations
   --enable-valgrind       extra support for debugging with valgrind
@@ -6830,11 +6845,70 @@ fi
 
 done
 
-#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
-if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
     $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
 
 fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lre2" >&5
+$as_echo_n "checking for main in -lre2... " >&6; }
+if ${ac_cv_lib_re2_main+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lre2  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_re2_main=yes
+else
+  ac_cv_lib_re2_main=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_re2_main" >&5
+$as_echo "$ac_cv_lib_re2_main" >&6; }
+if test "x$ac_cv_lib_re2_main" = xyes; then :
+  ac_have_re2=yes
+else
+  ac_have_re2=no
+fi
+
+for ac_header in re2/re2.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "re2/re2.h" "ac_cv_header_re2_re2_h" "$ac_includes_default"
+if test "x$ac_cv_header_re2_re2_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_RE2_RE2_H 1
+_ACEOF
+ ac_have_re2_h=yes
+else
+  ac_have_re2_h=no
+fi
+
+done
+
+if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
+    have_re2=yes
+    LIBS="$LIBS -lre2"
+    $as_echo "#define HAVE_RE2 1" >>confdefs.h
+
+else
+    have_re2=no
+fi
+
 
 
 # Check whether --enable-select was given.
@@ -7015,6 +7089,18 @@ fi
 
 if test "x$enable_flow_atomic" = xyes; then
     $as_echo "#define FLOW_ATOMIC_USE_COUNT 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-flow-dynamic was given.
+if test "${enable_flow_dynamic+set}" = set; then :
+  enableval=$enable_flow_dynamic; :
+else
+  enable_flow_dynamic=yes
+fi
+
+if test "x$enable_flow_dynamic" = xyes; then
+    $as_echo "#define HAVE_FLOW_DYNAMIC 1" >>confdefs.h
 
 fi
 
@@ -10209,6 +10295,8 @@ main ()
     if (*(data + i) != *(data3 + i))
       return 14;
   close (fd);
+  free (data);
+  free (data3);
   return 0;
 }
 _ACEOF
@@ -10745,6 +10833,7 @@ else
 =========================================" "$LINENO" 5
 fi
 
+
 # Check whether --enable-stride was given.
 if test "${enable_stride+set}" = set; then :
   enableval=$enable_stride; :
@@ -10796,6 +10885,37 @@ if test $enable_dmalloc = yes; then
 $as_echo "#define CLICK_DMALLOC 1" >>confdefs.h
 
 fi
+
+
+
+
+# Check whether --enable-hash-iterator-epochs was given.
+if test "${enable_hash_iterator_epochs+set}" = set; then :
+  enableval=$enable_hash_iterator_epochs; :
+else
+  enable_hash_iterator_epochs=no
+fi
+
+if test $enable_hash_iterator_epochs = yes; then
+
+$as_echo "#define CLICK_HASH_ITERATOR_EPOCHS 1" >>confdefs.h
+
+fi
+
+
+# Check whether --enable-force-expensive was given.
+if test "${enable_force_expensive+set}" = set; then :
+  enableval=$enable_force_expensive; :
+else
+  enable_force_expensive=no
+fi
+
+if test $enable_force_expensive = yes; then
+
+$as_echo "#define CLICK_FORCE_EXPENSIVE 1" >>confdefs.h
+
+fi
+
 
 
 # Check whether --enable-valgrind was given.
@@ -14238,6 +14358,10 @@ if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
 fi
 
+if test "x$have_re2" == xyes; then
+    provisions="$provisions re2"
+fi
+
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
 fi
@@ -15623,12 +15747,15 @@ fi
 
 echo "
 
-Configuration:
+Configuration Summary:
     C Compiler:                  ${CC}
     C++ Compiler:                ${CXX}
 
     DPDK support:                ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
+    PCAP support:                ${HAVE_PCAP}
+
+    RE2 support:                 ${have_re2}
 "
 
 echo "Now type make to build FastClick..."

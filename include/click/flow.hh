@@ -106,7 +106,9 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
 #if DEBUG_CLASSIFIER_MATCH > 1
     int level_nr = 0;
 #endif
+#if HAVE_FLOW_DYNAMIC
     bool dynamic = false;
+#endif
     do {
         bool need_grow = false;
         FlowNodeData data = parent->level()->get_data(p);
@@ -118,13 +120,14 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
         click_chatter("->Ptr is %p, is_leaf : %d",child_ptr->ptr, child_ptr->is_leaf());
 #endif
 
-        if (unlikely(IS_FREE_PTR_ANY(child_ptr->ptr) //Do not change ptr here to 0, as we could follow defautl path without changing this one
+        if (unlikely(IS_FREE_PTR_ANY(child_ptr->ptr) //Do not change ptr here to 0, as we could follow default path without changing this one
 #if FLOW_KEEP_STRUCTURE
                 || (child_ptr->is_node() && child_ptr->node->released())
 #endif
                 )) { //Unlikely to create a new node.
 
             if (parent->get_default().ptr) {
+#if HAVE_FLOW_DYNAMIC
                 if (parent->level()->is_dynamic()) {
                     if (unlikely(parent->growing())) {
                         //Table is growing, and we could not find a child, we go to the default table
@@ -218,11 +221,12 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p) {
 
                         _root->check(true, false);
                     }
-                } else { //There is a default but it is not a dynamic level, nor always_dup is set
+                } else
+#endif
+                { //There is a default but it is not a dynamic level, nor always_dup is set
                     child_ptr = parent->default_ptr();
                     if (child_ptr->is_leaf()) {
-                        _root->check(true, false);
-
+                        _root->check(true, false); //Do nothing if not in debug mode
                         flow_assert(reverse_match(child_ptr->leaf, p));
                         return child_ptr->leaf;
                     }

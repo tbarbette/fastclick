@@ -536,7 +536,7 @@ WritablePacket::recycle(WritablePacket *p)
     PacketPool& packet_pool = *make_local_packet_pool();
     bool data = is_from_data_pool(p);
 
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
     if (fcb_stack) {
         fcb_stack->release(1);
     } else {
@@ -574,7 +574,7 @@ WritablePacket::recycle(WritablePacket *p)
 void
 WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
     if (fcb_stack) {
         fcb_stack->release(count);
     } else {
@@ -602,13 +602,13 @@ WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigne
 void
 WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
     if (fcb_stack) {
         fcb_stack->release(count);
     } else {
-#if DEBUG_CLASSIFIER_RELEASE > 1
+# if DEBUG_CLASSIFIER_RELEASE > 1
         click_chatter("Warning : kill in recycle_data_batch without FCB");
-#endif
+# endif
     }
 #endif
     PacketPool& packet_pool = *make_local_packet_pool();
@@ -757,7 +757,7 @@ Packet::make(uint32_t headroom, const void *data,
     if (data)
         memcpy(rte_pktmbuf_mtod(mb, void *), data, length);
     (void) tailroom;
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
             if (fcb_stack)
                 fcb_stack->acquire(1);
 #endif
@@ -781,7 +781,7 @@ Packet::make(uint32_t headroom, const void *data,
 		# endif
 			if (data)
 			memcpy(p->data(), data, length);
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
 			if (fcb_stack)
 			    fcb_stack->acquire(1);
 #endif
@@ -830,7 +830,7 @@ assert(false); //TODO
 	p->_end = p->_tail + tailroom;
 	p->_destructor = destructor;
 	p->_destructor_argument = argument;
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
     if (fcb_stack)
         fcb_stack->acquire(1);
 #endif
@@ -954,7 +954,7 @@ Packet::clone(bool fast)
             p->_destructor = empty_destructor;
         }
         p->_data_packet = 0;
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
  //       if (fcb_stack)
  //           fcb_stack->acquire(1);
 #endif
@@ -972,7 +972,7 @@ Packet::clone(bool fast)
 	# endif
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
     //DO not acuire clone, as we only release when use_count is 0
     /*if (fcb_stack)
         fcb_stack->acquire(1);*/
@@ -1049,7 +1049,7 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
             kill();
         return 0;
     }
-#if HAVE_FLOW
+#if HAVE_FLOW_DYNAMIC
     if (likely(fcb_stack))
         fcb_stack->acquire(1);
 #endif

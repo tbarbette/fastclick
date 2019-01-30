@@ -341,6 +341,13 @@ if test "x$enable_flow_atomic" = xyes; then
     AC_DEFINE(FLOW_ATOMIC_USE_COUNT)
 fi
 
+AC_ARG_ENABLE([flow-dynamic],
+    [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
+    [:], [enable_flow_dynamic=yes])
+if test "x$enable_flow_dynamic" = xyes; then
+    AC_DEFINE(HAVE_FLOW_DYNAMIC)
+fi
+
 AC_ARG_ENABLE([flow-structure],
               [AS_HELP_STRING([  --disable-flow-structure], [do not free classifier nodes in pool, mark them as released to somehow keep the receive strucutre intact])],
     [:], [enable_flow_structure=yes])

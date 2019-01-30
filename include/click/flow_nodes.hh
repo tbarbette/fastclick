@@ -632,12 +632,18 @@ class FlowNodeHash : public FlowNode  {
     #define IS_FREE_PTR(ptr,parent) ((uint64_t)ptr <= parent->epoch)
     #define IS_FREE_PTR_ANY(ptr) ((uint64_t)ptr < MAX_EPOCH)
 #else
-    #define DESTRUCTED_NODE (void*)-1
-    #define SET_DESTRUCTED_NODE(ptr,parent) (ptr = DESTRUCTED_NODE)
     #define IS_EMPTY_PTR(ptr,parent)  (ptr == 0)
-    #define IS_DESTRUCTED_PTR(ptr,parent) (ptr == DESTRUCTED_NODE)
+# if HAVE_FLOW_DYNAMIC
+    #define DESTRUCTED_NODE (void*)-1
     #define IS_FREE_PTR(ptr,parent) (IS_EMPTY_PTR(ptr,parent) || IS_DESTRUCTED_PTR(ptr,parent))
     #define IS_FREE_PTR_ANY(ptr)    (ptr == 0 || ptr == DESTRUCTED_NODE)
+# else
+    #define DESTRUCTED_NODE (void*)0
+    #define IS_FREE_PTR(ptr,parent) (IS_EMPTY_PTR(ptr,parent))
+    #define IS_FREE_PTR_ANY(ptr)    (ptr == 0)
+# endif
+    #define SET_DESTRUCTED_NODE(ptr,parent) (ptr = DESTRUCTED_NODE)
+    #define IS_DESTRUCTED_PTR(ptr,parent) (ptr == DESTRUCTED_NODE)
 #endif
     #define IS_VALID_PTR(ptr,parent) (!IS_FREE_PTR(ptr,parent))
     #define IS_VALID_NODE(pptr,parent) (IS_VALID_PTR(pptr.ptr,parent) && pptr.is_node())
