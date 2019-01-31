@@ -224,6 +224,14 @@ public:
     FlowLevel* duplicate() override {
         return (new FlowLevelDummy())->assign(this);
     }
+
+    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, rte_flow_item &pat, bool is_default) {
+        pat.type = RTE_FLOW_ITEM_TYPE_VOID;
+        next_layer = last_layer;
+        next_layer_offset = offset;
+        return 0;
+    }
+
 };
 
 /**
