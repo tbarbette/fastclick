@@ -486,17 +486,17 @@ public:
 
     inline FlowNodePtr* find_heap(FlowNodeData data, bool &need_grow) {
         int i = 0;
-        while (childs[i].ptr) {
-            uint32_t cd = childs[i].data().data_32;
+        while (childs.unchecked_at(i).ptr) {
+            uint32_t cd = childs.unchecked_at(i).data().data_32;
             if (cd == data.data_32)
-                return &childs[i];
+                return &childs.unchecked_at(i);
             else if (cd < data.data_32) {
                 i = right_idx(i);
             } else {
                 i = left_idx(i);
             }
         }
-        return &childs[i];
+        return &childs.unchecked_at(i);
     }
 
     String name() const {
@@ -557,7 +557,7 @@ public:
     FLOW_NODE_DEFINE(FlowNodeArray,find_array);
 
     inline FlowNodePtr* find_array(FlowNodeData data, bool &need_grow) {
-        return &childs[data.data_32];
+        return &childs.unchecked_at(data.data_32);
     }
 
     String name() const {

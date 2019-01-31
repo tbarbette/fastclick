@@ -545,9 +545,9 @@ FlowNodeHeap::initialize(FlowNode* fn) {
 FlowNodeHeap::~FlowNodeHeap() {
     //Base destructor will delete the default
     for (int i = 0; i < childs.size(); i++) {
-        if (childs[i].ptr != NULL && childs[i].is_node()) {
-               delete childs[i].node;
-               childs[i].node = 0;
+        if (childs.unchecked_at(i).ptr != NULL && childs.unchecked_at(i).is_node()) {
+               delete childs.unchecked_at(i).node;
+               childs.unchecked_at(i).node = 0;
         }
     }
 }
@@ -580,9 +580,9 @@ void FlowNodeArray::destroy() {
 FlowNodeArray::~FlowNodeArray() {
     //Base destructor will delete the default
     for (int i = 0; i < childs.size(); i++) {
-        if (childs[i].ptr != NULL && childs[i].is_node()) {
-               delete childs[i].node;
-               childs[i].node = 0;
+        if (childs.uncheked_at(i).ptr != NULL && childs.uncheked_at(i).is_node()) {
+               delete childs.unchecked_at(i).node;
+               childs.unchecked_at(i).node = 0;
         }
     }
 }
