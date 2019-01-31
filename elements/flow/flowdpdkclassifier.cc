@@ -53,22 +53,30 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
     struct rte_flow_action action[3];
     struct rte_flow_action_mark mark;
     struct rte_flow_action_rss rss;
-    /*
-     * create the action sequence.
-     * one action only,  move packet to queue
-     */
+
     memset(action, 0, sizeof(action));
     memset(&rss, 0, sizeof(rss));
 
-    /*action[0].type = RTE_FLOW_ACTION_TYPE_RSS;
+    action[0].type = RTE_FLOW_ACTION_TYPE_MARK;
+    mark.id = _matches.size();
+    action[0].conf = &mark;
+
+    if (ptr.is_leaf() && ptr.leaf->is_early_drop()) {
+        action[1].type = RTE_FLOW_ACTION_TYPE_DROP;
+    } else {
+/*    struct rte_flow_action_queue queue;
+    action[1].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+    queue.index = 0;
+    action[1].conf = &queue;*/
+
+    action[1].type = RTE_FLOW_ACTION_TYPE_RSS;
     uint16_t queue[RTE_MAX_QUEUES_PER_PORT];
     queue[0] = 0;
     uint8_t rss_key[40];
-                                    struct rte_eth_rss_conf rss_conf;
-                                    rss_conf.rss_key = rss_key;
-                                    rss_conf.rss_key_len = 40;
-                    rte_eth_dev_rss_hash_conf_get(port_id,
-                                                          &rss_conf);
+    struct rte_eth_rss_conf rss_conf;
+    rss_conf.rss_key = rss_key;
+    rss_conf.rss_key_len = 40;
+    rte_eth_dev_rss_hash_conf_get(port_id, &rss_conf);
     rss.types = rss_conf.rss_hf;
     rss.key_len = rss_conf.rss_key_len;
     rss.queue_num = 1;
@@ -76,16 +84,8 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
     rss.queue = queue;
     rss.level = 0;
     rss.func = RTE_ETH_HASH_FUNCTION_DEFAULT;
-    action[0].conf = &rss;*/
-
-    action[0].type = RTE_FLOW_ACTION_TYPE_MARK;
-    mark.id = _matches.size();
-    action[0].conf = &mark;
-
-    struct rte_flow_action_queue queue;
-    action[1].type = RTE_FLOW_ACTION_TYPE_QUEUE;
-    queue.index = 0;
-    action[1].conf = &queue;
+    action[1].conf = &rss;
+    }
 
     action[2].type = RTE_FLOW_ACTION_TYPE_END;
 
@@ -100,7 +100,7 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
     if (!res) {
         struct rte_flow *flow = rte_flow_create(port_id, &attr, pattern.data(), action, &error);
         if (flow) {
-            click_chatter("Flow added succesfully with %d patterns to id %d !", pattern.size(), _matches.size());
+            click_chatter("Flow added succesfully with %d patterns to id %d with action %s !", pattern.size(), _matches.size(), action[1].type == RTE_FLOW_ACTION_TYPE_DROP? "drop":"rss");
         }
     } else {
         click_chatter("Could not validate pattern, error %d : %s", res, error.message);
@@ -114,7 +114,6 @@ int FlowDPDKClassifier::traverse_rules(FlowNode* node, Vector<rte_flow_item> &pa
        add_rule(pattern, FlowNodePtr(node));
        return 0;
     }
-
 
     FlowNode::NodeIterator it = node->iterator();
 
@@ -199,6 +198,9 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
             }
         } else
             ptr.leaf = _table.match(p);
+
+        if (!is_valid_fcb(p, last, next, ptr.leaf, now))
+            continue;
 
         handle_simple(p, last, ptr.leaf, awaiting_batch, count, now);
 

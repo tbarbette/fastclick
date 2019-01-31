@@ -570,34 +570,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) 
 #endif
 }
 
-
-
-static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-            if (unlikely(fcb->count() == 0 && fcb->hasTimeout())) {
-# if DEBUG_CLASSIFIER_TIMEOUT > 0
-                assert(fcb->flags & FLOW_TIMEOUT_INLIST);
-# endif
-                if (fcb->timeoutPassed(now)) {
-# if DEBUG_CLASSIFIER_TIMEOUT > 1
-                    click_chatter("Timeout of %p passed or released and is now seen again, reinitializing timer",fcb);
-# endif
-                    //Do not call initialize as everything is still set, just reinit timeout
-                    fcb->flags = FLOW_TIMEOUT | FLOW_TIMEOUT_INLIST;
-                } else {
-# if DEBUG_CLASSIFIER_TIMEOUT > 1
-                    click_chatter("Timeout recovered, keeping the flow %p",fcb);
-# endif
-                }
-            } else {
-# if DEBUG_CLASSIFIER_TIMEOUT > 1
-                click_chatter("Fcb %p Still valid : Fcb count is %d and hasTimeout %d",fcb, fcb->count(),fcb->hasTimeout());
-# endif
-            }
-#endif
-}
-
-inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, Timestamp &now) {
+inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, const Timestamp &now) {
     if (_aggcache) {
         uint32_t agg = AGGREGATE_ANNO(p);
         if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p)))) {
@@ -612,26 +585,7 @@ inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint
     {
         fcb = _table.match(p);
     }
-    if (unlikely(_verbose > 2)) {
-        if (_verbose > 3) {
-            click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
-        } else {
-            click_chatter("Table of %s after getting new packet (length %d) :",name().c_str(),p->length());
-        }
-        _table.get_root()->print(-1,_verbose > 3);
-    }
-    if (unlikely(!fcb || (fcb->is_early_drop() && _early_drop))) {
-        if (_verbose > 1)
-            debug_flow("Early drop !");
-        if (last) {
-            last->set_next(next);
-        }
-        SFCB_STACK(p->kill(););
-        p = next;
-        return false;
-    }
-    check_fcb_still_valid(fcb, now);
-    return true;
+    return is_valid_fcb(p, last, next, fcb, now);
 }
 
 /**
