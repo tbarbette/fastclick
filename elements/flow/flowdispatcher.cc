@@ -167,7 +167,7 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                 if (child_table) {
                     child_table->check();
                     click_chatter("flat combine");
-                    rules[i].root = rules[i].root->combine(child_table, true, true, false);
+                    rules[i].root = rules[i].root->combine(child_table, true, true, true);
                 } else {
                     //Just keep the root
                 }
@@ -208,7 +208,7 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
 				merged = rules[i].root;
 			} else {
 			    //We must replace all default path per the new rule
-				merged = merged->combine(rules[i].root, false, !_children_merge && (i > 0 && rules[i - 1].output != rules[i].output), false);
+				merged = merged->combine(rules[i].root, false, !_children_merge && (i > 0 && rules[i - 1].output != rules[i].output), true);
 			}
 			merged->check();
 

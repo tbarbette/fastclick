@@ -517,7 +517,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority, bool 
 	    debug_flow("COMBINE : Other is dummy")
 	    //If other is a dummy (and we're not)
 	    if (other->_default.is_leaf()) {
-	        debug_flow("COMBINE : Other is a leaf (as child %d):",as_child)
+	        debug_flow("COMBINE : Other is a leaf (as child %d, duplicate leaf %d):",as_child, duplicate_leaf)
 	        //other->_default.leaf->print("");
 	        if (as_child) { //Combine a leaf as child of all our leaf
 	            this->leaf_combine_data(other->_default.leaf, true, true);
@@ -945,13 +945,16 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
             if (inverted) {
                 if (olevel->equals(this->level())) { //Same level
                     //Remove data from level if it exists
-                    click_chatter("Same level!");
+                    debug_flow("Same level!");
                     bool need_grow;
                     FlowNodePtr* ptr_child = find(data,need_grow);
                     FlowNodePtr child = *ptr_child;
-                    ptr_child->ptr = 0;
-                    dec_num();
+                    if (child.ptr) {
+                        ptr_child->ptr = 0;
+                        dec_num();
+                    }
                     changed = true;
+
                     //TODO delete child
                 }
             } else {
@@ -1089,7 +1092,15 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
     FlowNodeData gdata = old_data;
     bool was_default = old_parent->default_ptr()->ptr == leaf;
     while (gparent != NULL) {
-        no = no.node->prune(gparent->level(),gdata, was_default, changed);
+        //If this level was a default level, we must remove all known values of this level from the child
+        if (was_default) {
+            FlowNode::NodeIterator it = gparent->iterator();
+            FlowNodePtr* cur;
+            while ((cur = it.next()) != 0) {
+               no = no.node->prune(gparent->level(), cur->data(), true, changed);
+            }
+        } else
+            no = no.node->prune(gparent->level(),gdata, was_default, changed);
         if (!no.ptr) { //Completely pruned, keep the FCB as it.
             debug_flow("Completely pruned");
             return true;
@@ -1097,6 +1108,8 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
         if (no.is_leaf()) {
             break;
         }
+
+        no.check();
         gdata = gparent->node_data;
         FlowNode* child = gparent;
         gparent = gparent->parent();
@@ -1112,6 +1125,7 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
     if (changed) {
         debug_flow("Pruned other : ");
         no.print();
+        no.check();
     } else {
         debug_flow("Pruning did not change the node.");
     }

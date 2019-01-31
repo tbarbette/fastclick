@@ -474,6 +474,11 @@ FlowNodeDefinition::create_final(bool mt_safe) {
     NodeIterator it = iterator();
     FlowNodePtr* cur = 0;
     while ((cur = it.next()) != 0) {
+        if (cur->data().data_32 > _level->get_max_value()) {
+            click_chatter("Data %d is bigger than expected value %d", cur->data().data_32, _level->get_max_value() );
+            print();
+            assert(false);
+        }
         cur->set_parent(fl);
         if (cur->is_node()) {
             fl->add_node(cur->data(),cur->node->optimize(mt_safe));
@@ -580,16 +585,16 @@ void FlowNodeArray::destroy() {
 FlowNodeArray::~FlowNodeArray() {
     //Base destructor will delete the default
     for (int i = 0; i < childs.size(); i++) {
-        if (childs.uncheked_at(i).ptr != NULL && childs.uncheked_at(i).is_node()) {
+        if (childs.unchecked_at(i).ptr != NULL && childs.unchecked_at(i).is_node()) {
                delete childs.unchecked_at(i).node;
                childs.unchecked_at(i).node = 0;
         }
     }
 }
-FlowNode* FlowNodeArray::duplicate(bool recursive,int use_count, bool duplicate_leaf) {
+FlowNode* FlowNodeArray::duplicate(bool recursive, int use_count, bool duplicate_leaf) {
     FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
     fa->initialize(childs.size());
-    fa->duplicate_internal(this,recursive,use_count, duplicate_leaf);
+    fa->duplicate_internal(this, recursive, use_count, duplicate_leaf);
     return fa;
 }
 
@@ -996,6 +1001,7 @@ String FlowLevelGeneric<T>::print() {
 FlowNodePtr
 FlowLevel::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &changed) {
     if (other->equals(this)) {
+        debug_flow("Pruning identical levels");
         FlowNodePtr* ptr = node->find_or_default(data);
         FlowNodePtr child = *ptr;
         node->dec_num();
@@ -1008,6 +1014,7 @@ FlowLevel::prune(FlowLevel* other, FlowNodeData data, FlowNode* node, bool &chan
        click_chatter("Cannot prune %s with %s",node->level()->print().c_str(),other->print().c_str());
 #endif
     }
+    node->check();
     return FlowNodePtr(node);
 }
 
@@ -1034,7 +1041,7 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
 #endif
         if (_mask == shiftedmask) { //Value totally define the child, only keep that one
 #if FLOW_DEBUG_PRUNE
-            click_chatter("Child");
+            click_chatter("FlowLevel identical child, only keeping identical child :");
 #endif
             FlowNodePtr* ptr = node->find_or_default(data);
             FlowNodePtr child = *ptr;
@@ -1042,6 +1049,10 @@ FlowNodePtr FlowLevelGeneric<T>::prune(FlowLevel* other, FlowNodeData data, Flow
             ptr->ptr = 0;
             //TODO delete this;
             changed = true;
+
+#if FLOW_DEBUG_PRUNE
+            child.print();
+#endif
             return child;
         } else if ((_mask & shiftedmask) != 0) {
 #if FLOW_DEBUG_PRUNE

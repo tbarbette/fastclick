@@ -241,8 +241,11 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                 return 0;
             }
         } else if (child_ptr->is_leaf()) {
-
-            flow_assert(reverse_match(child_ptr->leaf, p));
+#if DEBUG_FLOW
+            if (child_ptr->leaf->parent()) {
+                flow_assert(reverse_match(child_ptr->leaf, p));
+            }
+#endif
             return child_ptr->leaf;
         } else { // is an existing node, and not released. Just descend
 

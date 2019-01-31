@@ -230,6 +230,10 @@ int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
     if (table->is_dummy()) {
         return errh->error("%p{element} : FlowClassifier without classification !");
     }
+    if (_verbose > 1) {
+        click_chatter("Table of %s before optimization :",name().c_str());
+        table->print(-1,false);
+    }
     _table.set_root(table->optimize(passing.weight() <= 1));
     _table.get_root()->check();
     if (_verbose) {
@@ -301,7 +305,7 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
             return true;
     });
     if (!have_dynamic && _do_release) {
-        click_chatter("FlowClassifier is fully static, disabling release, consider using FlowClassifierStatic");
+        click_chatter("FlowClassifier is fully static, disabling release, consider compiling with --disable-dynamic-flow");
     }
 
 #ifndef HAVE_FLOW_DYNAMIC
