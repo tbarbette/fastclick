@@ -10,6 +10,9 @@
 
 CLICK_DECLS
 
+
+#define USE_CACHE_RING 1
+
 typedef struct {
     PacketBatch* batch;
     FlowControlBlock* fcb;
@@ -67,7 +70,9 @@ public:
 
     const char *class_name() const		{ return "FlowClassifier"; }
     const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return DOUBLE; }
+//    const char *processing() const		{ return DOUBLE; }
+
+    const char *processing() const		{ return PUSH; }
     int configure_phase() const     { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -79,7 +84,7 @@ public:
     inline int cache_find(FlowControlBlock* fcb);
     inline FlowControlBlock* set_fcb_cache(FlowCache* &c, Packet* &p, const uint32_t& agg);
     inline void remove_cache_fcb(FlowControlBlock* fcb);
-    inline FlowControlBlock* get_cache_fcb(Packet* p, uint32_t agg);
+    inline FlowControlBlock* get_cache_fcb(Packet* p, uint32_t agg, FlowNode* root);
     inline bool get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, const Timestamp &now);
     inline void push_batch_simple(int port, PacketBatch*);
     inline void push_batch_builder(int port, PacketBatch*);
@@ -115,8 +120,77 @@ protected:
 inline void flush_simple(Packet* &last, PacketBatch* awaiting_batch, int &count, const Timestamp &now);
 inline void handle_simple(Packet* &p, Packet* &last, FlowControlBlock* &fcb, PacketBatch* &awaiting_batch, int &count, const Timestamp &now);
 
-    inline bool is_valid_fcb(Packet* &p, Packet* &last, Packet* &next, FlowControlBlock* &fcb, const Timestamp &now);
+#define BUILDER_RING_SIZE 16
+
+struct Builder {
+    FlowBatch batches[BUILDER_RING_SIZE];
+    int head = 0;
+    int tail = 0;
+    int curbatch = -1;
+    int count = 0;
+    FlowControlBlock* lastfcb = 0;
+    Packet* last = NULL;
 };
+
+inline void flush_builder(Packet* &last, Builder &builder, const Timestamp &now);
+inline void handle_builder(Packet* &p, Packet* &last, FlowControlBlock* &fcb, Builder &builder, const Timestamp &now);
+
+inline bool is_valid_fcb(Packet* &p, Packet* &last, Packet* &next, FlowControlBlock* &fcb, const Timestamp &now);
+inline void check_release_flows();
+};
+
+inline FlowControlBlock* FlowClassifier::set_fcb_cache(FlowCache* &c, Packet* &p, const uint32_t& agg) {
+    FlowControlBlock* fcb = _table.match(p);
+
+    if (*((uint32_t*)&(fcb->node_data[1])) == 0) {
+        *((uint32_t*)&(fcb->node_data[1])) = agg;
+        c->fcb = fcb;
+        c->agg = agg;
+    } else {
+//        click_chatter("FCB already in cache with different AGG %u<->%u FCB %p dynamic %d",agg,*((uint32_t*)&(fcb->node_data[1])),fcb, fcb->dynamic);
+    }
+    return fcb;
+}
+
+inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, const Timestamp &now) {
+    if (_aggcache) {
+        uint32_t agg = AGGREGATE_ANNO(p);
+        if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p)))) {
+            if (_cache_size > 0)
+                fcb = get_cache_fcb(p,agg,_table.get_root());
+            else
+                fcb = _table.match(p);
+            lastagg = agg;
+        }
+    }
+    else
+    {
+        fcb = _table.match(p);
+    }
+    return is_valid_fcb(p, last, next, fcb, now);
+}
+
+inline void FlowClassifier::check_release_flows() {
+    if (_do_release) {
+#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+        auto &head = _table.old_flows.get();
+        if (head.count() > head._count_thresh) {
+#if DEBUG_CLASSIFIER_TIMEOUT > 0
+            click_chatter("%p{element} Forced release because %d is > than %d",this,head.count(), head._count_thresh);
+#endif
+            _table.check_release();
+            if (unlikely(head.count() < (head._count_thresh / 8) && head._count_thresh > FlowTableHolder::fcb_list::DEFAULT_THRESH)) {
+                head._count_thresh /= 2;
+            } else
+                head._count_thresh *= 2;
+#if DEBUG_CLASSIFIER_TIMEOUT > 0
+            click_chatter("%p{element} Forced release count %d thresh %d",this,head.count(), head._count_thresh);
+#endif
+        }
+#endif
+    }
+
+}
 
 inline void FlowClassifier::handle_simple(Packet* &p, Packet* &last, FlowControlBlock* &fcb, PacketBatch* &awaiting_batch, int &count, const Timestamp &now) {
         if (awaiting_batch == NULL) {
@@ -166,6 +240,102 @@ inline void FlowClassifier::flush_simple(Packet* &last, PacketBatch* awaiting_ba
     }
 
 }
+
+inline void FlowClassifier::handle_builder(Packet* &p, Packet* &last, FlowControlBlock* &fcb, Builder &builder, const Timestamp &now) {
+        if ((_nocut && builder.lastfcb) || builder.lastfcb == fcb) {
+            //Just continue as they are still linked
+        } else {
+
+                //Break the last flow
+                if (last) {
+                    last->set_next(0);
+                    builder.batches[builder.curbatch].batch->set_count(builder.count);
+                    builder.batches[builder.curbatch].batch->set_tail(last);
+                }
+
+                //Find a potential match
+                for (int i = builder.tail; i < builder.head; i++) {
+                    if (builder.batches[i % BUILDER_RING_SIZE].fcb == fcb) { //Flow already in list, append
+                        //click_chatter("Flow already in list");
+                        builder.curbatch = i % BUILDER_RING_SIZE;
+                        builder.count = builder.batches[builder.curbatch].batch->count();
+                        last = builder.batches[builder.curbatch].batch->tail();
+                        last->set_next(p);
+                        goto attach;
+                    }
+                }
+                //click_chatter("Unknown fcb %p, curbatch = %d",fcb,head);
+                builder.curbatch = builder.head % BUILDER_RING_SIZE;
+                builder.head++;
+
+                if (builder.tail % BUILDER_RING_SIZE == builder.head % BUILDER_RING_SIZE) {
+                    auto &b = builder.batches[builder.tail % BUILDER_RING_SIZE];
+                    if (_verbose > 1) {
+                        click_chatter("WARNING (unoptimized) Ring full with batch of %d packets, processing now !", b.batch->count());
+                    }
+                    //Ring full, process batch NOW
+                    fcb_stack = b.fcb;
+#if HAVE_FLOW_DYNAMIC
+                    fcb_stack->acquire(b.batch->count());
+#endif
+                    fcb_stack->lastseen = now;
+                    //click_chatter("FPush %d of %d packets",tail % BUILDER_RING_SIZE,batches[tail % BUILDER_RING_SIZE].batch->count());
+                    output_push_batch(0,b.batch);
+                    builder.tail++;
+                }
+                //click_chatter("batches[%d].batch = %p",curbatch,batch);
+                //click_chatter("batches[%d].fcb = %p",curbatch,fcb);
+                builder.batches[builder.curbatch].batch = PacketBatch::start_head(p);
+                builder.batches[builder.curbatch].fcb = fcb;
+                builder.count = 0;
+        }
+        attach:
+        builder.count ++;
+        builder.lastfcb = fcb;
+}
+
+
+inline void FlowClassifier::flush_builder(Packet* &last, Builder &builder, const Timestamp &now) {
+    if (last) {
+        last->set_next(0);
+        builder.batches[builder.curbatch].batch->set_tail(last);
+        builder.batches[builder.curbatch].batch->set_count(builder.count);
+    }
+
+    //click_chatter("%d batches :",head-tail);
+   // for (int i = tail;i < head;i++) {
+        //click_chatter("[%d] %d packets for fcb %p",i,batches[i%BUILDER_RING_SIZE].batch->count(),batches[i%BUILDER_RING_SIZE].fcb);
+    //}
+    for (;builder.tail < builder.head;) {
+        auto &b = builder.batches[builder.tail % BUILDER_RING_SIZE];
+        fcb_stack = b.fcb;
+
+#if HAVE_FLOW_DYNAMIC
+        fcb_stack->acquire(b.batch->count());
+#endif
+        fcb_stack->lastseen = now;
+        //click_chatter("EPush %d of %d packets",tail % BUILDER_RING_SIZE,batches[tail % BUILDER_RING_SIZE].batch->count());
+        output_push_batch(0,b.batch);
+
+        builder.tail++;
+        if (builder.tail == builder.head) break;
+
+        //Double mode
+        /*
+        if (input_is_pull(0) && ((batch = input_pull_batch(0,_pull_burst)) != 0)) { //If we can pull and it's not the last pull
+            curbatch = -1;
+            lastfcb = 0;
+            count = 0;
+            lastagg = 0;
+
+            //click_chatter("Pull continue because received %d ! tail %d, head %d",batch->count(),tail,head);
+            p = batch;
+            goto process;
+        }
+        */
+    }
+}
+
 
 /**
  * Checks that the FCB has not timed out
@@ -223,6 +393,122 @@ inline bool FlowClassifier::is_valid_fcb(Packet* &p, Packet* &last, Packet* &nex
     check_fcb_still_valid(fcb, now);
     return true;
 }
+
+inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg, FlowNode* root) {
+
+    if (unlikely(agg == 0)) {
+        return _table.match(p, root);
+    }
+
+#if DEBUG_CLASSIFIER > 1
+    click_chatter("Aggregate %d",agg);
+#endif
+        FlowControlBlock* fcb = 0;
+        uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
+#if USE_CACHE_RING
+        FlowCache* bucket = _cache.get() + ((uint32_t)hash * _cache_ring_size);
+#else
+        FlowCache* bucket = _cache.get() + hash;
+#endif
+        FlowCache* c = bucket;
+        int ic = 0;
+        do {
+            if (c->agg == 0) { //Empty slot
+    #if DEBUG_CLASSIFIER > 1
+                click_chatter("Cache miss !");
+    #endif
+                cache_miss++;
+                return set_fcb_cache(c,p,agg);
+            } else { //Non empty slot
+                if (likely(c->agg == agg)) { //Good agg
+                    if (likely(_collision_is_life || (c->fcb->parent && _table.reverse_match(c->fcb, p)))) {
+        #if DEBUG_CLASSIFIER > 1
+                        click_chatter("Cache hit");
+        #endif
+                        cache_hit++;
+                        fcb = c->fcb;
+                        return fcb;
+                        //OK
+                    } else { //The fcb for that agg does not match !
+
+                        cache_sharing++;
+                        fcb = _table.match(p, root);
+
+#if DEBUG_CLASSIFIER > 1 || DEBUG_FCB_CACHE
+
+                        click_chatter("Cache %d shared for agg %d : fcb %p %p!",hash,agg,fcb,c->fcb);
+                        flow_assert(fcb != c->fcb);
+                        //for (int i = 0; i < 10; i++)
+                            //click_chatter("%x",*(((uint32_t*)p->data()) + i));
+
+#endif
+                        return fcb;
+                        /*FlowControlBlock* firstfcb = fcb;
+                        int sechash = (agg >> 12) & 0xfff;
+                        fcb = _cache.get()[sechash + 4096];
+                        if (fcb && !fcb->released()) {
+                            if (_table.reverse_match(fcb, p)) {
+
+                            } else {
+                                click_chatter("Double collision for hash %d!",hash);
+                                fcb = _table.match(p);
+                                if (_cache.get()[hash]->lastseen < fcb->lastseen)
+                                    _cache.get()[hash] = fcb;
+                                else
+                                    _cache.get()[sechash] = fcb;
+                            }
+                        } else {
+                            fcb = _table.match(p);
+                            _cache.get()[sechash] = fcb;
+                        }*/
+                    }
+                } //Continue if bad agg
+            }
+#if !USE_CACHE_RING
+        } while (false);
+        fcb = _table.match(p,root);
+        if (fcb->dynamic > 1) {
+            click_chatter("ADDING A DYNAMIC TWICE");
+            table().get_root()->print();
+            assert(false);
+        }
+
+        return set_fcb_cache(c,p, agg);
+#else
+            c++;
+            ic++;
+        } while (ic < _cache_ring_size); //Try to put in the ring of the bucket
+
+        //Remove the oldest from the bucket
+        c = bucket;
+        FlowCache* oldest = c;
+        c++;
+        ic = 1;
+        int o = 0;
+        while (ic < _cache_ring_size) {
+            if (c->fcb->lastseen < oldest->fcb->lastseen) {
+                o = ic;
+                oldest = c;
+            }
+
+            c++;
+            ic++;
+        }
+        //click_chatter("Oldest is %d",o );
+        c = bucket;
+        if (o != 0) {
+            oldest->agg = c->agg;
+            oldest->fcb = c->fcb;
+        }
+
+        #if DEBUG_CLASSIFIER > 1
+        click_chatter("Cache miss with full ring !");
+        #endif
+        cache_miss++;
+        return set_fcb_cache(c,p, agg);
+#endif
+}
+
 
 
 CLICK_ENDDECLS

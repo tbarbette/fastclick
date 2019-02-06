@@ -33,6 +33,17 @@ int FlowDPDKClassifier::configure(Vector<String> &conf, ErrorHandler *errh) {
     return 0;
 }
 
+void *
+FlowDPDKClassifier::cast(const char *n)
+{
+    if (strcmp(n, "FlowClassifier") == 0)
+	return dynamic_cast<FlowClassifier *>(this);
+    else
+	return Element::cast(n);
+}
+
+
+
 void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
     if (pattern.size() == 0) {
         click_chatter("Cannot add classifier without rules !");
@@ -41,6 +52,12 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
     _matches.push_back(ptr);
 
     int port_id = _dev->port_id();
+
+    bool is_ip = false;
+    for (int i = 0; i < pattern.size(); i++) {
+        if (pattern[i].type == RTE_FLOW_ITEM_TYPE_TCP || pattern[i].type == RTE_FLOW_ITEM_TYPE_UDP)
+            is_ip = true;
+    }
 
     struct rte_flow_attr attr;
     /*
@@ -66,11 +83,12 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
     mark.id = _matches.size();
     action[0].conf = &mark;
 
+    if (!is_ip) {
     struct rte_flow_action_queue queue;
     action[1].type = RTE_FLOW_ACTION_TYPE_QUEUE;
     queue.index = 0;
     action[1].conf = &queue;
-/*
+    } else {
     action[1].type = RTE_FLOW_ACTION_TYPE_RSS;
     uint16_t queue[RTE_MAX_QUEUES_PER_PORT];
     queue[0] = 0;
@@ -86,8 +104,8 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
     rss.queue = queue;
     rss.level = 0;
     rss.func = RTE_ETH_HASH_FUNCTION_DEFAULT;
-    action[1].conf = &rss;*/
-
+    action[1].conf = &rss;
+    }
     action[2].type = RTE_FLOW_ACTION_TYPE_END;
     }
 
@@ -100,24 +118,26 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
     struct rte_flow_error error;
     int res;
     res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
+    const char* actiont = action[0].type == RTE_FLOW_ACTION_TYPE_DROP? "drop":(is_ip?"rss":"queue");
     if (!res) {
         struct rte_flow *flow = rte_flow_create(port_id, &attr, pattern.data(), action, &error);
         if (flow) {
-            click_chatter("Flow added succesfully with %d patterns to id %d with action %s !", pattern.size(), _matches.size(), action[0].type == RTE_FLOW_ACTION_TYPE_DROP? "drop":"rss");
+            click_chatter("Flow added succesfully with %d patterns to id %d with action %s !", pattern.size(), _matches.size(), actiont);
         } else {
 
-            click_chatter("Could not add pattern with %d patterns, error %d : %s", pattern.size(), res, error.message);
+            click_chatter("Could not add pattern with %d patterns with action %s, error %d : %s", pattern.size(), actiont, res, error.message);
         }
     } else {
-        click_chatter("Could not validate pattern with %d patterns, error %d : %s", pattern.size(),  res, error.message);
+        click_chatter("Could not validate pattern with %d patterns with action %s, error %d : %s", pattern.size(), actiont,  res, error.message);
     }
 
 }
 
-int FlowDPDKClassifier::traverse_rules(FlowNode* node, Vector<rte_flow_item> &pattern, rte_flow_item_type last_layer, int offset) {
+int FlowDPDKClassifier::traverse_rules(FlowNode* node, Vector<rte_flow_item> pattern, rte_flow_item_type last_layer, int offset) {
     if (node->level()->is_dynamic()) {
         click_chatter("Node is dynamic, adding this node and stopping");
        add_rule(pattern, FlowNodePtr(node));
+
        return 0;
     }
 
@@ -127,13 +147,12 @@ int FlowDPDKClassifier::traverse_rules(FlowNode* node, Vector<rte_flow_item> &pa
 
     rte_flow_item pat;
     bzero(&pat,sizeof(rte_flow_item));
-    pattern.push_back(pat);
-        rte_flow_item_type new_layer;
-        int new_offset;
+    rte_flow_item_type new_layer;
+    int new_offset;
 
     while ((cur = it.next()) != 0) {
-        int ret = node->level()->to_dpdk_flow(cur->data(), last_layer, offset, new_layer, new_offset, pattern[pattern.size() - 1], false);
-        if (ret != 0) {
+        int ret = node->level()->to_dpdk_flow(cur->data(), last_layer, offset, new_layer, new_offset, pattern, false);
+        if (ret < 0) {
             goto addthis;
         } else {
             click_chatter("Pattern found");
@@ -145,11 +164,13 @@ int FlowDPDKClassifier::traverse_rules(FlowNode* node, Vector<rte_flow_item> &pa
         } else {
             traverse_rules(cur->node, pattern, new_layer, new_offset);
         }
+        for (int i = 0; i < ret; i++)
+            pattern.pop_back();
     }
 
     if (node->default_ptr()->ptr != 0) {
-        int ret = node->level()->to_dpdk_flow(node->default_ptr()->data(), last_layer, offset, new_layer, new_offset, pattern[pattern.size() - 1], true);
-        if (ret != 0) {
+        int ret = node->level()->to_dpdk_flow(node->default_ptr()->data(), last_layer, offset, new_layer, new_offset, pattern, true);
+        if (ret < 0) {
             goto addthis;
         }
         if (node->default_ptr()->is_leaf()) {
@@ -158,13 +179,13 @@ int FlowDPDKClassifier::traverse_rules(FlowNode* node, Vector<rte_flow_item> &pa
         } else {
              traverse_rules(node->default_ptr()->node, pattern, new_layer, new_offset);
         }
+        for (int i = 0; i < ret; i++)
+            pattern.pop_back();
     }
 
-    pattern.pop_back();
     return 0;
 addthis:
     click_chatter("Unknown classification %s, stopping", node->level()->print().c_str());
-    pattern.pop_back();
     add_rule(pattern, FlowNodePtr(node));
     return 0;
 
@@ -190,6 +211,7 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
     fcb_table = &_table;
     Packet* last = 0;
     int count = 0;
+    uint32_t lastagg = 0;
     PacketBatch* awaiting_batch = 0;
     Timestamp now = Timestamp::recent_steady();
     Packet* p = batch;
@@ -197,14 +219,37 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
 
         Packet* next = p->next();
         FlowNodePtr ptr;
-        if (AGGREGATE_ANNO(p)) {
-            ptr = _matches[AGGREGATE_ANNO(p) - 1];
-//            click_chatter("Id %d, ptr %p", AGGREGATE_ANNO(p), ptr.ptr );
+        rte_mbuf* mbuf = (rte_mbuf*)p->destructor_argument();
+        if (likely(mbuf->ol_flags & PKT_RX_FDIR_ID)) {
+            int fid = mbuf->hash.fdir.hi;
+            ptr = _matches[fid - 1];
             if (ptr.is_node()) {
-                ptr.leaf = _table.match(p, ptr.node);
+                if (_aggcache) {
+                    uint32_t agg = AGGREGATE_ANNO(p);
+                    if (!(lastagg == agg && ptr.leaf && likely(ptr.leaf->parent && _table.reverse_match(ptr.leaf,p)))) {
+                        if (likely(_cache_size > 0))
+                            ptr.leaf = get_cache_fcb(p,agg,ptr.node);
+                        else
+                            ptr.leaf = _table.match(p, ptr.node);
+                        lastagg = agg;
+                    }
+                } else
+                    ptr.leaf = _table.match(p, ptr.node);
             }
-        } else
-            ptr.leaf = _table.match(p);
+        } else {
+                if (_aggcache) {
+                    uint32_t agg = AGGREGATE_ANNO(p);
+                    if (!(lastagg == agg && ptr.leaf && likely(ptr.leaf->parent && _table.reverse_match(ptr.leaf,p)))) {
+                        if (likely(_cache_size > 0))
+                            ptr.leaf = get_cache_fcb(p,agg,_table.get_root());
+                        else
+                            ptr.leaf = _table.match(p, _table.get_root());
+                        lastagg = agg;
+                    }
+                } else
+                    ptr.leaf = _table.match(p);
+        }
+
 
         if (!is_valid_fcb(p, last, next, ptr.leaf, now))
             continue;
@@ -216,14 +261,75 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
     }
 
     flush_simple(last, awaiting_batch, count,  now);
+    check_release_flows();
 
     fcb_stack = tmp_stack;
     fcb_table = tmp_table;
 }
 
 
+FlowDPDKBuilderClassifier::FlowDPDKBuilderClassifier() {
+
+}
+
+FlowDPDKBuilderClassifier::~FlowDPDKBuilderClassifier() {
+
+}
+
+void *
+FlowDPDKBuilderClassifier::cast(const char *n)
+{
+    if (strcmp(n, "FlowClassifier") == 0)
+	return dynamic_cast<FlowClassifier *>(this);
+    else
+	return Element::cast(n);
+}
+
+void FlowDPDKBuilderClassifier::push_batch(int port, PacketBatch* batch) {
+    FlowControlBlock* tmp_stack = fcb_stack;
+    FlowTableHolder* tmp_table = fcb_table;
+
+    fcb_table = &_table;
+    Packet* last = 0;
+    Timestamp now = Timestamp::recent_steady();
+
+    Builder builder;
+
+    Packet* p = batch;
+    while (p != NULL) {
+
+        Packet* next = p->next();
+        FlowNodePtr ptr;
+
+        rte_mbuf* mbuf = (rte_mbuf*)p->destructor_argument();
+        if (likely(mbuf->ol_flags & PKT_RX_FDIR_ID)) {
+            int fid = mbuf->hash.fdir.hi;
+            ptr = _matches[fid - 1];
+            if (ptr.is_node()) {
+                ptr.leaf = _table.match(p, ptr.node);
+            }
+        } else
+            ptr.leaf = _table.match(p);
+
+        if (!is_valid_fcb(p, last, next, ptr.leaf, now))
+            continue;
+
+        handle_builder(p, last, ptr.leaf, builder, now);
+
+        last = p;
+        p = next;
+    }
+
+    flush_builder(last, builder,  now);
+    check_release_flows();
+
+    fcb_stack = tmp_stack;
+    fcb_table = tmp_table;
+}
+
 
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(FlowDPDKClassifier)
+EXPORT_ELEMENT(FlowDPDKBuilderClassifier)
 ELEMENT_REQUIRES(FlowClassifier dpdk)

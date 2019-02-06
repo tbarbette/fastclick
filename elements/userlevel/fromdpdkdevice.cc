@@ -188,13 +188,9 @@ bool FromDPDKDevice::run_task(Task *t)
             p->set_mac_header(data);
             if (_set_rss_aggregate) {
 #if RTE_VERSION > RTE_VERSION_NUM(1,7,0,0)
-            if (pkts[i]->ol_flags & PKT_RX_FDIR_ID) {
-                SET_AGGREGATE_ANNO(p,pkts[i]->hash.fdir.hi);
-            } else {
-                SET_AGGREGATE_ANNO(p,0);
-            }
+               SET_AGGREGATE_ANNO(p,pkts[i]->hash.rss);
 #else
-                SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
+               SET_AGGREGATE_ANNO(p,pkts[i]->pkt.hash.rss);
 #endif
             }
             if (_set_paint_anno) {

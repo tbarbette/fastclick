@@ -189,7 +189,7 @@ public:
     }
 
 
-    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, rte_flow_item &pat, bool is_default) {
+    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, Vector<rte_flow_item> &pattern, bool is_default) {
         return -1;
     }
 
@@ -225,11 +225,13 @@ public:
         return (new FlowLevelDummy())->assign(this);
     }
 
-    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, rte_flow_item &pat, bool is_default) {
+    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, Vector<rte_flow_item> &pattern, bool is_default) override {
+        rte_flow_item pat;
         pat.type = RTE_FLOW_ITEM_TYPE_VOID;
         next_layer = last_layer;
         next_layer_offset = offset;
-        return 0;
+        pattern.push_back(pat);
+        return 1;
     }
 
 };
@@ -331,7 +333,7 @@ public:
         return ((FlowLevel::equals(level))&& (_offset == dynamic_cast<FlowLevelOffset*>(level)->_offset));
     }
 
-    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, rte_flow_item &pat, bool is_default);
+    virtual int to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int offset, rte_flow_item_type &next_layer, int &next_layer_offset, Vector<rte_flow_item> &pattern, bool is_default) override;
 
 };
 

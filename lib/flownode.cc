@@ -831,7 +831,17 @@ template class FlowNodeHash<9>;
 
 #define FLOW_DEBUG_PRUNE DEBUG_CLASSIFIER
 
-int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int last_offset, rte_flow_item_type &next_layer, int &next_layer_offset, rte_flow_item &pat, bool is_default) {
+rte_flow_item* find_layer(Vector<rte_flow_item> &pattern, enum rte_flow_item_type type) {
+    for (int i = 0; i < pattern.size(); i++)
+        if (pattern[i].type == type)
+            return &pattern[i];
+    return 0;
+}
+int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int last_offset, rte_flow_item_type &next_layer, int &next_layer_offset, Vector<rte_flow_item> &pattern, bool is_default) {
+        rte_flow_item pat;
+                        pat.spec = 0;
+                        pat.mask = 0;
+                        pat.last = 0;
         if (last_layer == RTE_FLOW_ITEM_TYPE_RAW) {
             if (offset() - last_offset == 12 && mask_size() == 2) {
                 click_chatter("Ether type");
@@ -848,7 +858,7 @@ int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_lay
                 } else {
                     eth->type = data.data_16;
                     mask->type = -1;
-                    click_chatter("Type %d", data.data_16);
+                    click_chatter("Ether Type %d", data.data_16);
                     pat.spec = eth;
                     pat.mask = mask;
                     pat.last = 0;
@@ -864,7 +874,8 @@ int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_lay
                         next_layer_offset = -1;
                     }
                 }
-                return 0;
+                pattern.push_back(pat);
+                return 1;
             } else {
                 return -1;
             }
@@ -884,57 +895,120 @@ int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_lay
                 } else {
                     spec->hdr.next_proto_id = data.data_8;
                     mask->hdr.next_proto_id = -1;
-                    click_chatter("Type %d", data.data_8);
+                    click_chatter("IPV4 Type %d", data.data_8);
                     pat.spec = spec;
                     pat.mask = mask;
                     pat.last = 0;
+                    bool addm = false;
                     if (spec->hdr.next_proto_id == 0x01) {
                         next_layer = RTE_FLOW_ITEM_TYPE_ICMP;
                         next_layer_offset = last_offset + 20;
+                        //addm = true; unsupported on mlx
                     } else if (spec->hdr.next_proto_id == 0x06) {
                         next_layer = RTE_FLOW_ITEM_TYPE_TCP;
-                        next_layer_offset = last_offset + 20;
+                        next_layer_offset = last_offset;// + 20;
+                        addm = true;
                     } else if (spec->hdr.next_proto_id == 0x11) {
                         next_layer = RTE_FLOW_ITEM_TYPE_UDP;
-                        next_layer_offset = last_offset + 20;
+                        next_layer_offset = last_offset;// + 20;
+                        addm = true;
                     } else {
                         click_chatter("Unknown ethertype...");
                         next_layer = RTE_FLOW_ITEM_TYPE_END;
                         next_layer_offset = -1;
                     }
+                    if (addm) {
+                        rte_flow_item patd;
+                        patd.type = next_layer;
+                        patd.spec = 0;
+                        patd.mask = 0;
+                        patd.last = 0;
+
+                        pattern.push_back(pat);
+                        pattern.push_back(patd);
+                        return 2;
+                    }
                 }
-                return 0;
+
+                pattern.push_back(pat);
+                return 1;
             } else
                 return -1;
-        } else if (last_layer == RTE_FLOW_ITEM_TYPE_UDP || last_layer == RTE_FLOW_ITEM_TYPE_TCP) {
-            if ((offset() - last_offset == 0 || offset() - last_offset == 2 ) && mask_size() == 2) {
+        } else {
+            click_chatter("%d offset",               offset() -last_offset);
+            rte_flow_item* udp = find_layer(pattern, RTE_FLOW_ITEM_TYPE_UDP);
+            rte_flow_item* tcp = find_layer(pattern, RTE_FLOW_ITEM_TYPE_TCP);
+            if ((udp || tcp)) {
+                click_chatter("Has UDP/TCP layer !");
+                if ((offset() - last_offset == 20 || offset() - last_offset == 22 ) && mask_size() == 2) {
                 click_chatter("UDP or TCP ports");
-                pat.type = last_layer;
+                rte_flow_item* pat;
+                if (udp) {
+                    pat = udp;
+                } else {
+                    pat = tcp;
+                }
 
                 struct rte_flow_item_tcp* spec = (struct rte_flow_item_tcp*) malloc(sizeof(rte_flow_item_tcp));
                 struct rte_flow_item_tcp* mask = (struct rte_flow_item_tcp*) malloc(sizeof(rte_flow_item_tcp));
                 bzero(spec, sizeof(rte_flow_item_tcp));
                 bzero(mask, sizeof(rte_flow_item_tcp));
                 if (is_default) {
-                    pat.spec = 0;
-                    pat.mask = 0;
-                    click_chatter("Default ipv4");
+                    pat->spec = 0;
+                    pat->mask = 0;
+                    click_chatter("Default TCP or UDP");
                 } else {
-                    if (offset() - last_offset == 0) {
+                    if (offset() - last_offset == 20) {
                         spec->hdr.src_port = data.data_16;
                         mask->hdr.src_port = -1;
+                    } else {
+                        spec->hdr.dst_port = data.data_16;
+                        mask->hdr.dst_port = -1;
                     }
                     click_chatter("Port %d", data.data_16);
-                    pat.spec = spec;
-                    pat.mask = mask;
-                    pat.last = 0;
-                        click_chatter("Unimplemented next proto...");
-                        next_layer = RTE_FLOW_ITEM_TYPE_END;
-                        next_layer_offset = -1;
+                    pat->spec = spec;
+                    pat->mask = mask;
+                    pat->last = 0;
+
+                    click_chatter("Unimplemented next proto...");
+                    next_layer = RTE_FLOW_ITEM_TYPE_END;
+                    next_layer_offset = -1;
                 }
+
                 return 0;
-            } else
-                return -1;
+                }
+            }
+
+            rte_flow_item* ipv4 = find_layer(pattern, RTE_FLOW_ITEM_TYPE_IPV4);
+            if (ipv4) {
+                click_chatter("Has IPV4 layer !");
+                if ((offset() - last_offset == 12 || offset() - last_offset  == 16 ) && mask_size() == 4) {
+                    click_chatter("IPV4 IP");
+                    rte_flow_item_ipv4* spec;
+                    rte_flow_item_ipv4* mask;
+                    if (!ipv4->spec) {
+                        spec = (struct rte_flow_item_ipv4*) malloc(sizeof(rte_flow_item_ipv4));
+                        mask = (struct rte_flow_item_ipv4*) malloc(sizeof(rte_flow_item_ipv4));
+                        bzero(spec, sizeof(rte_flow_item_ipv4));
+                        bzero(mask, sizeof(rte_flow_item_ipv4));
+                        ipv4->spec = spec;
+                        ipv4->mask = mask;
+                    } else {
+                        spec = (rte_flow_item_ipv4*)ipv4->spec;
+                        mask = (rte_flow_item_ipv4*)ipv4->mask;
+                    }
+                    if (offset() - last_offset == 12) {
+                        spec->hdr.src_addr = data.data_32;
+                        mask->hdr.src_addr = -1;
+                    } else {
+                        spec->hdr.dst_addr = data.data_32;
+                        mask->hdr.dst_addr = -1;
+                    }
+                    next_layer_offset = last_offset;
+                    next_layer = last_layer;
+                    return 0;
+                }
+            }
         }
 
         return -1;

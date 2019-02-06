@@ -375,7 +375,6 @@ void FlowClassifier::cleanup(CleanupStage stage) {
     click_chatter("%p{element} Miss : %d",this,cache_miss);*/
 }
 
-#define USE_CACHE_RING 1
 
 bool FlowClassifier::run_idle_task(IdleTask*) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
@@ -446,151 +445,6 @@ inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
 
 }
 
-inline FlowControlBlock* FlowClassifier::set_fcb_cache(FlowCache* &c, Packet* &p, const uint32_t& agg) {
-    FlowControlBlock* fcb = _table.match(p);
-
-    if (*((uint32_t*)&(fcb->node_data[1])) == 0) {
-        *((uint32_t*)&(fcb->node_data[1])) = agg;
-        c->fcb = fcb;
-        c->agg = agg;
-    } else {
-//        click_chatter("FCB already in cache with different AGG %u<->%u FCB %p dynamic %d",agg,*((uint32_t*)&(fcb->node_data[1])),fcb, fcb->dynamic);
-    }
-    return fcb;
-}
-
-inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg) {
-
-    if (unlikely(agg == 0)) {
-        return _table.match(p);
-    }
-
-#if DEBUG_CLASSIFIER > 1
-    click_chatter("Aggregate %d",agg);
-#endif
-        FlowControlBlock* fcb = 0;
-        uint16_t hash = (agg ^ (agg >> 16)) & _cache_mask;
-#if USE_CACHE_RING
-        FlowCache* bucket = _cache.get() + ((uint32_t)hash * _cache_ring_size);
-#else
-        FlowCache* bucket = _cache.get() + hash;
-#endif
-        FlowCache* c = bucket;
-        int ic = 0;
-        do {
-            if (c->agg == 0) { //Empty slot
-    #if DEBUG_CLASSIFIER > 1
-                click_chatter("Cache miss !");
-    #endif
-                cache_miss++;
-                return set_fcb_cache(c,p,agg);
-            } else { //Non empty slot
-                if (likely(c->agg == agg)) { //Good agg
-                    if (likely(_collision_is_life || (c->fcb->parent && _table.reverse_match(c->fcb, p)))) {
-        #if DEBUG_CLASSIFIER > 1
-                        click_chatter("Cache hit");
-        #endif
-                        cache_hit++;
-                        fcb = c->fcb;
-                        return fcb;
-                        //OK
-                    } else { //The fcb for that agg does not match !
-
-                        cache_sharing++;
-                        fcb = _table.match(p);
-
-#if DEBUG_CLASSIFIER > 1 || DEBUG_FCB_CACHE
-
-                        click_chatter("Cache %d shared for agg %d : fcb %p %p!",hash,agg,fcb,c->fcb);
-                        flow_assert(fcb != c->fcb);
-                        //for (int i = 0; i < 10; i++)
-                            //click_chatter("%x",*(((uint32_t*)p->data()) + i));
-
-#endif
-                        return fcb;
-                        /*FlowControlBlock* firstfcb = fcb;
-                        int sechash = (agg >> 12) & 0xfff;
-                        fcb = _cache.get()[sechash + 4096];
-                        if (fcb && !fcb->released()) {
-                            if (_table.reverse_match(fcb, p)) {
-
-                            } else {
-                                click_chatter("Double collision for hash %d!",hash);
-                                fcb = _table.match(p);
-                                if (_cache.get()[hash]->lastseen < fcb->lastseen)
-                                    _cache.get()[hash] = fcb;
-                                else
-                                    _cache.get()[sechash] = fcb;
-                            }
-                        } else {
-                            fcb = _table.match(p);
-                            _cache.get()[sechash] = fcb;
-                        }*/
-                    }
-                } //Continue if bad agg
-            }
-#if !USE_CACHE_RING
-        } while (false);
-        fcb = _table.match(p);
-        if (fcb->dynamic > 1) {
-            click_chatter("ADDING A DYNAMIC TWICE");
-            table().get_root()->print();
-            assert(false);
-        }
-
-        return set_fcb_cache(c,p, agg);
-#else
-            c++;
-            ic++;
-        } while (ic < _cache_ring_size); //Try to put in the ring of the bucket
-
-        //Remove the oldest from the bucket
-        c = bucket;
-        FlowCache* oldest = c;
-        c++;
-        ic = 1;
-        int o = 0;
-        while (ic < _cache_ring_size) {
-            if (c->fcb->lastseen < oldest->fcb->lastseen) {
-                o = ic;
-                oldest = c;
-            }
-
-            c++;
-            ic++;
-        }
-        //click_chatter("Oldest is %d",o );
-        c = bucket;
-        if (o != 0) {
-            oldest->agg = c->agg;
-            oldest->fcb = c->fcb;
-        }
-
-        #if DEBUG_CLASSIFIER > 1
-        click_chatter("Cache miss with full ring !");
-        #endif
-        cache_miss++;
-        return set_fcb_cache(c,p, agg);
-#endif
-}
-
-inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, const Timestamp &now) {
-    if (_aggcache) {
-        uint32_t agg = AGGREGATE_ANNO(p);
-        if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p)))) {
-            if (_cache_size > 0)
-                fcb = get_cache_fcb(p,agg);
-            else
-                fcb = _table.match(p);
-            lastagg = agg;
-        }
-    }
-    else
-    {
-        fcb = _table.match(p);
-    }
-    return is_valid_fcb(p, last, next, fcb, now);
-}
 
 /**
  * Push batch simple simply classify packets and push a batch when a packet
@@ -627,26 +481,16 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
     flush_simple(last, awaiting_batch, count,  now);
 }
 
-
-
-#define RING_SIZE 16
-
 /**
  * Push_batch_builder use double connection to build a ring and process packets trying to reconcile flows more
  *
  */
 inline void FlowClassifier::push_batch_builder(int, PacketBatch* batch) {
     Packet* p = batch;
-    int curbatch = -1;
-    Packet* last = NULL;
     FlowControlBlock* fcb = 0;
-    FlowControlBlock* lastfcb = 0;
     uint32_t lastagg = 0;
-    int count = 0;
-
-    FlowBatch batches[RING_SIZE];
-    int head = 0;
-    int tail = 0;
+    Packet* last = 0;
+    Builder builder;
 
     Timestamp now = Timestamp::recent_steady();
     process:
@@ -662,96 +506,13 @@ inline void FlowClassifier::push_batch_builder(int, PacketBatch* batch) {
 
         if (!get_fcb_for(p,fcb,lastagg,last,next,now))
             continue;
-        if ((_nocut && lastfcb) || lastfcb == fcb) {
-            //Just continue as they are still linked
-        } else {
 
-                //Break the last flow
-                if (last) {
-                    last->set_next(0);
-                    batches[curbatch].batch->set_count(count);
-                    batches[curbatch].batch->set_tail(last);
-                }
-
-                //Find a potential match
-                for (int i = tail; i < head; i++) {
-                    if (batches[i % RING_SIZE].fcb == fcb) { //Flow already in list, append
-                        //click_chatter("Flow already in list");
-                        curbatch = i % RING_SIZE;
-                        count = batches[curbatch].batch->count();
-                        last = batches[curbatch].batch->tail();
-                        last->set_next(p);
-                        goto attach;
-                    }
-                }
-                //click_chatter("Unknown fcb %p, curbatch = %d",fcb,head);
-                curbatch = head % RING_SIZE;
-                head++;
-
-                if (tail % RING_SIZE == head % RING_SIZE) {
-                    auto &b = batches[tail % RING_SIZE];
-                    if (_verbose > 1) {
-                        click_chatter("WARNING (unoptimized) Ring full with batch of %d packets, processing now !", b.batch->count());
-                    }
-                    //Ring full, process batch NOW
-                    fcb_stack = b.fcb;
-#if HAVE_FLOW_DYNAMIC
-                    fcb_stack->acquire(b.batch->count());
-#endif
-                    fcb_stack->lastseen = now;
-                    //click_chatter("FPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-                    output_push_batch(0,b.batch);
-                    tail++;
-                }
-                //click_chatter("batches[%d].batch = %p",curbatch,batch);
-                //click_chatter("batches[%d].fcb = %p",curbatch,fcb);
-                batches[curbatch].batch = PacketBatch::start_head(p);
-                batches[curbatch].fcb = fcb;
-                count = 0;
-        }
-        attach:
-        count ++;
+        handle_builder(p, last, fcb, builder, now);
         last = p;
         p = next;
-        lastfcb = fcb;
     }
 
-
-    if (last) {
-        last->set_next(0);
-        batches[curbatch].batch->set_tail(last);
-        batches[curbatch].batch->set_count(count);
-    }
-
-    //click_chatter("%d batches :",head-tail);
-    for (int i = tail;i < head;i++) {
-        //click_chatter("[%d] %d packets for fcb %p",i,batches[i%RING_SIZE].batch->count(),batches[i%RING_SIZE].fcb);
-    }
-    for (;tail < head;) {
-        auto &b = batches[tail % RING_SIZE];
-        fcb_stack = b.fcb;
-
-#if HAVE_FLOW_DYNAMIC
-        fcb_stack->acquire(b.batch->count());
-#endif
-        fcb_stack->lastseen = now;
-        //click_chatter("EPush %d of %d packets",tail % RING_SIZE,batches[tail % RING_SIZE].batch->count());
-        output_push_batch(0,b.batch);
-
-        curbatch = -1;
-        lastfcb = 0;
-        count = 0;
-        lastagg = 0;
-
-        tail++;
-        if (tail == head) break;
-
-        if (input_is_pull(0) && ((batch = input_pull_batch(0,_pull_burst)) != 0)) { //If we can pull and it's not the last pull
-            //click_chatter("Pull continue because received %d ! tail %d, head %d",batch->count(),tail,head);
-            p = batch;
-            goto process;
-        }
-    }
+    flush_builder(last, builder, now);
     fcb_stack = 0;
     //click_chatter("End");
 
@@ -769,24 +530,7 @@ void FlowClassifier::push_batch(int, PacketBatch* batch) {
     else
         push_batch_simple(0,batch);
 
-    if (_do_release) {
-#if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-        auto &head = _table.old_flows.get();
-        if (head.count() > head._count_thresh) {
-#if DEBUG_CLASSIFIER_TIMEOUT > 0
-            click_chatter("%p{element} Forced release because %d is > than %d",this,head.count(), head._count_thresh);
-#endif
-            _table.check_release();
-            if (unlikely(head.count() < (head._count_thresh / 8) && head._count_thresh > FlowTableHolder::fcb_list::DEFAULT_THRESH)) {
-                head._count_thresh /= 2;
-            } else
-                head._count_thresh *= 2;
-#if DEBUG_CLASSIFIER_TIMEOUT > 0
-            click_chatter("%p{element} Forced release count %d thresh %d",this,head.count(), head._count_thresh);
-#endif
-        }
-#endif
-    }
+    check_release_flows();
     fcb_stack = tmp_stack;
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = tmp_table;

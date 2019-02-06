@@ -11,6 +11,7 @@ class FlowDPDKClassifier : public FlowClassifier { public:
 	~FlowDPDKClassifier() CLICK_COLD;
 
     const char *class_name() const		{ return "FlowDPDKClassifier"; }
+    void* cast(const char *n) override;
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh) CLICK_COLD;
@@ -19,9 +20,23 @@ class FlowDPDKClassifier : public FlowClassifier { public:
 private:
 
     void add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr);
-    int traverse_rules(FlowNode* node, Vector<rte_flow_item> &pattern, rte_flow_item_type last_layer, int offset);
+    int traverse_rules(FlowNode* node, Vector<rte_flow_item> pattern, rte_flow_item_type last_layer, int offset);
 
+protected:
     Vector<FlowNodePtr> _matches;
     FromDPDKDevice* _dev;
+};
+
+class FlowDPDKBuilderClassifier : public FlowDPDKClassifier { public:
+
+    FlowDPDKBuilderClassifier() CLICK_COLD;
+
+	~FlowDPDKBuilderClassifier() CLICK_COLD;
+
+    const char *class_name() const		{ return "FlowDPDKBuilderClassifier"; }
+    void* cast(const char *n) override;
+
+    void push_batch(int port, PacketBatch* batch) override;
+
 };
 #endif
