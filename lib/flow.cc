@@ -135,11 +135,13 @@ FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress ds
 }
 
 FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verbose, bool add_leaf) {
-    std::regex reg("((?:(?:(?:agg|thread|(?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?))(?:[:]HASH-[0-9]+|[:]ARRAY)?[!]?[ \t]*)+)|-)([ \t]+keep)?([ \t]+[0-9]+|[ \t]+drop)?",
+    String REG_IPV4 = "[0-9]{1,3}(?:[.][0-9]{1,3}){3}";
+    String REG_NET = REG_IPV4 + "/[0-9]+";
+    String REG_AL = "(?:[a-z]+|[0-9+])";
+    std::regex reg(("((?:(?:(?:agg|thread|(?:ip proto "+REG_AL+"|(?:src|dst) (?:host "+REG_IPV4+"|port "+REG_AL+"|net "+REG_NET+")|(?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?)))(?:[:]HASH-[0-9]+|[:]ARRAY)?[!]?(?:[ ]*&&[ ]*|[ \t]*))+)|-)([ \t]+keep)?([ \t]+[0-9]+|[ \t]+drop)?").c_str(),
              std::regex_constants::icase);
-    std::regex classreg("thread|agg|(ip[+])?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?([:]HASH-[0-9]+|[:]ARRAY)?([!])?",
+    std::regex classreg(("thread|agg|(?:(ip) (proto) ([a-z]+|[0-9]+)|(src|dst) (?:(host) ("+REG_IPV4+")|(net) ("+REG_NET+"))|(ip[+])?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?)([:]HASH-[0-9]+|[:]ARRAY)?([!])?").c_str(),
                  std::regex_constants::icase);
-
     FlowNode* root = 0;
 
     FlowNodePtr* parent_ptr = 0;
@@ -179,13 +181,14 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
             {
                 if (verbose)
                     click_chatter("Class : %s",it->str(0).c_str());
-                std::string layer = it->str(1);
-                std::string offset = it->str(2);
-                std::string value = it->str(3);
-                std::string mask = it->str(4);
-                std::string hint = it->str(5);
-                std::string important = it->str(6);
 
+                int manoffset = 8;
+                std::string layer = it->str(1 + manoffset);
+                std::string offset = it->str(2 + manoffset);
+                std::string value = it->str(3 + manoffset);
+                std::string mask = it->str(4 + manoffset);
+                std::string hint = it->str(5 + manoffset);
+                std::string important = it->str(6 + manoffset);
 
                 if (verbose)
                     click_chatter("o : %s, v : %s, m : %s",offset.c_str(),value.c_str(), mask.c_str());
@@ -210,52 +213,92 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                     click_chatter("THREAD");
                     dynamic = true;
                 } else  {
-
                     unsigned long maskv = 0xffffffff;
-                    valuev = 0xffffffff;
-                    if (value != "" && value != "-") {
-                        valuev = std::stoul(value,nullptr,16);
-                        if (value.length() <= 2) {
+                    int offset_v = 0;
+                    if (it->str(1) == "ip") {
+                        if (it->str(2) != "proto") {
 
-                        } else if (value.length() <= 4) {
-                            valuev = htons(valuev);
-                        } else if (value.length() <= 8) {
-                            valuev = htonl(valuev);
+                            click_chatter("UNIMPLEMENTED IP");
+                            abort();
                         } else {
-                            valuev = __bswap_64(valuev);
-                        }
-                    }
-                    if (verbose)
-                        click_chatter("Mask is '%s'",mask.c_str());
-                    if (mask != "")
-                        maskv = std::stoul(mask,nullptr,16);
-                    else
-                        maskv = (1ul << value.length() * 4) - 1;
+                            offset_v = 9;
+                            maskv = UINT8_MAX;
+                            valuev = 0;
+                            if (it->str(3) == "tcp")
+                                valuev = 6;
+                            else if (it->str(3) == "udp")
+                                valuev = 17;
+                            else if (it->str(3) == "icmp")
+                                valuev = 1;
+                            else {
+                                valuev = strtol(it->str(3).c_str(),NULL,10);
+                            }
+                            if (valuev == 0) {
+                                click_chatter("Could not parse %s", it->str(3).c_str());
+                                abort();
+                            }
 
+                        }
+                    } else if (it->str(4) != "") {
+                        maskv = UINT32_MAX;
+                        if (it->str(4) == "src") {
+                            offset_v = 12;
+                        } else {
+                            offset_v = 16;
+                        }
+                        if (it->str(5) == "host") {
+                            IPAddress ip(it->str(6).c_str());
+                            valuev = ip.addr();
+                        } else {
+                            click_chatter("UNIMPLEMENTED net");
+                            abort();
+                        }
+
+                    } else {
+                        if (value != "" && value != "-") {
+                            valuev = std::stoul(value,nullptr,16);
+                            if (value.length() <= 2) {
+
+                            } else if (value.length() <= 4) {
+                                valuev = htons(valuev);
+                            } else if (value.length() <= 8) {
+                                valuev = htonl(valuev);
+                            } else {
+                                valuev = __bswap_64(valuev);
+                            }
+                        }
+                        if (verbose)
+                            click_chatter("Mask is '%s'",mask.c_str());
+                        if (mask != "")
+                            maskv = std::stoul(mask,nullptr,16);
+                        else
+                            maskv = (1ul << value.length() * 4) - 1;
+                        offset_v = std::stoul(offset);
+                    }
                     //TODO error for > 64
 
                     if (maskv <= UINT8_MAX){
                         FlowLevelGeneric8* fl = new FlowLevelGeneric8();
-                        fl->set_match(std::stoul(offset),maskv);
+                        fl->set_match(offset_v,maskv);
                         if (verbose)
                             click_chatter("HASH8 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
                         f = fl;
                     } else if (maskv <= UINT16_MAX){
                         FlowLevelGeneric16* fl = new FlowLevelGeneric16();
-                        fl->set_match(std::stoul(offset),maskv);
+                        fl->set_match(offset_v,maskv);
                         if (verbose)
                             click_chatter("HASH16 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
                         f = fl;
                     } else if (maskv <= UINT32_MAX){
                         FlowLevelGeneric32* fl = new FlowLevelGeneric32();
-                        fl->set_match(std::stoul(offset),maskv);
+                        fl->set_match(offset_v,maskv);
                         if (verbose)
                             click_chatter("HASH32 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
                         f = fl;
 #if HAVE_LONG_CLASSIFICATION
                     } else {
                         FlowLevelGeneric64* fl = new FlowLevelGeneric64();
-                        fl->set_match(std::stoul(offset),maskv);
+                        fl->set_match(offset_v,maskv);
                         if (verbose)
                             click_chatter("HASH64 Offset : %d, mask : 0x%lx",fl->offset(),fl->mask());
                         f = fl;
@@ -265,6 +308,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                         assert(false);
                     }
 #endif
+
                     if (maskv & valuev == 0)
                         dynamic = true;
                 }
