@@ -34,7 +34,7 @@ public:
     inline FlowControlBlock* match(Packet* p) {
         return match(p, _root);
     }
-    inline bool reverse_match(FlowControlBlock* sfcb, Packet* p);
+    inline bool reverse_match(FlowControlBlock* sfcb, Packet* p, FlowNode* root);
 
     typedef struct {
         FlowNode* root;
@@ -62,13 +62,13 @@ protected:
  * Check that a SFCB match correspond to a packet
  * @assert the FCB does not follow any default rule
  */
-bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
+bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p, FlowNode* root) {
     FlowNode* parent = (FlowNode*)sfcb->parent;
 #if DEBUG_CLASSIFIER
-    if (parent != _root && (!parent || !_root->find_node(parent))) {
+    if (parent != root && (!parent || !root->find_node(parent))) {
         click_chatter("GOING TO CRASH WHILE MATCHING fcb %p, with parent %p", sfcb, parent);
-        click_chatter("Parent exists : %d",_root->find_node(parent));
-        _root->print();
+        click_chatter("Parent exists : %d",root->find_node(parent));
+        root->print();
         sfcb->reverse_print();
         assert(false);
     }
@@ -84,7 +84,7 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p) {
 #endif
     }
 
-    while (parent != _root) {
+    while (parent != root) {
         FlowNode* child = parent;
         parent = parent->parent();
         flow_assert(parent);

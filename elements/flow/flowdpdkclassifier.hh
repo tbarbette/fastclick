@@ -34,7 +34,18 @@ class FlowDPDKBuilderClassifier : public FlowDPDKClassifier { public:
 	~FlowDPDKBuilderClassifier() CLICK_COLD;
 
     const char *class_name() const		{ return "FlowDPDKBuilderClassifier"; }
-    void* cast(const char *n) override;
+
+    void push_batch(int port, PacketBatch* batch) override;
+
+};
+
+class FlowDPDKCacheClassifier : public FlowDPDKClassifier { public:
+
+    FlowDPDKCacheClassifier() CLICK_COLD;
+
+	~FlowDPDKCacheClassifier() CLICK_COLD;
+
+    const char *class_name() const		{ return "FlowDPDKCacheClassifier"; }
 
     void push_batch(int port, PacketBatch* batch) override;
 

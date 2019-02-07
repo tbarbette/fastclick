@@ -43,6 +43,7 @@ protected:
     int _clean_timer;
     Timer _timer;
     bool _early_drop;
+    bool _optimize;
     FlowType _context;
 #if HAVE_FLOW_DYNAMIC
     static constexpr bool _do_release = true;
@@ -155,7 +156,7 @@ inline FlowControlBlock* FlowClassifier::set_fcb_cache(FlowCache* &c, Packet* &p
 inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, const Timestamp &now) {
     if (_aggcache) {
         uint32_t agg = AGGREGATE_ANNO(p);
-        if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p)))) {
+        if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p, _table.get_root())))) {
             if (_cache_size > 0)
                 fcb = get_cache_fcb(p,agg,_table.get_root());
             else
@@ -421,7 +422,7 @@ inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg, 
                 return set_fcb_cache(c,p,agg);
             } else { //Non empty slot
                 if (likely(c->agg == agg)) { //Good agg
-                    if (likely(_collision_is_life || (c->fcb->parent && _table.reverse_match(c->fcb, p)))) {
+                    if (likely(_collision_is_life || (c->fcb->parent && _table.reverse_match(c->fcb, p, _table.get_root())))) {
         #if DEBUG_CLASSIFIER > 1
                         click_chatter("Cache hit");
         #endif

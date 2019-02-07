@@ -17,7 +17,7 @@
 CLICK_DECLS
 
 FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true),
-    _ordered(true),_nocut(false) {
+    _ordered(true),_nocut(false), _optimize(true) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
@@ -55,6 +55,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("EARLYDROP",_early_drop)
             .read("ORDERED", _ordered) //Enforce FCB order of access
             .read("NOCUT", _nocut)
+            .read("OPTIMIZE", _optimize)
             .complete() < 0)
         return -1;
 
@@ -234,7 +235,11 @@ int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
         click_chatter("Table of %s before optimization :",name().c_str());
         table->print(-1,false);
     }
-    _table.set_root(table->optimize(passing.weight() <= 1));
+    if (_optimize) {
+        _table.set_root(table->optimize(passing.weight() <= 1));
+    } else {
+        _table.set_root(table);
+    }
     _table.get_root()->check();
     if (_verbose) {
         click_chatter("Table of %s after optimization :",name().c_str());

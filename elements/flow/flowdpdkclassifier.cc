@@ -9,7 +9,7 @@ CLICK_DECLS
 
 
 FlowDPDKClassifier::FlowDPDKClassifier() {
-
+    _builder = false;
 }
 
 FlowDPDKClassifier::~FlowDPDKClassifier() {
@@ -197,6 +197,18 @@ int FlowDPDKClassifier::initialize(ErrorHandler *errh) {
     if (_replace_leafs(errh) != 0)
         return -1;
 
+    if (!_builder && cast("FlowDPDKBuilderClassifier"))
+        return errh->error("This class is hardcoded to use builder. Use FlowDPDKClassifier or a variant to disable builder.");
+    if (_builder && !cast("FlowDPDKBuilderClassifier"))
+        return errh->error("This class is hardcoded to not use builder. Use FlowDPDKBuilderClassifier");
+    if (_aggcache && !cast("FlowDPDKCacheClassifier"))
+        return errh->error("This class is hardcoded to not use cache. Use FlowDPDKCacheClassifier");
+    if (!_aggcache && cast("FlowDPDKCacheClassifier"))
+        return errh->error("This class is hardcoded to use cache. Use FlowDPDKClassifier or FlowDPDKBuilderClassifier to disable cache");
+
+    if (_aggcache && _cache_size == 0)
+        return errh->error("With a cache size of 0, AGG is actualy disabled...");
+
     Vector<rte_flow_item> pattern;
     traverse_rules(_table.get_root(), pattern, RTE_FLOW_ITEM_TYPE_RAW, 0);
 
@@ -211,7 +223,6 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
     fcb_table = &_table;
     Packet* last = 0;
     int count = 0;
-    uint32_t lastagg = 0;
     PacketBatch* awaiting_batch = 0;
     Timestamp now = Timestamp::recent_steady();
     Packet* p = batch;
@@ -224,30 +235,10 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
             int fid = mbuf->hash.fdir.hi;
             ptr = _matches[fid - 1];
             if (ptr.is_node()) {
-                if (_aggcache) {
-                    uint32_t agg = AGGREGATE_ANNO(p);
-                    if (!(lastagg == agg && ptr.leaf && likely(ptr.leaf->parent && _table.reverse_match(ptr.leaf,p)))) {
-                        if (likely(_cache_size > 0))
-                            ptr.leaf = get_cache_fcb(p,agg,ptr.node);
-                        else
-                            ptr.leaf = _table.match(p, ptr.node);
-                        lastagg = agg;
-                    }
-                } else
-                    ptr.leaf = _table.match(p, ptr.node);
+                ptr.leaf = _table.match(p, ptr.node);
             }
         } else {
-                if (_aggcache) {
-                    uint32_t agg = AGGREGATE_ANNO(p);
-                    if (!(lastagg == agg && ptr.leaf && likely(ptr.leaf->parent && _table.reverse_match(ptr.leaf,p)))) {
-                        if (likely(_cache_size > 0))
-                            ptr.leaf = get_cache_fcb(p,agg,_table.get_root());
-                        else
-                            ptr.leaf = _table.match(p, _table.get_root());
-                        lastagg = agg;
-                    }
-                } else
-                    ptr.leaf = _table.match(p);
+            ptr.leaf = _table.match(p);
         }
 
 
@@ -267,23 +258,79 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
     fcb_table = tmp_table;
 }
 
+FlowDPDKCacheClassifier::FlowDPDKCacheClassifier() {
+    _builder = false;
+    _aggcache = true;
+}
+
+FlowDPDKCacheClassifier::~FlowDPDKCacheClassifier() {
+
+}
+
+
+void FlowDPDKCacheClassifier::push_batch(int port, PacketBatch* batch) {
+    FlowControlBlock* tmp_stack = fcb_stack;
+    FlowTableHolder* tmp_table = fcb_table;
+
+    fcb_table = &_table;
+    Packet* last = 0;
+    int count = 0;
+    uint32_t lastagg = 0;
+    PacketBatch* awaiting_batch = 0;
+    Timestamp now = Timestamp::recent_steady();
+    Packet* p = batch;
+    FlowControlBlock* fcb = 0;
+    while (p != NULL) {
+
+        Packet* next = p->next();
+        rte_mbuf* mbuf = (rte_mbuf*)p->destructor_argument();
+        if (likely(mbuf->ol_flags & PKT_RX_FDIR_ID)) {
+            FlowNodePtr ptr;
+            int fid = mbuf->hash.fdir.hi;
+            ptr = _matches[fid - 1];
+            if (ptr.is_node()) {
+                uint32_t agg = AGGREGATE_ANNO(p);
+                if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p,ptr.node)))) {
+                    fcb = get_cache_fcb(p,agg,ptr.node);
+                    lastagg = agg;
+                }  //else fcb is still a valid pointer
+            } else {
+                fcb = ptr.leaf;
+            }
+        } else {
+            uint32_t agg = AGGREGATE_ANNO(p);
+            if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p,_table.get_root())))) {
+                fcb = get_cache_fcb(p,agg,_table.get_root());
+                lastagg = agg;
+            } //else fcb is still a valid pointer
+        }
+
+        if (!is_valid_fcb(p, last, next, fcb, now))
+            continue;
+
+        handle_simple(p, last, fcb, awaiting_batch, count, now);
+
+        last = p;
+        p = next;
+    }
+
+    flush_simple(last, awaiting_batch, count,  now);
+    check_release_flows();
+
+    fcb_stack = tmp_stack;
+    fcb_table = tmp_table;
+}
 
 FlowDPDKBuilderClassifier::FlowDPDKBuilderClassifier() {
-
+    _builder = true;
+    _aggcache = false;
 }
 
 FlowDPDKBuilderClassifier::~FlowDPDKBuilderClassifier() {
 
 }
 
-void *
-FlowDPDKBuilderClassifier::cast(const char *n)
-{
-    if (strcmp(n, "FlowClassifier") == 0)
-	return dynamic_cast<FlowClassifier *>(this);
-    else
-	return Element::cast(n);
-}
+
 
 void FlowDPDKBuilderClassifier::push_batch(int port, PacketBatch* batch) {
     FlowControlBlock* tmp_stack = fcb_stack;
@@ -332,4 +379,5 @@ CLICK_ENDDECLS
 
 EXPORT_ELEMENT(FlowDPDKClassifier)
 EXPORT_ELEMENT(FlowDPDKBuilderClassifier)
+EXPORT_ELEMENT(FlowDPDKCacheClassifier)
 ELEMENT_REQUIRES(FlowClassifier dpdk)
