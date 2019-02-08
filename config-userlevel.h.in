@@ -230,7 +230,7 @@
 #undef HAVE_FLOW_DYNAMIC
 
 /* Define if use atomic use count */
-#define FLOW_ATOMIC_USE_COUNT 1
+#undef FLOW_ATOMIC_USE_COUNT
 
 /* Define if flow nodes should be released. */
 #undef FLOW_KEEP_STRUCTURE
