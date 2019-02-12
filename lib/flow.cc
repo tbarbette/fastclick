@@ -944,7 +944,7 @@ FlowNodePtr FlowNode::prune(FlowLevel* olevel,FlowNodeData data, bool inverted, 
             if (this->level()->prune(olevel)) {
                 changed = true;
                 if (!this->level()->is_usefull()) {
-                    print();
+                    //print();
                     debug_flow("Not usefull anymore, returning default !");
                     assert(this->getNum() == 0);
                     changed= true;
@@ -1137,7 +1137,7 @@ bool FlowNodePtr::replace_leaf_with_node(FlowNode* other, bool discard) {
     bool was_default = old_parent->default_ptr()->ptr == leaf;
     while (gparent != NULL) {
         //If this level was a default level, we must remove all known values of this level from the child
-        if (was_default) {
+        if (was_default and !gparent->level()->is_dynamic()) {
             FlowNode::NodeIterator it = gparent->iterator();
             FlowNodePtr* cur;
             while ((cur = it.next()) != 0) {
@@ -1496,19 +1496,19 @@ bool operator==(const FlowControlBlockRef &ar, const FlowControlBlockRef &br) {
 
     FlowControlBlock &b = *br._ref;
     if (a.flags != b.flags) {
-        click_chatter("diff flags");
+        //click_chatter("diff flags");
         return false;
     }
 
     if (a.get_pool() != b.get_pool()) {
-        click_chatter("diff pool");
+        //click_chatter("diff pool");
         return false;
     }
 
     if (memcmp(&(a.node_data[1].data_32),&(b.node_data[1].data_32), a.get_pool()->data_size() - sizeof(FlowNodeData)) != 0) {
-        click_chatter("diff content %d", a.get_pool()->data_size());
+/*        click_chatter("diff content %d", a.get_pool()->data_size());
         a.print("");
-        b.print("");
+        b.print("");*/
         return false;
     }
     return true;
@@ -1522,7 +1522,7 @@ bool operator==(const FlowControlBlockRef &ar, const FlowControlBlockRef &br) {
 
 void FlowNodePtr::print(int data_offset) const{
 	if (is_leaf())
-		leaf->print("",data_offset);
+        leaf->print("",data_offset);
 	else
 		node->print(data_offset);
 }

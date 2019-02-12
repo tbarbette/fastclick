@@ -2,47 +2,53 @@
 click C
 
 %file C
-Idle -> a :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10) -> Discard; //Accept  0/10, else drop
-Idle -> b :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10,-) -> Discard; //Accept 0/10, else drop
-Idle -> c :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10,-)[0-1] => {[0] -> Discard; [1] -> Discard;}
+Idle -> a :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10) -> Discard; //Accept  0/10, else drop
+Idle -> b :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10,-) -> Discard; //Accept 0/10, else drop
+Idle -> c :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10,-)[0-1] => {[0] -> Discard; [1] -> Discard;}
 
-Idle -> d1 :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 0, 0/20 0, -) -> Discard;
-Idle -> d2 :: FlowClassifier(VERBOSE 1) -> FlowDispatcher(0/10 0, 0/20 0, - drop) -> Discard;
+Idle -> d1 :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10 0, 0/20 0, -) -> Discard;
+Idle -> d2 :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10 0, 0/20 0, - drop) -> Discard;
 
 Script(TYPE ACTIVE, stop);
 
 %expect stderr
 
+Placing  FlowDispatcher@3 :: FlowDispatcher at [4-7]
+Placing  FlowDispatcher@7 :: FlowDispatcher at [4-7]
+Placing  FlowDispatcher@11 :: FlowDispatcher at [4-7]
+Placing  FlowDispatcher@15 :: FlowDispatcher at [4-7]
+Placing  FlowDispatcher@19 :: FlowDispatcher at [4-7]
+
 Table of b after optimization :
 ---
 0/FF (TWOCASE, 1 childs)
-|-> 16 UC:1 ED:0 (data 100000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
 ---
 Table of d1 after optimization :
 ---
 0/FF (THREECASE, 2 childs)
-|-> 32 UC:1 ED:0 (data 200000000000000000000000)
-|-> 16 UC:1 ED:0 (data 100000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
+|-> 32 UC:1 ED:0 (data 2000000000000000)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
 ---
 Table of a after optimization :
 ---
 0/FF (TWOCASE, 1 childs)
-|-> 16 UC:1 ED:0 (data 100000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
 ---
 Table of d2 after optimization :
 ---
 0/FF (THREECASE, 2 childs)
-|-> 32 UC:1 ED:0 (data 200000000000000000000000)
-|-> 16 UC:1 ED:0 (data 100000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:1 (data 0000000000000000ffffffff)
+|-> 32 UC:1 ED:0 (data 2000000000000000)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:1 (data 00000000ffffffff)
 ---
 Table of c after optimization :
 ---
 0/FF (TWOCASE, 1 childs)
-|-> 16 UC:1 ED:0 (data 100000000000000000000000)
-|-> DEFAULT 0 UC:1 ED:0 (data 000000000000000001000000)
+|-> 16 UC:1 ED:0 (data 1000000000000000)
+|-> DEFAULT 0 UC:1 ED:0 (data 0000000001000000)
 ---
 

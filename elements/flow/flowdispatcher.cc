@@ -166,7 +166,6 @@ FlowNode* FlowDispatcher::get_table(int, Vector<FlowElement*> context) {
                 bool changed = false;
                 if (child_table) {
                     child_table->check();
-                    click_chatter("flat combine");
                     rules[i].root = rules[i].root->combine(child_table, true, true, true);
                 } else {
                     //Just keep the root

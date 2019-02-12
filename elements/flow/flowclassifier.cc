@@ -266,9 +266,11 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
             nfcb = it->second;
             if (ptr->parent()->default_ptr()->leaf != ptr->leaf && !nfcb->get_data().equals(ptr->leaf->get_data())) {
                 //The data is not the same, we need to change the FCB by a classification node with the right data
-                click_chatter("Need a new node to keep data");
-                ptr->leaf->print("");
-                nfcb->print("");
+                if (_verbose > 1) {
+                    click_chatter("Need a new node to keep data");
+                    ptr->leaf->print("");
+                    nfcb->print("");
+                }
                 FlowNode* n = new FlowNodeDummy();
                 n->set_parent(ptr->parent());
                 n->set_level(new FlowLevelDummy());
@@ -298,7 +300,7 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
         ptr->set_leaf(nfcb);
     }, true, true);
 
-    if (_verbose) {
+    if (_verbose > 1) {
         click_chatter("Table of %s after replacing nodes :",name().c_str());
         _table.get_root()->print(-1,false);
     }
@@ -313,9 +315,11 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
             }
             return true;
     });
+#if HAVE_VERBOSE_BATCH
     if (!have_dynamic && _do_release) {
         click_chatter("FlowClassifier is fully static, disabling release, consider compiling with --disable-dynamic-flow");
     }
+#endif
 
 #ifndef HAVE_FLOW_DYNAMIC
     if (have_dynamic) {
@@ -611,7 +615,7 @@ class ElementDistanceCastTracker : public RouterVisitor { public:
            Element *from_e, int from_port, int distance);
     int distance(Element *e, Element *from_e) {
         if (from_e && from_e->cast("VirtualFlowSpaceElement")) {
-           click_chatter("Distance to VFSE %p{element}: ",e, dynamic_cast<VirtualFlowSpaceElement*>(from_e)->flow_data_size());
+           //click_chatter("Distance to VFSE %p{element}: %d",e, distance);
            return dynamic_cast<VirtualFlowSpaceElement*>(from_e)->flow_data_size();
         }
         return 0;
@@ -706,7 +710,7 @@ FlowClassifier::build_fcb() {
     ElementDistanceCastTracker reachables(router(),false);
     router()->visit(this, true, -1, &reachables);
 
-    if (_size_verbose > 0) {
+    if (_size_verbose > 1) {
         click_chatter("Reachable VirtualFlowSpaceElement element list :");
         for (int i = 0; i < reachables.elements().size(); i++) {
             click_chatter("Reachable from %p{element} : %p{element}, max offset %d",this,reachables.elements()[i].first,reachables.elements()[i].second);
@@ -717,8 +721,8 @@ FlowClassifier::build_fcb() {
     _classifiers.push_back(this);
     //If last of the classifiers
     if (_classifiers.size() == _n_classifiers) {
-        if (_size_verbose > 0)
-            click_chatter("Last classifier");
+        if (_size_verbose > 1)
+            click_chatter("Last classifier, here is the final table:");
 
         typedef Pair<int,int> CountDistancePair;
         HashTable<int,CountDistancePair> common(CountDistancePair{0,INT_MAX});
@@ -773,7 +777,8 @@ FlowClassifier::build_fcb() {
             }
 
             while (v.range(my_place,e->flow_data_size())) {
-                my_place++;
+                assert(false);
+                //my_place++;
             }
 
             if (_size_verbose > 0)
