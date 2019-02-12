@@ -27,8 +27,8 @@ class MoveData : public BatchElement { public:
 #endif
   private:
 
-    unsigned _src_offset;
-    unsigned _dst_offset;
+    int _src_offset;
+    int _dst_offset;
     unsigned _length;
     bool _grow;
 

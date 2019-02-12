@@ -52,7 +52,7 @@ MoveData::simple_action(Packet *p)
         return p;
     }
     else if (WritablePacket *q = p->uniqueify()) {
-        if (_dst_offset + _length > q->length()) {
+        if (_dst_offset + (int)_length > (int)q->length()) {
             if (_grow)
                 q = q->put(_dst_offset + _length - q->length());
             else
