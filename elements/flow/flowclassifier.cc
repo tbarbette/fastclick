@@ -249,6 +249,10 @@ int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
     return 0;
 }
 
+/**
+ * Replace all leafs of the tree by the final pool-alocated ones.
+ * During initialization leafs have a double size to note which field are initialized.
+ */
 int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
     //Replace FCBs by the final run-time ones
     //Also have common static FCBs
@@ -328,6 +332,9 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
     return 0;
 }
 
+/**
+ * Initialize timeout timers
+ */
 int FlowClassifier::_initialize_timers(ErrorHandler *errh) {
     if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
@@ -400,6 +407,7 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
 
 /**
  * Testing function
+ * Search a FCB in the cache, linearly
  */
 inline int FlowClassifier::cache_find(FlowControlBlock* fcb) {
     if (!_aggcache)
@@ -417,6 +425,9 @@ inline int FlowClassifier::cache_find(FlowControlBlock* fcb) {
     return n;
 }
 
+/**
+ * Remove a FCB from the cache
+ */
 inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
     uint32_t agg = *((uint32_t*)&(fcb->node_data[1]));
     if (agg == 0)
@@ -686,6 +697,9 @@ bool cmp(el a, el b) {
     return a.count > b.count || (a.count==b.count &&  a.distance < b.distance);
 }
 
+/**
+ * This function builds the layout of the FCB by going through the graph
+ */
 void
 FlowClassifier::build_fcb() {
     //Find list of reachable elements
@@ -710,7 +724,7 @@ FlowClassifier::build_fcb() {
         HashTable<int,CountDistancePair> common(CountDistancePair{0,INT_MAX});
         int min_place = 0;
 
-        //Counting elements that appear multiple times and their minimal distance
+        //Counting elements that appear multiple times and their maximal distance
         for (int i = 0; i < _classifiers.size(); i++) {
             FlowClassifier* fc = dynamic_cast<FlowClassifier*>(_classifiers[i]);
             if (fc->_reserve > min_place)
@@ -734,7 +748,7 @@ FlowClassifier::build_fcb() {
             elements.push_back(el{it->first,it->second.first, it->second.second});
         }
 
-        //Sorting the element, so we place shared first
+        //Sorting the element, so we place the most shared first, then the maximal distance first
         std::sort(elements.begin(), elements.end(),cmp);
 
         //We now place all elements
