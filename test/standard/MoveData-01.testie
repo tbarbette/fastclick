@@ -1,0 +1,25 @@
+%info
+Test that MoveData works correctly.
+
+%script
+click CONFIG
+
+%file CONFIG
+RatedSource(DATA "ABCD", LIMIT 1, STOP true)
+-> Print(CONTENTS ascii)
+-> MoveData(SRC_OFFSET 0, DST_OFFSET 2, LENGTH 2)
+-> Print(CONTENTS ascii)
+-> MoveData(SRC_OFFSET 1, DST_OFFSET 4, LENGTH 2, GROW true)
+-> Print(CONTENTS ascii)
+-> MoveData(SRC_OFFSET 1, DST_OFFSET 6, LENGTH 2, GROW false)
+-> Print(CONTENTS ascii)
+-> MoveData(SRC_OFFSET 60, DST_OFFSET 0, LENGTH 2, GROW true)
+-> Print(CONTENTS ascii)
+-> Discard();
+
+%expect stderr
+   4 |  ABCD
+   4 |  ABAB
+   6 |  ABABBA
+   6 |  ABABBA
+   6 |  ABABBA

@@ -39,9 +39,11 @@ Unqueue::configure(Vector<String> &conf, ErrorHandler *errh)
     _burst = 1;
     _limit = -1;
     _active = true;
+    _enable_signal = true;
     return Args(conf, this, errh)
 	.read_p("BURST", _burst)
 	.read("ACTIVE", _active)
+	.read("SIGNAL", _enable_signal)
 	.read("LIMIT", _limit).complete();
 }
 
@@ -50,7 +52,8 @@ Unqueue::initialize(ErrorHandler *errh)
 {
     _count = 0;
     ScheduleInfo::initialize_task(this, &_task, _active, errh);
-    _signal = Notifier::upstream_empty_signal(this, 0, &_task);
+    if (_enable_signal)
+        _signal = Notifier::upstream_empty_signal(this, 0, &_task);
     if (_burst < 0)
 	_burst = 0x7FFFFFFFU;
     else if (_burst == 0)
