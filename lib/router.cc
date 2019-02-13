@@ -917,7 +917,7 @@ Router::set_flow_code_override(int eindex, const String &flow_code)
  */
 int
 Router::visit(Element *first_element, bool forward, int first_port,
-              RouterVisitor *visitor) const
+              RouterVisitor *visitor, bool all_paths) const
 {
     if (!_have_connections || first_element->router() != this)
         return -1;
@@ -952,7 +952,7 @@ Router::visit(Element *first_element, bool forward, int first_port,
                     break;
                 Port connpt = _conn[ci][!forward];
                 int conng = gport(!forward, connpt);
-                if (result_bv[conng])
+                if (!all_paths && result_bv[conng])
                     continue;
                 result_bv[conng] = true;
                 int distance = spd->second + visitor->distance(_elements[connpt.idx], _elements[sp->idx]);
@@ -1075,7 +1075,6 @@ Router::visit_ports(Element *first_element, bool forward, int first_port,
 
     return 0;
 }
-
 
 namespace {
 class ElementFilterRouterVisitor : public RouterVisitor { public:

@@ -58,8 +58,11 @@ class Router { public:
     Element* find(const String& name, const Element* context, ErrorHandler* errh = 0) const;
 
     bool element_can_reach(Element* a, Element* b);
-    int visit(Element *e, bool isoutput, int port, RouterVisitor *visitor) const;
+    int visit(Element *e, bool isoutput, int port, RouterVisitor *visitor, bool all_paths = false) const;
     int visit_ports(Element *e, bool isoutput, int port, RouterVisitor *visitor) const;
+    int visit_paths(Element *e, bool isoutput, int port, RouterVisitor *visitor) const {
+        visit(e, isoutput, port, visitor, true);
+    }
     int visit_downstream(Element *e, int port, RouterVisitor *visitor) const;
     int visit_upstream(Element *e, int port, RouterVisitor *visitor) const;
 

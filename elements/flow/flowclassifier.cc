@@ -708,7 +708,7 @@ void
 FlowClassifier::build_fcb() {
     //Find list of reachable elements
     ElementDistanceCastTracker reachables(router(),false);
-    router()->visit(this, true, -1, &reachables);
+    router()->visit_paths(this, true, -1, &reachables);
 
     if (_size_verbose > 1) {
         click_chatter("Reachable VirtualFlowSpaceElement element list :");
@@ -748,23 +748,28 @@ FlowClassifier::build_fcb() {
         //Placing elements in a vector to sort them
         Vector<el> elements;
         for (auto it = common.begin(); it != common.end(); it++) {
-            //click_chatter("%p{element} -> %d,%d ",router()->element(it->first),it->second.first,it->second.second);
             elements.push_back(el{it->first,it->second.first, it->second.second});
         }
 
-        //Sorting the element, so we place the most shared first, then the maximal distance first
+        //Sorting the element, so we place the most shared first, then the minimal distance first. With the current version of the algo, this is not needed anymore
         std::sort(elements.begin(), elements.end(),cmp);
 
         //We now place all elements
         std::set<int> already_placed;
         for (auto it = elements.begin(); it != elements.end(); it++) {
             VirtualFlowSpaceElement* e = dynamic_cast<VirtualFlowSpaceElement*>(router()->element(it->id));
+            if (_size_verbose > 1)
+                click_chatter("Placing %p{element} : in %d sets, distance %d", e, it->count, it->distance);
             int my_place;
             if (_ordered)
                 my_place = min_place + it->distance;
             else
                 my_place = min_place;
             Bitvector v(false);
+
+            /**
+             * THe followoing is for verification purpose
+             */
             //For each already placed element that are reachable from this one, we set the assigned bits in the vector
             for (auto ai = already_placed.begin(); ai != already_placed.end(); ai++) {
                 int aid = *ai;
@@ -773,12 +778,12 @@ FlowClassifier::build_fcb() {
                     if (v.size() < ae->flow_data_offset() + ae->flow_data_size())
                         v.resize(ae->flow_data_offset() + ae->flow_data_size());
                     v.set_range(ae->flow_data_offset(), ae->flow_data_size(), true);
-                }
-            }
+                    if (!(ae->flow_data_offset() + ae->flow_data_size() <= my_place || ae->flow_data_offset() > my_place + e->flow_data_size())) {
+                        click_chatter("FATAL ERROR : Cannot place  %p{element} at [%d-%d] because it collides with %p{element}",e,my_place,my_place + e->flow_data_size() -1, ae);
+                        assert(false);
+                    }
 
-            while (v.range(my_place,e->flow_data_size())) {
-                assert(false);
-                //my_place++;
+                }
             }
 
             if (_size_verbose > 0)
