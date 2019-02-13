@@ -177,7 +177,8 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             tcp_seq_t seq = getSequenceNumber(p);
             tcp_seq_t ack = getAckNumber(p);
             uint16_t winSize = getWindowSize(p);
-            fcb_in->common->lock.acquire();
+            //No need to lock, this is our side
+            //fcb_in->common->lock.acquire();
 
             // Update the last sequence number seen
             // This number is used when crafting ACKs
@@ -192,7 +193,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             {
                 byteStreamMaintainer.setLastAckSent(ack);
             }
-            fcb_in->common->lock.release();
+            //fcb_in->common->lock.release();
 
             if (!_readonly) {
                 // Recompute the checksum
