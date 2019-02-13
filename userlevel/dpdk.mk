@@ -380,6 +380,9 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ 
 endif
 	touch $(PARSE_PATH)/.sentinel
 
+
+.NOTPARALLEL: ${PARSE_PATH}.sentinel
+
 test-pmd/%.o: ${PARSE_PATH}.sentinel
 	cp -u $(RTE_SDK)/app/test-pmd/$*.c $(PARSE_PATH)
 	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
