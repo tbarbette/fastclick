@@ -778,13 +778,18 @@ FlowClassifier::build_fcb() {
                     if (v.size() < ae->flow_data_offset() + ae->flow_data_size())
                         v.resize(ae->flow_data_offset() + ae->flow_data_size());
                     v.set_range(ae->flow_data_offset(), ae->flow_data_size(), true);
-                    if (!(ae->flow_data_offset() + ae->flow_data_size() <= my_place || ae->flow_data_offset() > my_place + e->flow_data_size())) {
+                    if (_ordered && !(ae->flow_data_offset() + ae->flow_data_size() <= my_place || ae->flow_data_offset() > my_place + e->flow_data_size())) {
                         click_chatter("FATAL ERROR : Cannot place  %p{element} at [%d-%d] because it collides with %p{element}",e,my_place,my_place + e->flow_data_size() -1, ae);
                         assert(false);
                     }
 
                 }
             }
+
+            while (!_ordered && v.range(my_place,e->flow_data_size())) {
+                my_place++;
+            }
+
 
             if (_size_verbose > 0)
                 click_chatter("Placing  %p{element} at [%d-%d]",e,my_place,my_place + e->flow_data_size() -1 );
