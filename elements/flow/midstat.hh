@@ -31,7 +31,11 @@ MidStat([CLOSECONNECTION])
 
 =s middlebox
 
+Count the number of bytes and packets in sessions.
 
+This element is not context aware. So it would count dups etc. FlowCounter is.
+
+=a FlowCounter
  */
 
 
