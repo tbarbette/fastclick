@@ -819,7 +819,7 @@ WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
 
 void TCPIn::requestMorePackets(Packet *packet, bool force)
 {
-    click_chatter("TCP requestMorePackets");
+    //click_chatter("TCP requestMorePackets");
     ackPacket(packet, force);
 
     // Continue in the stack function

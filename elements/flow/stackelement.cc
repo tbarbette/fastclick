@@ -247,7 +247,7 @@ WritablePacket* StackElement::insertBytes(WritablePacket* packet,
 
 void StackElement::requestMorePackets(Packet *packet, bool force)
 {
-    click_chatter("%p{element} : requestMorePackets", previousStackElement);
+    //click_chatter("%p{element} : requestMorePackets", previousStackElement);
 
     // Call the "requestMorePackets" method on every element in the stack
     if(previousStackElement == NULL)
