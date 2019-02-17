@@ -34,7 +34,7 @@ SimpleTCPRetransmitter::cast(const char * name) {
 int SimpleTCPRetransmitter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
-            .read("PROACK",_proack)
+            .read("PROACK", _proack)
             .read("VERBOSE", _verbose)
             .read("READONLY", _readonly)
             .complete() < 0)
