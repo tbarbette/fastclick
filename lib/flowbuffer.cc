@@ -402,7 +402,7 @@ int FlowBuffer::replaceInFlow(FlowBufferContentIter iter, const int pattern_leng
 
     // We compute the difference between the size of the previous content and the new one
     long offset = toReplace - pattern_length;
-    click_chatter("Offset %d %d", offset,toReplace);
+    //click_chatter("Offset %d %d", offset,toReplace);
     // Replace pattern by "replacement" until we reach the end of one of the two strings
     for(int i = 0; i < toReplace; ++i)
     {
