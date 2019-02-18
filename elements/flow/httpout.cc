@@ -71,7 +71,7 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                 // Check if we have the whole content in the buffer
                 if(isLastUsefulPacket(packet))
                 {
-                    click_chatter("Last usefull, flushing !");
+                        //click_chatter("Last usefull, flushing !");
                     // Compute the new Content-Length
                     FlowBufferIter it = flowBuffer.begin();
 

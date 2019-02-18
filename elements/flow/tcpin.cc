@@ -451,7 +451,7 @@ eagain:
             if(isSyn(p))
             {
                 if (fcb_in->common->state == TCPState::CLOSED) {
-                    click_chatter("Renewing !");
+                    //click_chatter("Renewing !");
                     SFCB_STACK(
                     release_tcp_internal(fcb_save);
                     );
