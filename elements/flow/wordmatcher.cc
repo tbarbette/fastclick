@@ -134,32 +134,32 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
             int result;
             do {
                 //iter = WordMatcher->flowBuffer.search(iter, insult, &result);
-                iter = WordMatcher->flowBuffer.searchSSE(iter, insult, insults[i].length(), &result);
+                int l = insults[i].length();
+                iter = WordMatcher->flowBuffer.searchSSE(iter, insult, l, &result);
+                click_chatter("Result %d", result);
                 if (result == 1) {
                     if (_mode == REMOVE) {
-                        WordMatcher->flowBuffer.remove(iter,insults[i].length(), this);
+                        WordMatcher->flowBuffer.remove(iter, l, this);
                         while (iter.leftInChunk() == 0 && iter)
                             iter.moveToNextChunk();
                     } else if (_mode == MASK) {
-                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), "*", 1, true, this);
+                        WordMatcher->flowBuffer.replaceInFlow(iter, l, "*", 1, true, this);
                     } else if (_mode == REPLACE) {
-                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), insults[i].length(), false, this);
+                        WordMatcher->flowBuffer.replaceInFlow(iter, l, _insert_msg.c_str(), insults[i].length(), false, this);
                     } else if (_mode == FULL) {
-                        WordMatcher->flowBuffer.replaceInFlow(iter, insults[i].length(), _insert_msg.c_str(), _insert_msg.length(), false, this);
+                        WordMatcher->flowBuffer.replaceInFlow(iter, l, _insert_msg.c_str(), _insert_msg.length(), false, this);
                     } else if (_mode == CLOSE) {
                         goto closeconn; 
-                    } else { //Alert
+                    } else { //_mode == ALERT
                         if (!_quiet)
                             click_chatter("Attack found !");
+                        if (_all)
+                            iter += l;
                     }
 
                     WordMatcher->counterRemoved += 1;
                 }
-
-                if (!_all)
-                    break;
-
-            } while (result == 1 && iter.leftInChunk());
+            } while (result == 1 && iter.leftInChunk() && _all);
             // While we keep finding complete insults in the packet
             if (result == 0) { //Finished in the middle of a potential match
                 if(!isLastUsefulPacket(flow->tail())) {

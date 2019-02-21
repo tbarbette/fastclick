@@ -478,7 +478,56 @@ eagain:
                 }
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now before the GT check for the OPEN state
                 fcb_in->common->state = TCPState::OPEN;
+            } else if (fcb_in->common->state == TCPState::BEING_CLOSED_ARTIFICIALLY_2 && isFin(p)) {
+                if (unlikely(_verbose)) {
+                    click_chatter("Processing last artificial fin");
+                }
+                WritablePacket* packet = p->uniqueify();
+
+                tcp_seq_t ackNumber = getAckNumber(packet);
+                tcp_seq_t seqNumber = getSequenceNumber(packet);
+
+                {
+                    //First, respond an ACK to the sender
+                    uint32_t saddr = getDestinationAddress(packet);
+                    uint32_t daddr = getSourceAddress(packet);
+                    uint16_t sport = getDestinationPort(packet);
+                    uint16_t dport = getSourcePort(packet);
+
+                    // The ACK is the sequence number sent by the source
+                    // to which we add the size of the payload in order to acknowledge it
+                    tcp_seq_t ackOf = getSequenceNumber(packet) + getPayloadLength(packet) + 1;
+
+                    fcb_in->common->lock.acquire();
+                    // Craft and send the ack
+                    outElement->sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+                        sport, dport, ackNumber, ackOf, true);
+                    fcb_in->common->lock.release();
+                }
+
+                //Second, change this packet to remove the fin
+
+                // Map the ack number according to the ByteStreamMaintainer of the other direction
+                fcb_in->common->lock.acquire();
+                ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
+                ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
+                tcp_seq_t newAckNumber = otherMaintainer.mapAck(ackNumber);
+                tcp_seq_t newSeqNumber = maintainer.mapSeq(seqNumber);
+                fcb_in->common->lock.release();
+                if (_verbose) {
+                    click_chatter("Map ACK %lu -> %lu", ackNumber, newAckNumber);
+                    click_chatter("Map SEQ %lu -> %lu", seqNumber, newSeqNumber);
+                }
+                setAckNumber(packet, newAckNumber);
+                setSequenceNumber(packet, newSeqNumber + 1);
+                click_tcp *tcph = packet->tcp_header();
+                tcph->th_flags &= ~TH_FIN;
+                outElement->sendModifiedPacket(packet);
+
+                fcb_in->common->state = TCPState::CLOSED;
+                return 0;
             }
+
         }
 
         tcp_seq_t currentSeq = getSequenceNumber(p);
@@ -682,8 +731,6 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
     else
         newFlag = TH_RST;
 
-    //Todo close also the source side in most cases
-
     click_tcp tcph = *packet->tcp_header();
 
     // Change the flags of the packet
@@ -696,12 +743,25 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
     {
         newState = TCPState::CLOSED;
     } else {
-        newState = TCPState::BEING_CLOSED_GRACEFUL_1;
+        newState = TCPState::BEING_CLOSED_ARTIFICIALLY_1;
     }
     fcb_in->common->state = newState;
     fcb_in->common->lock.release();
 
+    //Close the forward side
+    {
+        // Get the information needed to ack the given packet
+        uint32_t daddr = getDestinationAddress(packet);
+        uint32_t saddr = getSourceAddress(packet);
+        uint16_t dport = getDestinationPort(packet);
+        uint16_t sport = getSourcePort(packet);
+
+        // Craft and send the ack
+        outElement->sendClosingPacket(fcb_in->common->maintainers[getFlowDirection()],
+            saddr, daddr, sport, dport, graceful);
+    }
     //Send FIN or RST to other side
+    /*
         // Get the information needed to ack the given packet
         uint32_t saddr = getDestinationAddress(packet);
         uint32_t daddr = getSourceAddress(packet);
@@ -714,14 +774,14 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
         // The ACK is the sequence number sent by the source
         // to which we add the size of the payload in order to acknowledge it
         tcp_seq_t ack = getSequenceNumber(packet) + getPayloadLength(packet);
-
+//TODO : bad ack if removed
         if(isFin(packet) || isSyn(packet))
             ack++;
 
         // Craft and send the ack
         outElement->sendClosingPacket(fcb_in->common->maintainers[getOppositeFlowDirection()],
             saddr, daddr, sport, dport, seq, ack, graceful);
-
+*/
     //click_chatter("Closing connection on flow %u (graceful: %u)",        getFlowDirection(), graceful);
 
 
@@ -899,7 +959,30 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
         fcb_in->common->lock.release();
         return false; //Let the FIN through. We cannot release now as there is an ACK that needs to come
     // If the connection is being closed and we have received the last packet, close it completely
-    } else if(state == TCPState::BEING_CLOSED_GRACEFUL_1)
+    }
+    else if (unlikely(state == TCPState::BEING_CLOSED_ARTIFICIALLY_1))
+    {
+        if(isFin(packet)) {
+            if (_verbose)
+                click_chatter("Connection is being closed gracefully by us, this is the second FIN. Changing ACK to -1.");
+
+            tcp_seq_t ackNumber = getAckNumber(packet);
+            setAckNumber((WritablePacket*)packet, ackNumber-1);
+            //Todo : stay in this state until the ACK comes back
+            fcb_in->common->state = TCPState::BEING_CLOSED_ARTIFICIALLY_2;
+        } else {
+            if (_verbose)
+                click_chatter("Connection is being closed gracefully by other side, this is a normal ACK");
+        }
+        fcb_in->common->lock.release();
+        return false; //Let the packet through anyway
+    }
+    else if (unlikely(state == TCPState::BEING_CLOSED_ARTIFICIALLY_2))
+    {
+        //Unreachable
+        assert(false);
+    }
+    else if(state == TCPState::BEING_CLOSED_GRACEFUL_1)
     {
         if(isFin(packet)) {
             if (_verbose)

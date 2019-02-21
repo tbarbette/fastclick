@@ -122,10 +122,10 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                 //THis needs to intercept and recreate the close also
                 //It will not work as it
                 //TODO : if keepalive was not specified, we can just close prematurely
-/*                if (_in->fcb_data()->CLRemoved) {
+                 if (_in->fcb_data()->CLRemoved) {
                     fcb->seen += p->getPacketContentSize();
-                    click_chatter("Seen %d/%d",fcb->seen, _in->fcb_data()->contentLength);
-                    if (fcb->seen >= _in->fcb_data()->contentLength) {
+                    //click_chatter("Seen %d/%d-%d",fcb->seen, _in->fcb_data()->contentLength, _in->fcb_data()->contentRemoved);
+                    if (fcb->seen >= _in->fcb_data()->contentLength - _in->fcb_data()->contentRemoved) {
                         WritablePacket *packet = p->uniqueify();
                         click_tcp* tcph = packet->tcp_header();
                         // Change the flags of the packet
@@ -134,8 +134,7 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                         return packet;
                     }
                 }
-                */
-                    return p;
+                return p;
             }
         } else {
             return p;
@@ -150,8 +149,11 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
     if (lastPacket)
             requestMorePackets(lastPacket); 
 
-    if (doClose)
+    if (doClose) {
+        fcb_stack->acquire(1);
         lastPacket = flow->tail()->clone(true);
+    }
+
 end:
     if (flow)
         output_push_batch(0,flow);

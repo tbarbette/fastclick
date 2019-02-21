@@ -39,11 +39,16 @@ int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     if (_buffer > 0 && method != "unset") {
         return errh->error("When buffering, we do not need a resize method. Content-length will be stripped");
     }
-        
-    if (method == "fill_end" || method == "unset") {
+
+    if (_set10) {
+        if (method != "unset")
+            return errh->error("Filling method cannot be set with HTTP10 (as HTTP10 will remove content length)");
+        _fill = RESIZE_HTTP10;
+    } else if (method == "fill_end" || method == "unset") {
         click_chatter("HTTPIn will fill the last packet with space when some content is removed");
         _fill = RESIZE_FILL_END;
     } else if (method == "fill") {
+        click_chatter("HTTPIn will fill the packet with space when content is removed");
         _fill = RESIZE_FILL;
     } else {
         //TODO : implement method RESIZE_CHUNKED
@@ -87,8 +92,9 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
             if (getHeaderContent(fcb, packet, "Content-Length", buffer, 250)) {
                 fcb->contentLength = (uint64_t)atol(buffer);
                 if (_buffer == 0 && _resize) {
-                    if (_fill == RESIZE_CHUNKED) {
+                    if (_fill == RESIZE_CHUNKED || _set10) {
                         removeHeader(packet, "Content-Length");
+                        removeHeader(packet, "Connection");
                         fcb->CLRemoved = true;
                         //TODO : add chunked encoding
                     } else { //RESIZE_FILL or FILL_END
@@ -166,6 +172,8 @@ void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
     // Remove data corresponding to the header
     StackElement::removeBytes(packet, position, nbBytesToRemove);
 }
+
+/*TODO : has header*/
 
 bool HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const char* headerName,
      char* buffer, uint32_t bufferSize)
@@ -310,7 +318,7 @@ void HTTPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t len
 
     // TODO chunked mode (or maybe catch that in the output)
 
-    // Continue in the stack function
+    // Continue in the stack function if not fill
     StackElement::removeBytes(packet, position, length);
 }
 

@@ -19,6 +19,7 @@ ByteStreamMaintainer::ByteStreamMaintainer()
 {
     rbtManager = NULL;
     lastAckSent = 0;
+    lastPayloadLength = 0;
     lastAckReceived = 0;
     lastSeqSent = 0;
     pruneCounter = 0;
@@ -203,42 +204,6 @@ void ByteStreamMaintainer::prune(uint32_t position)
 
 }
 
-void ByteStreamMaintainer::setLastAckSent(uint32_t ackNumber)
-{
-    // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
-    // 0) for them and check that the given one is greater as we could have false negatives
-    if(!lastAckSentSet || SEQ_GT(ackNumber, lastAckSent))
-        lastAckSent = ackNumber;
-
-    lastAckSentSet = true;
-}
-
-uint32_t ByteStreamMaintainer::getLastAckSent()
-{
-    if(!lastAckSentSet)
-        click_chatter("Error: Last ack sent not defined");
-
-    return lastAckSent;
-}
-
-void ByteStreamMaintainer::setLastSeqSent(uint32_t seqNumber)
-{
-    // As the sequence and ack numbers may wrap, we cannot just set a default value (for instance
-    // 0) for them and check that the given one is greater as we could have false negatives
-    if(!lastSeqSentSet || SEQ_GT(seqNumber, lastSeqSent))
-        lastSeqSent = seqNumber;
-
-    lastSeqSentSet = true;
-}
-
-uint32_t ByteStreamMaintainer::getLastSeqSent()
-{
-    if(!lastSeqSentSet)
-        click_chatter("Error: Last sequence sent not defined");
-
-    return lastSeqSent;
-}
-
 void ByteStreamMaintainer::insertInAckTree(uint32_t position, int offset)
 {
     insertInTree(treeAck, position, offset);
@@ -274,127 +239,6 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
         // Node already exists, replace the old value
         *((int*)currentNode->info) = offset;
     }
-}
-
-
-bool ByteStreamMaintainer::isLastAckSentSet()
-{
-    return lastAckSentSet;
-}
-
-bool ByteStreamMaintainer::isLastSeqSentSet()
-{
-    return lastSeqSentSet;
-}
-
-void ByteStreamMaintainer::setWindowSize(uint16_t windowSize)
-{
-    this->windowSize = windowSize;
-}
-
-uint16_t ByteStreamMaintainer::getWindowSize()
-{
-    return windowSize;
-}
-
-void ByteStreamMaintainer::setIpSrc(uint32_t ipSrc)
-{
-    this->ipSrc = ipSrc;
-}
-
-uint32_t ByteStreamMaintainer::getIpSrc()
-{
-    return ipSrc;
-}
-
-void ByteStreamMaintainer::setIpDst(uint32_t ipDst)
-{
-    this->ipDst = ipDst;
-}
-
-uint32_t ByteStreamMaintainer::getIpDst()
-{
-    return ipDst;
-}
-
-void ByteStreamMaintainer::setPortSrc(uint16_t portSrc)
-{
-    this->portSrc = portSrc;
-}
-
-uint16_t ByteStreamMaintainer::getPortSrc()
-{
-    return portSrc;
-}
-
-void ByteStreamMaintainer::setPortDst(uint16_t portDst)
-{
-    this->portDst = portDst;
-}
-
-uint16_t ByteStreamMaintainer::getPortDst()
-{
-    return portDst;
-}
-
-void ByteStreamMaintainer::setWindowScale(uint16_t windowScale)
-{
-    this->windowScale = windowScale;
-}
-
-uint16_t ByteStreamMaintainer::getWindowScale()
-{
-    return windowScale;
-}
-
-void ByteStreamMaintainer::setUseWindowScale(bool useWindowScale)
-{
-    this->useWindowScale = useWindowScale;
-}
-
-bool ByteStreamMaintainer::getUseWindowScale()
-{
-    return useWindowScale;
-}
-
-uint16_t ByteStreamMaintainer::getMSS()
-{
-    return mss;
-}
-
-void ByteStreamMaintainer::setMSS(uint16_t mss)
-{
-    this->mss = mss;
-}
-
-uint8_t ByteStreamMaintainer::getDupAcks()
-{
-    return dupAcks;
-}
-
-void ByteStreamMaintainer::setDupAcks(uint8_t dupAcks)
-{
-    this->dupAcks = dupAcks;
-}
-
-uint64_t ByteStreamMaintainer::getCongestionWindowSize()
-{
-    return congestionWindow;
-}
-
-void ByteStreamMaintainer::setCongestionWindowSize(uint64_t congestionWindow)
-{
-    this->congestionWindow = congestionWindow;
-}
-
-uint64_t ByteStreamMaintainer::getSsthresh()
-{
-    return ssthresh;
-}
-
-void ByteStreamMaintainer::setSsthresh(uint64_t ssthresh)
-{
-    this->ssthresh = ssthresh;
 }
 
 int ByteStreamMaintainer::lastOffsetInAckTree()

@@ -144,10 +144,10 @@ protected:
     // Methods using the function stack mechanism
 
     const int MODIFICATION_NONE = 0;
-    const int MODIFICATION_WRITABLE = 1;
-    const int MODIFICATION_STALL = 2;
-    const int MODIFICATION_REPLACE = 4;
-    const int MODIFICATION_RESIZE = 8;
+    const int MODIFICATION_WRITABLE = 1; //May write to the packet without resizing
+    const int MODIFICATION_STALL = 2;    //May stall packets
+    const int MODIFICATION_REPLACE = 4;  //May replace some content
+    const int MODIFICATION_RESIZE = 8;   //May resize the packet
 
     /**
      * @brief Remove bytes in a packet

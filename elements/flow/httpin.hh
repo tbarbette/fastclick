@@ -33,7 +33,7 @@ struct fcb_httpin
 };
 
 
-enum fill_method{RESIZE_FILL_END, RESIZE_FILL, RESIZE_CHUNKED};
+enum fill_method{RESIZE_FILL_END, RESIZE_FILL, RESIZE_CHUNKED, RESIZE_HTTP10};
 
 /*
 =c

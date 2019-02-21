@@ -78,7 +78,16 @@ public:
       * packet) or ungracefully (via a RST packet)
       */
     void sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
-        uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful);
+        uint16_t sport, uint16_t dport, int graceful);
+
+    void sendModifiedPacket(WritablePacket* packet) {
+            if (!_checksum)
+                resetTCPChecksum(packet);
+            else
+                computeTCPChecksum(packet);
+           output_push_batch(0, PacketBatch::make_from_packet(packet)); //Elements never knew about this flow, we bypass
+
+    }
 
     /**
      * @brief Set the TCPIn element associated

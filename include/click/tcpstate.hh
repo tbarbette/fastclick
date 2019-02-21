@@ -19,8 +19,10 @@ struct TCPState
         ESTABLISHING_2,
         OPEN, // The connection is open and nothing has been made to close it
         BEING_CLOSED_GRACEFUL_1, // The connection is being closed gracefully (via first FIN packets)
+        BEING_CLOSED_ARTIFICIALLY_1,
+        BEING_CLOSED_ARTIFICIALLY_2,
         BEING_CLOSED_GRACEFUL_2, // The connection is being closed gracefully (via second FIN packets, second should free after this)
-        CLOSED // The connection has been closed (via RST packets or FIN, both side should have freed. Technically this state should be nearly unreadable)
+        CLOSED, // The connection has been closed (via RST packets or FIN, both side should have freed. Technically this state should be nearly unreadable)
     };
 };
 

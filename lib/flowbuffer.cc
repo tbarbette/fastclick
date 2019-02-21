@@ -420,7 +420,7 @@ int FlowBuffer::replaceInFlow(FlowBufferContentIter iter, const int pattern_leng
     {
             // Insert a number of bytes equal to the difference between the lengths of
             // the replacement and the pattern
-            click_chatter("Insert at %d, offset %d", offsetInPacket, offset);
+            //click_chatter("Insert at %d, offset %d", offsetInPacket, offset);
             entry = owner->insertBytes(entry, offsetInPacket, offset);
 
             assert(entry);

@@ -114,6 +114,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             // Update the "total length" field in the IP header (required to compute the
             // tcp checksum as it is in the pseudo header)
             setPacketTotalLength(packet, initialLength + offsetModification);
+            byteStreamMaintainer.setLastPayloadLength(prevPayloadSize + offsetModification);
 
             // Check if the ModificationList has to be committed
             if(hasModificationList)
@@ -184,6 +185,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             // This number is used when crafting ACKs
             ByteStreamMaintainer &byteStreamMaintainer = fcb_in->common->maintainers[getFlowDirection()];
             byteStreamMaintainer.setLastSeqSent(seq);
+            byteStreamMaintainer.setLastPayloadLength(getPayloadLength(p));
 
             // Update the window size
             byteStreamMaintainer.setWindowSize(winSize);
@@ -263,44 +265,51 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
 }
 
 void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
-    uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool graceful)
+    uint16_t sport, uint16_t dport, int graceful)
 {
-    if(noutputs() < 2)
+    /*if(noutputs() < 2)
     {
-        click_chatter("Warning: trying to send an FIN or RST packet on a TCPOut with only 1 output");
+        click_chatter("Warning: trying to send a FIN or RST packet on a TCPOut with only 1 output");
         return;
-    }
+    }*/
 
     // Update the number of the last ack sent for the other side
-    maintainer.setLastAckSent(ack);
+    //maintainer.setLastAckSent(ack);
 
-    if(maintainer.isLastSeqSentSet() && SEQ_LT(seq, maintainer.getLastSeqSent()))
-        seq = maintainer.getLastSeqSent();
+
+    tcp_seq_t seq, ack;
+    if(maintainer.isLastSeqSentSet() && maintainer.isLastAckSentSet()) {
+        seq = maintainer.getLastSeqSent() + maintainer.getLastPayloadLength();
+        ack = maintainer.getLastAckSent();
+    } else {
+        click_chatter("Cannot close a connection that never had a packet out");
+        return;
+    }
 
     uint16_t winSize = maintainer.getWindowSize();
 
     uint8_t flag = TH_ACK;
 
-    if(graceful)
+    if(graceful == 1)
     {
         flag = flag | TH_FIN;
         // Ensure that further packets will have seq + 1 (for the FIN flag) as a
         // sequence number
         maintainer.setLastSeqSent(seq + 1);
+        maintainer.setLastPayloadLength(0);
     }
-    else
+    else if (graceful == 0) {
         flag = flag | TH_RST;
+    } else {
+        click_chatter("Unknown graceful, flag not changed");
+    }
 
     // Craft the packet
     Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, flag);
 
     //Send it on the second output
-    #if HAVE_BATCH
-        PacketBatch *batch =  PacketBatch::make_from_packet(forged);
-        output_push_batch(1, batch);
-    #else
-        output(1).push(forged);
-    #endif
+    PacketBatch *batch =  PacketBatch::make_from_packet(forged);
+    output_push_batch(0, batch);
 }
 
 int TCPOut::setInElement(TCPIn* inElement, ErrorHandler* errh)
