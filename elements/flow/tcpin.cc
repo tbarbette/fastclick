@@ -508,18 +508,17 @@ eagain:
                 //Second, change this packet to remove the fin
 
                 // Map the ack number according to the ByteStreamMaintainer of the other direction
-                fcb_in->common->lock.acquire();
-                ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
-                ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
-                tcp_seq_t newAckNumber = otherMaintainer.mapAck(ackNumber);
-                tcp_seq_t newSeqNumber = maintainer.mapSeq(seqNumber);
-                fcb_in->common->lock.release();
-                if (_verbose) {
-                    click_chatter("Map ACK %lu -> %lu", ackNumber, newAckNumber);
-                    click_chatter("Map SEQ %lu -> %lu", seqNumber, newSeqNumber);
+                if (allowResize()) {
+                    fcb_in->common->lock.acquire();
+                    ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getFlowDirection()];
+                    ByteStreamMaintainer &otherMaintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
+                    ackNumber = otherMaintainer.mapAck(ackNumber);
+                    seqNumber = maintainer.mapSeq(seqNumber);
+                    fcb_in->common->lock.release();
                 }
-                setAckNumber(packet, newAckNumber);
-                setSequenceNumber(packet, newSeqNumber + 1);
+
+                setAckNumber(packet, ackNumber);
+                setSequenceNumber(packet, seqNumber + 1);
                 click_tcp *tcph = packet->tcp_header();
                 tcph->th_flags &= ~TH_FIN;
                 outElement->sendModifiedPacket(packet);
@@ -955,6 +954,7 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
     if(state == TCPState::OPEN) {
         if (_verbose)
             click_chatter("TCP is now closing with the first FIN");
+        fcb_in->fin_seen = true;
         fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_1;
         fcb_in->common->lock.release();
         return false; //Let the FIN through. We cannot release now as there is an ACK that needs to come
@@ -964,7 +964,7 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
     {
         if(isFin(packet)) {
             if (_verbose)
-                click_chatter("Connection is being closed gracefully by us, this is the second FIN. Changing ACK to -1.");
+                click_chatter("Connection is being closed gracefully artificially by us, this is the second FIN. Changing ACK to -1.");
 
             tcp_seq_t ackNumber = getAckNumber(packet);
             setAckNumber((WritablePacket*)packet, ackNumber-1);
@@ -972,22 +972,22 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
             fcb_in->common->state = TCPState::BEING_CLOSED_ARTIFICIALLY_2;
         } else {
             if (_verbose)
-                click_chatter("Connection is being closed gracefully by other side, this is a normal ACK");
+                click_chatter("Connection is being closed gracefully artificially by other side, this is a normal ACK");
         }
         fcb_in->common->lock.release();
         return false; //Let the packet through anyway
     }
     else if (unlikely(state == TCPState::BEING_CLOSED_ARTIFICIALLY_2))
     {
-        //Unreachable
-        assert(false);
+        return false; //It's not a FIN, let ACKs go through.
     }
     else if(state == TCPState::BEING_CLOSED_GRACEFUL_1)
     {
-        if(isFin(packet)) {
+        if(isFin(packet) && !fcb_in->fin_seen) {
             if (_verbose)
                 click_chatter("Connection is being closed gracefully, this is the second FIN");
             fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_2;
+            fcb_in->fin_seen = true;
         }
         fcb_in->common->lock.release();
         return false; //Let the packet through anyway

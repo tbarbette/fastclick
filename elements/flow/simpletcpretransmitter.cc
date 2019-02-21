@@ -196,6 +196,9 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                     }
                 }
                 click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu, last ack %lu, is_syn %d, is_ack %d, pay_len %d)", seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),isSyn(packet),isAck(packet), getPayloadLength(packet));
+                //This may be a retransmit for a packet we have seen acked (so we pruned), but the acked was lost
+                _in->ackPacket(packet, true);
+                goto found;
             }
 
 
@@ -230,7 +233,7 @@ void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
     }
     if (count) {
         PacketBatch* second = 0;
-//        click_chatter("Pruning %d (last received %lu, last was %lu)",count,_in->fcb_data()->common->getLastAckReceived(_in->getOppositeFlowDirection()),getSequenceNumber(last));
+        //click_chatter("Pruning %d (last received %lu, last was %lu)",count,_in->fcb_data()->common->getLastAckReceived(_in->getOppositeFlowDirection()),getSequenceNumber(last));
         if (next)
             fcb->first_unacked->cut(last, count, second);
         SFCB_STACK(

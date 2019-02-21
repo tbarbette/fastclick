@@ -25,7 +25,7 @@
 CLICK_DECLS
 
 TSCClock::TSCClock() :
-_verbose(1), _install(true), _nowait(false), _allow_offset(false),_correction_timer(this), _sync_timers(0), _base(0)
+_verbose(1), _install(true),  _allow_offset(false),_correction_timer(this), _sync_timers(0), _base(0)
 {
 
 }
@@ -45,8 +45,9 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
             .read("VERBOSE", _verbose)
             .read("INSTALL", _install)
-            .read("NOWAIT", _nowait)
             .read("BASE",basee)
+            .read_or_set("PRECISION", _prec, 100)
+            .read_or_set("SYNCHRONIZE", _sync, 10)
             .complete() < 0)
         return -1;
 
@@ -54,8 +55,6 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
         if (!(_base = static_cast<UserClock*>(basee->cast("UserClock"))))
             return errh->error("%p{element} is not a UserClock",basee);
 
-    if (_nowait && !_install)
-        return errh->error("You want to install without waiting but do not want to install?!");
     return 0;
 }
 
@@ -121,33 +120,27 @@ TSCClock::initialize(ErrorHandler*) {
     last_timestamp[0] = get_real_timestamp();
     last_cycles[0] = click_get_cycles();
 
-    max_precision = 100 * (double)Timestamp::subsec_per_sec/(double)tsc_freq;
+    max_precision = _prec * (double)Timestamp::subsec_per_sec/(double)tsc_freq;
     //Need to converge quickly enough, but have a period large enough so that the cycle is still correct
     update_period_subsec = (int64_t)Timestamp::subsec_per_sec / 10;
     update_period_msec = update_period_subsec / (Timestamp::subsec_per_sec / Timestamp::msec_per_sec);
     _correction_timer.initialize(this);
     _correction_timer.schedule_now();
 
-    if (_install && _nowait) {
-        initialize_clock();
-        if (_verbose)
-            click_chatter("Installing TSC clock right away");
-
-        Timestamp::set_clock(&now,(void*)this);
-    }
-
     return 0;
 }
 
 void TSCClock::initialize_clock() {
-            //Initialize steady clock
-            steady_timestamp[current_clock] = get_real_timestamp(true);
-            steady_cycle[current_clock] = click_get_cycles();
-            steady_cycles_per_subsec_mult = cycles_per_subsec_mult[current_clock];
+    //Initialize steady clock
+    if (!steady_timestamp[current_clock]) {
+        steady_timestamp[current_clock] = get_real_timestamp(true);
+        steady_cycle[current_clock] = click_get_cycles();
+        steady_cycles_per_subsec_mult = cycles_per_subsec_mult[current_clock];
+    }
 
-            //Initialize wall clock
-            last_cycles[current_clock] = click_get_cycles();
-            last_timestamp[current_clock] = get_real_timestamp(false);
+    //Initialize wall clock
+    last_cycles[current_clock] = click_get_cycles();
+    last_timestamp[current_clock] = get_real_timestamp(false);
 }
 
 /**
@@ -177,11 +170,11 @@ bool TSCClock::stabilize_tick() {
     //Lower alpha if we get a good precision 10 times in a row
     if (abs(period_error_delta_timestamp) < max_precision) {
         alpha_stable++;
-        if (alpha_stable == 10) {
-            alpha /= 10;
+        if (alpha_stable == _sync) {
+            alpha /= ((float)10.0 / _sync) * 10;
             alpha_stable = 0;
             //Stop when alpha cannot change the hz anymore
-            if (alpha * (double)tsc_freq < 1) {
+            if (alpha * (double)tsc_freq < 2) {
                 return true;
             }
         }
@@ -234,6 +227,8 @@ bool TSCClock::accumulate_tick(Timer* t) {
         if (_verbose > 1)
             click_chatter("Thread %d is doing too much work and prevent having a good clock, trying the next one");
     }
+    int64_t current = compute_now_steady(current_clock);
+    assert(compute_now_steady(next_clock) >= current);
 
     //We want to always take current cycle as close as possible to real timestamp, so we read it again just before get real timestamp
     int64_t cur_cycles = click_get_cycles();
@@ -272,7 +267,8 @@ bool TSCClock::accumulate_tick(Timer* t) {
     n_ticks ++;
 
     if (_verbose > 2) {
-        click_chatter("Phase: RUNNING\nTSC freq : %f\nNext TSC freq : %f\nAccumulated error : %ld\n",
+        click_chatter("Phase: %s\nTSC freq : %f\nNext TSC freq : %f\nAccumulated error : %ld\n",
+                      (_phase == RUNNING?"RUNNING":"SYNCHRONIZE"),
                       tsc_freq,
                       next_tsc_freq,
                       total_error_delta_timestamp);
@@ -310,6 +306,7 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
     int64_t real_time = tc->get_real_timestamp();
     int64_t approx_time = tc->compute_now_wall(local_current_clock);
     int64_t delta = real_time - approx_time;
+
     if (abs(delta) > tc->max_precision) {
         tc->tstate->local_tsc_offset += tc->subsec_to_tick(delta,tc->cycles_per_subsec_mult[local_current_clock]);
         if (tc->tstate->local_synchronize_bad++ == 10) {
@@ -322,7 +319,7 @@ void TSCClock::run_sync_timer(Timer* t, void* user) {
             return;
         }
     } else {
-        if (tc->tstate->local_synchronize_bad-- == -10) {
+        if (tc->tstate->local_synchronize_bad-- <= -10) {
             //Do not set an offset if it is small as this is probably a computation error
             if (tc->tstate->local_tsc_offset < 50 && tc->tstate->local_tsc_offset > -50)
                 tc->tstate->local_tsc_offset = 0;
@@ -361,6 +358,9 @@ void TSCClock::run_timer(Timer* timer) {
             initialize_clock();
             alpha = 0.5;
             _phase = SYNCHRONIZE;
+            if (_verbose) {
+                click_chatter("TSCClock switching to synchronize");
+            }
         }
     } else {
         if (unlikely(!accumulate_tick(timer)))
@@ -369,7 +369,7 @@ void TSCClock::run_timer(Timer* timer) {
 
     if (unlikely(_phase == SYNCHRONIZE)) {
         //Launch sync taks
-        if (_sync_timers == 0 && n_ticks == 10) {
+        if (_sync_timers == 0) {
             _sync_timers = new Timer*[master()->nthreads()];
              _synchronize_bad = 0;
              _synchronize_ok = 0;
@@ -391,9 +391,9 @@ void TSCClock::run_timer(Timer* timer) {
             if (_synchronize_ok == (unsigned)master()->nthreads()) {
                 //Start using the clock !
                 _phase = RUNNING;
-                if (_verbose)
+                if (_verbose > 0)
                     click_chatter("Switching to TSC clock");
-                if (_install && !_nowait)
+                if (_install)
                     Timestamp::set_clock(&now,(void*)this);
             }
         }

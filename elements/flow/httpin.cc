@@ -64,7 +64,7 @@ int
 HTTPIn::maxModificationLevel(Element* stop)
 {
         int r = StackSpaceElement<fcb_httpin>::maxModificationLevel(stop);
-        return r | _resize;
+        return r | MODIFICATION_RESIZE;
 }
 
 
@@ -93,9 +93,8 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                 fcb->contentLength = (uint64_t)atol(buffer);
                 if (_buffer == 0 && _resize) {
                     if (_fill == RESIZE_CHUNKED || _set10) {
-                        removeHeader(packet, "Content-Length");
-                        removeHeader(packet, "Connection");
-                        fcb->CLRemoved = true;
+                        fcb->CLRemoved = removeHeader(packet, "Content-Length");
+                        fcb->KARemoved = removeHeader(packet, "Connection: keep-alive");
                         //TODO : add chunked encoding
                     } else { //RESIZE_FILL or FILL_END
 
@@ -146,7 +145,7 @@ void HTTPIn::setHeader(WritablePacket*, const char* header, String value) {
 
 }*/
 
-void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
+bool HTTPIn::removeHeader(WritablePacket* packet, const char* header)
 {
     unsigned char* source = getPayload(packet);
 
@@ -155,14 +154,14 @@ void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
         getPayloadLength(packet));
 
     if(beginning == NULL)
-        return;
+        return false;
 
     uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
 
     // Search the end of the header
     unsigned char* end = (unsigned char*)searchInContent((char*)beginning, "\r\n", lengthLeft);
     if(end == NULL)
-        return;
+        return false;
 
     // Compute the size of the header
     unsigned nbBytesToRemove = (end - beginning) + strlen("\r\n");
@@ -171,6 +170,7 @@ void HTTPIn::removeHeader(WritablePacket* packet, const char* header)
 
     // Remove data corresponding to the header
     StackElement::removeBytes(packet, position, nbBytesToRemove);
+    return true;
 }
 
 /*TODO : has header*/

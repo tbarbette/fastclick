@@ -18,6 +18,7 @@ struct fcb_httpin
     uint64_t contentSeen;
     int64_t contentRemoved;
     bool CLRemoved;
+    bool KARemoved;
     bool isRequest;
 
     fcb_httpin()
@@ -89,8 +90,9 @@ private:
      * @param fcb Pointer to the FCB of the flow
      * @param packet Packet in which the header is located
      * @param header Name of the header to remove
+     * @return true if header was removed
      */
-    void removeHeader(WritablePacket* packet, const char *header);
+    bool removeHeader(WritablePacket* packet, const char *header);
 
     /** @brief Return the content of an HTTP header
      * @param fcb Pointer to the FCB of the flow

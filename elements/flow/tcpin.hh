@@ -86,6 +86,7 @@ struct fcb_tcpin : public FlowReleaseChain
     //For reordering
     Packet* packetList;
     uint16_t packetListLength;
+    bool fin_seen;
     tcp_seq_t expectedPacketSeq;
     tcp_seq_t lastSent;
 };

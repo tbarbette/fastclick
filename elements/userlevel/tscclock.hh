@@ -49,7 +49,6 @@ class TSCClock : public Element { public:
 private:
   int _verbose;
   bool _install;
-  bool _nowait;
   bool _allow_offset;
 
   typedef enum {STABILIZE,SYNCHRONIZE,RUNNING} phase_t;
@@ -63,6 +62,8 @@ private:
   int64_t cycles_per_subsec_mult[2] = {0};
 
   struct state {
+      state() : local_tsc_offset(0), local_synchronize_bad(0) {
+      }
       int64_t local_tsc_offset;
       int local_synchronize_bad;
   };
@@ -96,7 +97,8 @@ private:
   atomic_uint32_t _synchronize_bad;
   atomic_uint32_t _synchronize_ok;
   Timer** _sync_timers;
-
+  int _prec;
+  int _sync;
   UserClock* _base;
 
   inline int64_t tick_to_subsec(int64_t delta, int64_t mult);
@@ -106,12 +108,16 @@ private:
   inline int64_t freq_to_mult(int64_t freq);
   inline double delta_to_freq(int64_t tick, int64_t time);
 
-  inline int64_t compute_now_steady() {
-      return steady_timestamp[current_clock] + tick_to_subsec_steady(click_get_cycles() + tstate->local_tsc_offset - steady_cycle[current_clock]);
+  inline int64_t compute_now_steady(int clock) {
+      return steady_timestamp[clock] + tick_to_subsec_steady(click_get_cycles() + tstate->local_tsc_offset - steady_cycle[clock]);
   }
 
   inline int64_t compute_now_wall(int clock) {
       return last_timestamp[clock] + tick_to_subsec_wall(click_get_cycles() + tstate->local_tsc_offset- last_cycles[clock]);
+  }
+
+  inline int64_t compute_now_steady() {
+      return compute_now_steady(current_clock);
   }
 
   inline int64_t compute_now_wall() {

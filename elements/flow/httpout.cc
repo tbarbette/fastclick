@@ -122,7 +122,7 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                 //THis needs to intercept and recreate the close also
                 //It will not work as it
                 //TODO : if keepalive was not specified, we can just close prematurely
-                 if (_in->fcb_data()->CLRemoved) {
+                 if (_in->fcb_data()->CLRemoved && _in->fcb_data()->KARemoved) {
                     fcb->seen += p->getPacketContentSize();
                     //click_chatter("Seen %d/%d-%d",fcb->seen, _in->fcb_data()->contentLength, _in->fcb_data()->contentRemoved);
                     if (fcb->seen >= _in->fcb_data()->contentLength - _in->fcb_data()->contentRemoved) {
