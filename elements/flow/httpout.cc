@@ -128,9 +128,7 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                     if (fcb->seen >= _in->fcb_data()->contentLength - _in->fcb_data()->contentRemoved) {
                         WritablePacket *packet = p->uniqueify();
                         click_tcp* tcph = packet->tcp_header();
-                        // Change the flags of the packet
-//                        tcph->th_flags |= TH_FIN;
-//                        doClose = true;
+                        doClose = true;
                         return packet;
                     }
                 }

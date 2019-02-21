@@ -136,7 +136,7 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                 //iter = WordMatcher->flowBuffer.search(iter, insult, &result);
                 int l = insults[i].length();
                 iter = WordMatcher->flowBuffer.searchSSE(iter, insult, l, &result);
-                click_chatter("Result %d", result);
+//                click_chatter("Result %d", result);
                 if (result == 1) {
                     if (_mode == REMOVE) {
                         WordMatcher->flowBuffer.remove(iter, l, this);
