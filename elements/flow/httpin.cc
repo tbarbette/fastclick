@@ -97,8 +97,7 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
         if(!fcb->headerFound)
         {
             // Search the end of the first line
-            char* current = (char*)searchInContent((char*)packet->getPacketContent(), "\r\n",
-                                        getPayloadLength(packet));
+            char* current = (char*)memchr(packet->getPacketContent(), '\r', getPayloadLength(packet));
             if(current == NULL) {
                     click_chatter("Probable attack : no method in HTTP");
                     closeConnection(packet, false); //Todo : support inter-packet header
@@ -121,7 +120,7 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 
             int left = packet->getPacketContentSize() - endOfMethod;
             do {
-                char* end = searchInContent(current, "\r\n",  left);
+                char* end = (char*)memchr(current, '\r',left);
                 if (end == 0) {
                     click_chatter("Probable attack : no end of header in HTTP");
                     closeConnection(packet, false); //Todo : support inter-packet header
