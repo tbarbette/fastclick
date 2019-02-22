@@ -71,6 +71,9 @@ public:
 
     virtual WritablePacket* insertBytes(WritablePacket*, uint32_t, uint32_t) override;
 
+    //Called by OUT when the request is finished to reset buffer for a new request (HTTP connections can be re-used)
+    void requestTerminated();
+
     bool _set10;
     bool _remove_encoding;
     int _buffer;

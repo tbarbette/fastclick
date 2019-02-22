@@ -60,6 +60,14 @@ int HTTPIn::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 
+void
+HTTPIn::requestTerminated() {
+    auto fcb = fcb_data();
+    fcb->headerFound = false;
+    fcb->contentSeen = 0;
+    fcb->contentRemoved = 0;
+}
+
 int 
 HTTPIn::maxModificationLevel(Element* stop)
 {

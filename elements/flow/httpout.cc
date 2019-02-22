@@ -66,8 +66,6 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                 assert(packet != NULL);
                 FlowBuffer &flowBuffer = fcb->flowBuffer;
                 flowBuffer.enqueue(packet);
-                lastPacket = packet;
-
                 // Check if we have the whole content in the buffer
                 if(isLastUsefulPacket(packet))
                 {
@@ -100,8 +98,15 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
 
                     // Flush the buffer
                     output_push_batch(0, toPush);
-                } //TODO : when going out of max buffer size, jump to the "non-buffering" mode
 
+                    lastPacket = 0; //Do not ask for last packet if we have everything
+
+                    _in->requestTerminated();
+                } else {
+                    lastPacket = packet;
+                }
+
+                //TODO : when going out of max buffer size, jump to the "non-buffering" mode
                 return NULL;
             } else { //Do not buffer, or buffer is exhausted (todo)
                 //TODO : Go to chunk if need be
@@ -113,7 +118,8 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                         packet = insertBytes(packet, pos, _in->fcb_data()->contentRemoved);
                         //click_chatter("%d %d %d",pos,packet->getPacketContent() - packet->data(), _in->fcb_data()->contentRemoved);
                         memset(packet->getPacketContent() + pos + 1 , ' ',am);
-                        return packet; 
+                        _in->requestTerminated();
+                        return packet;
                     } else if (_in->fcb_data()->contentRemoved < 0) {
                         click_chatter("fill_end method does not work with HTTP payload that is growing after all modifications have been done. The transfer mode should have been changed to chunked, or the content buffered but it is too late for that.");
                     }
@@ -123,7 +129,7 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                 //It will not work as it
                 //TODO : if keepalive was not specified, we can just close prematurely
                  if (_in->fcb_data()->CLRemoved && _in->fcb_data()->KARemoved) {
-                    fcb->seen += p->getPacketContentSize();
+                    fcb->seen += p->getPacketContentSize(); //Todo the annotation is set, use it instead of re-counting
                     //click_chatter("Seen %d/%d-%d",fcb->seen, _in->fcb_data()->contentLength, _in->fcb_data()->contentRemoved);
                     if (fcb->seen >= _in->fcb_data()->contentLength - _in->fcb_data()->contentRemoved) {
                         WritablePacket *packet = p->uniqueify();
@@ -132,9 +138,12 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                         return packet;
                     }
                 }
+                if (isLastUsefulPacket(p))
+                    _in->requestTerminated();
                 return p;
             }
         } else {
+            lastPacket = 0;
             return p;
         }
     };
@@ -144,8 +153,9 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
         goto end;
 
     EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, [](Packet*){});
-    if (lastPacket)
-            requestMorePackets(lastPacket); 
+    if (lastPacket) {
+            requestMorePackets(lastPacket);
+    }
 
     if (doClose) {
         fcb_stack->acquire(1);

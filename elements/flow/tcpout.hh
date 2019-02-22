@@ -61,9 +61,10 @@ public:
      * @param force Boolean used to force the sending of the ACK even if a previous ACK for the same
      * data has already been sent
      */
-    void sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport,
+    Packet* forgeAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr, uint16_t sport,
          uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force = false);
 
+    void sendOpposite(Packet* p);
      /**
       * @brief Send a packet to close the connection on the second output
       * @param maintainer ByteStreamMaintainer of the other side of the connection (used to get

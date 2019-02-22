@@ -416,7 +416,9 @@ int FlowStateElement<Derived, T>::initialize(ErrorHandler *errh) {
  * In practice it will overwrite get_table
  */
 
+#define DEFAULT_4TUPLE "12/0/ffffffff 16/0/ffffffff 20/0/ffffffff"
 
+//Those should not be used anymore, as the FLOW_CONTEXT is a much alternative that assuming the top session is IP...
 #define TCP_SESSION "9/06! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
 #define UDP_SESSION "9/11! 12/0/ffffffff:HASH-7 16/0/ffffffff:HASH-7 20/0/ffff:HASH-6 22/0/ffff:HASH-6"
 

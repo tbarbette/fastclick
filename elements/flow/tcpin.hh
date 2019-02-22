@@ -144,7 +144,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
 
-    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff",FLOW_TCP);
+    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(DEFAULT_4TUPLE,FLOW_TCP);
 
     void push_batch(int port, fcb_tcpin* fcb, PacketBatch* flow);
 

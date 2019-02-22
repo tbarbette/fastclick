@@ -451,7 +451,8 @@ eagain:
             if(isSyn(p))
             {
                 if (fcb_in->common->state == TCPState::CLOSED) {
-                    //click_chatter("Renewing !");
+                    if (_verbose > 1)
+                        click_chatter("Renewing socket !");
                     SFCB_STACK(
                     release_tcp_internal(fcb_save);
                     );
@@ -500,9 +501,11 @@ eagain:
 
                     fcb_in->common->lock.acquire();
                     // Craft and send the ack
-                    outElement->sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+                    Packet* forged = outElement->forgeAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
                         sport, dport, ackNumber, ackOf, true);
                     fcb_in->common->lock.release();
+                    if (forged)
+                        outElement->sendOpposite(forged);
                 }
 
                 //Second, change this packet to remove the fin
@@ -571,9 +574,12 @@ eagain:
 
                 fcb_in->common->lock.acquire();
                 // Craft and send the ack
-                outElement->sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+                click_chatter("Forging ack for proactive dup");
+                Packet* forged = outElement->forgeAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
                     sport, dport, seq, ack, true); //We force the sending as we want DUP ack on purpose
                 fcb_in->common->lock.release();
+                if (forged)
+                    outElement->sendOpposite(forged);
             }
 
             putPacketInList(fcb_in, p);
@@ -615,8 +621,18 @@ eagain:
             }
         }
     }
+
     if (flow)
         output(0).push_batch(flow);
+
+    //Release FCB if we are now closing
+    if (fcb_in->common) {
+        TCPState::Value state = fcb_in->common->state; //Read-only for fast path
+        if ((state == TCPState::BEING_CLOSED_GRACEFUL_2 ||
+                state == TCPState::CLOSED)) {
+                releaseFCBState();
+        }
+    }
 }
 
 int TCPIn::initialize(ErrorHandler *errh) {
@@ -747,8 +763,8 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
     fcb_in->common->state = newState;
     fcb_in->common->lock.release();
 
-    //Close the forward side
-    {
+    //Close the forward side if graceful
+    if(graceful) {
         // Get the information needed to ack the given packet
         uint32_t daddr = getDestinationAddress(packet);
         uint32_t saddr = getSourceAddress(packet);
@@ -758,33 +774,20 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
         // Craft and send the ack
         outElement->sendClosingPacket(fcb_in->common->maintainers[getFlowDirection()],
             saddr, daddr, sport, dport, graceful);
-    }
+    } else {
     //Send FIN or RST to other side
-    /*
+
         // Get the information needed to ack the given packet
         uint32_t saddr = getDestinationAddress(packet);
         uint32_t daddr = getSourceAddress(packet);
         uint16_t sport = getDestinationPort(packet);
         uint16_t dport = getSourcePort(packet);
-        // The SEQ value is the initial ACK value in the packet sent
-        // by the source.
-        tcp_seq_t seq = getInitialAck(packet);
-
-        // The ACK is the sequence number sent by the source
-        // to which we add the size of the payload in order to acknowledge it
-        tcp_seq_t ack = getSequenceNumber(packet) + getPayloadLength(packet);
-//TODO : bad ack if removed
-        if(isFin(packet) || isSyn(packet))
-            ack++;
 
         // Craft and send the ack
         outElement->sendClosingPacket(fcb_in->common->maintainers[getOppositeFlowDirection()],
-            saddr, daddr, sport, dport, seq, ack, graceful);
-*/
-    //click_chatter("Closing connection on flow %u (graceful: %u)",        getFlowDirection(), graceful);
+            saddr, daddr, sport, dport, graceful);
 
-
-    if (!graceful) { //This is the last time this side will see a packet, release
+        click_chatter("Ungracefull close, releasing FCB state");
         releaseFCBState();
     }
 
@@ -878,6 +881,10 @@ WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
 
 void TCPIn::requestMorePackets(Packet *packet, bool force)
 {
+    if (!fcb_data()->common || fcb_data()->common->state == TCPState::CLOSED) { //Connection is closed
+        click_chatter("WARNING: Requesting more packets for a closed connection");
+        return;
+    }
     //click_chatter("TCP requestMorePackets");
     ackPacket(packet, force);
 
@@ -910,10 +917,13 @@ void TCPIn::ackPacket(Packet* packet, bool force)
         ack++;
 
     fcb_in->common->lock.acquire();
+    ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
     // Craft and send the ack
-    outElement->sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+    Packet* forged = outElement->forgeAck(maintainer, saddr, daddr,
         sport, dport, seq, ack, force);
     fcb_in->common->lock.release();
+    if (forged)
+        outElement->sendOpposite(forged);
 }
 
 bool TCPIn::checkConnectionClosed(Packet *packet)

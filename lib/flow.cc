@@ -137,10 +137,10 @@ FlowClassificationTable::Rule FlowClassificationTable::make_ip_mask(IPAddress ds
 FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verbose, bool add_leaf) {
     String REG_IPV4 = "[0-9]{1,3}(?:[.][0-9]{1,3}){3}";
     String REG_NET = REG_IPV4 + "/[0-9]+";
-    String REG_AL = "(?:[a-z]+|[0-9+])";
+    String REG_AL = "(?:[a-z]+|[0-9]+)";
     std::regex reg(("((?:(?:(?:agg|thread|(?:ip proto "+REG_AL+"|(?:src|dst) (?:host "+REG_IPV4+"|port "+REG_AL+"|net "+REG_NET+")|(?:(?:ip)?[+-]?[0-9]+/[0-9a-fA-F]+?/?[0-9a-fA-F]+?)))(?:[:]HASH-[0-9]+|[:]ARRAY)?[!]?(?:[ ]*&&[ ]*|[ \t]*))+)|-)([ \t]+keep)?([ \t]+[0-9]+|[ \t]+drop)?").c_str(),
              std::regex_constants::icase);
-    std::regex classreg(("thread|agg|(?:(ip) (proto) ([a-z]+|[0-9]+)|(src|dst) (?:(host) ("+REG_IPV4+")|(net) ("+REG_NET+"))|(ip[+])?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?)([:]HASH-[0-9]+|[:]ARRAY)?([!])?").c_str(),
+    std::regex classreg(("thread|agg|(?:(ip) (proto) ([a-z]+|[0-9]+)|(src|dst) (?:(host) ("+REG_IPV4+")|(port) ("+REG_AL+")|(net) ("+REG_NET+"))|(ip[+])?([-]?[0-9]+)/([0-9a-fA-F]+)?/?([0-9a-fA-F]+)?)([:]HASH-[0-9]+|[:]ARRAY)?([!])?").c_str(),
                  std::regex_constants::icase);
     FlowNode* root = 0;
 
@@ -182,7 +182,7 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
                 if (verbose)
                     click_chatter("Class : %s",it->str(0).c_str());
 
-                int manoffset = 8;
+                int manoffset = 10;
                 std::string layer = it->str(1 + manoffset);
                 std::string offset = it->str(2 + manoffset);
                 std::string value = it->str(3 + manoffset);
@@ -240,15 +240,27 @@ FlowClassificationTable::Rule FlowClassificationTable::parse(String s, bool verb
 
                         }
                     } else if (it->str(4) != "") {
-                        maskv = UINT32_MAX;
-                        if (it->str(4) == "src") {
-                            offset_v = 12;
+
+                        if (it->str(7) == "port") {
+                            maskv = UINT16_MAX;
+                            if (it->str(4) == "src") {
+                                offset_v = 20;
+                            } else {
+                                offset_v = 22;
+                            }
                         } else {
-                            offset_v = 16;
+                            maskv = UINT32_MAX;
+                            if (it->str(4) == "src") {
+                                offset_v = 12;
+                            } else {
+                                offset_v = 16;
+                            }
                         }
                         if (it->str(5) == "host") {
                             IPAddress ip(it->str(6).c_str());
                             valuev = ip.addr();
+                        } else if (it->str(7) == "port") {
+                            valuev = htons(atoi(it->str(8).c_str()));
                         } else {
                             click_chatter("UNIMPLEMENTED net");
                             abort();

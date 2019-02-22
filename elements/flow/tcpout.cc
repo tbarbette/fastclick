@@ -41,16 +41,15 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
 {
     auto fcb_in = inElement->fcb_data();
     auto fnt = [this,fcb_in](Packet* p) -> Packet* {
-/*        if(!checkConnectionClosed(p))
-        {
-            p->kill();
-            return NULL;
-        }*/
-
         if (_allow_resize) {
             WritablePacket *packet = p->uniqueify();
-            fcb_in->common->lock.acquire();
 
+            if (!fcb_in->common) {
+                click_chatter("ERROR : Connection released before all packets did go through. This is an edge case that should not happen");
+                packet->kill();
+                return NULL;
+            }
+            fcb_in->common->lock.acquire();
             bool hasModificationList = inElement->hasModificationList(packet);
 
             ByteStreamMaintainer &byteStreamMaintainer = fcb_in->common->maintainers[getFlowDirection()];
@@ -123,7 +122,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                 modList->commit(fcb_in->common->maintainers[getFlowDirection()]);
 
                 // Check if the full content of the packet has been removed
-                if(getPayloadLength(packet) == 0)
+                if(getPayloadLength(packet) == 0) //Some rightfull ack get here TODO
                 {
                     uint32_t saddr = getDestinationAddress(packet);
                     uint32_t daddr = getSourceAddress(packet);
@@ -141,8 +140,13 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                         ack++;
 
                     // Craft and send the ack
-                    sendAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
+                    Packet* forged = forgeAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
                         sport, dport, seq, ack);
+
+                    fcb_in->common->lock.release();
+                    if (forged)
+                        sendOpposite(forged);
+
 
                     // Even if the packet is empty it can still contain relevant
                     // information (significant ACK value or another flag)
@@ -156,18 +160,19 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                             // (And anyway it would be considered as a duplicate ACK)
                             click_chatter("Killing useless ACK");
                             packet->kill();
-                            fcb_in->common->lock.release();
                             return NULL;
                         }
                     } 
-                }
-            }
+                } else
+
+                    fcb_in->common->lock.release();
+            } else
+                fcb_in->common->lock.release();
 
 /*                if(prevLastAckSet && SEQ_LEQ(prevAck, prevLastAck)) {
                             click_chatter("ACK lower than already sent");
                 }*/
 
-            fcb_in->common->lock.release();
 
             if (!_checksum)
                 resetTCPChecksum(packet);
@@ -209,27 +214,20 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
             return p;
         }
     };
-    EXECUTE_FOR_EACH_PACKET(fnt, flow);
-
-    //Release FCB if we are now closing
-    TCPState::Value state = fcb_in->common->state; //Read-only for fast path
-    if ((state == TCPState::BEING_CLOSED_GRACEFUL_2 ||
-            state == TCPState::CLOSED)) {
-//            click_chatter("RELEASING FCB STATE");
-            inElement->releaseFCBState();
-    }
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, flow, [](Packet*){});
 
     output(0).push_batch(flow);
 }
 
-void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
+Packet*
+TCPOut::forgeAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,
     uint16_t sport, uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, bool force)
 {
     //click_chatter("Gen ack");
     if(noutputs() < 2)
     {
         click_chatter("Warning: trying to send an ack on a TCPOut with only 1 output. How could I send an ACK to the source ?");
-        return;
+        return 0;
     }
 
 
@@ -237,7 +235,7 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     if(!force && maintainer.isLastAckSentSet() && SEQ_LEQ(ack, maintainer.getLastAckSent())) {
         if (inElement->_verbose)
             click_chatter("Ack not sent, no new knowledge");
-        return;
+        return 0;
     }
 
     // Update the number of the last ack sent for the other side
@@ -255,13 +253,12 @@ void TCPOut::sendAck(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t 
     // Craft the packet
     Packet* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, winSize, TH_ACK);
 
-    //Send it on the second output
-    #if HAVE_BATCH
-        PacketBatch *batch =  PacketBatch::make_from_packet(forged);
-        output_push_batch(1, batch);
-    #else
-        output(1).push(forged);
-    #endif
+    return forged;
+}
+
+void TCPOut::sendOpposite(Packet* p) {
+    PacketBatch *batch =  PacketBatch::make_from_packet(p);
+    output_push_batch(1, batch);
 }
 
 void TCPOut::sendClosingPacket(ByteStreamMaintainer &maintainer, uint32_t saddr, uint32_t daddr,

@@ -17,7 +17,7 @@ public:
     const char *port_count() const        { return PORTS_1_1; }
     const char *processing() const        { return PROCESSING_A_AH; }
 
-    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff 16/0/ffffffff 20/0/ffff 22/0/ffff", FLOW_UDP);
+    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(DEFAULT_4TUPLE, FLOW_UDP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
