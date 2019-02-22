@@ -313,7 +313,12 @@ class HashContainerMP { public:
     /** @brief Copy the value of V for K in storage if K is found, delete it from the table and return true. If nonfound, nothing is deleted and return false. */
     inline bool find_remove(const K &key, V &storage);
 
+    inline bool find_remove_clean(const K &key, std::function<void(V &storage)> store, std::function<bool(V &storage)> shouldremove);
+
     inline ptr find_insert(const K &key, const V &value);
+
+    /** @brief Replace an item if it exists, insert it otherwise. Do not look at use count ! */
+    inline void replace(const K &key, const V &value, std::function<void(V&value)> on_replace);
 
     inline write_ptr find_insert_write(const K &key, const V &value);
 
@@ -368,6 +373,7 @@ class HashContainerMP { public:
         }
         return _allocator.allocate(li);
     }
+
     void release_pending(bool force=false) {
         ListItem* it;
         ListItem* next;
@@ -466,7 +472,7 @@ HashContainerMP<K,V,Item>::find_write(const K &key)
 
 template <typename K, typename V, typename Item>
 inline bool
-HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
+HashContainerMP<K,V,Item>::find_remove_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete)
 {
     if (likely(_mt))
         _table.read_begin();
@@ -480,15 +486,20 @@ HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
     ListItem* *pprev_ptr = &bucket.list->head;
     ptr p;
     while (pprev) {
-        if (hashkeyeq(hashkey(pprev), key)) {
-            storage = *pprev->item.unprotected_ptr();
+        if (shoulddelete(*pprev->item.unprotected_ptr())) {
             *pprev_ptr = pprev->_hashnext;
             erase_item(pprev);
-            goto found;
+            pprev = *pprev_ptr;
+        } else {
+            if (hashkeyeq(hashkey(pprev), key)) {
+                store(*pprev->item.unprotected_ptr());
+                *pprev_ptr = pprev->_hashnext;
+                erase_item(pprev);
+                goto found;
+            }
+            pprev_ptr = &pprev->_hashnext;
+            pprev = pprev->_hashnext;
         }
-        pprev_ptr = &pprev->_hashnext;
-        pprev = pprev->_hashnext;
-
     }
     if (likely(_mt))
         bucket.list.write_end();
@@ -498,6 +509,19 @@ HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
     if (likely(_mt))
         bucket.list.write_end();
     return true;
+}
+
+template <typename K, typename V, typename Item>
+inline bool
+HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage) {
+    return find_remove_clean(key, [&storage](V&c){storage = c;}, [](V&){return false;});
+}
+
+
+template <typename K, typename V, typename Item>
+inline void
+HashContainerMP<K,V,Item>::erase(const K &key) {
+    find_remove_clean(key, [](V&){}, [](V&){return false;});
 }
 
 #define MAKE_FIND_INSERT(ptr_type,on_exists) \
@@ -519,7 +543,7 @@ retry:\
         }\
     }\
     if (p) {\
-        on_exists\
+        on_exists(pprev->item);\
         if (likely(_mt))\
             bucket.list.read_end();\
     } else {\
@@ -544,15 +568,21 @@ retry:\
 template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::ptr
 HashContainerMP<K,V,Item>::find_insert(const K &key,const V &value) {
-    MAKE_FIND_INSERT(ptr,{});
+    MAKE_FIND_INSERT(ptr,(void));
     click_hashmp_assert(p.refcnt() > 0);
     return p;
 }
 
 template <typename K, typename V, typename Item>
+inline void
+HashContainerMP<K,V,Item>::replace(const K &key,const V &value, std::function<void(V&value)> on_replace) {
+    MAKE_FIND_INSERT(ptr,{on_replace(*pprev->item.unprotected_ptr());pprev->item = value;});
+}
+
+template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::write_ptr
 HashContainerMP<K,V,Item>::find_insert_write(const K &key,const V &value) {
-    MAKE_FIND_INSERT(write_ptr,{});
+    MAKE_FIND_INSERT(write_ptr,(void));
     click_hashmp_assert(p.refcnt() == -1);
     return p;
 }

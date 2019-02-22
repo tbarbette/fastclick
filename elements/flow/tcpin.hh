@@ -47,12 +47,13 @@ public:
 
     tcp_common() : lastAckReceived() //This is indeed called as it is not part of the FCBs
     {
-        //state = TCPState::ESTABLISHING;
-        use_count = 0;
+        //state = TCPState::ESTABLISHING_1; //always overwritten
+        //use_count = 0; //always overwriten
     }
 
     ~tcp_common()
     {
+
     }
 
     inline bool lastAckReceivedSet() {
