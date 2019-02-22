@@ -341,7 +341,7 @@ FlowBufferContentIter FlowBuffer::search(FlowBufferContentIter start, const char
 
 
 
-int FlowBuffer::removeInFlow(const char* pattern, StackElement* owner)
+int FlowBuffer::removeInFlow(const char* pattern,const int pattern_length, StackElement* owner)
 {
     int feedback = -1;
     FlowBufferContentIter iter = search(contentBegin(), pattern, &feedback);
@@ -349,7 +349,7 @@ int FlowBuffer::removeInFlow(const char* pattern, StackElement* owner)
     if(iter == contentEnd())
         return feedback;
 
-    remove(iter, strlen(pattern), owner);
+    remove(iter, pattern_length, owner);
 
     return 1;
 }

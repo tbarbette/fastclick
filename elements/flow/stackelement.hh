@@ -116,7 +116,7 @@ protected:
      * @param length The length of the content
      * @return A pointer to the first byte of pattern in the content or NULL if it cannot be found
      */
-    char* searchInContent(char *content, const char *pattern, uint32_t length);
+    inline char* searchInContent(char *content, const String &pattern, uint32_t length);
 
     /**
      * @brief Set the INITIAL_ACK annotation of the packet. This annotation stores the initial
@@ -510,6 +510,29 @@ class StackChunkBufferElement : public StackStateElement<Derived, BufferData<T>>
         }
     }
 };
+
+
+//Inline functions
+
+char* StackElement::searchInContent(char *content, const String &pattern, uint32_t length) {
+    // We use this method instead of a mere 'strstr' because the content of the packet
+    // is not necessarily NULL-terminated
+
+    uint32_t patternLen = pattern.length();
+
+    for(uint32_t i = 0; i < length; ++i)
+    {
+        if(patternLen + i > length)
+            return NULL;
+
+        if(strncmp(&content[i], pattern.data(), patternLen) == 0)
+            return &content[i];
+    }
+
+    return NULL;
+}
+
+
 
 
 CLICK_ENDDECLS

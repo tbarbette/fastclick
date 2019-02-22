@@ -75,10 +75,15 @@ HTTPIn::maxModificationLevel(Element* stop)
         return r | MODIFICATION_RESIZE;
 }
 
+struct Header {
+    String header;
+    String value;
+    int pos;
+};
 
 void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 {
-    auto fnt = [this,fcb](Packet* p){
+    auto fnt = [this,fcb](Packet* p) -> Packet* {
         // Check that the packet contains HTTP content
         if(p->isPacketContentEmpty())
             return p;
@@ -91,39 +96,94 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
         p = packet;
         if(!fcb->headerFound)
         {
-            if (_set10)
-                packet = setHTTP10(fcb, packet);
-            setRequestParameters(fcb, packet);
-            if (_remove_encoding)
-                removeHeader(packet, "Accept-Encoding");
-            char buffer[250];
-            if (getHeaderContent(fcb, packet, "Content-Length", buffer, 250)) {
-                fcb->contentLength = (uint64_t)atol(buffer);
-                if (_buffer == 0 && _resize) {
-                    if (_fill == RESIZE_CHUNKED || _set10) {
-                        fcb->CLRemoved = removeHeader(packet, "Content-Length");
-                        fcb->KARemoved = removeHeader(packet, "Connection: keep-alive");
-                        //TODO : add chunked encoding
-                    } else { //RESIZE_FILL or FILL_END
-
-                    }
-                }
+            // Search the end of the first line
+            char* current = (char*)searchInContent((char*)packet->getPacketContent(), "\r\n",
+                                        getPayloadLength(packet));
+            if(current == NULL) {
+                    click_chatter("Probable attack : no method in HTTP");
+                    closeConnection(packet, false); //Todo : support inter-packet header
+                    return NULL;
             }
 
+            int endOfMethod = current - (char*)packet->getPacketContent();
+
+            if (_set10) {
+                packet = setHTTP10(fcb, packet, endOfMethod);
+                current = (char*)(packet->getPacketContent() + endOfMethod);
+            }
+            current += 2;
+            String method((char*)packet->getPacketContent(), (char*)current);
+            //click_chatter("Method : %s", method.c_str());
+
+//            fcb->isRequest = true;
             // Compute the offset of the HTML payload
-            char* source = searchInContent((char*)packet->getPacketContent(), "\r\n\r\n",
-            packet->getPacketContentSize());
+            //Hashmap<Header> headers;
+
+            int left = packet->getPacketContentSize() - endOfMethod;
+            do {
+                char* end = searchInContent(current, "\r\n",  left);
+                if (end == 0) {
+                    click_chatter("Probable attack : no end of header in HTTP");
+                    closeConnection(packet, false); //Todo : support inter-packet header
+                    return 0;
+                }
+                if (end-current == 0) {
+                    break; //Found the double termination
+                }
+                Header header;
+                char* split = strchr(current, ':');
+                header.header = String(current, split);
+                header.value = String(split + 2, end);
+                header.pos = current - (char*)packet->getPacketContent();
+
+                bool remove = false;
+                if (_remove_encoding && header.header == "Accept-Encoding") {
+                    remove = true;
+                } else if (header.header == "Content-Length") {
+                    fcb->contentLength = (uint64_t)atol(header.value.data());
+                    if (_buffer == 0 && _resize) {
+                        if (_fill == RESIZE_CHUNKED || _set10) {
+                            fcb->CLRemoved = true;
+                            remove = true;
+                            //TODO : add chunked encoding
+                        } else { //RESIZE_FILL or FILL_END
+
+                        }
+                    }
+                } else if (header.header == "Connection") {
+                    if ((_fill == RESIZE_CHUNKED || _set10) && (_buffer == 0 && _resize)) {
+                        if (header.value == "keep-alive") {
+                            remove = true;
+                            fcb->KARemoved = true;
+                        }
+                    }
+                }
+
+                //click_chatter("header %s, value %s", header.header.c_str(), header.value.c_str());
+                //headers.insert(header);
+                //
+                if (remove) {
+                    click_chatter("Removing");
+                    StackElement::removeBytes(packet, header.pos, end - current + 2);
+                    current = (char*)packet->getPacketContent() + header.pos;
+                } else {
+                    current = end + 2;
+                }
+            } while(true);
+            current += 2;
+
+
             if (!_set10 && fcb->CLRemoved) {
                 //TODO : add chunked encoding
             }
 
-            if(source != NULL)
+            if(current != NULL)
             {
-                int offset = (int)(source - (char*)packet->data()) + 4;
+                int offset = (int)(current - (char*)packet->data());
                 int headerSize =  offset;
                 packet->setContentOffset(headerSize);
                 fcb->headerFound = headerSize;
-                if (_verbose)
+                if (unlikely(_verbose))
                     click_chatter("Header size %d. First two bytes : %x%x", headerSize, packet->getPacketContent()[0], packet->getPacketContent()[1]);
             }
 
@@ -153,7 +213,7 @@ void HTTPIn::setHeader(WritablePacket*, const char* header, String value) {
 
 }*/
 
-bool HTTPIn::removeHeader(WritablePacket* packet, const char* header)
+bool HTTPIn::removeHeader(WritablePacket* packet, const String& header)
 {
     unsigned char* source = getPayload(packet);
 
@@ -172,7 +232,7 @@ bool HTTPIn::removeHeader(WritablePacket* packet, const char* header)
         return false;
 
     // Compute the size of the header
-    unsigned nbBytesToRemove = (end - beginning) + strlen("\r\n");
+    unsigned nbBytesToRemove = (end - beginning) + 2; //2 is strlen("\r\n");
 
     uint32_t position = beginning - source;
 
@@ -183,7 +243,7 @@ bool HTTPIn::removeHeader(WritablePacket* packet, const char* header)
 
 /*TODO : has header*/
 
-bool HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const char* headerName,
+bool HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const String &headerName,
      char* buffer, uint32_t bufferSize)
 {
     unsigned char* source = getPayload(packet);
@@ -198,7 +258,7 @@ bool HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, co
     }
 
     // Skip the colon
-    beginning += strlen(headerName) + 1;
+    beginning += headerName.length() + 1;
 
     uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
 
@@ -227,28 +287,22 @@ bool HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, co
     return true;
 }
 
-WritablePacket* HTTPIn::setHTTP10(struct fcb_httpin *fcb, WritablePacket *packet)
+WritablePacket* HTTPIn::setHTTP10(struct fcb_httpin *fcb, WritablePacket *packet, int &endFirstLine)
 {
     unsigned char* source = getPayload(packet);
-    // Search the end of the first line
-    unsigned char* endFirstLine = (unsigned char*)searchInContent((char*)source, "\r\n",
-        getPayloadLength(packet));
-
-    if(endFirstLine == NULL)
-        return packet;
 
     // Search the HTTP version
     unsigned char* beginning = (unsigned char*)searchInContent((char*)source, "HTTP/",
-        getPayloadLength(packet));
+        endFirstLine);
 
-    if(beginning == NULL || beginning > endFirstLine)
+    if(beginning == NULL)
         return packet;
 
     uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
 
     unsigned char* endVersion = (unsigned char*)searchInContent((char*)beginning, " ", lengthLeft);
-    if(endVersion == NULL || endVersion > endFirstLine)
-        endVersion = endFirstLine;
+    if(endVersion == NULL || endVersion > source + endFirstLine)
+        endVersion = source + endFirstLine;
 
     // Ensure that the line has the right length
     int offset = endVersion - beginning - 8; // 8 is the length of "HTTP/1.1"
@@ -257,6 +311,8 @@ WritablePacket* HTTPIn::setHTTP10(struct fcb_httpin *fcb, WritablePacket *packet
     else
         packet = StackElement::insertBytes(packet , beginning - source + 5, -offset);
 
+    endFirstLine -= offset;
+
     beginning[5] = '1';
     beginning[6] = '.';
     beginning[7] = '0';
@@ -264,7 +320,7 @@ WritablePacket* HTTPIn::setHTTP10(struct fcb_httpin *fcb, WritablePacket *packet
     return packet;
 }
 
-void HTTPIn::setRequestParameters(struct fcb_httpin *fcb, WritablePacket *packet)
+/*void HTTPIn::setRequestParameters(struct fcb_httpin *fcb, WritablePacket *packet)
 {
 
     unsigned char* source = getPayload(packet);
@@ -308,7 +364,7 @@ void HTTPIn::setRequestParameters(struct fcb_httpin *fcb, WritablePacket *packet
 
     fcb->isRequest = true;
 }
-
+*/
 
 bool HTTPIn::isLastUsefulPacket(Packet *packet)
 {

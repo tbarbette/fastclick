@@ -172,7 +172,7 @@ end:
 }
 
 WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacket* packet,
-    const char* headerName, const char* content)
+    const String &headerName, const char* content)
 {
     unsigned char* source = getPayload(packet);
 
@@ -187,7 +187,7 @@ WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacke
     if(beginning == NULL)
         return packet;
 
-    beginning += strlen(headerName) + 1;
+    beginning += headerName.length() + 1;
 
     uint32_t lengthLeft = getPayloadLength(packet) - (beginning - source);
 

@@ -107,7 +107,7 @@ public:
      * 0 if the pattern has not been found but the pattern could start at the end of the last
      * packet in the buffer and thus enqueuing the next packet could result in a match.
      */
-    int removeInFlow(const char* pattern, StackElement* remove);
+    int removeInFlow(const char* pattern, const int pattern_length, StackElement* remove);
 
     /** @brief Replace a pattern in the buffer
      * @param fcb A pointer to the FCB of this flow

@@ -285,7 +285,7 @@ private:
 
     per_thread<MemoryPool<struct ModificationNode>> poolModificationNodes;
     per_thread<MemoryPool<struct ModificationList>> poolModificationLists;
-    per_thread<RBTMemoryPoolStreamManager> rbtManager;
+    per_thread<RBTManager> rbtManager;
 
     HashTableMP<IPFlowID, tcp_common*> tableFcbTcpCommon;
     pool_allocator_mt<tcp_common,false,TCPCOMMON_POOL_SIZE> poolFcbTcpCommon;

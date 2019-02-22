@@ -120,26 +120,6 @@ bool StackElement::getAnnotationBit(Packet* p, int bit) const
     return (bool)value;
 }
 
-
-char* StackElement::searchInContent(char *content, const char *pattern, uint32_t length) {
-    // We use this method instead of a mere 'strstr' because the content of the packet
-    // is not necessarily NULL-terminated
-
-    uint32_t patternLen = strlen(pattern);
-
-    for(uint32_t i = 0; i < length; ++i)
-    {
-        if(patternLen + i > length)
-            return NULL;
-
-        if(strncmp(&content[i], pattern, patternLen) == 0)
-            return &content[i];
-    }
-
-    return NULL;
-}
-
-
 void StackElement::setAnnotationLastUseful(Packet *p, bool value) const
 {
     setAnnotationBit(p, OFFSET_ANNOTATION_LASTUSEFUL, value);

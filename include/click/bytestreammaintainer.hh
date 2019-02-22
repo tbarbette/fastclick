@@ -3,7 +3,7 @@
  * (bytes removed or inserted) as well as information such as the MSS, ports, ips, last
  * ack received, last ack sent, ...
  *
- * This file also contains the declaration and definition of RBTMemoryPoolStreamManager
+ * This file also contains the declaration and definition of RBTManager
  * which is the RBTManager used by ByteStreamMaintainer to store the modifications in the flow.
  *
  * Romain Gaillard.
