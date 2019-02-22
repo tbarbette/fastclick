@@ -709,6 +709,7 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
             poolModificationLists->releaseMemory(it.value());
         }
         poolModificationTracker.release(fcb_in->modificationLists);
+        fcb_in->modificationLists = 0;
     }
     if (common) {
         //click_chatter("Release common");

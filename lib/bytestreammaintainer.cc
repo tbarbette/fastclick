@@ -262,6 +262,7 @@ ByteStreamMaintainer::~ByteStreamMaintainer()
         if (treeSeq)
             RBTreeDestroy(treeSeq);
         treeSeq = 0;
+        initialized = false;
     }
 }
 
