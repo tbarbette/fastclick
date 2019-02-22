@@ -10,6 +10,10 @@
 #ifndef MIDDLEBOX_RBT_HH
 #define MIDDLEBOX_RBT_HH
 
+
+#include <clicknet/tcp.h>
+#include "memorypool.hh"
+
 CLICK_DECLS
 
 class RBTManager;
@@ -46,72 +50,6 @@ typedef struct rb_red_blk_tree {
     rb_red_blk_node* root;
     rb_red_blk_node* nil;
 } rb_red_blk_tree;
-
-
-/** @class RBTManager
- * @brief This abstract class is used to define the behaviour of a RBT manager.
- * The manager must take care of memory management as well as providing
- * methods to handle the objects managed by the tree.
-*/
-class RBTManager
-{
-public:
-    /**
-     * @brief Compare two keys in the RBT.
-     * @param first Pointer to the first key
-     * @param second Pointer to the second key
-     * @return 1 if *first > *second, -1 if *first < *second and 0 otherwise
-     */
-    virtual int compareKeys(const void* first, const void* second) = 0;
-
-    /**
-     * @brief Print a key
-     * @param key Pointer to the key
-     */
-    virtual void printKey(const void* key) = 0;
-
-    /**
-     * @brief Print the info associated to a key in a node
-     * @param info Pointer to the info
-     */
-    virtual void printInfo(void* info) = 0;
-
-    /**
-     * @brief Allocate and return memory for a node
-     * @return A pointer to the allocated node
-     */
-    virtual rb_red_blk_node* allocateNode(void) = 0;
-
-    /**
-     * @brief Allocate and return memory for a tree
-     * @return A pointer to the allocated tree
-     */
-    virtual rb_red_blk_tree* allocateTree(void) = 0;
-
-    /**
-     * @brief Free the memory used by a tree
-     * @param tree Pointer to the tree
-     */
-    virtual void freeTree(rb_red_blk_tree* tree) = 0;
-
-    /**
-     * @brief Free the memory used by a node
-     * @param node Pointer to the node
-     */
-    virtual void freeNode(rb_red_blk_node* node) = 0;
-
-    /**
-     * @brief Free the memory used by a key
-     * @param key Pointer to the key
-     */
-    virtual void freeKey(void* key) = 0;
-
-    /**
-     * @brief Free the memory used by an info
-     * @param info Pointer to the info
-     */
-    virtual void freeInfo(void* info) = 0;
-};
 
 /**
  * @brief Create a RBT
@@ -218,6 +156,97 @@ rb_red_blk_node* RBMax(rb_red_blk_tree* tree);
  * @param key A pointer to the key acting as a threshold
  */
 void RBPrune(rb_red_blk_tree* tree, void* key);
+
+#define BS_TREE_POOL_SIZE 10
+#define BS_POOL_SIZE 5000
+#define BS_PRUNE_THRESHOLD 10
+
+
+/** @class RBTManager
+ * @brief RBTManager that uses memory pools to allocate memory and compares
+ * the keys as sequence numbers.
+ *
+ * The keys are sequence numbers (uint32_t)
+ * The info are offsets (int)
+ */
+class RBTManager
+{
+public:
+    RBTManager() : poolNodes(BS_POOL_SIZE),
+        poolKeys(BS_POOL_SIZE),
+        poolInfos(BS_POOL_SIZE),
+        poolTrees(BS_TREE_POOL_SIZE)
+    {
+
+    }
+
+    inline int compareKeys(const void* first, const void* second)
+    {
+        if(SEQ_GT(*(uint32_t*)first, *(uint32_t*)second))
+            return 1;
+        if(SEQ_LT(*(uint32_t*)first, *(uint32_t*)second))
+            return -1;
+
+        return 0;
+    }
+
+    void printKey(const void* first)
+    {
+        click_chatter("%u", *(uint32_t*)first);
+    }
+
+    void printInfo(void* first)
+    {
+        click_chatter("%d", *(int*)first);
+    }
+
+    rb_red_blk_node* allocateNode(void)
+    {
+        return poolNodes.getMemory();
+    }
+
+    rb_red_blk_tree* allocateTree(void)
+    {
+        return poolTrees.getMemory();
+    }
+
+    void freeNode(rb_red_blk_node* node)
+    {
+        poolNodes.releaseMemory(node);
+    }
+
+    void freeKey(void* key)
+    {
+        poolKeys.releaseMemory((uint32_t*)key);
+    }
+
+    void freeInfo(void* info)
+    {
+        poolInfos.releaseMemory((int*)info);
+    }
+
+    void freeTree(rb_red_blk_tree* tree)
+    {
+        poolTrees.releaseMemory(tree);
+    }
+
+    uint32_t* allocateKey(void)
+    {
+        return poolKeys.getMemory();
+    }
+
+    int* allocateInfo(void)
+    {
+        return poolInfos.getMemory();
+    }
+
+private:
+    MemoryPool<rb_red_blk_tree> poolTrees;
+    MemoryPool<rb_red_blk_node> poolNodes;
+    MemoryPool<uint32_t> poolKeys;
+    MemoryPool<int> poolInfos;
+};
+
 
 CLICK_ENDDECLS
 

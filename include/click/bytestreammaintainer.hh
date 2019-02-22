@@ -17,98 +17,8 @@
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
 #include "rbt.hh"
-#include "memorypool.hh"
 
 CLICK_DECLS
-
-#define BS_TREE_POOL_SIZE 10
-#define BS_POOL_SIZE 5000
-#define BS_PRUNE_THRESHOLD 10
-
-/** @class RBTMemoryPoolStreamManager
- * @brief RBTManager that uses memory pools to allocate memory and compares
- * the keys as sequence numbers.
- *
- * The keys are sequence numbers (uint32_t)
- * The info are offsets (int)
- */
-class RBTMemoryPoolStreamManager : public RBTManager
-{
-public:
-    RBTMemoryPoolStreamManager() : poolNodes(BS_POOL_SIZE),
-        poolKeys(BS_POOL_SIZE),
-        poolInfos(BS_POOL_SIZE),
-        poolTrees(BS_TREE_POOL_SIZE)
-    {
-
-    }
-
-    int compareKeys(const void* first, const void* second)
-    {
-        if(SEQ_GT(*(uint32_t*)first, *(uint32_t*)second))
-            return 1;
-        if(SEQ_LT(*(uint32_t*)first, *(uint32_t*)second))
-            return -1;
-
-        return 0;
-    }
-
-    void printKey(const void* first)
-    {
-        click_chatter("%u", *(uint32_t*)first);
-    }
-
-    void printInfo(void* first)
-    {
-        click_chatter("%d", *(int*)first);
-    }
-
-    rb_red_blk_node* allocateNode(void)
-    {
-        return poolNodes.getMemory();
-    }
-
-    rb_red_blk_tree* allocateTree(void)
-    {
-        return poolTrees.getMemory();
-    }
-
-    void freeNode(rb_red_blk_node* node)
-    {
-        poolNodes.releaseMemory(node);
-    }
-
-    void freeKey(void* key)
-    {
-        poolKeys.releaseMemory((uint32_t*)key);
-    }
-
-    void freeInfo(void* info)
-    {
-        poolInfos.releaseMemory((int*)info);
-    }
-
-    void freeTree(rb_red_blk_tree* tree)
-    {
-        poolTrees.releaseMemory(tree);
-    }
-
-    uint32_t* allocateKey(void)
-    {
-        return poolKeys.getMemory();
-    }
-
-    int* allocateInfo(void)
-    {
-        return poolInfos.getMemory();
-    }
-
-private:
-    MemoryPool<rb_red_blk_tree> poolTrees;
-    MemoryPool<rb_red_blk_node> poolNodes;
-    MemoryPool<uint32_t> poolKeys;
-    MemoryPool<int> poolInfos;
-};
 
 /** @class ByteStreamMaintainer
  * @brief Class used to manage a flow. Stores the modifications in the flow
@@ -156,7 +66,7 @@ class ByteStreamMaintainer
          * @param rbtManager The RBTManager used to manage the trees
          * @param flowStart The first sequence number in the flow
          */
-        void initialize(RBTMemoryPoolStreamManager *rbtManager, uint32_t flowStart);
+        void initialize(RBTManager *rbtManager, uint32_t flowStart);
 
         /** @brief Prune the trees
          * @param position Value of the last ACK sent by the destination

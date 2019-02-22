@@ -38,7 +38,7 @@ ByteStreamMaintainer::ByteStreamMaintainer()
     dupAcks = 0;
 }
 
-void ByteStreamMaintainer::initialize(RBTMemoryPoolStreamManager *rbtManager, uint32_t flowStart)
+void ByteStreamMaintainer::initialize(RBTManager *rbtManager, uint32_t flowStart)
 {
     if(initialized)
     {
@@ -227,9 +227,9 @@ void ByteStreamMaintainer::insertInTree(rb_red_blk_tree* tree, uint32_t position
     if(currentNode == tree->nil || currentNode == NULL)
     {
         // Node did not already exist, insert
-        uint32_t *newKey = ((RBTMemoryPoolStreamManager*)tree->manager)->allocateKey();
+        uint32_t *newKey = ((RBTManager*)tree->manager)->allocateKey();
         *newKey = position;
-        int *newInfo = ((RBTMemoryPoolStreamManager*)tree->manager)->allocateInfo();
+        int *newInfo = ((RBTManager*)tree->manager)->allocateInfo();
         *newInfo = offset;
 
         RBTreeInsert(tree, newKey, newInfo);
