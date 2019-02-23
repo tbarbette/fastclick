@@ -12,7 +12,6 @@ CLICK_DECLS
 #define TCP_TIMEOUT 30000
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
-    poolFcbTcpCommon(),
     tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(false),_retransmit_pt(false)
 {
     // Initialize the memory pools of each thread
@@ -718,7 +717,7 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
         if (--common->use_count == 0) {
             common->lock.release();
             //lock->acquire();
-            if (common->state < TCPState::OPEN) {
+            if (common->state < TCPState::OPEN) { //common still in the connection table
                 //click_chatter("Delay release %p", common);
             } else {
                 //click_chatter("Direct release %p", common);
@@ -732,10 +731,10 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
             common->lock.release();
         }
 
+        fcb_in->common = 0;
     } else {
         click_chatter("Double release !");
     }
-    fcb_in->common = 0;
 
 }
 
@@ -1333,6 +1332,10 @@ void TCPIn::setFlowDirection(unsigned int flowDirection)
 {
     this->flowDirection = flowDirection;
 }
+
+pool_allocator_mt<tcp_common,true,TCPCOMMON_POOL_SIZE> TCPIn::poolFcbTcpCommon;
+pool_allocator_mt<ModificationTracker,false> TCPIn::poolModificationTracker;
+
 
 
 CLICK_ENDDECLS

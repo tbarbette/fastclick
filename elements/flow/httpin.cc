@@ -72,7 +72,8 @@ int
 HTTPIn::maxModificationLevel(Element* stop)
 {
         int r = StackSpaceElement<fcb_httpin>::maxModificationLevel(stop);
-        return r | MODIFICATION_RESIZE;
+        if (_set10 || _remove_encoding)
+            return r | MODIFICATION_RESIZE;
 }
 
 struct Header {
@@ -83,10 +84,10 @@ struct Header {
 
 void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 {
-    auto fnt = [this,fcb](Packet* p) -> Packet* {
+    auto fnt = [this,fcb](Packet* &p) -> bool {
         // Check that the packet contains HTTP content
         if(p->isPacketContentEmpty())
-            return p;
+            return true;
 
         // By default, the packet is not considered to be the last one
         // containing HTTP content
@@ -101,7 +102,7 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
             if(current == NULL) {
                     click_chatter("Probable attack : no method in HTTP");
                     closeConnection(packet, false); //Todo : support inter-packet header
-                    return NULL;
+                    return false;
             }
 
             int endOfMethod = current - (char*)packet->getPacketContent();
@@ -124,13 +125,18 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                 if (end == 0) {
                     click_chatter("Probable attack : no end of header in HTTP");
                     closeConnection(packet, false); //Todo : support inter-packet header
-                    return 0;
+                    return false;
                 }
                 if (end-current == 0) {
                     break; //Found the double termination
                 }
                 Header header;
-                char* split = strchr(current, ':');
+                char* split = (char*)memchr(current, ':', end-current);
+                if (split == NULL) {
+                    click_chatter("Malformed HTTP header");
+                    closeConnection(packet, false);
+                    return false;
+                }
                 header.header = String(current, split);
                 header.value = String(split + 2, end);
                 header.pos = current - (char*)packet->getPacketContent();
@@ -202,10 +208,11 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                 click_chatter("Last usefull packet !");
             setAnnotationLastUseful(packet, true);
         }
-        return p;
+        return true;
     };
-    EXECUTE_FOR_EACH_PACKET(fnt,flow);
-	output(0).push_batch(flow);
+    EXECUTE_FOR_EACH_PACKET_UNTIL(fnt,flow);
+    if (flow)
+	    output(0).push_batch(flow);
 }
 /*
 void HTTPIn::setHeader(WritablePacket*, const char* header, String value) {

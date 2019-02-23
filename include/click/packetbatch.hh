@@ -44,6 +44,37 @@ CLICK_DECLS
                 }
 
 /**
+ * Execute a function on each packets of a batch. The function may return
+ * another packet to replace the current one. This version will stop when
+ * a packet is dropped.
+ */
+#define EXECUTE_FOR_EACH_PACKET_UNTIL(fnt,batch) \
+                Packet* efep_next = ((batch != 0)? batch->next() : 0 );\
+                Packet* p = batch;\
+                Packet* last = 0;\
+                int count = batch->count();\
+                for (;p != 0;p=efep_next,efep_next=(p==0?0:p->next())) {\
+                    Packet* q = p;\
+                    bool drop = !fnt(q);\
+                    if (q != p) {\
+                        if (last) {\
+                            last->set_next(q);\
+                        } else {\
+                            batch = static_cast<PacketBatch*>(q);\
+                        }\
+                        q->set_next(efep_next);\
+                    }\
+                    if (unlikely(drop)) {\
+                        batch->kill();\
+                        batch = 0;\
+                        break;\
+                    }\
+                    last = q;\
+                }
+
+
+
+/**
  * Execute a function on each packet of a batch. The function may return
  * another packet and which case the packet of the batch will be replaced by
  * that one, or null if the packet is to be dropped.

@@ -83,7 +83,7 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
     } Pool;
 
     typedef struct GlobalPool_t {
-        uint8_t _pad[sizeof(T*)];
+        uint8_t _pad[sizeof(item)];
         struct GlobalPool_t* next;
     } GlobalPool;
 
@@ -141,6 +141,10 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
 #if CLICK_DEBUG_ALLOCATOR
         assert(p.count == p.find_count());
 #endif
+
+#if CLICK_DEBUG_ALLOCATOR > 1
+        click_chatter("%s Allocate %p %d %d",  typeid(T).name(), e,_released, _allocated);
+#endif
         return e;
     }
 
@@ -157,8 +161,13 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
     }
 
     void release_unitialized(T* e) {
+
 #if CLICK_DEBUG_ALLOCATOR
         _released++;
+#if CLICK_DEBUG_ALLOCATOR > 1
+        click_chatter("%s Release %p %d %d", typeid(T).name(), e, _released, _allocated);
+#endif
+
         assert(_released <= _allocated);
 #endif
         Pool& p = _pool.get();

@@ -288,8 +288,8 @@ private:
     per_thread<RBTManager> rbtManager;
 
     HashTableMP<IPFlowID, tcp_common*> tableFcbTcpCommon;
-    pool_allocator_mt<tcp_common,false,TCPCOMMON_POOL_SIZE> poolFcbTcpCommon;
-    pool_allocator_mt<ModificationTracker,false> poolModificationTracker;
+    static pool_allocator_mt<tcp_common,true,TCPCOMMON_POOL_SIZE> poolFcbTcpCommon;
+    static pool_allocator_mt<ModificationTracker,false> poolModificationTracker;
 
     TCPOut* outElement; // TCPOut element of this path
     TCPIn* returnElement; // TCPIn element of the return path
