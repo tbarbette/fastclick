@@ -83,6 +83,7 @@ class Unqueue : public BatchElement { public:
     int32_t _burst;
     int32_t _limit;
     uint32_t _count;
+    bool _enable_signal;
     Task _task;
     NotifierSignal _signal;
 
