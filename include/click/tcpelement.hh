@@ -202,13 +202,13 @@ public:
      * @brief Compute the TCP checksum of a packet and set it in its header
      * @param packet The packet
      */
-    void computeTCPChecksum(WritablePacket* packet) const;
+    inline void computeTCPChecksum(WritablePacket* packet) const;
 
     /**
      * @brief Reset the TCP checksum of a packet and set it in its header
      * @param packet The packet
      */
-    void resetTCPChecksum(WritablePacket* packet) const;
+    inline void resetTCPChecksum(WritablePacket* packet) const;
 
     /*Element responsible of the timeout management.
      * to allow for a unique per-flow acquire/release and timeout management
@@ -248,7 +248,6 @@ inline void TCPElement::resetTCPChecksum(WritablePacket *packet) const
 {
     click_ip *iph = packet->ip_header();
     click_tcp *tcph = packet->tcp_header();
-
 
     iph->ip_sum = 0;
     tcph->th_sum = 0;

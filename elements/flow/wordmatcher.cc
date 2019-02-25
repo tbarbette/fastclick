@@ -23,6 +23,7 @@ int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
     _insert_msg = "<font color='red'>Blocked content !</font><br />";
     String mode = "MASK";
     bool all = false;
+    Vector<String> insults;
     if(Args(conf, this, errh)
             .read_all("WORD", insults)
             .read_p("MODE", mode)
@@ -88,7 +89,7 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
 
     for(int i = 0; i < insults.size(); ++i)
     {
-        const char* insult = insults[i].c_str();
+        StringRef insult = StringRef(insults[i]);
     /*
      The following is left for reference on how to do a byte-to-byte matching, that is obviously not very efficient
         if (_mode == MASK) { //Masking mode
@@ -133,8 +134,8 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
             int result;
             do {
                 //iter = WordMatcher->flowBuffer.search(iter, insult, &result);
-                int l = insults[i].length();
-                iter = WordMatcher->flowBuffer.searchSSE(iter, insult, l, &result);
+                int l = insult.length();
+                iter = WordMatcher->flowBuffer.searchSSE(iter, insult.data(), l, &result);
 //                click_chatter("Result %d", result);
                 if (result == 1) {
                     if (_mode == REMOVE) {
@@ -144,9 +145,9 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                     } else if (_mode == MASK) {
                         WordMatcher->flowBuffer.replaceInFlow(iter, l, "*", 1, true, this);
                     } else if (_mode == REPLACE) {
-                        WordMatcher->flowBuffer.replaceInFlow(iter, l, _insert_msg.c_str(), insults[i].length(), false, this);
+                        WordMatcher->flowBuffer.replaceInFlow(iter, l, _insert_msg.data(), l, false, this);
                     } else if (_mode == FULL) {
-                        WordMatcher->flowBuffer.replaceInFlow(iter, l, _insert_msg.c_str(), _insert_msg.length(), false, this);
+                        WordMatcher->flowBuffer.replaceInFlow(iter, l, _insert_msg.data(), _insert_msg.length(), false, this);
                     } else if (_mode == CLOSE) {
                         goto closeconn; 
                     } else { //_mode == ALERT
