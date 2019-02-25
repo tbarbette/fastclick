@@ -106,6 +106,10 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p, F
 FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
     const bool always_dup = false;
     FlowNodePtr* child_ptr = 0;
+#if DEBUG_CLASSIFIER
+
+    FlowNode* debug_save_root = parent;
+#endif
 #if DEBUG_CLASSIFIER_MATCH > 1
     int level_nr = 0;
 #endif
@@ -195,7 +199,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                             _root->print();
     #endif
                             _root->check(true, false);
-                            flow_assert(reverse_match(child_ptr->leaf, p));
+                            flow_assert(reverse_match(child_ptr->leaf, p, debug_save_root));
                             return child_ptr->leaf;
                         } else {
 #if FLOW_KEEP_STRUCTURE
@@ -230,7 +234,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                     child_ptr = parent->default_ptr();
                     if (child_ptr->is_leaf()) {
                         _root->check(true, false); //Do nothing if not in debug mode
-                        flow_assert(reverse_match(child_ptr->leaf, p));
+                        flow_assert(reverse_match(child_ptr->leaf, p, debug_save_root));
                         return child_ptr->leaf;
                     }
                 }

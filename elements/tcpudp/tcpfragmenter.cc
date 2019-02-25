@@ -219,7 +219,7 @@ TCPFragmenter::push_batch(int, PacketBatch *batch)
         click_tcp *tcp = original->tcp_header();
         int tcp_payload = original->transport_header_offset() + (tcp->th_off<<2);
         Packet* last = original;
-        int frag_count = 0;
+        int frag_count = 1;
         for (int offset = max_tcp_len; offset < tcp_len; offset += max_tcp_len) {
             int length = tcp_len;
             if (length + offset > tcp_len)

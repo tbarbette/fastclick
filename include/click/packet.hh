@@ -1752,7 +1752,7 @@ Packet::kill()
 inline void
 Packet::kill_nonatomic()
 {
-#if CLICK_LINUXMODULE
+    #if CLICK_LINUXMODULE
         struct sk_buff *b = skb();
         b->next = b->prev = 0;
     # if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 15)

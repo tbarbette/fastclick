@@ -15,7 +15,7 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
 #define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
 
-#define HAVE_STATIC_CLASSIFICATION 0
+#define HAVE_STATIC_CLASSIFICATION || !HAVE_FLOW_DYNAMIC
 
 #define RELEASE_RESET 0
 #define RELEASE_KEEP 1

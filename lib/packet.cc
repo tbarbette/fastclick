@@ -973,11 +973,12 @@ Packet::clone(bool fast)
 		// increment our reference count because of _data_packet reference
 		origin->_use_count++;
 #if HAVE_FLOW_DYNAMIC
-    //DO not acuire clone, as we only release when use_count is 0
+    //DO NOT acquire clone, as we only release when use_count is 0
     /*if (fcb_stack)
         fcb_stack->acquire(1);*/
 #endif
     }
+
     return p;
 
 #endif /* CLICK_LINUXMODULE */
@@ -1382,12 +1383,17 @@ Packet::static_cleanup()
 WritablePacket *
 Packet::make_similar(Packet* original, uint32_t length)
 {
-
 #if HAVE_DPDK && !HAVE_DPDK_PACKET_POOL
     if (DPDKDevice::is_dpdk_buffer(original) && length <= DPDKDevice::MBUF_DATA_SIZE) {
         WritablePacket* p = WritablePacket::pool_allocate();
         if (!p)
             return 0;
+		p->initialize();
+
+#if HAVE_FLOW_DYNAMIC
+            if (fcb_stack)
+                fcb_stack->acquire(1);
+#endif
         rte_mbuf* mbuf = DPDKDevice::get_pkt();
 	p->_head = (unsigned char*)mbuf->buf_addr;
         p->_data = rte_pktmbuf_mtod(mbuf, unsigned char*);
