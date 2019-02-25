@@ -417,6 +417,7 @@ eagain:
                 // The allocation failed, meaning that the packet is not a SYN
                 // packet. This is not supposed to happen and it means that
                 // the first two packets of the connection are not SYN packets
+                    if (_verbose)
                     click_chatter("Warning: Trying to assign a common tcp memory area"
                         " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d, F:%d, src %s:%d dst %s:%d)",
                         isSyn(p),isRst(p),isAck(p),isFin(p),
@@ -477,6 +478,7 @@ eagain:
                     if(!checkRetransmission(fcb_in, p, false)) {
                         return 0;
                     }
+                    if (_verbose)
                     click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d, src %s:%d dst %s:%d). Dropping it",fcb_in->common->state, isAck(p),
                             IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
                             IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
