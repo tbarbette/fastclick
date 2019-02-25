@@ -11,7 +11,7 @@
 #include <click/tcpstate.hh>
 #include "retransmissiontiming.hh"
 #include "stackelement.hh"
-#include "tcpelement.hh"
+#include <click/tcpelement.hh>
 #include "tcpout.hh"
 
 #define MODIFICATIONLISTS_POOL_SIZE 1000

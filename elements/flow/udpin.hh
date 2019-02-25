@@ -1,6 +1,6 @@
 #ifndef MIDDLEBOX_UDPIn_HH
 #define MIDDLEBOX_UDPIn_HH
-#include "ipelement.hh"
+#include <click/ipelement.hh>
 #include "stackelement.hh"
 #include <click/element.hh>
 

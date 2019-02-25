@@ -74,5 +74,4 @@ void TCPClientAck::push_batch(int port, fcb_clientack* fcb, PacketBatch *batch)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(TCPClientAck)
-ELEMENT_REQUIRES(TCPElement)
 ELEMENT_MT_SAFE(TCPClientAck)

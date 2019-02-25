@@ -10,7 +10,6 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include "midstat.hh"
-#include "tcpelement.hh"
 
 CLICK_DECLS
 

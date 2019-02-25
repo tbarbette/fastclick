@@ -9,7 +9,6 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include "wordmatcher.hh"
-#include "tcpelement.hh"
 
 CLICK_DECLS
 

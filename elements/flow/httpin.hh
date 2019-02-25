@@ -2,7 +2,7 @@
 #define MIDDLEBOX_HTTPIN_HH
 #include <click/element.hh>
 #include "stackelement.hh"
-#include "tcpelement.hh"
+#include <click/tcpelement.hh>
 
 CLICK_DECLS
 

@@ -8,8 +8,7 @@
 #include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include "batchfcb.hh"
-#include "tcpelement.hh"
-
+#include <click/tcpelement.hh>
 
 /**
  * Structure used by the TCPClientAck element

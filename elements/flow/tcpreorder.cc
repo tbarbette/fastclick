@@ -608,5 +608,4 @@ void TCPReorder::fcb_release_fnt(FlowControlBlock* fcb, void* thunk) {
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(TCPReorder)
-ELEMENT_REQUIRES(TCPElement)
 ELEMENT_MT_SAFE(TCPReorder)

@@ -1,7 +1,7 @@
 #ifndef MIDDLEBOX_IPOUT_HH
 #define MIDDLEBOX_IPOUT_HH
 #include <click/element.hh>
-#include "ipelement.hh"
+#include <click/ipelement.hh>
 #include "stackelement.hh"
 
 CLICK_DECLS

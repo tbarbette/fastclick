@@ -8,7 +8,6 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include "flowasciiprint.hh"
-#include "tcpelement.hh"
 
 CLICK_DECLS
 

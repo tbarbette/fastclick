@@ -5,7 +5,7 @@
 #include <clicknet/tcp.h>
 #include <click/timestamp.hh>
 #include "tcpin.hh"
-#include "ipelement.hh"
+#include <click/ipelement.hh>
 
 CLICK_DECLS
 
@@ -1339,6 +1339,5 @@ pool_allocator_mt<ModificationTracker,false> TCPIn::poolModificationTracker;
 
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(TCPIn)
 ELEMENT_MT_SAFE(TCPIn)

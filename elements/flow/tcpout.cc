@@ -6,11 +6,11 @@
 #include <clicknet/tcp.h>
 #include "tcpin.hh"
 #include "tcpout.hh"
-#include "ipelement.hh"
+#include <click/ipelement.hh>
 
 CLICK_DECLS
 
-TCPOut::TCPOut() : inElement(NULL),_readonly(false), _allow_resize(false),_checksum(true)
+TCPOut::TCPOut() : inElement(NULL),_readonly(false), _allow_resize(false), _sw_checksum(true)
 {
 
 }
@@ -19,7 +19,7 @@ int TCPOut::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
         .read_p("READONLY", _readonly)
-        .read("CHECKSUM", _checksum)
+        .read("CHECKSUM", _sw_checksum)
         .complete() < 0)
             return -1;
     return 0;
@@ -174,7 +174,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                 }*/
 
 
-            if (!_checksum)
+            if (!_sw_checksum)
                 resetTCPChecksum(packet);
             else
                 computeTCPChecksum(packet);
@@ -206,7 +206,7 @@ void TCPOut::push_batch(int port, PacketBatch* flow)
                 // Recompute the checksum
                 WritablePacket *packet = p->uniqueify();
                 p = packet;
-                if (!_checksum)
+                if (!_sw_checksum)
                     resetTCPChecksum(packet);
                 else
                     computeTCPChecksum(packet);
@@ -342,6 +342,5 @@ unsigned int TCPOut::getOppositeFlowDirection()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(TCPOut)
 ELEMENT_MT_SAFE(TCPOut)

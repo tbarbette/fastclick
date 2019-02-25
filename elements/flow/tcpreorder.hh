@@ -8,7 +8,7 @@
 #include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include "batchfcb.hh"
-#include "tcpelement.hh"
+#include <click/tcpelement.hh>
 
 #define TCPREORDER_POOL_SIZE 100
 

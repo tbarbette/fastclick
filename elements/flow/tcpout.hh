@@ -3,7 +3,7 @@
 #include <click/element.hh>
 #include "stackelement.hh"
 #include <click/bytestreammaintainer.hh>
-#include "tcpelement.hh"
+#include <click/tcpelement.hh>
 
 // Forward declaration
 class TCPIn;
@@ -82,7 +82,7 @@ public:
         uint16_t sport, uint16_t dport, int graceful);
 
     void sendModifiedPacket(WritablePacket* packet) {
-            if (!_checksum)
+            if (!_sw_checksum)
                 resetTCPChecksum(packet);
             else
                 computeTCPChecksum(packet);
@@ -131,7 +131,7 @@ private:
     unsigned int flowDirection;
     bool _readonly;
     bool _allow_resize;
-    bool _checksum;
+    bool _sw_checksum;
 };
 
 CLICK_ENDDECLS

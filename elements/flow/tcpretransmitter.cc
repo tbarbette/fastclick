@@ -697,6 +697,5 @@ void TCPRetransmitter::signalAck(uint32_t ack)
     fcb->common->retransmissionTimings[flowDirection].sendMoreData();
 }
 
-ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(TCPRetransmitter)
 ELEMENT_MT_SAFE(TCPRetransmitter)

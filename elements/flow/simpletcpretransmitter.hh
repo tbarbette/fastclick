@@ -10,7 +10,7 @@
 #include <click/multithread.hh>
 #include <click/vector.hh>
 #include <clicknet/tcp.h>
-#include "tcpelement.hh"
+#include <click/tcpelement.hh>
 #include "tcpin.hh"
 
 CLICK_DECLS

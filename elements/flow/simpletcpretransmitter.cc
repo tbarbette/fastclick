@@ -246,6 +246,5 @@ void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
 }
 
 
-ELEMENT_REQUIRES(TCPElement)
 EXPORT_ELEMENT(SimpleTCPRetransmitter)
 ELEMENT_MT_SAFE(SimpleTCPRetransmitter)

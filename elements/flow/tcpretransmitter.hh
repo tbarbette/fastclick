@@ -13,7 +13,7 @@
 #include "stackelement.hh"
 #include <click/memorypool.hh>
 #include <click/bufferpool.hh>
-#include "tcpelement.hh"
+#include <click/tcpelement.hh>
 #include "tcpin.hh"
 #include <click/bufferpoolnode.hh>
 #include <click/bytestreammaintainer.hh>
