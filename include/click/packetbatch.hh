@@ -363,6 +363,13 @@ public :
         return prev();
     }
 
+    inline void append_simple_list(Packet* lhead, Packet* ltail, int lcount) {
+        tail()->set_next(lhead);
+        set_tail(ltail);
+        ltail->set_next(0);
+        set_count(count() + lcount);
+    }
+
     inline void append_batch(PacketBatch* head) {
         tail()->set_next(head);
         set_tail(head->tail());

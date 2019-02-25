@@ -1074,7 +1074,9 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     } else {
         p->_head = NULL;
         p->_data_packet = NULL; //packet from pool_data_allocate can be dirty
+        SFCB_STACK(
         WritablePacket::recycle(p);
+        );
         p = (WritablePacket*)this;
     }
 

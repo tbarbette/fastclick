@@ -71,6 +71,7 @@ class Packet { public:
 				uint32_t length, uint32_t tailroom) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
+    static inline WritablePacket *make_similar(Packet* original, uint32_t length) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_LINUXMODULE
     static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
 #elif CLICK_PACKET_USE_DPDK
@@ -1622,6 +1623,32 @@ Packet::make(uint32_t length)
 {
     return make(default_headroom, (const unsigned char *) 0, length, 0);
 }
+
+inline WritablePacket *
+Packet::make_similar(Packet* original, uint32_t length)
+{
+
+#if HAVE_DPDK && !HAVE_DPDK_PACKET_POOL
+    if (DPDKDevice::is_dpdk_buffer(original) && length <= DPDKDevice::MBUF_DATA_SIZE) {
+        WritablePacket* p = WritablePacket::pool_allocate();
+        if (!p)
+            return 0;
+        rte_mbuf* mbuf = DPDKDevice::get_pkt();
+	p->_head = mbuf->buf_addr;
+        p->_data = rte_pktmbuf_mtod(mbuf, unsigned char*);
+	    p->_tail = _data + length;
+	p->_end = mbuf->buf_addr + DPDKDevice::MBUF_DATA_SIZE;
+        p->_destructor = DPDKDevice::free_pkt;
+        p->_destructor_argument = mbuf;
+        return p;
+    }
+#endif
+    {
+        return make(default_headroom, (const unsigned char *) 0, length, 0);
+    }
+}
+
+
 
 #if CLICK_LINUXMODULE
 /** @brief Change an sk_buff into a Packet (linuxmodule).

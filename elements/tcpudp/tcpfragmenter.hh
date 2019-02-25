@@ -2,6 +2,7 @@
 #define CLICK_TCPFRAGMENTER_HH
 #include <click/element.hh>
 #include <click/batchelement.hh>
+#include <click/tcpelement.hh>
 CLICK_DECLS
 
 /*
@@ -32,7 +33,7 @@ fragment every packet larger than the annotation's value.
 =a IPFragmenter, TCPIPEncap
 */
 
-class TCPFragmenter : public BatchElement { public:
+class TCPFragmenter : public BatchElement, public TCPElement { public:
 
     TCPFragmenter() CLICK_COLD;
     ~TCPFragmenter() CLICK_COLD;
@@ -46,19 +47,21 @@ class TCPFragmenter : public BatchElement { public:
 
     void add_handlers() CLICK_COLD;
 
-    void push_packet(int, Packet*);
+    void push(int, Packet*) override;
 
+    WritablePacket* split_packet(WritablePacket* original, int offset, int len, const int &tcp_payload, bool last);
     #if HAVE_BATCH
-    void push_batch(int, PacketBatch *batch);
+    void push_batch(int, PacketBatch *batch) override;
     #endif
 
   private:
     uint16_t _mtu;
     int8_t _mtu_anno;
+    bool _sw_checksum;
 
-  atomic_uint32_t _fragments;
-  atomic_uint32_t _fragmented_count;
-  atomic_uint32_t _count;
+    atomic_uint32_t _fragments;
+    atomic_uint32_t _fragmented_count;
+    atomic_uint32_t _count;
 };
 
 CLICK_ENDDECLS

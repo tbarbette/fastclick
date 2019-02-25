@@ -48,8 +48,9 @@ TCPFragmenter::configure(Vector<String> &conf, ErrorHandler *errh)
     int mtu_anno = -1;
 
     if (Args(conf, this, errh)
-	.read("MTU", mtu)
+	.read_or_set_p("MTU", mtu, 1500)
 	.read("MTU_ANNO", AnnoArg(2), mtu_anno)
+	.read_or_set("SW_CHECKSUM", _sw_checksum, true)
 	.complete() < 0)
 	return -1;
 
@@ -62,7 +63,7 @@ TCPFragmenter::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-TCPFragmenter::push_packet(int, Packet *p)
+TCPFragmenter::push(int, Packet *p)
 {
     int mtu = _mtu;
     if (_mtu_anno >= 0 && p->anno_u16(_mtu_anno) &&
@@ -98,6 +99,7 @@ TCPFragmenter::push_packet(int, Packet *p)
         if (!p_clone)
             break;
         WritablePacket *q = p_clone->uniqueify();
+
         p_clone = 0;
         click_ip *ip = q->ip_header();
         click_tcp *tcp = q->tcp_header();
@@ -129,6 +131,48 @@ TCPFragmenter::push_packet(int, Packet *p)
     }
 }
 
+
+/*
+ * Copy original[offset, offset + len] to q[0, len], fixing header, and only if needed (if offset == 0)).
+ */
+WritablePacket* TCPFragmenter::split_packet(WritablePacket* original, int offset, int len, const int &tcp_payload, bool last) {
+            WritablePacket *q;
+            if (offset != 0) {
+                q = WritablePacket::make_similar(original, len + tcp_payload);
+                if (!q)
+                    return 0;
+                memcpy(q->data(), original->data(), tcp_payload);
+                q->copy_annotations(original);
+                q->set_mac_header(original->mac_header() ? q->data() + original->mac_header_offset() : 0);
+                q->set_network_header(original->network_header() ? q->data() + original->network_header_offset() : 0);
+                if (original->has_transport_header())
+                    q->set_transport_header(q->data() + original->transport_header_offset());
+            } else {
+                q = original;
+            }
+            click_ip *ip = q->ip_header();
+            click_tcp *tcp = q->tcp_header();
+            if (offset != 0) {
+                memcpy(q->data() + tcp_payload, original->data() + tcp_payload + offset, len);
+            }
+
+            q->take(q->length() - len -tcp_payload);
+            ip->ip_len = htons(q->end_data() - q->network_header());
+
+            if ((tcp->th_flags & TH_FIN) && !last)
+                tcp->th_flags ^= TH_FIN;
+
+            tcp->th_seq = htonl(ntohl(tcp->th_seq) + offset);
+
+            if (!_sw_checksum)
+                resetTCPChecksum(q);
+            else
+                computeTCPChecksum(q);
+
+            return q;
+}
+
+
 #if HAVE_BATCH
 void
 TCPFragmenter::push_batch(int, PacketBatch *batch)
@@ -157,7 +201,7 @@ TCPFragmenter::push_batch(int, PacketBatch *batch)
         int max_tcp_len = mtu - hlen;
 
         _count++;
-        if (!mtu || max_tcp_len <= 0 || tcp_len < max_tcp_len) {
+        if (!mtu || max_tcp_len <= 0 || tcp_len <= max_tcp_len) {
             // We add the packet to the batch we are building instead of sending it immediately
             if(newBatch == NULL)
                 newBatch = PacketBatch::make_from_packet(p);
@@ -168,50 +212,29 @@ TCPFragmenter::push_batch(int, PacketBatch *batch)
         }
 
         _fragmented_count++;
-        for (int offset = 0; offset < tcp_len; offset += max_tcp_len) {
-            Packet *p_clone;
-            if (offset + max_tcp_len < tcp_len)
-                p_clone = p->clone();
-            else {
-                p_clone = p;
-                p = 0;
-            }
-            if (!p_clone)
-                break;
-            WritablePacket *q = p_clone->uniqueify();
-            p_clone = 0;
-            click_ip *ip = q->ip_header();
-            click_tcp *tcp = q->tcp_header();
-            uint8_t *tcp_data = ((uint8_t *)tcp) + (tcp->th_off<<2);
-            int this_len = tcp_len - offset > max_tcp_len ? max_tcp_len : tcp_len - offset;
-            if (offset != 0)
-                memcpy(tcp_data, tcp_data + offset, this_len);
-            q->take(tcp_len - this_len);
-            ip->ip_len = htons(q->end_data() - q->network_header());
-            ip->ip_sum = 0;
-            #if HAVE_FAST_CHECKSUM
-                    ip->ip_sum = ip_fast_csum((unsigned char *)ip, q->network_header_length() >> 2);
-            #else
-                    ip->ip_sum = click_in_cksum((unsigned char *)ip, q->network_header_length());
-            #endif
 
-            if ((tcp->th_flags & TH_FIN) && offset + mtu < tcp_len)
-                tcp->th_flags ^= TH_FIN;
 
-            tcp->th_seq = htonl(ntohl(tcp->th_seq) + offset);
-            tcp->th_sum = 0;
+        WritablePacket *original = p->uniqueify();
 
-            // now calculate tcp header cksum
-            int plen = q->end_data() - (uint8_t*)tcp;
-            unsigned csum = click_in_cksum((unsigned char *)tcp, plen);
-            tcp->th_sum = click_in_cksum_pseudohdr(csum, ip, plen);
-            _fragments++;
-            // We add the packet to the batch we are building instead of sending it immediately
-            if(newBatch == NULL)
-                newBatch = PacketBatch::make_from_packet(q);
-            else
-                newBatch->append_packet(q);
+        click_tcp *tcp = original->tcp_header();
+        int tcp_payload = original->transport_header_offset() + (tcp->th_off<<2);
+        Packet* last = original;
+        int frag_count = 0;
+        for (int offset = max_tcp_len; offset < tcp_len; offset += max_tcp_len) {
+            int length = tcp_len;
+            if (length + offset > tcp_len)
+                length = tcp_len - offset;
+            WritablePacket* q  = split_packet(original, offset, length, tcp_payload, offset + max_tcp_len >= tcp_len);
+            frag_count++;
+            last->set_next(q);
+            last = q;
         }
+        _fragments+= frag_count;
+        split_packet(original, 0, max_tcp_len , tcp_payload, false);
+        if(newBatch == NULL)
+            newBatch = PacketBatch::make_from_simple_list(original, last, frag_count);
+        else
+            newBatch->append_simple_list(original, last, frag_count);
     }
 
     // We now send the batch we built
