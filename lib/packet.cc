@@ -1379,6 +1379,29 @@ Packet::static_cleanup()
 #endif
 }
 
+WritablePacket *
+Packet::make_similar(Packet* original, uint32_t length)
+{
+
+#if HAVE_DPDK && !HAVE_DPDK_PACKET_POOL
+    if (DPDKDevice::is_dpdk_buffer(original) && length <= DPDKDevice::MBUF_DATA_SIZE) {
+        WritablePacket* p = WritablePacket::pool_allocate();
+        if (!p)
+            return 0;
+        rte_mbuf* mbuf = DPDKDevice::get_pkt();
+	p->_head = (unsigned char*)mbuf->buf_addr;
+        p->_data = rte_pktmbuf_mtod(mbuf, unsigned char*);
+	    p->_tail = p->_data + length;
+	    p->_end = p->_head + DPDKDevice::MBUF_DATA_SIZE;
+        p->_destructor = DPDKDevice::free_pkt;
+        p->_destructor_argument = mbuf;
+        return p;
+    }
+#endif
+    {
+        return make(default_headroom, (const unsigned char *) 0, length, 0);
+    }
+}
 
 #if HAVE_STATIC_ANNO
 unsigned int Packet::clean_offset = 0;

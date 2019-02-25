@@ -225,6 +225,10 @@ TCPFragmenter::push_batch(int, PacketBatch *batch)
             if (length + offset > tcp_len)
                 length = tcp_len - offset;
             WritablePacket* q  = split_packet(original, offset, length, tcp_payload, offset + max_tcp_len >= tcp_len);
+            if (q == 0) {
+                click_chatter("OOM");
+                abort();
+            }
             frag_count++;
             last->set_next(q);
             last = q;
