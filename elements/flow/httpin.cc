@@ -76,10 +76,45 @@ HTTPIn::maxModificationLevel(Element* stop)
             return r | MODIFICATION_RESIZE;
 }
 
+/*
 struct Header {
     String header;
     String value;
     int pos;
+};*/
+
+int constexpr length(const char* str)
+{
+    return *str ? 1 + length(str + 1) : 0;
+}
+
+class FString { public:
+    explicit inline FString(char* begin, int len) {
+        _data = begin;
+        _len = len;
+    }
+
+    explicit inline FString(char* begin, char* end) {
+        _data = begin;
+        _len = end-begin;
+    }
+
+    inline bool operator==(const char* str) {
+        int l = length(str);
+        return FString(const_cast<char*>(str), l) == *this;
+    }
+
+    inline bool operator==(const FString &o) {
+        return o._len == _len && memcmp(_data, o._data, _len) == 0;
+    }
+
+    char*& data() {
+        return _data;
+    }
+
+    private:
+    char* _data;
+    unsigned _len;
 };
 
 void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
@@ -130,22 +165,22 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                 if (end-current == 0) {
                     break; //Found the double termination
                 }
-                Header header;
+                //Header header;
                 char* split = (char*)memchr(current, ':', end-current);
                 if (split == NULL) {
                     click_chatter("Malformed HTTP header");
                     closeConnection(packet, false);
                     return false;
                 }
-                header.header = String(current, split);
-                header.value = String(split + 2, end);
-                header.pos = current - (char*)packet->getPacketContent();
+                FString header = FString(current, split);
+                FString value = FString(split + 2, end);
+                int pos = current - (char*)packet->getPacketContent();
 
                 bool remove = false;
-                if (_remove_encoding && header.header == "Accept-Encoding") {
+                if (_remove_encoding && header == "Accept-Encoding") {
                     remove = true;
-                } else if (header.header == "Content-Length") {
-                    fcb->contentLength = (uint64_t)atol(header.value.data());
+                } else if (header == "Content-Length") {
+                    fcb->contentLength = (uint64_t)atol(value.data());
                     if (_buffer == 0 && _resize) {
                         if (_fill == RESIZE_CHUNKED || _set10) {
                             fcb->CLRemoved = true;
@@ -155,9 +190,9 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 
                         }
                     }
-                } else if (header.header == "Connection") {
+                } else if (header == "Connection") {
                     if ((_fill == RESIZE_CHUNKED || _set10) && (_buffer == 0 && _resize)) {
-                        if (header.value == "keep-alive") {
+                        if (value == "keep-alive") {
                             remove = true;
                             fcb->KARemoved = true;
                         }
@@ -169,8 +204,8 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                 //
                 if (remove) {
                     click_chatter("Removing");
-                    StackElement::removeBytes(packet, header.pos, end - current + 2);
-                    current = (char*)packet->getPacketContent() + header.pos;
+                    StackElement::removeBytes(packet, pos, end - current + 2);
+                    current = (char*)packet->getPacketContent() + pos;
                 } else {
                     current = end + 2;
                 }
