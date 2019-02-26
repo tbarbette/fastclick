@@ -87,8 +87,7 @@ void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
                     Packet* tail = toPush->tail();
                     char bufferHeader[25];
 
-                    sprintf(bufferHeader, "%lu", newContentLength);
-                    WritablePacket* newHead = setHeaderContent(fcb, toPush, "Content-Length", bufferHeader);
+                    WritablePacket* newHead = setHeaderContent(fcb, toPush, "Content-Length", StringRef::make(bufferHeader, newContentLength,25));
                     if (newHead != toPush) {
                         toPush = PacketBatch::start_head(newHead);
                         toPush->set_next(next);
@@ -172,7 +171,7 @@ end:
 }
 
 WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacket* packet,
-    const String &headerName, const char* content)
+    const StringRef &headerName, const StringRef &content)
 {
     unsigned char* source = getPayload(packet);
 
@@ -200,7 +199,7 @@ WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacke
         beginning++;
 
     uint32_t startPos = beginning - source;
-    uint32_t newSize = strlen(content);
+    uint32_t newSize = content.length();
     uint32_t endPos = startPos + newSize;
     uint32_t prevSize = end - beginning;
     uint32_t prevEndPos = startPos + prevSize;
@@ -212,7 +211,7 @@ WritablePacket* HTTPOut::setHeaderContent(struct fcb_httpout *fcb, WritablePacke
     else if(offset < 0)
         removeBytes(packet, endPos, -offset);
 
-    memcpy(beginning, content, newSize);
+    memcpy(beginning, content.data(), newSize);
 
     return packet;
 }

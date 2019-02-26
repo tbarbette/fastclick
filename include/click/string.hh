@@ -313,7 +313,28 @@ class StringRef {
     inline StringRef(const StringRef &x);
     inline StringRef(const char *cstr);
     inline StringRef(const char *s, int len);
+    inline StringRef(const char *b, const char* end);
     inline StringRef(const String &x);
+
+    inline static StringRef make(char * buf, unsigned long t, unsigned end) {
+        StringRef r;
+        unsigned i = end;
+        if (unlikely(end == 0)) {
+            r.data_ = buf;
+            r.len_ = 1;
+            buf[0] = '0';
+            return buf;
+        }
+
+        for (unsigned long b ; t ; t = b) {
+            b = t/10;
+            unsigned long c = t%10;
+            buf[--i] = static_cast<char>('0' + c);
+        }
+        r.data_ = buf + i;
+        r.len_ = end-i;
+        return r;
+    }
 
     inline const char *data() const;
     inline int length() const;
@@ -323,10 +344,18 @@ class StringRef {
 
     inline uint32_t hashcode() const;
 
+    inline bool operator==(const StringRef &o) {
+        return o.len_ == len_ && memcmp(data_, o.data_, len_) == 0;
+    }
+
   private:
     const char *data_;
     int len_;
 };
+
+inline StringRef operator "" _s(const char *str, std::size_t len) {
+    return StringRef(str, len);
+}
 
 /** @brief Construct an empty String (with length 0). */
 inline String::String() {
@@ -863,6 +892,9 @@ inline StringRef::StringRef(const char *cstr)
 
 inline StringRef::StringRef(const char *s, int len)
     : data_(s), len_(len) {
+}
+
+inline StringRef::StringRef(const char *b, const char* end) : data_(b), len_(end - b) {
 }
 
 inline StringRef::StringRef(const String &x)

@@ -88,35 +88,6 @@ int constexpr length(const char* str)
     return *str ? 1 + length(str + 1) : 0;
 }
 
-class FString { public:
-    explicit inline FString(char* begin, int len) {
-        _data = begin;
-        _len = len;
-    }
-
-    explicit inline FString(char* begin, char* end) {
-        _data = begin;
-        _len = end-begin;
-    }
-
-    inline bool operator==(const char* str) {
-        int l = length(str);
-        return FString(const_cast<char*>(str), l) == *this;
-    }
-
-    inline bool operator==(const FString &o) {
-        return o._len == _len && memcmp(_data, o._data, _len) == 0;
-    }
-
-    char*& data() {
-        return _data;
-    }
-
-    private:
-    char* _data;
-    unsigned _len;
-};
-
 void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
 {
     auto fnt = [this,fcb](Packet* &p) -> bool {
@@ -147,7 +118,7 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                 current = (char*)(packet->getPacketContent() + endOfMethod);
             }
             current += 2;
-            String method((char*)packet->getPacketContent(), (char*)current);
+            StringRef method((char*)packet->getPacketContent(), (char*)current);
             //click_chatter("Method : %s", method.c_str());
 
 //            fcb->isRequest = true;
@@ -172,8 +143,8 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                     closeConnection(packet, false);
                     return false;
                 }
-                FString header = FString(current, split);
-                FString value = FString(split + 2, end);
+                StringRef header = StringRef(current, split);
+                StringRef value = StringRef(split + 2, end);
                 int pos = current - (char*)packet->getPacketContent();
 
                 bool remove = false;
@@ -254,7 +225,7 @@ void HTTPIn::setHeader(WritablePacket*, const char* header, String value) {
 
 }*/
 
-bool HTTPIn::removeHeader(WritablePacket* packet, const String& header)
+bool HTTPIn::removeHeader(WritablePacket* packet, const StringRef& header)
 {
     unsigned char* source = getPayload(packet);
 
@@ -284,7 +255,7 @@ bool HTTPIn::removeHeader(WritablePacket* packet, const String& header)
 
 /*TODO : has header*/
 
-bool HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const String &headerName,
+bool HTTPIn::getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const StringRef &headerName,
      char* buffer, uint32_t bufferSize)
 {
     unsigned char* source = getPayload(packet);

@@ -44,6 +44,12 @@ StringTest::initialize(ErrorHandler *errh)
     CHECK(String("HELLO;YOU").split(';')[0] == "HELLO");
     CHECK(String("HELLO;YOU").split(';')[1] == "YOU");
 
+
+    char buf[25];
+    CHECK(StringRef::make(buf, 10, 25) == "10");
+    CHECK(StringRef::make(buf, 0, 25) == "0");
+    CHECK(StringRef::make(buf, 899910, 25) == "899910");
+
     if (!errh->nerrors()) {
     	errh->message("All tests pass!");
 		return 0;

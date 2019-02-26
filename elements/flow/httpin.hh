@@ -95,7 +95,7 @@ private:
      * @param header Name of the header to remove
      * @return true if header was removed
      */
-    bool removeHeader(WritablePacket* packet, const String &header);
+    bool removeHeader(WritablePacket* packet, const StringRef &header);
 
     /** @brief Return the content of an HTTP header
      * @param fcb Pointer to the FCB of the flow
@@ -105,7 +105,7 @@ private:
      * @param bufferSize Maximum size of the header (the content will be truncated if the buffer
      * is not large enough to contain it)
      */
-    bool getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const String &headerName,
+    bool getHeaderContent(struct fcb_httpin *fcb, WritablePacket* packet, const StringRef &headerName,
         char* buffer, uint32_t bufferSize);
 
     /** @brief Process the headers and set the URL and the method in the httpin part of the FCB

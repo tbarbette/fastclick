@@ -68,7 +68,7 @@ protected:
      * @return The packet with the HTTP header modified
      */
     WritablePacket* setHeaderContent(struct fcb_httpout *fcb, WritablePacket* packet,
-        const String &headerName, const char* content) CLICK_WARN_UNUSED_RESULT;
+        const StringRef &headerName, const StringRef &content) CLICK_WARN_UNUSED_RESULT;
 
     HTTPIn* _in;
 };

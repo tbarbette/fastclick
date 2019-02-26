@@ -6,6 +6,7 @@
 #include <click/router.hh>
 #include <click/flowbuffer.hh>
 #include <click/routervisitor.hh>
+#   include <immintrin.h>
 
 CLICK_DECLS
 
@@ -116,7 +117,7 @@ protected:
      * @param length The length of the content
      * @return A pointer to the first byte of pattern in the content or NULL if it cannot be found
      */
-    inline char* searchInContent(char *content, const String &pattern, uint32_t length);
+    inline char* searchInContent(char *content, const StringRef &pattern, uint32_t length);
 
     /**
      * @brief Set the INITIAL_ACK annotation of the packet. This annotation stores the initial
@@ -511,25 +512,98 @@ class StackChunkBufferElement : public StackStateElement<Derived, BufferData<T>>
     }
 };
 
+/*
+Copyright (c) 2008-2016, Wojciech Muła
+All rights reserved.
 
-//Inline functions
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
 
-char* StackElement::searchInContent(char *content, const String &pattern, uint32_t length) {
-    // We use this method instead of a mere 'strstr' because the content of the packet
-    // is not necessarily NULL-terminated
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
 
-    uint32_t patternLen = pattern.length();
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
 
-    for(uint32_t i = 0; i < length; ++i)
-    {
-        if(patternLen + i > length)
-            return NULL;
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+namespace bits {
 
-        if(strncmp(&content[i], pattern.data(), patternLen) == 0)
-            return &content[i];
+    template <typename T>
+    inline T clear_leftmost_set(const T value) {
+
+        assert(value != 0);
+
+        return value & (value - 1);
     }
 
-    return NULL;
+
+    template <typename T>
+    inline unsigned get_first_bit_set(const T value) {
+
+        assert(value != 0);
+
+        return __builtin_ctz(value);
+    }
+
+
+    template <>
+    inline unsigned get_first_bit_set<uint64_t>(const uint64_t value) {
+
+        assert(value != 0);
+
+        return __builtin_ctzl(value);
+    }
+
+} // namespace bits
+
+inline size_t avx2_strstr_anysize(const char* s, size_t n, const char* needle, size_t k) {
+
+    const __m256i first = _mm256_set1_epi8(needle[0]);
+    const __m256i last  = _mm256_set1_epi8(needle[k - 1]);
+
+    for (size_t i = 0; i < n; i += 32) {
+
+        const __m256i block_first = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
+        const __m256i block_last  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + k - 1));
+
+        const __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);
+        const __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);
+
+        uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));
+
+        while (mask != 0) {
+
+            const auto bitpos = bits::get_first_bit_set(mask);
+
+            if (memcmp(s + i + bitpos + 1, needle + 1, k - 2) == 0) {
+                return i + bitpos;
+            }
+
+            mask = bits::clear_leftmost_set(mask);
+        }
+    }
+
+    return std::string::npos;
+}
+
+//Inline functions
+inline char* StackElement::searchInContent(char *content, const StringRef &pattern, uint32_t length) {
+    int pos = avx2_strstr_anysize(content, length, pattern.data(), pattern.length());
+    if (pos == std::string::npos)
+        return 0;
+    else return content + pos;
 }
 
 
