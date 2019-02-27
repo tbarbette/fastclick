@@ -28,13 +28,16 @@ CheckLength::CheckLength()
 int
 CheckLength::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    return Args(conf, this, errh).read_mp("LENGTH", _max).complete();
+    return Args(conf, this, errh)
+                .read_mp("LENGTH", _max)
+                .read_or_set("EXTRA_LENGTH", _use_extra_length, false)
+                .complete();
 }
 
 void
 CheckLength::push(int, Packet *p)
 {
-  if (p->length() > _max)
+  if (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0) > _max)
     checked_output_push(1, p);
   else
     output(0).push(p);
@@ -44,7 +47,7 @@ Packet *
 CheckLength::pull(int)
 {
   Packet *p = input(0).pull();
-  if (p && p->length() > _max) {
+  if (p && (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0)) > _max) {
     checked_output_push(1, p);
     return 0;
   } else
