@@ -37,7 +37,7 @@ class CheckLength : public Element { public:
  protected:
 
   unsigned _max;
-
+  bool _use_extra_length;
 };
 
 CLICK_ENDDECLS
