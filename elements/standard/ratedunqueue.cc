@@ -39,6 +39,7 @@ RatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(this, errh).bind(conf)
 	    .read_or_set("BURST", _burst, 32)
+        .read_or_set("ACTIVE", _active, true)
         .consume() < 0)
         return -1;
     return configure_helper(&_tb, is_bandwidth(), this, conf, errh);
