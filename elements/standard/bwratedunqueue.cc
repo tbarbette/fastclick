@@ -19,12 +19,27 @@
  */
 
 #include <click/config.h>
+#include <click/args.hh>
 #include "bwratedunqueue.hh"
 CLICK_DECLS
 
-BandwidthRatedUnqueue::BandwidthRatedUnqueue()
+BandwidthRatedUnqueue::BandwidthRatedUnqueue() : _use_extra_length(false), _link_rate(false)
 {
 }
+
+int
+BandwidthRatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (Args(this, errh).bind(conf)
+        .read_or_set("EXTRA_LENGTH", _use_extra_length, false)
+        .read_or_set("LINK_RATE", _link_rate, false)
+        .consume() < 0)
+        return -1;
+    return RatedUnqueue::configure(conf, errh);
+}
+
+#define LENGTHOF(p) \
+    ((_link_rate?8:1)*(p->length() + _use_extra_length? EXTRA_LENGTH_ANNO(p) : 0) + (_link_rate? 8 * 24:0))
 
 bool
 BandwidthRatedUnqueue::run_task(Task *)
@@ -43,7 +58,7 @@ BandwidthRatedUnqueue::run_task(Task *)
             PacketBatch* batch = input(0).pull_batch(_burst);
             if (batch) {
                 int c = 0;
-                FOR_EACH_PACKET(batch, p) c += p->length();
+                FOR_EACH_PACKET(batch, p) c += LENGTHOF(p);
                 _tb.remove(c);
                 _packets += batch->count();
                 _pushes++;
@@ -58,7 +73,7 @@ BandwidthRatedUnqueue::run_task(Task *)
 #endif
         {
             if (Packet *p = input(0).pull()) {
-                _tb.remove(p->length());
+                _tb.remove(LENGTHOF(p));
                 _packets++;
                 _pushes++;
                 worked = true;
