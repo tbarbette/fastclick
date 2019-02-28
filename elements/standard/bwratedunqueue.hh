@@ -34,6 +34,17 @@ CLICK_DECLS
  * Integer.  If specified, the capacity of the token bucket is set to this
  * value in bytes.
  *
+ * =item EXTRA_LENGTH
+ *
+ * Boolean. If true, then the length of the packet in the EXTRA_LENGTH 
+ * annotation will be taken into account. Default to false.
+ *
+ * =item LINK_RATE
+ *
+ * Boolean. If true, the given RATE is considered as a link rate, in bits/s,
+ * taking into account inter-frame, preamble and FCS for each packets. FCS
+ * is assumed to be stripped (hence, 24 bytes are added per-packets).
+ *
  * =h rate read/write
  *
  * =a RatedUnqueue, Unqueue, BandwidthShaper, BandwidthRatedSplitter */
