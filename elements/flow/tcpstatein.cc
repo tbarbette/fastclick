@@ -27,7 +27,7 @@ TCPStateIN::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Element* e;
     if (Args(conf, this, errh)
-                .read_m("RETURNNAME",e)
+                .read_mp("RETURNNAME",e)
                 .read("ACCEPT_NONSYN", _accept_nonsyn)
                 .complete() < 0)
         return -1;
@@ -68,17 +68,27 @@ int TCPStateIN::initialize(ErrorHandler *errh) {
 
 bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
     
-    TCPStateCommon* ref;
-        bool found = _return->_map.find_remove(IPFlowID(p),ref);
+    TCPStateCommon* common;
+    bool found = _return->_map.find_remove_clean(IPFlowID(p),[&common](TCPStateCommon* &c){common=c;},[this](TCPStateCommon* &c){ //This function is called under read lock
+                if (c->use_count == 1) { //Inserter removed the reference without grabing
+                    if (c->use_count.dec_and_test())
+                        _pool.release(c);
+                    return true;
+                }
+                return false;
+                });
         if (found) {
             if (_verbose)
-                click_chatter("Found entry!");
+                click_chatter("Found entry, map has %d entries!",_return->_map.size());
             auto th = p->tcp_header();
-            fcb->ref = ref;
+            fcb->common = common;
             fcb->fin_seen = false;
-            ++fcb->ref->ref;
-            if (fcb->ref->ref == 1) { //Connection was reset
-                --fcb->ref->ref;
+//we keep the reference from the table
+//            ++fcb->common->use_count;
+            if (fcb->common->use_count == 1) { //Connection was reset, we have the only ref
+                if (fcb->common->use_count.dec_and_test())
+                    _pool.release(fcb->common);
+                fcb->common = 0;
                 return false;
             }
             return true;
@@ -88,58 +98,90 @@ bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
         return false;
     }
     if (_verbose)
-        click_chatter("New entry!");
-    fcb->ref = _pool.allocate();
-    fcb->ref->ref = 1;
-    fcb->ref->closing = false;
+        click_chatter("New entry (return map has %d entries, my map has %d entries)!",_return->_map.size(), _map.size());
+    fcb->common = _pool.allocate();
+    fcb->common->use_count = 2; //us and the table
+    fcb->common->closing = false;
     fcb->fin_seen = false;
 
-    _map.find_insert(IPFlowID(p).reverse(), fcb->ref);
+    _map.find_insert(IPFlowID(p).reverse(), fcb->common);
+    if (_verbose)
+        click_chatter("Map has %d entries", _map.size());
     return true;
 }
 
 void TCPStateIN::release_flow(TCPStateEntry* fcb) {
     if (_verbose)
         click_chatter("Release entry!");
-    if (fcb->ref)
+    if (fcb->common)
     {
-        if (fcb->ref->ref.dec_and_test()) {
-            _pool.release(fcb->ref);
+        if (fcb->common->use_count.dec_and_test()) {
+            _pool.release(fcb->common);
             if (_verbose)
-                click_chatter("Release FCB!");
+                click_chatter("Release FCB common!");
         }
-        fcb->ref = 0;
+        fcb->common = 0;
     }
 }
 
 void TCPStateIN::push_batch(int port, TCPStateEntry* flowdata, PacketBatch* batch) {
     auto fnt = [this,flowdata](Packet* p) -> Packet*{
-        if (!flowdata->ref) {
+        if (!flowdata->common) {
+            //A packet arrived without a common but which is already seen. That's probably reusing of a connection, or a lost packet from a long time ago
             return 0;
         }
 
-        if (unlikely(p->tcp_header()->th_flags & TH_RST)) {
+        if (unlikely(p->tcp_header()->th_flags & TH_RST)) { //RST, this side will never see any useful packet
             close_flow();
             release_flow(flowdata);
             return p;
         } else if (unlikely(p->tcp_header()->th_flags & TH_FIN)) {
-            flowdata->fin_seen = true;
-            if (flowdata->ref->closing && p->tcp_header()->th_flags & TH_ACK) {
-                close_flow();
-                release_flow(flowdata);
+            if (flowdata->fin_seen) { //Fin retransmit
             } else {
-                flowdata->ref->closing = true;
+
+                flowdata->fin_seen = true; //First fin on this side
+                if (flowdata->common->closing && p->tcp_header()->th_flags & TH_ACK) {
+                    //This is the second fin from the other side
+                    close_flow();
+                    release_flow(flowdata);
+                } else {
+                    flowdata->common->closing = true; //This is the first fin, this side will send the final ACK
+                }
             }
-        } else if (unlikely(flowdata->ref->closing && p->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
+        } else if (unlikely(flowdata->common->closing && p->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
             close_flow();
             release_flow(flowdata);
         }
         return p;
     };
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, (void));
+    EXECUTE_FOR_EACH_PACKET_DROP_LIST(fnt, batch, drop);
 
-    checked_output_push_batch(0, batch);
+    output_push_batch(0, batch);
+
+    if (drop) {
+        checked_output_push_batch(1, drop);
+    }
 }
+
+enum {h_map_size};
+String TCPStateIN::read_handler(Element* e, void* thunk) {
+    TCPStateIN* tc = static_cast<TCPStateIN*>(e);
+
+    switch ((intptr_t)thunk) {
+        case h_map_size:
+            return String(tc->_map.size());
+    }
+    return String("");
+}
+
+void TCPStateIN::add_handlers() {
+
+    add_read_handler("map_size", TCPStateIN::read_handler, h_map_size);
+
+}
+
+
+pool_allocator_mt<TCPStateCommon,false,16384> TCPStateIN::_pool;
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)

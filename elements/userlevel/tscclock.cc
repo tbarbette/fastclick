@@ -218,7 +218,7 @@ bool TSCClock::accumulate_tick(Timer* t) {
         //If we did a full loop, we disable the clock...
         if (nt == home_thread()->thread_id()) {
             if (_verbose)
-                click_chatter("Click tasks are too heavy and the TSC clock cannot run at least once every %dmsec, the TSC clock is deactivated.");
+                click_chatter("Click tasks are too heavy and the TSC clock cannot run at least once every %dmsec, the TSC clock is deactivated.", update_period_subsec*2 / Timestamp::subsec_per_msec);
             if (_install)
                 Timestamp::set_clock(0,0);
             return false;

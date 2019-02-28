@@ -16,9 +16,9 @@ CLICK_DECLS
 
 struct TCPStateCommon {
     TCPStateCommon() : closing(false) {
-        ref = 0;
+        use_count = 0;
     }
-    atomic_uint32_t ref; //Reference count
+    atomic_uint32_t use_count; //Reference count
     bool closing; //Has one side started to close?
     uint32_t _pad[2];
 };
@@ -29,7 +29,7 @@ struct TCPStateCommon {
  * and a flag to know if the mapping has been seen on this side.
  */
 struct TCPStateEntry {
-    TCPStateCommon* ref;
+    TCPStateCommon* common;
     bool fin_seen;
 };
 
@@ -50,14 +50,14 @@ public:
     ~TCPStateIN() CLICK_COLD;
 
     const char *class_name() const		{ return "TCPStateIN"; }
-    const char *port_count() const		{ return "1/1"; }
+    const char *port_count() const		{ return "1/1-2"; }
     const char *processing() const		{ return PUSH; }
 
     //TCP only for now, just to reuse the macro but nothing prevents UDP
     FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY", FLOW_TCP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh);
+    int initialize(ErrorHandler *errh) CLICK_COLD;
 
     static const int timeout = TCP_STATE_FLOW_TIMEOUT;
     
@@ -65,8 +65,14 @@ public:
     void release_flow(TCPStateEntry*);
 
     void push_batch(int, TCPStateEntry*, PacketBatch *);
+
+
+    static String read_handler(Element* e, void* thunk);
+    void add_handlers();
 private:
-    pool_allocator_mt<TCPStateCommon,false,16384> _pool;
+
+    //Needs to be static to  prevent having one side releasing to another, hence having a pool only allocating and the other only cleaning
+    static pool_allocator_mt<TCPStateCommon,false,16384> _pool;
 
 private:
     bool _accept_nonsyn;

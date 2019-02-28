@@ -346,6 +346,8 @@ int FlowClassifier::_initialize_timers(ErrorHandler *errh) {
             IdleTask* idletask = new IdleTask(this);
             idletask->initialize(this, i, 100);
         }
+        _timer.initialize(this);
+        _timer.schedule_after_msec(_clean_timer);
         //todo : INIT timer if needed? The current solution seems ok
 #endif
     }
@@ -406,7 +408,8 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
 //#endif
     //return work_done;
 #endif
-    return false; //No reschedule
+//    return false; //No reschedule
+    return true;
 }
 
 /**
@@ -557,34 +560,42 @@ void FlowClassifier::push_batch(int, PacketBatch* batch) {
 //#endif
 }
 
+enum {h_leaves_count, h_active_count, h_print, h_timeout_count};
 String FlowClassifier::read_handler(Element* e, void* thunk) {
     FlowClassifier* fc = static_cast<FlowClassifier*>(e);
 
     fcb_table = &fc->_table;
     switch ((intptr_t)thunk) {
-        case 0: {
+        case h_active_count:
+        case h_leaves_count: {
             int n = 0;
             fc->_table.get_root()->traverse_all_leaves([&n](FlowNodePtr* ptr) {
-                #if HAVE_FLOW_DYNAMIC
-                click_chatter("%d",ptr->leaf->count());
+                #if HAVE_FLOW_DYNAMIC && FLOW_DEBUG_CLASSIFIER
+                    click_chatter("%d",ptr->leaf->count());
                 #endif
                 n++;
-            },true,true);
+            },true,(intptr_t)thunk==h_leaves_count);
             fcb_table = 0;
             return String(n);
         }
-        case 1:
-            fc->_table.get_root()->print(-1,false);
+        case h_print:
+            fc->_table.get_root()->print(-1,false,true,false);
             fcb_table = 0;
             return String("");
+        case h_timeout_count:
+            return String(fc->_table.old_flows->count());
         default:
             return String("<unknown>");
     }
 };
 
 void FlowClassifier::add_handlers() {
-    add_read_handler("leaves", FlowClassifier::read_handler, 0);
-    add_read_handler("print_tree", FlowClassifier::read_handler, 1);
+
+    add_read_handler("leaves_count", FlowClassifier::read_handler, h_leaves_count);
+    add_read_handler("leaves_all_count", FlowClassifier::read_handler, h_leaves_count);
+    add_read_handler("leaves_nondefault_count", FlowClassifier::read_handler, h_active_count);
+    add_read_handler("print_tree", FlowClassifier::read_handler, h_print);
+    add_read_handler("timeout_count", FlowClassifier::read_handler, h_timeout_count);
 }
 
 

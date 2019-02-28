@@ -162,7 +162,7 @@ void FlowNode::reverse_print() {
     };
 }
 
-void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr, bool recursive) {
+void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr, bool recursive, bool do_release) {
     if (show_ptr) {
         if (node->level()->is_dynamic()) {
             click_chatter("%s%s (%s, %d childs, dynamic) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
@@ -182,11 +182,13 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
     FlowNodePtr* cur = 0;
     while ((cur = it.next()) != 0) {
         if (!cur->is_leaf()) {
+            if (!do_release && cur->node->released())
+                continue;
             if (show_ptr)
                 click_chatter("%s|-> %lu Parent:%p",prefix.c_str(),cur->data().get_long(),cur->parent());
             else
-                click_chatter("%s|-> %lu",prefix.c_str(),cur->data().get_long());
-            print(cur->node,prefix + "|  ",data_offset, show_ptr);
+                click_chatter("%s|-> %lu",prefix.c_str(),cur->data().get_long(), cur->node->released());
+            print(cur->node,prefix + "|  ",data_offset, show_ptr, recursive, do_release);
         } else {
             cur->leaf->print(prefix + "|->",data_offset, show_ptr);
         }
@@ -199,7 +201,7 @@ void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool sh
             else
                 click_chatter("%s|-> DEFAULT",prefix.c_str());
             flow_assert(node->level()->is_dynamic() || node->_default.node->parent() == node);
-            print(node->_default.node,prefix + "|  ",data_offset, show_ptr);
+            print(node->_default.node,prefix + "|  ",data_offset, show_ptr, recursive, do_release);
         } else {
             node->_default.leaf->print(prefix + "|-> DEFAULT",data_offset, show_ptr);
         }
@@ -597,8 +599,26 @@ FlowNode* FlowNodeArray::duplicate(bool recursive, int use_count, bool duplicate
     fa->duplicate_internal(this, recursive, use_count, duplicate_leaf);
     return fa;
 }
-
-
+void FlowNodeArray::release_child(FlowNodePtr child, FlowNodeData data) {
+{
+            if (child.is_leaf()) {
+                childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
+            } else {
+                if (growing()) {
+                    child.node->destroy();
+                    child.node = 0;
+                } else {
+#if FLOW_KEEP_STRUCTURE
+                    child.node->release();
+#else
+                    child.node->destroy();
+                    child.node = 0;
+#endif
+                }
+            }
+            num--;
+    }
+};
 
 /******************************
  * FlowNodeHash

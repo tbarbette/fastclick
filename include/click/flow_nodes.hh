@@ -379,11 +379,11 @@ public:
     bool has_no_default(bool allow_dynamic = false);
 
     void reverse_print();
-    static void print(const FlowNode* node,String prefix,int data_offset = -1, bool show_ptr = true, bool recursive=true);
+    static void print(const FlowNode* node,String prefix,int data_offset = -1, bool show_ptr = true, bool recursive=true, bool do_release = true);
 
-    inline void print(int data_offset = -1, bool show_ptr = true) const {
+    inline void print(int data_offset = -1, bool show_ptr = true, bool recursive = true, bool do_release = true) const {
         click_chatter("---");
-        print(this,"", data_offset, show_ptr);
+        print(this,"", data_offset, show_ptr, recursive, do_release);
         click_chatter("---");
     }
 #if DEBUG_CLASSIFIER
@@ -563,25 +563,8 @@ public:
     String name() const {
         return "ARRAY";
     }
+    void release_child(FlowNodePtr child, FlowNodeData data) override;
 
-    void release_child(FlowNodePtr child, FlowNodeData data) override {
-            if (child.is_leaf()) {
-                childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
-            } else {
-                if (growing()) {
-                    child.node->destroy();
-                    child.node = 0;
-                } else {
-#if FLOW_KEEP_STRUCTURE
-                    child.node->release();
-#else
-                    child.node->destroy();
-                    child.node = 0;
-#endif
-                }
-            }
-            num--;
-    }
 
     ~FlowNodeArray();
 

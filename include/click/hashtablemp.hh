@@ -35,7 +35,7 @@ class HashContainerMP { public:
         ListItem* _hashnext;
     };
 
-    pool_allocator_mt<ListItem> _allocator;
+    pool_allocator_mt<ListItem, false, 2048> _allocator;
 
     class ListItemPtr { public:
         ListItemPtr() : head(0) {};
@@ -486,10 +486,13 @@ HashContainerMP<K,V,Item>::find_remove_clean(const K &key, std::function<void(V 
     ListItem* *pprev_ptr = &bucket.list->head;
     ptr p;
     while (pprev) {
+        //We have the write lock of the bucket, so cleaning along the way is fine
         if (shoulddelete(*pprev->item.unprotected_ptr())) {
             *pprev_ptr = pprev->_hashnext;
-            erase_item(pprev);
+            ListItem* tmp = pprev;
             pprev = *pprev_ptr;
+            erase_item(tmp);
+            _table->_size--;
         } else {
             if (hashkeyeq(hashkey(pprev), key)) {
                 store(*pprev->item.unprotected_ptr());

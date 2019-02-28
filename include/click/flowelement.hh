@@ -225,7 +225,7 @@ public :
  * void push_batch(int port, T*, Packet*);
  * void release_flow(T*);
  *
- * close_flow() can be called to release the flow now, remove timer etc It will not call your release_flow();.
+ * close_flow() can be called to release the flow now, remove timer etc It will not call your release_flow(); automatically, do it before. A packet coming for the same flow after close_flow() is called will be considered from a new flow (seen flag is reset).
  */
 template<class Derived, typename T> class FlowStateElement : public VirtualFlowSpaceElement {
     struct AT : public FlowReleaseChain {
