@@ -165,7 +165,19 @@ UDPRewriter::process(int port, Packet *p_in)
     }
 
     IPFlowID flowid(p);
-    IPRewriterEntry *m = _map[click_current_cpu_id()].get(flowid);
+    IPRewriterEntry *m;
+    IPRewriterState& s = *_state;
+    bool hit = false;
+    if (_use_cache) {
+        if (flowid == s.last_id) {
+            m = s.last_entry;
+            hit = true;
+        } else {
+            m = _map[click_current_cpu_id()].get(flowid);
+        }
+    } else {
+        m = _map[click_current_cpu_id()].get(flowid);
+    }
 
     if (!m) {			// create new mapping
         IPRewriterInput &is = _input_specs.unchecked_at(port);
@@ -182,15 +194,21 @@ UDPRewriter::process(int port, Packet *p_in)
             m->flow()->set_reply_anno(p->anno_u8(_annos >> 2));
         }
     }
+    if (_use_cache) {
+        s.last_id = flowid;
+        s.last_entry = m;
+    }
 
     UDPFlow *mf = static_cast<UDPFlow *>(m->flow());
     mf->apply(p, m->direction(), _annos);
 
-    click_jiffies_t now_j = click_jiffies();
-    if (_timeouts[click_current_cpu_id()][1])
-	mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
-    else
-	mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + udp_flow_timeout(mf));
+    if (!hit) {
+        click_jiffies_t now_j = click_jiffies();
+        if (_timeouts[click_current_cpu_id()][1])
+            mf->change_expiry(_heap[click_current_cpu_id()], true, now_j + _timeouts[click_current_cpu_id()][1]);
+        else
+            mf->change_expiry(_heap[click_current_cpu_id()], false, now_j + udp_flow_timeout(mf));
+    }
 
     return m->output();
 }
