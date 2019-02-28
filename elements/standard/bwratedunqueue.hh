@@ -44,8 +44,13 @@ class BandwidthRatedUnqueue : public RatedUnqueue { public:
 
     const char *class_name() const	{ return "BandwidthRatedUnqueue"; }
 
-    bool run_task(Task *);
+    int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
 
+    bool run_task(Task *) override;
+
+  private:
+    bool _use_extra_length;
+    bool _link_rate;
 };
 
 CLICK_ENDDECLS
