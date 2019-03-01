@@ -1,5 +1,5 @@
 /*
- * FlowSimpleIPLoadBalancer.{cc,hh}
+ * CTXIPLoadBalancer.{cc,hh}
  */
 
 #include <click/config.h>
@@ -8,23 +8,23 @@
 #include <click/flow.hh>
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
-#include "flowsimpleloadbalancer.hh"
+#include "ctxiploadbalancer.hh"
 
 CLICK_DECLS
 
 #define DEBUG_LB 0
 
 
-FlowSimpleIPLoadBalancer::FlowSimpleIPLoadBalancer() : _state(state{0}){
+CTXIPLoadBalancer::CTXIPLoadBalancer() : _state(state{0}){
 
 };
 
-FlowSimpleIPLoadBalancer::~FlowSimpleIPLoadBalancer() {
+CTXIPLoadBalancer::~CTXIPLoadBalancer() {
 
 }
 
 int
-FlowSimpleIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
+CTXIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
@@ -35,12 +35,12 @@ FlowSimpleIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 
-int FlowSimpleIPLoadBalancer::initialize(ErrorHandler *errh) {
+int CTXIPLoadBalancer::initialize(ErrorHandler *errh) {
     return FlowSpaceElement<SMapInfo>::initialize(errh);
 }
 
 
-void FlowSimpleIPLoadBalancer::push_batch(int, SMapInfo* flowdata, PacketBatch* batch) {
+void CTXIPLoadBalancer::push_batch(int, SMapInfo* flowdata, PacketBatch* batch) {
 
     state &s = *_state;
     if (flowdata->srv == 0) {
@@ -61,16 +61,16 @@ void FlowSimpleIPLoadBalancer::push_batch(int, SMapInfo* flowdata, PacketBatch* 
     checked_output_push_batch(0, batch);
 }
 
-FlowSimpleIPLoadBalancerReverse::FlowSimpleIPLoadBalancerReverse() {
+CTXIPLoadBalancerReverse::CTXIPLoadBalancerReverse() {
 
 };
 
-FlowSimpleIPLoadBalancerReverse::~FlowSimpleIPLoadBalancerReverse() {
+CTXIPLoadBalancerReverse::~CTXIPLoadBalancerReverse() {
 
 }
 
 int
-FlowSimpleIPLoadBalancerReverse::configure(Vector<String> &conf, ErrorHandler *errh)
+CTXIPLoadBalancerReverse::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Element* e;
     if (Args(conf, this, errh)
@@ -81,7 +81,7 @@ FlowSimpleIPLoadBalancerReverse::configure(Vector<String> &conf, ErrorHandler *e
 }
 
 
-int FlowSimpleIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
+int CTXIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
 
     return 0;
 }
@@ -89,7 +89,7 @@ int FlowSimpleIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
 
 
 
-void FlowSimpleIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
+void CTXIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
     auto fnt = [this](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
         q->rewrite_ip(_ip,0, true);
@@ -104,9 +104,7 @@ void FlowSimpleIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)
-EXPORT_ELEMENT(FlowSimpleIPLoadBalancerReverse)
-ELEMENT_MT_SAFE(FlowSimpleIPLoadBalancerReverse)
-EXPORT_ELEMENT(FlowSimpleIPLoadBalancer)
-EXPORT_ELEMENT(FlowSimpleIPLoadBalancer-CTXIPLoadBalancer)
-EXPORT_ELEMENT(FlowSimpleIPLoadBalancerReverse-CTXIPLoadBalancerReverse)
-ELEMENT_MT_SAFE(FlowSimpleIPLoadBalancer)
+EXPORT_ELEMENT(CTXIPLoadBalancerReverse)
+ELEMENT_MT_SAFE(CTXIPLoadBalancerReverse)
+EXPORT_ELEMENT(CTXIPLoadBalancer)
+ELEMENT_MT_SAFE(CTXIPLoadBalancer)

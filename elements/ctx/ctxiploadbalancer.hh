@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowSimpleIPLoadBalancer_HH
-#define CLICK_FlowSimpleIPLoadBalancer_HH
+#ifndef CLICK_CTXIPLoadBalancer_HH
+#define CLICK_CTXIPLoadBalancer_HH
 #include <click/config.h>
 #include <click/flowelement.hh>
 #include <click/multithread.hh>
@@ -21,20 +21,28 @@ struct SMapInfo {
     int srv;
 };
 
-
-class FlowSimpleIPLoadBalancer : public FlowSpaceElement<SMapInfo> {
+/**
+ * IP LoadBalancer that only change the destination address
+ * The routing must ensure packets go back by the source
+ *
+ * It is a context element because another element must handle the
+ * classification (eg 5 tuple) and maintainance on the state. But it does
+ * not register for any state, just remember the chosen server in the
+ * forward direction.
+ *
+ * Tipycally you want TCPStateIN -> CTXIPLoadBalancer
+ *
+ */
+class CTXIPLoadBalancer : public FlowSpaceElement<SMapInfo> {
 
 public:
 
-    FlowSimpleIPLoadBalancer() CLICK_COLD;
-    ~FlowSimpleIPLoadBalancer() CLICK_COLD;
+    CTXIPLoadBalancer() CLICK_COLD;
+    ~CTXIPLoadBalancer() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowSimpleIPLoadBalancer"; }
+    const char *class_name() const		{ return "CTXIPLoadBalancer"; }
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
-
-    //FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
-    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY", FLOW_TCP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
@@ -47,22 +55,19 @@ private:
     per_thread<state> _state;
     Vector<IPAddress> _dsts;
 
-    friend class FlowSimpleIPLoadBalancerReverse;
+    friend class CTXIPLoadBalancerReverse;
 };
 
-class FlowSimpleIPLoadBalancerReverse : public FlowElement {
+class CTXIPLoadBalancerReverse : public FlowElement {
 
 public:
 
-    FlowSimpleIPLoadBalancerReverse() CLICK_COLD;
-    ~FlowSimpleIPLoadBalancerReverse() CLICK_COLD;
+    CTXIPLoadBalancerReverse() CLICK_COLD;
+    ~CTXIPLoadBalancerReverse() CLICK_COLD;
 
-    const char *class_name() const      { return "FlowSimpleIPLoadBalancerReverse"; }
+    const char *class_name() const      { return "CTXIPLoadBalancerReverse"; }
     const char *port_count() const      { return "1/1"; }
     const char *processing() const      { return PUSH; }
-
-    //FLOW_ELEMENT_DEFINE_SESSION_DUAL(TCP_SESSION,UDP_SESSION);
-    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 20/0/ffff 22/0/ffff:ARRAY", FLOW_TCP);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
