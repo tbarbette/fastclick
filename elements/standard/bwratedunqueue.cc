@@ -39,7 +39,7 @@ BandwidthRatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 #define LENGTHOF(p) \
-    ((_link_rate?8:1)*(p->length() + _use_extra_length? EXTRA_LENGTH_ANNO(p) : 0) + (_link_rate? 8 * 24:0))
+    ((_link_rate?8:1)*(p->length() + (_use_extra_length? EXTRA_LENGTH_ANNO(p) : 0)) + (_link_rate? 8 * 24:0))
 
 bool
 BandwidthRatedUnqueue::run_task(Task *)
