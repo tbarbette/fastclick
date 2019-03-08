@@ -30,6 +30,22 @@ class TCPElement : public IPElement
 public:
     TCPElement() CLICK_COLD;
 
+
+    WritablePacket* forgeRst(Packet* packet) {
+        // Get the information needed to ack the given packet
+        uint32_t saddr = getDestinationAddress(packet);
+        uint32_t daddr = getSourceAddress(packet);
+        uint16_t sport = getDestinationPort(packet);
+        uint16_t dport = getSourcePort(packet);
+        tcp_seq_t ack = getSequenceNumber(packet);
+        tcp_seq_t seq = getAckNumber(packet);
+        uint8_t flag = TH_RST;
+
+        // Craft the packet
+        WritablePacket* forged = forgePacket(saddr, daddr, sport, dport, seq, ack, 0, flag);
+        return forged;
+    }
+
     /**
      * @brief Create a TCP packet
      * @param saddr Source IP address

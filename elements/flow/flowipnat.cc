@@ -12,11 +12,6 @@
 
 CLICK_DECLS
 
-
-#define DEBUG_NAT 0 //Do not debug
-#define NAT_COLLIDE 1  //Avoid port collisions
-
-
 FlowIPNAT::FlowIPNAT() : _sip(), _map(65536), _accept_nonsyn(true) {
 
 };
@@ -31,6 +26,7 @@ FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
                .read_mp("SIP",_sip)
                .read("ACCEPT_NONSYN", _accept_nonsyn)
+               .read("STATE", _own_state)
                .complete() < 0)
         return -1;
 
@@ -39,9 +35,7 @@ FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
 
 
 int FlowIPNAT::initialize(ErrorHandler *errh) {
-
-    /*
-     * Get "touching" threads. That is threads passing by us and touching
+    /* Get "touching" threads. That is threads passing by us and touching
      * our state.
      * NATReverse takes care of telling that it will touch our hashtable
      * therefore touching is actually the passing threads for both directions
@@ -75,25 +69,32 @@ int FlowIPNAT::initialize(ErrorHandler *errh) {
         state &s = _state.get_value_for_thread(i);
         int min_port = 1024 + (n*ports_per_thread);
         int max_port = min_port + ports_per_thread;
-        s.available_ports.initialize(ports_per_thread);
+        String rn = name() + "-t#" + String(i);
+        s.available_ports.initialize(ports_per_thread, rn.c_str());
         for (int port = min_port; port < max_port; port++) {
-            s.available_ports.insert(new PortRef(htons(port)));
+            NATCommon* ref = new NATCommon(htons(port), &s.available_ports);
+            assert(ref->ref == 0);
+            s.available_ports.insert(ref);
         }
         n++;
     }
     return 0;
 }
 
-PortRef* FlowIPNAT::pick_port() {
+NATCommon* FlowIPNAT::pick_port() {
     int i = 0;
-    PortRef* ref = 0;
+    NATCommon* ref = 0;
     if (_state->available_ports.is_empty()) {
         click_chatter("%p{element} : Not even a used port available", this);
         return 0;
     } else {
         ref = _state->available_ports.extract();
 #if NAT_COLLIDE
-        while (ref->ref.value() > 0)
+        if (ref->ref.value() != 0) {
+            click_chatter("Ref is %d", ref->ref.value());
+            assert(ref->ref.value() == 0);
+        }
+        /*while (ref->ref.value() > 0)
         {
             _state->available_ports.insert(ref);
             if (++i > _state->available_ports.count()) { //Full loop, stop here
@@ -101,9 +102,10 @@ PortRef* FlowIPNAT::pick_port() {
                 return 0;
             }
             ref = _state->available_ports.extract();
-        }
+        }*/
 #else
         //Reinsert the reference at the back
+        static_assert(false);
         _state->available_ports.insert(ref);
 #endif
     }
@@ -123,13 +125,15 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
         return false;
     }
 #if NAT_COLLIDE
-    fcb->ref->ref = 1;
+    fcb->ref->ref = 2; //One for us, one for the table
     fcb->ref->closing = false;
     fcb->fin_seen = false;
 #endif
     //click_chatter("NEW osip %s osport %d",osip.unparse().c_str(),htons(oport));
-    NATEntryOUT out = {IPPort(osip,oport),fcb->ref};
-    _map.find_insert(fcb->ref->port, out);
+    NATEntryOUT out(IPPort(osip,oport),fcb->ref);
+    _map.replace(fcb->ref->port, out,[this](NATEntryOUT& replaced){
+	release_ref(replaced.ref);
+    });
     return true;
 }
 
@@ -137,55 +141,35 @@ void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 //    click_chatter("Release %d",ntohs(fcb->ref->port));
 
 #if NAT_COLLIDE
-    if (fcb->ref)
-    {
-        --fcb->ref->ref;
-//        click_chatter("fcb->ref is now %d",fcb->ref->ref);
-//        assert((int32_t)fcb->ref->ref >= 0);
-        if (!_state->available_ports.insert(fcb->ref)) {
-            click_chatter("Double free");
-            abort();
-        }
-    }
+	release_ref(fcb->ref);
 #else
     _state->available_ports.insert(fcb->ref);
+    fcb->ref = 0;
 #endif
 
-    fcb->ref = 0;
 }
 
+
 void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
-    auto fnt = [this,flowdata](Packet* p) -> Packet*{
+    auto fnt = [this,flowdata](Packet* p) -> bool {
         if (!flowdata->ref) {
-            return 0;
+            return false;
         }
         WritablePacket* q=p->uniqueify();
         //click_chatter("Rewrite to %s %d",_sip.unparse().c_str(),htons(flowdata->ref->port));
         q->rewrite_ipport(_sip, flowdata->ref->port, 0, true);
 
-#if NAT_COLLIDE
-        if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
+        if (!_own_state || update_state<NATState>(flowdata,q)) {
+            return true;
+        } else {
             close_flow();
             release_flow(flowdata);
-            return q;
-        } else if (unlikely(q->tcp_header()->th_flags & TH_FIN)) {
-            flowdata->fin_seen = true;
-            if (flowdata->ref->closing && q->tcp_header()->th_flags & TH_ACK) {
-                close_flow();
-                release_flow(flowdata);
-            } else {
-                flowdata->ref->closing = true;
-            }
-        } else if (unlikely(flowdata->ref->closing && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
-            close_flow();
-            release_flow(flowdata);
+            return false;
         }
-#endif
-        return q;
     };
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, (void));
+    EXECUTE_FOR_EACH_PACKET_UNTIL_DROP(fnt, batch);
 
-    checked_output_push_batch(0, batch);
+    output_push_batch(0, batch);
 }
 
 FlowIPNATReverse::FlowIPNATReverse() {
@@ -218,58 +202,52 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
         //click_chatter("FOUND %d, port %d, osip %s osport %d, RST %d, FIN %d, SYN %d",found,ntohs(th->th_dport),fcb->map.ip.unparse().c_str(),ntohs(fcb->map.port), th->th_flags & TH_RST, th->th_flags & TH_FIN, th->th_flags & TH_SYN);
         return false;
     }
-    fcb->fin_seen = false;
-    ++fcb->ref->ref;
-    if (fcb->ref->ref == 1) { //Connection was reset
-        --fcb->ref->ref;
+
+    //No ref++, we keep the table reference
+    lb_assert(fcb->ref->ref > 0);
+    if (fcb->ref->ref == 1) { //Connection was reset by the inserter
+	click_chatter("Got a closed connection");
+	release_ref(fcb->ref);
         return false;
     }
     return true;
 }
 
 void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
-//    click_chatter("Release reverse %d",ntohs(fcb->ref->port));
+//    click_chatter("Release %d",ntohs(fcb->ref->port));
+
 #if NAT_COLLIDE
-    --fcb->ref->ref;
-//    click_chatter("fcb->ref is now %d",fcb->ref->ref);
-//    assert((int32_t)fcb->ref->ref >= 0);
+	release_ref(fcb->ref);
+#else
+    _state->available_ports.insert(fcb->ref);
     fcb->ref = 0;
 #endif
+
 }
 
 void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* batch) {
     //_state->port_epoch[*flowdata] = epoch;
-    auto fnt = [this,flowdata](Packet*p) -> Packet*{
+    auto fnt = [this,flowdata](Packet*p) -> bool {
         //click_chatter("Rewrite to %s %d",flowdata->map.ip.unparse().c_str(),ntohs(flowdata->map.port));
         if (!flowdata->ref) {
-            return 0;
+            return false;
         }
         WritablePacket* q=p->uniqueify();
         q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1, true);
         q->set_dst_ip_anno(flowdata->map.ip);
-#if NAT_COLLIDE
-        if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
-            close_flow();
-            release_flow(flowdata);
-            return q;
-        } else if ((q->tcp_header()->th_flags & TH_FIN)) {
-            flowdata->fin_seen = true;
-            if (flowdata->ref->closing && q->tcp_header()->th_flags & TH_ACK) {
-                close_flow();
-                release_flow(flowdata);
-            } else {
-                flowdata->ref->closing = true;
-            }
-        } else if (flowdata->ref->closing && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen) {
-            close_flow();
-            release_flow(flowdata);
-        }
-#endif
-        return q;
-    };
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(fnt, batch, (void));
 
-    checked_output_push_batch(0, batch);
+        if (!_in->_own_state || update_state<NATState>(flowdata, q)) {
+            return true;
+        } else {
+            close_flow();
+            release_flow(flowdata);
+            return false;
+        }
+
+    };
+    EXECUTE_FOR_EACH_PACKET_UNTIL_DROP(fnt, batch);
+
+    output_push_batch(0, batch);
 }
 
 CLICK_ENDDECLS

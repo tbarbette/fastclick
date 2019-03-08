@@ -27,10 +27,9 @@ struct SMapInfo {
  *
  * It is a context element because another element must handle the
  * classification (eg 5 tuple) and maintainance on the state. But it does
- * not register for any state, just remember the chosen server in the
- * forward direction.
+ * not register for any state.
  *
- * Tipycally you want TCPStateIN -> CTXIPLoadBalancer
+ * Typically you want TCPStateIN -> CTXIPLoadBalancer
  *
  */
 class CTXIPLoadBalancer : public FlowSpaceElement<SMapInfo> {

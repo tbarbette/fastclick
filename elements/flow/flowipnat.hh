@@ -9,27 +9,61 @@
 #include <click/deque.hh>
 CLICK_DECLS
 
+#define DEBUG_NAT 0
+
+#define NAT_STATS 0
+
+
+//If 0, it just uses ports in loop. Fine for slow rates, but not realistic
+//If 1, prevent reusing ports while connections are active
+#define HAVE_NAT_NEVER_REUSE 1 //Actually for the LB
+#define NAT_COLLIDE 1  //Avoid port collisions, same but for the NAT
+
+#if DEBUG_NAT>=2
+# define nat_debug_chatter(args...) click_chatter(args)
+# define nat_info_chatter(args...) click_chatter(args)
+# define lb_assert(args...) assert(args)
+#elif DEBUG_NAT==1
+# define nat_debug_chatter(args...)
+# define nat_info_chatter(args...) click_chatter(args)
+# define lb_assert(args...) assert(args)
+#else
+# define nat_debug_chatter(args...)
+# define nat_info_chatter(args...)
+# define lb_assert(args...)
+#endif
+
+
 #include <click/hashtablemp.hh>
 
 CLICK_DECLS
 
-struct PortRef {
-    PortRef(uint16_t _port) : port(_port), closing(false) {
+#if HAVE_NAT_NEVER_REUSE
+struct NATCommon {
+	NATCommon(uint16_t _port, MPSCDynamicRing<NATCommon*>* _ring) : port(_port), closing(0), ring(_ring) {
         ref = 0;
     }
     uint16_t port; //Port
     atomic_uint32_t ref; //Reference count
-    bool closing; //Has one side started to close?
+    uint8_t closing; //Has one side started to close?
+    MPSCDynamicRing<NATCommon*>* ring;
 };
+#endif
 
+class NATState { public:
+    NATState(NATCommon* _ref) : fin_seen(false), ref(_ref) {
+    }
+    bool fin_seen;
+    NATCommon* ref;
+};
 
 /**
  * NAT Entries for the mapping side : a mapping to the original port
  * and a flag to know if the mapping has been seen on this side.
  */
-struct NATEntryIN {
-    PortRef* ref;
-    bool fin_seen;
+class NATEntryIN : public NATState { public:
+    NATEntryIN(NATCommon* _ref) : NATState(_ref) {
+    }
 };
 
 
@@ -38,10 +72,10 @@ struct NATEntryIN {
  * the port for reference counting, and a flagto know if the fin has been seen
  * on this side.
  */
-struct NATEntryOUT {
+class NATEntryOUT: public NATState { public:
+    NATEntryOUT(IPPort _map, NATCommon* _ref) : map(_map), NATState(_ref) {
+    }
     IPPort map;
-    PortRef* ref;
-    bool fin_seen;
 };
 
 
@@ -85,20 +119,21 @@ public:
     int initialize(ErrorHandler *errh);
 
     static const int timeout = NAT_FLOW_TIMEOUT;
-    PortRef* pick_port();
+    NATCommon* pick_port();
     bool new_flow(NATEntryIN*, Packet*);
     void release_flow(NATEntryIN*);
 
     void push_batch(int, NATEntryIN*, PacketBatch *);
 private:
     struct state {
-        DynamicRing<PortRef*> available_ports;
+        MPSCDynamicRing<NATCommon*> available_ports;
     };
     per_thread<state> _state;
 
 private:
     IPAddress _sip;
     bool _accept_nonsyn;
+    bool _own_state;
     NATHashtable _map;
     friend class FlowIPNATReverse;
 };
@@ -131,6 +166,85 @@ private:
 
     FlowIPNAT* _in;
 };
+
+/*
+static inline bool update_state(WritablePacket* &q, T* flowdata) {
+    if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
+        return false;
+    } else if (unlikely(q->tcp_header()->th_flags & TH_FIN)) {
+        flowdata->fin_seen = true;
+        if (flowdata->ref->closing && q->tcp_header()->th_flags & TH_ACK) {
+            return false;
+        } else {
+            flowdata->ref->closing = true;
+        }
+    } else if (unlikely(flowdata->ref->closing && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
+        return false;
+    }
+    return true;
+}*/
+
+template <typename T>
+inline bool update_state(T* flowdata, const Packet* q) {
+#if HAVE_NAT_NEVER_REUSE
+        if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
+            nat_info_chatter("RST");
+            return false;
+        } else if (unlikely((q->tcp_header()->th_flags & TH_FIN))) {
+            if (flowdata->fin_seen) {
+                //Dup FIN
+                return true;
+            }
+            flowdata->fin_seen = true;
+            lb_assert(flowdata->ref->closing <= 1);
+            if (flowdata->ref->closing == 1 && q->tcp_header()->th_flags & TH_ACK) {
+                nat_debug_chatter("FIN ACK");
+                flowdata->ref->closing = 2;
+                return false;
+            } else {
+                nat_debug_chatter("FIRST FIN");
+                flowdata->ref->closing = 1;
+                return true;
+            }
+            //unreachable
+        } else if (unlikely(flowdata->ref->closing == 2 && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
+            nat_debug_chatter("CLOSING ACK");
+            return false;
+        }
+        return true;
+#else
+        if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
+#if DEBUG_NAT || DEBUG_CLASSIFIER_TIMEOUT > 1
+            click_chatter("Reverse Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
+#endif
+            return false;
+        }
+        return true;
+#endif
+        //unreachable
+
+}
+
+inline void release_ref(NATCommon* &ref) {
+    if (!ref)
+        return;
+    nat_debug_chatter("fcb->ref for port %d is %d, will be %d",ntohs(ref->port), ref->ref, ref->ref - 1);
+    lb_assert((int32_t)ref->ref >= 1);
+    if (ref->ref.dec_and_test()) {
+        nat_debug_chatter("Recycling %d !", ntohs(ref->port));
+
+        assert(ref->ref == 0);
+        if (!ref->ring->insert(ref)) {
+            click_chatter("Double free");
+            abort();
+        }
+    }
+    ref = 0;
+}
+
+
+
+
 
 CLICK_ENDDECLS
 #endif
