@@ -1594,7 +1594,7 @@ Optional Features:
                           Useful when using polling keeping the CPU at 100%
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
-                          hash iterator epoch
+                          hash iterator epochs
   --enable-force-expensive
                           force expensive packet operations
   --enable-valgrind       extra support for debugging with valgrind
@@ -10873,6 +10873,7 @@ else
 =========================================" "$LINENO" 5
 fi
 
+
 # Check whether --enable-stride was given.
 if test "${enable_stride+set}" = set; then :
   enableval=$enable_stride; :
@@ -10948,6 +10949,37 @@ if test $enable_dmalloc = yes; then
 $as_echo "#define CLICK_DMALLOC 1" >>confdefs.h
 
 fi
+
+
+
+
+# Check whether --enable-hash-iterator-epochs was given.
+if test "${enable_hash_iterator_epochs+set}" = set; then :
+  enableval=$enable_hash_iterator_epochs; :
+else
+  enable_hash_iterator_epochs=no
+fi
+
+if test $enable_hash_iterator_epochs = yes; then
+
+$as_echo "#define CLICK_HASH_ITERATOR_EPOCHS 1" >>confdefs.h
+
+fi
+
+
+# Check whether --enable-force-expensive was given.
+if test "${enable_force_expensive+set}" = set; then :
+  enableval=$enable_force_expensive; :
+else
+  enable_force_expensive=no
+fi
+
+if test $enable_force_expensive = yes; then
+
+$as_echo "#define CLICK_FORCE_EXPENSIVE 1" >>confdefs.h
+
+fi
+
 
 
 # Check whether --enable-valgrind was given.
