@@ -34,9 +34,9 @@ class Tee : public BatchElement {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  void push(int, Packet *);
+  void push(int, Packet *) override;
   #if HAVE_BATCH
-  void push_batch(int, PacketBatch *);
+  void push_batch(int, PacketBatch *) override;
   #endif
 
 };
@@ -53,9 +53,9 @@ class PullTee : public BatchElement {
 
   int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-  Packet *pull(int);
+  Packet *pull(int) override;
   #if HAVE_BATCH
-  PacketBatch *pull_batch(int, int);
+  PacketBatch *pull_batch(int, unsigned) override;
   #endif
 
 };
