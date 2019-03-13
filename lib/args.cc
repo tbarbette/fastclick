@@ -679,12 +679,13 @@ preparse_fraction(const char *begin, const char *end, bool is_signed,
     return s;
 }
 
+template <typename V = value_type>
 const char *
 parse_integer_portion(const char *s, const char *end, int integer_digits,
-                      value_type &ivalue, int &status)
+                      V &ivalue, int &status)
 {
-    constexpr value_type thresh = integer_traits<value_type>::const_max / 10;
-    constexpr int thresh_digit = integer_traits<value_type>::const_max - thresh * 10;
+    constexpr V thresh = integer_traits<V>::const_max / 10;
+    constexpr int thresh_digit = integer_traits<V>::const_max - thresh * 10;
     ivalue = 0;
     while (integer_digits > 0) {
         int digit;
@@ -698,7 +699,7 @@ parse_integer_portion(const char *s, const char *end, int integer_digits,
             continue;
         }
         if (ivalue > thresh || (ivalue == thresh && digit > thresh_digit)) {
-            ivalue = integer_traits<value_type>::const_max;
+            ivalue = integer_traits<V>::const_max;
             status = NumArg::status_range;
         } else
             ivalue = 10 * ivalue + digit;
@@ -820,10 +821,11 @@ struct fraction_accum<uint32_t, uint32_t> {
 };
 #endif
 
+template <typename T, typename V = value_type>
 const char *
 parse_fraction(const char *begin, const char *end,
                bool is_signed, int exponent_delta,
-               value_type &ivalue, uint32_t &fvalue, int &status)
+               V &ivalue, T &fvalue, int &status)
 {
     int integer_digits = exponent_delta;
     end = preparse_fraction(begin, end, is_signed, integer_digits);
@@ -837,14 +839,14 @@ parse_fraction(const char *begin, const char *end,
 
     ivalue = 0;
     if (integer_digits > 0) {
-        s = parse_integer_portion(s, end, integer_digits, ivalue, status);
+        s = parse_integer_portion<V>(s, end, integer_digits, ivalue, status);
         integer_digits = 0;
     }
 
     const char *x = s;
     while (x != end && *x != 'E' && *x != 'e')
         ++x;
-    fraction_accum<uint32_t> fwork;
+    fraction_accum<T> fwork;
     while (x != s) {
         --x;
         if (*x >= '0' && *x <= '9') {
@@ -872,7 +874,7 @@ FixedPointArg::underparse(const String &str, bool is_signed, uint32_t &result)
 {
     value_type ivalue;
     uint32_t fvalue;
-    const char *end = parse_fraction(str.begin(), str.end(),
+    const char *end = parse_fraction<uint32_t>(str.begin(), str.end(),
                                      is_signed, exponent_delta,
                                      ivalue, fvalue, status);
     if (end != str.end())
@@ -1244,7 +1246,7 @@ BandwidthArg::parse(const String &str, uint32_t &result, const ArgContext &args)
 
     value_type ix;
     uint32_t fx;
-    const char *xend = parse_fraction(str.begin(), unit_end,
+    const char *xend = parse_fraction<uint32_t>(str.begin(), unit_end,
                                       false, power, ix, fx, status);
     if (status == status_inval || xend != unit_end) {
         status = status_inval;
@@ -1278,6 +1280,52 @@ BandwidthArg::unparse(uint32_t x)
         return cp_unparse_real10(x * 8, 3) + "kbps";
 }
 
+bool
+Bandwidth64Arg::parse(const String &str, uint64_t &result, const ArgContext &args)
+{
+    int power, factor;
+    const char *unit_end = UnitArg(byte_bandwidth_units, byte_bandwidth_prefixes).parse(str.begin(), str.end(), power, factor);
+
+    uint64_t ix;
+    uint64_t fx;
+    const char *xend = parse_fraction<uint64_t,uint64_t>(str.begin(), unit_end,
+                                      false, power, ix, fx, status);
+    if (status == status_inval || xend != unit_end) {
+        status = status_inval;
+        return false;
+    }
+    if (uint64_t(ix) != ix)
+        status = status_range;
+
+    assert(fx == 0); //XXX unsupported
+    click_chatter("ix %llu fx %llu factor %llu", ix, fx, factor);
+    //ix = multiply_factor(ix, fx, factor, status);
+    ix *= factor;
+    if (status == status_range) {
+        args.error("out of range");
+        result = 0xFFFFFFFFU;
+        return false;
+    } else {
+        if (unit_end == str.end() && ix)
+            status = status_unitless;
+        result = ix;
+        return true;
+    }
+}
+
+String
+Bandwidth64Arg::unparse(uint64_t x)
+{
+    if (x >= 0x20000000U)
+        return cp_unparse_real2(x, 6) + "MBps";
+    else if (x >= 125000000)
+        return cp_unparse_real2(x * 8, 9) + "Gbps";
+    else if (x >= 125000)
+        return cp_unparse_real2(x * 8, 6) + "Mbps";
+    else
+        return cp_unparse_real2(x * 8, 3) + "kbps";
+}
+
 
 static const char seconds_units[] = "\
 \1\0\1s\
@@ -1298,7 +1346,7 @@ SecondsArg::parse_saturating(const String &str, uint32_t &result, const ArgConte
 
     value_type ix;
     uint32_t fx;
-    const char *xend = parse_fraction(str.begin(), unit_end,
+    const char *xend = parse_fraction<uint32_t>(str.begin(), unit_end,
                                       false, power + fraction_digits, ix, fx, status);
     if (status == status_inval || xend != unit_end) {
         status = status_inval;

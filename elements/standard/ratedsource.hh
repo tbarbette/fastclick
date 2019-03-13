@@ -1,11 +1,22 @@
 #ifndef CLICK_RATEDSOURCE_HH
 #define CLICK_RATEDSOURCE_HH
 #include <click/batchelement.hh>
-#include <click/tokenbucket.hh>
+#if HAVE_INT64_TYPES
+# include <click/tokenbucket64.hh>
+#else
+# include <click/tokenbucket.hh>
+#endif
 #include <click/task.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
 class HandlerCall;
+
+
+#if HAVE_INT64_TYPES
+class Bandwidth64Arg;
+#else
+class BandwidthArg;
+#endif
 
 /*
 =c
@@ -120,15 +131,19 @@ class RatedSource : public BatchElement, public ActiveNotifier {
         static const unsigned NO_LIMIT = 0xFFFFFFFFU;
         static const unsigned DEF_BATCH_SIZE = 32;
 
-    #if HAVE_INT64_TYPES
-        typedef uint64_t ucounter_t;
-        typedef int64_t counter_t;
-    #else
-        typedef uint32_t ucounter_t;
-        typedef int32_t counter_t;
-    #endif
+#if HAVE_INT64_TYPES
+    typedef uint64_t ucounter_t;
+    typedef int64_t counter_t;
+    typedef TokenBucket64 token_bucket_t;
+    typedef Bandwidth64Arg bandwidth_arg_t;
+#else
+    typedef uint32_t ucounter_t;
+    typedef int32_t counter_t;
+    typedef TokenBucket token_bucket_t;
+    typedef BandwidthArg bandwidth_arg_t;
+#endif
 
-        TokenBucket _tb;
+        token_bucket_t _tb;
         ucounter_t  _count;
         ucounter_t  _limit;
     #if HAVE_BATCH

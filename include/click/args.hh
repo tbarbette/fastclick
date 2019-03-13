@@ -1288,6 +1288,17 @@ class BandwidthArg : public NumArg { public:
     int status;
 };
 
+/** @class Bandwidth64Arg
+  @brief Parser class for 64bit bandwidth specifications.
+
+  Handles suffixes such as "Gbps", "k", etc. */
+class Bandwidth64Arg : public NumArg { public:
+    bool parse(const String &str, uint64_t &result, const ArgContext & = blank_args);
+    static String unparse(uint64_t x);
+    int status;
+};
+
+
 
 /** @class BitvectorArg **/
 class BitvectorArg { public:

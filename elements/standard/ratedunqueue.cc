@@ -46,17 +46,17 @@ RatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt, Vector<String> &conf, ErrorHandler *errh)
+RatedUnqueue::configure_helper(token_bucket_t *tb, bool is_bandwidth, Element *elt, Vector<String> &conf, ErrorHandler *errh)
 {
-    unsigned r;
+	ucounter_t r;
     unsigned dur_msec = 20;
-    unsigned tokens;
+    ucounter_t tokens;
     bool dur_specified, tokens_specified;
     const char *burst_size = is_bandwidth ? "BURST_BYTES" : "BURST_SIZE";
 
     Args args(conf, elt, errh);
     if (is_bandwidth)
-	args.read_mp("RATE", BandwidthArg(), r);
+	args.read_mp("RATE", bandwidth_arg_t(), r);
     else
 	args.read_mp("RATE", r);
     if (args.read("BURST_DURATION", SecondsArg(3), dur_msec).read_status(dur_specified)
@@ -65,17 +65,22 @@ RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt,
 	return -1;
 
     if (dur_specified && tokens_specified)
-	return errh->error("cannot specify both BURST_DURATION and BURST_SIZE");
+	    return errh->error("cannot specify both BURST_DURATION and BURST_SIZE");
     else if (!tokens_specified) {
+#if !HAVE_INT64_TYPES
 	bigint::limb_type res[2];
 	bigint::multiply(res[1], res[0], r, dur_msec);
 	bigint::divide(res, res, 2, 1000);
 	tokens = res[1] ? UINT_MAX : res[0];
+#else
+		ucounter_t l = r * (ucounter_t)dur_msec;
+		tokens = l / 1000;
+#endif
     }
 
     if (is_bandwidth) {
-	unsigned new_tokens = tokens + tb_bandwidth_thresh;
-	tokens = (tokens < new_tokens ? new_tokens : UINT_MAX);
+	    ucounter_t new_tokens = tokens + tb_bandwidth_thresh;
+	    tokens = (tokens < new_tokens ? new_tokens : UINT64_MAX);
     }
 
     tb->assign(r, tokens ? tokens : 1);
@@ -98,7 +103,7 @@ RatedUnqueue::run_task(Task *)
     _runs++;
 
     if (!_active)
-	return false;
+        return false;
 
     _tb.refill();
     if (_tb.contains(1)) {

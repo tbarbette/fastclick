@@ -3,7 +3,7 @@
 #define CLICK_RATEDSPLITTER_HH
 #include <click/element.hh>
 #include <click/batchelement.hh>
-#include <click/tokenbucket.hh>
+#include <click/tokenbucket64.hh>
 CLICK_DECLS
 
 /*
@@ -84,7 +84,11 @@ class RatedSplitter : public BatchElement { public:
 
   protected:
 
+#if HAVE_INT64_TYPES
+    TokenBucket64 _tb;
+#else
     TokenBucket _tb;
+#endif
 
     static String read_handler(Element *, void *) CLICK_COLD;
 
