@@ -91,7 +91,7 @@ class Replay : public ReplayBase { public:
     ActiveNotifier _notifier;
 
     struct s_output {
-    	DynamicRing<Packet*> ring;
+	SPSCDynamicRing<Packet*> ring;
     };
 
     struct s_output _output;

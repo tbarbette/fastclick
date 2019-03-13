@@ -94,7 +94,7 @@ public:
     bool _always_up;
     bool _allow_direct_traversal;
     bool _verbose;
-    typedef DynamicRing<Packet*> PacketRing;
+    typedef SPSCDynamicRing<Packet*> PacketRing;
 
     per_thread_oread<PacketRing> storage;
     struct stats {

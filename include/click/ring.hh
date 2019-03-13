@@ -4,6 +4,11 @@
 
 #include <click/atomic.hh>
 #include <click/sync.hh>
+#if HAVE_DPDK
+# include <rte_ring.h>
+# include <rte_errno.h>
+#endif
+
 
 CLICK_DECLS
 
@@ -68,8 +73,10 @@ CLICK_DECLS
 
 /**
  * Ring with size set at initialization time
+ *
+ * NOT MT-Safe
  */
-template <typename T> class DynamicRing {
+template <typename T> class SPSCDynamicRing {
 
 protected:
     uint32_t _size;
@@ -91,12 +98,12 @@ protected:
 
     T* ring;
 public:
-    DynamicRing() : _size(0),ring(0) {
+    SPSCDynamicRing() : _size(0),ring(0) {
         head = 0;
         tail = 0;
     }
 
-    ~DynamicRing() {
+    ~SPSCDynamicRing() {
     	if (_size)
     		delete[] ring;
     }
@@ -148,6 +155,77 @@ public:
         ring = new T[size];
     }
 };
+
+
+#if HAVE_DPDK
+inline uint64_t next_pow2(uint64_t x) {
+	return x == 1 ? 1 : 1<<(64-__builtin_clzl(x-1));
+}
+
+/**
+ * Ring with size set at initialization time
+ */
+template <typename T> class MPMCDynamicRing {
+    protected:
+    rte_ring* _ring;
+    public:
+    MPMCDynamicRing() : _ring(0) {
+        static_assert(std::is_pointer<T>());
+    }
+
+    inline void initialize(int size, const char* name, int flags = 0) {
+        assert(!_ring);
+        _ring = rte_ring_create(name, next_pow2(size), SOCKET_ID_ANY, flags);
+        if (unlikely(_ring == 0)) {
+            click_chatter("Could not create DPDK ring error %d: %s",rte_errno,rte_strerror(rte_errno));
+        }
+    }
+
+    inline bool insert(T o) {
+        return rte_ring_mp_enqueue(_ring, (void*)o) == 0;
+    }
+
+    inline T extract() {
+        T o;
+        if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1, 0) == 0)
+            return 0;
+        else
+            return o;
+    }
+
+
+    inline bool is_empty() {
+        return rte_ring_empty(_ring);
+    }
+
+    inline bool is_full() {
+        return rte_ring_full(_ring);
+    }
+
+
+    ~MPMCDynamicRing() {
+        rte_ring_free(_ring);
+    }
+};
+
+template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {
+    public:
+
+    inline void initialize(int size, const char* name) {
+        MPMCDynamicRing<T>::initialize(size, name, RING_F_SC_DEQ);
+    }
+
+    inline T extract() {
+        T o;
+        if (rte_ring_sc_dequeue_bulk(this->_ring, (void**)&o, 1, 0) == 0)
+            return 0;
+        else
+            return o;
+    }
+};
+#
+#endif
+
 
 template <typename T, size_t RING_SIZE> class Ring : public BaseRing<T,RING_SIZE> {};
 
