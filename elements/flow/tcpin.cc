@@ -14,6 +14,9 @@ CLICK_DECLS
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
     tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(false),_retransmit_pt(false)
 {
+poolModificationTracker.static_initialize();
+
+poolFcbTcpCommon.static_initialize();
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
         poolModificationNodes.get_value(i).initialize(MODIFICATIONNODES_POOL_SIZE);
@@ -1221,7 +1224,7 @@ tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
                     return true;
                 } else {
                     c->lock.release();
-                    click_chatter("BUG : established connection with reference in list");
+                    click_chatter("BUG : established connection with reference %d in list", c->use_count);
                     return true;
                 }
             } else if (unlikely(c->use_count == 1)) { //We have the only reference -> the inserter released it

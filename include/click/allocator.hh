@@ -90,6 +90,9 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
     pool_allocator_mt();
     ~pool_allocator_mt();
 
+    void static_initialize() {
+        _pool.resize(click_max_cpu_ids(),Pool());
+    }
 
     T* allocate_uninitialized() {
 #if CLICK_DEBUG_ALLOCATOR

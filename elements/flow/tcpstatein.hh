@@ -56,8 +56,10 @@ public:
     //TCP only for now, just to reuse the macro but nothing prevents UDP
     FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY", FLOW_TCP);
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh) CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+    int initialize(ErrorHandler *errh) override CLICK_COLD;
+
+    static void static_initialize();
 
     static const int timeout = TCP_STATE_FLOW_TIMEOUT;
     

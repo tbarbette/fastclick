@@ -40,6 +40,7 @@ TCPStateIN::configure(Vector<String> &conf, ErrorHandler *errh)
 
 int TCPStateIN::initialize(ErrorHandler *errh) {
 
+    _pool.static_initialize();
     /*
      * Get "touching" threads. That is threads passing by us and touching
      * our state.
@@ -178,6 +179,10 @@ void TCPStateIN::add_handlers() {
 
     add_read_handler("map_size", TCPStateIN::read_handler, h_map_size);
 
+}
+
+
+void TCPStateIN::static_initialize() {
 }
 
 

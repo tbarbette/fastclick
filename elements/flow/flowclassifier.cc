@@ -16,7 +16,7 @@
 
 CLICK_DECLS
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true),
+FlowClassifier::FlowClassifier(): _aggcache(false), _cache(0),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true),
     _ordered(true),_nocut(false), _optimize(true) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
@@ -376,7 +376,9 @@ void FlowClassifier::cleanup(CleanupStage stage) {
 //            click_chatter("Deleting!");
 //
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-            _table.delete_all_flows();
+            //We are not on the right thread, so we'll delete the cache by ourselves
+            //TODO : elements and cache assume release is done on the same thread, we must implement thread_cleanup
+            //_table.delete_all_flows();
 #endif
 //            _table.get_root()->print();
         }
@@ -388,6 +390,13 @@ void FlowClassifier::cleanup(CleanupStage stage) {
         }, true, true);
     }
     fcb_table = 0;
+    //If aggcache is enabled, initialize the cache
+    if (_aggcache && _cache_size > 0) {
+        for (unsigned i = 0; i < _cache.weight(); i++) {
+            if (_cache.get_value(i))
+                CLICK_LFREE(_cache.get_value(i),sizeof(FlowCache) * _cache_size * _cache_ring_size);
+        }
+    }
     /*click_chatter("%p{element} Hit : %d",this,cache_hit);
     click_chatter("%p{element}  Shared : %d",this,cache_sharing);
     click_chatter("%p{element} Miss : %d",this,cache_miss);*/

@@ -92,7 +92,8 @@ FlowTableHolder::~FlowTableHolder() {
     auto previous = fcb_table;
     fcb_table = this;
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-    delete_all_flows();
+    //TODO : same, do from the right thread
+    //delete_all_flows();
 #endif
     fcb_table = previous;
 }
@@ -1378,6 +1379,8 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 				fl->assign(this);
 				FlowNodePtr newB = childB->optimize(mt_safe);
 				fl->set_default(newB);
+                newA.set_parent(fl);
+                newB.set_parent(fl);
 				newnode = fl;
 			} else {
 #if DEBUG_CLASSIFIER
@@ -1396,12 +1399,13 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 				fl->inc_num();
 				fl->assign(this);
 				fl->set_default(_default);
+		ncA.set_parent(fl);
+			    ncB.set_parent(fl);
+                _default.set_parent(fl);
 				newnode = fl;
 				_default.ptr = 0;
 			}
-			childA->set_parent(newnode);
-			childB->set_parent(newnode);
-			childA->ptr = 0;
+		    childA->ptr = 0;
 			childB->ptr = 0;
 			dec_num();
 			dec_num();
