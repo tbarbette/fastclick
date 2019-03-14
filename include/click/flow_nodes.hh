@@ -131,6 +131,9 @@ protected:
 public:
     FlowNodeData node_data;
 
+#if DEBUG_CLASSIFIER
+    Bitvector threads;
+#endif
 
     /**
      * Destroy release memory efficiently (may call a pool instead of pure delete)
@@ -164,7 +167,7 @@ public:
             click_chatter("FATAL ERROR : Adding node to an existing node");
             print();
             node->print();
-            assert(ptr->ptr == 0);
+            flow_assert(ptr->ptr == 0);
         }
         inc_num();
         ptr->set_node(node);
@@ -174,7 +177,7 @@ public:
     inline void add_leaf(FlowNodeData data, FlowControlBlock* leaf) {
         bool need_grow;
         FlowNodePtr* ptr = _find(this,data,need_grow);
-        assert(ptr->ptr == 0);
+        flow_assert(ptr->ptr == 0);
         inc_num();
         ptr->set_leaf(leaf);
         ptr->set_data(data);
@@ -278,17 +281,17 @@ public:
 
     inline void set_default(FlowNodePtr ptr) {
         if (ptr.ptr) {
-            assert(ptr.ptr != this);
+            flow_assert(ptr.ptr != this);
             _default = ptr;
             _default.set_parent(this);
         }
-        assert(_default.ptr == ptr.ptr);
+        flow_assert(_default.ptr == ptr.ptr);
     }
 
 
     inline void set_default(FlowNode* node) {
-        assert(_default.ptr == 0);
-        assert(node != this);
+        flow_assert(_default.ptr == 0);
+        flow_assert(node != this);
         _default.ptr = node;
         node->set_parent(this);
     }
@@ -353,12 +356,12 @@ public:
     FlowNode* start_growing(bool impl);
 
 #if DEBUG_CLASSIFIER || DEBUG_CLASSIFIER_CHECK
-    void check(bool allow_parent = false, bool allow_default=true);
+    void check(bool allow_parent = false, bool allow_default=true, bool multithread=false);
 #else
     inline void check(bool allow_parent = false, bool allow_default=true) {};
 #endif
 
-    virtual FlowNode* optimize(bool mt_safe) CLICK_WARN_UNUSED_RESULT;
+    virtual FlowNode* optimize(Bitvector threads) CLICK_WARN_UNUSED_RESULT;
 
     void traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt, bool do_final, bool do_default);
 
@@ -381,10 +384,17 @@ public:
     void reverse_print();
     static void print(const FlowNode* node,String prefix,int data_offset = -1, bool show_ptr = true, bool recursive=true, bool do_release = true);
 
+    static Spinlock printlock;
     inline void print(int data_offset = -1, bool show_ptr = true, bool recursive = true, bool do_release = true) const {
+#if DEBUG_CLASSIFIER > 2
+	printlock.acquire();
+#endif
         click_chatter("---");
         print(this,"", data_offset, show_ptr, recursive, do_release);
         click_chatter("---");
+#if DEBUG_CLASSIFIER > 2
+	printlock.release();
+#endif
     }
 #if DEBUG_CLASSIFIER
     void debug_print(int data_offset = -1) const {
@@ -763,7 +773,7 @@ class FlowNodeHash : public FlowNode  {
         _find = &find_ptr;
 #if DEBUG_CLASSIFIER
         for (int i = 0; i < capacity(); i++) {
-            assert(childs[i].ptr == NULL);
+            flow_assert(childs[i].ptr == NULL);
         }
 #endif
     };
@@ -1011,7 +1021,7 @@ class FlowNodeDefinition : public FlowNodeHash<HASH_SIZES_NR - 1> { public:
 
     FlowNodeDefinition* duplicate(bool recursive,int use_count, bool duplicate_leaf) override;
 
-    FlowNode* create_final(bool mt_safe);
+    FlowNode* create_final(Bitvector threads);
 };
 
 inline void FlowNodePtr::traverse_all_leaves(std::function<void(FlowNodePtr*)> fnt) {
@@ -1038,6 +1048,8 @@ template<class T>
 class FlowAllocator { public:
     static per_thread<pool_allocator_aware_mt<T,POOL_SZ, EXCH_MAX> >& instance() {
         static per_thread<pool_allocator_aware_mt<T,POOL_SZ, EXCH_MAX> > instance;
+        flow_assert(instance.weight() == click_max_cpu_ids());
+        flow_assert(instance->initialized());
         return instance;
     }
 

@@ -536,7 +536,7 @@ WritablePacket::recycle(WritablePacket *p)
     PacketPool& packet_pool = *make_local_packet_pool();
     bool data = is_from_data_pool(p);
 
-#if HAVE_FLOW_DYNAMIC
+#if HAVE_FLOW && HAVE_FLOW_DYNAMIC
     if (fcb_stack) {
         fcb_stack->release(1);
     } else {
@@ -574,7 +574,7 @@ WritablePacket::recycle(WritablePacket *p)
 void
 WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-#if HAVE_FLOW_DYNAMIC
+#if HAVE_FLOW && HAVE_FLOW_DYNAMIC
     if (fcb_stack) {
         fcb_stack->release(count);
     } else {

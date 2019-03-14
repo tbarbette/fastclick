@@ -13,13 +13,33 @@
 #include <click/allocator.hh>
 
 #include <thread>
-#include <assert.h>
 
 CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
 #include "flow_nodes.hh"
+
+inline void check_thread(FlowNode* parent, FlowNode* child) {
+    FlowNodeData data = child->node_data;
+    while (parent && dynamic_cast<FlowLevelThread*>(parent->level()) == 0) {
+        child = parent;
+        data = child->node_data;
+        parent = parent->parent();
+    }
+    /*
+        click_chatter("Releasing a nonthread??");
+        parent->print();
+        abort();
+    }*/
+    if (!parent)
+	return;
+    if (data.data_32 != click_current_cpu_id()) {
+        click_chatter("Thead %d in level of thread %d", click_current_cpu_id(), data.data_32);
+        assert(false);
+    }
+}
+
 
 class FlowClassificationTable : public FlowTableHolder {
 public:
@@ -85,6 +105,14 @@ bool FlowClassificationTable::reverse_match(FlowControlBlock* sfcb, Packet* p, F
     }
 
     while (parent != root) {
+#if DEBUG_CLASSIFIER
+		if (parent->threads.size() <= click_current_cpu_id() || !parent->threads[click_current_cpu_id()]) {
+			click_chatter("[%d] FATAL : Parent should not have this thread",click_current_cpu_id());
+			click_chatter("[%d] FATAL : Thread of parent : %s",click_current_cpu_id(),parent->threads.unparse().c_str());
+			parent->print();
+			assert(parent->threads[click_current_cpu_id()]);
+		}
+#endif
         FlowNode* child = parent;
         parent = parent->parent();
         flow_assert(parent);
@@ -124,9 +152,8 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
 #endif
         child_ptr = parent->find(data,need_grow);
 #if DEBUG_CLASSIFIER_MATCH > 1
-        click_chatter("->Ptr is %p, is_leaf : %d",child_ptr->ptr, child_ptr->is_leaf());
+        click_chatter("[%d] ->Ptr is %p, is_leaf : %d",click_current_cpu_id(), child_ptr->ptr, child_ptr->is_leaf());
 #endif
-
         if (unlikely(IS_FREE_PTR_ANY(child_ptr->ptr) //Do not change ptr here to 0, as we could follow default path without changing this one
 #if FLOW_KEEP_STRUCTURE
                 || (child_ptr->is_node() && child_ptr->node->released())
@@ -176,12 +203,12 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                             click_chatter("%d %d",parent->getNum(), parent->findGetNum());
                             abort();
                         }
-                        assert(parent->getNum() < parent->max_size());
+                        flow_assert(parent->getNum() < parent->max_size());
 #endif
                         parent->inc_num();
                         if (parent->get_default().is_leaf()) { //Leaf are not duplicated, we need to do it ourself
     #if DEBUG_CLASSIFIER_MATCH > 1
-                            click_chatter("DUPLICATE leaf");
+                            click_chatter("[%d] DUPLICATE leaf %p", click_current_cpu_id(),parent->get_default().ptr);
     #endif
                             //click_chatter("New leaf with data '%x'",data.get_long());
                             //click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
@@ -190,6 +217,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                             flow_assert(child_ptr->is_leaf());
                             child_ptr->leaf->initialize();
                             child_ptr->leaf->parent = parent;
+
     /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
                             child_ptr->leaf->release_fnt = _classifier_release_fnt;
     #endif*/
@@ -198,7 +226,15 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
     #if DEBUG_CLASSIFIER_MATCH > 3
                             _root->print();
     #endif
+check_thread(parent->parent(),parent);
                             _root->check(true, false);
+#if DEBUG_CLASSIFIER
+                            if (parent->threads.weight() == 1)
+				child_ptr->leaf->thread = parent->threads.clz();
+                            else
+				child_ptr->leaf->thread = -1;
+                            flow_assert(child_ptr->leaf->thread == -1 || child_ptr->leaf->thread == click_current_cpu_id());
+#endif
                             flow_assert(reverse_match(child_ptr->leaf, p, debug_save_root));
                             return child_ptr->leaf;
                         } else {
@@ -209,18 +245,25 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                                 //flow_assert(parent->find(data)->ptr == child_ptr->ptr);
                             } else
 #endif
-                            {
+                            { //Duplicate node
+
                                 flow_assert(parent->default_ptr()->node->getNum() == 0);
                                 FlowNode* newNode = parent->level()->create_node(parent->default_ptr()->node, false, false);
                                 newNode->_level = parent->default_ptr()->node->level();
                                 *newNode->default_ptr() = *parent->default_ptr()->node->default_ptr();
                                 child_ptr->set_node(newNode);
         #if DEBUG_CLASSIFIER_MATCH > 1
-                                click_chatter("DUPLICATE node, new is %p",child_ptr->node);
+                                click_chatter("[%d] DUPLICATE node, new is %p, default is %p",click_current_cpu_id(),child_ptr->node,parent->default_ptr()->ptr);
         #endif
 
                                 child_ptr->set_data(data);
                                 child_ptr->set_parent(parent);
+#if DEBUG_CLASSIFIER
+                                newNode->threads.clear();
+                                newNode->threads.resize(click_max_cpu_ids());
+                                newNode->threads[click_current_cpu_id()] = true;
+                                flow_assert(parent->threads[click_current_cpu_id()]);
+#endif
 //                                flow_assert(parent->find(data)->ptr == child_ptr->ptr);
                             }
                         }
@@ -231,6 +274,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                 } else
 #endif
                 { //There is a default but it is not a dynamic level, nor always_dup is set
+			flow_assert(child_ptr->node->threads[click_current_cpu_id()]);
                     child_ptr = parent->default_ptr();
                     if (child_ptr->is_leaf()) {
                         _root->check(true, false); //Do nothing if not in debug mode
@@ -245,6 +289,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                 return 0;
             }
         } else if (child_ptr->is_leaf()) {
+		flow_assert(child_ptr->leaf->thread == -1 || child_ptr->leaf->thread == click_current_cpu_id());
 #if DEBUG_FLOW
             if (child_ptr->leaf->parent()) {
                 flow_assert(reverse_match(child_ptr->leaf, p));
@@ -252,7 +297,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
 #endif
             return child_ptr->leaf;
         } else { // is an existing node, and not released. Just descend
-
+		flow_assert(child_ptr->node->threads[click_current_cpu_id()]);
         }
 
         flow_assert(child_ptr->node->parent() == parent);

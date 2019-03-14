@@ -1228,7 +1228,7 @@ FlowNode* FlowNode::replace_leaves(FlowNode* other, bool do_final, bool do_defau
  * Optimize table, changing nodes perf the appropriate data structure, removinf useless classification step entries
  * If the path is not mt-safe but reaches a non-mutable level (eg dynamic), a thread node will be added
  */
-FlowNode* FlowNode::optimize(bool mt_safe) {
+FlowNode* FlowNode::optimize(Bitvector threads) {
 	FlowNodePtr* ptr;
 
 	//Before everything else, remove this level if it's dynamic but useless
@@ -1240,44 +1240,54 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
                 click_chatter("Optimize : no need for this dynamic level");
 #endif
                 _default.set_parent(0);
-                return _default.node->optimize(mt_safe);
+                return _default.node->optimize(threads);
         } else {
             click_chatter("WARNING : useless path, please specify this to author");
         }
     }
 
     if (level()->is_mt_safe()) {
-        mt_safe = true;
+        assert(threads.weight() == 1);
+        //TODO : if lock, it is a different story
     }
 
     _level = level()->optimize();
 
-	if (level()->is_dynamic() && !mt_safe) {
+	FlowNode* newnode;
+	if (level()->is_dynamic() && threads.weight() > 1) {
+        click_chatter("Optimize : Inserting FlowLevelThread node");
 	    FlowLevel* thread = new FlowLevelThread(click_max_cpu_ids());
 	    FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
 
-        fa->initialize(thread->get_max_value());
-        fa->_level = thread;
-        fa->_parent = parent();
-	    fa->set_default(this->optimize(true));
+	    fa->initialize(thread->get_max_value());
+	    newnode = fa;
+	    newnode->_level = thread;
+	    newnode->_parent = parent();
+	    newnode->default_ptr()->ptr = 0; //BUG if an unexpected thread classify, this is expected
 	    for (int i = 0; i < click_max_cpu_ids(); i++) {
-	         FlowNode* newNode = thread->create_node(fa->default_ptr()->node, false, false);
-	         newNode->_level = fa->default_ptr()->node->level();
-	         *newNode->default_ptr() = *fa->default_ptr()->node->default_ptr();
+		 Bitvector tb(threads.size(), false);
+		 tb[i] = true;
+		 FlowNode* newNode = this->duplicate(true,1,true)->optimize(tb);
+	         //FlowNode* newNode = thread->create_node(def, false, false);
+	         //newNode->_level = def->level();
+	         //We keep an identical default, which breaks parent but
+             //  that is not a problem at this stage for a dynamic default (will never be released from child)
+             //*newNode->default_ptr() = *fa->default_ptr()->node->default_ptr();
 	         FlowNodeData data = FlowNodeData((uint32_t)i);
              bool need_grow;
-	         FlowNodePtr* child_ptr = fa->find(data,need_grow);
+	         FlowNodePtr* child_ptr = newnode->find(data,need_grow);
 	         child_ptr->set_node(newNode);
              child_ptr->set_data(data);
-             child_ptr->set_parent(fa);
-             fa->inc_num();
+             child_ptr->set_parent(newnode);
+             newnode->inc_num();
 	    }
-	    return fa;
+	    goto newnode;
 	}
 
 	//Optimize default
 	if (_default.ptr && _default.is_node())
-		_default.node = _default.node->optimize(mt_safe);
+		_default.node = _default.node->optimize(threads);
+
 
 	if (!level()->is_dynamic()) {
 		if (getNum() == 0) {
@@ -1295,7 +1305,8 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
                     fl->check();
 					return fl;*/
                     _default.set_parent(0);
-                    return _default.node;
+                    newnode = _default.node;
+                    goto newnode;
 				//}
 			} else {
 			    //TODO
@@ -1306,7 +1317,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 			    assert(false);
 			}
 		} else if (getNum() == 1) {
-			FlowNode* newnode;
+
 
 			FlowNodePtr* child = (iterator().next());
 
@@ -1318,13 +1329,13 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 #endif
 					FlowNodeDummy* fl = new FlowNodeDummy();
 					fl->assign(this);
-					fl->set_default(child->optimize(mt_safe));
+					fl->set_default(child->optimize(threads));
 
 					newnode = fl;
 				} else { //Child is node
 				    FlowNodeDefinition* defnode = dynamic_cast<FlowNodeDefinition*>(this);
 				    if (defnode->_else_drop) {
-				        FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize(mt_safe));
+				        FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize(threads));
                         fl->assign(this);
                         fl->inc_num();
                         fl->set_default(_default);
@@ -1337,11 +1348,11 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
                         newnode = child->node;
 				    }
 				}
-			} else {
+			} else { //_default.ptr != 0
 #if DEBUG_CLASSIFIER
 				click_chatter("Optimize : only 2 possible case (value %lu or default %lu)",child->data().get_long(),_default.data().get_long());
 #endif
-				FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize(mt_safe));
+				FlowNodeTwoCase* fl = new FlowNodeTwoCase(child->optimize(threads));
 				fl->assign(this);
 				fl->inc_num();
 				fl->set_default(_default);
@@ -1354,12 +1365,11 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 			assert(getNum() == 0);
 			//TODO delete this;
             newnode->check();
-			return newnode;
+            goto newnode;
 		} else if (getNum() == 2) {
 #if DEBUG_CLASSIFIER
             click_chatter("Optimize : node has 2 childs");
 #endif
-			FlowNode* newnode;
 			NodeIterator cit = iterator();
 			FlowNodePtr* childA = (cit.next());
 			FlowNodePtr* childB = (cit.next());
@@ -1373,11 +1383,11 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 #if DEBUG_CLASSIFIER
 				click_chatter("Optimize : 2 child and no default value : only 2 possible case (value %lu or value %lu)!",childA->data().get_long(),childB->data().get_long());
 #endif
-				FlowNodePtr newA = childA->optimize(mt_safe);
+				FlowNodePtr newA = childA->optimize(threads);
 				FlowNodeTwoCase* fl = new FlowNodeTwoCase(newA);
 				fl->inc_num();
 				fl->assign(this);
-				FlowNodePtr newB = childB->optimize(mt_safe);
+				FlowNodePtr newB = childB->optimize(threads);
 				fl->set_default(newB);
                 newA.set_parent(fl);
                 newB.set_parent(fl);
@@ -1386,8 +1396,8 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 #if DEBUG_CLASSIFIER
 				click_chatter("Optimize : only 3 possible cases (value %lu, value %lu or default %lu)",childA->data().get_long(),childB->data().get_long(),_default.data().get_long());
 #endif
-				FlowNodePtr ncA = childA->optimize(mt_safe);
-				FlowNodePtr ncB = childB->optimize(mt_safe);
+				FlowNodePtr ncA = childA->optimize(threads);
+				FlowNodePtr ncB = childB->optimize(threads);
 #if DEBUG_CLASSIFIER
 				click_chatter("The 2 cases are :");
 				ncA.print();
@@ -1399,7 +1409,7 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 				fl->inc_num();
 				fl->assign(this);
 				fl->set_default(_default);
-		ncA.set_parent(fl);
+		        ncA.set_parent(fl);
 			    ncB.set_parent(fl);
                 _default.set_parent(fl);
 				newnode = fl;
@@ -1412,32 +1422,40 @@ FlowNode* FlowNode::optimize(bool mt_safe) {
 			assert(getNum() == 0);
 			//TODO delete this;
             newnode->check();
-			return newnode;
+            goto newnode;
 		} else {
 #if DEBUG_CLASSIFIER
 			click_chatter("No optimization for level with %d childs",getNum());
 #endif
-			return dynamic_cast<FlowNodeDefinition*>(this)->create_final(mt_safe);
+			newnode = dynamic_cast<FlowNodeDefinition*>(this)->create_final(threads);
+			goto newnode;
 		}
 	} else {
 #if DEBUG_CLASSIFIER
 		click_chatter("Dynamic level won't be optimized");
 #endif
-		return dynamic_cast<FlowNodeDefinition*>(this)->create_final(mt_safe);
+		newnode = dynamic_cast<FlowNodeDefinition*>(this)->create_final(threads);
+		goto newnode;
 	}
 
 	//Unhandled case?
 	assert(false);
 	return this;
+	newnode:
+#if DEBUG_CLASSIFIER
+	assert(newnode);
+	newnode->threads = threads;
+#endif
+	return newnode;
 }
 
-FlowNodePtr FlowNodePtr::optimize(bool mt_safe) {
+FlowNodePtr FlowNodePtr::optimize(Bitvector threads) {
     if (is_leaf()) {
         return *this;
     } else {
         FlowNodePtr ptr = *this;
         FlowNodeData data = node->node_data;
-        ptr.node = node->optimize(mt_safe);
+        ptr.node = node->optimize(threads);
         ptr.node->node_data = data;
         ptr.node->check();
         return ptr;
@@ -1477,7 +1495,11 @@ void FlowControlBlock::print(String prefix, int data_offset, bool show_ptr) cons
 	    sprintf(&data_str[j],"%02x",data[data_offset]);
 	}
 	if (show_ptr)
-	    click_chatter("%s %lu Parent:%p UC:%d ED:%d (%p data %s)",prefix.c_str(),node_data[0].get_long(),parent,count(),is_early_drop(),this,data_str);
+#if DEBUG_CLASSIFIER
+	    click_chatter("%s %lu Parent:%p UC:%d ED:%d T:%d (%p data %s)",prefix.c_str(),node_data[0].get_long(),parent,count(),is_early_drop(),thread,this,data_str);
+#else
+	click_chatter("%s %lu Parent:%p UC:%d ED:%d (%p data %s)",prefix.c_str(),node_data[0].get_long(),parent,count(),is_early_drop(),this,data_str);
+#endif
 	else
 	    click_chatter("%s %lu UC:%d ED:%d (data %s)",prefix.c_str(),node_data[0].get_long(),count(),is_early_drop(),data_str);
 }
@@ -1664,7 +1686,7 @@ FCBPool::init_release(FlowControlBlock* fcb) {
 }
 
 
-
+Spinlock FlowNode::printlock;
 FCBPool* FCBPool::biggest_pool = 0;
 int FCBPool::initialized = 0;
 int NR_SHARED_FLOW = 0;

@@ -13,7 +13,7 @@ CLICK_DECLS
 #define DEBUG_CLASSIFIER_RELEASE 0
 #define DEBUG_CLASSIFIER_TIMEOUT 0
 #define DEBUG_CLASSIFIER_TIMEOUT_CHECK 0 //1 check at release, 2 check at insert (big hit)
-#define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time
+#define DEBUG_CLASSIFIER 0 //1 : Build-time only, >1 : whole time, >2 lock prints
 
 #define HAVE_STATIC_CLASSIFICATION 0 || !HAVE_FLOW_DYNAMIC
 
@@ -106,7 +106,9 @@ private:
 #endif
 
 	public:
-
+#if DEBUG_CLASSIFIER
+		int thread = -1;
+#endif
         Timestamp lastseen; //Last seen is also used without sloppy timeout for cache purposes
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
@@ -171,6 +173,9 @@ private:
 			use_count = 0;
 #endif
             flags = 0;
+#if DEBUG_CLASSIFIER
+            thread = -1;
+#endif
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
             release_fnt = 0;
             thunk = 0;
@@ -180,6 +185,7 @@ private:
 #endif
 		}
 
+
 #if HAVE_FLOW_DYNAMIC
 		inline void acquire(int packets_nr = 1);
 		inline void release(int packets_nr = 1);
@@ -188,6 +194,10 @@ private:
 
         inline int count() const {
 			return use_count;
+		}
+
+        inline int reset_count(int n) {
+			use_count = n;
 		}
 #else
 		inline void acquire(int packets_nr = 1) {
@@ -215,8 +225,7 @@ private:
 		void check() {
 		}
 
-    int hashcode() const;
-
+		int hashcode() const;
 };
 
 class FlowControlBlockRef { public:
@@ -277,8 +286,8 @@ private:
             }
 
             inline void assign(SFCBList list) {
-                assert(_p == NULL);
-                assert(_count == 0);
+                flow_assert(_p == NULL);
+                flow_assert(_count == 0);
                 _count = list._count;
                 _p = list._p;
             }
@@ -316,7 +325,7 @@ private:
 
 	inline FlowControlBlock* alloc_new() {
 		FlowControlBlock* fcb = (FlowControlBlock*)CLICK_LALLOC(sizeof(FlowControlBlock) + _data_size);
-        assert(fcb);
+		flow_assert(fcb);
 /*#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
 		fcb->release_fnt = &pool_release_fnt;
 		fcb->thunk = this;
@@ -468,7 +477,7 @@ public:
                 if (fcb == head)
                     return fcb;
 
-                assert(head != head->next);
+                flow_assert(head != head->next);
                 head = head->next;
         #if DEBUG_CLASSIFIER_TIMEOUT > 5
                 click_chatter("FIND next %p",head);
@@ -515,17 +524,23 @@ extern __thread FlowTableHolder* fcb_table;
 
 #if HAVE_FLOW_DYNAMIC
  void FlowControlBlock::acquire(int packets_nr) {
+#if DEBUG_CLASSIFIER
+	 if (thread != -1 && thread != click_current_cpu_id()) {
+		 click_chatter("Read FCB %p for thread %d from thread %d",this, thread, click_current_cpu_id());
+		 abort();
+	 }
+#endif
             use_count+=packets_nr;
 #if DEBUG_CLASSIFIER_RELEASE > 1
             click_chatter("Acquire %d to %p, total is %d",packets_nr,this,use_count);
 #endif
-        }
+}
 
 inline void FlowControlBlock::_do_release() {
 #if DEBUG_CLASSIFIER && HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-    assert(!(flags & FLOW_TIMEOUT_INLIST));
+    flow_assert(!(flags & FLOW_TIMEOUT_INLIST));
 #endif
-
+    flow_assert(thread == click_current_cpu_id());
     //click_chatter("Release fnt is %p",release_fnt);
     SFCB_STACK(
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
@@ -538,10 +553,13 @@ inline void FlowControlBlock::_do_release() {
 }
 
 inline void FlowControlBlock::release(int packets_nr) {
+	flow_assert(thread == -1 || thread == click_current_cpu_id());
+#ifndef NDEBUG
 	if ((int)use_count - packets_nr  < 0) {
 		click_chatter("ERROR : negative release : release %p, use_count = %d, releasing %d",this,use_count,packets_nr);
 		assert(use_count - packets_nr >= 0);
 	}
+#endif
 	use_count -= packets_nr;
 
 #if DEBUG_CLASSIFIER_RELEASE > 1
@@ -549,7 +567,7 @@ inline void FlowControlBlock::release(int packets_nr) {
 #endif
 
 	if (use_count == 0) {
-	    debug_flow_2("Release fcb %p, uc 0, hc %d",this,hasTimeout());
+	    debug_flow_2("[%d] Release fcb %p, uc 0, hc %d",click_current_cpu_id(), this,hasTimeout());
 		//assert(this->hasTimeout());
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 	    if (this->hasTimeout()) {

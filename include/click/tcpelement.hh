@@ -13,9 +13,13 @@
 #include <clicknet/ip.h>
 #include <click/element.hh>
 #include <click/flowelement.hh>
+#if HAVE_DPDK
 #include <click/dpdkdevice.hh>
+#endif
 #include "ipelement.hh"
+#if HAVE_DPDK
 #include <rte_ip.h>
+#endif
 
 CLICK_DECLS
 
@@ -267,17 +271,24 @@ inline void TCPElement::resetTCPChecksum(WritablePacket *packet) const
 
     iph->ip_sum = 0;
     tcph->th_sum = 0;
-    if (!DPDKDevice::is_dpdk_buffer(packet)) {
-        click_chatter("Not a DPDK buffer");
+#if HAVE_DPDK
+    if (!DPDKDevice::is_dpdk_buffer(packet))
+    {
+        click_chatter("Not a DPDK buffer. For max performance, arrange TCP element to always work on DPDK buffers");
+#else
+    {
+#endif
         computeTCPChecksum(packet);
         return;
     }
+#if HAVE_DPDK
     rte_mbuf* mbuf = (struct rte_mbuf *) packet->destructor_argument();
     mbuf->l2_len = packet->mac_header_length();
     mbuf->l3_len = packet->network_header_length();
     mbuf->l4_len = tcph->th_off << 2;
         mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4;
     tcph->th_sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+#endif
 }
 
 inline void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq) const

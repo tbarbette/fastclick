@@ -344,7 +344,7 @@ fi
 AC_ARG_ENABLE([flow-dynamic],
     [AS_HELP_STRING([  --disable-flow-dynamic], [allow dynamic flow system])],
     [:], [enable_flow_dynamic=yes])
-if test "x$enable_flow_dynamic" = xyes; then
+if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
     AC_DEFINE(HAVE_FLOW_DYNAMIC)
 fi
 

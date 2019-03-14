@@ -123,5 +123,6 @@ BitvectorTest::initialize(ErrorHandler *errh)
     return 0;
 }
 
+ELEMENT_PROVIDES(BitvectorTest)
 EXPORT_ELEMENT(BitvectorTest)
 CLICK_ENDDECLS

@@ -7099,7 +7099,7 @@ else
   enable_flow_dynamic=yes
 fi
 
-if test "x$enable_flow_dynamic" = xyes; then
+if test "x$enable_flow$enable_flow_dynamic" = xyesyes; then
     $as_echo "#define HAVE_FLOW_DYNAMIC 1" >>confdefs.h
 
 fi
@@ -8770,6 +8770,36 @@ $as_echo "#define HAVE_ADDRESSABLE_VA_LIST 1" >>confdefs.h
 
 
 
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __builtin_ctz" >&5
+$as_echo_n "checking for __builtin_ctz... " >&6; }
+if ${ac_cv_have___builtin_ctz+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+volatile int x = 11;
+int
+main ()
+{
+int y = __builtin_ctz(x);
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ac_cv_have___builtin_ctz=yes
+else
+  ac_cv_have___builtin_ctz=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_have___builtin_ctz" >&5
+$as_echo "$ac_cv_have___builtin_ctz" >&6; }
+    if test $ac_cv_have___builtin_ctz = yes; then
+
+$as_echo "#define HAVE___BUILTIN_CTZ 1" >>confdefs.h
+
+    fi
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __builtin_clz" >&5
 $as_echo_n "checking for __builtin_clz... " >&6; }
 if ${ac_cv_have___builtin_clz+:} false; then :
@@ -8949,6 +8979,37 @@ $as_echo "$ac_cv_have___builtin_ffsll" >&6; }
     if test $ac_cv_have___builtin_ffsll = yes; then
 
 $as_echo "#define HAVE___BUILTIN_FFSLL 1" >>confdefs.h
+
+    fi
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for __builtin_popcount" >&5
+$as_echo_n "checking for __builtin_popcount... " >&6; }
+if ${ac_cv_have___builtin_popcount+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+volatile int x = 11;
+int
+main ()
+{
+int y = __builtin_popcount(x);
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ac_cv_have___builtin_popcount=yes
+else
+  ac_cv_have___builtin_popcount=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_have___builtin_popcount" >&5
+$as_echo "$ac_cv_have___builtin_popcount" >&6; }
+    if test $ac_cv_have___builtin_popcount = yes; then
+
+$as_echo "#define HAVE___BUILTIN_POPCOUNT 1" >>confdefs.h
 
     fi
 

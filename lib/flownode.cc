@@ -29,16 +29,22 @@ FlowNode* FlowNode::start_growing(bool impl) {
             click_chatter("Table starting to grow (was level %s, node %s, num %d, impl %d)",level()->print().c_str(),name().c_str(), num, impl);
             set_growing(true);
             FlowNode* newNode = level()->create_node(this, true, impl);
+            flow_assert(newNode->getNum() == 0);
+            flow_assert(newNode->findGetNum() == 0);
             if (newNode == 0) {
                 //TODO : better to release old flows
                 debug_flow("Could not expand");
                 return 0;
             }
+#if DEBUG_CLASSIFIER
+            newNode->threads = threads;
+#endif
             newNode->_default = _default;
             newNode->_level = _level;
             newNode->_parent = this;
             _default.set_node(newNode);
             click_chatter("Table is now (level %s, node %s)",newNode->level()->print().c_str(),newNode->name().c_str());
+
             return newNode;
 }
 
@@ -46,8 +52,9 @@ FlowNode* FlowNode::start_growing(bool impl) {
 int FlowNode::findGetNum() {
     int count = 0;
     apply([&count](FlowNodePtr* p) {
-        flow_assert(p->ptr != (void*)-1);
+        flow_assert(p->ptr != DESTRUCTED_NODE);
         flow_assert(p->ptr);
+        flow_assert(!IS_FREE_PTR(p->ptr,this));
 #if FLOW_KEEP_STRUCTURE
         if (p->is_leaf()
                 || !p->node->released()
@@ -94,52 +101,65 @@ FlowNode::find_node(FlowNode* other) {
  * Ensure consistency of the tree
  * @param node
  */
-void FlowNode::check(bool allow_parent, bool allow_default) {
+void FlowNode::check(bool allow_parent, bool allow_default, bool multithread) {
     FlowNode* node = this;
     NodeIterator it = node->iterator();
     FlowNodePtr* cur = 0;
+    if (dynamic_cast<FlowNodeDefinition*>(this) != 0)
+	multithread = true;
     int num = 0;
+    int released = 0;
+    int prenum = findGetNum();
     while ((cur = it.next()) != 0) {
+        flow_assert(cur->ptr != 0);
+        flow_assert(cur->ptr != DESTRUCTED_NODE);
         if (cur->is_node()) {
             if (!allow_parent && cur->node->parent() != node)
                 goto error;
-            assert(cur->ptr != (void*)-1);
 #if FLOW_KEEP_STRUCTURE
             if (!cur->node->released())
+#else
+            if (true)
 #endif
             {
-                cur->node->check(allow_parent, allow_default);
+		if (multithread || cur->node->threads[click_current_cpu_id()])
+			cur->node->check(allow_parent, allow_default, multithread);
                 num++;
+            } else {
+                released++;
             }
         } else {
             cur->leaf->check();
             num++;
         }
     }
-
     if (num != getNum()) {
-        click_chatter("Number of child error (live count %d != theorical count %d) in :",num,getNum());
+        click_chatter("[%d] Number of child error (live count %d with %d released != theorical count %d) in :",click_current_cpu_id(),num, released,getNum());
         print();
+        assert(num == prenum);
+        assert(prenum == findGetNum()); //Concurrent modification
+        assert(num == findGetNum()); //Concurrent modification
         assert(num == getNum());
     }
     if (!allow_default) {
-        if (node->default_ptr()->ptr == 0) {
-            click_chatter("This node has no default path, this is not allowed : ");
+        if (node->default_ptr()->ptr == 0 && dynamic_cast<FlowLevelThread*>(node->level()) == 0) {
+            click_chatter("This node has no default path, this is not allowed except for FlowLevelThread: ");
             node->reverse_print();
             assert(false);
         }
     }
     if (node->default_ptr()->ptr != 0) {
 
-        assert(node->get_default().ptr != (void*)-1);
-        if (!allow_parent && node->default_ptr()->parent() != node)
+        assert(node->get_default().ptr != DESTRUCTED_NODE);
+        if (!allow_parent && node->default_ptr()->parent() != node && dynamic_cast<FlowLevelThread*>(node->level()) != 0)
             goto error;
         if (node->default_ptr()->is_node()) {
 #if FLOW_KEEP_STRUCTURE
             assert(!node->default_ptr()->node->released());
 #endif
             assert(node->level()->is_dynamic() || node->get_default().node->parent() == node);
-            node->get_default().node->check(allow_parent, allow_default);
+            if (multithread || node->get_default().node->threads[click_current_cpu_id()])
+		node->get_default().node->check(allow_parent, allow_default,multithread);
         } else {
             node->default_ptr()->leaf->check();
         }
@@ -165,13 +185,21 @@ void FlowNode::reverse_print() {
 void FlowNode::print(const FlowNode* node,String prefix,int data_offset, bool show_ptr, bool recursive, bool do_release) {
     if (show_ptr) {
         if (node->level()->is_dynamic()) {
-            click_chatter("%s%s (%s, %d childs, dynamic) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+#if DEBUG_CLASSIFIER
+		click_chatter("%s%s (%s, %d childs, dynamic, threads %s) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(), node->getNum() , node->threads.unparse().c_str(),node,node->parent());
+#else
+            click_chatter("%s%s (%s, %d childs, dynamic) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(), node->getNum() ,node,node->parent());
+#endif
         } else {
+#if DEBUG_CLASSIFIER
+            click_chatter("%s%s (%s, %d childs, threads %s) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(), node->threads.unparse().c_str(),node,node->parent());
+#else
             click_chatter("%s%s (%s, %d childs) %p Parent:%p",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum(),node,node->parent());
+#endif
         }
     } else {
         if (node->level()->is_dynamic())
-            click_chatter("%s%s (%s, %d childs, dynamic)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
+		click_chatter("%s%s (%s, %d childs, dynamic)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
         else
             click_chatter("%s%s (%s, %d childs)",prefix.c_str(),node->level()->print().c_str(),node->name().c_str(),node->getNum());
     }
@@ -416,7 +444,7 @@ FlowNodeDefinition::duplicate(bool recursive,int use_count, bool duplicate_leaf)
  * Create best structure for this node, and optimize all childs
  */
 FlowNode*
-FlowNodeDefinition::create_final(bool mt_safe) {
+FlowNodeDefinition::create_final(Bitvector threads) {
     FlowNode * fl;
     //click_chatter("Level max is %u, deletable = %d",level->get_max_value(),level->deletable);
     if (_hint) {
@@ -444,15 +472,18 @@ FlowNodeDefinition::create_final(bool mt_safe) {
                 assert(getNum() == flh->getNum());
                 flh->_level = _level;
                 flh->_parent = parent();
-                flh->apply([flh,mt_safe](FlowNodePtr* cur) {
+                flh->apply([flh,threads](FlowNodePtr* cur) {
                     cur->set_parent(flh);
                     if (cur->is_node()) {
                         FlowNodeData data = cur->data();
-                        cur->set_node(cur->node->optimize(mt_safe));
+                        cur->set_node(cur->node->optimize(threads));
                         cur->set_data(data);
                     }
                 });
                 flh->set_default(_default);
+#if DEBUG_CLASSIFIER
+                flh->threads = threads;
+#endif
                 return flh;
             } else {
                 FlowNode* fh0 = FlowNode::create_hash(0);
@@ -483,12 +514,21 @@ FlowNodeDefinition::create_final(bool mt_safe) {
         }
         cur->set_parent(fl);
         if (cur->is_node()) {
-            fl->add_node(cur->data(),cur->node->optimize(mt_safe));
+            fl->add_node(cur->data(),cur->node->optimize(threads));
         } else {
+#if DEBUG_CLASSIFIER
+			if (threads.weight() == 1)
+				cur->leaf->thread = threads.clz();
+			else
+				cur->leaf->thread = -1;
+#endif
             fl->add_leaf(cur->data(),cur->leaf);
         }
     }
     fl->set_default(_default);
+#if DEBUG_CLASSIFIER
+    fl->threads = threads;
+#endif
     return fl;
 }
 
@@ -600,7 +640,6 @@ FlowNode* FlowNodeArray::duplicate(bool recursive, int use_count, bool duplicate
     return fa;
 }
 void FlowNodeArray::release_child(FlowNodePtr child, FlowNodeData data) {
-{
             if (child.is_leaf()) {
                 childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
             } else {
@@ -617,7 +656,7 @@ void FlowNodeArray::release_child(FlowNodePtr child, FlowNodeData data) {
                 }
             }
             num--;
-    }
+            flow_assert(getNum() == findGetNum());
 };
 
 /******************************

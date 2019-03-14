@@ -260,6 +260,9 @@ class pool_allocator_aware_mt : pool_allocator_mt_base { public:
     pool_allocator_aware_mt();
     ~pool_allocator_aware_mt();
 
+    bool initialized() {
+        return _pool.weight() == click_max_cpu_ids();
+    }
 
     T* allocate_uninitialized() {
 #if CLICK_DEBUG_ALLOCATOR

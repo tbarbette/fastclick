@@ -119,7 +119,7 @@ void FlowClassifier::run_timer(Timer*) {
  */
 void release_subflow(FlowControlBlock* fcb, void* thunk) {
 #if DEBUG_CLASSIFIER_RELEASE
-    click_chatter("Release from tree fcb %p data %d, parent %p",fcb,fcb->data_64[0],fcb->parent);
+    click_chatter("[%d] Release from tree fcb %p data %d, parent %p, thread %d",click_current_cpu_id(), fcb,fcb->data_64[0],fcb->parent, fcb->thread);
 #endif
 
     flow_assert(thunk);
@@ -152,9 +152,11 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
     //Release nodes up to the root
     int up = 0;
     while (parent && parent->level()->is_dynamic() && child->getNum() == 0) { //A && B is empty and A is dynamic (so B was a duplicate as it comes from a FCB)
+
 #if DEBUG_CLASSIFIER_RELEASE
         click_chatter("[%d] Releasing parent %s's child %p, growing %d, num %d, child is type %s num %d",up,parent->name().c_str(), child, parent->growing(), parent->getNum(),child->name().c_str(),child->getNum());
 #endif
+        flow_assert(parent->threads[click_current_cpu_id()]);
         parent->check(true, false);
         flow_assert(child->level()->is_dynamic());
         if (parent->growing() && !child->growing() && child == parent->default_ptr()->ptr) {
@@ -210,6 +212,8 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
         parent = child->parent(); //Parent is 0
         up++;
     };
+    check_thread(parent, child);
+    fc->table().get_root()->check();
 }
 
 
@@ -235,17 +239,23 @@ int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
         click_chatter("Table of %s before optimization :",name().c_str());
         table->print(-1,false);
     }
+    table->check();
     if (_optimize) {
-        _table.set_root(table->optimize(passing.weight() <= 1));
+        _table.set_root(table->optimize(passing));
     } else {
         _table.set_root(table);
     }
     _table.get_root()->check();
     if (_verbose) {
         click_chatter("Table of %s after optimization :",name().c_str());
-        _table.get_root()->print(-1,false);
+        bool showptr = false;
+#if DEBUG_CLASSIFIER
+        showptr = true;
+#endif
+        _table.get_root()->print(-1,showptr);
     }
     FCBPool::initialized --;
+
     return 0;
 }
 
@@ -289,12 +299,18 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
             memcpy(nfcb->data, ptr->leaf->data, _table.get_pool()->data_size());
             nfcb->parent = ptr->leaf->parent;
             nfcb->flags = ptr->leaf->flags;
+#if DEBUG_CLASSIFIER
+			if (nfcb->parent->threads.weight() == 1) {
+				nfcb->thread = nfcb->parent->threads.clz();
+			} else
+				nfcb->thread = -1;
+#endif
             known_static_fcbs.set(FlowControlBlockRef(nfcb), nfcb);
             assert(known_static_fcbs.find(FlowControlBlockRef(nfcb)));
             delete ptr->leaf;
         }
 #if HAVE_FLOW_DYNAMIC
-        nfcb->acquire(1);
+        nfcb->reset_count(1);
 #endif
         nfcb->release_fnt = 0;
         ptr->set_leaf(nfcb);
@@ -302,7 +318,11 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
 
     if (_verbose > 1) {
         click_chatter("Table of %s after replacing nodes :",name().c_str());
-        _table.get_root()->print(-1,false);
+        bool showptr = false;
+#if DEBUG_CLASSIFIER
+        showptr = true;
+#endif
+        _table.get_root()->print(-1,showptr);
     }
 
 

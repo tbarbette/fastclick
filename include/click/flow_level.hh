@@ -74,7 +74,7 @@ public :
     //Compile time functions
     //---
 
-    FlowNodePtr optimize(bool mt_safe);
+    FlowNodePtr optimize(Bitvector threads);
 
     bool else_drop();
 
