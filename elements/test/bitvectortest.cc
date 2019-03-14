@@ -35,24 +35,46 @@ BitvectorTest::initialize(ErrorHandler *errh)
     Bitvector bv;
     CHECK(bv.size() == 0);
     CHECK(bv.zero());
+    CHECK(bv.weight() == 0);
+    CHECK(bv.clz() == 0);
     CHECK(!bv);
+
+    bv.resize(1);
+    CHECK(bv.weight() == 0);
+    CHECK(bv.clz() == 1);
+    bv[0] = true;
+    CHECK(bv.weight() == 1);
+    CHECK(bv.clz() == 0);
+    bv.clear();
 
     bv.resize(40);
     bv[39] = true;
     CHECK(bv.size() == 40);
     CHECK(bv[39]);
     CHECK(bv);
+    CHECK(bv.weight() == 1);
+    CHECK(bv.clz() == 39);
 
     bv.resize(10);
     CHECK(!bv);
+    CHECK(bv.weight() == 0);
+    CHECK(bv.clz() == 10);
 
     bv.resize(40);
     CHECK(!bv);
     CHECK(!bv[39]);
+    CHECK(bv.weight() == 0);
+    CHECK(bv.clz() == 40);
+
+    bv[10] = true;
+    CHECK(bv.weight() == 1);
+    CHECK(bv.clz() == 10);
 
     bv[0] = true;
     bv.resize(0);
     CHECK(bv.words()[0] == 0);
+    CHECK(bv.weight() == 0);
+    CHECK(bv.clz() == 0);
 
     CHECK(!bv.parse("3", 0, 5, -3));
     CHECK(!bv.parse("3", 5, 3));
@@ -84,6 +106,8 @@ BitvectorTest::initialize(ErrorHandler *errh)
     bv.assign(6, true);
     bv[2] = bv[4] = false;
     CHECK(bv.unparse() == "0-1,3,5");
+    CHECK(bv.weight() == 4);
+    CHECK(bv.clz() == 0);
     CHECK(bv.unparse(0) == "0-1,3,5");
     CHECK(bv.unparse(-1) == "1-2,4,6");
     CHECK(bv.unparse(1) == "0,2,4");
@@ -93,7 +117,8 @@ BitvectorTest::initialize(ErrorHandler *errh)
     CHECK(bv.unparse(1, 1) == "1,3,5");
     bv[4] = true;
     CHECK(bv.unparse() == "0-1,3-5");
-
+    CHECK(bv.weight() == 5);
+    CHECK(bv.clz() == 0);
     errh->message("All tests pass!");
     return 0;
 }

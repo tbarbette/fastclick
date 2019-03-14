@@ -41,6 +41,9 @@
 /* Define if PollDevice should run fast to get good benchmark numbers */
 #undef CLICK_WARP9
 
+/* Define if you have the __builtin_ctz function. */
+#undef HAVE___BUILTIN_CTZ
+
 /* Define if you have the __builtin_clz function. */
 #undef HAVE___BUILTIN_CLZ
 
@@ -58,6 +61,9 @@
 
 /* Define if you have the __builtin_ffsll function. */
 #undef HAVE___BUILTIN_FFSLL
+
+/* Define if you have the __builtin_popcount function. */
+#undef HAVE___BUILTIN_POPCOUNT
 
 /* Define if you have the __has_trivial_copy compiler intrinsic. */
 #undef HAVE___HAS_TRIVIAL_COPY
