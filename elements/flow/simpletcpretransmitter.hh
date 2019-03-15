@@ -3,7 +3,6 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/flowelement.hh>
 #include <click/timer.hh>
 #include <click/timestamp.hh>
 #include <click/sync.hh>
@@ -11,6 +10,7 @@
 #include <click/vector.hh>
 #include <clicknet/tcp.h>
 #include <click/tcpelement.hh>
+#include <click/flow/flowelement.hh>
 #include "tcpin.hh"
 
 CLICK_DECLS

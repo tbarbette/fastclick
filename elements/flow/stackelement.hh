@@ -2,11 +2,11 @@
 #define MIDDLEBOX_STACKELEMENT_HH
 #include <click/config.h>
 #include <click/element.hh>
-#include <click/flowelement.hh>
 #include <click/router.hh>
 #include <click/flowbuffer.hh>
 #include <click/routervisitor.hh>
 #   include <immintrin.h>
+#include <click/flow/flowelement.hh>
 
 CLICK_DECLS
 

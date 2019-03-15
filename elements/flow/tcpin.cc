@@ -1224,7 +1224,7 @@ tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
                     return true;
                 } else {
                     c->lock.release();
-                    click_chatter("BUG : established connection with reference %d in list", c->use_count);
+                    click_chatter("BUG : established connection (state %d) with reference %d in list", c->state, c->use_count + 1);
                     return true;
                 }
             } else if (unlikely(c->use_count == 1)) { //We have the only reference -> the inserter released it

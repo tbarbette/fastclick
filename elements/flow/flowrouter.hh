@@ -1,10 +1,10 @@
 #ifndef CLICK_FLOWROUTER_HH
 #define CLICK_FLOWROUTER_HH
-#include <click/flowelement.hh>
 #include <click/string.hh>
 #include <click/timer.hh>
 #include "flowclassifier.hh"
 #include <vector>
+#include <click/flow/flowelement.hh>
 
 CLICK_DECLS
 

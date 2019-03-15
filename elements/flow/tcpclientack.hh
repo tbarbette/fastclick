@@ -5,10 +5,10 @@
 #include <click/element.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
-#include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include "batchfcb.hh"
 #include <click/tcpelement.hh>
+#include <click/flow/flowelement.hh>
 
 /**
  * Structure used by the TCPClientAck element

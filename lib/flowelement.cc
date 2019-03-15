@@ -1,4 +1,4 @@
-// -*- c-basic-offset: 4; related-file-name: "../include/click/flowelement.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "../include/click/flow/flowelement.hh" -*-
 /*
  * flowelement.{cc,hh} -- the FlowElement base class
  * Tom Barbette
@@ -17,7 +17,7 @@
  */
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/flowelement.hh>
+#include <click/flow/flowelement.hh>
 
 
 CLICK_DECLS

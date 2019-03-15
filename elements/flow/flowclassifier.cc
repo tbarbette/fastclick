@@ -6,13 +6,13 @@
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/routervisitor.hh>
-#include <click/flowelement.hh>
 #include "flowclassifier.hh"
 #include "flowdispatcher.hh"
 #include <click/idletask.hh>
 #include <click/hashtable.hh>
 #include <algorithm>
 #include <set>
+#include <click/flow/flowelement.hh>
 
 CLICK_DECLS
 
@@ -171,10 +171,10 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
             flow_assert(parent->getNum() == parent->findGetNum());
             FlowNode* subchild = child->default_ptr()->node;
 
-            //Clean the growing flag for fast pool reuse
-            child->set_growing(false);
+
             if (child == parent->default_ptr()->ptr) { //Growing child was the default path
                 debug_flow("Default");
+                child->set_growing(false);
                 child->destroy();
                 parent->default_ptr()->ptr = subchild;
                 subchild->set_parent(parent);
@@ -184,8 +184,9 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
                     click_chatter("Growing of unrelated growing, not deleting");
                     break;
                 } else { //Release growing of normal, we cannot swap pointer because find could give a different bucket
-                    parent->release_child(FlowNodePtr(child), data); //A->release(B)
+                    parent->release_child(FlowNodePtr(child), data); //A->release(B). As growing flag is set, the parent will not keep the pointer even if KEEP_STRUCTURE
                 }
+                //the child has been destroyed by release_child, because of the growing flag
 
                 bool need_grow;
                 parent->find(data,need_grow)->set_node(subchild);

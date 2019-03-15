@@ -1,10 +1,11 @@
 #ifndef CLICK_FlowWebGen_HH
 #define CLICK_FlowWebGen_HH
-#include <click/flowelement.hh>
 #include <click/glue.hh>
 #include <click/task.hh>
 #include <click/timer.hh>
 #include <click/ipaddress.hh>
+
+#include <click/flow/flowelement.hh>
 CLICK_DECLS
 
 class TCPClientAck;

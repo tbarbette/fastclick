@@ -1,10 +1,9 @@
-#ifndef CLICK_FLOW_HH
-#define CLICK_FLOW_HH 1
+#ifndef CLICK_FLOW
+#define CLICK_FLOW 1
 
 #include <click/timestamp.hh>
 #include <click/error.hh>
 #include <click/sync.hh>
-#include <click/flow_common.hh>
 #include <click/packet.hh>
 #include <click/multithread.hh>
 #include <click/bitvector.hh>
@@ -13,12 +12,13 @@
 #include <click/allocator.hh>
 
 #include <thread>
+#include "common.hh"
 
 CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-#include "flow_nodes.hh"
+#include "node/flow_nodes.hh"
 
 inline void check_thread(FlowNode* parent, FlowNode* child) {
     FlowNodeData data = child->node_data;
@@ -138,22 +138,16 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
 
     FlowNode* debug_save_root = parent;
 #endif
-#if DEBUG_CLASSIFIER_MATCH > 1
     int level_nr = 0;
-#endif
 #if HAVE_FLOW_DYNAMIC
     bool dynamic = false;
 #endif
     do {
         bool need_grow = false;
         FlowNodeData data = parent->level()->get_data(p);
-#if DEBUG_CLASSIFIER_MATCH > 1
-        click_chatter("[%d] Data level %d is %016llX",click_current_cpu_id(), level_nr++,data.get_long());
-#endif
+        debug_flow("[%d] Data level %d is %016llX %s",click_current_cpu_id(), level_nr++,data.get_long(),parent->level()->print().c_str());
         child_ptr = parent->find(data,need_grow);
-#if DEBUG_CLASSIFIER_MATCH > 1
-        click_chatter("[%d] ->Ptr is %p, is_leaf : %d",click_current_cpu_id(), child_ptr->ptr, child_ptr->is_leaf());
-#endif
+        debug_flow("[%d] ->Ptr is %p, is_leaf : %d",click_current_cpu_id(), child_ptr->ptr, child_ptr->is_leaf());
         if (unlikely(IS_FREE_PTR_ANY(child_ptr->ptr) //Do not change ptr here to 0, as we could follow default path without changing this one
 #if FLOW_KEEP_STRUCTURE
                 || (child_ptr->is_node() && child_ptr->node->released())
@@ -178,6 +172,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                         }
 #endif
 */
+
                         flow_assert(parent->default_ptr()->node->parent() == parent);
                         parent = parent->default_ptr()->node;
                         continue;
@@ -207,9 +202,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
 #endif
                         parent->inc_num();
                         if (parent->get_default().is_leaf()) { //Leaf are not duplicated, we need to do it ourself
-    #if DEBUG_CLASSIFIER_MATCH > 1
-                            click_chatter("[%d] DUPLICATE leaf %p", click_current_cpu_id(),parent->get_default().ptr);
-    #endif
+				debug_flow("[%d] DUPLICATE leaf %p", click_current_cpu_id(),parent->get_default().ptr);
                             //click_chatter("New leaf with data '%x'",data.get_long());
                             //click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
                             child_ptr->set_leaf(_pool.allocate());
@@ -252,9 +245,7 @@ check_thread(parent->parent(),parent);
                                 newNode->_level = parent->default_ptr()->node->level();
                                 *newNode->default_ptr() = *parent->default_ptr()->node->default_ptr();
                                 child_ptr->set_node(newNode);
-        #if DEBUG_CLASSIFIER_MATCH > 1
-                                click_chatter("[%d] DUPLICATE node, new is %p, default is %p",click_current_cpu_id(),child_ptr->node,parent->default_ptr()->ptr);
-        #endif
+                                debug_flow("[%d] DUPLICATE node, new is %p, default is %p",click_current_cpu_id(),child_ptr->node,parent->default_ptr()->ptr);
 
                                 child_ptr->set_data(data);
                                 child_ptr->set_parent(parent);
@@ -274,7 +265,7 @@ check_thread(parent->parent(),parent);
                 } else
 #endif
                 { //There is a default but it is not a dynamic level, nor always_dup is set
-			flow_assert(child_ptr->node->threads[click_current_cpu_id()]);
+        			flow_assert(child_ptr->node->threads[click_current_cpu_id()]);
                     child_ptr = parent->default_ptr();
                     if (child_ptr->is_leaf()) {
                         _root->check(true, false); //Do nothing if not in debug mode
@@ -289,7 +280,7 @@ check_thread(parent->parent(),parent);
                 return 0;
             }
         } else if (child_ptr->is_leaf()) {
-		flow_assert(child_ptr->leaf->thread == -1 || child_ptr->leaf->thread == click_current_cpu_id());
+		    flow_assert(child_ptr->leaf->thread == -1 || child_ptr->leaf->thread == click_current_cpu_id());
 #if DEBUG_FLOW
             if (child_ptr->leaf->parent()) {
                 flow_assert(reverse_match(child_ptr->leaf, p));

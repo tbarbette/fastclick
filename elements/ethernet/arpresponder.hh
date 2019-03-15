@@ -1,10 +1,11 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_ARPRESPONDER_HH
 #define CLICK_ARPRESPONDER_HH
-#include <click/flowelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/vector.hh>
+
+#include <click/flow/flowelement.hh>
 CLICK_DECLS
 
 /*

@@ -1,7 +1,6 @@
 #ifndef CLICK_TCPSTATEIN_HH
 #define CLICK_TCPSTATEIN_HH
 #include <click/config.h>
-#include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include <click/hashtablemp.hh>
 #include <click/allocator.hh>
@@ -11,6 +10,7 @@
 CLICK_DECLS
 
 #include <click/hashtablemp.hh>
+#include <click/flow/flowelement.hh>
 
 CLICK_DECLS
 

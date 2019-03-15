@@ -1,12 +1,13 @@
 #ifndef CLICK_FLOWIPNAT_HH
 #define CLICK_FLOWIPNAT_HH
 #include <click/config.h>
-#include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include <click/hashtablemp.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
 #include <click/deque.hh>
+
+#include <click/flow/flowelement.hh>
 CLICK_DECLS
 
 #define DEBUG_NAT 0

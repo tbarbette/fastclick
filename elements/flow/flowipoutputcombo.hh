@@ -1,9 +1,10 @@
 #ifndef CLICK_FLOWIPOUTPUTCOMBO_HH
 #define CLICK_FLOWIPOUTPUTCOMBO_HH
 #include <click/config.h>
-#include <click/flowelement.hh>
 #include <click/glue.hh>
 #include <clicknet/ip.h>
+
+#include <click/flow/flowelement.hh>
 CLICK_DECLS
 
 /*

@@ -5,10 +5,10 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
-#include <click/flow.hh>
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include "ctxiploadbalancer.hh"
+#include <click/flow/flow.hh>
 
 CLICK_DECLS
 

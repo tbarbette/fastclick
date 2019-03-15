@@ -1,4 +1,4 @@
-// -*- c-basic-offset: 4; related-file-name: "../include/click/flow.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "../include/click/flow/flow.hh" -*-
 /*
  * flow.{cc,hh} -- the Flow class
  * Tom Barbette
@@ -15,11 +15,13 @@
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
  */
+
+
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/flow.hh>
 #include <stdlib.h>
 #include <regex>
+#include <click/flow/flow.hh>
 
 CLICK_DECLS
 
@@ -1259,7 +1261,7 @@ FlowNode* FlowNode::optimize(Bitvector threads) {
 	    FlowLevel* thread = new FlowLevelThread(click_max_cpu_ids());
 	    FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
 
-	    fa->initialize(thread->get_max_value());
+	    fa->initialize(thread->get_max_value() + 1);
 	    newnode = fa;
 	    newnode->_level = thread;
 	    newnode->_parent = parent();
@@ -1632,7 +1634,7 @@ FlowNode* FlowLevel::create_node(FlowNode* parent, bool better, bool better_impl
 
     if (l >= 100 || FlowNodeHash<0>::capacity_for(l) >= this->get_max_value()) {
         FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
-        fa->initialize(get_max_value());
+        fa->initialize(get_max_value() + 1);
         l = 100;
         return fa;
     }

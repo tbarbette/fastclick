@@ -1,6 +1,6 @@
 #ifndef CLICK_FLOWPAINT_HH
 #define CLICK_FLOWPAINT_HH
-#include <click/flowelement.hh>
+#include <click/flow/flowelement.hh>
 CLICK_DECLS
 
 /*

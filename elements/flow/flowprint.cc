@@ -6,8 +6,8 @@
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/routervisitor.hh>
-#include <click/flowelement.hh>
 #include "flowprint.hh"
+#include <click/flow/flowelement.hh>
 
 CLICK_DECLS
 

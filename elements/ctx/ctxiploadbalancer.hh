@@ -1,10 +1,10 @@
 #ifndef CLICK_CTXIPLoadBalancer_HH
 #define CLICK_CTXIPLoadBalancer_HH
 #include <click/config.h>
-#include <click/flowelement.hh>
 #include <click/multithread.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
+#include <click/flow/flowelement.hh>
 
 #define IPLOADBALANCER_MP 1
 #if IPLOADBALANCER_MP

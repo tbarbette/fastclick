@@ -36,8 +36,10 @@ CLICK_DECLS
 
 #if DEBUG_CLASSIFIER_CHECK || DEBUG_CLASSIFIER
     #define flow_assert(...) assert(__VA_ARGS__);
+	#define FLOW_INDEX(table,index) table[index]
 #else
     #define flow_assert(...)
+	#define FLOW_INDEX(table,index) table.unchecked_at(index)
 #endif
 
 #define HAVE_DYNAMIC_FLOW_RELEASE_FNT 1

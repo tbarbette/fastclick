@@ -2,7 +2,8 @@
 #ifndef CLICK_FlowStack_HH
 #define CLICK_FlowStack_HH
 #include <click/batchelement.hh>
-#include <click/flowelement.hh>
+
+#include <click/flow/flowelement.hh>
 CLICK_DECLS
 
 /*

@@ -12,7 +12,7 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include <click/element.hh>
-#include <click/flowelement.hh>
+
 #if HAVE_DPDK
 #include <click/dpdkdevice.hh>
 #endif

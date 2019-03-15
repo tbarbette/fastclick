@@ -1,11 +1,11 @@
 #ifndef CLICK_FLOWCLASSIFIER_HH
 #define CLICK_FLOWCLASSIFIER_HH
-#include <click/flowelement.hh>
 #include <click/string.hh>
 #include <click/timer.hh>
-#include <click/flow.hh>
 #include <click/multithread.hh>
 #include <vector>
+#include <click/flow/flow.hh>
+#include <click/flow/flowelement.hh>
 
 
 CLICK_DECLS

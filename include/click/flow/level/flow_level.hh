@@ -1,8 +1,8 @@
-#ifndef CLICK_FLOW_LEVEL_HH
-#define CLICK_FLOW_LEVEL_HH 1
-#include <click/flow_common.hh>
+#ifndef CLICK_FLOWLEVEL_HH
+#define CLICK_FLOWLEVEL_HH 1
 #include <click/packet.hh>
 #include <rte_flow.h>
+#include "../common.hh"
 
 #define FLOW_LEVEL_DEFINE(T,fnt) \
         static FlowNodeData get_data_ptr(void* thunk, Packet* p) {\
@@ -109,6 +109,12 @@ public:
     GetDataFn _get_data;
 
     virtual ~FlowLevel() {};
+
+    /**
+     * Maximum value this level can return, included.
+     * Eg 255 for an array of 256 values. In most cases this is actually
+     *  equal to the mask.
+     */
     virtual long unsigned get_max_value() = 0;
 
     virtual void add_offset(int offset) {};
@@ -288,7 +294,7 @@ public:
 
     virtual bool is_mt_safe() const override { return true;};
     inline long unsigned get_max_value() {
-        return _numthreads;
+        return _numthreads - 1;
     }
 
     inline FlowNodeData get_data_thread(Packet*) {

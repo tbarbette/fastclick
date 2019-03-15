@@ -5,7 +5,6 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
-#include <click/flow.hh>
 #include "flowdispatcher.hh"
 #include <iostream>
 #include <string>
@@ -13,6 +12,7 @@
 #include <algorithm>
 #include <vector>
 #include <iterator>
+#include <click/flow/flow.hh>
 
 
 CLICK_DECLS

@@ -1,11 +1,12 @@
 #ifndef CLICK_FLOWIPLOADBALANCER_HH
 #define CLICK_FLOWIPLOADBALANCER_HH
 #include <click/config.h>
-#include <click/flowelement.hh>
 #include <click/tcpelement.hh>
 #include <click/multithread.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
+
+#include <click/flow/flowelement.hh>
 #include "flowipnat.hh"
 
 

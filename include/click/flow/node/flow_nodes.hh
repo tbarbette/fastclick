@@ -1,9 +1,10 @@
-#ifndef CLICK_FLOW_NODES_HH
-#define CLICK_FLOW_NODES_HH 1
+#ifndef CLICK_FLOWNODES_HH
+#define CLICK_FLOWNODES_HH 1
 
 #include <click/allocator.hh>
 #include <click/straccum.hh>
-#include "flow_level.hh"
+
+#include "../level/flow_level.hh"
 
 #define FLOW_NODE_DEFINE(T,fnt) \
         static FlowNodePtr* find_ptr(void* thunk, FlowNodeData data, bool &need_grow) {\
@@ -496,17 +497,17 @@ public:
 
     inline FlowNodePtr* find_heap(FlowNodeData data, bool &need_grow) {
         int i = 0;
-        while (childs.unchecked_at(i).ptr) {
-            uint32_t cd = childs.unchecked_at(i).data().data_32;
+        while (FLOW_INDEX(childs,i).ptr) {
+            uint32_t cd = FLOW_INDEX(childs,i).data().data_32;
             if (cd == data.data_32)
-                return &childs.unchecked_at(i);
+                return &FLOW_INDEX(childs,i);
             else if (cd < data.data_32) {
                 i = right_idx(i);
             } else {
                 i = left_idx(i);
             }
         }
-        return &childs.unchecked_at(i);
+        return &FLOW_INDEX(childs,i);
     }
 
     String name() const {
@@ -515,6 +516,7 @@ public:
 
     void release_child(FlowNodePtr child, FlowNodeData data) override {
         click_chatter("TODO : release child heap");
+        abort();
     }
 
     ~FlowNodeHeap();
@@ -567,7 +569,7 @@ public:
     FLOW_NODE_DEFINE(FlowNodeArray,find_array);
 
     inline FlowNodePtr* find_array(FlowNodeData data, bool &need_grow) {
-        return &childs.unchecked_at(data.data_32);
+        return &FLOW_INDEX(childs,data.data_32);
     }
 
     String name() const {

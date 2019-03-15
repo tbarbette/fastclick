@@ -5,8 +5,8 @@
 #include <click/vector.hh>
 #include <click/string.hh>
 #include <click/batchelement.hh>
-#include <click/flow.hh>
 #include <click/routervisitor.hh>
+#include "flow.hh"
 
 
 CLICK_DECLS

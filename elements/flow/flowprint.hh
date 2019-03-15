@@ -3,8 +3,8 @@
 #include <click/batchelement.hh>
 #include <click/string.hh>
 #include <click/timer.hh>
-#include <click/flow.hh>
 #include <vector>
+#include <click/flow/flow.hh>
 
 CLICK_DECLS
 

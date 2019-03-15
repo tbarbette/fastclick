@@ -1,4 +1,4 @@
-// -*- c-basic-offset: 4; related-file-name: "../include/click/flow.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "../include/click/flow/flow.hh" -*-
 /*
  * flow.{cc,hh} -- the Flow class
  * Tom Barbette
@@ -17,9 +17,9 @@
  */
 #include <click/config.h>
 #include <click/glue.hh>
-#include <click/flow.hh>
 #include <stdlib.h>
 #include <algorithm>
+#include <click/flow/flow.hh>
 
 /********************************
  * FlowNode functions
@@ -455,7 +455,7 @@ FlowNodeDefinition::create_final(Bitvector threads) {
             fl = FlowNode::create_hash(l);
         } else if (_hint == "ARRAY") {
             FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
-            fa->initialize(_level->get_max_value());
+            fa->initialize(_level->get_max_value() + 1);
             _level->current_level = 100;
             fl = fa;
         } else {
@@ -465,7 +465,7 @@ FlowNodeDefinition::create_final(Bitvector threads) {
     } else {
         if (_level->get_max_value() == 0)
             fl = new FlowNodeDummy();
-        else if (_level->get_max_value() > 256) {
+        else if (_level->get_max_value() > 255) {
             if (!_level->is_dynamic()) {
                 FlowNodeHeap* flh = new FlowNodeHeap();
                 flh->initialize(this);
@@ -497,7 +497,7 @@ FlowNodeDefinition::create_final(Bitvector threads) {
         } else {
             FlowNodeArray* fa = FlowAllocator<FlowNodeArray>::allocate();
             _level->current_level = 100;
-            fa->initialize(_level->get_max_value());
+            fa->initialize(_level->get_max_value() + 1);
             fl = fa;
         }
     }
@@ -592,9 +592,9 @@ FlowNodeHeap::initialize(FlowNode* fn) {
 FlowNodeHeap::~FlowNodeHeap() {
     //Base destructor will delete the default
     for (int i = 0; i < childs.size(); i++) {
-        if (childs.unchecked_at(i).ptr != NULL && childs.unchecked_at(i).is_node()) {
-               delete childs.unchecked_at(i).node;
-               childs.unchecked_at(i).node = 0;
+        if (FLOW_INDEX(childs,i).ptr != NULL && FLOW_INDEX(childs,i).is_node()) {
+               delete FLOW_INDEX(childs,i).node;
+               FLOW_INDEX(childs,i).node = 0;
         }
     }
 }
@@ -627,9 +627,9 @@ void FlowNodeArray::destroy() {
 FlowNodeArray::~FlowNodeArray() {
     //Base destructor will delete the default
     for (int i = 0; i < childs.size(); i++) {
-        if (childs.unchecked_at(i).ptr != NULL && childs.unchecked_at(i).is_node()) {
-               delete childs.unchecked_at(i).node;
-               childs.unchecked_at(i).node = 0;
+        if (FLOW_INDEX(childs,i).ptr != NULL && FLOW_INDEX(childs,i).is_node()) {
+               delete FLOW_INDEX(childs,i).node;
+               FLOW_INDEX(childs,i).node = 0;
         }
     }
 }
@@ -641,9 +641,10 @@ FlowNode* FlowNodeArray::duplicate(bool recursive, int use_count, bool duplicate
 }
 void FlowNodeArray::release_child(FlowNodePtr child, FlowNodeData data) {
             if (child.is_leaf()) {
-                childs[data.data_32].ptr = 0; //FCB deletion is handled by the caller which goes bottom up
+                FLOW_INDEX(childs,data.data_32).ptr = 0; //FCB deletion is handled by the caller which goes bottom up
             } else {
-                if (growing()) {
+                if (growing()) { //We need to destroy the pointer FLOW_KEEP_STRUCTURE as this node will be reused elswhere
+			child.node->set_growing(false);
                     child.node->destroy();
                     child.node = 0;
                 } else {
@@ -843,6 +844,7 @@ void FlowNodeHash<capacity_n>::release_child(FlowNodePtr child, FlowNodeData dat
     } else {
         if (unlikely(growing())) { //If we are growing, or the child is growing, we want to destroy the child definitively
             SET_DESTRUCTED_NODE(childs[idx].ptr,this);
+            child.node->set_growing(false);
             child.node->destroy();
         } else { //Child is node and not growing
             //flow_assert(!child.node->growing()); //If the child is growing, the caller has to swap it, not destroy it

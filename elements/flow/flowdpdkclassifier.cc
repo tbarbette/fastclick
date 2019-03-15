@@ -2,8 +2,9 @@
 #include <click/glue.hh>
 #include <click/args.hh>
 #include "flowdpdkclassifier.hh"
-#include <click/flow.hh>
-#include <click/flow_nodes.hh>
+
+#include <click/flow/flow.hh>
+#include <click/flow/node/flow_nodes.hh>
 
 CLICK_DECLS
 

@@ -1,10 +1,10 @@
 #ifndef CLICK_TCPStatus_HH
 #define CLICK_TCPStatus_HH
-#include <click/flow.hh>
-#include <click/flowelement.hh>
 #include <click/string.hh>
 #include <click/timer.hh>
 #include <vector>
+#include <click/flow/flow.hh>
+#include <click/flow/flowelement.hh>
 
 CLICK_DECLS
 

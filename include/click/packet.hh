@@ -5,7 +5,8 @@
 #include <click/glue.hh>
 #include <click/timestamp.hh>
 #include <click/packet_anno.hh>
-#include <click/flow_common.hh>
+
+#include "flow/common.hh"
 #if CLICK_LINUXMODULE
 # include <click/skbmgr.hh>
 #elif CLICK_PACKET_USE_DPDK

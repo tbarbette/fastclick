@@ -4,6 +4,7 @@
 #include <click/hashcode.hh>
 #define CLICK_DEBUG_HASHMAP 1
 #include <click/allocator.hh>
+#include <functional>
 #include <click/multithread.hh>
 #if CLICK_DEBUG_HASHMAP
 # define click_hashmp_assert(x) assert(x)

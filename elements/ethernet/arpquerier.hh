@@ -1,10 +1,11 @@
 #ifndef CLICK_ARPQUERIER_HH
 #define CLICK_ARPQUERIER_HH
-#include <click/flowelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/sync.hh>
 #include <click/timer.hh>
+
+#include <click/flow/flowelement.hh>
 #include "arptable.hh"
 CLICK_DECLS
 
