@@ -78,22 +78,22 @@ bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
                 }
                 return false;
                 });
-        if (found) {
-            if (_verbose)
-                click_chatter("Found entry, map has %d entries!",_return->_map.size());
-            auto th = p->tcp_header();
-            fcb->common = common;
-            fcb->fin_seen = false;
+	if (found) {
+		if (_verbose)
+			click_chatter("Found entry, map has %d entries!",_return->_map.size());
+		auto th = p->tcp_header();
+		fcb->common = common;
+		fcb->fin_seen = false;
 //we keep the reference from the table
 //            ++fcb->common->use_count;
-            if (fcb->common->use_count == 1) { //Connection was reset, we have the only ref
-                if (fcb->common->use_count.dec_and_test())
-                    _pool.release(fcb->common);
-                fcb->common = 0;
-                return false;
-            }
-            return true;
-        }
+		if (fcb->common->use_count == 1) { //Connection was reset, we have the only ref
+			if (fcb->common->use_count.dec_and_test())
+				_pool.release(fcb->common);
+			fcb->common = 0;
+			return false;
+		}
+		return true;
+	}
     if (!_accept_nonsyn && !p->tcp_header()->th_flags & TH_SYN) {
         click_chatter("Flow does not start with a SYN...");
         return false;

@@ -1135,32 +1135,21 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
 
         IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
         // We are the initiator, so we need to allocate memory
-        tcp_common *allocated = poolFcbTcpCommon.allocate();
+        fcb_in->common = poolFcbTcpCommon.allocate();
         //click_chatter("Alloc %p", allocated);
         //assert(!allocated->maintainers[0].initialized);
         //assert(!allocated->maintainers[1].initialized);
 
-        allocated->use_count = 2; //One for us, one for the table
+        fcb_in->common->use_count = 2; //One for us, one for the table
 
-        //A pending reset or time out connection could exist so we use replace and free any existing entry if found
-        tableFcbTcpCommon.replace(flowID, allocated,[this](tcp_common* &existing) {
-            existing->lock.acquire();
-            if (--existing->use_count == 0) {
-                existing->lock.release();
-                poolFcbTcpCommon.release(existing);
-            } else {
-                click_chatter("Probable bug 828");
-                existing->lock.release();
-            }
-        });
-
-        fcb_in->common = allocated;
 //DEBUG
 //        if (*tableFcbTcpCommon.find(flowID) != allocated) {
 //            allocated = *tableFcbTcpCommon.find(flowID);
 //            click_chatter("Looking for that flow gave %p, in state %d, uc %d. It is not bad because it should be released before us.", allocated, allocated->state, allocated->use_count);
 //            assert(false);
 //        }
+
+
 
         // Set the pointer in the structure
         if (allowResize() || returnElement->allowResize()) {
@@ -1174,6 +1163,20 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
             fcb_in->common->state = TCPState::ESTABLISHING_1;
         else
             fcb_in->common->state = TCPState::ESTABLISHING_2;
+
+        //A pending reset or time out connection could exist so we use replace and free any existing entry if found
+        tableFcbTcpCommon.replace(flowID, fcb_in->common, [this](tcp_common* &existing) {
+            existing->lock.acquire();
+            if (--existing->use_count == 0) {
+                existing->lock.release();
+                poolFcbTcpCommon.release(existing);
+            } else {
+                click_chatter("Probable bug 828");
+                existing->lock.release();
+            }
+        });
+
+
 
         // Store in our structure the information needed to free the memory
         // of the common structure
@@ -1218,13 +1221,16 @@ tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
     bool it = tableFcbTcpCommon.find_remove_clean(flowID,[&p](tcp_common* &c){p=c;},[this](tcp_common* &c){
             if (unlikely(c->state >= TCPState::OPEN)) { //An established connection in the list : means a pending connection was reset
                 c->lock.acquire();
+                if (unlikely(c->state < TCPState::OPEN)) {
+			click_chatter("Concurrent access... This is not a dangerous bug, but please report bug 978.");
+                }
                 if (likely(--c->use_count == 0)) { //The reseter left a reference, it is likely we have the last (or it would not be pending)
                     c->lock.release();
                     poolFcbTcpCommon.release(c); //Will call ~common
                     return true;
                 } else {
+                    click_chatter("BUG : established connection (state %d) with %d references in list", c->state, c->use_count + 1);
                     c->lock.release();
-                    click_chatter("BUG : established connection (state %d) with reference %d in list", c->state, c->use_count + 1);
                     return true;
                 }
             } else if (unlikely(c->use_count == 1)) { //We have the only reference -> the inserter released it
