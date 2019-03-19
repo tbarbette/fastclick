@@ -234,6 +234,7 @@ template<class Derived, typename T> class FlowStateElement : public VirtualFlowS
     };
 public :
 
+    typedef FlowStateElement<Derived, T> derived;
 
     FlowStateElement() CLICK_COLD;
     virtual int initialize(ErrorHandler *errh) CLICK_COLD;

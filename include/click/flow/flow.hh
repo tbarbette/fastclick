@@ -21,6 +21,9 @@ CLICK_DECLS
 #include "node/flow_nodes.hh"
 
 inline void check_thread(FlowNode* parent, FlowNode* child) {
+#if !DEBUG_CLASSIFIER
+    assert(false); //Never run this in non-debug
+#endif
     FlowNodeData data = child->node_data;
     while (parent && dynamic_cast<FlowLevelThread*>(parent->level()) == 0) {
         child = parent;
@@ -219,7 +222,6 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
     #if DEBUG_CLASSIFIER_MATCH > 3
                             _root->print();
     #endif
-check_thread(parent->parent(),parent);
                             _root->check(true, false);
 #if DEBUG_CLASSIFIER
                             if (parent->threads.weight() == 1)

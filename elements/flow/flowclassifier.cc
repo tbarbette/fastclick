@@ -107,7 +107,8 @@ void FlowClassifier::run_timer(Timer*) {
     fcb_table = &_table;
     _table.check_release();
     fcb_table = 0;
-    _timer.reschedule_after_msec(_clean_timer);
+    if (_clean_timer > 0)
+        _timer.reschedule_after_msec(_clean_timer);
 }
 #endif
 
@@ -213,7 +214,9 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
         parent = child->parent(); //Parent is 0
         up++;
     };
+#if DEBUG_CLASSIFIER
     check_thread(parent, child);
+#endif
     fc->table().get_root()->check();
 }
 
