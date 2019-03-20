@@ -71,8 +71,9 @@ public:
     struct DevInfo {
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
-            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0),
+            rx_queues(0,false), tx_queues(0,false),
+            promisc(false), vlan_filter(false), vlan_strip(false),
+            n_rx_descs(0), n_tx_descs(0),
             init_mac(), init_mtu(0), init_fc_mode(FC_UNSET) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
@@ -84,6 +85,8 @@ public:
             click_chatter("   Device   ID: %d", device_id);
             click_chatter("   Driver Name: %s", driver);
             click_chatter("Promisc   Mode: %s", promisc? "true":"false");
+            click_chatter("Vlan Filtering: %s", vlan_filter? "true":"false");
+            click_chatter("Vlan Stripping: %s", vlan_strip? "true":"false");
             click_chatter("   MAC Address: %s", init_mac.unparse().c_str());
             click_chatter("# of Rx Queues: %d", rx_queues.size());
             click_chatter("# of Tx Queues: %d", tx_queues.size());
@@ -98,6 +101,8 @@ public:
         Vector<bool> rx_queues;
         Vector<bool> tx_queues;
         bool promisc;
+        bool vlan_filter;
+        bool vlan_strip;
         unsigned n_rx_descs;
         unsigned n_tx_descs;
         EtherAddress init_mac;
@@ -106,7 +111,7 @@ public:
     };
 
     int add_rx_queue(
-        unsigned &queue_id, bool promisc,
+        unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
         unsigned n_desc, ErrorHandler *errh
     ) CLICK_COLD;
 
@@ -239,7 +244,7 @@ private:
     static bool no_more_buffer_msg_printed;
 
     int initialize_device(ErrorHandler *errh) CLICK_COLD;
-    int add_queue(Dir dir, unsigned &queue_id, bool promisc,
+    int add_queue(Dir dir, unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
                    unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
     static int alloc_pktmbufs(ErrorHandler* errh) CLICK_COLD;
