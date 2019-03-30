@@ -129,7 +129,7 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
     fcb->ref->closing = false;
     fcb->fin_seen = false;
 #endif
-    //click_chatter("NEW osip %s osport %d",osip.unparse().c_str(),htons(oport));
+    //click_chatter("NEW osip %s osport %d, new port %d",osip.unparse().c_str(),htons(oport),ntohs(fcb->ref->port));
     NATEntryOUT out(IPPort(osip,oport),fcb->ref);
     _map.replace(fcb->ref->port, out,[this](NATEntryOUT& replaced){
 	release_ref(replaced.ref);
@@ -151,10 +151,15 @@ void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 
 
 void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
+	if (!_own_state && flowdata->ref->closing) {
+		release_ref(flowdata->ref);
+		new_flow(flowdata, batch->first());
+	}
     auto fnt = [this,flowdata](Packet* p) -> bool {
         if (!flowdata->ref) {
             return false;
         }
+
         WritablePacket* q=p->uniqueify();
         //click_chatter("Rewrite to %s %d",_sip.unparse().c_str(),htons(flowdata->ref->port));
         q->rewrite_ipport(_sip, flowdata->ref->port, 0, true);
@@ -199,7 +204,7 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
     bool found = _in->_map.find_remove(th->th_dport,*fcb);
 
     if (unlikely(!found)) {
-        //click_chatter("FOUND %d, port %d, osip %s osport %d, RST %d, FIN %d, SYN %d",found,ntohs(th->th_dport),fcb->map.ip.unparse().c_str(),ntohs(fcb->map.port), th->th_flags & TH_RST, th->th_flags & TH_FIN, th->th_flags & TH_SYN);
+        //click_chatter("NOT FOUND %d, %d, osip %s osport %d, RST %d, FIN %d, SYN %d",found,ntohs(th->th_dport),fcb->map.ip.unparse().c_str(),ntohs(fcb->map.port), th->th_flags & TH_RST, th->th_flags & TH_FIN, th->th_flags & TH_SYN);
         return false;
     }
 
@@ -214,8 +219,10 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
 }
 
 void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
-//    click_chatter("Release %d",ntohs(fcb->ref->port));
+//    click_chatter("Release rvr %d",ntohs(fcb->ref->port));
 
+    if (!_in->_own_state)
+	fcb->ref->closing = 1;
 #if NAT_COLLIDE
 	release_ref(fcb->ref);
 #else
@@ -230,7 +237,8 @@ void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* 
     auto fnt = [this,flowdata](Packet*p) -> bool {
         //click_chatter("Rewrite to %s %d",flowdata->map.ip.unparse().c_str(),ntohs(flowdata->map.port));
         if (!flowdata->ref) {
-            return false;
+		click_chatter("Return flow without ref?");
+		return false;
         }
         WritablePacket* q=p->uniqueify();
         q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1, true);

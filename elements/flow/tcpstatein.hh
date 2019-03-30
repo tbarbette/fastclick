@@ -76,10 +76,11 @@ private:
     //Needs to be static to  prevent having one side releasing to another, hence having a pool only allocating and the other only cleaning
     static pool_allocator_mt<TCPStateCommon,false,16384> _pool;
 
-private:
     bool _accept_nonsyn;
     TCPStateHashtable _map;
     TCPStateIN* _return;
+    int _verbose;
+    atomic_uint32_t _established;
 };
 
 CLICK_ENDDECLS

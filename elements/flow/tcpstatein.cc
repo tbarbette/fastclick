@@ -1,4 +1,5 @@
 /*
+/*
  * TCPStateIN.{cc,hh}
  */
 
@@ -12,9 +13,7 @@
 
 CLICK_DECLS
 
-#define _verbose false
-
-TCPStateIN::TCPStateIN() : _map(65535),  _accept_nonsyn(true) {
+TCPStateIN::TCPStateIN() : _map(65535),  _accept_nonsyn(true), _verbose(0) {
 
 };
 
@@ -28,7 +27,8 @@ TCPStateIN::configure(Vector<String> &conf, ErrorHandler *errh)
     Element* e;
     if (Args(conf, this, errh)
                 .read_mp("RETURNNAME",e)
-                .read("ACCEPT_NONSYN", _accept_nonsyn)
+                .read_or_set("ACCEPT_NONSYN", _accept_nonsyn, true)
+				.read_or_set("VERBOSE", _verbose, 0)
                 .complete() < 0)
         return -1;
 
@@ -71,9 +71,11 @@ bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
     
     TCPStateCommon* common;
     bool found = _return->_map.find_remove_clean(IPFlowID(p),[&common](TCPStateCommon* &c){common=c;},[this](TCPStateCommon* &c){ //This function is called under read lock
-                if (c->use_count == 1) { //Inserter removed the reference without grabing
-                    if (c->use_count.dec_and_test())
+                if (c->use_count == 1) { //Inserter removed the reference without it being grabbed by other side
+                    if (c->use_count.dec_and_test()) {
                         _pool.release(c);
+                        //No established-- because it was not established
+                    }
                     return true;
                 }
                 return false;
@@ -92,6 +94,7 @@ bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
 			fcb->common = 0;
 			return false;
 		}
+		_established ++;
 		return true;
 	}
     if (!_accept_nonsyn && !p->tcp_header()->th_flags & TH_SYN) {
@@ -117,6 +120,7 @@ void TCPStateIN::release_flow(TCPStateEntry* fcb) {
     if (fcb->common)
     {
         if (fcb->common->use_count.dec_and_test()) {
+		_established --;
             _pool.release(fcb->common);
             if (_verbose)
                 click_chatter("Release FCB common!");
@@ -164,13 +168,15 @@ void TCPStateIN::push_batch(int port, TCPStateEntry* flowdata, PacketBatch* batc
     }
 }
 
-enum {h_map_size};
+enum {h_map_size, h_established};
 String TCPStateIN::read_handler(Element* e, void* thunk) {
     TCPStateIN* tc = static_cast<TCPStateIN*>(e);
 
     switch ((intptr_t)thunk) {
         case h_map_size:
             return String(tc->_map.size());
+        case h_established:
+		return String(tc->_established);
     }
     return String("");
 }
@@ -178,6 +184,7 @@ String TCPStateIN::read_handler(Element* e, void* thunk) {
 void TCPStateIN::add_handlers() {
 
     add_read_handler("map_size", TCPStateIN::read_handler, h_map_size);
+    add_read_handler("established", TCPStateIN::read_handler, h_established);
 
 }
 

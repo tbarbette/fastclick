@@ -158,7 +158,7 @@ public:
      * @param packet The packet
      * @return The length of the TCP payload of the packet
      */
-    unsigned getPayloadLength(Packet* packet) const;
+    static unsigned getPayloadLength(Packet* packet);
 
     /**
      * @brief Return the payload of a TCP packet
@@ -209,7 +209,7 @@ public:
      * @return A boolean indicating whether the packet is just an ACK without any additional
      * information
      */
-    bool isJustAnAck(Packet* packet) const;
+    static bool isJustAnAck(Packet* packet);
 
     /**
      * @brief Return the flags of a TCP packet
@@ -333,7 +333,7 @@ inline void TCPElement::setWindowSize(WritablePacket *packet, uint16_t winSize) 
     tcph->th_win = htons(winSize);
 }
 
-inline unsigned TCPElement::getPayloadLength(Packet* packet) const
+inline unsigned TCPElement::getPayloadLength(Packet* packet)
 {
     const click_ip *iph = packet->ip_header();
     unsigned iph_len = iph->ip_hl << 2;
@@ -439,7 +439,7 @@ inline uint8_t TCPElement::getFlags(Packet *packet) const
     return tcph->th_flags;
 }
 
-inline bool TCPElement::isJustAnAck(Packet* packet) const
+inline bool TCPElement::isJustAnAck(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
