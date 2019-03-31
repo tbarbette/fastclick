@@ -6,7 +6,7 @@
 #include <click/glue.hh>
 #include <click/vector.hh>
 #include <click/deque.hh>
-
+#include <click/tcpelement.hh>
 #include <click/flow/flowelement.hh>
 CLICK_DECLS
 
@@ -102,7 +102,7 @@ typedef HashTableMP<uint16_t,NATEntryOUT> NATHashtable; //Table used to pass the
  * Therefore both side only use their scratchpad for the rest of the flow, that
  * is classified once for all 4-tuples functions (TCP and UDP based).
  */
-class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> {
+class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> , TCPElement {
 
 public:
 
@@ -143,7 +143,7 @@ private:
 /**
  * See FlowIPNAT
  */
-class FlowIPNATReverse : public FlowStateElement<FlowIPNATReverse,NATEntryOUT> {
+class FlowIPNATReverse : public FlowStateElement<FlowIPNATReverse,NATEntryOUT>, TCPElement {
 
 public:
 

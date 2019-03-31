@@ -139,7 +139,8 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
 
 void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 //    click_chatter("Release %d",ntohs(fcb->ref->port));
-
+    if (!_own_state)
+	fcb->ref->closing = 1;
 #if NAT_COLLIDE
 	release_ref(fcb->ref);
 #else
@@ -151,7 +152,7 @@ void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 
 
 void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
-	if (!_own_state && flowdata->ref->closing) {
+	if (!_own_state && flowdata->ref->closing && isSyn(batch->first())) {
 		release_ref(flowdata->ref);
 		new_flow(flowdata, batch->first());
 	}
@@ -233,6 +234,11 @@ void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
 }
 
 void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* batch) {
+	if (!_in->_own_state && flowdata->ref->closing && isSyn(batch->first())) {
+		release_ref(flowdata->ref);
+		new_flow(flowdata, batch->first());
+	}
+
     //_state->port_epoch[*flowdata] = epoch;
     auto fnt = [this,flowdata](Packet*p) -> bool {
         //click_chatter("Rewrite to %s %d",flowdata->map.ip.unparse().c_str(),ntohs(flowdata->map.port));

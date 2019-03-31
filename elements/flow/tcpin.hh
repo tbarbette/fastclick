@@ -41,7 +41,7 @@ public:
     TCPState::Value state;
     // Lock to ensure that only one side of the flow (one thread) at a time
     // accesses the common structure
-    Spinlock lock;
+    Spinlock lock; //Needs to be reentrant
     int use_count;
     tcp_seq_t lastAckReceived[2] = {0,0};
 
@@ -220,6 +220,11 @@ protected:
     virtual bool isEstablished() override;
     virtual bool isLastUsefulPacket(Packet *packet) override;
     virtual unsigned int determineFlowDirection() override;
+
+
+    inline void intializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool keep_fct);
+    inline void releaseFcbSide(FlowControlBlock* fcb, fcb_tcpin* fcb_in);
+    inline void initializeFcbSyn(fcb_tcpin* fcb_in, const click_ip *iph , const click_tcp *tcph );
 
     /**
      * Remove timeout and clean function
