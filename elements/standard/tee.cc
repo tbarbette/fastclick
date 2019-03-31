@@ -90,7 +90,7 @@ PullTee::pull(int)
 
 #if HAVE_BATCH
 PacketBatch *
-PullTee::pull_batch(int, int max)
+PullTee::pull_batch(int, unsigned max)
 {
   PacketBatch *p = input(0).pull_batch(max);
   if (p) {
