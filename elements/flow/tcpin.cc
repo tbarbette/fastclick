@@ -12,11 +12,11 @@ CLICK_DECLS
 #define TCP_TIMEOUT 30000
 
 TCPIn::TCPIn() : outElement(NULL), returnElement(NULL),_retransmit(0),
-    tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(false),_retransmit_pt(false)
+tableFcbTcpCommon(), _verbose(false), _reorder(true), _proactive_dup(false),_retransmit_pt(false)
 {
-poolModificationTracker.static_initialize();
+    poolModificationTracker.static_initialize();
 
-poolFcbTcpCommon.static_initialize();
+    poolFcbTcpCommon.static_initialize();
     // Initialize the memory pools of each thread
     for(unsigned int i = 0; i < poolModificationNodes.weight(); ++i)
         poolModificationNodes.get_value(i).initialize(MODIFICATIONNODES_POOL_SIZE);
@@ -26,11 +26,11 @@ poolFcbTcpCommon.static_initialize();
 
     // Warning about the fact that the system must be integrated to Middleclick in order to
     // work properly.
-    #ifndef HAVE_FLOW
-        click_chatter("WARNING: You are using a version of this program that is not compatible"
+#ifndef HAVE_FLOW
+    click_chatter("WARNING: You are using a version of this program that is not compatible"
             " with the flow management system provided by Middleclick. Therefore, you will"
             " only be able to use one flow.");
-    #endif
+#endif
 }
 
 TCPIn::~TCPIn() {
@@ -44,14 +44,14 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     int flowDirectionParam = -1;
 
     if(Args(conf, this, errh)
-    .read_mp("RETURNNAME", returnName)
-    .read("FLOWDIRECTION", flowDirectionParam)
-    .read("REORDER", _reorder)
-    .read("OUTNAME", outName)
-    .read("VERBOSE", _verbose)
-    .read("PROACK", _proactive_dup)
-    .read("RETRANSMIT_PT",_retransmit_pt)
-    .complete() < 0)
+            .read_mp("RETURNNAME", returnName)
+            .read("FLOWDIRECTION", flowDirectionParam)
+            .read("REORDER", _reorder)
+            .read("OUTNAME", outName)
+            .read("VERBOSE", _verbose)
+            .read("PROACK", _proactive_dup)
+            .read("RETRANSMIT_PT",_retransmit_pt)
+            .complete() < 0)
         return -1;
 
     Element* returnElement = this->router()->find(returnName, errh);
@@ -80,25 +80,25 @@ int TCPIn::configure(Vector<String> &conf, ErrorHandler *errh)
     if(returnElement == NULL)
     {
         click_chatter("Error: Could not find TCPIn element "
-            "called \"%s\".", returnName.c_str());
+                "called \"%s\".", returnName.c_str());
         return -1;
     }
     else if(outElement == NULL)
     {
         click_chatter("Error: Could not find TCPOut element "
-            "called \"%s\".", outName.c_str());
+                "called \"%s\".", outName.c_str());
         return -1;
     }
     else if(strcmp("TCPIn", returnElement->class_name()) != 0)
     {
         click_chatter("Error: Element \"%s\" is not a TCPIn element "
-            "but a %s element.", returnName.c_str(), returnElement->class_name());
+                "but a %s element.", returnName.c_str(), returnElement->class_name());
         return -1;
     }
     else if(strcmp("TCPOut", outElement->class_name()) != 0)
     {
         click_chatter("Error: Element \"%s\" is not a TCPOut element "
-            "but a %s element.", outName.c_str(), outElement->class_name());
+                "but a %s element.", outName.c_str(), outElement->class_name());
         return -1;
     }
     else if(flowDirectionParam != 0 && flowDirectionParam != 1 && flowDirectionParam != -1)
@@ -166,7 +166,7 @@ bool TCPIn::checkRetransmission(struct fcb_tcpin *tcpreorder, Packet* packet, bo
         {
             if (_retransmit) {
                 if (unlikely(_verbose))
-                                    click_chatter("Retransmit passed to retransmitter");
+                    click_chatter("Retransmit passed to retransmitter");
                 _retransmit->push_batch(PacketBatch::make_from_packet(packet));
             } else {
                 if (unlikely(_verbose))
@@ -191,7 +191,7 @@ bool TCPIn::putPacketInList(struct fcb_tcpin* tcpreorder, Packet* packetToAdd)
     // Browse the list until we find a packet with a greater sequence number than the
     // packet to add in the list
     while(packetNode != NULL
-        && (SEQ_LT(getSequenceNumber(packetNode), pSeq)))
+            && (SEQ_LT(getSequenceNumber(packetNode), pSeq)))
     {
         last = packetNode;
         packetNode = packetNode->next();
@@ -212,7 +212,7 @@ bool TCPIn::putPacketInList(struct fcb_tcpin* tcpreorder, Packet* packetToAdd)
     else
         last->set_next(packetToAdd); // If not, the previous node in the list now points to the node to add
 
-     // The node to add points to the first node with a greater sequence number
+    // The node to add points to the first node with a greater sequence number
     packetToAdd->set_next(packetNode);
 
     //Packet in list have no FCB reference
@@ -290,7 +290,7 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
             // Map the ack number according to the ByteStreamMaintainer of the other direction
             ackNumber = getAckNumber(packet);
             newAckNumber = otherMaintainer.mapAck(ackNumber);
-            
+
 
             if (unlikely(_verbose))
                 click_chatter("Map ACK %lu -> %lu", ackNumber, newAckNumber);
@@ -405,7 +405,7 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
         bool keep_fct = false;
         if(fcb_in->common == NULL)
         {
-eagain:
+            eagain:
             if(!assignTCPCommon(p, keep_fct))
             {
                 if (isRst(p)) {
@@ -415,15 +415,15 @@ eagain:
                     resetReorderer(fcb_in);
                     //TCPReorder will ensure the RST is alone, so we don't need to bother about dropping the rest of the batch, there is none
                 } else {
-                // The allocation failed, meaning that the packet is not a SYN
-                // packet. This is not supposed to happen and it means that
-                // the first two packets of the connection are not SYN packets
+                    // The allocation failed, meaning that the packet is not a SYN
+                    // packet. This is not supposed to happen and it means that
+                    // the first two packets of the connection are not SYN packets
                     if (_verbose)
-                    click_chatter("Warning: Trying to assign a common tcp memory area"
-                        " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d, F:%d, src %s:%d dst %s:%d)",
-                        isSyn(p),isRst(p),isAck(p),isFin(p),
-                        IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
-                        IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
+                        click_chatter("Warning: Trying to assign a common tcp memory area"
+                                " for a non-SYN packet or a non-matching tupple (S: %d, R: %d, A:%d, F:%d, src %s:%d dst %s:%d)",
+                                isSyn(p),isRst(p),isAck(p),isFin(p),
+                                IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
+                                IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
                     p->kill();
                 }
 
@@ -463,8 +463,8 @@ eagain:
             {
                 if (fcb_in->common->state == TCPState::CLOSED) {
                     if (isAck(p)) {
-                        if (_verbose > 1)
-                            click_chatter("Syn ack on a CLOSED connection. Send an ACK first...");
+                        if (unlikely(_verbose))
+                            click_chatter("Syn ACK on a CLOSED connection. Send an ACK first...");
                         p->kill();
                         return 0;
                     }
@@ -477,52 +477,52 @@ eagain:
                     auto common = fcb_in->common;
 
                     if (fcb_in->common->use_count == 2) { //Still valid on the other side
-					if (_verbose > 1)
-						click_chatter("Reusing socket !");
+                        if (unlikely(_verbose > 1))
+                            click_chatter("Reusing socket !");
 
-					SFCB_STACK(
-						releaseFcbSide(fcb_save, fcb_in);
-						);
-					//Todo reuse may be more efficient
-						intializeFcbSide(fcb_in, p, true);
+                        SFCB_STACK(
+                                releaseFcbSide(fcb_save, fcb_in);
+                        );
+                        //Todo reuse may be more efficient
+                        intializeFcbSide(fcb_in, p, true);
 
-						if (getFlowDirection() == 1)
-								fcb_in->common->state = TCPState::ESTABLISHING_1;
-							else
-								fcb_in->common->state = TCPState::ESTABLISHING_2;
+                        if (getFlowDirection() == 1)
+                            fcb_in->common->state = TCPState::ESTABLISHING_1;
+                        else
+                            fcb_in->common->state = TCPState::ESTABLISHING_2;
 
-						/*
-						 *  From here we could have a race condition, if before reusing the state below,
-			 * the other side releases itself because of a timeout from flow that cannot
-			 * be stopped.
-						 * if (fcb_in->common->use_count == 1) {
-							const click_tcp *tcph = p->tcp_header();
-							const click_ip *iph = p->ip_header();
-							initializeFcbSyn(fcb_in, iph, tcph);
-						}*/
-						common->lock.release();
-						goto doopt;
+                        /*
+                         *  From here we could have a race condition, if before reusing the state below,
+                         * the other side releases itself because of a timeout from flow that cannot
+                         * be stopped.
+                         * if (fcb_in->common->use_count == 1) {
+                            const click_tcp *tcph = p->tcp_header();
+                            const click_ip *iph = p->ip_header();
+                            initializeFcbSyn(fcb_in, iph, tcph);
+                        }*/
+                        common->lock.release();
+                        goto doopt;
                     } else {
-					if (_verbose > 1)
-						click_chatter("Renewing a socket !");
+                        if (unlikely(_verbose > 1))
+                            click_chatter("Renewing a socket !");
 
 
-			fcb_in->common->lock.release();
+                        fcb_in->common->lock.release();
 
-						/*
-						 * Release this side
-						 * It may seem stupid to do reelease then reattach if reuse is true, but it is quite complex
-						 *  to extract the release/renew state
-						 */
+                        /*
+                         * Release this side
+                         * It may seem stupid to do reelease then reattach if reuse is true, but it is quite complex
+                         *  to extract the release/renew state
+                         */
 
-						SFCB_STACK(
-						release_tcp_internal(fcb_save); //Works because lock is reentrant
-						);
+                        SFCB_STACK(
+                                release_tcp_internal(fcb_save); //Works because lock is reentrant
+                        );
 
 
-	                    keep_fct = true;
-	                    goto eagain;
-					}
+                        keep_fct = true;
+                        goto eagain;
+                    }
 
 
                 } else {
@@ -532,26 +532,26 @@ eagain:
 
                     /** We may be the SYN/ACK of a reused connection */
                     if (isAck(p)) {
-			fcb_in->common->lock.acquire();
-						auto common = fcb_in->common;
-						bool reuse = false;
-						if (fcb_in->common->use_count == 2) { //Still valid on the other side
-							SFCB_STACK(
-							releaseFcbSide(fcb_save, fcb_in);
-							);
-							intializeFcbSide(fcb_in, p, true);
-							fcb_in->common->lock.release();
-							//Finish SYN/ACK initialization
-							goto doopt;
-						} else
-							fcb_in->common->lock.release();
+                        fcb_in->common->lock.acquire();
+                        auto common = fcb_in->common;
+                        bool reuse = false;
+                        if (fcb_in->common->use_count == 2) { //Still valid on the other side
+                            SFCB_STACK(
+                                    releaseFcbSide(fcb_save, fcb_in);
+                            );
+                            intializeFcbSide(fcb_in, p, true);
+                            fcb_in->common->lock.release();
+                            //Finish SYN/ACK initialization
+                            goto doopt;
+                        } else
+                            fcb_in->common->lock.release();
 
                     }
 
                     if (_verbose)
-			click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d, src %s:%d dst %s:%d). Dropping it",fcb_in->common->state, isAck(p),
-                            IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
-                            IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
+                        click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d, src %s:%d dst %s:%d). Dropping it",fcb_in->common->state, isAck(p),
+                                IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
+                                IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
                     p->kill();
                     return NULL;
                 }
@@ -588,7 +588,7 @@ eagain:
                     fcb_in->common->lock.acquire();
                     // Craft and send the ack
                     Packet* forged = outElement->forgeAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
-                        sport, dport, ackNumber, ackOf, true);
+                            sport, dport, ackNumber, ackOf, true);
                     fcb_in->common->lock.release();
                     if (forged)
                         outElement->sendOpposite(forged);
@@ -638,7 +638,7 @@ eagain:
             if (_proactive_dup) {
                 //This needs more enginnering, not retransmit too much, and only after processing all of the input maybe
                 tcp_seq_t ack = fcb_in->expectedPacketSeq;
-/*                tcp_seq_t last_ack = fcb_in->common->maintainers[getOppositeFlowDirection()].getLastAckSent();
+                /*                tcp_seq_t last_ack = fcb_in->common->maintainers[getOppositeFlowDirection()].getLastAckSent();
                 if (SEQ_GT(ack, last_ack))
                     ack = last_ack;*/
                 if (unlikely(_verbose))
@@ -662,7 +662,7 @@ eagain:
                 // Craft and send the ack
                 click_chatter("Forging ack for proactive dup");
                 Packet* forged = outElement->forgeAck(fcb_in->common->maintainers[getOppositeFlowDirection()], saddr, daddr,
-                    sport, dport, seq, ack, true); //We force the sending as we want DUP ack on purpose
+                        sport, dport, seq, ack, true); //We force the sending as we want DUP ack on purpose
                 fcb_in->common->lock.release();
                 if (forged)
                     outElement->sendOpposite(forged);
@@ -723,7 +723,7 @@ eagain:
         int _timewait = 1; //As a middlebox, we have to keep the block for _timewait
         if (( _timewait == 0 && (state == TCPState::BEING_CLOSED_GRACEFUL_2 ||
                 state == TCPState::CLOSED))) {
-			releaseFCBState();
+            releaseFCBState();
         }
     }
     //click_chatter("END Fcb in : %p, Common : %p, Batch : %p, State %d", fcb_in, fcb_in->common,flow,(fcb_in->common?fcb_in->common->state:-1));
@@ -754,15 +754,15 @@ TCPIn* TCPIn::getReturnElement()
 }
 
 void TCPIn::resetReorderer(struct fcb_tcpin* tcpreorder) {
-        SFCB_STACK( //Packet in the list have no reference
+    SFCB_STACK( //Packet in the list have no reference
             FOR_EACH_PACKET_SAFE(tcpreorder->packetList,p) {
-                //click_chatter("WARNING : Non-free TCPReorder flow bucket , seq %lu, expected %lu",getSequenceNumber(p),tcpreorder->expectedPacketSeq);
-                p->kill();
-            }
-        );
-        tcpreorder->packetList = 0;
-        tcpreorder->packetListLength = 0;
-        tcpreorder->expectedPacketSeq = 0;
+        //click_chatter("WARNING : Non-free TCPReorder flow bucket , seq %lu, expected %lu",getSequenceNumber(p),tcpreorder->expectedPacketSeq);
+        p->kill();
+    }
+    );
+    tcpreorder->packetList = 0;
+    tcpreorder->packetListLength = 0;
+    tcpreorder->expectedPacketSeq = 0;
 }
 
 void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
@@ -819,7 +819,7 @@ void TCPIn::releaseFCBState() {
     fcb_release_timeout();
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
     SFCB_STACK(
-    release_tcp_internal(fcb_save);
+            release_tcp_internal(fcb_save);
     );
 }
 
@@ -860,9 +860,9 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
 
         // Craft and send the ack
         outElement->sendClosingPacket(fcb_in->common->maintainers[getFlowDirection()],
-            saddr, daddr, sport, dport, graceful);
+                saddr, daddr, sport, dport, graceful);
     } else {
-    //Send FIN or RST to other side
+        //Send FIN or RST to other side
 
         // Get the information needed to ack the given packet
         uint32_t saddr = getDestinationAddress(packet);
@@ -872,7 +872,7 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
 
         // Craft and send the ack
         outElement->sendClosingPacket(fcb_in->common->maintainers[getOppositeFlowDirection()],
-            saddr, daddr, sport, dport, graceful);
+                saddr, daddr, sport, dport, graceful);
 
         click_chatter("Ungracefull close, releasing FCB state");
         releaseFCBState();
@@ -895,7 +895,7 @@ ModificationList* TCPIn::getModificationList(WritablePacket* packet)
 
     // Search the modification list in the hashtable
     ModificationTracker::iterator it =
-        modificationLists->find(getSequenceNumber(packet));
+            modificationLists->find(getSequenceNumber(packet));
 
     // If we could find the element
     if(it != modificationLists->end())
@@ -920,7 +920,7 @@ bool TCPIn::hasModificationList(Packet* packet)
     if (!fcb_in->modificationLists)
         return false;
     ModificationTracker::iterator it =
-        modificationLists->find(getSequenceNumber(packet));
+            modificationLists->find(getSequenceNumber(packet));
 
     return (it != modificationLists->end());
 }
@@ -942,7 +942,7 @@ void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t leng
     if(position + contentOffset > packet->length())
     {
         click_chatter("Error: Invalid removeBytes call (packet length: %u, position: %u)",
-            packet->length(), position);
+                packet->length(), position);
         return;
     }
 
@@ -952,7 +952,7 @@ void TCPIn::removeBytes(WritablePacket* packet, uint32_t position, uint32_t leng
 }
 
 WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
-     uint32_t length)
+        uint32_t length)
 {
     tcp_seq_t seqNumber = getSequenceNumber(packet);
 
@@ -961,7 +961,7 @@ WritablePacket* TCPIn::insertBytes(WritablePacket* packet, uint32_t position,
     if (unlikely(_verbose))
         click_chatter("Adding modification at seq %lu, pos in content %lu, seq+pos %lu, adding %d bytes",seqNumber, position, seqNumber + ((position + contentOffset) - tcpOffset), length);
     getModificationList(packet)->addModification(seqNumber, seqNumber + (position + contentOffset - tcpOffset),
-         (int)length);
+            (int)length);
 
     return StackElement::insertBytes(packet, position, length);
 }
@@ -1007,7 +1007,7 @@ void TCPIn::ackPacket(Packet* packet, bool force)
     ByteStreamMaintainer &maintainer = fcb_in->common->maintainers[getOppositeFlowDirection()];
     // Craft and send the ack
     Packet* forged = outElement->forgeAck(maintainer, saddr, daddr,
-        sport, dport, seq, ack, force);
+            sport, dport, seq, ack, force);
     fcb_in->common->lock.release();
     if (forged)
         outElement->sendOpposite(forged);
@@ -1043,8 +1043,8 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
     state = fcb_in->common->state;
 
     if (isRst(packet)) {
-	if (unlikely(_verbose > 1))
-	            click_chatter("RST received, connection is now closed");
+        if (unlikely(_verbose > 1))
+            click_chatter("RST received, connection is now closed");
         fcb_in->common->state = TCPState::CLOSED;
         fcb_in->common->lock.release();
         resetReorderer(fcb_in);
@@ -1058,7 +1058,7 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
         fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_1;
         fcb_in->common->lock.release();
         return false; //Let the FIN through. We cannot release now as there is an ACK that needs to come
-    // If the connection is being closed and we have received the last packet, close it completely
+        // If the connection is being closed and we have received the last packet, close it completely
     }
     else if (unlikely(state == TCPState::BEING_CLOSED_ARTIFICIALLY_1))
     {
@@ -1089,8 +1089,8 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
             fcb_in->common->state = TCPState::BEING_CLOSED_GRACEFUL_2;
             fcb_in->fin_seen = true;
         } else {
-		if (unlikely(_verbose > 1))
-		    click_chatter("FCB already seen on this side");
+            if (unlikely(_verbose > 1))
+                click_chatter("FCB already seen on this side");
         }
         fcb_in->common->lock.release();
         return false; //Let the packet through anyway
@@ -1103,15 +1103,15 @@ bool TCPIn::checkConnectionClosed(Packet *packet)
         fcb_in->common->lock.release();
         return false; //We need the out element to eventually correct the ACK number
     } else if(state == TCPState::CLOSED) {
-	if (isJustAnAck(packet, true)) {
-		//Probable retransmission of the last ack
-		fcb_in->common->lock.release();
-		return false;
-	}
+        if (isJustAnAck(packet, true)) {
+            //Probable retransmission of the last ack
+            fcb_in->common->lock.release();
+            return false;
+        }
     } else {
-	if (unlikely(_verbose)) {
-		click_chatter("Unhandled state %d", fcb_in->common->state);
-	}
+        if (unlikely(_verbose)) {
+            click_chatter("Unhandled state %d", fcb_in->common->state);
+        }
     }
 
     fcb_in->common->lock.release();
@@ -1124,17 +1124,17 @@ unsigned int TCPIn::determineFlowDirection()
 }
 
 inline void TCPIn::intializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool keep_fct) {
-	fcb_in->fin_seen = false;
+    fcb_in->fin_seen = false;
 
-	if (allowResize() || returnElement->allowResize()) {
-	            // Initialize the RBT with the RBTManager
-	            if (_verbose > 1)
-	                click_chatter("Initialize direction %d for SYN/ACK",getFlowDirection());
-	            // The data in the flow will start at current sequence number
-	            uint32_t flowStart = getSequenceNumber(packet);
+    if (allowResize() || returnElement->allowResize()) {
+        // Initialize the RBT with the RBTManager
+        if (_verbose > 1)
+            click_chatter("Initialize direction %d for SYN/ACK",getFlowDirection());
+        // The data in the flow will start at current sequence number
+        uint32_t flowStart = getSequenceNumber(packet);
 
-	            fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
-	}
+        fcb_in->common->maintainers[getFlowDirection()].initialize(&(*rbtManager), flowStart);
+    }
 
     fcb_in->expectedPacketSeq = getSequenceNumber(packet); //Not next because this one will be checked just after
 
@@ -1152,41 +1152,41 @@ inline void TCPIn::intializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool keep
 
 
 inline void TCPIn::releaseFcbSide(FlowControlBlock* fcb, fcb_tcpin* fcb_in) {
-	fcb_in->fin_seen = false;
-	    if (fcb_in->conn_release_fnt) {
-	        fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
-	        fcb_in->conn_release_fnt = 0;
-	    }
-	    resetReorderer(fcb_in);
-	    if (fcb_in->modificationLists) {
-	        for(HashTable<tcp_seq_t, ModificationList*>::iterator it = fcb_in->modificationLists->begin();
-	            it != fcb_in->modificationLists->end(); ++it)
-	        {
-	            // Call the destructor to release the object's own memory
-	            (it.value())->~ModificationList();
-	            // Put it back in the pool
-	            poolModificationLists->releaseMemory(it.value());
-	        }
-	        poolModificationTracker.release(fcb_in->modificationLists);
-	        fcb_in->modificationLists = 0;
-	    }
+    fcb_in->fin_seen = false;
+    if (fcb_in->conn_release_fnt) {
+        fcb_in->conn_release_fnt(fcb,fcb_in->conn_release_thunk);
+        fcb_in->conn_release_fnt = 0;
+    }
+    resetReorderer(fcb_in);
+    if (fcb_in->modificationLists) {
+        for(HashTable<tcp_seq_t, ModificationList*>::iterator it = fcb_in->modificationLists->begin();
+                it != fcb_in->modificationLists->end(); ++it)
+        {
+            // Call the destructor to release the object's own memory
+            (it.value())->~ModificationList();
+            // Put it back in the pool
+            poolModificationLists->releaseMemory(it.value());
+        }
+        poolModificationTracker.release(fcb_in->modificationLists);
+        fcb_in->modificationLists = 0;
+    }
 }
 
 
 inline void TCPIn::initializeFcbSyn(fcb_tcpin* fcb_in, const click_ip *iph , const click_tcp *tcph ) {
 
-		IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
-		//A pending reset or time out connection could exist so we use replace and free any existing entry if found
-		tableFcbTcpCommon.replace(flowID, fcb_in->common, [this](tcp_common* &existing) {
-			existing->lock.acquire();
-			if (--existing->use_count == 0) {
-				existing->lock.release();
-				poolFcbTcpCommon.release(existing);
-			} else {
-				click_chatter("Probable bug 828");
-				existing->lock.release();
-			}
-		});
+    IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
+    //A pending reset or time out connection could exist so we use replace and free any existing entry if found
+    tableFcbTcpCommon.replace(flowID, fcb_in->common, [this](tcp_common* &existing) {
+        existing->lock.acquire();
+        if (--existing->use_count == 0) {
+            existing->lock.release();
+            poolFcbTcpCommon.release(existing);
+        } else {
+            click_chatter("Probable bug 828");
+            existing->lock.release();
+        }
+    });
 }
 
 bool TCPIn::registerConnectionClose(StackReleaseChain* fcb_chain, SubFlowRealeaseFnt fnt, void* thunk)
@@ -1230,7 +1230,7 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
         //assert(fcb_in->common->state == TCPState::ESTABLISHING_1 || fcb_in->common->state == TCPState::ESTABLISHING_2);
 
         if (flags & TH_RST) {
-		click_chatter("Reset");
+            click_chatter("Reset");
             fcb_in->common->state = TCPState::CLOSED;
             fcb_in->common->lock.acquire();
             fcb_in->common->use_count--;
@@ -1261,22 +1261,22 @@ bool TCPIn::assignTCPCommon(Packet *packet, bool keep_fct)
 
         fcb_in->common->use_count = 2; //One for us, one for the table
 
-//DEBUG
-//        if (*tableFcbTcpCommon.find(flowID) != allocated) {
-//            allocated = *tableFcbTcpCommon.find(flowID);
-//            click_chatter("Looking for that flow gave %p, in state %d, uc %d. It is not bad because it should be released before us.", allocated, allocated->state, allocated->use_count);
-//            assert(false);
-//        }
+        //DEBUG
+        //        if (*tableFcbTcpCommon.find(flowID) != allocated) {
+        //            allocated = *tableFcbTcpCommon.find(flowID);
+        //            click_chatter("Looking for that flow gave %p, in state %d, uc %d. It is not bad because it should be released before us.", allocated, allocated->state, allocated->use_count);
+        //            assert(false);
+        //        }
 
 
 
         // Set the pointer in the structure
         intializeFcbSide(fcb_in, packet, keep_fct);
 
-	if (getFlowDirection() == 1)
-			fcb_in->common->state = TCPState::ESTABLISHING_1;
-		else
-			fcb_in->common->state = TCPState::ESTABLISHING_2;
+        if (getFlowDirection() == 1)
+            fcb_in->common->state = TCPState::ESTABLISHING_1;
+        else
+            fcb_in->common->state = TCPState::ESTABLISHING_2;
 
         initializeFcbSyn(fcb_in, iph, tcph);
 
@@ -1311,34 +1311,34 @@ tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
     tcp_common* p;
     bool it = tableFcbTcpCommon.find_remove_clean(flowID,[&p](tcp_common* &c){p=c;},[this](tcp_common* &c){
-            if (unlikely(c->state >= TCPState::OPEN)) { //An established connection in the list : means a pending connection was reset
-                c->lock.acquire();
-                if (unlikely(c->state < TCPState::OPEN)) {
-			click_chatter("Concurrent access... This is not a dangerous bug, but please report bug 978.");
-                }
-                if (likely(--c->use_count == 0)) { //The reseter left a reference, it is likely we have the last (or it would not be pending)
-                    c->lock.release();
-                    poolFcbTcpCommon.release(c); //Will call ~common
-                    return true;
-                } else {
-                    click_chatter("BUG : established connection (state %d) with %d references in list", c->state, c->use_count + 1);
-                    c->lock.release();
-                    return true;
-                }
-            } else if (unlikely(c->use_count == 1)) { //We have the only reference -> the inserter released it
-                c->lock.acquire();
-                if (likely(--c->use_count == 0)) { //Normally it means we have the only reference, so nobody could have grabed the lock
-                    c->lock.release();
-                    click_chatter("Release delayed %p", c);
-                    poolFcbTcpCommon.release(c); //Will call ~common
-                } else {
-                    c->lock.release();
-                    //If we have the only reference, this test should always succeed
-                    click_chatter("Concurreny. Please report because this case should be impossible.");
-                }
+        if (unlikely(c->state >= TCPState::OPEN)) { //An established connection in the list : means a pending connection was reset
+            c->lock.acquire();
+            if (unlikely(c->state < TCPState::OPEN)) {
+                click_chatter("Concurrent access... This is not a dangerous bug, but please report bug 978.");
+            }
+            if (likely(--c->use_count == 0)) { //The reseter left a reference, it is likely we have the last (or it would not be pending)
+                c->lock.release();
+                poolFcbTcpCommon.release(c); //Will call ~common
+                return true;
+            } else {
+                click_chatter("BUG : established connection (state %d) with %d references in list", c->state, c->use_count + 1);
+                c->lock.release();
                 return true;
             }
-            return false;
+        } else if (unlikely(c->use_count == 1)) { //We have the only reference -> the inserter released it
+            c->lock.acquire();
+            if (likely(--c->use_count == 0)) { //Normally it means we have the only reference, so nobody could have grabed the lock
+                c->lock.release();
+                click_chatter("Release delayed %p", c);
+                poolFcbTcpCommon.release(c); //Will call ~common
+            } else {
+                c->lock.release();
+                //If we have the only reference, this test should always succeed
+                click_chatter("Concurreny. Please report because this case should be impossible.");
+            }
+            return true;
+        }
+        return false;
     });
 
     if(!it)
