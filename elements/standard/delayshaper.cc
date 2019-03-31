@@ -26,7 +26,7 @@
 CLICK_DECLS
 
 DelayShaper::DelayShaper()
-    : _p(0), _timer(this), _notifier(Notifier::SEARCH_CONTINUE_WAKE)
+    : _p(0), _timer(this), _notifier(Notifier::SEARCH_CONTINUE_WAKE), _burst(1)
 {
 }
 
@@ -45,7 +45,10 @@ int
 DelayShaper::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     _notifier.initialize(Notifier::EMPTY_NOTIFIER, router());
-    return Args(conf, this, errh).read_mp("DELAY", _delay).complete();
+    return Args(conf, this, errh)
+                .read_mp("DELAY", _delay)
+                .read_or_set_p("BURST", _burst, 1)
+                .complete();
 }
 
 int
@@ -60,7 +63,7 @@ void
 DelayShaper::cleanup(CleanupStage)
 {
     if (_p)
-	_p->kill();
+        _p->kill();
 }
 
 Packet *
@@ -102,6 +105,13 @@ DelayShaper::pull(int)
     return 0;
 }
 
+PacketBatch *
+DelayShaper::pull_batch(int port, unsigned max) {
+    PacketBatch* batch = 0;
+    MAKE_BATCH(DelayShaper::pull(port), batch, max);
+    return batch;
+}
+
 void
 DelayShaper::run_timer(Timer *)
 {
@@ -129,6 +139,7 @@ DelayShaper::add_handlers()
 {
     add_read_handler("delay", read_param, 0, Handler::h_calm);
     add_write_handler("delay", write_param, 0, Handler::h_nonexclusive);
+    add_data_handlers("burst", Handler::f_read | Handler::f_write, &_burst);
 }
 
 CLICK_ENDDECLS

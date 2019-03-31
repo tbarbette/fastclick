@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_TRUNCATEIPPAYLOAD_HH
 #define CLICK_TRUNCATEIPPAYLOAD_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -27,7 +27,7 @@ annotations are updated to account for any dropped bytes.  Default is true.
 =a Truncate
 */
 
-class TruncateIPPayload : public Element { public:
+class TruncateIPPayload : public SimpleElement<TruncateIPPayload> { public:
 
     TruncateIPPayload() CLICK_COLD;
     ~TruncateIPPayload() CLICK_COLD;

@@ -209,7 +209,7 @@ public:
      * @return A boolean indicating whether the packet is just an ACK without any additional
      * information
      */
-    static bool isJustAnAck(Packet* packet);
+    static bool isJustAnAck(Packet* packet, const bool or_fin=false);
 
     /**
      * @brief Return the flags of a TCP packet
@@ -439,7 +439,7 @@ inline uint8_t TCPElement::getFlags(Packet *packet) const
     return tcph->th_flags;
 }
 
-inline bool TCPElement::isJustAnAck(Packet* packet)
+inline bool TCPElement::isJustAnAck(Packet* packet, const bool or_fin)
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
@@ -449,7 +449,7 @@ inline bool TCPElement::isJustAnAck(Packet* packet)
         return false;
 
     //  If we have other flags, we are more than just an ACK
-    if(flags == TH_ACK)
+    if(flags == TH_ACK || (or_fin && flags == TH_ACK | TH_FIN))
         return true;
     else
         return false;

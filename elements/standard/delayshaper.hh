@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_DELAYSHAPER_HH
 #define CLICK_DELAYSHAPER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/timer.hh>
 #include <click/notifier.hh>
 CLICK_DECLS
@@ -35,7 +35,7 @@ Returns or sets the DELAY parameter.
 
 =a BandwidthShaper, DelayUnqueue, SetTimestamp */
 
-class DelayShaper : public Element, public ActiveNotifier { public:
+class DelayShaper : public BatchElement, public ActiveNotifier { public:
 
     DelayShaper() CLICK_COLD;
 
@@ -49,7 +49,11 @@ class DelayShaper : public Element, public ActiveNotifier { public:
     void cleanup(CleanupStage) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    Packet *pull(int);
+    Packet *pull(int) override;
+#if HAVE_BATCH
+    PacketBatch* pull_batch(int, unsigned) override;
+#endif
+
     void run_timer(Timer *);
 
   private:
@@ -59,6 +63,7 @@ class DelayShaper : public Element, public ActiveNotifier { public:
     Timer _timer;
     NotifierSignal _upstream_signal;
     ActiveNotifier _notifier;
+    int _burst;
 
     static String read_param(Element *, void *) CLICK_COLD;
     static int write_param(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
