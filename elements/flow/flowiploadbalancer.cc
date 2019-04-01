@@ -172,7 +172,7 @@ bool FlowNAPTLoadBalancer::new_flow(TTuple* flowdata, Packet* p) {
 }
 
 void FlowNAPTLoadBalancer::release_flow(TTuple* fcb) {
-    release_ref(fcb->ref);
+    release_ref(fcb->ref, _own_state);
 }
 
 void FlowNAPTLoadBalancer::push_batch(int, TTuple* flowdata, PacketBatch* batch) {
@@ -303,7 +303,7 @@ bool FlowNAPTLoadBalancerReverse::new_flow(Packet* batch) {
 
 
 void FlowNAPTLoadBalancerReverse::release_flow(LBEntryOut* fcb) {
-    release_ref(fcb->ref);
+    release_ref(fcb->ref,_lb->_own_state);
 }
 
 void FlowNAPTLoadBalancerReverse::push_batch(int, LBEntryOut* flowdata, PacketBatch* batch) {

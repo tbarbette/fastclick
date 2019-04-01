@@ -132,17 +132,16 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
     //click_chatter("NEW osip %s osport %d, new port %d",osip.unparse().c_str(),htons(oport),ntohs(fcb->ref->port));
     NATEntryOUT out(IPPort(osip,oport),fcb->ref);
     _map.replace(fcb->ref->port, out,[this](NATEntryOUT& replaced){
-	release_ref(replaced.ref);
+	release_ref(replaced.ref, _own_state);
     });
     return true;
 }
 
 void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 //    click_chatter("Release %d",ntohs(fcb->ref->port));
-    if (!_own_state)
-	fcb->ref->closing = 1;
+
 #if NAT_COLLIDE
-	release_ref(fcb->ref);
+	release_ref(fcb->ref, _own_state);
 #else
     _state->available_ports.insert(fcb->ref);
     fcb->ref = 0;
@@ -152,8 +151,10 @@ void FlowIPNAT::release_flow(NATEntryIN* fcb) {
 
 
 void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
-	if (!_own_state && flowdata->ref->closing && isSyn(batch->first())) {
-		release_ref(flowdata->ref);
+	if (!_own_state && flowdata->ref && flowdata->ref->closing && isSyn(batch->first())) {
+		//If the state is not handled by us, another manager could have deleted the other side while
+		// this side has still a handle.
+		release_ref(flowdata->ref, _own_state);
 		new_flow(flowdata, batch->first());
 	}
     auto fnt = [this,flowdata](Packet* p) -> bool {
@@ -213,7 +214,7 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
     lb_assert(fcb->ref->ref > 0);
     if (fcb->ref->ref == 1) { //Connection was reset by the inserter
 	click_chatter("Got a closed connection");
-	release_ref(fcb->ref);
+	release_ref(fcb->ref, _in->_own_state);
         return false;
     }
     return true;
@@ -222,10 +223,8 @@ bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
 void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
 //    click_chatter("Release rvr %d",ntohs(fcb->ref->port));
 
-    if (!_in->_own_state)
-	fcb->ref->closing = 1;
 #if NAT_COLLIDE
-	release_ref(fcb->ref);
+	release_ref(fcb->ref, _in->_own_state);
 #else
     _state->available_ports.insert(fcb->ref);
     fcb->ref = 0;
@@ -234,8 +233,10 @@ void FlowIPNATReverse::release_flow(NATEntryOUT* fcb) {
 }
 
 void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* batch) {
-	if (!_in->_own_state && flowdata->ref->closing && isSyn(batch->first())) {
-		release_ref(flowdata->ref);
+	if (!_in->_own_state && flowdata->ref && flowdata->ref->closing && isSyn(batch->first())) {
+		//If the state is not handled by us, another manager could have deleted the other side while
+		// this side has still a handle.
+		release_ref(flowdata->ref, _in->_own_state);
 		new_flow(flowdata, batch->first());
 	}
 

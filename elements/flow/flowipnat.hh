@@ -226,11 +226,13 @@ inline bool update_state(T* flowdata, const Packet* q) {
 
 }
 
-inline void release_ref(NATCommon* &ref) {
+inline void release_ref(NATCommon* &ref, const bool &own_state) {
     if (!ref)
         return;
     nat_debug_chatter("fcb->ref for port %d is %d, will be %d",ntohs(ref->port), ref->ref, ref->ref - 1);
     lb_assert((int32_t)ref->ref >= 1);
+    if (!own_state)
+	ref->closing = 1;
     if (ref->ref.dec_and_test()) {
         nat_debug_chatter("Recycling %d !", ntohs(ref->port));
 
