@@ -12,9 +12,10 @@
 
 CLICK_DECLS
 
-WordMatcher::WordMatcher() : insults(), _mode(ALERT), _quiet(false)
+WordMatcher::WordMatcher() : _words(), _mode(ALERT), _quiet(false)
 {
     _all = false;
+    found = 0;
 }
 
 int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
@@ -59,6 +60,11 @@ int WordMatcher::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("No words given");
     }
 
+    for (int i = 0; i < insults.size(); i++) {
+	_words.push_back(StringRef(insults[i].data(), insults[i].length()));
+    }
+
+
     return 0;
 }
 
@@ -86,10 +92,9 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
         goto finished;
     }
 
-
-    for(int i = 0; i < insults.size(); ++i)
+    for(int i = 0; i < _words.size(); ++i)
     {
-        StringRef insult = StringRef(insults[i]);
+        StringRef insult = StringRef(_words[i]);
     /*
      The following is left for reference on how to do a byte-to-byte matching, that is obviously not very efficient
         if (_mode == MASK) { //Masking mode
@@ -136,8 +141,9 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                 //iter = WordMatcher->flowBuffer.search(iter, insult, &result);
                 int l = insult.length();
                 iter = WordMatcher->flowBuffer.searchSSE(iter, insult.data(), l, &result);
-//                click_chatter("Result %d", result);
+
                 if (result == 1) {
+			 found++;
                     if (_mode == REMOVE) {
                         WordMatcher->flowBuffer.remove(iter, l, this);
                         while (iter.leftInChunk() == 0 && iter)
@@ -158,6 +164,7 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
                     }
 
                     WordMatcher->counterRemoved += 1;
+
                 }
             } while (result == 1 && iter.leftInChunk() && _all);
             // While we keep finding complete insults in the packet
@@ -191,6 +198,32 @@ void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch
     if(flow != NULL)
         output_push_batch(0, flow);
     return;
+}
+
+
+enum {
+    WM_FOUND,
+};
+
+String
+WordMatcher::read_handler(Element *e, void *thunk)
+{
+	WordMatcher *wm = static_cast<WordMatcher *>(e);
+	int t = (intptr_t)thunk;
+    switch (t) {
+      case WM_FOUND:
+	  return String(wm->found);
+
+      default:
+	  return "<error>";
+    }
+}
+
+void
+WordMatcher::add_handlers()
+{
+	add_read_handler("found", read_handler, WM_FOUND);
+
 }
 
 

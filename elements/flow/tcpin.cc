@@ -454,10 +454,11 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 
             if (isAck(p) && fcb_in->common->state < TCPState::OPEN) {
                 fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now before the GT check for the OPEN state
+                //TODO check the side of the ack with ESTABLISHING 1, or an attacker may create ressource sending himself the synack
                 fcb_in->common->state = TCPState::OPEN;
             }
         } /* fcb_in->common != NULL */
-        else // At least one packet of this side of the flow has been seen
+        else // At least one packet of this side of the flow has been seen, or con has been reset
         {
             // The structure has been assigned so the three-way handshake is over
             // Check that the packet is not a SYN packet
@@ -528,7 +529,7 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
                     }
 
 
-                } else {
+                } else { //state != closed (and packet is syn)
                     if(!checkRetransmission(fcb_in, p, false)) {
                         return 0;
                     }
@@ -536,7 +537,6 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
                     /** We may be the SYN/ACK of a reused connection */
                     if (isAck(p)) {
                         fcb_in->common->lock.acquire();
-                        auto common = fcb_in->common;
                         if (fcb_in->common->use_count == 2) { //Still valid on the other side
                             SFCB_STACK(
                                     releaseFcbSide(fcb_save, fcb_in);
@@ -558,15 +558,10 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
                     return NULL;
                 }
             } else if (isAck(p) && fcb_in->common->state < TCPState::OPEN) {
-                if (getFlowDirection() == 1 && fcb_in->common->state == TCPState::ESTABLISHING_1
-                        || getFlowDirection() == 0 && fcb_in->common->state == TCPState::ESTABLISHING_2) {
-                    if (unlikely(_verbose > 1))
-                        click_chatter("Unexpected packet");
-                    p->kill();
-                    return 0;
-                }
-                fcb_in->common->lastAckReceived[getFlowDirection()] = getAckNumber(p); //We need to do it now before the GT check for the OPEN state
-                fcb_in->common->state = TCPState::OPEN;
+				if (unlikely(_verbose > 1))
+					click_chatter("Unexpected non-SYN ACK packet on non-established connection.");
+				p->kill();
+				return 0;
             } else if (fcb_in->common->state == TCPState::BEING_CLOSED_ARTIFICIALLY_2 && isFin(p)) {
                 if (unlikely(_verbose)) {
                     click_chatter("Processing last artificial fin");

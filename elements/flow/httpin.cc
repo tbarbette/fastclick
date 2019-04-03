@@ -139,7 +139,7 @@ void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
                 //Header header;
                 char* split = (char*)memchr(current, ':', end-current);
                 if (split == NULL) {
-                    click_chatter("Malformed HTTP header");
+                    click_chatter("Malformed HTTP header %s",String(current,end-current));
                     closeConnection(packet, false);
                     return false;
                 }

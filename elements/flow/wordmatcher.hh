@@ -68,16 +68,21 @@ public:
 
     void push_batch(int port, fcb_WordMatcher* fcb, PacketBatch*) override;
 
+    static String read_handler(Element *e, void *thunk);
+    void add_handlers() override;
+
 protected:
 
     virtual int maxModificationLevel(Element* stop) override;
 
-    Vector<String> insults; // Vector containing the words to remove from the web pages
+    Vector<StringRef> _words; // Vector containing the words to remove from the web pages
 
     enum DPIMode _mode;
     bool _all;
     bool _quiet;
     String _insert_msg;
+    atomic_uint32_t found;
+
 };
 
 CLICK_ENDDECLS
