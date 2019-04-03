@@ -770,7 +770,6 @@ void TCPIn::release_tcp_internal(FlowControlBlock* fcb) {
     auto &common = fcb_in->common;
     releaseFcbSide(fcb, fcb_in);
     if (common) {
-        click_chatter("Release common");
         common->lock.acquire();
         //The last one release common
         if (--common->use_count == 0) {
