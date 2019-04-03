@@ -698,4 +698,5 @@ void TCPRetransmitter::signalAck(uint32_t ack)
 }
 
 EXPORT_ELEMENT(TCPRetransmitter)
+ELEMENT_REQUIRES(false)
 ELEMENT_MT_SAFE(TCPRetransmitter)

@@ -315,4 +315,5 @@ void RetransmissionTiming::setLastManualTransmission(uint32_t lastManualTransmis
 
 CLICK_ENDDECLS
 
+ELEMENT_REQUIRES(false)
 ELEMENT_PROVIDES(RetransmissionTiming)

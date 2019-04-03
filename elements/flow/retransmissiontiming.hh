@@ -50,6 +50,10 @@ public:
      */
     ~RetransmissionTiming();
 
+    inline void reinit() {
+	this->~RetransmissionTiming();
+	new (this) RetransmissionTiming();
+    }
     /**
      * @brief Initialize the retransmission timer
      * @param fcb A pointer to the FCB of the flow

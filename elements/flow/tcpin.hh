@@ -35,8 +35,8 @@ class tcp_common
 public:
     // One maintainer for each direction of the connection
     ByteStreamMaintainer maintainers[2];
-    // One retransmission manager for each direction of the connection
-    RetransmissionTiming retransmissionTimings[2];
+    // One retransmission manager for each direction of the connection, deprectaed, now we let end host handle this
+    // RetransmissionTiming retransmissionTimings[2];
     // State of the connection
     TCPState::Value state;
     // Lock to ensure that only one side of the flow (one thread) at a time
@@ -54,6 +54,20 @@ public:
     ~tcp_common()
     {
 
+    }
+
+    inline void reinit() {
+	maintainers[0].reinit();
+	maintainers[1].reinit();
+	/*
+	retransmissionTimings[0].reinit();
+	retransmissionTimings[1].reinit();*/
+
+	//State is handled by caller
+	//Lock is handled by caller
+	//Use_count is handled by caller
+	lastAckReceived[0] = 0;
+	lastAckReceived[1] = 0;
     }
 
     inline bool lastAckReceivedSet() {

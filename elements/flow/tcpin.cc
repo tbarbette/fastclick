@@ -331,9 +331,10 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
 
             // Update the statistics about the RTT
             // And potentially update the retransmission timer
-            fcb_in->common->lock.release();
-            fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
-            fcb_in->common->lock.acquire();
+            /*fcb_in->common->lock.release();
+            if (has_retrans)
+		fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].signalAck(ackNumber);
+            fcb_in->common->lock.acquire();*/
 
             // Check if the current packet is just an ACK without additional information
             if(isJustAnAck(packet) && prevWindowSize == newWindowSize)
@@ -353,9 +354,10 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
                     // Fast retransmit
                     if(dupAcks >= 3)
                     {
-                        fcb_in->common->lock.release();
-                        fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
-                        fcb_in->common->lock.acquire();
+                       /* fcb_in->common->lock.release();
+                        if (has_retrans)
+				fcb_in->common->retransmissionTimings[getOppositeFlowDirection()].fireNow();
+                        fcb_in->common->lock.acquire();*/
                         maintainer.setDupAcks(0);
                     }
                 }
@@ -476,13 +478,14 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
                     fcb_in->common->lock.acquire();
                     auto common = fcb_in->common;
 
-                    if (fcb_in->common->use_count == 2) { //Still valid on the other side
+                    if (fcb_in->common->use_count == 2) { //Still valid on the other side, it's in TIMEWAIT
                         if (unlikely(_verbose > 1))
                             click_chatter("Reusing socket !");
 
                         SFCB_STACK(
                                 releaseFcbSide(fcb_save, fcb_in);
                         );
+                        fcb_in->common->reinit();
                         //Todo reuse may be more efficient
                         intializeFcbSide(fcb_in, p, true);
 
@@ -534,7 +537,6 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
                     if (isAck(p)) {
                         fcb_in->common->lock.acquire();
                         auto common = fcb_in->common;
-                        bool reuse = false;
                         if (fcb_in->common->use_count == 2) { //Still valid on the other side
                             SFCB_STACK(
                                     releaseFcbSide(fcb_save, fcb_in);
@@ -548,7 +550,7 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 
                     }
 
-                    if (_verbose)
+                    if (unlikely(_verbose))
                         click_chatter("Warning: Unexpected SYN packet (state %d, is_ack : %d, src %s:%d dst %s:%d). Dropping it",fcb_in->common->state, isAck(p),
                                 IPAddress(p->ip_header()->ip_src).unparse().c_str(), ntohs(p->tcp_header()->th_sport),
                                 IPAddress(p->ip_header()->ip_dst).unparse().c_str(), ntohs(p->tcp_header()->th_dport));
@@ -558,7 +560,7 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
             } else if (isAck(p) && fcb_in->common->state < TCPState::OPEN) {
                 if (getFlowDirection() == 1 && fcb_in->common->state == TCPState::ESTABLISHING_1
                         || getFlowDirection() == 0 && fcb_in->common->state == TCPState::ESTABLISHING_2) {
-                    if (_verbose > 1)
+                    if (unlikely(_verbose > 1))
                         click_chatter("Unexpected packet");
                     p->kill();
                     return 0;

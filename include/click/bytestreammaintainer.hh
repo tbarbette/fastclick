@@ -41,6 +41,11 @@ class ByteStreamMaintainer
          */
         ~ByteStreamMaintainer();
 
+        inline void reinit() {
+		this->~ByteStreamMaintainer();
+		new (this) ByteStreamMaintainer();
+        }
+
         /** @brief Map an ack number
          * @param position Initial ack value
          * @return New value, taking into account the modifications in the flow
