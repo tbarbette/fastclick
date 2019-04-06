@@ -100,7 +100,10 @@ BatchStats::read_handler(Element *e, void *thunk)
                   count += fd->stats.get_value(i)[j];
               }
           }
-          return String(total/count);
+          if (count > 0)
+		  return String(total/count);
+          else
+		  return String(0);
       }
       case H_DUMP: {
           StringAccum s;
