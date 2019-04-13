@@ -705,8 +705,8 @@ minios_dir
 xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
-DPDK_INCLUDES
 USE_DPDK
+DPDK_INCLUDES
 RTE_VER_MONTH
 RTE_VER_YEAR
 RTE_VER_MINOR
@@ -1576,7 +1576,7 @@ Optional Features:
   --enable-task-heap      use heap for task list
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
-                          hash iterator epoch
+                          hash iterator epochs
   --enable-force-expensive
                           force expensive packet operations
   --enable-valgrind       extra support for debugging with valgrind
@@ -6813,11 +6813,70 @@ fi
 
 done
 
-#if test "$ac_have_libpthread$ac_have_pthread_h" = yesyes; then
-if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
+if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
     $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
 
 fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lre2" >&5
+$as_echo_n "checking for main in -lre2... " >&6; }
+if ${ac_cv_lib_re2_main+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lre2  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_re2_main=yes
+else
+  ac_cv_lib_re2_main=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_re2_main" >&5
+$as_echo "$ac_cv_lib_re2_main" >&6; }
+if test "x$ac_cv_lib_re2_main" = xyes; then :
+  ac_have_re2=yes
+else
+  ac_have_re2=no
+fi
+
+for ac_header in re2/re2.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "re2/re2.h" "ac_cv_header_re2_re2_h" "$ac_includes_default"
+if test "x$ac_cv_header_re2_re2_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_RE2_RE2_H 1
+_ACEOF
+ ac_have_re2_h=yes
+else
+  ac_have_re2_h=no
+fi
+
+done
+
+if test "x$ac_have_re2$ac_have_re2_h" = "xyesyes"; then
+    have_re2=yes
+    LIBS="$LIBS -lre2"
+    $as_echo "#define HAVE_RE2 1" >>confdefs.h
+
+else
+    have_re2=no
+fi
+
 
 
 # Check whether --enable-select was given.
@@ -6897,6 +6956,10 @@ if test "x$enable_dpdk" = "xyes"; then
         RTE_LIBNAME=dpdk
     fi
 
+    if test -z "$RTE_SRCDIR"; then
+        RTE_SRCDIR=$RTE_SDK
+    fi
+
     if test "x$enable_user_multithread" != "xyes"; then
         as_fn_error $? "
 =========================================
@@ -6905,37 +6968,50 @@ if test "x$enable_dpdk" = "xyes"; then
 
 =========================================" "$LINENO" 5
     fi
-    if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
+
+
+    if pkg-config --exists libdpdk ; then
+        :
+    else
+      if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
 =========================================
 
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
+Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
+or install DPDK using meson, or he system package manager.
 
 =========================================" "$LINENO" 5
+      fi
+      if test -e "$RTE_SRCDIR/VERSION"; then
+        rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
+        rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
+        rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
+      else
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+      fi
+
+
+
+      RTE_VER_MAJOR=$rte_ver_major
+
+      RTE_VER_MINOR=$rte_ver_minor
+
+      RTE_VER_YEAR=$rte_ver_year
+
+      RTE_VER_MONTH=$rte_ver_month
+
+      DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
+
     fi
-    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-
-
-
-
-    RTE_VER_MAJOR=$rte_ver_major
-
-    RTE_VER_MINOR=$rte_ver_minor
-
-    RTE_VER_YEAR=$rte_ver_year
-
-    RTE_VER_MONTH=$rte_ver_month
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
-
     USE_DPDK=yes
 
-    DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
 
 fi
 
@@ -10101,6 +10177,8 @@ main ()
     if (*(data + i) != *(data3 + i))
       return 14;
   close (fd);
+  free (data);
+  free (data3);
   return 0;
 }
 _ACEOF
@@ -10637,6 +10715,7 @@ else
 =========================================" "$LINENO" 5
 fi
 
+
 # Check whether --enable-stride was given.
 if test "${enable_stride+set}" = set; then :
   enableval=$enable_stride; :
@@ -10688,6 +10767,37 @@ if test $enable_dmalloc = yes; then
 $as_echo "#define CLICK_DMALLOC 1" >>confdefs.h
 
 fi
+
+
+
+
+# Check whether --enable-hash-iterator-epochs was given.
+if test "${enable_hash_iterator_epochs+set}" = set; then :
+  enableval=$enable_hash_iterator_epochs; :
+else
+  enable_hash_iterator_epochs=no
+fi
+
+if test $enable_hash_iterator_epochs = yes; then
+
+$as_echo "#define CLICK_HASH_ITERATOR_EPOCHS 1" >>confdefs.h
+
+fi
+
+
+# Check whether --enable-force-expensive was given.
+if test "${enable_force_expensive+set}" = set; then :
+  enableval=$enable_force_expensive; :
+else
+  enable_force_expensive=no
+fi
+
+if test $enable_force_expensive = yes; then
+
+$as_echo "#define CLICK_FORCE_EXPENSIVE 1" >>confdefs.h
+
+fi
+
 
 
 # Check whether --enable-valgrind was given.
@@ -14120,6 +14230,13 @@ fi
 
 if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
+    have_pcap=yes
+else
+    have_pcap=no
+fi
+
+if test "x$have_re2" == xyes; then
+    provisions="$provisions re2"
 fi
 
 if test "$enable_multithread" != no; then
@@ -15507,12 +15624,15 @@ fi
 
 echo "
 
-Configuration:
+Configuration Summary:
     C Compiler:                  ${CC}
     C++ Compiler:                ${CXX}
 
     DPDK support:                ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
+    PCAP support:                ${have_pcap}
+
+    RE2 support:                 ${have_re2}
 "
 
 echo "Now type make to build FastClick..."
