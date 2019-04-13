@@ -22,7 +22,7 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0) && RTE_VERSION < RTE_VERSION_NUM(19,2,0,0)
     #include <rte_bus_pci.h>
 #endif
 
