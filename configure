@@ -6914,10 +6914,23 @@ Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
 
 =========================================" "$LINENO" 5
     fi
-    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+
+    res=`find "$RTE_SDK_BIN" -name "rte_version.h"`
+    if test -z $res; then
+      dpdk_ver_file="$RTE_SDK_BIN/include/rte_version.h"
+    else
+      dpdk_ver_file="$RTE_SDK_BIN/include/rte_config.h"
+    fi
+
+    rte_ver_year=`grep "#define RTE_VER_YEAR" $dpdk_ver_file | head -n 1 | awk '{print $3}'`
+    rte_ver_month=`grep "#define RTE_VER_MONTH" $dpdk_ver_file | head -n 1 | awk '{print $3}'`
+    rte_ver_minor=`grep "#define RTE_VER_MINOR" $dpdk_ver_file | head -n 1 | awk '{print $3}'`
+
+    if test -z $res; then
+      rte_ver_major=grep "#define RTE_VER_MAJOR" $dpdk_ver_file | head -n 1 | awk '{print $3}'
+    else
+      rte_ver_major=$rte_ver_year
+    fi
 
 
 
