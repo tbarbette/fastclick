@@ -372,39 +372,6 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
-
-	int diag;
-	int vlan_offload;
-
-	rx_conf.offloads = dev_conf.rxmode.offloads;
-	vlan_offload = rte_eth_dev_get_vlan_offload(port_id);
-
-	if (info.vlan_filter) {
-		vlan_offload |= ETH_VLAN_FILTER_OFFLOAD;
-		rx_conf.offloads |= DEV_RX_OFFLOAD_VLAN_FILTER;
-	} else {
-		vlan_offload &= ~ETH_VLAN_FILTER_OFFLOAD;
-		rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_FILTER;
-	}
-
-	if (info.vlan_strip) {
-		vlan_offload |= ETH_VLAN_STRIP_OFFLOAD;
-		rx_conf.offloads |= DEV_RX_OFFLOAD_VLAN_STRIP;
-	} else {
-		vlan_offload &= ~ETH_VLAN_STRIP_OFFLOAD;
-		rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_STRIP;
-	}
-
-	diag = rte_eth_dev_set_vlan_offload(port_id, vlan_offload);
-	if (diag < 0)
-		printf("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s) failed "
-				"diag=%d\n", port_id, info.vlan_filter ? "true" : "false", info.vlan_strip ? "true" : "false", diag);
-
-	dev_conf.rxmode.offloads = rx_conf.offloads;
-
-#endif
-
     struct rte_eth_txconf tx_conf;
     tx_conf = dev_info.default_txconf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
@@ -487,6 +454,39 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         if (ret != 0)
              return errh->error("Could not set flow control status !");
     }
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+
+    int diag;
+    int vlan_offload;
+
+    rx_conf.offloads = dev_conf.rxmode.offloads;
+    vlan_offload = rte_eth_dev_get_vlan_offload(port_id);
+
+    if (info.vlan_filter) {
+        vlan_offload |= ETH_VLAN_FILTER_OFFLOAD;
+        rx_conf.offloads |= DEV_RX_OFFLOAD_VLAN_FILTER;
+    } else {
+        vlan_offload &= ~ETH_VLAN_FILTER_OFFLOAD;
+        rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_FILTER;
+    }
+
+    if (info.vlan_strip) {
+        vlan_offload |= ETH_VLAN_STRIP_OFFLOAD;
+        rx_conf.offloads |= DEV_RX_OFFLOAD_VLAN_STRIP;
+    } else {
+        vlan_offload &= ~ETH_VLAN_STRIP_OFFLOAD;
+        rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_STRIP;
+    }
+
+    diag = rte_eth_dev_set_vlan_offload(port_id, vlan_offload);
+    if (diag < 0)
+        printf("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s) failed "
+                "diag=%d\n", port_id, info.vlan_filter ? "true" : "false", info.vlan_strip ? "true" : "false", diag);
+
+    dev_conf.rxmode.offloads = rx_conf.offloads;
+
+#endif
 
     return 0;
 }
