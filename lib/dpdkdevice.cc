@@ -597,10 +597,6 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     rx_conf.rx_thresh.wthresh = RX_WTHRESH;
 #endif
 
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
-    rx_conf.offloads = dev_conf.rxmode.offloads;
-#endif
-
     struct rte_eth_txconf tx_conf;
     tx_conf = dev_info.default_txconf;
 #if RTE_VERSION >= RTE_VERSION_NUM(2,0,0,0)
@@ -707,6 +703,42 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         }
     }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+
+    int diag;
+    int vlan_offload;
+
+    rx_conf.offloads = dev_conf.rxmode.offloads;
+    vlan_offload = rte_eth_dev_get_vlan_offload(port_id);
+
+    if (info.vlan_filter) {
+        vlan_offload |= ETH_VLAN_FILTER_OFFLOAD;
+        rx_conf.offloads |= DEV_RX_OFFLOAD_VLAN_FILTER;
+    } else {
+        vlan_offload &= ~ETH_VLAN_FILTER_OFFLOAD;
+        rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_FILTER;
+    }
+
+    if (info.vlan_strip) {
+        vlan_offload |= ETH_VLAN_STRIP_OFFLOAD;
+        rx_conf.offloads |= DEV_RX_OFFLOAD_VLAN_STRIP;
+    } else {
+        vlan_offload &= ~ETH_VLAN_STRIP_OFFLOAD;
+        rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_STRIP;
+    }
+
+    printf("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s) failed "
+            "diag=%d\n", port_id, info.vlan_filter ? "true" : "false", info.vlan_strip ? "true" : "false", diag);
+
+    diag = rte_eth_dev_set_vlan_offload(port_id, vlan_offload);
+    if (diag < 0)
+        printf("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s) failed "
+                "diag=%d\n", port_id, info.vlan_filter ? "true" : "false", info.vlan_strip ? "true" : "false", diag);
+
+    dev_conf.rxmode.offloads = rx_conf.offloads;
+
+#endif
+
     return 0;
 }
 
@@ -764,7 +796,7 @@ bool set_slot(Vector<bool> &v, unsigned &id) {
 }
 
 int DPDKDevice::add_queue(DPDKDevice::Dir dir,
-                           unsigned &queue_id, bool promisc, unsigned n_desc,
+                           unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip, unsigned n_desc,
                            ErrorHandler *errh)
 {
     if (_is_initialized) {
@@ -778,6 +810,19 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
                 "Some elements disagree on whether or not device %u should"
                 " be in promiscuous mode", port_id);
         info.promisc |= promisc;
+
+		if (info.rx_queues.size() > 0 && vlan_filter != info.vlan_filter)
+			return errh->error(
+					"Some elements disagree on whether or not device %u should"
+							" filter vlan tagged packets", port_id);
+		info.vlan_filter |= vlan_filter;
+
+		if (info.rx_queues.size() > 0 && vlan_strip != info.vlan_strip)
+			return errh->error(
+					"Some elements disagree on whether or not device %u should"
+							" strip vlan tagged packets", port_id);
+		info.vlan_strip |= vlan_strip;
+
         if (n_desc > 0) {
             if (n_desc != info.n_rx_descs && info.rx_queues.size() > 0)
                 return errh->error(
@@ -806,16 +851,16 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
     return 0;
 }
 
-int DPDKDevice::add_rx_queue(unsigned &queue_id, bool promisc,
+int DPDKDevice::add_rx_queue(unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
                               unsigned n_desc, ErrorHandler *errh)
 {
-    return add_queue(DPDKDevice::RX, queue_id, promisc, n_desc, errh);
+    return add_queue(DPDKDevice::RX, queue_id, promisc, vlan_filter, vlan_strip, n_desc, errh);
 }
 
 int DPDKDevice::add_tx_queue(unsigned &queue_id, unsigned n_desc,
                               ErrorHandler *errh)
 {
-    return add_queue(DPDKDevice::TX, queue_id, false, n_desc, errh);
+    return add_queue(DPDKDevice::TX, queue_id, false, false, false, n_desc, errh);
 }
 
 int DPDKDevice::static_initialize(ErrorHandler* errh) {
@@ -1188,3 +1233,4 @@ unsigned DPDKDevice::_nr_pktmbuf_pools;
 bool DPDKDevice::no_more_buffer_msg_printed = false;
 
 CLICK_ENDDECLS
+

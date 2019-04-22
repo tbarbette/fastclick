@@ -38,7 +38,11 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_KNI)            += -lrte_kni
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IVSHMEM)        += -lrte_ivshmem
 endif
 
-ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL)$(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),yytrue)
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_CRYPTO),y)
+_LDLIBS-y += -lrte_common_cpt
+endif
+
+ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL)$(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),yytrue)
 	_LDLIBS-y += -lrte_common_octeontx
 endif
 
@@ -54,6 +58,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_BPF)            += -lrte_bpf
 ifeq ($(CONFIG_RTE_LIBRTE_BPF_ELF),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BPF)            += -lelf
 endif
+_LDLIBS-$(CONFIG_RTE_LIBRTE_IPSEC)            += -lrte_ipsec
 _LDLIBS-$(CONFIG_RTE_LIBRTE_CFGFILE)        += -lrte_cfgfile
 _LDLIBS-$(CONFIG_RTE_LIBRTE_GRO)            += -lrte_gro
 _LDLIBS-$(CONFIG_RTE_LIBRTE_GSO)            += -lrte_gso
@@ -106,6 +111,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_IP_FRAG)        += -lrte_ip_frag
 
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 16 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 17 ] ) && echo true),true)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ETHER)          += -lrte_ethdev
+_LDLIBS-$(CONFIG_RTE_LIBRTE_BBDEV)          += -lrte_bbdev
 _LDLIBS-$(CONFIG_RTE_LIBRTE_NET)            += -lrte_net
 else
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ETHER)          += -lethdev
@@ -131,18 +137,22 @@ endif # CONFIG_RTE_LIBRTE_IFPGA_BUS
 endif # CONFIG_RTE_LIBRTE_RAWDEV
 _LDLIBS-$(CONFIG_RTE_LIBRTE_TIMER)          += -lrte_timer
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MEMPOOL)        += -lrte_mempool
+_LDLIBS-$(CONFIG_RTE_LIBRTE_STACK)          += -lrte_stack
+_LDLIBS-$(CONFIG_RTE_DRIVER_MEMPOOL_RING)   += -lrte_mempool_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MEMPOOL_RING)   += -lrte_mempool_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_RING)           += -lrte_ring
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PCI)            += -lrte_pci
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EAL)            += -lrte_eal
 _LDLIBS-$(CONFIG_RTE_LIBRTE_CMDLINE)        += -lrte_cmdline
-ifeq ($(CONFIG_RTE_LIBRTE_DPAA_BUS),y)
- _LDLIBS-$(CONFIG_RTE_LIBRTE_COMMON_DPAAX)   += -lrte_common_dpaax
-endif
 ifeq ($(CONFIG_RTE_LIBRTE_FSLMC_BUS),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_COMMON_DPAAX)   += -lrte_common_dpaax
 endif
-
+ifeq ($(CONFIG_RTE_LIBRTE_DPAA_BUS),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_COMMON_DPAAX)   += -lrte_common_dpaax
+endif
+ifeq ($(CONFIG_RTE_LIBRTE_MVPP2_PMD),y)
+_LDLIBS-y += -lrte_common_mvep -L$(LIBMUSDK_PATH)/lib -lmusdk
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PCI_BUS)        += -lrte_bus_pci
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VDEV_BUS)       += -lrte_bus_vdev
 
@@ -183,6 +193,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)      += -lrte_pmd_dpaa2
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ENIC_PMD)       += -lrte_pmd_enic
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_FAILSAFE)   += -lrte_pmd_failsafe
 _LDLIBS-$(CONFIG_RTE_LIBRTE_I40E_PMD)       += -lrte_pmd_i40e
+_LDLIBS-$(CONFIG_RTE_LIBRTE_ICE_PMD)        += -lrte_pmd_ice
 _LDLIBS-$(CONFIG_RTE_LIBRTE_FM10K_PMD)      += -lrte_pmd_fm10k
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IXGBE_PMD)      += -lrte_pmd_ixgbe
 ifeq ($(CONFIG_RTE_LIBRTE_KNI),y)
@@ -191,9 +202,19 @@ endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LIO_PMD)        += -lrte_pmd_lio
 _LDLIBS-$(CONFIG_RTE_LIBRTE_E1000_PMD)      += -lrte_pmd_e1000
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ENA_PMD)        += -lrte_pmd_ena
+_LDLIBS-$(CONFIG_RTE_LIBRTE_ENETC_PMD)      += -lrte_pmd_enetc
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LIO_PMD)        += -lrte_pmd_lio
-_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lrte_pmd_mlx4 -libverbs
-_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lrte_pmd_mlx5 -libverbs
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lrte_pmd_mlx4
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lrte_pmd_mlx5
+ifeq ($(CONFIG_RTE_IBVERBS_LINK_STATIC),y)
+LIBS_IBVERBS_STATIC = $(shell $(RTE_SDK)/buildtools/options-ibverbs-static.sh)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += $(LIBS_IBVERBS_STATIC)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += $(LIBS_IBVERBS_STATIC)
+else
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -libverbs -lmlx4
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -libverbs -lmlx5
+endif
+
 # DPDK 17.11 or beyond requires additional libraries for Mellanox NICs
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX4_PMD)       += -lmlx4
@@ -221,7 +242,12 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_SFC_EFX_PMD)    += -lrte_pmd_sfc_efx
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_TAP)        += -lrte_pmd_tap
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_PCAP)       += -lrte_pmd_pcap
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AF_PACKET)  += -lrte_pmd_af_packet
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AF_XDP)     += -lrte_pmd_af_xdp -lbpf
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ARK_PMD)        += -lrte_pmd_ark
+_LDLIBS-$(CONFIG_RTE_LIBRTE_ATLANTIC_PMD)   += -lrte_pmd_atlantic
+_LDLIBS-$(CONFIG_RTE_LIBRTE_AVF_PMD)        += -lrte_pmd_avf
+_LDLIBS-$(CONFIG_RTE_LIBRTE_AVF_PMD)        += -lrte_pmd_avf
+_LDLIBS-$(CONFIG_RTE_LIBRTE_IAVF_PMD)       += -lrte_pmd_iavf
 _LDLIBS-$(CONFIG_RTE_LIBRTE_AVP_PMD)        += -lrte_pmd_avp
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NULL)       += -lrte_pmd_null
 _LDLIBS-$(CONFIG_RTE_LIBRTE_VMXNET3_PMD)    += -lrte_pmd_vmxnet3_uio
@@ -240,6 +266,7 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NULL_CRYPTO) += -lrte_pmd_null_crypto
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
 ifeq ($(CONFIG_RTE_LIBRTE_PMD_QAT),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT_SYM)     += -lrte_pmd_qat -lcrypto
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT_ASYM)    += -lrte_pmd_qat -lcrypto
 endif # CONFIG_RTE_LIBRTE_PMD_QAT
 else
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT)        += -lrte_pmd_qat -lcrypto

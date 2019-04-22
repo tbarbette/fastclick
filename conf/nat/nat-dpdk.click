@@ -42,7 +42,7 @@ arpq_right :: ARPQuerier(wan_interface) -> nicOut1; //The packet will go to wan 
 ip_rw_l :: IPClassifier(proto tcp, proto udp, -);
 ip_rw_r :: IPClassifier(proto tcp, proto udp, -);
 
-rwpattern :: IPRewriterPatterns(NAT right_interface 50000-65535 - -);
+rwpattern :: IPRewriterPatterns(NAT wan_interface 50000-65535 - -);
 tcp_rw :: TCPRewriter(pattern NAT 0 1, pass 1);
 udp_rw :: UDPRewriter(pattern NAT 0 1, pass 1);
 

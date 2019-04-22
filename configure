@@ -705,8 +705,8 @@ minios_dir
 xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
-DPDK_INCLUDES
 USE_DPDK
+DPDK_INCLUDES
 RTE_VER_MONTH
 RTE_VER_YEAR
 RTE_VER_MINOR
@@ -7131,6 +7131,10 @@ if test "x$enable_dpdk" = "xyes"; then
         RTE_LIBNAME=dpdk
     fi
 
+    if test -z "$RTE_SRCDIR"; then
+        RTE_SRCDIR=$RTE_SDK
+    fi
+
     if test "x$enable_user_multithread" != "xyes"; then
         as_fn_error $? "
 =========================================
@@ -7139,37 +7143,50 @@ if test "x$enable_dpdk" = "xyes"; then
 
 =========================================" "$LINENO" 5
     fi
-    if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
+
+
+    if pkg-config --exists libdpdk ; then
+        :
+    else
+      if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         as_fn_error $? "
 =========================================
 
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
-Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation.
+Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
+or install DPDK using meson, or he system package manager.
 
 =========================================" "$LINENO" 5
+      fi
+      if test -e "$RTE_SRCDIR/VERSION"; then
+        rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
+        rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
+        rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
+      else
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+      fi
+
+
+
+      RTE_VER_MAJOR=$rte_ver_major
+
+      RTE_VER_MINOR=$rte_ver_minor
+
+      RTE_VER_YEAR=$rte_ver_year
+
+      RTE_VER_MONTH=$rte_ver_month
+
+      DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
+
     fi
-    rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-    rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-
-
-
-
-    RTE_VER_MAJOR=$rte_ver_major
-
-    RTE_VER_MINOR=$rte_ver_minor
-
-    RTE_VER_YEAR=$rte_ver_year
-
-    RTE_VER_MONTH=$rte_ver_month
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
-
     USE_DPDK=yes
 
-    DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
 
 fi
 
@@ -14418,6 +14435,13 @@ fi
 
 if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
+    have_pcap=yes
+else
+    have_pcap=no
+fi
+
+if test "x$have_re2" == xyes; then
+    provisions="$provisions re2"
 fi
 
 if test "x$have_re2" == xyes; then
@@ -15827,11 +15851,13 @@ Configuration Summary:
 
     DPDK support:                ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
-    PCAP support:                ${HAVE_PCAP}
+
+    PCAP support:                ${have_pcap}
 
     Metron support:              ${have_metron}
 
     PAPI support:                ${have_papi}
+
     RE2 support:                 ${have_re2}
 "
 

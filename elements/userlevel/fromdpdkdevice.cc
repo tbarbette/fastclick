@@ -167,7 +167,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     for (unsigned i = (unsigned)firstqueue; i <= (unsigned)lastqueue; i++) {
-        ret = _dev->add_rx_queue(i , _promisc, ndesc, errh);
+        ret = _dev->add_rx_queue(i , _promisc, _vlan_filter, _vlan_strip, ndesc, errh);
         if (ret != 0) return ret;
     }
 
