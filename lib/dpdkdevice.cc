@@ -727,9 +727,6 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_STRIP;
     }
 
-    printf("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s) failed "
-            "diag=%d\n", port_id, info.vlan_filter ? "true" : "false", info.vlan_strip ? "true" : "false", diag);
-
     diag = rte_eth_dev_set_vlan_offload(port_id, vlan_offload);
     if (diag < 0)
         printf("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s) failed "
