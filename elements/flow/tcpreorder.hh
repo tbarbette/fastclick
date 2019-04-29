@@ -171,13 +171,15 @@ private:
      */
     bool checkRetransmission(struct fcb_tcpreorder *fcb, Packet* packet, bool always_retransmit);
 
+public:
 
     /**
      * @brief Sort the list of waiting packets using merge sort
      * @param list A pointer to the head of the list of waiting packets
      * @return A pointer to the new head of the list of waiting packets
      */
-    Packet* sortList(Packet *list);
+    static Packet* sortList(Packet *list);
+private:
 
     bool _mergeSort;
     bool _notimeout;

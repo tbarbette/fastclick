@@ -86,14 +86,14 @@ public:
      * @param packet The packet
      * @return The sequence number of the packet
      */
-    tcp_seq_t getSequenceNumber(Packet* packet) const;
+    static inline tcp_seq_t getSequenceNumber(Packet* packet);
 
     /**
      * @brief Return the ack number of a packet
      * @param packet The packet
      * @return The ack number of the packet
      */
-    tcp_seq_t getAckNumber(Packet* packet) const;
+    static inline tcp_seq_t getAckNumber(Packet* packet);
 
     /**
      * @brief Return the sequence number of the packet that will be received after the given one
@@ -222,7 +222,7 @@ public:
      * @brief Compute the TCP checksum of a packet and set it in its header
      * @param packet The packet
      */
-    inline void computeTCPChecksum(WritablePacket* packet) const;
+    static inline void computeTCPChecksum(WritablePacket* packet);
 
     /**
      * @brief Reset the TCP checksum of a packet and set it in its header
@@ -253,7 +253,7 @@ TCPElement::getNextSequenceNumber(Packet* packet) const
     return nextSeq;
 }
 
-inline void TCPElement::computeTCPChecksum(WritablePacket *packet) const
+inline void TCPElement::computeTCPChecksum(WritablePacket *packet)
 {
     click_ip *iph = packet->ip_header();
     click_tcp *tcph = packet->tcp_header();
@@ -298,14 +298,14 @@ inline void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq)
     tcph->th_seq = htonl(seq);
 }
 
-inline tcp_seq_t TCPElement::getSequenceNumber(Packet* packet) const
+inline tcp_seq_t TCPElement::getSequenceNumber(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohl(tcph->th_seq);
 }
 
-inline tcp_seq_t TCPElement::getAckNumber(Packet* packet) const
+inline tcp_seq_t TCPElement::getAckNumber(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 

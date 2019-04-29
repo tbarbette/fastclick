@@ -548,12 +548,12 @@ Packet* TCPReorder::sortList(Packet *list)
                     e = p;
                     p = p->next();
                     psize--;
-                } else if (getSequenceNumber(p) == getSequenceNumber(q)
+                } /* else if (getSequenceNumber(p) == getSequenceNumber(q)
                         && SEQ_LT(getAckNumber(p), getAckNumber(q))) {
                     //TODO
                     assert(false);
                     p->kill();
-                }
+                }*/
                 else
                 {
                     /* First element of q is lower; e must come from q. */
