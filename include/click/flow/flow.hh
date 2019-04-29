@@ -242,10 +242,11 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
 #endif
                             { //Duplicate node
 
+                                FlowNode* defNode = parent->default_ptr()->node;
                                 flow_assert(parent->default_ptr()->node->getNum() == 0);
-                                FlowNode* newNode = parent->level()->create_node(parent->default_ptr()->node, false, false);
-                                newNode->_level = parent->default_ptr()->node->level();
-                                *newNode->default_ptr() = *parent->default_ptr()->node->default_ptr();
+                                FlowNode* newNode = defNode->level()->create_node(defNode, false, false);
+                                newNode->_level = defNode->level();
+                                *newNode->default_ptr() = *defNode->default_ptr();
                                 child_ptr->set_node(newNode);
                                 debug_flow("[%d] DUPLICATE node, new is %p, default is %p",click_current_cpu_id(),child_ptr->node,parent->default_ptr()->ptr);
 
