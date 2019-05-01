@@ -48,13 +48,15 @@ TimedSource::configure(Vector<String> &conf, ErrorHandler *errh)
     _data = data;
     if (_packet)
 	_packet->kill();
-    _packet = Packet::make(_headroom, _data.data(), _data.length(), 0);
     return 0;
 }
 
 int
 TimedSource::initialize(ErrorHandler *)
 {
+  WritablePacket *q = Packet::make(_headroom, _data.data(), _data.length(), 0);
+  _packet = q;
+
   _timer.initialize(this);
   if (_active)
     _timer.schedule_after(_interval);

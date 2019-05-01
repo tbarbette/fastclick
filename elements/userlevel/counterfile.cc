@@ -58,7 +58,10 @@ CounterFile::initialize(ErrorHandler *errh)
         return e;
     }
 
-    ftruncate(fd, sizeof(stats_atomic));
+    int r = ftruncate(fd, sizeof(stats_atomic));
+    if (r != 0) {
+        return -errno;
+    }
 
     void *mmap_data = mmap(0, sizeof(stats_atomic), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE, fd, 0);
 

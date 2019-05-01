@@ -109,6 +109,11 @@ LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 
 USE_DPDK = @USE_DPDK@
 ifeq ($(USE_DPDK),yes)
+ifeq ($(shell pkg-config --exists libdpdk && echo 1), 1)
+CFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+CXXFLAGS := $(CFLAGS) $(shell pkg-config --cflags libdpdk)
+LDFLAGS := $(LDFLAGS) $(shell pkg-config --libs libdpdk) -Wl,-Bstatic $(shell pkg-config --static --libs libdpdk)
+else
 RTE_SDK = @RTE_SDK@
 RTE_TARGET = @RTE_TARGET@
 RTE_VER_MAJOR = @RTE_VER_MAJOR@
@@ -116,6 +121,7 @@ RTE_VER_MINOR = @RTE_VER_MINOR@
 RTE_VER_YEAR = @RTE_VER_YEAR@
 RTE_VER_MONTH = @RTE_VER_MONTH@
 include dpdk.mk
+endif
 EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 endif
 

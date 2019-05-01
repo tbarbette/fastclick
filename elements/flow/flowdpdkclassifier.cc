@@ -96,7 +96,7 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
             for (int i = 0; i < threads.size(); i++) {
                 if (!threads[i])
                     continue;
-                queue[id++] = i;
+                queue[id++] = id;
             }
             uint8_t rss_key[40];
             struct rte_eth_rss_conf rss_conf;

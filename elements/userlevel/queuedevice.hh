@@ -200,6 +200,8 @@ protected:
 class RXQueueDevice : public QueueDevice {
 protected:
 	bool _promisc;
+	bool _vlan_filter;
+	bool _vlan_strip;
 	bool _set_rss_aggregate;
 	bool _set_paint_anno;
 	bool _set_timestamp;

@@ -105,12 +105,14 @@ DelayShaper::pull(int)
     return 0;
 }
 
-PacketBatch *
+#if HAVE_BATCH
+PacketBatch*
 DelayShaper::pull_batch(int port, unsigned max) {
     PacketBatch* batch = 0;
     MAKE_BATCH(DelayShaper::pull(port), batch, max);
     return batch;
 }
+#endif
 
 void
 DelayShaper::run_timer(Timer *)
