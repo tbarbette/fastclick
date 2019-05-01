@@ -212,7 +212,7 @@ fi
 
 AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
 AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
-if test "x$ac_have_papi_h" = "xyesyes"; then
+if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
     AC_DEFINE([HAVE_PAPI])
     have_papi=yes
 else
