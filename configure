@@ -14444,10 +14444,6 @@ if test "x$have_re2" == xyes; then
     provisions="$provisions re2"
 fi
 
-if test "x$have_re2" == xyes; then
-    provisions="$provisions re2"
-fi
-
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
 fi
@@ -15851,13 +15847,11 @@ Configuration Summary:
 
     DPDK support:                ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
-
     PCAP support:                ${have_pcap}
 
     Metron support:              ${have_metron}
 
     PAPI support:                ${have_papi}
-
     RE2 support:                 ${have_re2}
 "
 
