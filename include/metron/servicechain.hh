@@ -107,7 +107,7 @@ class StandaloneSCManager : public PidSCManager {
         void run_load_timer();
         int run_service_chain(ErrorHandler *errh);
 
-        virtual String fix_rule(NIC* nic, String rule);
+        virtual String fix_rule(NIC *nic, String rule);
 private:
 
 struct CPUStat {
@@ -116,7 +116,7 @@ struct CPUStat {
 };
 
 
-Vector<float> updateLoad(Vector<CPUStat> &v);
+Vector<float> update_load(Vector<CPUStat> &v);
         int _sriov;
         Vector<CPUStat> _cpustats;
 };

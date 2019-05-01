@@ -45,12 +45,14 @@ ServiceChainManager::~ServiceChainManager()
  * Click Service Chain Manager
  ****************************************/
 /**
- * Fix rule sent by the controller according to dataplane informations
+ * Fix the rule sent by the controller according to data plane information.
  */
 String
-ServiceChainManager::fix_rule(NIC *nic, String rule) {
-    // compose rule for the right nic
+ServiceChainManager::fix_rule(NIC *nic, String rule)
+{
+    // Compose rule for the right NIC
     rule = "flow create " + String(nic->get_port_id()) + " " + rule;
+
     return rule;
 }
 
@@ -641,7 +643,8 @@ PidSCManager::check_alive()
  * Fix the rule sent by the controller according to data plane information.
  */
 String
-StandaloneSCManager::fix_rule(NIC *nic, String rule) {
+StandaloneSCManager::fix_rule(NIC *nic, String rule)
+{
     // Compose rule for the right NIC
     if (_sriov <= 0) {
         rule = "flow create " + String(nic->get_port_id()) + " " + rule;
@@ -653,13 +656,13 @@ StandaloneSCManager::fix_rule(NIC *nic, String rule) {
         //click_chatter("qid %s", qid.c_str());
         int queue = atoi(qid.substring(0, qid.find_left(' ')).c_str());
 #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
-        char porthex[3];
-        char corehex[3];
+        char porthex[6];
+        char corehex[6];
         sprintf(porthex, "%02x", pindex);
         sprintf(corehex, "%02x", queue);
-        rule = rule.substring(0,rule.find_left("actions")) + "actions set_mac_dst mac_addr 98:03:9b:33:" + porthex  + ":" + corehex + " / port_id id " + String(pindex + (queue % _sriov)) + " / end\n";
+        rule = rule.substring(0, rule.find_left("actions")) + "actions set_mac_dst mac_addr 98:03:9b:33:" + porthex  + ":" + corehex + " / port_id id " + String(pindex + (queue % _sriov)) + " / end\n";
 #else
-        rule = rule.substring(0,rule.find_left("actions")) + "actions port_id id " + String(pindex + (queue % _sriov)) + " / end\n";
+        rule = rule.substring(0, rule.find_left("actions")) + "actions port_id id " + String(pindex + (queue % _sriov)) + " / end\n";
 #endif
 
         click_chatter("Rewrited rule : %s", rule.c_str());
@@ -768,13 +771,16 @@ StandaloneSCManager::StandaloneSCManager(ServiceChain *sc) : PidSCManager(sc), _
 
 };
 
-Vector<float> StandaloneSCManager::updateLoad(Vector<CPUStat> &v) {
+Vector<float>
+StandaloneSCManager::update_load(Vector<CPUStat> &v)
+{
     Vector<float> load(v.size(), 0);
     unsigned long long totalUser, totalUserLow, totalSys, totalIdle;
     int cpuId;
     FILE* file = fopen("/proc/stat", "r");
     char buffer[1024];
-    fgets(buffer, 1024, file);
+    char *res = fgets(buffer, 1024, file);
+    assert(res);
     while (fscanf(file, "cpu%d %llu %llu %llu %llu", &cpuId, &totalUser, &totalUserLow, &totalSys, &totalIdle) > 0) {
         if (cpuId < load.size()) {
             unsigned long long newTotal = totalUser + totalUserLow + totalSys;
@@ -785,7 +791,7 @@ Vector<float> StandaloneSCManager::updateLoad(Vector<CPUStat> &v) {
             v[cpuId].lastTotal = newTotal;
             v[cpuId].lastIdle = totalIdle;
 
-            fgets(buffer, 1024, file);
+            res = fgets(buffer, 1024, file);
         }
     }
     fclose(file);
@@ -800,30 +806,23 @@ StandaloneSCManager::run_load_timer()
 {
     float max_cpu_load = 0;
     int max_cpu_load_index = 0;
-    float total_cpu_load = 0;
-    Vector<float> load = updateLoad(_cpustats);
+    Vector<float> load = update_load(_cpustats);
     for (int j = 0; j < _sc->get_max_cpu_nb(); j++) {
-
         const int cpu_id = _sc->get_cpu_phys_id(j);
         String js = String(j);
         float cpu_load = 0;
-        float cpu_queue = 0;
         uint64_t throughput = 0;
         for (int i = 0; i < _sc->get_nics_nb(); i++) {
             String is = String(i);
             NIC *nic = _sc->get_nic_by_index(i);
             assert(nic);
             assert(_sc->get_cpu_info(j).assigned());
-            /*if (ncpuqueue > cpu_queue) {
-                cpu_queue = ncpuqueue;
-            }*/
         }
 
         cpu_load = load[cpu_id];
-        //click_chatter("Load %d %f",cpu_id,cpu_load);
+        // click_chatter("Load %d %f", cpu_id, cpu_load);
+
         _sc->_cpus[j].load = cpu_load;
-        _sc->_cpus[j].max_nic_queue = cpu_queue;
-        //total_cpu_load += cpu_load;
         if (cpu_load > max_cpu_load) {
            max_cpu_load = cpu_load;
            max_cpu_load_index = j;
