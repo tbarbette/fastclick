@@ -205,7 +205,7 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
 #endif
                         parent->inc_num();
                         if (parent->get_default().is_leaf()) { //Leaf are not duplicated, we need to do it ourself
-				debug_flow("[%d] DUPLICATE leaf %p", click_current_cpu_id(),parent->get_default().ptr);
+				            debug_flow("[%d] DUPLICATE leaf %p", click_current_cpu_id(),parent->get_default().ptr);
                             //click_chatter("New leaf with data '%x'",data.get_long());
                             //click_chatter("Data %x %x",parent->default_ptr()->leaf->data_32[2],parent->default_ptr()->leaf->data_32[3]);
                             child_ptr->set_leaf(_pool.allocate());
@@ -225,9 +225,9 @@ FlowControlBlock* FlowClassificationTable::match(Packet* p, FlowNode* parent) {
                             _root->check(true, false);
 #if DEBUG_CLASSIFIER
                             if (parent->threads.weight() == 1)
-				child_ptr->leaf->thread = parent->threads.clz();
+				                child_ptr->leaf->thread = parent->threads.clz();
                             else
-				child_ptr->leaf->thread = -1;
+				                child_ptr->leaf->thread = -1;
                             flow_assert(child_ptr->leaf->thread == -1 || child_ptr->leaf->thread == click_current_cpu_id());
 #endif
                             flow_assert(reverse_match(child_ptr->leaf, p, debug_save_root));
