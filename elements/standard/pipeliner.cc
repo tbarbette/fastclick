@@ -42,7 +42,10 @@ Pipeliner::get_spawning_threads(Bitvector& b, bool, int port) {
 }
 
 void Pipeliner::cleanup(CleanupStage) {
-    for (unsigned i = 0; i < storage.weight(); i++) {
+    if (storage.initialized()) {
+      for (unsigned i = 0; i < storage.weight(); i++) {
+        if (!storage.get_value(i).initialized())
+            continue;
         Packet* p;
         while ((p = storage.get_value(i).extract()) != 0) {
 #if HAVE_BATCH
@@ -52,6 +55,7 @@ void Pipeliner::cleanup(CleanupStage) {
 #endif
                 p->kill();
         }
+      }
     }
 }
 
