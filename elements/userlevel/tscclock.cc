@@ -22,6 +22,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <click/master.hh>
+#include <click/handler.hh>
 CLICK_DECLS
 
 
@@ -64,6 +65,7 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("NOWAIT", _nowait)
             .read("BASE",basee)
             .read("SOURCE", sourcee)
+            .read("READY_CALL", HandlerCallArg(HandlerCall::writable), _ready_h)
             .complete() < 0)
         return -1;
 
@@ -120,7 +122,10 @@ inline int64_t TSCClock::get_real_timestamp(bool steady) {
  * from the last clock before going to the other thanks to a read memory fence.
  */
 int
-TSCClock::initialize(ErrorHandler*) {
+TSCClock::initialize(ErrorHandler* errh) {
+    if (_ready_h && _ready_h.initialize_write(this, errh) < 0)
+        return -1;
+
     if (_source.get_tick_hz == 0) {
         uint64_t hz = 0;
         for (int i = 0; i < 10; i++) {
@@ -434,6 +439,9 @@ void TSCClock::run_timer(Timer* timer) {
                     click_chatter("Switching to TSC clock");
                 if (_install && !_nowait)
                     Timestamp::set_clock(&now,(void*)this);
+                if (_ready_h) {
+                    (void) _ready_h.call_write();
+                }
             }
         }
     }

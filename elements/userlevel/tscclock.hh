@@ -5,6 +5,8 @@
 #include <click/task.hh>
 #include <click/sync.hh>
 #include <click/timestamp.hh>
+#include <click/handlercall.hh>
+
 CLICK_DECLS
 
 class TSCClock;
@@ -160,6 +162,8 @@ protected:
 
   struct UserClockSource _source;
   void* _source_thunk;
+
+  HandlerCall _ready_h;
 };
 
 inline int64_t TSCClock::tick_to_subsec(int64_t delta, int64_t mult) {
