@@ -22,7 +22,13 @@ timestamp. Keeps track of the total elapsed time accumulated over all packets.
 Returns the number of packets that have passed.
 
 =h time read-only
-Returns the accumulated timestamp difference for all passing packets.
+Returns the accumulated timestamp difference for all passing packets in seconds.
+
+=h min read-only
+Returns the minimal timestamp difference across all passing packets in seconds.
+
+=h max read-only
+Returns the maximal timestamp difference across all passing packets in seconds.
 
 =h average_time read-only
 Returns the average timestamp difference over all passing packets.
@@ -49,6 +55,8 @@ class TimestampAccum : public SimpleElement<TimestampAccum> { public:
 
     double _usec_accum;
     uint64_t _count;
+    double _min;
+    double _max;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int reset_handler(const String &, Element *, void *, ErrorHandler *);
