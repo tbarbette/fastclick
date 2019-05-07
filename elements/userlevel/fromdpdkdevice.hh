@@ -18,7 +18,7 @@ FromDPDKDevice(PORT [, QUEUE, N_QUEUES, I<keywords> PROMISC, BURST, NDESC])
 
 =s netdevices
 
-reads packets from network device using Intel's DPDK (user-level)
+reads packets from network device using DPDK (user-level)
 
 =d
 
