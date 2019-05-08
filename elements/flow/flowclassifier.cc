@@ -780,10 +780,12 @@ FlowClassifier::build_fcb() {
             if (fc->_reserve > min_place)
                 min_place = fc->_reserve;
             for (int j = 0; j < _classifiers[i]->_reachable_list.size(); j++) {
+                //click_chatter("%p{element} : %d", _classifiers[i]->_reachable_list[j].first, _classifiers[i]->_reachable_list[j].second);
                 auto ptr = common.find_insert(_classifiers[i]->_reachable_list[j].first->eindex(),CountDistancePair(0,_classifiers[i]->_reachable_list[j].second));
                 ptr->second.first++;
-                if (ptr->second.second > _classifiers[i]->_reachable_list[j].second)
+                if (ptr->second.second < _classifiers[i]->_reachable_list[j].second) {
                     ptr->second.second = _classifiers[i]->_reachable_list[j].second;
+                }
             }
 
             //Set unstack before non-compatible element
@@ -824,7 +826,7 @@ FlowClassifier::build_fcb() {
                     if (v.size() < ae->flow_data_offset() + ae->flow_data_size())
                         v.resize(ae->flow_data_offset() + ae->flow_data_size());
                     v.set_range(ae->flow_data_offset(), ae->flow_data_size(), true);
-                    if (_ordered && !(ae->flow_data_offset() + ae->flow_data_size() <= my_place || ae->flow_data_offset() > my_place + e->flow_data_size())) {
+                    if (_ordered && !(ae->flow_data_offset() + ae->flow_data_size() <= my_place || ae->flow_data_offset() >= my_place + e->flow_data_size())) {
                         click_chatter("FATAL ERROR : Cannot place  %p{element} at [%d-%d] because it collides with %p{element}",e,my_place,my_place + e->flow_data_size() -1, ae);
                         assert(false);
                     }
