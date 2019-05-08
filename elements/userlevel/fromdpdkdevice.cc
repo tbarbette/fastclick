@@ -116,8 +116,12 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _dev->set_init_fc_mode(fc_mode);
 
     if (set_timestamp) {
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         _dev->set_offload(DEV_RX_OFFLOAD_TIMESTAMP);
         _set_timestamp = true;
+#else
+        errh->error("HW Timestamping is not supported before DPDK 18.02");
+#endif
     }
 
     return 0;
@@ -246,9 +250,11 @@ bool FromDPDKDevice::run_task(Task *t)
                 SET_PAINT_ANNO(p, iqueue);
             }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
             if (_set_timestamp && (pkts[i]->ol_flags & PKT_RX_TIMESTAMP)) {
                 p->timestamp_anno().assignlong(pkts[i]->timestamp);
             }
+#endif
 #if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);

@@ -264,6 +264,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
     dev_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     if (info.offload & DEV_RX_OFFLOAD_TIMESTAMP) {
         if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TIMESTAMP)) {
             return errh->error("Hardware timestamp offloading is not supported by this device !");
@@ -271,6 +272,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TIMESTAMP;
         }
     }
+#endif
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
