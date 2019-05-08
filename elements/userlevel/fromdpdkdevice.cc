@@ -84,6 +84,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (_use_numa) {
         numa_node = DPDKDevice::get_port_numa_node(_dev->port_id);
+        if (_numa_node_override > -1)
+            numa_node = _numa_node_override;
     }
 
     int r;
