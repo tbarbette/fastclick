@@ -464,7 +464,7 @@ void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
             // Check that the packet is not a SYN packet
             if(isSyn(p))
             {
-                if (fcb_in->common->state == TCPState::CLOSED) {
+                if (unlikely(fcb_in->common->state == TCPState::CLOSED)) {
                     if (isAck(p)) {
                         if (unlikely(_verbose))
                             click_chatter("Syn ACK on a CLOSED connection. Send an ACK first...");
@@ -800,7 +800,7 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
     tin->release_tcp_internal(fcb);
 
     if (fcb_in->previous_fnt) {
-        assert(fcb_in->previous_fnt != &release_tcp);
+        flow_assert(fcb_in->previous_fnt != &release_tcp);
         fcb_in->previous_fnt(fcb, fcb_in->previous_thunk);
     }
 

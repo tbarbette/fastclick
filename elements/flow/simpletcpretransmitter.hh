@@ -17,6 +17,7 @@ CLICK_DECLS
 
 struct fcb_transmit_buffer {
     PacketBatch* first_unacked;
+    tcp_seq_t first_unacked_seq;
 };
 
 /*

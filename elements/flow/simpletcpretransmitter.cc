@@ -80,6 +80,7 @@ SimpleTCPRetransmitter::forward_packets(fcb_transmit_buffer* fcb, PacketBatch* b
      * Just prune the buffer and put the packet with payload in the list (don't buffer ACKs)
      */
     prune(fcb);
+
     FOR_EACH_PACKET_SAFE(batch,packet) {
         if (getPayloadLength(packet) == 0)
             continue;
@@ -96,6 +97,7 @@ SimpleTCPRetransmitter::forward_packets(fcb_transmit_buffer* fcb, PacketBatch* b
             clone->set_next(0);
         } else {
             fcb->first_unacked = PacketBatch::make_from_packet(clone);
+            fcb->first_unacked_seq = getSequenceNumber(packet);
         }
     }
 
@@ -146,7 +148,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
          * equivalent packet in the buffer. We cannot retransmit the same packet
          * because it could be a retransmit attack.
          */
-        prune(fcb);
+
         Packet* lastretransmit = 0;
 
         unsigned int flowDirection = determineFlowDirection();
@@ -212,12 +214,15 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
     }
 }
 
-void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
+inline void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
 {
     if (!_in->fcb_data()->common->lastAckReceivedSet())
         return;
     tcp_seq_t seq = _in->fcb_data()->common->getLastAckReceived(_in->getOppositeFlowDirection());
+    tcp_seq_t next_seq = fcb->first_unacked_seq;
     Packet* next = fcb->first_unacked;
+    if (!next || SEQ_GEQ(next_seq,seq))
+        return;
     Packet* last = 0;
     int count = 0;
 //    tcp_seq_t lastSeq = 0;
@@ -242,6 +247,8 @@ void SimpleTCPRetransmitter::prune(fcb_transmit_buffer* fcb)
             fcb->first_unacked->fast_kill();
         );
         fcb->first_unacked = second;
+        if (second)
+            fcb->first_unacked_seq = getSequenceNumber(second->first());
     }
 }
 
