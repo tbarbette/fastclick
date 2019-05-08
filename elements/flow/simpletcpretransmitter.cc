@@ -84,8 +84,9 @@ SimpleTCPRetransmitter::forward_packets(fcb_transmit_buffer* fcb, PacketBatch* b
     FOR_EACH_PACKET_SAFE(batch,packet) {
         if (getPayloadLength(packet) == 0)
             continue;
+
         Packet* clone = packet->clone(true); //Fast clone. If using DPDK, we only hold a buffer reference
-        assert(clone->buffer() == packet->buffer());
+        flow_assert(clone->buffer() == packet->buffer());
         /*click_chatter("%p %p %p",clone->mac_header(),packet->mac_header());
         clone->set_mac_header(packet->mac_header());
         clone->set_network_header(packet->network_header());
@@ -198,7 +199,7 @@ SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBat
                     }
                 }
 
-                if (_verbose)
+                if (unlikely(_verbose))
                     click_chatter("ERROR : Received a retransmit for a packet not in the buffer (%lu, last ack %lu, is_syn %d, is_ack %d, pay_len %d)", seq, fcb_in->common->getLastAckReceived(_in->getOppositeFlowDirection()),isSyn(packet),isAck(packet), getPayloadLength(packet));
                 //This may be a retransmit for a packet we have seen acked (so we pruned), but the acked was lost
                 _in->ackPacket(packet, true);

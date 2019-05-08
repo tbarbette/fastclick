@@ -122,28 +122,28 @@ public:
      * @param packet The packet
      * @return A boolean indicating whether the packet is a SYN packet
      */
-    bool isSyn(Packet* packet) const;
+    static bool isSyn(Packet* packet);
 
     /**
      * @brief Indicate whether a packet is a FIN packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is a FIN packet
      */
-    bool isFin(Packet* packet) const;
+    static bool isFin(Packet* packet);
 
     /**
      * @brief Indicate whether a packet is a RST packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is a RST packet
      */
-    bool isRst(Packet* packet) const;
+    static bool isRst(Packet* packet);
 
     /**
      * @brief Indicate whether a packet is an ACK packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is an ACK packet
      */
-    bool isAck(Packet* packet) const;
+    static bool isAck(Packet* packet);
 
     /**
      * @brief Check if a given flag is set in a packet
@@ -151,7 +151,7 @@ public:
      * @param flag The offset of the flag
      * @return A boolean indicating whether the flag is set in the packet
      */
-    bool checkFlag(Packet *packet, uint8_t flag) const;
+    static bool checkFlag(Packet *packet, uint8_t flag);
 
     /**
      * @brief Return the length of the TCP payload of a packet
@@ -401,27 +401,27 @@ inline uint16_t TCPElement::getDestinationPort(Packet* packet) const
     return ntohs(tcph->th_dport);
 }
 
-inline bool TCPElement::isSyn(Packet* packet) const
+inline bool TCPElement::isSyn(Packet* packet)
 {
     return checkFlag(packet, TH_SYN);
 }
 
-inline bool TCPElement::isFin(Packet* packet) const
+inline bool TCPElement::isFin(Packet* packet)
 {
     return checkFlag(packet, TH_FIN);
 }
 
-inline bool TCPElement::isRst(Packet* packet) const
+inline bool TCPElement::isRst(Packet* packet)
 {
     return checkFlag(packet, TH_RST);
 }
 
-inline bool TCPElement::isAck(Packet* packet) const
+inline bool TCPElement::isAck(Packet* packet)
 {
     return checkFlag(packet, TH_ACK);
 }
 
-inline bool TCPElement::checkFlag(Packet *packet, uint8_t flag) const
+inline bool TCPElement::checkFlag(Packet *packet, uint8_t flag)
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;

@@ -236,7 +236,7 @@ protected:
     virtual unsigned int determineFlowDirection() override;
 
 
-    inline void intializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool keep_fct);
+    inline void initializeFcbSide(fcb_tcpin* fcb_in, Packet* packet, bool keep_fct);
     inline void releaseFcbSide(FlowControlBlock* fcb, fcb_tcpin* fcb_in);
     inline void initializeFcbSyn(fcb_tcpin* fcb_in, const click_ip *iph , const click_tcp *tcph );
 
@@ -265,6 +265,9 @@ private:
      * released. Will call the release chain.
      */
     static void release_tcp(FlowControlBlock* fcb, void* thunk);
+
+
+    static void print_packet(const char* text, struct fcb_tcpin* fcb_in, Packet* p);
 
 
     void resetReorderer(struct fcb_tcpin* tcpreorder);
