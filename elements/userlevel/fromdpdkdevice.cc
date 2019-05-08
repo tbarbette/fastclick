@@ -283,6 +283,18 @@ bool FromDPDKDevice::run_task(Task *t)
     return (ret);
 }
 
+enum {
+        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
+        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
+        h_active,
+        h_xstats, h_queue_count, h_stats_packets, h_stats_bytes,
+        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
+        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+        h_mtu,
+        h_device,
+};
+
+
 String FromDPDKDevice::read_handler(Element *e, void * thunk)
 {
     FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
@@ -434,7 +446,8 @@ int FromDPDKDevice::xstats_handler(
     if (!fd->_dev)
         return -1;
 
-    switch ((intptr_t)handler->read_user_data()) {
+    int op = (intptr_t)handler->read_user_data();
+    switch (op) {
         case h_xstats: {
             struct rte_eth_xstat_name *names;
         #if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
@@ -485,6 +498,24 @@ int FromDPDKDevice::xstats_handler(
                 input = String(v);
             }
             return 0;
+        case h_stats_packets:
+        case h_stats_bytes:
+            {
+                struct rte_eth_stats stats;
+                if (rte_eth_stats_get(fd->_dev->port_id, &stats))
+                    return -1;
+
+                int id = atoi(input.c_str());
+                if (id < 0 || id > RTE_ETHDEV_QUEUE_STAT_CNTRS)
+                    return -EINVAL;
+                uint64_t v;
+                if (op == h_stats_packets)
+                     v = stats.q_ipackets[id];
+                else
+                     v = stats.q_opackets[id];
+                input = String(v);
+                return 0;
+            }
         default:
             return -1;
     }
@@ -504,6 +535,8 @@ void FromDPDKDevice::add_handlers()
 
     set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler, h_xstats);
     set_handler("queue_count", Handler::f_read | Handler::f_read_param, xstats_handler, h_queue_count);
+    set_handler("queue_packets", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_packets);
+    set_handler("queue_bytes", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_bytes);
 
     add_read_handler("active", read_handler, h_active);
     add_write_handler("active", write_handler, h_active);
