@@ -108,6 +108,7 @@ public:
     per_thread_oread<struct stats> stats;
     volatile int sleepiness;
     int _sleep_threshold;
+    unsigned long _highwater; //Not volatile, if not exact we don't care much
 
   protected:
     Task _task;
