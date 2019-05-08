@@ -163,7 +163,9 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
+#if HAVE_DPDK_READ_CLOCK
     static uint64_t read_clock(void* thunk);
+#endif
 
 private:
 

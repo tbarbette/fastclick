@@ -123,6 +123,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+#if HAVE_DPDK_READ_CLOCK
 uint64_t FromDPDKDevice::read_clock(void* thunk) {
     FromDPDKDevice* fd = (FromDPDKDevice*)thunk;
     uint64_t clock;
@@ -134,15 +135,17 @@ uint64_t FromDPDKDevice::read_clock(void* thunk) {
     return -1;
 }
 
-
 struct UserClockSource dpdk_clock {
     .get_current_tick = &FromDPDKDevice::read_clock,
     .get_tick_hz = 0,
 };
+#endif
 
 void* FromDPDKDevice::cast(const char* name) {
+#if HAVE_DPDK_READ_CLOCK
     if (String(name) == "UserClockSource")
         return &dpdk_clock;
+#endif
     return RXQueueDevice::cast(name);
 }
 
@@ -180,6 +183,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     }
 
     if (_set_timestamp) {
+#if HAVE_DPDK_READ_CLOCK
         uint64_t t;
         int err;
 #pragma GCC diagnostic push
@@ -188,6 +192,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
             return errh->error("Device does not support queryig internal time ! Disable hardware timestamping. Error %d", err);
         }
 #pragma GCC diagnostic pop
+#endif
     }
 
     return ret;
