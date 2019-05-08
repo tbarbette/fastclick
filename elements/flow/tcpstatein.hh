@@ -54,7 +54,7 @@ public:
     const char *processing() const		{ return PUSH; }
 
     //TCP only for now, just to reuse the macro but nothing prevents UDP
-    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT("12/0/ffffffff:HASH-3 16/0/ffffffff:HASH-3 22/0/ffff 20/0/ffff:ARRAY", FLOW_TCP);
+    FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(DEFAULT_4TUPLE, FLOW_TCP);
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;
