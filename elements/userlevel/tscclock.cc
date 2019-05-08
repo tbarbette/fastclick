@@ -44,6 +44,7 @@ _verbose(1), _install(true), _nowait(false), _allow_offset(false),_correction_ti
 {
     _source = tsc_source;
     _source_thunk = this;
+    _convert_steady = false;
 }
 
 void *
@@ -65,6 +66,7 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("NOWAIT", _nowait)
             .read("BASE",basee)
             .read("SOURCE", sourcee)
+            .read("CONVERT_STEADY", _convert_steady)
             .read("READY_CALL", HandlerCallArg(HandlerCall::writable), _ready_h)
             .complete() < 0)
         return -1;
@@ -452,7 +454,11 @@ void TSCClock::run_timer(Timer* timer) {
 void
 TSCClock::push(int, Packet* p) {
     unsigned clock = current_clock;
-    int64_t translated = last_timestamp[clock] + tick_to_subsec_wall(p->timestamp_anno().longval() + tstate->local_tsc_offset - last_cycles[clock]);
+    uint64_t translated;
+    if (_convert_steady)
+        translated = last_timestamp[clock] + tick_to_subsec_steady(p->timestamp_anno().longval() + tstate->local_tsc_offset - last_cycles[clock]);
+    else
+        translated = last_timestamp[clock] + tick_to_subsec_wall(p->timestamp_anno().longval() + tstate->local_tsc_offset - last_cycles[clock]);
     p->timestamp_anno().assignlong(translated);
     output_push(0, p);
 }
@@ -461,7 +467,11 @@ TSCClock::push(int, Packet* p) {
 void TSCClock::push_batch(int port, PacketBatch* batch) {
     FOR_EACH_PACKET(batch, p) {
         unsigned clock = current_clock;
-        int64_t translated = last_timestamp[clock] + tick_to_subsec_wall(p->timestamp_anno().longval() + tstate->local_tsc_offset - last_cycles[clock]);
+        uint64_t translated;
+        if (_convert_steady)
+            translated = last_timestamp[clock] + tick_to_subsec_steady(p->timestamp_anno().longval() + tstate->local_tsc_offset - last_cycles[clock]);
+        else
+            translated = last_timestamp[clock] + tick_to_subsec_wall(p->timestamp_anno().longval() + tstate->local_tsc_offset - last_cycles[clock]);
         p->timestamp_anno().assignlong(translated);
     }
     output_push_batch(0, batch);

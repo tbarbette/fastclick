@@ -87,6 +87,7 @@ protected:
   bool _install;
   bool _nowait;
   bool _allow_offset;
+  bool _convert_steady;
 
   typedef enum {STABILIZE,SYNCHRONIZE,RUNNING} phase_t;
   phase_t _phase = STABILIZE;
