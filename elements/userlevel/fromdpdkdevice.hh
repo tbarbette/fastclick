@@ -151,6 +151,8 @@ public:
     const char *class_name() const { return "FromDPDKDevice"; }
     const char *port_count() const { return PORTS_0_1; }
     const char *processing() const { return PUSH; }
+    void* cast(const char* name) override;
+
     int configure_phase() const {
         return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
@@ -161,7 +163,10 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
-    
+#if HAVE_DPDK_READ_CLOCK
+    static uint64_t read_clock(void* thunk);
+#endif
+
 private:
 
     static String read_handler(Element *, void *) CLICK_COLD;
@@ -184,6 +189,7 @@ private:
     };
 
     DPDKDevice* _dev;
+    bool _set_timestamp;
 };
 
 CLICK_ENDDECLS

@@ -264,6 +264,16 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
     dev_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    if (info.offload & DEV_RX_OFFLOAD_TIMESTAMP) {
+        if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TIMESTAMP)) {
+            return errh->error("Hardware timestamp offloading is not supported by this device !");
+        } else {
+            dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TIMESTAMP;
+        }
+    }
+#endif
+
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
     if (dev_info.pci_dev) {
@@ -504,6 +514,11 @@ void DPDKDevice::set_init_mtu(uint16_t mtu) {
 void DPDKDevice::set_init_fc_mode(FlowControlMode fc) {
     assert(!_is_initialized);
     info.init_fc_mode = fc;
+}
+
+void DPDKDevice::set_offload(uint64_t offload) {
+    assert(!_is_initialized);
+    info.offload |= offload;
 }
 
 

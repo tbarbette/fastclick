@@ -19,6 +19,8 @@
 #include <click/config.h>
 #include "timestampaccum.hh"
 #include <click/glue.hh>
+#include <float.h>
+
 CLICK_DECLS
 
 TimestampAccum::TimestampAccum()
@@ -34,13 +36,20 @@ TimestampAccum::initialize(ErrorHandler *)
 {
     _usec_accum = 0;
     _count = 0;
+    _max = 0;
+    _min = DBL_MAX;
     return 0;
 }
 
 inline Packet *
 TimestampAccum::simple_action(Packet *p)
 {
-    _usec_accum += (Timestamp::now() - p->timestamp_anno()).doubleval();
+    double val =  (Timestamp::now() - p->timestamp_anno()).doubleval();
+    _usec_accum += val;
+    if (val < _min)
+        _min = val;
+    if (val > _max)
+        _max = val;
     _count++;
     return p;
 }
@@ -77,6 +86,8 @@ TimestampAccum::add_handlers()
     add_read_handler("count", read_handler, 0);
     add_read_handler("time", read_handler, 1);
     add_read_handler("average_time", read_handler, 2);
+    add_data_handlers("min", Handler::h_read, &_min);
+    add_data_handlers("max", Handler::h_read, &_max);
     add_write_handler("reset_counts", reset_handler, 0, Handler::f_button);
 }
 

@@ -74,7 +74,7 @@ public:
             rx_queues(0,false), tx_queues(0,false),
             promisc(false), vlan_filter(false), vlan_strip(false),
             n_rx_descs(0), n_tx_descs(0),
-            init_mac(), init_mtu(0), init_fc_mode(FC_UNSET) {
+            init_mac(), init_mtu(0), init_fc_mode(FC_UNSET), offload(0)  {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -108,6 +108,7 @@ public:
         EtherAddress init_mac;
         uint16_t init_mtu;
         FlowControlMode init_fc_mode;
+        uint64_t offload;
     };
 
     int add_rx_queue(
@@ -124,6 +125,7 @@ public:
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
     void set_init_fc_mode(FlowControlMode fc);
+    void set_offload(uint64_t offload);
 
     unsigned int get_nb_txdesc();
 

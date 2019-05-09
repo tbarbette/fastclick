@@ -15,9 +15,9 @@ class NumberPacket;
 
 RecordTimestamp([I<keywords> N])
 
-Record timestamp in memory
-
 =s timestamps
+
+Record timestamp in memory
 
 =d
 

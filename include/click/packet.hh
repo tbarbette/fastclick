@@ -807,11 +807,16 @@ class Packet { public:
 	unsigned char *nh;
 	unsigned char *h;
 	Packet::PacketType pkt_type;
+#if !CLICK_PACKET_USE_DPDK
 	Timestamp timestamp;
+#endif
 	Packet *next;
 	Packet *prev;
 	AllAnno()
-	    : timestamp(Timestamp::uninitialized_t()) {
+#if !CLICK_PACKET_USE_DPDK
+	    : timestamp(Timestamp::uninitialized_t())
+#endif
+	{
 	}
     };
 
@@ -1012,6 +1017,7 @@ Packet::clear_annotations(bool all)
     }
 #elif CLICK_PACKET_USE_DPDK
     memset(all_anno(), 0, all ? sizeof(AllAnno) : sizeof(Anno));
+    set_timestamp_anno(Timestamp());
 #else
     memset(&_aa, 0, all ? sizeof(AllAnno) : sizeof(Anno));
 #endif

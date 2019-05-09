@@ -13,9 +13,9 @@ class RecordTimestamp;
 
 TimestampDiff()
 
-Compute the RTT of packets marked with RecordTimestamp
-
 =s timestamps
+
+Compute the RTT of packets marked with RecordTimestamp
 
 =d
 

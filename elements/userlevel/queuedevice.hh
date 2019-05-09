@@ -206,6 +206,7 @@ protected:
 	bool _set_paint_anno;
 	int _threadoffset;
 	bool _use_numa;
+    int _numa_node_override;
 	bool _scale_parallel;
 
     /**
