@@ -447,7 +447,7 @@ SelectSet::run_selects_poll(RouterThread *thread)
 	timeout = 0;
     else if (delay_type > 0)
 	timeout = (t.sec() >= INT_MAX / 1000 ? INT_MAX - 1000 : t.msecval());
-    else if (thread->_idle_dorun)
+    else if (thread->_idle_dorun >= 0)
     timeout = 0;
     else
 	timeout = -1;

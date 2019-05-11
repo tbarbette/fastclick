@@ -371,8 +371,8 @@ int FlowClassifier::_initialize_timers(ErrorHandler *errh) {
             idletask->initialize(this, i, 100);
         }
         _timer.initialize(this);
-        _timer.schedule_after_msec(_clean_timer);
-        //todo : INIT timer if needed? The current solution seems ok
+        if (_clean_timer > 0)
+            _timer.schedule_after_msec(_clean_timer);
 #endif
     }
 
