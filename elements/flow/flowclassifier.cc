@@ -439,10 +439,8 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = 0;
 //#endif
-    //return work_done;
 #endif
-//    return false; //No reschedule
-    return true;
+    return work_done;
 }
 
 /**

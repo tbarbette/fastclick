@@ -228,14 +228,60 @@ public:
      * @brief Reset the TCP checksum of a packet and set it in its header
      * @param packet The packet
      */
-    inline void resetTCPChecksum(WritablePacket* packet) const;
+    static inline void resetTCPChecksum(WritablePacket* packet);
+/*
+    void TCPIn::iterateOptions(Packet *packet, std::function<bool(void*)> fnt)
+    {
+        auto fcb_in = fcb_data();
 
-    /*Element responsible of the timeout management.
-     * to allow for a unique per-flow acquire/release and timeout management
-     * elements that can be used without a real tcp context (such as TCPReorder)
-     * can check if some TCP context is managed by a more tailored element
-     */
-    //FlowElement* _tcp_context;
+        click_tcp *tcph = packet->tcp_header();
+
+        uint8_t *optStart = (uint8_t *) (tcph + 1);
+        uint8_t *optEnd = (uint8_t *) tcph + (tcph->th_off << 2);
+
+        if(optEnd > packet->end_data())
+            optEnd = packet->end_data();
+
+        while(optStart < optEnd)
+        {
+            if(optStart[0] == TCPOPT_EOL) // End of list
+                break; // Stop searching
+            else if(optStart[0] == TCPOPT_NOP)
+                optStart += 1; // Move to the next option
+            else if(optStart[1] < 2 || optStart[1] + optStart > optEnd)
+                break; // Avoid malformed options
+            else if(optStart[0] == TCPOPT_SACK_PERMITTED && optStart[1] == TCPOLEN_SACK_PERMITTED)
+            {
+                fnt(optStart[0],)
+                uint32_t old_hw = *((uint16_t*)optStart);
+                // If we find the SACK permitted option, we remove it
+                for(int i = 0; i < TCPOLEN_SACK_PERMITTED; ++i) {
+                    optStart[i] = TCPOPT_NOP; // Replace the option with NOP
+                }
+                uint32_t new_hw = (TCPOPT_NOP << 8) + TCPOPT_NOP;
+
+                click_update_in_cksum(&tcph->th_sum, old_hw, new_hw);
+                //click_chatter("SACK Permitted removed from options");
+
+                optStart += optStart[1];
+            }
+            else if(optStart[0] == TCPOPT_WSCALE && optStart[1] == TCPOLEN_WSCALE)
+            {
+                if (allowResize()) {
+                    uint16_t winScale = optStart[2];
+
+                    if(winScale >= 1)
+                        winScale = 2 << (winScale - 1);
+
+                    fcb_in->common->maintainers[flowDirection].setWindowScale(winScale);
+                    fcb_in->common->maintainers[flowDirection].setUseWindowScale(true);
+
+                    //click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
+
+                    if(isAck(packet))
+                    {
+                        // Here, we have a SYNACK
+*/
 };
 
 inline tcp_seq_t
@@ -264,7 +310,7 @@ inline void TCPElement::computeTCPChecksum(WritablePacket *packet)
     tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
 }
 
-inline void TCPElement::resetTCPChecksum(WritablePacket *packet) const
+inline void TCPElement::resetTCPChecksum(WritablePacket *packet)
 {
     click_ip *iph = packet->ip_header();
     click_tcp *tcph = packet->tcp_header();
