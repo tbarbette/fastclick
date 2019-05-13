@@ -117,6 +117,7 @@ CLICK_DECLS
                 if (batch) {\
                     batch->set_count(count);\
                     batch->set_tail(last);\
+                    last->set_next(0);\
                 }\
             }\
 
@@ -493,7 +494,8 @@ public :
      * @param head The first packet of the batch
      * @param size Number of packets in the linkedlist
      *
-     * The "prev" annotation of the first packet must point to the last packet of the linked list
+     * @pre The "prev" annotation of the first packet must point to the last packet of the linked list
+     * @pre The tail->next() packet must be zero
      */
     inline static PacketBatch* make_from_tailed_list(Packet* head, unsigned int size) {
         PacketBatch* b = static_cast<PacketBatch*>(head);
