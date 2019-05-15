@@ -57,6 +57,7 @@ ToDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _extra_length = true;
     _unbuffered = false;
     _nano = Timestamp::subsec_per_sec == Timestamp::nsec_per_sec;
+    _force_ts = false;
 #if HAVE_PCAP && !defined(PCAP_TSTAMP_PRECISION_NANO)
     _nano = false;
 #endif
@@ -75,6 +76,7 @@ ToDump::configure(Vector<String> &conf, ErrorHandler *errh)
 #if CLICK_NS
 	.read("PER_NODE", per_node)
 #endif
+    .read("FORCE_TS", _force_ts)
 	.complete() < 0)
 	return -1;
 
@@ -218,7 +220,7 @@ ToDump::write_packet(Packet *p)
     struct fake_pcap_pkthdr ph;
 
     Timestamp ts = p->timestamp_anno();
-    if (!ts)
+    if (!ts && !_force_ts)
         ts = Timestamp::now();
     ph.ts.tv.tv_sec = ts.sec();
     ph.ts.tv.tv_usec = _nano ? ts.nsec() : ts.usec();
