@@ -3,10 +3,12 @@
  * timestamp of a packet using RecordTimestamp and a fresh timestamp
  * Cyril Soldani, Tom Barbette
  *
- * Various latency percentiles by Georgios Katsikas
+ * Various latency percentiles by Georgios Katsikas and Tom Barbette
+ *
  *
  * Copyright (c) 2015-2016 University of Liège
  * Copyright (c) 2017 RISE SICS
+ * Copyright (c) 2019 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -147,28 +149,28 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
             tsd->min_mean_max(min, mean, max, begin);
             data = String(min); break;
         case TSD_PERC_01_HANDLER:
-            data = String(tsd->percentile(1)); break;
+            data = String(tsd->percentile(1, begin)); break;
         case TSD_PERC_05_HANDLER:
-            data = String(tsd->percentile(5)); break;
+            data = String(tsd->percentile(5, begin)); break;
         case TSD_PERC_10_HANDLER:
-            data = String(tsd->percentile(10)); break;
+            data = String(tsd->percentile(10, begin)); break;
         case TSD_PERC_25_HANDLER:
-            data = String(tsd->percentile(25)); break;
+            data = String(tsd->percentile(25, begin)); break;
         case TSD_MED_HANDLER:
-            data = String(tsd->percentile(50)); break;
+            data = String(tsd->percentile(50, begin)); break;
         case TSD_PERC_75_HANDLER:
-            data = String(tsd->percentile(75)); break;
+            data = String(tsd->percentile(75, begin)); break;
         case TSD_PERC_90_HANDLER:
-            data = String(tsd->percentile(90)); break;
+            data = String(tsd->percentile(90, begin)); break;
         case TSD_PERC_95_HANDLER:
-            data = String(tsd->percentile(95)); break;
+            data = String(tsd->percentile(95, begin)); break;
         case TSD_PERC_99_HANDLER:
-            data = String(tsd->percentile(99)); break;
+            data = String(tsd->percentile(99, begin)); break;
         case TSD_PERC_100_HANDLER:
             tsd->min_mean_max(min, mean, max, begin);
             data = String(max); break;
         case TSD_PERC_HANDLER:
-            data = String(tsd->percentile(perc)); break;
+            data = String(tsd->percentile(perc, begin)); break;
         case TSD_LAST_SEEN:
             data = String(tsd->last_value_seen()); break;
         case TSD_CURRENT_INDEX: {
@@ -316,26 +318,28 @@ TimestampDiff::percentile(const double percent, uint32_t begin)
 
     const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
 
-    // The desired percentile
-    size_t idx = (percent * current_vector_length) / 100;
-
     // Implies empty vector, no percentile.
-    if ((idx == begin) && (current_vector_length == begin)) {
-        return perc;
+    if (current_vector_length == 0 || begin >= current_vector_length) {
+        return 0;
     }
+
+    // The desired percentile
+    size_t idx = (percent * (current_vector_length - begin)) / 100 + begin;
+
     // Implies that user asked for the 0 percetile (i.e., min).
-    else if ((idx == begin) && (current_vector_length > begin)) {
-        std::sort(_delays.begin(), _delays.end());
-        perc = static_cast<double>(_delays[begin]);
+    if (idx <= begin) {
+        std::min(_delays.begin() + begin, _delays.end());
+        perc = static_cast<double>(_delays[idx]);
         return perc;
     // Implies that user asked for the 100 percetile (i.e., max).
-    } else if (idx == current_vector_length) {
-        std::sort(_delays.begin() + begin, _delays.end());
+    } else if (idx >= current_vector_length) {
+        std::max(_delays.begin() + begin, _delays.end());
         perc = static_cast<double>(_delays[current_vector_length - 1]);
         return perc;
     }
+    //else no need to sort, we use nth_element
 
-    auto nth = _delays.begin() + begin + idx;
+    auto nth = _delays.begin() + idx;
     std::nth_element(_delays.begin() + begin, nth, _delays.begin() + current_vector_length);
     perc = static_cast<double>(*nth);
 
