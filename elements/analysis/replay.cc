@@ -250,18 +250,21 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
 
-    if (timing_fnt != "" && _stop_time > 0) {
+    if (timing_fnt != "") {
         String max = String(_timing); //Max replay timing
         String min = "1"; //Min replay timing
         String time = String(_stop_time);
 
+
         if (timing_fnt == "@0")
             return 0; //Contant, no fnt
         if (timing_fnt == "@1") {
-            timing_fnt = "(sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+            timing_fnt = "100 * ((sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min+")";
             click_chatter("Using function '%s'", timing_fnt.c_str());
-        } else if (timing_fnt == "@2")
-            timing_fnt = "(-squarewave(((x + 40) * 1/50) ^ 5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+        } else if (timing_fnt == "@2") {
+            timing_fnt = "100 * ((-squarewave(((x + 40) * 1/50) ^ 5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min+")";
+        }
+
         _fnt_expr = TinyExpr::compile(timing_fnt, 1);
 
     }
@@ -318,7 +321,7 @@ ReplayUnqueue::run_task(Task* task)
 
                 long diff;
                 long rdiff;
-                while ((diff = (p->timestamp_anno() - _timing_packet).usecval()) - (rdiff = ((long)(now - _timing_real).usecval() * _timing)) > min_timing) {
+                while ((diff = (p->timestamp_anno() - _timing_packet).usecval()) - (rdiff = ((long)(now - _timing_real).usecval() * _timing / 100)) > min_timing) {
 #if HAVE_BATCH
                     if (head) {
                         output_push_batch(0,head->make_tail(last,c));
@@ -331,9 +334,10 @@ ReplayUnqueue::run_task(Task* task)
                         float nt = _fnt_expr.eval((float)diff_s.msecval() / 1000);
                         if (_timing != (unsigned)nt) {
                             _timing = nt;
+
                             _timing_packet = _lastsent_packet;
                             _timing_real = _lastsent_real;
-                            click_chatter("Timing is %f -> %d", nt, _timing);
+                            click_chatter("Timing is %f -> %d%%", nt, _timing);
                         } else {
                             goto loop;
                         }
