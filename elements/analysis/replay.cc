@@ -317,12 +317,12 @@ ReplayUnqueue::run_task(Task* task)
 
             //If timing is activated, wait for the amount of time or resched
             if (_timing > 0) {
-                const unsigned min_timing = 1; //Amount of us between packets to ignore and sent right away
-                const unsigned min_sched = 10; //Amount of us that leads to rescheduling
+                const unsigned min_timing_ns = 0; //Amount of us between packets to ignore and sent right away
+                const unsigned min_sched_ns = 10000; //Amount of us that leads to rescheduling
 
-                long diff;
-                long rdiff;
-                while ((diff = (p->timestamp_anno() - _timing_packet).usecval()) - (rdiff = ((long)(now - _timing_real).usecval() * _timing / 100)) > min_timing) {
+                int64_t diff;
+                int64_t rdiff;
+                while ((diff = (p->timestamp_anno() - _timing_packet).nsecval()) - (rdiff = (((int64_t)(now - _timing_real).nsecval() * (int64_t)_timing) / 100)) > min_timing_ns) {
 #if HAVE_BATCH
                     if (head) {
                         output_push_batch(0,head->make_tail(last,c));
@@ -343,7 +343,7 @@ ReplayUnqueue::run_task(Task* task)
                             goto loop;
                         }
                     }
-                    if (diff - rdiff > min_sched) {
+                    if (diff - rdiff > min_sched_ns) {
                             goto end;
                     }
 loop:
