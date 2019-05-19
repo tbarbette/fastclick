@@ -221,7 +221,7 @@ Replay::run_task(Task* task)
         n++;
     }
 
-    check_end_loop(task);
+    check_end_loop(task, n==0);
 
     return n > 0;
 }
@@ -280,6 +280,8 @@ ReplayUnqueue::initialize(ErrorHandler * errh) {
 
     if (_fnt_expr) {
         _timing = _fnt_expr.eval(0);
+
+        click_chatter("Timing starts with %d%%", _timing);
     }
 
     return 0;
@@ -384,7 +386,7 @@ loop:
 #endif
 
 end:
-    check_end_loop(task);
+    check_end_loop(task, n==0);
 
     return n > 0;
 }
