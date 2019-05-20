@@ -126,7 +126,7 @@ MultiReplay::run_task(Task* task)
         n++;
     }
 
-    check_end_loop(task, n==0);
+    check_end_loop(task, n == 0);
 
     return n > 0;
 }

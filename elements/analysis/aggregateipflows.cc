@@ -118,6 +118,7 @@ AggregateIPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("SOURCE", ElementArg(), _packet_source)
 #endif
 	.read("FRAGMENTS", fragments).read_status(fragments_parsed)
+	.read_or_set("SYMETRIC", _symetric, true)
 	.complete() < 0)
 	return -1;
 
@@ -364,7 +365,7 @@ AggregateIPFlows::find_flow_info(Map &m, HostPairInfo *hpinfo, uint32_t ports, b
 		// old aggregate has died
 		notify(finfo->aggregate(), AggregateListener::DELETE_AGG, 0);
 		const click_ip *iph = good_ip_header(p);
-		HostPair hp(iph->ip_src.s_addr, iph->ip_dst.s_addr);
+		HostPair hp(iph->ip_src.s_addr, iph->ip_dst.s_addr, _symetric);
 		delete_flowinfo(hp, finfo, false);
 
 		// make a new aggregate
@@ -504,7 +505,7 @@ AggregateIPFlows::handle_packet(Packet *p)
 
     // find relevant HostPairInfo
     Map &m = (iph->ip_p == IP_PROTO_TCP ? _tcp_map : _udp_map);
-    HostPair hosts(iph->ip_src.s_addr, iph->ip_dst.s_addr);
+    HostPair hosts(iph->ip_src.s_addr, iph->ip_dst.s_addr, _symetric);
     if (hosts.a != iph->ip_src.s_addr)
         paint ^= 1;
     HostPairInfo *hpinfo = &m[hosts];
