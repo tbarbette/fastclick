@@ -101,7 +101,8 @@ enum {
     TSD_PERC_HANDLER,
     TSD_LAST_SEEN,
     TSD_CURRENT_INDEX,
-    TSD_DUMP_HANDLER
+    TSD_DUMP_HANDLER,
+    TSD_DUMP_LIST_HANDLER
 };
 
 int TimestampDiff::handler(int operation, String &data, Element *e,
@@ -178,10 +179,15 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
             const int32_t last_vector_index = static_cast<const int32_t>(tsd->_nd.value() - 1);
             data = String(last_vector_index); break;
         }
+        case TSD_DUMP_LIST_HANDLER:
         case TSD_DUMP_HANDLER: {
             StringAccum s;
-            for (size_t i = 0; i < tsd->_nd; ++i)
-                s << i << ": " << String(tsd->_delays[i]) << "\n";
+            for (size_t i = 0; i < tsd->_nd; ++i) {
+                if (opt == TSD_DUMP_HANDLER)
+                    s << i << ": " << String(tsd->_delays[i]) << "\n";
+                else
+                    s << String(tsd->_delays[i]) << "\n";
+            }
             data = s.take_string(); break;
         }
         default:
@@ -213,6 +219,7 @@ void TimestampDiff::add_handlers()
     set_handler("index", Handler::f_read, handler, TSD_CURRENT_INDEX, 0);
     set_handler("last", Handler::f_read, handler, TSD_LAST_SEEN, 0);
     set_handler("dump", Handler::f_read, handler, TSD_DUMP_HANDLER, 0);
+    set_handler("dump_list", Handler::f_read, handler, TSD_DUMP_LIST_HANDLER, 0);
 }
 
 inline int TimestampDiff::smaction(Packet *p)
