@@ -33,7 +33,7 @@ CLICK_DECLS
 const unsigned FastTCPFlows::NO_LIMIT;
 
 FastTCPFlows::FastTCPFlows()
-  : _flows(0)
+  : _flows(0), _end_h{nullptr}
 {
 #if HAVE_BATCH
   in_batch_mode = BATCH_MODE_YES;
@@ -54,6 +54,7 @@ FastTCPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
   _active = true;
   unsigned rate;
   int limit;
+  bool stop = false;
   if (Args(conf, this, errh)
       .read_mp("RATE", rate)
       .read_mp("LIMIT", limit)
@@ -65,6 +66,7 @@ FastTCPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
       .read_mp("FLOWS", _nflows)
       .read_mp("FLOWSIZE", _flowsize)
       .read_p("ACTIVE", _active)
+      .read("STOP", stop)
       .complete() < 0)
     return -1;
   if (_flowsize < 3) {
@@ -83,6 +85,9 @@ FastTCPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
     _rate_limited = false;
   }
   _limit = (limit >= 0 ? limit : NO_LIMIT);
+  if (stop) {
+    _end_h = new HandlerCall("stop");
+  }
   return 0;
 }
 
@@ -158,11 +163,14 @@ FastTCPFlows::get_packet()
 
 
 int
-FastTCPFlows::initialize(ErrorHandler *)
+FastTCPFlows::initialize(ErrorHandler *errh)
 {
   _count = 0;
   _sent_all_fins = false;
   _flows = new flow_t[_nflows];
+
+  if (_end_h && _end_h->initialize_write(this, errh) < 0)
+      return -1;
 
   for (unsigned i=0; i<_nflows; i++) {
     unsigned short sport = (click_random() >> 2) % 0xFFFF;
@@ -301,8 +309,13 @@ FastTCPFlows::pull(int)
 
   if (!_active)
     return 0;
-  if (_limit != NO_LIMIT && _count >= _limit && _sent_all_fins)
+
+  if (_limit != NO_LIMIT && _count >= _limit && _sent_all_fins) {
+    if (_end_h) {
+      _end_h->call_write();
+    }
     return 0;
+  }
 
   if(_rate_limited){
     if (_rate.need_update(Timestamp::now())) {

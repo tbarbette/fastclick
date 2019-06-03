@@ -6,6 +6,7 @@
 #include <click/packet.hh>
 #include <clicknet/ether.h>
 #include <clicknet/tcp.h>
+#include <click/handlercall.hh>
 
 CLICK_DECLS
 
@@ -71,6 +72,7 @@ class FastTCPFlows : public BatchElement {
   bool _cksum;
   click_jiffies_t _first;
   click_jiffies_t _last;
+  HandlerCall *_end_h;
 
   struct flow_t {
     Packet *syn_packet;
