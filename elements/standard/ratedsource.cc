@@ -50,7 +50,7 @@ RatedSource::configure(Vector<String> &conf, ErrorHandler *errh)
     String data =
       "Random bullshit in a packet, at least 64 bytes long. Well, now it is.";
     unsigned rate = 10;
-    unsigned bandwidth = 0;
+    unsigned long long bandwidth = 0;
     int limit = -1;
     int datasize = -1;
     bool active = true, stop = false;

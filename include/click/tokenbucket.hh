@@ -214,13 +214,13 @@ void TokenRateX<P>::assign(token_type rate, token_type capacity)
     token_type frequency = P::frequency();
     if (rate != 0) {
 	// constrain capacity so _tokens_per_tick fits in 1 limb
-	unsigned min_capacity = (rate - 1) / frequency + 1;
+	unsigned long long min_capacity = (rate - 1) / frequency + 1;
 	if (capacity < min_capacity)
 	    capacity = min_capacity;
     }
     _token_scale = max_tokens / capacity;
 
-    // XXX on non-32 bit types
+    // XXX on non unsigned long long types
     static_assert(sizeof(bigint::limb_type) == sizeof(token_type),
 		  "bigint::limb_type should have the same size as token_type.");
     bigint::limb_type l[2] = { 0, 0 };
@@ -233,10 +233,12 @@ void TokenRateX<P>::assign(token_type rate, token_type capacity)
 	// constrain _tokens_per_tick to be at least 1
 	_tokens_per_tick = (l[0] != 0 ? l[0] : 1);
 	_time_until_full = (max_tokens - 1) / _tokens_per_tick + 1;
+
     } else {
 	_tokens_per_tick = 0;
 	_time_until_full = (ticks_type) -1;
     }
+
 }
 
 template <typename P>
@@ -441,6 +443,7 @@ class TokenCounterX { public:
      * adjust() with the old and new rates; TokenCounterX will as far as
      * possible compensate for the rate change. */
     void adjust(const rate_type &old_rate, const rate_type &new_rate) {
+
 	if (old_rate.token_scale() != new_rate.token_scale()) {
 	    static_assert(sizeof(bigint::limb_type) == sizeof(token_type),
 			  "bigint::limb_type should have the same size as token_type.");
@@ -450,6 +453,7 @@ class TokenCounterX { public:
 	    (void) bigint::divide(l, l, 2, old_rate.token_scale());
 	    _tokens = l[1] ? (token_type) max_tokens : l[0];
 	}
+
     }
 
     /** @brief Refill the token counter to time @a rate.now().
@@ -999,7 +1003,7 @@ inline typename TokenBucketX<P>::ticks_type TokenBucketX<P>::epochs_until_contai
  * Equivalent to
  * @link TokenRateX TokenRateX<TokenBucketJiffyParameters<unsigned> >@endlink.
  * @sa TokenRateX, TokenBucketJiffyParameters */
-typedef TokenRateX<TokenBucketJiffyParameters<unsigned> > TokenRate;
+typedef TokenRateX<TokenBucketJiffyParameters<unsigned long long> > TokenRate;
 
 /** @class TokenCounter include/click/tokenbucket.hh <click/tokenbucket.hh>
  * @brief Jiffy-based token counter
@@ -1015,7 +1019,7 @@ typedef TokenCounterX<TokenRate> TokenCounter;
  * Equivalent to
  * @link TokenBucketX TokenBucketX<TokenBucketJiffyParameters<unsigned> >@endlink.
  * @sa TokenBucketX, TokenBucketJiffyParameters */
-typedef TokenBucketX<TokenBucketJiffyParameters<unsigned> > TokenBucket;
+typedef TokenBucketX<TokenBucketJiffyParameters<unsigned long long> > TokenBucket;
 
 CLICK_ENDDECLS
 #endif

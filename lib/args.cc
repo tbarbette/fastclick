@@ -31,6 +31,7 @@
 # include <pwd.h>
 #endif
 #include <stdarg.h>
+#include <iostream>
 CLICK_DECLS
 
 const ArgContext blank_args;
@@ -1232,47 +1233,69 @@ multiply_factor(uint32_t ix, uint32_t fx, uint32_t factor, int &status)
 }
 
 bool
-BandwidthArg::parse(const String &str, uint32_t &result, const ArgContext &args)
+BandwidthArg::parse(const String &_str, unsigned long long &result, const ArgContext &args)
 {
-    int power, factor;
-    const char *unit_end = UnitArg(byte_bandwidth_units, byte_bandwidth_prefixes).parse(str.begin(), str.end(), power, factor);
 
-    value_type ix;
-    uint32_t fx;
-    const char *xend = parse_fraction(str.begin(), unit_end,
-                                      false, power, ix, fx, status);
-    if (status == status_inval || xend != unit_end) {
-        status = status_inval;
-        return false;
-    }
-    if (uint32_t(ix) != ix)
-        status = status_range;
-    ix = multiply_factor(ix, fx, factor, status);
-    if (status == status_range) {
-        args.error("out of range");
-        result = 0xFFFFFFFFU;
-        return false;
-    } else {
-        if (unit_end == str.end() && ix)
-            status = status_unitless;
-        result = ix;
-        return true;
-    }
+  std::string str(_str.begin(), _str.end());
+
+  long double d;
+  size_t number_end{};
+  try {
+    d = std::stold(str, &number_end);
+  } catch(...) {
+    return false;
+  }
+
+
+  auto unit = str.substr(number_end);
+  auto prefix_c = unit[0];
+
+  unsigned long long prefix = 0;
+  switch (prefix_c) {
+    case 'k':
+    case 'K':
+      prefix = 1e4;
+      break;
+    case 'M':
+      prefix = 1e6;
+      break;
+    case 'G':
+      prefix = 1e9;
+      break;
+    default:
+      prefix = 1;
+  }
+
+  auto unit_s = prefix > 1 ? unit.substr(1) : unit;
+  unsigned short bits = 0;
+  if (unit_s == "baud")    bits = 8;
+  else if(unit_s == "bps") bits = 8;
+  else if(unit_s == "b/s") bits = 8;
+  else if(unit_s == "Bps") bits = 1;
+  else if(unit_s == "B/s") bits = 1;
+  else return false;
+
+  result = (unsigned long long)((d * prefix) / bits);
+
+  return true;
+
 }
 
 String
-BandwidthArg::unparse(uint32_t x)
+BandwidthArg::unparse(unsigned long long x)
 {
-    if (x >= 0x20000000U)
-        return cp_unparse_real10(x, 6) + "MBps";
-    else if (x >= 125000000)
-        return cp_unparse_real10(x * 8, 9) + "Gbps";
-    else if (x >= 125000)
-        return cp_unparse_real10(x * 8, 6) + "Mbps";
-    else
-        return cp_unparse_real10(x * 8, 3) + "kbps";
-}
+  std::string s;
+  if (x >= 0x20000000U)
+    s = std::to_string(x * 1e-6);
+  else if (x >= 125000000)
+    s = std::to_string(x * 8 * 1e-9);
+  else if (x >= 125000)
+    s = std::to_string(x * 8 * 1e-6);
+  else
+    s = std::to_string(x * 8 * 1e-3);
 
+  return String(s.c_str());
+}
 
 static const char seconds_units[] = "\
 \1\0\1s\

@@ -1,6 +1,7 @@
 // -*- c-basic-offset: 4; related-file-name: "../../lib/args.cc" -*-
 #ifndef CLICK_ARGS_HH
 #define CLICK_ARGS_HH
+#include <string>
 #include <click/type_traits.hh>
 #include <click/vector.hh>
 #include <click/string.hh>
@@ -1283,8 +1284,8 @@ class UnitArg { public:
 
   Handles suffixes such as "Gbps", "k", etc. */
 class BandwidthArg : public NumArg { public:
-    bool parse(const String &str, uint32_t &result, const ArgContext & = blank_args);
-    static String unparse(uint32_t x);
+    bool parse(const String &str, unsigned long long &result, const ArgContext & = blank_args);
+    static String unparse(unsigned long long x);
     int status;
 };
 
