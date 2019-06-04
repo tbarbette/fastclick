@@ -36,8 +36,8 @@ BigintTest::BigintTest()
 #define CHECK(x, a, b) if (!(x)) return errh->error("%s:%d: test `%s' failed [%llu, %u]", __FILE__, __LINE__, #x, a, b);
 #define CHECK0(x) if (!(x)) return errh->error("%s:%d: test `%s' failed", __FILE__, __LINE__, #x);
 
-static bool test_multiply(uint32_t a, uint32_t b, ErrorHandler *errh) {
-    uint32_t x[2];
+static bool test_multiply(unsigned long long a, unsigned long long b, ErrorHandler *errh) {
+    unsigned long long x[2];
     bigint::multiply(x[1], x[0], a, b);
     uint64_t c = (((uint64_t) x[1]) << 32) | x[0];
     if (c != (uint64_t) a * b) {
@@ -47,11 +47,11 @@ static bool test_multiply(uint32_t a, uint32_t b, ErrorHandler *errh) {
     return true;
 }
 
-static bool test_mul(uint64_t a, uint32_t b, ErrorHandler *errh) {
-    uint32_t ax[2];
+static bool test_mul(uint64_t a, unsigned long long b, ErrorHandler *errh) {
+    unsigned long long ax[2];
     ax[0] = a;
     ax[1] = a >> 32;
-    uint32_t cx[2];
+    unsigned long long cx[2];
     cx[0] = cx[1] = 0;
     bigint::multiply_add(cx, ax, 2, b);
     uint64_t c = (((uint64_t) cx[1]) << 32) | cx[0];
@@ -62,11 +62,11 @@ static bool test_mul(uint64_t a, uint32_t b, ErrorHandler *errh) {
     return true;
 }
 
-static bool test_div(uint64_t a, uint32_t b, ErrorHandler *errh) {
-    uint32_t ax[4];
+static bool test_div(uint64_t a, unsigned long long b, ErrorHandler *errh) {
+    unsigned long long ax[4];
     ax[0] = a;
     ax[1] = a >> 32;
-    uint32_t r = bigint::divide(ax+2, ax, 2, b);
+    unsigned long long r = bigint::divide(ax+2, ax, 2, b);
     uint64_t c = ((uint64_t) ax[3] << 32) | ax[2];
     if (c != a / b) {
         errh->error("%llu / %u == %llu, not %llu", a, b, a * b, c);
@@ -94,7 +94,7 @@ static bool test_inverse(uint32_t a, ErrorHandler *errh) {
 }
 
 static bool test_add(uint64_t a, uint64_t b, ErrorHandler *errh) {
-    uint32_t ax[6];
+    unsigned long long ax[6];
     ax[2] = a;
     ax[3] = a >> 32;
     ax[4] = b;
@@ -140,7 +140,7 @@ BigintTest::initialize(ErrorHandler *errh)
         CHECK(test_div(a, b | 0x80000000, errh), a, b | 0x80000000);
     }
 
-    uint32_t x[3] = { 3481, 592182, 3024921038U };
+    unsigned long long x[3] = { 3481, 592182, 3024921038U };
     CHECK0(bigint::unparse_clear(x, 3) == "55799944231168388787108580761");
 
     x[0] = 10;

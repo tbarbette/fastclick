@@ -32,6 +32,7 @@
 #endif
 #include <stdarg.h>
 #include <iostream>
+#include <algorithm>
 CLICK_DECLS
 
 const ArgContext blank_args;
@@ -1243,18 +1244,22 @@ BandwidthArg::parse(const String &_str, unsigned long long &result, const ArgCon
   try {
     d = std::stold(str, &number_end);
   } catch(...) {
+    status = status_inval;
     return false;
   }
 
 
   auto unit = str.substr(number_end);
-  auto prefix_c = unit[0];
+  auto prefix_c = ' ';
+  if (!unit.empty()) {
+    prefix_c = unit[0];
+  }
 
   unsigned long long prefix = 0;
   switch (prefix_c) {
     case 'k':
     case 'K':
-      prefix = 1e4;
+      prefix = 1e3;
       break;
     case 'M':
       prefix = 1e6;
@@ -1266,14 +1271,24 @@ BandwidthArg::parse(const String &_str, unsigned long long &result, const ArgCon
       prefix = 1;
   }
 
+  status = status_ok;
+
   auto unit_s = prefix > 1 ? unit.substr(1) : unit;
+  unit_s.erase(std::remove_if(unit_s.begin(), unit_s.end(), isspace), unit_s.end());
   unsigned short bits = 0;
-  if (unit_s == "baud")    bits = 8;
-  else if(unit_s == "bps") bits = 8;
-  else if(unit_s == "b/s") bits = 8;
-  else if(unit_s == "Bps") bits = 1;
-  else if(unit_s == "B/s") bits = 1;
-  else return false;
+  if (unit_s == ""){
+    bits = 1;
+    status = status_unitless;
+  }
+  else if(unit_s == "baud")  bits = 8;
+  else if(unit_s == "bps")   bits = 8;
+  else if(unit_s == "b/s")   bits = 8;
+  else if(unit_s == "Bps")   bits = 1;
+  else if(unit_s == "B/s")   bits = 1;
+  else {
+    status = status_inval;
+    return false;
+  }
 
   result = (unsigned long long)((d * prefix) / bits);
 
