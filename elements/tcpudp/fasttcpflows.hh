@@ -10,6 +10,13 @@
 
 CLICK_DECLS
 
+struct flow_t {
+  Packet *syn_packet;
+  Packet *fin_packet;
+  Packet *data_packet;
+  unsigned flow_count;
+};
+
 /*
  * =c
  * FastTCPFlows(RATE, LIMIT, LENGTH,
@@ -74,12 +81,6 @@ class FastTCPFlows : public BatchElement {
   click_jiffies_t _last;
   HandlerCall *_end_h;
 
-  struct flow_t {
-    Packet *syn_packet;
-    Packet *fin_packet;
-    Packet *data_packet;
-    unsigned flow_count;
-  };
   flow_t *_flows;
   void change_ports(int);
   Packet *get_packet();
@@ -104,6 +105,16 @@ class FastTCPFlows : public BatchElement {
   int initialize(ErrorHandler *) CLICK_COLD;
   void cleanup(CleanupStage) CLICK_COLD;
   Packet *pull(int);
+
+  static Packet *make_packet(
+      unsigned len, 
+      click_ether eth, 
+      in_addr sipaddr, 
+      in_addr dipaddr,
+      unsigned short sport, 
+      unsigned short dport, 
+      uint8_t flags
+  );
 
 #if HAVE_BATCH
   PacketBatch *pull_batch(int, unsigned);

@@ -161,6 +161,46 @@ FastTCPFlows::get_packet()
   }
 }
 
+Packet *FastTCPFlows::make_packet(
+    unsigned len, click_ether eth, in_addr sipaddr, in_addr dipaddr,
+    unsigned short sport, unsigned short dport, uint8_t flags) {
+
+  WritablePacket *q = Packet::make(len);
+  memcpy((void*)q->data(), &eth, 14);
+  click_ip *ip = reinterpret_cast<click_ip *>(q->data()+14);
+  click_tcp *tcp = reinterpret_cast<click_tcp *>(ip + 1);
+  // set up IP header
+  ip->ip_v = 4;
+  ip->ip_hl = sizeof(click_ip) >> 2;
+  ip->ip_len = htons(len-14);
+  ip->ip_id = 0;
+  ip->ip_p = IP_PROTO_TCP;
+  ip->ip_src = sipaddr;
+  ip->ip_dst = dipaddr;
+  ip->ip_tos = 0;
+  ip->ip_off = 0;
+  ip->ip_ttl = 250;
+  ip->ip_sum = 0;
+  ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
+  q->set_dst_ip_anno(IPAddress(dipaddr));
+  q->set_ip_header(ip, sizeof(click_ip));
+  // set up TCP header
+  tcp->th_sport = sport;
+  tcp->th_dport = dport;
+  tcp->th_seq = click_random();
+  tcp->th_ack = click_random();
+  tcp->th_off = sizeof(click_tcp) >> 2;
+  tcp->th_flags = flags;
+  tcp->th_win = 65535;
+  tcp->th_urp = 0;
+  tcp->th_sum = 0;
+  unsigned short len_ = len-14-sizeof(click_ip);
+  unsigned csum = click_in_cksum((uint8_t *)tcp, len_);
+  tcp->th_sum = click_in_cksum_pseudohdr(csum, ip, len_);
+
+  return q;
+
+}
 
 int
 FastTCPFlows::initialize(ErrorHandler *errh)
@@ -177,110 +217,11 @@ FastTCPFlows::initialize(ErrorHandler *errh)
     unsigned short dport = (click_random() >> 2) % 0xFFFF;
 
     // SYN packet
-    WritablePacket *q = Packet::make(_len);
-    _flows[i].syn_packet = q;
-    memcpy((void*)_flows[i].syn_packet->data(), &_ethh, 14);
-    click_ip *ip =
-      reinterpret_cast<click_ip *>(q->data()+14);
-    click_tcp *tcp = reinterpret_cast<click_tcp *>(ip + 1);
-    // set up IP header
-    ip->ip_v = 4;
-    ip->ip_hl = sizeof(click_ip) >> 2;
-    ip->ip_len = htons(_len-14);
-    ip->ip_id = 0;
-    ip->ip_p = IP_PROTO_TCP;
-    ip->ip_src = _sipaddr;
-    ip->ip_dst = _dipaddr;
-    ip->ip_tos = 0;
-    ip->ip_off = 0;
-    ip->ip_ttl = 250;
-    ip->ip_sum = 0;
-    ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
-    _flows[i].syn_packet->set_dst_ip_anno(IPAddress(_dipaddr));
-    _flows[i].syn_packet->set_ip_header(ip, sizeof(click_ip));
-    // set up TCP header
-    tcp->th_sport = sport;
-    tcp->th_dport = dport;
-    tcp->th_seq = click_random();
-    tcp->th_ack = click_random();
-    tcp->th_off = sizeof(click_tcp) >> 2;
-    tcp->th_flags = TH_SYN;
-    tcp->th_win = 65535;
-    tcp->th_urp = 0;
-    tcp->th_sum = 0;
-    unsigned short len = _len-14-sizeof(click_ip);
-    unsigned csum = click_in_cksum((uint8_t *)tcp, len);
-    tcp->th_sum = click_in_cksum_pseudohdr(csum, ip, len);
-
+    _flows[i].syn_packet = make_packet(_len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_SYN);
     // DATA packet with PUSH and ACK
-    q = Packet::make(_len);
-    _flows[i].data_packet = q;
-    memcpy(q->data(), &_ethh, 14);
-    ip = reinterpret_cast<click_ip *>(q->data()+14);
-    tcp = reinterpret_cast<click_tcp *>(ip + 1);
-    // set up IP header
-    ip->ip_v = 4;
-    ip->ip_hl = sizeof(click_ip) >> 2;
-    ip->ip_len = htons(_len-14);
-    ip->ip_id = 0;
-    ip->ip_p = IP_PROTO_TCP;
-    ip->ip_src = _sipaddr;
-    ip->ip_dst = _dipaddr;
-    ip->ip_tos = 0;
-    ip->ip_off = 0;
-    ip->ip_ttl = 250;
-    ip->ip_sum = 0;
-    ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
-    _flows[i].data_packet->set_dst_ip_anno(IPAddress(_dipaddr));
-    _flows[i].data_packet->set_ip_header(ip, sizeof(click_ip));
-    // set up TCP header
-    tcp->th_sport = sport;
-    tcp->th_dport = dport;
-    tcp->th_seq = click_random();
-    tcp->th_ack = click_random();
-    tcp->th_off = sizeof(click_tcp) >> 2;
-    tcp->th_flags = TH_PUSH | TH_ACK;
-    tcp->th_win = 65535;
-    tcp->th_urp = 0;
-    tcp->th_sum = 0;
-    len = _len-14-sizeof(click_ip);
-    csum = click_in_cksum((uint8_t *)tcp, len);
-    tcp->th_sum = click_in_cksum_pseudohdr(csum, ip, len);
-
+    _flows[i].data_packet = make_packet(_len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_PUSH | TH_ACK);
     // FIN packet
-    q = Packet::make(_len);
-    _flows[i].fin_packet = q;
-    memcpy(q->data(), &_ethh, 14);
-    ip = reinterpret_cast<click_ip *>(q->data()+14);
-    tcp = reinterpret_cast<click_tcp *>(ip + 1);
-    // set up IP header
-    ip->ip_v = 4;
-    ip->ip_hl = sizeof(click_ip) >> 2;
-    ip->ip_len = htons(_len-14);
-    ip->ip_id = 0;
-    ip->ip_p = IP_PROTO_TCP;
-    ip->ip_src = _sipaddr;
-    ip->ip_dst = _dipaddr;
-    ip->ip_tos = 0;
-    ip->ip_off = 0;
-    ip->ip_ttl = 250;
-    ip->ip_sum = 0;
-    ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
-    _flows[i].fin_packet->set_dst_ip_anno(IPAddress(_dipaddr));
-    _flows[i].fin_packet->set_ip_header(ip, sizeof(click_ip));
-    // set up TCP header
-    tcp->th_sport = sport;
-    tcp->th_dport = dport;
-    tcp->th_seq = click_random();
-    tcp->th_ack = click_random();
-    tcp->th_off = sizeof(click_tcp) >> 2;
-    tcp->th_flags = TH_FIN;
-    tcp->th_win = 65535;
-    tcp->th_urp = 0;
-    tcp->th_sum = 0;
-    len = _len-14-sizeof(click_ip);
-    csum = click_in_cksum((uint8_t *)tcp, len);
-    tcp->th_sum = click_in_cksum_pseudohdr(csum, ip, len);
+    _flows[i].fin_packet = make_packet(_len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_FIN);
 
     _flows[i].flow_count = 0;
   }
