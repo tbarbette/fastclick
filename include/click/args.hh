@@ -376,8 +376,18 @@ class Args : public ArgContext {
         return read(keyword, mandatory, x);
     }
     template <typename T>
+    Args &read_mi(const char *keyword, size_t i, T &x) {
+      std::string kw = std::string(keyword) + std::to_string(i);
+        return read(kw.c_str(), mandatory, x);
+    }
+    template <typename T>
     Args &read_p(const char *keyword, T &x) {
         return read(keyword, positional, x);
+    }
+    template <typename T>
+    Args &read_pi(const char *keyword, size_t i, T &x) {
+      std::string kw = std::string(keyword) + std::to_string(i);
+      return read(kw.c_str(), positional, x);
     }
     template <typename T>
     Args &read_mp(const char *keyword, T &x) {
@@ -402,6 +412,11 @@ class Args : public ArgContext {
     template <typename T, typename V>
     Args &read_or_set(const char *keyword, T &x, const V &default_value) {
         return read_or_set(keyword, 0, x, default_value);
+    }
+    template <typename T, typename V>
+    Args &read_or_seti(const char *keyword, size_t i , T &x, const V &default_value) {
+        std::string kw = std::string(keyword) + std::to_string(i);
+        return read_or_set(kw.c_str(), 0, x, default_value);
     }
     template <typename T, typename V>
     Args &read_or_set_p(const char *keyword, T &x, const V &default_value) {
