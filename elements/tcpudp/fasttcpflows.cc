@@ -217,11 +217,16 @@ FastTCPFlows::initialize(ErrorHandler *errh)
     unsigned short dport = (click_random() >> 2) % 0xFFFF;
 
     // SYN packet
-    _flows[i].syn_packet = make_packet(_len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_SYN);
+    _flows[i].syn_packet = make_packet(
+        _len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_SYN);
+
     // DATA packet with PUSH and ACK
-    _flows[i].data_packet = make_packet(_len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_PUSH | TH_ACK);
+    _flows[i].data_packet = make_packet(
+        _len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_PUSH | TH_ACK);
+
     // FIN packet
-    _flows[i].fin_packet = make_packet(_len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_FIN);
+    _flows[i].fin_packet = make_packet(
+        _len, _ethh, _sipaddr, _dipaddr, sport, dport, TH_FIN);
 
     _flows[i].flow_count = 0;
   }
