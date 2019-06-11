@@ -254,5 +254,8 @@ IPRoute::match(const IPRoute& r) const
 	&& (port < 0 || (gw == r.gw && port == r.port));
 }
 
+bool
+cp_ip_route(String s, IPRoute *r_store, bool remove_route, Element *context);
+
 CLICK_ENDDECLS
 #endif
