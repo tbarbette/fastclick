@@ -31,6 +31,11 @@ Boolean. If true, then set added packet data to zero; if false, then
 additional packet data is left uninitialized (which might be a security
 problem). Default is true.
 
+=item RANDOM
+
+Boolean. If true, the added data is randomized. Exclusive with ZERO. Default is
+false.
+
 =back
 
 =a Truncate
@@ -52,7 +57,7 @@ class Pad : public SimpleElement<Pad> { public:
 
     unsigned _nbytes;
     bool _zero;
-
+    bool _random;
 };
 
 CLICK_ENDDECLS
