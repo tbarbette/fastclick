@@ -116,6 +116,16 @@ Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
 Boolean. If False, the device is only initialized. Use this when you want
 to read packet using secondary DPDK applications.
 
+=item TCO
+
+Boolean. If True, enables TCP Checksum Offload. Packets must be set with the
+checksum flag, eg with ResetTCPChecksum. Defaults to False.
+
+=item TSO
+
+Boolean. If True, enables TCP Segmentation Offload. Packets must be configured
+individually as per DPDK documentation. Defaults to False.
+
 =item VERBOSE
 
 Boolean. If True, more detailed messages about the device are printed to

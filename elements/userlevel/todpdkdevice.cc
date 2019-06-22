@@ -26,7 +26,7 @@ CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
     _iqueues(), _dev(0),
-    _timeout(0), _congestion_warning_printed(false)
+    _timeout(0), _congestion_warning_printed(false), _create(true), _tso(0)
 {
      _blocking = false;
      _burst = -1;
@@ -55,6 +55,9 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("TIMEOUT", _timeout)
         .read("NDESC",ndesc)
         .read("MAXQUEUES", maxqueues)
+        .read("ALLOC",_create)
+        .read("TSO", _tso)
+        .read("TCO", _tco)
         .complete() < 0)
             return -1;
     if (!DPDKDeviceArg::parse(dev, _dev)) {
@@ -73,6 +76,12 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         configure_tx(n_queues,n_queues,errh);
     }
 
+    if (_tso)
+        _dev->set_tx_offload(DEV_TX_OFFLOAD_TCP_TSO);
+    if (_tco) {
+        _dev->set_tx_offload(DEV_TX_OFFLOAD_IPV4_CKSUM);
+        _dev->set_tx_offload(DEV_TX_OFFLOAD_TCP_CKSUM);
+    }
     return 0;
 }
 
@@ -255,10 +264,13 @@ void ToDPDKDevice::push(int, Packet *p)
                 _congestion_warning_printed = true;
             }
         } else { // If there is space in the iqueue
-            struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
+            struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
             if (mbuf != NULL) {
-                iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size] = mbuf;
+                enqueue(iqueue.pkts[(iqueue.index + iqueue.nr_pending) % _internal_tx_queue_size], mbuf, p);
                 iqueue.nr_pending++;
+            } else {
+                click_chatter("No more DPDK buffer");
+                abort();
             }
         }
 
@@ -276,6 +288,12 @@ void ToDPDKDevice::push(int, Packet *p)
     else
         p->kill();
 #endif
+}
+
+
+inline void
+ToDPDKDevice::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p) {
+    q = mbuf;
 }
 
 
@@ -305,10 +323,13 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         //First, place the packets in the queue
         while (iqueue.nr_pending < (unsigned)_internal_tx_queue_size && p) { // Internal queue is full
             // While there is still place in the iqueue
-            struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, true, _this_node);
+            struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(p, _create, _this_node);
             if (mbuf != NULL) {
-                iqueue.pkts[(iqueue.index + iqueue.nr_pending) & (_internal_tx_queue_size - 1)] = mbuf;
+                enqueue(iqueue.pkts[(iqueue.index + iqueue.nr_pending) & (_internal_tx_queue_size - 1)], mbuf, p);
                 iqueue.nr_pending++;
+            } else {
+                click_chatter("No more DPDK buffer");
+                abort();
             }
             next = p->next();
 #if !CLICK_PACKET_USE_DPDK

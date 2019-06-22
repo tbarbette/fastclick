@@ -117,7 +117,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (set_timestamp) {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
-        _dev->set_offload(DEV_RX_OFFLOAD_TIMESTAMP);
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_TIMESTAMP);
         _set_timestamp = true;
 #else
         errh->error("HW Timestamping is not supported before DPDK 18.02");
