@@ -443,8 +443,10 @@ AggregateIPFlows::emit_fragment_head(HostPairInfo *hpinfo)
 	    break;
 	}
 
-    assert(finfo);
-    packet_emit_hook(head, iph, finfo);
+    if (!finfo) {
+        click_chatter("BUG : no finfo");
+    } else
+        packet_emit_hook(head, iph, finfo);
 #if HAVE_BATCH
     if (in_batch_mode)
         output(0).push_batch(PacketBatch::make_from_packet(head));
