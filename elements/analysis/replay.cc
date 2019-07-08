@@ -134,9 +134,9 @@ void *
 Replay::cast(const char *n)
 {
     if (strcmp(n, Notifier::EMPTY_NOTIFIER) == 0)
-    return static_cast<Notifier *>(&_notifier);
+        return static_cast<Notifier *>(&_notifier);
     else
-    return Element::cast(n);
+        return Element::cast(n);
 }
 
 
@@ -259,10 +259,12 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
             return 0; //Contant, no fnt
         if (timing_fnt == "@1") {
             timing_fnt = "100 * ((sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min+")";
-            click_chatter("Using function '%s'", timing_fnt.c_str());
         } else if (timing_fnt == "@2") {
             timing_fnt = "100 * ((-squarewave(((x + 40) * 1/50) ^ 5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min+")";
         }
+
+        if (_verbose)
+            click_chatter("Using function '%s'", timing_fnt.c_str());
 
         _fnt_expr = TinyExpr::compile(timing_fnt, 1);
 

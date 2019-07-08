@@ -221,7 +221,7 @@ stop:
             return;
         }
 
-    } else if (unlikely(force_time)) {
+    } else if (unlikely(_stop_time > 0 && force_time)) {
          int diff = (Timestamp::now_steady() - _startsent).msecval() / 1000;
          if (diff >= _stop_time)
              goto stop;
