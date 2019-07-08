@@ -56,7 +56,8 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("OFFSET",_offset)
             .read("N", _limit)
             .read("MAXDELAY", _max_delay_ms)
-            .read("VERBOSE", _verbose)
+            .read_or_set("SAMPLE", _sample, 1)
+            .read_or_set("VERBOSE", _verbose, false)
             .complete() < 0)
         return -1;
 
@@ -224,6 +225,12 @@ inline int TimestampDiff::smaction(Packet *p)
         return 1;
     }
 
+    if (_sample != 1) {
+        if ((uint32_t)i % _sample != 0) {
+            return 0;
+        }
+    }
+
     Timestamp diff = now - old;
     if ((diff.msecval() > _max_delay_ms)) {
         if (_verbose) {
@@ -290,6 +297,7 @@ TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t
         mean = 0.0;
         return;
     }
+
     mean = sum / static_cast<double>(current_vector_length - begin);
 }
 

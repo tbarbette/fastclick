@@ -255,7 +255,6 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         String min = "1"; //Min replay timing
         String time = String(_stop_time);
 
-
         if (timing_fnt == "@0")
             return 0; //Contant, no fnt
         if (timing_fnt == "@1") {
