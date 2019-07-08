@@ -336,21 +336,16 @@ TimestampDiff::percentile(const double percent, uint32_t begin)
 
     // Implies that user asked for the 0 percetile (i.e., min).
     if (idx <= begin) {
-        std::min(_delays.begin() + begin, _delays.end());
-        perc = static_cast<double>(_delays[idx]);
-        return perc;
+        return (double)*std::min_element(_delays.begin() + begin, _delays.begin() + current_vector_length);
     // Implies that user asked for the 100 percetile (i.e., max).
     } else if (idx >= current_vector_length) {
-        std::max(_delays.begin() + begin, _delays.end());
-        perc = static_cast<double>(_delays[current_vector_length - 1]);
-        return perc;
+        return (double)*std::max_element(_delays.begin() + begin, _delays.begin() + current_vector_length);
     }
     //else no need to sort, we use nth_element
 
     auto nth = _delays.begin() + idx;
     std::nth_element(_delays.begin() + begin, nth, _delays.begin() + current_vector_length);
-    perc = static_cast<double>(*nth);
-
+    perc = (double)*nth;
     return perc;
 }
 
