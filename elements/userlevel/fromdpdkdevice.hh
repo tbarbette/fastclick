@@ -126,6 +126,11 @@ checksum flag, eg with ResetTCPChecksum. Defaults to False.
 Boolean. If True, enables TCP Segmentation Offload. Packets must be configured
 individually as per DPDK documentation. Defaults to False.
 
+=item IPCO
+
+Booelan. If True, enables IP checksum offload alone (not L4 as TCO).
+Defaults to False.
+
 =item VERBOSE
 
 Boolean. If True, more detailed messages about the device are printed to

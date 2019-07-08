@@ -26,7 +26,8 @@ CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
     _iqueues(), _dev(0),
-    _timeout(0), _congestion_warning_printed(false), _create(true), _tso(0)
+    _timeout(0), _congestion_warning_printed(false), _create(true),
+    _tso(0), _ipco(false)
 {
      _blocking = false;
      _burst = -1;
@@ -57,6 +58,7 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MAXQUEUES", maxqueues)
         .read("ALLOC",_create)
         .read("TSO", _tso)
+        .read("IPCO", _ipco)
         .read("TCO", _tco)
         .complete() < 0)
             return -1;
@@ -78,6 +80,8 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (_tso)
         _dev->set_tx_offload(DEV_TX_OFFLOAD_TCP_TSO);
+    if (_ipco)
+        _dev->set_tx_offload(DEV_TX_OFFLOAD_IPV4_CKSUM);
     if (_tco) {
         _dev->set_tx_offload(DEV_TX_OFFLOAD_IPV4_CKSUM);
         _dev->set_tx_offload(DEV_TX_OFFLOAD_TCP_CKSUM);
