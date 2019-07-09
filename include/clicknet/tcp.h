@@ -75,4 +75,10 @@ struct click_tcp {
 #define TCPOPT_TIMESTAMP	8
 #define TCPOLEN_TIMESTAMP	10
 
+struct tcp_opt_timestamp {
+	uint32_t ts_val;
+	uint32_t ts_ecr;
+};
+
+
 #endif
