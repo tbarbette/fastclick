@@ -57,9 +57,11 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("NDESC",ndesc)
         .read("MAXQUEUES", maxqueues)
         .read("ALLOC",_create)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         .read("TSO", _tso)
         .read("IPCO", _ipco)
         .read("TCO", _tco)
+#endif
         .complete() < 0)
             return -1;
     if (!DPDKDeviceArg::parse(dev, _dev)) {

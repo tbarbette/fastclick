@@ -275,6 +275,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     if (info.tx_offload & DEV_TX_OFFLOAD_IPV4_CKSUM) {
         if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM)) {
             return errh->error("Hardware IPv4 checksum offloading is not supported by this device !");
@@ -298,6 +299,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_TSO;
         }
     }
+#endif
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
