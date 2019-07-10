@@ -97,8 +97,8 @@ class TokenRate64X : public P { public:
 
 
     ~TokenRate64X() {
-        static_assert(sizeof(time_point_type) == sizeof(uint64_t));
-        static_assert(sizeof(token_type) == sizeof(uint64_t));
+        static_assert(sizeof(time_point_type) == sizeof(uint64_t), "time_point_type has the wrong size.");
+        static_assert(sizeof(token_type) == sizeof(uint64_t), "toke_type has the wrong size.");
     }
 
     /** @brief Set the token rate to idle or unlimited.
@@ -208,7 +208,7 @@ void TokenRate64X<P>::assign(bool unlimited)
 template <typename P>
 void TokenRate64X<P>::assign(token_type rate, token_type capacity)
 {
-    static_assert(sizeof(token_type) == sizeof(uint64_t));
+    static_assert(sizeof(token_type) == sizeof(uint64_t), "token_type has the wrong size.");
     if (capacity == 0) {
 	    rate = 0;
 	    capacity = tokens_overflow;
@@ -276,7 +276,7 @@ template<typename rate_type> struct TokenRate64Converter<rate_type, true> {
 };
 template<typename rate_type> struct TokenRate64Converter<rate_type, false> {
     static bool cvt(const rate_type &rate, typename rate_type::token_type &t) {
-        static_assert(sizeof(rate_type) == sizeof(uint64_t));
+        static_assert(sizeof(rate_type) == sizeof(uint64_t), "rate_type has the wrong size.");
 	if (t <= rate.capacity()) {
 	    return true;
 	} else {
@@ -339,9 +339,9 @@ class TokenCounter64X { public:
      * The initial time point is 0. */
     TokenCounter64X()
 	: _tokens(0), _time_point() {
-        static_assert(sizeof(ticks_type) == sizeof(uint64_t));
-        static_assert(sizeof(time_point_type) == sizeof(uint64_t));
-        static_assert(sizeof(token_type) == sizeof(uint64_t));
+        static_assert(sizeof(ticks_type) == sizeof(uint64_t), "tickes_type has the wrong size.");
+        static_assert(sizeof(time_point_type) == sizeof(uint64_t), "time_point_type has the wrong size.");
+        static_assert(sizeof(token_type) == sizeof(uint64_t), "token_type has the wrong size.");
     }
 
     /** @brief Return the number of tokens in the counter.
@@ -708,7 +708,7 @@ class TokenBucket64X { public:
     }
 
     ~TokenBucket64X() {
-        static_assert(sizeof(token_type) == sizeof(uint64_t));
+        static_assert(sizeof(token_type) == sizeof(uint64_t), "token_type has the wrong size.");
     }
 
     /** @brief Set the token bucket rate to idle or unlimited.
