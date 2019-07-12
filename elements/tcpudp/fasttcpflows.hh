@@ -41,6 +41,14 @@ CLICK_DECLS
  *
  * By default FastTCPFlows is ACTIVE.
  *
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item STOP
+ *
+ * Boolean. Stops the driver after generating LIMIT packets.
+ *
  * =h count read-only
  * Returns the total number of packets that have been generated.
  * =h rate read/write
@@ -90,6 +98,7 @@ class FastTCPFlows : public BatchElement {
   unsigned _count;
   unsigned _limit;
   bool _active;
+  bool _stop;
 
   FastTCPFlows() CLICK_COLD;
   ~FastTCPFlows() CLICK_COLD;

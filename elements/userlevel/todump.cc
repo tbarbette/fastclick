@@ -57,6 +57,7 @@ ToDump::configure(Vector<String> &conf, ErrorHandler *errh)
     _extra_length = true;
     _unbuffered = false;
     _nano = Timestamp::subsec_per_sec == Timestamp::nsec_per_sec;
+    _force_ts = false;
 #if HAVE_PCAP && !defined(PCAP_TSTAMP_PRECISION_NANO)
     _nano = false;
 #endif
@@ -65,45 +66,47 @@ ToDump::configure(Vector<String> &conf, ErrorHandler *errh)
 #endif
 
     if (Args(conf, this, errh)
-	.read_mp("FILENAME", FilenameArg(), _filename)
-	.read_p("SNAPLEN", _snaplen)
-	.read_p("ENCAP", WordArg(), encap_type)
-	.read("USE_ENCAP_FROM", AnyArg(), use_encap_from)
-	.read("EXTRA_LENGTH", _extra_length)
-	.read("UNBUFFERED", _unbuffered)
+        .read_mp("FILENAME", FilenameArg(), _filename)
+        .read_p("SNAPLEN", _snaplen)
+        .read_p("ENCAP", WordArg(), encap_type)
+        .read("USE_ENCAP_FROM", AnyArg(), use_encap_from)
+        .read("EXTRA_LENGTH", _extra_length)
+        .read("UNBUFFERED", _unbuffered)
         .read("NANO", _nano)
 #if CLICK_NS
-	.read("PER_NODE", per_node)
+        .read("PER_NODE", per_node)
 #endif
-	.complete() < 0)
-	return -1;
+        .read("FORCE_TS", _force_ts)
+        .complete() < 0)
+            return -1;
 
     if (_snaplen == 0)
-	_snaplen = 0xFFFFFFFFU;
+        _snaplen = 0xFFFFFFFFU;
 
     if (use_encap_from && encap_type)
-	return errh->error("specify at most one of 'ENCAP' and 'USE_ENCAP_FROM'");
+        return errh->error("specify at most one of 'ENCAP' and 'USE_ENCAP_FROM'");
     else if (use_encap_from) {
-	Vector<String> words;
-	cp_spacevec(use_encap_from, words);
-	_use_encap_from = new Element *[words.size() + 1];
-	for (int i = 0; i < words.size(); i++)
-	    if (!(_use_encap_from[i] = router()->find(words[i], this, errh)))
-		return -1;
-	_use_encap_from[words.size()] = 0;
-	if (words.size() == 0)
-	    return errh->error("element names missing after 'USE_ENCAP_FROM'");
+        Vector<String> words;
+        cp_spacevec(use_encap_from, words);
+        _use_encap_from = new Element *[words.size() + 1];
+        for (int i = 0; i < words.size(); i++) {
+            if (!(_use_encap_from[i] = router()->find(words[i], this, errh)))
+                return -1;
+        }
+        _use_encap_from[words.size()] = 0;
+        if (words.size() == 0)
+            return errh->error("element names missing after 'USE_ENCAP_FROM'");
     } else if (!encap_type)
-	_linktype = FAKE_DLT_EN10MB;
+        _linktype = FAKE_DLT_EN10MB;
     else if ((_linktype = fake_pcap_parse_dlt(encap_type)) < 0)
-	return errh->error("bad encapsulation type");
+        return errh->error("bad encapsulation type");
 
 #if CLICK_NS
     if (per_node) {
-	char tmp[255];
-	int r = simclick_sim_command(router()->simnode(), SIMCLICK_GET_NODE_NAME,tmp,255);
-	if (r >= 0)
-	    _filename = String(tmp) + String("_") + _filename;
+    char tmp[255];
+    int r = simclick_sim_command(router()->simnode(), SIMCLICK_GET_NODE_NAME,tmp,255);
+    if (r >= 0)
+        _filename = String(tmp) + String("_") + _filename;
     }
 #endif
 
@@ -114,10 +117,10 @@ ToDump *
 ToDump::hotswap_element() const
 {
     if (Element *e = Element::hotswap_element())
-	if (ToDump *td = (ToDump *)e->cast("ToDump"))
-	    if (td->_filename == _filename
-		&& td->_linktype == _linktype)
-		return td;
+    if (ToDump *td = (ToDump *)e->cast("ToDump"))
+        if (td->_filename == _filename
+        && td->_linktype == _linktype)
+        return td;
     return 0;
 }
 
@@ -126,69 +129,69 @@ ToDump::initialize(ErrorHandler *errh)
 {
     // check _use_encap_from
     if (_use_encap_from) {
-	_linktype = -1;
-	// collect encap types
-	Vector<String> encap_types;
-	for (int i = 0; _use_encap_from[i]; i++) {
-	    const Handler *h = Router::handler(_use_encap_from[i], "encap");
-	    if (!h || !h->readable())
-		return errh->error("%<%p{element}%> has no %<encap%> read handler", _use_encap_from[i]);
-	    encap_types.push_back(cp_uncomment(h->call_read(_use_encap_from[i])));
-	}
-	// parse encap types
-	for (int i = 0; i < encap_types.size(); i++) {
-	    int et = fake_pcap_parse_dlt(encap_types[i]);
-	    if (et < 0)
-		return errh->error("%<%p{element}.encap%> did not return a valid encapsulation type", _use_encap_from[i]);
-	    else if (_linktype >= 0 && et != _linktype) {
-		errh->error("source encapsulation types disagree:");
-		for (int j = 0; j < encap_types.size(); j++)
-		    errh->error("  %s has %s\n", _use_encap_from[j]->declaration().c_str(), encap_types[j].c_str());
-		return -EINVAL;
-	    } else
-		_linktype = et;
-	}
+    _linktype = -1;
+    // collect encap types
+    Vector<String> encap_types;
+    for (int i = 0; _use_encap_from[i]; i++) {
+        const Handler *h = Router::handler(_use_encap_from[i], "encap");
+        if (!h || !h->readable())
+        return errh->error("%<%p{element}%> has no %<encap%> read handler", _use_encap_from[i]);
+        encap_types.push_back(cp_uncomment(h->call_read(_use_encap_from[i])));
+    }
+    // parse encap types
+    for (int i = 0; i < encap_types.size(); i++) {
+        int et = fake_pcap_parse_dlt(encap_types[i]);
+        if (et < 0)
+        return errh->error("%<%p{element}.encap%> did not return a valid encapsulation type", _use_encap_from[i]);
+        else if (_linktype >= 0 && et != _linktype) {
+        errh->error("source encapsulation types disagree:");
+        for (int j = 0; j < encap_types.size(); j++)
+            errh->error("  %s has %s\n", _use_encap_from[j]->declaration().c_str(), encap_types[j].c_str());
+        return -EINVAL;
+        } else
+        _linktype = et;
+    }
     }
 
     // skip initialization if we're hotswapping later
     if (!hotswap_element()) {
 
-	// prepare files
-	assert(!_fp);
-	if (_filename != "-") {
-	    if (compressed_filename(_filename) > 0)
-		_fp = open_compress_pipe(_filename, errh);
-	    else
-		_fp = fopen(_filename.c_str(), "wb");
-	    if (!_fp)
-		return errh->error("%s: %s", _filename.c_str(), strerror(errno));
-	} else {
-	    _fp = stdout;
-	    _filename = "<stdout>";
-	}
+    // prepare files
+    assert(!_fp);
+    if (_filename != "-") {
+        if (compressed_filename(_filename) > 0)
+        _fp = open_compress_pipe(_filename, errh);
+        else
+        _fp = fopen(_filename.c_str(), "wb");
+        if (!_fp)
+        return errh->error("%s: %s", _filename.c_str(), strerror(errno));
+    } else {
+        _fp = stdout;
+        _filename = "<stdout>";
+    }
 
-	if (_unbuffered)
-	    setvbuf(_fp, (char *) 0, _IONBF, 0);
+    if (_unbuffered)
+        setvbuf(_fp, (char *) 0, _IONBF, 0);
 
-	struct fake_pcap_file_header h;
+    struct fake_pcap_file_header h;
 
-	h.magic = _nano ? FAKE_PCAP_MAGIC_NANO : FAKE_PCAP_MAGIC;
-	h.version_major = FAKE_PCAP_VERSION_MAJOR;
-	h.version_minor = FAKE_PCAP_VERSION_MINOR;
+    h.magic = _nano ? FAKE_PCAP_MAGIC_NANO : FAKE_PCAP_MAGIC;
+    h.version_major = FAKE_PCAP_VERSION_MAJOR;
+    h.version_minor = FAKE_PCAP_VERSION_MINOR;
 
-	h.thiszone = 0;		// timestamps are in GMT
-	h.sigfigs = 0;		// XXX accuracy of timestamps?
-	h.snaplen = _snaplen;
-	h.linktype = _linktype;
+    h.thiszone = 0;        // timestamps are in GMT
+    h.sigfigs = 0;        // XXX accuracy of timestamps?
+    h.snaplen = _snaplen;
+    h.linktype = _linktype;
 
-	size_t wrote_header = fwrite(&h, sizeof(h), 1, _fp);
-	if (wrote_header != 1)
-	    return errh->error("%s: unable to write file header", _filename.c_str());
+    size_t wrote_header = fwrite(&h, sizeof(h), 1, _fp);
+    if (wrote_header != 1)
+        return errh->error("%s: unable to write file header", _filename.c_str());
     }
 
     if (input_is_pull(0) && noutputs() == 0) {
-	ScheduleInfo::join_scheduler(this, &_task, errh);
-	_signal = Notifier::upstream_empty_signal(this, 0, &_task);
+        ScheduleInfo::join_scheduler(this, &_task, errh);
+        _signal = Notifier::upstream_empty_signal(this, 0, &_task);
     }
     _active = true;
 
@@ -208,7 +211,7 @@ void
 ToDump::cleanup(CleanupStage)
 {
     if (_fp && _fp != stdout)
-	fclose(_fp);
+        fclose(_fp);
     _fp = 0;
 }
 
@@ -218,7 +221,7 @@ ToDump::write_packet(Packet *p)
     struct fake_pcap_pkthdr ph;
 
     Timestamp ts = p->timestamp_anno();
-    if (!ts)
+    if (!ts && !_force_ts)
         ts = Timestamp::now();
     ph.ts.tv.tv_sec = ts.sec();
     ph.ts.tv.tv_usec = _nano ? ts.nsec() : ts.usec();
@@ -226,20 +229,20 @@ ToDump::write_packet(Packet *p)
     unsigned to_write = p->length();
     ph.len = to_write + (_extra_length ? EXTRA_LENGTH_ANNO(p) : 0);
     if (_snaplen && to_write > _snaplen)
-	to_write = _snaplen;
+        to_write = _snaplen;
     ph.caplen = to_write;
 
     if (_mt)
         _lock.acquire();
     // XXX writing to pipe?
     if (fwrite(&ph, sizeof(ph), 1, _fp) == 0
-	|| (to_write > 0 && fwrite(p->data(), 1, to_write, _fp) == 0)) {
-	if (errno != EAGAIN) {
-	    _active = false;
-	    click_chatter("ToDump(%s): %s", _filename.c_str(), strerror(errno));
-	}
+    || (to_write > 0 && fwrite(p->data(), 1, to_write, _fp) == 0)) {
+        if (errno != EAGAIN) {
+            _active = false;
+            click_chatter("ToDump(%s): %s", _filename.c_str(), strerror(errno));
+        }
     } else
-	_count++;
+        _count++;
     if (_mt)
         _lock.release();
 }
@@ -260,7 +263,7 @@ void
 ToDump::push(int, Packet *p)
 {
     if (_active)
-	write_packet(p);
+        write_packet(p);
     checked_output_push(0, p);
 }
 
@@ -269,7 +272,7 @@ ToDump::pull(int)
 {
     Packet *p = input(0).pull();
     if (_active && p)
-	write_packet(p);
+        write_packet(p);
     return p;
 }
 
@@ -277,13 +280,13 @@ bool
 ToDump::run_task(Task *)
 {
     if (!_active)
-	return false;
+        return false;
     Packet *p = input(0).pull();
     if (p) {
-	write_packet(p);
-	p->kill();
+        write_packet(p);
+        p->kill();
     } else if (!_signal)
-	return false;
+        return false;
     _task.fast_reschedule();
     return p != 0;
 }
@@ -295,12 +298,12 @@ ToDump::read_handler(Element *e, void *thunk)
 {
     ToDump *td = static_cast<ToDump *>(e);
     switch ((uintptr_t) thunk) {
-    case H_FILENAME:
-	return td->_filename;
-    case H_COUNT:
-	return String(td->_count);
-    default:
-	return "<error>";
+      case H_FILENAME:
+        return td->_filename;
+      case H_COUNT:
+        return String(td->_count);
+      default:
+        return "<error>";
     }
 }
 
@@ -319,7 +322,7 @@ ToDump::add_handlers()
     add_read_handler("count", read_handler, H_COUNT);
     add_write_handler("reset_counts", write_handler, H_RESET_COUNTS, Handler::BUTTON);
     if (input_is_pull(0) && noutputs() == 0)
-	add_task_handlers(&_task);
+        add_task_handlers(&_task);
 }
 
 CLICK_ENDDECLS

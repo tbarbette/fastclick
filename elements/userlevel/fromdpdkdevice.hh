@@ -116,6 +116,21 @@ Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
 Boolean. If False, the device is only initialized. Use this when you want
 to read packet using secondary DPDK applications.
 
+=item TCO
+
+Boolean. If True, enables TCP Checksum Offload. Packets must be set with the
+checksum flag, eg with ResetTCPChecksum. Defaults to False.
+
+=item TSO
+
+Boolean. If True, enables TCP Segmentation Offload. Packets must be configured
+individually as per DPDK documentation. Defaults to False.
+
+=item IPCO
+
+Booelan. If True, enables IP checksum offload alone (not L4 as TCO).
+Defaults to False.
+
 =item VERBOSE
 
 Boolean. If True, more detailed messages about the device are printed to
@@ -177,16 +192,6 @@ private:
     static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
     static int xstats_handler(int operation, String &input, Element *e,
                               const Handler *handler, ErrorHandler *errh);
-    enum {
-        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
-        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
-        h_active,
-        h_xstats, h_queue_count,
-        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
-        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
-        h_mtu,
-        h_device,
-    };
 
     DPDKDevice* _dev;
     bool _set_timestamp;

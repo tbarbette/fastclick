@@ -51,6 +51,10 @@ acounting for this format.
 If COUNTER is set, it adheres to the settings of that element.
 Otherwise, user can set it. Defaults to false.
 
+=item SAMPLE
+
+Only samples one packet every N packets. Defaults to 1 (all packets)
+
 =a
 
 NumberPacket, TimestampDiff
