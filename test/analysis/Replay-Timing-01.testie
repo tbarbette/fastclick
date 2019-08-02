@@ -3,7 +3,7 @@ click --simtime CONFIG
 
 %file CONFIG
 FromIPSummaryDump(IN, TIMING false, STOP false)
-    -> ReplayUnqueue(STOP 2, TIMING 2, ACTIVE true)
+    -> ReplayUnqueue(STOP 2, TIMING 200, ACTIVE true)
     -> SetTimestamp()
     -> ToIPSummaryDump(OUT, FIELDS timestamp payload)
 

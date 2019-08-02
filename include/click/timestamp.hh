@@ -750,6 +750,7 @@ class Timestamp { public:
 };
 
 class UserClock {public:
+    enum {h_now, h_now_steady};
     virtual int64_t now(bool steady) = 0;
 };
 

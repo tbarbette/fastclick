@@ -13,9 +13,9 @@ class RecordTimestamp;
 
 TimestampDiff()
 
-Compute the RTT of packets marked with RecordTimestamp
-
 =s timestamps
+
+Compute the RTT of packets marked with RecordTimestamp
 
 =d
 
@@ -77,6 +77,7 @@ private:
     RecordTimestamp *_rt;
     //Current index in the delays
     atomic_uint32_t _nd;
+    uint32_t _sample;
     bool _verbose;
 
     inline int smaction(Packet *p);
@@ -89,6 +90,7 @@ private:
         unsigned &max,
         uint32_t begin = 0
     );
+
     double standard_deviation(const double mean, uint32_t begin = 0);
     double percentile(const double percent, uint32_t begin = 0);
     unsigned last_value_seen();

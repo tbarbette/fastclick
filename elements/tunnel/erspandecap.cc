@@ -1,8 +1,8 @@
 /*
- * gtpdecap.{cc,hh}
+ * erspandecap.{cc,hh}
  * Tom Barbette
  *
- * Copyright (c) 2018 University of Liege
+ * Copyright (c) 2019 KTH Royal Institute of Techonology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),

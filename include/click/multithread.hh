@@ -36,6 +36,10 @@ class per_thread_oread : public per_thread<T> { public:
         per_thread<T>::_size = id;
     }
 
+    inline bool initialized() {
+        return mapping.size() > 0;
+    }
+
     inline T& get_value(int i) const{
         return per_thread<T>::storage[mapping[i]].v;
     }

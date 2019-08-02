@@ -1,11 +1,21 @@
 #ifndef CLICK_TSCCLOCK_HH
 #define CLICK_TSCCLOCK_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/timer.hh>
 #include <click/task.hh>
 #include <click/sync.hh>
 #include <click/timestamp.hh>
+#include <click/handlercall.hh>
+
 CLICK_DECLS
+
+class TSCClock;
+
+struct UserClockSource {
+    uint64_t (*get_current_tick)(void*);
+    uint64_t (*get_tick_hz)(void*);
+};
+
 
 /* =c
  * TSCClock()
@@ -21,14 +31,36 @@ CLICK_DECLS
  *
  * Click needs to be compiled with --enable-user-timestamp for this to be used.
  *
+ * If packets go through this element, the element will consider the
+ * timestamp field is in ticks (eg TSC by default), and convert it to the
+ * real time.
+ *
+ * Arguments:
+ *
+ * =over 20
+ *
+ * =item BASE
+ * Element. Take the base time from a given source instead of get_timeofday. Eg NTP.
+ * MBGClock is the only acceptable implementation for now, taking the source
+ * from a MBG PCIe GPS clock. Optional.
+ *
+ * =item SOURCE
+ * Element. Instead of using the TSC as clock, use the given source element. Eg.
+ * FromDPDKDevice for device that support rte_eth_read_clock. Optional.
+ *
  */
 
-class TSCClock : public Element { public:
+class TSCClock : public BatchElement { public:
 
   TSCClock() CLICK_COLD;
 
   const char *class_name() const        { return "TSCClock"; }
-  const char *port_count() const        { return PORTS_0_0; }
+  const char *port_count() const        { return PORTS_1_1; }
+  const char *processing() const        { return PUSH; }
+
+  int configure_phase() const {
+        return CONFIGURE_PHASE_LAST;
+  }
 
   void *cast(const char *name);
 
@@ -43,14 +75,19 @@ class TSCClock : public Element { public:
   static String read_handler(Element *e, void *thunk);
   void add_handlers() CLICK_COLD;
 
+  void push(int, Packet* p);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch* batch);
+#endif
 
   static int64_t now(void* user, bool steady);
 
-private:
+protected:
   int _verbose;
   bool _install;
   bool _nowait;
   bool _allow_offset;
+  bool _convert_steady;
 
   typedef enum {STABILIZE,SYNCHRONIZE,RUNNING} phase_t;
   phase_t _phase = STABILIZE;
@@ -107,11 +144,11 @@ private:
   inline double delta_to_freq(int64_t tick, int64_t time);
 
   inline int64_t compute_now_steady() {
-      return steady_timestamp[current_clock] + tick_to_subsec_steady(click_get_cycles() + tstate->local_tsc_offset - steady_cycle[current_clock]);
+      return steady_timestamp[current_clock] + tick_to_subsec_steady(_source.get_current_tick(_source_thunk) + tstate->local_tsc_offset - steady_cycle[current_clock]);
   }
 
   inline int64_t compute_now_wall(int clock) {
-      return last_timestamp[clock] + tick_to_subsec_wall(click_get_cycles() + tstate->local_tsc_offset- last_cycles[clock]);
+      return last_timestamp[clock] + tick_to_subsec_wall(_source.get_current_tick(_source_thunk) + tstate->local_tsc_offset - last_cycles[clock]);
   }
 
   inline int64_t compute_now_wall() {
@@ -123,6 +160,11 @@ private:
   bool accumulate_tick(Timer*);
 
   int64_t get_real_timestamp(bool steady=false);
+
+  struct UserClockSource _source;
+  void* _source_thunk;
+
+  HandlerCall _ready_h;
 };
 
 inline int64_t TSCClock::tick_to_subsec(int64_t delta, int64_t mult) {

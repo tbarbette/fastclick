@@ -24,7 +24,7 @@ class ReplayBase : public BatchElement { public:
 protected:
     inline bool load_packets();
     void cleanup_packets();
-    inline void check_end_loop(Task* t);
+    inline void check_end_loop(Task* t, bool force_time);
     static int write_handler(const String &, Element *e, void *thunk, ErrorHandler *errh);
     void add_handlers() override;
     void set_active(bool active);
@@ -193,26 +193,38 @@ inline bool ReplayBase::load_packets() {
         return true;
 }
 
-inline void ReplayBase::check_end_loop(Task* t) {
+inline void ReplayBase::check_end_loop(Task* t, bool force_time) {
     if (unlikely(!_queue_current)) {
         _queue_current = _queue_head;
         reset_time();
         if (_stop_time == 0) {
+            if (_verbose)
+                click_chatter("Replay loop");
             if (_stop > 0)
                 _stop--;
         } else {
-            if ((Timestamp::now_steady() - _startsent).msecval() / 1000 >= _stop_time) {
+            int diff = (Timestamp::now_steady() - _startsent).msecval() / 1000;
+            if (diff >= _stop_time) {
+                if (_verbose)
+                    click_chatter("Replay stopped after %d seconds",diff);
                 _stop = 0;
+            } else {
+                if (_verbose)
+                    click_chatter("Replay continue after %d seconds",_stop_time);
             }
         }
         if (_stop == 0) {
+stop:
             router()->please_stop_driver();
             _active = false;
-            _startsent = Timestamp();
+            _startsent = Timestamp::uninitialized_t();
             return;
         }
-        if (_verbose)
-            click_chatter("Replay loop");
+
+    } else if (unlikely(_stop_time > 0 && force_time)) {
+         int diff = (Timestamp::now_steady() - _startsent).msecval() / 1000;
+         if (diff >= _stop_time)
+             goto stop;
     }
     t->fast_reschedule();
 }

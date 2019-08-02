@@ -47,7 +47,10 @@ IPFlowID::IPFlowID(const Packet *p, bool reverse)
 
 IPFlowID::IPFlowID(const click_ip *iph, bool reverse)
 {
-    assert(iph && IP_FIRSTFRAG(iph));
+    if (!iph || !IP_FIRSTFRAG(iph)) {
+        return;
+    }
+
     const click_udp *udph = reinterpret_cast<const click_udp *>(reinterpret_cast<const unsigned char *>(iph) + (iph->ip_hl << 2));
 
     if (likely(!reverse))
@@ -84,5 +87,10 @@ operator<<(StringAccum &sa, const IPFlowID &flow_id)
     sa.adjust_length(flow_id.unparse(sa.reserve(64)));
     return sa;
 }
+
+IPFlow5ID::IPFlow5ID(const Packet *p, bool reverse) : IPFlowID(p,reverse) {
+	_proto = p->ip_header()->ip_p;
+}
+
 
 CLICK_ENDDECLS

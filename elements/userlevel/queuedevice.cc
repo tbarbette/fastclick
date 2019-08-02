@@ -122,11 +122,13 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
 	String scale;
 	bool has_scale = false;
 	_scale_parallel = false;
+    _numa_node_override = -1;
 
     if (Args(this, errh).bind(conf)
             .read("RSS_AGGREGATE", _set_rss_aggregate)
             .read("PAINT_QUEUE", _set_paint_anno)
             .read("NUMA", _use_numa)
+            .read("NUMA_NODE", _numa_node_override)
 			.read("SCALE", scale).read_status(has_scale)
             .read("THREADOFFSET", _threadoffset)
             .consume() < 0) {

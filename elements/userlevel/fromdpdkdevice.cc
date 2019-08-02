@@ -25,8 +25,8 @@
 #include <click/standard/scheduleinfo.hh>
 #include <click/etheraddress.hh>
 #include <click/straccum.hh>
-
 #include "fromdpdkdevice.hh"
+#include "tscclock.hh"
 
 CLICK_DECLS
 
@@ -54,6 +54,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     uint16_t mtu = 0;
     bool has_mac = false;
     bool has_mtu = false;
+    bool set_timestamp = false;
     FlowControlMode fc_mode(FC_UNSET);
 
     if (Args(this, errh).bind(conf)
@@ -68,7 +69,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
-        .read("MAXQUEUES",maxqueues)
+        .read("MAXQUEUES", maxqueues)
+        .read("TIMESTAMP", set_timestamp)
         .read("PAUSE", fc_mode)
         .complete() < 0)
         return -1;
@@ -82,6 +84,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (_use_numa) {
         numa_node = DPDKDevice::get_port_numa_node(_dev->port_id);
+        if (_numa_node_override > -1)
+            numa_node = _numa_node_override;
     }
 
     int r;
@@ -111,8 +115,45 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (fc_mode != FC_UNSET)
         _dev->set_init_fc_mode(fc_mode);
 
+    if (set_timestamp) {
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+        _dev->set_rx_offload(DEV_RX_OFFLOAD_TIMESTAMP);
+        _set_timestamp = true;
+#else
+        errh->error("HW Timestamping is not supported before DPDK 18.02");
+#endif
+    }
+
     return 0;
 }
+
+#if HAVE_DPDK_READ_CLOCK
+uint64_t FromDPDKDevice::read_clock(void* thunk) {
+    FromDPDKDevice* fd = (FromDPDKDevice*)thunk;
+    uint64_t clock;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    if (rte_eth_read_clock(fd->_dev->port_id, &clock) == 0)
+        return clock;
+#pragma GCC diagnostic pop
+    return -1;
+}
+
+struct UserClockSource dpdk_clock {
+    .get_current_tick = &FromDPDKDevice::read_clock,
+    .get_tick_hz = 0,
+};
+#endif
+
+void* FromDPDKDevice::cast(const char* name) {
+#if HAVE_DPDK_READ_CLOCK
+    if (String(name) == "UserClockSource")
+        return &dpdk_clock;
+#endif
+    return RXQueueDevice::cast(name);
+}
+
+
 
 int FromDPDKDevice::initialize(ErrorHandler *errh)
 {
@@ -143,6 +184,19 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (all_initialized()) {
         ret = DPDKDevice::initialize(errh);
         if (ret != 0) return ret;
+    }
+
+    if (_set_timestamp) {
+#if HAVE_DPDK_READ_CLOCK
+        uint64_t t;
+        int err;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        if ((err = rte_eth_read_clock(_dev->port_id, &t)) != 0) {
+            return errh->error("Device does not support queryig internal time ! Disable hardware timestamping. Error %d", err);
+        }
+#pragma GCC diagnostic pop
+#endif
     }
 
     return ret;
@@ -195,6 +249,12 @@ bool FromDPDKDevice::run_task(Task *t)
             if (_set_paint_anno) {
                 SET_PAINT_ANNO(p, iqueue);
             }
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+            if (_set_timestamp && (pkts[i]->ol_flags & PKT_RX_TIMESTAMP)) {
+                p->timestamp_anno().assignlong(pkts[i]->timestamp);
+            }
+#endif
 #if HAVE_BATCH
             if (head == NULL)
                 head = PacketBatch::start_head(p);
@@ -222,6 +282,18 @@ bool FromDPDKDevice::run_task(Task *t)
     t->fast_reschedule();
     return (ret);
 }
+
+enum {
+        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
+        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
+        h_active,
+        h_xstats, h_queue_count, h_stats_packets, h_stats_bytes,
+        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
+        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+        h_mtu,
+        h_device,
+};
+
 
 String FromDPDKDevice::read_handler(Element *e, void * thunk)
 {
@@ -374,7 +446,8 @@ int FromDPDKDevice::xstats_handler(
     if (!fd->_dev)
         return -1;
 
-    switch ((intptr_t)handler->read_user_data()) {
+    int op = (intptr_t)handler->read_user_data();
+    switch (op) {
         case h_xstats: {
             struct rte_eth_xstat_name *names;
         #if RTE_VERSION >= RTE_VERSION_NUM(16,07,0,0)
@@ -425,6 +498,24 @@ int FromDPDKDevice::xstats_handler(
                 input = String(v);
             }
             return 0;
+        case h_stats_packets:
+        case h_stats_bytes:
+            {
+                struct rte_eth_stats stats;
+                if (rte_eth_stats_get(fd->_dev->port_id, &stats))
+                    return -1;
+
+                int id = atoi(input.c_str());
+                if (id < 0 || id > RTE_ETHDEV_QUEUE_STAT_CNTRS)
+                    return -EINVAL;
+                uint64_t v;
+                if (op == h_stats_packets)
+                     v = stats.q_ipackets[id];
+                else
+                     v = stats.q_opackets[id];
+                input = String(v);
+                return 0;
+            }
         default:
             return -1;
     }
@@ -444,6 +535,8 @@ void FromDPDKDevice::add_handlers()
 
     set_handler("xstats", Handler::f_read | Handler::f_read_param, xstats_handler, h_xstats);
     set_handler("queue_count", Handler::f_read | Handler::f_read_param, xstats_handler, h_queue_count);
+    set_handler("queue_packets", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_packets);
+    set_handler("queue_bytes", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_bytes);
 
     add_read_handler("active", read_handler, h_active);
     add_write_handler("active", write_handler, h_active);
@@ -470,6 +563,7 @@ void FromDPDKDevice::add_handlers()
 }
 
 CLICK_ENDDECLS
+
 ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
 EXPORT_ELEMENT(FromDPDKDevice)
 ELEMENT_MT_SAFE(FromDPDKDevice)

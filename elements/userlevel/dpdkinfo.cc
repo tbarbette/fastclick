@@ -65,7 +65,7 @@ String DPDKInfo::read_handler(Element *e, void * thunk)
 #else
                 int avail = rte_mempool_avail_count(DPDKDevice::_pktmbuf_pools[i]);
 #endif
-                acc << "0 " << String(avail) << "\n";
+                acc << String(i) << " " << String(avail) << "\n";
             }
             break;
         case h_pools:

@@ -10,7 +10,8 @@ CLICK_DECLS
  * Use Linux to get time
  * =d
  *
- * Click needs to be compiled with --enable-user-timestamp for this to be used.
+ * Click needs to be compiled with --enable-user-timestamp for this to be
+ * used. This Clock can be used as a BASE of TSCClock
  *
  */
 
