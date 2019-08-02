@@ -1,0 +1,17 @@
+Source: fastclick
+Section: net
+Priority: optional
+Maintainer: Ryan Goodfellow <rgoodfel@isi.edu>
+Build-Depends: 
+  libnuma-dev,
+  libibverbs-dev,
+  rdma-core,
+  lshw,
+  pciutils,
+  zlib1g-dev
+Homepage: https://github.com/tbarbette/fastclick
+
+Package: fastclick
+Architecture: amd64
+Priority: optional
+Description: The FastClick modular router
