@@ -1,0 +1,6 @@
+debhelper-build-stamp
+fastclick
+fastclick.debhelper.log
+fastclick.substvars
+files
+.debhelper
