@@ -94,7 +94,9 @@ ConfParseTest::initialize(ErrorHandler *errh)
     // cp_integer parsing
     int32_t i32;
     uint32_t u32;
+    unsigned long long ull;
     u32 = 97;
+    ull = 97;
     CHECK(cp_integer("0", &i32) == true && i32 == 0);
     CHECK(cp_integer("-0", &i32) == true && i32 == 0);
     CHECK(u32 == 97);
@@ -228,10 +230,10 @@ ConfParseTest::initialize(ErrorHandler *errh)
 #endif
 
     BandwidthArg bwarg;
-    CHECK(bwarg.parse("8", u32) == true && bwarg.status == NumArg::status_unitless && u32 == 8);
-    CHECK(bwarg.parse("8 baud", u32) == true && bwarg.status == NumArg::status_ok && u32 == 1);
-    CHECK(bwarg.parse("8Kbps", u32) == true && bwarg.status == NumArg::status_ok && u32 == 1000);
-    CHECK(bwarg.parse("8KBps", u32) == true && bwarg.status == NumArg::status_ok && u32 == 8000);
+    CHECK(bwarg.parse("8", ull) == true && bwarg.status == NumArg::status_unitless && ull == 8);
+    CHECK(bwarg.parse("8 baud", ull) == true && bwarg.status == NumArg::status_ok && ull == 1);
+    CHECK(bwarg.parse("8Kbps", ull) == true && bwarg.status == NumArg::status_ok && ull == 1000);
+    CHECK(bwarg.parse("8KBps", ull) == true && bwarg.status == NumArg::status_ok && ull == 8000);
 
     {
 	IPAddress a, m;

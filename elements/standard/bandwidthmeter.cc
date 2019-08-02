@@ -42,7 +42,7 @@ BandwidthMeter::configure(Vector<String> &conf, ErrorHandler *errh)
   if (conf.size() == 0)
     return errh->error("too few arguments to BandwidthMeter(bandwidth, ...)");
 
-  Vector<unsigned> vals(conf.size(), 0);
+  Vector<unsigned long long> vals(conf.size(), 0);
   BandwidthArg ba;
   for (int i = 0; i < conf.size(); i++)
     if (!ba.parse(conf[i], vals[i]))

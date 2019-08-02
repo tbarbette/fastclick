@@ -1,6 +1,7 @@
 // -*- c-basic-offset: 4; related-file-name: "../../lib/args.cc" -*-
 #ifndef CLICK_ARGS_HH
 #define CLICK_ARGS_HH
+#include <string>
 #include <click/type_traits.hh>
 #include <click/vector.hh>
 #include <click/string.hh>
@@ -375,8 +376,18 @@ class Args : public ArgContext {
         return read(keyword, mandatory, x);
     }
     template <typename T>
+    Args &read_mi(const char *keyword, size_t i, T &x) {
+      std::string kw = std::string(keyword) + std::to_string(i);
+        return read(kw.c_str(), mandatory, x);
+    }
+    template <typename T>
     Args &read_p(const char *keyword, T &x) {
         return read(keyword, positional, x);
+    }
+    template <typename T>
+    Args &read_pi(const char *keyword, size_t i, T &x) {
+      std::string kw = std::string(keyword) + std::to_string(i);
+      return read(kw.c_str(), positional, x);
     }
     template <typename T>
     Args &read_mp(const char *keyword, T &x) {
@@ -401,6 +412,11 @@ class Args : public ArgContext {
     template <typename T, typename V>
     Args &read_or_set(const char *keyword, T &x, const V &default_value) {
         return read_or_set(keyword, 0, x, default_value);
+    }
+    template <typename T, typename V>
+    Args &read_or_seti(const char *keyword, size_t i , T &x, const V &default_value) {
+        std::string kw = std::string(keyword) + std::to_string(i);
+        return read_or_set(kw.c_str(), 0, x, default_value);
     }
     template <typename T, typename V>
     Args &read_or_set_p(const char *keyword, T &x, const V &default_value) {
@@ -1283,8 +1299,8 @@ class UnitArg { public:
 
   Handles suffixes such as "Gbps", "k", etc. */
 class BandwidthArg : public NumArg { public:
-    bool parse(const String &str, uint32_t &result, const ArgContext & = blank_args);
-    static String unparse(uint32_t x);
+    bool parse(const String &str, unsigned long long &result, const ArgContext & = blank_args);
+    static String unparse(unsigned long long x);
     int status;
 };
 

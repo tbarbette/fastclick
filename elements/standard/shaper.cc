@@ -32,7 +32,7 @@ Shaper::Shaper()
 int
 Shaper::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    uint32_t rate;
+    unsigned long long rate;
     Args args(conf, this, errh);
     if (is_bandwidth())
 	args.read_mp("RATE", BandwidthArg(), rate);

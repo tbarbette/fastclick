@@ -224,7 +224,7 @@ class Bigint { public:
      * Like @a x = (@a a * @a b) + @a carry.  Both @a x and @a a must have @a
      * n limbs.  It is safe for @a x and @a a to point to exactly the same
      * memory, but they must not otherwise overlap. */
-    static limb_type multiply(limb_type *x, const limb_type *a, int n,
+    static limb_type multiply(limb_type *x, const limb_type *a, unsigned long long n,
 			      limb_type b, limb_type carry = 0) {
 	do {
 	    limb_type x0, x1;
@@ -385,7 +385,7 @@ class Bigint { public:
 };
 
 /** @brief Typical Bigint usage with uint32_t limb_type. */
-typedef Bigint<uint32_t> bigint;
+typedef Bigint<unsigned long long> bigint;
 
 CLICK_ENDDECLS
 #endif

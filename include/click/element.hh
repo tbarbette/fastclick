@@ -24,6 +24,12 @@ class BatchElement;
 
 #define BATCH_MAX_PULL 256
 
+static constexpr int
+  CONFIGURE_SUCCESS{0},
+  CONFIGURE_FAIL{-1},
+  INITIALIZE_SUCCESS{0},
+  INITIALIZE_FAIL{-1};
+
 /** @file <click/element.hh>
  * @brief Click's Element class.
  */

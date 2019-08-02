@@ -126,7 +126,7 @@ MultiReplay::run_task(Task* task)
         n++;
     }
 
-    check_end_loop(task);
+    check_end_loop(task, n == 0);
 
     return n > 0;
 }
@@ -235,7 +235,7 @@ MultiReplayUnqueue::run_task(Task* task)
 #endif
 
 
-    check_end_loop(task);
+    check_end_loop(task, n == 0);
 
     return n > 0;
 }

@@ -4,6 +4,7 @@
 #include <click/string.hh>
 #include <click/glue.hh>
 #include <click/type_traits.hh>
+#include <random>
 CLICK_DECLS
 
 class EtherAddress { public:
@@ -31,6 +32,39 @@ class EtherAddress { public:
     /** @brief Return the broadcast EtherAddress, FF-FF-FF-FF-FF-FF. */
     static EtherAddress make_broadcast() {
 	return EtherAddress(0xFFFF);
+    }
+
+    /** @brief Return a random EtherAddress, in the range 00:00:00:00:00:01 -
+     * 00:FF:FF:FF:FF:FF */
+    static EtherAddress make_random() {
+
+      std::default_random_engine generator;
+      std::uniform_int_distribution<uint64_t> distribution(
+          0x000000000001, 
+          0x00ffffffffff
+      );
+
+      EtherAddress e;
+
+      uint64_t x = distribution(generator);
+      e._data[0] = (x & 0xFFFF00000000) >> 32;
+      e._data[1] = (x & 0x0000FFFF0000) >> 16;
+      e._data[2] = (x & 0x00000000FFFF);
+
+      return e;
+
+    }
+
+    void assign(uint8_t *addr) {
+
+      auto data = reinterpret_cast<const uint8_t*>(_data);
+      addr[0] = data[0];
+      addr[1] = data[1];
+      addr[2] = data[2];
+      addr[3] = data[3];
+      addr[4] = data[4];
+      addr[5] = data[5];
+
     }
 
     static inline EtherAddress broadcast() CLICK_DEPRECATED;

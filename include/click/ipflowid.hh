@@ -194,5 +194,23 @@ inline String IPFlowID::s() const
     return unparse();
 }
 
+class IPFlow5ID : public IPFlowID { public:
+    /** @brief Construct a flow ID from @a p's ip_header() and udp_header().
+     * @param p input packet
+     * @param reverse if true, use the reverse of @a p's flow ID
+     *
+     * @pre @a p's ip_header() must point to a first-fragment IPv4 header, and
+     * @a p's transport header should have source and destination ports in the
+     * UDP-like positions; TCP, UDP, and DCCP fit the bill. */
+    explicit IPFlow5ID(const Packet *p, bool reverse = false);
+
+    uint8_t proto() const {
+	return _proto;
+    }
+
+protected:
+	uint8_t _proto;
+};
+
 CLICK_ENDDECLS
 #endif

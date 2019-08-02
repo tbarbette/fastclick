@@ -172,7 +172,7 @@ bool cp_seconds(const String& str, double* result);
 bool cp_time(const String &str, Timestamp *result, bool allow_negative = false);
 bool cp_time(const String& str, struct timeval* result);
 
-bool cp_bandwidth(const String& str, uint32_t* result);
+bool cp_bandwidth(const String& str, unsigned long long* result);
 
 // network addresses
 class IPAddressList;
@@ -410,6 +410,7 @@ struct cp_value {
 	int64_t s64;
 	int64_t i64 CLICK_DEPRECATED;
 	uint64_t u64;
+  unsigned long long ull;
 #endif
 	size_t size;
 #if HAVE_FLOAT_TYPES

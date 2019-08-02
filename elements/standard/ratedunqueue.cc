@@ -48,15 +48,16 @@ RatedUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt, Vector<String> &conf, ErrorHandler *errh)
 {
-    unsigned r;
+    unsigned long long r{};
     unsigned dur_msec = 20;
-    unsigned tokens;
+    unsigned long long tokens;
     bool dur_specified, tokens_specified;
     const char *burst_size = is_bandwidth ? "BURST_BYTES" : "BURST_SIZE";
 
     Args args(conf, elt, errh);
-    if (is_bandwidth)
+    if (is_bandwidth) {
 	args.read_mp("RATE", BandwidthArg(), r);
+    }
     else
 	args.read_mp("RATE", r);
     if (args.read("BURST_DURATION", SecondsArg(3), dur_msec).read_status(dur_specified)
@@ -70,16 +71,18 @@ RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt,
 	bigint::limb_type res[2];
 	bigint::multiply(res[1], res[0], r, dur_msec);
 	bigint::divide(res, res, 2, 1000);
-	tokens = res[1] ? UINT_MAX : res[0];
+	tokens = res[1] ? ULLONG_MAX : res[0];
+        tokens = tokens ? tokens : ULLONG_MAX;
     }
 
     if (is_bandwidth) {
-	unsigned new_tokens = tokens + tb_bandwidth_thresh;
-	tokens = (tokens < new_tokens ? new_tokens : UINT_MAX);
+	unsigned long long new_tokens = tokens + tb_bandwidth_thresh;
+	tokens = (tokens < new_tokens ? new_tokens : ULLONG_MAX);
     }
 
     tb->assign(r, tokens ? tokens : 1);
     return 0;
+
 }
 
 int
@@ -90,6 +93,7 @@ RatedUnqueue::initialize(ErrorHandler *errh)
     _timer.initialize(this);
     return 0;
 }
+
 
 bool
 RatedUnqueue::run_task(Task *)
