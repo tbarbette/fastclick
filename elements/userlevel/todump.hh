@@ -72,6 +72,12 @@ false.
 Boolean. Set to true to write nanosecond-precision timestamps. Default depends
 on the version of tcpdump/pcap on the machine.
 
+=item FORCE_TS
+
+Boolean. Set to true to force writing a "zero" timestamp. This may be useful to
+write trace with offests relative to the first packet, that will be zero.
+Defaults to False for backward compatibility.
+
 =back
 
 This element is only available at user level.
@@ -132,6 +138,7 @@ class ToDump : public BatchElement { public:
     bool _extra_length;
     bool _unbuffered;
     bool _nano;
+    bool _force_ts;
 
 #if HAVE_INT64_TYPES
     typedef uint64_t counter_t;

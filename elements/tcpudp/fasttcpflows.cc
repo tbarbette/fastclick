@@ -255,6 +255,7 @@ FastTCPFlows::pull(int)
 
   if (!_active)
     return 0;
+<<<<<<< HEAD
 
   if (_limit != NO_LIMIT && _count >= _limit && _sent_all_fins) {
     if (_end_h) {

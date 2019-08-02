@@ -1,6 +1,6 @@
 #ifndef CLICK_SETTCPCHECKSUM_HH
 #define CLICK_SETTCPCHECKSUM_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -18,7 +18,7 @@ CLICK_DECLS
  * =a CheckTCPHeader, SetIPChecksum, CheckIPHeader, SetUDPChecksum
  */
 
-class SetTCPChecksum : public Element { public:
+class SetTCPChecksum : public SimpleElement<SetTCPChecksum> { public:
 
   SetTCPChecksum() CLICK_COLD;
   ~SetTCPChecksum() CLICK_COLD;

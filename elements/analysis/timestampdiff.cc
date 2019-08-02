@@ -3,10 +3,12 @@
  * timestamp of a packet using RecordTimestamp and a fresh timestamp
  * Cyril Soldani, Tom Barbette
  *
- * Various latency percentiles by Georgios Katsikas
+ * Various latency percentiles by Georgios Katsikas and Tom Barbette
+ *
  *
  * Copyright (c) 2015-2016 University of Liège
  * Copyright (c) 2017 RISE SICS
+ * Copyright (c) 2019 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -54,7 +56,8 @@ int TimestampDiff::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("OFFSET",_offset)
             .read("N", _limit)
             .read("MAXDELAY", _max_delay_ms)
-            .read("VERBOSE", _verbose)
+            .read_or_set("SAMPLE", _sample, 1)
+            .read_or_set("VERBOSE", _verbose, false)
             .complete() < 0)
         return -1;
 
@@ -98,7 +101,8 @@ enum {
     TSD_PERC_HANDLER,
     TSD_LAST_SEEN,
     TSD_CURRENT_INDEX,
-    TSD_DUMP_HANDLER
+    TSD_DUMP_HANDLER,
+    TSD_DUMP_LIST_HANDLER
 };
 
 int TimestampDiff::handler(int operation, String &data, Element *e,
@@ -147,38 +151,43 @@ int TimestampDiff::handler(int operation, String &data, Element *e,
             tsd->min_mean_max(min, mean, max, begin);
             data = String(min); break;
         case TSD_PERC_01_HANDLER:
-            data = String(tsd->percentile(1)); break;
+            data = String(tsd->percentile(1, begin)); break;
         case TSD_PERC_05_HANDLER:
-            data = String(tsd->percentile(5)); break;
+            data = String(tsd->percentile(5, begin)); break;
         case TSD_PERC_10_HANDLER:
-            data = String(tsd->percentile(10)); break;
+            data = String(tsd->percentile(10, begin)); break;
         case TSD_PERC_25_HANDLER:
-            data = String(tsd->percentile(25)); break;
+            data = String(tsd->percentile(25, begin)); break;
         case TSD_MED_HANDLER:
-            data = String(tsd->percentile(50)); break;
+            data = String(tsd->percentile(50, begin)); break;
         case TSD_PERC_75_HANDLER:
-            data = String(tsd->percentile(75)); break;
+            data = String(tsd->percentile(75, begin)); break;
         case TSD_PERC_90_HANDLER:
-            data = String(tsd->percentile(90)); break;
+            data = String(tsd->percentile(90, begin)); break;
         case TSD_PERC_95_HANDLER:
-            data = String(tsd->percentile(95)); break;
+            data = String(tsd->percentile(95, begin)); break;
         case TSD_PERC_99_HANDLER:
-            data = String(tsd->percentile(99)); break;
+            data = String(tsd->percentile(99, begin)); break;
         case TSD_PERC_100_HANDLER:
             tsd->min_mean_max(min, mean, max, begin);
             data = String(max); break;
         case TSD_PERC_HANDLER:
-            data = String(tsd->percentile(perc)); break;
+            data = String(tsd->percentile(perc, begin)); break;
         case TSD_LAST_SEEN:
             data = String(tsd->last_value_seen()); break;
         case TSD_CURRENT_INDEX: {
             const int32_t last_vector_index = static_cast<const int32_t>(tsd->_nd.value() - 1);
             data = String(last_vector_index); break;
         }
+        case TSD_DUMP_LIST_HANDLER:
         case TSD_DUMP_HANDLER: {
             StringAccum s;
-            for (size_t i = 0; i < tsd->_nd; ++i)
-                s << i << ": " << String(tsd->_delays[i]) << "\n";
+            for (size_t i = 0; i < tsd->_nd; ++i) {
+                if (opt == TSD_DUMP_HANDLER)
+                    s << i << ": " << String(tsd->_delays[i]) << "\n";
+                else
+                    s << String(tsd->_delays[i]) << "\n";
+            }
             data = s.take_string(); break;
         }
         default:
@@ -210,6 +219,7 @@ void TimestampDiff::add_handlers()
     set_handler("index", Handler::f_read, handler, TSD_CURRENT_INDEX, 0);
     set_handler("last", Handler::f_read, handler, TSD_LAST_SEEN, 0);
     set_handler("dump", Handler::f_read, handler, TSD_DUMP_HANDLER, 0);
+    set_handler("dump_list", Handler::f_read, handler, TSD_DUMP_LIST_HANDLER, 0);
 }
 
 inline int TimestampDiff::smaction(Packet *p)
@@ -220,6 +230,12 @@ inline int TimestampDiff::smaction(Packet *p)
 
     if (old == Timestamp::uninitialized_t()) {
         return 1;
+    }
+
+    if (_sample != 1) {
+        if ((uint32_t)i % _sample != 0) {
+            return 0;
+        }
     }
 
     Timestamp diff = now - old;
@@ -288,6 +304,7 @@ TimestampDiff::min_mean_max(unsigned &min, double &mean, unsigned &max, uint32_t
         mean = 0.0;
         return;
     }
+
     mean = sum / static_cast<double>(current_vector_length - begin);
 }
 
@@ -316,29 +333,26 @@ TimestampDiff::percentile(const double percent, uint32_t begin)
 
     const uint32_t current_vector_length = static_cast<const uint32_t>(_nd.value());
 
-    // The desired percentile
-    size_t idx = (percent * current_vector_length) / 100;
-
     // Implies empty vector, no percentile.
-    if ((idx == begin) && (current_vector_length == begin)) {
-        return perc;
+    if (current_vector_length == 0 || begin >= current_vector_length) {
+        return 0;
     }
+
+    // The desired percentile
+    size_t idx = (percent * (current_vector_length - begin)) / 100 + begin;
+
     // Implies that user asked for the 0 percetile (i.e., min).
-    else if ((idx == begin) && (current_vector_length > begin)) {
-        std::sort(_delays.begin(), _delays.end());
-        perc = static_cast<double>(_delays[begin]);
-        return perc;
+    if (idx <= begin) {
+        return (double)*std::min_element(_delays.begin() + begin, _delays.begin() + current_vector_length);
     // Implies that user asked for the 100 percetile (i.e., max).
-    } else if (idx == current_vector_length) {
-        std::sort(_delays.begin() + begin, _delays.end());
-        perc = static_cast<double>(_delays[current_vector_length - 1]);
-        return perc;
+    } else if (idx >= current_vector_length) {
+        return (double)*std::max_element(_delays.begin() + begin, _delays.begin() + current_vector_length);
     }
+    //else no need to sort, we use nth_element
 
-    auto nth = _delays.begin() + begin + idx;
+    auto nth = _delays.begin() + idx;
     std::nth_element(_delays.begin() + begin, nth, _delays.begin() + current_vector_length);
-    perc = static_cast<double>(*nth);
-
+    perc = (double)*nth;
     return perc;
 }
 

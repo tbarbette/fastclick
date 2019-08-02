@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_ERASEIPPAYLOAD_HH
 #define CLICK_ERASEIPPAYLOAD_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 #include <click/atomic.hh>
 #include <clicknet/ip.h>
@@ -23,7 +23,7 @@ have the same length, but all payload bytes are zero.
 
 =a AnonymizeIPAddr */
 
-class EraseIPPayload : public Element { public:
+class EraseIPPayload : public SimpleElement<EraseIPPayload> { public:
 
     EraseIPPayload() CLICK_COLD;
     ~EraseIPPayload() CLICK_COLD;

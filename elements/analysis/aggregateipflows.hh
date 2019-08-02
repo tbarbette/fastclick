@@ -110,6 +110,12 @@ Boolean. If true, then try to assign aggregate annotations to all fragments.
 May only be set to true if AggregateIPFlows is running in a push context.
 Default is true in a push context and false in a pull context.
 
+=item SYMETRIC
+
+Boolean. If true, reverse connections are considered the same connection. Else,
+every different typle would be considered as separate connection (the paint ANNO
+will be always 0).
+
 =back
 
 AggregateIPFlows is an AggregateNotifier, so AggregateListeners can request
@@ -173,8 +179,13 @@ class AggregateIPFlows : public BatchElement, public AggregateNotifier { public:
 	uint32_t a;
 	uint32_t b;
 	HostPair() : a(0), b(0) { }
-	HostPair(uint32_t aa, uint32_t bb) {
-	    aa > bb ? (a = bb, b = aa) : (a = aa, b = bb);
+	HostPair(uint32_t aa, uint32_t bb, bool symetric) {
+        if (symetric) {
+	        aa > bb ? (a = bb, b = aa) : (a = aa, b = bb);
+        } else {
+            a = aa;
+            b = bb;
+        }
 	}
 	inline hashcode_t hashcode() const;
     };
@@ -231,6 +242,7 @@ class AggregateIPFlows : public BatchElement, public AggregateNotifier { public:
     bool _handle_icmp_errors : 1;
     unsigned _fragments : 2;
     bool _timestamp_warning : 1;
+    bool _symetric;
 
 #if CLICK_USERLEVEL
     FILE *_traceinfo_file;
