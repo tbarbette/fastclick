@@ -21,7 +21,7 @@ Pipeliner::Pipeliner()
         _home_thread_id(0), _block(false),
         _active(true),_nouseless(false),_always_up(false),
         _allow_direct_traversal(true), _verbose(true),
-        sleepiness(0),_sleep_threshold(0),
+        sleepiness(0),_sleep_threshold(0), _highwater(0),
         _task(this), _last_start(0)
 {
 #if HAVE_BATCH
@@ -42,7 +42,10 @@ Pipeliner::get_spawning_threads(Bitvector& b, bool, int port) {
 }
 
 void Pipeliner::cleanup(CleanupStage) {
-    for (unsigned i = 0; i < storage.weight(); i++) {
+    if (storage.initialized()) {
+      for (unsigned i = 0; i < storage.weight(); i++) {
+        if (!storage.get_value(i).initialized())
+            continue;
         Packet* p;
         while ((p = storage.get_value(i).extract()) != 0) {
 #if HAVE_BATCH
@@ -52,6 +55,7 @@ void Pipeliner::cleanup(CleanupStage) {
 #endif
                 p->kill();
         }
+      }
     }
 }
 
@@ -257,6 +261,8 @@ Pipeliner::run_task(Task* t)
             r = true;
 #endif
         }
+        if (s.count() > _highwater)
+            _highwater = s.count();
 
 #if HAVE_BATCH
         if (out) {
@@ -306,6 +312,7 @@ Pipeliner::add_handlers()
     add_read_handler("count", count_handler, 0);
     add_data_handlers("active", Handler::OP_READ, &_active);
     add_write_handler("active", write_handler, 0);
+    add_data_handlers("highwater", Handler::OP_READ, &_highwater);
 }
 
 CLICK_ENDDECLS

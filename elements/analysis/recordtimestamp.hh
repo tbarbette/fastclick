@@ -15,9 +15,9 @@ class NumberPacket;
 
 RecordTimestamp([I<keywords> N])
 
-Record timestamp in memory
-
 =s timestamps
+
+Record timestamp in memory
 
 =d
 
@@ -50,6 +50,10 @@ Writes the number in network order format and returns this number
 acounting for this format.
 If COUNTER is set, it adheres to the settings of that element.
 Otherwise, user can set it. Defaults to false.
+
+=item SAMPLE
+
+Only samples one packet every N packets. Defaults to 1 (all packets)
 
 =a
 

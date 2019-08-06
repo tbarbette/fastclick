@@ -444,6 +444,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 #endif
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,11,0,0)
     dev_conf.rxmode.offloads = DEV_RX_OFFLOAD_CRC_STRIP;
+    dev_conf.txmode.offloads = 0;
 #endif
 
     if (info.mq_mode & ETH_MQ_RX_VMDQ_FLAG) {
@@ -488,6 +489,42 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
         dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
         dev_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
     }
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    if (info.rx_offload & DEV_RX_OFFLOAD_TIMESTAMP) {
+        if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TIMESTAMP)) {
+            return errh->error("Hardware timestamp offloading is not supported by this device !");
+        } else {
+            dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TIMESTAMP;
+        }
+    }
+#endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    if (info.tx_offload & DEV_TX_OFFLOAD_IPV4_CKSUM) {
+        if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM)) {
+            return errh->error("Hardware IPv4 checksum offloading is not supported by this device !");
+        } else {
+            dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
+        }
+    }
+
+    if (info.tx_offload & DEV_TX_OFFLOAD_TCP_CKSUM) {
+        if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM)) {
+            return errh->error("Hardware TCP checksum offloading is not supported by this device !");
+        } else {
+            dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_CKSUM;
+        }
+    }
+
+    if (info.tx_offload & DEV_TX_OFFLOAD_TCP_TSO) {
+        if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_TCP_TSO)) {
+            return errh->error("Hardware TCP Segmentation Offloading is not supported by this device !");
+        } else {
+            dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_TSO;
+        }
+    }
+#endif
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
@@ -558,6 +595,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
             dev_conf.txmode.offloads |=
                 DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+also                ETH_TXQ_FLAGS_NOMULTMEMP
                 */
 
     int ret;
@@ -759,6 +797,15 @@ void DPDKDevice::set_init_fc_mode(FlowControlMode fc) {
     info.init_fc_mode = fc;
 }
 
+void DPDKDevice::set_rx_offload(uint64_t offload) {
+    assert(!_is_initialized);
+    info.rx_offload |= offload;
+}
+
+void DPDKDevice::set_tx_offload(uint64_t offload) {
+    assert(!_is_initialized);
+    info.tx_offload |= offload;
+}
 
 EtherAddress DPDKDevice::get_mac() {
     assert(_is_initialized);

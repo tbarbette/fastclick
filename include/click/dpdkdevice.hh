@@ -75,10 +75,13 @@ public:
     struct DevInfo {
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
-            rx_queues(0,false), tx_queues(0,false), promisc(false), n_rx_descs(0),
-            n_tx_descs(0), mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
-            num_pools(0), vf_vlan(), vlan_filter(false), vlan_strip(false),
-            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET) {
+            rx_queues(0,false), tx_queues(0,false),
+            promisc(false),
+            mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
+            num_pools(0), vf_vlan(),
+            vlan_filter(false), vlan_strip(false),
+            n_rx_descs(0), n_tx_descs(0),
+            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -117,6 +120,8 @@ public:
         uint16_t init_mtu;
         int init_rss;
         FlowControlMode init_fc_mode;
+        uint64_t rx_offload;
+        uint64_t tx_offload;
     };
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -143,6 +148,8 @@ public:
     void set_init_mtu(uint16_t mtu);
     void set_init_rss_max(int rss_max);
     void set_init_fc_mode(FlowControlMode fc);
+    void set_rx_offload(uint64_t offload);
+    void set_tx_offload(uint64_t offload);
 
 
     unsigned int get_nb_rxdesc();

@@ -1,5 +1,5 @@
 /*
- * mbgclock.{cc,hh} -- Meinberg-based clock
+ * linuxclock.{cc,hh} -- User Clock wrapper for Linux
  * Tom Barbette
  *
  * Copyright (c) 2017 University of Liege

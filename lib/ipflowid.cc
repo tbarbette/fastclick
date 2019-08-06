@@ -88,4 +88,9 @@ operator<<(StringAccum &sa, const IPFlowID &flow_id)
     return sa;
 }
 
+IPFlow5ID::IPFlow5ID(const Packet *p, bool reverse) : IPFlowID(p,reverse) {
+	_proto = p->ip_header()->ip_p;
+}
+
+
 CLICK_ENDDECLS

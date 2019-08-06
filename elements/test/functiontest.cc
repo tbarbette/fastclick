@@ -106,6 +106,12 @@ FunctionTest::initialize(ErrorHandler *errh)
     CHECK(TinyExpr::compile("squarewave(1.5)",0).eval() == -1);
 
     expr = TinyExpr::compile("(squarewave(((x + 20 / 2) * 1/20) ^ 2.5) * (-x / 45 + 1) + 1) * ((200 -1) / 2) + 1", 1);
+
+
+    CHECK(TinyExpr::compile("min(1, 2)",0).eval() == 1);
+
+    CHECK(abs(TinyExpr::compile("min(1, (0.1 + (x/10)))",1).eval(1) - 0.2) < 0.01);
+
     CHECK(abs(expr.eval(0) - 200) < 0.01);
     CHECK(abs(expr.eval(5)  - 3401.0/18) < 0.01);
     CHECK(abs(expr.eval(45)  - 201.0/2) < 0.01);

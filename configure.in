@@ -291,8 +291,9 @@ if test "x$enable_dpdk" = "xyes"; then
 
 
     if pkg-config --exists libdpdk ; then
-        :
+      RTE_LIB=pkg-config --variable=libdir libdpdk
     else
+      RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         AC_MSG_ERROR([
 =========================================
@@ -321,6 +322,14 @@ or install DPDK using meson, or he system package manager.
       AC_SUBST(RTE_VER_YEAR, $rte_ver_year)
       AC_SUBST(RTE_VER_MONTH, $rte_ver_month)
       AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
+
+      AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
+      if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
+        AC_MSG_RESULT([yes])
+        AC_DEFINE([HAVE_DPDK_READ_CLOCK])
+      else
+        AC_MSG_RESULT([no])
+      fi
     fi
 
     AC_DEFINE([HAVE_DPDK])

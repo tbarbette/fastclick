@@ -137,6 +137,21 @@ Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
 Boolean. If False, the device is only initialized. Use this when you want
 to read packet using secondary DPDK applications.
 
+=item TCO
+
+Boolean. If True, enables TCP Checksum Offload. Packets must be set with the
+checksum flag, eg with ResetTCPChecksum. Defaults to False.
+
+=item TSO
+
+Boolean. If True, enables TCP Segmentation Offload. Packets must be configured
+individually as per DPDK documentation. Defaults to False.
+
+=item IPCO
+
+Booelan. If True, enables IP checksum offload alone (not L4 as TCO).
+Defaults to False.
+
 =item VERBOSE
 
 Boolean. If True, more detailed messages about the device are printed to
@@ -172,6 +187,8 @@ public:
     const char *class_name() const { return "FromDPDKDevice"; }
     const char *port_count() const { return PORTS_0_1; }
     const char *processing() const { return PUSH; }
+    void* cast(const char* name) override;
+
     int configure_phase() const {
         return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
@@ -191,6 +208,10 @@ public:
     inline DPDKDevice *get_device() {
         return _dev;
     }
+
+#if HAVE_DPDK_READ_CLOCK
+    static uint64_t read_clock(void* thunk);
+#endif
 
 private:
     static int reset_load_handler(
@@ -212,6 +233,7 @@ private:
     enum {
         h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
         h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
+        h_stats_packets, h_stats_bytes,
         h_active, h_safe_active,
         h_xstats, h_queue_count,
         h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
@@ -236,6 +258,7 @@ private:
         int useful;
     };
     per_thread<FDState> _fdstate;
+    bool _set_timestamp;
 };
 
 CLICK_ENDDECLS
