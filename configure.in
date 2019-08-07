@@ -238,6 +238,14 @@ if echo "$enable_select" | grep kqueue >/dev/null 2>&1 && test "$enable_kqueue" 
     AC_DEFINE([HAVE_ALLOW_KQUEUE], [1], [Define if kqueue() may be used to wait for file descriptor events.])
 fi
 
+AC_ARG_ENABLE([xdp],
+    [AS_HELP_STRING([  --enable-xdp], [use XDP])],
+    [:], [enable_xdp=yes])
+
+if test "x$enable_xdp" = "xyes"; then
+  LIBS="$LIBS -lbpf"
+fi
+
 AC_ARG_ENABLE([dpdk],
     [AS_HELP_STRING([  --enable-dpdk], [use DPDK])],
     [:], [enable_dpdk=no])

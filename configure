@@ -810,6 +810,7 @@ enable_netmap_pool
 enable_select
 enable_poll
 enable_kqueue
+enable_xdp
 enable_dpdk
 enable_dpdk_pool
 enable_dpdk_packet
@@ -1532,6 +1533,7 @@ Optional Features:
     --disable-select      do not use select()
     --disable-poll        do not use poll()
     --disable-kqueue      do not use kqueue()
+    --enable-xdp          use XDP
     --enable-dpdk         use DPDK
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
@@ -6932,6 +6934,18 @@ if echo "$enable_select" | grep kqueue >/dev/null 2>&1 && test "$enable_kqueue" 
 
 $as_echo "#define HAVE_ALLOW_KQUEUE 1" >>confdefs.h
 
+fi
+
+# Check whether --enable-xdp was given.
+if test "${enable_xdp+set}" = set; then :
+  enableval=$enable_xdp; :
+else
+  enable_xdp=yes
+fi
+
+
+if test "x$enable_xdp" = "xyes"; then
+  LIBS="$LIBS -lbpf"
 fi
 
 # Check whether --enable-dpdk was given.

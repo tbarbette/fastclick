@@ -28,3 +28,4 @@ share/click/pkg-config.mk
 stamp-egroup
 stamp-h
 *.sw*
+tags
