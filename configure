@@ -837,6 +837,7 @@ enable_app
 enable_aqm
 enable_ethernet
 enable_etherswitch
+enable_flow
 enable_grid
 enable_icmp
 enable_ip
@@ -1556,6 +1557,7 @@ Optional Features:
   --disable-aqm           do not include active queue management elements
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
+  --enable-flow           include Enable flow system and elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
@@ -7498,6 +7500,18 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_etherswitch" = xNO -o "x$enable_etherswitch" = x \) && enable_etherswitch=yes
 if test "x$enable_etherswitch" = xyes; then
     :
+
+fi
+# Check whether --enable-flow was given.
+if test "${enable_flow+set}" = set; then :
+  enableval=$enable_flow;
+else
+  enable_flow=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flow" = x \) && enable_flow=yes
+if test "x$enable_flow" = xyes; then
+    :
+    $as_echo "#define HAVE_FLOW 1" >>confdefs.h
 
 fi
 # Check whether --enable-grid was given.

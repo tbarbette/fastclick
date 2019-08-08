@@ -56,6 +56,9 @@
 /* Define if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
+/* Define if you have the flow function. */
+#undef HAVE_FLOW
+
 /* Define if you have the ffs function. */
 #undef HAVE_FFS
 
