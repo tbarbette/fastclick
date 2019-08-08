@@ -353,7 +353,7 @@ RouterThread::run_tasks(int ntasks)
     if (ntasks > 32768)
         ntasks = 32768;
 
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
     // cycle counter for adaptive scheduling among processors
     click_cycles_t cycles = 0;
 #endif
@@ -364,7 +364,7 @@ RouterThread::run_tasks(int ntasks)
     want_status.is_strong_unscheduled = false;
 
     Task *t;
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
     int runs;
 #endif
     bool work_done;
@@ -382,7 +382,7 @@ RouterThread::run_tasks(int ntasks)
             continue;
         }
 
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
         runs = t->cycle_runs();
         if (runs > PROFILE_ELEMENT)
             cycles = click_get_cycles();
@@ -391,7 +391,7 @@ RouterThread::run_tasks(int ntasks)
         t->_status.is_scheduled = false;
         work_done = t->fire();
 
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
         if (runs > PROFILE_ELEMENT) {
             unsigned delta = click_get_cycles() - cycles;
             t->update_cycles(delta/32 + (t->cycles()*31)/32);

@@ -149,6 +149,9 @@
 #undef HAVE_TASK_HEAP
 #endif
 
+/* Define if compiled with task statistics. */
+#undef HAVE_TASK_STATS
+
 /* The size of a `int', as computed by sizeof. */
 #undef SIZEOF_INT
 
