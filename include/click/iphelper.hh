@@ -1,7 +1,7 @@
 /*
  * IPHelper.hh - Provides several methods that can be used by elements to manage IP packets
  *
- * Romain Gaillard.
+ * Romain Gaillard, Tom Barbette
  */
 
 #ifndef MIDDLEBOX_IPHELPER_HH
@@ -9,6 +9,8 @@
 
 #include <click/config.h>
 #include <click/glue.hh>
+#include <clicknet/tcp.h>
+#include <clicknet/udp.h>
 
 CLICK_DECLS
 
@@ -54,6 +56,13 @@ public:
      * @param packet The IP packet
      */
     inline void computeIPChecksum(WritablePacket* packet) const;
+
+
+    /**
+     * Rewrite the src or dst IP address and src or dst port of the packet.
+     */
+    inline void rewrite_ipport(WritablePacket* p, IPAddress ip, uint16_t port,
+                               const int shift, bool is_tcp);
 };
 
 inline uint16_t IPHelper::packetTotalLength(Packet *packet) const
@@ -98,6 +107,40 @@ inline const uint32_t IPHelper::getDestinationAddress(Packet* packet) const
     const click_ip *iph = packet->ip_header();
 
     return *(const uint32_t*)&iph->ip_dst;
+}
+
+inline void
+IPHelper::rewrite_ipport(WritablePacket* p, IPAddress ip, uint16_t port,
+                            const int shift, bool is_tcp) {
+    assert(p->network_header());
+    assert(p->transport_header());
+    uint32_t old_hw, t_old_hw;
+    uint32_t new_hw, t_new_hw;
+
+    uint16_t *xip = reinterpret_cast<uint16_t *>(&p->ip_header()->ip_src);
+    old_hw = (uint32_t) xip[(shift * 2) + 0] + xip[(shift*2) + 1];
+    t_old_hw = old_hw;
+    old_hw += (old_hw >> 16);
+
+    memcpy(&xip[shift*2], &ip, 4);
+
+    new_hw = (uint32_t) xip[(shift*2) + 0] + xip[(shift*2) + 1];
+    t_new_hw = new_hw;
+    new_hw += (new_hw >> 16);
+    click_ip *iph = p->ip_header();
+    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
+
+    uint16_t *xport = reinterpret_cast<uint16_t *>(&p->tcp_header()->th_sport);
+    t_old_hw += (uint32_t) xport[shift + 0];
+    t_old_hw += (t_old_hw >> 16);
+    xport[shift + 0] = port;
+    t_new_hw += (uint32_t) xport[shift + 0];
+    t_new_hw += (t_new_hw >> 16);
+
+    if (is_tcp)
+        click_update_in_cksum(&p->tcp_header()->th_sum, t_old_hw, t_new_hw);
+    else
+        click_update_in_cksum(&p->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
 
 CLICK_ENDDECLS
