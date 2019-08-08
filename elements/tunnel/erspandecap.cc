@@ -51,7 +51,7 @@ ERSPANDecap::classify(Packet *p)
   int sz = sizeof(click_erspan);
   if (_span_anno)
       SET_AGGREGATE_ANNO(p, (uint16_t)erspan->id_up << 8 | (uint16_t)erspan->id_down);
-  int ret = 0;
+
   uint8_t ver = erspan->ver;
   if (ver == 0x01) {
       if (_direction_anno)
