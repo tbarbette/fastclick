@@ -1273,6 +1273,14 @@ Ignoring --enable-task-heap, which is incompatible with --disable-stride.
 fi
 
 
+dnl task statistics
+AC_ARG_ENABLE([task-stats],
+    [AS_HELP_STRING([--enable-task-stats], [Keep track of task statistics, used for automatic balancing of tasks among threads])],
+    [:], [enable_task_stats=no])
+if test "x$enable_task_stats" = xyes; then
+    AC_DEFINE(HAVE_TASK_STATS)
+fi
+
 dnl debugging malloc
 
 AC_ARG_ENABLE([dmalloc], [AS_HELP_STRING([--enable-dmalloc], [enable debugging malloc])], :, enable_dmalloc=no)
@@ -2357,6 +2365,11 @@ fi
 dnl add 'smpclick' if compiled with --enable-multithread > 1
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
+fi
+
+dnl add 'taskstats' if compiled with --enable-task-stats
+if test "x$enable_task_stats" = xyes; then
+    provisions="$provisions taskstats"
 fi
 
 dnl add 'umultithread' if compiled with --enable-user-multithread

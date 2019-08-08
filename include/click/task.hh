@@ -289,7 +289,7 @@ class Task : private TaskLink { public:
     inline unsigned utilization() const;
     inline void clear_runs();
 #endif
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
     inline int cycles() const;
     inline unsigned cycle_runs() const;
     inline void update_cycles(unsigned c);
@@ -623,7 +623,7 @@ Task::clear_runs()
 }
 #endif
 
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
 inline int
 Task::cycles() const
 {

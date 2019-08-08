@@ -135,5 +135,5 @@ BalancedThreadSched::run_timer(Timer *)
     _timer.schedule_after_msec(_interval);
 }
 
-ELEMENT_REQUIRES(multithread)
+ELEMENT_REQUIRES(multithread taskstats)
 EXPORT_ELEMENT(BalancedThreadSched BalancedThreadSched-SortedTaskSched)
