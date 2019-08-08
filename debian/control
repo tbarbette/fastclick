@@ -8,10 +8,25 @@ Build-Depends:
   rdma-core,
   lshw,
   pciutils,
-  zlib1g-dev
+  zlib1g-dev,
+  libbpf-dev,
+  libpcap-dev
 Homepage: https://github.com/tbarbette/fastclick
 
 Package: fastclick
 Architecture: amd64
 Priority: optional
 Description: The FastClick modular router
+Depends:
+  libnuma1,
+  ibverbs-providers,
+  libibverbs1,
+  libnl-route-3-200,
+  libnl-3-200,
+  rdma-core,
+  lshw,
+  pciutils,
+  zlib1g,
+  libc6,
+  libbpf4.19,
+  libpcap0.8
