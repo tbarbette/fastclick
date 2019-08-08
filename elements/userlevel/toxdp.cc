@@ -1,5 +1,5 @@
 /*
- * fromxdp.{cc,hh} reads network packets from a linux netdev via XDP
+ * fromxdp.{cc,hh} writes network packets to a linux netdev via XDP
  *
  * Ryan Goodfellow
  *
@@ -16,9 +16,10 @@
  * legally binding.
  */
 
-#include "fromxdp.hh"
+#include "toxdp.hh"
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/xdp_common.hh>
 
 extern "C" {
 #include <bpf/libbpf.h>
@@ -45,47 +46,45 @@ extern "C" {
 
 CLICK_DECLS
 
-static void free_pkt(unsigned char *, size_t, void *pktmbuf)
-{
-   //TODO, possibly no need for anything ans umem_fill_to_kernel_ex churns the
-   //ring?
-}
-
-bool FromXDP::run_task(Task *t) 
+void ToXDP::push(int port, Packet *p)
 {
 
-  struct xdp_desc descs[BATCH_SIZE];
-  unsigned int rcvd = xq_deq(&_xsk->rx, descs, BATCH_SIZE);
-  printf("recvd: %u\n", rcvd);
-  if (!rcvd)
-    return false;
+  struct xdp_uqueue *uq = &_xsk->tx;
+  struct xdp_desc *r = uq->ring;
 
-  for (unsigned int i = 0; i < rcvd; i++) {
-    char *pkt = (char*)xq_get_data(_xsk, descs[i].addr);
-    hex_dump(pkt, descs[i].len, descs[i].addr);
-
-    //TODO totally untested
-    WritablePacket *p = Packet::make(
-        (unsigned char*)pkt,
-        descs[i].len,
-        free_pkt,
-        pkt,
-        FRAME_HEADROOM,
-        FRAME_TAILROOM
-    );
-    output(0).push(p);
+  if (xq_nb_free(uq, 1) < 1) {
+    click_chatter("toxdp: ring overflow");
+    return;
   }
 
-  _xsk->rx_npkts += rcvd;
+  u32 idx = uq->cached_prod++ & uq->mask;
+  u64 addr = idx << FRAME_SHIFT;
+  r[idx].addr = addr;
+  r[idx].len = p->length();
+  memcpy(
+      &_xsk->umem->frames[addr],
+      p->data(),
+      p->length()
+  );
 
-  umem_fill_to_kernel_ex(&_xsk->umem->fq, descs, rcvd);
+  u_smp_wmb();
+  *uq->producer = uq->cached_prod;
+  _xsk->outstanding_tx++;
 
-  t->fast_reschedule();
+  u64 descs[BATCH_SIZE];
+  size_t ndescs = 
+    (_xsk->outstanding_tx > BATCH_SIZE) ? BATCH_SIZE : _xsk->outstanding_tx;
+  unsigned int rcvd = umem_complete_from_kernel(&_xsk->umem->cq, descs, ndescs);
+  if (rcvd > 0) {
+    umem_fill_to_kernel(&_xsk->umem->fq, descs, rcvd);
+    _xsk->outstanding_tx -= rcvd;
+    _xsk->tx_npkts += rcvd;
+  }
 
-  return true;
+  kick_tx(_xsk->sfd);
 
 }
 
 CLICK_ENDDECLS
 
-EXPORT_ELEMENT(FromXDP)
+EXPORT_ELEMENT(ToXDP)
