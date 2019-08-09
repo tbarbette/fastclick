@@ -194,6 +194,7 @@ uninstall:
 clean:
 	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
+	cd bpf && $(MAKE) clean
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
 distclean: clean

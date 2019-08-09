@@ -335,7 +335,7 @@ void BaseXDP::init_bpf(ErrorHandler *errh) {
 
   int err = bpf_prog_load_xattr(&pla, &bpf_obj, &bpf_fd);
   if (err) {
-    errh->fatal("failed to load bpf program: %s", strerror(err));
+    errh->fatal("failed to load bpf program %s: %s", pla.file, strerror(err));
   }
   if (bpf_fd < 0) {
     errh->fatal("failed to load bpf program (fd): %s", strerror(bpf_fd));

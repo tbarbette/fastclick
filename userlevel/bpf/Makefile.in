@@ -8,3 +8,6 @@ xdpbpf.o: ../../elements/userlevel/bpf/xdpbpf.c
 
 install: xdpbpf.o
 	$(INSTALL) $< -m 0644 -D $(DESTDIR)$(prefix)/lib/click/$<
+
+clean:
+	rm -f *.o
