@@ -85,7 +85,7 @@ void hex_dump(void *pkt, size_t length, u64 addr)
 	char buf[32];
 	int i = 0;
 
-	sprintf(buf, "addr=%llu", addr);
+	sprintf(buf, "addr=%lu", addr);
 	printf("length = %zu\n", length);
 	printf("%s | ", buf);
 	while (length-- > 0) {
@@ -326,7 +326,7 @@ void BaseXDP::init_bpf(ErrorHandler *errh) {
   // load program
 
   struct bpf_prog_load_attr pla = {
-    .file = "/usr/lib/moa/xdpbpf.o",
+    .file = "/usr/lib/click/xdpbpf.o",
     .prog_type = BPF_PROG_TYPE_XDP,
   };
 

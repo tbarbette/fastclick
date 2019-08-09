@@ -139,7 +139,11 @@ endif
 endif
 
 
-all: $(INSTALLPROGS) $(INSTALLLIBS)
+all: $(INSTALLPROGS) $(INSTALLLIBS) bpfobj
+
+.PHONY: bpfobj
+bpfobj:
+	cd bpf && $(MAKE) all
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
@@ -175,6 +179,7 @@ endif
 install: $(INSTALLPROGS) install-lib
 	$(call verbose_cmd,$(mkinstalldirs) $(DESTDIR)$(bindir))
 	@for i in $(INSTALLPROGS); do $(call x_verbose_cmd,$(INSTALL) $$i,INSTALL,$(DESTDIR)$(bindir)/$$i); done
+	cd bpf && $(MAKE) install
 install-include:
 	@:
 install-lib: $(INSTALLLIBS)

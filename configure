@@ -14307,6 +14307,8 @@ test -f $srcdir/ns/Makefile.in && ac_config_files="$ac_config_files ns/Makefile"
 
 test -f $srcdir/userlevel/Makefile.in && ac_config_files="$ac_config_files userlevel/Makefile"
 
+test -f $srcdir/userlevel/bpf/Makefile.in && ac_config_files="$ac_config_files userlevel/bpf/Makefile"
+
 
 test -d $srcdir/tools/click-align && ac_config_files="$ac_config_files tools/click-align/Makefile"
 
@@ -15053,6 +15055,7 @@ do
     "minios/config.mk") CONFIG_FILES="$CONFIG_FILES minios/config.mk" ;;
     "ns/Makefile") CONFIG_FILES="$CONFIG_FILES ns/Makefile" ;;
     "userlevel/Makefile") CONFIG_FILES="$CONFIG_FILES userlevel/Makefile" ;;
+    "userlevel/bpf/Makefile") CONFIG_FILES="$CONFIG_FILES userlevel/bpf/Makefile" ;;
     "tools/click-align/Makefile") CONFIG_FILES="$CONFIG_FILES tools/click-align/Makefile" ;;
     "tools/click-check/Makefile") CONFIG_FILES="$CONFIG_FILES tools/click-check/Makefile" ;;
     "tools/click-combine/Makefile") CONFIG_FILES="$CONFIG_FILES tools/click-combine/Makefile" ;;

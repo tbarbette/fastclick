@@ -2390,6 +2390,7 @@ test -f $srcdir/linuxmodule/Makefile.in && AC_CONFIG_FILES([linuxmodule/Makefile
 test -f $srcdir/minios/Makefile.in && AC_CONFIG_FILES([minios/Makefile minios/config.mk])
 test -f $srcdir/ns/Makefile.in && AC_CONFIG_FILES([ns/Makefile])
 test -f $srcdir/userlevel/Makefile.in && AC_CONFIG_FILES([userlevel/Makefile])
+test -f $srcdir/userlevel/bpf/Makefile.in && AC_CONFIG_FILES([userlevel/bpf/Makefile])
 
 test -d $srcdir/tools/click-align && AC_CONFIG_FILES([tools/click-align/Makefile])
 test -d $srcdir/tools/click-check && AC_CONFIG_FILES([tools/click-check/Makefile])

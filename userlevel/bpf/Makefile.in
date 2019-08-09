@@ -1,0 +1,10 @@
+all: xdpbpf.o
+
+prefix = @prefix@
+INSTALL = @INSTALL@
+
+xdpbpf.o: ../../elements/userlevel/bpf/xdpbpf.c
+	clang -O2 -emit-llvm -c $< -o - | llc -march=bpf -filetype=obj -o $@
+
+install: xdpbpf.o
+	$(INSTALL) $< -m 0644 -D $(DESTDIR)$(prefix)/lib/click/$<
