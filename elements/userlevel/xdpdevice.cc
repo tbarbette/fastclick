@@ -598,9 +598,12 @@ void XDPDevice::pull()
   struct xdp_uqueue *uq = &_xsk->tx;
   struct xdp_desc *r = uq->ring;
 
+  kick_tx(_xsk->sfd);
+
   for (Packet *p = input(0).pull(); p != nullptr; p = input(0).pull()) {
 
-    printf("%s sending packet\n", name().c_str());
+    printf("%s sending packet (%d)\n", name().c_str(), p->length());
+    hex_dump((void*)p->data(), p->length(), 1701);
 
     if (xq_nb_free(uq, 1) < 1) {
       click_chatter("toxdp: ring overflow");
