@@ -270,28 +270,28 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_MB)   += -lrte_pmd_aesni_mb
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_MB)   += -L$(AESNI_MULTI_BUFFER_LIB_PATH) -lIPSec_MB
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_GCM)  += -lrte_pmd_aesni_gcm -lcrypto
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_AESNI_GCM)  += -L$(AESNI_MULTI_BUFFER_LIB_PATH) -lIPSec_MB
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_CCP)         += -lrte_pmd_ccp -lcrypto
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_CCP)        += -lrte_pmd_ccp -lcrypto
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NULL_CRYPTO) += -lrte_pmd_null_crypto
 
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
 ifeq ($(CONFIG_RTE_LIBRTE_PMD_QAT),y)
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT_SYM)     += -lrte_pmd_qat -lcrypto
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT_ASYM)    += -lrte_pmd_qat -lcrypto
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT_SYM)    += -lrte_pmd_qat -lcrypto
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT_ASYM)   += -lrte_pmd_qat -lcrypto
 endif # CONFIG_RTE_LIBRTE_PMD_QAT
 else
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT)        += -lrte_pmd_qat -lcrypto
 endif
 
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SNOW3G)     += -lrte_pmd_snow3g
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SNOW3G)     += -L$(LIBSSO_SNOW3G_PATH)/build -lsso_snow3g
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI)     += -lrte_pmd_kasumi
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI)     += -L$(LIBSSO_KASUMI_PATH)/build -lsso_kasumi
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZUC)         += -lrte_pmd_zuc
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZUC)         += -L$(LIBSSO_ZUC_PATH)/build -lsso_zuc
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ARMV8_CRYPTO)    += -lrte_pmd_armv8
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ARMV8_CRYPTO)    += -L$(ARMV8_CRYPTO_LIB_PATH) -larmv8_crypto
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO) += -L$(LIBMUSDK_PATH)/lib -lrte_pmd_mrvl_crypto -lmusdk
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_MVSAM_CRYPTO) += -L$(LIBMUSDK_PATH)/lib -lrte_pmd_mvsam_crypto -lmusdk
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SNOW3G)           += -lrte_pmd_snow3g
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SNOW3G)           += -L$(LIBSSO_SNOW3G_PATH)/build -lsso_snow3g
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI)           += -lrte_pmd_kasumi
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_KASUMI)           += -L$(LIBSSO_KASUMI_PATH)/build -lsso_kasumi
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZUC)              += -lrte_pmd_zuc
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ZUC)              += -L$(LIBSSO_ZUC_PATH)/build -lsso_zuc
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ARMV8_CRYPTO)     += -lrte_pmd_armv8
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ARMV8_CRYPTO)     += -L$(ARMV8_CRYPTO_LIB_PATH) -larmv8_crypto
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO)      += -L$(LIBMUSDK_PATH)/lib -lrte_pmd_mrvl_crypto -lmusdk
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_MVSAM_CRYPTO)     += -L$(LIBMUSDK_PATH)/lib -lrte_pmd_mvsam_crypto -lmusdk
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += -lrte_pmd_crypto_scheduler
 ifeq ($(CONFIG_RTE_LIBRTE_FSLMC_BUS),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC)   += -lrte_pmd_dpaa2_sec
@@ -303,7 +303,7 @@ endif # CONFIG_RTE_LIBRTE_CRYPTODEV
 ifeq ($(CONFIG_RTE_LIBRTE_COMPRESSDEV),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ISAL) += -lrte_pmd_isal_comp
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ISAL) += -lisal
-+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_ZIPVF) += -lrte_pmd_octeontx_zip
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_ZIPVF) += -lrte_pmd_octeontx_zip
 # Link QAT driver if it has not been linked yet
 ifeq ($(CONFIG_RTE_LIBRTE_PMD_QAT_SYM),n)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_QAT)  += -lrte_pmd_qat
@@ -314,24 +314,24 @@ endif # CONFIG_RTE_LIBRTE_COMPRESSDEV
 
 
 ifeq ($(CONFIG_RTE_LIBRTE_EVENTDEV),y)
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SKELETON_EVENTDEV) += -lrte_pmd_skeleton_event
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SW_EVENTDEV) += -lrte_pmd_sw_event
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF) += -lrte_pmd_octeontx_ssovf
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SKELETON_EVENTDEV)  += -lrte_pmd_skeleton_event
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_SW_EVENTDEV)        += -lrte_pmd_sw_event
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)     += -lrte_pmd_octeontx_ssovf
 ifeq ($(CONFIG_RTE_LIBRTE_DPAA_BUS),y)
-	_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_DPAA_EVENTDEV) += -lrte_pmd_dpaa_event
+	_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_DPAA_EVENTDEV)  += -lrte_pmd_dpaa_event
 endif # CONFIG_RTE_LIBRTE_DPAA_BUS
 ifeq ($(CONFIG_RTE_EAL_VFIO)$(CONFIG_RTE_LIBRTE_FSLMC_BUS),yy)
 	_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_EVENTDEV) += -lrte_pmd_dpaa2_event
 endif # CONFIG_RTE_LIBRTE_FSLMC_BUS
 
-_LDLIBS-$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL) += -lrte_mempool_octeontx
-_LDLIBS-$(CONFIG_RTE_LIBRTE_OCTEONTX_PMD) += -lrte_pmd_octeontx
-_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OPDL_EVENTDEV) += -lrte_pmd_opdl_event
+_LDLIBS-$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL)       += -lrte_mempool_octeontx
+_LDLIBS-$(CONFIG_RTE_LIBRTE_OCTEONTX_PMD)           += -lrte_pmd_octeontx
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OPDL_EVENTDEV)      += -lrte_pmd_opdl_event
 endif # CONFIG_RTE_LIBRTE_EVENTDEV
 
 ifeq ($(CONFIG_RTE_LIBRTE_DPAA2_PMD),y)
-_LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)      += -lrte_bus_fslmc
-_LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)      += -lrte_mempool_dpaa2
+_LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)              += -lrte_bus_fslmc
+_LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)              += -lrte_mempool_dpaa2
 endif # CONFIG_RTE_LIBRTE_DPAA2_PMD
 
 endif # ! $(CONFIG_RTE_BUILD_SHARED_LIB)
