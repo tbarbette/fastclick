@@ -97,6 +97,7 @@ class XDPDevice : public Element {
 
     String _dev;
     String _mode;
+    String _prog;
 
     struct bpf_map *_xsk_map,
                    *_qidconf_map;

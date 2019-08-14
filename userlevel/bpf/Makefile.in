@@ -1,13 +1,18 @@
-all: xdpbpf.o
+all: xdpallrx.o xdpvxlan.o
 
 prefix = @prefix@
 INSTALL = @INSTALL@
 
-xdpbpf.o: ../../elements/userlevel/bpf/xdpbpf.c
-	clang -O2 -emit-llvm -c $< -o - | llc -march=bpf -filetype=obj -o $@
+%.llvmir: ../../elements/userlevel/bpf/%.c
+	clang -O2 -Wno-compare-distinct-pointer-types -emit-llvm -c $< -o $@
 
-install: xdpbpf.o
-	$(INSTALL) $< -m 0644 -D $(DESTDIR)$(prefix)/lib/click/$<
+%.o: %.llvmir
+	llc -march=bpf -filetype=obj -o $@ $<
+
+install: xdpallrx.o xdpvxlan.o
+	$(INSTALL) xdpallrx.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpallrx.o
+	$(INSTALL) xdpvxlan.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpvxlan.o
 
 clean:
+	rm -f *.llvmir
 	rm -f *.o

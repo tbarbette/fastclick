@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright(c) 2019 - The MergeTB Authors */
 
-#define KBUILD_HODNAME "moaq"
+#define KBUILD_MODNAME "moaq"
 #include <linux/bpf.h>
 #include "bpf_helpers.h"
 

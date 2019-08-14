@@ -273,6 +273,7 @@ int XDPDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
   if(Args(conf, this, errh)
       .read_mp("DEV", _dev)
       .read_or_set("MODE", _mode, "skb")
+      .read_or_set("PROG", _prog, "xdpallrx")
       .consume() < 0 ) {
 
     return CONFIGURE_FAIL;
@@ -318,12 +319,11 @@ void XDPDevice::init_bpf(ErrorHandler *errh) {
 
   // load program
 
+  String fn = String("/usr/lib/click/")+ _prog + String(".o");
   struct bpf_prog_load_attr pla = {
-    .file = "/usr/lib/click/xdpbpf.o",
+    .file = fn.c_str(),
     .prog_type = BPF_PROG_TYPE_XDP,
   };
-
-  printf("cats\n");
 
   struct bpf_object *bpf_obj;
   int bpf_fd;
@@ -335,8 +335,6 @@ void XDPDevice::init_bpf(ErrorHandler *errh) {
   if (bpf_fd < 0) {
     errh->fatal("failed to load bpf program (fd): %s", strerror(bpf_fd));
   }
-
-  printf("bananas\n");
 
   // load socket map
 
