@@ -283,8 +283,12 @@ inline void TCPHelper::resetTCPChecksum(WritablePacket *packet)
     mbuf->l2_len = packet->mac_header_length();
     mbuf->l3_len = packet->network_header_length();
     mbuf->l4_len = tcph->th_off << 2;
-        mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4;
-    tcph->th_sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+    mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+        tcph->th_sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
+    #else
+        tcph->th_sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+    #endif
 #endif
 }
 
@@ -446,7 +450,7 @@ inline bool TCPHelper::isJustAnAck(Packet* packet, const bool or_fin)
         return false;
 
     //  If we have other flags, we are more than just an ACK
-    if(flags == TH_ACK || (or_fin && flags == TH_ACK | TH_FIN))
+    if(flags == TH_ACK || (or_fin && flags == (TH_ACK | TH_FIN)))
         return true;
     else
         return false;
