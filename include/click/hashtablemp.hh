@@ -4,6 +4,7 @@
 #include <click/hashcode.hh>
 #define CLICK_DEBUG_HASHMAP 1
 #include <click/allocator.hh>
+#include <functional>
 #include <click/multithread.hh>
 #if CLICK_DEBUG_HASHMAP
 # define click_hashmp_assert(x) assert(x)
@@ -35,7 +36,7 @@ class HashContainerMP { public:
         ListItem* _hashnext;
     };
 
-    pool_allocator_mt<ListItem> _allocator;
+    pool_allocator_mt<ListItem, false, 2048> _allocator;
 
     class ListItemPtr { public:
         ListItemPtr() : head(0) {};
@@ -270,6 +271,17 @@ class HashContainerMP { public:
         return s;
     }
 
+    /** @brief Return the number of buckets. */
+    inline size_type buckets() {
+        size_type s;
+        if (likely(_mt))
+            _table.read_begin();
+        s = _table->_nbuckets;
+        if (likely(_mt))
+            _table.read_end();
+        return s;
+    }
+
     /** @brief Return true iff size() == 0. */
     inline bool empty() {
         return size() == 0;
@@ -303,7 +315,14 @@ class HashContainerMP { public:
     /** @brief Copy the value of V for K in storage if K is found, delete it from the table and return true. If nonfound, nothing is deleted and return false. */
     inline bool find_remove(const K &key, V &storage);
 
+    inline bool find_remove_clean(const K &key, std::function<void(V &storage)> store, std::function<bool(V &storage)> shouldremove);
+
     inline ptr find_insert(const K &key, const V &value);
+
+    inline ptr find_create(const K &key,std::function<V(void)> on_create);
+
+    /** @brief Replace an item if it exists, insert it otherwise. Do not look at use count ! */
+    inline void replace(const K &key, const V &value, std::function<void(V&value)> on_replace);
 
     inline write_ptr find_insert_write(const K &key, const V &value);
 
@@ -324,6 +343,11 @@ class HashContainerMP { public:
 
     inline void disable_mt() {
         _mt = false;
+    }
+
+    inline void resize_clear(size_t n) {
+        deinitialize();
+        initialize(n);
     }
   protected:
     bool _mt;
@@ -358,6 +382,7 @@ class HashContainerMP { public:
         }
         return _allocator.allocate(li);
     }
+
     void release_pending(bool force=false) {
         ListItem* it;
         ListItem* next;
@@ -456,7 +481,7 @@ HashContainerMP<K,V,Item>::find_write(const K &key)
 
 template <typename K, typename V, typename Item>
 inline bool
-HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
+HashContainerMP<K,V,Item>::find_remove_clean(const K &key, std::function<void(V &c)> store, std::function<bool(V &c)> shoulddelete)
 {
     if (likely(_mt))
         _table.read_begin();
@@ -470,15 +495,23 @@ HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
     ListItem* *pprev_ptr = &bucket.list->head;
     ptr p;
     while (pprev) {
-        if (hashkeyeq(hashkey(pprev), key)) {
-            storage = *pprev->item.unprotected_ptr();
+        //We have the write lock of the bucket, so cleaning along the way is fine
+        if (shoulddelete(*pprev->item.unprotected_ptr())) {
             *pprev_ptr = pprev->_hashnext;
-            erase_item(pprev);
-            goto found;
+            ListItem* tmp = pprev;
+            pprev = *pprev_ptr;
+            erase_item(tmp);
+            _table->_size--;
+        } else {
+            if (hashkeyeq(hashkey(pprev), key)) {
+                store(*pprev->item.unprotected_ptr());
+                *pprev_ptr = pprev->_hashnext;
+                erase_item(pprev);
+                goto found;
+            }
+            pprev_ptr = &pprev->_hashnext;
+            pprev = pprev->_hashnext;
         }
-        pprev_ptr = &pprev->_hashnext;
-        pprev = pprev->_hashnext;
-
     }
     if (likely(_mt))
         bucket.list.write_end();
@@ -490,7 +523,20 @@ HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage)
     return true;
 }
 
-#define MAKE_FIND_INSERT(ptr_type,on_exists) \
+template <typename K, typename V, typename Item>
+inline bool
+HashContainerMP<K,V,Item>::find_remove(const K &key, V &storage) {
+    return find_remove_clean(key, [&storage](V&c){storage = c;}, [](V&){return false;});
+}
+
+
+template <typename K, typename V, typename Item>
+inline void
+HashContainerMP<K,V,Item>::erase(const K &key) {
+    find_remove_clean(key, [](V&){}, [](V&){return false;});
+}
+
+#define MAKE_FIND_INSERT(ptr_type,on_exists,value) \
     if (likely(_mt))\
         _table.read_begin();\
     size_type b = bucket(key);\
@@ -509,7 +555,7 @@ retry:\
         }\
     }\
     if (p) {\
-        on_exists\
+        on_exists(pprev->item);\
         if (likely(_mt))\
             bucket.list.read_end();\
     } else {\
@@ -534,15 +580,28 @@ retry:\
 template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::ptr
 HashContainerMP<K,V,Item>::find_insert(const K &key,const V &value) {
-    MAKE_FIND_INSERT(ptr,{});
+    MAKE_FIND_INSERT(ptr,(void),value);
     click_hashmp_assert(p.refcnt() > 0);
+    return p;
+}
+
+template <typename K, typename V, typename Item>
+inline void
+HashContainerMP<K,V,Item>::replace(const K &key,const V &value, std::function<void(V&value)> on_replace) {
+    MAKE_FIND_INSERT(ptr,{on_replace(*pprev->item.unprotected_ptr());pprev->item = value;},value);
+}
+
+template <typename K, typename V, typename Item>
+inline typename HashContainerMP<K,V,Item>::ptr
+HashContainerMP<K,V,Item>::find_create(const K &key,std::function<V(void)> on_create) {
+    MAKE_FIND_INSERT(ptr,(void),on_create());
     return p;
 }
 
 template <typename K, typename V, typename Item>
 inline typename HashContainerMP<K,V,Item>::write_ptr
 HashContainerMP<K,V,Item>::find_insert_write(const K &key,const V &value) {
-    MAKE_FIND_INSERT(write_ptr,{});
+    MAKE_FIND_INSERT(write_ptr,(void),value);
     click_hashmp_assert(p.refcnt() == -1);
     return p;
 }
@@ -550,7 +609,7 @@ HashContainerMP<K,V,Item>::find_insert_write(const K &key,const V &value) {
 template <typename K, typename V, typename Item>
 inline void
 HashContainerMP<K,V,Item>::set(const K &key,const V &value) {
-    MAKE_FIND_INSERT(write_ptr,{*p = value;});
+    MAKE_FIND_INSERT(write_ptr,{*p = value;},value);
 }
 
 
@@ -780,6 +839,11 @@ void HashContainerMP<K,V,Item>::rehash(size_type n)
 
 template <typename K, typename V>
 class HashTableMP : public HashContainerMP<K,V,shared<V> > { public:
+    HashTableMP() : HashContainerMP<K,V,shared<V> >::HashContainerMP() {
+    }
+
+    HashTableMP(int n) : HashContainerMP<K,V,shared<V> >::HashContainerMP(n) {
+    }
 };
 
 

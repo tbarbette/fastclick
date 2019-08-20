@@ -12,3 +12,4 @@
 # PARTICULAR PURPOSE.
 
 m4_include([m4/click.m4])
+m4_include([m4/ax_check_compile_flag.m4])

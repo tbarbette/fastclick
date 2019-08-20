@@ -10,6 +10,7 @@ CLICK_CXX_PROTECT
 #else
 # include <sys/types.h>
 # include <netinet/in.h>
+# include <netinet/ip.h>
 #endif
 
 /*
@@ -43,7 +44,9 @@ struct click_ip {
 #define	IP_RF		0x8000		/*         reserved fragment flag    */
 #define	IP_DF		0x4000		/*         don't fragment flag	     */
 #define	IP_MF		0x2000		/*         more fragments flag	     */
+#if CLICK_LINUXMODULE
 #define	IP_OFFMASK	0X1FFF		/*         mask for fragmenting bits */
+#endif
     uint8_t	ip_ttl;			/* 8     time to live		     */
     uint8_t	ip_p;			/* 9     protocol		     */
     uint16_t	ip_sum;			/* 10-11 checksum		     */
