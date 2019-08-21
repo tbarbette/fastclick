@@ -3,6 +3,8 @@ Section: net
 Priority: optional
 Maintainer: Ryan Goodfellow <rgoodfel@isi.edu>
 Build-Depends: 
+  clang,
+  llvm,
   libnuma-dev,
   libibverbs-dev,
   rdma-core,
