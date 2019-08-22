@@ -30,7 +30,9 @@ struct vlan_hdr {
 #define u32 __u32
 #define u64 __u64
 
-//#define DEBUG 1
+char _license[] SEC("license") = "GPL";
+
+#define DEBUG 1
 #ifdef  DEBUG
 /* Only use this for debug output. Notice output from bpf_trace_printk()
  * end-up in /sys/kernel/debug/tracing/trace_pipe
@@ -105,6 +107,8 @@ bool parse_eth(struct ethhdr *eth, void *data_end,
 		eth_type = vlan_hdr->h_vlan_encapsulated_proto;
 	}
 
+  bpf_debug("offset: %u\n", offset);
+
 	*eth_proto = ntohs(eth_type);
 	*l3_offset = offset;
 	return true;
@@ -116,6 +120,8 @@ u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
   void *data_end = (void *)(long)ctx->data_end;
   struct udphdr *udph;
   struct tcphdr *tcph;
+
+  bpf_debug("ipv4 proto %u\n", proto);
 
   switch (proto) {
     case IPPROTO_UDP:
@@ -166,19 +172,26 @@ u32 parse_ipv4(struct xdp_md *ctx, u64 l3_offset)
 }
 
 static __always_inline
-bool handle_packet(struct xdp_md *ctx, u16 eth_proto, u64 l3_offset)
+int handle_packet(struct xdp_md *ctx, u16 eth_proto, u64 l3_offset)
 {
   u32 port;
 	switch (eth_proto) {
+	case ETH_P_ARP:  
+    /* arps should go to ther kenel */
+    bpf_debug("arp\n");
+    return XDP_PASS;
 	case ETH_P_IP:
+    bpf_debug("ipv4\n");
 		port = parse_ipv4(ctx, l3_offset);
+    bpf_debug("ipv4 port %u\n", port);
+    /* vxlan packets go to userspace */
     if(port == 4789) {
       return bpf_redirect_map(&xsk_map, 0, 0);
     }
+    /* everybody else goes to the kernel */
     return XDP_PASS;
 	case ETH_P_IPV6: /* No handler for IPv6 yet*/
-	case ETH_P_ARP:  /* Let OS handle ARP */
-		/* Fall-through */
+    bpf_debug("ipv6\n");
 	default:
 		bpf_debug("Not handling eth_proto:0x%x\n", eth_proto);
 		return XDP_PASS;
@@ -215,6 +228,5 @@ int xdpvlan_prog(struct xdp_md *ctx)
 	}
 	bpf_debug("Reached L3: L3off:%llu proto:0x%x\n", l3_offset, eth_proto);
 
-	action = handle_packet(ctx, eth_proto, l3_offset);
-  return 0;
+	return handle_packet(ctx, eth_proto, l3_offset);
 }
