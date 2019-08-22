@@ -110,36 +110,37 @@ bool parse_eth(struct ethhdr *eth, void *data_end,
 	return true;
 }
 
+static __always_inline
 u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
 {
-	void *data_end = (void *)(long)ctx->data_end;
-	struct udphdr *udph;
-	struct tcphdr *tcph;
+  void *data_end = (void *)(long)ctx->data_end;
+  struct udphdr *udph;
+  struct tcphdr *tcph;
 
-	switch (proto) {
-	case IPPROTO_UDP:
-		udph = hdr;
-		if (udph + 1 > data_end) {
-			bpf_debug("Invalid UDPv4 packet: L4off:%llu\n",
-				  sizeof(struct iphdr) + sizeof(struct udphdr));
-			return XDP_ABORTED;
-		}
-		return ntohs(udph->dest);
+  switch (proto) {
+    case IPPROTO_UDP:
+      udph = hdr;
+      if (udph + 1 > data_end) {
+        bpf_debug("Invalid UDPv4 packet: L4off:%llu\n",
+            sizeof(struct iphdr) + sizeof(struct udphdr));
+        return XDP_ABORTED;
+      }
+      return ntohs(udph->dest);
 
-	case IPPROTO_TCP:
-		tcph = hdr;
-		if (tcph + 1 > data_end) {
-			bpf_debug("Invalid TCPv4 packet: L4off:%llu\n",
-				  sizeof(struct iphdr) + sizeof(struct tcphdr));
-			return XDP_ABORTED;
-		}
-		return ntohs(tcph->dest);
+    case IPPROTO_TCP:
+      tcph = hdr;
+      if (tcph + 1 > data_end) {
+        bpf_debug("Invalid TCPv4 packet: L4off:%llu\n",
+            sizeof(struct iphdr) + sizeof(struct tcphdr));
+        return XDP_ABORTED;
+      }
+      return ntohs(tcph->dest);
 
-	default:
-		return 0;
-	}
+    default:
+      return 0;
+  }
 
-        return 0;
+  return 0;
 }
 
 static __always_inline
