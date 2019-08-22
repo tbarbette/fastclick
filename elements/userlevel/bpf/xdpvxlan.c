@@ -126,7 +126,7 @@ u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
   switch (proto) {
     case IPPROTO_UDP:
       udph = hdr;
-      if (udph + 1 > data_end) {
+      if (udph + 1 > (struct udphdr*)data_end) {
         bpf_debug("Invalid UDPv4 packet: L4off:%llu\n",
             sizeof(struct iphdr) + sizeof(struct udphdr));
         return XDP_ABORTED;
@@ -135,7 +135,7 @@ u32 parse_port(struct xdp_md *ctx, u8 proto, void *hdr)
 
     case IPPROTO_TCP:
       tcph = hdr;
-      if (tcph + 1 > data_end) {
+      if (tcph + 1 > (struct tcphdr*)data_end) {
         bpf_debug("Invalid TCPv4 packet: L4off:%llu\n",
             sizeof(struct iphdr) + sizeof(struct tcphdr));
         return XDP_ABORTED;
@@ -158,7 +158,7 @@ u32 parse_ipv4(struct xdp_md *ctx, u64 l3_offset)
 	u32 ip_src; /* type need to match map */
 
 	/* Hint: +1 is sizeof(struct iphdr) */
-	if (iph + 1 > data_end) {
+	if (iph + 1 > (struct iphdr*)data_end) {
 		bpf_debug("Invalid IPv4 packet: L3off:%llu\n", l3_offset);
 		return XDP_ABORTED;
 	}
