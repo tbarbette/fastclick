@@ -240,7 +240,7 @@ int handle_packet_vni(
         int *q = bpf_map_lookup_elem(vni_map, &vni);
         if(q) {
           bpf_debug("vni %lu is in vni map, @sfd %d\n", vni, *q);
-          return bpf_redirect_map(xsk_map, 47, 0);
+          return bpf_redirect_map(xsk_map, *q, 0);
         }
         else {
           bpf_debug("vni %lu is NOT in vni map\n", vni);
