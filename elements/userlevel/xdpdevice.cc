@@ -16,7 +16,10 @@
  * legally binding.
  */
 
+#include <array>
+#include <memory>
 #include "xdpdevice.hh"
+#include "json.hpp"
 #include <click/args.hh>
 #include <click/error.hh>
 
@@ -41,6 +44,35 @@ extern "C" {
 #include <sys/resource.h>
 #include <linux/if_xdp.h>
 #include <linux/if_link.h>
+}
+
+using std::string;
+using std::array;
+using std::unique_ptr;
+using nlohmann::json;
+
+static string exec(const char* cmd) {
+    array<char, 128> buffer;
+    string result;
+    unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    return result;
+}
+
+static int bpf(int cmd, union bpf_attr *attr, unsigned int size)
+{
+#ifdef __NR_bpf
+	return syscall(__NR_bpf, cmd, attr, size);
+#else
+	fprintf(stderr, "No bpf syscall, kernel headers too old?\n");
+	errno = ENOSYS;
+	return -1;
+#endif
 }
 
 CLICK_DECLS
@@ -270,10 +302,14 @@ struct xdp_umem *XDPDevice::umem_config(int sfd)
 
 int XDPDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
 
+  String entry;
+
   if(Args(conf, this, errh)
       .read_mp("DEV", _dev)
       .read_or_set("MODE", _mode, "skb")
       .read_or_set("PROG", _prog, "xdpallrx")
+      .read_or_set("LOAD", _load, true)
+      .read_or_set("VNI", _vni, 0)
       .consume() < 0 ) {
 
     return CONFIGURE_FAIL;
@@ -301,6 +337,8 @@ int XDPDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
     return CONFIGURE_FAIL;
   }
 
+  _prog_file = String("/usr/lib/click/")+ _prog + String(".o");
+
   return CONFIGURE_SUCCESS;
 
 }
@@ -315,55 +353,108 @@ void XDPDevice::set_rlimit(ErrorHandler *errh) {
 
 }
 
-void XDPDevice::init_bpf(ErrorHandler *errh) {
-
-  // load program
-
-  String fn = String("/usr/lib/click/")+ _prog + String(".o");
+void XDPDevice::load_bpf_program(ErrorHandler *errh) 
+{
   struct bpf_prog_load_attr pla = {
-    .file = fn.c_str(),
+    .file = _prog_file.c_str(),
     .prog_type = BPF_PROG_TYPE_XDP,
   };
 
-  struct bpf_object *bpf_obj;
-  int bpf_fd;
-
-  int err = bpf_prog_load_xattr(&pla, &bpf_obj, &bpf_fd);
+  int err = bpf_prog_load_xattr(&pla, &_bpf_obj, &_bpf_fd);
   if (err) {
     errh->fatal("failed to load bpf program %s: %s", pla.file, strerror(err));
   }
-  if (bpf_fd < 0) {
-    errh->fatal("failed to load bpf program (fd): %s", strerror(bpf_fd));
+  if (_bpf_fd < 0) {
+    errh->fatal("failed to load bpf program (fd): %s", strerror(_bpf_fd));
   }
 
-  // load socket map
+  // apply the bpf program to the specified link
+  err = bpf_set_link_xdp_fd(_ifx_index, _bpf_fd, _flags);
+  if(err < 0) {
+    errh->fatal("xdp link set failed: %s", strerror(err));
+  }
+}
 
-  _xsk_map = bpf_object__find_map_by_name(bpf_obj, "xsk_map");
+void XDPDevice::open_bpf_program(ErrorHandler *errh)
+{
+  struct bpf_object_open_attr attr = {
+    .file = _prog_file.c_str(),
+    .prog_type = BPF_PROG_TYPE_XDP,
+  };
+
+  _bpf_obj = bpf_object__open_xattr(&attr);
+  if (IS_ERR_OR_NULL(_bpf_obj))
+    errh->fatal("failed to open bpf object");
+
+  string cmd = "ip -j link show dev " + string(_dev.c_str());
+  string out = exec(cmd.c_str());
+
+  json j = json::parse(out);
+  int prog_id = j[0]["xdp"]["prog"]["id"];
+
+  union bpf_attr battr = {};
+  battr.prog_id = prog_id;
+  _bpf_fd = bpf(BPF_PROG_GET_FD_BY_ID, &battr, sizeof(attr));
+  if (_bpf_fd < 0)
+    errh->fatal("failed to get bpf program fd using id: %s", strerror(_bpf_fd));
+
+  /*
+  struct bpf_program *prog = bpf_program__next(NULL, _bpf_obj);
+  if (IS_ERR_OR_NULL(_bpf_obj))
+    errh->fatal("failed to open bpf program");
+
+  _bpf_fd = bpf_program__fd(prog);
+  if (_bpf_fd < 0) {
+    errh->fatal("failed to load bpf program (fd): %s", strerror(_bpf_fd));
+  }
+  */
+
+}
+
+void XDPDevice::load_bpf_maps(ErrorHandler *errh)
+{
+  // load socket map
+  _xsk_map = bpf_object__find_map_by_name(_bpf_obj, "xsk_map");
   _xsk_map_fd = bpf_map__fd(_xsk_map);
   if (_xsk_map_fd < 0) {
     errh->fatal("failed to load xsk_map: %s", strerror(_xsk_map_fd));
   }
 
+  // load vni map
+  if (_vni) {
+    _vni_map = bpf_object__find_map_by_name(_bpf_obj, "vni_map");
+    _vni_map_fd = bpf_map__fd(_vni_map);
+    if (_vni_map_fd < 0) {
+      errh->fatal("failed to load vni_map: %s", strerror(_vni_map_fd));
+    }
+  }
+
   // load queue id config map
-  _qidconf_map = bpf_object__find_map_by_name(bpf_obj, "qidconf_map");
+  _qidconf_map = bpf_object__find_map_by_name(_bpf_obj, "qidconf_map");
   _qidconf_map_fd = bpf_map__fd(_qidconf_map);
   if (_qidconf_map_fd < 0) {
     errh->fatal("failed to load qidconf_map: %s", strerror(_qidconf_map_fd));
   }
+}
 
+void XDPDevice::init_bpf_qidconf(ErrorHandler *errh)
+{
   int key = 0, q = 0;
-  err = bpf_map_update_elem(_qidconf_map_fd, &key, &q, 0);
+  int err = bpf_map_update_elem(_qidconf_map_fd, &key, &q, 0);
   if (err) {
     errh->fatal("failed to configure qidconf map: %s", strerror(err));
   }
+}
 
-  // apply the bpf program to the specified link
+void XDPDevice::init_bpf(ErrorHandler *errh) 
+{
+  if (_load) 
+    load_bpf_program(errh);
+  else 
+    open_bpf_program(errh);
 
-  err = bpf_set_link_xdp_fd(_ifx_index, bpf_fd, _flags);
-  if(err < 0) {
-    errh->fatal("xdp link set failed: %s", strerror(err));
-  }
-
+  load_bpf_maps(errh);
+  init_bpf_qidconf(errh);
 }
 
 void XDPDevice::init_xsk(ErrorHandler *errh) {
@@ -463,9 +554,15 @@ void XDPDevice::init_xsk(ErrorHandler *errh) {
   }
 
   // insert xdp sockets into map
+  if (_vni) {
+    printf("%s adding vni map [%d]%d -> %d\n", name().c_str(), _vni_map_fd, _vni, _xsk->sfd);
+    err = bpf_map_update_elem(_vni_map_fd, &_vni, &_xsk->sfd, 0);
+    if (err) {
+      errh->fatal("failed to add socket to map: %s", strerror(err));
+    }
+  }
 
-  int key = 0;
-  err = bpf_map_update_elem(_xsk_map_fd, &key, &_xsk->sfd, 0);
+  err = bpf_map_update_elem(_xsk_map_fd, &_vni, &_xsk->sfd, 0);
   if (err) {
     errh->fatal("failed to add socket to map: %s", strerror(err));
   }
@@ -642,3 +739,4 @@ void XDPDevice::pull()
 CLICK_ENDDECLS
 
 EXPORT_ELEMENT(XDPDevice)
+

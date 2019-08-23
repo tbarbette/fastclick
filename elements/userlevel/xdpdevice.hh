@@ -16,6 +16,13 @@
 #define u_smp_wmb() barrier()
 #define u_smp_rmb() barrier()
 
+#define MAX_ERRNO	4095
+#define IS_ERR_VALUE(x) unlikely((unsigned long)(void *)(x) >= (unsigned long)-MAX_ERRNO)
+inline bool IS_ERR_OR_NULL(const void *ptr)
+{
+	return unlikely(!ptr) || IS_ERR_VALUE((unsigned long)ptr);
+}
+
 #define NUM_FRAMES 131072
 #define NUM_DESCS 1024
 #define FRAME_SIZE 2048
@@ -88,7 +95,6 @@ class XDPDevice : public Element {
     const char *processing() const override final { return PULL_TO_PUSH; }
 
     bool run_task(Task *t) override final;
-    //void push(int port, Packet *p) override final;
     void push();
     void pull();
 
@@ -99,20 +105,36 @@ class XDPDevice : public Element {
     String _mode;
     String _prog;
 
+    bool _load{true};
+
     struct bpf_map *_xsk_map,
+                   *_vni_map,
                    *_qidconf_map;
     xdpsock *_xsk;
+    struct bpf_object *_bpf_obj;
+
+    String _prog_file{};
 
     int _xsk_map_fd,
+        _vni_map_fd,
         _qidconf_map_fd;
 
     u32 _ifx_index{0};
     u16 _flags{0};
     u16 _bind_flags{0};
-    int _sfd;
+    int _sfd,
+        _bpf_fd;
+
+    int _vni{0};
 
     void set_rlimit(ErrorHandler*);
+
     void init_bpf(ErrorHandler*);
+    void load_bpf_program(ErrorHandler*);
+    void open_bpf_program(ErrorHandler*);
+    void load_bpf_maps(ErrorHandler*);
+    void init_bpf_qidconf(ErrorHandler*);
+
     void init_xsk(ErrorHandler*);
 
     int xq_deq(struct xdp_uqueue *uq, struct xdp_desc *descs, int ndescs);

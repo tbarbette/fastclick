@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright(c) 2019 - The MergeTB Authors */
-/*
- * derived from
- * https://github.com/netoptimizer/prototype-kernel/blob/master/kernel/samples/bpf/xdp_ddos01_blacklist_kern.c
- */
-
-#define KBUILD_MODNAME "xdpvxlan"
+#define KBUILD_MODNAME "xdpvxlanvni"
 #include <linux/bpf.h>
 #include "bpf_helpers.h"
 #include "common.h"
@@ -19,17 +14,25 @@ struct bpf_map_def SEC("maps") qidconf_map = {
   .max_entries = 1,
 };
 
-// TODO: do we really need a map in this case (1 entry only), or is there a 
-// simpler way
+// TODO remove this if/when 
+//   https://www.mail-archive.com/netdev@vger.kernel.org/msg297102.html
+// gets merged.
+struct bpf_map_def SEC("maps") vni_map = {
+  .type = BPF_MAP_TYPE_ARRAY,
+  .key_size = sizeof(int),
+  .value_size = sizeof(int),
+  .max_entries = 1024,
+};
+
 struct bpf_map_def SEC("maps") xsk_map = {
   .type = BPF_MAP_TYPE_XSKMAP,
   .key_size = sizeof(int),
   .value_size = sizeof(int),
-  .max_entries = 1,
+  .max_entries = 1024,
 };
 
 SEC(KBUILD_MODNAME)
-int xdpvlan_prog(struct xdp_md *ctx)
+int xdpvlanvni_prog(struct xdp_md *ctx)
 {
   // queue mapping
   int key = 0;
@@ -37,7 +40,6 @@ int xdpvlan_prog(struct xdp_md *ctx)
   if (!qidconf) {
     return XDP_PASS;
   }
-
   if(*qidconf != ctx->rx_queue_index) {
     return XDP_PASS;
   }
@@ -57,5 +59,5 @@ int xdpvlan_prog(struct xdp_md *ctx)
 	}
 	bpf_debug("Reached L3: L3off:%llu proto:0x%x\n", l3_offset, eth_proto);
 
-	return handle_packet(&xsk_map, ctx, eth_proto, l3_offset);
+	return handle_packet_vni(&xsk_map, &vni_map, ctx, eth_proto, l3_offset);
 }

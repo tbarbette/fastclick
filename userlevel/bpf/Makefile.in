@@ -1,4 +1,4 @@
-all: xdpallrx.o xdpvxlan.o
+all: xdpallrx.o xdpvxlan.o xdpvxlanvni.o
 
 prefix = @prefix@
 INSTALL = @INSTALL@
@@ -12,6 +12,7 @@ INSTALL = @INSTALL@
 install: xdpallrx.o xdpvxlan.o
 	$(INSTALL) xdpallrx.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpallrx.o
 	$(INSTALL) xdpvxlan.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpvxlan.o
+	$(INSTALL) xdpvxlanvni.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpvxlanvni.o
 
 clean:
 	rm -f *.llvmir
