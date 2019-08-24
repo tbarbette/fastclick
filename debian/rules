@@ -15,9 +15,9 @@
 
 
 %:
-	dh $@ --without autoreconf --no-parallel
+	dh $@ --without autoreconf
 
 override_dh_auto_configure:
-	dh_auto_configure -- --verbose --with-netmap=no --disable-batch --disable-dpdk --disable-dpdk-packet --disable-dynamic-linking --disable-linuxmodule --enable-bound-port-transfer --enable-etherswitch --enable-intel-cpu --enable-local --enable-multithread --enable-poll --enable-user-multithread --enable-zerocopy
+	CXXFLAGS=-Wno-pointer-arith dh_auto_configure -- --verbose --with-netmap=no --disable-batch --disable-dpdk --disable-dpdk-packet --disable-dynamic-linking --disable-linuxmodule --enable-bound-port-transfer --enable-etherswitch --enable-intel-cpu --enable-local --enable-multithread --enable-poll --enable-user-multithread --enable-zerocopy
 
 override_dh_auto_test:

@@ -51,6 +51,22 @@ using std::array;
 using std::unique_ptr;
 using nlohmann::json;
 
+#ifndef __NR_bpf
+# if defined(__i386__)
+#  define __NR_bpf 357
+# elif defined(__x86_64__)
+#  define __NR_bpf 321
+# elif defined(__aarch64__)
+#  define __NR_bpf 280
+# elif defined(__sparc__)
+#  define __NR_bpf 349
+# elif defined(__s390__)
+#  define __NR_bpf 351
+# else
+#  error __NR_bpf not defined. bpf does not support your arch.
+# endif
+#endif
+
 static string exec(const char* cmd) {
     array<char, 128> buffer;
     string result;
@@ -66,13 +82,7 @@ static string exec(const char* cmd) {
 
 static int bpf(int cmd, union bpf_attr *attr, unsigned int size)
 {
-#ifdef __NR_bpf
 	return syscall(__NR_bpf, cmd, attr, size);
-#else
-	fprintf(stderr, "No bpf syscall, kernel headers too old?\n");
-	errno = ENOSYS;
-	return -1;
-#endif
 }
 
 CLICK_DECLS
@@ -394,7 +404,7 @@ void XDPDevice::open_bpf_program(ErrorHandler *errh)
 
   union bpf_attr battr = {};
   battr.prog_id = prog_id;
-  _bpf_fd = bpf(BPF_PROG_GET_FD_BY_ID, &battr, sizeof(attr));
+  _bpf_fd = bpf(BPF_PROG_GET_FD_BY_ID, &battr, sizeof(battr));
   if (_bpf_fd < 0)
     errh->fatal("failed to get bpf program fd using id: %s", strerror(_bpf_fd));
 
@@ -415,6 +425,9 @@ void XDPDevice::load_bpf_maps(ErrorHandler *errh)
 {
   // load socket map
   _xsk_map = bpf_object__find_map_by_name(_bpf_obj, "xsk_map");
+  if (IS_ERR_OR_NULL(_xsk_map))
+    errh->fatal("could not find xsk_map");
+
   _xsk_map_fd = bpf_map__fd(_xsk_map);
   if (_xsk_map_fd < 0) {
     errh->fatal("failed to load xsk_map: %s", strerror(_xsk_map_fd));
