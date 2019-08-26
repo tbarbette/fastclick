@@ -9,10 +9,54 @@
 #include <click/pair.hh>
 #include <click/flow/common.hh>
 #include <click/batchbuilder.hh>
-
 CLICK_DECLS
 class DPDKDevice;
 struct rte_hash;
+
+template <typename T>
+class TimerWheel {
+	uint32_t _mask;
+	uint32_t _index;
+	Vector<T*> _buckets;
+	Spinlock _writers_lock;
+
+public:
+	TimerWheel() : _index(0) {
+
+	}
+
+	void initialize(int max) {
+		max = next_pow2(max + 2);
+		_mask = max - 1;
+		_buckets.resize(max);
+	}
+
+	inline void schedule_after(T* obj, uint32_t timeout, const std::function<void(T*,T*)> setter) {
+		T** f = &_buckets.unchecked_at((_index + timeout) & _mask);
+		setter(obj,*f);
+		*f = obj;
+	}
+
+	inline void schedule_after_mp(T* obj, uint32_t timeout, const std::function<void(T*,T*)> setter) {
+		_writers_lock.acquire();
+		T** f = &_buckets.unchecked_at(((*(volatile uint32_t*)&_index) + timeout) & _mask);
+		setter(obj,*f);
+		*f = obj;
+		//click_write_fence(); done by release()
+		_writers_lock.release();
+	}
+
+	/**
+	 * Must be called by one thread only!
+	 */
+	inline void run_timers(std::function<T*(T*)> expire) {
+		T** f = &_buckets.unchecked_at((_index) & _mask);
+		while (*f != 0) {
+			*f = expire(*f);
+		}
+		_index++;
+	}
+};
 
 /**
  * FlowIPManager(CAPACITY [, RESERVE])
@@ -51,17 +95,16 @@ public:
     void cleanup(CleanupStage stage) CLICK_COLD;
 
     void push_batch(int, PacketBatch* batch) override;
+    void run_timer(Timer*) override;
 
     void add_handlers() override CLICK_COLD;
 
 protected:
 
-
 	volatile int owner;
 	Packet* queue;
 	rte_hash* hash;
 	FlowControlBlock *fcbs;
-
 
     int _reserve;
     int _table_size;
@@ -69,12 +112,13 @@ protected:
     int _verbose;
     int _flags;
 
+    int _timeout;
+    Timer _timer; //Timer to launch the wheel
+
     String read_handler(Element* e, void* thunk);
-    inline void process(Packet* p, BatchBuilder& b);
-
+    inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
+    TimerWheel<FlowControlBlock> _timer_wheel;
 };
-
-
 
 CLICK_ENDDECLS
 #endif
