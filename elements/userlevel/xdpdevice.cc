@@ -251,12 +251,16 @@ struct xdp_umem *XDPDevice::umem_config(int sfd)
   }
 
   struct xdp_mmap_offsets off;
-  printf("off.fr.producer %llx\n", off.fr.producer);
-  printf("off.fr.consumer %llx\n", off.fr.consumer);
+  if (_trace) {
+    printf("off.fr.producer %llx\n", off.fr.producer);
+    printf("off.fr.consumer %llx\n", off.fr.consumer);
+  }
   socklen_t optlen = sizeof(struct xdp_mmap_offsets);
   err = getsockopt(sfd, SOL_XDP, XDP_MMAP_OFFSETS, &off, &optlen);
-  printf("off.fr.producer %llx\n", off.fr.producer);
-  printf("off.fr.consumer %llx\n", off.fr.consumer);
+  if (_trace) {
+    printf("off.fr.producer %llx\n", off.fr.producer);
+    printf("off.fr.consumer %llx\n", off.fr.consumer);
+  }
   if (err) {
     fprintf(stderr, "failed to get xdp mmap offsets: %s\n", strerror(err));
     exit(EXIT_FAILURE);
