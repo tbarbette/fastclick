@@ -105,6 +105,8 @@ class XDPDevice : public Element {
     String _mode;
     String _prog;
 
+    bool _trace{false};
+
     bool _load{true};
 
     struct bpf_map *_xsk_map,

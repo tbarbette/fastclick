@@ -320,6 +320,7 @@ int XDPDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
       .read_or_set("PROG", _prog, "xdpallrx")
       .read_or_set("LOAD", _load, true)
       .read_or_set("VNI", _vni, 0)
+      .read_or_set("TRACE", _trace, false)
       .consume() < 0 ) {
 
     return CONFIGURE_FAIL;
@@ -615,7 +616,9 @@ size_t XDPDevice::umem_complete_from_kernel( struct xdp_umem_uqueue *cq, u64 *d,
   }
 
   if (entries > 0) {
-    printf("kernel completed %d entries\n", entries);
+    if (_trace) {
+      printf("kernel completed %d entries\n", entries);
+    }
     u_smp_wmb();
     *cq->consumer = cq->cached_cons;
   }
@@ -672,11 +675,16 @@ void XDPDevice::push()
   if (rcvd == 0) {
     return;
   }
-  printf("recvd: %u\n", rcvd);
+  if (_trace) {
+    printf("recvd: %u\n", rcvd);
+  }
 
   for (unsigned int i = 0; i < rcvd; i++) {
     char *pkt = (char*)xq_get_data(_xsk, descs[i].addr);
-    hex_dump(pkt, descs[i].len, descs[i].addr);
+
+    if (_trace) {
+      hex_dump(pkt, descs[i].len, descs[i].addr);
+    }
 
     //TODO totally untested
     WritablePacket *p = Packet::make(
@@ -710,8 +718,10 @@ void XDPDevice::pull()
 
   for (Packet *p = input(0).pull(); p != nullptr; p = input(0).pull()) {
 
-    printf("%s sending packet (%d)\n", name().c_str(), p->length());
-    hex_dump((void*)p->data(), p->length(), 1701);
+    if (_trace) {
+      printf("%s sending packet (%d)\n", name().c_str(), p->length());
+      hex_dump((void*)p->data(), p->length(), 1701);
+    }
 
     if (xq_nb_free(uq, 1) < 1) {
       click_chatter("toxdp: ring overflow");
