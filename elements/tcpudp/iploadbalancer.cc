@@ -64,9 +64,8 @@ void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
         WritablePacket* q =p->uniqueify();
         p = q;
 
-        unsigned hash = IPFlowID(p).hashcode();
-        hash = hash >> 16 ^  hash;
-        IPAddress srv = _dsts[hash % _dsts.size()];
+        unsigned hash = pick_server(p);
+        IPAddress srv = _dsts.unchecked_at(hash);
 
 	q->ip_header()->ip_dst = srv;
         p->set_dst_ip_anno(srv);

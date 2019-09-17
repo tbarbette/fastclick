@@ -123,9 +123,9 @@ int FlowIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-void FlowIPLoadBalancerReverse::push_batch(int, SNull* flowdata, PacketBatch* batch) {
+void FlowIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
 
-    auto fnt = [this,flowdata](Packet* &p) -> bool {
+    auto fnt = [this](Packet* &p) -> bool {
         WritablePacket* q =p->uniqueify();
         p = q;
         q->ip_header()->ip_src = _lb->_vip;

@@ -1,12 +1,12 @@
 // -*- c-basic-offset: 4 -*-
-#include <click/ipflowid.hh>
-
 #ifndef CLICK_LB_HH
 #define CLICK_LB_HH
 
+#include <click/ipflowid.hh>
+
 class LoadBalancer { public:
 
-	LoadBalancer() : _current(0) {
+	LoadBalancer() : _current(0), _mode_case(weight_round_robin) {
 		modetrans.find_insert("rr",round_robin);
 		modetrans.find_insert("hash",direct_hash);
 		modetrans.find_insert("wrr",weight_round_robin);

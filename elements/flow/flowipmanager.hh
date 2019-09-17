@@ -32,16 +32,20 @@ public:
 	}
 
 	inline void schedule_after(T* obj, uint32_t timeout, const std::function<void(T*,T*)> setter) {
-		T** f = &_buckets.unchecked_at((_index + timeout) & _mask);
-		setter(obj,*f);
-		*f = obj;
+		unsigned id = ((*(volatile uint32_t*)&_index) + timeout) & _mask;
+		T* f = _buckets.unchecked_at(id);
+		setter(obj,f);
+        _buckets.unchecked_at(id) = obj;
 	}
 
 	inline void schedule_after_mp(T* obj, uint32_t timeout, const std::function<void(T*,T*)> setter) {
 		_writers_lock.acquire();
-		T** f = &_buckets.unchecked_at(((*(volatile uint32_t*)&_index) + timeout) & _mask);
-		setter(obj,*f);
-		*f = obj;
+        unsigned id = ((*(volatile uint32_t*)&_index) + timeout) & _mask;
+
+        //click_chatter("Enqueue %p at %d", obj, id);
+		T* f = _buckets.unchecked_at(id);
+		setter(obj,f);
+        _buckets.unchecked_at(id) = obj;
 		//click_write_fence(); done by release()
 		_writers_lock.release();
 	}
@@ -50,10 +54,12 @@ public:
 	 * Must be called by one thread only!
 	 */
 	inline void run_timers(std::function<T*(T*)> expire) {
-		T** f = &_buckets.unchecked_at((_index) & _mask);
-		while (*f != 0) {
-			*f = expire(*f);
+		T* f = _buckets.unchecked_at((_index) & _mask);
+		//click_chatter("Expire %d -> %d", _index, _index & _mask);
+		while (f != 0) {
+			f = expire(f);
 		}
+		_buckets.unchecked_at((_index) & _mask) = 0;
 		_index++;
 	}
 };
@@ -96,6 +102,7 @@ public:
 
     void push_batch(int, PacketBatch* batch) override;
     void run_timer(Timer*) override;
+    bool run_task(Task* t) override;
 
     void add_handlers() override CLICK_COLD;
 
@@ -114,8 +121,9 @@ protected:
 
     int _timeout;
     Timer _timer; //Timer to launch the wheel
+    Task _task;
 
-    String read_handler(Element* e, void* thunk);
+    static String read_handler(Element* e, void* thunk);
     inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
     TimerWheel<FlowControlBlock> _timer_wheel;
 };
