@@ -2,6 +2,7 @@
 #ifndef CLICK_LB_HH
 #define CLICK_LB_HH
 
+#include <click/hashtable.hh>
 #include <click/ipflowid.hh>
 
 class LoadBalancer { public:
