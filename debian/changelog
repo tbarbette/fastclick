@@ -1,7 +1,8 @@
-fastclick (0.1.1-1) stable; urgency=medium
+fastclick (0.1.2-0) stable; urgency=medium
 
   * Initial package release
   * Only dump packets in trace mode
+  * Fix colliding rx/tx ring descriptors in xdpdevice
 
- -- Ryan Goodfellow <ry@mergetb.org>  Fri, 2 Aug 2019 00:47:00 +0300
+ -- Ryan Goodfellow <ry@mergetb.org>  Sat, 21 Sep 2019 00:47:00 +0300
 
