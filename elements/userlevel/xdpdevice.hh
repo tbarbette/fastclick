@@ -24,7 +24,7 @@ inline bool IS_ERR_OR_NULL(const void *ptr)
 }
 
 #define NUM_FRAMES 131072
-#define NUM_DESCS 1024
+#define NUM_DESCS 2048
 #define FRAME_SIZE 2048
 #define FRAME_SHIFT 11
 #define FRAME_HEADROOM 0

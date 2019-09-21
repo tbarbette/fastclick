@@ -158,6 +158,7 @@ void *XDPDevice::xq_get_data(struct xdpsock *xsk, u64 addr)
 }
 
 
+// calculate the number of free entries in a queue
 u32 XDPDevice::umem_nb_free(struct xdp_umem_uqueue *q, u32 nb)
 {
   u32 free_entries = q->cached_cons - q->cached_prod;
@@ -170,36 +171,46 @@ u32 XDPDevice::umem_nb_free(struct xdp_umem_uqueue *q, u32 nb)
   return q->cached_cons - q->cached_prod;
 }
 
-int XDPDevice::umem_fill_to_kernel_ex(struct xdp_umem_uqueue *fq, struct xdp_desc *d, size_t nb)
+// send descriptors to the kernel
+int XDPDevice::umem_fill_to_kernel_ex(struct xdp_umem_uqueue *q, struct xdp_desc *d, size_t nb)
 {
-  if (umem_nb_free(fq, nb) < nb)
+  // see if there is enough space in the queue
+  if (umem_nb_free(q, nb) < nb)
     return -ENOSPC;
 
-  for (u32 i = 0; i < nb; i++) {
-    u32 idx = fq->cached_prod++ & fq->mask;
-    fq->ring[idx] = d[i].addr;
+  // add the descriptors to the ring, updating the cached producer index
+  for (size_t i = 0; i < nb; i++) {
+    u32 idx = q->cached_prod++ & q->mask;
+    q->ring[idx] = d[i].addr;
   }
 
+  // write through the cached producer to the producer variable after a memory
+  // barrier
   u_smp_wmb();
-  *fq->producer = fq->cached_prod;
+  *q->producer = q->cached_prod;
 
   return 0;
 }
 
-int XDPDevice::umem_fill_to_kernel(struct xdp_umem_uqueue *fq, u64 *d,
+// send descriptors to the kernel by address
+int XDPDevice::umem_fill_to_kernel(struct xdp_umem_uqueue *q, u64 *d,
     size_t nb) 
 {
 
-  if (umem_nb_free(fq, nb) < nb)
+  // see if there is enough space in the queue
+  if (umem_nb_free(q, nb) < nb)
     return -ENOSPC;
 
+  // add the descriptors to the ring, updating the cached producer index
   for (size_t i = 0; i < nb; i++) {
-    u32 idx = fq->cached_prod++ & fq->mask;
-    fq->ring[idx] = d[i];
+    u32 idx = q->cached_prod++ & q->mask;
+    q->ring[idx] = d[i];
   }
 
+  // write through the cached producer to the producer variable after a memory
+  // barrier
   u_smp_wmb();
-  *fq->producer = fq->cached_prod;
+  *q->producer = q->cached_prod;
 
   return 0;
 }
@@ -496,11 +507,13 @@ void XDPDevice::init_xsk(ErrorHandler *errh) {
 
   _xsk->umem = umem_config(_sfd);
 
-  int ndescs = NUM_DESCS;
+  int ndescs = FQ_NUM_DESCS;
   int err = setsockopt(_sfd, SOL_XDP, XDP_RX_RING, &ndescs, sizeof(int));
   if (err) {
     errh->fatal("failed to set rx ring descriptor: %s", strerror(err));
   }
+
+  ndescs = CQ_NUM_DESCS;
   err = setsockopt(_sfd, SOL_XDP, XDP_TX_RING, &ndescs, sizeof(int));
   if (err) {
     errh->fatal("failed to set tx ring descriptor: %s", strerror(err));
@@ -516,7 +529,7 @@ void XDPDevice::init_xsk(ErrorHandler *errh) {
   // rx 
   _xsk->rx.map = mmap(
       NULL,
-      off.rx.desc + NUM_DESCS * sizeof(struct xdp_desc),
+      off.rx.desc + FQ_NUM_DESCS * sizeof(struct xdp_desc),
       PROT_READ | PROT_WRITE,
       MAP_SHARED | MAP_POPULATE,
       _sfd,
@@ -526,7 +539,7 @@ void XDPDevice::init_xsk(ErrorHandler *errh) {
     errh->fatal("failed to mmap rx ring");
   }
 
-  for (u64 i=0; i < NUM_DESCS*FRAME_SIZE; i += FRAME_SIZE) {
+  for (u64 i=0; i < FQ_NUM_DESCS*FRAME_SIZE; i += FRAME_SIZE) {
     err = umem_fill_to_kernel(&_xsk->umem->fq, &i, 1);
     if (err) {
       errh->fatal("failed to fill rx frame to kernel: %s", strerror(err));
@@ -536,7 +549,7 @@ void XDPDevice::init_xsk(ErrorHandler *errh) {
   // tx 
   _xsk->tx.map = mmap(
       NULL,
-      off.tx.desc + NUM_DESCS * sizeof(struct xdp_desc),
+      off.tx.desc + CQ_NUM_DESCS * sizeof(struct xdp_desc),
       PROT_READ | PROT_WRITE,
       MAP_SHARED | MAP_POPULATE,
       _sfd,
@@ -546,18 +559,18 @@ void XDPDevice::init_xsk(ErrorHandler *errh) {
     errh->fatal("failed to mmap tx ring");
   }
 
-  _xsk->rx.mask = NUM_DESCS - 1;
-  _xsk->rx.size = NUM_DESCS;
+  _xsk->rx.mask = FQ_NUM_DESCS - 1;
+  _xsk->rx.size = FQ_NUM_DESCS;
   _xsk->rx.producer = (u32*)(_xsk->rx.map + off.rx.producer);
   _xsk->rx.consumer = (u32*)(_xsk->rx.map + off.rx.consumer);
   _xsk->rx.ring = (xdp_desc*)(_xsk->rx.map + off.rx.desc);
 
-  _xsk->tx.mask = NUM_DESCS - 1;
-  _xsk->tx.size = NUM_DESCS;
+  _xsk->tx.mask = CQ_NUM_DESCS - 1;
+  _xsk->tx.size = CQ_NUM_DESCS;
   _xsk->tx.producer = (u32*)(_xsk->tx.map + off.tx.producer);
   _xsk->tx.consumer = (u32*)(_xsk->tx.map + off.tx.consumer);
   _xsk->tx.ring = (xdp_desc*)(_xsk->tx.map + off.tx.desc);
-  _xsk->tx.cached_cons = NUM_DESCS;
+  _xsk->tx.cached_cons = CQ_NUM_DESCS;
 
   struct sockaddr_xdp sxdp = {
     .sxdp_family = AF_XDP,
@@ -621,7 +634,7 @@ size_t XDPDevice::umem_complete_from_kernel( struct xdp_umem_uqueue *cq, u64 *d,
 
   if (entries > 0) {
     if (_trace) {
-      printf("kernel completed %d entries\n", entries);
+      //printf("%s) kernel completed %d entries\n", name().c_str(), entries);
     }
     u_smp_wmb();
     *cq->consumer = cq->cached_cons;
@@ -657,10 +670,16 @@ int XDPDevice::initialize(ErrorHandler *errh) {
 
 }
 
-static void free_pkt(unsigned char *, size_t, void *pktmbuf)
+static void free_pkt(unsigned char *pkt, size_t, void *pktmbuf)
 {
-   //TODO, possibly no need for anything ans umem_fill_to_kernel_ex churns the
-   //ring?
+   // right now we copy packets into click. an optimiazation that could be nice
+   // is that instead of allocating a chunk of memory for a packet we 'allocate'
+   // a frame from the destination xdp device. this is not really allocation in
+   // the sense that all the frames for the device are allocated up front, it's
+   // more of a taking of ownership. This would eliminate the need for any
+   // dynamic memory allocation. However we would still need to copy the packet
+   // from the source UMEM to the target UMEM.
+   free(pkt);
 }
 
 bool XDPDevice::run_task(Task *t) 
@@ -672,30 +691,33 @@ bool XDPDevice::run_task(Task *t)
   return true;
 }
 
+// process packets received from the kernel
 void XDPDevice::push()
 {
-  struct xdp_desc descs[BATCH_SIZE];
+  static struct xdp_desc descs[BATCH_SIZE];
   unsigned int rcvd = xq_deq(&_xsk->rx, descs, BATCH_SIZE);
   if (rcvd == 0) {
     return;
   }
   if (_trace) {
-    printf("recvd: %u\n", rcvd);
+    printf("%s) recvd: %u\n", name().c_str(), rcvd);
   }
 
   for (unsigned int i = 0; i < rcvd; i++) {
     char *pkt = (char*)xq_get_data(_xsk, descs[i].addr);
 
     if (_trace) {
-      hex_dump(pkt, descs[i].len, descs[i].addr);
+      //hex_dump(pkt, descs[i].len, descs[i].addr);
     }
 
-    //TODO totally untested
+    char *_pkt = (char*)malloc(descs[i].len);
+    memcpy(_pkt, pkt, descs[i].len);
+
     WritablePacket *p = Packet::make(
-        (unsigned char*)pkt,
+        (unsigned char*)_pkt,
         descs[i].len,
         free_pkt,
-        pkt,
+        _pkt,
         FRAME_HEADROOM,
         FRAME_TAILROOM
     );
@@ -712,28 +734,30 @@ void XDPDevice::push()
 // ~~~~ to ~~~~
 
 
-
+// process packets received from click
 void XDPDevice::pull()
 {
   struct xdp_uqueue *uq = &_xsk->tx;
   struct xdp_desc *r = uq->ring;
 
-  kick_tx(_xsk->sfd);
+  //kick_tx(_xsk->sfd);
 
-  for (Packet *p = input(0).pull(); p != nullptr; p = input(0).pull()) {
+  size_t i{0};
+  for (Packet *p = input(0).pull(); p != nullptr; p = input(0).pull(), i++) {
 
     if (_trace) {
-      printf("%s sending packet (%d)\n", name().c_str(), p->length());
-      hex_dump((void*)p->data(), p->length(), 1701);
+      //printf("%s sending packet (%d)\n", name().c_str(), p->length());
+      //hex_dump((void*)p->data(), p->length(), 1701);
     }
 
+    //printf("%s) tx-free %d\n", name().c_str(), xq_nb_free(uq, 1));
     if (xq_nb_free(uq, 1) < 1) {
       click_chatter("toxdp: ring overflow");
       return;
     }
 
     u32 idx = uq->cached_prod++ & uq->mask;
-    u64 addr = idx << FRAME_SHIFT;
+    u64 addr = (idx + FQ_NUM_DESCS) << FRAME_SHIFT;
     r[idx].addr = addr;
     r[idx].len = p->length();
     memcpy(
@@ -746,14 +770,17 @@ void XDPDevice::pull()
 
   u_smp_wmb();
   *uq->producer = uq->cached_prod;
-  _xsk->outstanding_tx++;
+  _xsk->outstanding_tx += i;
+
+  //printf("%s) sending %d,%d\n", name().c_str(), i, _xsk->outstanding_tx);
 
   u64 descs[BATCH_SIZE];
   size_t ndescs = 
     (_xsk->outstanding_tx > BATCH_SIZE) ? BATCH_SIZE : _xsk->outstanding_tx;
+
   unsigned int rcvd = umem_complete_from_kernel(&_xsk->umem->cq, descs, ndescs);
+
   if (rcvd > 0) {
-    umem_fill_to_kernel(&_xsk->umem->fq, descs, rcvd);
     _xsk->outstanding_tx -= rcvd;
     _xsk->tx_npkts += rcvd;
   }
