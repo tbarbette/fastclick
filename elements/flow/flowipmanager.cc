@@ -15,6 +15,8 @@
 
 CLICK_DECLS
 
+Spinlock* FlowIPManager::hash_table_lock = 0;
+
 FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this) {
 }
 
@@ -39,6 +41,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+
 int FlowIPManager::initialize(ErrorHandler *errh) {
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
@@ -48,7 +51,8 @@ int FlowIPManager::initialize(ErrorHandler *errh) {
     hash_params.hash_func = ipv4_hash_crc;
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
-    hash_table_lock = new Spinlock();
+    if(!hash_table_lock)
+        FlowIPManager::hash_table_lock = new Spinlock();
 
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
@@ -84,9 +88,9 @@ bool FlowIPManager::run_task(Task* t) {
         if (old > _timeout) {
             //click_chatter("Release %p as it is expired since %d", prev, old);
 		//expire
-            hash_table_lock->acquire();
+            FlowIPManager::hash_table_lock->acquire();
             rte_hash_free_key_with_position(hash, prev->data_32[0]);
-            hash_table_lock->release();
+            FlowIPManager::hash_table_lock->release();
         } else {
             //click_chatter("Cascade %p", prev);
             //No need for lock as we'll be the only one to enqueue there
@@ -105,9 +109,9 @@ void FlowIPManager::run_timer(Timer* t) {
 void FlowIPManager::cleanup(CleanupStage stage) {
     if (hash)
     {
-        hash_table_lock->acquire();
+        FlowIPManager::hash_table_lock->acquire();
         rte_hash_free(hash);
-        hash_table_lock->release();
+        FlowIPManager::hash_table_lock->release();
     }
 }
 
@@ -117,7 +121,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
     rte_hash*& table = hash;
     FlowControlBlock* fcb;
 
-    hash_table_lock->acquire();
+    FlowIPManager::hash_table_lock->acquire();
     int ret = rte_hash_lookup(table, &fid);
 
     if (ret < 0) { //new flow
@@ -143,7 +147,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
     } else {
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
     }
-    hash_table_lock->release();
+    FlowIPManager::hash_table_lock->release();
     if (b.last == ret) {
         b.append(p);
     } else {
@@ -182,9 +186,9 @@ String FlowIPManager::read_handler(Element* e, void* thunk) {
     rte_hash* table = fc->hash;
     switch ((intptr_t)thunk) {
     case h_count:
-        hash_table_lock->acquire();
+        FlowIPManager::hash_table_lock->acquire();
         return String(rte_hash_count(table));
-        hash_table_lock->release();
+        FlowIPManager::hash_table_lock->release();
     default:
         return "<error>";
     }
