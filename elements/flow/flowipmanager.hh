@@ -119,6 +119,7 @@ protected:
     int _verbose;
     int _flags;
 
+
     int _timeout;
     Timer _timer; //Timer to launch the wheel
     Task _task;
@@ -126,6 +127,9 @@ protected:
     static String read_handler(Element* e, void* thunk);
     inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
     TimerWheel<FlowControlBlock> _timer_wheel;
+
+	//Added the Spinlock to manage multi-thread operations on the flow table
+	static Spinlock* hash_table_lock;
 };
 
 CLICK_ENDDECLS
