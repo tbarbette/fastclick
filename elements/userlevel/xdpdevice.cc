@@ -765,6 +765,7 @@ void XDPDevice::pull()
         p->data(),
         p->length()
     );
+    p->kill();
 
   }
 
