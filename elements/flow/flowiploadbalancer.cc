@@ -40,15 +40,19 @@ FlowIPLoadBalancer::~FlowIPLoadBalancer() {
 int
 FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    String _mode= "rr";
     if (Args(conf, this, errh)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
                .read_mp("VIP", _vip)
                .read("STATE", _own_state)
                .read("FCB_OFFSET", _flow_data_offset)
+               .read("MODE", _mode)
                .complete() < 0)
         return -1;
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
+    set_mode(_mode);
+    click_chatter("MODE setted to %s", _mode.mutable_c_str());
     return 0;
 }
 
