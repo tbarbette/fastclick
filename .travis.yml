@@ -64,7 +64,7 @@ script:
             sed -i "s/CONFIG_RTE_LIBRTE_KNI=.*/CONFIG_RTE_LIBRTE_KNI=n/g" config/common_linux* &&
             sed -i "s/CONFIG_RTE_EAL_IGB_UIO=.*/CONFIG_RTE_EAL_IGB_UIO=n/g" config/common_linux* &&
             sed -i "s/CONFIG_RTE_LIBRTE_VIRTIO_PMD=.*/CONFIG_RTE_LIBRTE_VIRTIO_PMD=n/g" config/common_base ;
-            cp config/defconfig_x86_64-native-linuxapp-gcc config/defconfig_x86_64-default-linux*-gcc ;
+            cp config/defconfig_x86_64-native-linuxapp-gcc config/defconfig_x86_64-default-linuxapp-gcc ;
             sed -i "s/CONFIG_RTE_MACHINE=.*/CONFIG_RTE_MACHINE=default/g" config/defconfig_x86_64-default-linux*-gcc ;
             make config T=$RTE_TARGET &&
             make install T=$RTE_TARGET &&
