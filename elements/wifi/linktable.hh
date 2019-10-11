@@ -20,39 +20,6 @@ CLICK_DECLS
  * =a ARPTable
  *
  */
-class IPPair {
-  public:
-
-    IPAddress _to;
-    IPAddress _from;
-
-    IPPair()
-	: _to(), _from() {
-    }
-
-    IPPair(IPAddress from, IPAddress to)
-	: _to(to), _from(from) {
-    }
-
-    bool contains(IPAddress foo) const {
-	return (foo == _to) || (foo == _from);
-    }
-
-    bool other(IPAddress foo) const {
-	return (_to == foo) ? _from : _to;
-    }
-
-    inline hashcode_t hashcode() const {
-	return CLICK_NAME(hashcode)(_to) + CLICK_NAME(hashcode)(_from);
-    }
-
-    inline bool operator==(IPPair other) const {
-	return (other._to == _to && other._from == _from);
-    }
-
-};
-
-
 class LinkTable: public Element{
 public:
 
