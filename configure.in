@@ -869,6 +869,10 @@ if test "$enable_bound_port_transfer" = yes; then
   CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
 fi
 
+AX_CHECK_COMPILE_FLAG([-faligned-new], [have_aligned_new=yes], [have_aligned_new=no])
+if test "x$have_aligned_new" = xyes; then
+    CXXFLAGS="$CXXFLAGS -faligned-new"
+fi
 
 dnl
 dnl check whether tools should be built for host or build
@@ -989,6 +993,8 @@ if test "x$enable_ip6" = xyes; then
     EXTRA_DRIVER_OBJS="ip6address.o ip6flowid.o ip6table.o $EXTRA_DRIVER_OBJS"
     EXTRA_TOOL_OBJS="ip6address.o $EXTRA_TOOL_OBJS"
 fi
+AC_SUBST(EXTRA_DRIVER_OBJS)
+AC_SUBST(EXTRA_TOOL_OBJS)
 
 
 dnl
@@ -2304,7 +2310,6 @@ dnl add 'dpdk' if compiled with --enable-dpdk
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
 fi
-
 
 dnl add 'experimental' if --enable-experimental was supplied
 if test "x$enable_experimental" = xyes; then

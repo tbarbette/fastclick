@@ -299,6 +299,7 @@ ReplayUnqueue::run_task(Task* task)
         return false;
 
     if (_stop == 0) {
+stop:
         router()->please_stop_driver();
         _active = false;
         _startsent = Timestamp();
@@ -335,6 +336,12 @@ ReplayUnqueue::run_task(Task* task)
                     if (_fnt_expr != 0) {
                         Timestamp diff_s = now - _startsent; //x is the seconds since the beginning of the sending
                         float nt = _fnt_expr.eval((float)diff_s.msecval() / 1000);
+                        if (_stop_time > 0 && diff_s.sec() > _stop_time) {
+                            click_chatter("Forced stop because time is achieved!");
+                            _stop = 0;
+                            goto stop;
+                        }
+
                         if (_timing != (unsigned)nt) {
                             _timing = nt;
 

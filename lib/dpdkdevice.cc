@@ -691,8 +691,13 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         rte_eth_promiscuous_enable(port_id);
 
     if (info.init_mac != EtherAddress()) {
+    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+        struct rte_ether_addr addr;
+        memcpy(&addr, info.init_mac.data(), sizeof(struct rte_ether_addr));
+    #else
         struct ether_addr addr;
-        memcpy(&addr,info.init_mac.data(),sizeof(struct ether_addr));
+        memcpy(&addr, info.init_mac.data(), sizeof(struct ether_addr));
+    #endif
         if (rte_eth_dev_default_mac_addr_set(port_id, &addr) != 0) {
             return errh->error("Could not set default MAC address");
         }
@@ -809,8 +814,12 @@ void DPDKDevice::set_tx_offload(uint64_t offload) {
 
 EtherAddress DPDKDevice::get_mac() {
     assert(_is_initialized);
+#if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+    struct rte_ether_addr addr;
+#else
     struct ether_addr addr;
-    rte_eth_macaddr_get(port_id,&addr);
+#endif
+    rte_eth_macaddr_get(port_id, &addr);
     return EtherAddress((unsigned char*)&addr);
 }
 

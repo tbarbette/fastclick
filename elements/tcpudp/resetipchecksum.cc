@@ -20,6 +20,9 @@
 #include <click/glue.hh>
 #include <click/dpdkdevice.hh>
 #include <clicknet/ip.h>
+#include <clicknet/tcp.h>
+#include <clicknet/udp.h>
+#include <rte_ip.h>
 CLICK_DECLS
 
 ResetIPChecksum::ResetIPChecksum()
@@ -31,11 +34,24 @@ ResetIPChecksum::~ResetIPChecksum()
 {
 }
 
+int
+ResetIPChecksum::configure(Vector<String> &conf, ErrorHandler *errh)
+{
+    if (Args(conf, this, errh)
+            .read_or_set_p("L4", _l4, false)
+            .complete() < 0)
+		return -1;
+
+
+    return 0;
+}
+
 Packet *
 ResetIPChecksum::simple_action(Packet *p_in)
 {
     if (WritablePacket *p = p_in->uniqueify()) {
         click_ip *iph = p->ip_header();
+
 
         iph->ip_sum = 0;
         if (!DPDKDevice::is_dpdk_buffer(p))
@@ -45,9 +61,35 @@ ResetIPChecksum::simple_action(Packet *p_in)
             rte_mbuf* mbuf = (struct rte_mbuf *) p->destructor_argument();
             mbuf->l2_len = p->mac_header_length();
             mbuf->l3_len = p->network_header_length();
-            //mbuf->l4_len = tcph->th_off << 2;
-            mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
-            //tcph->th_sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+
+            if (_l4) {
+                uint16_t sum;
+			if (iph->ip_p == IP_PROTO_TCP) {
+                    click_tcp *tcph = p->tcp_header();
+                    mbuf->l4_len = tcph->th_off << 2;
+                #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+                    sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
+                #else
+                    sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+                #endif
+					tcph->th_sum = sum;
+					mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_TCP_CKSUM | PKT_TX_IPV4;
+				} else if (iph->ip_p == IP_PROTO_UDP) {
+			        click_udp *udph = p->udp_header();
+			        mbuf->l4_len = sizeof(click_udp);
+                #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+                    sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
+                #else
+                    sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+                #endif
+			        udph->uh_sum = sum;
+				mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM | PKT_TX_IPV4;
+			} else {
+			mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+			}
+            } else {
+		mbuf->ol_flags |= PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+            }
         }
         return p;
     } else {
