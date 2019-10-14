@@ -1,5 +1,5 @@
 /*
- * FlowIPManager.{cc,hh}
+ * FlowIPManagerSpinlock.{cc,hh}
  */
 
 #include <click/config.h>
@@ -8,21 +8,23 @@
 #include <click/ipflowid.hh>
 #include <click/routervisitor.hh>
 #include <click/error.hh>
-#include "flowipmanager.hh"
+#include "FlowIPManagerSpinlock.hh"
 #include <rte_hash.h>
 #include <click/dpdk_glue.hh>
 #include <rte_ethdev.h>
 
 CLICK_DECLS
 
-FlowIPManager::FlowIPManager() : _verbose(1), _flags(0), _timer(this), _task(this) {
+Spinlock FlowIPManagerSpinlock::hash_table_lock;
+
+FlowIPManagerSpinlock::FlowIPManagerSpinlock() : _verbose(1), _flags(0), _timer(this), _task(this) {
 }
 
-FlowIPManager::~FlowIPManager() {
+FlowIPManagerSpinlock::~FlowIPManagerSpinlock() {
 }
 
 int
-FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
+FlowIPManagerSpinlock::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 
     if (Args(conf, this, errh)
@@ -39,7 +41,8 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int FlowIPManager::initialize(ErrorHandler *errh) {
+
+int FlowIPManagerSpinlock::initialize(ErrorHandler *errh) {
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
     hash_params.name = buf;
@@ -48,6 +51,7 @@ int FlowIPManager::initialize(ErrorHandler *errh) {
     hash_params.hash_func = ipv4_hash_crc;
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
+    FlowIPManagerSpinlock::hash_table_lock = Spinlock();
 
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
@@ -75,7 +79,7 @@ const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next) {
     *((FlowControlBlock**)&prev->data_32[2]) = next;
 };
 
-bool FlowIPManager::run_task(Task* t) {
+bool FlowIPManagerSpinlock::run_task(Task* t) {
     Timestamp recent = Timestamp::recent_steady();
     _timer_wheel.run_timers([this,recent](FlowControlBlock* prev) -> FlowControlBlock*{
         FlowControlBlock* next = *((FlowControlBlock**)&prev->data_32[2]);
@@ -83,7 +87,9 @@ bool FlowIPManager::run_task(Task* t) {
         if (old > _timeout) {
             //click_chatter("Release %p as it is expired since %d", prev, old);
 		//expire
+            FlowIPManagerSpinlock::hash_table_lock.acquire();
             rte_hash_free_key_with_position(hash, prev->data_32[0]);
+            FlowIPManagerSpinlock::hash_table_lock.release();
         } else {
             //click_chatter("Cascade %p", prev);
             //No need for lock as we'll be the only one to enqueue there
@@ -94,24 +100,31 @@ bool FlowIPManager::run_task(Task* t) {
     return true;
 }
 
-void FlowIPManager::run_timer(Timer* t) {
+void FlowIPManagerSpinlock::run_timer(Timer* t) {
     _task.reschedule();
     t->reschedule_after(Timestamp::make_sec(1));
 }
 
-void FlowIPManager::cleanup(CleanupStage stage) {
+void FlowIPManagerSpinlock::cleanup(CleanupStage stage) {
     if (hash)
+    {
+        FlowIPManagerSpinlock::hash_table_lock.acquire();
         rte_hash_free(hash);
+        FlowIPManagerSpinlock::hash_table_lock.release();
+    }
 }
 
 
-void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent) {
+void FlowIPManagerSpinlock::process(Packet* p, BatchBuilder& b, const Timestamp& recent) {
     IPFlow5ID fid = IPFlow5ID(p);
     rte_hash*& table = hash;
     FlowControlBlock* fcb;
+
+    FlowIPManagerSpinlock::hash_table_lock.acquire();
     int ret = rte_hash_lookup(table, &fid);
 
     if (ret < 0) { //new flow
+
 
         ret = rte_hash_add_key(table, &fid);
         if (ret < 0) {
@@ -133,7 +146,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
     } else {
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
     }
-
+    FlowIPManagerSpinlock::hash_table_lock.release();
     if (b.last == ret) {
         b.append(p);
     } else {
@@ -150,7 +163,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
 }
 
 
-void FlowIPManager::push_batch(int, PacketBatch* batch) {
+void FlowIPManagerSpinlock::push_batch(int, PacketBatch* batch) {
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
     FOR_EACH_PACKET_SAFE(batch, p) {
@@ -166,23 +179,25 @@ void FlowIPManager::push_batch(int, PacketBatch* batch) {
 
 
 enum {h_count};
-String FlowIPManager::read_handler(Element* e, void* thunk) {
-    FlowIPManager* fc = static_cast<FlowIPManager*>(e);
+String FlowIPManagerSpinlock::read_handler(Element* e, void* thunk) {
+    FlowIPManagerSpinlock* fc = static_cast<FlowIPManagerSpinlock*>(e);
 
     rte_hash* table = fc->hash;
     switch ((intptr_t)thunk) {
     case h_count:
+        FlowIPManagerSpinlock::hash_table_lock.acquire();
         return String(rte_hash_count(table));
+        FlowIPManagerSpinlock::hash_table_lock.release();
     default:
         return "<error>";
     }
 };
 
-void FlowIPManager::add_handlers() {
+void FlowIPManagerSpinlock::add_handlers() {
 
 }
 
 CLICK_ENDDECLS
 
-EXPORT_ELEMENT(FlowIPManager)
-ELEMENT_MT_SAFE(FlowIPManager)
+EXPORT_ELEMENT(FlowIPManagerSpinlock)
+ELEMENT_MT_SAFE(FlowIPManagerSpinlock)

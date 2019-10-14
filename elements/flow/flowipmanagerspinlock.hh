@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowIPManager_HH
-#define CLICK_FlowIPManager_HH
+#ifndef CLICK_FlowIPManagerSpinlock_HH
+#define CLICK_FlowIPManagerSpinlock_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>
@@ -14,14 +14,14 @@ class DPDKDevice;
 struct rte_hash;
 
 template <typename T>
-class TimerWheel {
+class TimerWheelSpinlock {
 	uint32_t _mask;
 	uint32_t _index;
 	Vector<T*> _buckets;
 	Spinlock _writers_lock;
 
 public:
-	TimerWheel() : _index(0) {
+	TimerWheelSpinlock() : _index(0) {
 
 	}
 
@@ -65,7 +65,7 @@ public:
 };
 
 /**
- * FlowIPManager(CAPACITY [, RESERVE])
+ * FlowIPManagerSpinlock(CAPACITY [, RESERVE])
  *
  * =s flow
  *  FCB packet classifier - cuckoo shared-by-all-threads
@@ -82,15 +82,15 @@ public:
  * =a FlowIPManger
  *
  */
-class FlowIPManager: public BatchElement {
+class FlowIPManagerSpinlock: public BatchElement {
 public:
 
 
-    FlowIPManager() CLICK_COLD;
+    FlowIPManagerSpinlock() CLICK_COLD;
 
-	~FlowIPManager() CLICK_COLD;
+	~FlowIPManagerSpinlock() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowIPManager"; }
+    const char *class_name() const		{ return "FlowIPManagerSpinlock"; }
     const char *port_count() const		{ return "1/1"; }
 
     const char *processing() const		{ return PUSH; }
@@ -106,6 +106,7 @@ public:
 
     void add_handlers() override CLICK_COLD;
 
+
 protected:
 
 	volatile int owner;
@@ -119,13 +120,17 @@ protected:
     int _verbose;
     int _flags;
 
+
     int _timeout;
     Timer _timer; //Timer to launch the wheel
     Task _task;
 
     static String read_handler(Element* e, void* thunk);
     inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
-    TimerWheel<FlowControlBlock> _timer_wheel;
+    TimerWheelSpinlock<FlowControlBlock> _timer_wheel;
+
+	//Added the Spinlock to manage multi-thread operations on the flow table
+	static Spinlock hash_table_lock;
 };
 
 CLICK_ENDDECLS
