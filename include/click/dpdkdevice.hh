@@ -34,6 +34,11 @@
 #include <click/etheraddress.hh>
 #include <click/timer.hh>
 
+#if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
+#define rte_ipv4_hdr ipv4_hdr
+#define rte_ether_addr ether_addr
+#endif
+
 /**
  * Unified type for DPDK port IDs.
  * Until DPDK v17.05 was uint8_t

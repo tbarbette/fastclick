@@ -284,11 +284,7 @@ inline void TCPHelper::resetTCPChecksum(WritablePacket *packet)
     mbuf->l3_len = packet->network_header_length();
     mbuf->l4_len = tcph->th_off << 2;
     mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4;
-    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
-        tcph->th_sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
-    #else
-        tcph->th_sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
-    #endif
+    tcph->th_sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
 #endif
 }
 
