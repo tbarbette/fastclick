@@ -409,27 +409,14 @@ String DPDKDevice::get_mode_str() {
     return get_info().mq_mode_str;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
 static struct rte_ether_addr pool_addr_template = {
-#else
-static struct ether_addr pool_addr_template = {
-#endif
-        .addr_bytes = {0x52, 0x54, 0x00, 0x00, 0x00, 0x00}
+    .addr_bytes = {0x52, 0x54, 0x00, 0x00, 0x00, 0x00}
 };
 
-#if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
-struct rte_ether_addr DPDKDevice::gen_mac( int a, int b) {
+struct rte_ether_addr DPDKDevice::gen_mac(int a, int b) {
     struct rte_ether_addr mac;
-#else
-struct ether_addr DPDKDevice::gen_mac( int a, int b) {
-    struct ether_addr mac;
-#endif
     if (info.init_mac != EtherAddress()) {
-    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
         memcpy(&mac, info.init_mac.data(), sizeof(struct rte_ether_addr));
-    #else
-        memcpy(&mac, info.init_mac.data(), sizeof(struct ether_addr));
-    #endif
     } else
         mac = pool_addr_template;
     mac.addr_bytes[4] = a;
@@ -748,12 +735,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
          * Set mac for each pool and parameters
          */
         for (unsigned q = 0; q < info.num_pools; q++) {
-        #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
-            struct rte_ether_addr mac;
-        #else
-            struct ether_addr mac;
-        #endif
-            mac = gen_mac(port_id, q);
+            struct rte_ether_addr mac = gen_mac(port_id, q);
             printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
                         port_id, q,
                         mac.addr_bytes[0], mac.addr_bytes[1],
