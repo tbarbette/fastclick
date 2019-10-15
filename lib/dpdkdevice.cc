@@ -408,16 +408,29 @@ String DPDKDevice::get_mode_str() {
     return get_info().mq_mode_str;
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+static struct rte_ether_addr pool_addr_template = {
+#else
 static struct ether_addr pool_addr_template = {
+#endif
         .addr_bytes = {0x52, 0x54, 0x00, 0x00, 0x00, 0x00}
 };
 
+#if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+struct rte_ether_addr DPDKDevice::gen_mac( int a, int b) {
+    struct rte_ether_addr mac;
+#else
 struct ether_addr DPDKDevice::gen_mac( int a, int b) {
     struct ether_addr mac;
-     if (info.init_mac != EtherAddress()) {
-         memcpy(&mac,info.init_mac.data(),sizeof(struct ether_addr));
-     } else
-         mac = pool_addr_template;
+#endif
+    if (info.init_mac != EtherAddress()) {
+    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+        memcpy(&mac, info.init_mac.data(), sizeof(struct rte_ether_addr));
+    #else
+        memcpy(&mac, info.init_mac.data(), sizeof(struct ether_addr));
+    #endif
+    } else
+        mac = pool_addr_template;
     mac.addr_bytes[4] = a;
     mac.addr_bytes[5] = b;
     return mac;
@@ -730,19 +743,22 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
          * Set mac for each pool and parameters
          */
         for (unsigned q = 0; q < info.num_pools; q++) {
-                struct ether_addr mac;
-                mac = gen_mac(port_id, q);
-                printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
+        #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+            struct rte_ether_addr mac;
+        #else
+            struct ether_addr mac
+        #endif
+            mac = gen_mac(port_id, q);
+            printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
                         port_id, q,
                         mac.addr_bytes[0], mac.addr_bytes[1],
                         mac.addr_bytes[2], mac.addr_bytes[3],
                         mac.addr_bytes[4], mac.addr_bytes[5]);
-                int retval = rte_eth_dev_mac_addr_add(port_id, &mac,
-                                q);
-                if (retval) {
-                        printf("mac addr add failed at pool %d\n", q);
-                        return retval;
-                }
+            int retval = rte_eth_dev_mac_addr_add(port_id, &mac, q);
+            if (retval) {
+                printf("mac addr add failed at pool %d\n", q);
+                return retval;
+            }
         }
     }
 

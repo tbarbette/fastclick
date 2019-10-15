@@ -483,7 +483,11 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
 #if HAVE_JSON
             Json jaddr = Json::make_array();
             for (int i = 0; i < fd->_dev->nb_vf_pools(); i++) {
+            #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+                struct rte_ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
+            #else
                 struct ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
+            #endif
                 jaddr.push_back(
                     EtherAddress(
                         reinterpret_cast<unsigned char *>(&mac)
@@ -493,7 +497,11 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
 #else
             String s = "";
             for (int i = 0; i < fd->_dev->nb_vf_pools(); i++) {
+            #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+                struct rte_ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
+            #else
                 struct ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
+            #endif
                 s += EtherAddress(
                         reinterpret_cast<unsigned char *>(&mac)
                     ).unparse_colon() + ";";
