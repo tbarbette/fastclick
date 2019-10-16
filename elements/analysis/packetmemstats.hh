@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
-#ifndef CLICK_PACKETMEMALIGNED_HH
-#define CLICK_PACKETMEMALIGNED_HH
+#ifndef CLICK_PACKETMEMSTATS_HH
+#define CLICK_PACKETMEMSTATS_HH
 
 #include <click/batchelement.hh>
 #include <click/multithread.hh>
@@ -13,16 +13,17 @@ CLICK_DECLS
 
 =c
 
-PacketMemAligned([ALIGN_STRIDE])
+PacketMemStats([ALIGN_STRIDE])
 
 =s counters
 
-keep statistics about memory alignment
+keep statistics about packet memory
 
 =d
 
 Expects Ethernet packets as input. Checks whether input packets are aligned
 with respect to the ALIGN_STRIDE argument and counts aligned and total packets.
+Reports the ratio of aligned/total and unaligned/total packets.
 
 Keyword arguments are:
 
@@ -34,7 +35,7 @@ Unsigned integer. Defines the stride of the alignment. Defaults to 64 (usual cac
 
 =e
 
-  FromDevice(eth0) -> PacketMemAligned() -> ...
+  FromDevice(eth0) -> PacketMemStats() -> ...
 
 =h align_stride read-only
 
@@ -58,14 +59,14 @@ Updates the alignment stride.
 
 =a BatchStats */
 
-class PacketMemAligned : public BatchElement {
+class PacketMemStats : public BatchElement {
 
     public:
-        PacketMemAligned() CLICK_COLD;
-        PacketMemAligned(unsigned align) CLICK_COLD;
-        ~PacketMemAligned() CLICK_COLD;
+        PacketMemStats() CLICK_COLD;
+        PacketMemStats(unsigned align) CLICK_COLD;
+        ~PacketMemStats() CLICK_COLD;
 
-        const char *class_name() const  { return "PacketMemAligned"; }
+        const char *class_name() const  { return "PacketMemStats"; }
         const char *port_count() const  { return PORTS_1_1; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -129,10 +130,10 @@ class PacketMemAligned : public BatchElement {
         };
         
         unsigned _align;
-        per_thread<PacketMemAligned::MemStats *> _stats;
+        per_thread<PacketMemStats::MemStats *> _stats;
 
         enum{
-            h_aligned = 0, h_unaligned, h_total, h_align
+            h_aligned = 0, h_unaligned, h_total, h_align_stride, h_aligned_ratio, h_unaligned_ratio
         };
 
         inline bool mem_is_aligned(void *p, unsigned k = DEF_ALIGN) {
