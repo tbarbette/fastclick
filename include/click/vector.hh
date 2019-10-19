@@ -530,7 +530,7 @@ inline void Vector<T>::shuffle(int n) {
 	if (size() > 1)
 	{
 		size_t i;
-		for (i = 0; i < n; i++)
+		for (i = 0; i < (unsigned)n; i++)
 		{
 			int n_i = i % size();
 			size_t j = click_random(0, size() -1);

@@ -54,8 +54,9 @@ PaintTee::simple_action_batch(PacketBatch *batch)
     BATCH_CREATE_INIT(tee_batch);
 
     FOR_EACH_PACKET(batch, p) {
-        if (p->anno_u8(_anno) == _color)
+        if (((uint8_t)p->anno_u8(_anno)) == _color) {
             BATCH_CREATE_APPEND(tee_batch, p->clone());
+        }
     }
 
     BATCH_CREATE_FINISH(tee_batch);
