@@ -2,6 +2,7 @@
 #define CLICK_IPFILTER_HH
 #include "elements/standard/classification.hh"
 #include <click/batchelement.hh>
+#include <click/error.hh>
 CLICK_DECLS
 
 /*
@@ -263,6 +264,7 @@ class IPFilter : public BatchElement { public:
     static int lookup(String word, int type, int transp_proto, uint32_t &data,
 		      const Element *context, ErrorHandler *errh);
 
+    static void add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh, const Element *context, int noutputs, Vector<Classification::Wordwise::Program> &progs);
     struct Parser {
 	const Vector<String> &_words;
 	Vector<int> &_tree;

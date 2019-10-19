@@ -1218,16 +1218,81 @@ IPFilter::parse_program(Classification::Wordwise::CompressedProgram &zprog,
     // QUALS ::= src | dst | src and dst | src or dst | \empty
     //        |  ip | icmp | tcp | udp
     for (int argno = 0; argno < conf.size(); argno++) {
-	Vector<String> words;
-	separate_text(cp_unquote(conf[argno]), words);
+        Vector<String> words;
+        separate_text(cp_unquote(conf[argno]), words);
 
-	if (words.size() == 0) {
-	    errh->error("empty pattern %d", argno);
-	    continue;
-	}
+        if (words.size() == 0) {
+            errh->error("empty pattern %d", argno);
+            continue;
+        }
 
-	PrefixErrorHandler cerrh(errh, "pattern " + String(argno) + ": ");
+        PrefixErrorHandler cerrh(errh, "pattern " + String(argno) + ": ");
 
+        if (words[0] == "file") {
+            if (words.size() != 2) {
+                cerrh.error("file must have a single argument, the filename");
+                continue;
+            }
+            FILE *fp = NULL;
+            fp = fopen(words[1].c_str(), "r");
+            if (fp == NULL) {
+                cerrh.error("Could not open file %s", words[1].c_str());
+                continue;
+            }
+
+            char *line = NULL;
+            size_t len;
+            int lineno = 0;
+            // Read file line-by-line (or rule-by-rule)
+            while ((getline(&line, &len, fp)) != -1) {
+                if (len == 0)
+                    continue;
+                String s = String(line);
+                s = s.trim_space().trim_space_left();
+
+                if (s.empty())
+                    continue;
+
+                PrefixErrorHandler csuberrh(errh, "file " + words[1] + "/pattern " + String(lineno)+": ");
+
+                Vector<String> subwords;
+                separate_text(cp_unquote(s), subwords);
+                add_pattern(subwords,csuberrh,context,noutputs, progs);
+                lineno++;
+            }
+        } else
+            add_pattern(words,cerrh,context,noutputs, progs);
+
+    }
+
+
+    static const int offset_map[] = { offset_net + 8, offset_net + 3 };
+    // merge programs
+    for (int merge_step = 1; merge_step < progs.size(); merge_step *= 2)
+        for (int i = 0; i + merge_step < progs.size(); i += 2 * merge_step) {
+            progs[i].add_or_program(progs[i + merge_step]);
+            progs[i].optimize(offset_map, offset_map + 2, Classification::offset_max);
+        }
+    // special-case single program
+    if (progs.empty())
+        progs.push_back(Classification::Wordwise::Program());
+    if (progs.size() == 1)
+        progs[0].optimize(offset_map, offset_map + 2, Classification::offset_max);
+    // any remaining failure branches drop the input
+    progs[0].set_failure(Classification::j_never);
+
+    // Compress the program into _zprog.
+    // It helps to do another bubblesort for things like ports.
+    progs[0].bubble_sort_and_exprs(offset_map, offset_map + 2, Classification::offset_max);
+    zprog.compile(progs[0], PERFORM_BINARY_SEARCH, MIN_BINARY_SEARCH);
+
+    // click_chatter("%s", zprog.unparse().c_str());
+
+}
+
+void
+IPFilter::add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh, const Element *context, int noutputs, Vector<Classification::Wordwise::Program> &progs)
+{
 	// get slot
 	int slot = -Classification::j_never;
 	{
@@ -1266,29 +1331,6 @@ IPFilter::parse_program(Classification::Wordwise::CompressedProgram &zprog,
 
 	prog.finish_subtree(tree, Classification::c_and,
                             -slot, Classification::j_failure);
-    }
-
-    static const int offset_map[] = { offset_net + 8, offset_net + 3 };
-    // merge programs
-    for (int merge_step = 1; merge_step < progs.size(); merge_step *= 2)
-        for (int i = 0; i + merge_step < progs.size(); i += 2 * merge_step) {
-            progs[i].add_or_program(progs[i + merge_step]);
-            progs[i].optimize(offset_map, offset_map + 2, Classification::offset_max);
-        }
-    // special-case single program
-    if (progs.empty())
-        progs.push_back(Classification::Wordwise::Program());
-    if (progs.size() == 1)
-        progs[0].optimize(offset_map, offset_map + 2, Classification::offset_max);
-    // any remaining failure branches drop the input
-    progs[0].set_failure(Classification::j_never);
-
-    // Compress the program into _zprog.
-    // It helps to do another bubblesort for things like ports.
-    progs[0].bubble_sort_and_exprs(offset_map, offset_map + 2, Classification::offset_max);
-    zprog.compile(progs[0], PERFORM_BINARY_SEARCH, MIN_BINARY_SEARCH);
-
-    // click_chatter("%s", zprog.unparse().c_str());
 }
 
 int
