@@ -808,13 +808,12 @@ class Packet { public:
 	unsigned char *h;
 	Packet::PacketType pkt_type;
 #if !CLICK_PACKET_USE_DPDK
-	Timestamp timestamp;
+	char timestamp[sizeof(Timestamp)];
 #endif
 	Packet *next;
 	Packet *prev;
 	AllAnno()
 #if !CLICK_PACKET_USE_DPDK
-	    : timestamp(Timestamp::uninitialized_t())
 #endif
 	{
 	}
@@ -1478,35 +1477,35 @@ Packet::transport_length() const
     return end_data() - transport_header();
 }
 
-inline const Timestamp &
+inline const Timestamp&
 Packet::timestamp_anno() const
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 13)
-    return *reinterpret_cast<const Timestamp *>(&skb()->stamp);
+    return *reinterpret_cast<const Timestamp*>(&skb()->stamp);
 # else
-    return *reinterpret_cast<const Timestamp *>(&skb()->tstamp);
+    return *reinterpret_cast<const Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
     return all_anno()->timestamp;
 #else
-    return _aa.timestamp;
+    return *reinterpret_cast<const Timestamp*>(&_aa.timestamp);
 #endif
 }
 
-inline Timestamp &
+inline Timestamp&
 Packet::timestamp_anno()
 {
 #if CLICK_LINUXMODULE
 # if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 13)
-    return *reinterpret_cast<Timestamp *>(&skb()->stamp);
+    return *reinterpret_cast<Timestamp*>(&skb()->stamp);
 # else
-    return *reinterpret_cast<Timestamp *>(&skb()->tstamp);
+    return *reinterpret_cast<Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
     return all_anno()->timestamp;
 #else
-    return _aa.timestamp;
+    return *reinterpret_cast<Timestamp*>(&_aa.timestamp);
 #endif
 }
 

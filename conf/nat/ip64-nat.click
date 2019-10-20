@@ -82,13 +82,14 @@ pt64 :: ProtocolTranslator64();
 pt46 :: ProtocolTranslator46();	
 
 FromDevice(eth0, 1)
-  	-> c;
-to_eth0 :: ToDevice(eth0);
+  	-> c; 
+
+q :: Queue(1024)
+	-> td0 :: ToDevice(eth0);
 
 c[0] 	-> nda
 	//-> Print(nda, 200)
-	-> Queue(1024)
-	-> to_eth0;
+	-> q;
 c[1] 	-> [1]nds;
 c[2]	//-> Print(before-Strip, 200) 
 	-> Strip(14)
@@ -99,8 +100,7 @@ c[2]	//-> Print(before-Strip, 200)
 
 c[3] 	//-> Print(arr, 200) 
 	-> arr	
-	-> Queue(1024)
-	-> to_eth0;
+	-> q;
 	
 c[4] 	//-> Print(arp-reply, 200) 
 	->[1]arp;
@@ -112,7 +112,7 @@ c[5] 	//-> Print(c5-normal-ip-pkt, 200)
 	-> rt;
 
 c[6]	//-> Print(c6-normal-ip-pkt, 200) 
-	->Discard;
+	-> Discard;
 
 rt[0]	->Print(rt0, 200) ->Discard;
 rt[1]	//->Print(rt1, 200)
@@ -154,16 +154,7 @@ pt46[0]	-> Print(after-pt460, 200)
 	-> [1]at;
 
 arp[0] 	-> Print(arp0, 200)
-	-> to_eth0;
+	-> q;
 
 nds[0]  //-> Print(nds, 200)
-	-> to_eth0;
-	
-	
-
-
-
-
-
-
-
+	-> q;
