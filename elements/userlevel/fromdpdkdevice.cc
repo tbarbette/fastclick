@@ -122,6 +122,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #else
         errh->error("HW Timestamping is not supported before DPDK 18.02");
 #endif
+    } else {
+        _set_timestamp = false;
     }
 
     return 0;
