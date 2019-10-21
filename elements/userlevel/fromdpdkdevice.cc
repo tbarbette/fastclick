@@ -120,7 +120,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _dev->set_rx_offload(DEV_RX_OFFLOAD_TIMESTAMP);
         _set_timestamp = true;
 #else
-        errh->error("HW Timestamping is not supported before DPDK 18.02");
+        errh->error("Hardware timestamping is not supported before DPDK 18.02");
 #endif
     } else {
         _set_timestamp = false;
@@ -168,7 +168,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     for (unsigned i = (unsigned)firstqueue; i <= (unsigned)lastqueue; i++) {
-        ret = _dev->add_rx_queue(i , _promisc, _vlan_filter, _vlan_strip, ndesc, errh);
+        ret = _dev->add_rx_queue(i , _promisc, _vlan_filter, _vlan_strip, _vlan_extend, _lro, _jumbo, ndesc, errh);
         if (ret != 0) return ret;
     }
 
