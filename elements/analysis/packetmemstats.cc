@@ -30,14 +30,14 @@ PacketMemStats::PacketMemStats() : PacketMemStats(DEF_ALIGN)
 
 }
 
-PacketMemStats::PacketMemStats(unsigned align) : _stats(), _align(align)
+PacketMemStats::PacketMemStats(unsigned align) : _align(align), _stats()
 {
 
 }
 
 PacketMemStats::~PacketMemStats()
 {
-    for (int i = 0; i < _stats.weight(); i ++) {
+    for (unsigned i = 0; i < _stats.weight(); i ++) {
         delete _stats.get();
     }
 }
@@ -56,7 +56,7 @@ PacketMemStats::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 PacketMemStats::initialize(ErrorHandler *errh)
 {
-    for (int i = 0; i < _stats.weight(); i ++) {
+    for (unsigned i = 0; i < _stats.weight(); i ++) {
         _stats.set_value_for_thread(i, new PacketMemStats::MemStats());
     }
     return 0;
