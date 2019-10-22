@@ -1,6 +1,6 @@
 #ifndef CLICK_CHECKTCPHEADER_HH
 #define CLICK_CHECKTCPHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -51,7 +51,7 @@ true.
 
 =a CheckIPHeader, CheckUDPHeader, CheckICMPHeader, MarkIPHeader */
 
-class CheckTCPHeader : public Element { public:
+class CheckTCPHeader : public SimpleElement<CheckTCPHeader> { public:
 
   CheckTCPHeader() CLICK_COLD;
   ~CheckTCPHeader() CLICK_COLD;
@@ -71,6 +71,7 @@ class CheckTCPHeader : public Element { public:
  private:
 
   bool _verbose : 1;
+  bool _checksum : 1;
   atomic_uint32_t _drops;
   atomic_uint32_t *_reason_drops;
 
