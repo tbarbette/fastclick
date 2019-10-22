@@ -71,6 +71,7 @@ class CheckUDPHeader : public BatchElement { public:
  private:
 
   bool _verbose : 1;
+  bool _checksum : 1;
   atomic_uint32_t _drops;
   atomic_uint32_t *_reason_drops;
 
