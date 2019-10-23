@@ -66,9 +66,27 @@ AggregateLength::pull(int)
 {
     Packet *p = input(0).pull();
     if (p)
-	p = handle_packet(p);
+        p = handle_packet(p);
     return p;
 }
+
+#if HAVE_BATCH
+void
+AggregateLength::push_batch(int, PacketBatch *batch)
+{
+    EXECUTE_FOR_EACH_PACKET_DROPPABLE(handle_packet, batch, [](Packet *){});
+    if (batch)
+        output(0).push_batch(batch);
+}
+
+PacketBatch *
+AggregateLength::pull_batch(int port, unsigned max)
+{
+    PacketBatch *batch;
+    MAKE_BATCH(AggregateLength::pull(port), batch, max);
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel)
