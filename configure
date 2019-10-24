@@ -9763,11 +9763,7 @@ if test "x$enable_dynamic_linking" = xyes; then
 
     DL_LIBS=
 
-    ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
-if test "x$ac_cv_func_dlopen" = xyes; then :
-  ac_have_dlopen=yes
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
 $as_echo_n "checking for dlopen in -ldl... " >&6; }
 if ${ac_cv_lib_dl_dlopen+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -9805,6 +9801,10 @@ fi
 $as_echo "$ac_cv_lib_dl_dlopen" >&6; }
 if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
   ac_have_dlopen=yes; DL_LIBS="-ldl"
+else
+  ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
+if test "x$ac_cv_func_dlopen" = xyes; then :
+  ac_have_dlopen=yes
 else
   ac_have_dlopen=no
 fi
@@ -14467,7 +14467,7 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
     provisions="$provisions microhttpd"
 fi
 
-if test "x$HAVE_NETMAP" == xyes; then
+if test "x$HAVE_NETMAP" = xyes; then
     provisions="$provisions netmap"
 fi
 
@@ -14490,7 +14490,7 @@ else
     have_pcap=no
 fi
 
-if test "x$have_re2" == xyes; then
+if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
 fi
 

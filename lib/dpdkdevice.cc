@@ -751,7 +751,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
             struct rte_ether_addr mac;
         #else
-            struct ether_addr mac
+            struct ether_addr mac;
         #endif
             mac = gen_mac(port_id, q);
             printf("Port %u vmdq pool %u set mac %02x:%02x:%02x:%02x:%02x:%02x\n",
