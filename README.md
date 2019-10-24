@@ -5,12 +5,12 @@ Metron
 
 About
 ----
-Metron's control plane is based on the [ONOS SDN controller][onos], which we extended with [southbound drivers][metron-driver] that allow Metron to monitor and configure important resources (i.e., CPU cores and network cards) on commodity servers.
+Metron's [control plane][metron-ctrl] is based on the [ONOS SDN controller][onos], which we extended with [southbound drivers][metron-driver] that allow Metron to monitor and configure important resources (i.e., CPU cores and network cards) on commodity servers.
 Metron's data plane extends [FastClick][fastclick] (see the FastClick paper [here][fastclick-paper]), which in turn uses [DPDK][dpdk] as a high performance network I/O subsystem.
 The Metron data plane uses two features available in modern network interface cards (NICs) to achieve accurate dispatching of input traffic to the desired CPU core(s), thus eliminating inter-core communication.
 Specifically, the Metron data plane uses either:
   1. the Virtual Machine Device queues (VMDq) to implement hardware dispatching based on the values of input packets' destination MAC address or
-  2. DPDK's Flow API library (i.e., Flow Director) to classify and dispatch input traffic to available NIC queues (associated with CPU cores).
+  2. DPDK's Flow API library (e.g., Flow Director) to classify and dispatch input traffic to available NIC queues (associated with CPU cores).
 
 The VMDq mode requires a device prior to the server to tag incoming packets with the correct destination MAC address value, which will be matched by the NIC of the Metron data plane agent to perform CPU core dispatching.
 This task is automatically performed by the Metron controller, using e.g., an OpenFlow switch between a traffic source and the NFV server where the Metron agent is deployed.
@@ -40,7 +40,7 @@ First, setup your DPDK environment (version 17.05 or later) and then configure M
 Build
 ----
 ```bash
-make -j <coresNb>
+make
 ```
 
 
@@ -95,6 +95,7 @@ The FastClick README is available [here][fastclick-readme], while the original C
 [metron-paper]: https://www.usenix.org/system/files/conference/nsdi18/nsdi18-katsikas.pdf
 [metron-nsdi-page]: https://www.usenix.org/conference/nsdi18/presentation/katsikas
 [onos]: https://onosproject.org/
+[metron-ctrl]: https://github.com/gkatsikas/onos/tree/metron-ctrl-1.15.0
 [metron-driver]: https://github.com/opennetworkinglab/onos/tree/master/drivers/server
 [metron-tutorial]: https://wiki.onosproject.org/display/ONOS/Server+Device+Driver+Tutorial
 [fastclick]: https://github.com/tbarbette/fastclick
