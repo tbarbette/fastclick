@@ -203,20 +203,23 @@ protected:
 
 class RXQueueDevice : public QueueDevice {
 protected:
-	bool _promisc;
-	bool _vlan_filter;
-	bool _vlan_strip;
-	bool _set_rss_aggregate;
-	bool _set_paint_anno;
-	int _threadoffset;
-	bool _use_numa;
+    bool _promisc;
+    bool _vlan_filter;
+    bool _vlan_strip;
+    bool _vlan_extend;
+    bool _lro;
+    bool _jumbo;
+    bool _set_rss_aggregate;
+    bool _set_paint_anno;
+    int _threadoffset;
+    bool _use_numa;
     int _numa_node_override;
-	bool _scale_parallel;
+    bool _scale_parallel;
 
     /**
      * Common parsing for all RXQueueDevice
      */
-	int parse(Vector<String> &conf, ErrorHandler *errh);
+    int parse(Vector<String> &conf, ErrorHandler *errh);
 
     /*
      * Configure a RX side of a queuedevice. Take cares of setting user max
@@ -231,8 +234,8 @@ protected:
 
 class TXQueueDevice : public QueueDevice {
 protected:
-	bool _blocking;
-	int _internal_tx_queue_size;
+    bool _blocking;
+    int _internal_tx_queue_size;
 
     /**
      * Common parsing for all RXQueueDevice

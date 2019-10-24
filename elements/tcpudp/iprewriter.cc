@@ -242,10 +242,10 @@ IPRewriter::udp_mappings_handler(Element *e, void *)
     IPRewriter *rw = (IPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (int i = 0; i < rw->_ipstate.weight(); i++) {
+    for (unsigned i = 0; i < rw->_ipstate.weight(); i++) {
         for (Map::iterator iter = rw->_ipstate.get_value(i).map.begin(); iter.live(); ++iter) {
-        iter->flow()->unparse(sa, iter->direction(), now);
-        sa << '\n';
+            iter->flow()->unparse(sa, iter->direction(), now);
+            sa << '\n';
         }
     }
     return sa.take_string();

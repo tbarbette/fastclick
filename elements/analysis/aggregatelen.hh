@@ -1,7 +1,7 @@
 // -*- mode: c++; c-basic-offset: 4 -*-
 #ifndef CLICK_AGGREGATELEN_HH
 #define CLICK_AGGREGATELEN_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -40,7 +40,7 @@ AggregateIP, AggregateCounter
 
 */
 
-class AggregateLength : public Element { public:
+class AggregateLength : public BatchElement { public:
 
     AggregateLength() CLICK_COLD;
     ~AggregateLength() CLICK_COLD;
@@ -52,6 +52,10 @@ class AggregateLength : public Element { public:
 
     void push(int, Packet *);
     Packet *pull(int);
+#if HAVE_BATCH
+    void push_batch(int, PacketBatch*) override;
+    PacketBatch *pull_batch(int,unsigned) override;
+#endif
 
   private:
 

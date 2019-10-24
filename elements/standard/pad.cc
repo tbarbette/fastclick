@@ -62,7 +62,7 @@ Pad::simple_action(Packet* p)
             memset(q->end_data() - nput, 0, nput);
         if (_random) {
             unsigned char* data = q->end_data() - nput;
-            for (int i = 0; i < nput / 4; i++,data+=4) {
+            for (unsigned i = 0; i < nput / 4; i++,data+=4) {
                 *((uint32_t*)data) = click_random();
 
             }

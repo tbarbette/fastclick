@@ -54,8 +54,6 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 String DPDKInfo::read_handler(Element *e, void * thunk)
 {
-    DPDKInfo *fd = static_cast<DPDKInfo *>(e);
-
     StringAccum acc;
     switch((uintptr_t) thunk) {
         case h_pool_count:

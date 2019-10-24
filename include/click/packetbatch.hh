@@ -212,7 +212,7 @@ CLICK_DECLS
         int passed = 0;\
         for (;p != 0;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
-            if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
+            if (o < 0 || o>=(int)(nbatches)) o = (nbatches - 1);\
             if (o == last_o) {\
                 passed ++;\
             } else {\
@@ -242,8 +242,8 @@ CLICK_DECLS
             out[last_o]->set_count(out[last_o]->count() + passed);\
         }\
 \
-        int i = 0;\
-        for (; i < (nbatches); i++) {\
+        unsigned i = 0;\
+        for (; i < (unsigned)(nbatches); i++) {\
             if (out[i]) {\
                 out[i]->tail()->set_next(0);\
                 (on_finish(i,out[i]));\

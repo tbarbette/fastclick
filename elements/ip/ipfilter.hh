@@ -2,6 +2,7 @@
 #define CLICK_IPFILTER_HH
 #include "elements/standard/classification.hh"
 #include <click/batchelement.hh>
+#include <click/error.hh>
 CLICK_DECLS
 
 /*
@@ -26,6 +27,12 @@ Each ACTION is either a port number, which specifies that the packet should be
 sent out on that port; 'C<allow>', which is equivalent to 'C<0>'; or 'C<drop>'
 , which means drop the packet. You can also say 'C<deny>' instead of
 'C<drop>'.
+
+One can load rules from a file with the "file" ACTION and the path as PATTERN.
+E.g., where firewall.rules is a file with one rule per line following the
+ACTION-PATTERN described above:
+  IPFilter(file firewall.rules);
+
 
 The IPFilter element has an arbitrary number of outputs. Input packets must
 have their IP header annotation set; CheckIPHeader and MarkIPHeader do
@@ -263,6 +270,7 @@ class IPFilter : public BatchElement { public:
     static int lookup(String word, int type, int transp_proto, uint32_t &data,
 		      const Element *context, ErrorHandler *errh);
 
+    static void add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh, const Element *context, int noutputs, Vector<Classification::Wordwise::Program> &progs);
     struct Parser {
 	const Vector<String> &_words;
 	Vector<int> &_tree;

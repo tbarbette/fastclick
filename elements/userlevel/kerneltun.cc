@@ -68,7 +68,8 @@
 CLICK_DECLS
 
 KernelTun::KernelTun()
-    : _fd(-1), _flags(0) ,_tap(false), _task(this), _ignore_q_errs(false),
+    : _tap(false), _dev_name(), _flags(0),
+      _fd(-1) , _task(this), _ignore_q_errs(false),
       _printed_write_err(false), _printed_read_err(false),
       _selected_calls(0), _packets(0)
 {
