@@ -31,7 +31,7 @@ const char *CheckUDPHeader::reason_texts[NREASONS] = {
 };
 
 CheckUDPHeader::CheckUDPHeader()
-  : _reason_drops(0)
+  : _reason_drops(0), _checksum(true)
 {
   _drops = 0;
 }
@@ -46,14 +46,17 @@ CheckUDPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool verbose = false;
     bool details = false;
+    bool checksum = true;
 
     if (Args(conf, this, errh)
 	.read("VERBOSE", verbose)
 	.read("DETAILS", details)
+	.read("CHECKSUM", checksum)
 	.complete() < 0)
 	return -1;
 
   _verbose = verbose;
+  _checksum = checksum;
   if (details) {
     _reason_drops = new atomic_uint32_t[NREASONS];
     for (int i = 0; i < NREASONS; ++i)
@@ -98,9 +101,11 @@ CheckUDPHeader::simple_action(Packet *p)
     return drop(BAD_LENGTH, p);
 
   if (udph->uh_sum != 0) {
-    unsigned csum = click_in_cksum((unsigned char *)udph, len);
-    if (click_in_cksum_pseudohdr(csum, iph, len) != 0)
-      return drop(BAD_CHECKSUM, p);
+    if (_checksum) {
+        unsigned csum = click_in_cksum((unsigned char *)udph, len);
+        if (click_in_cksum_pseudohdr(csum, iph, len) != 0)
+          return drop(BAD_CHECKSUM, p);
+    }
   }
 
   return p;

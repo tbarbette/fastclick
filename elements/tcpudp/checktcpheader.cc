@@ -32,7 +32,7 @@ const char *CheckTCPHeader::reason_texts[NREASONS] = {
 };
 
 CheckTCPHeader::CheckTCPHeader()
-  : _reason_drops(0)
+  : _reason_drops(0), _checksum(true)
 {
   _drops = 0;
 }
@@ -47,14 +47,17 @@ CheckTCPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool verbose = false;
     bool details = false;
+    bool checksum = true;
 
     if (Args(conf, this, errh)
 	.read("VERBOSE", verbose)
 	.read("DETAILS", details)
+    .read("CHECKSUM", checksum)
 	.complete() < 0)
 	return -1;
 
   _verbose = verbose;
+  _checksum = checksum;
   if (details) {
     _reason_drops = new atomic_uint32_t[NREASONS];
     for (int i = 0; i < NREASONS; ++i)
@@ -99,9 +102,11 @@ CheckTCPHeader::simple_action(Packet *p)
       || p->length() < len + iph_len + p->network_header_offset())
     return drop(BAD_LENGTH, p);
 
-  csum = click_in_cksum((unsigned char *)tcph, len);
-  if (click_in_cksum_pseudohdr(csum, iph, len) != 0)
-    return drop(BAD_CHECKSUM, p);
+  if (_checksum) {
+      csum = click_in_cksum((unsigned char *)tcph, len);
+      if (click_in_cksum_pseudohdr(csum, iph, len) != 0)
+        return drop(BAD_CHECKSUM, p);
+  }
 
   return p;
 }
