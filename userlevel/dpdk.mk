@@ -37,12 +37,28 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_KNI)            += -lrte_kni
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IVSHMEM)        += -lrte_ivshmem
 endif
 
-ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_CRYPTO),y)
+OTX-CPT-y := $(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_CRYPTO)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+OTX-CPT-y += $(CONFIG_RTE_LIBRTE_PMD_OCTEONTX2_CRYPTO)
+endif
+ifeq ($(findstring y,$(OTX-CPT-y)),y)
 _LDLIBS-y += -lrte_common_cpt
 endif
 
 ifeq ($(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_SSOVF)$(CONFIG_RTE_LIBRTE_OCTEONTX_MEMPOOL)$(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),yytrue)
 	_LDLIBS-y += -lrte_common_octeontx
+endif
+OCTEONTX2-y := $(CONFIG_RTE_LIBRTE_OCTEONTX2_MEMPOOL)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+OCTEONTX2-y += $(CONFIG_RTE_LIBRTE_PMD_OCTEONTX2_CRYPTO)
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+OCTEONTX2-y += $(CONFIG_RTE_LIBRTE_PMD_OCTEONTX2_EVENTDEV)
+OCTEONTX2-y += $(CONFIG_RTE_LIBRTE_PMD_OCTEONTX2_DMA_RAWDEV)
+OCTEONTX2-y += $(CONFIG_RTE_LIBRTE_OCTEONTX2_PMD)
+endif
+ifeq ($(findstring y,$(OCTEONTX2-y)),y)
+	_LDLIBS-y += -lrte_common_octeontx2
 endif
 
 _LDLIBS-$(CONFIG_RTE_LIBRTE_FLOW_CLASSIFY)  += -lrte_flow_classify
@@ -118,6 +134,11 @@ endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MALLOC)         += -lrte_malloc
 _LDLIBS-$(CONFIG_RTE_LIBRTE_CRYPTODEV)      += -lrte_cryptodev
 _LDLIBS-$(CONFIG_RTE_LIBRTE_SECURITY)       += -lrte_security
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+	ifeq ($(CONFIG_RTE_LIBRTE_SECURITY),y)
+		_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_CAAM_JR)   += -lrte_pmd_caam_jr
+	endif
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_COMPRESSDEV)    += -lrte_compressdev
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EVENTDEV)       += -lrte_eventdev
 _LDLIBS-$(CONFIG_RTE_LIBRTE_RAWDEV)         += -lrte_rawdev
@@ -199,11 +220,20 @@ ifeq ($(CONFIG_RTE_LIBRTE_DPAA_BUS),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA_BUS)       += -lrte_bus_dpaa
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA_MEMPOOL)   += -lrte_mempool_dpaa
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA_PMD)       += -lrte_pmd_dpaa
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_DPAA_SEC)   += -lrte_pmd_dpaa_sec
+endif
 endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_VIRTIO_CRYPTO) += -lrte_pmd_virtio_crypto
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)      += -lrte_pmd_dpaa2
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ENIC_PMD)       += -lrte_pmd_enic
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_FAILSAFE)   += -lrte_pmd_failsafe
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_HINIC_PMD)      += -lrte_pmd_hinic
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_HNS3_PMD)       += -lrte_pmd_hns3
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_I40E_PMD)       += -lrte_pmd_i40e
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ICE_PMD)        += -lrte_pmd_ice
 _LDLIBS-$(CONFIG_RTE_LIBRTE_FM10K_PMD)      += -lrte_pmd_fm10k
@@ -239,6 +269,9 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_MVPP2_PMD)      += -lrte_pmd_mvpp2 -L$(LIBMUSDK_PATH
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MRVL_PMD)       += -lrte_pmd_mrvl -L$(LIBMUSDK_PATH)/lib -lmusdk
 _LDLIBS-$(CONFIG_RTE_LIBRTE_NFP_PMD)        += -lrte_pmd_nfp
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MPIPE_PMD)      += -lrte_pmd_mpipe -lgxio
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PFE_PMD)        += -lrte_pmd_pfe
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_QEDE_PMD)       += -lrte_pmd_qede
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ \( $(RTE_VER_YEAR) -gt 16 \) -o \( $(RTE_VER_MINOR) -ge 11 \) ] && echo true),true)
 _NEED_LZ-$(CONFIG_RTE_LIBRTE_QEDE_PMD)       = -lz
@@ -292,6 +325,15 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ARMV8_CRYPTO)     += -lrte_pmd_armv8
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_ARMV8_CRYPTO)     += -L$(ARMV8_CRYPTO_LIB_PATH) -larmv8_crypto
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO)      += -L$(LIBMUSDK_PATH)/lib -lrte_pmd_mrvl_crypto -lmusdk
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_MVSAM_CRYPTO)     += -L$(LIBMUSDK_PATH)/lib -lrte_pmd_mvsam_crypto -lmusdk
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NITROX)           += -lrte_pmd_nitrox
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 18 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX_CRYPTO) += -lrte_pmd_octeontx_crypto
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_OCTEONTX2_CRYPTO) += -lrte_pmd_octeontx2_crypto
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_CRYPTO_SCHEDULER) += -lrte_pmd_crypto_scheduler
 ifeq ($(CONFIG_RTE_LIBRTE_FSLMC_BUS),y)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_DPAA2_SEC)   += -lrte_pmd_dpaa2_sec
