@@ -586,7 +586,10 @@ void XDPDevice::init_xsk(ErrorHandler *errh) {
 
   // insert xdp sockets into map
   if (_vni) {
-    printf("%s adding vni map [%d]%d -> %d\n", name().c_str(), _vni_map_fd, _vni, _xsk->sfd);
+
+    printf("%s adding vni map [%d]%d -> %d\n", 
+        name().c_str(), _vni_map_fd, _vni, _xsk->sfd);
+
     err = bpf_map_update_elem(_vni_map_fd, &_vni, &_xsk->sfd, 0);
     if (err) {
       errh->fatal("failed to add socket to map: %s", strerror(err));
@@ -689,6 +692,7 @@ bool XDPDevice::run_task(Task *t)
   pull();
   t->fast_reschedule();
   return true;
+
 }
 
 // process packets received from the kernel
@@ -726,7 +730,9 @@ void XDPDevice::push()
 
   _xsk->rx_npkts += rcvd;
 
-  umem_fill_to_kernel_ex(&_xsk->umem->fq, descs, rcvd);
+  if (rcvd > 0) {
+    umem_fill_to_kernel_ex(&_xsk->umem->fq, descs, rcvd);
+  }
 
 
 }
@@ -753,7 +759,7 @@ void XDPDevice::pull()
     //printf("%s) tx-free %d\n", name().c_str(), xq_nb_free(uq, 1));
     if (xq_nb_free(uq, 1) < 1) {
       click_chatter("toxdp: ring overflow");
-      return;
+      break;
     }
 
     u32 idx = uq->cached_prod++ & uq->mask;
@@ -767,19 +773,32 @@ void XDPDevice::pull()
     );
     p->kill();
 
+    if (i >= BATCH_SIZE) break;
+
   }
 
   u_smp_wmb();
   *uq->producer = uq->cached_prod;
   _xsk->outstanding_tx += i;
 
-  //printf("%s) sending %d,%d\n", name().c_str(), i, _xsk->outstanding_tx);
+  /*
+  if (i > 0) {
+    printf("%s) sending %d,%d\n", name().c_str(), i, _xsk->outstanding_tx);
+  }
+  */
+
+  if (_xsk->outstanding_tx > 0) {
+    kick_tx(_xsk->sfd);
+  }
 
   u64 descs[BATCH_SIZE];
   size_t ndescs = 
     (_xsk->outstanding_tx > BATCH_SIZE) ? BATCH_SIZE : _xsk->outstanding_tx;
 
-  unsigned int rcvd = umem_complete_from_kernel(&_xsk->umem->cq, descs, ndescs);
+  unsigned int rcvd{0};
+  if (ndescs > 0) {
+    rcvd = umem_complete_from_kernel(&_xsk->umem->cq, descs, ndescs);
+  }
 
   if (rcvd > 0) {
     _xsk->outstanding_tx -= rcvd;
@@ -787,7 +806,6 @@ void XDPDevice::pull()
   }
 
 
-  kick_tx(_xsk->sfd);
 
 }
 
