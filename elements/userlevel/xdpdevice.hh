@@ -152,4 +152,6 @@ class XDPDevice : public Element {
     u32 umem_nb_free(struct xdp_umem_uqueue *q, u32 nb);
     struct xdp_umem *umem_config(int sfd);
 
+    void do_tx();
+
 };

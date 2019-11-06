@@ -746,10 +746,16 @@ void XDPDevice::pull()
   struct xdp_uqueue *uq = &_xsk->tx;
   struct xdp_desc *r = uq->ring;
 
+  //do_tx();
+
   //kick_tx(_xsk->sfd);
 
   size_t i{0};
-  for (Packet *p = input(0).pull(); p != nullptr; p = input(0).pull(), i++) {
+  for (
+      Packet *p = input(0).pull(); 
+      p != nullptr && i<BATCH_SIZE; 
+      p = input(0).pull(), i++
+  ) {
 
     if (_trace) {
       //printf("%s sending packet (%d)\n", name().c_str(), p->length());
@@ -758,7 +764,9 @@ void XDPDevice::pull()
 
     //printf("%s) tx-free %d\n", name().c_str(), xq_nb_free(uq, 1));
     if (xq_nb_free(uq, 1) < 1) {
-      click_chatter("toxdp: ring overflow");
+      printf("toxdp: ring overflow\n");
+      printf("POOP %i %d\n", i, _xsk->outstanding_tx);
+      exit(1);
       break;
     }
 
@@ -773,7 +781,6 @@ void XDPDevice::pull()
     );
     p->kill();
 
-    if (i >= BATCH_SIZE) break;
 
   }
 
@@ -781,11 +788,23 @@ void XDPDevice::pull()
   *uq->producer = uq->cached_prod;
   _xsk->outstanding_tx += i;
 
+  if (_xsk->outstanding_tx > 47) {
+    printf("TX SIZE %d\n", _xsk->outstanding_tx);
+  }
+
   /*
   if (i > 0) {
     printf("%s) sending %d,%d\n", name().c_str(), i, _xsk->outstanding_tx);
   }
   */
+
+  do_tx();
+
+
+}
+
+void XDPDevice::do_tx()
+{
 
   if (_xsk->outstanding_tx > 0) {
     kick_tx(_xsk->sfd);
@@ -804,8 +823,6 @@ void XDPDevice::pull()
     _xsk->outstanding_tx -= rcvd;
     _xsk->tx_npkts += rcvd;
   }
-
-
 
 }
 
