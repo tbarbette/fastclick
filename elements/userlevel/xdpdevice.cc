@@ -751,11 +751,12 @@ void XDPDevice::pull()
   //kick_tx(_xsk->sfd);
 
   size_t i{0};
-  for (
-      Packet *p = input(0).pull(); 
-      p != nullptr && i<BATCH_SIZE; 
-      p = input(0).pull(), i++
-  ) {
+  for(i=0; i<BATCH_SIZE; i++) {
+
+    Packet *p = input(0).pull();
+    if (p == nullptr) {
+      break;
+    }
 
     if (_trace) {
       //printf("%s sending packet (%d)\n", name().c_str(), p->length());
