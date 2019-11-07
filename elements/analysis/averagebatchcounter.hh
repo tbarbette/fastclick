@@ -20,6 +20,8 @@ keep average statistics about batching since last reset and last tick
 Expects Ethernet frames as input. Computes statistics related to the batches
 being created either since the last tick or since the initialization of the
 element.
+If LENGTH_STATS is set to true, this element should be combined with an
+upstream AggregateLength element, which provides frames' length.
 
 Keyword arguments are:
 
@@ -91,10 +93,10 @@ private:
     struct BatchStats {
         uint64_t count_batches;
         uint64_t count_packets;
-        uint32_t agg_frame_len;
+        uint64_t count_bytes;
         float avg_frame_len;
 
-        BatchStats() : count_batches(0), count_packets(0), agg_frame_len(0), avg_frame_len(0.0f) {
+        BatchStats() : count_batches(0), count_packets(0), count_bytes(0), avg_frame_len(0.0f) {
 
         }
     };
