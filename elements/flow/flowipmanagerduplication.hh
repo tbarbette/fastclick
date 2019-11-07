@@ -65,7 +65,7 @@ public:
 };
 
 /**
- * FlowIPManager(CAPACITY [, RESERVE])
+ * FlowIPManagerDuplication(CAPACITY [, RESERVE])
  *
  * =s flow
  *  FCB packet classifier - cuckoo shared-by-all-threads
@@ -90,7 +90,7 @@ public:
 
 	~FlowIPManagerDuplication() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowIPManager"; }
+    const char *class_name() const		{ return "FlowIPManagerDuplication"; }
     const char *port_count() const		{ return "1/1"; }
 
     const char *processing() const		{ return PUSH; }

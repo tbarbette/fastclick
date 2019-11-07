@@ -1,5 +1,5 @@
 /*
- * FlowIPManager.{cc,hh}
+ * FlowIPManagerDuplication.{cc,hh}
  */
 
 #include <click/config.h>
@@ -118,7 +118,7 @@ void FlowIPManagerDuplication::cleanup(CleanupStage stage) {
 
 void FlowIPManagerDuplication::process(Packet* p, BatchBuilder& b, const Timestamp& recent) {
     IPFlow5ID fid = IPFlow5ID(p);
-    rte_hash*& table = vhash[click_current_cpu_id()];
+    rte_hash*& table = vhash[click_current_cpu_id()]; //
     FlowControlBlock* fcb;
     int ret = rte_hash_lookup(table, &fid);
 
