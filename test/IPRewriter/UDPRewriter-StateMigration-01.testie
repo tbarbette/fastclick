@@ -8,7 +8,7 @@ click-buildtool provides umultithread
 
 %script
 
-$VALGRIND click -j 2 -e "
+click -j 2 -e "
 rw :: UDPRewriter(pattern 1.0.0.1 1024-65535# - - 0 1, drop, HANDLE_MIGRATION true);
 f1 :: FromIPSummaryDump(IN1, STOP true)
 	-> [0]rw;
