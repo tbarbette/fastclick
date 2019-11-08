@@ -779,6 +779,30 @@ open_compress_pipe(const String &filename, ErrorHandler *errh)
     }
 }
 
+/*
+ * Extract @a k bits from @a p position of @a number and
+ * return the extracted value as integer.
+ */
+uint64_t
+bit_extractor(const uint64_t &number, const unsigned short &k, const unsigned short &p)
+{
+    return (((1 << k) - 1) & (number >> (p - 1)));
+}
+
+/*
+ * Convert @a bits_nb (MSB) of number @a number to binary and
+ * return the result as a string.
+ */
+String
+number_to_binary_str(const uint64_t &number, const unsigned &bits_nb)
+{
+    StringAccum sa;
+    if (bits_nb <= 64)
+    	for (unsigned i = 1 << bits_nb-1; i > 0; i = i / 2)
+        	(number & i)? sa << "1" : sa << "0";
+    return sa.take_string();
+}
+
 #if HAVE_DYNAMIC_LINKING
 
 extern "C" {
