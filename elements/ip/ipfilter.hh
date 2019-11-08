@@ -164,12 +164,12 @@ class IPFilter : public BatchElement { public:
     static void static_initialize();
     static void static_cleanup();
 
-    const char *class_name() const		{ return "IPFilter"; }
-    const char *port_count() const		{ return "1/-"; }
-    const char *processing() const		{ return PUSH; }
+    const char *class_name() const      { return "IPFilter"; }
+    const char *port_count() const      { return "1/-"; }
+    const char *processing() const      { return PUSH; }
     // this element does not need AlignmentInfo; override Classifier's "A" flag
-    const char *flags() const			{ return ""; }
-    bool can_live_reconfigure() const		{ return true; }
+    const char *flags() const           { return ""; }
+    bool can_live_reconfigure() const       { return true; }
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
@@ -181,126 +181,124 @@ class IPFilter : public BatchElement { public:
 
     typedef Classification::Wordwise::CompressedProgram IPFilterProgram;
     static void parse_program(IPFilterProgram &zprog,
-			      const Vector<String> &conf, int noutputs,
-			      const Element *context, ErrorHandler *errh);
+                  const Vector<String> &conf, int noutputs,
+                  const Element *context, ErrorHandler *errh);
     inline int match(const IPFilterProgram &zprog, const Packet *p, const bool &caching);
     inline int match(Packet *p);
 
     enum {
-	TYPE_NONE	= 0,		// data types
-	TYPE_TYPE	= 1,
-	TYPE_SYNTAX	= 2,
-	TYPE_INT	= 3,
+        TYPE_NONE   = 0,        // data types
+        TYPE_TYPE   = 1,
+        TYPE_SYNTAX = 2,
+        TYPE_INT    = 3,
 
-	TYPE_HOST	= 10,		// expression types
-	TYPE_PROTO	= 11,
-	TYPE_IPFRAG	= 12,
-	TYPE_PORT	= 13,
-	TYPE_TCPOPT	= 14,
-	TYPE_ETHER	= 15,
+        TYPE_HOST   = 10,       // expression types
+        TYPE_PROTO  = 11,
+        TYPE_IPFRAG = 12,
+        TYPE_PORT   = 13,
+        TYPE_TCPOPT = 14,
+        TYPE_ETHER  = 15,
 
-	TYPE_NET	= 30,		// shorthands
-	TYPE_IPUNFRAG	= 31,
-	TYPE_IPECT	= 32,
-	TYPE_IPCE	= 33,
+        TYPE_NET    = 30,       // shorthands
+        TYPE_IPUNFRAG   = 31,
+        TYPE_IPECT  = 32,
+        TYPE_IPCE   = 33,
 
-	TYPE_FIELD	= 0x40000000,
-	// bit 31 must be zero
-	// bit 30 must be one
-	// bits 29-21 represent IP protocol (9 bits); 0 means no protocol
-	// bits 20-5 represent field offset into header in bits (16 bits)
-	// bits 4-0 represent field length in bits minus one (5 bits)
-	FIELD_PROTO_SHIFT = 21,
-	FIELD_PROTO_MASK = (0x1FF << FIELD_PROTO_SHIFT),
-	FIELD_OFFSET_SHIFT = 5,
-	FIELD_OFFSET_MASK = (0xFFFF << FIELD_OFFSET_SHIFT),
-	FIELD_LENGTH_SHIFT = 0,
-	FIELD_LENGTH_MASK = (0x1F << FIELD_LENGTH_SHIFT),
-	FIELD_CSUM	= (TYPE_FIELD | ((10*8) << FIELD_OFFSET_SHIFT) | 15),
-	FIELD_IPLEN	= (TYPE_FIELD | ((2*8) << FIELD_OFFSET_SHIFT) | 15),
-	FIELD_ID	= (TYPE_FIELD | ((4*8) << FIELD_OFFSET_SHIFT) | 15),
-	FIELD_VERSION	= (TYPE_FIELD | (0 << FIELD_OFFSET_SHIFT) | 3),
-	FIELD_HL	= (TYPE_FIELD | (4 << FIELD_OFFSET_SHIFT) | 3),
-	FIELD_TOS	= (TYPE_FIELD | ((1*8) << FIELD_OFFSET_SHIFT) | 7),
-	FIELD_DSCP	= (TYPE_FIELD | ((1*8) << FIELD_OFFSET_SHIFT) | 5),
-	FIELD_TTL	= (TYPE_FIELD | ((8*8) << FIELD_OFFSET_SHIFT) | 7),
-	FIELD_TCP_WIN = (TYPE_FIELD | (IP_PROTO_TCP << FIELD_PROTO_SHIFT) | ((14*8) << FIELD_OFFSET_SHIFT) | 15),
-	FIELD_ICMP_TYPE = (TYPE_FIELD | (IP_PROTO_ICMP << FIELD_PROTO_SHIFT) | (0 << FIELD_OFFSET_SHIFT) | 7)
+        TYPE_FIELD  = 0x40000000,
+        // bit 31 must be zero
+        // bit 30 must be one
+        // bits 29-21 represent IP protocol (9 bits); 0 means no protocol
+        // bits 20-5 represent field offset into header in bits (16 bits)
+        // bits 4-0 represent field length in bits minus one (5 bits)
+        FIELD_PROTO_SHIFT = 21,
+        FIELD_PROTO_MASK = (0x1FF << FIELD_PROTO_SHIFT),
+        FIELD_OFFSET_SHIFT = 5,
+        FIELD_OFFSET_MASK = (0xFFFF << FIELD_OFFSET_SHIFT),
+        FIELD_LENGTH_SHIFT = 0,
+        FIELD_LENGTH_MASK = (0x1F << FIELD_LENGTH_SHIFT),
+        FIELD_CSUM  = (TYPE_FIELD | ((10*8) << FIELD_OFFSET_SHIFT) | 15),
+        FIELD_IPLEN = (TYPE_FIELD | ((2*8) << FIELD_OFFSET_SHIFT) | 15),
+        FIELD_ID    = (TYPE_FIELD | ((4*8) << FIELD_OFFSET_SHIFT) | 15),
+        FIELD_VERSION   = (TYPE_FIELD | (0 << FIELD_OFFSET_SHIFT) | 3),
+        FIELD_HL    = (TYPE_FIELD | (4 << FIELD_OFFSET_SHIFT) | 3),
+        FIELD_TOS   = (TYPE_FIELD | ((1*8) << FIELD_OFFSET_SHIFT) | 7),
+        FIELD_DSCP  = (TYPE_FIELD | ((1*8) << FIELD_OFFSET_SHIFT) | 5),
+        FIELD_TTL   = (TYPE_FIELD | ((8*8) << FIELD_OFFSET_SHIFT) | 7),
+        FIELD_TCP_WIN = (TYPE_FIELD | (IP_PROTO_TCP << FIELD_PROTO_SHIFT) | ((14*8) << FIELD_OFFSET_SHIFT) | 15),
+        FIELD_ICMP_TYPE = (TYPE_FIELD | (IP_PROTO_ICMP << FIELD_PROTO_SHIFT) | (0 << FIELD_OFFSET_SHIFT) | 7)
     };
 
     enum {
-	UNKNOWN = -1000
+        UNKNOWN = -1000
     };
 
     enum {
-	SD_SRC = 1, SD_DST = 2, SD_AND = 3, SD_OR = 4
+        SD_SRC = 1, SD_DST = 2, SD_AND = 3, SD_OR = 4
     };
 
     enum {
-	OP_EQ = 0, OP_GT = 1, OP_LT = 2
+        OP_EQ = 0, OP_GT = 1, OP_LT = 2
     };
 
     enum {
-	// if you change this, change click-fastclassifier.cc also
-	offset_mac = 0,
-	offset_net = 256,
-	offset_transp = 512
+        // if you change this, change click-fastclassifier.cc also
+        offset_mac = 0,
+        offset_net = 256,
+        offset_transp = 512
     };
 
     enum {
-	PERFORM_BINARY_SEARCH = 1,
-	MIN_BINARY_SEARCH = 7
+        PERFORM_BINARY_SEARCH = 1,
+        MIN_BINARY_SEARCH = 7
     };
 
     union PrimitiveData {
-	uint32_t u;
-	int32_t i;
-	struct in_addr ip4;
-	unsigned char c[8];
+        uint32_t u;
+        int32_t i;
+        struct in_addr ip4;
+        unsigned char c[8];
     };
 
     struct Primitive {
+        int _type;
+        int _data;
 
-	int _type;
-	int _data;
+        int _op;
+        bool _op_negated;
 
-	int _op;
-	bool _op_negated;
+        int _srcdst;
+        int _transp_proto;
 
-	int _srcdst;
-	int _transp_proto;
+        PrimitiveData _u;
+        PrimitiveData _mask;
 
-	PrimitiveData _u;
-	PrimitiveData _mask;
+        Primitive()         { clear(); }
 
-	Primitive()			{ clear(); }
+        void clear();
+        void set_type(int, ErrorHandler *);
+        void set_srcdst(int, ErrorHandler *);
+        void set_transp_proto(int, ErrorHandler *);
 
-	void clear();
-	void set_type(int, ErrorHandler *);
-	void set_srcdst(int, ErrorHandler *);
-	void set_transp_proto(int, ErrorHandler *);
+        int set_mask(uint32_t full_mask, int shift, uint32_t provided_mask,
+                 ErrorHandler *errh);
+        int check(const Primitive &prev_prim, int level,
+              int mask_dt, const PrimitiveData &mask,
+              ErrorHandler *errh);
+        void compile(Classification::Wordwise::Program &p, Vector<int> &tree) const;
 
-	int set_mask(uint32_t full_mask, int shift, uint32_t provided_mask,
-		     ErrorHandler *errh);
-	int check(const Primitive &prev_prim, int level,
-		  int mask_dt, const PrimitiveData &mask,
-		  ErrorHandler *errh);
-	void compile(Classification::Wordwise::Program &p, Vector<int> &tree) const;
+        bool has_transp_proto() const;
+        bool negation_is_simple() const;
+        void simple_negate();
 
-	bool has_transp_proto() const;
-	bool negation_is_simple() const;
-	void simple_negate();
+        String unparse_type() const;
+        String unparse_op() const;
+        static String unparse_type(int srcdst, int type);
+        static String unparse_transp_proto(int transp_proto);
 
-	String unparse_type() const;
-	String unparse_op() const;
-	static String unparse_type(int srcdst, int type);
-	static String unparse_transp_proto(int transp_proto);
+          private:
 
-      private:
-
-	int type_error(ErrorHandler *errh, const char *msg) const;
-	void add_comparison_exprs(Classification::Wordwise::Program &p, Vector<int> &tree, int offset, int shift, bool swapped, bool op_negate) const;
-
+        int type_error(ErrorHandler *errh, const char *msg) const;
+        void add_comparison_exprs(Classification::Wordwise::Program &p, Vector<int> &tree, int offset, int shift, bool swapped, bool op_negate) const;
     };
 
   protected:
@@ -324,45 +322,42 @@ class IPFilter : public BatchElement { public:
   private:
 
     static int lookup(String word, int type, int transp_proto, uint32_t &data,
-		      const Element *context, ErrorHandler *errh);
+              const Element *context, ErrorHandler *errh);
 
     static void add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh, const Element *context, int noutputs, Vector<Classification::Wordwise::Program> &progs);
     struct Parser {
-	const Vector<String> &_words;
-	Vector<int> &_tree;
-	Classification::Wordwise::Program &_prog;
-	const Element *_context;
-	ErrorHandler *_errh;
-	Primitive _prev_prim;
+        const Vector<String> &_words;
+        Vector<int> &_tree;
+        Classification::Wordwise::Program &_prog;
+        const Element *_context;
+        ErrorHandler *_errh;
+        Primitive _prev_prim;
 
-	Parser(const Vector<String> &words, Vector<int> &tree,
-	       Classification::Wordwise::Program &prog,
-	       const Element *context, ErrorHandler *errh)
-	    : _words(words), _tree(tree), _prog(prog), _context(context),
-	      _errh(errh) {
-	}
+        Parser(const Vector<String> &words, Vector<int> &tree,
+               Classification::Wordwise::Program &prog,
+               const Element *context, ErrorHandler *errh)
+            : _words(words), _tree(tree), _prog(prog), _context(context),
+              _errh(errh) {
+        }
 
-	struct parse_state {
-	    int state;
-	    int last_pos;
-	    parse_state(int s)
-		: state(s) {
-	    }
-	};
-	enum {
-	    s_expr0, s_expr1, s_expr2,
-	    s_orexpr0, s_orexpr1,
-	    s_term0, s_term1, s_term2,
-	    s_factor0, s_factor1, s_factor2,
-	    s_factor0_neg, s_factor1_neg, s_factor2_neg
-	};
-	void parse_slot(int output, int pos);
-	int parse_expr_iterative(int pos);
-	int parse_test(int pos, bool negated);
+        struct parse_state {
+            int state;
+            int last_pos;
+            parse_state(int s) : state(s) {}
+        };
+        enum {
+            s_expr0, s_expr1, s_expr2,
+            s_orexpr0, s_orexpr1,
+            s_term0, s_term1, s_term2,
+            s_factor0, s_factor1, s_factor2,
+            s_factor0_neg, s_factor1_neg, s_factor2_neg
+        };
+        void parse_slot(int output, int pos);
+        int parse_expr_iterative(int pos);
+        int parse_test(int pos, bool negated);
     };
 
-    static int length_checked_match(const IPFilterProgram &zprog,
-				    const Packet *p, int packet_length);
+    static int length_checked_match(const IPFilterProgram &zprog, const Packet *p, int packet_length);
 
 };
 
@@ -377,22 +372,22 @@ inline bool
 IPFilter::Primitive::negation_is_simple() const
 {
     if (_type == TYPE_PROTO)
-	return true;
+        return true;
     else if (_transp_proto >= 0)
-	return false;
+        return false;
     else
-	return _type == TYPE_HOST || (_type & TYPE_FIELD) || _type == TYPE_IPFRAG;
+        return _type == TYPE_HOST || (_type & TYPE_FIELD) || _type == TYPE_IPFRAG;
 }
 
 inline int
 IPFilter::match(const IPFilterProgram &zprog, const Packet *p, const bool &caching)
 {
     int packet_length = p->network_length(),
-	network_header_length = p->network_header_length();
+    network_header_length = p->network_header_length();
     if (packet_length > network_header_length)
-	packet_length += offset_transp - network_header_length;
+        packet_length += offset_transp - network_header_length;
     else
-	packet_length += offset_net;
+        packet_length += offset_net;
 
     if (zprog.output_everything() >= 0) {
         if (caching) {
@@ -434,53 +429,53 @@ IPFilter::match(const IPFilterProgram &zprog, const Packet *p, const bool &cachi
     const uint32_t *pp;
     uint32_t data;
     while (1) {
-	int off = (int16_t) pr[0];
-	if (off >= offset_transp)
-	    data = *(const uint32_t *)(transph_data + off - offset_transp);
-	else if (off >= offset_net)
-	    data = *(const uint32_t *)(neth_data + off - offset_net);
-	else
-	    data = *(const uint32_t *)(p->mac_header() - 2 + off);
-	data &= pr[3];
-	off = pr[0] >> 17;
-	pp = pr + 4;
-	if (!PERFORM_BINARY_SEARCH || off < MIN_BINARY_SEARCH) {
-	    for (; off; --off, ++pp)
-		if (*pp == data) {
-		    off = pr[2];
-		    goto gotit;
-		}
-	} else {
-	    const uint32_t *px = pp + off;
-	    while (pp < px) {
-		const uint32_t *pm = pp + (px - pp) / 2;
-		if (*pm == data) {
-		    off = pr[2];
-		    goto gotit;
-		} else if (*pm < data)
-		    pp = pm + 1;
-		else
-		    px = pm;
-	    }
-	}
-	off = pr[1];
-    gotit:
-	if (off <= 0) {
-        if (caching) {
-            IPFlow5ID new_flow_id(p);
-            _last_flow_id.insert(name(), &new_flow_id);
-            _last_port.insert(name(), -off);
+        int off = (int16_t) pr[0];
+        if (off >= offset_transp)
+            data = *(const uint32_t *)(transph_data + off - offset_transp);
+        else if (off >= offset_net)
+            data = *(const uint32_t *)(neth_data + off - offset_net);
+        else
+            data = *(const uint32_t *)(p->mac_header() - 2 + off);
+        data &= pr[3];
+        off = pr[0] >> 17;
+        pp = pr + 4;
+        if (!PERFORM_BINARY_SEARCH || off < MIN_BINARY_SEARCH) {
+            for (; off; --off, ++pp)
+                if (*pp == data) {
+                    off = pr[2];
+                    goto gotit;
+                }
+        } else {
+            const uint32_t *px = pp + off;
+            while (pp < px) {
+                const uint32_t *pm = pp + (px - pp) / 2;
+                if (*pm == data) {
+                    off = pr[2];
+                    goto gotit;
+                } else if (*pm < data)
+                    pp = pm + 1;
+                else
+                    px = pm;
+            }
         }
-	    return -off;
-    }
-	pr += off;
+        off = pr[1];
+        gotit:
+        if (off <= 0) {
+            if (caching) {
+                IPFlow5ID new_flow_id(p);
+                _last_flow_id.insert(name(), &new_flow_id);
+                _last_port.insert(name(), -off);
+            }
+            return -off;
+        }
+        pr += off;
     }
 }
 
 inline int
 IPFilter::match(Packet *p)
 {
-	return match(_zprog, p, _caching);
+    return match(_zprog, p, _caching);
 }
 
 CLICK_ENDDECLS
