@@ -72,6 +72,11 @@ static const uint32_t db2type[] = {
     IPFilter::TYPE_TCPOPT, IPFilter::FIELD_ICMP_TYPE
 };
 
+HashMap<String, IPFlow5ID *> IPFilter::_last_flow_id;
+HashMap<String, int> IPFilter::_last_port;
+HashMap<String, uint64_t> IPFilter::_cache_hits_nb;
+HashMap<String, uint64_t> IPFilter::_cache_misses_nb;
+
 static String
 unparse_word(int type, int proto, const String &word)
 {
@@ -159,12 +164,19 @@ IPFilter::static_cleanup()
 {
     delete dbs[0];
     delete dbs[1];
+
+    if (!_last_flow_id.empty()) {
+        _last_flow_id.clear();
+        _last_port.clear();
+        _cache_hits_nb.clear();
+        _cache_misses_nb.clear();
+    }
 }
 
-
-IPFilter::IPFilter()
+IPFilter::IPFilter() : _caching(false)
 {
 }
+
 
 IPFilter::~IPFilter()
 {
@@ -643,6 +655,7 @@ IPFilter::Primitive::add_comparison_exprs(Classification::Wordwise::Program &p, 
       p.negate_subtree(tree, true);
     return;
   }
+
 
   // To implement a greater-than test for "input&MASK > U":
   // Check the top bit of U&MASK.
@@ -1265,7 +1278,6 @@ IPFilter::parse_program(Classification::Wordwise::CompressedProgram &zprog,
 
     }
 
-
     static const int offset_map[] = { offset_net + 8, offset_net + 3 };
     // merge programs
     for (int merge_step = 1; merge_step < progs.size(); merge_step *= 2)
@@ -1291,7 +1303,9 @@ IPFilter::parse_program(Classification::Wordwise::CompressedProgram &zprog,
 }
 
 void
-IPFilter::add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh, const Element *context, int noutputs, Vector<Classification::Wordwise::Program> &progs)
+IPFilter::add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh,
+			const Element *context, int noutputs,
+			Vector<Classification::Wordwise::Program> &progs)
 {
 	// get slot
 	int slot = -Classification::j_never;
@@ -1312,7 +1326,7 @@ IPFilter::add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh, const El
 		cerrh.error("unknown slot ID %<%s%>", slotwd.c_str());
 	}
 
-        progs.push_back(Classification::Wordwise::Program());
+    progs.push_back(Classification::Wordwise::Program());
 	Classification::Wordwise::Program& prog = progs.back();
 	Vector<int> tree = prog.init_subtree();
 	prog.start_subtree(tree);
@@ -1333,31 +1347,103 @@ IPFilter::add_pattern(Vector<String> &words, PrefixErrorHandler &cerrh, const El
                             -slot, Classification::j_failure);
 }
 
+
 int
 IPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    // Consume key-value argument before parsing the rules
+    if (Args(this, errh).bind(conf)
+        .read("CACHING", _caching)
+        .consume() < 0)
+        return -1;
+
+    // In caching mode, a set of table entries per IPFilter element stores caching info
+    if (_caching) {
+        errh->message("%s::%s: Caching mode enabled", name().c_str(), class_name());
+        _last_flow_id.insert(name(), 0);
+        _last_port.insert(name(), -1);
+        _cache_hits_nb.insert(name(), 0);
+        _cache_misses_nb.insert(name(), 0);
+    }
+
     IPFilterProgram zprog;
     parse_program(zprog, conf, noutputs(), this, errh);
+
     if (!errh->nerrors()) {
-	_zprog = zprog;
-	return 0;
-    } else
+        _zprog = zprog;
+        return 0;
+    }
+
 	return -1;
 }
 
+
 String
-IPFilter::program_string(Element *e, void *)
+IPFilter::read_handler(Element *e, void *thunk)
 {
     IPFilter *ipf = static_cast<IPFilter *>(e);
-    return ipf->_zprog.unparse();
+
+    switch ((intptr_t)thunk) {
+        case H_PROGRAM: {
+            return ipf->_zprog.unparse();
+        }
+        case H_CACHE_HITS: {
+            if (!ipf->_caching){
+                return "-1";
+            }
+            return String(IPFilter::_cache_hits_nb[ipf->name()]);
+        }
+        case H_CACHE_MISSES: {
+            if (!ipf->_caching){
+                return "-1";
+            }
+            return String(IPFilter::_cache_misses_nb[ipf->name()]);
+        }
+        case H_CACHE_TOTAL: {
+            if (!ipf->_caching){
+                return "-1";
+            }
+            return String(
+                IPFilter::_cache_hits_nb[ipf->name()] +
+                IPFilter::_cache_misses_nb[ipf->name()]
+            );
+        }
+        case H_CACHE_HITS_RATIO: {
+            if (!ipf->_caching) {
+                return "-1";
+            }
+            uint64_t tot = IPFilter::_cache_hits_nb[ipf->name()] + IPFilter::_cache_misses_nb[ipf->name()];
+            if (tot == 0) {
+                return "0";
+            }
+            return String(((float) IPFilter::_cache_hits_nb[ipf->name()] / (float) tot)*100);
+        }
+        case H_CACHE_MISSES_RATIO: {
+            if (!ipf->_caching) {
+                return "-1";
+            }
+            uint64_t tot = IPFilter::_cache_hits_nb[ipf->name()] + IPFilter::_cache_misses_nb[ipf->name()];
+            if (tot == 0) {
+                return "0";
+            }
+            return String(((float) IPFilter::_cache_misses_nb[ipf->name()] / (float) tot)*100);
+        }
+        default: {
+            return "-1";
+        }
+    }
 }
 
 void
 IPFilter::add_handlers()
 {
-    add_read_handler("program", program_string);
+    add_read_handler("program", read_handler, H_PROGRAM);
+    add_read_handler("cache_hits_count", read_handler, H_CACHE_HITS);
+    add_read_handler("cache_misses_count", read_handler, H_CACHE_MISSES);
+    add_read_handler("cache_total_count", read_handler, H_CACHE_TOTAL);
+    add_read_handler("cache_hits_ratio", read_handler, H_CACHE_HITS_RATIO);
+    add_read_handler("cache_misses_ratio", read_handler, H_CACHE_MISSES_RATIO);
 }
-
 
 //
 // RUNNING
@@ -1432,17 +1518,20 @@ IPFilter::length_checked_match(const IPFilterProgram &zprog, const Packet *p,
 void
 IPFilter::push_batch(int, PacketBatch *batch)
 {
-	CLASSIFY_EACH_PACKET(	(noutputs() + 1),
-							match,
-							batch,
-							checked_output_push_batch);
+	CLASSIFY_EACH_PACKET(
+		(noutputs() + 1),
+		match,
+		batch,
+		checked_output_push_batch
+	);
 
 }
 #endif
+
 void
 IPFilter::push(int, Packet *p)
 {
-    checked_output_push(match(_zprog, p), p);
+    checked_output_push(match(_zprog, p, _caching), p);
 }
 
 CLICK_ENDDECLS

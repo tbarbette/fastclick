@@ -2,13 +2,15 @@
 #define CLICK_IPFILTER_HH
 #include "elements/standard/classification.hh"
 #include <click/batchelement.hh>
+#include <click/hashmap.hh>
+#include <click/ipflowid.hh>
 #include <click/error.hh>
 CLICK_DECLS
 
 /*
 =c
 
-IPFilter(ACTION_1 PATTERN_1, ..., ACTION_N PATTERN_N)
+IPFilter([CACHING,] ACTION_1 PATTERN_1, ..., ACTION_N PATTERN_N)
 
 =s ip
 
@@ -37,6 +39,12 @@ ACTION-PATTERN described above:
 The IPFilter element has an arbitrary number of outputs. Input packets must
 have their IP header annotation set; CheckIPHeader and MarkIPHeader do
 this.
+
+Arguments:
+
+=item CACHING
+
+Boolean. Enables or disables caching. Defaults to false (i.e., no caching).
 
 =n
 
@@ -109,6 +117,40 @@ is using to classify packets. At each step in the program, four bytes
 of packet data are ANDed with a mask and compared against four bytes of
 classifier pattern.
 
+=h cache_hits_count read-only
+If CACHING is enabled, the IPFilter element stores the last rule in a cache.
+This handler returns the number of cache hits (i.e., number of input packets
+that matched directly the cached rule, thereby did not have to traverse the
+classification tree).
+If CACHING is disabled, this handler returns -1.
+
+=h cache_misses_count read-only
+If CACHING is enabled, the IPFilter element stores the last rule in a cache.
+This handler returns the number of cache misses (i.e., number of input packets
+that did not match the cached rule, thereby had to traverse the
+classification tree).
+If CACHING is disabled, this handler returns -1.
+
+=h cache_total_count read-only
+If CACHING is enabled, the IPFilter element stores the last rule in a cache.
+This handler returns the number of total accesses in the cache (i.e., the summary
+of hits and misses).
+If CACHING is disabled, this handler returns -1.
+
+=h cache_hits_ratio read-only
+If CACHING is enabled, the IPFilter element stores the last rule in a cache.
+This handler returns the ratio of cache hits over the total number of accesses
+in the cache.
+This ratio ranges in [0, 100].
+If CACHING is disabled, this handler returns -1.
+
+=h cache_misses_ratio read-only
+If CACHING is enabled, the IPFilter element stores the last rule in a cache.
+This handler returns the ratio of cache misses over the total number of accesses
+in the cache.
+This ratio ranges in [0, 100].
+If CACHING is disabled, this handler returns -1.
+
 =a
 
 IPClassifier, Classifier, CheckIPHeader, MarkIPHeader, CheckIPHeader2,
@@ -141,7 +183,7 @@ class IPFilter : public BatchElement { public:
     static void parse_program(IPFilterProgram &zprog,
 			      const Vector<String> &conf, int noutputs,
 			      const Element *context, ErrorHandler *errh);
-    static inline int match(const IPFilterProgram &zprog, const Packet *p);
+    inline int match(const IPFilterProgram &zprog, const Packet *p, const bool &caching);
     inline int match(Packet *p);
 
     enum {
@@ -265,6 +307,20 @@ class IPFilter : public BatchElement { public:
 
     IPFilterProgram _zprog;
 
+    bool _caching;
+    static HashMap<String, IPFlow5ID *> _last_flow_id;
+    static HashMap<String, int> _last_port;
+    static HashMap<String, uint64_t> _cache_hits_nb;
+    static HashMap<String, uint64_t> _cache_misses_nb;
+
+    static String read_handler(Element *e, void *thunk);
+
+    enum {
+        H_PROGRAM,
+        H_CACHE_HITS, H_CACHE_MISSES, H_CACHE_TOTAL,
+        H_CACHE_HITS_RATIO, H_CACHE_MISSES_RATIO
+    };
+
   private:
 
     static int lookup(String word, int type, int transp_proto, uint32_t &data,
@@ -308,8 +364,6 @@ class IPFilter : public BatchElement { public:
     static int length_checked_match(const IPFilterProgram &zprog,
 				    const Packet *p, int packet_length);
 
-    static String program_string(Element *e, void *user_data);
-
 };
 
 
@@ -331,7 +385,7 @@ IPFilter::Primitive::negation_is_simple() const
 }
 
 inline int
-IPFilter::match(const IPFilterProgram &zprog, const Packet *p)
+IPFilter::match(const IPFilterProgram &zprog, const Packet *p, const bool &caching)
 {
     int packet_length = p->network_length(),
 	network_header_length = p->network_header_length();
@@ -340,11 +394,38 @@ IPFilter::match(const IPFilterProgram &zprog, const Packet *p)
     else
 	packet_length += offset_net;
 
-    if (zprog.output_everything() >= 0)
-	return zprog.output_everything();
-    else if (packet_length < (int) zprog.safe_length())
-	// common case never checks packet length
-	return length_checked_match(zprog, p, packet_length);
+    if (zprog.output_everything() >= 0) {
+        if (caching) {
+            (*_cache_misses_nb.findp(name()))++;
+        }
+        return zprog.output_everything();
+    }
+    else if (packet_length < (int) zprog.safe_length()) {
+        if (caching) {
+            (*_cache_misses_nb.findp(name()))++;
+        }
+        // common case never checks packet length
+        return length_checked_match(zprog, p, packet_length);
+    }
+
+    // Caching enabled
+    if (caching) {
+        if (_last_flow_id[name()]) {
+            // Get the flow ID of this packet
+            IPFlow5ID new_flow_id(p);
+            // Exploit last output port stored from a previous packet of the same flow
+            if (new_flow_id == *_last_flow_id[name()]) {
+                int port = _last_port[name()];
+                assert((port >= 0) && (port < noutputs()));
+                (*_cache_hits_nb.findp(name()))++;
+                return port;
+            } else {
+                (*_cache_misses_nb.findp(name()))++;
+            }
+        } else {
+            (*_cache_misses_nb.findp(name()))++;
+        }
+    }
 
     const unsigned char *neth_data = p->network_header();
     const unsigned char *transph_data = p->transport_header();
@@ -384,8 +465,14 @@ IPFilter::match(const IPFilterProgram &zprog, const Packet *p)
 	}
 	off = pr[1];
     gotit:
-	if (off <= 0)
+	if (off <= 0) {
+        if (caching) {
+            IPFlow5ID new_flow_id(p);
+            _last_flow_id.insert(name(), &new_flow_id);
+            _last_port.insert(name(), -off);
+        }
 	    return -off;
+    }
 	pr += off;
     }
 }
@@ -393,7 +480,7 @@ IPFilter::match(const IPFilterProgram &zprog, const Packet *p)
 inline int
 IPFilter::match(Packet *p)
 {
-	return match(_zprog,p);
+	return match(_zprog, p, _caching);
 }
 
 CLICK_ENDDECLS
