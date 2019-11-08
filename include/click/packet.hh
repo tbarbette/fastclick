@@ -1348,7 +1348,7 @@ Packet::network_header() const
 #endif
 }
 
-/** @brief Return true iff the packet's network header pointer is set.
+/** @brief Return true iff the packet's transport header pointer is set.
  * @sa set_network_header, clear_transport_header */
 inline bool
 Packet::has_transport_header() const

@@ -88,6 +88,9 @@ FILE *open_uncompress_pipe(const String &filename, const unsigned char *buf,
 int compressed_filename(const String &filename);
 FILE *open_compress_pipe(const String &filename, ErrorHandler *);
 
+uint64_t bit_extractor(const uint64_t &number, const unsigned short &k, const unsigned short &p);
+String number_to_binary_str(const uint64_t &number, const unsigned &bits_nb = 32);
+
 #if HAVE_DYNAMIC_LINKING
 int clickdl_load_package(String, ErrorHandler *);
 void clickdl_load_requirement(String, const Vector<ArchiveElement> *archive, ErrorHandler *);
