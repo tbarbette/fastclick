@@ -789,9 +789,11 @@ void XDPDevice::pull()
   *uq->producer = uq->cached_prod;
   _xsk->outstanding_tx += i;
 
+  /*
   if (_xsk->outstanding_tx > 47) {
     printf("TX SIZE %d\n", _xsk->outstanding_tx);
   }
+  */
 
   /*
   if (i > 0) {
