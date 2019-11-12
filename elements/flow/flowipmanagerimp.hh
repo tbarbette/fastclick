@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowIPManagerDuplication_HH
-#define CLICK_FlowIPManagerDuplication_HH
+#ifndef CLICK_FlowIPManagerIMP_HH
+#define CLICK_FlowIPManagerIMP_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>
@@ -65,7 +65,7 @@ public:
 };
 
 /**
- * FlowIPManagerDuplication(CAPACITY [, RESERVE])
+ * FlowIPManagerIMP(CAPACITY [, RESERVE])
  *
  * =s flow
  *  FCB packet classifier - cuckoo shared-by-all-threads
@@ -82,15 +82,15 @@ public:
  * =a FlowIPManger
  *
  */
-class FlowIPManagerDuplication: public BatchElement {
+class FlowIPManagerIMP: public BatchElement {
 public:
 
 
-    FlowIPManagerDuplication() CLICK_COLD;
+    FlowIPManagerIMP() CLICK_COLD;
 
-	~FlowIPManagerDuplication() CLICK_COLD;
+	~FlowIPManagerIMP() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowIPManagerDuplication"; }
+    const char *class_name() const		{ return "FlowIPManagerIMP"; }
     const char *port_count() const		{ return "1/1"; }
 
     const char *processing() const		{ return PUSH; }
@@ -111,7 +111,7 @@ protected:
 	volatile int owner;
 	Packet* queue;
 	rte_hash* hash;
-	Vector<rte_hash*> vhash; //add: Vector of flow tables
+	rte_hash** vhash; //add: Vector of flow tables
 	FlowControlBlock *fcbs;
 
     int _reserve;
