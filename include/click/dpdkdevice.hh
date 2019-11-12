@@ -267,11 +267,7 @@ public:
     inline int nb_tx_queues();
     inline int nb_vf_pools();
 
-#if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
     struct rte_ether_addr gen_mac(int a, int b);
-#else
-    struct ether_addr gen_mac(int a, int b);
-#endif
 
     /*
     * TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting

@@ -416,7 +416,7 @@ FlowCache::get_rule_by_global_id(const long &rule_id)
 String
 FlowCache::get_rule_by_internal_id(const uint32_t &int_rule_id)
 {
-    get_rule_by_global_id(global_from_internal_rule_id(int_rule_id));
+    return get_rule_by_global_id(global_from_internal_rule_id(int_rule_id));
 }
 
 /**

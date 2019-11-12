@@ -403,7 +403,7 @@ MonitoringReportSocket::run_timer(Timer *t)
                         e->name().c_str(), h->name().c_str()
                     );
                 }
-            } while (buffer && !status);
+            } while (!status);
             
 
             if (_verbose) {            

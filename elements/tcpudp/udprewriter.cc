@@ -101,15 +101,15 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
     timeouts[1] = default_guarantee;
 
     if (Args(this, errh).bind(conf)
-	.read("DST_ANNO", dst_anno)
-	.read("REPLY_ANNO", AnnoArg(1), reply_anno).read_status(has_reply_anno)
-	.read("UDP_TIMEOUT", SecondsArg(), timeouts[0])
-	.read("TIMEOUT", SecondsArg(), timeouts[0])
-	.read("UDP_STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_udp_streaming_timeout)
-	.read("STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_streaming_timeout)
-	.read("UDP_GUARANTEE", SecondsArg(), timeouts[1])
-    .read("HANDLE_MIGRATION", handle_migration)
-	.consume() < 0)
+        .read("DST_ANNO", dst_anno)
+        .read("REPLY_ANNO", AnnoArg(1), reply_anno).read_status(has_reply_anno)
+        .read("UDP_TIMEOUT", SecondsArg(), timeouts[0])
+        .read("TIMEOUT", SecondsArg(), timeouts[0])
+        .read("UDP_STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_udp_streaming_timeout)
+        .read("STREAMING_TIMEOUT", SecondsArg(), _udp_streaming_timeout).read_status(has_streaming_timeout)
+        .read("UDP_GUARANTEE", SecondsArg(), timeouts[1])
+        .read("HANDLE_MIGRATION", handle_migration)
+        .consume() < 0)
 	return -1;
 
     for (unsigned i=0; i<_mem_units_no; i++) {

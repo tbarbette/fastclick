@@ -39,8 +39,11 @@ class Json { public:
     typedef bool (Json::*unspecified_bool_type)() const;
     struct unparse_manipulator;
 
+    typedef uninitialized_type uninitialized_t;
+
     // Constructors
     inline Json();
+    inline Json(const uninitialized_t &);
     inline Json(const Json &x);
 #if HAVE_CXX_RVALUE_REFERENCES
     inline Json(Json &&x);
@@ -645,7 +648,7 @@ class Json::const_iterator { public:
 #endif
 
     const_iterator()
-	: value_(String(), *(Json *) 0) {
+	: value_(String(), Json::uninitialized_t()) {
     }
     typedef bool (const_iterator::*unspecified_bool_type)() const;
     operator unspecified_bool_type() const {
@@ -678,7 +681,7 @@ class Json::const_iterator { public:
     int i_;
     value_type value_;
     const_iterator(const Json *j, int i)
-	: j_(j), i_(i), value_(String(), *(Json *) 0) {
+	: j_(j), i_(i), value_(String(), Json::uninitialized_t()) {
 	if (i_ >= 0)
 	    fix();
     }
@@ -1262,6 +1265,10 @@ inline const Json_get_proxy Json_proxy_base<T>::get(const StringRef &key, String
 /** @brief Construct a null Json. */
 inline Json::Json()
     : _type(j_null), _cjson() {
+}
+/** @brief Construct an uninitialized timestamp. */
+inline Json::Json(const uninitialized_t &unused) : _type(j_null), _cjson()  {
+    (void) unused;
 }
 /** @brief Construct a Json copy of @a x. */
 inline Json::Json(const Json &x)
