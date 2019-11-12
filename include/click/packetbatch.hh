@@ -479,7 +479,7 @@ public :
 
     /**
      * Remove the first packet
-     * @return
+     * @return the new batch without front. Do not use "this" afterwards!
      */
     PacketBatch* pop_front() {
         if (count() == 1)
