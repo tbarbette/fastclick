@@ -149,6 +149,7 @@ IPRewriter::process(int port, Packet *p_in)
     if ( !map ) {
         click_chatter("[%s] [Core %d]: UDP Map is NULL", class_name(), click_current_cpu_id());
     }
+    //No lock access because we are the only writer
     IPRewriterEntry *m = map->get(flowid);
 
     if (!m) {			// create new mapping

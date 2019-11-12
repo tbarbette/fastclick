@@ -479,6 +479,7 @@ public :
 
     /**
      * Remove the first packet
+     * @return the new batch without front. Do not use "this" afterwards!
      */
     PacketBatch* pop_front() {
         if (count() == 1)
@@ -486,6 +487,7 @@ public :
         PacketBatch* poped = PacketBatch::start_head(next());
         poped->set_count(count() -1 );
         poped->set_tail(tail());
+        return poped;
     }
 
     /**

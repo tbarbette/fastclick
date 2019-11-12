@@ -81,7 +81,7 @@ public:
             vlan_filter(false), vlan_strip(false), vlan_extend(false),
             lro(false), jumbo(false),
             n_rx_descs(0), n_tx_descs(0),
-            init_mac(), init_mtu(0), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0) {
+            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
@@ -120,6 +120,7 @@ public:
         unsigned n_tx_descs;
         EtherAddress init_mac;
         uint16_t init_mtu;
+        int init_rss;
         FlowControlMode init_fc_mode;
         uint64_t rx_offload;
         uint64_t tx_offload;
@@ -138,16 +139,20 @@ public:
     EtherAddress get_mac();
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
+    void set_init_rss_max(int rss_max);
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
 
+
+    unsigned int get_nb_rxdesc();
     unsigned int get_nb_txdesc();
 
     uint16_t get_device_vendor_id();
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
+    int set_rss_max(int max);
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)

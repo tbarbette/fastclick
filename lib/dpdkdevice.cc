@@ -52,6 +52,37 @@ const char *DPDKDevice::get_device_driver()
     return info.driver;
 }
 
+
+
+#define RETA_CONF_SIZE     (ETH_RSS_RETA_SIZE_512 / RTE_RETA_GROUP_SIZE)
+
+int DPDKDevice::set_rss_max(int max)
+{
+    struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
+    struct rte_eth_dev_info dev_info;
+
+    rte_eth_dev_info_get(port_id, &dev_info);
+    uint16_t reta_size = dev_info.reta_size;
+	uint32_t i;
+	int status;
+	/* RETA setting */
+	memset(reta_conf, 0, sizeof(reta_conf));
+    for (i = 0; i < reta_size; i++) {
+			reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
+    }
+	for (i = 0; i < reta_size; i++) {
+			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
+			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
+			uint32_t core_id = i % max;
+			reta_conf[reta_id].reta[reta_pos] = core_id;
+	}
+	/* RETA update */
+	status = rte_eth_dev_rss_reta_update(port_id,
+			reta_conf,
+			reta_size);
+	return status;
+}
+
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
 int DPDKDevice::get_port_numa_node(portid_t port_id)
@@ -60,6 +91,11 @@ int DPDKDevice::get_port_numa_node(portid_t port_id)
         return -1;
     int numa_node = rte_eth_dev_socket_id(port_id);
     return (numa_node == -1) ? 0 : numa_node;
+}
+
+unsigned int DPDKDevice::get_nb_rxdesc()
+{
+    return info.n_rx_descs;
 }
 
 unsigned int DPDKDevice::get_nb_txdesc()
@@ -465,6 +501,12 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     #endif
     }
 
+    if (info.init_rss > 0) {
+        if (set_rss_max(info.init_rss) != 0) {
+            return errh->error("Could not set RSS to %d queues",info.init_rss);
+        }
+    }
+
     int err = rte_eth_dev_start(port_id);
     if (err < 0)
         return errh->error(
@@ -595,6 +637,11 @@ void DPDKDevice::set_init_mac(EtherAddress mac) {
 void DPDKDevice::set_init_mtu(uint16_t mtu) {
     assert(!_is_initialized);
     info.init_mtu = mtu;
+}
+
+void DPDKDevice::set_init_rss_max(int rss_max) {
+    assert(!_is_initialized);
+    info.init_rss = rss_max;
 }
 
 void DPDKDevice::set_init_fc_mode(FlowControlMode fc) {
@@ -984,7 +1031,7 @@ int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE;
 #else
 int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM;
 #endif
-int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE 
+int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE
                           + sizeof (struct rte_mbuf);
 int DPDKDevice::MBUF_CACHE_SIZE = 256;
 int DPDKDevice::RX_PTHRESH = 8;
