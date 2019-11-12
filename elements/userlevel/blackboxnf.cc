@@ -330,13 +330,14 @@ BlackboxNF::set_flush_timer(DPDKDevice::TXInternalQueue &iqueue)
                 iqueue.timeout.unschedule();
         }
         else {
-            if (iqueue.nr_pending > 0)
+            if (iqueue.nr_pending > 0) {
                 // Pending packets, set timeout to flush packets after a while even without burst
                 if (_timeout == 0) {
                     iqueue.timeout.schedule_now();
                 } else {
                     iqueue.timeout.schedule_after_msec(_timeout);
                 }
+            }
         }
     }
 }

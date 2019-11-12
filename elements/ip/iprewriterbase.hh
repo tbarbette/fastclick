@@ -165,7 +165,7 @@ class IPRewriterBase : public BatchElement { public:
 	    Map map;
     };
     struct IPRewriterState : public IPRewriterMapState {
-	IPRewriterState() : IPRewriterMapState() {
+	IPRewriterState() : IPRewriterMapState(), gc_timer() {
 	    }
 	    Timer gc_timer;
     };
@@ -351,6 +351,7 @@ bool doMigrate(Task *, void * obj) {
 		//jstate.map_lock.write_end();
 		tstate.map_lock.read_end();
 	}
+	return true;
 };
 
 template <class T> inline void

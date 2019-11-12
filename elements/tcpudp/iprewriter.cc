@@ -89,12 +89,14 @@ IPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 
 int IPRewriter::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
 	click_jiffies_t jiffies = click_jiffies();
-	if (stage == THREAD_RECONFIGURE_UP_PRE) {
-        set_migration(true, threads, _state);
-        set_migration<IPState>(true, threads, _ipstate);
-	} else if (stage == THREAD_RECONFIGURE_DOWN_PRE){
-        set_migration(false, threads, _state);
-        set_migration<IPState>(false, threads, _ipstate);
+	if (_handle_migration) {
+        if (stage == THREAD_RECONFIGURE_UP_PRE) {
+            set_migration(true, threads, _state);
+            set_migration<IPState>(true, threads, _ipstate);
+        } else if (stage == THREAD_RECONFIGURE_DOWN_PRE){
+            set_migration(false, threads, _state);
+            set_migration<IPState>(false, threads, _ipstate);
+        }
 	}
 	return 0;
 }

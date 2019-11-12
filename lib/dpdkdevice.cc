@@ -352,7 +352,7 @@ int DPDKDevice::set_mode(
         return errh->error("Unknown mode %s",mode.c_str());
     }
 
-    if (m != info.mq_mode && info.mq_mode != -1) {
+    if (m != info.mq_mode && info.mq_mode != (enum rte_eth_rx_mq_mode)-1) {
         return errh->error("Device can only have one mode.");
     }
 
@@ -438,7 +438,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     }
 #endif
 
-    info.mq_mode = (info.mq_mode == -1? ETH_MQ_RX_RSS : info.mq_mode);
+    info.mq_mode = (info.mq_mode == (enum rte_eth_rx_mq_mode)-1? ETH_MQ_RX_RSS : info.mq_mode);
     dev_conf.rxmode.mq_mode = info.mq_mode;
 #if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
     dev_conf.rxmode.hw_vlan_filter = 0;

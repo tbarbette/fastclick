@@ -652,16 +652,16 @@ class Metron : public Element {
 
         int configure_phase() const { return CONFIGURE_PHASE_LAST; }
 
-        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-        int initialize(ErrorHandler *) CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+        int initialize(ErrorHandler *) override CLICK_COLD;
         bool discover();
-        void cleanup(CleanupStage) CLICK_COLD;
+        void cleanup(CleanupStage) override CLICK_COLD;
         static int static_cleanup();
 
         static void discover_timer(Timer *timer, void *user_data);
         void run_timer(Timer *t) override;
 
-        void add_handlers() CLICK_COLD;
+        void add_handlers() override CLICK_COLD;
         static int param_handler(
             int operation, String &param, Element *e,
             const Handler *, ErrorHandler *errh
