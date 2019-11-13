@@ -72,7 +72,7 @@ const char *DPDKDevice::get_device_driver()
 
 int DPDKDevice::set_rss_max(int max)
 {
-	struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
+    struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
     struct rte_eth_dev_info dev_info;
 
     rte_eth_dev_info_get(port_id, &dev_info);
@@ -644,13 +644,17 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     bzero(&tx_conf,sizeof tx_conf);
 #endif
 
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0) && RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
+    tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
+#else
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
-
-#if RTE_VERSION >= RTE_VERSION_NUM(18,8,0,0)
-    tx_conf.offloads = 0;
-#else
+#endif
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,i0)
+    tx_conf.offloads = dev_conf.txmode.offloads;
+#endif
+#if RTE_VERSION <= RTE_VERSION_NUM(18,05,0,0)
     tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
 #endif
 

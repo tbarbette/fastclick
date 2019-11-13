@@ -6,7 +6,7 @@
  *
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2008-2010 Meraki, Inc.
- * Copyright (c) 2016-2018 KTH Royal Institute of Technology
+ * Copyright (c) 2016-2019 KTH Royal Institute of Technology
  * Copyright (c) 2017 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
