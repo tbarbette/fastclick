@@ -243,6 +243,7 @@ AC_ARG_ENABLE([xdp],
     [:], [enable_xdp=yes])
 
 if test "x$enable_xdp" = "xyes"; then
+  AC_SUBST(USE_XDP, yes)
   LIBS="$LIBS -lbpf"
 fi
 

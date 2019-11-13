@@ -714,6 +714,7 @@ RTE_VER_MAJOR
 RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
+USE_XDP
 PTHREAD_LIBS
 HAVE_BATCH
 AR_CREATEFLAGS
@@ -6945,6 +6946,8 @@ fi
 
 
 if test "x$enable_xdp" = "xyes"; then
+  USE_XDP=yes
+
   LIBS="$LIBS -lbpf"
 fi
 

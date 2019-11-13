@@ -119,6 +119,11 @@ endif
 EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 endif
 
+USE_XDP = @USE_XDP@
+ifeq ($(USE_XDP),yes)
+EXTRA_DRIVER_OBJS := xdpmanager.o xdpsock.o $(EXTRA_DRIVER_OBJS)
+endif
+
 ifndef MINDRIVER
 DRIVER = click
 ELEMENTSCONF = elements
