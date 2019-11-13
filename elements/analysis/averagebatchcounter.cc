@@ -84,26 +84,26 @@ AverageBatchCounter::run_timer(Timer *t)
     total.count_packets += last_tick.count_packets;
     if (_frame_len_stats) {
         if (last_tick.count_packets > 0) {
-            total.agg_frame_len += last_tick.agg_frame_len;
-            total.avg_frame_len = (float) total.agg_frame_len / (float) total.count_packets;
+            total.count_bytes += last_tick.count_bytes;
+            total.avg_frame_len = (float) total.count_bytes / (float) total.count_packets;
         }
     }
     last_tick.count_batches = 0;
     last_tick.count_packets = 0;
-    last_tick.agg_frame_len = 0;
+    last_tick.count_bytes = 0;
     last_tick.avg_frame_len = 0;
     for (unsigned i = 0; i < _stats.weight(); i++) {
         last_tick.count_batches += _stats.get_value(i).count_batches;
         last_tick.count_packets += _stats.get_value(i).count_packets;
         if (_frame_len_stats) {
-            if (last_tick.count_packets > 0) {
-                last_tick.agg_frame_len += _stats.get_value(i).agg_frame_len;
-                last_tick.avg_frame_len = (float) last_tick.agg_frame_len / (float) last_tick.count_packets;
+            if (_stats.get_value(i).count_packets > 0) {
+                last_tick.count_bytes += _stats.get_value(i).count_bytes;
+                last_tick.avg_frame_len = (float) last_tick.count_bytes / (float) last_tick.count_packets;
             }
         }
         _stats.get_value(i).count_batches = 0;
         _stats.get_value(i).count_packets = 0;
-        _stats.get_value(i).agg_frame_len = 0;
+        _stats.get_value(i).count_bytes = 0;
         _stats.get_value(i).avg_frame_len = 0;
     }
     _stats_total.write_commit();
@@ -120,8 +120,8 @@ AverageBatchCounter::simple_action_batch(PacketBatch *b)
     stat.count_packets += b->count();
     if (_frame_len_stats) {
         if (b->count() > 0) {
-            stat.agg_frame_len += compute_agg_frame_len(b);
-            stat.avg_frame_len = (float) stat.agg_frame_len / (float) stat.count_packets;
+            stat.count_bytes += (uint64_t) compute_agg_frame_len(b);
+            stat.avg_frame_len = (float) stat.count_bytes / (float) stat.count_packets;
         }
     }
 
@@ -131,18 +131,18 @@ AverageBatchCounter::simple_action_batch(PacketBatch *b)
 uint32_t
 AverageBatchCounter::compute_agg_frame_len(PacketBatch *batch)
 {
-    uint32_t len = 0;
+    uint32_t agg_len = 0;
     for(Packet *p = batch; p != 0; p = p->next()) {
         uint32_t value = AGGREGATE_ANNO(p);
         if (value > 0) {
-            len += value;
+            agg_len += value;
         } else {
             // The upstream AggregateLength must prevent this from happening
             assert(false);
         }
     }
 
-    return len;
+    return agg_len;
 }
 
 String
@@ -153,14 +153,14 @@ AverageBatchCounter::read_handler(Element *e, void *thunk)
         case H_AVERAGE: {
             BatchStats stat = fd->_stats_last_tick.read();
             if (stat.count_batches == 0)
-                return 0;
-            return String(stat.count_packets / stat.count_batches);
+                return "0";
+            return String((float) stat.count_packets / (float) stat.count_batches);
         }
         case H_AVERAGE_TOTAL: {
             BatchStats stat = fd->_stats_total.read();
             if (stat.count_batches == 0)
-                return 0;
-            return String(stat.count_packets / stat.count_batches);
+                return "0";
+            return String((float) stat.count_packets / (float) stat.count_batches);
         }
         case H_COUNT_BATCHES: {
             BatchStats stat = fd->_stats_last_tick.read();
