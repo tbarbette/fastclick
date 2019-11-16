@@ -5,7 +5,7 @@ Maintainer: Ryan Goodfellow <rgoodfel@isi.edu>
 Build-Depends: 
   clang,
   llvm,
-  libexpart1-dev
+  libexpat1-dev,
   libnuma-dev,
   libibverbs-dev,
   binutils-dev,
