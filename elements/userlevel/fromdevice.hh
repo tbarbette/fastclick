@@ -7,9 +7,16 @@
 # define FROMDEVICE_ALLOW_LINUX 1
 #endif
 
+struct bpf_program {
+ u_int bpf_len;
+ struct bpf_insn *bpf_insns;
+};
+
 #if HAVE_PCAP
 # define FROMDEVICE_ALLOW_PCAP 1
 extern "C" {
+# include <bpf/libbpf.h>
+# define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
 # include <pcap.h>
 /* Prototype pcap_setnonblock if we have it, but not the prototype. */
 # if HAVE_PCAP_SETNONBLOCK && !HAVE_DECL_PCAP_SETNONBLOCK

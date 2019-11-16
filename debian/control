@@ -5,14 +5,19 @@ Maintainer: Ryan Goodfellow <rgoodfel@isi.edu>
 Build-Depends: 
   clang,
   llvm,
+  libexpart1-dev
   libnuma-dev,
   libibverbs-dev,
+  binutils-dev,
+  rsync,
+  libreadline-dev,
   rdma-core,
   lshw,
   pciutils,
   zlib1g-dev,
   libbpf-dev,
-  libpcap-dev
+  libpcap-dev,
+  gawk
 Homepage: https://github.com/tbarbette/fastclick
 
 Package: fastclick

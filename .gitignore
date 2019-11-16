@@ -29,3 +29,4 @@ stamp-egroup
 stamp-h
 *.sw*
 tags
+*.deb

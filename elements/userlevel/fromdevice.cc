@@ -50,6 +50,7 @@
 # include <net/if.h>
 # include <features.h>
 # include <linux/if_packet.h>
+#include <linux/sockios.h>
 # if HAVE_DPDK
 #  define ether_addr ether_addr_undefined
 # endif
