@@ -15,7 +15,6 @@ Build-Depends:
   lshw,
   pciutils,
   zlib1g-dev,
-  libbpf-dev,
   libpcap-dev,
   gawk
 Homepage: https://github.com/tbarbette/fastclick
@@ -35,5 +34,7 @@ Depends:
   pciutils,
   zlib1g,
   libc6,
-  libbpf4.19,
+  libbpf5.3,
   libpcap0.8
+
+# libbpf5.3 is a package we'll have to make too

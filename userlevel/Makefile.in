@@ -122,6 +122,8 @@ endif
 USE_XDP = @USE_XDP@
 ifeq ($(USE_XDP),yes)
 EXTRA_DRIVER_OBJS := xdpmanager.o xdpsock.o $(EXTRA_DRIVER_OBJS)
+#LDFLAGS := $(LDFLAGS) $(shell pkg-config --libs libbpf) -Wl,-Bstatic $(shell pkg-config --static --libs libbpf)
+LDFLAGS := $(LDFLAGS) $(shell pkg-config --libs libbpf)
 endif
 
 ifndef MINDRIVER
