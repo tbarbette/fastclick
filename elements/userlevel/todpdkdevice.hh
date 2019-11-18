@@ -17,7 +17,7 @@ ToDPDKDevice(PORT [, QUEUE, N_QUEUES, I<keywords> IQUEUE, BLOCKING, etc.])
 
 =s netdevices
 
-sends packets to network device using Intel's DPDK (user-level)
+sends packets to network device using DPDK (user-level)
 
 =d
 
@@ -30,38 +30,44 @@ BURST packets.
 
 Arguments:
 
-=over 8
+=over 14
 
 =item PORT
 
-Integer or PCI address.  Port identifier of the device, or a PCI address in the
+Integer or PCI address. Port identifier of the device or a PCI address in the
 format fffff:ff:ff.f
 
 =item QUEUE
 
-Integer.  A specific hardware queue to use. Default is 0.
+Integer. A specific hardware queue to use. Default is 0.
 
 =item N_QUEUES
 
-Integer.  Number of hardware queues to use. -1 or default is to use as many
+Integer. Number of hardware queues to use. -1 or default is to use as many
 queues as threads which can end up in this element.
+
+=item MAXQUEUES
+
+Integer. Set the maximum number of hardware queues to be used for transmission.
+If N_QUEUES is not set, the minimum number of queues is 1 and the maximum is MAXQUEUES.
+Defaults to 128.
 
 =item IQUEUE
 
-Integer.  Size of the internal queue, i.e. number of packets that we can buffer
+Integer. Size of the internal queue, i.e. number of packets that we can buffer
 before pushing them to the DPDK framework. If IQUEUE is bigger than BURST,
 some packets could be buffered in the internal queue when the output ring is
 full. Defaults to 1024.
 
 =item BLOCKING
 
-Boolean.  If true, when there is no more space in the output device ring, and
+Boolean. If true, when there is no more space in the output device ring, and
 the IQUEUE is full, we'll block until some packet could be sent. If false the
 packet will be dropped. Defaults to true.
 
 =item BURST
 
-Integer.  Number of packets to batch before sending them out. A bigger BURST
+Integer. Number of packets to batch before sending them out. A bigger BURST
 leads to more latency, but a better throughput. The default value of 32 is
 recommended as it is what DPDK will do under the hood. Prefer to set the
 TIMEOUT parameter to 0 if the throughput is low as it will maintain
@@ -69,7 +75,7 @@ performance.
 
 =item TIMEOUT
 
-Integer.  Set a timeout to flush the internal queue. It is useful under low
+Integer. Set a timeout to flush the internal queue. It is useful under low
 throughput as it could take a long time before reaching BURST packet in the
 internal queue. The timeout is expressed in milliseconds. Setting the timer to
 0 is not a bad idea as it will schedule after the source element (such as a
@@ -84,12 +90,32 @@ packets will never wait in the internal queue.
 
 =item NDESC
 
-Integer.  Number of descriptors per ring. The default is 1024.
+Integer. Number of descriptors per ring. The default is 1024.
 
 =item ALLOW_NONEXISTENT
 
-Boolean.  Do not fail if the PORT do not existent. If it's the case the task
+Boolean. Do not fail if the PORT do not existent. If it's the case the task
 will never run and this element will behave like Idle.
+
+=item ALLOC
+
+Boolean. If true, packets hosted in non-DPDK buffers are copied into newly-allocated
+DPDK mbufs.
+
+=item TCO
+
+Boolean. If True, enables TCP Checksum Offload. Packets must be set with the
+checksum flag, eg with ResetTCPChecksum. Defaults to False.
+
+=item TSO
+
+Boolean. If True, enables TCP Segmentation Offload. Packets must be configured
+individually as per DPDK documentation. Defaults to False.
+
+=item IPCO
+
+Booelan. If True, enables IP checksum offload alone (not L4 as TCO).
+Defaults to False.
 
 =back
 

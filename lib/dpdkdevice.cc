@@ -77,24 +77,22 @@ int DPDKDevice::set_rss_max(int max)
 
     rte_eth_dev_info_get(port_id, &dev_info);
     uint16_t reta_size = dev_info.reta_size;
-	uint32_t i;
-	int status;
-	/* RETA setting */
-	memset(reta_conf, 0, sizeof(reta_conf));
+    uint32_t i;
+    int status;
+    /* RETA setting */
+    memset(reta_conf, 0, sizeof(reta_conf));
     for (i = 0; i < reta_size; i++) {
-			reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
+        reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
     }
-	for (i = 0; i < reta_size; i++) {
-			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
-			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
-			uint32_t core_id = i % max;
-			reta_conf[reta_id].reta[reta_pos] = core_id;
-	}
-	/* RETA update */
-	status = rte_eth_dev_rss_reta_update(port_id,
-			reta_conf,
-			reta_size);
-	return status;
+    for (i = 0; i < reta_size; i++) {
+        uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
+        uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
+        uint32_t core_id = i % max;
+        reta_conf[reta_id].reta[reta_pos] = core_id;
+    }
+    /* RETA update */
+    status = rte_eth_dev_rss_reta_update(port_id, reta_conf, reta_size);
+    return status;
 }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -105,8 +103,7 @@ int DPDKDevice::set_rss_max(int max)
  * @param port_id the ID of the device where Flow Director is invoked
  * @param errh an error handler instance
  */
-void DPDKDevice::initialize_flow_director(
-        const portid_t &port_id, ErrorHandler *errh)
+void DPDKDevice::initialize_flow_director(const portid_t &port_id, ErrorHandler *errh)
 {
     FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
     if (!flow_dir) {
@@ -320,12 +317,13 @@ static String keep_token_left(String str, char delimiter)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 int DPDKDevice::set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
-        const String &rules_path, ErrorHandler *errh) {
+        const String &fd_rules_filename, const bool &fd_isolate, ErrorHandler *errh)
 #else
 int DPDKDevice::set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
-        ErrorHandler *errh) {
+        ErrorHandler *errh)
 #endif
+{
     mode = mode.lower();
 
     enum rte_eth_rx_mq_mode m;
@@ -385,12 +383,14 @@ int DPDKDevice::set_mode(
     if (mode == FlowDirector::FLOW_DIR_MODE) {
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
         flow_dir->set_active(true);
-        flow_dir->set_rules_filename(rules_path);
+        flow_dir->set_isolation_mode(fd_isolate);
+        flow_dir->set_rules_filename(fd_rules_filename);
         errh->message(
-            "Flow Director (port %u): State %s - Source file '%s'",
+            "Flow Director (port %u): State %s - Isolation Mode %s - Source file '%s'",
             port_id,
             flow_dir->active() ? "active" : "inactive",
-            rules_path.empty() ? "None" : rules_path.c_str()
+            flow_dir->isolated() ? "active" : "inactive",
+            fd_rules_filename.empty() ? "None" : fd_rules_filename.c_str()
         );
     }
 #endif
@@ -918,19 +918,19 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir, unsigned &queue_id,
 		if (info.rx_queues.size() > 0 && vlan_filter != info.vlan_filter)
 			return errh->error(
 					"Some elements disagree on whether or not device %u should"
-							" filter vlan tagged packets", port_id);
+							" filter VLAN tagged packets", port_id);
 		info.vlan_filter |= vlan_filter;
 
 		if (info.rx_queues.size() > 0 && vlan_strip != info.vlan_strip)
 			return errh->error(
 					"Some elements disagree on whether or not device %u should"
-							" strip vlan tagged packets", port_id);
+							" strip VLAN tagged packets", port_id);
 		info.vlan_strip |= vlan_strip;
 
         if (info.rx_queues.size() > 0 && vlan_extend != info.vlan_extend)
             return errh->error(
                     "Some elements disagree on whether or not device %u should"
-                            " extend vlan tagged packets via QinQ", port_id);
+                            " extend VLAN tagged packets via QinQ", port_id);
         info.vlan_extend |= vlan_extend;
 
         if (info.rx_queues.size() > 0 && lro != info.lro)
@@ -1220,7 +1220,6 @@ FlowControlModeArg::parse(
 
     return true;
 }
-
 
 String
 FlowControlModeArg::unparse(FlowControlMode mode) {
