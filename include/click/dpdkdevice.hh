@@ -86,16 +86,21 @@ public:
             num_pools(0), vf_vlan(), vlan_filter(false), vlan_strip(false), vlan_extend(false),
             lro(false), jumbo(false),
             n_rx_descs(0), n_tx_descs(0),
-            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0) {
+            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0)
+        {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
 
         void print_device_info() {
+            if (device_id == PCI_ANY_ID) {
+                return;
+            }
             click_chatter("                Vendor   ID: %d", vendor_id);
             click_chatter("                Vendor Name: %s", vendor_name.c_str());
             click_chatter("                Device   ID: %d", device_id);
             click_chatter("                Driver Name: %s", driver);
+            click_chatter("             Reception Mode: %s", mq_mode_str.c_str());
             click_chatter("           Promiscuous Mode: %s", promisc? "true":"false");
             click_chatter("          VLAN    Filtering: %s", vlan_filter? "true":"false");
             click_chatter("          VLAN    Stripping: %s", vlan_strip? "true":"false");
@@ -187,7 +192,7 @@ public:
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     int set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
-        const String &rules_path, ErrorHandler *errh
+        const String &fd_rules_filename, const bool &fd_isolate, ErrorHandler *errh
     );
 #else
     int set_mode(

@@ -73,7 +73,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int max_rss = 0;
     bool has_rss = false;
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    String rules_filename;
+    String fd_rules_filename;
+    bool fd_isolate = false;
 #endif
     if (Args(this, errh).bind(conf)
         .read_mp("PORT", dev)
@@ -89,7 +90,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MTU", mtu).read_status(has_mtu)
         .read("MODE", mode)
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        .read("FLOW_DIR_RULES_FILE", rules_filename)
+        .read("FLOW_DIR_RULES_FILE", fd_rules_filename)
+        .read("FLOW_DIR_ISOLATE", fd_isolate)
     #endif
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
@@ -156,7 +158,11 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _dev->set_init_rss_max(max_rss);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    if ((mode == FlowDirector::FLOW_DIR_MODE) && (rules_filename.empty())) {
+    if (fd_isolate && (mode != FlowDirector::FLOW_DIR_MODE)) {
+        return errh->error("Flow Director (port %s): FLOW_DIR_ISOLATE requires MODE flow_dir", dev.c_str());
+    }
+
+    if ((mode == FlowDirector::FLOW_DIR_MODE) && (fd_rules_filename.empty())) {
         errh->warning(
             "Flow Director (port %s): FLOW_DIR_RULES_FILE is not set, "
             "hence this NIC can only be configured by the handlers",
@@ -164,7 +170,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         );
     }
 
-    r = _dev->set_mode(mode, num_pools, vf_vlan, rules_filename, errh);
+    r = _dev->set_mode(mode, num_pools, vf_vlan, fd_rules_filename, fd_isolate, errh);
 #else
     r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
 #endif
@@ -564,6 +570,10 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             portid_t port_id = fd->get_device()->get_port_id();
             return FlowDirector::get_flow_director(port_id)->flow_rules_list();
         }
+        case h_rules_list_with_hits: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDirector::get_flow_director(port_id)->flow_rules_list(true);
+        }
         case h_rules_ids_global: {
             portid_t port_id = fd->get_device()->get_port_id();
             return FlowDirector::get_flow_director(port_id)->flow_rule_ids_global();
@@ -575,6 +585,10 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
         case h_rules_count: {
             portid_t port_id = fd->get_device()->get_port_id();
             return String(FlowDirector::get_flow_director(port_id)->flow_rules_count_explicit());
+        }
+        case h_rules_isolate: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return String(FlowDirector::get_flow_director(port_id)->isolated() ? "1" : "0");
         }
     #endif
         case h_nombufs:
@@ -618,7 +632,7 @@ int FromDPDKDevice::write_handler(
                 fd->_active = active;
                 Bitvector b(fd->router()->master()->nthreads());
                 fd->get_spawning_threads(b, true, -1);
-                if (fd->_active) { //Activating
+                if (fd->_active) { // Activating
                     fd->trigger_thread_reconfiguration(true,[fd,thunk](){
                         for (int i = 0; i < fd->usable_threads.weight(); i++) {
                             fd->_tasks[i]->reschedule();
@@ -629,7 +643,7 @@ int FromDPDKDevice::write_handler(
                                 fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
                         }
                     }, b);
-                } else { //Deactivating
+                } else { // Deactivating
                     fd->trigger_thread_reconfiguration(false,[fd](){
                         for (int i = 0; i < fd->usable_threads.weight(); i++) {
                             fd->_tasks[i]->unschedule();
@@ -720,6 +734,14 @@ int FromDPDKDevice::flow_handler(
             // Batch deletion
             return flow_dir->flow_rules_delete((uint32_t *) rule_ids, rules_nb);
         }
+        case h_rules_isolate: {
+            if (input.empty()) {
+                return errh->error("Flow Director (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", port_id);
+            }
+            bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
+            flow_dir->set_isolation_mode(status);
+            return 0;
+        }
         case h_rules_flush: {
             return flow_dir->flow_rules_flush();
         }
@@ -780,28 +802,28 @@ int FromDPDKDevice::xstats_handler(
                 StringAccum acc;
                 for (uint16_t i = 0; i < fd->_dev->nb_rx_queues(); i++) {
                     int v = rte_eth_rx_queue_count(fd->_dev->get_port_id(), i);
-                    acc << i << " = " << v << "\n";
+                    acc << "Queue " << i << ": " << v << "\n";
                 }
                 input = acc.take_string();
             } else {
                 int v = rte_eth_rx_queue_count(fd->_dev->get_port_id(), atoi(input.c_str()));
                 input = String(v);
-                return 0;
             }
+            return 0;
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        case h_rule_byte_count: {
-        case h_rule_packet_hits:
+        case h_rule_byte_count:
+        case h_rule_packet_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
             FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
             assert(flow_dir);
             if (input == "") {
-                return errh->error("Aggregate flow rule counters are not supported");
+                return errh->error("Aggregate flow rule counters are not supported. Please specify a rule number to query");
             } else {
                 const uint32_t rule_id = atoi(input.c_str());
                 int64_t matched_pkts = -1;
                 int64_t matched_bytes = -1;
                 flow_dir->flow_rule_query(rule_id, matched_pkts, matched_bytes);
-                if ((intptr_t)handler->read_user_data() == (intptr_t)h_rule_packet_hits) {
+                if (op == (int) h_rule_packet_hits) {
                     input = String(matched_pkts);
                 } else {
                     input = String(matched_bytes);
@@ -818,23 +840,22 @@ int FromDPDKDevice::xstats_handler(
         }
     #endif
         case h_stats_packets:
-        case h_stats_bytes:
-            {
-                struct rte_eth_stats stats;
-                if (rte_eth_stats_get(fd->_dev->port_id, &stats))
-                    return -1;
+        case h_stats_bytes: {
+            struct rte_eth_stats stats;
+            if (rte_eth_stats_get(fd->_dev->port_id, &stats))
+                return -1;
 
-                int id = atoi(input.c_str());
-                if (id < 0 || id > RTE_ETHDEV_QUEUE_STAT_CNTRS)
-                    return -EINVAL;
-                uint64_t v;
-                if (op == h_stats_packets)
-                     v = stats.q_ipackets[id];
-                else
-                     v = stats.q_opackets[id];
-                input = String(v);
-                return 0;
-            }
+            int id = atoi(input.c_str());
+            if (id < 0 || id > RTE_ETHDEV_QUEUE_STAT_CNTRS)
+                return -EINVAL;
+            uint64_t v;
+            if (op == (int) h_stats_packets)
+                 v = stats.q_ipackets[id];
+            else
+                 v = stats.q_ibytes[id];
+            input = String(v);
+            return 0;
+        }
         default:
             return -1;
     }
@@ -904,13 +925,16 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("nombufs",statistics_handler, h_nombufs);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    add_write_handler(FlowDirector::FLOW_RULE_ADD,   flow_handler, h_rule_add,    0);
-    add_write_handler(FlowDirector::FLOW_RULE_DEL,   flow_handler, h_rules_del,   0);
-    add_write_handler(FlowDirector::FLOW_RULE_FLUSH, flow_handler, h_rules_flush, 0);
-    add_read_handler(FlowDirector::FLOW_RULE_LIST,  statistics_handler, h_rules_list);
-    add_read_handler(FlowDirector::FLOW_RULE_IDS_GLB, statistics_handler, h_rules_ids_global);
-    add_read_handler(FlowDirector::FLOW_RULE_IDS_INT, statistics_handler, h_rules_ids_internal);
-    add_read_handler(FlowDirector::FLOW_RULE_COUNT,   statistics_handler, h_rules_count);
+    add_write_handler(FlowDirector::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
+    add_write_handler(FlowDirector::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
+    add_write_handler(FlowDirector::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);
+    add_write_handler(FlowDirector::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
+    add_read_handler (FlowDirector::FLOW_RULE_IDS_GLB,        statistics_handler, h_rules_ids_global);
+    add_read_handler (FlowDirector::FLOW_RULE_IDS_INT,        statistics_handler, h_rules_ids_internal);
+    add_read_handler (FlowDirector::FLOW_RULE_LIST,           statistics_handler, h_rules_list);
+    add_read_handler (FlowDirector::FLOW_RULE_LIST_WITH_HITS, statistics_handler, h_rules_list_with_hits);
+    add_read_handler (FlowDirector::FLOW_RULE_COUNT,          statistics_handler, h_rules_count);
+    add_read_handler (FlowDirector::FLOW_RULE_ISOLATE,        statistics_handler, h_rules_isolate);
 #endif
 
     add_read_handler("mtu",read_handler, h_mtu);

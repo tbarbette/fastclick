@@ -173,10 +173,11 @@ class FlowDirector {
         static String FLOW_RULE_IDS_INT;
         static String FLOW_RULE_PACKET_HITS;
         static String FLOW_RULE_BYTE_COUNT;
-        static String FLOW_RULE_STATS;
         static String FLOW_RULE_AGGR_STATS;
         static String FLOW_RULE_LIST;
+        static String FLOW_RULE_LIST_WITH_HITS;
         static String FLOW_RULE_COUNT;
+        static String FLOW_RULE_ISOLATE;
         static String FLOW_RULE_FLUSH;
 
         // For debugging
@@ -239,6 +240,17 @@ class FlowDirector {
         };
         inline String rules_filename() { return _rules_filename; };
 
+        // Flow rules' isolation mode
+        inline void set_isolation_mode(const bool &isolated) {
+            _isolated = isolated;
+            if (_isolated) {
+                flow_rules_isolate(1);
+            } else {
+                flow_rules_isolate(0);
+            }
+        };
+        inline bool isolated() { return _isolated; };
+
         // Calibrates flow rule cache before inserting new rules
         void calibrate_cache(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
         void calibrate_cache(const HashMap<long, String> &rules_map);
@@ -292,7 +304,7 @@ class FlowDirector {
         void nic_and_cache_counts_agree();
 
         // Lists all NIC flow rules
-        String flow_rules_list();
+        String flow_rules_list(const bool only_matching_rules = false);
 
         // Lists all installed (internal + global flow rule IDs along with counters
         String flow_rule_ids_internal_counters();
@@ -345,6 +357,9 @@ class FlowDirector {
         // Indicates whether Flow Director is active for a given device
         bool _active;
 
+        // Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future)
+        bool _isolated;
+
         // Set stdout verbosity
         bool _verbose;
         bool _debug_mode;
@@ -367,6 +382,9 @@ class FlowDirector {
 
         // Pre-populate the supported matches and actions on relevant maps
         void populate_supported_flow_items_and_actions();
+
+        // Restrict ingress traffic to the defined flow rules
+        int flow_rules_isolate(int set);
 
         // Sorts a list of flow rules by group, priority, and ID
         void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);

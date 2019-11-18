@@ -641,7 +641,6 @@ class ServiceChain {
 =c
 
 Metron */
-
 class Metron : public Element {
     public:
         Metron() CLICK_COLD;

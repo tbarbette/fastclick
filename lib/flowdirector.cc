@@ -1059,17 +1059,18 @@ FlowCache::flush_rule_counters()
 String FlowDirector::FLOW_DIR_MODE = "flow_dir";
 
 // Supported flow director handlers (called from FromDPDKDevice)
-String FlowDirector::FLOW_RULE_ADD         = "rule_add";
-String FlowDirector::FLOW_RULE_DEL         = "rules_del";
-String FlowDirector::FLOW_RULE_IDS_GLB     = "rules_ids_global";
-String FlowDirector::FLOW_RULE_IDS_INT     = "rules_ids_internal";
-String FlowDirector::FLOW_RULE_PACKET_HITS = "rule_packet_hits";
-String FlowDirector::FLOW_RULE_BYTE_COUNT  = "rule_byte_count";
-String FlowDirector::FLOW_RULE_STATS       = "rules_stats";
-String FlowDirector::FLOW_RULE_AGGR_STATS  = "rules_aggr_stats";
-String FlowDirector::FLOW_RULE_LIST        = "rules_list";
-String FlowDirector::FLOW_RULE_COUNT       = "rules_count";
-String FlowDirector::FLOW_RULE_FLUSH       = "rules_flush";
+String FlowDirector::FLOW_RULE_ADD            = "rule_add";
+String FlowDirector::FLOW_RULE_DEL            = "rules_del";
+String FlowDirector::FLOW_RULE_IDS_GLB        = "rules_ids_global";
+String FlowDirector::FLOW_RULE_IDS_INT        = "rules_ids_internal";
+String FlowDirector::FLOW_RULE_PACKET_HITS    = "rule_packet_hits";
+String FlowDirector::FLOW_RULE_BYTE_COUNT     = "rule_byte_count";
+String FlowDirector::FLOW_RULE_AGGR_STATS     = "rules_aggr_stats";
+String FlowDirector::FLOW_RULE_LIST           = "rules_list";
+String FlowDirector::FLOW_RULE_LIST_WITH_HITS = "rules_list_with_hits";
+String FlowDirector::FLOW_RULE_COUNT          = "rules_count";
+String FlowDirector::FLOW_RULE_ISOLATE        = "rules_isolate";
+String FlowDirector::FLOW_RULE_FLUSH          = "rules_flush";
 
 // Set of flow rule items supported by the Flow API
 HashMap<int, String> FlowDirector::flow_item;
@@ -1092,14 +1093,14 @@ HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_del_stats_map;
 struct cmdline *FlowDirector::_parser = NULL;
 
 FlowDirector::FlowDirector() :
-        _port_id(-1), _active(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
+        _port_id(-1), _active(false), _isolated(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
     _flow_cache = 0;
 }
 
 FlowDirector::FlowDirector(portid_t port_id, ErrorHandler *errh) :
-        _port_id(port_id), _active(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
+        _port_id(port_id), _active(false), _isolated(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
 {
     _errh = new ErrorVeneer(errh);
     _flow_cache = new FlowCache(port_id, _verbose, _debug_mode, _errh);
@@ -1941,6 +1942,30 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
 }
 
 /**
+ * Restricts ingress traffic to the defined flow rules.
+ * In case ingress traffic does not match any of the defined rules,
+ * it will be dropped by the NIC.
+ *
+ * @args set: non-zero to enter isolated mode.
+ * @return 0 upon success, otherwise a negative number if isolation fails
+ */
+int
+FlowDirector::flow_rules_isolate(int set)
+{
+    if (port_flow_isolate(_port_id, set) != FLOWDIR_SUCCESS) {
+        return _errh->error(
+            "Flow Director (port %u): Failed to restrict ingress traffic to the defined flow rules", _port_id
+        );
+    }
+    _errh->message(
+        "Flow Director (port %u): Ingress traffic is %s to the defined flow rules\n",
+        _port_id, set ? "now restricted" : "not restricted"
+    );
+
+    return 0;
+}
+
+/**
  * Queries the statistics of a NIC flow rule.
  *
  * @args int_rule_id: a flow rule's internal ID
@@ -2042,9 +2067,9 @@ FlowDirector::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts
 }
 
 /**
- * Reports aggregate flow rule statistics on a NIC.
+ * Reports NIC's aggregate flow rule statistics.
  *
- * @return aggregate flow rule statistics as a string
+ * @return NIC's aggregate flow rule statistics as a string
  */
 String
 FlowDirector::flow_rule_aggregate_stats()
@@ -2060,13 +2085,14 @@ FlowDirector::flow_rule_aggregate_stats()
         return "";
     }
 
-    uint64_t tot_pkts = 0;
-    uint64_t tot_bytes = 0;
-    HashTable<uint16_t, uint64_t> pkts_per_queue;
-    HashTable<uint16_t, uint64_t> bytes_per_queue;
+    int64_t tot_pkts = 0;
+    int64_t tot_bytes = 0;
+    HashTable<uint16_t, int64_t> pkts_in_queue;
+    HashTable<uint16_t, int64_t> bytes_in_queue;
 
     // Traverse the list of installed flow rules
     for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
+        uint32_t id = pf->id;
     #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         const struct rte_flow_action *action = pf->rule.actions;
     #else
@@ -2088,43 +2114,62 @@ FlowDirector::flow_rule_aggregate_stats()
         }
 
         // Initialize the counters for this queue
-        if (pkts_per_queue.find((uint16_t) queue) != pkts_per_queue.end()) {
-            pkts_per_queue[(uint16_t) queue] = 0;
-            bytes_per_queue[(uint16_t) queue] = 0;
+        if (pkts_in_queue.find((uint16_t) queue) == pkts_in_queue.end()) {
+            pkts_in_queue[(uint16_t) queue] = 0;
+            bytes_in_queue[(uint16_t) queue] = 0;
         }
 
+        // Get currest state of the pacet and byte counters from the device
+        int64_t matched_pkts = 0;
+        int64_t matched_bytes = 0;
+        flow_rule_query(id, matched_pkts, matched_bytes);
+
         // Count packets and bytes per queue as well as across queues
-        pkts_per_queue[(uint16_t) queue] += _flow_cache->get_matched_packets(pf->id);
-        bytes_per_queue[(uint16_t) queue] += _flow_cache->get_matched_bytes(pf->id);
-        tot_pkts += _flow_cache->get_matched_packets(pf->id);
-        tot_bytes += _flow_cache->get_matched_bytes(pf->id);
+        pkts_in_queue[(uint16_t) queue] += matched_pkts;
+        bytes_in_queue[(uint16_t) queue] += matched_bytes;
+        tot_pkts += matched_pkts;
+        tot_bytes += matched_bytes;
     }
 
-    uint16_t queues_nb = pkts_per_queue.size();
+    uint16_t queues_nb = pkts_in_queue.size();
     if (queues_nb == 0) {
         _errh->warning("Flow Director (port %u): No queues to produce aggregate statistics", _port_id);
         return "";
     }
 
-    float perfect_pkts_per_queue = (float) tot_pkts / (float) queues_nb;
-    float perfect_bytes_per_queue = (float) tot_bytes / (float) queues_nb;
+    float perfect_pkts_in_queue = (float) tot_pkts / (float) queues_nb;
+    float perfect_bytes_in_queue = (float) tot_bytes / (float) queues_nb;
 
-    float pkt_imbalance_ratio = 0.0;
-    float byte_imbalance_ratio = 0.0;
+    short tab_size = 26;
+    StringAccum aggr_stats;
+    aggr_stats.snprintf(tab_size, "%26s", "QUEUE");
+    aggr_stats.snprintf(tab_size, "%26s", "RECEIVED PACKETS").snprintf(tab_size, "%26s", "PERF. BALANCED PACKETS");
+    aggr_stats.snprintf(tab_size, "%26s", "RECEIVED BYTES").snprintf(tab_size, "%26s", "PERF. BALANCED BYTES");
+    aggr_stats.snprintf(tab_size, "%26s", "PACKET IMBALANCE(%)").snprintf(tab_size, "%26s", "BYTE IMBALANCE(%)");
+    aggr_stats << "\n";
+    float imbalanced_pkts = 0.0;
+    float imbalanced_bytes = 0.0;
     for (uint16_t i = 0; i < queues_nb; i++) {
-        if (perfect_pkts_per_queue != 0) {
-            pkt_imbalance_ratio += (float) (abs(pkts_per_queue[i] - perfect_pkts_per_queue)) /
-                                   (float) perfect_pkts_per_queue;
-        }
-        if (perfect_bytes_per_queue != 0) {
-            byte_imbalance_ratio += (float) (abs(bytes_per_queue[i] - perfect_bytes_per_queue)) /
-                                    (float) perfect_bytes_per_queue;
-        }
+        imbalanced_pkts += abs((float)pkts_in_queue[i] - perfect_pkts_in_queue);
+        imbalanced_bytes += abs((float)bytes_in_queue[i] - perfect_bytes_in_queue);
+        float q_pkt_imb_ratio  = (abs((float)  pkts_in_queue[i] -  perfect_pkts_in_queue) /  perfect_pkts_in_queue)*100;
+        float q_byte_imb_ratio = (abs((float) bytes_in_queue[i] - perfect_bytes_in_queue) / perfect_bytes_in_queue)*100;
+
+        aggr_stats.snprintf(tab_size, "%26d", i);
+        aggr_stats.snprintf(tab_size, "%26" PRId64,  pkts_in_queue[i]).snprintf(tab_size, "%26.2f",  perfect_pkts_in_queue);
+        aggr_stats.snprintf(tab_size, "%26" PRId64, bytes_in_queue[i]).snprintf(tab_size, "%26.2f", perfect_bytes_in_queue);
+        aggr_stats.snprintf(tab_size, "%26.2f", q_pkt_imb_ratio).snprintf(tab_size, "%26.2f", q_pkt_imb_ratio);
+        aggr_stats << "\n";
     }
 
-    StringAccum aggr_stats;
-    aggr_stats << "Packet imbalance ratio over " << queues_nb << " queues: " << pkt_imbalance_ratio << "\n";
-    aggr_stats << "Bytes imbalance ratio over "  << queues_nb << " queues: " << byte_imbalance_ratio;
+    float pkt_imbalance_ratio  =  (perfect_pkts_in_queue == 0) ? 0.0 : (imbalanced_pkts / perfect_pkts_in_queue)*100;
+    float byte_imbalance_ratio = (perfect_bytes_in_queue == 0) ? 0.0 : (imbalanced_bytes/perfect_bytes_in_queue)*100;
+
+    aggr_stats << "\n";
+    aggr_stats.snprintf(tab_size, "%26s", "TOTAL PACKET IMBALANCE(%)").snprintf(tab_size, "%26s", "TOTAL BYTE IMBALANCE(%)");
+    aggr_stats << "\n";
+    aggr_stats.snprintf(tab_size, "%26.2f", pkt_imbalance_ratio).snprintf(tab_size, "%26.2f", byte_imbalance_ratio);
+    aggr_stats << "\n";
 
     return aggr_stats.take_string();
 }
@@ -2190,10 +2235,12 @@ FlowDirector::nic_and_cache_counts_agree()
 /**
  * Lists all of a NIC's flow rules.
  *
- * @return a string of NIC flow rules (each on a different line)
+ * @args only_matching_rules: If true, only rules that matched some traffic will be returned
+ *                            Defaults to false, which means all rules are returned.
+ * @return a string of NIC flow rules (each in a different line)
  */
 String
-FlowDirector::flow_rules_list()
+FlowDirector::flow_rules_list(const bool only_matching_rules)
 {
     if (!active()) {
         return "Flow Director is inactive";
@@ -2213,6 +2260,7 @@ FlowDirector::flow_rules_list()
 
     // Traverse and print the sorted list of installed flow rules
     for (struct port_flow *pf = sorted_rules; pf != NULL; pf = pf->tmp) {
+        uint32_t id = pf->id;
     #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         const struct rte_flow_item *item = pf->rule.pattern;
         const struct rte_flow_action *action = pf->rule.actions;
@@ -2221,7 +2269,17 @@ FlowDirector::flow_rules_list()
         const struct rte_flow_action *action = pf->actions;
     #endif
 
-        rules_list << "Flow rule #" << pf->id << ": [";
+        // Get currest state of the pacet and byte counters from the device
+        int64_t matched_pkts = -1;
+        int64_t matched_bytes = -1;
+        flow_rule_query(id, matched_pkts, matched_bytes);
+
+        // Skip rule without match, if requested by the user
+        if (only_matching_rules && ((matched_pkts == 0) || (matched_bytes == 0))) {
+            continue;
+        }
+
+        rules_list << "Flow rule #" << id << ": [";
     #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         rules_list << "Group: " << pf->rule.attr->group << ", Prio: " << pf->rule.attr->priority << ", ";
         rules_list << "Scope: " << (pf->rule.attr->ingress == 1 ? "ingress" : "-");
@@ -2260,11 +2318,11 @@ FlowDirector::flow_rules_list()
         }
 
         // There is a valid index for flow rule counters
-        if (_flow_cache->internal_rule_id_exists(pf->id)) {
+        if (_flow_cache->internal_rule_id_exists(id)) {
             rules_list << ", ";
             rules_list << "Stats: ";
-            rules_list << "Matched packets: " << _flow_cache->get_matched_packets(pf->id) << ", ";
-            rules_list << "Matched bytes: " << _flow_cache->get_matched_bytes(pf->id);
+            rules_list << "Matched packets: " << matched_pkts << ", ";
+            rules_list << "Matched bytes: " << matched_bytes;
         }
 
         rules_list << "]\n";
@@ -2272,6 +2330,9 @@ FlowDirector::flow_rules_list()
 
     if (rules_list.empty()) {
         rules_list << "No flow rules";
+        if (only_matching_rules) {
+            rules_list << " with packet hits";
+        }
     }
 
     return rules_list.take_string();

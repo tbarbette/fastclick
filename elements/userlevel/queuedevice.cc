@@ -151,13 +151,13 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
         } else if (scale.lower() == "share") {
             _scale_parallel = false;
         } else {
-            return errh->error("Unknown scaling mode %s !",scale.c_str());
+            return errh->error("Unknown scaling mode %s!",scale.c_str());
         }
     }
 
 #if !HAVE_NUMA
     if (_use_numa) {
-        click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
+        click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time!");
     }
     _use_numa = false;
 #endif
