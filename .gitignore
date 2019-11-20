@@ -30,3 +30,7 @@ stamp-h
 *.sw*
 tags
 *.deb
+
+*.build
+*.buildinfo
+*.changes
