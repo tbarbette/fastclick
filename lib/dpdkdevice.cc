@@ -317,7 +317,7 @@ static String keep_token_left(String str, char delimiter)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 int DPDKDevice::set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
-        const String &fd_rules_filename, const bool &fd_isolate, ErrorHandler *errh)
+        const String &flow_rules_filename, ErrorHandler *errh)
 #else
 int DPDKDevice::set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
@@ -383,14 +383,13 @@ int DPDKDevice::set_mode(
     if (mode == FlowDirector::FLOW_DIR_MODE) {
         FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
         flow_dir->set_active(true);
-        flow_dir->set_isolation_mode(fd_isolate);
-        flow_dir->set_rules_filename(fd_rules_filename);
+        flow_dir->set_rules_filename(flow_rules_filename);
         errh->message(
             "Flow Director (port %u): State %s - Isolation Mode %s - Source file '%s'",
             port_id,
             flow_dir->active() ? "active" : "inactive",
-            flow_dir->isolated() ? "active" : "inactive",
-            fd_rules_filename.empty() ? "None" : fd_rules_filename.c_str()
+            FlowDirector::isolated(port_id) ? "active" : "inactive",
+            flow_rules_filename.empty() ? "None" : flow_rules_filename.c_str()
         );
     }
 #endif
@@ -696,13 +695,22 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         }
     }
 
-    int err = rte_eth_dev_start(port_id);
-    if (err < 0)
-        return errh->error(
-            "Cannot start DPDK port %u: error %d", port_id, err);
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    if (info.flow_isolate) {
+        FlowDirector::set_isolation_mode(port_id, true);
+    } else {
+        FlowDirector::set_isolation_mode(port_id, false);
+    }
+#endif
 
-    if (info.promisc)
+    int err = rte_eth_dev_start(port_id);
+    if (err < 0) {
+        return errh->error("Cannot start DPDK port %u: error %d", port_id, err);
+    }
+
+    if (info.promisc) {
         rte_eth_promiscuous_enable(port_id);
+    }
 
     if (info.init_mac != EtherAddress()) {
         struct rte_ether_addr addr;
@@ -865,6 +873,10 @@ void DPDKDevice::set_rx_offload(uint64_t offload) {
 void DPDKDevice::set_tx_offload(uint64_t offload) {
     assert(!_is_initialized);
     info.tx_offload |= offload;
+}
+
+void DPDKDevice::set_flow_isolate(const bool &flow_isolate) {
+    info.flow_isolate = flow_isolate;
 }
 
 EtherAddress DPDKDevice::get_mac() {

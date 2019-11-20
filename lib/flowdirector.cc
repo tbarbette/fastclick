@@ -1089,18 +1089,21 @@ HashTable<portid_t, FlowDirector *> FlowDirector::dev_flow_dir;
 HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_inst_stats_map;
 HashMap<portid_t, Vector<RuleTiming>> FlowDirector::_rule_del_stats_map;
 
+// Isolation mode per port
+HashMap<portid_t, bool> FlowDirector::_isolated;
+
 // A unique parser
 struct cmdline *FlowDirector::_parser = NULL;
 
 FlowDirector::FlowDirector() :
-        _port_id(-1), _active(false), _isolated(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
+        _port_id(-1), _active(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
 {
     _errh = new ErrorVeneer(ErrorHandler::default_handler());
     _flow_cache = 0;
 }
 
 FlowDirector::FlowDirector(portid_t port_id, ErrorHandler *errh) :
-        _port_id(port_id), _active(false), _isolated(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
+        _port_id(port_id), _active(false), _verbose(DEF_VERBOSITY), _debug_mode(DEF_DEBUG_MODE), _rules_filename("")
 {
     _errh = new ErrorVeneer(errh);
     _flow_cache = new FlowCache(port_id, _verbose, _debug_mode, _errh);
@@ -1122,6 +1125,10 @@ FlowDirector::~FlowDirector()
         if (verbose()) {
             _errh->message("Flow Director (port %u): Parser deleted", _port_id);
         }
+    }
+
+    if (_isolated.size() > 0) {
+        _isolated.clear();
     }
 
     if (_flow_cache) {
@@ -1946,21 +1953,19 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
  * In case ingress traffic does not match any of the defined rules,
  * it will be dropped by the NIC.
  *
+ * @args port_id: the ID of the NIC
  * @args set: non-zero to enter isolated mode.
  * @return 0 upon success, otherwise a negative number if isolation fails
  */
 int
-FlowDirector::flow_rules_isolate(int set)
+FlowDirector::flow_rules_isolate(const portid_t &port_id, const int &set)
 {
-    if (port_flow_isolate(_port_id, set) != FLOWDIR_SUCCESS) {
-        return _errh->error(
-            "Flow Director (port %u): Failed to restrict ingress traffic to the defined flow rules", _port_id
+    if (port_flow_isolate(port_id, set) != FLOWDIR_SUCCESS) {
+        ErrorHandler *errh = ErrorHandler::default_handler();
+        return errh->error(
+            "Flow Director (port %u): Failed to restrict ingress traffic to the defined flow rules", port_id
         );
     }
-    _errh->message(
-        "Flow Director (port %u): Ingress traffic is %s to the defined flow rules\n",
-        _port_id, set ? "now restricted" : "not restricted"
-    );
 
     return 0;
 }

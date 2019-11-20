@@ -241,15 +241,15 @@ class FlowDirector {
         inline String rules_filename() { return _rules_filename; };
 
         // Flow rules' isolation mode
-        inline void set_isolation_mode(const bool &isolated) {
-            _isolated = isolated;
-            if (_isolated) {
-                flow_rules_isolate(1);
+        static inline void set_isolation_mode(const portid_t &port_id, const bool &isolated) {
+            _isolated.insert(port_id, isolated);
+            if (_isolated[port_id]) {
+                flow_rules_isolate(port_id, 1);
             } else {
-                flow_rules_isolate(0);
+                flow_rules_isolate(port_id, 0);
             }
         };
-        inline bool isolated() { return _isolated; };
+        static inline bool isolated(const portid_t &port_id) { return _isolated[port_id]; };
 
         // Calibrates flow rule cache before inserting new rules
         void calibrate_cache(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
@@ -357,9 +357,6 @@ class FlowDirector {
         // Indicates whether Flow Director is active for a given device
         bool _active;
 
-        // Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future)
-        bool _isolated;
-
         // Set stdout verbosity
         bool _verbose;
         bool _debug_mode;
@@ -373,6 +370,9 @@ class FlowDirector {
         // A low rule cache associated with the port of this Flow Director
         FlowCache *_flow_cache;
 
+        // Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future)
+        static HashMap<portid_t, bool> _isolated;
+
         // Flow rule commands' parser
         static struct cmdline *_parser;
 
@@ -380,11 +380,11 @@ class FlowDirector {
         static HashMap<portid_t, Vector<RuleTiming>> _rule_inst_stats_map;
         static HashMap<portid_t, Vector<RuleTiming>> _rule_del_stats_map;
 
+        // Restrict ingress traffic to the defined flow rules
+        static int flow_rules_isolate(const portid_t &port_id, const int &set);
+
         // Pre-populate the supported matches and actions on relevant maps
         void populate_supported_flow_items_and_actions();
-
-        // Restrict ingress traffic to the defined flow rules
-        int flow_rules_isolate(int set);
 
         // Sorts a list of flow rules by group, priority, and ID
         void flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules);
