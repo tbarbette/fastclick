@@ -73,8 +73,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     int max_rss = 0;
     bool has_rss = false;
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    String fd_rules_filename;
-    bool fd_isolate = false;
+    String flow_rules_filename;
+    bool flow_isolate = false;
 #endif
     if (Args(this, errh).bind(conf)
         .read_mp("PORT", dev)
@@ -90,8 +90,8 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("MTU", mtu).read_status(has_mtu)
         .read("MODE", mode)
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        .read("FLOW_DIR_RULES_FILE", fd_rules_filename)
-        .read("FLOW_DIR_ISOLATE", fd_isolate)
+        .read("FLOW_RULES_FILE", flow_rules_filename)
+        .read("FLOW_ISOLATE", flow_isolate)
     #endif
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
@@ -118,14 +118,14 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int r;
     if (n_queues == -1) {
-    if (firstqueue == -1) {
-        firstqueue = 0;
-        // With DPDK we'll take as many queues as available threads
-        r = configure_rx(numa_node, 1, maxqueues, errh);
-    } else {
-        // If a queue number is set, user probably wants only one queue
-        r = configure_rx(numa_node, 1, 1, errh);
-    }
+        if (firstqueue == -1) {
+            firstqueue = 0;
+            // With DPDK we'll take as many queues as available threads
+            r = configure_rx(numa_node, 1, maxqueues, errh);
+        } else {
+            // If a queue number is set, user probably wants only one queue
+            r = configure_rx(numa_node, 1, 1, errh);
+        }
     } else {
         if (firstqueue == -1)
             firstqueue = 0;
@@ -158,11 +158,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _dev->set_init_rss_max(max_rss);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    if (fd_isolate && (mode != FlowDirector::FLOW_DIR_MODE)) {
-        return errh->error("Flow Director (port %s): FLOW_DIR_ISOLATE requires MODE flow_dir", dev.c_str());
-    }
-
-    if ((mode == FlowDirector::FLOW_DIR_MODE) && (fd_rules_filename.empty())) {
+    if ((mode == FlowDirector::FLOW_DIR_MODE) && (flow_rules_filename.empty())) {
         errh->warning(
             "Flow Director (port %s): FLOW_DIR_RULES_FILE is not set, "
             "hence this NIC can only be configured by the handlers",
@@ -170,7 +166,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         );
     }
 
-    r = _dev->set_mode(mode, num_pools, vf_vlan, fd_rules_filename, fd_isolate, errh);
+    r = _dev->set_mode(mode, num_pools, vf_vlan, flow_rules_filename, errh);
+
+    _dev->set_flow_isolate(flow_isolate);
 #else
     r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
 #endif
@@ -588,7 +586,7 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
         }
         case h_rules_isolate: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return String(FlowDirector::get_flow_director(port_id)->isolated() ? "1" : "0");
+            return String(FlowDirector::isolated(port_id) ? "1" : "0");
         }
     #endif
         case h_nombufs:
@@ -739,7 +737,7 @@ int FromDPDKDevice::flow_handler(
                 return errh->error("Flow Director (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", port_id);
             }
             bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
-            flow_dir->set_isolation_mode(status);
+            FlowDirector::set_isolation_mode(port_id, status);
             return 0;
         }
         case h_rules_flush: {
