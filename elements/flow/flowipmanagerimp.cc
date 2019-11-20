@@ -34,7 +34,6 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (!is_pow2(_table_size)) {
         _table_size = next_pow2(_table_size);
-        click_chatter("Real capacity will be %d",_table_size);
     }
     return 0;
 }
@@ -43,6 +42,8 @@ int FlowIPManagerIMP::initialize(ErrorHandler *errh) {
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
     hash_params.name = buf;
+    _table_size = next_pow2(_table_size/click_max_cpu_ids());
+    click_chatter("Real capacity for each table will be %d", _table_size);
     hash_params.entries = _table_size;
     hash_params.key_len = sizeof(IPFlow5ID);
     hash_params.hash_func = ipv4_hash_crc;
