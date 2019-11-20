@@ -18,6 +18,10 @@ from common import *
 STRATEGY_FILE = "file"
 STRATEGY_RAND = "random"
 
+PROTO_UDP = "udp"
+PROTO_TCP = "tcp"
+PROTO_RANDOM = "random"
+
 ETHERNET_RULE_PREF = "ingress pattern eth"
 
 INACTIVE = -1
@@ -37,7 +41,7 @@ def parse_protocols(rule_map):
 
 	return rule_str
 
-def dump_flow_director(rule_list, target_nic, target_queues_nb, outfile, verbose=False):
+def dump_flow_director(rule_list, target_nic, target_queues_nb, outfile, rule_count_instr, verbose=False):
 	"""
 	Writes the contents of a string into a file.
 
@@ -45,6 +49,7 @@ def dump_flow_director(rule_list, target_nic, target_queues_nb, outfile, verbose
 	@param target_nic a target DPDK port ID
 	@param target_queues_nb a target number of hardware queues
 	@param outfile the output file where the data is written
+	@param rule_count_instr if true, add a count instruction to rule actions
 	"""
 
 	assert rule_list, "Input data is NULL"
@@ -78,7 +83,8 @@ def dump_flow_director(rule_list, target_nic, target_queues_nb, outfile, verbose
 			curr_queue += 1
 			rule_str += "{} {} / ".format(ACTION_Q, next_queue)
 			# Monitoring
-			# rule_str += "{} / ".format(ACTION_CNT)
+			if rule_count_instr:
+				rule_str += "{} / ".format(ACTION_CNT)
 			rule_str += "end "
 
 			print("DPDK Flow rule #{0:>4}: {1}".format(rule_nb, rule_str))
@@ -254,9 +260,12 @@ def parse_ipfilter(input_file):
 def get_random_ipv4_address():
 	return ".".join(str(randint(0, 255)) for _ in range(4))
 
-def get_random_ip_proto_str():
-	value = randint(0, 1)
-	proto_str = UDP if value == 0 else TCP
+def get_ip_proto_str(protocol):
+	proto_str = ""
+	if protocol == PROTO_RANDOM:
+		proto_str = UDP if randint(0, 1) == 0 else TCP
+	else:
+		proto_str = UDP if protocol == PROTO_UDP else TCP
 	return proto_str
 
 def ip_proto_str_to_int(proto_str):
@@ -269,8 +278,8 @@ def ip_proto_str_to_int(proto_str):
 def get_random_port():
 	return randint(0, 65535)
 
-def get_random_rule(rule_nb):
-	proto = get_random_ip_proto_str()
+def get_random_rule(rule_nb, protocol):
+	proto = get_ip_proto_str(protocol)
 
 	rule_map = {}
 	rule_map[IPVF] = {}
@@ -288,39 +297,39 @@ def get_random_rule(rule_nb):
 
 	return rule_map
 
-def rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb):
+def rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb, rule_count_instr):
 	# Generate one or multiple load balancing configurations
 	for q in range(start_queues_nb, target_queues_nb + 1):
 		outfile_pref = get_substring_until_delimiter(in_file, ".") + "_hw_queues_{}.fdir".format(q)
 		out_file = os.path.join("{}".format(os.path.abspath(output_folder)), outfile_pref)
 
-		dump_flow_director(rule_list, target_nic, q, out_file)
+		dump_flow_director(rule_list, target_nic, q, out_file, rule_count_instr)
 
-def rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, target_queues_nb):
+def rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, target_queues_nb, rule_count_instr=False):
 	for in_file in input_file_list:
 		# Build the rules
 		rule_list = parse_ipfilter(in_file)
 
 		# Dump them to a file
-		rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb)
+		rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb, rule_count_instr)
 
-def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb):
+def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb, protocol, rule_count_instr=False):
 	rule_list = []
 
 	for i in xrange(target_rules_nb):
-		rule = get_random_rule(i)
+		rule = get_random_rule(i, protocol)
 		rule_list.append(rule)
 
 	# Dump them to a file
 	in_file = "random_flow_dir_rules_{}.txt".format(target_rules_nb)
-	rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb)
+	rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb, rule_count_instr)
 
 ###
 ### To translate rules from file:
 ### python click_to_fdir_rules.py --strategy file --input-files test_click_rules --target-queues-nb 16
 ###
 ### To generate random rules:
-### python click_to_fdir_rules.py --strategy random --target-rules-nb 1000 --target-queues-nb 16
+### python click_to_fdir_rules.py --strategy random --target-rules-nb 1000 --target-queues-nb 16 --rule-count --protocol UDP
 ###
 
 if __name__ == "__main__":
@@ -331,6 +340,8 @@ if __name__ == "__main__":
 	parser.add_argument("--target-nic", type=int, default=NIC_INDEPENDENT, help="The DPDK port ID where the generated rules will be installed or -1 for NIC independent rules")
 	parser.add_argument("--target-rules-nb", type=int, default=INACTIVE, help="For strategy random, you must specify how many random rules you need")
 	parser.add_argument("--target-queues-nb", type=int, default=DEF_QUEUES_NB, help="The number of hardware queues, to distribute the rules across")
+	parser.add_argument("--protocol", type=str, default=PROTO_RANDOM, help="Set IP protocol for random rule generation. Can be [TCP, UDP, RANDOM]")
+	parser.add_argument("--rule-count", action="store_true", help="Adds rule counter instructions to rules")
 	parser.add_argument("--iterative", action="store_true", help="Executes this script for 1 to target-queues-nb")
 
 	args = parser.parse_args()
@@ -359,10 +370,17 @@ if __name__ == "__main__":
 	if target_queues_nb <= 0:
 		raise RuntimeError("A target number of hardware queues must be positive.")
 
+	protocol = args.protocol.lower()
+	allowed_protos = [PROTO_TCP, PROTO_UDP, PROTO_RANDOM]
+	if (protocol not in allowed_protos):
+		raise RuntimeError("Specify a protocol type from this list: {}".format(allowed_protos))
+
+	rule_count_instr = args.rule_count
+
 	iterative = args.iterative
 	start_queues_nb = 1 if iterative else target_queues_nb
 
 	if strategy == STRATEGY_FILE:
-		rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, target_queues_nb)
+		rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, target_queues_nb, rule_count_instr)
 	else:
-		rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb)
+		rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb, protocol, rule_count_instr)
