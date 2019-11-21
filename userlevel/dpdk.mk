@@ -469,8 +469,9 @@ ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RT
 endif
 	touch $(PARSE_PATH)/.sentinel
 
-
+ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -eq 19 ] && [ $(RTE_VER_MONTH) -le 08 ] ) || [ $(RTE_VER_YEAR) -lt 19 ] ) && echo true),true)
 .NOTPARALLEL: ${PARSE_PATH}.sentinel
+endif
 
 test-pmd/%.o: ${PARSE_PATH}.sentinel
 	cp -u $(RTE_SDK)/app/test-pmd/$*.c $(PARSE_PATH)
