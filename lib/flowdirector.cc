@@ -1960,6 +1960,7 @@ FlowDirector::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb
 int
 FlowDirector::flow_rules_isolate(const portid_t &port_id, const int &set)
 {
+#if RTE_VERSION >= RTE_VERSION_NUM(17,8,0,0)
     if (port_flow_isolate(port_id, set) != FLOWDIR_SUCCESS) {
         ErrorHandler *errh = ErrorHandler::default_handler();
         return errh->error(
@@ -1968,7 +1969,14 @@ FlowDirector::flow_rules_isolate(const portid_t &port_id, const int &set)
     }
 
     return 0;
+#else
+    ErrorHandler *errh = ErrorHandler::default_handler();
+    return errh->error(
+        "Flow Director (port %u): Flow isolation is supported since DPDK 17.08", port_id
+    );
+#endif
 }
+
 
 /**
  * Queries the statistics of a NIC flow rule.
