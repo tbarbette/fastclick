@@ -3,6 +3,7 @@ cache:
   directories:
     - dpdk-2.2.0
     - dpdk-16.04
+    - dpdk-17.05
     - dpdk-17.08
     - dpdk-17.11
     - dpdk-18.02
