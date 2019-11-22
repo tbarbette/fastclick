@@ -58,9 +58,7 @@ typedef enum { RX_FILTER_TYPES } RxFilterType;
 #undef rxfiltertype
 #define rxfiltertype(x) #x
 
-
 CLICK_DECLS
-
 
 /*
 =c
@@ -362,7 +360,7 @@ class NIC {
         }
 
         Element *element;
-        NIC* mirror;
+        NIC *mirror;
 
         inline bool is_ghost() {
             return element == NULL;
@@ -375,8 +373,12 @@ class NIC {
         void set_index(const int &index);
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        FlowDirector *get_flow_director(int sriov = 0) { return FlowDirector::get_flow_director(get_port_id() + sriov); };
-        FlowCache *get_flow_cache(int sriov = 0) { return get_flow_director(sriov)->get_flow_cache(); };
+        FlowDirector *get_flow_director(int sriov = 0) {
+            return FlowDirector::get_flow_director(get_port_id() + sriov);
+        };
+        FlowCache *get_flow_cache(int sriov = 0) {
+            return get_flow_director(sriov)->get_flow_cache();
+        };
     #endif
 
         int queue_per_pool();
@@ -392,9 +394,9 @@ class NIC {
         int    call_rx_write(String h, const String input);
 
     private:
-        // Click port index of this NIC
+        /* Click port index of this NIC. */
         int _index;
-        // Verbosity flag
+        /* Verbosity flag. */
         bool _verbose;
 };
 
@@ -458,7 +460,6 @@ class NicStat {
         }
 };
 
-
 class ServiceChain {
     public:
         class RxFilter {
@@ -492,14 +493,12 @@ class ServiceChain {
                 Vector<Vector<String>> values;
         };
 
-        /**
-         * Service chain public attributes.
-         */
+        /* Public service chain attributes. */
         String id;
         RxFilter *rx_filter;
         String config;
 
-        // Service chain type
+        /* Service chain type. */
         ScType config_type;
 
         enum ScStatus {
@@ -508,9 +507,6 @@ class ServiceChain {
         };
         enum ScStatus status;
 
-        /**
-         * Service chain methods.
-         */
         ServiceChain(Metron *m);
         ~ServiceChain();
 
@@ -526,7 +522,7 @@ class ServiceChain {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         Json rules_to_json();
         int32_t rules_from_json(Json j, Metron *m, ErrorHandler *errh);
-        static int     delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh);
+        static int delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh);
         static int32_t delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHandler *errh);
         static int32_t delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandler *errh);
     #endif
@@ -637,10 +633,6 @@ class ServiceChain {
         friend class StandaloneSCManager;
 };
 
-/*
-=c
-
-Metron */
 class Metron : public Element {
     public:
         Metron() CLICK_COLD;
@@ -682,7 +674,7 @@ class Metron : public Element {
         int  controllers_from_json(const Json &j);
         int  delete_controller_from_json(const String &ip);
 
-        // Read and write handlers
+        /* Read and write handlers */
         enum {
             h_discovered, h_resources, h_controllers, h_stats,
         #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -826,10 +818,12 @@ class Metron : public Element {
         /* Mirror */
         bool _mirror;
 
-        /* Click IDs to Physical ids. Important when launching DPDK slaves as we must not use unallowed CPUs. */
+        /**
+         * Click IDs to Physical IDs.
+         * Important when launching DPDK slaves as we must not use unallowed CPUs.
+         */
         Vector<int> _cpu_click_to_phys;
 
-        /* Private methods */
         int try_slaves(ErrorHandler *errh);
 
         int confirm_nic_mode(ErrorHandler *errh);
