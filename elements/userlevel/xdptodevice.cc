@@ -42,6 +42,7 @@ int XDPToDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 void XDPToDevice::push(int port, Packet *p)
 {
   _sock->tx(p);
+  _sock->kick();
 }
 
 CLICK_ENDDECLS

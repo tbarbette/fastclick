@@ -155,7 +155,7 @@ vector<Packet*> XDPSock::rx()
         FRAME_HEADROOM,
         FRAME_TAILROOM
     );
-    result.push_back(p);
+    result[i] = p;
 
   }
 
