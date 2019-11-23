@@ -139,7 +139,7 @@ vector<Packet*> XDPSock::rx()
 
   for (size_t i = 0; i < rcvd; i++) {
 
-    auto *desc = xsk_ring_cons__rx_desc(&_xsk->rx, idx_rx);
+    auto *desc = xsk_ring_cons__rx_desc(&_xsk->rx, idx_rx+i);
     char *xsk_pkt = static_cast<char*>(
         xsk_umem__get_data(_xsk->umem->buffer, desc->addr)
     );
@@ -155,6 +155,7 @@ vector<Packet*> XDPSock::rx()
         FRAME_HEADROOM,
         FRAME_TAILROOM
     );
+    p->timestamp_anno();
     result[i] = p;
 
   }
