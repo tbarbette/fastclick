@@ -45,17 +45,47 @@ int XDPFromDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
 
 bool XDPFromDevice::run_task(Task *t)
 {
-
-  vector<Packet*> pkts = _sock->rx();
-  for(Packet *p : pkts) {
-    output(0).push(p);
-  }
+  
+  #if HAVE_BATCH
+  rx_batch();
+  #else
+  rx();
+  #endif
 
   t->fast_reschedule();
 
   return true;
 
 }
+
+#if HAVE_BATCH
+void XDPFromDevice::rx_batch()
+{
+
+  vector<Packet*> pkts = _sock->rx();
+  if (pkts.empty()) {
+    return;
+  }
+
+  PacketBatch *head = PacketBatch::start_head(pkts[0]);
+  for(size_t i=0; i<pkts.size()-1; i++) {
+    pkts[i]->set_next(pkts[i+1]);    
+  }
+  head->make_tail(*pkts.end(), pkts.size());
+
+  output_push_batch(0, head);
+
+}
+#else
+void XDPFromDevice::rx()
+{
+  vector<Packet*> pkts = _sock->rx();
+  for(Packet *p : pkts) {
+    output(0).push(p);
+  }
+}
+#endif
+
 
 CLICK_ENDDECLS
 

@@ -1,13 +1,13 @@
 #pragma once
 
 #include <click/config.h>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/xdpmanager.hh>
 #include <click/task.hh>
 
 CLICK_DECLS
 
-class XDPFromDevice : public Element {
+class XDPFromDevice : public BatchElement {
 
   public:
 
@@ -22,6 +22,8 @@ class XDPFromDevice : public Element {
     const char *processing() const override final { return PUSH; }
 
     bool run_task(Task *t) override final;
+    void rx();
+    void rx_batch();
 
   private:
     Task *_t{nullptr};

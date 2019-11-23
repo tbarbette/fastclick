@@ -1,12 +1,12 @@
 #pragma once
 
 #include <click/config.h>
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/xdpmanager.hh>
 
 CLICK_DECLS
 
-class XDPToDevice : public Element {
+class XDPToDevice : public BatchElement {
 
   public:
 
@@ -21,6 +21,7 @@ class XDPToDevice : public Element {
     const char *processing() const override final { return PUSH; }
 
     void push(int port, Packet *p) override final;
+    void push_batch(int, PacketBatch *head);
 
   private:
 
