@@ -24,23 +24,16 @@
 #include <click/error.hh>
 CLICK_DECLS
 
-AverageCounter::AverageCounter()
+template <typename Stats>
+AverageCounterBase<Stats>::AverageCounterBase()
 {
-    _mp = false;
     _link_fcs = true;
 }
 
-void
-AverageCounter::reset()
-{
-  _count = 0;
-  _byte_count = 0;
-  _first = 0;
-  _last = 0;
-}
 
+template <typename Stats>
 int
-AverageCounter::configure(Vector<String> &conf, ErrorHandler *errh)
+AverageCounterBase<Stats>::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 #if HAVE_FLOAT_TYPES
   double ignore = 0;
@@ -60,46 +53,50 @@ AverageCounter::configure(Vector<String> &conf, ErrorHandler *errh)
   return 0;
 }
 
+template <typename Stats>
 int
-AverageCounter::initialize(ErrorHandler *)
+AverageCounterBase<Stats>::initialize(ErrorHandler *)
 {
   reset();
   return 0;
 }
 
 #if HAVE_BATCH
+template <typename Stats>
 PacketBatch *
-AverageCounter::simple_action_batch(PacketBatch *batch)
+AverageCounterBase<Stats>::simple_action_batch(PacketBatch *batch)
 {
     click_jiffies_t jpart = click_jiffies();
-    if (_first == 0)
-        _first.compare_swap(0, jpart);
-    if (jpart - _first >= _ignore) {
+    if (_stats.my_first() == 0)
+        _stats.set_first(jpart);
+    if (jpart - _stats.my_first() >= _ignore) {
         uint64_t l = 0;
         FOR_EACH_PACKET(batch,p) {
             l+=p->length();
         }
-		add_count(batch->count(), l);
+		_stats.add_count(batch->count(), l);
 	}
-    _last = jpart;
+    _stats.set_last(jpart);
     return batch;
 }
 #endif
 
+template <typename Stats>
 Packet *
-AverageCounter::simple_action(Packet *p)
+AverageCounterBase<Stats>::simple_action(Packet *p)
 {
     click_jiffies_t jpart = click_jiffies();
-    if (_first == 0)
-	_first.compare_swap(0, jpart);
-    if (jpart - _first >= _ignore) {
-	    add_count(1,p->length());
+    if (_stats.my_first() == 0)
+	_stats.set_first(jpart);
+    if (jpart - _stats.my_first() >= _ignore) {
+	    _stats.add_count(1,p->length());
     }
-    _last = jpart;
+    _stats.set_last(jpart);
     return p;
 }
 
-uint64_t get_count(AverageCounter* c, int user_data) {
+template <typename Stats>
+uint64_t get_count(AverageCounterBase<Stats>* c, int user_data) {
   switch(user_data) {
     case 3:
       return (c->byte_count() + (c->count() * (20 + (c->_link_fcs?4:0) )) ) << 3;
@@ -112,19 +109,21 @@ uint64_t get_count(AverageCounter* c, int user_data) {
   }
 }
 
+template <typename Stats>
 static String
 averagecounter_read_count_handler(Element *e, void *thunk)
 {
   int user_data = (long)thunk;
-  AverageCounter *c = (AverageCounter *)e;
+  AverageCounterBase<Stats> *c = (AverageCounterBase<Stats> *)e;
   return String(get_count(c, user_data));
 }
 
-static String
-averagecounter_read_rate_handler(Element *e, void *thunk)
+template <typename Stats>
+String
+AverageCounterBase<Stats>::averagecounter_read_rate_handler(Element *e, void *thunk)
 {
-  AverageCounter *c = (AverageCounter *)e;
-  uint64_t d = c->last() - c->first();
+  AverageCounterBase<Stats> *c = (AverageCounterBase<Stats> *)e;
+  uint64_t d = c->_stats.last() - c->_stats.first();
   int user_data = (long)thunk;
   d -= c->ignore();
   if (d < 1) d = 1;
@@ -149,36 +148,51 @@ averagecounter_read_rate_handler(Element *e, void *thunk)
 #endif
 }
 
+template <typename Stats>
 static int
 averagecounter_reset_write_handler
 (const String &, Element *e, void *, ErrorHandler *)
 {
-  AverageCounter *c = (AverageCounter *)e;
+  AverageCounterBase<Stats> *c = (AverageCounterBase<Stats> *)e;
   c->reset();
   return 0;
 }
 
+template <typename Stats>
 void
-AverageCounter::add_handlers()
+AverageCounterBase<Stats>::add_handlers()
 {
-  add_read_handler("count", averagecounter_read_count_handler, 0);
-  add_read_handler("byte_count", averagecounter_read_count_handler, 1);
-  add_read_handler("bit_count", averagecounter_read_count_handler, 2);
-  add_read_handler("link_count", averagecounter_read_count_handler, 3);
+  add_read_handler("count", averagecounter_read_count_handler<Stats>, 0);
+  add_read_handler("byte_count", averagecounter_read_count_handler<Stats>, 1);
+  add_read_handler("bit_count", averagecounter_read_count_handler<Stats>, 2);
+  add_read_handler("link_count", averagecounter_read_count_handler<Stats>, 3);
   add_read_handler("rate", averagecounter_read_rate_handler, 0);
   add_read_handler("byte_rate", averagecounter_read_rate_handler, 1);
   add_read_handler("bit_rate", averagecounter_read_rate_handler, 2);
   add_read_handler("link_rate", averagecounter_read_rate_handler, 3);
   add_read_handler("time", averagecounter_read_rate_handler, 4);
-  add_write_handler("reset", averagecounter_reset_write_handler, 0, Handler::BUTTON);
+  add_write_handler("reset", averagecounter_reset_write_handler<Stats>, 0, Handler::BUTTON);
+}
+
+AverageCounter::AverageCounter()
+{
 }
 
 AverageCounterMP::AverageCounterMP()
 {
-    _mp = true;
 }
+
+AverageCounterIMP::AverageCounterIMP()
+{
+}
+
+template class AverageCounterBase<AverageCounterStats<uint64_t> >;
+template class AverageCounterBase<AverageCounterStats<atomic_uint64_t> >;
+template class AverageCounterBase<AverageCounterStatsIMP>;
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(AverageCounter)
 EXPORT_ELEMENT(AverageCounterMP)
+EXPORT_ELEMENT(AverageCounterIMP)
 ELEMENT_MT_SAFE(AverageCounterMP)
+ELEMENT_MT_SAFE(AverageCounterIMP)
