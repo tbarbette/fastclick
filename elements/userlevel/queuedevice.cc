@@ -74,7 +74,6 @@ bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
 {
     if (noutputs()) { //RX
         //if (_active) { TODO
-            assert(thread_for_queue_available());
             for (int i = firstqueue; i < firstqueue + n_queues; i++) {
                 for (int j = 0; j < queue_share; j++) {
                     bmk[thread_for_queue(i) - j] = 1;
@@ -93,10 +92,10 @@ bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
 }
 
 void QueueDevice::cleanup_tasks() {
-    for (int i = 0; i < usable_threads.weight(); i++) {
-        if (_q_infos[i].task) {
-            delete _q_infos[i].task;
-            _q_infos[i].task = 0;
+    for (int i = 0; i < _thread_state.weight(); i++) {
+        if (_thread_state.get_value(i).task) {
+            delete _thread_state.get_value(i).task;
+            _thread_state.get_value(i).task = 0;
         }
     }
 }
@@ -215,13 +214,13 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
         if (_maxthreads == -1)
             n_threads = 1;
         else
-            n_threads = min(_maxthreads,master()->nthreads() - router()->home_thread_id(this));
+            n_threads = min(_maxthreads, master()->nthreads() - router()->home_thread_id(this));
     } else {
         usable_threads = get_passing_threads();
         if (_maxthreads == -1)
             n_threads = usable_threads.weight();
         else
-            n_threads = min(_maxthreads,usable_threads.weight());
+            n_threads = min(_maxthreads, usable_threads.weight());
     }
 
     if (n_threads == 0) {
@@ -429,9 +428,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 }
 
 int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
-    _q_infos.resize(usable_threads.weight());
-    _thread_to_firstqueue.resize(master()->nthreads());
-    _queue_to_thread.resize(firstqueue + n_queues);
+    _q_infos.resize(n_queues);
 
     int th_num = 0;
     int qu_num = firstqueue;
@@ -447,35 +444,28 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
         if (th_share_idx % thread_share != 0) {
             --th_num;
-            if (_q_infos[th_num].lock == NO_LOCK) {
-                _q_infos[th_num].lock = 0;
-            }
-        } else {
-            assert(!_q_infos[th_num].task);
-            _q_infos[th_num].task = (new Task(this));
-            ScheduleInfo::initialize_task(this, _q_infos[th_num].task, schedule, errh);
-            _q_infos[th_num].task->move_thread(th_id);
-            _q_infos[th_num].lock = NO_LOCK;
+            _q_infos[qu_num].lock = 0;
         }
+
+        Task* &task = _thread_state.get_value_for_thread(th_id).task;
+        task = (new Task(this));
+        ScheduleInfo::initialize_task(this, task, schedule, errh);
+        task->move_thread(th_id);
+
         th_share_idx++;
 
-        _thread_to_firstqueue[th_id] = qu_num;
+        _thread_state.get_value_for_thread(th_id).first_queue_id = qu_num;
 
         for (int j = 0; j < queue_per_threads; j++) {
             if (_verbose > 2)
                 click_chatter("%s: Queue %d handled by th %d", name().c_str(), qu_num,th_id);
-            _queue_to_thread[qu_num] = th_id;
-            // If queues are shared, this mapping is loosy: _queue_to_thread will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
+            _q_infos[qu_num].thread_id = th_id;
+            // If queues are shared, this mapping is loosy: _q_infos[].thread_id will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
             qu_share_idx++;
             if (qu_share_idx % queue_share == 0)
                 qu_num++;
             if (qu_num == firstqueue + n_queues) break;
         }
-
-        if (queue_share > 1) {
-            _q_infos[th_num].lock = 0;
-        }
-
 
         if (qu_num == firstqueue + n_queues) break;
         ++th_num;
@@ -486,24 +476,24 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
 unsigned long long QueueDevice::n_count() {
     unsigned long long total = 0;
-    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-        total += thread_state.get_value(i)._count;
+    for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
+        total += _thread_state.get_value(i)._count;
     }
     return total;
 }
 
 unsigned long long QueueDevice::n_dropped() {
     unsigned long long total = 0;
-    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-        total += thread_state.get_value(i)._dropped;
+    for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
+        total += _thread_state.get_value(i)._dropped;
     }
     return total;
 }
 
 void QueueDevice::reset_count() {
-    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-        thread_state.get_value(i)._count = 0;
-        thread_state.get_value(i)._dropped = 0;
+    for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
+        _thread_state.get_value(i)._count = 0;
+        _thread_state.get_value(i)._dropped = 0;
     }
 }
 
