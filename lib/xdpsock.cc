@@ -7,10 +7,11 @@
 using std::string;
 using std::vector;
 
-XDPSock::XDPSock(string ifname, u16 xdp_flags, u16 bind_flags)
+XDPSock::XDPSock(string ifname, u16 xdp_flags, u16 bind_flags, u32 queue_id)
   : _ifname{ifname},
     _xdp_flags{xdp_flags},
-    _bind_flags{bind_flags}
+    _bind_flags{bind_flags},
+    _queue_id{queue_id}
 {
   configure_umem();
   configure_socket();
@@ -34,13 +35,11 @@ void XDPSock::configure_socket()
   };
 
  
-  //TODO something configurable?
-  u32 queue_id{0};
 
   int ret = xsk_socket__create(
       &_xsk->xsk,
       _ifname.c_str(),
-      queue_id,
+      _queue_id,
       _umem->umem,
       &_xsk->rx,
       &_xsk->tx,

@@ -10,7 +10,7 @@ CLICK_DECLS
 
 int XDPFromDevice::initialize(ErrorHandler *errh) {
 
-  _sock = XDPManager::ensure(_dev);
+  _sock = XDPManager::ensure(_dev, _xdp_flags, _bind_flags, 0);
   _t = new Task(this);
   _t->initialize(this, true);
 
@@ -36,10 +36,8 @@ int XDPFromDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
   }
 
   _dev = string{dev.c_str()};
-  _mode = string{mode.c_str()};
   _prog = string{prog.c_str()};
-
-  return CONFIGURE_SUCCESS;
+  return handle_mode(string{mode.c_str()}, errh);
 
 }
 
@@ -82,6 +80,9 @@ void XDPFromDevice::rx()
   vector<Packet*> pkts = _sock->rx();
   for(Packet *p : pkts) {
     output(0).push(p);
+    if (_trace) {
+      click_chatter("rx");
+    }
   }
 }
 #endif

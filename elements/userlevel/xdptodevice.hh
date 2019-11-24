@@ -3,10 +3,11 @@
 #include <click/config.h>
 #include <click/batchelement.hh>
 #include <click/xdpmanager.hh>
+#include "xdpdev.hh"
 
 CLICK_DECLS
 
-class XDPToDevice : public BatchElement {
+class XDPToDevice : public BatchElement, XDPDev {
 
   public:
 
@@ -25,9 +26,6 @@ class XDPToDevice : public BatchElement {
 
   private:
 
-    std::string _dev,
-                _mode,
-                _prog;
 
     bool _trace{false};
 

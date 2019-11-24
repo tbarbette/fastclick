@@ -4,10 +4,11 @@
 #include <click/batchelement.hh>
 #include <click/xdpmanager.hh>
 #include <click/task.hh>
+#include "xdpdev.hh"
 
 CLICK_DECLS
 
-class XDPFromDevice : public BatchElement {
+class XDPFromDevice : public BatchElement, XDPDev {
 
   public:
 
@@ -29,7 +30,6 @@ class XDPFromDevice : public BatchElement {
     Task *_t{nullptr};
 
     std::string _dev,
-                _mode,
                 _prog;
 
     bool _trace{false};

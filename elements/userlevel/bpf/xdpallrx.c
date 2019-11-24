@@ -4,6 +4,9 @@
 #define KBUILD_MODNAME "moaq"
 #include <linux/bpf.h>
 #include "bpf_helpers.h"
+#include "common.h"
+
+char _license[] SEC("license") = "GPL";
 
 struct bpf_map_def SEC("maps") qidconf_map = {
   .type = BPF_MAP_TYPE_ARRAY,
@@ -24,21 +27,36 @@ struct bpf_map_def SEC("maps") xsk_map = {
 SEC("moaq")
 int moaq_prog(struct xdp_md *ctx)
 {
+  bpf_debug("pkt: q=%d\n", ctx->rx_queue_index);
+
+  return bpf_redirect_map(
+      &xsk_map, 
+      0, // key into the xdp socket map, for this app there ins only 1 socket
+      0  // no special flags
+  );
+
+  /*
   int key = 0;
   int *qidconf = bpf_map_lookup_elem(&qidconf_map, &key);
   if (!qidconf) {
     return XDP_PASS;
     //return XDP_ABORTED;
   }
+  */
 
+
+  /*
   if(*qidconf != ctx->rx_queue_index) {
     return XDP_PASS;
   }
+  */
 
   // redirect all packets on the interface to an XDP socket
+  /*
   return bpf_redirect_map(
       &xsk_map, 
       0, // key into the xdp socket map, for this app there ins only 1 socket
       0  // no special flags
   );
+  */
 }

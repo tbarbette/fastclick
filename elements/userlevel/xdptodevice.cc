@@ -8,7 +8,7 @@ CLICK_DECLS
 int XDPToDevice::initialize(ErrorHandler *errh) 
 {
 
-  _sock = XDPManager::ensure(_dev);
+  _sock = XDPManager::ensure(_dev, _xdp_flags, _bind_flags, 0);
   return INITIALIZE_SUCCESS;
 
 }
@@ -22,8 +22,8 @@ int XDPToDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
   if(Args(conf, this, errh)
       .read_mp("DEV", dev)
-      .read_or_set("MODE", mode, "skb")
       .read_or_set("PROG", prog, "xdpallrx")
+      .read_or_set("MODE", mode, "skb")
       .read_or_set("TRACE", _trace, false)
       .consume() < 0 ) {
 
@@ -32,10 +32,8 @@ int XDPToDevice::configure(Vector<String> &conf, ErrorHandler *errh)
   }
 
   _dev = string{dev.c_str()};
-  _mode = string{mode.c_str()};
   _prog = string{prog.c_str()};
-
-  return CONFIGURE_SUCCESS;
+  return handle_mode(string{mode.c_str()}, errh);
 
 }
 
@@ -44,6 +42,9 @@ void XDPToDevice::push(int port, Packet *p)
   _sock->tx(p);
   p->kill();
   _sock->kick();
+  if (_trace) {
+    click_chatter("tx");
+  }
 }
 
 void XDPToDevice::push_batch(int, PacketBatch *head)

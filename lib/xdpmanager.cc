@@ -26,12 +26,14 @@ shared_ptr<XDPSock> XDPManager::get(string dev)
   return x->second;
 }
 
-shared_ptr<XDPSock> XDPManager::ensure(string dev) 
+shared_ptr<XDPSock> XDPManager::ensure(
+    string dev, u16 xdp_flags, u16 bind_flags, u32 queue_id
+)
 {
   auto &socks = get().socks;
   auto x = socks.find(dev);
   if (x == socks.end()) {
-    socks[dev] = make_shared<XDPSock>(dev);
+    socks[dev] = make_shared<XDPSock>(dev, xdp_flags, bind_flags, queue_id);
   }
 
   return socks[dev];

@@ -44,8 +44,9 @@ class XDPSock {
   public:
     XDPSock(
         std::string ifname,
-        u16 xdp_flags = XDP_FLAGS_SKB_MODE,
-        u16 bind_flags = 0
+        u16 xdp_flags,
+        u16 bind_flags,
+        u32 queue_id
     );
 
     std::vector<Packet*>  rx();
@@ -59,7 +60,8 @@ class XDPSock {
 
     std::string _ifname;
 
-    u32 _prog_id;
+    u32 _prog_id,
+        _queue_id;
 
     u16 _xdp_flags,
         _bind_flags;
