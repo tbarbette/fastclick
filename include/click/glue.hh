@@ -126,6 +126,7 @@ extern uint32_t click_dmalloc_where;
 // LALLOC
 
 #if CLICK_LINUXMODULE
+# define CLICK_DEFAULT_ALIGNMENT ARCH_KMALLOC_MINALIGN
 # define CLICK_LALLOC(size)	(click_lalloc((size)))
 # define CLICK_LFREE(p, size)	(click_lfree((p), (size)))
 extern "C" {
@@ -133,18 +134,25 @@ void *click_lalloc(size_t size);
 void click_lfree(volatile void *p, size_t size);
 }
 #else
+# ifdef __STDCPP_DEFAULT_NEW_ALIGNMENT__
+#  define CLICK_DEFAULT_ALIGNMENT __STDCPP_DEFAULT_NEW_ALIGNMENT__
+# else
+#  define CLICK_DEFAULT_ALIGNMENT 16
+# endif
 # define CLICK_LALLOC(size)	((void *)(new uint8_t[(size)]))
 # define CLICK_LFREE(p, size)	delete[] ((void) (size), (uint8_t *)(p))
 #endif
 
 # if HAVE_ALIGNED_ALLOC
-#  define CLICK_ALIGNED_ALLOC(size) (aligned_alloc(CLICK_CACHE_LINE_SIZE, size))
+#  define CLICK_ALIGNED_ALLOC(size, ...) (aligned_alloc(CLICK_CACHE_LINE_SIZE, size))
+#  define CLICK_ALIGNED_ALLOC_T(size,align) (aligned_alloc(align, size))
 #  define CLICK_ALIGNED_FREE(p,size) (free(p))
 # else
 #  ifndef CLICK_LINUXMODULE
 #    warning Using normal allocation instead of aligned one, please use a compiler that supports aligned_alloc
 #  endif
 #  define CLICK_ALIGNED_ALLOC(size) CLICK_LALLOC(size)
+#  define CLICK_ALIGNED_ALLOC_T(size,align) CLICK_LALLOC(size)
 #  define CLICK_ALIGNED_FREE(p,size) CLICK_LFREE(p,size);
 # endif
 

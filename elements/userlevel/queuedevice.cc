@@ -94,9 +94,9 @@ bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
 
 void QueueDevice::cleanup_tasks() {
     for (int i = 0; i < usable_threads.weight(); i++) {
-        if (_tasks[i]) {
-            delete _tasks[i];
-            _tasks[i] = 0;
+        if (_q_infos[i].task) {
+            delete _q_infos[i].task;
+            _q_infos[i].task = 0;
         }
     }
 }
@@ -151,13 +151,13 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
         } else if (scale.lower() == "share") {
             _scale_parallel = false;
         } else {
-            return errh->error("Unknown scaling mode %s!",scale.c_str());
+            return errh->error("Unknown scaling mode %s !",scale.c_str());
         }
     }
 
 #if !HAVE_NUMA
     if (_use_numa) {
-        click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time!");
+        click_chatter("Cannot use numa if --enable-numa wasn't set during compilation time !");
     }
     _use_numa = false;
 #endif
@@ -429,8 +429,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 }
 
 int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
-    _tasks.resize(usable_threads.weight());
-    _locks.resize(usable_threads.weight());
+    _q_infos.resize(usable_threads.weight());
     _thread_to_firstqueue.resize(master()->nthreads());
     _queue_to_thread.resize(firstqueue + n_queues);
 
@@ -448,15 +447,15 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
         if (th_share_idx % thread_share != 0) {
             --th_num;
-            if (_locks[th_num] == NO_LOCK) {
-                _locks[th_num] = 0;
+            if (_q_infos[th_num].lock == NO_LOCK) {
+                _q_infos[th_num].lock = 0;
             }
         } else {
-            assert(!_tasks[th_num]);
-            _tasks[th_num] = (new Task(this));
-            ScheduleInfo::initialize_task(this, _tasks[th_num], schedule, errh);
-            _tasks[th_num]->move_thread(th_id);
-            _locks[th_num] = NO_LOCK;
+            assert(!_q_infos[th_num].task);
+            _q_infos[th_num].task = (new Task(this));
+            ScheduleInfo::initialize_task(this, _q_infos[th_num].task, schedule, errh);
+            _q_infos[th_num].task->move_thread(th_id);
+            _q_infos[th_num].lock = NO_LOCK;
         }
         th_share_idx++;
 
@@ -474,7 +473,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
         }
 
         if (queue_share > 1) {
-            _locks[th_num] = 0;
+            _q_infos[th_num].lock = 0;
         }
 
 
