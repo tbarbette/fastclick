@@ -40,25 +40,23 @@ CLICK_DECLS
  * Resets the count and rate to zero.
  */
 
-class AverageCounter : public BatchElement { public:
+template <typename Stats>
+class AverageCounterBase : public BatchElement { public:
 
-    AverageCounter() CLICK_COLD;
+    AverageCounterBase() CLICK_COLD;
 
-    const char *class_name() const		{ return "AverageCounter"; }
     const char *port_count() const		{ return PORTS_1_1; }
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-
-    uint64_t count() const			{ return _count; }
-    uint64_t byte_count() const			{ return _byte_count; }
-    uint64_t first() const			{ return _first; }
-    uint64_t last() const			{ return _last; }
-    uint64_t ignore() const			{ return _ignore; }
-    void reset();
 
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
 
-    inline void add_count(uint64_t,uint64_t);
+    inline uint64_t count() const           { return _stats.count(); }
+    inline uint64_t byte_count() const      { return _stats.byte_count(); }
+    inline uint64_t first() const			{ return _stats.first(); }
+    inline uint64_t last() const			{ return _stats.last(); }
+    inline uint64_t ignore() const			{ return _ignore; }
+    inline void reset()	{ _stats.reset(); }
 
 #if HAVE_BATCH
     PacketBatch *simple_action_batch(PacketBatch *batch);
@@ -68,34 +66,114 @@ class AverageCounter : public BatchElement { public:
 
     bool _link_fcs;
   private:
-
-    volatile uint64_t _count;
-    volatile uint64_t _byte_count;
-    atomic_uint64_t _first;
-    volatile uint64_t _last;
+    static String averagecounter_read_rate_handler(Element *e, void *thunk);
+    Stats _stats;
     uint64_t _ignore;
-  protected:
-    bool _mp;
 };
 
 
-inline void
-AverageCounter::add_count(uint64_t c,uint64_t b) {
-    if (_mp) {
-        atomic_uint64_t::add(_count,c);
-        atomic_uint64_t::add(_byte_count,b);
-    } else {
+template <typename T>
+struct AverageCounterStats {
+    T _count;
+    T _byte_count;
+    T _first;
+    T _last;
+
+    inline void add_count(uint64_t c,uint64_t b) {
         _count += c;
         _byte_count += b;
     }
-}
+
+    inline void reset()
+    {
+      _count = 0;
+      _byte_count = 0;
+      _first = 0;
+      _last = 0;
+    }
+
+    inline uint64_t count() const { return _count; }
+    inline uint64_t byte_count() const  {   return _byte_count; };
+    inline uint64_t first() const { return _first; }
+    inline uint64_t my_first() const { return _first; }
+    inline void set_first(uint64_t first){ _first = first; }
+    inline uint64_t last() const { return _last; }
+    inline void set_last(uint64_t last){ _last = last; }
+
+};
 
 
-class AverageCounterMP : public AverageCounter { public:
+
+
+class AverageCounter : public AverageCounterBase<AverageCounterStats<uint64_t> > { public:
+    AverageCounter() CLICK_COLD;
+
+    const char *class_name() const		{ return "AverageCounter"; }
+};
+
+class AverageCounterMP : public AverageCounterBase<AverageCounterStats<atomic_uint64_t> > { public:
     AverageCounterMP() CLICK_COLD;
 
     const char *class_name() const		{ return "AverageCounterMP"; }
 };
+
+
+struct AverageCounterStatsIMP {
+    struct Count {
+        uint64_t count;
+        uint64_t byte_count;
+        uint64_t first;
+        uint64_t last;
+    };
+
+    per_thread<Count> _counts;
+
+    inline void add_count(uint64_t c,uint64_t b) {
+        _counts->count += c;
+        _counts->byte_count += b;
+    }
+
+    inline void reset()
+    {
+        for (int i =0; i < _counts.weight(); i++) {
+            _counts.get_value(i).count = 0;
+            _counts.get_value(i).byte_count = 0;
+            _counts.get_value(i).first = 0;
+            _counts.get_value(i).last = 0;
+        }
+    }
+
+    inline uint64_t count() const { PER_THREAD_MEMBER_SUM(uint64_t,total,_counts,count);return total; }
+    inline uint64_t byte_count() const  { PER_THREAD_MEMBER_SUM(uint64_t,total,_counts,byte_count);return total; };
+    inline uint64_t first() const {
+        uint64_t min = UINT64_MAX;
+        for (int i =0; i < _counts.weight(); i++) {
+            if (_counts.get_value(i).first != 0 && _counts.get_value(i).first < min)
+                min = _counts.get_value(i).first;
+        }
+        return min;
+    }
+    inline uint64_t last() const {
+        uint64_t max = 0;
+        for (int i =0; i < _counts.weight(); i++) {
+            if (_counts.get_value(i).last != 0 && _counts.get_value(i).last > max)
+                max = _counts.get_value(i).last;
+        }
+        return max;
+    }
+
+    inline uint64_t my_first() const { return _counts->first; }
+    inline void set_first(uint64_t first){ _counts->first = first; }
+    inline void set_last(uint64_t last){ _counts->last = last; }
+};
+
+class AverageCounterIMP : public AverageCounterBase<AverageCounterStatsIMP> { public:
+    AverageCounterIMP() CLICK_COLD;
+
+    const char *class_name() const		{ return "AverageCounterIMP"; }
+};
+
+
 
 CLICK_ENDDECLS
 #endif
