@@ -34,8 +34,11 @@ private :
 protected:
 
 	int _burst; //Max size of burst
-    Vector<Task*> _tasks;
-    Vector<atomic_uint32_t> _locks;
+    struct QueueInfo {
+        atomic_uint32_t lock;
+        Task*   task;
+    } CLICK_CACHE_ALIGN;
+    Vector<QueueInfo,CLICK_CACHE_LINE_SIZE> _q_infos;
 #define NO_LOCK 2
 
     Bitvector usable_threads;
@@ -80,8 +83,8 @@ protected:
     bool _active;
 
     inline bool lock_attempt() {
-        if (_locks[id_for_thread()] != NO_LOCK) {
-            if (_locks[id_for_thread()].swap((uint32_t)1) == (uint32_t)0)
+        if (_q_infos[id_for_thread()].lock.nonatomic_value() != NO_LOCK) {
+            if (_q_infos[id_for_thread()].lock.swap((uint32_t)1) == (uint32_t)0)
                 return true;
             else
                 return false;
@@ -92,17 +95,18 @@ protected:
     }
 
     inline void lock() {
-        if (_locks[id_for_thread()] != NO_LOCK) {
-            while ( _locks[id_for_thread()].swap((uint32_t)1) != (uint32_t)0)
+        if (_q_infos[id_for_thread()].lock.nonatomic_value() != NO_LOCK) {
+            while (_q_infos[id_for_thread()].lock.swap((uint32_t)1) != (uint32_t)0)
                     do {
                     click_relax_fence();
-                    } while ( _locks[id_for_thread()] != (uint32_t)0);
+                    } while ( _q_infos[id_for_thread()].lock != (uint32_t)0);
         }
     }
 
     inline void unlock() {
-        if (_locks[id_for_thread()] != NO_LOCK)
-            _locks[id_for_thread()] = (uint32_t)0;
+        if (_q_infos[id_for_thread()].lock.nonatomic_value() != NO_LOCK) {
+            _q_infos[id_for_thread()].lock = (uint32_t)0;
+        }
     }
 
     enum {h_count};
@@ -176,11 +180,11 @@ protected:
     }
 
     inline Task* task_for_thread() {
-        return _tasks[id_for_thread()];
+        return _q_infos[id_for_thread()].task;
     }
 
     inline Task* task_for_thread(int tid) {
-        return _tasks[id_for_thread(tid)];
+        return _q_infos[id_for_thread(tid)].task;
     }
 
     inline bool thread_for_queue_available() {

@@ -11,7 +11,7 @@ class StringAccum;
 class ArgContext;
 extern const ArgContext blank_args;
 class IPAddressArg;
-template <typename T> class Vector;
+template <typename T, size_t ALIGNMENT> class Vector;
 
 class IPAddress { public:
 

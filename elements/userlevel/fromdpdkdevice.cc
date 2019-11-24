@@ -426,11 +426,11 @@ int FromDPDKDevice::write_handler(
                 fd->_active = active;
                 if (fd->_active) {
                     for (int i = 0; i < fd->usable_threads.weight(); i++) {
-                        fd->_tasks[i]->reschedule();
+                        fd->_q_infos[i].task->reschedule();
                     }
                 } else {
                     for (int i = 0; i < fd->usable_threads.weight(); i++) {
-                        fd->_tasks[i]->unschedule();
+                        fd->_q_infos[i].task->unschedule();
                     }
                 }
             }

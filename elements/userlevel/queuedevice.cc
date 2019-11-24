@@ -94,9 +94,9 @@ bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
 
 void QueueDevice::cleanup_tasks() {
     for (int i = 0; i < usable_threads.weight(); i++) {
-        if (_tasks[i]) {
-            delete _tasks[i];
-            _tasks[i] = 0;
+        if (_q_infos[i].task) {
+            delete _q_infos[i].task;
+            _q_infos[i].task = 0;
         }
     }
 }
@@ -132,7 +132,7 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     String scale;
     bool has_scale = false;
     _scale_parallel = false;
-        _numa_node_override = -1;
+    _numa_node_override = -1;
 
     if (Args(this, errh).bind(conf)
         .read("RSS_AGGREGATE", _set_rss_aggregate)
@@ -200,7 +200,7 @@ int RXQueueDevice::configure_rx(int numa_node, int minqueues, int maxqueues, Err
     return 0;
 }
 
-int TXQueueDevice::configure_tx(int minqueues, int maxqueues,ErrorHandler *) {
+int TXQueueDevice::configure_tx(int minqueues, int maxqueues, ErrorHandler *) {
     _minqueues = minqueues;
     _maxqueues = maxqueues;
     return 0;
@@ -429,15 +429,14 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 }
 
 int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
-    _tasks.resize(usable_threads.weight());
-    _locks.resize(usable_threads.weight());
+    _q_infos.resize(usable_threads.weight());
     _thread_to_firstqueue.resize(master()->nthreads());
     _queue_to_thread.resize(firstqueue + n_queues);
 
     int th_num = 0;
     int qu_num = firstqueue;
     if (_verbose > 2)
-        click_chatter("%s : using queues from %d to %d",name().c_str(),firstqueue,firstqueue+n_queues-1);
+        click_chatter("%s: using queues from %d to %d", name().c_str(), firstqueue, firstqueue + n_queues - 1);
 
     //If there is multiple threads per queue, share_idx will be in [0,thread_share[, thread_share being the amount of queues that needs to be shared between threads
     int th_share_idx = 0;
@@ -448,14 +447,15 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
         if (th_share_idx % thread_share != 0) {
             --th_num;
-            if (_locks[th_num] == NO_LOCK) {
-                _locks[th_num] = 0;
+            if (_q_infos[th_num].lock == NO_LOCK) {
+                _q_infos[th_num].lock = 0;
             }
         } else {
-            _tasks[th_num] = (new Task(this));
-            ScheduleInfo::initialize_task(this, _tasks[th_num], schedule, errh);
-            _tasks[th_num]->move_thread(th_id);
-            _locks[th_num] = NO_LOCK;
+            assert(!_q_infos[th_num].task);
+            _q_infos[th_num].task = (new Task(this));
+            ScheduleInfo::initialize_task(this, _q_infos[th_num].task, schedule, errh);
+            _q_infos[th_num].task->move_thread(th_id);
+            _q_infos[th_num].lock = NO_LOCK;
         }
         th_share_idx++;
 
@@ -463,9 +463,9 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
 
         for (int j = 0; j < queue_per_threads; j++) {
             if (_verbose > 2)
-                click_chatter("%s : Queue %d handled by th %d",name().c_str(),qu_num,th_id);
+                click_chatter("%s: Queue %d handled by th %d", name().c_str(), qu_num,th_id);
             _queue_to_thread[qu_num] = th_id;
-            //If queue are shared, this mapping is loosy : _queue_to_thread will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
+            // If queues are shared, this mapping is loosy: _queue_to_thread will map to the last thread. That's fine, we only want to retrieve one to find one thread to finish some job
             qu_share_idx++;
             if (qu_share_idx % queue_share == 0)
                 qu_num++;
@@ -473,7 +473,7 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
         }
 
         if (queue_share > 1) {
-            _locks[th_num] = 0;
+            _q_infos[th_num].lock = 0;
         }
 
 
@@ -482,7 +482,6 @@ int QueueDevice::initialize_tasks(bool schedule, ErrorHandler *errh) {
     }
 
     return 0;
-
 }
 
 unsigned long long QueueDevice::n_count() {
