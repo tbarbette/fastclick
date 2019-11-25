@@ -116,7 +116,7 @@ int ToNetmapDevice::initialize(ErrorHandler *errh)
 		int nt = 0;
 		for (int i = 0; i < click_max_cpu_ids(); i++) {
 			if (!usable_threads[i]) continue;
-			state.get_value_for_thread(i).signal = (Notifier::upstream_empty_signal(this, 0, _tasks[nt]));
+			state.get_value_for_thread(i).signal = (Notifier::upstream_empty_signal(this, 0, _thread_state.get_value_for_thread(i).task));
 			state.get_value_for_thread(i).timer = new Timer(task_for_thread(i));
 			state.get_value_for_thread(i).timer->initialize(this);
 			state.get_value_for_thread(i).backoff = 1;
