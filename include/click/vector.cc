@@ -24,15 +24,15 @@
 CLICK_DECLS
 /** @cond never */
 
-template <typename AM>
-vector_memory<AM>::~vector_memory()
+template <typename AM, size_t ALIGNMENTM>
+vector_memory<AM,ALIGNMENTM>::~vector_memory()
 {
     AM::destroy(l_, n_);
     CLICK_LFREE(l_, capacity_ * sizeof(type));
 }
 
-template <typename AM>
-void vector_memory<AM>::assign(const vector_memory<AM> &x)
+template <typename AM, size_t ALIGNMENTM>
+void vector_memory<AM,ALIGNMENTM>::assign(const vector_memory<AM,ALIGNMENTM> &x)
 {
     if (&x != this) {
 	AM::destroy(l_, n_);
@@ -46,8 +46,8 @@ void vector_memory<AM>::assign(const vector_memory<AM> &x)
     }
 }
 
-template <typename AM>
-void vector_memory<AM>::assign(size_type n, const type *vp)
+template <typename AM, size_t ALIGNMENTM>
+void vector_memory<AM,ALIGNMENTM>::assign(size_type n, const type *vp)
 {
     if (unlikely(need_argument_copy(vp))) {
 	type v_copy(*vp);
@@ -58,8 +58,8 @@ void vector_memory<AM>::assign(size_type n, const type *vp)
     resize(n, vp);
 }
 
-template <typename AM>
-typename vector_memory<AM>::iterator vector_memory<AM>::insert(iterator it, const type *vp)
+template <typename AM, size_t ALIGNMENTM>
+typename vector_memory<AM,ALIGNMENTM>::iterator vector_memory<AM,ALIGNMENTM>::insert(iterator it, const type *vp)
 {
     assert(it >= begin() && it <= end());
     if (unlikely(need_argument_copy(vp))) {
@@ -81,8 +81,8 @@ typename vector_memory<AM>::iterator vector_memory<AM>::insert(iterator it, cons
     return it;
 }
 
-template <typename AM>
-typename vector_memory<AM>::iterator vector_memory<AM>::erase(iterator a, iterator b)
+template <typename AM, size_t ALIGNMENTM>
+typename vector_memory<AM,ALIGNMENTM>::iterator vector_memory<AM,ALIGNMENTM>::erase(iterator a, iterator b)
 {
     if (a < b) {
 	assert(a >= begin() && b <= end());
@@ -95,8 +95,8 @@ typename vector_memory<AM>::iterator vector_memory<AM>::erase(iterator a, iterat
 	return b;
 }
 
-template <typename AM>
-bool vector_memory<AM>::reserve_and_push_back(size_type want, const type *push_vp)
+template <typename AM, size_t ALIGNMENTM>
+bool vector_memory<AM,ALIGNMENTM>::reserve_and_push_back(size_type want, const type *push_vp)
 {
     if (unlikely(push_vp && need_argument_copy(push_vp))) {
 	type push_v_copy(*push_vp);
@@ -107,12 +107,12 @@ bool vector_memory<AM>::reserve_and_push_back(size_type want, const type *push_v
 	want = (capacity_ > 0 ? capacity_ * 2 : 4);
 
     if (want > capacity_) {
-	type *new_l = (type *) CLICK_LALLOC(want * sizeof(type));
+	type *new_l = (type *) CLICK_ALIGNED_ALLOC_T(want * sizeof(type),ALIGNMENTM);
 	if (!new_l)
 	    return false;
 	AM::mark_noaccess(new_l + n_, want - n_);
 	AM::move(new_l, l_, n_);
-	CLICK_LFREE(l_, capacity_ * sizeof(type));
+	CLICK_ALIGNED_FREE(l_, capacity_ * sizeof(type));
 	l_ = new_l;
 	capacity_ = want;
     }
@@ -122,8 +122,8 @@ bool vector_memory<AM>::reserve_and_push_back(size_type want, const type *push_v
     return true;
 }
 
-template <typename AM>
-void vector_memory<AM>::resize(size_type n, const type *vp)
+template <typename AM, size_t ALIGNMENTM>
+void vector_memory<AM,ALIGNMENTM>::resize(size_type n, const type *vp)
 {
     if (unlikely(need_argument_copy(vp))) {
 	type v_copy(*vp);
@@ -144,8 +144,8 @@ void vector_memory<AM>::resize(size_type n, const type *vp)
     }
 }
 
-template <typename AM>
-void vector_memory<AM>::swap(vector_memory<AM> &x)
+template <typename AM, size_t ALIGNMENTM>
+void vector_memory<AM,ALIGNMENTM>::swap(vector_memory<AM,ALIGNMENTM> &x)
 {
     type *l = l_;
     l_ = x.l_;

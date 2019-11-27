@@ -425,12 +425,14 @@ int FromDPDKDevice::write_handler(
             if (fd->_active != active) {
                 fd->_active = active;
                 if (fd->_active) {
-                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
-                        fd->_tasks[i]->reschedule();
+                    for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                        if (fd->_thread_state.get_value(i).task)
+                            fd->_thread_state.get_value(i).task->reschedule();
                     }
                 } else {
-                    for (int i = 0; i < fd->usable_threads.weight(); i++) {
-                        fd->_tasks[i]->unschedule();
+                    for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                        if (fd->_thread_state.get_value(i).task)
+                            fd->_thread_state.get_value(i).task->unschedule();
                     }
                 }
             }

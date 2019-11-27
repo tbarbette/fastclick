@@ -1021,9 +1021,9 @@ DPDKRing::parse(Args* args) {
  * Must be able to fill the packet data pool,
  * and then have some packets for I/O.
  */
-int DPDKDevice::DEFAULT_NB_MBUF = 32*4096*2;
+int DPDKDevice::DEFAULT_NB_MBUF = 32*4096*2 - 1;
 #else
-int DPDKDevice::DEFAULT_NB_MBUF = 65536;
+int DPDKDevice::DEFAULT_NB_MBUF = 65536 - 1;
 #endif
 Vector<int> DPDKDevice::NB_MBUF;
 #ifdef RTE_MBUF_DEFAULT_BUF_SIZE

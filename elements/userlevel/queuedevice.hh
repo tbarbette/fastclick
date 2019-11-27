@@ -34,9 +34,22 @@ private :
 protected:
 
 	int _burst; //Max size of burst
-    Vector<Task*> _tasks;
-    Vector<atomic_uint32_t> _locks;
-#define NO_LOCK 2
+
+
+    #define NO_LOCK 2
+    /**
+     * Per-queue data structure. Have a lock per queue, when multiple thread
+     * can access the same queue, and a reference to a thread id serving this
+     * queue.
+     */
+    struct QueueInfo {
+        QueueInfo() : thread_id(-1) {
+            lock = NO_LOCK;
+        }
+        atomic_uint32_t lock;
+        unsigned thread_id;
+    } CLICK_CACHE_ALIGN;
+    Vector<QueueInfo,CLICK_CACHE_LINE_SIZE> _q_infos;
 
     Bitvector usable_threads;
     int queue_per_threads;
@@ -53,10 +66,8 @@ protected:
     // n_queues will be the final choice in [_minqueues, _maxqueues].
     int n_queues;
 
+    //Number of queues per threads, normally 1
     int thread_share;
-
-    Vector<int> _thread_to_firstqueue;
-    Vector<int> _queue_to_thread;
 
     static int n_initialized; //Number of total elements configured
     static int n_elements; //Number of total elements heriting from QueueDevice
@@ -67,21 +78,31 @@ protected:
 
     static Vector<int> shared_offset; //Thread offset for each node
 
+    /**
+     * Per-thread state. Holds statistics, pointer to the per-thread task and id of the first queue
+     * to be served by this thread
+     */
     class ThreadState {
         public:
-        ThreadState() : _count(0), _dropped(0) {};
+        ThreadState() : _count(0), _dropped(0), first_queue_id(-1) {};
         long long unsigned _count;
         long long unsigned _dropped;
+        Task*       task;
+        unsigned    first_queue_id;
     };
-    per_thread<ThreadState> thread_state;
+    per_thread<ThreadState> _thread_state;
 
     int _this_node; //Numa node index
 
-    bool _active;
+    bool _active; //Is this element active
 
+    /**
+     * Attempt to take the per-queue lock
+     * @return true if taken
+     */
     inline bool lock_attempt() {
-        if (_locks[id_for_thread()] != NO_LOCK) {
-            if (_locks[id_for_thread()].swap((uint32_t)1) == (uint32_t)0)
+        if (_q_infos[id_for_thread()].lock.nonatomic_value() != NO_LOCK) {
+            if (_q_infos[id_for_thread()].lock.swap((uint32_t)1) == (uint32_t)0)
                 return true;
             else
                 return false;
@@ -91,18 +112,25 @@ protected:
         }
     }
 
+    /**
+     * Takes the per-queue lock
+     */
     inline void lock() {
-        if (_locks[id_for_thread()] != NO_LOCK) {
-            while ( _locks[id_for_thread()].swap((uint32_t)1) != (uint32_t)0)
+        if (_q_infos[id_for_thread()].lock.nonatomic_value() != NO_LOCK) {
+            while (_q_infos[id_for_thread()].lock.swap((uint32_t)1) != (uint32_t)0)
                     do {
                     click_relax_fence();
-                    } while ( _locks[id_for_thread()] != (uint32_t)0);
+                    } while ( _q_infos[id_for_thread()].lock != (uint32_t)0);
         }
     }
 
+    /**
+     * Release the per-queue lock
+     */
     inline void unlock() {
-        if (_locks[id_for_thread()] != NO_LOCK)
-            _locks[id_for_thread()] = (uint32_t)0;
+        if (_q_infos[id_for_thread()].lock.nonatomic_value() != NO_LOCK) {
+            _q_infos[id_for_thread()].lock = (uint32_t)0;
+        }
     }
 
     enum {h_count};
@@ -117,15 +145,15 @@ protected:
                                     ErrorHandler *);
 
     inline void add_count(unsigned int n) {
-        thread_state->_count += n;
+        _thread_state->_count += n;
     }
 
     inline void set_dropped(long long unsigned n) {
-        thread_state->_dropped = n;
+        _thread_state->_dropped = n;
     }
 
     inline void add_dropped(unsigned int n) {
-        thread_state->_dropped += n;
+        _thread_state->_dropped += n;
     }
 
     bool get_spawning_threads(Bitvector& bmk, bool isoutput, int port);
@@ -145,11 +173,11 @@ protected:
     void cleanup_tasks();
 
     inline int queue_for_thread_begin(int tid) {
-        return _thread_to_firstqueue[tid];
+        return _thread_state.get_value_for_thread(tid).first_queue_id;
     }
 
     inline int queue_for_thread_end(int tid) {
-        int q =  _thread_to_firstqueue[tid] + queue_per_threads - 1;
+        int q =  _thread_state.get_value_for_thread(tid).first_queue_id + queue_per_threads - 1;
         if (unlikely(q > lastqueue))
             return lastqueue;
         return q;
@@ -166,9 +194,9 @@ protected:
 
     inline int id_for_thread(int tid) {
         if (likely(queue_per_threads == 1))
-            return _thread_to_firstqueue[tid] - firstqueue;
+            return queue_for_thread_begin(tid) - firstqueue;
         else
-            return (_thread_to_firstqueue[tid] - firstqueue) / queue_per_threads;
+            return (queue_for_thread_begin(tid) - firstqueue) / queue_per_threads;
     }
 
     inline int id_for_thread() {
@@ -176,19 +204,15 @@ protected:
     }
 
     inline Task* task_for_thread() {
-        return _tasks[id_for_thread()];
+        return _thread_state->task;
     }
 
     inline Task* task_for_thread(int tid) {
-        return _tasks[id_for_thread(tid)];
-    }
-
-    inline bool thread_for_queue_available() {
-        return !_queue_to_thread.empty();
+        return _thread_state.get_value_for_thread(tid).task;
     }
 
     inline int thread_for_queue(int queue) {
-        return _queue_to_thread[queue];
+        return _q_infos[queue].thread_id;
     }
 
     int thread_per_queues() {
