@@ -8,7 +8,7 @@
 #include <click/ipflowid.hh>
 #include <click/routervisitor.hh>
 #include <click/error.hh>
-#include "flowipmanagerduplication.hh"
+#include "flowipmanagerimp.hh"
 #include <rte_hash.h>
 #include <click/dpdk_glue.hh>
 #include <rte_ethdev.h>
