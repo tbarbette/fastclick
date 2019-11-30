@@ -285,7 +285,7 @@ struct xdp_umem *XDPDevice::umem_config(int sfd)
       MAP_SHARED | MAP_POPULATE,
       sfd,
       XDP_UMEM_PGOFF_FILL_RING
-      );
+  );
   if (umem->fq.map == MAP_FAILED) {
     fprintf(stderr, "%s\n", "failed to map fill ring");
     exit(EXIT_FAILURE);
@@ -831,5 +831,5 @@ void XDPDevice::do_tx()
 
 CLICK_ENDDECLS
 
-EXPORT_ELEMENT(XDPDevice)
+//EXPORT_ELEMENT(XDPDevice)
 

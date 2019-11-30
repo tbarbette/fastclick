@@ -23,6 +23,10 @@ extern "C" {
 #include <linux/if_link.h>
 }
 
+#include <vector>
+#include <string>
+#include <memory>
+
 #ifndef AF_XDP
 #define AF_XDP 44
 #endif
@@ -51,6 +55,34 @@ extern "C" {
 # endif
 #endif
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
+
+using std::string;
+using std::vector;
+
+class XDPSock;
+class XDPInterface;
+class XDPManager;
+
+using XDPSockSP = std::shared_ptr<XDPSock>;
+using XDPInterfaceSP = std::shared_ptr<XDPInterface>;
+
+static inline void die(const char *msg, int err)
+{
+  if (err < 0) {
+    err = -err;
+  }
+  fprintf(stderr, "%s: %s\n", msg, strerror(err));
+  exit(1);
+}
+
+static inline void die(const char *msg)
+{
+  fprintf(stderr, "%s\n", msg);
+  exit(1);
+}

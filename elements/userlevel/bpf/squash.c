@@ -20,15 +20,16 @@ int moaq_prog(struct xdp_md *ctx)
 {
   bpf_debug("pkt: @%d:%d\n", ctx->ingress_ifindex, ctx->rx_queue_index);
 
-  int index = ctx->rx_queue_index;
+  int index = 0;
 
   if (bpf_map_lookup_elem(&xsks_map, &index)) {
+    bpf_debug("squashing %d -> %d\n", ctx->rx_queue_index, index);
     return bpf_redirect_map(
         &xsks_map, 
         index, // key into the xdp socket map
         0  // no special flags
     );
   }
-
   return XDP_PASS;
+
 }

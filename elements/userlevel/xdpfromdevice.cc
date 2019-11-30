@@ -1,6 +1,7 @@
 #include "xdpfromdevice.hh"
 
 #include <click/args.hh>
+#include <click/xdpsock.hh>
 
 using std::shared_ptr;
 using std::string;
@@ -10,7 +11,7 @@ CLICK_DECLS
 
 int XDPFromDevice::initialize(ErrorHandler *errh) {
 
-  _sock = XDPManager::ensure(_dev, _xdp_flags, _bind_flags, 0);
+  _xfx = XDPManager::ensure(_dev, _prog, _xdp_flags, _bind_flags);
   _t = new Task(this);
   _t->initialize(this, true);
 
@@ -36,7 +37,7 @@ int XDPFromDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
   }
 
   _dev = string{dev.c_str()};
-  _prog = string{prog.c_str()};
+  _prog = "/usr/lib/click/" + string{prog.c_str()} + ".o";
   return handle_mode(string{mode.c_str()}, errh);
 
 }
@@ -77,13 +78,23 @@ void XDPFromDevice::rx_batch()
 #else
 void XDPFromDevice::rx()
 {
-  vector<Packet*> pkts = _sock->rx();
-  for(Packet *p : pkts) {
-    output(0).push(p);
-    if (_trace) {
-      click_chatter("rx");
+
+  XDPPacketMap xpm = _xfx->rx();
+
+  for(auto x : xpm) {
+
+    u32 queue_id = x.first;
+    vector<Packet*> pkts = x.second;
+
+    for(Packet *p : pkts) {
+      output(0).push(p);
+      if (_trace) {
+        printf("[%s] rx q=%d\n", name().c_str(), queue_id);
+      }
     }
+
   }
+
 }
 #endif
 

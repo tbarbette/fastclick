@@ -1,9 +1,11 @@
 #include <click/xdp.hh>
 #include <click/config.h>
 #include <click/packet.hh>
+#include <click/xdp.hh>
 
 #include <vector>
 #include <string>
+#include <memory>
 
 extern "C" {
 #include <linux/if_xdp.h>
@@ -42,48 +44,28 @@ struct xsk_socket_info {
 class XDPSock {
 
   public:
-    XDPSock(
-        std::string ifname,
-        u16 xdp_flags,
-        u16 bind_flags,
-        u32 queue_id
-    );
+    XDPSock(XDPInterfaceSP xfx, u32 queue_id);
 
     std::vector<Packet*>  rx();
     void                  tx(Packet *p);
     void                  kick();
+
+    inline u32 queue_id() const { return _queue_id; }
+    pollfd poll_fd() const;
 
   private:
     void configure_umem();
     void configure_socket();
     void kick_tx();
 
-    std::string _ifname;
-
-    u32 _prog_id,
-        _queue_id;
-
-    u16 _xdp_flags,
-        _bind_flags;
-
-    xsk_socket_info *_xsk;
-    xsk_umem_info *_umem;
-    void *_umem_buf;
-
+    std::shared_ptr<XDPInterface>   _xfx;
+    u32                             _queue_id,
+                                    _prog_id;
+    xsk_socket_info                 *_xsk;
+    xsk_umem_info                   *_umem;
+    void                            *_umem_buf;
 
 };
-
-static inline void die(const char *msg, int err)
-{
-  fprintf(stderr, "%s: %s\n", msg, strerror(err));
-  exit(1);
-}
-
-static inline void die(const char *msg)
-{
-  fprintf(stderr, "%s\n", msg);
-  exit(1);
-}
 
 static inline void free_pkt(unsigned char *pkt, size_t, void *pktmbuf)
 {

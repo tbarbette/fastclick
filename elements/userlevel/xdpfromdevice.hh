@@ -34,7 +34,7 @@ class XDPFromDevice : public BatchElement, XDPDev {
 
     bool _trace{false};
 
-    std::shared_ptr<XDPSock> _sock{nullptr};
+    std::shared_ptr<XDPInterface> _xfx{};
 
 };
 

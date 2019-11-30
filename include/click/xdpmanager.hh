@@ -1,19 +1,22 @@
 #pragma once
 
-#include <memory>
 #include <unordered_map>
-#include "xdpsock.hh"
+#include <click/xdpinterface.hh>
 
 class XDPManager {
 
   public:
-    static std::shared_ptr<XDPSock> get(std::string dev);
-    static std::shared_ptr<XDPSock> ensure(
-        std::string dev, u16 xdp_flags, u16 bind_flags, u32 queue_id);
+    static XDPInterfaceSP get(string dev);
+    static XDPInterfaceSP ensure(
+        string dev, string prog, u16 xdp_flags, u16 bind_flags
+    );
 
   private:
     static XDPManager& get();
+    static XDPInterfaceSP create_device_sockets(
+        string dev, string prog, u16 xdp_flags, u16 bind_flags
+    );
 
-    std::unordered_map<std::string, std::shared_ptr<XDPSock>> socks;
+    std::unordered_map<string, XDPInterfaceSP> ifxs;
 
 };

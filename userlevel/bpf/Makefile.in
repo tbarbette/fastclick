@@ -1,4 +1,4 @@
-all: xdpallrx.o xdpvxlan.o xdpvxlanvni.o
+all: xdpallrx.o xdpvxlan.o xdpvxlanvni.o bpf4.o bpf2.o eno7.o eno8.o ens5f0_to_eno7.o eno7_to_ens5f0.o eno3_to_eno4.o eno4_to_eno3.o squash.o
 
 prefix = @prefix@
 INSTALL = @INSTALL@
@@ -9,7 +9,7 @@ INSTALL = @INSTALL@
 %.o: %.llvmir
 	llc -march=bpf -filetype=obj -o $@ $<
 
-install: xdpallrx.o xdpvxlan.o
+install: xdpallrx.o xdpvxlan.o 
 	$(INSTALL) xdpallrx.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpallrx.o
 	$(INSTALL) xdpvxlan.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpvxlan.o
 	$(INSTALL) xdpvxlanvni.o -m 0644 -D $(DESTDIR)$(prefix)/lib/click/xdpvxlanvni.o
