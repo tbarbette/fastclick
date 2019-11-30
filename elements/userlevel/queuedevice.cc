@@ -484,16 +484,16 @@ unsigned long long QueueDevice::n_count() {
 
 unsigned long long QueueDevice::n_useful() {
     unsigned long long total = 0;
-    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-        total += thread_state.get_value(i)._useful;
+    for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
+        total += _thread_state.get_value(i)._useful;
     }
     return total;
 }
 
 unsigned long long QueueDevice::n_useless() {
     unsigned long long total = 0;
-    for (unsigned int i = 0; i < thread_state.weight(); i ++) {
-        total += thread_state.get_value(i)._useless;
+    for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
+        total += _thread_state.get_value(i)._useless;
     }
     return total;
 }
