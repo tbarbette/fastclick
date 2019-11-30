@@ -18,7 +18,7 @@ struct bpf_map_def SEC("maps") xsks_map = {
 SEC("xdp_sock")
 int moaq_prog(struct xdp_md *ctx)
 {
-  bpf_debug("pkt: @%d:%d\n", ctx->ingress_ifindex, ctx->rx_queue_index);
+  //bpf_debug("pkt: @%d:%d\n", ctx->ingress_ifindex, ctx->rx_queue_index);
 
   int index = ctx->rx_queue_index;
 

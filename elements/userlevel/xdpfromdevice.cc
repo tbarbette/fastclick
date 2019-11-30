@@ -11,7 +11,7 @@ CLICK_DECLS
 
 int XDPFromDevice::initialize(ErrorHandler *errh) {
 
-  _xfx = XDPManager::ensure(_dev, _prog, _xdp_flags, _bind_flags);
+  _xfx = XDPManager::ensure(_dev, _prog, _xdp_flags, _bind_flags, _trace);
   _t = new Task(this);
   _t->initialize(this, true);
 

@@ -8,14 +8,11 @@ class XDPManager {
   public:
     static XDPInterfaceSP get(string dev);
     static XDPInterfaceSP ensure(
-        string dev, string prog, u16 xdp_flags, u16 bind_flags
+        string dev, string prog, u16 xdp_flags, u16 bind_flags, bool trace
     );
 
   private:
     static XDPManager& get();
-    static XDPInterfaceSP create_device_sockets(
-        string dev, string prog, u16 xdp_flags, u16 bind_flags
-    );
 
     std::unordered_map<string, XDPInterfaceSP> ifxs;
 

@@ -29,12 +29,14 @@ XDPInterface::XDPInterface(
     string dev,
     string prog,
     u16 xdp_flags,
-    u16 bind_flags
+    u16 bind_flags,
+    bool trace
 ) 
 : _dev{dev},
   _prog{prog},
   _xdp_flags{xdp_flags},
-  _bind_flags{bind_flags}
+  _bind_flags{bind_flags},
+  _trace{trace}
 { }
 
 void XDPInterface::init()
@@ -118,11 +120,11 @@ void XDPInterface::create_device_sockets()
   }
 
   int numchan{0};
-  if (err || channels.max_combined == 0) {
+  if (err || channels.max_combined == 0 || channels.combined_count == 0) {
     numchan = 1;
   }
   else {
-    numchan = channels.max_combined;
+    numchan = channels.combined_count;
   }
 
   // create an XDP socket per interface channel
@@ -131,7 +133,7 @@ void XDPInterface::create_device_sockets()
 
   for (u32 i=0; i<numchan; i++) {
     _socks.push_back(
-        make_shared<XDPSock>(shared_from_this(), i)
+        make_shared<XDPSock>(shared_from_this(), i, _trace)
     );
   }
 
@@ -162,6 +164,7 @@ XDPPacketMap XDPInterface::rx()
     if(_poll_fds[i].revents & POLLIN)
     {
       xpm[i] = _socks[i]->rx();
+      _poll_fds[i].revents = 0;
     }
   }
 

@@ -12,7 +12,13 @@ using XDPPacketMap = std::map<u32, vector<Packet*>>;
 class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
 
   public:
-    XDPInterface(string dev, string prog, u16 xdp_flags, u16 bind_flags);
+    XDPInterface(
+        string dev,
+        string prog,
+        u16 xdp_flags,
+        u16 bind_flags,
+        bool trace=false
+    );
 
     void init();
     XDPPacketMap rx();
@@ -46,6 +52,7 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
     uint                     _ifindex;
     std::vector<XDPSockSP>   _socks;
     std::vector<pollfd>      _poll_fds;
+    bool                     _trace;
   
 };
 

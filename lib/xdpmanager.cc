@@ -24,15 +24,21 @@ XDPInterfaceSP XDPManager::get(string dev)
 }
 
 XDPInterfaceSP XDPManager::ensure(
-    string dev, string prog, u16 xdp_flags, u16 bind_flags
+    string dev, string prog, u16 xdp_flags, u16 bind_flags, bool trace
 )
 {
   auto &ifxs = get().ifxs;
   auto x = ifxs.find(dev);
   if (x == ifxs.end()) {
+
     printf("creating new xdp socket for %s\n", dev.c_str());
-    ifxs[dev] = make_shared<XDPInterface>(dev, prog, xdp_flags, bind_flags);
-    ifxs[dev]->init();
+    XDPInterfaceSP xfx = make_shared<XDPInterface>(
+        dev, prog, xdp_flags, bind_flags, trace
+    );
+    xfx->init();
+
+    ifxs[dev] = xfx;
+
   }
 
   return ifxs[dev];

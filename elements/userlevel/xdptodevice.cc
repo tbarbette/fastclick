@@ -12,7 +12,7 @@ CLICK_DECLS
 int XDPToDevice::initialize(ErrorHandler *errh) 
 {
 
-  _xfx = XDPManager::ensure(_dev, _prog, _xdp_flags, _bind_flags);
+  _xfx = XDPManager::ensure(_dev, _prog, _xdp_flags, _bind_flags, _trace);
   return INITIALIZE_SUCCESS;
 
 }

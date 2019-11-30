@@ -44,7 +44,7 @@ struct xsk_socket_info {
 class XDPSock {
 
   public:
-    XDPSock(XDPInterfaceSP xfx, u32 queue_id);
+    XDPSock(XDPInterfaceSP xfx, u32 queue_id, bool trace=false);
 
     std::vector<Packet*>  rx();
     void                  tx(Packet *p);
@@ -64,6 +64,7 @@ class XDPSock {
     xsk_socket_info                 *_xsk;
     xsk_umem_info                   *_umem;
     void                            *_umem_buf;
+    bool                            _trace;
 
 };
 
