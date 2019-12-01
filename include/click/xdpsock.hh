@@ -13,15 +13,6 @@ extern "C" {
 #include <bpf/xsk.h>
 }
 
-#define FRAME_SIZE    XSK_UMEM__DEFAULT_FRAME_SIZE
-#define NUM_RX_DESCS  XSK_RING_CONS__DEFAULT_NUM_DESCS
-#define NUM_TX_DESCS  XSK_RING_PROD__DEFAULT_NUM_DESCS
-#define NUM_DESCS     (NUM_RX_DESCS + NUM_TX_DESCS)
-#define NUM_FRAMES    NUM_DESCS
-#define BATCH_SIZE    64
-#define FRAME_HEADROOM XSK_UMEM__DEFAULT_FRAME_HEADROOM
-#define FRAME_TAILROOM FRAME_HEADROOM
-
 struct xsk_umem_info {
 	struct xsk_ring_prod fq;
 	struct xsk_ring_cons cq;
@@ -46,9 +37,9 @@ class XDPSock {
   public:
     XDPSock(XDPInterfaceSP xfx, u32 queue_id, bool trace=false);
 
-    std::vector<Packet*>  rx();
-    void                  tx(Packet *p);
-    void                  kick();
+    void rx(PBuf &pb);
+    void tx(Packet *p);
+    void kick();
 
     inline u32 queue_id() const { return _queue_id; }
     pollfd poll_fd() const;

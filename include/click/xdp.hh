@@ -27,6 +27,9 @@ extern "C" {
 #include <string>
 #include <memory>
 
+#include <click/config.h>
+#include <click/packet.hh>
+
 #ifndef AF_XDP
 #define AF_XDP 44
 #endif
@@ -58,6 +61,15 @@ extern "C" {
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+#define FRAME_SIZE    XSK_UMEM__DEFAULT_FRAME_SIZE
+#define NUM_RX_DESCS  XSK_RING_CONS__DEFAULT_NUM_DESCS
+#define NUM_TX_DESCS  XSK_RING_PROD__DEFAULT_NUM_DESCS
+#define NUM_DESCS     (NUM_RX_DESCS + NUM_TX_DESCS)
+#define NUM_FRAMES    NUM_DESCS
+#define BATCH_SIZE    64
+#define FRAME_HEADROOM XSK_UMEM__DEFAULT_FRAME_HEADROOM
+#define FRAME_TAILROOM FRAME_HEADROOM
+
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
@@ -71,6 +83,11 @@ class XDPManager;
 
 using XDPSockSP = std::shared_ptr<XDPSock>;
 using XDPInterfaceSP = std::shared_ptr<XDPInterface>;
+
+struct PBuf {
+  std::array<Packet*, BATCH_SIZE> pkts{};
+  size_t len{0};
+};
 
 static inline void die(const char *msg, int err)
 {

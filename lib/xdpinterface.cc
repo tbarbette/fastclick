@@ -13,6 +13,7 @@ extern "C" {
 }
 
 #include <stdexcept>
+#include <array>
 
 using std::map;
 using std::make_shared;
@@ -144,31 +145,40 @@ void XDPInterface::create_device_sockets()
     _poll_fds.push_back(x->poll_fd());
   }
 
+  _pbufs = vector<PBuf>(numchan);
+  
 }
 
-XDPPacketMap XDPInterface::rx()
+const vector<PBuf> & XDPInterface::rx()
 {
-  XDPPacketMap xpm;
 
   // poll the file descriptors of all the XDP sockets associated with this
   // interface
-  int ret = poll(_poll_fds.data(), _poll_fds.size(), 0);
-  if (ret <= 0) {
-    return xpm;
+  if(_poll) {
+    int ret = poll(_poll_fds.data(), _poll_fds.size(), 0);
+    if (ret <= 0) {
+      for (PBuf &x : _pbufs) x.len = 0;
+      return _pbufs;
+    }
   }
 
   // for any sockets that registered a POLLIN event, collect the packets from
   // that sockets ring buffers
   for(u32 i=0; i<_poll_fds.size(); i++)
   {
-    if(_poll_fds[i].revents & POLLIN)
-    {
-      xpm[i] = _socks[i]->rx();
-      _poll_fds[i].revents = 0;
+    if(_poll) {
+      if(_poll_fds[i].revents & POLLIN)
+      {
+        _socks[i]->rx(_pbufs[i]);
+        _poll_fds[i].revents = 0;
+      }
+    }
+    else {
+      _socks[i]->rx(_pbufs[i]);
     }
   }
 
-  return xpm;
+  return _pbufs;
 }
 
 void XDPInterface::tx(Packet *p, u32 queue_id)

@@ -79,17 +79,14 @@ void XDPFromDevice::rx_batch()
 void XDPFromDevice::rx()
 {
 
-  XDPPacketMap xpm = _xfx->rx();
+  const vector<PBuf> &pbufs = _xfx->rx();
 
-  for(auto x : xpm) {
+  for(size_t i=0; i<pbufs.size(); i++) {
 
-    u32 queue_id = x.first;
-    vector<Packet*> pkts = x.second;
-
-    for(Packet *p : pkts) {
-      output(0).push(p);
+    for(size_t j=0; j<pbufs[i].len; j++) {
+      output(0).push(pbufs[i].pkts[j]);
       if (_trace) {
-        printf("[%s] rx q=%d\n", name().c_str(), queue_id);
+        printf("[%s] rx q=%d\n", name().c_str(), i);
       }
     }
 

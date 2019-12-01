@@ -7,7 +7,7 @@
 #include <click/packet.hh>
 
 // maps a queue index to a vector of packets
-using XDPPacketMap = std::map<u32, vector<Packet*>>;
+//using XDPPacketMap = std::map<u32, PBuf>;
 
 class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
 
@@ -21,7 +21,7 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
     );
 
     void init();
-    XDPPacketMap rx();
+    const vector<PBuf> & rx();
     void tx(Packet *p, u32 queue_id);
     void kick(u32 queue_id);
 
@@ -41,7 +41,7 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
     void load_bpf_program();
     void load_bpf_maps();
 
-    std::string              _dev,
+    string                   _dev,
                              _prog;
     u16                      _xdp_flags,
                              _bind_flags;
@@ -50,9 +50,11 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
     int                      _bpf_fd,
                              _xsks_map_fd;
     uint                     _ifindex;
-    std::vector<XDPSockSP>   _socks;
-    std::vector<pollfd>      _poll_fds;
-    bool                     _trace;
+    vector<XDPSockSP>        _socks;
+    vector<pollfd>           _poll_fds;
+    bool                     _trace,
+                             _poll{true};
+    vector<PBuf>             _pbufs;
   
 };
 
