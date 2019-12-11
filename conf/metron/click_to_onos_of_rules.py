@@ -9,13 +9,15 @@ import argparse
 from os.path import abspath, join
 from common import *
 
-DEF_RULE_TABLE_ID = 0
 DEF_RULE_PRIO = 1000
 DEF_RULE_PERM = True
 DEF_RULE_TIMEOUT = 0
 DEF_ETH_PROTO = "0x800"
 
-def add_of_rule_properties(sw_dpid, tableId=DEF_RULE_TABLE_ID, priority=DEF_RULE_PRIO,
+DEF_SW_DPID="of:000000223d4b0182"
+DEF_SW_TABLE_ID=0
+
+def add_of_rule_properties(sw_dpid, tableId=DEF_SW_TABLE_ID, priority=DEF_RULE_PRIO,
 							permanent=DEF_RULE_PERM, timeout=DEF_RULE_TIMEOUT):
 	rule_str  = "\t\t\t\"deviceId\": \"{}\",\n".format(sw_dpid)
 	rule_str += "\t\t\t\"tableId\": {},\n".format(tableId)
@@ -134,6 +136,7 @@ def add_actions(sw_outport, eth_src="ec:f4:bb:d5:ff:08", eth_dst="ec:f4:bb:d5:ff
 	rule_str += "\t\t\t\t\t\t\"type\": \"OUTPUT\",\n"
 	rule_str += "\t\t\t\t\t\t\"port\": {}\n".format(sw_outport)
 	rule_str += "\t\t\t\t\t}\n"
+	# Uncomment these lines if you wish to rewrite specific MAC addresses
 	# rule_str += "\t\t\t\t\t{\n"
 	# rule_str += "\t\t\t\t\t\t\"type\": \"L2MODIFICATION\",\n"
 	# rule_str += "\t\t\t\t\t\t\"subtype\": \"ETH_SRC\",\n"
@@ -148,7 +151,7 @@ def add_actions(sw_outport, eth_src="ec:f4:bb:d5:ff:08", eth_dst="ec:f4:bb:d5:ff
 	rule_str += "\t\t\t}\n"
 	return rule_str
 
-def dump_onos_of_rules(rule_list, outfile, sw_dpid, sw_inport, sw_outport, verbose=False):
+def dump_onos_of_rules(rule_list, outfile, sw_dpid, sw_inport, sw_outport, sw_tableid, verbose=False):
 	"""
 	Writes the rules of the input list into a file following ONOS's OpenFlow rule format.
 
@@ -176,7 +179,7 @@ def dump_onos_of_rules(rule_list, outfile, sw_dpid, sw_inport, sw_outport, verbo
 				print("Rule: {}".format(rule))
 
 			rule_str += "\t\t{\n"
-			rule_str += add_of_rule_properties(sw_dpid)
+			rule_str += add_of_rule_properties(sw_dpid=sw_dpid, tableId=sw_tableid)
 
 			# Append matches
 			rule_str += "\t\t\t\"selector\": {\n"
@@ -202,22 +205,21 @@ def dump_onos_of_rules(rule_list, outfile, sw_dpid, sw_inport, sw_outport, verbo
 
 	print("Dumped {} rules to file: {}".format(rule_nb, outfile))
 
-def rule_list_to_file(rule_list, in_file, output_folder, sw_dpid, sw_inport, sw_outport):
+def rule_list_to_file(rule_list, in_file, output_folder, sw_dpid, sw_inport, sw_outport, sw_tableid):
 	outfile_pref = get_substring_until_delimiter(in_file, ".") + "_inport_{}_outport_{}.json".format(sw_inport, sw_outport)
 	out_file = os.path.join("{}".format(os.path.abspath(output_folder)), outfile_pref)
 
-	# dump_flow_director(rule_list, target_nic, q, out_file)
-	dump_onos_of_rules(rule_list, out_file, sw_dpid, sw_inport, sw_outport)
+	dump_onos_of_rules(rule_list, out_file, sw_dpid, sw_inport, sw_outport, sw_tableid)
 
-def rule_gen_file(input_file_list, output_folder, sw_dpid, sw_inport, sw_outport):
+def rule_gen_file(input_file_list, output_folder, sw_dpid, sw_inport, sw_outport, sw_tableid):
 	for in_file in input_file_list:
 		# Build the rules
 		rule_list = parse_ipfilter(in_file)
 
 		# Dump them to a file
-		rule_list_to_file(rule_list, in_file, output_folder, sw_dpid, sw_inport, sw_outport)
+		rule_list_to_file(rule_list, in_file, output_folder, sw_dpid, sw_inport, sw_outport, sw_tableid)
 
-def rule_gen_random(output_folder, target_rules_nb, protocol, sw_dpid, sw_inport, sw_outport):
+def rule_gen_random(output_folder, target_rules_nb, protocol, sw_dpid, sw_inport, sw_outport, sw_tableid):
 	rule_list = []
 
 	for i in xrange(target_rules_nb):
@@ -226,7 +228,7 @@ def rule_gen_random(output_folder, target_rules_nb, protocol, sw_dpid, sw_inport
 
 	# Dump them to a file
 	in_file = "random_onos_of_rules_{}.json".format(target_rules_nb)
-	rule_list_to_file(rule_list, in_file, output_folder, sw_dpid, sw_inport, sw_outport)
+	rule_list_to_file(rule_list, in_file, output_folder, sw_dpid, sw_inport, sw_outport, sw_tableid)
 
 ###
 ### To translate rules from file:
@@ -241,9 +243,10 @@ if __name__ == "__main__":
 	parser.add_argument("--strategy", type=str, default=STRATEGY_FILE, help="Strategy for rule generation. Can be [file, random]")
 	parser.add_argument("--input-files", nargs='*', help="Set of space separated input files with IP-level Click rules")
 	parser.add_argument("--output-folder", type=str, default=".", help="Output folder where rules will be stored")
-	parser.add_argument("--sw-dpid", type=str, default="of:000000223d4b0182", help="The switch's Data Path ID (DPID)")
+	parser.add_argument("--sw-dpid", type=str, default=DEF_SW_DPID, help="The switch's Data Path ID (DPID)")
 	parser.add_argument("--sw-inport", type=int, default=1, help="The switch's input port")
-	parser.add_argument("--sw-outport", type=int, default=1, help="The switch's output port")
+	parser.add_argument("--sw-outport", type=int, default=2, help="The switch's output port")
+	parser.add_argument("--sw-tableid", type=int, default=DEF_SW_TABLE_ID, help="The switch's table ID")
 	parser.add_argument("--target-rules-nb", type=int, default=CANNOT_SPECIFY_RULES_NB, help="For strategy random, you must specify how many random rules you need")
 	parser.add_argument("--protocol", type=str, default=PROTO_RANDOM, help="Set IP protocol for random rule generation. Can be [TCP, UDP, RANDOM]")
 
@@ -277,12 +280,16 @@ if __name__ == "__main__":
 	if sw_outport < 0:
 		raise RuntimeError("Switch's output port must be non-negative.")
 
+	sw_tableid = args.sw_tableid
+	if sw_tableid < 0:
+		raise RuntimeError("Switch's table ID must be non-negative.")
+
 	protocol = args.protocol.lower()
 	allowed_protos = [PROTO_TCP, PROTO_UDP, PROTO_RANDOM]
 	if (protocol not in allowed_protos):
 		raise RuntimeError("Specify a protocol type from this list: {}".format(allowed_protos))
 
 	if strategy == STRATEGY_FILE:
-		rule_gen_file(input_file_list, output_folder, sw_dpid, sw_inport, sw_outport)
+		rule_gen_file(input_file_list, output_folder, sw_dpid, sw_inport, sw_outport, sw_tableid)
 	else:
-		rule_gen_random(output_folder, target_rules_nb, protocol, sw_dpid, sw_inport, sw_outport)
+		rule_gen_random(output_folder, target_rules_nb, protocol, sw_dpid, sw_inport, sw_outport, sw_tableid)
