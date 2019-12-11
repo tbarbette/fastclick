@@ -160,7 +160,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     if ((mode == FlowDirector::FLOW_DIR_MODE) && (flow_rules_filename.empty())) {
         errh->warning(
-            "Flow Director (port %s): FLOW_DIR_RULES_FILE is not set, "
+            "Flow Director (port %s): FLOW_RULES_FILE is not set, "
             "hence this NIC can only be configured by the handlers",
             dev.c_str()
         );

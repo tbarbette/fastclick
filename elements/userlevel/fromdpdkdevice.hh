@@ -94,13 +94,13 @@ String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
 vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 17.05, flow_dir is also
 supported.
 
-=item FLOW_DIR_RULES_FILE
+=item FLOW_RULES_FILE
 
 String. For DPDK version >= 17.05, if MODE is set to flow_dir, a path to
 a file with Flow Director rules can be supplied to the device.
 These rules are installed in the NIC using DPDK's flow API.
 
-=item FLOW_DIR_ISOLATE
+=item FLOW_ISOLATE
 
 Boolean. Requires MODE flow_dir. Isolated mode guarantees that all ingress
 traffic comes from defined flow rules only (current and future).

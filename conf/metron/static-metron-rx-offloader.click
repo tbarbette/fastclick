@@ -26,7 +26,7 @@ fd0 :: FromDPDKDevice(
 	PORT $iface, MODE $mode,
 	N_QUEUES $queues, NUMA $numa,
 	THREADOFFSET 0, MAXTHREADS $threads,
-	FLOW_DIR_RULES_FILE $rules,
+	FLOW_RULES_FILE $rules,
 	VERBOSE $verbose, PAUSE full
 );
 
