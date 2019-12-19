@@ -4,6 +4,7 @@ TCPRewriter and FTPPortMapper sequence number translation, even for SACK.
 
 %require
 click-buildtool provides dpdk
+click-buildtool provides flow
 
 %script
 $VALGRIND click --dpdk --no-huge --no-pci -- CONFIG
