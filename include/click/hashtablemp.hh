@@ -1,5 +1,5 @@
-#ifndef CLICK_HashContainerMP_HH
-#define CLICK_HashContainerMP_HH
+#ifndef CLICK_HASHTABLEMP_HH
+#define CLICK_HASHTABLEMP_HH
 #include <click/glue.hh>
 #include <click/hashcode.hh>
 #include <click/hashcontainer.hh>
@@ -330,11 +330,15 @@ class HashContainerMP { public:
     /* @brief find a key, and if it does not exists, inserts the given value. Return a write pointer to the entry. */
     inline write_ptr find_insert_write(const K &key, const V &value);
 
-    /* Looks for a key, if it does not exists on_create is called to "create" the value to be inserted */
+    /* Looks for a key, if it does not exists on_create is called to "create" the value to be inserted.
+     * This is very similar to find_insert, but is useful for cases where the object should only be constructed if it does not already exists,
+     * this is more performant that using find/contains, then insert a newly created value, rehashing again etc. Also it is "atomic". */
     inline ptr find_create(const K &key,std::function<V(void)> on_create);
 
     //Replacing insertions
-    /** @brief Insert a key. Replace an item if it already exists, insert it if not. Gives the ability to do something (eg free resources) with the previous element. Does not look at use count for you and done under read lock ! */
+    /** @brief Insert a key. Replace an item if it already exists, insert it if not. Gives the ability to do something (eg free resources) with the previous element. Does not look at use count for you and done under read lock !
+     * The difference with find_insert, is that find_insert will not change the value if the value already existsn while here on_replace() will be called, and then the value will be replaced.
+     * on_replace() is NOT called if the value does not exists. */
     inline void insert(const K &key, const V &value, std::function<void(V&value)> on_replace = [](V&){});
 
     /* @brie Insert a key in the table, calling clean on collisions. If a key exists, it is replaced. */

@@ -130,8 +130,8 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
 #endif
     //click_chatter("NEW osip %s osport %d, new port %d",osip.unparse().c_str(),htons(oport),ntohs(fcb->ref->port));
     NATEntryOUT out(IPPort(osip,oport),fcb->ref);
-    _map.replace(fcb->ref->port, out,[this](NATEntryOUT& replaced){
-	release_ref(replaced.ref, _own_state);
+    _map.insert(fcb->ref->port, out,[this](NATEntryOUT& replaced){
+        release_ref(replaced.ref, _own_state);
     });
     return true;
 }
@@ -201,7 +201,7 @@ FlowIPNATReverse::configure(Vector<String> &conf, ErrorHandler *errh)
 bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
     auto th = p->tcp_header();
 
-    bool found = _in->_map.find_remove(th->th_dport,*fcb);
+    bool found = _in->_map.find_erase(th->th_dport,*fcb);
 
     if (unlikely(!found)) {
         //click_chatter("NOT FOUND %d, %d, osip %s osport %d, RST %d, FIN %d, SYN %d",found,ntohs(th->th_dport),fcb->map.ip.unparse().c_str(),ntohs(fcb->map.port), th->th_flags & TH_RST, th->th_flags & TH_FIN, th->th_flags & TH_SYN);
