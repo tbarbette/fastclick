@@ -28,13 +28,15 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
             .read_or_set_p("CAPACITY", _table_size, 65536)
             .read_or_set("RESERVE",_reserve, 0)
-            .read_or_set("TIMEOUT", _timeout, 60)
+            .read_or_set("TIMEOUT", _timeout, -1)
             .complete() < 0)
         return -1;
 
-    if (!is_pow2(_table_size)) {
-        _table_size = next_pow2(_table_size);
+    if (_timeout >= 0) {
+        return errh->error("Timeout unsupported!");
     }
+
+    errh->warning("This element does not support timeout");
     return 0;
 }
 
@@ -61,14 +63,15 @@ int FlowIPManagerIMP::initialize(ErrorHandler *errh) {
         _timer_wheel.initialize(_timeout);
     }
 
+    /*
     _timer.initialize(this);
-    _timer.schedule_after(Timestamp::make_sec(1));
+    _timer.schedule_after(Timestamp::make_sec(1));*/
     _task.initialize(this, false);
 
     click_chatter("We will have %d threads", click_max_cpu_ids());
     //add: get the number of threads, do per core duplication of the flow table
     vhash = new rte_hash*[click_max_cpu_ids()];
-    for (int i = 0; i < click_max_cpu_ids(); i++){
+    for (int i = 0; i < click_max_cpu_ids(); i++) {
         sprintf(buf, "tab%d", i); //<- here we are changing the name of the flow table
         vhash[i] = rte_hash_create(&hash_params);
         if (!vhash[i])
@@ -85,7 +88,9 @@ const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next) {
 };
 
 bool FlowIPManagerIMP::run_task(Task* t) {
-    Timestamp recent = Timestamp::recent_steady();
+    /*
+     Not working : the timerwheel must be per-thread too
+     Timestamp recent = Timestamp::recent_steady();
     _timer_wheel.run_timers([this,recent](FlowControlBlock* prev) -> FlowControlBlock*{
         FlowControlBlock* next = *((FlowControlBlock**)&prev->data_32[2]);
         int old = (recent - prev->lastseen).sec();
@@ -100,12 +105,12 @@ bool FlowIPManagerIMP::run_task(Task* t) {
         }
         return next;
     });
-    return true;
+    return true;*/
 }
 
 void FlowIPManagerIMP::run_timer(Timer* t) {
-    _task.reschedule();
-    t->reschedule_after(Timestamp::make_sec(1));
+    //_task.reschedule();
+   // t->reschedule_after(Timestamp::make_sec(1));
 }
 
 void FlowIPManagerIMP::cleanup(CleanupStage stage) {

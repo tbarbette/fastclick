@@ -74,7 +74,7 @@ class NATEntryIN : public NATState { public:
  * on this side.
  */
 class NATEntryOUT: public NATState { public:
-    NATEntryOUT(IPPort _map, NATCommon* _ref) : NATState(_ref), map(_map) {
+    NATEntryOUT(IPPort _map, NATCommon* _ref) : map(_map), NATState(_ref) {
     }
     IPPort map;
 };

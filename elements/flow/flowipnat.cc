@@ -12,7 +12,7 @@
 
 CLICK_DECLS
 
-FlowIPNAT::FlowIPNAT() : _sip(), _map(65536), _accept_nonsyn(true) {
+FlowIPNAT::FlowIPNAT() : _sip(), _map(65536), _accept_nonsyn(true), _own_state(false) {
 
 };
 
@@ -27,7 +27,6 @@ FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
                .read_mp("SIP",_sip)
                .read("ACCEPT_NONSYN", _accept_nonsyn)
                .read("STATE", _own_state)
-			   .read_mp("FCB_OFFSET",_flow_data_offset)
                .complete() < 0)
         return -1;
 
@@ -131,7 +130,7 @@ bool FlowIPNAT::new_flow(NATEntryIN* fcb, Packet* p) {
 #endif
     //click_chatter("NEW osip %s osport %d, new port %d",osip.unparse().c_str(),htons(oport),ntohs(fcb->ref->port));
     NATEntryOUT out(IPPort(osip,oport),fcb->ref);
-    _map.insert(fcb->ref->port, out,[this](NATEntryOUT& replaced){
+    _map.replace(fcb->ref->port, out,[this](NATEntryOUT& replaced){
 	release_ref(replaced.ref, _own_state);
     });
     return true;
@@ -163,7 +162,7 @@ void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch) {
 
         WritablePacket* q=p->uniqueify();
         //click_chatter("Rewrite to %s %d",_sip.unparse().c_str(),htons(flowdata->ref->port));
-        rewrite_ipport(q, _sip, flowdata->ref->port, 0, true);
+        q->rewrite_ipport(_sip, flowdata->ref->port, 0, true);
 
         if (!_own_state || update_state<NATState>(flowdata,q)) {
             return true;
@@ -193,7 +192,6 @@ FlowIPNATReverse::configure(Vector<String> &conf, ErrorHandler *errh)
     Element* e;
     if (Args(conf, this, errh)
                 .read_mp("NAT",e)
-				.read("FCB_OFFSET",_flow_data_offset)
                 .complete() < 0)
         return -1;
     _in = reinterpret_cast<FlowIPNAT*>(e);
@@ -203,7 +201,7 @@ FlowIPNATReverse::configure(Vector<String> &conf, ErrorHandler *errh)
 bool FlowIPNATReverse::new_flow(NATEntryOUT* fcb, Packet* p) {
     auto th = p->tcp_header();
 
-    bool found = _in->_map.find_erase(th->th_dport,*fcb);
+    bool found = _in->_map.find_remove(th->th_dport,*fcb);
 
     if (unlikely(!found)) {
         //click_chatter("NOT FOUND %d, %d, osip %s osport %d, RST %d, FIN %d, SYN %d",found,ntohs(th->th_dport),fcb->map.ip.unparse().c_str(),ntohs(fcb->map.port), th->th_flags & TH_RST, th->th_flags & TH_FIN, th->th_flags & TH_SYN);
@@ -247,7 +245,7 @@ void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* 
 		return false;
         }
         WritablePacket* q=p->uniqueify();
-        rewrite_ipport(q, flowdata->map.ip, flowdata->map.port, 1, true);
+        q->rewrite_ipport(flowdata->map.ip, flowdata->map.port, 1, true);
         q->set_dst_ip_anno(flowdata->map.ip);
 
         if (!_in->_own_state || update_state<NATState>(flowdata, q)) {
