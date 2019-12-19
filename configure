@@ -6894,7 +6894,70 @@ else
     have_re2=no
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for hs_compile_multi in -lhs" >&5
+$as_echo_n "checking for hs_compile_multi in -lhs... " >&6; }
+if ${ac_cv_lib_hs_hs_compile_multi+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lhs  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
 
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char hs_compile_multi ();
+int
+main ()
+{
+return hs_compile_multi ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_hs_hs_compile_multi=yes
+else
+  ac_cv_lib_hs_hs_compile_multi=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_hs_hs_compile_multi" >&5
+$as_echo "$ac_cv_lib_hs_hs_compile_multi" >&6; }
+if test "x$ac_cv_lib_hs_hs_compile_multi" = xyes; then :
+  ac_have_hyperscan=yes
+else
+  ac_have_hyperscan=no
+fi
+
+for ac_header in hs/hs.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "hs/hs.h" "ac_cv_header_hs_hs_h" "$ac_includes_default"
+if test "x$ac_cv_header_hs_hs_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_HS_HS_H 1
+_ACEOF
+ ac_have_hyperscan_h=yes
+else
+  ac_have_hyperscan_h=no
+fi
+
+done
+
+if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
+    have_hyperscan=yes
+    LIBS="$LIBS -lhs"
+    $as_echo "#define HAVE_HYPERSCAN 1" >>confdefs.h
+
+else
+    have_hyperscan=no
+fi
 
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
@@ -14275,6 +14338,10 @@ fi
 
 if test "x$enable_gtp" = xyes; then
     provisions="$provisions gtp"
+fi
+
+if test "x$have_hyperscan" = xyes; then
+    provisions="$provisions hs"
 fi
 
 if test "x$have_int64_types" = xyes; then
