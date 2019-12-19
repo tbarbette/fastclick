@@ -37,6 +37,12 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 
     errh->warning("This element does not support timeout");
+
+    find_children(_verbose);
+
+    router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+    _fcb_builded_init_future.post(this);
+
     return 0;
 }
 

@@ -5,9 +5,9 @@
 #include <click/timer.hh>
 #include <click/vector.hh>
 #include <click/multithread.hh>
-#include <click/batchelement.hh>
 #include <click/pair.hh>
 #include <click/flow/common.hh>
+#include <click/flow/flowelement.hh>
 #include <click/batchbuilder.hh>
 CLICK_DECLS
 class DPDKDevice;
@@ -82,7 +82,7 @@ public:
  * =a FlowIPManger
  *
  */
-class FlowIPManagerSpinlock: public BatchElement {
+class FlowIPManagerSpinlock: public VirtualFlowManager, public Router::InitFuture {
 public:
 
 

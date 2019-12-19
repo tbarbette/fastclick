@@ -29,7 +29,7 @@ FlowIPManagerSpinlock::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
             .read_or_set_p("CAPACITY", _table_size, 65536)
-            .read_or_set("RESERVE",_reserve, 0)
+            .read_or_set("RESERVE", _reserve, 0)
             .read_or_set("TIMEOUT", _timeout, 60)
             .complete() < 0)
         return -1;
@@ -38,6 +38,12 @@ FlowIPManagerSpinlock::configure(Vector<String> &conf, ErrorHandler *errh)
         _table_size = next_pow2(_table_size);
         click_chatter("Real capacity will be %d",_table_size);
     }
+
+    find_children(_verbose);
+
+    router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+    _fcb_builded_init_future.post(this);
+
     return 0;
 }
 

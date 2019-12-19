@@ -872,7 +872,7 @@ Router::set_flow_code_override(int eindex, const String &flow_code)
     _flow_code_override.push_back(flow_code);
 }
 
-/** @brief Traverse the router configuration from one of @a e's ports.
+/** @brief Traverse the router configuration from one of @a e's ports, maximum once per port.
  * @param e element to start search
  * @param forward true to search down from outputs, false to search up from
  *   inputs
@@ -895,7 +895,7 @@ Router::set_flow_code_override(int eindex, const String &flow_code)
  */
 int
 Router::visit(Element *first_element, bool forward, int first_port,
-              RouterVisitor *visitor) const
+              RouterVisitor *visitor, bool all_paths) const
 {
     if (!_have_connections || first_element->router() != this)
         return -1;
@@ -903,6 +903,115 @@ Router::visit(Element *first_element, bool forward, int first_port,
     sort_connections();
 
     Bitvector result_bv(ngports(!forward), false), scratch;
+
+    typedef Pair<Port,int> PortDistance;
+    Vector<PortDistance> sources;
+    if (first_port < 0) {
+        for (int port = 0; port < first_element->nports(forward); ++port) {
+            int distance = visitor->distance(_elements[first_element->eindex()], 0);
+            sources.push_back(PortDistance{Port(first_element->eindex(), port), distance});
+        }
+    } else if (first_port < first_element->nports(forward)) {
+        int distance = visitor->distance(_elements[first_element->eindex()], 0);
+        sources.push_back(PortDistance{Port(first_element->eindex(), first_port), distance});
+    }
+
+    Vector<PortDistance> next_sources;
+
+    while (sources.size()) {
+        next_sources.clear();
+
+        for (PortDistance *spd = sources.begin(); spd != sources.end(); ++spd) {
+            Port* sp = &spd->first;
+            for (int cix = connindex_lower_bound(forward, *sp);
+                 cix < _conn.size(); ++cix) {
+                int ci = (forward ? _conn_output_sorter[cix] : cix);
+                if (_conn[ci][forward] != *sp)
+                    break;
+                Port connpt = _conn[ci][!forward];
+                int conng = gport(!forward, connpt);
+                if (!all_paths && result_bv[conng])
+                    continue;
+                result_bv[conng] = true;
+                int distance = spd->second + visitor->distance(_elements[connpt.idx], _elements[sp->idx]);
+                if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
+                                    _elements[sp->idx], sp->port, distance))
+                    continue;
+                _elements[connpt.idx]->port_flow(!forward, connpt.port, &scratch);
+                for (int port = 0; port < scratch.size(); ++port)
+                    if (scratch[port])
+                        next_sources.push_back(PortDistance{Port(connpt.idx, port),distance});
+            }
+        }
+
+        sources.swap(next_sources);
+    }
+
+    return 0;
+}
+
+class ReachVisitor : public RouterVisitor { public:
+    Element* _target;
+    bool _reached;
+
+    ReachVisitor(Element* t) : _target(t), _reached(false) {
+
+    }
+
+    bool visit(Element *e, bool, int,
+               Element *, int, int) {
+        if (e == _target) {
+            _reached = true;
+            return false;
+        }
+        return true;
+    }
+
+    bool reached() {
+        return _reached;
+    }
+};
+
+bool
+Router::element_can_reach(Element* a, Element* b) {
+    ReachVisitor r(b);
+    visit(a, true, -1, &r);
+    if (!r.reached())
+        visit(a, false, -1, &r);
+    return r.reached();
+}
+
+/** @brief Traverse the router configuration from one of @a e's ports, passing per each ports
+ * @param e element to start search
+ * @param forward true to search down from outputs, false to search up from
+ *   inputs
+ * @param port port (or -1 to search all ports)
+ * @param visitor RouterVisitor traversal object
+ * @return 0 on success, -1 in early router configuration stages
+ *
+ * Calls @a visitor ->@link RouterVisitor::visit visit() @endlink on each
+ * reachable port starting from a port on @a e.  Follows connections and
+ * traverses inside elements from port to port by Element::flow_code().  The
+ * visitor can stop a traversal path by returning false from visit().
+ *
+ * @a visitor ->@link RouterVisitor::visit visit() is called on input
+ * ports if @a forward is true and output ports if @a forward is false.
+ *
+ * Equivalent to either visit_downstream() or visit_upstream(), depending on
+ * @a forward.
+ *
+ * @sa visit_downstream(), visit_upstream()
+ */
+int
+Router::visit_ports(Element *first_element, bool forward, int first_port,
+              RouterVisitor *visitor) const
+{
+    if (!_have_connections || first_element->router() != this)
+        return -1;
+
+    sort_connections();
+
+    Bitvector result_e(nelements(),false),scratch;
 
     Vector<Port> sources;
     if (first_port < 0) {
@@ -925,12 +1034,13 @@ Router::visit(Element *first_element, bool forward, int first_port,
                     break;
                 Port connpt = _conn[ci][!forward];
                 int conng = gport(!forward, connpt);
-                if (result_bv[conng])
-                    continue;
-                result_bv[conng] = true;
+
                 if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
                                     _elements[sp->idx], sp->port, distance))
                     continue;
+                if (result_e[connpt.idx])
+                    continue;
+                result_e[connpt.idx] = true;
                 _elements[connpt.idx]->port_flow(!forward, connpt.port, &scratch);
                 for (int port = 0; port < scratch.size(); ++port)
                     if (scratch[port])
@@ -967,6 +1077,7 @@ class ElementFilterRouterVisitor : public RouterVisitor { public:
 
 };
 }
+
 
 /** @brief Search for elements downstream from @a e.
  * @param e element to start search
@@ -1092,6 +1203,54 @@ Router::initialize_handlers(bool defaults, bool specifics)
 }
 
 int
+Router::InitFuture::solve_initialize(ErrorHandler* errh) {
+    bool all_ok = true;
+    for (int i = 0; i < _children.size(); i++) {
+        if (_children[i]->solve_initialize(errh) < 0) {
+            all_ok = false;
+        }
+    }
+    if (!all_ok)
+        return -1;
+    return 0;
+}
+
+void
+Router::InitFuture::postOnce(InitFuture* future) {
+    for (int i = 0; i < _children.size(); i++) {
+            if (_children[i] == future)
+                break;
+    }
+    post(future);
+}
+
+class FctFuture : public Router::InitFuture { public:
+
+    FctFuture(std::function<int(void)> f) : _f(f) {
+    }
+
+    int solve_initialize(ErrorHandler* errh) {
+        int r = _f();
+        delete this;
+        return r;
+    };
+
+    std::function<int(void)> _f;
+};
+
+void
+Router::InitFuture::post(std::function<int(void)> f) {
+    InitFuture* future = new FctFuture(f);
+    post(future);
+}
+
+void
+Router::InitFuture::post(InitFuture* future) {
+    _children.push_back(future);
+}
+
+
+int
 Router::initialize(ErrorHandler *errh)
 {
     if (_state != ROUTER_NEW)
@@ -1211,7 +1370,7 @@ Router::initialize(ErrorHandler *errh)
                 click_chatter("%p{element} is a batch-only element ! Please "
                         "check that all elements sending packets to it are "
                         "producing batches of packets instead of single "
-                        "packets.",this);
+                        "packets.", e);
                 all_ok = false;
                 break;
             } else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
@@ -1225,7 +1384,7 @@ Router::initialize(ErrorHandler *errh)
                 click_chatter("%p{element} is a batch-only element ! Please "
                         "check that all elements sending packets to it are "
                         "producing batches of packets instead of single "
-                        "packets.",this);
+                        "packets.",e);
                 all_ok = false;
                 break;
             }
@@ -1268,6 +1427,11 @@ Router::initialize(ErrorHandler *errh)
                 element_stage[i] = Element::CLEANUP_INITIALIZE_FAILED;
                 all_ok = false;
             }
+        }
+        if (_root_init_future.solve_initialize(errh) < 0) {
+            if (!errh->nerrors())
+                errh->error("unspecified error");
+            all_ok = false;
         }
     }
 

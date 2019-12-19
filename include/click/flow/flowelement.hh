@@ -6,6 +6,7 @@
 #include <click/string.hh>
 #include <click/batchelement.hh>
 #include <click/routervisitor.hh>
+#include <click/pair.hh>
 #include "flow.hh"
 
 
@@ -13,8 +14,7 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-class FlowClassifier;
-
+class VirtualFlowManager;
 
 enum FlowType {
     FLOW_NONE = 0,
@@ -172,8 +172,54 @@ public:
 protected:
 	int _flow_data_offset;
 	friend class FlowBufferVisitor;
-	friend class FlowClassifier;
+	friend class VirtualFlowManager;
+};
 
+class CounterInitFuture : public Router::InitFuture { public:
+    CounterInitFuture(String name, std::function<void(void)> on_reached) : _name(name), _n(0), _on_reached(on_reached) {
+
+
+    }
+
+    virtual void post(Router::InitFuture* future) {
+        _n++;
+        Router::InitFuture::post(future);
+    }
+
+    virtual int solve_initialize(ErrorHandler* errh) {
+        if (_children.size() == _n) {
+            _on_reached();
+            return Router::InitFuture::solve_initialize(errh);
+        }
+        else
+            return errh->error("%s: router is trying to initialize while all dependent elements have not called", _name.c_str());
+        return 0;
+    }
+
+private:
+    int _n;
+    String _name;
+    std::function<void(void)> _on_reached;
+};
+
+/**
+ * Element that allocates some FCB Space
+ */
+class VirtualFlowManager : public FlowElement { public:
+    VirtualFlowManager();
+protected:
+    int _reserve;
+
+    typedef Pair<Element*,int> EDPair;
+    Vector<EDPair>  _reachable_list;
+
+    static Vector<VirtualFlowManager*> _entries;
+    static CounterInitFuture _fcb_builded_init_future;
+
+    void find_children(int verbose = 0);
+
+    static void _build_fcb(int verbose,  bool ordered);
+    static void build_fcb();
 
 };
 
@@ -182,10 +228,10 @@ template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
 public :
 
 	FlowSpaceElement() CLICK_COLD;
-	virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+	virtual int initialize(ErrorHandler *errh) override CLICK_COLD;
     void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
 
-	virtual const size_t flow_data_size()  const { return sizeof(T); }
+	virtual const size_t flow_data_size()  const override { return sizeof(T); }
 
 
 	/**

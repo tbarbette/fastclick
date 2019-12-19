@@ -551,4 +551,5 @@ inline void FlowControlBlock::release(int packets_nr) {
 #endif //HAVE_FLOW
 
 CLICK_ENDDECLS
+
 #endif

@@ -32,6 +32,11 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
             .complete() < 0)
         return -1;
 
+    find_children(_verbose);
+
+    router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+    _fcb_builded_init_future.post(this);
+
     if (!is_pow2(_table_size)) {
         _table_size = next_pow2(_table_size);
         click_chatter("Real capacity will be %d",_table_size);
