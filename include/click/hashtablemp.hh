@@ -338,7 +338,8 @@ class HashContainerMP { public:
     //Replacing insertions
     /** @brief Insert a key. Replace an item if it already exists, insert it if not. Gives the ability to do something (eg free resources) with the previous element. Does not look at use count for you and done under read lock !
      * The difference with find_insert, is that find_insert will not change the value if the value already existsn while here on_replace() will be called, and then the value will be replaced.
-     * on_replace() is NOT called if the value does not exists. */
+     * on_replace() is NOT called if the value does not exists.
+     * This function was called set() before*/
     inline void insert(const K &key, const V &value, std::function<void(V&value)> on_replace = [](V&){});
 
     /* @brie Insert a key in the table, calling clean on collisions. If a key exists, it is replaced. */
