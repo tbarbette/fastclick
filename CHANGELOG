@@ -10,5 +10,5 @@ This version has seen the introduction of the tagging scheme. It is therefore a 
  - ERSPAN support for decapsulation and a few things
  - GTP encapsulation, GTP Table, etc and other stuffs done as part of SuperFluidity H2020 project. To implement a GTP Mobile Edge Computing (MEC) "dirverter" that can "divert" some traffic for applicitions before even going into the packet gateway. Look at the SF deliverables for more.
  - A lot of Counter variants for research purpose as part of Tom Barbette's thesis, in the research package. Similarly there is the WorkPackage and FlowWorkPackage.
- - DPDK support from 1.8 to 19.11. 
+ - DPDK support from 1.8 to 19.11.
  - A lot of bug fixes and performance improvements.

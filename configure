@@ -14332,6 +14332,10 @@ if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
 fi
 
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
+fi
+
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi

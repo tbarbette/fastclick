@@ -2297,6 +2297,11 @@ if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
 fi
 
+dnl add 'flow' if compiled with --enable-flow
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
+fi
+
 dnl add 'experimental' if --enable-experimental was supplied
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"

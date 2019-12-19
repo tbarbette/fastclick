@@ -45,7 +45,6 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
                .read_mp("VIP", _vip)
                .read("STATE", _own_state)
-               .read("FCB_OFFSET", _flow_data_offset)
                .read("MODE", mode)
                .complete() < 0)
         return -1;

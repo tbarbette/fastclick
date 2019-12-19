@@ -144,6 +144,18 @@ class Router { public:
     void set_hotswap_router(Router* router);
 
 #if CLICK_USERLEVEL
+    /**
+     * Node of a dependency graph
+     *
+     * The node has multiple children. It should resolve all children (default action of solve_initialize)
+     * then return.
+     *
+     * post() allows to post a new children.
+     *
+     * postOnce() allows to post a child, but does nothing if it's already in the list.
+     *
+     * Used to solve dependencies in router initialization.
+     */
     class InitFuture { public:
         InitFuture() : _children() {
 
