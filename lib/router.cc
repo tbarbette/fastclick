@@ -908,12 +908,10 @@ Router::visit(Element *first_element, bool forward, int first_port,
     Vector<PortDistance> sources;
     if (first_port < 0) {
         for (int port = 0; port < first_element->nports(forward); ++port) {
-            int distance = visitor->distance(_elements[first_element->eindex()], 0);
-            sources.push_back(PortDistance{Port(first_element->eindex(), port), distance});
+            sources.push_back(PortDistance{Port(first_element->eindex(), port), 0});
         }
     } else if (first_port < first_element->nports(forward)) {
-        int distance = visitor->distance(_elements[first_element->eindex()], 0);
-        sources.push_back(PortDistance{Port(first_element->eindex(), first_port), distance});
+        sources.push_back(PortDistance{Port(first_element->eindex(), first_port), 0});
     }
 
     Vector<PortDistance> next_sources;
