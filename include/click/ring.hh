@@ -7,8 +7,9 @@
 #if HAVE_DPDK
 # include <rte_ring.h>
 # include <rte_errno.h>
+# include <click/dpdk_glue.hh>
 #endif
-
+#include <type_traits>
 
 CLICK_DECLS
 
@@ -163,6 +164,7 @@ using DynamicRing = SPSCDynamicRing<T>;
 inline uint64_t next_pow2(uint64_t x) {
 	return x == 1 ? 1 : 1<<(64-__builtin_clzl(x-1));
 }
+
 
 /**
  * Ring with size set at initialization time
