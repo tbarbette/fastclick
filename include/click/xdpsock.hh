@@ -1,7 +1,10 @@
+#pragma once
+
 #include <click/xdp.hh>
 #include <click/config.h>
 #include <click/packet.hh>
 #include <click/xdp.hh>
+#include <click/xdpumem.hh>
 
 #include <vector>
 #include <string>
@@ -12,13 +15,6 @@ extern "C" {
 #include <bpf/libbpf.h>
 #include <bpf/xsk.h>
 }
-
-struct xsk_umem_info {
-	struct xsk_ring_prod fq;
-	struct xsk_ring_cons cq;
-	struct xsk_umem *umem;
-	void *buffer;
-};
 
 struct xsk_socket_info {
 	struct xsk_ring_cons rx;

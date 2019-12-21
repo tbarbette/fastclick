@@ -24,10 +24,12 @@ int XDPFromDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
   String dev,
          mode,
          prog;
+  bool   zero_copy;
 
   if(Args(conf, this, errh)
       .read_mp("DEV", dev)
       .read_or_set("MODE", mode, "skb")
+      .read_or_set("ZEROCOPY", zero_copy, false)
       .read_or_set("PROG", prog, "xdpallrx")
       .read_or_set("TRACE", _trace, false)
       .consume() < 0 ) {
@@ -35,6 +37,13 @@ int XDPFromDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
     return CONFIGURE_FAIL;
   
   }
+
+  if (zero_copy) {
+    _bind_flags |= XDP_ZEROCOPY;
+  } else {
+    _bind_flags |= XDP_COPY;
+  }
+
 
   _dev = string{dev.c_str()};
   _prog = "/usr/lib/click/" + string{prog.c_str()} + ".o";

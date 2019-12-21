@@ -70,6 +70,7 @@ extern "C" {
 #define FRAME_HEADROOM XSK_UMEM__DEFAULT_FRAME_HEADROOM
 #define FRAME_TAILROOM FRAME_HEADROOM
 
+typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
