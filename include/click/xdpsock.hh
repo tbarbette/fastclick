@@ -45,7 +45,7 @@ class XDPSock {
     void configure_socket();
     void kick_tx();
 
-    std::shared_ptr<XDPInterface>   _xfx;
+    std::shared_ptr<XDPInterface>   _xfx{nullptr};
     u32                             _queue_id,
                                     _prog_id;
     xsk_socket_info                 *_xsk;

@@ -1,7 +1,8 @@
 #!/bin/bash
 
-export CFLAGS="-g -O3"
-export CXXFLAGS="-g -O3 -std=gnu++11 -Wno-pmf-conversions -Wno-missing-field-initializers -Wno-pointer-arith -fpermissive"
+export CFLAGS="-g -O0"
+export CXXFLAGS="-g -O0 -std=gnu++11 -Wno-pmf-conversions -Wno-missing-field-initializers -Wno-pointer-arith -fpermissive"
+export LD_LIBRARY_PATH=/usr/local/lib64
 
 ./configure \
   --prefix=/usr/local \

@@ -36,28 +36,21 @@
  *
  */
 
-XDPUMEM::XDPUMEM(size_t size) 
-: _size{size} 
-{
+XDPUMEM::XDPUMEM(size_t size) : _size{size} {
+    // calculate height of trie
+    _height = ceil(log(size) + log(RADIX)) + 1;
 
-  // calculate height of trie
-  _height = ceil(log(size) + log(RADIX)) + 1;
+    // calculate number of nodes in trie
+    _nodes = 0;
+    for (size_t i = 0; i < _height; i++) {
+        _nodes += pow(RADIX, i);
+    }
 
-  // calculate number of nodes in trie
-  _nodes = 0;
-  for(size_t i=0; i < _height; i++) {
-    _nodes += pow(RADIX, i);
-  }
-
-  // allocate/zero trie
-  _trie = (u64*)calloc(_nodes, sizeof(u64));
-
+    // allocate/zero trie
+    _trie = (u64*)calloc(_nodes, sizeof(u64));
 }
 
-static inline bool full(u64 node)
-{
-  return node == ~0UL;
-}
+static inline bool full(u64 node) { return node == ~0UL; }
 
 // get the lowest position zero bit
 static inline ulong ffz(u64 node)

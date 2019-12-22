@@ -69,11 +69,10 @@ bool XDPFromDevice::run_task(Task *t)
 #if HAVE_BATCH
 void XDPFromDevice::rx_batch()
 {
-
-  vector<Packet*> pkts = _sock->rx();
-  if (pkts.empty()) {
-    return;
-  }
+    vector<Packet*> pkts = _sock->rx();
+    if (pkts.empty()) {
+        return;
+    }
 
   PacketBatch *head = PacketBatch::start_head(pkts[0]);
   for(size_t i=0; i<pkts.size()-1; i++) {
