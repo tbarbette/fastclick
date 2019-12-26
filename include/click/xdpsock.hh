@@ -53,6 +53,8 @@ class XDPSock {
     void                            *_umem_buf;
     bool                            _trace;
 
+    std::shared_ptr<XDPUMEM> _umem_mgr{nullptr};
+
 };
 
 static inline void free_pkt(unsigned char *pkt, size_t, void *pktmbuf)

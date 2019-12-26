@@ -6,6 +6,7 @@
 #include <click/xdpinterface.hh>
 #include <poll.h>
 
+using std::make_shared;
 using std::string;
 using std::vector;
 
@@ -64,6 +65,7 @@ void XDPSock::configure_umem()
   }
   _umem->buffer = _umem_buf;
 
+  _umem_mgr = make_shared<XDPUMEM>(NUM_FRAMES);
 }
 
 void XDPSock::configure_socket()
@@ -138,23 +140,25 @@ void XDPSock::rx(PBuf &pb)
 
   static int cnt{0};
   pb.len = 0;
+  u32 idx_rx{0};
 
+  // peek into the rx ring
   if(_trace) {
     printf("[%s:%d] (%d) rx\n", _xfx->dev().c_str(), _queue_id, cnt++);
     printf("[%s:%d] rx peeking\n", _xfx->dev().c_str(), _queue_id);
   }
-
-  u32 idx_rx{0};
   uint rcvd = xsk_ring_cons__peek(&_xsk->rx, BATCH_SIZE, &idx_rx);
+
+  // if there is nothing to be received, bail
   if (!rcvd) {
     return;
   }
-
   if(_trace) {
     printf("[%s:%d] rx rcvd=%u\n", _xfx->dev().c_str(), _queue_id, rcvd);
     printf("[%s:%d] rx reserving\n", _xfx->dev().c_str(), _queue_id);
   }
 
+  // prepare to give the kernel new frames to replace the ones in the rx ring
   u32 idx_fq{0};
   int ret = xsk_ring_prod__reserve(&_xsk->umem->fq, rcvd, &idx_fq);
   while (ret != rcvd) {
@@ -181,17 +185,14 @@ void XDPSock::rx(PBuf &pb)
         xsk_umem__get_data(_xsk->umem->buffer, desc->addr)
     );
 
+    /*
     char *click_pkt = static_cast<char*>( malloc(desc->len) );
     memcpy(click_pkt, xsk_pkt, desc->len);
+    */
 
-    WritablePacket *p = Packet::make(
-        reinterpret_cast<unsigned char*>(click_pkt),
-        desc->len,
-        free_pkt,
-        click_pkt,
-        FRAME_HEADROOM,
-        FRAME_TAILROOM
-    );
+    WritablePacket* p =
+        Packet::make(reinterpret_cast<unsigned char*>(xsk_pkt), desc->len,
+                     free_pkt, xsk_pkt, FRAME_HEADROOM, FRAME_TAILROOM);
     p->timestamp_anno();
     p->set_anno_u32(7, _queue_id);
     pb.pkts[i] = p;
@@ -200,8 +201,10 @@ void XDPSock::rx(PBuf &pb)
       printf("[%s:%d] setting fill addr @%u\n", _xfx->dev().c_str(), _queue_id, idx_fq+i);
     }
 
-    *xsk_ring_prod__fill_addr(&_xsk->umem->fq, idx_fq+i) = desc->addr;
-
+    // TODO get next frame from UMEM manager and give to kernel to keep fill
+    // queue as full as possible
+    //*xsk_ring_prod__fill_addr(&_xsk->umem->fq, idx_fq+i) = desc->addr;
+    xsk_ring_prod__fill_addr(&_xsk->umem->fq, _umem_mgr->next());
   }
   pb.len = rcvd;
 
