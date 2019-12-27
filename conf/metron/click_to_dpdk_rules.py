@@ -22,7 +22,7 @@ ACTION_COUNT = "count"
 
 NIC_INDEPENDENT = -1
 DEF_QUEUES_NB = 4
-DEF_GROUP_NB = 0
+DEF_GROUP_NB = -1
 
 def add_matching_criteria(rule_map):
 	rule_str = ""
@@ -77,9 +77,10 @@ def dump_flow_rules(rule_list, target_nic, target_queues_nb, target_group_nb, ou
 
 			rule_str = ""
 			if target_nic >= 0:
-				rule_str = "{} {} {} {} {} {}".format(FD_CREATE, target_nic, GROUP, target_group_nb, INGRESS, FD_ETHERNET_RULE_PREF)
-			else:
-				rule_str = GROUP + " " + str(target_group_nb) + " " + INGRESS + " " + FD_ETHERNET_RULE_PREF
+				rule_str = "{} {}".format(FD_CREATE, target_nic)
+
+			if target_group_nb >= 0:
+				rule_str += GROUP + " " + str(target_group_nb) + " " + INGRESS + " " + FD_ETHERNET_RULE_PREF
 
 			# Append matches
 			rule_str += add_matching_criteria(rule)
