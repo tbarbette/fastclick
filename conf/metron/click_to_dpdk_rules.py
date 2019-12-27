@@ -50,7 +50,7 @@ def add_actions(curr_queue, target_queues_nb, rule_count_instr):
 	rule_str += "end "
 	return rule_str
 
-def dump_flow_director(rule_list, target_nic, target_queues_nb, target_group_nb, outfile, rule_count_instr, verbose=False):
+def dump_flow_rules(rule_list, target_nic, target_queues_nb, target_group_nb, outfile, rule_count_instr, verbose=False):
 	"""
 	Writes the rules of the input list into a file following DPDK's Flow API rule format.
 
@@ -103,7 +103,7 @@ def rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queue
 		outfile_pref = get_substring_until_delimiter(in_file, ".") + "_group_{}_hw_queues_{}.dpdk".format(target_group_nb, q)
 		out_file = os.path.join("{}".format(os.path.abspath(output_folder)), outfile_pref)
 
-		dump_flow_director(rule_list, target_nic, q, target_group_nb, out_file, rule_count_instr)
+		dump_flow_rules(rule_list, target_nic, q, target_group_nb, out_file, rule_count_instr)
 
 def rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, target_queues_nb, target_group_nb, rule_count_instr=False):
 	for in_file in input_file_list:
