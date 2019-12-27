@@ -121,7 +121,7 @@ def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb,
 		rule_list.append(rule)
 
 	# Dump them to a file
-	in_file = "random_flow_dir_rules_{}.txt".format(target_rules_nb)
+	in_file = "random_rules_{}.txt".format(target_rules_nb)
 	rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb, target_group_nb, rule_count_instr)
 
 ###
