@@ -100,7 +100,7 @@ def dump_flow_director(rule_list, target_nic, target_queues_nb, target_group_nb,
 def rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb, target_group_nb, rule_count_instr):
 	# Generate one or multiple load balancing configurations
 	for q in range(start_queues_nb, target_queues_nb + 1):
-		outfile_pref = get_substring_until_delimiter(in_file, ".") + "_hw_queues_{}.dpdk".format(q)
+		outfile_pref = get_substring_until_delimiter(in_file, ".") + "_group_{}_hw_queues_{}.dpdk".format(target_group_nb, q)
 		out_file = os.path.join("{}".format(os.path.abspath(output_folder)), outfile_pref)
 
 		dump_flow_director(rule_list, target_nic, q, target_group_nb, out_file, rule_count_instr)
