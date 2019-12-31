@@ -77,7 +77,7 @@ def dump_flow_rules(rule_list, target_nic, target_queues_nb, target_group_nb, ou
 
 			rule_str = ""
 			if target_nic >= 0:
-				rule_str = "{} {}".format(FD_CREATE, target_nic)
+				rule_str = "{} {} ".format(FD_CREATE, target_nic)
 
 			if target_group_nb >= 0:
 				rule_str += GROUP + " " + str(target_group_nb) + " " + INGRESS + " " + FD_ETHERNET_RULE_PREF
