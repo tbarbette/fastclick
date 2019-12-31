@@ -347,17 +347,15 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
         //       The agent should be able to provide MAC or VLAN tags.
         if ((_rx_mode == MAC) && (fd_mode != "vmdq")) {
             return errh->error(
-                "Metron RX_MODE %s requires FromDPDKDevice(%s) MODE vmdq",
-                rx_filter_type_enum_to_str(_rx_mode).c_str(),
-                nic.value().get_name().c_str()
+                "[NIC %s] Metron RX_MODE %s requires FromDPDKDevice MODE vmdq",
+                nic.value().get_name().c_str(), rx_filter_type_enum_to_str(_rx_mode).c_str()
             );
         }
 
         if ((_rx_mode == RSS) && (fd_mode != "rss")) {
             return errh->error(
-                "RX_MODE %s is the default FastClick mode and requires FromDPDKDevice(%s) MODE rss. Current mode is %s.",
-                rx_filter_type_enum_to_str(_rx_mode).c_str(),
-                nic.value().get_name().c_str(), fd_mode.c_str()
+                "[NIC %s] RX_MODE %s is the default FastClick mode and requires FromDPDKDevice MODE rss. Current mode is %s",
+                nic.value().get_name().c_str(), rx_filter_type_enum_to_str(_rx_mode).c_str(), fd_mode.c_str()
             );
         }
 
@@ -901,8 +899,6 @@ Metron::write_handler(
 
             // NIC is valid, now parse the second argument
             String filename = data.substring(delim + 1).trim_space_left();
-
-            click_chatter("[NIC %d] Rule installation from file: %s", port_id, filename.c_str());
 
             int32_t installed_rules = FlowDirector::get_flow_director(port_id)->add_rules_from_file(filename);
             if (installed_rules < 0) {
@@ -2141,10 +2137,9 @@ ServiceChain::stats_to_json(bool monitoring_mode)
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
- * Decodes service chain rules from JSON
- * and installs the rules in the respective NIC.
- * Returns the number of installed rules on success,
- * otherwise a negative integer.
+ * Decodes service chain rules from JSON and installs the rules in the respective NIC.
+ *
+ * @return the number of installed rules on success, otherwise a negative integer.
  */
 int32_t
 ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
@@ -2189,11 +2184,11 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             int core_id = jcpu.second.get_i("cpuId");
             assert(get_cpu_info(core_id).active());
 
-            HashMap<long, String> rules_map;
+            HashMap<uint32_t, String> rules_map;
 
             Json jrules = jcpu.second.get("cpuRules");
             for (auto jrule : jrules) {
-                long rule_id = jrule.second.get_i("ruleId");
+                uint32_t rule_id = jrule.second.get_i("ruleId");
                 String rule = jrule.second.get_s("ruleContent");
                 rules_nb++;
 
@@ -2213,17 +2208,17 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             click_chatter("Adding %4d rules for CPU %d with physical ID %d", rules_map.size(), core_id, phys_core_id);
 
             // Update a batch of rules associated with this CPU core ID
-            int status = nic->get_flow_director()->update_rules(rules_map, true, phys_core_id);
+            int32_t status = nic->get_flow_director()->update_rules(rules_map, true, phys_core_id);
             if (status >= 0) {
                 inserted_rules_nb += status;
             }
 
             if (nic->mirror) {
                 click_chatter("Device has mirror NIC");
-                HashMap<long, String> mirror_rules_map;
+                HashMap<uint32_t, String> mirror_rules_map;
 
                 for (auto jrule : jrules) {
-                    long rule_id = jrule.second.get_i("ruleId");
+                    uint32_t rule_id = jrule.second.get_i("ruleId");
                     String rule = jrule.second.get_s("ruleContent");
                     rules_nb++;
 
@@ -2241,10 +2236,9 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 
                     // Store this rule
                     mirror_rules_map.insert(rule_id, rule);
-            }
+                }
 
-            click_chatter("Adding %4d MIRROR rules for CPU %d with physical ID %d", mirror_rules_map.size(), core_id, phys_core_id);
-
+                click_chatter("Adding %" PRIu32 " MIRROR rules for CPU %d with physical ID %d", mirror_rules_map.size(), core_id, phys_core_id);
 
                 status = nic->mirror->get_flow_director()->update_rules(mirror_rules_map, true, phys_core_id);
                 if (status >= 0) {
@@ -2316,7 +2310,7 @@ ServiceChain::rules_to_json()
         // One NIC can dispatch to multiple CPU cores
         for (int j = 0; j < get_max_cpu_nb(); j++) {
             // Fetch the rules for this NIC and this CPU core
-            HashMap<long, String> *rules_map = nic->get_flow_cache()->rules_map_by_core_id(j);
+            HashMap<uint32_t, String> *rules_map = nic->get_flow_cache()->rules_map_by_core_id(j);
             if (!rules_map || rules_map->empty()) {
                 continue;
             }
@@ -2328,7 +2322,7 @@ ServiceChain::rules_to_json()
 
             auto begin = rules_map->begin();
             while (begin != rules_map->end()) {
-                long rule_id = begin.key();
+                uint32_t rule_id = begin.key();
                 String rule = begin.value();
 
                 Json jrule = Json::make_object();
@@ -2358,7 +2352,7 @@ ServiceChain::rules_to_json()
  * Deletes a rule from a NIC.
  */
 int
-ServiceChain::delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh)
+ServiceChain::delete_rule(const uint32_t &rule_id, Metron *m, ErrorHandler *errh)
 {
     // No controller
     if (!m->_discovered) {
@@ -2426,8 +2420,8 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
         }
 
         bool nic_found = false;
-        for (int i = 0; i < rules_vec.size(); i++) {
-            long rule_id = atol(rules_vec[i].c_str());
+        for (uint32_t i = 0; i < rules_vec.size(); i++) {
+            uint32_t rule_id = atol(rules_vec[i].c_str());
             int32_t int_rule_id = nic->get_flow_cache()->internal_from_global_rule_id(rule_id);
 
             // Mapping not found
@@ -2532,9 +2526,9 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
         if (jfield.first == "cpus") {
             Bitvector old_map = active_cpus();
             Bitvector new_map(get_max_cpu_nb(), false);
-            HashTable<int,Bitvector> migration;
+            HashTable<int, Bitvector> migration;
             if (jfield.second.is_array()) {
-                for (int i = 0; i < jfield.second.size(); i++) {
+                for (uint32_t i = 0; i < jfield.second.size(); i++) {
                     int cpuId;
                     if (jfield.second[i].is_object()) {
                         Json jcpustate = jfield.second[i];
@@ -2545,7 +2539,7 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         }
                         Json s = it.value();
                         Bitvector state(get_max_cpu_nb());
-                        for (int j = 0; j < s.size(); j++) {
+                        for (uint32_t j = 0; j < s.size(); j++) {
                             state[s[j].to_i()] = true;
                         }
                         if (cpuId < 0) {
@@ -2563,11 +2557,8 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
                         new_map[cpuId] = true;
                     }
 
-                    if (abs(cpuId) >  get_max_cpu_nb()) {
-                            return errh->error(
-                                "Number of used CPUs must be less or equal "
-                                "than the maximum number of CPUs!"
-                            );
+                    if (abs(cpuId) > get_max_cpu_nb()) {
+                        return errh->error("Number of used CPUs must be less or equal than the maximum number of CPUs!");
                     }
 
                 }
