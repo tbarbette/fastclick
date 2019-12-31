@@ -78,19 +78,19 @@ class FlowCache {
 
         // Search methods
         bool has_rules();
-        bool global_rule_id_exists(const long &rule_id);
+        bool global_rule_id_exists(const uint32_t &rule_id);
         bool internal_rule_id_exists(const uint32_t &int_rule_id);
-        long global_from_internal_rule_id(const uint32_t &int_rule_id);
-        int32_t internal_from_global_rule_id(const long &rule_id);
+        uint32_t global_from_internal_rule_id(const uint32_t &int_rule_id);
+        int32_t internal_from_global_rule_id(const uint32_t &rule_id);
         template<typename T> void sort_rule_ids_inc(Vector<T> &rule_ids_vec);
         template<typename T> void sort_rule_ids_dec(Vector<T> &rule_ids_vec);
-        Vector<long> global_rule_ids(const bool increasing = true);
+        Vector<uint32_t> global_rule_ids(const bool increasing = true);
         Vector<uint32_t> internal_rule_ids(const bool increasing = true);
         Vector<uint32_t> internal_rule_ids_counters(const bool increasing = true);
-        HashMap<long, String> *rules_map_by_core_id(const int &core_id);
+        HashMap<uint32_t, String> *rules_map_by_core_id(const int &core_id);
         Vector<String> rules_list_by_core_id(const int &core_id);
         Vector<int> cores_with_rules();
-        String get_rule_by_global_id(const long &rule_id);
+        String get_rule_by_global_id(const uint32_t &rule_id);
         String get_rule_by_internal_id(const uint32_t &int_rule_id);
 
         // Flow Cache methods
@@ -98,14 +98,14 @@ class FlowCache {
         uint32_t next_internal_rule_id();
         void set_next_internal_rule_id(uint32_t next_id);
         int insert_rule_in_flow_cache(
-            const int &core_id, const long &rule_id,
+            const int &core_id, const uint32_t &rule_id,
             const uint32_t &int_rule_id, const String rule
         );
         bool update_rule_in_flow_cache(
-            const int &core_id, const long &rule_id,
+            const int &core_id, const uint32_t &rule_id,
             const uint32_t &int_rule_id, String rule
         );
-        int32_t delete_rule_by_global_id(const long &rule_id);
+        int32_t delete_rule_by_global_id(const uint32_t &rule_id);
         String delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
         String delete_rules_by_internal_id(const Vector<String> &rules_vec);
         int32_t flush_rules_from_cache();
@@ -132,11 +132,11 @@ class FlowCache {
         // Next available rule ID
         uint32_t _next_rule_id;
 
-        // Maps CPU cores to a map of global rule IDs (long) -> rules (Strings)
-        HashMap<int, HashMap<long, String> *> _rules;
+        // Maps CPU cores to a map of global rule IDs -> rules
+        HashMap<int, HashMap<uint32_t, String> *> _rules;
 
-        // Maps global rule IDs (long) to internal NIC rule IDs (uint32_t)
-        HashMap<long, uint32_t> _internal_rule_map;
+        // Maps global rule IDs to internal NIC rule IDs
+        HashMap<uint32_t, uint32_t> _internal_rule_map;
 
         // Matched packets and bytes per rule ID
         HashMap<uint32_t, uint64_t> _matched_pkts;
@@ -150,11 +150,11 @@ class FlowCache {
         bool _debug_mode;
 
         // Methods to facilitate the mapping between ONOS and NIC rule IDs
-        bool store_rule_id_mapping(const long &rule_id, const uint32_t &int_rule_id);
-        bool delete_rule_id_mapping(const long &rule_id);
+        bool store_rule_id_mapping(const uint32_t &rule_id, const uint32_t &int_rule_id);
+        bool delete_rule_id_mapping(const uint32_t &rule_id);
 
         // Methods to verify cache consistency
-        bool verify_transactions(const Vector<uint32_t> &int_vec, const Vector<long> &glb_vec);
+        bool verify_transactions(const Vector<uint32_t> &int_vec, const Vector<uint32_t> &glb_vec);
 };
 
 class FlowDirector {
@@ -253,7 +253,7 @@ class FlowDirector {
 
         // Calibrates flow rule cache before inserting new rules
         void calibrate_cache(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
-        void calibrate_cache(const HashMap<long, String> &rules_map);
+        void calibrate_cache(const HashMap<uint32_t, String> &rules_map);
 
         // Updates the internal ID for the next rule to be allocated
         void update_internal_rule_id();
@@ -262,8 +262,7 @@ class FlowDirector {
         int32_t add_rules_from_file(const String &filename);
 
         // Update NIC flow rules
-        int32_t update_rules(const HashMap<long, String> &rules_map,
-                    bool by_controller = true, int core_id = -1);
+        int32_t update_rules(const HashMap<uint32_t, String> &rules_map, bool by_controller = true, int core_id = -1);
 
         // Loads a set of rules from a file to memory
         String load_rules_from_file_to_string(const String &filename);
@@ -271,7 +270,7 @@ class FlowDirector {
         // Install flow rule(s) in a NIC
         int flow_rules_install(const String &rules, const uint32_t &rules_nb);
         int flow_rule_install(
-            const uint32_t &int_rule_id, const long &rule_id,
+            const uint32_t &int_rule_id, const uint32_t &rule_id,
             const int &core_id, const String &rule,
             const bool with_cache = true
         );

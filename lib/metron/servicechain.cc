@@ -718,7 +718,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
         int idx = 0;
         for (int i = 0; i < sc->get_nics_nb(); i++) {
             // Insert VF->PF traffic return rules
-            HashMap<long, String> rules_map;
+            HashMap<uint32_t, String> rules_map;
 
             NIC *nic = sc->get_nic_by_index(i);
 
@@ -726,7 +726,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
             for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
                 int cpid = sc->get_cpu_phys_id(j);
                 String rule = "flow create " + String((cpid % _sriov) + 1 + pindex) + " transfer ingress pattern eth type is 2048 / end actions port_id id " + String(pindex) + " / end\n";
-                rules_map.insert(2093323+ i * 128 * 128 + pindex * 128 + cpid, rule);
+                rules_map.insert(2093323 + i * 128 * 128 + pindex * 128 + cpid, rule);
                 //click_chatter("Install %s", rule);
             }
             int status = nic->get_flow_director(_sriov)->update_rules(rules_map, false);
@@ -775,21 +775,21 @@ Vector<float>
 StandaloneSCManager::update_load(Vector<CPUStat> &v)
 {
     Vector<float> load(v.size(), 0);
-    unsigned long long totalUser, totalUserLow, totalSys, totalIdle;
-    int cpuId;
+    unsigned long long total_user, total_user_low, total_sys, total_idle;
+    int cpu_id;
     FILE* file = fopen("/proc/stat", "r");
     char buffer[1024];
     char *res = fgets(buffer, 1024, file);
     assert(res);
-    while (fscanf(file, "cpu%d %llu %llu %llu %llu", &cpuId, &totalUser, &totalUserLow, &totalSys, &totalIdle) > 0) {
-        if (cpuId < load.size()) {
-            unsigned long long newTotal = totalUser + totalUserLow + totalSys;
-            unsigned long long tdiff =  (newTotal - v[cpuId].lastTotal);
-            unsigned long long idiff =  (totalIdle - v[cpuId].lastIdle);
+    while (fscanf(file, "cpu%d %llu %llu %llu %llu", &cpu_id, &total_user, &total_user_low, &total_sys, &total_idle) > 0) {
+        if (cpu_id < load.size()) {
+            unsigned long long new_total = total_user + total_user_low + total_sys;
+            unsigned long long tdiff =  (new_total - v[cpu_id].lastTotal);
+            unsigned long long idiff =  (total_idle - v[cpu_id].lastIdle);
             if (tdiff + idiff > 0)
-                load[cpuId] =  tdiff / (tdiff + idiff);
-            v[cpuId].lastTotal = newTotal;
-            v[cpuId].lastIdle = totalIdle;
+                load[cpu_id] =  tdiff / (tdiff + idiff);
+            v[cpu_id].lastTotal = new_total;
+            v[cpu_id].lastIdle = total_idle;
 
             res = fgets(buffer, 1024, file);
         }

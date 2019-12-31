@@ -278,6 +278,10 @@ Returns the maximum latency (ms) to remove rules from the input DPDK-based NIC.
 
 Returns or sets the conteoller instance associated with this Metron agent.
 
+=h delete_controllers write-only
+
+Disassociates this Metron agent from a Metron controller instance.
+
 =h chains read/write
 
 Returns the currently deployed service chains or instantiates a set of new
@@ -292,30 +296,35 @@ deployed service chains or statistics only for a desired service chain.
 
 Reconfigures a set of already deployed service chains encoded as a JSON object.
 
+=h delete_chains write-only
+
+Tears down a deployed service chain.
+
+=h add_rules_from_file write-only
+
+Installs a set of NIC rules from file.
+
 =h rules read/write
 
 Returns or sets the rules associated with either all deployed service chains or a specific
 service chain.
 
-=h rules_from_file write-only
-
-Installs a set of NIC rules from file.
-
-=h delete_chains write-only
-
-Tears down a deployed service chain.
-
 =h delete_rules write-only
 
-Removes a given list of rules associated with (a) service chain(s).
+Removes a given list of comma-separated rules associated with (a) service chain(s).
+This command is issued by an associated Metron controller.
+To manually delete rules from a given NIC, use the FromDPDKDevice rules_del handler.
+
+=h verify_nic write-only
+
+Verifies the consistency between the rules in the FlowCache (software) and the rules
+installed into the NIC (hardware). The user must know the correct number of rules in
+the NIC.
+Usage example (assuming that NIC fd0 has 150 rules): verify_nic fd0 150
 
 =h flush_nics write-only
 
-Flushes all Metron NICs.
-
-=h delete_controllers write-only
-
-Disassociates this Metron agent from a Metron controller instance.
+Flushes the rules from all Metron NICs.
 
 */
 
@@ -522,7 +531,7 @@ class ServiceChain {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         Json rules_to_json();
         int32_t rules_from_json(Json j, Metron *m, ErrorHandler *errh);
-        static int delete_rule(const long &rule_id, Metron *m, ErrorHandler *errh);
+        static int delete_rule(const uint32_t &rule_id, Metron *m, ErrorHandler *errh);
         static int32_t delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHandler *errh);
         static int32_t delete_rule_batch_from_json(String rule_ids, Metron *m, ErrorHandler *errh);
     #endif
