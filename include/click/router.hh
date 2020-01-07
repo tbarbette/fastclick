@@ -157,9 +157,9 @@ class Router { public:
      * Used to solve dependencies in router initialization.
      */
     class InitFuture { public:
-        InitFuture() : _children() {
+        InitFuture();
+        ~InitFuture();
 
-        }
         virtual int solve_initialize(ErrorHandler* errh);
 
         void postOnce(InitFuture* future);

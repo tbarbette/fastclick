@@ -1031,7 +1031,7 @@ Router::visit_ports(Element *first_element, bool forward, int first_port,
                 if (_conn[ci][forward] != *sp)
                     break;
                 Port connpt = _conn[ci][!forward];
-                int conng = gport(!forward, connpt);
+                gport(!forward, connpt);
 
                 if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
                                     _elements[sp->idx], sp->port, distance))
@@ -1200,6 +1200,13 @@ Router::initialize_handlers(bool defaults, bool specifics)
             _elements[i]->add_handlers();
 }
 
+Router::InitFuture::InitFuture() : _children() {
+
+}
+
+Router::InitFuture::~InitFuture() {
+}
+
 int
 Router::InitFuture::solve_initialize(ErrorHandler* errh) {
     bool all_ok = true;
@@ -1225,7 +1232,9 @@ Router::InitFuture::postOnce(InitFuture* future) {
 class FctFuture : public Router::InitFuture { public:
 
     FctFuture(std::function<int(void)> f) : _f(f) {
-    }
+    };
+
+    ~FctFuture() {};
 
     int solve_initialize(ErrorHandler* errh) {
         int r = _f();

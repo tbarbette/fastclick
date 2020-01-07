@@ -1,6 +1,8 @@
 #ifndef DPDKGLUE_H
 #define DPDKGLUE_H
+#include <rte_version.h>
 #include <rte_hash_crc.h>
+#include <click/ipflowid.hh>
 
 inline uint32_t
 ipv4_hash_crc(const void *data,  uint32_t data_len,
