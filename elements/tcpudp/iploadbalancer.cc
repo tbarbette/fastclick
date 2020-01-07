@@ -57,7 +57,7 @@ int IPLoadBalancer::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-
+#if HAVE_BATCH
 void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
 
     auto fnt = [this](Packet*&p) {
@@ -67,8 +67,8 @@ void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
         unsigned hash = pick_server(p);
         IPAddress srv = _dsts.unchecked_at(hash);
 
-	q->ip_header()->ip_dst = srv;
-        p->set_dst_ip_anno(srv);
+	    q->ip_header()->ip_dst = srv;
+        q->set_dst_ip_anno(srv);
         return q;
     };
     EXECUTE_FOR_EACH_PACKET(fnt, batch);
@@ -76,7 +76,22 @@ void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
     if (batch)
         checked_output_push_batch(0, batch);
 }
+#endif
 
+void IPLoadBalancer::push(int, Packet* p) {
+        WritablePacket* q =p->uniqueify();
+
+        if (!q)
+            return;
+
+        unsigned hash = pick_server(p);
+        IPAddress srv = _dsts.unchecked_at(hash);
+
+	q->ip_header()->ip_dst = srv;
+        q->set_dst_ip_anno(srv);
+
+        output_push(0, q);
+}
 
 IPLoadBalancerReverse::IPLoadBalancerReverse() {
 
@@ -104,6 +119,7 @@ int IPLoadBalancerReverse::initialize(ErrorHandler *errh) {
     return 0;
 }
 
+#if HAVE_BATCH
 void IPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
 
     auto fnt = [this](Packet* &p)  {
@@ -119,10 +135,19 @@ void IPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
     if (batch)
         checked_output_push_batch(0, batch);
 }
+#endif
 
+void IPLoadBalancerReverse::push(int, Packet* p) {
+        WritablePacket* q =p->uniqueify();
+        if (!q)
+            return;
+	    q->ip_header()->ip_src = _lb->_vip;
 
+        output_push(0, q);
+}
 
 CLICK_ENDDECLS
+
 EXPORT_ELEMENT(IPLoadBalancerReverse)
 ELEMENT_MT_SAFE(IPLoadBalancerReverse)
 EXPORT_ELEMENT(IPLoadBalancer)

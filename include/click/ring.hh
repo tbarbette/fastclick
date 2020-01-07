@@ -191,7 +191,12 @@ template <typename T> class MPMCDynamicRing {
 
     inline T extract() {
         T o;
+
+#if RTE_VERSION >= RTE_VERSION_NUM(16,8,0,0)
         if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1, 0) == 0)
+#else
+        if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1) == 0)
+#endif
             return 0;
         else
             return o;

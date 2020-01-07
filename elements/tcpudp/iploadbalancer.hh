@@ -59,8 +59,11 @@ public:
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;
 
+#if HAVE_BATCH
     void push_batch(int, PacketBatch *) override;
+#endif
 
+    void push(int, Packet *) override;
 
 private:
 
@@ -87,9 +90,11 @@ public:
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-
+#if HAVE_BATCH
     void push_batch(int, PacketBatch *) override;
+#endif
 
+    void push(int, Packet *) override;
 private:
     IPLoadBalancer* _lb;
 };
