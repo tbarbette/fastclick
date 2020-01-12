@@ -1,0 +1,10 @@
+FROM mergetb/kernel-builder
+
+RUN curl -L https://pkg.mergetb.net/addrepo | RELEASE=kass bash -
+RUN apt-get install -y libbpf-moa
+
+COPY . /click
+WORKDIR /click
+
+ENV TOOL_ARGS apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes
+RUN mk-build-deps --install --tool="$TOOL_ARGS" debian/control

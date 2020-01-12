@@ -15,8 +15,8 @@ Build-Depends:
   lshw,
   pciutils,
   zlib1g-dev,
-  libpcap-dev,
-  libbpf-moa
+  libbpf-moa,
+  libpcap-dev
 Homepage: https://github.com/tbarbette/fastclick
 
 Package: fastclick
@@ -37,4 +37,3 @@ Depends:
   libbpf-moa,
   libpcap0.8
 
-# libbpf5.3 is a package we'll have to make too
