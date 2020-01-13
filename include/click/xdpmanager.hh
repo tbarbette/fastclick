@@ -6,14 +6,17 @@
 class XDPManager {
 
   public:
+    static XDPManager& get();
     static XDPInterfaceSP get(string dev);
-    static XDPInterfaceSP ensure(
+    XDPInterfaceSP ensure(
         string dev, string prog, u16 xdp_flags, u16 bind_flags, bool trace
     );
 
   private:
-    static XDPManager& get();
+    XDPManager();
 
     std::unordered_map<string, XDPInterfaceSP> ifxs;
+
+    XDPUMEMSP _xm{nullptr};
 
 };

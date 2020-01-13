@@ -3,6 +3,7 @@
  */
 
 #include <click/xdpmanager.hh>
+#include <click/xdpumem.hh>
 
 using std::make_shared;
 
@@ -23,6 +24,11 @@ XDPInterfaceSP XDPManager::get(string dev)
   return x->second;
 }
 
+XDPManager::XDPManager()
+{
+  _xm = make_shared<XDPUMEM>(NUM_FRAMES, FRAME_SIZE, NUM_RX_DESCS, NUM_TX_DESCS);
+}
+
 XDPInterfaceSP XDPManager::ensure(
     string dev, string prog, u16 xdp_flags, u16 bind_flags, bool trace
 )
@@ -33,7 +39,7 @@ XDPInterfaceSP XDPManager::ensure(
 
     printf("creating new xdp socket for %s\n", dev.c_str());
     XDPInterfaceSP xfx = make_shared<XDPInterface>(
-        dev, prog, xdp_flags, bind_flags, trace
+        dev, prog, xdp_flags, bind_flags, _xm, trace
     );
     xfx->init();
 

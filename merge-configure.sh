@@ -1,10 +1,10 @@
 #!/bin/bash
 
 export CFLAGS="-g -O0"
-export CXXFLAGS="-g -O0 -std=gnu++11 -Wno-pmf-conversions -Wno-missing-field-initializers -Wno-pointer-arith -fpermissive"
+export CXXFLAGS="-g -O0 -std=gnu++11 -Wno-pmf-conversions -Wno-missing-field-initializers -Wno-pointer-arith -fpermissive -Wno-address-of-packed-member"
 export LD_LIBRARY_PATH=/usr/local/lib64
 
-./configure \
+./configure -v \
   --prefix=/usr/local \
   --enable-xdp \
   --enable-multithread \

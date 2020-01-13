@@ -26,12 +26,13 @@ struct xsk_socket_info {
 	unsigned long prev_rx_npkts;
 	unsigned long prev_tx_npkts;
 	u32 outstanding_tx;
+	u32 outstanding_fq;
 };
 
 class XDPSock {
 
   public:
-    XDPSock(XDPInterfaceSP xfx, u32 queue_id, bool trace=false);
+    XDPSock(XDPInterfaceSP xfx, XDPUMEMSP xm, u32 queue_id, bool trace=false);
 
     void rx(PBuf &pb);
     void tx(Packet *p);
@@ -41,31 +42,31 @@ class XDPSock {
     pollfd poll_fd() const;
 
   private:
-    void configure_umem();
+    //void configure_umem();
     void configure_socket();
     void kick_tx();
+
+    void tx_complete();
+    void fq_replenish();
+    void ingress(PBuf &pb);
 
     std::shared_ptr<XDPInterface>   _xfx{nullptr};
     u32                             _queue_id,
                                     _prog_id;
     xsk_socket_info                 *_xsk;
-    xsk_umem_info                   *_umem;
+    //xsk_umem_info                   *_umem;
     void                            *_umem_buf;
     bool                            _trace;
+    pollfd                          _fd;
 
     std::shared_ptr<XDPUMEM> _umem_mgr{nullptr};
+
+    static int _poll_timeout;
 
 };
 
 static inline void free_pkt(unsigned char *pkt, size_t, void *pktmbuf)
 {
-   // right now we copy packets into click. an optimiazation that could be nice
-   // is that instead of allocating a chunk of memory for a packet we 'allocate'
-   // a frame from the destination xdp device. this is not really allocation in
-   // the sense that all the frames for the device are allocated up front, it's
-   // more of a taking of ownership. This would eliminate the need for any
-   // dynamic memory allocation. However we would still need to copy the packet
-   // from the source UMEM to the target UMEM.
-   free(pkt);
+    // notthing to do, packets are part of an emulation wide ringbuffer
 }
 

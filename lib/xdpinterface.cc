@@ -26,13 +26,21 @@ inline bool IS_ERR_OR_NULL(const void* ptr) {
     return unlikely(!ptr) || IS_ERR_VALUE((unsigned long)ptr);
 }
 
-XDPInterface::XDPInterface(string dev, string prog, u16 xdp_flags,
-                           u16 bind_flags, bool trace)
+XDPInterface::XDPInterface(
+    string dev, 
+    string prog, 
+    u16 xdp_flags, 
+    u16 bind_flags, 
+    XDPUMEMSP xm,
+    bool trace
+)
     : _dev{dev},
       _prog{prog},
       _xdp_flags{xdp_flags},
       _bind_flags{bind_flags},
-      _trace{trace} {}
+      _trace{trace},
+      _xm{xm}
+{}
 
 void XDPInterface::init() {
     _ifindex = if_nametoindex(_dev.c_str());
@@ -128,7 +136,7 @@ void XDPInterface::create_device_sockets() {
 
     for (u32 i = start; i < start + numchan; i++) {
         printf("initializing queue %d\n", i);
-        _socks.push_back(make_shared<XDPSock>(shared_from_this(), i, _trace));
+        _socks.push_back(make_shared<XDPSock>(shared_from_this(), _xm, i, _trace));
     }
 
     // create polling file descriptors

@@ -17,6 +17,7 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
         string prog,
         u16 xdp_flags,
         u16 bind_flags,
+        XDPUMEMSP xm,
         bool trace=false
     );
 
@@ -55,6 +56,7 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
     bool                     _trace,
                              _poll{true};
     vector<PBuf>             _pbufs;
+    XDPUMEMSP _xm;
   
 };
 

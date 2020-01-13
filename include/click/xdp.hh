@@ -3,6 +3,7 @@
 extern "C" {
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <bpf/xsk.h>
 #include <poll.h>
 #include <time.h>
 #include <signal.h>
@@ -81,9 +82,11 @@ using std::vector;
 class XDPSock;
 class XDPInterface;
 class XDPManager;
+class XDPUMEM;
 
 using XDPSockSP = std::shared_ptr<XDPSock>;
 using XDPInterfaceSP = std::shared_ptr<XDPInterface>;
+using XDPUMEMSP = std::shared_ptr<XDPUMEM>;
 
 struct PBuf {
   std::array<Packet*, BATCH_SIZE> pkts{};
