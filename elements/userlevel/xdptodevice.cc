@@ -43,7 +43,7 @@ int XDPToDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
 void XDPToDevice::push(int port, Packet *p)
 {
-  u32 q = p->anno_u32(7);
+  u32 q = p->anno_u32(8);
   _xfx->tx(p, q);
   p->kill();
   _xfx->kick(q);

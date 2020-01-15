@@ -58,9 +58,4 @@ XDPUMEM::XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size, v
     _umem->buffer = buf;
 }
 
-u64 XDPUMEM::next() {
-    u64 v = _head;
-    _head = _head++ & (_num_frames - 1);
-    return v;
-}
 

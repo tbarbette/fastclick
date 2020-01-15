@@ -70,3 +70,11 @@ static inline void free_pkt(unsigned char *pkt, size_t, void *pktmbuf)
     // notthing to do, packets are part of an emulation wide ringbuffer
 }
 
+static inline u64 umem_next(void)
+{
+        static u64 __i = 0;
+        u64 x = __i;
+        __i = (__i+1) & (NUM_FRAMES - 1);
+        //dbg("i=%llu\n", x);
+        return x;
+}

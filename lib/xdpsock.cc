@@ -2,6 +2,7 @@
  * xdpsock.{cc,hh} An express data path socket (XDP) object
  */
 
+#include <click/xdpmanager.hh>
 #include <click/xdpsock.hh>
 #include <click/xdpinterface.hh>
 #include <poll.h>
@@ -124,9 +125,9 @@ void XDPSock::configure_socket()
 
     for(size_t i = 0; i < NUM_RX_DESCS; i++) {
 
-        auto *addr = xsk_ring_prod__fill_addr(&_xsk->umem->fq, idx);
+        auto *addr = xsk_ring_prod__fill_addr(&_xsk->umem->fq, idx++);
         //*addr = i*FRAME_SIZE;
-        *addr = _umem_mgr->next() * FRAME_SIZE;
+        *addr = umem_next() * FRAME_SIZE;
 
     }
     xsk_ring_prod__submit(&_xsk->umem->fq, NUM_RX_DESCS);
@@ -212,7 +213,7 @@ void XDPSock::fq_replenish() {
 
     for (i = 0; i < ret; i++)
         *xsk_ring_prod__fill_addr(&_xsk->umem->fq, idx_fq++) =
-            _umem_mgr->next() * FRAME_SIZE;
+            umem_next() * FRAME_SIZE;
 
     xsk_ring_prod__submit(&_xsk->umem->fq, ret);
     _xsk->outstanding_fq -= ret;
@@ -254,8 +255,10 @@ void XDPSock::rx(PBuf &pb)
                 FRAME_TAILROOM
             );
         p->timestamp_anno();
-        p->set_anno_u32(7, _queue_id);
-        p->set_anno_u32(8, in->addr);
+        printf("setqid=%d\n", _queue_id);
+        p->set_anno_u32(8, _queue_id);
+        printf("setaddr=%d\n", in->addr);
+        p->set_anno_u64(12, in->addr);
         pb.pkts[i] = p;
     }
     pb.len = rcvd;
@@ -374,7 +377,8 @@ void XDPSock::tx(Packet *p)
 
             // collect ingress/egress descriptors
             out = xsk_ring_prod__tx_desc(&_xsk->tx, idx_tx++);
-            u32 addr = p->anno_u32(8);
+            u32 addr = p->anno_u64(12);
+            printf("addr=%d\n", addr);
 
             if (_trace) {
                 printf("tx: addr=%lld len=%d\n", out->addr, addr);

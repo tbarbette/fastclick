@@ -154,6 +154,12 @@ void XDPInterface::create_device_sockets() {
 }
 
 const vector<PBuf>& XDPInterface::rx() {
+
+    for (u32 i = 0; i < _poll_fds.size(); i++) {
+            _socks[i]->tx_complete();
+            _socks[i]->fq_replenish();
+    }
+
     // poll the file descriptors of all the XDP sockets associated with this
     // interface
     if (_poll) {
@@ -164,10 +170,6 @@ const vector<PBuf>& XDPInterface::rx() {
         }
     }
 
-    for (u32 i = 0; i < _poll_fds.size(); i++) {
-            _socks[i]->tx_complete();
-            _socks[i]->fq_replenish();
-    }
 
     // for any sockets that registered a POLLIN event, collect the packets from
     // that sockets ring buffers
@@ -191,6 +193,7 @@ void XDPInterface::tx(Packet* p, u32 queue_id) {
     if (is_mlx5 && (_xdp_flags & XDP_ZEROCOPY)) {
         queue_id -= _poll_fds.size();
     }
+    printf("txq=%d\n", queue_id);
     _socks[queue_id]->tx(p);
 }
 
@@ -202,3 +205,4 @@ void XDPInterface::kick(u32 queue_id) {
     }
     _socks[queue_id]->kick();
 }
+

@@ -12,6 +12,7 @@ class XDPManager {
         string dev, string prog, u16 xdp_flags, u16 bind_flags, bool trace
     );
 
+
   private:
     XDPManager();
 

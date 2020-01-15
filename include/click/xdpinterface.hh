@@ -36,6 +36,7 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
     inline u16 bind_flags() const                   { return _bind_flags; }
     inline uint ifindex() const                     { return _ifindex; }
 
+
   private:
     void create_device_sockets();
     void load_bpf();
