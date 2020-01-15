@@ -18,60 +18,9 @@ XDPSock::XDPSock(XDPInterfaceSP xfx, XDPUMEMSP xm, u32 queue_id, int xsks_map, b
   _umem_mgr{xm},
   _xsks_map{xsks_map}
 {
-  //configure_umem();
   configure_socket();
   printf("xdpsock %s is ready\n", xfx->dev().c_str());
 }
-
-/*
-void XDPSock::configure_umem()
-{
-
-  struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-  if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-    die("failed to set rlimit", errno);
-  }
-
-  int ret = posix_memalign(&_umem_buf, getpagesize(), NUM_FRAMES * FRAME_SIZE);
-  if (ret) {
-    die("failed to align umem buffer", ret);
-  }
-
-  if(_trace) {
-    printf("fill size:  %d\n", NUM_RX_DESCS);
-    printf("comp size:  %d\n", NUM_TX_DESCS);
-    printf("frame size: %d\n", FRAME_SIZE);
-    printf("num frames: %d\n", NUM_FRAMES);
-  }
-
-  xsk_umem_config cfg = {
-		.fill_size = NUM_RX_DESCS,
-		.comp_size = NUM_TX_DESCS,
-		.frame_size = FRAME_SIZE,
-		.frame_headroom = XSK_UMEM__DEFAULT_FRAME_HEADROOM,
-	};
-
-  _umem = static_cast<xsk_umem_info*>( calloc(1, sizeof(xsk_umem_info)) );
-  if (_umem == nullptr) {
-    die("failed to allocate umem", errno);
-  }
-
-  ret = xsk_umem__create(
-    &_umem->umem,
-    _umem_buf,
-    NUM_FRAMES * FRAME_SIZE,
-    &_umem->fq,
-    &_umem->cq,
-    &cfg
-  );
-  if (ret) {
-    die("failed to create umem", ret);
-  }
-  _umem->buffer = _umem_buf;
-
-  _umem_mgr = make_shared<XDPUMEM>(NUM_FRAMES, FRAME_SIZE, NUM_RX_DESCS, NUM_TX_DESCS);
-}
-*/
 
 void XDPSock::configure_socket()
 {
@@ -132,18 +81,6 @@ void XDPSock::configure_socket()
     }
     xsk_ring_prod__submit(&_xsk->umem->fq, NUM_RX_DESCS);
 
-    // initialize the tx queue addresses - the places in the UMEM where the
-    // application will place packets to transmit
-    /*
-       for(size_t i = 0; i < NUM_TX_DESCS; i++) {
-
-    // TX frames are in the second partition of the UMEM after the RX frames,
-    // hence the NUM_RX_DESCS offset
-    auto *addr = xsk_ring_prod__fill_addr(&_xsk->tx, i);
-     *addr = NUM_RX_DESCS*FRAME_SIZE + i*FRAME_SIZE;
-
-     }
-     */
     _fd.fd = xsk_socket__fd(_xsk->xsk);
     _fd.events = POLLIN;
 
@@ -152,8 +89,6 @@ void XDPSock::configure_socket()
 
 
 }
-
-int XDPSock::_poll_timeout{100};
 
 void XDPSock::tx_complete()
 {
@@ -255,9 +190,11 @@ void XDPSock::rx(PBuf &pb)
                 FRAME_TAILROOM
             );
         p->timestamp_anno();
-        printf("setqid=%d\n", _queue_id);
+        if(_trace)
+            printf("setqid=%d\n", _queue_id);
         p->set_anno_u32(8, _queue_id);
-        printf("setaddr=%d\n", in->addr);
+        if(_trace)
+            printf("setaddr=%d\n", in->addr);
         p->set_anno_u64(12, in->addr);
         pb.pkts[i] = p;
     }
@@ -378,7 +315,8 @@ void XDPSock::tx(Packet *p)
             // collect ingress/egress descriptors
             out = xsk_ring_prod__tx_desc(&_xsk->tx, idx_tx++);
             u32 addr = p->anno_u64(12);
-            printf("addr=%d\n", addr);
+            if(_trace)
+                printf("addr=%d\n", addr);
 
             if (_trace) {
                 printf("tx: addr=%lld len=%d\n", out->addr, addr);
@@ -455,14 +393,3 @@ void XDPSock::kick_tx()
 
 }
 
-/*
-pollfd XDPSock::poll_fd() const
-{ 
-  pollfd pfd = {
-    .fd = xsk_socket__fd(_xsk->xsk), 
-    .events = POLLIN
-  }; 
-
-  return pfd;
-}
-*/

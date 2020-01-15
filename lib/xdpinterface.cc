@@ -193,7 +193,8 @@ void XDPInterface::tx(Packet* p, u32 queue_id) {
     if (is_mlx5 && (_xdp_flags & XDP_ZEROCOPY)) {
         queue_id -= _poll_fds.size();
     }
-    printf("txq=%d\n", queue_id);
+    if(_trace) 
+        printf("txq=%d\n", queue_id);
     _socks[queue_id]->tx(p);
 }
 

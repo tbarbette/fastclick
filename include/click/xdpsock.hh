@@ -60,7 +60,6 @@ class XDPSock {
 
     std::shared_ptr<XDPUMEM> _umem_mgr{nullptr};
 
-    static int _poll_timeout;
     friend class XDPInterface;
 
 };
