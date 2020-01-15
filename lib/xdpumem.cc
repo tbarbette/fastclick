@@ -7,13 +7,14 @@
 
 using std::runtime_error;
 
-XDPUMEM::XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size)
+XDPUMEM::XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size, void *buf)
     : _num_frames{num_frames},
       _frame_size{frame_size}, 
       _fill_size{fill_size}, 
       _comp_size{comp_size} 
 {
     // reserve memory for UMEM
+    /*
     void* buffer = mmap(
         NULL, 
         num_frames * frame_size, 
@@ -27,6 +28,7 @@ XDPUMEM::XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size)
         printf("ERROR: mmap failed\n");
         exit(EXIT_FAILURE);
     }
+    */
 
     struct xsk_umem_config cfg = {
         .fill_size = fill_size,
@@ -44,7 +46,7 @@ XDPUMEM::XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size)
 
     ret = xsk_umem__create(
         &_umem->umem, 
-        buffer, 
+        buf, 
         num_frames * frame_size, 
         &_umem->fq, 
         &_umem->cq, &cfg
@@ -53,7 +55,7 @@ XDPUMEM::XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size)
         throw runtime_error{"umem create failed"};
     }
 
-    _umem->buffer = buffer;
+    _umem->buffer = buf;
 }
 
 u64 XDPUMEM::next() {

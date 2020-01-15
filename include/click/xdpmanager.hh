@@ -17,6 +17,8 @@ class XDPManager {
 
     std::unordered_map<string, XDPInterfaceSP> ifxs;
 
-    XDPUMEMSP _xm{nullptr};
+    //XDPUMEMSP _xm{nullptr};
+    // packet buffer
+    void *_pbuf;
 
 };

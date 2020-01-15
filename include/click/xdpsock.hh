@@ -32,14 +32,13 @@ struct xsk_socket_info {
 class XDPSock {
 
   public:
-    XDPSock(XDPInterfaceSP xfx, XDPUMEMSP xm, u32 queue_id, bool trace=false);
+    XDPSock(XDPInterfaceSP xfx, XDPUMEMSP xm, u32 queue_id, int xsks_map, bool trace=false);
 
     void rx(PBuf &pb);
     void tx(Packet *p);
     void kick();
 
     inline u32 queue_id() const { return _queue_id; }
-    pollfd poll_fd() const;
 
   private:
     //void configure_umem();
@@ -48,7 +47,6 @@ class XDPSock {
 
     void tx_complete();
     void fq_replenish();
-    void ingress(PBuf &pb);
 
     std::shared_ptr<XDPInterface>   _xfx{nullptr};
     u32                             _queue_id,
@@ -58,10 +56,12 @@ class XDPSock {
     void                            *_umem_buf;
     bool                            _trace;
     pollfd                          _fd;
+    int                             _xsks_map;
 
     std::shared_ptr<XDPUMEM> _umem_mgr{nullptr};
 
     static int _poll_timeout;
+    friend class XDPInterface;
 
 };
 

@@ -62,12 +62,13 @@ extern "C" {
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#define FRAME_SIZE    XSK_UMEM__DEFAULT_FRAME_SIZE
+//#define FRAME_SIZE    XSK_UMEM__DEFAULT_FRAME_SIZE
+#define FRAME_SIZE    2048
 #define NUM_RX_DESCS  XSK_RING_CONS__DEFAULT_NUM_DESCS
 #define NUM_TX_DESCS  XSK_RING_PROD__DEFAULT_NUM_DESCS
 #define NUM_DESCS     (NUM_RX_DESCS + NUM_TX_DESCS)
-#define NUM_FRAMES    NUM_DESCS
-#define BATCH_SIZE    64
+#define NUM_FRAMES    524288ul
+#define BATCH_SIZE    256
 #define FRAME_HEADROOM XSK_UMEM__DEFAULT_FRAME_HEADROOM
 #define FRAME_TAILROOM FRAME_HEADROOM
 

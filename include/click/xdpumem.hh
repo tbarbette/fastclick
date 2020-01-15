@@ -15,7 +15,7 @@ struct xsk_umem_info {
 
 class XDPUMEM {
    public:
-    XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size);
+    XDPUMEM(u32 num_frames, u32 frame_size, u32 fill_size, u32 comp_size, void *buf);
 
     u64 next();
 

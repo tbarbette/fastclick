@@ -31,7 +31,7 @@ XDPInterface::XDPInterface(
     string prog, 
     u16 xdp_flags, 
     u16 bind_flags, 
-    XDPUMEMSP xm,
+    void *pbuf,
     bool trace
 )
     : _dev{dev},
@@ -39,7 +39,10 @@ XDPInterface::XDPInterface(
       _xdp_flags{xdp_flags},
       _bind_flags{bind_flags},
       _trace{trace},
-      _xm{xm}
+      _xm{
+          make_shared<XDPUMEM>(
+                  NUM_FRAMES, FRAME_SIZE, NUM_RX_DESCS, NUM_TX_DESCS, pbuf)
+    }
 {}
 
 void XDPInterface::init() {
@@ -92,7 +95,7 @@ void XDPInterface::load_bpf_maps() {
 }
 
 // TODO XXX detect this dynamically
-constexpr bool is_mlx5{true};
+constexpr bool is_mlx5{false};
 
 void XDPInterface::create_device_sockets() {
     // determine the number of channels the interface has via ethtool
@@ -106,13 +109,14 @@ void XDPInterface::create_device_sockets() {
     channels.cmd = ETHTOOL_GCHANNELS;
 
     ifreq ifr;
+    bzero(&ifr, sizeof(ifr));
     ifr.ifr_data = reinterpret_cast<char*>(&channels);
     memcpy(ifr.ifr_name, _dev.c_str(), _dev.size());
 
     int err = ioctl(fd, SIOCETHTOOL, &ifr);
     if (err && errno != EOPNOTSUPP) {
         close(fd);
-        printf("ethtool ioctl err %s\n", strerror(err));
+        printf("[%s] ethtool ioctl err %s\n", _dev.c_str(),  strerror(err));
         throw runtime_error{"ethtool ioctl failed"};
     }
 
@@ -136,16 +140,17 @@ void XDPInterface::create_device_sockets() {
 
     for (u32 i = start; i < start + numchan; i++) {
         printf("initializing queue %d\n", i);
-        _socks.push_back(make_shared<XDPSock>(shared_from_this(), _xm, i, _trace));
+        _socks.push_back(make_shared<XDPSock>(shared_from_this(), _xm, i, _xsks_map_fd, _trace));
     }
 
     // create polling file descriptors
 
     for (XDPSockSP x : _socks) {
-        _poll_fds.push_back(x->poll_fd());
+        _poll_fds.push_back(x->_fd);
     }
 
     _pbufs = vector<PBuf>(numchan);
+    close(fd);
 }
 
 const vector<PBuf>& XDPInterface::rx() {
@@ -157,6 +162,11 @@ const vector<PBuf>& XDPInterface::rx() {
             for (PBuf& x : _pbufs) x.len = 0;
             return _pbufs;
         }
+    }
+
+    for (u32 i = 0; i < _poll_fds.size(); i++) {
+            _socks[i]->tx_complete();
+            _socks[i]->fq_replenish();
     }
 
     // for any sockets that registered a POLLIN event, collect the packets from

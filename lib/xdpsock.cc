@@ -10,11 +10,12 @@ using std::make_shared;
 using std::string;
 using std::vector;
 
-XDPSock::XDPSock(XDPInterfaceSP xfx, XDPUMEMSP xm, u32 queue_id, bool trace)
+XDPSock::XDPSock(XDPInterfaceSP xfx, XDPUMEMSP xm, u32 queue_id, int xsks_map, bool trace)
 : _xfx{xfx},
   _queue_id{queue_id},
   _trace{trace},
-  _umem_mgr{xm}
+  _umem_mgr{xm},
+  _xsks_map{xsks_map}
 {
   //configure_umem();
   configure_socket();
@@ -116,9 +117,14 @@ void XDPSock::configure_socket()
 
     // initialize the fill queue addresses - the places in the UMEM where the
     // kernel will place received packets
+    int n = NUM_RX_DESCS;
+    u32 idx;
+    ret = xsk_ring_prod__reserve(&_xsk->umem->fq, n, &idx);
+    if (ret != n) die("failed to reserve fq descs", -ret);
+
     for(size_t i = 0; i < NUM_RX_DESCS; i++) {
 
-        auto *addr = xsk_ring_prod__fill_addr(&_xsk->umem->fq, i);
+        auto *addr = xsk_ring_prod__fill_addr(&_xsk->umem->fq, idx);
         //*addr = i*FRAME_SIZE;
         *addr = _umem_mgr->next() * FRAME_SIZE;
 
@@ -139,6 +145,10 @@ void XDPSock::configure_socket()
      */
     _fd.fd = xsk_socket__fd(_xsk->xsk);
     _fd.events = POLLIN;
+
+    ret = bpf_map_update_elem(_xsks_map, &_queue_id, &_fd.fd, 0);
+    if (ret) die("failed to update bpf map elem", -ret);
+
 
 }
 
@@ -208,7 +218,7 @@ void XDPSock::fq_replenish() {
     _xsk->outstanding_fq -= ret;
 }
 
-void XDPSock::ingress(PBuf &pb)
+void XDPSock::rx(PBuf &pb)
 {
     unsigned int rcvd, i;
     u32 idx_rx = 0;
@@ -254,16 +264,6 @@ void XDPSock::ingress(PBuf &pb)
     _xsk->outstanding_fq += rcvd;
 }
 
-void XDPSock::rx(PBuf &pb)
-{
-    tx_complete();
-    fq_replenish();
-
-    int ret = poll(&_fd, 1, _poll_timeout);
-    if (ret <= 0) return;
-    if (_fd.revents) ingress(pb);
-
-}
 
 #if 0
 void XDPSock::rx(PBuf &pb) 
@@ -451,6 +451,7 @@ void XDPSock::kick_tx()
 
 }
 
+/*
 pollfd XDPSock::poll_fd() const
 { 
   pollfd pfd = {
@@ -460,3 +461,4 @@ pollfd XDPSock::poll_fd() const
 
   return pfd;
 }
+*/

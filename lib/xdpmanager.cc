@@ -26,7 +26,20 @@ XDPInterfaceSP XDPManager::get(string dev)
 
 XDPManager::XDPManager()
 {
-  _xm = make_shared<XDPUMEM>(NUM_FRAMES, FRAME_SIZE, NUM_RX_DESCS, NUM_TX_DESCS);
+    //_xm = make_shared<XDPUMEM>(NUM_FRAMES, FRAME_SIZE, NUM_RX_DESCS, NUM_TX_DESCS);
+    _pbuf = mmap(
+        NULL, 
+        NUM_FRAMES * FRAME_SIZE, 
+        PROT_READ | PROT_WRITE, 
+        MAP_PRIVATE | MAP_ANONYMOUS, 
+        -1, 
+        0
+    );
+
+    if (_pbuf == MAP_FAILED) {
+        printf("ERROR: mmap failed\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 XDPInterfaceSP XDPManager::ensure(
@@ -39,7 +52,7 @@ XDPInterfaceSP XDPManager::ensure(
 
     printf("creating new xdp socket for %s\n", dev.c_str());
     XDPInterfaceSP xfx = make_shared<XDPInterface>(
-        dev, prog, xdp_flags, bind_flags, _xm, trace
+        dev, prog, xdp_flags, bind_flags, _pbuf, trace
     );
     xfx->init();
 
