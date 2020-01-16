@@ -1,34 +1,31 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2019 - The MergeTB Authors */
-
-#define KBUILD_MODNAME "moaq"
 #include <linux/bpf.h>
 #include "bpf_helpers.h"
-#include "common.h"
+//#include "xdpsock.h"
+
+#define __uint(name, val) int (*name)[val]
+#define MAX_SOCKS 4
+
+#define bpf_debug(fmt, ...)				                \
+        ({                                                              \
+        char ____fmt[] = fmt;				                \
+        bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__);      \
+        })
 
 char _license[] SEC("license") = "GPL";
 
-struct bpf_map_def SEC("maps") xsks_map = {
-  .type = BPF_MAP_TYPE_XSKMAP,
-  .key_size = sizeof(int),
-  .value_size = sizeof(int),
-  .max_entries = 64,
-};
+struct {
+        __uint(type, BPF_MAP_TYPE_XSKMAP);
+        __uint(max_entries, MAX_SOCKS);
+        __uint(key_size, sizeof(int));
+        __uint(value_size, sizeof(int));
+} xsks_map SEC(".maps");
 
-SEC("xdp_sock")
-int moaq_prog(struct xdp_md *ctx)
+static unsigned int index;
+
+SEC("xdp_sock") int xdp_sock_prog(struct xdp_md *ctx)
 {
-  //bpf_debug("pkt: @%d:%d\n", ctx->ingress_ifindex, ctx->rx_queue_index);
+        //bpf_debug("pkt: @%d:%d\n", ctx->ingress_ifindex, ctx->rx_queue_index);
 
-  int index = ctx->rx_queue_index;
-
-  if (bpf_map_lookup_elem(&xsks_map, &index)) {
-    return bpf_redirect_map(
-        &xsks_map, 
-        index, // key into the xdp socket map
-        0  // no special flags
-    );
-  }
-
-  return XDP_PASS;
+        return bpf_redirect_map(&xsks_map, ctx->rx_queue_index, XDP_DROP);
 }
