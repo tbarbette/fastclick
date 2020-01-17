@@ -4,7 +4,13 @@ prefix = @prefix@
 INSTALL = @INSTALL@
 
 %.llvmir: ../../elements/userlevel/bpf/%.c
-	clang -O2 -Wno-compare-distinct-pointer-types -emit-llvm -c $< -o $@
+	clang -g \
+		-D__KERNEL__ -D__BPF_TRACING__ -Wno-unused-value -Wno-pointer-sign \
+		-D__TARGET_ARCH_x86 -Wno-compare-distinct-pointer-types \
+		-Wno-gnu-variable-sized-type-not-at-end \
+		-Wno-address-of-packed-member -Wno-tautological-compare \
+		-Wno-unknown-warning-option  \
+		-O2 -emit-llvm -c $< -o  $@
 
 %.o: %.llvmir
 	llc -march=bpf -filetype=obj -o $@ $<

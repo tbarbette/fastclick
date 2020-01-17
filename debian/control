@@ -3,8 +3,8 @@ Section: net
 Priority: optional
 Maintainer: Ryan Goodfellow <rgoodfel@isi.edu>
 Build-Depends: 
-  clang,
-  llvm,
+  clang-9,
+  llvm-9,
   libexpat1-dev,
   libnuma-dev,
   libibverbs-dev,
