@@ -60,12 +60,25 @@ void XDPInterface::load_bpf() {
     load_bpf_maps();
 }
 
+void XDPInterface::remove_xdp_program() {
+
+    u32 curr_prog_id = 0;
+    if (bpf_get_link_xdp_id(_ifindex, &curr_prog_id, _xdp_flags)) {
+        return;
+    }
+
+    bpf_set_link_xdp_fd(_ifindex, -1, _xdp_flags);
+
+}
+
 void XDPInterface::load_bpf_program() {
     printf("loading program %s\n", _prog.c_str());
     struct bpf_prog_load_attr pla = {
         .file = _prog.c_str(),
         .prog_type = BPF_PROG_TYPE_XDP,
     };
+
+    remove_xdp_program();
 
     int err = bpf_prog_load_xattr(&pla, &_bpf_obj, &_bpf_fd);
     if (err) {

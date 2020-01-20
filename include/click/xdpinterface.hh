@@ -42,6 +42,7 @@ class XDPInterface : public std::enable_shared_from_this<XDPInterface> {
     void load_bpf();
     void load_bpf_program();
     void load_bpf_maps();
+    void remove_xdp_program();
 
     string                   _dev,
                              _prog;
