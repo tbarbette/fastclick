@@ -69,6 +69,7 @@ IPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
   bool print_ttl = false;
   bool print_len = false;
   bool print_aggregate = false;
+  bool print_vlan = false;
   bool bcontents;
   String channel;
 
@@ -86,6 +87,7 @@ IPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("SWAP", _swap)
 	.read("LENGTH", print_len)
 	.read("AGGREGATE", print_aggregate)
+	.read("VLAN", print_vlan)
 	.read("ACTIVE", _active)
 #if CLICK_USERLEVEL
 	.read("OUTFILE", FilenameArg(), _outfilename)
@@ -128,6 +130,7 @@ IPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
   _print_ttl = print_ttl;
   _print_len = print_len;
   _print_aggregate = print_aggregate;
+  _print_vlan = print_vlan;
   _errh = router()->chatter_channel(channel);
   return 0;
 }
@@ -345,6 +348,8 @@ IPPrint::simple_action(Packet *p)
 	sa << p->timestamp_anno() << ": ";
     if (_print_aggregate)
 	sa << '#' << AGGREGATE_ANNO(p);
+    if (_print_vlan)
+	sa << " VLAN:" << VLAN_TCI_ANNO(p);
     if (_print_paint)
 	sa << (_print_aggregate ? "." : "paint ") << (int)PAINT_ANNO(p);
     if (_print_aggregate || _print_paint)
