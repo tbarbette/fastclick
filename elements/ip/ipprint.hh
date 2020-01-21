@@ -127,6 +127,7 @@ class IPPrint : public BatchElement { public:
   bool _print_ttl : 1;
   bool _print_len : 1;
   bool _print_aggregate : 1;
+  bool _print_vlan : 1;
   bool _payload : 1;		// '_contents' refers to payload
   unsigned _contents : 2;	// Whether to dump packet contents
 
