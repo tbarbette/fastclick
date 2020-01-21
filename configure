@@ -6830,7 +6830,9 @@ done
 
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
     $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
-
+    have_httpd=yes
+else
+    have_httpd=no
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lre2" >&5
@@ -7567,7 +7569,9 @@ test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_jso
 if test "x$enable_json" = xyes; then
     :
     $as_echo "#define HAVE_JSON 1" >>confdefs.h
-
+    have_json=yes
+else
+    have_json=no
 fi
 # Check whether --enable-local was given.
 if test "${enable_local+set}" = set; then :
@@ -15702,18 +15706,19 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
-
 echo "
 
 Configuration Summary:
-    C Compiler:                  ${CC}
-    C++ Compiler:                ${CXX}
+    C     Compiler:              ${CC}
+    C++   Compiler:              ${CXX}
 
-    DPDK support:                ${enable_dpdk}
+    DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
-    PCAP support:                ${have_pcap}
+    PCAP   support:              ${have_pcap}
 
-    RE2 support:                 ${have_re2}
+    RE2    support:              ${have_re2}
+    HTTPD  support:              ${have_httpd}
+    JSON   support:              ${have_json}
 "
 
 echo "Now type make to build FastClick..."
