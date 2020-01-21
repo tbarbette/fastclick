@@ -131,12 +131,17 @@ class ARPAdvertiser : public BatchElement {
 
                 String to_str() {
                     StringAccum sa;
+                    short tab_size = 17;
 
-                    sa << "[Dst IP: " << this->dst_ip.unparse().c_str() << ", ";
-                    sa << "Dst MAC: " << this->dst_mac.unparse_colon().c_str() << "]";
-                    sa << " --> ";
-                    sa << "[Adv IP: " << this->adv_ip.unparse().c_str() << ", ";
-                    sa << "Adv MAC: " << this->adv_mac.unparse_colon().c_str() << "]\n";
+                    sa << "[Dst IP ";
+                    sa.snprintf(tab_size, "%17s", this->dst_ip.unparse().c_str());
+                    sa << ", Dst MAC ";
+                    sa.snprintf(tab_size, "%17s", this->dst_mac.unparse_colon().c_str());
+                    sa << "] --> [Adv IP ";
+                    sa.snprintf(tab_size, "%17s", this->adv_ip.unparse().c_str());
+                    sa << ", Adv MAC ";
+                    sa.snprintf(tab_size, "%17s", this->adv_mac.unparse_colon().c_str());
+                    sa << "]\n";
 
                     return sa.take_string();
                 }
