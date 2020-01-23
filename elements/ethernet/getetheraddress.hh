@@ -1,6 +1,6 @@
 #ifndef CLICK_GETETHERADDRESS_HH
 #define CLICK_GETETHERADDRESS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -26,7 +26,7 @@ of the source and destination Ethernet addresses.
 EtherEncap, SetEtherAddress, StoreEtherAddress
 */
 
-class GetEtherAddress : public Element {
+class GetEtherAddress : public SimpleElement<GetEtherAddress> {
 
   public:
 

@@ -1,6 +1,6 @@
 #ifndef CLICK_SETETHERADDRESS_HH
 #define CLICK_SETETHERADDRESS_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/etheraddress.hh>
 CLICK_DECLS
 
@@ -16,7 +16,7 @@ CLICK_DECLS
  * =a StoreEtherAddress, GetEtherAddress
  */
 
-class SetEtherAddress : public Element {
+class SetEtherAddress : public SimpleElement<SetEtherAddress> {
   public:
 
     const char *class_name() const		{ return "SetEtherAddress"; }
