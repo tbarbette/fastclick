@@ -32,7 +32,7 @@
 CLICK_DECLS
 
 const char *CheckICMPHeader::reason_texts[NREASONS] = {
-  "not ICMP", "bad packet length", "bad ICMP checksum"
+    "not ICMP", "bad packet length", "bad ICMP checksum"
 };
 
 CheckICMPHeader::CheckICMPHeader() : _reason_drops(0)
