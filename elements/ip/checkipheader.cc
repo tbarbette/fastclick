@@ -224,6 +224,8 @@ inline CheckIPHeader::Reason CheckIPHeader::valid(Packet* p) {
     // reported by Parveen Kumar Patel at Utah -- 4/3/2002
     p->set_dst_ip_anno(ip->ip_dst);
 
+    _count++;
+
     return NREASONS;
 }
 
