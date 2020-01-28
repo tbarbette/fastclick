@@ -88,7 +88,6 @@ class CheckICMPHeader : public BatchElement {
 
         Packet *drop(Reason reason, Packet *p);
         static String read_handler(Element *e, void *thunk) CLICK_COLD;
-
 };
 
 CLICK_ENDDECLS
