@@ -6960,8 +6960,8 @@ if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
 
 else
     have_hyperscan=no
-fi    
-    
+fi
+
 # Check whether --enable-json was given.
 if test "${enable_json+set}" = set; then :
   enableval=$enable_json; :
@@ -14344,6 +14344,8 @@ fi
 
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
+else
+    enable_batch="no"
 fi
 
 if test "x$enable_dpdk" = xyes; then
@@ -14352,6 +14354,8 @@ fi
 
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
+else
+    enable_flow="no"
 fi
 
 if test "x$enable_experimental" = xyes; then
@@ -15813,6 +15817,7 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
+              Flow:              ${enable_flow}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}

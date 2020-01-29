@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowIPManagerSpinlock_HH
-#define CLICK_FlowIPManagerSpinlock_HH
+#ifndef CLICK_FLOWIPMANAGERSPINLOCK_HH
+#define CLICK_FLOWIPMANAGERSPINLOCK_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>

@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowIPManagerHMPMP_HH
-#define CLICK_FlowIPManagerHMPMP_HH
+#ifndef CLICK_FLOWIPMANAGERHMP_HH
+#define CLICK_FLOWIPMANAGERHMP_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>
