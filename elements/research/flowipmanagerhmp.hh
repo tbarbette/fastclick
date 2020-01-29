@@ -20,6 +20,8 @@ CLICK_DECLS
 
 /**
  * FlowIPManager based on the HashtableMP (hierarchical locked hashtable)
+ *
+ * @see also FlowIPManager
  */
 class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
 public:

@@ -17,6 +17,16 @@ struct FlowLockState {
 	Spinlock lock;
 };
 
+
+/**
+ * =s
+ *
+ * FlowLock()
+ *
+ * =c flow
+ *
+ * Flock the downards path per-flow, so packets of the same flow cannot go further at the same time.
+ */
 class FlowLock : public FlowSpaceElement<FlowLockState> {
 
 public:

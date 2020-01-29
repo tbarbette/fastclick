@@ -2,7 +2,7 @@
  * flowiploadbalancer.{cc,hh} -- TCP & UDP load-balancer
  * Tom Barbette
  *
- * Copyright (c) 2019 KTH Royal Institute of Technology
+ * Copyright (c) 2019-2020 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),

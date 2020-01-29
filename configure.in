@@ -2302,6 +2302,8 @@ fi
 dnl add 'batch' if compiled with --enable-batch
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
+else
+    enable_batch="no"
 fi
 
 dnl add 'dpdk' if compiled with --enable-dpdk
@@ -2312,6 +2314,8 @@ fi
 dnl add 'flow' if compiled with --enable-flow
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
+else
+    enable_flow="no"
 fi
 
 dnl add 'experimental' if --enable-experimental was supplied
@@ -2457,6 +2461,7 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
+              Flow:              ${enable_flow}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}

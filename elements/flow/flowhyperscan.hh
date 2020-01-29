@@ -8,6 +8,9 @@ extern "C" {
 
 CLICK_DECLS
 
+/*
+ * State of one stream
+ */
 struct FlowHyperScanState {
 	FlowHyperScanState() {
 
@@ -15,6 +18,25 @@ struct FlowHyperScanState {
 	hs_stream_t* stream;
 };
 
+/**
+ * =title FlowHyperScan
+ *
+ * =c
+ *
+ * FlowHyperScan(PATTERNS)
+ *
+ * =s flow
+ *
+ * Flow-based IDS using the HyperScan library
+ *
+ * =d
+ *
+ * This element uses the HyperScan library to implement a pattern matcher that
+ * is not subject to eviction by splitting the stream of attack at the right
+ * place as it keeps a per-flow record of the DFA.
+ *
+ *
+ */
 class FlowHyperScan : public FlowSpaceElement<FlowHyperScanState> {
 
 public:

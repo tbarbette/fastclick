@@ -1,25 +1,8 @@
 /*
- * FlowHyperScan.{cc,hh}
- */
-
-#include <click/config.h>
-#include <click/glue.hh>
-#include <click/args.hh>
-#include <click/flow/flow.hh>
-#include "flowhyperscan.hh"
-
-CLICK_DECLS
-
-FlowHyperScan::FlowHyperScan() {
-    _scratch = 0;
-};
-
-FlowHyperScan::~FlowHyperScan() {
-
-}
-
-
-/*
+ * FlowHyperScan.{cc,hh} Flow-based IDS using the HyperScan library
+ *
+ * This file integrates some code taken from the hyperscan helper, the license for that code is:
+ *
  * Copyright (c) 2015-2016, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,11 +28,38 @@ FlowHyperScan::~FlowHyperScan() {
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The rest of the code is using the usual Click license :
+ *
+ * Copyright (c) 2019-2020 Tom Barbette, KTH Royal Institute of Technology
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
  */
 
-// helper function - see end of file
-//static void parseFile(const char *filename, Vector<String> &patterns,
-        //Vector<unsigned> &flags, Vector<unsigned> &ids);
+#include <click/config.h>
+#include <click/glue.hh>
+#include <click/args.hh>
+#include <click/flow/flow.hh>
+#include "flowhyperscan.hh"
+
+CLICK_DECLS
+
+FlowHyperScan::FlowHyperScan() {
+    _scratch = 0;
+};
+
+FlowHyperScan::~FlowHyperScan() {
+
+}
+
 
 static hs_database_t *buildDatabase(const Vector<const char *> &expressions,
                                     const Vector<unsigned> flags,
