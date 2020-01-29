@@ -21,7 +21,7 @@
 #include <click/args.hh>
 CLICK_DECLS
 
-MarkMACHeader::MarkMACHeader()
+MarkMACHeader::MarkMACHeader() : _offset(0), _length(0)
 {
 }
 
@@ -29,37 +29,27 @@ int
 MarkMACHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     uint32_t offset = 0, length = 0;
+
     if (Args(conf, this, errh)
-	.read_p("OFFSET", offset)
-	.read_p("LENGTH", length).complete() < 0)
-	return -1;
+        .read_p("OFFSET", offset)
+        .read_p("LENGTH", length)
+        .complete() < 0)
+        return -1;
+
     _offset = offset;
     _length = length;
+
     return 0;
 }
-
-#if HAVE_BATCH
-PacketBatch *
-MarkMACHeader::simple_action_batch(PacketBatch* head) {
-	Packet* current = head;
-	while (current != NULL) {
-		if (_length)
-		    current->set_mac_header(current->data() + _offset, _length);
-	        else
-		    current->set_mac_header(current->data() + _offset);
-		current = current->next();
-	}
-	return head;
-}
-#endif
 
 Packet *
 MarkMACHeader::simple_action(Packet *p)
 {
-    if (_length)
-	p->set_mac_header(p->data() + _offset, _length);
-    else
-	p->set_mac_header(p->data() + _offset);
+    if (_length) {
+        p->set_mac_header(p->data() + _offset, _length);
+    } else {
+        p->set_mac_header(p->data() + _offset);
+    }
     return p;
 }
 

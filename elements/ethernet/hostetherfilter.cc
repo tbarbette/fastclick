@@ -38,12 +38,12 @@ HostEtherFilter::configure(Vector<String> &conf, ErrorHandler *errh)
     bool drop_own = false, drop_other = true;
     uint32_t offset = 0;
     if (Args(conf, this, errh)
-	.read_mp("ETHER", _addr)
-	.read_p("DROP_OWN", drop_own)
-	.read_p("DROP_OTHER", drop_other)
-	.read("OFFSET", offset)
-	.complete() < 0)
-	return -1;
+        .read_mp("ETHER", _addr)
+        .read_p("DROP_OWN", drop_own)
+        .read_p("DROP_OTHER", drop_other)
+        .read("OFFSET", offset)
+        .complete() < 0)
+        return -1;
     _offset = offset;
     _drop_own = drop_own;
     _drop_other = drop_other;
@@ -57,20 +57,20 @@ HostEtherFilter::simple_action(Packet *p)
     const unsigned short *daddr = (const unsigned short *)e->ether_dhost;
 
     if (_drop_own && memcmp(e->ether_shost, _addr.data(), 6) == 0) {
-	checked_output_push(1, p);
-	p = 0;
+        checked_output_push(1, p);
+        p = 0;
     } else if (memcmp(e->ether_dhost, _addr.data(), 6) == 0) {
-	p->set_packet_type_anno(Packet::HOST);
+        p->set_packet_type_anno(Packet::HOST);
     } else if (daddr[0] == 0xFFFF && daddr[1] == 0xFFFF && daddr[2] == 0xFFFF) {
-	p->set_packet_type_anno(Packet::BROADCAST);
+        p->set_packet_type_anno(Packet::BROADCAST);
     } else if (e->ether_dhost[0] & 0x01) {
-	p->set_packet_type_anno(Packet::MULTICAST);
+        p->set_packet_type_anno(Packet::MULTICAST);
     } else {
-	p->set_packet_type_anno(Packet::OTHERHOST);
-	if (_drop_other) {
-	    checked_output_push(1, p);
-	    p = 0;
-	}
+        p->set_packet_type_anno(Packet::OTHERHOST);
+        if (_drop_other) {
+            checked_output_push(1, p);
+            p = 0;
+        }
     }
     return p;
 }

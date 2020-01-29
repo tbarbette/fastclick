@@ -96,51 +96,47 @@ Boolean.  If false, then don't print messages.  Default is true.
 
 =a Print, CheckIPHeader */
 
-class IPPrint : public BatchElement { public:
+class IPPrint : public SimpleElement<IPPrint> {
+    public:
+        IPPrint() CLICK_COLD;
+        ~IPPrint() CLICK_COLD;
 
-  IPPrint() CLICK_COLD;
-  ~IPPrint() CLICK_COLD;
+        const char *class_name() const { return "IPPrint"; }
+        const char *port_count() const { return PORTS_1_1; }
 
-  const char *class_name() const		{ return "IPPrint"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *) CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  int initialize(ErrorHandler *) CLICK_COLD;
-  void cleanup(CleanupStage) CLICK_COLD;
-  void add_handlers() CLICK_COLD;
+        Packet *simple_action(Packet *p);
 
-  Packet      *simple_action      (Packet      *p);
-#if HAVE_BATCH
-  PacketBatch *simple_action_batch(PacketBatch *batch);
-#endif
+    private:
+        bool _swap;
+        bool _active;
+        String _label;
+        int _bytes;               // Number of bytes to dump
+        bool _print_id : 1;       // Print IP ID?
+        bool _print_timestamp : 1;
+        bool _print_paint : 1;
+        bool _print_tos : 1;
+        bool _print_ttl : 1;
+        bool _print_len : 1;
+        bool _print_aggregate : 1;
+        bool _print_vlan : 1;
+        bool _payload : 1;        // '_contents' refers to payload
+        unsigned _contents : 2;   // Whether to dump packet contents
 
- private:
+    #if CLICK_USERLEVEL
+        String _outfilename;
+        FILE *_outfile;
+    #endif
+        ErrorHandler *_errh;
 
-  bool _swap;
-  bool _active;
-  String _label;
-  int _bytes;			// Number of bytes to dump
-  bool _print_id : 1;		// Print IP ID?
-  bool _print_timestamp : 1;
-  bool _print_paint : 1;
-  bool _print_tos : 1;
-  bool _print_ttl : 1;
-  bool _print_len : 1;
-  bool _print_aggregate : 1;
-  bool _payload : 1;		// '_contents' refers to payload
-  unsigned _contents : 2;	// Whether to dump packet contents
-
-#if CLICK_USERLEVEL
-  String _outfilename;
-  FILE *_outfile;
-#endif
-  ErrorHandler *_errh;
-
-    static StringAccum &address_pair(StringAccum &sa, const click_ip *iph);
-    void tcp_line(StringAccum &, const Packet *, int transport_len) const;
-    void udp_line(StringAccum &, const Packet *, int transport_len) const;
-    void icmp_line(StringAccum &, const Packet *, int transport_len) const;
-
+        static StringAccum &address_pair(StringAccum &sa, const click_ip *iph);
+        void tcp_line(StringAccum &, const Packet *, int transport_len) const;
+        void udp_line(StringAccum &, const Packet *, int transport_len) const;
+        void icmp_line(StringAccum &, const Packet *, int transport_len) const;
 };
 
 CLICK_ENDDECLS

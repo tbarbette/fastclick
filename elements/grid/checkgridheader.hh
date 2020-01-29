@@ -1,6 +1,7 @@
 #ifndef CHECKGRIDHEADER_HH
 #define CHECKGRIDHEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
+#include <click/atomic.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -14,30 +15,41 @@ CLICK_DECLS
  * and that the Grid header length, length, and
  * checksum fields are valid.
  *
+ * =back
+ *
+ * =h count read-only
+ *
+ * Returns the number of correct packets CheckGridHeader has seen.
+ *
+ * =h drops read-only
+ *
+ * Returns the number of incorrect packets CheckGridHeader has seen.
+ *
  * =a
  * SetGridChecksum
  */
 
-class CheckGridHeader : public Element {
+class CheckGridHeader : public SimpleElement<CheckGridHeader> {
+    public:
+        CheckGridHeader() CLICK_COLD;
+        ~CheckGridHeader() CLICK_COLD;
 
-  int _drops;
+        const char *class_name() const { return "CheckGridHeader"; }
+        const char *port_count() const { return "1/1-2"; }
+        const char *processing() const { return PROCESSING_A_AH; }
 
- public:
+        void add_handlers() CLICK_COLD;
 
-  CheckGridHeader() CLICK_COLD;
-  ~CheckGridHeader() CLICK_COLD;
+        Packet *simple_action(Packet *p);
 
-  const char *class_name() const		{ return "CheckGridHeader"; }
-  const char *port_count() const		{ return "1/1-2"; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+    private:
+        atomic_uint64_t _count;
+        atomic_uint64_t _drops;
 
-  int drops() const				{ return _drops; }
+        enum { h_count, h_drops };
 
-  void add_handlers() CLICK_COLD;
-
-  Packet *simple_action(Packet *);
-  void drop_it(Packet *);
-
+        void drop(Packet *p);
+        static String read_handler(Element *e, void *thunk) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

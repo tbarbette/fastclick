@@ -2,7 +2,11 @@
  * markipce.{cc,hh} -- element marks IP header ECN CE bit
  * Eddie Kohler
  *
+ * Computational batching support and updated counters
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2001 International Computer Science Institute
+ * Copyright (c) 2020 UBITECH and KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,7 +26,7 @@
 #include <click/error.hh>
 CLICK_DECLS
 
-MarkIPCE::MarkIPCE()
+MarkIPCE::MarkIPCE() : _force(false)
 {
     _drops = 0;
 }
@@ -34,7 +38,6 @@ MarkIPCE::~MarkIPCE()
 int
 MarkIPCE::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    _force = false;
     return Args(conf, this, errh).read_p("FORCE", _force).complete();
 }
 
@@ -44,14 +47,16 @@ MarkIPCE::simple_action(Packet *p)
     assert(p->has_network_header());
     const click_ip *iph = p->ip_header();
     if ((iph->ip_tos & IP_ECNMASK) == IP_ECN_NOT_ECT && !_force) {
-	p->kill();
-	return 0;
-    } else if ((iph->ip_tos & IP_ECNMASK) == IP_ECN_CE)
-	return p;
+        p->kill();
+        return 0;
+    } else if ((iph->ip_tos & IP_ECNMASK) == IP_ECN_CE) {
+        return p;
+    }
 
     WritablePacket *q;
-    if (!(q = p->uniqueify()))
-	return 0;
+    if (!(q = p->uniqueify())) {
+        return 0;
+    }
 
     click_ip *q_iph = q->ip_header();
     uint16_t old_hw = *(uint16_t *) q_iph;
@@ -61,10 +66,25 @@ MarkIPCE::simple_action(Packet *p)
     return q;
 }
 
+String
+MarkIPCE::read_handler(Element *e, void *thunk)
+{
+    MarkIPCE *m = reinterpret_cast<MarkIPCE *>(e);
+
+    switch ((intptr_t)thunk) {
+        case 0: {
+            return String(m->_drops);
+        }
+        default: {
+            return String();
+        }
+    }
+}
+
 void
 MarkIPCE::add_handlers()
 {
-    add_data_handlers("drops", Handler::OP_READ, &_drops);
+    add_read_handler("drops", read_handler, 0);
 }
 
 CLICK_ENDDECLS

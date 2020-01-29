@@ -25,7 +25,7 @@
 #include <clicknet/ip.h>
 CLICK_DECLS
 
-MarkIPHeader::MarkIPHeader()
+MarkIPHeader::MarkIPHeader() : _offset(0)
 {
 }
 
@@ -36,7 +36,6 @@ MarkIPHeader::~MarkIPHeader()
 int
 MarkIPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    _offset = 0;
     return Args(conf, this, errh).read_p("OFFSET", _offset).complete();
 }
 
@@ -47,15 +46,6 @@ MarkIPHeader::simple_action(Packet *p)
     p->set_ip_header(ip, ip->ip_hl << 2);
     return p;
 }
-
-#if HAVE_BATCH
-PacketBatch*
-MarkIPHeader::simple_action_batch(PacketBatch *batch)
-{
-    EXECUTE_FOR_EACH_PACKET(MarkIPHeader::simple_action, batch);
-    return batch;
-}
-#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(MarkIPHeader)

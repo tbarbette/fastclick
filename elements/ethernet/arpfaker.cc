@@ -2,7 +2,11 @@
  * arpfaker.{cc,hh} -- ARP response faker element
  * Robert Morris
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2020 UBITECH and KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,9 +30,11 @@
 #include <click/glue.hh>
 CLICK_DECLS
 
-ARPFaker::ARPFaker()
-  : _timer(this)
+ARPFaker::ARPFaker() : _timer(this)
 {
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 ARPFaker::~ARPFaker()
@@ -39,11 +45,11 @@ int
 ARPFaker::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     return Args(conf, this, errh)
-	.read_mp("DSTIP", _ip1)
-	.read_mp("DSTETH", _eth1)
-	.read_mp("SRCIP", _ip2)
-	.read_mp("SRCETH", _eth2)
-	.complete();
+        .read_mp("DSTIP", _ip1)
+        .read_mp("DSTETH", _eth1)
+        .read_mp("SRCIP", _ip2)
+        .read_mp("SRCETH", _eth2)
+        .complete();
 }
 
 int
@@ -57,9 +63,18 @@ ARPFaker::initialize(ErrorHandler *)
 void
 ARPFaker::run_timer(Timer *)
 {
-    if (Packet *p = ARPResponder::make_response(_eth1.data(), _ip1.data(),
-						_eth2.data(), _ip2.data()))
-	output(0).push(p);
+    Packet *p = ARPResponder::make_response(
+        _eth1.data(), _ip1.data(), _eth2.data(), _ip2.data()
+    );
+
+    if (p) {
+    #if HAVE_BATCH
+        output_push_batch(0, PacketBatch::make_from_packet(p));
+    #else
+        output(0).push(p);
+    #endif
+    }
+
     _timer.schedule_after_msec(10 * 1000);
 }
 

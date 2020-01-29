@@ -2,7 +2,11 @@
  * etherpausesource.{cc,hh} -- generates Ethernet PAUSE MAC control frames
  * Eddie Kohler, based on etherpause.cc by Roman Chertov
  *
+ * Computational batching support
+ * by Georgios Katsikas
+ *
  * Copyright (c) 2008 Meraki, Inc.
+ * Copyright (c) 2020 UBITECH and KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -31,6 +35,9 @@ static const unsigned char default_destination[6] = {
 EtherPauseSource::EtherPauseSource()
     : _packet(0), _timer(this)
 {
+#if HAVE_BATCH
+    in_batch_mode = BATCH_MODE_YES;
+#endif
 }
 
 EtherPauseSource::~EtherPauseSource()
@@ -46,19 +53,19 @@ EtherPauseSource::configure(Vector<String> &conf, ErrorHandler *errh)
     _active = true;
     _interval = 1000;
     if (Args(conf, this, errh)
-	.read_mp("SRC", src)
-	.read_mp("PAUSETIME", pausetime)
-	.read("DST", dst)
-	.read("LIMIT", _limit)
-	.read("ACTIVE", _active)
-	.read("INTERVAL", SecondsArg(3), _interval)
-	.complete() < 0)
+    .read_mp("SRC", src)
+    .read_mp("PAUSETIME", pausetime)
+    .read("DST", dst)
+    .read("LIMIT", _limit)
+    .read("ACTIVE", _active)
+    .read("INTERVAL", SecondsArg(3), _interval)
+    .complete() < 0)
         return -1;
 
     // build PAUSE frame
     WritablePacket *q;
     if (!(q = Packet::make(64)))
-	return errh->error("out of memory!"), -ENOMEM;
+    return errh->error("out of memory!"), -ENOMEM;
 
     q->set_mac_header(q->data(), sizeof(click_ether));
     click_ether *ethh = q->ether_header();
@@ -81,7 +88,7 @@ EtherPauseSource::initialize(ErrorHandler *)
     _count = 0;
     _timer.initialize(this);
     if (_limit != 0 && _active && output_is_push(0))
-	_timer.schedule_after_msec(_interval);
+    _timer.schedule_after_msec(_interval);
     return 0;
 }
 
@@ -97,12 +104,18 @@ EtherPauseSource::cleanup(CleanupStage)
 void
 EtherPauseSource::run_timer(Timer *)
 {
-    if (Packet *p = _packet->clone()) {
-	++_count;
-	output(0).push(p);
+    Packet *p = _packet->clone();
+    if (p) {
+        ++_count;
+    #if HAVE_BATCH
+        output_push_batch(0, PacketBatch::make_from_packet(p));
+    #else
+        output(0).push(p);
+    #endif
     }
+
     if (_limit < 0 || _count < _limit)
-	_timer.reschedule_after_msec(_interval);
+       _timer.reschedule_after_msec(_interval);
 }
 
 Packet *
@@ -111,11 +124,21 @@ EtherPauseSource::pull(int)
     if (!_active || (_limit >= 0 && _count >= _limit))
         return 0;
     if (Packet *p = _packet->clone()) {
-	++_count;
-	return p;
+    ++_count;
+    return p;
     } else
-	return 0;
+    return 0;
 }
+
+#if HAVE_BATCH
+PacketBatch *
+EtherPauseSource::pull_batch(int port, unsigned max)
+{
+    PacketBatch *batch;
+    MAKE_BATCH(EtherPauseSource::pull(port), batch, max);
+    return batch;
+}
+#endif
 
 String
 EtherPauseSource::reader(Element *e, void *user_data)
@@ -123,15 +146,15 @@ EtherPauseSource::reader(Element *e, void *user_data)
     EtherPauseSource *eps = static_cast<EtherPauseSource *>(e);
     switch ((intptr_t) user_data) {
     case h_src:
-	return EtherAddress(eps->_packet->ether_header()->ether_shost).unparse();
+    return EtherAddress(eps->_packet->ether_header()->ether_shost).unparse();
     case h_dst:
-	return EtherAddress(eps->_packet->ether_header()->ether_dhost).unparse();
+    return EtherAddress(eps->_packet->ether_header()->ether_dhost).unparse();
     case h_pausetime: {
-	const click_ether_macctl *emc = (const click_ether_macctl *) eps->_packet->network_header();
-	return String(ntohs(emc->ether_macctl_param));
+    const click_ether_macctl *emc = (const click_ether_macctl *) eps->_packet->network_header();
+    return String(ntohs(emc->ether_macctl_param));
     }
     default:
-	return String();
+    return String();
     }
 }
 
@@ -139,21 +162,21 @@ int
 EtherPauseSource::rewrite_packet(const void *data, uint32_t offset, uint32_t size, ErrorHandler *errh)
 {
     if (WritablePacket *q = Packet::make(64)) {
-	memcpy(q->data(), _packet->data(), 64);
-	memcpy(q->data() + offset, data, size);
-	q->set_mac_header(q->data(), sizeof(click_ether));
-	_packet->kill();
-	_packet = q;
-	return 0;
+    memcpy(q->data(), _packet->data(), 64);
+    memcpy(q->data() + offset, data, size);
+    q->set_mac_header(q->data(), sizeof(click_ether));
+    _packet->kill();
+    _packet = q;
+    return 0;
     } else
-	return errh->error("out of memory!"), -ENOMEM;
+    return errh->error("out of memory!"), -ENOMEM;
 }
 
 void
 EtherPauseSource::check_awake()
 {
     if (output_is_push(0) && !_timer.scheduled() && _active)
-	_timer.schedule_now();
+    _timer.schedule_now();
 }
 
 int
@@ -163,34 +186,34 @@ EtherPauseSource::writer(const String &str, Element *e, void *user_data, ErrorHa
     switch ((intptr_t) user_data) {
     case h_src:
     case h_dst: {
-	EtherAddress a;
-	if (!EtherAddressArg().parse(str, a, e))
-	    return errh->error("type mismatch");
-	return eps->rewrite_packet(&a, ((intptr_t) user_data == h_src ? offsetof(click_ether, ether_shost) : offsetof(click_ether, ether_dhost)), 6, errh);
+    EtherAddress a;
+    if (!EtherAddressArg().parse(str, a, e))
+        return errh->error("type mismatch");
+    return eps->rewrite_packet(&a, ((intptr_t) user_data == h_src ? offsetof(click_ether, ether_shost) : offsetof(click_ether, ether_dhost)), 6, errh);
     }
     case h_pausetime: {
-	uint32_t x;
-	if (!IntArg().parse(str, x) || x > 0xFFFF)
-	    return errh->error("type mismatch");
-	uint16_t param = htons((uint16_t) x);
-	return eps->rewrite_packet(&param, sizeof(click_ether) + offsetof(click_ether_macctl, ether_macctl_param), 2, errh);
+    uint32_t x;
+    if (!IntArg().parse(str, x) || x > 0xFFFF)
+        return errh->error("type mismatch");
+    uint16_t param = htons((uint16_t) x);
+    return eps->rewrite_packet(&param, sizeof(click_ether) + offsetof(click_ether_macctl, ether_macctl_param), 2, errh);
     }
     case h_limit:
-	if (!IntArg().parse(str, eps->_limit))
-	    return errh->error("type mismatch");
-	eps->check_awake();
-	return 0;
+    if (!IntArg().parse(str, eps->_limit))
+        return errh->error("type mismatch");
+    eps->check_awake();
+    return 0;
     case h_active:
-	if (!BoolArg().parse(str, eps->_active))
-	    return errh->error("type mismatch");
-	eps->check_awake();
-	return 0;
+    if (!BoolArg().parse(str, eps->_active))
+        return errh->error("type mismatch");
+    eps->check_awake();
+    return 0;
     case h_reset_counts:
-	eps->_count = 0;
-	eps->check_awake();
-	return 0;
+    eps->_count = 0;
+    eps->check_awake();
+    return 0;
     default:
-	return 0;
+    return 0;
     }
 }
 
