@@ -87,7 +87,11 @@ CheckARPHeader::drop(Reason reason, Packet *p)
         _reason_drops[reason]++;
     }
 
-    checked_output_push(1, p);
+    if (noutputs() == 2) {
+        output(1).push(p);
+    } else {
+        p->kill();
+    }
 
     return 0;
 }
