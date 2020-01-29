@@ -15712,6 +15712,8 @@ Configuration Summary:
     C     Compiler:              ${CC}
     C++   Compiler:              ${CXX}
 
+          Batching:              ${enable_batch}
+
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
