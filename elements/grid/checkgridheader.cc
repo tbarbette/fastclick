@@ -132,3 +132,4 @@ CheckGridHeader::add_handlers()
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckGridHeader)
+ELEMENT_MT_SAFE(CheckGridHeader)

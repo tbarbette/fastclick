@@ -241,14 +241,6 @@ CheckIPHeader::simple_action(Packet *p)
     }
 }
 
-#if HAVE_BATCH
-PacketBatch *
-CheckIPHeader::simple_action_batch(PacketBatch* batch) {
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(CheckIPHeader::simple_action, batch, [](Packet*){});
-    return batch;
-}
-#endif
-
 String
 CheckIPHeader::read_handler(Element *e, void *thunk)
 {
@@ -288,3 +280,4 @@ CheckIPHeader::add_handlers()
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckIPHeader)
+ELEMENT_MT_SAFE(CheckIPHeader)

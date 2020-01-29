@@ -161,3 +161,4 @@ CheckTCPHeader::add_handlers()
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckTCPHeader)
+ELEMENT_MT_SAFE(CheckTCPHeader)

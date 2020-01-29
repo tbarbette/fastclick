@@ -155,15 +155,6 @@ CheckICMPHeader::simple_action(Packet *p)
     return p;
 }
 
-#if HAVE_BATCH
-PacketBatch*
-CheckICMPHeader::simple_action_batch(PacketBatch *batch)
-{
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(CheckICMPHeader::simple_action, batch, [](Packet*){});
-    return batch;
-}
-#endif
-
 String
 CheckICMPHeader::read_handler(Element *e, void *thunk)
 {
@@ -203,3 +194,4 @@ CheckICMPHeader::add_handlers()
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckICMPHeader)
+ELEMENT_MT_SAFE(CheckICMPHeader)

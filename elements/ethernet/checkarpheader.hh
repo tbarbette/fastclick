@@ -64,8 +64,7 @@ subdivided by error. Only available if the DETAILS keyword argument is true.
 ARPPrint, ARPQuerier, ARPResponder, ARPFaker
 */
 
-class CheckARPHeader : public BatchElement {
-
+class CheckARPHeader : public SimpleElement<CheckARPHeader> {
     public:
         CheckARPHeader() CLICK_COLD;
         ~CheckARPHeader() CLICK_COLD;
@@ -78,9 +77,6 @@ class CheckARPHeader : public BatchElement {
         void add_handlers() CLICK_COLD;
 
         Packet *simple_action(Packet *p);
-    #if HAVE_BATCH
-        PacketBatch *simple_action_batch(PacketBatch *batch);
-    #endif
 
     private:
         unsigned _offset;

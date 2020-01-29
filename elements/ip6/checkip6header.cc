@@ -185,3 +185,4 @@ CheckIP6Header::add_handlers()
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckIP6Header)
+ELEMENT_MT_SAFE(CheckIP6Header)

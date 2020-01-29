@@ -2,7 +2,11 @@
  * markip6header.{cc,hh} -- element sets IP6 Header annotation
  * Eddie Kohler, Peilei Fan
  *
+ * Computational batching support by
+ * by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2020 UBITECH and KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -21,7 +25,7 @@
 #include <clicknet/ip6.h>
 CLICK_DECLS
 
-MarkIP6Header::MarkIP6Header()
+MarkIP6Header::MarkIP6Header() : _offset(0)
 {
 }
 
@@ -32,17 +36,17 @@ MarkIP6Header::~MarkIP6Header()
 int
 MarkIP6Header::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  _offset = 0;
-  return Args(conf, this, errh).read_p("OFFSET", _offset).complete();
+    return Args(conf, this, errh).read_p("OFFSET", _offset).complete();
 }
 
 Packet *
 MarkIP6Header::simple_action(Packet *p)
 {
-  const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p->data() + _offset);
-  p->set_ip6_header(ip6, 10 << 2);
-  return p;
+    const click_ip6 *ip6 = reinterpret_cast<const click_ip6 *>(p->data() + _offset);
+    p->set_ip6_header(ip6, 10 << 2);
+    return p;
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(MarkIP6Header)
+ELEMENT_MT_SAFE(MarkIP6Header)
