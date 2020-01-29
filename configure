@@ -807,6 +807,7 @@ enable_batch
 enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
+enable_json
 enable_select
 enable_poll
 enable_kqueue
@@ -842,7 +843,6 @@ enable_icmp
 enable_ip
 enable_ip6
 enable_ipsec
-enable_json
 enable_local
 enable_radio
 enable_research
@@ -1528,6 +1528,7 @@ Optional Features:
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
+    --enable-json         enable JSON support
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
@@ -6755,7 +6756,6 @@ else
     LIBS="$save_libs"
 fi
 
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing MHD_start_daemon" >&5
 $as_echo_n "checking for library containing MHD_start_daemon... " >&6; }
 if ${ac_cv_search_MHD_start_daemon+:} false; then :
@@ -6829,8 +6829,9 @@ fi
 done
 
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
-    $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
     have_httpd=yes
+    $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
+
 else
     have_httpd=no
 fi
@@ -6894,7 +6895,20 @@ else
     have_re2=no
 fi
 
+# Check whether --enable-json was given.
+if test "${enable_json+set}" = set; then :
+  enableval=$enable_json; :
+else
+  enable_json=no
+fi
 
+if test "x$enable_json" = "xyes"; then
+    have_json=yes
+    $as_echo "#define HAVE_JSON 1" >>confdefs.h
+
+else
+    have_json=no
+fi
 
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
@@ -7569,9 +7583,7 @@ test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_jso
 if test "x$enable_json" = xyes; then
     :
     $as_echo "#define HAVE_JSON 1" >>confdefs.h
-    have_json=yes
-else
-    have_json=no
+
 fi
 # Check whether --enable-local was given.
 if test "${enable_local+set}" = set; then :
@@ -15705,6 +15717,7 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
+
 
 echo "
 

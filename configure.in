@@ -193,11 +193,13 @@ else
     LIBS="$save_libs"
 fi
 
-
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
+    have_httpd=yes
     AC_DEFINE([HAVE_MICROHTTPD])
+else
+    have_httpd=no
 fi
 
 AC_CHECK_LIB([re2], [main], [ac_have_re2=yes], [ac_have_re2=no])
@@ -210,7 +212,15 @@ else
     have_re2=no
 fi
 
-
+AC_ARG_ENABLE([json],
+    [AS_HELP_STRING([  --enable-json], [enable JSON support])],
+    [:], [enable_json=no])
+if test "x$enable_json" = "xyes"; then
+    have_json=yes
+    AC_DEFINE([HAVE_JSON])
+else
+    have_json=no
+fi
 
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
@@ -2422,14 +2432,18 @@ AC_OUTPUT
 echo "
 
 Configuration Summary:
-    C Compiler:                  ${CC}
-    C++ Compiler:                ${CXX}
+    C     Compiler:              ${CC}
+    C++   Compiler:              ${CXX}
 
-    DPDK support:                ${enable_dpdk}
+          Batching:              ${enable_batch}
+
+    DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
-    PCAP support:                ${have_pcap}
+    PCAP   support:              ${have_pcap}
 
-    RE2 support:                 ${have_re2}
+    RE2    support:              ${have_re2}
+    HTTPD  support:              ${have_httpd}
+    JSON   support:              ${have_json}
 "
 
 echo "Now type make to build FastClick..."
