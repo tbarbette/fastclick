@@ -109,7 +109,7 @@ subdivided by error. Only available if the DETAILS keyword argument is true.
 CheckTCPHeader, CheckUDPHeader, CheckICMPHeader
 */
 
-class CheckIPHeader : public BatchElement {
+class CheckIPHeader : public SimpleElement<CheckIPHeader> {
     public:
         CheckIPHeader() CLICK_COLD;
         ~CheckIPHeader() CLICK_COLD;
@@ -123,9 +123,6 @@ class CheckIPHeader : public BatchElement {
         void add_handlers() CLICK_COLD;
 
         Packet *simple_action(Packet *p);
-    #if HAVE_BATCH
-        PacketBatch *simple_action_batch(PacketBatch *batch);
-    #endif
 
         struct OldBadSrcArg {
             static bool parse(const String &str, Vector<IPAddress> &result, Args &args);

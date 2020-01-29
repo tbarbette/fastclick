@@ -53,7 +53,7 @@ subdivided by error. Only available if the DETAILS keyword argument was true.
 
 =a CheckIPHeader, CheckTCPHeader, CheckUDPHeader, MarkIPHeader */
 
-class CheckICMPHeader : public BatchElement {
+class CheckICMPHeader : public SimpleElement<CheckICMPHeader> {
     public:
         CheckICMPHeader() CLICK_COLD;
         ~CheckICMPHeader() CLICK_COLD;
@@ -66,9 +66,6 @@ class CheckICMPHeader : public BatchElement {
         void add_handlers() CLICK_COLD;
 
         Packet *simple_action(Packet *p);
-    #if HAVE_BATCH
-        PacketBatch *simple_action_batch(PacketBatch *batch);
-    #endif
 
     private:
         bool _verbose : 1;

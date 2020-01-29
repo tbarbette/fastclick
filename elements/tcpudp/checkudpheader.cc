@@ -161,3 +161,4 @@ CheckUDPHeader::add_handlers()
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckUDPHeader)
+ELEMENT_MT_SAFE(CheckUDPHeader)
