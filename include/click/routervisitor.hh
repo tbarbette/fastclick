@@ -50,6 +50,22 @@ class RouterVisitor { public:
     virtual bool visit(Element *e, bool isoutput, int port,
 		       Element *from_e, int from_port, int distance);
 
+    /**
+     * @brief return the distance between two neighbour elements
+     * @param e the first element
+     * @param from_e the second element
+     *
+     * A router traversal normally consider the distance of two neighbour elements
+     * to be 1. Hence, the distance specified to the visit() call above
+     * will be the number of elements since the beginning of the
+     * traversal in breadth-first. However, to take into consideration some
+     * path cost, one may override this function to consider the distance
+     * between elements to be more.
+     *
+     * You normally do not need to override this.
+     */
+    virtual int distance(Element *e, Element *from_e);
+
 };
 
 /** @class ElementTracker

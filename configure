@@ -838,6 +838,7 @@ enable_app
 enable_aqm
 enable_ethernet
 enable_etherswitch
+enable_flow
 enable_grid
 enable_icmp
 enable_ip
@@ -1557,6 +1558,7 @@ Optional Features:
   --disable-aqm           do not include active queue management elements
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
+  --enable-flow           include Enable flow system and elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
@@ -6895,6 +6897,71 @@ else
     have_re2=no
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for hs_compile_multi in -lhs" >&5
+$as_echo_n "checking for hs_compile_multi in -lhs... " >&6; }
+if ${ac_cv_lib_hs_hs_compile_multi+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lhs  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char hs_compile_multi ();
+int
+main ()
+{
+return hs_compile_multi ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_hs_hs_compile_multi=yes
+else
+  ac_cv_lib_hs_hs_compile_multi=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_hs_hs_compile_multi" >&5
+$as_echo "$ac_cv_lib_hs_hs_compile_multi" >&6; }
+if test "x$ac_cv_lib_hs_hs_compile_multi" = xyes; then :
+  ac_have_hyperscan=yes
+else
+  ac_have_hyperscan=no
+fi
+
+for ac_header in hs/hs.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "hs/hs.h" "ac_cv_header_hs_hs_h" "$ac_includes_default"
+if test "x$ac_cv_header_hs_hs_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_HS_HS_H 1
+_ACEOF
+ ac_have_hyperscan_h=yes
+else
+  ac_have_hyperscan_h=no
+fi
+
+done
+
+if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
+    have_hyperscan=yes
+    LIBS="$LIBS -lhs"
+    $as_echo "#define HAVE_HYPERSCAN 1" >>confdefs.h
+
+else
+    have_hyperscan=no
+fi
+
 # Check whether --enable-json was given.
 if test "${enable_json+set}" = set; then :
   enableval=$enable_json; :
@@ -7514,6 +7581,18 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_etherswitch" = xNO -o "x$enable_etherswitch" = x \) && enable_etherswitch=yes
 if test "x$enable_etherswitch" = xyes; then
     :
+
+fi
+# Check whether --enable-flow was given.
+if test "${enable_flow+set}" = set; then :
+  enableval=$enable_flow;
+else
+  enable_flow=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flow" = x \) && enable_flow=yes
+if test "x$enable_flow" = xyes; then
+    :
+    $as_echo "#define HAVE_FLOW 1" >>confdefs.h
 
 fi
 # Check whether --enable-grid was given.
@@ -14265,10 +14344,18 @@ fi
 
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
+else
+    enable_batch="no"
 fi
 
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
+fi
+
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
+else
+    enable_flow="no"
 fi
 
 if test "x$enable_experimental" = xyes; then
@@ -14277,6 +14364,10 @@ fi
 
 if test "x$enable_gtp" = xyes; then
     provisions="$provisions gtp"
+fi
+
+if test "x$have_hyperscan" = xyes; then
+    provisions="$provisions hs"
 fi
 
 if test "x$have_int64_types" = xyes; then
@@ -15726,6 +15817,7 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
+              Flow:              ${enable_flow}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}

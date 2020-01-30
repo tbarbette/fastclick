@@ -73,8 +73,14 @@ class Bitvector {
     void or_with_difference(const Bitvector &x, Bitvector &difference);
 
     void swap(Bitvector &x);
+    void set_range(int start, int length, bool value);
+    bool range(int start, int length);
 
     inline int weight() const;
+    inline int popcnt() const;
+    inline int weight_range(int start, int length) const;
+
+    inline int clz() const;
 
     bool parse(const String &str, int min_val, int max_val, int offset = 0);
     String unparse(int read_offset = 0, int output_offset = 0) const;
@@ -385,12 +391,54 @@ inline Bitvector::Bit &Bitvector::Bit::operator-=(bool x) {
 
 /** @brief Return the number of true bits */
 inline int Bitvector::weight() const {
-    int w = 0;
-    for (int i = 0; i < size(); i++)
-        if ((*this)[i])
-            w++;
-    return w;
+	int n = 0;
+#if HAVE___BUILTIN_POPCOUNT
+	for (int i =0 ; i < (_max + wbits)>>wshift; i++) {
+		n+= __builtin_popcount(_data[i]);
+	}
+#else
+	for (int i = 0; i < size(); i++)
+	  if ((*this)[i])
+		n++;
+#endif
+	return n;
 }
+
+/** @brief Return the number of true bits
+ *  @sa weight */
+inline int Bitvector::popcnt() const {
+	return weight();
+}
+
+/** @brief Return the number of true bits */
+inline int Bitvector::weight_range(int start, int length) const {
+	assert(start+length < _max);
+	int w = 0;
+	for (int i = start; i < start + length; i++)
+		if ((*this)[i])
+			w++;
+	return w;
+}
+
+/** @brief Return the number of leading zeroes */
+inline int Bitvector::clz() const {
+	int n = 0;
+	for (int i =0 ; i < (_max + wbits)>>wshift; i++) {
+		if (!_data[i])
+			n+=wbits;
+		else {
+#if HAVE___BUILTIN_CTZ
+			return n + __builtin_ctz(_data[i]);
+#else
+			while (!this[n])
+				n++;
+			return n;
+#endif
+		}
+	}
+	return size();
+}
+
 
 CLICK_ENDDECLS
 #endif

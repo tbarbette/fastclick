@@ -196,7 +196,7 @@ GTPTable::process(int port, Packet* p) {
                    icmpflowid.daddr().unparse().c_str(),
                    icmpflowid.id(),
                    icmpflowid.seq(),gtp_out.gtp_id);
-        if (!_icmp_map.find_remove(icmpflowid,gtp_in)) {
+        if (!_icmp_map.find_erase(icmpflowid,gtp_in)) {
             click_chatter("Unknown FLOW ! Dropping packet");
             return -1;
         }
@@ -205,7 +205,7 @@ GTPTable::process(int port, Packet* p) {
 	        click_chatter("PING RECEIVED, ADDING MAP TEID %u->%u",gtp_in.gtp_id, gtp_out.gtp_id);
 	}
 
-        _gtpmap.set(gtp_in,gtp_out);
+        _gtpmap.insert(gtp_in,gtp_out);
 
         assert(*_gtpmap.find(gtp_in) == gtp_out);
 

@@ -24,14 +24,18 @@
 #include <rte_ethdev.h>
 CLICK_DECLS
 
-inline uint64_t get_current_tick_dpdk(TSCClock* thunk) {
+inline uint64_t get_current_tick_dpdk(void* thunk) {
+#if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
+    return 0;
+#else
     uint64_t t;
     if (rte_eth_read_clock(((DPDKDeviceClock*)thunk)->_dev->port_id, &t) != 0)
         return 0;
     return t;
+#endif
 }
 
-inline uint64_t get_tick_hz_dpdk(TSCClock* thunk) {
+inline uint64_t get_tick_hz_dpdk(void* thunk) {
     uint64_t begin = get_current_tick_dpdk(thunk);
     rte_delay_ms(100);
     uint64_t end = get_current_tick_dpdk(thunk);
@@ -60,6 +64,10 @@ DPDKDeviceClock::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("INSTALL", _install)
             .complete() < 0)
         return -1;
+
+#if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
+    return errh->error("DPDKDeviceClock needs DPDK 19.08");
+#endif
     return 0;
 }
 
