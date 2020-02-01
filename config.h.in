@@ -77,6 +77,9 @@
 /* Define if Port::push/Port::pull should use bound function pointers. */
 #undef HAVE_BOUND_PORT_TRANSFER
 
+/* Define if compiled with heuristic for CPU load. */
+#undef HAVE_CLICK_LOAD
+
 /* Define if the C++ compiler understands constexpr. */
 #undef HAVE_CXX_CONSTEXPR
 
