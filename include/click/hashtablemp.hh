@@ -502,7 +502,7 @@ HashContainerMP<K,V,Item>::find_write(const K &key)
 }
 
 /**
- * Find a key and then removes it from the table.
+ * Find a key and then removes it from the table if do_remove is true.
  * While going through collisions, entries are removed if shoulddelete returns true.
  * Calls store to save the found entry to eg a temporary variables. Return true if found, false if not.
  *
@@ -533,7 +533,7 @@ HashContainerMP<K,V,Item>::_find_clean(const K &key, std::function<void(V &c)> s
             if (hashkeyeq(hashkey(pprev), key)) {
                 store(*pprev->item.unprotected_ptr());
                 if (do_remove) {
-			*pprev_ptr = pprev->_hashnext;
+				*pprev_ptr = pprev->_hashnext;
 					erase_item(pprev);
 					_table->_size--;
                 }
@@ -578,20 +578,21 @@ HashContainerMP<K,V,Item>::find_clean(const K &key, std::function<void(V &c)> st
 
 /**
  * XXX Replacement if the item already exists is not respectful of the item lock
- * Cleaning is done respectfully of the item lock. It is remove right away but not freed until references expire.
+ * Cleaning is done respectfully of the item lock. It is removed right away but not freed until references expire.
  */
 template <typename K, typename V, typename Item>
 inline void
 HashContainerMP<K,V,Item>::insert_clean(const K &key, const V& value, std::function<bool(V &c)> shoulddelete)
 {
-	_find_clean<false>(key, [&value](V&c){c = value;}, shoulddelete,[key,value,this](ListItem* &head){
+    auto inserter = [key,value,this](ListItem* &head){
 		ListItem* e = allocate(ListItem(key,value));
 		*e->item.unprotected_ptr() = value;
 		click_hashmp_assert(e->item.unshared());
 		e->_hashnext = head;
 		head = e;
 		_table->_size++;
-	});
+	};
+	_find_clean<false>(key, [&value](V&c){c = value;}, shoulddelete, inserter);
 }
 
 
@@ -930,6 +931,7 @@ class RWHashTableMP : public HashContainerMP<K,V,rwlock<V> > {
 
 };
 
+
 template <typename K, typename Vin, typename Time = click_jiffies_t, template <typename> class Protector = shared>
 class AgingTableMP {
 	struct V {
@@ -937,6 +939,7 @@ class AgingTableMP {
 		Time time;
 	};
 
+  protected:
 	HashContainerMP<K,V,Protector<V> > _table;
 	Time _timeout;
 	typedef typename HashContainerMP<K,V,Protector<V> >::size_type size_type;
@@ -953,7 +956,14 @@ class AgingTableMP {
 	 * Search for a key
 	 */
 	inline bool find(K key, const Time &now, Vin& storage, const bool update_age = true) {
-		return _table.find_clean(key, [&storage,now,update_age](V&c){storage = c.value;if (update_age) c.time = now;}, [now,this](V& v){return v.time + _timeout < now;});
+		return _table.find_clean(key, [&storage,now,update_age](V&c){storage = c.value;if (update_age) c.time = now;}, [now,this](V& v){
+                bool remove = v.time + _timeout < now;
+#ifdef DEBUG_AGING
+                if (remove)
+                    click_chatter("Removing entry upon search (time is %d, expired %d, now %d)",v.time,_timeout,now);
+#endif
+                return remove;
+        });
 	}
 
 	/**
@@ -961,7 +971,14 @@ class AgingTableMP {
 	 */
 	inline void insert(const K &key, const Time &now, const Vin& value) {
 		const V val = {.value = value, .time = now};
-		_table.insert_clean(key, val, [now,this](V& v){return v.time + _timeout < now;});
+		_table.insert_clean(key, val, [now,this](V& v){
+                bool remove = v.time + _timeout < now;
+#ifdef DEBUG_AGING
+                if (remove)
+                    click_chatter("Removing entry upon insertion (time is %d, expired %d, now %d)",v.time,_timeout,now);
+#endif
+                return remove;
+        });
 	}
 
 	inline size_type size() {
@@ -971,8 +988,8 @@ class AgingTableMP {
 
 template <typename K, typename Vin, typename Time = click_jiffies_t>
 class AgingTable : public AgingTableMP<K,Vin,Time,not_shared> { public:
-	AgingTable(Time timeout = 60) : AgingTableMP<K,Vin,Time,not_shared>(timeout) {
-
+	AgingTable(Time timeout = 60 * CLICK_HZ ) : AgingTableMP<K,Vin,Time,not_shared>(timeout) {
+        AgingTableMP<K,Vin,Time,not_shared>::_table.disable_mt();
 	}
 };
 CLICK_ENDDECLS
