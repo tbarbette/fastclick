@@ -29,6 +29,9 @@
 /* Define if you have the <byteswap.h> header file. */
 #undef HAVE_BYTESWAP_H
 
+/* Define if you have the CPU load cycles tracking function. */
+#undef HAVE_CLICK_LOAD
+
 /* Define if you have the clock_gettime function. */
 #undef HAVE_CLOCK_GETTIME
 

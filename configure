@@ -868,6 +868,7 @@ enable_stats
 enable_stride
 enable_task_heap
 enable_task_stats
+enable_cpu_load
 enable_dmalloc
 enable_hash_iterator_epochs
 enable_force_expensive
@@ -1592,6 +1593,8 @@ Optional Features:
   --enable-task-heap      use heap for task list
   --enable-task-stats     Keep track of task statistics, used for automatic
                           balancing of tasks among threads
+  --enable-cpu-load       Keep track of CPU usage using an approximation.
+                          Useful when using polling keeping the CPU at 100%
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
                           hash iterator epochs
@@ -10924,6 +10927,18 @@ fi
 
 if test "x$enable_task_stats" = xyes; then
     $as_echo "#define HAVE_TASK_STATS 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-cpu-load was given.
+if test "${enable_cpu_load+set}" = set; then :
+  enableval=$enable_cpu_load; :
+else
+  enable_cpu_load=no
+fi
+
+if test "x$enable_cpu_load" = xyes; then
+    $as_echo "#define HAVE_CLICK_LOAD 1" >>confdefs.h
 
 fi
 
