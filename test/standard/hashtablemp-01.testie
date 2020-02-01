@@ -1,0 +1,15 @@
+%info
+Tests hash table functionality with the HashTableMPTest element.
+
+%require
+click-buildtool provides HashTableMPTest
+
+%script
+click -qe 'HashTableMPTest'
+
+%expect stderr
+config:1:{{.*}}
+  All tests pass!
+
+%ignore stderr
+  Time: {{.*}}
