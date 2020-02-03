@@ -10,11 +10,9 @@
 #include <click/pair.hh>
 #include <click/ipflowid.hh>
 #include <click/flow/common.hh>
-
+#include <click/timerwheel.hh>
 
 #include "../flow/flowipmanager.hh"
-
-
 
 CLICK_DECLS
 
@@ -25,7 +23,6 @@ CLICK_DECLS
  */
 class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
 public:
-
 
     FlowIPManagerHMP() CLICK_COLD;
 
@@ -50,7 +47,6 @@ public:
 
 private:
 
-
     HashTableMP<IPFlow5ID,int> _hash;
     atomic_uint32_t _current;
 
@@ -63,8 +59,6 @@ private:
     int _verbose;
 
 };
-
-
 
 CLICK_ENDDECLS
 #endif

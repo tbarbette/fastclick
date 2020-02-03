@@ -130,7 +130,6 @@ void FlowIPManagerIMP::cleanup(CleanupStage stage) {
     delete vhash;
 }
 
-
 void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& recent) {
     IPFlow5ID fid = IPFlow5ID(p);
 
@@ -176,7 +175,6 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
     }
 }
 
-
 void FlowIPManagerIMP::push_batch(int, PacketBatch* batch) {
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
@@ -190,7 +188,6 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch) {
         output_push_batch(0, batch);
     }
 }
-
 
 enum {h_count};
 String FlowIPManagerIMP::read_handler(Element* e, void* thunk) {
@@ -211,5 +208,6 @@ void FlowIPManagerIMP::add_handlers() {
 
 CLICK_ENDDECLS
 
+ELEMENT_REQUIRES(dpdk)
 EXPORT_ELEMENT(FlowIPManagerIMP)
 ELEMENT_MT_SAFE(FlowIPManagerIMP)

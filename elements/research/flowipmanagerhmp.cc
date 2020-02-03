@@ -72,11 +72,9 @@ void FlowIPManagerHMP::cleanup(CleanupStage stage) {
 
 }
 
-
 void FlowIPManagerHMP::pre_migrate(DPDKDevice* dev, int from, Vector<Pair<int,int>> gids) {
 
 }
-
 
 void FlowIPManagerHMP::post_migrate(DPDKDevice* dev, int from) {
 
@@ -107,12 +105,9 @@ void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b) {
 	}
 }
 
-
 void FlowIPManagerHMP::init_assignment(Vector<unsigned> table) {
 
 }
-
-
 
 void FlowIPManagerHMP::push_batch(int, PacketBatch* batch) {
 	BatchBuilder b;
@@ -127,11 +122,8 @@ void FlowIPManagerHMP::push_batch(int, PacketBatch* batch) {
 
 }
 
-
-
-
-
 CLICK_ENDDECLS
 
+ELEMENT_REQUIRES(dpdk)
 EXPORT_ELEMENT(FlowIPManagerHMP)
 ELEMENT_MT_SAFE(FlowIPManagerHMP)
