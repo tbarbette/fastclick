@@ -41,6 +41,7 @@ CounterRxWMPPR::CounterRxWMPPR()
 CounterRxWMPPR::~CounterRxWMPPR()
 {
 }
+
 CounterRxWMPPW::CounterRxWMPPW()
 {
     _atomic = 2;
@@ -49,8 +50,6 @@ CounterRxWMPPW::CounterRxWMPPW()
 CounterRxWMPPW::~CounterRxWMPPW()
 {
 }
-
-
 
 CounterLockMP::CounterLockMP()
 {
@@ -70,13 +69,12 @@ CounterPLockMP::~CounterPLockMP()
 {
 }
 
-
-
 int
-CounterLockMP::initialize(ErrorHandler *errh) {
+CounterLockMP::initialize(ErrorHandler *errh)
+{
     if (CounterBase::initialize(errh) != 0)
         return -1;
-    //If not in simple mode, we only allow one writer so we can sum up the total number of threads
+    // If not in simple mode, we only allow one writer so we can sum up the total number of threads
 
     return 0;
 }
@@ -89,7 +87,7 @@ CounterLockMP::simple_action(Packet *p)
     _stats->s._byte_count += p->length();
     _stats->lock.release();
     if (unlikely(!_simple))
-        check_handlers(CounterLockMP::count(), CounterLockMP::byte_count()); //BUG : if not atomic, then handler may be called twice
+        check_handlers(CounterLockMP::count(), CounterLockMP::byte_count()); // BUG: if not atomic, then handler may be called twice
     return p;
 }
 
@@ -149,13 +147,12 @@ CounterPRWMP::~CounterPRWMP()
 {
 }
 
-
-
 int
-CounterRWMP::initialize(ErrorHandler *errh) {
+CounterRWMP::initialize(ErrorHandler *errh)
+{
     if (CounterBase::initialize(errh) != 0)
         return -1;
-    //If not in simple mode, we only allow one writer so we can sum up the total number of threads
+    // If not in simple mode, we only allow one writer so we can sum up the total number of threads
 
     return 0;
 }
@@ -168,7 +165,7 @@ CounterRWMP::simple_action(Packet *p)
     _stats->s._byte_count += p->length();
     _stats->lock.write_end();
     if (unlikely(!_simple))
-        check_handlers(CounterRWMP::count(), CounterRWMP::byte_count()); //BUG : if not atomic, then handler may be called twice
+        check_handlers(CounterRWMP::count(), CounterRWMP::byte_count()); // BUG : if not atomic, then handler may be called twice
     return p;
 }
 
@@ -209,7 +206,6 @@ CounterRWMP::reset()
     release_write();
     CounterBase::reset();
 }
-
 
 /*
 CounterRCUMP::CounterRCUMP() : _stats()
@@ -274,6 +270,7 @@ CounterRCUMP::reset()
     _stats.write_commit();
 }
 */
+
 CounterRCU::CounterRCU()
 {
 }
@@ -333,7 +330,6 @@ CounterRCU::reset()
     _stats.write_commit(flags);
 }
 
-
 CounterAtomic::CounterAtomic()
 {
 }
@@ -359,7 +355,7 @@ CounterAtomic::simple_action_batch(PacketBatch *batch)
 {
     if (unlikely(_batch_precise)) {
         FOR_EACH_PACKET(batch,p)
-                        CounterAtomic::simple_action(p);
+            CounterAtomic::simple_action(p);
         return batch;
     }
 
@@ -383,7 +379,6 @@ CounterAtomic::reset()
     _byte_count = 0;
     CounterBase::reset();
 }
-
 
 CounterLock::CounterLock()
 {
@@ -412,7 +407,7 @@ CounterLock::simple_action_batch(PacketBatch *batch)
 {
     if (unlikely(_batch_precise)) {
         FOR_EACH_PACKET(batch,p)
-        CounterLock::simple_action(p);
+            CounterLock::simple_action(p);
         return batch;
     }
 
@@ -441,8 +436,6 @@ CounterLock::reset()
     _lock.release();
 }
 
-
-
 CounterRW::CounterRW()
 {
 }
@@ -470,7 +463,7 @@ CounterRW::simple_action_batch(PacketBatch *batch)
 {
     if (unlikely(_batch_precise)) {
         FOR_EACH_PACKET(batch,p)
-        CounterRW::simple_action(p);
+            CounterRW::simple_action(p);
         return batch;
     }
 
@@ -526,7 +519,7 @@ CounterPRW::simple_action_batch(PacketBatch *batch)
 {
     if (unlikely(_batch_precise)) {
         FOR_EACH_PACKET(batch,p)
-        CounterPRW::simple_action(p);
+            CounterPRW::simple_action(p);
         return batch;
     }
 

@@ -17,34 +17,34 @@ it passes.
 
 */
 
-class CounterTest : public BatchElement { public:
+class CounterTest : public BatchElement {
+    public:
+        CounterTest() CLICK_COLD;
 
-    CounterTest() CLICK_COLD;
+        const char *class_name() const { return "CounterTest"; }
+        const char *port_count() const { return "0-1/1"; }
+        const char *processing() const { return PUSH; }
 
-    const char *class_name() const      { return "CounterTest"; }
-    const char *port_count() const    { return "0-1/1"; }
-    const char *processing() const    { return PUSH; }
+        int configure(Vector<String>&, ErrorHandler*) override;
+        bool run_task(Task *) override;
+        void push(int, Packet* p) override;
+    #if HAVE_BATCH
+        void push_batch(int, PacketBatch* batch) override;
+    #endif
+        void add_handlers() override;
 
-    int configure(Vector<String>&, ErrorHandler*) override;
-    bool run_task(Task *) override;
-    void push(int, Packet* p) override;
-#if HAVE_BATCH
-    void push_batch(int, PacketBatch* batch) override;
-#endif
-    void add_handlers() override;
-private:
-    CounterBase* _counter;
-    int _rate;
-    unsigned long _read;
-    unsigned long _write;
-    bool _atomic;
-    bool _standalone;
-    Task _task;
-    int _pass;
-    per_thread<int> _cur_pass;
-    void(*_add_fnt)(CounterBase*,CounterBase::stats);
-    CounterBase::stats(*_read_fnt)(CounterBase*);
-
+    private:
+        CounterBase* _counter;
+        int _rate;
+        unsigned long _read;
+        unsigned long _write;
+        bool _atomic;
+        bool _standalone;
+        Task _task;
+        int _pass;
+        per_thread<int> _cur_pass;
+        void(*_add_fnt)(CounterBase*,CounterBase::stats);
+        CounterBase::stats(*_read_fnt)(CounterBase*);
 };
 
 CLICK_ENDDECLS

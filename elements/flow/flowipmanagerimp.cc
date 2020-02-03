@@ -15,21 +15,22 @@
 
 CLICK_DECLS
 
-FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this) {
+FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this)
+{
 }
 
-FlowIPManagerIMP::~FlowIPManagerIMP() {
+FlowIPManagerIMP::~FlowIPManagerIMP()
+{
 }
 
 int
 FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-
     if (Args(conf, this, errh)
-            .read_or_set_p("CAPACITY", _table_size, 65536)
-            .read_or_set("RESERVE",_reserve, 0)
-            .read_or_set("TIMEOUT", _timeout, -1)
-            .complete() < 0)
+        .read_or_set_p("CAPACITY", _table_size, 65536)
+        .read_or_set("RESERVE",_reserve, 0)
+        .read_or_set("TIMEOUT", _timeout, -1)
+        .complete() < 0)
         return -1;
 
     if (_timeout >= 0) {
@@ -46,7 +47,8 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int FlowIPManagerIMP::initialize(ErrorHandler *errh) {
+int FlowIPManagerIMP::initialize(ErrorHandler *errh)
+{
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
     hash_params.name = buf;
@@ -84,16 +86,18 @@ int FlowIPManagerIMP::initialize(ErrorHandler *errh) {
             return errh->error("Could not init flow table !");
         click_chatter("table %d has address %d",i, vhash[i]);
     }
-    return 0;
 
+    return 0;
 }
 
 
-const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next) {
+const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+{
         *((FlowControlBlock**)&prev->data_32[2]) = next;
 };
 
-bool FlowIPManagerIMP::run_task(Task* t) {
+bool FlowIPManagerIMP::run_task(Task* t)
+{
     /*
      Not working : the timerwheel must be per-thread too
      Timestamp recent = Timestamp::recent_steady();
@@ -102,7 +106,7 @@ bool FlowIPManagerIMP::run_task(Task* t) {
         int old = (recent - prev->lastseen).sec();
         if (old > _timeout) {
             //click_chatter("Release %p as it is expired since %d", prev, old);
-		//expire
+        //expire
             rte_hash_free_key_with_position(vhash[click_current_cpu_id()], prev->data_32[0]);//depreciated
         } else {
             //click_chatter("Cascade %p", prev);
@@ -114,15 +118,16 @@ bool FlowIPManagerIMP::run_task(Task* t) {
     return true;*/
 }
 
-void FlowIPManagerIMP::run_timer(Timer* t) {
+void FlowIPManagerIMP::run_timer(Timer* t)
+{
     //_task.reschedule();
    // t->reschedule_after(Timestamp::make_sec(1));
 }
 
-void FlowIPManagerIMP::cleanup(CleanupStage stage) {
+void FlowIPManagerIMP::cleanup(CleanupStage stage)
+{
     click_chatter("Cleanup the table");
-    for(int i =0; i<click_max_cpu_ids(); i++)
-    {
+    for(int i =0; i<click_max_cpu_ids(); i++) {
        if (vhash[i])
            rte_hash_free(vhash[i]);
     }
@@ -130,7 +135,8 @@ void FlowIPManagerIMP::cleanup(CleanupStage stage) {
     delete vhash;
 }
 
-void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& recent) {
+void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
+{
     IPFlow5ID fid = IPFlow5ID(p);
 
     rte_hash* table = vhash[click_current_cpu_id()];
@@ -141,8 +147,8 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
     if (ret < 0) { //new flow
         ret = rte_hash_add_key(table, &fid);
         if (ret < 0) {
-		    if (unlikely(_verbose > 0)) {
-		        click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
+            if (unlikely(_verbose > 0)) {
+                click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
             }
             p->kill();
             return;
@@ -175,7 +181,8 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
     }
 }
 
-void FlowIPManagerIMP::push_batch(int, PacketBatch* batch) {
+void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
+{
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
     FOR_EACH_PACKET_SAFE(batch, p) {
@@ -184,13 +191,14 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch) {
 
     batch = b.finish();
     if (batch) {
-	fcb_stack->lastseen = recent;
+    fcb_stack->lastseen = recent;
         output_push_batch(0, batch);
     }
 }
 
 enum {h_count};
-String FlowIPManagerIMP::read_handler(Element* e, void* thunk) {
+String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
+{
     FlowIPManagerIMP* fc = static_cast<FlowIPManagerIMP*>(e);
     click_chatter("ENTERED in the read_handler function");
     rte_hash* table = fc->vhash[click_current_cpu_id()];
@@ -202,7 +210,8 @@ String FlowIPManagerIMP::read_handler(Element* e, void* thunk) {
     }
 };
 
-void FlowIPManagerIMP::add_handlers() {
+void FlowIPManagerIMP::add_handlers()
+{
 
 }
 
