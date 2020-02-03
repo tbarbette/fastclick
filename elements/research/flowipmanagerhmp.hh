@@ -22,6 +22,7 @@ CLICK_DECLS
  * @see also FlowIPManager
  */
 class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
+
     public:
         FlowIPManagerHMP() CLICK_COLD;
         ~FlowIPManagerHMP() CLICK_COLD;

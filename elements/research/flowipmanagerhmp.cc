@@ -109,6 +109,7 @@ void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
     }
 }
 
+
 void FlowIPManagerHMP::init_assignment(Vector<unsigned> table)
 {
 }
@@ -120,7 +121,7 @@ void FlowIPManagerHMP::push_batch(int, PacketBatch* batch)
     FOR_EACH_PACKET_SAFE(batch, p) {
         process(p, b);
     }
-    assert(fcb_stack);
+
     batch = b.finish();
     if (batch)
         output_push_batch(0, batch);
