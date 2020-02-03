@@ -35,7 +35,6 @@ struct rte_hash;
 class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
 public:
 
-
     FlowIPManagerIMP() CLICK_COLD;
 
 	~FlowIPManagerIMP() CLICK_COLD;
