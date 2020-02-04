@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowIPManagerMP_HH
-#define CLICK_FlowIPManagerMP_HH
+#ifndef CLICK_FLOWIPMANAGERMP_HH
+#define CLICK_FLOWIPMANAGERMP_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>
@@ -30,19 +30,14 @@ struct rte_hash;
  * =a FlowIPManger
  */
 class FlowIPManagerMP: public FlowIPManager {
-public:
-    FlowIPManagerMP() CLICK_COLD;
+    public:
+        FlowIPManagerMP() CLICK_COLD;
+        ~FlowIPManagerMP() CLICK_COLD;
 
-	~FlowIPManagerMP() CLICK_COLD;
-
-    const char *class_name() const		{ return "FlowIPManagerMP"; }
-    const char *port_count() const		{ return "1/1"; }
-
-    const char *processing() const		{ return PUSH; }
-
+        const char *class_name() const { return "FlowIPManagerMP"; }
+        const char *port_count() const { return "1/1"; }
+        const char *processing() const { return PUSH; }
 };
-
-
 
 CLICK_ENDDECLS
 #endif

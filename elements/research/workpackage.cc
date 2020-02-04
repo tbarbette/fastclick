@@ -26,7 +26,6 @@ CLICK_DECLS
 
 std::random_device rd;
 
-
 #define FRAND_MAX _gens->max()
 
 WorkPackage::WorkPackage() : _w(1)
@@ -56,7 +55,8 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void
-WorkPackage::rmaction(Packet* p, int &n_data) {
+WorkPackage::rmaction(Packet* p, int &n_data)
+{
     uint32_t sum = 0;
     unsigned r = 0;
     for (int i = 0; i < _w; i ++) {
@@ -78,7 +78,8 @@ WorkPackage::rmaction(Packet* p, int &n_data) {
 
 #if HAVE_BATCH
 void
-WorkPackage::push_batch(int port, PacketBatch* batch) {
+WorkPackage::push_batch(int port, PacketBatch* batch)
+{
     int n_data = 0;
     FOR_EACH_PACKET(batch, p)
             rmaction(p,n_data);
@@ -87,12 +88,12 @@ WorkPackage::push_batch(int port, PacketBatch* batch) {
 #endif
 
 void
-WorkPackage::push(int port, Packet* p) {
+WorkPackage::push(int port, Packet* p)
+{
     int n_data = 0;
     rmaction(p,n_data);
     output_push(port, p);
 }
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(WorkPackage)

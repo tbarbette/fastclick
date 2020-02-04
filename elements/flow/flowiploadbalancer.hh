@@ -17,15 +17,15 @@ CLICK_DECLS
 struct IPLBEntry {
     int chosen_server;
     IPLBEntry(int addr) : chosen_server(addr) {
-
     }
-    inline hashcode_t hashcode() const {
-       return CLICK_NAME(hashcode)(chosen_server);
-   }
 
-   inline bool operator==(IPLBEntry other) const {
-       return (other.chosen_server == chosen_server);
-   }
+    inline hashcode_t hashcode() const {
+        return CLICK_NAME(hashcode)(chosen_server);
+    }
+
+    inline bool operator==(IPLBEntry other) const {
+        return (other.chosen_server == chosen_server);
+    }
 };
 
 class FlowIPLoadBalancerReverse;
@@ -37,7 +37,7 @@ FlowIPLoadBalancer([I<KEYWORDS>])
 
 =s flow
 
-TCP&UDP load-balancer, without SNAT
+TCP & UDP load-balancer, without SNAT
 
 =d
 
@@ -57,42 +57,37 @@ IP Address of this load-balancer.
 =back
 
 =e
-	FlowIPLoadBalancer(VIP 10.220.0.1, DST 10.221.0.1, DST 10.221.0.2, DST 10.221.0.3)
+    FlowIPLoadBalancer(VIP 10.220.0.1, DST 10.221.0.1, DST 10.221.0.2, DST 10.221.0.3)
 
 =a
 
 FlowIPLoadBalancer, FlowIPNAT */
 
-class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>, public TCPHelper, public LoadBalancer {
+class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>,
+                           public TCPHelper, public LoadBalancer {
+    public:
+        FlowIPLoadBalancer() CLICK_COLD;
+        ~FlowIPLoadBalancer() CLICK_COLD;
 
-public:
+        const char *class_name() const { return "FlowIPLoadBalancer"; }
+        const char *port_count() const { return "1/1"; }
+        const char *processing() const { return PUSH; }
 
-    FlowIPLoadBalancer() CLICK_COLD;
-    ~FlowIPLoadBalancer() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+        int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowIPLoadBalancer"; }
-    const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return PUSH; }
+        static const int timeout = LB_FLOW_TIMEOUT;
+        bool new_flow(IPLBEntry*, Packet*);
+        void release_flow(IPLBEntry*) {};
 
+        void push_batch(int, IPLBEntry*, PacketBatch *);
 
-    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
-    int initialize(ErrorHandler *errh) override CLICK_COLD;
+    private:
+        IPAddress _vip;
+        bool _own_state;
+        bool _accept_nonsyn;
 
-    static const int timeout = LB_FLOW_TIMEOUT;
-    bool new_flow(IPLBEntry*, Packet*);
-    void release_flow(IPLBEntry*) {};
-
-    void push_batch(int, IPLBEntry*, PacketBatch *);
-
-
-private:
-
-    IPAddress _vip;
-    bool _own_state;
-    bool _accept_nonsyn;
-
-    friend class FlowIPLoadBalancerReverse;
-
+        friend class FlowIPLoadBalancerReverse;
 };
 
 struct SNull {
@@ -110,8 +105,6 @@ Reverse side for FlowIPLoadBalancerReverse.
 
 =d
 
-
-
 Keyword arguments are:
 
 =over 8
@@ -126,32 +119,29 @@ IP Address of this load-balancer.
 =back
 
 =e
-	FlowIPLoadBalancer(VIP 10.220.0.1, DST 10.221.0.1, DST 10.221.0.2, DST 10.221.0.3)
+    FlowIPLoadBalancer(VIP 10.220.0.1, DST 10.221.0.1, DST 10.221.0.2, DST 10.221.0.3)
 
 =a
 
 FlowIPLoadBalancer, FlowIPNAT */
 
 class FlowIPLoadBalancerReverse : public BatchElement {
+    public:
+        FlowIPLoadBalancerReverse() CLICK_COLD;
+        ~FlowIPLoadBalancerReverse() CLICK_COLD;
 
-public:
+        const char *class_name() const { return "FlowIPLoadBalancerReverse"; }
+        const char *port_count() const { return "1/1"; }
+        const char *processing() const { return PUSH; }
 
-    FlowIPLoadBalancerReverse() CLICK_COLD;
-    ~FlowIPLoadBalancerReverse() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+        int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-    const char *class_name() const      { return "FlowIPLoadBalancerReverse"; }
-    const char *port_count() const      { return "1/1"; }
-    const char *processing() const      { return PUSH; }
+        void push_batch(int, PacketBatch *) override;
 
-
-    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
-    int initialize(ErrorHandler *errh) override CLICK_COLD;
-
-    void push_batch(int, PacketBatch *) override;
-private:
-    FlowIPLoadBalancer* _lb;
+    private:
+        FlowIPLoadBalancer* _lb;
 };
-
 
 CLICK_ENDDECLS
 #endif

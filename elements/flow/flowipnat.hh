@@ -15,7 +15,6 @@ CLICK_DECLS
 
 #define NAT_STATS 0
 
-
 //If 0, it just uses ports in loop. Fine for slow rates, but not realistic
 //If 1, prevent reusing ports while connections are active
 #define HAVE_NAT_NEVER_REUSE 1 //Actually for the LB
@@ -36,35 +35,35 @@ CLICK_DECLS
 # define lb_assert(args...)
 #endif
 
-
 #include <click/hashtablemp.hh>
 
 CLICK_DECLS
 
 struct NATCommon {
-	NATCommon(uint16_t _port, MPSCDynamicRing<NATCommon*>* _ring) : port(_port), closing(0), ring(_ring) {
+    NATCommon(uint16_t _port, MPSCDynamicRing<NATCommon*>* _ring) :
+                port(_port), closing(0), ring(_ring) {
         ref = 0;
     }
-    uint16_t port; //Port
-    atomic_uint32_t ref; //Reference count
-    uint8_t closing; //Has one side started to close?
+    uint16_t port; // Port
+    atomic_uint32_t ref; // Reference count
+    uint8_t closing; // Has one side started to close?
     MPSCDynamicRing<NATCommon*>* ring;
 };
 
-class NATState { public:
-    NATState(NATCommon* _ref) : fin_seen(false), ref(_ref) {
-    }
-    bool fin_seen;
-    NATCommon* ref;
+class NATState {
+    public:
+        NATState(NATCommon* _ref) : fin_seen(false), ref(_ref) {}
+        bool fin_seen;
+        NATCommon* ref;
 };
 
 /**
  * NAT Entries for the mapping side : a mapping to the original port
  * and a flag to know if the mapping has been seen on this side.
  */
-class NATEntryIN : public NATState { public:
-    NATEntryIN(NATCommon* _ref) : NATState(_ref) {
-    }
+class NATEntryIN : public NATState {
+    public:
+        NATEntryIN(NATCommon* _ref) : NATState(_ref) {}
 };
 
 
@@ -73,14 +72,14 @@ class NATEntryIN : public NATState { public:
  * the port for reference counting, and a flagto know if the fin has been seen
  * on this side.
  */
-class NATEntryOUT: public NATState { public:
-    NATEntryOUT(IPPort _map, NATCommon* _ref) : map(_map), NATState(_ref) {
-    }
-    IPPort map;
+class NATEntryOUT: public NATState {
+    public:
+        NATEntryOUT(IPPort _map, NATCommon* _ref) : map(_map), NATState(_ref) {}
+        IPPort map;
 };
 
-
-typedef HashTableMP<uint16_t,NATEntryOUT> NATHashtable; //Table used to pass the mapping from the mapper to the reverse
+// Table used to pass the mapping from the mapper to the reverse
+typedef HashTableMP<uint16_t,NATEntryOUT> NATHashtable;
 
 #define NAT_FLOW_TIMEOUT 2 * 1000 //Flow timeout
 
@@ -104,38 +103,36 @@ typedef HashTableMP<uint16_t,NATEntryOUT> NATHashtable; //Table used to pass the
  * is classified once for all 4-tuples functions (TCP and UDP based).
  */
 class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> , TCPHelper {
+    public:
 
-public:
+        FlowIPNAT() CLICK_COLD;
+        ~FlowIPNAT() CLICK_COLD;
 
-    FlowIPNAT() CLICK_COLD;
-    ~FlowIPNAT() CLICK_COLD;
+        const char *class_name() const { return "FlowIPNAT"; }
+        const char *port_count() const { return "1/1"; }
+        const char *processing() const { return PUSH; }
 
-    const char *class_name() const		{ return "FlowIPNAT"; }
-    const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return PUSH; }
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *errh);
 
+        static const int timeout = NAT_FLOW_TIMEOUT;
+        NATCommon* pick_port();
+        bool new_flow(NATEntryIN*, Packet*);
+        void release_flow(NATEntryIN*);
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh);
+        void push_batch(int, NATEntryIN*, PacketBatch *);
 
-    static const int timeout = NAT_FLOW_TIMEOUT;
-    NATCommon* pick_port();
-    bool new_flow(NATEntryIN*, Packet*);
-    void release_flow(NATEntryIN*);
+    private:
+        struct state {
+            MPSCDynamicRing<NATCommon*> available_ports;
+        };
+        per_thread<state> _state;
 
-    void push_batch(int, NATEntryIN*, PacketBatch *);
-private:
-    struct state {
-        MPSCDynamicRing<NATCommon*> available_ports;
-    };
-    per_thread<state> _state;
-
-private:
-    IPAddress _sip;
-    bool _accept_nonsyn;
-    bool _own_state;
-    NATHashtable _map;
-    friend class FlowIPNATReverse;
+        IPAddress _sip;
+        bool _accept_nonsyn;
+        bool _own_state;
+        NATHashtable _map;
+        friend class FlowIPNATReverse;
 };
 
 
@@ -143,31 +140,29 @@ private:
  * See FlowIPNAT
  */
 class FlowIPNATReverse : public FlowStateElement<FlowIPNATReverse,NATEntryOUT>, TCPHelper {
+    public:
+        FlowIPNATReverse() CLICK_COLD;
+        ~FlowIPNATReverse() CLICK_COLD;
 
-public:
+        const char *class_name() const { return "FlowIPNATReverse"; }
+        const char *port_count() const { return "1/1"; }
+        const char *processing() const { return PUSH; }
 
-    FlowIPNATReverse() CLICK_COLD;
-    ~FlowIPNATReverse() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowIPNATReverse"; }
-    const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return PUSH; }
+        static const int timeout = NAT_FLOW_TIMEOUT;
+        bool new_flow(NATEntryOUT*, Packet*);
+        void release_flow(NATEntryOUT*);
 
+        void push_batch(int, NATEntryOUT*, PacketBatch *);
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-
-    static const int timeout = NAT_FLOW_TIMEOUT;
-    bool new_flow(NATEntryOUT*, Packet*);
-    void release_flow(NATEntryOUT*);
-
-    void push_batch(int, NATEntryOUT*, PacketBatch *);
-private:
-
-    FlowIPNAT* _in;
+    private:
+        FlowIPNAT* _in;
 };
 
 /*
-static inline bool update_state(WritablePacket* &q, T* flowdata) {
+static inline bool update_state(WritablePacket* &q, T* flowdata)
+{
     if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
         return false;
     } else if (unlikely(q->tcp_header()->th_flags & TH_FIN)) {
@@ -184,53 +179,54 @@ static inline bool update_state(WritablePacket* &q, T* flowdata) {
 }*/
 
 template <typename T>
-inline bool update_state(T* flowdata, const Packet* q) {
+inline bool update_state(T* flowdata, const Packet* q)
+{
 #if HAVE_NAT_NEVER_REUSE
-        if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
-            nat_info_chatter("RST");
-            return false;
-        } else if (unlikely((q->tcp_header()->th_flags & TH_FIN))) {
-            if (flowdata->fin_seen) {
-                //Dup FIN
-                return true;
-            }
-            flowdata->fin_seen = true;
-            lb_assert(flowdata->ref->closing <= 1);
-            if (flowdata->ref->closing == 1 && q->tcp_header()->th_flags & TH_ACK) {
-                nat_debug_chatter("FIN ACK");
-                flowdata->ref->closing = 2;
-                return false;
-            } else {
-                nat_debug_chatter("FIRST FIN");
-                flowdata->ref->closing = 1;
-                return true;
-            }
-            //unreachable
-        } else if (unlikely(flowdata->ref->closing == 2 && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
-            nat_debug_chatter("CLOSING ACK");
-            return false;
+    if (unlikely(q->tcp_header()->th_flags & TH_RST)) {
+        nat_info_chatter("RST");
+        return false;
+    } else if (unlikely((q->tcp_header()->th_flags & TH_FIN))) {
+        if (flowdata->fin_seen) {
+            // Dup FIN
+            return true;
         }
-        return true;
+        flowdata->fin_seen = true;
+        lb_assert(flowdata->ref->closing <= 1);
+        if (flowdata->ref->closing == 1 && q->tcp_header()->th_flags & TH_ACK) {
+            nat_debug_chatter("FIN ACK");
+            flowdata->ref->closing = 2;
+            return false;
+        } else {
+            nat_debug_chatter("FIRST FIN");
+            flowdata->ref->closing = 1;
+            return true;
+        }
+        // unreachable
+    } else if (unlikely(flowdata->ref->closing == 2 && q->tcp_header()->th_flags & TH_ACK && flowdata->fin_seen)) {
+        nat_debug_chatter("CLOSING ACK");
+        return false;
+    }
+    return true;
 #else
-        if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
+    if ((q->tcp_header()->th_flags & TH_RST) || ((q->tcp_header()->th_flags & TH_FIN) && (q->tcp_header()->th_flags | TH_ACK))) {
 #if DEBUG_NAT || DEBUG_CLASSIFIER_TIMEOUT > 1
-            click_chatter("Reverse Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
+        click_chatter("Reverse Rst %d, fin %d, ack %d",(q->tcp_header()->th_flags & TH_RST), (q->tcp_header()->th_flags & (TH_FIN)), (q->tcp_header()->th_flags & (TH_ACK)));
 #endif
-            return false;
-        }
-        return true;
+        return false;
+    }
+    return true;
 #endif
-        //unreachable
-
+    // unreachable
 }
 
-inline void release_ref(NATCommon* &ref, const bool &own_state) {
+inline void release_ref(NATCommon* &ref, const bool &own_state)
+{
     if (!ref)
         return;
     nat_debug_chatter("fcb->ref for port %d is %d, will be %d",ntohs(ref->port), ref->ref, ref->ref - 1);
     lb_assert((int32_t)ref->ref >= 1);
     if (!own_state)
-	    ref->closing = 1;
+        ref->closing = 1;
     if (ref->ref.dec_and_test()) {
         nat_debug_chatter("Recycling %d !", ntohs(ref->port));
 
@@ -242,10 +238,6 @@ inline void release_ref(NATCommon* &ref, const bool &own_state) {
     }
     ref = 0;
 }
-
-
-
-
 
 CLICK_ENDDECLS
 #endif

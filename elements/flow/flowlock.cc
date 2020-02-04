@@ -25,35 +25,34 @@
 
 CLICK_DECLS
 
-FlowLock::FlowLock() {
+FlowLock::FlowLock()
+{
+}
 
-};
-
-FlowLock::~FlowLock() {
-
+FlowLock::~FlowLock()
+{
 }
 
 int
 FlowLock::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-               .complete() < 0)
+       .complete() < 0)
         return -1;
-
     return 0;
 }
 
-
-int FlowLock::initialize(ErrorHandler *errh) {
+int FlowLock::initialize(ErrorHandler *errh)
+{
     return 0;
 }
 
-void FlowLock::push_batch(int port, FlowLockState* flowdata, PacketBatch* batch) {
-	flowdata->lock.acquire();
+void FlowLock::push_batch(int port, FlowLockState* flowdata, PacketBatch* batch)
+{
+    flowdata->lock.acquire();
     output_push_batch(0, batch);
-	flowdata->lock.release();
+    flowdata->lock.release();
 }
-
 
 CLICK_ENDDECLS
 
