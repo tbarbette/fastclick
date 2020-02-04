@@ -21,14 +21,14 @@
 
 CLICK_DECLS
 
-FlowIPManagerMP::FlowIPManagerMP() {
-	_flags = RTE_HASH_EXTRA_FLAGS_MULTI_WRITER_ADD | RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
+FlowIPManagerMP::FlowIPManagerMP()
+{
+    _flags = RTE_HASH_EXTRA_FLAGS_MULTI_WRITER_ADD | RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
 }
 
-FlowIPManagerMP::~FlowIPManagerMP() {
-
+FlowIPManagerMP::~FlowIPManagerMP()
+{
 }
-
 
 CLICK_ENDDECLS
 

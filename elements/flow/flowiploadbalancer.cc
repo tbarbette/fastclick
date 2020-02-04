@@ -29,12 +29,12 @@ CLICK_DECLS
 
 //TODO : disable timer if own_state is false
 
-FlowIPLoadBalancer::FlowIPLoadBalancer() : _own_state(true), _accept_nonsyn(true) {
+FlowIPLoadBalancer::FlowIPLoadBalancer() : _own_state(true), _accept_nonsyn(true)
+{
+}
 
-};
-
-FlowIPLoadBalancer::~FlowIPLoadBalancer() {
-
+FlowIPLoadBalancer::~FlowIPLoadBalancer()
+{
 }
 
 int
@@ -42,11 +42,11 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String mode= "rr";
     if (Args(conf, this, errh)
-               .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
-               .read_mp("VIP", _vip)
-               .read("STATE", _own_state)
-               .read("MODE", mode)
-               .complete() < 0)
+       .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
+       .read_mp("VIP", _vip)
+       .read("STATE", _own_state)
+       .read("MODE", mode)
+       .complete() < 0)
         return -1;
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
@@ -55,33 +55,31 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-
-int FlowIPLoadBalancer::initialize(ErrorHandler *errh) {
-
+int FlowIPLoadBalancer::initialize(ErrorHandler *errh)
+{
     return 0;
 }
 
 
-bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p) {
-        if (!isSyn(p)) {
-            nat_info_chatter("Non syn establishment!");
+bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
+{
+    if (!isSyn(p)) {
+        nat_info_chatter("Non syn establishment!");
+        if (!_accept_nonsyn || _own_state)
+            return false;
+    }
+    int server = pick_server(p);
 
-            if (!_accept_nonsyn || _own_state)
-                return false;
-        }
-        int server = pick_server(p);
+    flowdata->chosen_server = server;
 
+    nat_debug_chatter("New flow %d",server);
 
-        flowdata->chosen_server = server;
-
-        nat_debug_chatter("New flow %d",server);
-
-        return true;
+    return true;
 }
 
 
-void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch) {
-
+void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch)
+{
     auto fnt = [this,flowdata](Packet*&p) -> bool {
         WritablePacket* q =p->uniqueify();
         p = q;
@@ -100,12 +98,12 @@ void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch
 }
 
 
-FlowIPLoadBalancerReverse::FlowIPLoadBalancerReverse() : _lb(0) {
+FlowIPLoadBalancerReverse::FlowIPLoadBalancerReverse() : _lb(0)
+{
+}
 
-};
-
-FlowIPLoadBalancerReverse::~FlowIPLoadBalancerReverse() {
-
+FlowIPLoadBalancerReverse::~FlowIPLoadBalancerReverse()
+{
 }
 
 int
@@ -113,21 +111,23 @@ FlowIPLoadBalancerReverse::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     Element* e;
     if (Args(conf, this, errh)
-               .read_mp("LB",e)
-               .complete() < 0)
+       .read_mp("LB",e)
+       .complete() < 0)
         return -1;
+
     _lb = reinterpret_cast<FlowIPLoadBalancer*>(e);
     _lb->add_remote_element(this);
     return 0;
 }
 
 
-int FlowIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
+int FlowIPLoadBalancerReverse::initialize(ErrorHandler *errh)
+{
     return 0;
 }
 
-void FlowIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
-
+void FlowIPLoadBalancerReverse::push_batch(int, PacketBatch* batch)
+{
     auto fnt = [this](Packet* &p) -> bool {
         WritablePacket* q =p->uniqueify();
         p = q;
@@ -140,8 +140,6 @@ void FlowIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
     if (batch)
         checked_output_push_batch(0, batch);
 }
-
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(FlowIPLoadBalancerReverse)

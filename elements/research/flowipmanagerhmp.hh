@@ -22,42 +22,38 @@ CLICK_DECLS
  * @see also FlowIPManager
  */
 class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
-public:
 
-    FlowIPManagerHMP() CLICK_COLD;
+    public:
+        FlowIPManagerHMP() CLICK_COLD;
+        ~FlowIPManagerHMP() CLICK_COLD;
 
-	~FlowIPManagerHMP() CLICK_COLD;
+        const char *class_name() const { return "FlowIPManagerHMP"; }
+        const char *port_count() const { return "1/1"; }
 
-    const char *class_name() const		{ return "FlowIPManagerHMP"; }
-    const char *port_count() const		{ return "1/1"; }
+        int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+        int initialize(ErrorHandler *errh) override CLICK_COLD;
+        int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
+        void cleanup(CleanupStage stage) override CLICK_COLD;
 
+        //First : group id, second : destination cpu
+        void pre_migrate(DPDKDevice* dev, int from, Vector<Pair<int,int>> gids);
+        void post_migrate(DPDKDevice* dev, int from);
 
-    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
-    int initialize(ErrorHandler *errh) override CLICK_COLD;
-    int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
-    void cleanup(CleanupStage stage) override CLICK_COLD;
+        void push_batch(int, PacketBatch* batch) override;
 
-    //First : group id, second : destination cpu
-    void pre_migrate(DPDKDevice* dev, int from, Vector<Pair<int,int>> gids);
-    void post_migrate(DPDKDevice* dev, int from);
+        void init_assignment(Vector<unsigned> table);
 
-    void push_batch(int, PacketBatch* batch) override;
+    private:
+        HashTableMP<IPFlow5ID,int> _hash;
+        atomic_uint32_t _current;
 
-    void init_assignment(Vector<unsigned> table);
+        inline void process(Packet* p, BatchBuilder& b);
 
-private:
+        FlowControlBlock *fcbs;
 
-    HashTableMP<IPFlow5ID,int> _hash;
-    atomic_uint32_t _current;
-
-    inline void process(Packet* p, BatchBuilder& b);
-
-    FlowControlBlock *fcbs;
-
-    int _table_size;
-    int _flow_state_size_full;
-    int _verbose;
-
+        int _table_size;
+        int _flow_state_size_full;
+        int _verbose;
 };
 
 CLICK_ENDDECLS

@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowLock_HH
-#define CLICK_FlowLock_HH
+#ifndef CLICK_FLOWLOCK_HH
+#define CLICK_FLOWLOCK_HH
 #include <click/config.h>
 #include <click/multithread.hh>
 #include <click/hashtablemp.hh>
@@ -11,12 +11,9 @@
 CLICK_DECLS
 
 struct FlowLockState {
-	FlowLockState() : lock() {
-
-	}
-	Spinlock lock;
+    FlowLockState() : lock() {}
+    Spinlock lock;
 };
-
 
 /**
  * =s
@@ -28,27 +25,19 @@ struct FlowLockState {
  * Flock the downards path per-flow, so packets of the same flow cannot go further at the same time.
  */
 class FlowLock : public FlowSpaceElement<FlowLockState> {
+    public:
+        FlowLock() CLICK_COLD;
+        ~FlowLock() CLICK_COLD;
 
-public:
+        const char *class_name() const { return "FlowLock"; }
+        const char *port_count() const { return "1/1"; }
+        const char *processing() const { return PUSH; }
 
-    FlowLock() CLICK_COLD;
-    ~FlowLock() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+        int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowLock"; }
-    const char *port_count() const		{ return "1/1"; }
-    const char *processing() const		{ return PUSH; }
-
-    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
-    int initialize(ErrorHandler *errh) override CLICK_COLD;
-
-    void push_batch(int, FlowLockState*, PacketBatch *);
-
-
+        void push_batch(int, FlowLockState*, PacketBatch *);
 };
-
-
-
-
 
 CLICK_ENDDECLS
 #endif

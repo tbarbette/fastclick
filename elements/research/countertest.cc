@@ -64,7 +64,8 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
 void
-CounterTest::push_batch(int, PacketBatch* batch) {
+CounterTest::push_batch(int, PacketBatch* batch)
+{
     if (++_cur_pass == _pass) {
         _cur_pass.set(0);
         for (int i = 0; i < _rate; i++) {
@@ -82,7 +83,8 @@ CounterTest::push_batch(int, PacketBatch* batch) {
 #endif
 
 void
-CounterTest::push(int, Packet* p) {
+CounterTest::push(int, Packet* p)
+{
     for (int i = 0; i < _rate; i++) {
         if (master()->paused())
             break;
@@ -90,8 +92,6 @@ CounterTest::push(int, Packet* p) {
     }
     output_push(0, p);
 }
-
-
 
 bool
 CounterTest::run_task(Task* t)
@@ -109,11 +109,11 @@ CounterTest::run_task(Task* t)
 }
 
 void
-CounterTest::add_handlers() {
+CounterTest::add_handlers()
+{
     add_data_handlers("read", Handler::f_read, &_read);
     add_data_handlers("write", Handler::f_read, &_write);
 }
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CounterTest)

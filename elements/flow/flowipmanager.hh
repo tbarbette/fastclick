@@ -1,5 +1,5 @@
-#ifndef CLICK_FlowIPManager_HH
-#define CLICK_FlowIPManager_HH
+#ifndef CLICK_FLOWIPMANAGER_HH
+#define CLICK_FLOWIPMANAGER_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>
@@ -34,49 +34,45 @@ struct rte_hash;
  *
  */
 class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
-public:
+    public:
+        FlowIPManager() CLICK_COLD;
+        ~FlowIPManager() CLICK_COLD;
 
+        const char *class_name() const { return "FlowIPManager"; }
+        const char *port_count() const { return "1/1"; }
 
-    FlowIPManager() CLICK_COLD;
+        const char *processing() const { return PUSH; }
+        int configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
-	~FlowIPManager() CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        int initialize(ErrorHandler *errh) CLICK_COLD;
+        void cleanup(CleanupStage stage) CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowIPManager"; }
-    const char *port_count() const		{ return "1/1"; }
+        void push_batch(int, PacketBatch* batch) override;
+        void run_timer(Timer*) override;
+        bool run_task(Task* t) override;
 
-    const char *processing() const		{ return PUSH; }
-    int configure_phase() const     { return CONFIGURE_PHASE_PRIVILEGED + 1; }
+        void add_handlers() override CLICK_COLD;
 
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    int initialize(ErrorHandler *errh) CLICK_COLD;
-    void cleanup(CleanupStage stage) CLICK_COLD;
+    protected:
+        volatile int owner;
+        Packet* queue;
+        rte_hash* hash;
+        FlowControlBlock *fcbs;
 
-    void push_batch(int, PacketBatch* batch) override;
-    void run_timer(Timer*) override;
-    bool run_task(Task* t) override;
+        int _reserve;
+        int _table_size;
+        int _flow_state_size_full;
+        int _verbose;
+        int _flags;
 
-    void add_handlers() override CLICK_COLD;
+        int _timeout;
+        Timer _timer; //Timer to launch the wheel
+        Task _task;
 
-protected:
-
-	volatile int owner;
-	Packet* queue;
-	rte_hash* hash;
-	FlowControlBlock *fcbs;
-
-    int _reserve;
-    int _table_size;
-    int _flow_state_size_full;
-    int _verbose;
-    int _flags;
-
-    int _timeout;
-    Timer _timer; //Timer to launch the wheel
-    Task _task;
-
-    static String read_handler(Element* e, void* thunk);
-    inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
-    TimerWheel<FlowControlBlock> _timer_wheel;
+        static String read_handler(Element* e, void* thunk);
+        inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
+        TimerWheel<FlowControlBlock> _timer_wheel;
 };
 
 CLICK_ENDDECLS
