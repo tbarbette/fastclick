@@ -10,12 +10,11 @@ CLICK_DECLS
 /*
 =c
 
-WorkPackage()
+WorkPackage(W, N)
 
 =s test
 
-Call read_atomic on the counter in a certain proportion regarding the batch
-it passes.
+Compute a random number for a certain amount of W time, and makes N accesses to
 
 */
 class WorkPackage : public BatchElement {

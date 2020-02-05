@@ -203,8 +203,7 @@ String FlowIPManager::read_handler(Element* e, void* thunk)
 
 void FlowIPManager::add_handlers()
 {
-
-    add_read_handler("h_count", read_handler, h_count);
+    add_read_handler("count", read_handler, h_count);
 }
 
 CLICK_ENDDECLS
