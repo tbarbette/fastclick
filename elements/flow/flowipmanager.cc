@@ -1,5 +1,5 @@
 /*
- * FlowIPManager.{cc,hh} - Flow classification for the flow subsystem
+ * flowipmanager.{cc,hh} - Flow classification for the flow subsystem
  *
  * Copyright (c) 2019-2020 Tom Barbette, KTH Royal Institute of Technology
  *
@@ -41,11 +41,11 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     bool lf = false;
 
     if (Args(conf, this, errh)
-            .read_or_set_p("CAPACITY", _table_size, 65536)
-            .read_or_set("RESERVE",_reserve, 0)
-            .read_or_set("TIMEOUT", _timeout, 60)
-            .read_or_set("LF", lf, false)
-            .complete() < 0)
+        .read_or_set_p("CAPACITY", _table_size, 65536)
+        .read_or_set("RESERVE",_reserve, 0)
+        .read_or_set("TIMEOUT", _timeout, 60)
+        .read_or_set("LF", lf, false)
+        .complete() < 0)
         return -1;
 
     find_children(_verbose);
