@@ -22,7 +22,7 @@
 #include <click/glue.hh>
 
 CycleCountAccum::CycleCountAccum()
-    : _accum(0), _count(0), _zero_count(0)
+    : _state()
 {
 }
 
@@ -30,32 +30,18 @@ CycleCountAccum::~CycleCountAccum()
 {
 }
 
-inline void
-CycleCountAccum::rmaction(Packet *p)
+inline Packet*
+CycleCountAccum::simple_action(Packet *p)
 {
+	state &s = *_state;
     if (PERFCTR_ANNO(p)) {
-	_accum += click_get_cycles() - PERFCTR_ANNO(p);
-	_count++;
+	s.accum += click_get_cycles() - PERFCTR_ANNO(p);
+	s.count++;
     } else {
-	_zero_count++;
-	if (_zero_count == 1)
-	    click_chatter("%s: packet with zero cycle counter annotation!", declaration().c_str());
+	s.zero_count++;
+	if (s.zero_count == 1)
+		click_chatter("%s: packet with zero cycle counter annotation!", declaration().c_str());
     }
-}
-
-void
-CycleCountAccum::push(int, Packet *p)
-{
-    rmaction(p);
-    output(0).push(p);
-}
-
-Packet *
-CycleCountAccum::pull(int)
-{
-    Packet *p = input(0).pull();
-    if (p)
-	rmaction(p);
     return p;
 }
 
@@ -64,14 +50,21 @@ CycleCountAccum::read_handler(Element *e, void *thunk)
 {
     CycleCountAccum *cca = static_cast<CycleCountAccum *>(e);
     switch ((uintptr_t)thunk) {
-      case 0:
-	return String(cca->_count);
-      case 1:
-	return String(cca->_accum);
-      case 2:
-	return String(cca->_zero_count);
+      case 0: {
+	  PER_THREAD_MEMBER_SUM(uint64_t,count,cca->_state,count);
+	  return String(count); }
+      case 1: {
+	  PER_THREAD_MEMBER_SUM(uint64_t,accum,cca->_state,accum);
+	  return String(accum); }
+      case 2: {
+	  PER_THREAD_MEMBER_SUM(uint64_t,zero_count,cca->_state,zero_count);
+	  return String(zero_count); }
+      case 3: {
+	  PER_THREAD_MEMBER_SUM(uint64_t,accum,cca->_state,accum);
+	  PER_THREAD_MEMBER_SUM(uint64_t,count,cca->_state,count);
+	  return String(accum / count); }
       default:
-	return String();
+	  return String();
     }
 }
 
@@ -79,7 +72,9 @@ int
 CycleCountAccum::reset_handler(const String &, Element *e, void *, ErrorHandler *)
 {
     CycleCountAccum *cca = static_cast<CycleCountAccum *>(e);
-    cca->_count = cca->_accum = cca->_zero_count = 0;
+    PER_THREAD_MEMBER_SET(cca->_state,accum,0);
+    PER_THREAD_MEMBER_SET(cca->_state,count,0);
+    PER_THREAD_MEMBER_SET(cca->_state,zero_count,0);
     return 0;
 }
 
@@ -89,8 +84,10 @@ CycleCountAccum::add_handlers()
     add_read_handler("count", read_handler, 0);
     add_read_handler("cycles", read_handler, 1);
     add_read_handler("zero_count", read_handler, 2);
+    add_read_handler("cycles_pp", read_handler, 3);
     add_write_handler("reset_counts", reset_handler, 0, Handler::BUTTON);
 }
 
-ELEMENT_REQUIRES(linuxmodule int64)
+ELEMENT_REQUIRES(int64)
 EXPORT_ELEMENT(CycleCountAccum)
+ELEMENT_MT_SAFE(CycleCountAccum)
