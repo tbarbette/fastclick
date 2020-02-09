@@ -74,7 +74,7 @@ script:
     fi
 
   - ./configure $CONFIG $FLAGS $FRAMEWORK_FLAGS && make
-  - make check
+  - travis_retry make check
 
 install:
   - export PATH=$PATH:`pwd`/tcpdump-4.9.3/sbin/ && if [ ! -e "tcpdump-4.9.3/sbin/tcpdump" ] ; then wget http://www.tcpdump.org/release/tcpdump-4.9.3.tar.gz && tar -zxf tcpdump-4.9.3.tar.gz && cd tcpdump-4.9.3 && ./configure --prefix=`pwd` && make && make install && cd .. ; fi
