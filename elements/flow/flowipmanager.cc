@@ -1,5 +1,5 @@
 /*
- * FlowIPManager.{cc,hh} - Flow classification for the flow subsystem
+ * flowipmanager.{cc,hh} - Flow classification for the flow subsystem
  *
  * Copyright (c) 2019-2020 Tom Barbette, KTH Royal Institute of Technology
  *
@@ -38,10 +38,13 @@ FlowIPManager::~FlowIPManager()
 int
 FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    bool lf = false;
+
     if (Args(conf, this, errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
         .read_or_set("RESERVE",_reserve, 0)
         .read_or_set("TIMEOUT", _timeout, 60)
+        .read_or_set("LF", lf, false)
         .complete() < 0)
         return -1;
 
@@ -53,6 +56,11 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     if (!is_pow2(_table_size)) {
         _table_size = next_pow2(_table_size);
         click_chatter("Real capacity will be %d",_table_size);
+    }
+
+    if (lf) {
+        _flags &= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
+        _flags |= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF;
     }
     return 0;
 }
@@ -82,11 +90,13 @@ int FlowIPManager::initialize(ErrorHandler *errh)
 
     if (_timeout > 0) {
         _timer_wheel.initialize(_timeout);
+
+        _timer.initialize(this);
+        _timer.schedule_after(Timestamp::make_sec(1));
+        _task.initialize(this, false);
+
     }
 
-    _timer.initialize(this);
-    _timer.schedule_after(Timestamp::make_sec(1));
-    _task.initialize(this, false);
     return 0;
 }
 
