@@ -31,6 +31,11 @@ RouterVisitor::visit(Element *, bool, int, Element *, int, int)
     return true;
 }
 
+int
+RouterVisitor::distance(Element *e, Element *from_e) {
+    return 1;
+}
+
 ElementTracker::ElementTracker(Router *router)
     : _reached(router->nelements(), false)
 {

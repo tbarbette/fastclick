@@ -43,16 +43,17 @@ NeighborhoodTest::handler(int, String &data, Element *element,
     cp_uncomment(data);
     int diameter = 1;
     if (data && !IntArg().parse(data, diameter))
-	return errh->error("syntax error");
+        return errh->error("syntax error");
+
     ElementNeighborhoodTracker tracker(element->router(), diameter);
     intptr_t port = (intptr_t) handler->write_user_data();
     if (handler->read_user_data())
-	element->router()->visit_downstream(element, port, &tracker);
+        element->router()->visit_downstream(element, port, &tracker);
     else
-	element->router()->visit_upstream(element, port, &tracker);
+        element->router()->visit_upstream(element, port, &tracker);
     StringAccum sa;
     for (int i = 0; i < tracker.size(); ++i)
-	sa << tracker[i]->name() << '\n';
+        sa << tracker[i]->name() << '\n';
     data = sa.take_string();
     return 0;
 }
@@ -61,9 +62,9 @@ void
 NeighborhoodTest::add_handlers()
 {
     for (int i = -1; i < ninputs(); ++i)
-	set_handler("upstream" + (i < 0 ? String() : String(i)), Handler::OP_READ | Handler::READ_PARAM, handler, 0, i);
+        set_handler("upstream" + (i < 0 ? String() : String(i)), Handler::OP_READ | Handler::READ_PARAM, handler, 0, i);
     for (int o = -1; o < noutputs(); ++o)
-	set_handler("downstream" + (o < 0 ? String() : String(o)), Handler::OP_READ | Handler::READ_PARAM, handler, 1, o);
+        set_handler("downstream" + (o < 0 ? String() : String(o)), Handler::OP_READ | Handler::READ_PARAM, handler, 1, o);
 }
 
 CLICK_ENDDECLS

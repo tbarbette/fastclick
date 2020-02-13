@@ -1,6 +1,6 @@
 #ifndef CLICK_ARPFAKER_HH
 #define CLICK_ARPFAKER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/timer.hh>
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
@@ -31,7 +31,7 @@ CLICK_DECLS
  * ARPQuerier, ARPResponder
  */
 
-class ARPFaker : public Element {
+class ARPFaker : public BatchElement {
 
 public:
 

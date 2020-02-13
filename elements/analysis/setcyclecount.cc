@@ -28,21 +28,13 @@ SetCycleCount::~SetCycleCount()
 {
 }
 
-void
-SetCycleCount::push(int, Packet *p)
+Packet*
+SetCycleCount::simple_action(Packet *p)
 {
   SET_PERFCTR_ANNO(p, click_get_cycles());
-  output(0).push(p);
-}
-
-Packet *
-SetCycleCount::pull(int)
-{
-  Packet *p = input(0).pull();
-  if (p)
-    SET_PERFCTR_ANNO(p, click_get_cycles());
   return p;
 }
 
-ELEMENT_REQUIRES(linuxmodule int64)
+ELEMENT_REQUIRES(int64)
 EXPORT_ELEMENT(SetCycleCount)
+ELEMENT_MT_SAFE(SetCycleCount)

@@ -3,11 +3,11 @@
  * (checksums, lengths)
  * Eddie Kohler
  *
- * Computational batching support
+ * Computational batching support and counter & handler updates
  * by Georgios Katsikas
  *
  * Copyright (c) 2000 Mazu Networks, Inc.
- * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2016-2020 UBITECH and KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,18 +32,20 @@
 CLICK_DECLS
 
 const char *CheckICMPHeader::reason_texts[NREASONS] = {
-  "not ICMP", "bad packet length", "bad ICMP checksum"
+    "not ICMP", "bad packet length", "bad ICMP checksum"
 };
 
-CheckICMPHeader::CheckICMPHeader()
-  : _reason_drops(0)
+CheckICMPHeader::CheckICMPHeader() : _reason_drops(0)
 {
-  _drops = 0;
+    _count = 0;
+    _drops = 0;
 }
 
 CheckICMPHeader::~CheckICMPHeader()
 {
-  delete[] _reason_drops;
+    if (_reason_drops) {
+        delete _reason_drops;
+    }
 }
 
 int
@@ -52,136 +54,144 @@ CheckICMPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
     bool verbose = false, details = false;
 
     if (Args(conf, this, errh)
-	.read("VERBOSE", verbose)
-	.read("DETAILS", details)
-	.complete() < 0)
-	return -1;
+        .read("VERBOSE", verbose)
+        .read("DETAILS", details)
+        .complete() < 0)
+        return -1;
 
-  _verbose = verbose;
-  if (details)
-    _reason_drops = new atomic_uint32_t[NREASONS];
+    _verbose = verbose;
+    if (details) {
+        _reason_drops = new atomic_uint64_t[NREASONS];
+        memset(_reason_drops, 0, NREASONS * sizeof(atomic_uint64_t));
+    }
 
-  return 0;
+    return 0;
 }
 
 
 Packet *
 CheckICMPHeader::drop(Reason reason, Packet *p)
 {
-  if (_drops == 0 || _verbose)
-    click_chatter("%p{element}: ICMP header check failed: %s", this, reason_texts[reason]);
-  _drops++;
+    if (_drops == 0 || _verbose) {
+        click_chatter("%p{element}: ICMP header check failed: %s", this, reason_texts[reason]);
+    }
+    _drops++;
 
-  if (_reason_drops)
-    _reason_drops[reason]++;
+    if (_reason_drops) {
+        _reason_drops[reason]++;
+    }
 
-  if (noutputs() == 2)
-    output(1).push(p);
-  else
-    p->kill();
+    if (noutputs() == 2) {
+        output(1).push(p);
+    } else {
+        p->kill();
+    }
 
-  return 0;
+    return 0;
 }
 
 Packet *
 CheckICMPHeader::simple_action(Packet *p)
 {
-  const click_ip *iph = p->ip_header();
-  unsigned csum, icmp_len;
-  const click_icmp *icmph = p->icmp_header();
+    const click_ip *iph = p->ip_header();
 
-  if (!p->has_network_header() || iph->ip_p != IP_PROTO_ICMP)
-    return drop(NOT_ICMP, p);
+    if (!p->has_network_header() || iph->ip_p != IP_PROTO_ICMP) {
+        return drop(NOT_ICMP, p);
+    }
 
-  icmp_len = p->length() - p->transport_header_offset();
-  if (icmp_len < sizeof(click_icmp))
-    return drop(BAD_LENGTH, p);
+    unsigned icmp_len = p->length() - p->transport_header_offset();
+    if (icmp_len < sizeof(click_icmp)) {
+        return drop(BAD_LENGTH, p);
+    }
 
-  switch (icmph->icmp_type) {
+    const click_icmp *icmph = p->icmp_header();
+    switch (icmph->icmp_type) {
+        case ICMP_UNREACH:
+        case ICMP_TIMXCEED:
+        case ICMP_PARAMPROB:
+        case ICMP_SOURCEQUENCH:
+        case ICMP_REDIRECT:
+            // check for IP header + first 64 bits of datagram = at least 28 bytes
+            if (icmp_len < sizeof(click_icmp) + 28) {
+                return drop(BAD_LENGTH, p);
+            }
+            break;
 
-   case ICMP_UNREACH:
-   case ICMP_TIMXCEED:
-   case ICMP_PARAMPROB:
-   case ICMP_SOURCEQUENCH:
-   case ICMP_REDIRECT:
-    // check for IP header + first 64 bits of datagram = at least 28 bytes
-    if (icmp_len < sizeof(click_icmp) + 28)
-      return drop(BAD_LENGTH, p);
-    break;
+        case ICMP_TSTAMP:
+        case ICMP_TSTAMPREPLY:
+            // exactly 12 more bytes
+            if (icmp_len != sizeof(click_icmp_tstamp)) {
+                return drop(BAD_LENGTH, p);
+            }
+            break;
 
-   case ICMP_TSTAMP:
-   case ICMP_TSTAMPREPLY:
-    // exactly 12 more bytes
-    if (icmp_len != sizeof(click_icmp_tstamp))
-      return drop(BAD_LENGTH, p);
-    break;
+        case ICMP_IREQ:
+        case ICMP_IREQREPLY:
+            // exactly 0 more bytes
+            if (icmp_len != sizeof(click_icmp)) {
+                return drop(BAD_LENGTH, p);
+            }
+            break;
 
-   case ICMP_IREQ:
-   case ICMP_IREQREPLY:
-    // exactly 0 more bytes
-    if (icmp_len != sizeof(click_icmp))
-      return drop(BAD_LENGTH, p);
-    break;
+        case ICMP_ROUTERADVERT:
+            /* nada */
+        case ICMP_MASKREQ:
+        case ICMP_MASKREQREPLY:
+            /* nada */
+        case ICMP_ECHO:
+        case ICMP_ECHOREPLY:
+        default:
+            // no additional length checks
+            break;
+    }
 
-   case ICMP_ROUTERADVERT:
-    /* nada */
-   case ICMP_MASKREQ:
-   case ICMP_MASKREQREPLY:
-    /* nada */
+    unsigned csum = click_in_cksum((unsigned char *)icmph, icmp_len) & 0xFFFF;
+    if (csum != 0) {
+        return drop(BAD_CHECKSUM, p);
+    }
 
-   case ICMP_ECHO:
-   case ICMP_ECHOREPLY:
-   default:
-    // no additional length checks
-    break;
+    _count++;
 
-  }
-
-  csum = click_in_cksum((unsigned char *)icmph, icmp_len) & 0xFFFF;
-  if (csum != 0)
-    return drop(BAD_CHECKSUM, p);
-
-  return p;
+    return p;
 }
-
-#if HAVE_BATCH
-PacketBatch*
-CheckICMPHeader::simple_action_batch(PacketBatch *batch)
-{
-    EXECUTE_FOR_EACH_PACKET_DROPPABLE(CheckICMPHeader::simple_action, batch, [](Packet*){});
-    return batch;
-}
-#endif
 
 String
 CheckICMPHeader::read_handler(Element *e, void *thunk)
 {
-  CheckICMPHeader *c = reinterpret_cast<CheckICMPHeader *>(e);
-  switch ((intptr_t)thunk) {
+    CheckICMPHeader *c = reinterpret_cast<CheckICMPHeader *>(e);
 
-   case 0:			// drops
-       return String(c->_drops);
-
-   case 1: {			// drop_details
-     StringAccum sa;
-     for (int i = 0; i < NREASONS; i++)
-       sa << c->_reason_drops[i] << '\t' << reason_texts[i] << '\n';
-     return sa.take_string();
-   }
-
-   default:
-    return String("<error>");
-
-  }
+    switch ((intptr_t)thunk) {
+        case h_count: {
+            return String(c->_count);
+        }
+        case h_drops: {
+            return String(c->_drops);
+        }
+        case h_drop_details: {
+            StringAccum sa;
+            for (unsigned i = 0; i < NREASONS; i++) {
+                sa.snprintf(15, "%15" PRIu64, c->_reason_drops[i].value());
+                sa << " packets due to: ";
+                sa.snprintf(24, "%24s", reason_texts[i]);
+                sa << "\n";
+            }
+            return sa.take_string();
+        }
+        default: {
+            return String("<error>");
+        }
+    }
 }
 
 void
 CheckICMPHeader::add_handlers()
 {
-  add_read_handler("drops", read_handler, 0);
-  if (_reason_drops)
-    add_read_handler("drop_details", read_handler, 1);
+    add_read_handler("count", read_handler, h_count);
+    add_read_handler("drops", read_handler, h_drops);
+    if (_reason_drops)
+        add_read_handler("drop_details", read_handler, h_drop_details);
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckICMPHeader)
+ELEMENT_MT_SAFE(CheckICMPHeader)

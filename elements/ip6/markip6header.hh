@@ -1,6 +1,6 @@
 #ifndef CLICK_MARKIP6HEADER_HH
 #define CLICK_MARKIP6HEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 CLICK_DECLS
 
 /*
@@ -17,21 +17,19 @@ CLICK_DECLS
  *
  * =a CheckIP6Header, CheckIP6Header2, StripIP6Header */
 
-class MarkIP6Header : public Element {
+class MarkIP6Header : public SimpleElement<MarkIP6Header> {
+    public:
+        MarkIP6Header();
+        ~MarkIP6Header();
 
-  int _offset;
+        const char *class_name() const { return "MarkIP6Header"; }
+        const char *port_count() const { return PORTS_1_1; }
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
 
- public:
+        Packet *simple_action(Packet *p);
 
-  MarkIP6Header();
-  ~MarkIP6Header();
-
-  const char *class_name() const		{ return "MarkIP6Header"; }
-  const char *port_count() const		{ return PORTS_1_1; }
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-
-  Packet *simple_action(Packet *);
-
+    private:
+        int _offset;
 };
 
 CLICK_ENDDECLS

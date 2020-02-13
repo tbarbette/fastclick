@@ -47,6 +47,10 @@ C<drop_details> handler. False by default.
 
 =n
 
+=h count read-only
+
+Returns the number of correct packets CheckARPHeader has seen.
+
 =h drops read-only
 
 Returns the number of incorrect packets CheckARPHeader has seen.
@@ -54,16 +58,13 @@ Returns the number of incorrect packets CheckARPHeader has seen.
 =h drop_details read-only
 
 Returns a text file showing how many erroneous packets CheckARPHeader has seen,
-subdivided by error. Only available if the DETAILS keyword argument was true.
+subdivided by error. Only available if the DETAILS keyword argument is true.
 
 =a
-
 ARPPrint, ARPQuerier, ARPResponder, ARPFaker
-
 */
 
-class CheckARPHeader : public BatchElement {
-
+class CheckARPHeader : public SimpleElement<CheckARPHeader> {
     public:
         CheckARPHeader() CLICK_COLD;
         ~CheckARPHeader() CLICK_COLD;
@@ -75,31 +76,29 @@ class CheckARPHeader : public BatchElement {
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         void add_handlers() CLICK_COLD;
 
-        Packet      *simple_action      (Packet *);
-    #if HAVE_BATCH
-        PacketBatch *simple_action_batch(PacketBatch *);
-    #endif
+        Packet *simple_action(Packet *p);
 
     private:
-
         unsigned _offset;
-
         bool _verbose : 1;
 
-        atomic_uint32_t _drops;
-        atomic_uint32_t *_reason_drops;
+        atomic_uint64_t _count;
+        atomic_uint64_t _drops;
+        atomic_uint64_t *_reason_drops;
 
         enum Reason {
-        MINISCULE_PACKET,
-        BAD_LENGTH,
-        BAD_HRD,
-        BAD_PRO,
-        NREASONS
+            MINISCULE_PACKET = 0,
+            BAD_LENGTH,
+            BAD_HRD,
+            BAD_PRO,
+            NREASONS
         };
         static const char * const reason_texts[NREASONS];
 
-        Packet *drop(Reason, Packet *);
-        static String read_handler(Element *, void *) CLICK_COLD;
+        enum { h_count, h_drops, h_drop_details };
+
+        Packet *drop(Reason reason, Packet *p);
+        static String read_handler(Element *e, void *thunk) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

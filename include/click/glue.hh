@@ -160,8 +160,8 @@ void click_lfree(volatile void *p, size_t size);
 # define CLICK_ALIGNED_NEW(T,n) (new T[n])
 # define CLICK_ALIGNED_DELETE(p,T,n) (delete[] p)
 #else
-# define CLICK_ALIGNED_NEW(T,n) ({T* v = (T*)CLICK_ALIGNED_ALLOC(sizeof(T) * n);for (unsigned i = 0; i < n; i++) {new(&v[i]) T();};v;})
-# define CLICK_ALIGNED_DELETE(p,T,n) {for (unsigned i = 0; i < n; i++) p[i].~T();CLICK_ALIGNED_FREE(p,sizeof(T)*n);}
+# define CLICK_ALIGNED_NEW(T,n) ({T* v = (T*)CLICK_ALIGNED_ALLOC(sizeof(T) * (n));for (unsigned i = 0; i < (n); i++) {new(&v[i]) T();};v;})
+# define CLICK_ALIGNED_DELETE(p,T,n) {for (unsigned i = 0; i < (n); i++) p[i].~T();CLICK_ALIGNED_FREE(p,sizeof(T)*(n));}
 #endif
 
 #define CLICK_ASSERT_ALIGNED(p) (assert(((intptr_t)p & (intptr_t)(CLICK_CACHE_LINE_SIZE - 1)) == 0))

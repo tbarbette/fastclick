@@ -867,7 +867,6 @@ enable_stats
 enable_stride
 enable_task_heap
 enable_task_stats
-enable_cpu_load
 enable_dmalloc
 enable_hash_iterator_epochs
 enable_force_expensive
@@ -1590,8 +1589,6 @@ Optional Features:
   --enable-task-heap      use heap for task list
   --enable-task-stats     Keep track of task statistics, used for automatic
                           balancing of tasks among threads
-  --enable-cpu-load       Keep track of CPU usage using an approximation.
-                          Useful when using polling keeping the CPU at 100%
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
                           hash iterator epochs
@@ -7662,6 +7659,18 @@ if test "x$enable_etherswitch" = xyes; then
     :
 
 fi
+# Check whether --enable-flow was given.
+if test "${enable_flow+set}" = set; then :
+  enableval=$enable_flow;
+else
+  enable_flow=NO
+fi
+test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flow" = x \) && enable_flow=yes
+if test "x$enable_flow" = xyes; then
+    :
+    $as_echo "#define HAVE_FLOW 1" >>confdefs.h
+
+fi
 # Check whether --enable-grid was given.
 if test "${enable_grid+set}" = set; then :
   enableval=$enable_grid;
@@ -10996,18 +11005,6 @@ if test "x$enable_task_stats" = xyes; then
 
 fi
 
-# Check whether --enable-cpu-load was given.
-if test "${enable_cpu_load+set}" = set; then :
-  enableval=$enable_cpu_load; :
-else
-  enable_cpu_load=no
-fi
-
-if test "x$enable_cpu_load" = xyes; then
-    $as_echo "#define HAVE_CLICK_LOAD 1" >>confdefs.h
-
-fi
-
 
 # Check whether --enable-dmalloc was given.
 if test "${enable_dmalloc+set}" = set; then :
@@ -11280,8 +11277,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_working_pcap_h" >&5
 $as_echo "$ac_cv_working_pcap_h" >&6; }
         test "$ac_cv_working_pcap_h" != yes && HAVE_PCAP=
-    else
-        HAVE_PCAP=no
     fi
 
     if test "$HAVE_PCAP" = yes; then
@@ -14433,12 +14428,22 @@ if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
 fi
 
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
+else
+    enable_flow="no"
+fi
+
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
 if test "x$enable_gtp" = xyes; then
     provisions="$provisions gtp"
+fi
+
+if test "x$have_hyperscan" = xyes; then
+    provisions="$provisions hs"
 fi
 
 if test "x$have_int64_types" = xyes; then
@@ -14481,10 +14486,6 @@ fi
 
 if test "x$HAVE_NUMA" = xyes; then
     provisions="$provisions numa"
-fi
-
-if test "x$have_papi" = xyes; then
-    provisions="$provisions papi"
 fi
 
 if test "x$HAVE_PCAP" = xyes; then
@@ -15899,6 +15900,9 @@ echo "
 Configuration Summary:
     C     Compiler:              ${CC}
     C++   Compiler:              ${CXX}
+
+          Batching:              ${enable_batch}
+              Flow:              ${enable_flow}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}

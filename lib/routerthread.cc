@@ -69,7 +69,7 @@ static unsigned long greedy_schedule_jiffies;
 RouterThread::RouterThread(Master *master, int id)
     : _stop_flag(false), _master(master), _id(id), _driver_entered(false)
 #if HAVE_CLICK_LOAD
-    , _load(), _useless(0), _useful(0), _last_update(0)
+    , _load_state()
 #endif
 {
     _pending_head.x = 0;
@@ -370,7 +370,7 @@ RouterThread::run_tasks(int ntasks)
     want_status.is_strong_unscheduled = false;
 
     Task *t;
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS
     int runs;
 #endif
     bool work_done;
@@ -479,16 +479,19 @@ RouterThread::run_tasks(int ntasks)
 
 #if HAVE_CLICK_LOAD
     if (useless > 0 || useful > 0) {
-        _useless += useless;
-        _useful += useful;
+	LoadState &ls = _load_state.write_begin();
+	ls.useless += useless;
+        ls.useful += useful;
 
-        if (cycles - _last_update > UPDATE_TIME) {
+        if (cycles - ls.last_update > UPDATE_TIME) {
             //click_chatter("[%d] %lu %lu %lu, %lu %lu",thread_id(), _useful, _useless, (_useful << 10) / (_useless + _useful), cycles - _last_update, UPDATE_TIME);
-            _load.update((_useful << 10) / (_useless + _useful));
-            _last_update = cycles;
-            _useless = 0;
-            _useful = 0;
+            ls.load.update((ls.useful << 10) / (ls.useless + ls.useful));
+            ls.last_update = cycles;
+            ls.all_useful_kcycles += (ls.useful / 1000);
+            ls.useless = 0;
+            ls.useful = 0;
         }
+        _load_state.write_commit();
     }
 #endif
 
@@ -504,7 +507,25 @@ RouterThread::run_tasks(int ntasks)
 #if HAVE_CLICK_LOAD
 float
 RouterThread::load() {
-  return (float) _load.unscaled_average() / 1024;
+  return (float) _load_state.read().load.unscaled_average() / 1024;
+}
+
+unsigned long long
+RouterThread::load_cycles() {
+  const LoadState &ls = _load_state.read_begin();
+  uint64_t time = click_get_cycles() - ls.last_update;
+  double r = (double)ls.useful * ((double)UPDATE_TIME * 10 / (double)time) ;
+  _load_state.read_end();
+  return r;
+}
+
+unsigned long long
+RouterThread::useful_kcycles() {
+	const LoadState &ls = _load_state.read_begin();
+    unsigned long long uk = ls.all_useful_kcycles;
+    uk += ls.useful / 1000;
+    _load_state.read_end();
+    return uk;
 }
 #endif
 
@@ -616,7 +637,10 @@ RouterThread::driver()
 #endif
 
 #if HAVE_CLICK_LOAD
-    _last_update = click_get_cycles();
+    //Initialize the load update time
+    LoadState &ls = _load_state.write_begin();
+    ls.last_update = click_get_cycles();
+    _load_state.write_commit();
 #endif
 
 #if CLICK_NS

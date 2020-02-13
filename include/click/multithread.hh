@@ -478,6 +478,18 @@ class shared { public:
         return _refcnt;
     }
 
+    inline bool unshared() {
+	return _refcnt == 0;
+    }
+
+    inline bool write_held() {
+	return hasref();
+    }
+
+    inline bool hasref() {
+	return _refcnt > 0;
+    }
+
     T* unprotected_ptr() {
         return &_p;
     }
@@ -493,6 +505,123 @@ private:
     inline void put() {
         click_read_fence();
         _refcnt--;
+    }
+};
+
+/**
+ * Wrapper class to easily build a non-RW protected equivalent of shared
+ */
+template <typename T>
+class not_shared { public:
+
+	not_shared() {
+    }
+
+	not_shared(T p) : _p(p) {
+    }
+
+    class ptr { public:
+        inline ptr() : _v(0) {};
+        inline ptr(shared<T>* v) : _v(v) {_v->get();}
+        inline ~ptr() {
+            release();
+        }
+
+        inline T* operator->() {
+             return &_v->_p;
+        }
+
+        inline T* get() {
+            return &_v->_p;
+        }
+
+        inline T& operator*() {
+            return _v->_p;
+        }
+
+        inline ptr(const ptr &o) {
+            _v = o._v;
+            o._v = 0;
+        }
+
+
+        inline void assign(shared<T>* v) {
+            release();
+            _v = v;
+            _v->get();
+        }
+
+        inline void assign_release(ptr &o) {
+            release();
+            _v = o._v;
+            o._v = 0;
+        }
+
+        inline void operator=(const ptr &o) {
+            release();
+            _v = o._v;
+            if (_v)
+                _v->get();
+        }
+
+        inline void release() {
+            if (_v)
+                _v->put();
+            _v = 0;
+        }
+
+        inline operator bool() const {
+            return _v;
+        }
+
+    private:
+        mutable not_shared<T>* _v;
+    };
+
+    //shared does not support write_ptr, we typedef for convenience
+    typedef ptr write_ptr;
+
+    inline ptr operator->() {
+        return ptr(this);
+    }
+
+    inline ptr read() {
+        return ptr(this);
+    }
+
+    inline ptr write() {
+        return write_ptr(this);
+    }
+
+
+    inline void get(ptr &o) {
+        o.assign(this);
+    }
+
+    T* unprotected_ptr() {
+        return &_p;
+    }
+
+    inline bool unshared() {
+	return true;
+    }
+
+    inline bool write_held() {
+	return true;
+    }
+
+    inline bool hasref() {
+	return true;
+    }
+
+
+private:
+    T _p;
+
+    inline void get() {
+    }
+
+    inline void put() {
     }
 };
 

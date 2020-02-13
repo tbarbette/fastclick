@@ -912,6 +912,11 @@ class WritablePacket : public Packet { public:
     inline click_tcp *tcp_header() const;
     inline click_udp *udp_header() const;
 
+    inline void rewrite_ips(IPPair pair, bool is_tcp = true);
+    inline void rewrite_ips_ports(IPPair pair, uint16_t sport, uint16_t dport, bool is_tcp = true);
+    inline void rewrite_ipport(IPAddress ip, uint16_t port, const int shift, bool is_tcp = true);
+    inline void rewrite_ip(IPAddress ip, const int shift, bool is_tcp = true);
+
 #if !CLICK_LINUXMODULE
     inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
 #endif
@@ -2886,6 +2891,125 @@ WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t
 # endif
 }
 #endif
+
+#include <clicknet/tcp.h>
+#include <clicknet/udp.h>
+
+inline void
+WritablePacket::rewrite_ips(IPPair pair, bool is_tcp) {
+    assert(this->network_header());
+    uint16_t *x = reinterpret_cast<uint16_t *>(&this->ip_header()->ip_src);
+    uint32_t old_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
+    old_hw += (old_hw >> 16);
+
+    memcpy(x, &pair, 8);
+
+    uint32_t new_hw = (uint32_t) x[0] + x[1] + x[2] + x[3];
+    new_hw += (new_hw >> 16);
+    click_ip *iph = this->ip_header();
+    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
+    if (is_tcp)
+        click_update_in_cksum(&this->tcp_header()->th_sum, old_hw, new_hw);
+    else
+        click_update_in_cksum(&this->udp_header()->uh_sum, old_hw, new_hw);
+}
+
+inline void
+WritablePacket::rewrite_ips_ports(IPPair pair, uint16_t sport, uint16_t dport, bool is_tcp) {
+    assert(this->network_header());
+    assert(this->transport_header());
+    uint32_t old_hw, t_old_hw;
+    uint32_t new_hw, t_new_hw;
+
+    uint16_t *xip = reinterpret_cast<uint16_t *>(&this->ip_header()->ip_src);
+    old_hw = (uint32_t) xip[0] + xip[1] + xip[2] + xip[3];
+    t_old_hw = old_hw;
+    old_hw += (old_hw >> 16);
+
+    memcpy(xip, &pair, 8);
+
+    new_hw = (uint32_t) xip[0] + xip[1] + xip[2] + xip[3];
+    t_new_hw = new_hw;
+    new_hw += (new_hw >> 16);
+    click_ip *iph = this->ip_header();
+    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
+
+    uint16_t *xport = reinterpret_cast<uint16_t *>(&this->tcp_header()->th_sport);
+    t_old_hw += (uint32_t) xport[0] + xport[1];
+    t_old_hw += (t_old_hw >> 16);
+    if (sport)
+        xport[0] = sport;
+    if (dport)
+        xport[1] = dport;
+    t_new_hw += (uint32_t) xport[0] + xport[1];
+    t_new_hw += (t_new_hw >> 16);
+
+    if (is_tcp)
+        click_update_in_cksum(&this->tcp_header()->th_sum, t_old_hw, t_new_hw);
+    else
+        click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
+}
+
+//shift : 0 for source, 1 for dst
+inline void
+WritablePacket::rewrite_ipport(IPAddress ip, uint16_t port,const int shift, bool is_tcp) {
+    assert(this->network_header());
+    assert(this->transport_header());
+    uint32_t old_hw, t_old_hw;
+    uint32_t new_hw, t_new_hw;
+
+    uint16_t *xip = reinterpret_cast<uint16_t *>(&this->ip_header()->ip_src);
+    old_hw = (uint32_t) xip[(shift * 2) + 0] + xip[(shift*2) + 1];
+    t_old_hw = old_hw;
+    old_hw += (old_hw >> 16);
+
+    memcpy(&xip[shift*2], &ip, 4);
+
+    new_hw = (uint32_t) xip[(shift*2) + 0] + xip[(shift*2) + 1];
+    t_new_hw = new_hw;
+    new_hw += (new_hw >> 16);
+    click_ip *iph = this->ip_header();
+    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
+
+    uint16_t *xport = reinterpret_cast<uint16_t *>(&this->tcp_header()->th_sport);
+    t_old_hw += (uint32_t) xport[shift + 0];
+    t_old_hw += (t_old_hw >> 16);
+    xport[shift + 0] = port;
+    t_new_hw += (uint32_t) xport[shift + 0];
+    t_new_hw += (t_new_hw >> 16);
+
+    if (is_tcp)
+        click_update_in_cksum(&this->tcp_header()->th_sum, t_old_hw, t_new_hw);
+    else
+        click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
+}
+
+//shift : 0 for source, 1 for dst
+inline void
+WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
+    assert(this->network_header());
+    assert(this->transport_header());
+    uint32_t old_hw, t_old_hw;
+    uint32_t new_hw, t_new_hw;
+
+    uint16_t *xip = reinterpret_cast<uint16_t *>(&this->ip_header()->ip_src);
+    old_hw = (uint32_t) xip[(shift * 2) + 0] + xip[(shift*2) + 1];
+    t_old_hw = old_hw;
+    old_hw += (old_hw >> 16);
+
+    memcpy(&xip[shift*2], &ip, 4);
+
+    new_hw = (uint32_t) xip[(shift*2) + 0] + xip[(shift*2) + 1];
+    t_new_hw = new_hw;
+    new_hw += (new_hw >> 16);
+    click_ip *iph = this->ip_header();
+    click_update_in_cksum(&iph->ip_sum, old_hw, new_hw);
+
+    if (is_tcp)
+        click_update_in_cksum(&this->tcp_header()->th_sum, t_old_hw, t_new_hw);
+    else
+        click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
+}
 
 typedef Packet::PacketType PacketType;
 

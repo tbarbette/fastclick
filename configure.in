@@ -193,11 +193,19 @@ else
     LIBS="$save_libs"
 fi
 
+AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
+AC_CHECK_HEADERS([curl/curl.h], [ac_have_curl_h=yes], [ac_have_curl_h=no])
+if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
+    AC_DEFINE([HAVE_CURL])
+fi
 
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
+    have_httpd=yes
     AC_DEFINE([HAVE_MICROHTTPD])
+else
+    have_httpd=no
 fi
 
 AC_CHECK_LIB([re2], [main], [ac_have_re2=yes], [ac_have_re2=no])
@@ -219,13 +227,26 @@ else
     have_papi=no
 fi
 
-
-AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
-AC_CHECK_HEADERS([curl/curl.h], [ac_have_curl_h=yes], [ac_have_curl_h=no])
-if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
-    AC_DEFINE([HAVE_CURL])
+AC_CHECK_LIB([hs], [hs_compile_multi], [ac_have_hyperscan=yes], [ac_have_hyperscan=no])
+AC_CHECK_HEADERS([hs/hs.h], [ac_have_hyperscan_h=yes], [ac_have_hyperscan_h=no])
+if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
+    have_hyperscan=yes
+    LIBS="$LIBS -lhs"
+    AC_DEFINE([HAVE_HYPERSCAN])
+else
+    have_hyperscan=no
 fi
 
+
+AC_ARG_ENABLE([json],
+    [AS_HELP_STRING([  --enable-json], [enable JSON support])],
+    [:], [enable_json=no])
+if test "x$enable_json" = "xyes"; then
+    have_json=yes
+    AC_DEFINE([HAVE_JSON])
+else
+    have_json=no
+fi
 
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
@@ -669,6 +690,7 @@ ELEMENTS_ARG_ENABLE(app, [include application-level elements], yes)
 ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
+ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO, AC_DEFINE(HAVE_FLOW))
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
@@ -1294,14 +1316,6 @@ AC_ARG_ENABLE([task-stats],
     [:], [enable_task_stats=no])
 if test "x$enable_task_stats" = xyes; then
     AC_DEFINE(HAVE_TASK_STATS)
-fi
-
-dnl click load
-AC_ARG_ENABLE([cpu-load],
-    [AS_HELP_STRING([--enable-cpu-load], [Keep track of CPU usage using an approximation. Useful when using polling keeping the CPU at 100%])],
-    [:], [enable_cpu_load=no])
-if test "x$enable_cpu_load" = xyes; then
-    AC_DEFINE(HAVE_CLICK_LOAD)
 fi
 
 dnl debugging malloc
@@ -2372,11 +2386,6 @@ if test "x$HAVE_NUMA" = xyes; then
     provisions="$provisions numa"
 fi
 
-dnl add 'papi' if libpapi support is available
-if test "x$have_papi" = xyes; then
-    provisions="$provisions papi"
-fi
-
 dnl add 'pcap' if libpcap is available
 if test "x$HAVE_PCAP" = xyes; then
     provisions="$provisions pcap"
@@ -2461,6 +2470,9 @@ echo "
 Configuration Summary:
     C Compiler:                  ${CC}
     C++ Compiler:                ${CXX}
+
+          Batching:              ${enable_batch}
+              Flow:              ${enable_flow}
 
     DPDK support:                ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}

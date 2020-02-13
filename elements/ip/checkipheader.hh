@@ -92,6 +92,10 @@ this syntax, 0.0.0.0 and 255.255.255.255 considered bad addresses in addition
 to those explicitly in the list. This syntax is deprecated and should not be
 used in new configurations.
 
+=h count read-only
+
+Returns the number of correct packets CheckIPHeader has seen.
+
 =h drops read-only
 
 Returns the number of incorrect packets CheckIPHeader has seen.
@@ -99,74 +103,72 @@ Returns the number of incorrect packets CheckIPHeader has seen.
 =h drop_details read-only
 
 Returns a text file showing how many erroneous packets CheckIPHeader has seen,
-subdivided by error. Only available if the DETAILS keyword argument was true.
+subdivided by error. Only available if the DETAILS keyword argument is true.
 
 =a CheckIPHeader2, MarkIPHeader, SetIPChecksum, StripIPHeader,
-CheckTCPHeader, CheckUDPHeader, CheckICMPHeader */
+CheckTCPHeader, CheckUDPHeader, CheckICMPHeader
+*/
 
-class CheckIPHeader : public BatchElement { public:
+class CheckIPHeader : public SimpleElement<CheckIPHeader> {
+    public:
+        CheckIPHeader() CLICK_COLD;
+        ~CheckIPHeader() CLICK_COLD;
 
-  CheckIPHeader() CLICK_COLD;
-  ~CheckIPHeader() CLICK_COLD;
+        const char *class_name() const { return "CheckIPHeader"; }
+        const char *port_count() const { return PORTS_1_1X2; }
+        const char *processing() const { return PROCESSING_A_AH; }
+        const char *flags() const      { return Element::AGNOSTIC; }
 
-  const char *class_name() const		{ return "CheckIPHeader"; }
-  const char *port_count() const		{ return PORTS_1_1X2; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
-  const char *flags() const			{ return Element::AGNOSTIC; }
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  void add_handlers() CLICK_COLD;
+        Packet *simple_action(Packet *p);
 
-#if HAVE_BATCH
-  PacketBatch *simple_action_batch(PacketBatch *);
-#endif
-  Packet *simple_action(Packet *);
+        struct OldBadSrcArg {
+            static bool parse(const String &str, Vector<IPAddress> &result, Args &args);
+        };
 
-  struct OldBadSrcArg {
-      static bool parse(const String &str, Vector<IPAddress> &result,
-			Args &args);
-  };
+        struct InterfacesArg {
+            static bool parse(
+                const String &str, Vector<IPAddress> &result_bad_src,
+                Vector<IPAddress> &result_good_dst, Args &args
+            );
+        };
 
-  struct InterfacesArg {
-      static bool parse(const String &str, Vector<IPAddress> &result_bad_src,
-			Vector<IPAddress> &result_good_dst, Args &args);
-  };
+    private:
+        unsigned _offset;
+        Vector<IPAddress> _bad_src;   // array of illegal IP src addresses
 
- private:
+        bool _checksum;
+    #if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
+        bool _aligned;
+    #endif
+        bool _verbose;
 
-  unsigned _offset;
+        Vector<IPAddress> _good_dst;  // array of IP dst addrs for which _bad_src does not apply
 
-  Vector<IPAddress> _bad_src;	// array of illegal IP src addresses
+        atomic_uint64_t _count;
+        atomic_uint64_t _drops;
+        atomic_uint64_t *_reason_drops;
 
-  bool _checksum;
-#if HAVE_FAST_CHECKSUM && FAST_CHECKSUM_ALIGNED
-  bool _aligned;
-#endif
-  bool _verbose;
+        enum Reason {
+            MINISCULE_PACKET = 0,
+            BAD_VERSION,
+            BAD_HLEN,
+            BAD_IP_LEN,
+            BAD_CHECKSUM,
+            BAD_SADDR,
+            NREASONS
+        };
+        static const char * const reason_texts[NREASONS];
 
-  Vector<IPAddress> _good_dst;	// array of IP dst addrs for which _bad_src
-				// does not apply
+        enum { h_count, h_drops, h_drop_details };
 
-  atomic_uint32_t _drops;
-  atomic_uint32_t *_reason_drops;
+        inline Reason valid(Packet *p);
+        Packet *drop(Reason reason, Packet *p, bool batch);
+        static String read_handler(Element *e, void *thunk) CLICK_COLD;
 
-  enum Reason {
-    MINISCULE_PACKET,
-    BAD_VERSION,
-    BAD_HLEN,
-    BAD_IP_LEN,
-    BAD_CHECKSUM,
-    BAD_SADDR,
-    NREASONS
-  };
-  static const char * const reason_texts[NREASONS];
-
-  inline Reason valid(Packet* p);
-  Packet *drop(Reason, Packet *, bool batch);
-  static String read_handler(Element *, void *) CLICK_COLD;
-
-  friend class CheckIPHeader2;
-
+        friend class CheckIPHeader2;
 };
 
 CLICK_ENDDECLS

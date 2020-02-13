@@ -21,6 +21,7 @@ CLICK_CXX_UNPROTECT
 #endif
 #if HAVE_CLICK_LOAD
 # include <click/ewma.hh>
+# include <click/multithread.hh>
 #endif
 
 // NB: user must #include <click/task.hh> before <click/routerthread.hh>.
@@ -74,6 +75,8 @@ class RouterThread { public:
 
 #if HAVE_CLICK_LOAD
     float load();
+    unsigned long long load_cycles();
+    unsigned long long useful_kcycles();
 #endif
 
 #if CLICK_LINUXMODULE || CLICK_BSDMODULE
@@ -152,11 +155,18 @@ class RouterThread { public:
 #endif
 
 #if HAVE_CLICK_LOAD
-    EXPSMOOTH<512,10> _load;
-    uint64_t _useful;
-    uint64_t _useless;
-    click_cycles_t _last_update;
-    click_cycles_t UPDATE_TIME;
+    struct LoadState {
+	LoadState() : load(), useful(0),useless(0), all_useful_kcycles(0), last_update(0) {
+
+	}
+		EXPSMOOTH<512,10> load;
+		uint64_t useful;
+		uint64_t useless;
+		uint64_t all_useful_kcycles;
+		click_cycles_t last_update;
+    };
+	click_cycles_t UPDATE_TIME;
+	unprotected_rcu_singlewriter<LoadState,2> _load_state;
 #endif
 
     // EXTERNAL STATE GROUP
