@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowdirectorglue.hh -- element that glues Click and DPDK for
+ * flowdispatcherglue.hh -- element that glues Click and DPDK for
  * flow parsing and installation on DPDK-based NICs.
  *
  * Copyright (c) 2018 Tom Barbette, University of Liège
@@ -17,8 +17,8 @@
  * legally binding.
  */
 
-#ifndef CLICK_FLOWDIRECTOR_GLUE_H
-#define CLICK_FLOWDIRECTOR_GLUE_H
+#ifndef CLICK_FLOWDISPATCHER_GLUE_H
+#define CLICK_FLOWDISPATCHER_GLUE_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,7 +65,7 @@ static struct rte_port *get_ports() {
 static struct rte_port *get_port(const portid_t &port_id) {
     if (!ports) {
         printf(
-            "Flow Director (port %u): Unallocated DPDK ports\n",
+            "Flow Dispatcher (port %u): Unallocated DPDK ports\n",
             port_id
         );
         return NULL;
@@ -73,7 +73,7 @@ static struct rte_port *get_port(const portid_t &port_id) {
 
     if (port_id < 0) {
         printf(
-            "Flow Director (port %u): Invalid port identifier\n",
+            "Flow Dispatcher (port %u): Invalid port identifier\n",
             port_id
         );
         return NULL;
@@ -126,4 +126,4 @@ int cmdline_parse(
 }
 #endif
 
-#endif /* CLICK_FLOWDIRECTOR_GLUE_H */
+#endif /* CLICK_FLOWDISPATCHER_GLUE_H */

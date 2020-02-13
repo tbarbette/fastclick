@@ -108,17 +108,17 @@ class StandaloneSCManager : public PidSCManager {
         int run_service_chain(ErrorHandler *errh);
 
         virtual String fix_rule(NIC *nic, String rule);
-private:
 
-struct CPUStat {
-    unsigned long long lastTotal;
-    unsigned long long lastIdle;
-};
+    private:
+        struct CPUStat {
+            unsigned long long last_total;
+            unsigned long long last_idle;
+        };
 
+        Vector<float> update_load(Vector<CPUStat> &v);
 
-Vector<float> update_load(Vector<CPUStat> &v);
         int _sriov;
-        Vector<CPUStat> _cpustats;
-};
+        Vector<CPUStat> _cpu_stats;
+    };
 
 #endif // CLICK_METRON_SC_HH

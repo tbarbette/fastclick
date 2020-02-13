@@ -37,7 +37,7 @@
 #include <metron/servicechain.hh>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdirector.hh>
+    #include <click/flowdispatcher.hh>
 #endif
 
 #if HAVE_CURL
@@ -153,20 +153,20 @@ Metron::Metron() :
     _cpu_click_to_phys.resize(click_max_cpu_ids(), 0);
 #if HAVE_DPDK
     if (dpdk_enabled) {
-        int id = 0;
-        for (int i = 0; i < RTE_MAX_LCORE; i++) {
+        unsigned id = 0;
+        for (unsigned i = 0; i < RTE_MAX_LCORE; i++) {
             if (rte_lcore_is_enabled(i)) {
-
-                click_chatter("CPU %d to %d",id,i);
+                click_chatter("Logical CPU core %d to %d", id, i);
                 _cpu_click_to_phys[id++]=i;
             } else {
-                click_chatter("lcore %d deactivated",i);
+                click_chatter("Logical CPU core %d deactivated", i);
             }
         }
     } else
 #endif
     {
-        for (int i = 0; i < _cpu_click_to_phys.size(); i++) {
+        for (unsigned i = 0; i < _cpu_click_to_phys.size(); i++) {
+            click_chatter("Logical CPU core %d to %d", i, i);
             _cpu_click_to_phys[i] = i;
         }
     }
@@ -197,7 +197,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
     _mirror = false;
     _slave_td_args = "";
 
-    bool nodiscovery = false;
+    bool no_discovery = false;
 
     if (Args(conf, this, errh)
         .read    ("ID",                _id)
@@ -219,7 +219,7 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_all("SLAVE_ARGS",        _args)
         .read    ("SLAVE_EXTRA",       _slave_extra)
         .read    ("SLAVE_TD_EXTRA",    _slave_td_args)
-        .read    ("NODISCOVERY",       nodiscovery)
+        .read    ("NODISCOVERY",       no_discovery)
         .read    ("MIRROR",            _mirror)
         .read    ("VERBOSE",           _verbose)
         .complete() < 0)
@@ -255,44 +255,39 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         }
     #endif
     }
-    errh->message(
-        "Rx filter mode: %s",
-        rx_filter_type_enum_to_str(_rx_mode).c_str()
-    );
 
     if (_load_timer <= 0) {
         return errh->error("Set a positive scheduling frequency using LOAD_TIMER");
     }
 
-    if (nodiscovery) {
+    if (no_discovery) {
         _discovered = true;
     } else {
+    #ifndef HAVE_CURL
+        if (_discover_ip) {
+            return errh->error(
+                "Metron data plane agent requires controller discovery, "
+                "but Click was compiled without libcurl support!"
+            );
+        }
+    #endif
 
-#ifndef HAVE_CURL
-    if (_discover_ip) {
-        return errh->error(
-            "Metron data plane agent requires controller discovery, "
-            "but Click was compiled without libcurl support!"
-        );
-    }
-#endif
+    #if HAVE_CURL
+        // No discovery if key information is missing
+        if (_discover_ip &&
+            ((!_agent_ip) || (!_discover_user) || (!_discover_password))) {
+            return errh->error(
+                "Provide your local IP, a username, and a password to "
+                "access Metron controller's REST API"
+            );
+        }
 
-#if HAVE_CURL
-    // No discovery if key information is missing
-    if (_discover_ip &&
-        ((!_agent_ip) || (!_discover_user) || (!_discover_password))) {
-        return errh->error(
-            "Provide your local IP and a username & password to "
-            "access Metron controller's REST API"
-        );
-    }
-
-    // Ports must strictly become positive uint16_t
-    if (        (_agent_port <= 0) ||         (_agent_port > UINT16_MAX) ||
-        (_discover_rest_port <= 0) || (_discover_rest_port > UINT16_MAX)) {
-        return errh->error("Invalid port number");
-    }
-#endif
+        // Ports must strictly become positive uint16_t
+        if (        (_agent_port <= 0) ||         (_agent_port > UINT16_MAX) ||
+            (_discover_rest_port <= 0) || (_discover_rest_port > UINT16_MAX)) {
+            return errh->error("Invalid port number");
+        }
+    #endif
     }
 
     if (_monitoring_mode) {
@@ -311,8 +306,15 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
         _nics.insert(nic.get_name(), nic);
     }
 
+    int status = confirm_nic_mode(errh);
+
+    errh->message(
+        "Rx filter mode: %s",
+        rx_filter_type_enum_to_str(_rx_mode).c_str()
+    );
+
     // Confirm the mode of the underlying NICs
-    return confirm_nic_mode(errh);
+    return status;
 }
 
 /**
@@ -322,29 +324,40 @@ Metron::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 Metron::confirm_nic_mode(ErrorHandler *errh)
 {
+    bool confirmed = false;
+
     auto nic = _nics.begin();
     while (nic != _nics.end()) {
         // Cast input element
         FromDPDKDevice *fd = dynamic_cast<FromDPDKDevice *>(nic.value().element);
-
-        if (!fd->get_device())
+        if (!fd || !fd->get_device()) {
+            nic++;
             continue;
+        }
 
         // Get its Rx mode
-        String fd_mode = fd->get_device()->get_mode_str();
+        String fd_mode = fd->get_device()->get_mode_str().empty() ? "unknown" : fd->get_device()->get_mode_str();
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         // TODO: What if none of the NICs is in Metron mode?
-        if ((_rx_mode == FLOW) && (fd_mode != FlowDirector::FLOW_DIR_MODE)) {
+        if ((_rx_mode == FLOW) && (fd_mode != FlowDispatcher::DISPATCHING_MODE)) {
             errh->warning(
                 "[NIC %s] Configured in MODE %s, which is incompatible with Metron's accurate dispatching",
                 nic.value().get_name().c_str(), fd_mode.c_str()
             );
+        } else if (_rx_mode == FLOW) {
+            confirmed = true;
         }
     #endif
 
-        // TODO: What if _rx_mode = VLAN and fd_mode = vmdq?
-        //       The agent should be able to provide MAC or VLAN tags.
+        // TODO: Implement VLAN tagging with VMDq
+        if ((_rx_mode == VLAN) && (fd_mode == "vmdq")) {
+            return errh->error(
+                "[NIC %s] Metron RX_MODE %s based on %s is not supported yet",
+                nic.value().get_name().c_str(), rx_filter_type_enum_to_str(_rx_mode).c_str(), fd_mode.c_str()
+            );
+        }
+
         if ((_rx_mode == MAC) && (fd_mode != "vmdq")) {
             return errh->error(
                 "[NIC %s] Metron RX_MODE %s requires FromDPDKDevice MODE vmdq",
@@ -359,7 +372,17 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
             );
         }
 
+        confirmed = true;
+
         nic++;
+    }
+
+    if (!confirmed) {
+        _rx_mode = NONE;
+        errh->warning(
+            "None of the NICs' Rx modes complies with Metron's dispatching, setting Rx mode to %s",
+            rx_filter_type_enum_to_str(_rx_mode).c_str()
+        );
     }
 
     return SUCCESS;
@@ -392,7 +415,6 @@ Metron::initialize(ErrorHandler *errh)
         uuid = uuid.substring(0, uuid.find_left("\n"));
         _id = (!uuid || uuid.empty())? _id + "00000000-0000-0000-0000-000000000001" : _id + uuid;
     }
-
 
     if (_on_scale)
         if (_on_scale.initialize_write(this, errh) < 0)
@@ -427,12 +449,14 @@ Metron::initialize(ErrorHandler *errh)
     }
 #endif
 
-    if (_nics.size() > 0) {
-        assert(DPDKDevice::initialized());
-    }
+    if (dpdk_enabled) {
+        if (_nics.size() > 0) {
+            assert(DPDKDevice::initialized());
+        }
 
-    if (try_slaves(errh) != SUCCESS) {
-        return ERROR;
+        if (try_slaves(errh) != SUCCESS) {
+            return ERROR;
+        }
     }
 
     _timer.initialize(this);
@@ -466,8 +490,8 @@ Metron::try_slaves(ErrorHandler *errh)
     sc.id = "slaveTest";
     sc.config_type = CLICK;
     sc.config = "";
-    sc.initialize_cpus(click_max_cpu_ids(),click_max_cpu_ids());
-    for (int i = 0; i < sc.get_nics_nb(); i++) {
+    sc.initialize_cpus(click_max_cpu_ids(), click_max_cpu_ids());
+    for (unsigned i = 0; i < sc.get_nics_nb(); i++) {
         NIC *nic = sc.get_nic_by_index(i);
         sc._nics.push_back(nic);
     }
@@ -477,7 +501,7 @@ Metron::try_slaves(ErrorHandler *errh)
     cpu_phys_map.resize(click_max_cpu_ids());
     assign_cpus(&sc, cpu_phys_map);
     assert(cpu_phys_map[0] >= 0);
-    for (int i = 0; i < click_max_cpu_ids(); i++) {
+    for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
         sc.get_cpu_info(i).cpu_phys_id = cpu_phys_map[i];
         sc.get_cpu_info(i).set_active(true);
     }
@@ -514,7 +538,7 @@ Metron::discover()
     /* Get a curl handle */
     curl = curl_easy_init();
     if(curl) {
-        struct curl_slist *headers=NULL;
+        struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Accept: application/json");
         headers = curl_slist_append(headers, "Content-Type: application/json");
         headers = curl_slist_append(headers, "charsets: utf-8");
@@ -627,7 +651,7 @@ int
 Metron::get_assigned_cpus_nb()
 {
     int tot = 0;
-    for (int i = 0; i < get_cpus_nb(); i++) {
+    for (unsigned i = 0; i < get_cpus_nb(); i++) {
         if (_cpu_map[i] != 0) {
             tot++;
         }
@@ -660,7 +684,7 @@ Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 
     int j = 0;
 
-    for (int i = 0; i < _cpu_map.size(); i++) {
+    for (unsigned i = 0; i < _cpu_map.size(); i++) {
         if (_cpu_map[i] == 0) {
             _cpu_map[i] = sc;
             map[j++] = i;
@@ -679,7 +703,7 @@ Metron::assign_cpus(ServiceChain *sc, Vector<int> &map)
 void
 Metron::unassign_cpus(ServiceChain *sc)
 {
-    for (int i = 0; i < get_cpus_nb(); i++) {
+    for (unsigned i = 0; i < get_cpus_nb(); i++) {
         if (_cpu_map[i] == sc) {
             _cpu_map[i] = 0;
         }
@@ -735,11 +759,11 @@ Metron::instantiate_service_chain(ServiceChain *sc, ErrorHandler *errh)
         return ERROR;
     }
 
-    for (int i = 0; i < cpu_phys_map.size(); i++) {
+    for (unsigned i = 0; i < cpu_phys_map.size(); i++) {
         assert(cpu_phys_map[i] >= 0);
         sc->get_cpu_info(i).cpu_phys_id = cpu_phys_map[i];
     }
-    for (int i = 0; i < sc->_initial_cpus_nb; i++) {
+    for (unsigned i = 0; i < sc->_initial_cpus_nb; i++) {
         sc->get_cpu_info(i).set_active(true);
     }
 
@@ -900,7 +924,7 @@ Metron::write_handler(
             // NIC is valid, now parse the second argument
             String filename = data.substring(delim + 1).trim_space_left();
 
-            int32_t installed_rules = FlowDirector::get_flow_director(port_id)->add_rules_from_file(filename);
+            int32_t installed_rules = FlowDispatcher::get_flow_dispatcher(port_id)->add_rules_from_file(filename);
             if (installed_rules < 0) {
                 return errh->error("Failed to insert NIC flow rules from file %s", filename.c_str());
             }
@@ -943,7 +967,7 @@ Metron::write_handler(
             String sec_arg = data.substring(delim + 1).trim_space_left();
             if (sec_arg.empty()) {
                 // User did not specify the number of rules, infer it automatically
-                rules_present = FlowDirector::get_flow_director(port_id)->flow_rules_count_explicit();
+                rules_present = FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_count_explicit();
             } else {
                 // User want to enforce the desired number of rules (assuming that he/she knows..)
                 rules_present = atoi(sec_arg.c_str());
@@ -954,7 +978,7 @@ Metron::write_handler(
                 nic_name.c_str(), port_id, rules_present
             );
 
-            FlowDirector::get_flow_director(port_id)->rule_consistency_check(rules_present);
+            FlowDispatcher::get_flow_dispatcher(port_id)->rule_consistency_check(rules_present);
             return SUCCESS;
         }
         case h_flush_nics: {
@@ -1225,7 +1249,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_inst_lat_min:
         case h_rule_inst_lat_avg:
         case h_rule_inst_lat_max: {
-            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, true, true);
+            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, true, true);
             if ((intptr_t) what == h_rule_inst_lat_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_inst_lat_avg) {
@@ -1238,7 +1262,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_inst_rate_min:
         case h_rule_inst_rate_avg:
         case h_rule_inst_rate_max: {
-            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, true, false);
+            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, true, false);
             if ((intptr_t) what == h_rule_inst_rate_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_inst_rate_avg) {
@@ -1251,7 +1275,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_del_lat_min:
         case h_rule_del_lat_avg:
         case h_rule_del_lat_max: {
-            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, false, true);
+            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, false, true);
             if ((intptr_t) what == h_rule_del_lat_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_del_lat_avg) {
@@ -1264,7 +1288,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_del_rate_min:
         case h_rule_del_rate_avg:
         case h_rule_del_rate_max: {
-            FlowDirector::get_flow_director(port_id)->min_avg_max(min, avg, max, false, false);
+            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, false, false);
             if ((intptr_t) what == h_rule_del_rate_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_del_rate_avg) {
@@ -1416,11 +1440,14 @@ Metron::to_json()
 
     // CPU resources
     Json jcpus = Json::make_array();
-    for (int i = 0; i < get_cpus_nb(); i++) {
+    for (unsigned i = 0; i < get_cpus_nb(); i++) {
+        uint64_t cycles_mhz = cycles_hz() / CPU::MEGA_HZ;   // In MHz
+        assert(cycles_mhz > 0);
+
         Json jcpu = Json::make_object();
         jcpu.set("id", i);
         jcpu.set("vendor", _cpu_vendor);
-        jcpu.set("frequency", cycles_hz() / CPU::MEGA_HZ);  // In MHz
+        jcpu.set("frequency", cycles_mhz);
         jcpus.push_back(jcpu);
     }
     jroot.set("cpus", jcpus);
@@ -1448,7 +1475,7 @@ Metron::flush_nics()
     while (it != _nics.end()) {
         NIC *nic = &it.value();
 
-        FlowDirector::get_flow_director(nic->get_port_id())->flow_rules_flush();
+        FlowDispatcher::get_flow_dispatcher(nic->get_port_id())->flow_rules_flush();
 
         it++;
     }
@@ -1491,7 +1518,7 @@ Metron::stats_to_json()
     while (sci != _scs.end()) {
         ServiceChain *sc = sci.value();
 
-        for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
+        for (unsigned j = 0; j < sc->get_max_cpu_nb(); j++) {
             Json jcpu = sc->get_cpu_stats(j);
             jcpus.push_back(jcpu);
 
@@ -1503,8 +1530,8 @@ Metron::stats_to_json()
     }
 
     // Now, inititialize the load of each idle core to 0
-    for (int j = 0; j < get_cpus_nb(); j++) {
-        int *found = find(busy_cpus.begin(), busy_cpus.end(), j);
+    for (unsigned j = 0; j < get_cpus_nb(); j++) {
+        int *found = find(busy_cpus.begin(), busy_cpus.end(), (int) j);
         // This is a busy one
         if (found != busy_cpus.end()) {
             continue;
@@ -1611,7 +1638,7 @@ Metron::controllers_from_json(const Json &j)
     // A list of controllers is expected
     Json jlist = j.get("controllers");
 
-    for (unsigned short i=0; i<jlist.size(); i++) {
+    for (unsigned short i = 0; i < jlist.size(); i++) {
         String ctrl_ip;
         int    ctrl_port = -1;
         String ctrl_type;
@@ -1835,10 +1862,10 @@ ServiceChain::RxFilter::to_json()
     j.set("method", rx_filter_type_enum_to_str(method));
 
     Json jnic_values = Json::make_object();
-    for (int nic_id = 0; nic_id < sc->get_nics_nb(); nic_id++) {
+    for (unsigned nic_id = 0; nic_id < sc->get_nics_nb(); nic_id++) {
         NIC *nic = sc->get_nic_by_index(nic_id);
         Json jaddrs = Json::make_array();
-        for (int j = 0; j < sc->get_max_cpu_nb(); j++) {
+        for (unsigned j = 0; j < sc->get_max_cpu_nb(); j++) {
             const String tag = get_tag_value(nic_id, j);
             assert(!tag.empty());
             jaddrs.push_back(tag);
@@ -1882,7 +1909,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     if (method == MAC) {
         Json jaddrs = Json::parse(nic->call_rx_read("vf_mac_addr"));
 
-        for (int i = 0; i < sc->get_max_cpu_nb(); i++) {
+        for (unsigned i = 0; i < sc->get_max_cpu_nb(); i++) {
             int available_pools = atoi(nic->call_rx_read("nb_vf_pools").c_str());
             const int core_id = i;
             if (available_pools <= core_id) {
@@ -1892,7 +1919,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
         }
     } else if ((method == FLOW) || (method == RSS)) {
         // Advertize the available CPU core IDs
-        for (int i = 0; i < sc->get_max_cpu_nb(); i++) {
+        for (unsigned i = 0; i < sc->get_max_cpu_nb(); i++) {
             const int core_id = i;
             set_tag_value(inic, core_id, String(sc->get_cpu_phys_id(core_id)));
         }
@@ -1943,7 +1970,7 @@ ServiceChain::initialize_cpus(int initial_cpu_nb, int max_cpu_nb)
     _max_cpus_nb = max_cpu_nb;
     _autoscale = false;
     _cpus.resize(max_cpu_nb,CpuInfo());
-    for (int i = 0; i < max_cpu_nb; i++) {
+    for (unsigned i = 0; i < max_cpu_nb; i++) {
         _cpus[i].cpu_phys_id = -1;
     }
 }
@@ -2056,7 +2083,7 @@ ServiceChain::from_json(const Json &j, Metron *m, ErrorHandler *errh)
     }
 
     if (m->_mirror) {
-        for (int i = 0; i < sc->_nics.size(); i+=2) {
+        for (unsigned i = 0; i < sc->_nics.size(); i+=2) {
             if (i + 1 < sc->_nics.size()) {
                 sc->_nics[i]->mirror = sc->_nics[i + 1];
             }
@@ -2083,7 +2110,7 @@ ServiceChain::to_json()
     jsc.set("config", config);
     jsc.set("expandedConfig", generate_configuration(true));
     Json jcpus = Json::make_array();
-    for (int i = 0; i < get_max_cpu_nb(); i++) {
+    for (unsigned i = 0; i < get_max_cpu_nb(); i++) {
         jcpus.push_back(i); // TODO: physical IDs?
     }
     jsc.set("cpus", jcpus);
@@ -2109,10 +2136,10 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     jsc.set("id", get_id());
 
     Json jcpus = Json::make_array();
-    for (int j = 0; j < get_max_cpu_nb(); j++) {
+    for (unsigned j = 0; j < get_max_cpu_nb(); j++) {
         String js = String(j);
 /*        int avg_max = 0;
-          for (int i = 0; i < get_nics_nb(); i++) {
+          for (unsigned i = 0; i < get_nics_nb(); i++) {
             String is = String(i);
             int avg = atoi(
                 simple_call_read("batchAvg" + is + "C" + js + ".average").c_str()
@@ -2208,13 +2235,13 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             click_chatter("Adding %4d rules for CPU %d with physical ID %d", rules_map.size(), core_id, phys_core_id);
 
             // Update a batch of rules associated with this CPU core ID
-            int32_t status = nic->get_flow_director()->update_rules(rules_map, true, phys_core_id);
+            int32_t status = nic->get_flow_dispatcher()->update_rules(rules_map, true, phys_core_id);
             if (status >= 0) {
                 inserted_rules_nb += status;
             }
 
             if (nic->mirror) {
-                click_chatter("Device has mirror NIC");
+                click_chatter("Device %s has mirror NIC", nic_name.c_str());
                 HashMap<uint32_t, String> mirror_rules_map;
 
                 for (auto jrule : jrules) {
@@ -2240,7 +2267,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 
                 click_chatter("Adding %" PRIu32 " MIRROR rules for CPU %d with physical ID %d", mirror_rules_map.size(), core_id, phys_core_id);
 
-                status = nic->mirror->get_flow_director()->update_rules(mirror_rules_map, true, phys_core_id);
+                status = nic->mirror->get_flow_dispatcher()->update_rules(mirror_rules_map, true, phys_core_id);
                 if (status >= 0) {
                     inserted_rules_nb += status;
                 }
@@ -2298,7 +2325,7 @@ ServiceChain::rules_to_json()
     }
 
     // All NICs
-    for (int i = 0; i < get_nics_nb(); i++) {
+    for (unsigned i = 0; i < get_nics_nb(); i++) {
         NIC *nic = _nics[i];
 
         Json jnic = Json::make_object();
@@ -2308,7 +2335,7 @@ ServiceChain::rules_to_json()
         Json jcpus_array = Json::make_array();
 
         // One NIC can dispatch to multiple CPU cores
-        for (int j = 0; j < get_max_cpu_nb(); j++) {
+        for (unsigned j = 0; j < get_max_cpu_nb(); j++) {
             // Fetch the rules for this NIC and this CPU core
             HashMap<uint32_t, String> *rules_map = nic->get_flow_cache()->rules_map_by_core_id(j);
             if (!rules_map || rules_map->empty()) {
@@ -2379,7 +2406,7 @@ ServiceChain::delete_rule(const uint32_t &rule_id, Metron *m, ErrorHandler *errh
         // This internal rule ID exists, we can proceed with the deletion
         if (int_rule_id >= 0) {
             uint32_t rule_ids[1] = {(uint32_t) int_rule_id};
-            return (nic->get_flow_director()->flow_rules_delete(rule_ids, 1) == 1)? SUCCESS : ERROR;
+            return (nic->get_flow_dispatcher()->flow_rules_delete(rule_ids, 1) == 1)? SUCCESS : ERROR;
         }
 
         it++;
@@ -2448,7 +2475,7 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
     }
 
     // Delete the flow rules
-    return n.get_flow_director()->flow_rules_delete(rule_ids, rules_nb);
+    return n.get_flow_dispatcher()->flow_rules_delete(rule_ids, rules_nb);
 }
 
 /**
@@ -2570,14 +2597,14 @@ ServiceChain::reconfigure_from_json(Json j, Metron *m, ErrorHandler *errh)
             bool did_scale = false;
 
             if (_metron->_rx_mode == RSS) {
-                for (int i = 0; i < new_map.size(); i++) {
+                for (unsigned i = 0; i < new_map.size(); i++) {
                     if (!new_map[i] && i < new_map.weight()) {
                         return errh->error("RSS must allocate CPUs in order!");
                     }
                 }
             }
 
-            for (int new_cpu_id = 0; new_cpu_id < get_max_cpu_nb(); new_cpu_id++) {
+            for (unsigned new_cpu_id = 0; new_cpu_id < get_max_cpu_nb(); new_cpu_id++) {
                 if (old_map[new_cpu_id] == new_map[new_cpu_id]) {
                     continue;
                 }
@@ -2640,7 +2667,7 @@ ServiceChain::do_autoscale(int n_cpu_change)
     ts.autoscale_start = Timestamp::now_steady();
 
     int last_idx = get_active_cpu_nb() - 1;
-    for (int i = 0; i < abs(n_cpu_change); i++) {
+    for (unsigned i = 0; i < abs(n_cpu_change); i++) {
         get_cpu_info(last_idx + (n_cpu_change>0?i:-1)).set_active(n_cpu_change > 0);
     }
     click_chatter(
@@ -2674,7 +2701,7 @@ ServiceChain::generate_configuration(bool add_extra)
         new_conf += "rrs :: RoundRobinSwitch(MAX " + String(get_active_cpu_nb()) + ");\n";
         new_conf += "ps :: PaintSwitch();\n\n";
 
-        for (int i = 0 ; i < get_max_cpu_nb(); i++) {
+        for (unsigned i = 0 ; i < get_max_cpu_nb(); i++) {
             new_conf += "rrs[" + String(i) + "] -> slavep" + String(i) +
                        " :: Pipeliner(CAPACITY 8, BLOCKING false) -> "
                        "[0]ps; StaticThreadSched(slavep" +
@@ -2682,7 +2709,7 @@ ServiceChain::generate_configuration(bool add_extra)
         }
         new_conf += "\n";
 
-        for (int i = 0; i < get_nics_nb(); i++) {
+        for (unsigned i = 0; i < get_nics_nb(); i++) {
             String is = String(i);
             new_conf += "input[" + is + "] -> Paint(" + is + ") -> rrs;\n";
         }
@@ -2707,14 +2734,14 @@ ServiceChain::generate_configuration(bool add_extra)
         rx_conf += "MODE flow_dir, ";
     }
 
-    for (int i = 0; i < get_nics_nb(); i++) {
+    for (unsigned i = 0; i < get_nics_nb(); i++) {
         String is = String(i);
         NIC *nic = get_nic_by_index(i);
         if (_metron->_rx_mode == RSS) {
             nic->call_rx_write("max_rss", String(get_active_cpu_nb()));
         }
 
-        for (int j = 0; j < get_max_cpu_nb(); j++) {
+        for (unsigned j = 0; j < get_max_cpu_nb(); j++) {
             assert(get_cpu_info(j).assigned());
             String js = String(j);
             String active = (j < get_cpu_info(j).active() ? "1":"0");
@@ -2742,7 +2769,7 @@ ServiceChain::generate_configuration(bool add_extra)
             new_conf += "slaveTD" + is + " :: Null -> " + _metron->_slave_td_args + "ToDPDKDevice(" + nic->get_device_address() + ", QUEUE " + String(queue_no) + ", VERBOSE 99);\n";
         } else {
             new_conf += "slaveTD" + is + " :: ExactCPUSwitch();\n";
-            for (int j = 0; j < get_max_cpu_nb(); j++) {
+            for (unsigned j = 0; j < get_max_cpu_nb(); j++) {
                 String js = String(j);
                 assert(get_cpu_info(j).assigned());
                 int phys_cpu_id = get_cpu_phys_id(j);
@@ -2770,7 +2797,7 @@ ServiceChain::active_cpus()
 {
     Bitvector b;
     b.resize(get_max_cpu_nb());
-    for (int i = 0; i < b.size(); i++) {
+    for (unsigned i = 0; i < b.size(); i++) {
         b[i] = _cpus[i].active();
     }
     return b;
@@ -2784,10 +2811,11 @@ ServiceChain::assigned_phys_cpus()
 {
     Bitvector b;
     b.resize(click_max_cpu_ids());
-    for (int i = 0; i < get_max_cpu_nb(); i++) {
+    for (unsigned i = 0; i < get_max_cpu_nb(); i++) {
         int pid = _cpus[i].cpu_phys_id;
-        if (pid >= 0)
+        if (pid >= 0) {
             b[pid] = true;
+        }
     }
     return b;
 }
@@ -2960,7 +2988,7 @@ String
 NIC::call_tx_read(String h)
 {
     // TODO: Ensure element type
-    ToDPDKDevice *td = dynamic_cast<FromDPDKDevice *>(element)->findOutputElement();
+    ToDPDKDevice *td = dynamic_cast<FromDPDKDevice *>(element)->find_output_element();
     if (!td) {
         return "[NIC " + String(get_device_address()) + "] Could not find matching ToDPDKDevice";
     }

@@ -26,9 +26,8 @@
 #include <click/userutils.hh>
 #include <rte_errno.h>
 
-
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdirector.hh>
+    #include <click/flowdispatcher.hh>
 extern "C" {
     #include <rte_pmd_ixgbe.h>
 }
@@ -42,7 +41,7 @@ DPDKDevice::DPDKDevice() : port_id(-1), info() {
 DPDKDevice::DPDKDevice(portid_t port_id) : port_id(port_id) {
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         if (port_id >= 0)
-            initialize_flow_director(port_id, ErrorHandler::default_handler());
+            initialize_flow_dispatcher(port_id, ErrorHandler::default_handler());
     #endif
 };
 
@@ -98,14 +97,14 @@ int DPDKDevice::set_rss_max(int max)
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
  * Called by the constructor of DPDKDevice.
- * Flow Director must be strictly invoked once for each port.
+ * Flow Dispatcher must be strictly invoked once for each port.
  *
- * @param port_id the ID of the device where Flow Director is invoked
+ * @param port_id the ID of the device where Flow Dispatcher is invoked
  * @param errh an error handler instance
  */
-void DPDKDevice::initialize_flow_director(const portid_t &port_id, ErrorHandler *errh)
+void DPDKDevice::initialize_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh)
 {
-    FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
+    FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
     if (!flow_dir) {
         return;
     }
@@ -331,7 +330,7 @@ int DPDKDevice::set_mode(
     if (mode == "none") {
         m = ETH_MQ_RX_NONE;
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    } else if ((mode == "rss") || (mode == FlowDirector::FLOW_DIR_MODE) || (mode == "")) {
+    } else if ((mode == "rss") || (mode == FlowDispatcher::DISPATCHING_MODE) || (mode == "")) {
 #else
     } else if ((mode == "rss") || (mode == "")) {
 #endif
@@ -380,15 +379,15 @@ int DPDKDevice::set_mode(
     }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    if (mode == FlowDirector::FLOW_DIR_MODE) {
-        FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id, errh);
+    if (mode == FlowDispatcher::DISPATCHING_MODE) {
+        FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
         flow_dir->set_active(true);
         flow_dir->set_rules_filename(flow_rules_filename);
         errh->message(
-            "Flow Director (port %u): State %s - Isolation Mode %s - Source file '%s'",
+            "Flow Dispatcher (port %u): State %s - Isolation Mode %s - Source file '%s'",
             port_id,
             flow_dir->active() ? "active" : "inactive",
-            FlowDirector::isolated(port_id) ? "active" : "inactive",
+            FlowDispatcher::isolated(port_id) ? "active" : "inactive",
             flow_rules_filename.empty() ? "None" : flow_rules_filename.c_str()
         );
     }
@@ -697,9 +696,9 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
     if (info.flow_isolate) {
-        FlowDirector::set_isolation_mode(port_id, true);
+        FlowDispatcher::set_isolation_mode(port_id, true);
     } else {
-        FlowDirector::set_isolation_mode(port_id, false);
+        FlowDispatcher::set_isolation_mode(port_id, false);
     }
 #endif
 
@@ -1054,11 +1053,11 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
     _is_initialized = true;
 
-    // Configure Flow Director
+    // Configure Flow Dispatcher
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    for (HashTable<portid_t, FlowDirector *>::iterator
-            it = FlowDirector::dev_flow_dir.begin();
-            it != FlowDirector::dev_flow_dir.end(); ++it) {
+    for (HashTable<portid_t, FlowDispatcher *>::iterator
+            it = FlowDispatcher::dev_flow_disp.begin();
+            it != FlowDispatcher::dev_flow_disp.end(); ++it) {
         const portid_t port_id = it.key();
 
         DPDKDevice *dev = get_device(port_id);
@@ -1067,7 +1066,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         }
 
         // Only if the device is registered and has the correct mode
-        if (dev->get_mode_str() == FlowDirector::FLOW_DIR_MODE) {
+        if (dev->get_mode_str() == FlowDispatcher::DISPATCHING_MODE) {
             int err = DPDKDevice::configure_nic(port_id);
             if (err != 0) {
                 return errh->error("Could not configure all rules for device %d", port_id);
@@ -1086,10 +1085,10 @@ int DPDKDevice::configure_nic(const portid_t &port_id)
         return -1;
     }
 
-    FlowDirector *flow_dir = FlowDirector::get_flow_director(port_id);
+    FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id);
     assert(flow_dir);
 
-    // Invoke Flow Director only if active
+    // Invoke Flow Dispatcher only if active
     if (flow_dir->active()) {
         // Retrieve the file that contains the rules (if any)
         String rules_file = flow_dir->rules_filename();
@@ -1115,16 +1114,16 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    HashTable<portid_t, FlowDirector *> map = FlowDirector::flow_director_map();
+    HashTable<portid_t, FlowDispatcher *> map = FlowDispatcher::flow_dispatcher_map();
 
-    for (HashTable<portid_t, FlowDirector *>::const_iterator
+    for (HashTable<portid_t, FlowDispatcher *>::const_iterator
             it = map.begin(); it != map.end(); ++it) {
         if (it == NULL) {
             continue;
         }
 
         portid_t port_id = it.key();
-        FlowDirector *flow_dir = it.value();
+        FlowDispatcher *flow_dir = it.value();
 
         // Flush
         uint32_t rules_flushed = flow_dir->flow_rules_flush();
@@ -1135,14 +1134,14 @@ void DPDKDevice::cleanup(ErrorHandler *errh)
         // Report
         if (rules_flushed > 0) {
             errh->message(
-                "Flow Director (port %u): Flushed %d rules from the NIC",
+                "Flow Dispatcher (port %u): Flushed %d rules from the NIC",
                 port_id, rules_flushed
             );
         }
     }
 
     // Clean up the table
-    FlowDirector::clean_flow_director_map();
+    FlowDispatcher::clean_flow_dispatcher_map();
 #endif
 }
 

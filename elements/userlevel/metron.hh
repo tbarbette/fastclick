@@ -13,7 +13,7 @@
 #include "../json/json.hh"
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
- #include <click/flowdirector.hh>
+ #include <click/flowdispatcher.hh>
 #endif
 
 class ServiceChainManager;
@@ -41,7 +41,7 @@ typedef enum { SC_CONF_TYPES } ScType;
  * The Rx filter types supported by Metron:
  * |->  MAC-based using VMDq
  * |-> VLAN-based using VMDq
- * |-> Flow-based using Flow Director
+ * |-> Flow-based using Flow API
  * |-> Hash-based using RSS (default FastClick)
  */
 #define RX_FILTER_TYPES \
@@ -382,11 +382,11 @@ class NIC {
         void set_index(const int &index);
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        FlowDirector *get_flow_director(int sriov = 0) {
-            return FlowDirector::get_flow_director(get_port_id() + sriov);
+        FlowDispatcher *get_flow_dispatcher(int sriov = 0) {
+            return FlowDispatcher::get_flow_dispatcher(get_port_id() + sriov);
         };
         FlowCache *get_flow_cache(int sriov = 0) {
-            return get_flow_director(sriov)->get_flow_cache();
+            return get_flow_dispatcher(sriov)->get_flow_cache();
         };
     #endif
 

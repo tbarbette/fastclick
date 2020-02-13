@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowdirector.hh -- DPDK's Flow API in Click
+ * flowdispatcher.hh -- DPDK's Flow API in Click
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS & KTH Royal Institute of Technology
  *
@@ -15,21 +15,21 @@
  * legally binding.
  */
 
-#ifndef CLICK_FLOWDIRECTOR_H
-#define CLICK_FLOWDIRECTOR_H
+#ifndef CLICK_FLOWDISPATCHER_H
+#define CLICK_FLOWDISPATCHER_H
 
 #include <click/error.hh>
 #include <click/hashmap.hh>
 #include <click/hashtable.hh>
 #include <click/dpdkdevice.hh>
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdirectorparser.hh>
+    #include <click/flowdispatcherparser.hh>
 #endif
 
 CLICK_DECLS
 
 /**
- * DPDK's Flow Director API.
+ * DPDK's Flow API.
  */
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
@@ -157,16 +157,16 @@ class FlowCache {
         bool verify_transactions(const Vector<uint32_t> &int_vec, const Vector<uint32_t> &glb_vec);
 };
 
-class FlowDirector {
+class FlowDispatcher {
     public:
-        FlowDirector();
-        FlowDirector(portid_t port_id, ErrorHandler *errh);
-        ~FlowDirector();
+        FlowDispatcher();
+        FlowDispatcher(portid_t port_id, ErrorHandler *errh);
+        ~FlowDispatcher();
 
-        // DPDKDevice mode is Flow Director
-        static String FLOW_DIR_MODE;
+        // DPDKDevice mode is Flow Dispatcher
+        static String DISPATCHING_MODE;
 
-        // Supported flow director handlers (called from FromDPDKDevice)
+        // Supported Flow Dispatcher handlers (called from FromDPDKDevice)
         static String FLOW_RULE_ADD;
         static String FLOW_RULE_DEL;
         static String FLOW_RULE_IDS_GLB;
@@ -190,22 +190,22 @@ class FlowDirector {
         // Set of flow rule actions supported by the Flow API
         static HashMap<int, String> flow_action;
 
-        // Global table of DPDK ports mapped to their Flow Director objects
-        static HashTable<portid_t, FlowDirector *> dev_flow_dir;
+        // Global table of DPDK ports mapped to their Flow Dispatcher objects
+        static HashTable<portid_t, FlowDispatcher *> dev_flow_disp;
 
-        // Map of ports to Flow Director instances
-        static HashTable<portid_t, FlowDirector *> flow_director_map();
+        // Map of ports to Flow Dispatcher instances
+        static HashTable<portid_t, FlowDispatcher *> flow_dispatcher_map();
 
-        // Cleans the mappings between ports and Flow Director instances
-        static void clean_flow_director_map();
+        // Cleans the mappings between ports and Flow Dispatcher instances
+        static void clean_flow_dispatcher_map();
 
-        // Acquires a Flow Director instance on a port
-        static FlowDirector *get_flow_director(const portid_t &port_id, ErrorHandler *errh = NULL);
+        // Acquires a Flow Dispatcher instance on a port
+        static FlowDispatcher *get_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh = NULL);
 
         // Parser initialization
         static struct cmdline *parser(ErrorHandler *errh);
 
-        // Get the flow cache associated with a Flow Director
+        // Get the flow cache associated with a Flow Dispatcher
         FlowCache *get_flow_cache();
 
         // Deletes the error handler of this element
@@ -353,7 +353,7 @@ class FlowDirector {
         // Device ID
         portid_t _port_id;
 
-        // Indicates whether Flow Director is active for a given device
+        // Indicates whether Flow Dispatcher is active for a given device
         bool _active;
 
         // Set stdout verbosity
@@ -366,7 +366,7 @@ class FlowDirector {
         // A dedicated error handler
         ErrorVeneer *_errh;
 
-        // A low rule cache associated with the port of this Flow Director
+        // A low rule cache associated with the port of this Flow Dispatcher
         FlowCache *_flow_cache;
 
         // Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future)
@@ -397,4 +397,4 @@ class FlowDirector {
 
 CLICK_ENDDECLS
 
-#endif /* CLICK_FLOWDIRECTOR_H */
+#endif /* CLICK_FLOWDISPATCHER_H */

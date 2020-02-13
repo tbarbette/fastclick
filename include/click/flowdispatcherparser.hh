@@ -1,7 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowdirectorparser.hh -- Flow Director parsing API between
- * Click and DPDK.
+ * flowdispatcherparser.hh -- DPDK's Flow parsing API integrated into Click.
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS
  * Copyright (c) 2018 Tom Barbette, University of Liège
@@ -17,22 +16,22 @@
  * legally binding.
  */
 
-#ifndef CLICK_FLOWDIRECTORPARSER_HH
-#define CLICK_FLOWDIRECTORPARSER_HH
+#ifndef CLICK_FLOWDISPATCHERPARSER_HH
+#define CLICK_FLOWDISPATCHERPARSER_HH
 
 #include <click/config.h>
 #include <click/error.hh>
-#include <click/flowdirectorglue.hh>
+#include <click/flowdispatcherglue.hh>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
-#define FLOWDIR_ERROR   ((int)-1)
-#define FLOWDIR_SUCCESS ((int) 0)
+#define FLOWDISP_ERROR   ((int)-1)
+#define FLOWDISP_SUCCESS ((int) 0)
 
 CLICK_DECLS
 
 /**
- * Flow Director parsing API.
+ * DPDK's Flow parsing API.
  */
 
 /**
@@ -52,7 +51,7 @@ init_port(void)
 }
 
 /**
- * Obtains an instance of the Flow Director parser.
+ * Obtains an instance of the Flow Dispatcher parser.
  *
  * @args errh: an instance of the error handler
  * @return a parser object
@@ -62,7 +61,7 @@ struct cmdline *flow_parser_init(
 );
 
 /**
- * Creates an instance of the Flow Director parser
+ * Creates an instance of the Flow Dispatcher parser
  * on a given context of instructions, obtained
  * from DPDK.
  *
@@ -101,4 +100,4 @@ CLICK_ENDDECLS
 
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
-#endif /* CLICK_FLOWDIRECTORPARSER_HH */
+#endif /* CLICK_FLOWDISPATCHERPARSER_HH */

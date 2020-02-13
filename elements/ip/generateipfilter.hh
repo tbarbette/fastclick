@@ -150,7 +150,7 @@ class GenerateIPFilter : public GenerateIPPacket {
             IPFILTER,
             IPCLASSIFIER,
             IPLOOKUP,
-            FLOW_DIRECTOR,
+            FLOW_DISPATCHER,
             NONE
         };
 

@@ -25,7 +25,7 @@
 
 #include "generateipfilter.hh"
 #include "generateiplookup.hh"
-#include "generateipflowdirector.hh"
+#include "generateipflowdispatcher.hh"
 
 CLICK_DECLS
 
@@ -141,11 +141,11 @@ GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
             errh->error("Invalid PATTERN_TYPE for GenerateIPLookup.");
             return -1;
         }
-    // GenerateIPFlowDirector sub-class
-    } else if (_pattern_type == FLOW_DIRECTOR) {
-        GenerateIPFlowDirector *fd_ptr = dynamic_cast<GenerateIPFlowDirector *>(this);
+    // GenerateIPFlowDispatcher sub-class
+    } else if (_pattern_type == FLOW_DISPATCHER) {
+        GenerateIPFlowDispatcher *fd_ptr = dynamic_cast<GenerateIPFlowDispatcher *>(this);
         if (fd_ptr == NULL) {
-            errh->error("Invalid PATTERN_TYPE for GenerateIPFlowDirector.");
+            errh->error("Invalid PATTERN_TYPE for GenerateIPFlowDispatcher.");
             return -1;
         }
     }

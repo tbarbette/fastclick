@@ -116,7 +116,7 @@ RTE_VER_YEAR = @RTE_VER_YEAR@
 RTE_VER_MONTH = @RTE_VER_MONTH@
 include dpdk.mk
 endif
-EXTRA_DRIVER_OBJS := dpdkdevice.o flowdirector.o flowdirectorparser.o servicechain.o $(EXTRA_DRIVER_OBJS)
+EXTRA_DRIVER_OBJS := dpdkdevice.o flowdispatcher.o flowdispatcherparser.o servicechain.o $(EXTRA_DRIVER_OBJS)
 endif
 
 ifndef MINDRIVER
@@ -144,7 +144,7 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
 endif
 
-# At of after DPDK 17.05, compile against an additional library librte_parse (flow director)
+# At of after DPDK 17.05, compile against an additional library librte_parse (flow dispatcher)
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 5 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
 ddeps: Makefile librte_parse.a libclick.a $(OBJS)
 

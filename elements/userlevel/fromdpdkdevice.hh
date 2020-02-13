@@ -430,7 +430,7 @@ public:
     void run_timer(Timer* t);
     void selected(int fd, int mask);
 
-    ToDPDKDevice* findOutputElement();
+    ToDPDKDevice *find_output_element();
 
     inline DPDKDevice *get_device() {
         return _dev;

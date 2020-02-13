@@ -1,5 +1,5 @@
-#ifndef CLICK_GENERATEIPFLOWDIRECTOR_HH
-#define CLICK_GENERATEIPFLOWDIRECTOR_HH
+#ifndef CLICK_GENERATEIPFLOWDISPATCHER_HH
+#define CLICK_GENERATEIPFLOWDISPATCHER_HH
 
 #include <click/hashmap.hh>
 #include <click/timestamp.hh>
@@ -11,11 +11,11 @@ CLICK_DECLS
 /*
 =c
 
-GenerateIPFlowDirector(PORT, NB_QUEUES, NB_RULES [, POLICY, KEEP_SPORT, KEEP_DPORT] )
+GenerateIPFlowDispatcher(PORT, NB_QUEUES, NB_RULES [, POLICY, KEEP_SPORT, KEEP_DPORT] )
 
 =s ip
 
-generates DPDK Flow Director patterns out of input traffic
+generates DPDK Flow Dispatcher patterns out of input traffic
 
 =d
 
@@ -63,16 +63,16 @@ Default is false.
 =a DPDKDevice, GenerateIPFilter */
 
 /**
- * Uses the base class to generate Flow Director patterns out of the traffic.
+ * Uses the base class to generate Flow Dispatcher patterns out of the traffic.
  */
-class GenerateIPFlowDirector : public GenerateIPFilter {
+class GenerateIPFlowDispatcher : public GenerateIPFilter {
 
     public:
 
-        GenerateIPFlowDirector() CLICK_COLD;
-        virtual ~GenerateIPFlowDirector() CLICK_COLD;
+        GenerateIPFlowDispatcher() CLICK_COLD;
+        virtual ~GenerateIPFlowDispatcher() CLICK_COLD;
 
-        const char *class_name() const { return "GenerateIPFlowDirector"; }
+        const char *class_name() const { return "GenerateIPFlowDispatcher"; }
         const char *port_count() const { return PORTS_1_1; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;

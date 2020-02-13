@@ -1,6 +1,6 @@
-// -*- c-basic-offset: 4; related-file-name: "generateipflowdirector.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "generateipflowdispatcher.hh" -*-
 /*
- * GenerateIPFlowDirector.{cc,hh} -- element generates Flow Director patterns
+ * GenerateIPFlowDispatcher.{cc,hh} -- element generates Flow Dispatcher patterns
  * out of input traffic, following DPDK's flow API syntax.
  * Georgios Katsikas, Tom Barbette
  *
@@ -26,27 +26,27 @@
 #include <click/error.hh>
 #include <click/straccum.hh>
 
-#include "generateipflowdirector.hh"
+#include "generateipflowdispatcher.hh"
 
 CLICK_DECLS
 
 static const uint16_t DEF_NB_QUEUES = 16;
 
 /**
- * Flow Director rules' generator out of incoming traffic.
+ * Flow Dispatcher rules' generator out of incoming traffic.
  */
-GenerateIPFlowDirector::GenerateIPFlowDirector() :
+GenerateIPFlowDispatcher::GenerateIPFlowDispatcher() :
         _port(0), _nb_queues(DEF_NB_QUEUES),
         _queue_load_map(),
         _queue_alloc_policy(LOAD_AWARE),
         _queue_load_imbalance(),
         _avg_total_load_imbalance_ratio(NO_LOAD),
-        GenerateIPFilter(FLOW_DIRECTOR)
+        GenerateIPFilter(FLOW_DISPATCHER)
 {
     _keep_dport = false;
 }
 
-GenerateIPFlowDirector::~GenerateIPFlowDirector()
+GenerateIPFlowDispatcher::~GenerateIPFlowDispatcher()
 {
     if (!_queue_load_map.empty()) {
         _queue_load_map.clear();
@@ -58,7 +58,7 @@ GenerateIPFlowDirector::~GenerateIPFlowDirector()
 }
 
 void
-GenerateIPFlowDirector::init_queue_load_map(uint16_t queues_nb)
+GenerateIPFlowDispatcher::init_queue_load_map(uint16_t queues_nb)
 {
     for (uint16_t i = 0; i < queues_nb; i++) {
         _queue_load_map.insert(i, 0);
@@ -67,7 +67,7 @@ GenerateIPFlowDirector::init_queue_load_map(uint16_t queues_nb)
 }
 
 int
-GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
+GenerateIPFlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String policy = "LOAD_AWARE";
 
@@ -103,13 +103,13 @@ GenerateIPFlowDirector::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-GenerateIPFlowDirector::initialize(ErrorHandler *errh)
+GenerateIPFlowDispatcher::initialize(ErrorHandler *errh)
 {
     return GenerateIPFilter::initialize(errh);
 }
 
 void
-GenerateIPFlowDirector::cleanup(CleanupStage)
+GenerateIPFlowDispatcher::cleanup(CleanupStage)
 {
 }
 
@@ -151,7 +151,7 @@ print_queue_load_map(const HashMap<uint16_t, uint64_t> &queue_load_map)
 }
 
 String
-GenerateIPFlowDirector::policy_based_rule_generation(const uint8_t aggregation_prefix)
+GenerateIPFlowDispatcher::policy_based_rule_generation(const uint8_t aggregation_prefix)
 {
     StringAccum acc;
 
@@ -230,7 +230,7 @@ GenerateIPFlowDirector::policy_based_rule_generation(const uint8_t aggregation_p
 }
 
 String
-GenerateIPFlowDirector::dump_stats()
+GenerateIPFlowDispatcher::dump_stats()
 {
     uint64_t total_load = 0;
     for (uint16_t i = 0; i < _queue_load_map.size(); i++) {
@@ -289,7 +289,7 @@ GenerateIPFlowDirector::dump_stats()
 }
 
 String
-GenerateIPFlowDirector::dump_load()
+GenerateIPFlowDispatcher::dump_load()
 {
     StringAccum acc;
 
@@ -308,9 +308,9 @@ GenerateIPFlowDirector::dump_load()
 }
 
 String
-GenerateIPFlowDirector::dump_rules(bool verbose)
+GenerateIPFlowDispatcher::dump_rules(bool verbose)
 {
-    assert(_pattern_type == FLOW_DIRECTOR);
+    assert(_pattern_type == FLOW_DISPATCHER);
 
     Timestamp before = Timestamp::now();
 
@@ -367,11 +367,11 @@ GenerateIPFlowDirector::dump_rules(bool verbose)
 }
 
 String
-GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
+GenerateIPFlowDispatcher::read_handler(Element *e, void *user_data)
 {
-    GenerateIPFlowDirector *g = static_cast<GenerateIPFlowDirector *>(e);
+    GenerateIPFlowDispatcher *g = static_cast<GenerateIPFlowDispatcher *>(e);
     if (!g) {
-        return "GenerateIPFlowDirector element not found";
+        return "GenerateIPFlowDispatcher element not found";
     }
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
 
@@ -405,12 +405,12 @@ GenerateIPFlowDirector::read_handler(Element *e, void *user_data)
 }
 
 int
-GenerateIPFlowDirector::param_handler(
+GenerateIPFlowDispatcher::param_handler(
         int operation, String &input, Element *e,
         const Handler *handler, ErrorHandler *errh) {
-    GenerateIPFlowDirector *g = static_cast<GenerateIPFlowDirector *>(e);
+    GenerateIPFlowDispatcher *g = static_cast<GenerateIPFlowDispatcher *>(e);
     if (!g) {
-        return errh->error("GenerateIPFlowDirector element not found");
+        return errh->error("GenerateIPFlowDispatcher element not found");
     }
 
     switch ((intptr_t)handler->read_user_data()) {
@@ -441,7 +441,7 @@ GenerateIPFlowDirector::param_handler(
 }
 
 void
-GenerateIPFlowDirector::add_handlers()
+GenerateIPFlowDispatcher::add_handlers()
 {
     add_read_handler("dump",  read_handler, h_dump);
     add_read_handler("load",  read_handler, h_load);
@@ -454,4 +454,4 @@ GenerateIPFlowDirector::add_handlers()
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(userlevel GenerateIPFilter)
-EXPORT_ELEMENT(GenerateIPFlowDirector)
+EXPORT_ELEMENT(GenerateIPFlowDispatcher)

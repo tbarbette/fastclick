@@ -1,6 +1,6 @@
-// -*- c-basic-offset: 4; related-file-name: "flowdirectorparser.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "flowdispatcherparser.hh" -*-
 /*
- * flowdirectorparser.cc -- element that relays flow rule instructions
+ * flowdispatcherparser.cc -- element that relays flow rule instructions
  * to DPDK's flow parsing library.
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS
@@ -17,14 +17,14 @@
  * legally binding.
  */
 
-#include <click/flowdirectorparser.hh>
+#include <click/flowdispatcherparser.hh>
 
 CLICK_DECLS
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
 /**
- * Flow Director parsing implementation.
+ * DPDK's flow parsing implementation.
  */
 
 struct cmdline *
@@ -87,7 +87,7 @@ flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
 {
     if (!cl) {
         errh->error("Flow parser is not initialized");
-        return FLOWDIR_ERROR;
+        return FLOWDISP_ERROR;
     }
 
     char buff[512];
@@ -99,7 +99,7 @@ flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
         int line_len;
         if ((line_len = cmdline_parse(cl, buff)) < 0) {
             errh->error("Flow parser failed to parse input line: %s\n", buff);
-            return FLOWDIR_ERROR;
+            return FLOWDISP_ERROR;
         }
         tot_line_len += line_len;
     }
