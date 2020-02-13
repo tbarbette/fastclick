@@ -807,6 +807,7 @@ enable_batch
 enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
+enable_json
 enable_select
 enable_poll
 enable_kqueue
@@ -837,12 +838,12 @@ enable_app
 enable_aqm
 enable_ethernet
 enable_etherswitch
+enable_flow
 enable_grid
 enable_icmp
 enable_ip
 enable_ip6
 enable_ipsec
-enable_json
 enable_local
 enable_radio
 enable_research
@@ -1528,6 +1529,7 @@ Optional Features:
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
+    --enable-json         enable JSON support
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
@@ -1556,6 +1558,7 @@ Optional Features:
   --disable-aqm           do not include active queue management elements
   --disable-ethernet      do not include Ethernet elements
   --enable-etherswitch    include Ethernet switch elements
+  --enable-flow           include Enable flow system and elements
   --enable-grid           include Grid elements (see FAQ)
   --disable-icmp          do not include ICMP elements
   --disable-ip            do not include IP elements
@@ -6755,6 +6758,82 @@ else
     LIBS="$save_libs"
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing curl_global_init" >&5
+$as_echo_n "checking for library containing curl_global_init... " >&6; }
+if ${ac_cv_search_curl_global_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char curl_global_init ();
+int
+main ()
+{
+return curl_global_init ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' curl; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_search_curl_global_init=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_curl_global_init+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_curl_global_init+:} false; then :
+
+else
+  ac_cv_search_curl_global_init=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_curl_global_init" >&5
+$as_echo "$ac_cv_search_curl_global_init" >&6; }
+ac_res=$ac_cv_search_curl_global_init
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  ac_have_curl=yes
+else
+  ac_have_curl=no
+fi
+
+for ac_header in curl/curl.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "curl/curl.h" "ac_cv_header_curl_curl_h" "$ac_includes_default"
+if test "x$ac_cv_header_curl_curl_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_CURL_CURL_H 1
+_ACEOF
+ ac_have_curl_h=yes
+else
+  ac_have_curl_h=no
+fi
+
+done
+
+if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
+    $as_echo "#define HAVE_CURL 1" >>confdefs.h
+
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing MHD_start_daemon" >&5
 $as_echo_n "checking for library containing MHD_start_daemon... " >&6; }
@@ -6829,8 +6908,9 @@ fi
 done
 
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
-    $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
     have_httpd=yes
+    $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
+
 else
     have_httpd=no
 fi
@@ -6974,13 +7054,13 @@ else
     have_papi=no
 fi
 
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing curl_global_init" >&5
-$as_echo_n "checking for library containing curl_global_init... " >&6; }
-if ${ac_cv_search_curl_global_init+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for hs_compile_multi in -lhs" >&5
+$as_echo_n "checking for hs_compile_multi in -lhs... " >&6; }
+if ${ac_cv_lib_hs_hs_compile_multi+:} false; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_func_search_save_LIBS=$LIBS
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lhs  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6990,68 +7070,70 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char curl_global_init ();
+char hs_compile_multi ();
 int
 main ()
 {
-return curl_global_init ();
+return hs_compile_multi ();
   ;
   return 0;
 }
 _ACEOF
-for ac_lib in '' curl; do
-  if test -z "$ac_lib"; then
-    ac_res="none required"
-  else
-    ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
-  fi
-  if ac_fn_cxx_try_link "$LINENO"; then :
-  ac_cv_search_curl_global_init=$ac_res
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_hs_hs_compile_multi=yes
+else
+  ac_cv_lib_hs_hs_compile_multi=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext
-  if ${ac_cv_search_curl_global_init+:} false; then :
-  break
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
 fi
-done
-if ${ac_cv_search_curl_global_init+:} false; then :
-
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_hs_hs_compile_multi" >&5
+$as_echo "$ac_cv_lib_hs_hs_compile_multi" >&6; }
+if test "x$ac_cv_lib_hs_hs_compile_multi" = xyes; then :
+  ac_have_hyperscan=yes
 else
-  ac_cv_search_curl_global_init=no
-fi
-rm conftest.$ac_ext
-LIBS=$ac_func_search_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_curl_global_init" >&5
-$as_echo "$ac_cv_search_curl_global_init" >&6; }
-ac_res=$ac_cv_search_curl_global_init
-if test "$ac_res" != no; then :
-  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
-  ac_have_curl=yes
-else
-  ac_have_curl=no
+  ac_have_hyperscan=no
 fi
 
-for ac_header in curl/curl.h
+for ac_header in hs/hs.h
 do :
-  ac_fn_cxx_check_header_mongrel "$LINENO" "curl/curl.h" "ac_cv_header_curl_curl_h" "$ac_includes_default"
-if test "x$ac_cv_header_curl_curl_h" = xyes; then :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "hs/hs.h" "ac_cv_header_hs_hs_h" "$ac_includes_default"
+if test "x$ac_cv_header_hs_hs_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
-#define HAVE_CURL_CURL_H 1
+#define HAVE_HS_HS_H 1
 _ACEOF
- ac_have_curl_h=yes
+ ac_have_hyperscan_h=yes
 else
-  ac_have_curl_h=no
+  ac_have_hyperscan_h=no
 fi
 
 done
 
-if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
-    $as_echo "#define HAVE_CURL 1" >>confdefs.h
+if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
+    have_hyperscan=yes
+    LIBS="$LIBS -lhs"
+    $as_echo "#define HAVE_HYPERSCAN 1" >>confdefs.h
 
+else
+    have_hyperscan=no
 fi
 
+
+# Check whether --enable-json was given.
+if test "${enable_json+set}" = set; then :
+  enableval=$enable_json; :
+else
+  enable_json=no
+fi
+
+if test "x$enable_json" = "xyes"; then
+    have_json=yes
+    $as_echo "#define HAVE_JSON 1" >>confdefs.h
+
+else
+    have_json=no
+fi
 
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
@@ -7738,9 +7820,7 @@ test "x$enable_all_elements" = xyes -a \( "x$enable_json" = xNO -o "x$enable_jso
 if test "x$enable_json" = xyes; then
     :
     $as_echo "#define HAVE_JSON 1" >>confdefs.h
-    have_json=yes
-else
-    have_json=no
+
 fi
 # Check whether --enable-local was given.
 if test "${enable_local+set}" = set; then :
@@ -11277,6 +11357,8 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_working_pcap_h" >&5
 $as_echo "$ac_cv_working_pcap_h" >&6; }
         test "$ac_cv_working_pcap_h" != yes && HAVE_PCAP=
+    else
+        HAVE_PCAP=no
     fi
 
     if test "$HAVE_PCAP" = yes; then
@@ -14428,22 +14510,12 @@ if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
 fi
 
-if test "x$enable_flow" = xyes; then
-    provisions="$provisions flow"
-else
-    enable_flow="no"
-fi
-
 if test "x$enable_experimental" = xyes; then
     provisions="$provisions experimental"
 fi
 
 if test "x$enable_gtp" = xyes; then
     provisions="$provisions gtp"
-fi
-
-if test "x$have_hyperscan" = xyes; then
-    provisions="$provisions hs"
 fi
 
 if test "x$have_int64_types" = xyes; then
@@ -15898,22 +15970,20 @@ fi
 echo "
 
 Configuration Summary:
-    C     Compiler:              ${CC}
-    C++   Compiler:              ${CXX}
+    C Compiler:                  ${CC}
+    C++ Compiler:                ${CXX}
 
           Batching:              ${enable_batch}
               Flow:              ${enable_flow}
 
-    DPDK   support:              ${enable_dpdk}
+    DPDK support:                ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
-    PCAP   support:              ${have_pcap}
+    PCAP support:                ${have_pcap}
 
     Metron support:              ${have_metron}
 
-    PAPI   support:              ${have_papi}
-    RE2    support:              ${have_re2}
-    HTTPD  support:              ${have_httpd}
-    JSON   support:              ${have_json}
+    PAPI support:                ${have_papi}
+    RE2 support:                 ${have_re2}
 "
 
 if test "$feedback" != no; then
