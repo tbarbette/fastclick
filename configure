@@ -15970,20 +15970,20 @@ fi
 echo "
 
 Configuration Summary:
-    C Compiler:                  ${CC}
-    C++ Compiler:                ${CXX}
+    C     Compiler:              ${CC}
+    C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
               Flow:              ${enable_flow}
 
-    DPDK support:                ${enable_dpdk}
+    DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
-    PCAP support:                ${have_pcap}
+    PCAP   support:              ${have_pcap}
 
     Metron support:              ${have_metron}
 
-    PAPI support:                ${have_papi}
-    RE2 support:                 ${have_re2}
+    PAPI   support:              ${have_papi}
+    RE2    support:              ${have_re2}
 "
 
 if test "$feedback" != no; then
