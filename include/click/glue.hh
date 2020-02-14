@@ -170,6 +170,10 @@ void click_lfree(volatile void *p, size_t size);
 
 CLICK_DECLS
 
+#if HAVE_DPDK
+extern bool dpdk_enabled;
+#endif
+
 /** @brief Return a number between 0 and CLICK_RAND_MAX, inclusive.
  *
  * CLICK_RAND_MAX is guaranteed to be at least 2^31 - 1. */
@@ -746,15 +750,18 @@ click_get_cycles()
 #endif
 }
 
-#if HAVE_DPDK && !CLICK_TOOL
-#  define cycles_hz() rte_get_timer_hz()
-#else
 inline click_cycles_t cycles_hz() {
+#if HAVE_DPDK && !CLICK_TOOL
+    if (dpdk_enabled) {
+        return rte_get_timer_hz();
+    }
+    return 0;
+#else
     click_cycles_t tsc_freq = click_get_cycles();
     sleep(1);
     return click_get_cycles() - tsc_freq;
-}
 #endif
+}
 
 // Host to network order
 
