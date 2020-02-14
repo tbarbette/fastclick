@@ -53,12 +53,21 @@ To deploy a Metron server in Flow-based dispatching mode, do:
 sudo bin/click --dpdk -l 0-15 -v -- conf/metron/metron-dispatcher-flow.click
 ```
 
-To deploy a Metron server in Flow-based dispatching mode using Linux kernel interfaces, do:
+To deploy a Metron server in Flow-based dispatching mode using Linux kernel interfaces, we offer two possibilities.
+First, using DPDK's AF_PACKET PMD, as follows:
 ```bash
 sudo bin/click --dpdk -l 0-1 -w 0000:01:00.0 -w 0000:01:00.1 -v \
         --vdev=eth_af_packet0,iface=eno1,blocksz=4096,framesz=2048,framecnt=512,qpairs=1,qdisc_bypass=0 \
         --vdev=eth_af_packet1,iface=eno2,blocksz=4096,framesz=2048,framecnt=512,qpairs=1,qdisc_bypass=0 \
-        -- conf/metron/metron-dispatcher-flow-legacy.click
+        -- conf/metron/metron-dispatcher-flow-legacy-af-pkt.click
+```
+
+Second, using DPDK's AF_XDP PMD, as follows:
+```bash
+sudo bin/click --dpdk -l 0-1 -w 0000:01:00.0 -w 0000:01:00.1 -v \
+        --vdev net_af_xdp,iface=eno1 \
+        --vdev net_af_xdp,iface=eno2 \
+        -- conf/metron/metron-dispatcher-flow-legacy-af-xdp.click
 ```
 
 To deploy a Metron server in MAC-based VMDq dispatching mode, do:

@@ -34,7 +34,7 @@
  * sudo ../../bin/click --dpdk -l 0-1 -w 0000:01:00.0 -w 0000:01:00.1 -v \
         --vdev=eth_af_packet0,iface=eno1,blocksz=4096,framesz=2048,framecnt=512,qpairs=1,qdisc_bypass=0 \
         --vdev=eth_af_packet1,iface=eno2,blocksz=4096,framesz=2048,framecnt=512,qpairs=1,qdisc_bypass=0 \
-        -- metron-dispatcher-flow-legacy.click
+        -- metron-dispatcher-flow-legacy-af-pkt.click
  * Use -w parameter to declare only the PCI addresses of interfaces eno1 and eno2.
  */
 

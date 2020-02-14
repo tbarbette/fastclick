@@ -34,8 +34,8 @@
  * Deploy as follows (replacing eno1/eno2 with your kernel interfaces):
  * sudo ../../bin/click --dpdk -l 0-1 -w 0000:01:00.0 -w 0000:01:00.1 -v \
         --vdev net_af_xdp,iface=eno1 \
-        --vdev net_af_xdp,iface=eno2
-        -- metron-dispatcher-flow-legacy-xdp.click
+        --vdev net_af_xdp,iface=eno2 \
+        -- metron-dispatcher-flow-legacy-af-xdp.click
  * Use -w parameter to declare only the PCI addresses of interfaces eno1 and eno2.
  */
 
