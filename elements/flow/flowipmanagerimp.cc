@@ -1,5 +1,5 @@
 /*
- * FlowIPManagerIMP.{cc,hh}
+ * flowipmanagerimp.{cc,hh}
  */
 
 #include <click/config.h>
@@ -15,8 +15,7 @@
 
 CLICK_DECLS
 
-FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this)
-{
+FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0) {
 }
 
 FlowIPManagerIMP::~FlowIPManagerIMP()
@@ -33,7 +32,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
 
-    if (_timeout >= 0) {
+    if (_timeout > 0) {
         return errh->error("Timeout unsupported!");
     }
 
@@ -52,7 +51,8 @@ int FlowIPManagerIMP::initialize(ErrorHandler *errh)
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
     hash_params.name = buf;
-    _table_size = next_pow2(_table_size/click_max_cpu_ids());
+    auto passing = get_passing_threads();
+    _table_size = next_pow2(_table_size/passing.weight());
     click_chatter("Real capacity for each table will be %d", _table_size);
     hash_params.entries = _table_size;
     hash_params.key_len = sizeof(IPFlow5ID);
@@ -62,10 +62,23 @@ int FlowIPManagerIMP::initialize(ErrorHandler *errh)
 
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
-    fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
-    CLICK_ASSERT_ALIGNED(fcbs);
-    if (!fcbs)
-        return errh->error("Could not init data table !");
+    _tables = CLICK_ALIGNED_NEW(gtable, passing.size());
+    CLICK_ASSERT_ALIGNED(_tables);
+
+    for (int i = 0; i < passing.size(); i++) {
+        if (!passing[i])
+            continue;
+        sprintf(buf, "flowipmanager%d", i);
+        _tables[i].hash = rte_hash_create(&hash_params);
+        if (!_tables[i].hash)
+            return errh->error("Could not init flow table %d!", i);
+
+        _tables[i].fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
+        CLICK_ASSERT_ALIGNED(_tables[i].fcbs);
+        bzero(_tables[i].fcbs,_flow_state_size_full * _table_size);
+        if (!_tables[i].fcbs)
+            return errh->error("Could not init data table %d!", i);
+    }
 
     if (_timeout > 0) {
         _timer_wheel.initialize(_timeout);
@@ -75,17 +88,6 @@ int FlowIPManagerIMP::initialize(ErrorHandler *errh)
     _timer.initialize(this);
     _timer.schedule_after(Timestamp::make_sec(1));*/
     _task.initialize(this, false);
-
-    click_chatter("We will have %d threads", click_max_cpu_ids());
-    //add: get the number of threads, do per core duplication of the flow table
-    vhash = new rte_hash*[click_max_cpu_ids()];
-    for (int i = 0; i < click_max_cpu_ids(); i++) {
-        sprintf(buf, "tab%d", i); //<- here we are changing the name of the flow table
-        vhash[i] = rte_hash_create(&hash_params);
-        if (!vhash[i])
-            return errh->error("Could not init flow table !");
-        click_chatter("table %d has address %d",i, vhash[i]);
-    }
 
     return 0;
 }
@@ -106,7 +108,7 @@ bool FlowIPManagerIMP::run_task(Task* t)
         int old = (recent - prev->lastseen).sec();
         if (old > _timeout) {
             //click_chatter("Release %p as it is expired since %d", prev, old);
-        //expire
+            //expire
             rte_hash_free_key_with_position(vhash[click_current_cpu_id()], prev->data_32[0]);//depreciated
         } else {
             //click_chatter("Cascade %p", prev);
@@ -128,18 +130,22 @@ void FlowIPManagerIMP::cleanup(CleanupStage stage)
 {
     click_chatter("Cleanup the table");
     for(int i =0; i<click_max_cpu_ids(); i++) {
-       if (vhash[i])
-           rte_hash_free(vhash[i]);
+       if (_tables[i].hash)
+           rte_hash_free(_tables[i].hash);
+
+       if (_tables[i].fcbs)
+            delete _tables[i].fcbs;
     }
 
-    delete vhash;
+    delete _tables;
 }
 
 void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
 {
     IPFlow5ID fid = IPFlow5ID(p);
 
-    rte_hash* table = vhash[click_current_cpu_id()];
+    auto& tab = _tables[click_current_cpu_id()];
+    rte_hash* table = tab.hash;
 
     FlowControlBlock* fcb;
 
@@ -147,15 +153,15 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
     if (ret < 0) { //new flow
         ret = rte_hash_add_key(table, &fid);
         if (ret < 0) {
-            if (unlikely(_verbose > 0)) {
-                click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
+                    if (unlikely(_verbose > 0)) {
+                        click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
             }
             p->kill();
             return;
         }
-        fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
+        fcb = (FlowControlBlock*)((unsigned char*)tab.fcbs + (_flow_state_size_full * ret));
         fcb->data_32[0] = ret;
-        if (_timeout) {
+        if (_timeout > 0) {
             if (_flags) {
                 _timer_wheel.schedule_after_mp(fcb, _timeout, setter);
             } else {
@@ -163,7 +169,7 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
             }
         }
     } else {
-        fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
+        fcb = (FlowControlBlock*)((unsigned char*)tab.fcbs + (_flow_state_size_full * ret));
     }
 
     if (b.last == ret) {
@@ -191,7 +197,7 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
 
     batch = b.finish();
     if (batch) {
-    fcb_stack->lastseen = recent;
+        fcb_stack->lastseen = recent;
         output_push_batch(0, batch);
     }
 }
@@ -201,7 +207,7 @@ String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
 {
     FlowIPManagerIMP* fc = static_cast<FlowIPManagerIMP*>(e);
     click_chatter("ENTERED in the read_handler function");
-    rte_hash* table = fc->vhash[click_current_cpu_id()];
+    rte_hash* table = fc->_tables[click_current_cpu_id()].hash;
     switch ((intptr_t)thunk) {
     case h_count:
         return String(rte_hash_count(table));

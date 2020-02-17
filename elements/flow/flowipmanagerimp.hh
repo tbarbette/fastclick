@@ -18,12 +18,12 @@ struct rte_hash;
  * FlowIPManagerIMP(CAPACITY [, RESERVE])
  *
  * =s flow
- *  FCB packet classifier - cuckoo shared-by-all-threads
+ *  FCB packet classifier - cuckoo per-thread
  *
  * =d
  *
  * Initialize the FCB stack for every packets passing by.
- * The classification is done using a unique cuckoo hash table.
+ * The classification is done using a per-core cuckoo hash table.
  *
  * This element does not find automatically the FCB layout for FlowElement,
  * neither set the offsets for placement in the FCB automatically. Look at
@@ -56,9 +56,17 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
     protected:
         volatile int owner;
         Packet* queue;
-        rte_hash* hash;
-        rte_hash** vhash; //add: Vector of flow tables
-        FlowControlBlock *fcbs;
+
+
+    struct gtable {
+	gtable() : hash(0), fcbs(0) {
+
+	}
+	rte_hash* hash;
+	FlowControlBlock *fcbs;
+    } CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);
+
+	gtable* _tables;
 
         int _reserve;
         int _table_size;
