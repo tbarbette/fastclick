@@ -361,18 +361,32 @@ class PacketBatch : public WritablePacket {
 #define MAX_BATCH_SIZE 8192
 
 public :
+    /*
+     * Return the first packet of the batch
+     */
     inline Packet* first() {
         return this;
     }
 
+    /*
+     * Set the tail of the batch
+     */
     inline void set_tail(Packet* p) {
         set_prev(p);
     }
 
+    /*
+     * Return the tail of the batch
+     */
     inline Packet* tail() {
         return prev();
     }
-
+    
+    /*
+     * Append a simply-linked list of packet to the batch.
+     * One must therefore pass the tail and the number of packets to do it in constant time. Chances are you
+     * just created that list and can track taht.
+     */
     inline void append_simple_list(Packet* lhead, Packet* ltail, int lcount) {
         tail()->set_next(lhead);
         set_tail(ltail);
@@ -380,12 +394,18 @@ public :
         set_count(count() + lcount);
     }
 
+    /*
+     * Append a proper PacketBatch to this batch.
+     */
     inline void append_batch(PacketBatch* head) {
         tail()->set_next(head);
         set_tail(head->tail());
         set_count(count() + head->count());
     }
 
+    /*
+     * Append a packet to the list.
+     */
     inline void append_packet(Packet* p) {
         tail()->set_next(p);
         set_tail(p);
