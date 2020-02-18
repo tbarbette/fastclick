@@ -57,13 +57,10 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         volatile int owner;
         Packet* queue;
 
-
     struct gtable {
-	gtable() : queue(0) {
+	gtable() : hash(0), fcbs(0) {
 
 	}
-	volatile int owner;
-	Packet* queue;
 	rte_hash* hash;
 	FlowControlBlock *fcbs;
     } CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);

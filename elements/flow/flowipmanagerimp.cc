@@ -22,13 +22,6 @@ FlowIPManagerIMP::~FlowIPManagerIMP()
 {
 }
 
-void *
-FlowIPManagerIMP::cast(const char *name) {
-    if (strcmp(name,"VirtualFlowManager") == 0)
-        return dynamic_cast<VirtualFlowManager*>(this);
-    return FlowElement::cast(name);
-}
-
 int
 FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
@@ -45,7 +38,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 
     errh->warning("This element does not support timeout");
 
-    find_children(this, _verbose);
+    find_children(_verbose);
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
     _fcb_builded_init_future.post(this);
