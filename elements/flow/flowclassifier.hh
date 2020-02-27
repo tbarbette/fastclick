@@ -242,6 +242,15 @@ inline void FlowClassifier::flush_simple(Packet* &last, PacketBatch* awaiting_ba
 
 }
 
+/**
+ * Rebuild batches of packets of the same flow using a ring. The ring is composed of linked-list of batches of packets of the same flow.
+ *   for each packet we try to insert it in the ring, or take a new entry. When we wrap-up we force flushing the first batch.
+ * @arg p The packet
+ * @arg last The last classified packet, used to avoid rebuilding a LL if the link is still valid
+ * @arg fcb FCB of the packet
+ * @arg builder Builder element to keep track of the ring.
+ * @arg timestamp now Current timestamp. Just to avoid re-computing it more often than needed.
+ */
 inline void FlowClassifier::handle_builder(Packet* &p, Packet* &last, FlowControlBlock* &fcb, Builder &builder, const Timestamp &now) {
         if ((_nocut && builder.lastfcb) || builder.lastfcb == fcb) {
             //Just continue as they are still linked
