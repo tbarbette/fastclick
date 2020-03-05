@@ -582,6 +582,7 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 					  String value;
 					  String param =  trim_quotes(args[0].trim());
 					  int pos = configline.find_left(param);
+                      click_chatter("Param is %s", param.c_str());
 					  if (pos >= 0) {
 						  pos += param.length();
 						  while (configline[pos] == ' ')
@@ -590,7 +591,7 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 						  while (configline[end] != ',' && configline[end] != ')') end++;
 						  end -= 1;
 						  while (configline[end] == ' ') end--;
-						  value = configline.substring(pos,end+1);
+						  value = configline.substring(pos,end+1 - pos);
 						  click_chatter("Config value is %s",value.c_str());
 					  } else {
 						  if (args.size() > 2) {
