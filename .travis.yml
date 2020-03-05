@@ -24,7 +24,7 @@ matrix:
 
 env:
   global:
-    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule --enable-tunnel"
+    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule --enable-tunnel --enable-research --enable-flow"
     - CXXFLAGS="-std=gnu++11"
   matrix:
     - FRAMEWORK=vanilla CONFIG="--enable-batch --disable-verbose-batch"
