@@ -44,7 +44,7 @@ Resets C<count>, C<cycles>, and C<zero_count> counters to zero when written.
 #include <click/batchelement.hh>
 #include <click/sync.hh>
 
-class CycleCountAccum : public SimpleElement<CycleCountAccum> { public:
+class CycleCountAccum : public SimpleBatchElement<CycleCountAccum> { public:
 
     CycleCountAccum() CLICK_COLD;
     ~CycleCountAccum() CLICK_COLD;
@@ -55,6 +55,9 @@ class CycleCountAccum : public SimpleElement<CycleCountAccum> { public:
     void add_handlers() override CLICK_COLD;
 
     inline Packet* simple_action(Packet *);
+#if HAVE_BATCH
+    inline PacketBatch* simple_action_batch(PacketBatch *batch);
+#endif
 
   private:
 
