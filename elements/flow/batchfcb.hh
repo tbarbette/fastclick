@@ -59,7 +59,6 @@
         }\
         last = q;\
     }\
-
     if (batch) {\
         batch->set_count(count);\
         batch->set_tail(last);\
