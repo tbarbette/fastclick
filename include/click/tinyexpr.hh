@@ -12,6 +12,22 @@ static double square_wave(double x) {
             return -1;
 }
 
+static double t_min(double a, double b) {
+        if (a < b)
+            return a;
+        else
+            return b;
+}
+
+static double t_max(double a, double b) {
+        if (a > b)
+            return a;
+        else
+            return b;
+}
+
+
+
 class TinyExpr { public:
 
     static TinyExpr compile(String expr, int n_vars) {
@@ -19,14 +35,15 @@ class TinyExpr { public:
         static constexpr const char* const var_names[] = {"x", "y", "z"};
         TinyExpr e;
         assert(n_vars < 4);
-        e._n_vars = n_vars + 1;
+        e._n_vars = n_vars + 3;
         e._vars = (te_variable*)CLICK_LALLOC(sizeof(te_variable) * e._n_vars);
         e._vars_values = (double*)CLICK_LALLOC(sizeof(double) * e._n_vars);
         for (int i = 0; i < n_vars; i++) {
             e._vars[i] = {var_names[i], &e._vars_values[i], 0};
         }
         e._vars[n_vars] = (te_variable){"squarewave", (const void*)square_wave, TE_FUNCTION1};
-
+        e._vars[n_vars + 1] = (te_variable){"min", (const void*)t_min, TE_FUNCTION2};
+        e._vars[n_vars + 2] = (te_variable){"max", (const void*)t_max, TE_FUNCTION2};
         int error;
         e._expr = te_compile(expr.c_str(), e._vars, e._n_vars, &error); 
         assert(error == 0);
@@ -53,7 +70,7 @@ class TinyExpr { public:
         _vars = expr._vars;
         _vars_values = expr._vars_values;
         _use_count = expr._use_count;
-        *_use_count++;
+        _use_count = _use_count + 1;
     }
 
     operator bool() const {

@@ -907,7 +907,7 @@ ReadWriteLock::attempt_write()
 #if HAVE_MULTITHREAD
     bool all = true;
     unsigned i;
-    for (unsigned i = 0; i < _l.weight(); i++) {
+    for (i = 0; i < (unsigned) _l.weight(); i++) {
         if (!(_l.get_value(i).attempt())) {
             all = false;
             break;

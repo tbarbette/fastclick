@@ -21,7 +21,7 @@ CLICK_DECLS
 class RoundRobinSwitch : public BatchElement {
 
   atomic_uint32_t _next;
-  unsigned _max;
+  uint32_t _max;
   bool _split_batch;
  public:
 

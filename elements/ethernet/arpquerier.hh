@@ -3,6 +3,7 @@
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/sync.hh>
+#include <click/hashtablemp.hh>
 #include <click/timer.hh>
 
 #include <click/flow/flowelement.hh>
@@ -207,6 +208,7 @@ class ARPQuerier : public FlowElement { public:
     IPAddress _my_bcast_ip;
     uint32_t _poll_timeout_j;
     int _broadcast_poll;
+    bool _have_cache;
 
     // statistics
     atomic_uint32_t _arp_queries;
@@ -230,6 +232,7 @@ class ARPQuerier : public FlowElement { public:
     enum { h_table, h_table_xml, h_stats, h_insert, h_delete, h_clear,
 	   h_count, h_length };
 
+    per_thread<AgingTable<IPAddress,EtherAddress> > _cache;
 };
 
 CLICK_ENDDECLS

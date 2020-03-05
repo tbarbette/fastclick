@@ -19,9 +19,9 @@
  *
  * =a CycleCountAccum, RoundTripCycleCount, SetPerfCount, PerfCountAccum */
 
-#include <click/element.hh>
+#include <click/batchelement.hh>
 
-class SetCycleCount : public Element { public:
+class SetCycleCount : public SimpleElement<SetCycleCount> { public:
 
   SetCycleCount() CLICK_COLD;
   ~SetCycleCount() CLICK_COLD;
@@ -29,9 +29,7 @@ class SetCycleCount : public Element { public:
   const char *class_name() const		{ return "SetCycleCount"; }
   const char *port_count() const		{ return PORTS_1_1; }
 
-  void push(int, Packet *p);
-  Packet *pull(int);
-
+  Packet* simple_action(Packet *p);
 };
 
 #endif

@@ -18,7 +18,7 @@ FromDPDKDevice(PORT [, QUEUE, N_QUEUES, I<keywords> PROMISC, BURST, NDESC])
 
 =s netdevices
 
-reads packets from network device using Intel's DPDK (user-level)
+reads packets from network device using DPDK (user-level)
 
 =d
 
@@ -116,6 +116,21 @@ Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
 Boolean. If False, the device is only initialized. Use this when you want
 to read packet using secondary DPDK applications.
 
+=item TCO
+
+Boolean. If True, enables TCP Checksum Offload. Packets must be set with the
+checksum flag, eg with ResetTCPChecksum. Defaults to False.
+
+=item TSO
+
+Boolean. If True, enables TCP Segmentation Offload. Packets must be configured
+individually as per DPDK documentation. Defaults to False.
+
+=item IPCO
+
+Booelan. If True, enables IP checksum offload alone (not L4 as TCO).
+Defaults to False.
+
 =item VERBOSE
 
 Boolean. If True, more detailed messages about the device are printed to
@@ -151,6 +166,8 @@ public:
     const char *class_name() const { return "FromDPDKDevice"; }
     const char *port_count() const { return PORTS_0_1; }
     const char *processing() const { return DOUBLE; }
+    void* cast(const char* name) override;
+
     int configure_phase() const {
         return CONFIGURE_PHASE_PRIVILEGED - 5;
     }
@@ -161,13 +178,16 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
-    Packet* pull(int);
-#if HAVE_BATCH
-    PacketBatch* pull_batch(int,int);
+#if HAVE_DPDK_READ_CLOCK
+    static uint64_t read_clock(void* thunk);
 #endif
 
     portid_t port_id();
     
+#if HAVE_BATCH
+    PacketBatch* pull_batch(int, unsigned max) override;
+#endif
+
 private:
 
     static String read_handler(Element *, void *) CLICK_COLD;
@@ -178,16 +198,6 @@ private:
     static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
     static int xstats_handler(int operation, String &input, Element *e,
                               const Handler *handler, ErrorHandler *errh);
-    enum {
-        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
-        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
-        h_active,
-        h_xstats, h_queue_count,
-        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
-        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
-        h_mtu,
-        h_device,
-    };
 
     DPDKDevice* _dev;
     bool _set_timestamp;

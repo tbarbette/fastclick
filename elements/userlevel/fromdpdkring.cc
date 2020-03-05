@@ -142,7 +142,7 @@ FromDPDKRing::run_task(Task *t)
     }
 
     // Turn the received frames into Click frames
-    for (unsigned i = 0; i < n; ++i) {
+    for (unsigned i = 0; i < (unsigned)n; ++i) {
 
     #if CLICK_PACKET_USE_DPDK
         rte_prefetch0(rte_pktmbuf_mtod(pkts[i], void *));
@@ -200,6 +200,7 @@ FromDPDKRing::read_handler(Element *e, void *thunk)
 
     if ( thunk == (void *) 0 )
         return String(fr->_count);
+    return "<error>";
 }
 
 void

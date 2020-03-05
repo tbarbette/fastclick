@@ -5,6 +5,7 @@
  * Copyright (c) 2014-2016 University of Liege
  * Copyright (c) 2016 Cisco Meraki
  * Copyright (c) 2017 RISE SICS
+ * Copyright (c) 2018-2019 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -51,6 +52,37 @@ const char *DPDKDevice::get_device_driver()
     return info.driver;
 }
 
+
+
+#define RETA_CONF_SIZE     (ETH_RSS_RETA_SIZE_512 / RTE_RETA_GROUP_SIZE)
+
+int DPDKDevice::set_rss_max(int max)
+{
+    struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
+    struct rte_eth_dev_info dev_info;
+
+    rte_eth_dev_info_get(port_id, &dev_info);
+    uint16_t reta_size = dev_info.reta_size;
+	uint32_t i;
+	int status;
+	/* RETA setting */
+	memset(reta_conf, 0, sizeof(reta_conf));
+    for (i = 0; i < reta_size; i++) {
+			reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
+    }
+	for (i = 0; i < reta_size; i++) {
+			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
+			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
+			uint32_t core_id = i % max;
+			reta_conf[reta_id].reta[reta_pos] = core_id;
+	}
+	/* RETA update */
+	status = rte_eth_dev_rss_reta_update(port_id,
+			reta_conf,
+			reta_size);
+	return status;
+}
+
 /* Wraps rte_eth_dev_socket_id(), which may return -1 for valid ports when NUMA
  * is not well supported. This function will return 0 instead in that case. */
 int DPDKDevice::get_port_numa_node(portid_t port_id)
@@ -59,6 +91,11 @@ int DPDKDevice::get_port_numa_node(portid_t port_id)
         return -1;
     int numa_node = rte_eth_dev_socket_id(port_id);
     return (numa_node == -1) ? 0 : numa_node;
+}
+
+unsigned int DPDKDevice::get_nb_rxdesc()
+{
+    return info.n_rx_descs;
 }
 
 unsigned int DPDKDevice::get_nb_txdesc()
@@ -251,7 +288,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     rte_eth_dev_info_get(port_id, &dev_info);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
-    if (strcmp(dev_info.driver_name,"net_mlx5") == 0) {
+    if (strcmp(dev_info.driver_name, "net_mlx5") == 0) {
         errh->warning("WARNING : DPDK 17.11 to 18.02 included have broken support for secondary process with mlx5. Use 18.05 with mlx5 cards if you use secondary process.");
     }
 #endif
@@ -265,17 +302,20 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     dev_conf.rx_adv_conf.rss_conf.rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP;
     dev_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     if (info.rx_offload & DEV_RX_OFFLOAD_TIMESTAMP) {
         if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TIMESTAMP)) {
-            return errh->error("Hardware timestamp offloading is not supported by this device !");
+            return errh->error("Hardware timestamp offloading is not supported by this device!");
         } else {
             dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TIMESTAMP;
         }
     }
+#endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     if (info.tx_offload & DEV_TX_OFFLOAD_IPV4_CKSUM) {
         if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM)) {
-            return errh->error("Hardware IPv4 checksum offloading is not supported by this device !");
+            return errh->error("Hardware IPv4 checksum offloading is not supported by this device!");
         } else {
             dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
         }
@@ -283,7 +323,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     if (info.tx_offload & DEV_TX_OFFLOAD_TCP_CKSUM) {
         if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_TCP_CKSUM)) {
-            return errh->error("Hardware TCP checksum offloading is not supported by this device !");
+            return errh->error("Hardware TCP checksum offloading is not supported by this device!");
         } else {
             dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_CKSUM;
         }
@@ -291,11 +331,12 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
     if (info.tx_offload & DEV_TX_OFFLOAD_TCP_TSO) {
         if (!(dev_info.rx_offload_capa & DEV_TX_OFFLOAD_TCP_TSO)) {
-            return errh->error("Hardware TCP Segmentation Offloading is not supported by this device !");
+            return errh->error("Hardware TCP Segmentation Offloading (TSO) is not supported by this device!");
         } else {
             dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_TSO;
         }
     }
+#endif
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     // Obtain general device information
@@ -323,7 +364,6 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
     //We must open at least one queue per direction
     if (info.rx_queues.size() == 0) {
         info.rx_queues.resize(1);
-        info.n_rx_descs = DEF_DEV_RXDESC;
     }
     if (info.tx_queues.size() == 0) {
         info.tx_queues.resize(1);
@@ -447,8 +487,23 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
                 i, port_id, numa_node);
 
     if (info.init_mtu != 0) {
+        if (dev_conf.rxmode.max_rx_pkt_len < info.init_mtu) {
+            dev_conf.rxmode.max_rx_pkt_len = info.init_mtu;
+        }
         if (rte_eth_dev_set_mtu(port_id, info.init_mtu) != 0) {
             return errh->error("Could not set MTU %d",info.init_mtu);
+        }
+    } else {
+    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+        dev_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
+    #else
+        dev_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+    #endif
+    }
+
+    if (info.init_rss > 0) {
+        if (set_rss_max(info.init_rss) != 0) {
+            return errh->error("Could not set RSS to %d queues",info.init_rss);
         }
     }
 
@@ -461,8 +516,8 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         rte_eth_promiscuous_enable(port_id);
 
     if (info.init_mac != EtherAddress()) {
-        struct ether_addr addr;
-        memcpy(&addr,info.init_mac.data(),sizeof(struct ether_addr));
+        struct rte_ether_addr addr;
+        memcpy(&addr, info.init_mac.data(), sizeof(struct rte_ether_addr));
         if (rte_eth_dev_default_mac_addr_set(port_id, &addr) != 0) {
             return errh->error("Could not set default MAC address");
         }
@@ -472,7 +527,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         struct rte_eth_fc_conf conf;
         ret = rte_eth_dev_flow_ctrl_get(port_id, &conf);
         if (ret != 0)
-            return errh->error("Could not get flow control status !");
+            return errh->error("Could not get flow control status!");
         switch (info.init_fc_mode) {
             case FC_FULL:
                 conf.mode = RTE_FC_FULL; break;
@@ -487,11 +542,10 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         }
         ret = rte_eth_dev_flow_ctrl_set(port_id, &conf);
         if (ret != 0)
-             return errh->error("Could not set flow control status !");
+             return errh->error("Could not set flow control status!");
     }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
-
     int diag;
     int vlan_offload;
 
@@ -514,13 +568,62 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_STRIP;
     }
 
+    if (info.vlan_extend) {
+        vlan_offload |= ETH_VLAN_EXTEND_OFFLOAD;
+        rx_conf.offloads |= DEV_RX_OFFLOAD_VLAN_EXTEND;
+    } else {
+        vlan_offload &= ~ETH_VLAN_EXTEND_OFFLOAD;
+        rx_conf.offloads &= ~DEV_RX_OFFLOAD_VLAN_EXTEND;
+    }
+
     diag = rte_eth_dev_set_vlan_offload(port_id, vlan_offload);
-    if (diag < 0)
-        printf("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s) failed "
-                "diag=%d\n", port_id, info.vlan_filter ? "true" : "false", info.vlan_strip ? "true" : "false", diag);
+    if (diag < 0) {
+        errh->error("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s, vlan_extend=%s) failed "
+                "diag=%d\n", port_id, info.vlan_filter ? "enabled" : "disabled", info.vlan_strip ? "enabled" : "disabled", info.vlan_extend ? "enabled" : "disabled", diag);
+    } else {
+        if (vlan_offload != 0) {
+            errh->message("rx_vlan_offload_set(port_pi=%d, vlan_filter=%s, vlan_strip=%s, vlan_extend=%s) status "
+                "diag=%d\n", port_id, info.vlan_filter ? "enabled" : "disabled", info.vlan_strip ? "enabled" : "disabled", info.vlan_extend ? "enabled" : "disabled", diag);
+        }
+    }
 
     dev_conf.rxmode.offloads = rx_conf.offloads;
+#endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+    if (info.lro) {
+        if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_LRO)) {
+            return errh->error("Large Receive Offload (LRO) is not supported by this device!");
+        } else {
+            dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TCP_LRO;
+        }
+        errh->message("Large Receive Offload (LRO): %s", (dev_conf.rxmode.offloads & DEV_RX_OFFLOAD_TCP_LRO) ? "enabled" : "disabled");
+    } else {
+        dev_conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_TCP_LRO;
+    }
+#endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
+    if (info.jumbo) {
+    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+        unsigned int min_rx_pktlen = (unsigned int) RTE_ETHER_MIN_LEN;
+    #else
+        unsigned int min_rx_pktlen = (unsigned int) ETHER_MIN_LEN;
+    #endif
+        if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_JUMBO_FRAME)) {
+            return errh->error("Rx jumbo frame offload is not supported by this device!");
+        } else {
+            if (dev_conf.rxmode.max_rx_pkt_len > dev_info.max_rx_pktlen) {
+                return errh->error("Cannot perorm Rx jumbo frames offloading on port_id=%u: max_rx_pkt_len %u > max valid value %u\n", port_id, dev_conf.rxmode.max_rx_pkt_len, dev_info.max_rx_pktlen);
+            } else if (dev_conf.rxmode.max_rx_pkt_len < min_rx_pktlen) {
+                return errh->error("Cannot perorm Rx jumbo frames offloading on port_id=%u: max_rx_pkt_len %u < min valid value %u\n", port_id, dev_conf.rxmode.max_rx_pkt_len, min_rx_pktlen);
+            }
+            dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+        }
+        errh->message("Rx jumbo frames offloading enabled on port_id=%u with max_rx_pkt_len %u in [%u, %u]\n", port_id, dev_conf.rxmode.max_rx_pkt_len, min_rx_pktlen, dev_info.max_rx_pktlen);
+    } else {
+        dev_conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
+    }
 #endif
 
     return 0;
@@ -534,6 +637,11 @@ void DPDKDevice::set_init_mac(EtherAddress mac) {
 void DPDKDevice::set_init_mtu(uint16_t mtu) {
     assert(!_is_initialized);
     info.init_mtu = mtu;
+}
+
+void DPDKDevice::set_init_rss_max(int rss_max) {
+    assert(!_is_initialized);
+    info.init_rss = rss_max;
 }
 
 void DPDKDevice::set_init_fc_mode(FlowControlMode fc) {
@@ -553,8 +661,8 @@ void DPDKDevice::set_tx_offload(uint64_t offload) {
 
 EtherAddress DPDKDevice::get_mac() {
     assert(_is_initialized);
-    struct ether_addr addr;
-    rte_eth_macaddr_get(port_id,&addr);
+    struct rte_ether_addr addr;
+    rte_eth_macaddr_get(port_id, &addr);
     return EtherAddress((unsigned char*)&addr);
 }
 
@@ -583,9 +691,9 @@ bool set_slot(Vector<bool> &v, unsigned &id) {
     return true;
 }
 
-int DPDKDevice::add_queue(DPDKDevice::Dir dir,
-                           unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip, unsigned n_desc,
-                           ErrorHandler *errh)
+int DPDKDevice::add_queue(DPDKDevice::Dir dir, unsigned &queue_id,
+                            bool promisc, bool vlan_filter, bool vlan_strip, bool vlan_extend,
+                            bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh)
 {
     if (_is_initialized) {
         return errh->error(
@@ -610,6 +718,24 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
 					"Some elements disagree on whether or not device %u should"
 							" strip vlan tagged packets", port_id);
 		info.vlan_strip |= vlan_strip;
+
+        if (info.rx_queues.size() > 0 && vlan_extend != info.vlan_extend)
+            return errh->error(
+                    "Some elements disagree on whether or not device %u should"
+                            " extend vlan tagged packets via QinQ", port_id);
+        info.vlan_extend |= vlan_extend;
+
+        if (info.rx_queues.size() > 0 && lro != info.lro)
+            return errh->error(
+                    "Some elements disagree on whether or not device %u should"
+                            " perform large receive offload (LRO) ", port_id);
+        info.lro |= lro;
+
+        if (info.rx_queues.size() > 0 && jumbo != info.jumbo)
+            return errh->error(
+                    "Some elements disagree on whether or not device %u should"
+                            " perform Rx jumbo frames offload ", port_id);
+        info.jumbo |= jumbo;
 
         if (n_desc > 0) {
             if (n_desc != info.n_rx_descs && info.rx_queues.size() > 0)
@@ -639,16 +765,15 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir,
     return 0;
 }
 
-int DPDKDevice::add_rx_queue(unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
-                              unsigned n_desc, ErrorHandler *errh)
+int DPDKDevice::add_rx_queue(unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip, bool vlan_extend,
+                              bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh)
 {
-    return add_queue(DPDKDevice::RX, queue_id, promisc, vlan_filter, vlan_strip, n_desc, errh);
+    return add_queue(DPDKDevice::RX, queue_id, promisc, vlan_filter, vlan_strip, vlan_extend, lro, jumbo, n_desc, errh);
 }
 
-int DPDKDevice::add_tx_queue(unsigned &queue_id, unsigned n_desc,
-                              ErrorHandler *errh)
+int DPDKDevice::add_tx_queue(unsigned &queue_id, unsigned n_desc, ErrorHandler *errh)
 {
-    return add_queue(DPDKDevice::TX, queue_id, false, false, false, n_desc, errh);
+    return add_queue(DPDKDevice::TX, queue_id, false, false, false, false, false, false, n_desc, errh);
 }
 
 int DPDKDevice::static_initialize(ErrorHandler* errh) {
@@ -896,9 +1021,9 @@ DPDKRing::parse(Args* args) {
  * Must be able to fill the packet data pool,
  * and then have some packets for I/O.
  */
-int DPDKDevice::DEFAULT_NB_MBUF = 32*4096*2;
+int DPDKDevice::DEFAULT_NB_MBUF = 32*4096*2 - 1;
 #else
-int DPDKDevice::DEFAULT_NB_MBUF = 65536;
+int DPDKDevice::DEFAULT_NB_MBUF = 65536 - 1;
 #endif
 Vector<int> DPDKDevice::NB_MBUF;
 #ifdef RTE_MBUF_DEFAULT_BUF_SIZE
@@ -906,7 +1031,7 @@ int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE;
 #else
 int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM;
 #endif
-int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE 
+int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE
                           + sizeof (struct rte_mbuf);
 int DPDKDevice::MBUF_CACHE_SIZE = 256;
 int DPDKDevice::RX_PTHRESH = 8;

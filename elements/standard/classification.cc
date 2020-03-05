@@ -149,10 +149,10 @@ operator<<(StringAccum &sa, const Insn &e)
     int offset = e.offset;
     sprintf(buf, "%3d/", offset);
     sa << buf;
-    for (int i = 0; i < 4; i++)
+    for (unsigned short i = 0; i < 4; i++)
 	sprintf(buf + 2*i, "%02x", e.value.c[i]);
     sprintf(buf + 8, "%%");
-    for (int i = 0; i < 4; i++)
+    for (unsigned short i = 0; i < 4; i++)
 	sprintf(buf + 9 + 2*i, "%02x", e.mask.c[i]);
     sa << buf << "  yes->";
     jump_accum(sa, e.yes());

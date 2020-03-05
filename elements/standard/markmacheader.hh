@@ -18,25 +18,20 @@ CLICK_DECLS
  *
  * =a MarkIPHeader */
 
-class MarkMACHeader : public BatchElement { public:
+class MarkMACHeader : public SimpleElement<MarkMACHeader> {
+    public:
+        MarkMACHeader() CLICK_COLD;
 
-    MarkMACHeader() CLICK_COLD;
+        const char *class_name() const      { return "MarkMACHeader"; }
+        const char *port_count() const      { return PORTS_1_1; }
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        bool can_live_reconfigure() const       { return true; }
 
-    const char *class_name() const		{ return "MarkMACHeader"; }
-    const char *port_count() const		{ return PORTS_1_1; }
-    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-    bool can_live_reconfigure() const		{ return true; }
+        Packet *simple_action(Packet *p);
 
-#if HAVE_BATCH
-    PacketBatch *simple_action_batch(PacketBatch *head);
-#endif
-    Packet *simple_action(Packet *);
-
-  private:
-
-    int _offset;
-    int _length;
-
+    private:
+        int _offset;
+        int _length;
 };
 
 CLICK_ENDDECLS

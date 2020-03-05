@@ -1,6 +1,6 @@
 #ifndef CLICK_IP6NDADVERTISER_HH
 #define CLICK_IP6NDADVERTISER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/etheraddress.hh>
 #include <click/ip6address.hh>
 #include <click/vector.hh>
@@ -36,7 +36,7 @@ CLICK_DECLS
  * IP6NDSolicitor
  */
 
-class IP6NDAdvertiser : public Element { public:
+class IP6NDAdvertiser : public SimpleElement<IP6NDAdvertiser> { public:
 
   IP6NDAdvertiser();
   ~IP6NDAdvertiser();

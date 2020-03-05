@@ -50,13 +50,13 @@ RoundRobinSwitch::next(Packet*)
     int i = _next;
   #ifndef __MTCLICK__
     _next++;
-    if (_next >= (uint32_t)_max)
+    if (_next >= _max)
       _next = 0;
   #else
     // in MT case try our best to be rr, but don't worry about it if we mess up
     // once in awhile
-    int newval = i+1;
-    if (newval >= (uint32_t)_max)
+    uint32_t newval = i+1;
+    if (newval >= _max)
       newval = 0;
     _next.compare_swap(i, newval);
   #endif

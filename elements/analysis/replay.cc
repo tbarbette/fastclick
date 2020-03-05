@@ -134,9 +134,9 @@ void *
 Replay::cast(const char *n)
 {
     if (strcmp(n, Notifier::EMPTY_NOTIFIER) == 0)
-    return static_cast<Notifier *>(&_notifier);
+        return static_cast<Notifier *>(&_notifier);
     else
-    return Element::cast(n);
+        return Element::cast(n);
 }
 
 
@@ -221,7 +221,7 @@ Replay::run_task(Task* task)
         n++;
     }
 
-    check_end_loop(task);
+    check_end_loop(task, n==0);
 
     return n > 0;
 }
@@ -250,7 +250,7 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
         return -1;
 
-    if (timing_fnt != "" && _stop_time > 0) {
+    if (timing_fnt != "") {
         String max = String(_timing); //Max replay timing
         String min = "1"; //Min replay timing
         String time = String(_stop_time);
@@ -258,10 +258,14 @@ ReplayUnqueue::configure(Vector<String> &conf, ErrorHandler *errh)
         if (timing_fnt == "@0")
             return 0; //Contant, no fnt
         if (timing_fnt == "@1") {
-            timing_fnt = "(sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+            timing_fnt = "100 * ((sin(-pi/2 + (x/10)^2.5) * (-x/"+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min+")";
+        } else if (timing_fnt == "@2") {
+            timing_fnt = "100 * ((-squarewave(((x + 40) * 1/50) ^ 5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min+")";
+        }
+
+        if (_verbose)
             click_chatter("Using function '%s'", timing_fnt.c_str());
-        } else if (timing_fnt == "@2")
-            timing_fnt = "(-squarewave(((x + 40) * 1/50) ^ 5) * (-x / "+time+" + 1) + 1) * (("+max+" - "+min+") / 2) + "+min;
+
         _fnt_expr = TinyExpr::compile(timing_fnt, 1);
 
     }
@@ -278,6 +282,8 @@ ReplayUnqueue::initialize(ErrorHandler * errh) {
 
     if (_fnt_expr) {
         _timing = _fnt_expr.eval(0);
+
+        click_chatter("Timing starts with %d%%", _timing);
     }
 
     return 0;
@@ -293,6 +299,7 @@ ReplayUnqueue::run_task(Task* task)
         return false;
 
     if (_stop == 0) {
+stop:
         router()->please_stop_driver();
         _active = false;
         _startsent = Timestamp();
@@ -313,12 +320,12 @@ ReplayUnqueue::run_task(Task* task)
 
             //If timing is activated, wait for the amount of time or resched
             if (_timing > 0) {
-                const unsigned min_timing = 1; //Amount of us between packets to ignore and sent right away
-                const unsigned min_sched = 10; //Amount of us that leads to rescheduling
+                const unsigned min_timing_ns = 0; //Amount of us between packets to ignore and sent right away
+                const unsigned min_sched_ns = 10000; //Amount of us that leads to rescheduling
 
-                long diff;
-                long rdiff;
-                while ((diff = (p->timestamp_anno() - _timing_packet).usecval()) - (rdiff = ((long)(now - _timing_real).usecval() * _timing)) > min_timing) {
+                int64_t diff;
+                int64_t rdiff;
+                while ((diff = (p->timestamp_anno() - _timing_packet).nsecval()) - (rdiff = (((int64_t)(now - _timing_real).nsecval() * (int64_t)_timing) / 100)) > min_timing_ns) {
 #if HAVE_BATCH
                     if (head) {
                         output_push_batch(0,head->make_tail(last,c));
@@ -329,16 +336,23 @@ ReplayUnqueue::run_task(Task* task)
                     if (_fnt_expr != 0) {
                         Timestamp diff_s = now - _startsent; //x is the seconds since the beginning of the sending
                         float nt = _fnt_expr.eval((float)diff_s.msecval() / 1000);
+                        if (_stop_time > 0 && diff_s.sec() > _stop_time) {
+                            click_chatter("Forced stop because time is achieved!");
+                            _stop = 0;
+                            goto stop;
+                        }
+
                         if (_timing != (unsigned)nt) {
                             _timing = nt;
+
                             _timing_packet = _lastsent_packet;
                             _timing_real = _lastsent_real;
-                            click_chatter("Timing is %f -> %d", nt, _timing);
+                            click_chatter("Timing is %f -> %d%%", nt, _timing);
                         } else {
                             goto loop;
                         }
                     }
-                    if (diff - rdiff > min_sched) {
+                    if (diff - rdiff > min_sched_ns) {
                             goto end;
                     }
 loop:
@@ -381,7 +395,7 @@ loop:
 #endif
 
 end:
-    check_end_loop(task);
+    check_end_loop(task, n==0);
 
     return n > 0;
 }

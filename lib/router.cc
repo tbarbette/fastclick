@@ -976,12 +976,12 @@ class ReachVisitor : public RouterVisitor { public:
     Element* _target;
     bool _reached;
 
-    ReachVisitor(Element* t) : _reached(false), _target(t) {
+    ReachVisitor(Element* t) : _target(t), _reached(false) {
 
     }
 
-    bool visit(Element *e, bool isoutput, int port,
-               Element *from_e, int from_port, int distance) {
+    bool visit(Element *e, bool, int,
+               Element *, int, int) {
         if (e == _target) {
             _reached = true;
             return false;
@@ -1055,7 +1055,7 @@ Router::visit_ports(Element *first_element, bool forward, int first_port,
                 if (_conn[ci][forward] != *sp)
                     break;
                 Port connpt = _conn[ci][!forward];
-                int conng = gport(!forward, connpt);
+                gport(!forward, connpt);
 
                 if (!visitor->visit(_elements[connpt.idx], !forward, connpt.port,
                                     _elements[sp->idx], sp->port, distance))
@@ -1099,6 +1099,7 @@ class ElementFilterRouterVisitor : public RouterVisitor { public:
 
 };
 }
+
 
 /** @brief Search for elements downstream from @a e.
  * @param e element to start search
@@ -1223,6 +1224,63 @@ Router::initialize_handlers(bool defaults, bool specifics)
             _elements[i]->add_handlers();
 }
 
+Router::InitFuture::InitFuture() : _children() {
+
+}
+
+Router::InitFuture::~InitFuture() {
+}
+
+int
+Router::InitFuture::solve_initialize(ErrorHandler* errh) {
+    bool all_ok = true;
+    for (int i = 0; i < _children.size(); i++) {
+        if (_children[i]->solve_initialize(errh) < 0) {
+            all_ok = false;
+        }
+    }
+    if (!all_ok)
+        return -1;
+    return 0;
+}
+
+void
+Router::InitFuture::postOnce(InitFuture* future) {
+    for (int i = 0; i < _children.size(); i++) {
+            if (_children[i] == future)
+                break;
+    }
+    post(future);
+}
+
+class FctFuture : public Router::InitFuture { public:
+
+    FctFuture(std::function<int(void)> f) : _f(f) {
+    };
+
+    ~FctFuture() {};
+
+    int solve_initialize(ErrorHandler* errh) {
+        int r = _f();
+        delete this;
+        return r;
+    };
+
+    std::function<int(void)> _f;
+};
+
+void
+Router::InitFuture::post(std::function<int(void)> f) {
+    InitFuture* future = new FctFuture(f);
+    post(future);
+}
+
+void
+Router::InitFuture::post(InitFuture* future) {
+    _children.push_back(future);
+}
+
+
 int
 Router::initialize(ErrorHandler *errh)
 {
@@ -1343,7 +1401,7 @@ Router::initialize(ErrorHandler *errh)
                 click_chatter("%p{element} is a batch-only element ! Please "
                         "check that all elements sending packets to it are "
                         "producing batches of packets instead of single "
-                        "packets.",e);
+                        "packets.", e);
                 all_ok = false;
                 break;
             } else if (e->in_batch_mode == Element::BATCH_MODE_IFPOSSIBLE) {
@@ -1357,7 +1415,7 @@ Router::initialize(ErrorHandler *errh)
                 click_chatter("%p{element} is a batch-only element ! Please "
                         "check that all elements sending packets to it are "
                         "producing batches of packets instead of single "
-                        "packets.",this);
+                        "packets.",e);
                 all_ok = false;
                 break;
             }
@@ -1427,6 +1485,12 @@ Router::initialize(ErrorHandler *errh)
             if (!all_ok)
                 break;
         }
+    }
+
+    if (_root_init_future.solve_initialize(errh) < 0) {
+        if (!errh->nerrors())
+            errh->error("unspecified error");
+        all_ok = false;
     }
 
 #if CLICK_DMALLOC
@@ -1738,7 +1802,8 @@ Router::store_local_handler(int eindex, Handler &to_store)
             for (int i = 0; i < HANDLER_BUFSIZ - 1; i++)
                 new_handler_buf[i]._next_by_name = _nhandlers_bufs + i + 1;
             _free_handler = _nhandlers_bufs;
-            memcpy(new_handler_bufs, _handler_bufs, sizeof(Handler*) * n_handler_bufs);
+            if (n_handler_bufs)
+                memcpy(new_handler_bufs, _handler_bufs, sizeof(Handler*) * n_handler_bufs);
             new_handler_bufs[n_handler_bufs] = new_handler_buf;
             delete[] _handler_bufs;
             _handler_bufs = new_handler_bufs;
@@ -2418,7 +2483,7 @@ Router::configuration_string() const
     }
 }
 
-enum { GH_VERSION, GH_CONFIG, GH_FLATCONFIG, GH_LIST, GH_REQUIREMENTS,
+enum { GH_VERSION, GH_CONFIG, GH_FLATCONFIG, GH_LIST, GH_LOAD, GH_LOAD_CYCLES, GH_USEFUL_CYCLES, GH_REQUIREMENTS,
        GH_DRIVER, GH_ACTIVE_PORTS, GH_ACTIVE_PORT_STATS, GH_STRING_PROFILE,
        GH_STRING_PROFILE_LONG, GH_SCHEDULING_PROFILE, GH_STOP,
        GH_ELEMENT_CYCLES, GH_CLASS_CYCLES, GH_RESET_CYCLES };
@@ -2429,6 +2494,48 @@ struct stats_info {
     uint32_t task_calls, timer_calls, xfer_calls, nelements;
 };
 #endif
+
+
+int
+Router::router_handler(int operation, String &data, Element *e,
+			       const Handler *handler, ErrorHandler *errh) {
+    Router *r = (e ? e->router() : 0);
+    StringAccum sa;
+    int opt = reinterpret_cast<intptr_t>(handler->_read_user_data);
+    switch (opt) {
+ #if HAVE_CLICK_LOAD
+      case GH_LOAD:
+      case GH_LOAD_CYCLES:
+      case GH_USEFUL_CYCLES:
+          {
+        int index;
+        IntArg arg;
+        if (data && arg.parse(data, index, errh)) {
+            sa << r->master()->thread(index)->load();
+        } else {
+            int n = r->master()->nthreads();
+            for (int i = 0; i < n; i++) {
+                if (opt == GH_LOAD) {
+                    float l = r->master()->thread(i)->load();
+                    sa << (l == 0 ? "0" : String(r->master()->thread(i)->load()));
+                } else if (opt == GH_LOAD_CYCLES)
+                    sa << String(r->master()->thread(i)->load_cycles());
+                else
+                    sa << String(r->master()->thread(i)->useful_kcycles());
+                if (i < n - 1)
+                    sa << " ";
+            }
+        }
+        break;
+        }
+#endif
+        default:
+          data = "<error>";
+          return -1;
+    }
+    data = sa.take_string();
+    return 0;
+}
 
 String
 Router::router_read_handler(Element *e, void *thunk)
@@ -2652,6 +2759,11 @@ Router::static_initialize()
         add_read_handler(0, "requirements", router_read_handler, (void *)GH_REQUIREMENTS);
         add_read_handler(0, "handlers", Element::read_handlers_handler, 0);
         add_read_handler(0, "list", router_read_handler, (void *)GH_LIST);
+#if HAVE_CLICK_LOAD
+        set_handler(0, "load", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_LOAD, (void *)0);
+        set_handler(0, "load_cycles", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_LOAD_CYCLES, (void *)0);
+        set_handler(0, "useful_kcycles", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_USEFUL_CYCLES, (void *)0);
+#endif
         add_write_handler(0, "stop", router_write_handler, (void *)GH_STOP);
 #if CLICK_STATS >= 1
         add_read_handler(0, "active_ports", router_read_handler, (void *)GH_ACTIVE_PORTS);

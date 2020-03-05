@@ -7,8 +7,9 @@
 #if HAVE_DPDK
 # include <rte_ring.h>
 # include <rte_errno.h>
+# include <click/dpdk_glue.hh>
 #endif
-
+#include <type_traits>
 
 CLICK_DECLS
 
@@ -150,17 +151,20 @@ public:
         return _size > 0;
     }
 
-    inline void initialize(int size) {
+    inline void initialize(int size, const char* = 0) {
         _size = size;
         ring = new T[size];
     }
 };
 
+template <typename T>
+using DynamicRing = SPSCDynamicRing<T>;
 
 #if HAVE_DPDK
 inline uint64_t next_pow2(uint64_t x) {
 	return x == 1 ? 1 : 1<<(64-__builtin_clzl(x-1));
 }
+
 
 /**
  * Ring with size set at initialization time
@@ -187,7 +191,12 @@ template <typename T> class MPMCDynamicRing {
 
     inline T extract() {
         T o;
+
+#if RTE_VERSION >= RTE_VERSION_NUM(16,8,0,0)
         if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1, 0) == 0)
+#else
+        if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1) == 0)
+#endif
             return 0;
         else
             return o;
@@ -208,6 +217,7 @@ template <typename T> class MPMCDynamicRing {
     }
 };
 
+
 template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {
     public:
 
@@ -223,7 +233,38 @@ template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {
             return o;
     }
 };
-#
+#else
+/**
+ * Ring with size set at initialization time
+ *
+ * NOT MT-Safe
+ */
+template <typename T> class MPMCDynamicRing : public SPSCDynamicRing<T> {
+	Spinlock _lock;
+
+public:
+
+	MPMCDynamicRing() : _lock() {
+
+	}
+
+    inline T extract() {
+        _lock.acquire();
+        T v= SPSCDynamicRing<T> :: extract();
+        _lock.release();
+        return v;
+    }
+
+    inline bool insert(T v) {
+	_lock.acquire();
+	bool r = SPSCDynamicRing<T> :: insert(v);
+	_lock.release();
+	return r;
+    }
+
+};
+template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {};
+
 #endif
 
 
@@ -279,21 +320,24 @@ public:
 #define SPSCRing Ring
 
 template <typename T, size_t MAX_SIZE> class MPMCLIFO {
+private:
     SimpleSpinlock _lock;
+
 protected:
 
-inline bool has_space() {
-    return _count < MAX_SIZE;
-}
+	inline bool has_space() {
+		return _count < MAX_SIZE;
+	}
 
-inline bool is_empty() {
-   return _first == 0;
-}
+	inline bool is_empty() {
+	   return _first == 0;
+	}
 
 public:
-int id;
-T _first;
-unsigned int _count;
+	int id;
+	T _first;
+	unsigned int _count;
+
     MPMCLIFO() : _lock(), id(0),_first(0),_count(0) {
 
     }

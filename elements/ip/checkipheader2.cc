@@ -22,19 +22,21 @@
 #include <click/glue.hh>
 #include <click/confparse.hh>
 #include <click/error.hh>
+
 CLICK_DECLS
 
 CheckIPHeader2::CheckIPHeader2()
 {
-  // other stuff belongs to CheckIPHeader
-  _checksum = false;
+    // other stuff belongs to CheckIPHeader
+    _checksum = false;
 }
 
 CheckIPHeader2::~CheckIPHeader2()
 {
-  // other stuff belongs to CheckIPHeader
+    // other stuff belongs to CheckIPHeader
 }
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(CheckIPHeader)
 EXPORT_ELEMENT(CheckIPHeader2)
+ELEMENT_MT_SAFE(CheckIPHeader2)

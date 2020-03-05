@@ -11,7 +11,7 @@ class StringAccum;
 class ArgContext;
 extern const ArgContext blank_args;
 class IPAddressArg;
-template <typename T> class Vector;
+template <typename T, size_t ALIGNMENT> class Vector;
 
 class IPAddress { public:
 
@@ -431,12 +431,20 @@ class IPPair {
         dst = b;
     }
 
+    bool contains(IPAddress foo) const {
+        return (foo == src) || (foo == dst);
+    }
+
+    bool other(IPAddress foo) const {
+        return (src == foo) ? dst : src;
+    }
+
     inline hashcode_t hashcode() const {
-       return CLICK_NAME(hashcode)(src) + CLICK_NAME(hashcode)(dst);
+        return CLICK_NAME(hashcode)(src) + CLICK_NAME(hashcode)(dst);
    }
 
    inline bool operator==(IPPair other) const {
-       return (other.src == src && other.dst == dst);
+        return (other.src == src && other.dst == dst);
    }
 };
 

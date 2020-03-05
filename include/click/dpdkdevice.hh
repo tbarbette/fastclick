@@ -34,6 +34,11 @@
 #include <click/etheraddress.hh>
 #include <click/timer.hh>
 
+#if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
+#define rte_ipv4_hdr ipv4_hdr
+#define rte_ether_addr ether_addr
+#endif
+
 /**
  * Unified type for DPDK port IDs.
  * Until DPDK v17.05 was uint8_t
@@ -71,28 +76,32 @@ public:
     struct DevInfo {
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
-            rx_queues(0,false), tx_queues(0,false),
+            rx_queues(0, false), tx_queues(0, false),
             promisc(false),
-            vlan_filter(false), vlan_strip(false),
+            vlan_filter(false), vlan_strip(false), vlan_extend(false),
+            lro(false), jumbo(false),
             n_rx_descs(0), n_tx_descs(0),
-            init_mac(), init_mtu(0), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0) {
+            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0) {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
 
         void print_device_info() {
-            click_chatter("   Vendor   ID: %d", vendor_id);
-            click_chatter("   Vendor Name: %s", vendor_name.c_str());
-            click_chatter("   Device   ID: %d", device_id);
-            click_chatter("   Driver Name: %s", driver);
-            click_chatter("Promisc   Mode: %s", promisc? "true":"false");
-            click_chatter("Vlan Filtering: %s", vlan_filter? "true":"false");
-            click_chatter("Vlan Stripping: %s", vlan_strip? "true":"false");
-            click_chatter("   MAC Address: %s", init_mac.unparse().c_str());
-            click_chatter("# of Rx Queues: %d", rx_queues.size());
-            click_chatter("# of Tx Queues: %d", tx_queues.size());
-            click_chatter("# of Rx  Descs: %d", n_rx_descs);
-            click_chatter("# of Tx  Descs: %d", n_tx_descs);
+            click_chatter("                Vendor   ID: %d", vendor_id);
+            click_chatter("                Vendor Name: %s", vendor_name.c_str());
+            click_chatter("                Device   ID: %d", device_id);
+            click_chatter("                Driver Name: %s", driver);
+            click_chatter("           Promiscuous Mode: %s", promisc? "true":"false");
+            click_chatter("          VLAN    Filtering: %s", vlan_filter? "true":"false");
+            click_chatter("          VLAN    Stripping: %s", vlan_strip? "true":"false");
+            click_chatter("          VLAN QinQ(extend): %s", vlan_extend? "true":"false");
+            click_chatter("Large Receive Offload (LRO): %s", lro ? "true":"false");
+            click_chatter("    Rx Jumbo Frames Offload: %s", jumbo ? "true":"false");
+            click_chatter("                MAC Address: %s", init_mac.unparse().c_str());
+            click_chatter("             # of Rx Queues: %d", rx_queues.size());
+            click_chatter("             # of Tx Queues: %d", tx_queues.size());
+            click_chatter("             # of Rx  Descs: %d", n_rx_descs);
+            click_chatter("             # of Tx  Descs: %d", n_tx_descs);
         }
 
         uint16_t vendor_id;
@@ -104,18 +113,22 @@ public:
         bool promisc;
         bool vlan_filter;
         bool vlan_strip;
+        bool vlan_extend;
+        bool lro;
+        bool jumbo;
         unsigned n_rx_descs;
         unsigned n_tx_descs;
         EtherAddress init_mac;
         uint16_t init_mtu;
+        int init_rss;
         FlowControlMode init_fc_mode;
         uint64_t rx_offload;
         uint64_t tx_offload;
     };
 
     int add_rx_queue(
-        unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
-        unsigned n_desc, ErrorHandler *errh
+        unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip, bool vlan_extend,
+        bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh
     ) CLICK_COLD;
 
     int add_tx_queue(
@@ -126,16 +139,20 @@ public:
     EtherAddress get_mac();
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
+    void set_init_rss_max(int rss_max);
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
 
+
+    unsigned int get_nb_rxdesc();
     unsigned int get_nb_txdesc();
 
     uint16_t get_device_vendor_id();
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
+    int set_rss_max(int max);
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
@@ -249,8 +266,9 @@ private:
     static bool no_more_buffer_msg_printed;
 
     int initialize_device(ErrorHandler *errh) CLICK_COLD;
-    int add_queue(Dir dir, unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
-                   unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
+    int add_queue(Dir dir, unsigned &queue_id,
+                    bool promisc, bool vlan_filter, bool vlan_strip, bool vlan_extend,
+                    bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
     static int alloc_pktmbufs(ErrorHandler* errh) CLICK_COLD;
 

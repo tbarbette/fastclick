@@ -99,7 +99,9 @@ extern "C" int simclick_gettimeofday(struct timeval *);
 # endif
 
 #if HAVE_DPDK && !CLICK_TOOL
-#include <rte_cycles.h>
+extern "C" {
+    #include <rte_cycles.h>
+}
 #endif
 
 #endif
@@ -124,6 +126,7 @@ extern uint32_t click_dmalloc_where;
 // LALLOC
 
 #if CLICK_LINUXMODULE
+# define CLICK_DEFAULT_ALIGNMENT ARCH_KMALLOC_MINALIGN
 # define CLICK_LALLOC(size)	(click_lalloc((size)))
 # define CLICK_LFREE(p, size)	(click_lfree((p), (size)))
 extern "C" {
@@ -131,31 +134,45 @@ void *click_lalloc(size_t size);
 void click_lfree(volatile void *p, size_t size);
 }
 #else
+# ifdef __STDCPP_DEFAULT_NEW_ALIGNMENT__
+#  define CLICK_DEFAULT_ALIGNMENT __STDCPP_DEFAULT_NEW_ALIGNMENT__
+# else
+#  define CLICK_DEFAULT_ALIGNMENT 16
+# endif
 # define CLICK_LALLOC(size)	((void *)(new uint8_t[(size)]))
 # define CLICK_LFREE(p, size)	delete[] ((void) (size), (uint8_t *)(p))
 #endif
 
-#if HAVE_ALIGNED_NEW
-# define CLICK_ALIGNED_NEW(T,size) (new T[_size])
-# define CLICK_ALIGNED_DELETE(p,T,size) (delete[] p)
-#else
 # if HAVE_ALIGNED_ALLOC
-#  define CLICK_ALIGNED_ALLOC(T,size) ((T*)(aligned_alloc(64, sizeof(T) * size)))
-#  define CLICK_ALIGNED_FREE(p,T,size) (free(p))
+#  define CLICK_ALIGNED_ALLOC(size, ...) (aligned_alloc(CLICK_CACHE_LINE_SIZE, size))
+#  define CLICK_ALIGNED_ALLOC_T(size,align) (aligned_alloc(align, size))
+#  define CLICK_ALIGNED_FREE(p,size) (free(p))
 # else
 #  ifndef CLICK_LINUXMODULE
 #    warning Using normal allocation instead of aligned one, please use a compiler that supports aligned_alloc
 #  endif
-#  define CLICK_ALIGNED_ALLOC(T,size) CLICK_LALLOC(sizeof(T) * size)
-#  define CLICK_ALIGNED_FREE(p,T,size) CLICK_LFREE(p,sizeof(T) * size);
+#  define CLICK_ALIGNED_ALLOC(size) CLICK_LALLOC(size)
+#  define CLICK_ALIGNED_ALLOC_T(size,align) CLICK_LALLOC(size)
+#  define CLICK_ALIGNED_FREE(p,size) CLICK_LFREE(p,size);
 # endif
-# define CLICK_ALIGNED_NEW(T,size) ({T* v = (T*)CLICK_ALIGNED_ALLOC(T,size);for (unsigned i = 0; i < size; i++) {new(&v[i]) T();};v;})
-# define CLICK_ALIGNED_DELETE(p,T,size) {for (unsigned i = 0; i < size; i++) p[i].~T();CLICK_ALIGNED_FREE(p,T,size);}
+
+#if HAVE_ALIGNED_NEW
+# define CLICK_ALIGNED_NEW(T,n) (new T[n])
+# define CLICK_ALIGNED_DELETE(p,T,n) (delete[] p)
+#else
+# define CLICK_ALIGNED_NEW(T,n) ({T* v = (T*)CLICK_ALIGNED_ALLOC(sizeof(T) * (n));for (unsigned i = 0; i < (n); i++) {new(&v[i]) T();};v;})
+# define CLICK_ALIGNED_DELETE(p,T,n) {for (unsigned i = 0; i < (n); i++) p[i].~T();CLICK_ALIGNED_FREE(p,sizeof(T)*(n));}
 #endif
+
+#define CLICK_ASSERT_ALIGNED(p) (assert(((intptr_t)p & (intptr_t)(CLICK_CACHE_LINE_SIZE - 1)) == 0))
 
 // RANDOMNESS
 
 CLICK_DECLS
+
+#if HAVE_DPDK
+extern bool dpdk_enabled;
+#endif
 
 /** @brief Return a number between 0 and CLICK_RAND_MAX, inclusive.
  *
@@ -733,15 +750,18 @@ click_get_cycles()
 #endif
 }
 
-#if HAVE_DPDK && !CLICK_TOOL
-#  define cycles_hz() rte_get_timer_hz()
-#else
 inline click_cycles_t cycles_hz() {
+#if HAVE_DPDK && !CLICK_TOOL
+    if (dpdk_enabled) {
+        return rte_get_timer_hz();
+    }
+    return 0;
+#else
     click_cycles_t tsc_freq = click_get_cycles();
     sleep(1);
     return click_get_cycles() - tsc_freq;
-}
 #endif
+}
 
 // Host to network order
 

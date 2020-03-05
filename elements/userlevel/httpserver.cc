@@ -20,7 +20,7 @@ static int ahc_policy(void *cls, const struct sockaddr *addr, socklen_t addrlen)
     return MHD_YES;
 }
 
-HTTPServer::HTTPServer() : _verbose(false), _port(80), _daemon(0) {
+HTTPServer::HTTPServer() : _port(80), _alias_map(), _verbose(false),  _daemon(0) {
 }
 
 HTTPServer::~HTTPServer() {

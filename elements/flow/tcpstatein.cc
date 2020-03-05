@@ -70,7 +70,7 @@ int TCPStateIN::initialize(ErrorHandler *errh) {
 bool TCPStateIN::new_flow(TCPStateEntry* fcb, Packet* p) {
     
     TCPStateCommon* common;
-    bool found = _return->_map.find_remove_clean(IPFlowID(p),[&common](TCPStateCommon* &c){common=c;},[this](TCPStateCommon* &c){ //This function is called under read lock
+    bool found = _return->_map.find_erase_clean(IPFlowID(p),[&common](TCPStateCommon* &c){common=c;},[this](TCPStateCommon* &c){ //This function is called under read lock
                 if (c->use_count == 1) { //Inserter removed the reference without it being grabbed by other side
                     if (c->use_count.dec_and_test()) {
                         _pool.release(c);

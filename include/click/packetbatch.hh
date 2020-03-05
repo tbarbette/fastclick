@@ -12,7 +12,7 @@ CLICK_DECLS
 #define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != 0;p=p->next())
 
 /**
- * Iterate over a simply linked packet a batch. The current packet can be modified
+ * Iterate over all packets of a batch. The current packet can be modified
  *  during iteration as the "next" pointer is read before going in the core of
  *  the loop.
  */
@@ -212,7 +212,7 @@ CLICK_DECLS
         int passed = 0;\
         for (;p != 0;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
-            if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
+            if (o < 0 || o>=(int)(nbatches)) o = (nbatches - 1);\
             if (o == last_o) {\
                 passed ++;\
             } else {\
@@ -242,8 +242,8 @@ CLICK_DECLS
             out[last_o]->set_count(out[last_o]->count() + passed);\
         }\
 \
-        int i = 0;\
-        for (; i < (nbatches); i++) {\
+        unsigned i = 0;\
+        for (; i < (unsigned)(nbatches); i++) {\
             if (out[i]) {\
                 out[i]->tail()->set_next(0);\
                 (on_finish(i,out[i]));\
@@ -361,18 +361,32 @@ class PacketBatch : public WritablePacket {
 #define MAX_BATCH_SIZE 8192
 
 public :
+    /*
+     * Return the first packet of the batch
+     */
     inline Packet* first() {
         return this;
     }
 
+    /*
+     * Set the tail of the batch
+     */
     inline void set_tail(Packet* p) {
         set_prev(p);
     }
 
+    /*
+     * Return the tail of the batch
+     */
     inline Packet* tail() {
         return prev();
     }
-
+    
+    /*
+     * Append a simply-linked list of packet to the batch.
+     * One must therefore pass the tail and the number of packets to do it in constant time. Chances are you
+     * just created that list and can track taht.
+     */
     inline void append_simple_list(Packet* lhead, Packet* ltail, int lcount) {
         tail()->set_next(lhead);
         set_tail(ltail);
@@ -380,12 +394,18 @@ public :
         set_count(count() + lcount);
     }
 
+    /*
+     * Append a proper PacketBatch to this batch.
+     */
     inline void append_batch(PacketBatch* head) {
         tail()->set_next(head);
         set_tail(head->tail());
         set_count(count() + head->count());
     }
 
+    /*
+     * Append a packet to the list.
+     */
     inline void append_packet(Packet* p) {
         tail()->set_next(p);
         set_tail(p);
@@ -479,6 +499,7 @@ public :
 
     /**
      * Remove the first packet
+     * @return the new batch without front. Do not use "this" afterwards!
      */
     PacketBatch* pop_front() {
         if (count() == 1)
@@ -486,6 +507,7 @@ public :
         PacketBatch* poped = PacketBatch::start_head(next());
         poped->set_count(count() -1 );
         poped->set_tail(tail());
+        return poped;
     }
 
     /**

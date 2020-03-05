@@ -4,19 +4,21 @@
  * Tom Barbette
  */
 
-#ifndef MIDDLEBOX_TCPELEMENT_HH
-#define MIDDLEBOX_TCPELEMENT_HH
+#ifndef MIDDLEBOX_TCPHELPER_HH
+#define MIDDLEBOX_TCPHELPER_HH
 
 #include <click/config.h>
 #include <click/glue.hh>
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include <click/element.hh>
+#include <functional>
+
 
 #if HAVE_DPDK
 #include <click/dpdkdevice.hh>
 #endif
-#include "ipelement.hh"
+#include "iphelper.hh"
 #if HAVE_DPDK
 #include <rte_ip.h>
 #endif
@@ -29,7 +31,7 @@ CLICK_DECLS
  * from it to manage TCP packets.
  */
 
-class TCPHelper : public IPElement
+class TCPHelper : public IPHelper
 {
 public:
     TCPHelper() CLICK_COLD;
@@ -229,59 +231,8 @@ public:
      * @param packet The packet
      */
     static inline void resetTCPChecksum(WritablePacket* packet);
-/*
-    void TCPIn::iterateOptions(Packet *packet, std::function<bool(void*)> fnt)
-    {
-        auto fcb_in = fcb_data();
 
-        click_tcp *tcph = packet->tcp_header();
-
-        uint8_t *optStart = (uint8_t *) (tcph + 1);
-        uint8_t *optEnd = (uint8_t *) tcph + (tcph->th_off << 2);
-
-        if(optEnd > packet->end_data())
-            optEnd = packet->end_data();
-
-        while(optStart < optEnd)
-        {
-            if(optStart[0] == TCPOPT_EOL) // End of list
-                break; // Stop searching
-            else if(optStart[0] == TCPOPT_NOP)
-                optStart += 1; // Move to the next option
-            else if(optStart[1] < 2 || optStart[1] + optStart > optEnd)
-                break; // Avoid malformed options
-            else if(optStart[0] == TCPOPT_SACK_PERMITTED && optStart[1] == TCPOLEN_SACK_PERMITTED)
-            {
-                fnt(optStart[0],)
-                uint32_t old_hw = *((uint16_t*)optStart);
-                // If we find the SACK permitted option, we remove it
-                for(int i = 0; i < TCPOLEN_SACK_PERMITTED; ++i) {
-                    optStart[i] = TCPOPT_NOP; // Replace the option with NOP
-                }
-                uint32_t new_hw = (TCPOPT_NOP << 8) + TCPOPT_NOP;
-
-                click_update_in_cksum(&tcph->th_sum, old_hw, new_hw);
-                //click_chatter("SACK Permitted removed from options");
-
-                optStart += optStart[1];
-            }
-            else if(optStart[0] == TCPOPT_WSCALE && optStart[1] == TCPOLEN_WSCALE)
-            {
-                if (allowResize()) {
-                    uint16_t winScale = optStart[2];
-
-                    if(winScale >= 1)
-                        winScale = 2 << (winScale - 1);
-
-                    fcb_in->common->maintainers[flowDirection].setWindowScale(winScale);
-                    fcb_in->common->maintainers[flowDirection].setUseWindowScale(true);
-
-                    //click_chatter("Window scaling set to %u for flow %u", winScale, flowDirection);
-
-                    if(isAck(packet))
-                    {
-                        // Here, we have a SYNACK
-*/
+    static int iterateOptions(Packet *packet, std::function<bool(uint8_t,void*)> fnt);
 };
 
 inline tcp_seq_t
@@ -332,8 +283,8 @@ inline void TCPHelper::resetTCPChecksum(WritablePacket *packet)
     mbuf->l2_len = packet->mac_header_length();
     mbuf->l3_len = packet->network_header_length();
     mbuf->l4_len = tcph->th_off << 2;
-        mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4;
-    tcph->th_sum = rte_ipv4_phdr_cksum((struct ipv4_hdr *)iph, mbuf->ol_flags);
+    mbuf->ol_flags |= PKT_TX_TCP_CKSUM | PKT_TX_IP_CKSUM | PKT_TX_IPV4;
+    tcph->th_sum = rte_ipv4_phdr_cksum((const struct rte_ipv4_hdr *)iph, mbuf->ol_flags);
 #endif
 }
 
@@ -495,7 +446,7 @@ inline bool TCPHelper::isJustAnAck(Packet* packet, const bool or_fin)
         return false;
 
     //  If we have other flags, we are more than just an ACK
-    if(flags == TH_ACK || (or_fin && flags == TH_ACK | TH_FIN))
+    if(flags == TH_ACK || (or_fin && flags == (TH_ACK | TH_FIN)))
         return true;
     else
         return false;

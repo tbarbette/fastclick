@@ -83,6 +83,9 @@
 /* Define if Port::push/Port::pull should use bound function pointers. */
 #undef HAVE_BOUND_PORT_TRANSFER
 
+/* Define if compiled with heuristic for CPU load. */
+#undef HAVE_CLICK_LOAD
+
 /* Define if the C++ compiler understands constexpr. */
 #undef HAVE_CXX_CONSTEXPR
 
@@ -160,6 +163,9 @@
 /* Define if you want task scheduling to use a heap, not a linked list. */
 #undef HAVE_TASK_HEAP
 #endif
+
+/* Define if compiled with task statistics. */
+#undef HAVE_TASK_STATS
 
 /* The size of a `int', as computed by sizeof. */
 #undef SIZEOF_INT

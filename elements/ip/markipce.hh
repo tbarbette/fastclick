@@ -1,6 +1,6 @@
 #ifndef CLICK_MARKIPCE_HH
 #define CLICK_MARKIPCE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/atomic.hh>
 CLICK_DECLS
 
@@ -20,24 +20,24 @@ Congestion Experienced (value 3), incrementally recalculates the IP checksum,
 and passes the packet to output 0.  Packets whose ECN field is zero (not
 ECN-capable) are dropped unless the optional FORCE argument is true. */
 
-class MarkIPCE : public Element { public:
+class MarkIPCE : public SimpleElement<MarkIPCE> {
+    public:
+        MarkIPCE() CLICK_COLD;
+        ~MarkIPCE() CLICK_COLD;
 
-    MarkIPCE() CLICK_COLD;
-    ~MarkIPCE() CLICK_COLD;
+        const char *class_name() const { return "MarkIPCE"; }
+        const char *port_count() const { return PORTS_1_1; }
 
-    const char *class_name() const		{ return "MarkIPCE"; }
-    const char *port_count() const		{ return PORTS_1_1; }
+        int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
 
-    int configure(Vector<String> &conf, ErrorHandler *errh) CLICK_COLD;
-    void add_handlers() CLICK_COLD;
+        Packet *simple_action(Packet *);
 
-    Packet *simple_action(Packet *);
+    private:
+        bool _force;
+        atomic_uint64_t _drops;
 
-  private:
-
-    bool _force;
-    atomic_uint32_t _drops;
-
+        static String read_handler(Element *e, void *thunk) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

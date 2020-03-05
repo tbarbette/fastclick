@@ -6,7 +6,7 @@
  *
  * Copyright (c) 2000 Massachusetts Institute of Technology
  * Copyright (c) 2008-2010 Meraki, Inc.
- * Copyright (c) 2016 KTH Royal Institute of Technology
+ * Copyright (c) 2016-2019 KTH Royal Institute of Technology
  * Copyright (c) 2017 University of Liege
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -117,7 +117,7 @@ UDPRewriter::configure(Vector<String> &conf, ErrorHandler *errh)
 
     _annos = (dst_anno ? 1 : 0) + (has_reply_anno ? 2 + (reply_anno << 2) : 0);
     if (!has_udp_streaming_timeout && !has_streaming_timeout) {
-        for (int i = 0; i < _mem_units_no; i++) {
+        for (unsigned i = 0; i < _mem_units_no; i++) {
             _udp_streaming_timeout = _timeouts[i][0];
         }
     }
@@ -223,7 +223,7 @@ UDPRewriter::dump_mappings_handler(Element *e, void *)
     UDPRewriter *rw = (UDPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (int i = 0; i < rw->_mem_units_no; i++) {
+    for (unsigned i = 0; i < rw->_mem_units_no; i++) {
         for (Map::iterator iter = rw->_map[i].begin(); iter.live(); ++iter) {
             iter->flow()->unparse(sa, iter->direction(), now);
             sa << '\n';

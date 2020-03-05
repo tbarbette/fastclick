@@ -1,6 +1,7 @@
 #ifndef CLICK_CHECKIP6HEADER_HH
 #define CLICK_CHECKIP6HEADER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
+#include <click/atomic.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -35,39 +36,42 @@ CLICK_DECLS
  *
  * =back
  *
+ * =h count read-only
+ *
+ * Returns the number of correct packets CheckIP6Header has seen.
+ *
+ * =h drops read-only
+ *
+ * Returns the number of incorrect packets CheckIP6Header has seen.
+ *
  * =a MarkIP6Header */
 
-class CheckIP6Header : public Element {
+class CheckIP6Header : public SimpleElement<CheckIP6Header> {
+    public:
+        CheckIP6Header();
+        ~CheckIP6Header();
 
-  int _offset;
+        const char *class_name() const { return "CheckIP6Header"; }
+        const char *port_count() const { return PORTS_1_1X2; }
+        const char *processing() const { return PROCESSING_A_AH; }
 
-  int _n_bad_src;
-  IP6Address *_bad_src; // array of illegal IP6 src addresses.
-#ifdef CLICK_LINUXMODULE
-  bool _aligned;
-#endif
-  int _drops;
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
 
- public:
+        Packet *simple_action(Packet *p);
 
-  CheckIP6Header();
-  ~CheckIP6Header();
+    private:
+        int _offset;
+        int _n_bad_src;
+        IP6Address *_bad_src; // array of illegal IP6 src addresses.
 
-  const char *class_name() const		{ return "CheckIP6Header"; }
-  const char *port_count() const		{ return PORTS_1_1X2; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+        atomic_uint64_t _count;
+        atomic_uint64_t _drops;
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        enum { h_count, h_drops };
 
-  int drops() const				{ return _drops; }
-
-
-  void add_handlers() CLICK_COLD;
-
-  Packet *simple_action(Packet *);
-  void drop_it(Packet *);
-
-
+        void drop(Packet *p);
+        static String read_handler(Element *e, void *thunk) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

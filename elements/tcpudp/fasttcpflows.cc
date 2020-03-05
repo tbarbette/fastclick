@@ -67,6 +67,7 @@ FastTCPFlows::configure(Vector<String> &conf, ErrorHandler *errh)
       .read_mp("FLOWSIZE", _flowsize)
       .read_p("SEQUENCE", _sequence)
       .read_p("ACTIVE", _active)
+      .read("STOP", _stop)
       .complete() < 0)
     return -1;
   if (_flowsize < 3) {
@@ -312,8 +313,11 @@ FastTCPFlows::pull(int)
 
   if (!_active)
     return 0;
-  if (_limit != NO_LIMIT && _count >= _limit && _sent_all_fins)
-    return 0;
+  if (_limit != NO_LIMIT && _count >= _limit && _sent_all_fins) {
+     if (_stop)
+         router()->please_stop_driver();
+     return 0;
+  }
 
   if(_rate_limited){
     if (_rate.need_update(Timestamp::now())) {

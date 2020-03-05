@@ -1,6 +1,6 @@
 #ifndef CLICK_ETHERPAUSESOURCE_HH
 #define CLICK_ETHERPAUSESOURCE_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/timer.hh>
 CLICK_DECLS
 
@@ -69,7 +69,7 @@ CLICK_DECLS
  *    -> ToDevice;
  */
 
-class EtherPauseSource : public Element { public:
+class EtherPauseSource : public BatchElement { public:
 
     static const unsigned NO_LIMIT = 0xFFFFFFFFU;
 
@@ -86,6 +86,9 @@ class EtherPauseSource : public Element { public:
 
     void run_timer(Timer *);
     Packet *pull(int);
+#if HAVE_BATCH
+    PacketBatch *pull_batch(int, unsigned) override;
+#endif
 
   private:
 

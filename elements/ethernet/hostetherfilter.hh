@@ -1,6 +1,6 @@
 #ifndef CLICK_HOSTETHERFILTER_HH
 #define CLICK_HOSTETHERFILTER_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/etheraddress.hh>
 CLICK_DECLS
 
@@ -47,27 +47,26 @@ The ethernet header starts OFFSET bytes into the packet. Default OFFSET is 0.
 
 */
 
-class HostEtherFilter : public Element { public:
+class HostEtherFilter : public SimpleElement<HostEtherFilter> {
+    public:
+        HostEtherFilter() CLICK_COLD;
+        ~HostEtherFilter() CLICK_COLD;
 
-  HostEtherFilter() CLICK_COLD;
-  ~HostEtherFilter() CLICK_COLD;
+        const char *class_name() const    { return "HostEtherFilter"; }
+        const char *port_count() const    { return PORTS_1_1X2; }
+        const char *processing() const    { return PROCESSING_A_AH; }
 
-  const char *class_name() const		{ return "HostEtherFilter"; }
-  const char *port_count() const		{ return PORTS_1_1X2; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        bool can_live_reconfigure() const   { return true; }
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  bool can_live_reconfigure() const		{ return true; }
+        Packet *simple_action(Packet *);
+        void add_handlers() CLICK_COLD;
 
-  Packet *simple_action(Packet *);
-  void add_handlers() CLICK_COLD;
-
- private:
-
-  bool _drop_own : 1;
-  bool _drop_other : 1;
-  int _offset;
-  EtherAddress _addr;
+    private:
+        bool _drop_own : 1;
+        bool _drop_other : 1;
+        int _offset;
+        EtherAddress _addr;
 
 };
 

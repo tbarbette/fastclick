@@ -808,6 +808,7 @@ enable_batch
 enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
+enable_json
 enable_select
 enable_poll
 enable_kqueue
@@ -850,7 +851,6 @@ enable_ids
 enable_ip
 enable_ip6
 enable_ipsec
-enable_json
 enable_local
 enable_radio
 enable_research
@@ -874,6 +874,8 @@ enable_dynamic_linking
 enable_stats
 enable_stride
 enable_task_heap
+enable_task_stats
+enable_cpu_load
 enable_dmalloc
 enable_hash_iterator_epochs
 enable_force_expensive
@@ -1536,6 +1538,7 @@ Optional Features:
     --enable-auto-batch=[list|jump|port]
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
+    --enable-json         enable JSON support
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
@@ -1607,6 +1610,10 @@ Optional Features:
   --enable-stats[=LEVEL]  enable statistics collection
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
+  --enable-task-stats     Keep track of task statistics, used for automatic
+                          balancing of tasks among threads
+  --enable-cpu-load       Keep track of CPU usage using an approximation.
+                          Useful when using polling keeping the CPU at 100%
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
                           hash iterator epochs
@@ -6774,7 +6781,6 @@ else
     LIBS="$save_libs"
 fi
 
-
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing MHD_start_daemon" >&5
 $as_echo_n "checking for library containing MHD_start_daemon... " >&6; }
 if ${ac_cv_search_MHD_start_daemon+:} false; then :
@@ -6848,8 +6854,11 @@ fi
 done
 
 if test "x$ac_have_libmicrohttpd$ac_have_microhttpd_h" = "xyesyes"; then
+    have_httpd=yes
     $as_echo "#define HAVE_MICROHTTPD 1" >>confdefs.h
 
+else
+    have_httpd=no
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lre2" >&5
@@ -6911,7 +6920,85 @@ else
     have_re2=no
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for hs_compile_multi in -lhs" >&5
+$as_echo_n "checking for hs_compile_multi in -lhs... " >&6; }
+if ${ac_cv_lib_hs_hs_compile_multi+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lhs  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
 
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char hs_compile_multi ();
+int
+main ()
+{
+return hs_compile_multi ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_hs_hs_compile_multi=yes
+else
+  ac_cv_lib_hs_hs_compile_multi=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_hs_hs_compile_multi" >&5
+$as_echo "$ac_cv_lib_hs_hs_compile_multi" >&6; }
+if test "x$ac_cv_lib_hs_hs_compile_multi" = xyes; then :
+  ac_have_hyperscan=yes
+else
+  ac_have_hyperscan=no
+fi
+
+for ac_header in hs/hs.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "hs/hs.h" "ac_cv_header_hs_hs_h" "$ac_includes_default"
+if test "x$ac_cv_header_hs_hs_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_HS_HS_H 1
+_ACEOF
+ ac_have_hyperscan_h=yes
+else
+  ac_have_hyperscan_h=no
+fi
+
+done
+
+if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
+    have_hyperscan=yes
+    LIBS="$LIBS -lhs"
+    $as_echo "#define HAVE_HYPERSCAN 1" >>confdefs.h
+
+else
+    have_hyperscan=no
+fi
+
+# Check whether --enable-json was given.
+if test "${enable_json+set}" = set; then :
+  enableval=$enable_json; :
+else
+  enable_json=no
+fi
+
+if test "x$enable_json" = "xyes"; then
+    have_json=yes
+    $as_echo "#define HAVE_JSON 1" >>confdefs.h
+
+else
+    have_json=no
+fi
 
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
@@ -7040,6 +7127,18 @@ or install DPDK using meson, or he system package manager.
 
       DPDK_INCLUDES=-I${RTE_SDK_BIN}/include/
 
+
+      { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether DPDK has rte_eth_read_clock" >&5
+$as_echo_n "checking whether DPDK has rte_eth_read_clock... " >&6; }
+      if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+        $as_echo "#define HAVE_DPDK_READ_CLOCK 1" >>confdefs.h
+
+      else
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+      fi
     fi
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
@@ -9406,6 +9505,44 @@ $as_echo "#define HAVE_BOUND_PORT_TRANSFER 1" >>confdefs.h
   CXXFLAGS="$CXXFLAGS -Wno-pmf-conversions"
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -faligned-new" >&5
+$as_echo_n "checking whether C++ compiler accepts -faligned-new... " >&6; }
+if ${ax_cv_check_cxxflags___faligned_new+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -faligned-new"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___faligned_new=yes
+else
+  ax_cv_check_cxxflags___faligned_new=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___faligned_new" >&5
+$as_echo "$ax_cv_check_cxxflags___faligned_new" >&6; }
+if test "x$ax_cv_check_cxxflags___faligned_new" = xyes; then :
+  have_aligned_new=yes
+else
+  have_aligned_new=no
+fi
+
+if test "x$have_aligned_new" = xyes; then
+    CXXFLAGS="$CXXFLAGS -faligned-new"
+fi
 
 
 # Check whether --enable-tools was given.
@@ -9735,11 +9872,7 @@ if test "x$enable_dynamic_linking" = xyes; then
 
     DL_LIBS=
 
-    ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
-if test "x$ac_cv_func_dlopen" = xyes; then :
-  ac_have_dlopen=yes
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
 $as_echo_n "checking for dlopen in -ldl... " >&6; }
 if ${ac_cv_lib_dl_dlopen+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -9777,6 +9910,10 @@ fi
 $as_echo "$ac_cv_lib_dl_dlopen" >&6; }
 if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
   ac_have_dlopen=yes; DL_LIBS="-ldl"
+else
+  ac_fn_cxx_check_func "$LINENO" "dlopen" "ac_cv_func_dlopen"
+if test "x$ac_cv_func_dlopen" = xyes; then :
+  ac_have_dlopen=yes
 else
   ac_have_dlopen=no
 fi
@@ -10951,6 +11088,30 @@ Ignoring --enable-task-heap, which is incompatible with --disable-stride.
 =========================================" >&2;}
 fi
 
+
+# Check whether --enable-task-stats was given.
+if test "${enable_task_stats+set}" = set; then :
+  enableval=$enable_task_stats; :
+else
+  enable_task_stats=no
+fi
+
+if test "x$enable_task_stats" = xyes; then
+    $as_echo "#define HAVE_TASK_STATS 1" >>confdefs.h
+
+fi
+
+# Check whether --enable-cpu-load was given.
+if test "${enable_cpu_load+set}" = set; then :
+  enableval=$enable_cpu_load; :
+else
+  enable_cpu_load=no
+fi
+
+if test "x$enable_cpu_load" = xyes; then
+    $as_echo "#define HAVE_CLICK_LOAD 1" >>confdefs.h
+
+fi
 
 
 # Check whether --enable-dmalloc was given.
@@ -14412,6 +14573,8 @@ fi
 
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
+else
+    enable_batch="no"
 fi
 
 if test "x$enable_dpdk" = xyes; then
@@ -14420,6 +14583,8 @@ fi
 
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
+else
+    enable_flow="no"
 fi
 
 if test "x$enable_experimental" = xyes; then
@@ -14428,6 +14593,10 @@ fi
 
 if test "x$enable_gtp" = xyes; then
     provisions="$provisions gtp"
+fi
+
+if test "x$have_hyperscan" = xyes; then
+    provisions="$provisions hs"
 fi
 
 if test "x$have_int64_types" = xyes; then
@@ -14460,7 +14629,7 @@ if test "$ac_have_libmicrohttpd$ac_have_microhttpd_h" = yesyes; then
     provisions="$provisions microhttpd"
 fi
 
-if test "x$HAVE_NETMAP" == xyes; then
+if test "x$HAVE_NETMAP" = xyes; then
     provisions="$provisions netmap"
 fi
 
@@ -14479,12 +14648,16 @@ else
     have_pcap=no
 fi
 
-if test "x$have_re2" == xyes; then
+if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
 fi
 
 if test "$enable_multithread" != no; then
     provisions="$provisions smpclick"
+fi
+
+if test "x$enable_task_stats" = xyes; then
+    provisions="$provisions taskstats"
 fi
 
 if test "x$enable_user_multithread" = xyes; then
@@ -15869,16 +16042,21 @@ fi
 echo "
 
 Configuration Summary:
-    C Compiler:                  ${CC}
-    C++ Compiler:                ${CXX}
+    C     Compiler:              ${CC}
+    C++   Compiler:              ${CXX}
 
-    DPDK support:                ${enable_dpdk}
+          Batching:              ${enable_batch}
+              Flow:              ${enable_flow}
+
+    DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
-    PCAP support:                ${have_pcap}
+    PCAP   support:              ${have_pcap}
 
-    RE2 support:                 ${have_re2}
+    RE2    support:              ${have_re2}
+    HTTPD  support:              ${have_httpd}
+    JSON   support:              ${have_json}
 
-    AVX2 support:                ${HAVE_AVX2}
+    AVX2   support:              ${HAVE_AVX2}
 "
 
 echo "Now type make to build FastClick..."

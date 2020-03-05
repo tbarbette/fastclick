@@ -1201,7 +1201,7 @@ inline void TCPIn::initializeFcbSyn(fcb_tcpin* fcb_in, const click_ip *iph , con
 
     IPFlowID flowID(iph->ip_src, tcph->th_sport, iph->ip_dst, tcph->th_dport);
     //A pending reset or time out connection could exist so we use replace and free any existing entry if found
-    tableFcbTcpCommon.replace(flowID, fcb_in->common, [this](tcp_common* &existing) {
+    tableFcbTcpCommon.insert(flowID, fcb_in->common, [this](tcp_common* &existing) {
         existing->lock.acquire();
         if (--existing->use_count == 0) {
             existing->lock.release();
@@ -1334,7 +1334,7 @@ bool TCPIn::isLastUsefulPacket(Packet *packet)
 tcp_common* TCPIn::getTCPCommon(IPFlowID flowID)
 {
     tcp_common* p;
-    bool it = tableFcbTcpCommon.find_remove_clean(flowID,[&p](tcp_common* &c){p=c;},[this](tcp_common* &c){
+    bool it = tableFcbTcpCommon.find_erase_clean(flowID,[&p](tcp_common* &c){p=c;},[this](tcp_common* &c){
         if (unlikely(c->state >= TCPState::OPEN)) { //An established connection in the list : means a pending connection was reset
             c->lock.acquire();
             if (unlikely(c->state < TCPState::OPEN)) {

@@ -19,6 +19,10 @@ CLICK_CXX_UNPROTECT
 #elif CLICK_USERLEVEL
 # include <click/selectset.hh>
 #endif
+#if HAVE_CLICK_LOAD
+# include <click/ewma.hh>
+# include <click/multithread.hh>
+#endif
 
 // NB: user must #include <click/task.hh> before <click/routerthread.hh>.
 // We cannot #include <click/task.hh> ourselves because of circular #include
@@ -67,6 +71,12 @@ class RouterThread { public:
     unsigned max_cpu_share() const      { return _max_click_share; }
     unsigned cur_cpu_share() const      { return _cur_click_share; }
     void set_cpu_share(unsigned min_share, unsigned max_share);
+#endif
+
+#if HAVE_CLICK_LOAD
+    float load();
+    unsigned long long load_cycles();
+    unsigned long long useful_kcycles();
 #endif
 
 #if CLICK_LINUXMODULE || CLICK_BSDMODULE
@@ -142,6 +152,21 @@ class RouterThread { public:
     unsigned _cur_click_share;          // current Click share
     Timestamp _adaptive_restride_timestamp;
     int _adaptive_restride_iter;
+#endif
+
+#if HAVE_CLICK_LOAD
+    struct LoadState {
+	LoadState() : load(), useful(0),useless(0), all_useful_kcycles(0), last_update(0) {
+
+	}
+		EXPSMOOTH<512,10> load;
+		uint64_t useful;
+		uint64_t useless;
+		uint64_t all_useful_kcycles;
+		click_cycles_t last_update;
+    };
+	click_cycles_t UPDATE_TIME;
+	unprotected_rcu_singlewriter<LoadState,2> _load_state;
 #endif
 
     // EXTERNAL STATE GROUP

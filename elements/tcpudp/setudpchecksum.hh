@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4 -*-
 #ifndef CLICK_SETUDPCHECKSUM_HH
 #define CLICK_SETUDPCHECKSUM_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/glue.hh>
 CLICK_DECLS
 
@@ -22,7 +22,7 @@ CLICK_DECLS
  *
  * =a CheckUDPHeader, SetIPChecksum, CheckIPHeader, SetTCPChecksum */
 
-class SetUDPChecksum : public Element { public:
+class SetUDPChecksum : public SimpleElement<SetUDPChecksum> { public:
 
     SetUDPChecksum() CLICK_COLD;
     ~SetUDPChecksum() CLICK_COLD;

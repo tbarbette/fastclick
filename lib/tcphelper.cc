@@ -1,3 +1,19 @@
+// -*- c-basic-offset: 4; related-file-name: "../include/click/tcphelper.hh"-*-
+/*
+ * tcphelper.{cc,hh} -- utility routines for TCP packets
+ * Tom Barbette, Romain Gaillard
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
+ */
+
 #include <click/config.h>
 #include <click/router.hh>
 #include <click/args.hh>
@@ -67,6 +83,54 @@ WritablePacket* TCPHelper::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t 
     packet->set_dst_ip_anno(daddr);
 
     return packet;
+}
+
+int TCPHelper::iterateOptions(Packet *packet, std::function<bool(uint8_t, void*)> fnt)
+{
+	const click_tcp *tcph = packet->tcp_header();
+
+	uint8_t *optStart = const_cast<uint8_t *>((uint8_t *) (tcph + 1));
+	uint8_t *optEnd = const_cast<uint8_t *>((uint8_t *) tcph + (tcph->th_off << 2));
+
+	if(optEnd > packet->end_data())
+		optEnd = const_cast<uint8_t *>(packet->end_data());
+
+	int n = 0;
+
+	while(optStart < optEnd)
+	{
+		if(optStart[0] == TCPOPT_EOL) // End of list
+			break; // Stop searching
+		else if(optStart[0] == TCPOPT_NOP)
+			optStart += 1; // Move to the next option
+		else if(optStart[1] < 2 || optStart[1] + optStart > optEnd) {
+			return -1; // Avoid malformed options
+		}
+		/*else if(optStart[0] == TCPOPT_SACK_PERMITTED && optStart[1] == TCPOLEN_SACK_PERMITTED)
+		{
+			fnt(TCPOPT_SACK_PERMITTED,(void*)&optStart[2]);
+			optStart += optStart[1];
+		}
+		else if(optStart[0] == TCPOPT_WSCALE && optStart[1] == TCPOLEN_WSCALE)
+		{
+			fnt(TCPOPT_WSCALE,(void*)&optStart[2]);
+			optStart += optStart[1];
+		}
+		else if(optStart[0] == TCPOPT_MAXSEG && optStart[1] == TCPOLEN_MAXSEG)
+		{
+			fnt(TCPOPT_MAXSEG,(void*)&optStart[2]);
+			optStart += optStart[1];
+		}*/
+		else
+		{
+			fnt(optStart[0],(void*)&optStart[2]);
+			optStart += optStart[1];
+			return -1;
+		}
+
+		n++;
+	}
+	return n;
 }
 
 CLICK_ENDDECLS

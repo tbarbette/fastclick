@@ -83,8 +83,9 @@ MonitoringReportSocket::MonitoringReportSocket()
     _socktype_str("UDP"), _fd(-1), _active(-1),
     _family(AF_INET), _remote_port(0),
     _sndbuf(-1), _nodelay(1), _verbose(false),
+    _frequency(DEF_FREQ),
     _tot_msg_length(MIN_TOT_MSG_LEN),
-    _frequency(DEF_FREQ), _core_nb(0)
+    _core_nb(0)
 {
 }
 
@@ -168,8 +169,6 @@ MonitoringReportSocket::configure(Vector<String> &conf, ErrorHandler *errh)
         if (!handler_name || handler_name.empty()) {
             return errh->error("No handler for element '%s'", element_name.c_str());
         }
-
-        const Handler *h = Router::handler(e, handler_name);
 
         if (!_elementHandlers[e].empty()) {
             _elementHandlers[e].push_back(handler_name);
@@ -404,7 +403,7 @@ MonitoringReportSocket::run_timer(Timer *t)
                         e->name().c_str(), h->name().c_str()
                     );
                 }
-            } while (buffer && !status);
+            } while (!status);
             
 
             if (_verbose) {            

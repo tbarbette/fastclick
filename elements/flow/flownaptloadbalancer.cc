@@ -1,5 +1,19 @@
 /*
- * flowiploadbalancer.{cc,hh}
+ * flownaptloadbalancer.{cc,hh} -- TCP & UDP load-balancer
+ * Tom Barbette
+ *
+ * Copyright (c) 2017-2018 University of Liege
+ * Copyright (c) 2019-2020 KTH Royal Institute of Technology
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, subject to the conditions
+ * listed in the Click LICENSE file. These conditions include: you must
+ * preserve this copyright notice, and you cannot mention the copyright
+ * holders in advertising related to the Software without their permission.
+ * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
+ * notice is a summary of the Click LICENSE file; the license in that file is
+ * legally binding.
  */
 
 #include <click/config.h>
@@ -7,8 +21,9 @@
 #include <click/args.hh>
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
-#include "flowiploadbalancer.hh"
 #include <click/flow/flow.hh>
+
+#include "flownaptloadbalancer.hh"
 
 
 CLICK_DECLS
@@ -156,7 +171,7 @@ bool FlowNAPTLoadBalancer::new_flow(TTuple* flowdata, Packet* p) {
         LBEntry entry = LBEntry(flowdata->pair.dst, flowdata->ref->port);
         LBEntryOut out(IPPair(odip,osip),osport,flowdata->ref);
         assert(out.ref);
-        _map.replace(entry, out,[](LBEntryOut& replaced){
+        _map.insert(entry, out,[](LBEntryOut& replaced){
              nat_info_chatter("Replacing never established %d", ntohs(replaced.ref->port) );
              //  release_ref(replaced.ref);
              //  The ref is still in one side's timeout, simply forget about it
@@ -235,7 +250,7 @@ bool FlowNAPTLoadBalancerReverse::new_flow(LBEntryOut* fcb, Packet* p) {
     auto ip = p->ip_header();
     auto th = p->tcp_header();
     LBEntry entry = LBEntry(ip->ip_src, th->th_dport);
-    bool found = _lb->_map.find_remove(entry,*fcb);
+    bool found = _lb->_map.find_erase(entry,*fcb);
 
     if (!isSyn(p)) {
         nat_info_chatter("Non syn answer!");

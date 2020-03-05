@@ -26,7 +26,8 @@ CLICK_DECLS
 
 ToDPDKDevice::ToDPDKDevice() :
     _iqueues(), _dev(0),
-    _timeout(0), _congestion_warning_printed(false), _create(true), _tso(0)
+    _timeout(0), _congestion_warning_printed(false), _create(true),
+    _tso(0), _tco(false), _ipco(false)
 {
      _blocking = false;
      _burst = -1;
@@ -56,8 +57,11 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("NDESC",ndesc)
         .read("MAXQUEUES", maxqueues)
         .read("ALLOC",_create)
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         .read("TSO", _tso)
+        .read("IPCO", _ipco)
         .read("TCO", _tco)
+#endif
         .complete() < 0)
             return -1;
     if (!DPDKDeviceArg::parse(dev, _dev)) {
@@ -78,6 +82,8 @@ int ToDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (_tso)
         _dev->set_tx_offload(DEV_TX_OFFLOAD_TCP_TSO);
+    if (_ipco)
+        _dev->set_tx_offload(DEV_TX_OFFLOAD_IPV4_CKSUM);
     if (_tco) {
         _dev->set_tx_offload(DEV_TX_OFFLOAD_IPV4_CKSUM);
         _dev->set_tx_offload(DEV_TX_OFFLOAD_TCP_CKSUM);
@@ -221,7 +227,7 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
 
     do {
         sub_burst = iqueue.nr_pending > 32 ? 32 : iqueue.nr_pending;
-        if (iqueue.index + sub_burst >= _internal_tx_queue_size)
+        if (iqueue.index + sub_burst >= (unsigned)_internal_tx_queue_size)
             // The sub_burst wraps around the ring
             sub_burst = _internal_tx_queue_size - iqueue.index;
         //Todo : if there is multiple queue assigned to this thread, send on all of them
@@ -230,7 +236,7 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
         iqueue.nr_pending -= r;
         iqueue.index += r;
 
-        if (iqueue.index >= _internal_tx_queue_size) // Wrapping around the ring
+        if (iqueue.index >= (unsigned)_internal_tx_queue_size) // Wrapping around the ring
             iqueue.index = 0;
 
         sent += r;

@@ -149,6 +149,7 @@ IPRewriter::process(int port, Packet *p_in)
     if ( !map ) {
         click_chatter("[%s] [Core %d]: UDP Map is NULL", class_name(), click_current_cpu_id());
     }
+    //No lock access because we are the only writer
     IPRewriterEntry *m = map->get(flowid);
 
     if (!m) {			// create new mapping
@@ -215,10 +216,10 @@ IPRewriter::udp_mappings_handler(Element *e, void *)
     IPRewriter *rw = (IPRewriter *)e;
     click_jiffies_t now = click_jiffies();
     StringAccum sa;
-    for (int i = 0; i < rw->_state.weight(); i++) {
+    for (unsigned i = 0; i < rw->_state.weight(); i++) {
         for (Map::iterator iter = rw->_state.get_value(i)._udp_map.begin(); iter.live(); ++iter) {
-        iter->flow()->unparse(sa, iter->direction(), now);
-        sa << '\n';
+            iter->flow()->unparse(sa, iter->direction(), now);
+            sa << '\n';
         }
     }
     return sa.take_string();

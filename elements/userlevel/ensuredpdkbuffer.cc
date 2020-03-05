@@ -89,7 +89,7 @@ EnsureDPDKBuffer::smaction(Packet* p) {
             return q;
         } else {
             click_chatter("[%s] Could not ensure buffer for packet with length %d bytes. Dropped!", name().c_str(), p->length());
-            if (p->length() <= (DPDKDevice::MBUF_DATA_SIZE - RTE_PKTMBUF_HEADROOM)) {
+            if (p->length() <= (unsigned)(DPDKDevice::MBUF_DATA_SIZE - RTE_PKTMBUF_HEADROOM)) {
                 p->kill();
             }
             q->kill();
