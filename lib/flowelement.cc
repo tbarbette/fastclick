@@ -41,7 +41,7 @@ FlowElementVisitor::get_downward_table(Element* e,int output, Vector<FlowElement
     for (int i = 0; i < v.dispatchers.size(); i++) {
         //click_chatter("%p{element}",v.dispatchers[i].elem);
 		if (v.dispatchers[i].elem == (FlowElement*)e) {
-			click_chatter("Classification loops are unsupported, place another FlowClassifier before reinjection of the packets.");
+			click_chatter("Classification loops are unsupported, place another FlowManager before reinjection of the packets.");
 			e->router()->please_stop_driver();
 			return 0;
 		}

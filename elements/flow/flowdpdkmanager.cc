@@ -1,7 +1,7 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
-#include "flowdpdkclassifier.hh"
+#include "flowdpdkmanager.hh"
 
 #include <click/flow/flow.hh>
 #include <click/flow/node/flow_nodes.hh>
@@ -9,15 +9,15 @@
 CLICK_DECLS
 
 
-FlowDPDKClassifier::FlowDPDKClassifier() {
+FlowDPDKManager::FlowDPDKManager() {
     _builder = false;
 }
 
-FlowDPDKClassifier::~FlowDPDKClassifier() {
+FlowDPDKManager::~FlowDPDKManager() {
     
 }
 
-int FlowDPDKClassifier::configure(Vector<String> &conf, ErrorHandler *errh) {
+int FlowDPDKManager::configure(Vector<String> &conf, ErrorHandler *errh) {
 
     Element* dev;
     if (Args(this, errh).bind(conf)
@@ -26,7 +26,7 @@ int FlowDPDKClassifier::configure(Vector<String> &conf, ErrorHandler *errh) {
             .consume() < 0)
         return -1;
 
-    if (FlowClassifier::configure(conf, errh) != 0)
+    if (FlowManager::configure(conf, errh) != 0)
         return -1;
 
     _dev = dynamic_cast<FromDPDKDevice*>(dev);
@@ -35,17 +35,17 @@ int FlowDPDKClassifier::configure(Vector<String> &conf, ErrorHandler *errh) {
 }
 
 void *
-FlowDPDKClassifier::cast(const char *n)
+FlowDPDKManager::cast(const char *n)
 {
-    if (strcmp(n, "FlowClassifier") == 0)
-	return dynamic_cast<FlowClassifier *>(this);
+    if (strcmp(n, "FlowManager") == 0)
+	return dynamic_cast<FlowManager *>(this);
     else
 	return Element::cast(n);
 }
 
 
 
-void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
+void FlowDPDKManager::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
     if (pattern.size() == 0) {
         click_chatter("Cannot add classifier without rules !");
         return;
@@ -139,7 +139,7 @@ void FlowDPDKClassifier::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr
 
 }
 
-int FlowDPDKClassifier::traverse_rules(FlowNode* node, Vector<rte_flow_item> pattern, rte_flow_item_type last_layer, int offset) {
+int FlowDPDKManager::traverse_rules(FlowNode* node, Vector<rte_flow_item> pattern, rte_flow_item_type last_layer, int offset) {
     if (node->level()->is_dynamic()) {
         click_chatter("Node is dynamic, adding this node and stopping");
        add_rule(pattern, FlowNodePtr(node));
@@ -197,20 +197,20 @@ addthis:
 
 }
 
-int FlowDPDKClassifier::initialize(ErrorHandler *errh) {
+int FlowDPDKManager::initialize(ErrorHandler *errh) {
     if (_initialize_classifier(errh) != 0)
         return -1;
     if (_replace_leafs(errh) != 0)
         return -1;
 
-    if (!_builder && cast("FlowDPDKBuilderClassifier"))
-        return errh->error("This class is hardcoded to use builder. Use FlowDPDKClassifier or a variant to disable builder.");
-    if (_builder && !cast("FlowDPDKBuilderClassifier"))
-        return errh->error("This class is hardcoded to not use builder. Use FlowDPDKBuilderClassifier");
-    if (_aggcache && !cast("FlowDPDKCacheClassifier"))
-        return errh->error("This class is hardcoded to not use cache. Use FlowDPDKCacheClassifier");
-    if (!_aggcache && cast("FlowDPDKCacheClassifier"))
-        return errh->error("This class is hardcoded to use cache. Use FlowDPDKClassifier or FlowDPDKBuilderClassifier to disable cache");
+    if (!_builder && cast("FlowDPDKBuilderManager"))
+        return errh->error("This class is hardcoded to use builder. Use FlowDPDKManager or a variant to disable builder.");
+    if (_builder && !cast("FlowDPDKBuilderManager"))
+        return errh->error("This class is hardcoded to not use builder. Use FlowDPDKBuilderManager");
+    if (_aggcache && !cast("FlowDPDKCacheManager"))
+        return errh->error("This class is hardcoded to not use cache. Use FlowDPDKCacheManager");
+    if (!_aggcache && cast("FlowDPDKCacheManager"))
+        return errh->error("This class is hardcoded to use cache. Use FlowDPDKManager or FlowDPDKBuilderManager to disable cache");
 
     if (_aggcache && _cache_size == 0)
         return errh->error("With a cache size of 0, AGG is actualy disabled...");
@@ -222,7 +222,7 @@ int FlowDPDKClassifier::initialize(ErrorHandler *errh) {
         return -1;
 }
 
-void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
+void FlowDPDKManager::push_batch(int port, PacketBatch* batch) {
     FlowControlBlock* tmp_stack = fcb_stack;
     FlowTableHolder* tmp_table = fcb_table;
 
@@ -264,17 +264,17 @@ void FlowDPDKClassifier::push_batch(int port, PacketBatch* batch) {
     fcb_table = tmp_table;
 }
 
-FlowDPDKCacheClassifier::FlowDPDKCacheClassifier() {
+FlowDPDKCacheManager::FlowDPDKCacheManager() {
     _builder = false;
     _aggcache = true;
 }
 
-FlowDPDKCacheClassifier::~FlowDPDKCacheClassifier() {
+FlowDPDKCacheManager::~FlowDPDKCacheManager() {
 
 }
 
 
-void FlowDPDKCacheClassifier::push_batch(int port, PacketBatch* batch) {
+void FlowDPDKCacheManager::push_batch(int port, PacketBatch* batch) {
     FlowControlBlock* tmp_stack = fcb_stack;
     FlowTableHolder* tmp_table = fcb_table;
 
@@ -327,18 +327,18 @@ void FlowDPDKCacheClassifier::push_batch(int port, PacketBatch* batch) {
     fcb_table = tmp_table;
 }
 
-FlowDPDKBuilderClassifier::FlowDPDKBuilderClassifier() {
+FlowDPDKBuilderManager::FlowDPDKBuilderManager() {
     _builder = true;
     _aggcache = false;
 }
 
-FlowDPDKBuilderClassifier::~FlowDPDKBuilderClassifier() {
+FlowDPDKBuilderManager::~FlowDPDKBuilderManager() {
 
 }
 
 
 
-void FlowDPDKBuilderClassifier::push_batch(int port, PacketBatch* batch) {
+void FlowDPDKBuilderManager::push_batch(int port, PacketBatch* batch) {
     FlowControlBlock* tmp_stack = fcb_stack;
     FlowTableHolder* tmp_table = fcb_table;
 
@@ -383,7 +383,7 @@ void FlowDPDKBuilderClassifier::push_batch(int port, PacketBatch* batch) {
 
 CLICK_ENDDECLS
 
-EXPORT_ELEMENT(FlowDPDKClassifier)
-EXPORT_ELEMENT(FlowDPDKBuilderClassifier)
-EXPORT_ELEMENT(FlowDPDKCacheClassifier)
-ELEMENT_REQUIRES(FlowClassifier dpdk)
+EXPORT_ELEMENT(FlowDPDKManager)
+EXPORT_ELEMENT(FlowDPDKBuilderManager)
+EXPORT_ELEMENT(FlowDPDKCacheManager)
+ELEMENT_REQUIRES(FlowManager dpdk)

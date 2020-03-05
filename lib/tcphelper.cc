@@ -5,16 +5,16 @@
 #include <clicknet/tcp.h>
 #include <clicknet/ip.h>
 #include <clicknet/ether.h>
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 #include <click/ipelement.hh>
 
 CLICK_DECLS
 
-TCPElement::TCPElement()
+TCPHelper::TCPHelper()
 {
 
 }
-WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
+WritablePacket* TCPHelper::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t sport,
     uint16_t dport, tcp_seq_t seq, tcp_seq_t ack, uint16_t winSize, uint8_t flags,
     uint32_t contentSize) const
 {
@@ -70,4 +70,4 @@ WritablePacket* TCPElement::forgePacket(uint32_t saddr, uint32_t daddr, uint16_t
 }
 
 CLICK_ENDDECLS
-ELEMENT_PROVIDES(TCPElement)
+ELEMENT_PROVIDES(TCPHelper)

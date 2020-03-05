@@ -23,7 +23,7 @@ typedef struct FlowCache_t{
     FlowControlBlock* fcb;
 } FlowCache;
 
-class FlowClassifier: public FlowElement {
+class FlowManager: public FlowElement {
 protected:
     FlowClassificationTable _table;
     per_thread<FlowCache*> _cache;
@@ -56,7 +56,7 @@ protected:
     per_thread<FlowBatch*> _builder_batch;
     static int _n_classifiers;
     int _reserve;
-    static Vector<FlowClassifier *> _classifiers;
+    static Vector<FlowManager *> _classifiers;
     typedef Pair<Element*,int> EDPair;
     Vector<EDPair>  _reachable_list;
 
@@ -65,11 +65,11 @@ protected:
 
     void build_fcb();
 public:
-    FlowClassifier() CLICK_COLD;
+    FlowManager() CLICK_COLD;
 
-	~FlowClassifier() CLICK_COLD;
+	~FlowManager() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowClassifier"; }
+    const char *class_name() const		{ return "FlowManager"; }
     const char *port_count() const		{ return "1/1"; }
 //    const char *processing() const		{ return DOUBLE; }
 
@@ -140,7 +140,7 @@ inline bool is_valid_fcb(Packet* &p, Packet* &last, Packet* &next, FlowControlBl
 inline void check_release_flows();
 };
 
-inline FlowControlBlock* FlowClassifier::set_fcb_cache(FlowCache* &c, Packet* &p, const uint32_t& agg) {
+inline FlowControlBlock* FlowManager::set_fcb_cache(FlowCache* &c, Packet* &p, const uint32_t& agg) {
     FlowControlBlock* fcb = _table.match(p);
 
     if (*((uint32_t*)&(fcb->node_data[1])) == 0) {
@@ -153,7 +153,7 @@ inline FlowControlBlock* FlowClassifier::set_fcb_cache(FlowCache* &c, Packet* &p
     return fcb;
 }
 
-inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, const Timestamp &now) {
+inline bool FlowManager::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint32_t &lastagg, Packet* &last, Packet* &next, const Timestamp &now) {
     if (_aggcache) {
         uint32_t agg = AGGREGATE_ANNO(p);
         if (!(lastagg == agg && fcb && likely(fcb->parent && _table.reverse_match(fcb,p, _table.get_root())))) {
@@ -171,7 +171,7 @@ inline bool FlowClassifier::get_fcb_for(Packet* &p, FlowControlBlock* &fcb, uint
     return is_valid_fcb(p, last, next, fcb, now);
 }
 
-inline void FlowClassifier::check_release_flows() {
+inline void FlowManager::check_release_flows() {
     if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
         auto &head = _table.old_flows.get();
@@ -193,7 +193,7 @@ inline void FlowClassifier::check_release_flows() {
 
 }
 
-inline void FlowClassifier::handle_simple(Packet* &p, Packet* &last, FlowControlBlock* &fcb, PacketBatch* &awaiting_batch, int &count, const Timestamp &now) {
+inline void FlowManager::handle_simple(Packet* &p, Packet* &last, FlowControlBlock* &fcb, PacketBatch* &awaiting_batch, int &count, const Timestamp &now) {
         if (awaiting_batch == NULL) {
 #if DEBUG_CLASSIFIER > 1
             click_chatter("New fcb %p",fcb);
@@ -227,7 +227,7 @@ inline void FlowClassifier::handle_simple(Packet* &p, Packet* &last, FlowControl
         count ++;
 }
 
-inline void FlowClassifier::flush_simple(Packet* &last, PacketBatch* awaiting_batch, int &count, const Timestamp &now) {
+inline void FlowManager::flush_simple(Packet* &last, PacketBatch* awaiting_batch, int &count, const Timestamp &now) {
     if (awaiting_batch) {
 #if HAVE_FLOW_DYNAMIC
         fcb_stack->acquire(count);
@@ -251,7 +251,7 @@ inline void FlowClassifier::flush_simple(Packet* &last, PacketBatch* awaiting_ba
  * @arg builder Builder element to keep track of the ring.
  * @arg timestamp now Current timestamp. Just to avoid re-computing it more often than needed.
  */
-inline void FlowClassifier::handle_builder(Packet* &p, Packet* &last, FlowControlBlock* &fcb, Builder &builder, const Timestamp &now) {
+inline void FlowManager::handle_builder(Packet* &p, Packet* &last, FlowControlBlock* &fcb, Builder &builder, const Timestamp &now) {
         if ((_nocut && builder.lastfcb) || builder.lastfcb == fcb) {
             //Just continue as they are still linked
         } else {
@@ -305,7 +305,7 @@ inline void FlowClassifier::handle_builder(Packet* &p, Packet* &last, FlowContro
 }
 
 
-inline void FlowClassifier::flush_builder(Packet* &last, Builder &builder, const Timestamp &now) {
+inline void FlowManager::flush_builder(Packet* &last, Builder &builder, const Timestamp &now) {
     if (last) {
         last->set_next(0);
         builder.batches[builder.curbatch].batch->set_tail(last);
@@ -380,7 +380,7 @@ static inline void check_fcb_still_valid(FlowControlBlock* fcb, Timestamp now) {
  * Check that the FCB is not null, drop the packet if it is an early drop,
  *  then check its timeout with check_fcb_still_valid.
  */
-inline bool FlowClassifier::is_valid_fcb(Packet* &p, Packet* &last, Packet* &next, FlowControlBlock* &fcb, const Timestamp &now) {
+inline bool FlowManager::is_valid_fcb(Packet* &p, Packet* &last, Packet* &next, FlowControlBlock* &fcb, const Timestamp &now) {
     if (unlikely(_verbose > 2)) {
         if (_verbose > 3) {
             click_chatter("Table of %s after getting fcb %p :",name().c_str(),fcb);
@@ -404,7 +404,7 @@ inline bool FlowClassifier::is_valid_fcb(Packet* &p, Packet* &last, Packet* &nex
     return true;
 }
 
-inline FlowControlBlock* FlowClassifier::get_cache_fcb(Packet* p, uint32_t agg, FlowNode* root) {
+inline FlowControlBlock* FlowManager::get_cache_fcb(Packet* p, uint32_t agg, FlowNode* root) {
 
     if (unlikely(agg == 0)) {
         return _table.match(p, root);

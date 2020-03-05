@@ -2,7 +2,7 @@
 #define CLICK_FLOWROUTER_HH
 #include <click/string.hh>
 #include <click/timer.hh>
-#include "flowclassifier.hh"
+#include "flowmanager.hh"
 #include <vector>
 #include <click/flow/flowelement.hh>
 

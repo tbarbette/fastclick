@@ -7,7 +7,7 @@
 #include <clicknet/ip.h>
 #include <click/multithread.hh>
 #include "batchfcb.hh"
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 #include <click/flow/flowelement.hh>
 
 #define TCPREORDER_POOL_SIZE 100
@@ -94,7 +94,7 @@ Default value: true.
 
 =a TCPIn, TCPOut, TCPRetransmitter */
 
-class TCPReorder : public FlowSpaceElement<fcb_tcpreorder>, public TCPElement
+class TCPReorder : public FlowSpaceElement<fcb_tcpreorder>, public TCPHelper
 {
 public:
     /**

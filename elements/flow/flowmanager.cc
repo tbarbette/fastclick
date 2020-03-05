@@ -1,12 +1,12 @@
 /*
- * flowclassifier.{cc,hh}
+ * flowmanager.{cc,hh}
  */
 
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/routervisitor.hh>
-#include "flowclassifier.hh"
+#include "flowmanager.hh"
 #include "flowdispatcher.hh"
 #include <click/idletask.hh>
 #include <click/hashtable.hh>
@@ -16,7 +16,7 @@
 
 CLICK_DECLS
 
-FlowClassifier::FlowClassifier(): _aggcache(false), _cache(0),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true),
+FlowManager::FlowManager(): _aggcache(false), _cache(0),_cache_size(4096), _cache_ring_size(8),_pull_burst(0),_builder(true),_collision_is_life(false), cache_miss(0),cache_sharing(0),cache_hit(0),_clean_timer(5000), _timer(this), _early_drop(true),
     _ordered(true),_nocut(false), _optimize(true) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
@@ -26,15 +26,15 @@ FlowClassifier::FlowClassifier(): _aggcache(false), _cache(0),_cache_size(4096),
     _verbose = 0;
     _size_verbose = 0;
 #endif
-    FlowClassifier::_n_classifiers++;
+    FlowManager::_n_classifiers++;
 }
 
-FlowClassifier::~FlowClassifier() {
+FlowManager::~FlowManager() {
 
 }
 
 int
-FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
+FlowManager::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     int reserve = 0;
     String context = "ETHER";
@@ -77,7 +77,7 @@ FlowClassifier::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-FlowNode* FlowClassifier::resolveContext(FlowType t, Vector<FlowElement*> contextStack) {
+FlowNode* FlowManager::resolveContext(FlowType t, Vector<FlowElement*> contextStack) {
     String prot;
     if (_context == FLOW_ETHER) {
         switch (t) {
@@ -99,7 +99,7 @@ FlowNode* FlowClassifier::resolveContext(FlowType t, Vector<FlowElement*> contex
 }
 
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
-void FlowClassifier::run_timer(Timer*) {
+void FlowManager::run_timer(Timer*) {
     click_chatter("Release timer!");
 #if DEBUG_CLASSIFIER_RELEASE
     click_chatter("Force run check-release");
@@ -124,7 +124,7 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
 #endif
 
     flow_assert(thunk);
-    FlowClassifier* fc = static_cast<FlowClassifier*>(thunk);
+    FlowManager* fc = static_cast<FlowManager*>(thunk);
 #if DEBUG_CLASSIFIER
     if (fcb->parent != fc->table().get_root() && (!fcb->parent || !fc->table().get_root()->find_node(fcb->parent))) {
         click_chatter("GOING TO CRASH WHILE REMOVING fcb %p, with parent %p", fcb, fcb->parent);
@@ -221,7 +221,7 @@ void release_subflow(FlowControlBlock* fcb, void* thunk) {
 }
 
 
-int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
+int FlowManager::_initialize_classifier(ErrorHandler *errh) {
     if (input_is_pull(0)) {
         assert(input(0).element());
     }
@@ -233,11 +233,11 @@ int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
     FlowNode* table = FlowElementVisitor::get_downward_table(this, 0, s);
 
     if (!table)
-       return errh->error("%s: FlowClassifier without any downward dispatcher?",name().c_str());
+       return errh->error("%s: FlowManager without any downward dispatcher?",name().c_str());
 
     _table.set_release_fnt(release_subflow,this);
     if (table->is_dummy()) {
-        return errh->error("%p{element} : FlowClassifier without classification !");
+        return errh->error("%p{element} : FlowManager without classification !");
     }
     if (_verbose > 1) {
         click_chatter("Table of %s before optimization :",name().c_str());
@@ -267,7 +267,7 @@ int FlowClassifier::_initialize_classifier(ErrorHandler *errh) {
  * Replace all leafs of the tree by the final pool-alocated ones.
  * During initialization leafs have a double size to note which field are initialized.
  */
-int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
+int FlowManager::_replace_leafs(ErrorHandler *errh) {
     //Replace FCBs by the final run-time ones
     //Also have common static FCBs
     HashTable<FlowControlBlockRef, FlowControlBlock*> known_static_fcbs;
@@ -341,7 +341,7 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
     });
 #if HAVE_VERBOSE_BATCH
     if (!have_dynamic && _do_release) {
-        click_chatter("FlowClassifier is fully static, disabling release, consider compiling with --disable-dynamic-flow");
+        click_chatter("FlowManager is fully static, disabling release, consider compiling with --disable-dynamic-flow");
     }
 #endif
 
@@ -363,7 +363,7 @@ int FlowClassifier::_replace_leafs(ErrorHandler *errh) {
 /**
  * Initialize timeout timers
  */
-int FlowClassifier::_initialize_timers(ErrorHandler *errh) {
+int FlowManager::_initialize_timers(ErrorHandler *errh) {
     if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
         for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
@@ -380,7 +380,7 @@ int FlowClassifier::_initialize_timers(ErrorHandler *errh) {
     return 0;
 }
 
-int FlowClassifier::initialize(ErrorHandler *errh) {
+int FlowManager::initialize(ErrorHandler *errh) {
     if (_initialize_classifier(errh) != 0)
         return -1;
     if (_replace_leafs(errh) != 0)
@@ -390,7 +390,7 @@ int FlowClassifier::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-void FlowClassifier::cleanup(CleanupStage stage) {
+void FlowManager::cleanup(CleanupStage stage) {
         fcb_table = &_table;
         bool previous = pool_allocator_mt_base::dying();
         pool_allocator_mt_base::set_dying(true);
@@ -427,7 +427,7 @@ void FlowClassifier::cleanup(CleanupStage stage) {
 }
 
 
-bool FlowClassifier::run_idle_task(IdleTask*) {
+bool FlowManager::run_idle_task(IdleTask*) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_table = &_table;
@@ -447,7 +447,7 @@ bool FlowClassifier::run_idle_task(IdleTask*) {
  * Testing function
  * Search a FCB in the cache, linearly
  */
-inline int FlowClassifier::cache_find(FlowControlBlock* fcb) {
+inline int FlowManager::cache_find(FlowControlBlock* fcb) {
     if (!_aggcache)
         return 0;
     FlowCache* bucket = _cache.get();
@@ -466,7 +466,7 @@ inline int FlowClassifier::cache_find(FlowControlBlock* fcb) {
 /**
  * Remove a FCB from the cache
  */
-inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
+inline void FlowManager::remove_cache_fcb(FlowControlBlock* fcb) {
     uint32_t agg = *((uint32_t*)&(fcb->node_data[1]));
     if (agg == 0)
         return;
@@ -504,7 +504,7 @@ inline void FlowClassifier::remove_cache_fcb(FlowControlBlock* fcb) {
  * Push batch simple simply classify packets and push a batch when a packet
  * is different
  */
-inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
+inline  void FlowManager::push_batch_simple(int port, PacketBatch* batch) {
     PacketBatch* awaiting_batch = NULL;
     Packet* p = batch;
     Packet* last = NULL;
@@ -539,7 +539,7 @@ inline  void FlowClassifier::push_batch_simple(int port, PacketBatch* batch) {
  * Push_batch_builder use double connection to build a ring and process packets trying to reconcile flows more
  *
  */
-inline void FlowClassifier::push_batch_builder(int, PacketBatch* batch) {
+inline void FlowManager::push_batch_builder(int, PacketBatch* batch) {
     Packet* p = batch;
     FlowControlBlock* fcb = 0;
     uint32_t lastagg = 0;
@@ -573,7 +573,7 @@ inline void FlowClassifier::push_batch_builder(int, PacketBatch* batch) {
 }
 
 
-void FlowClassifier::push_batch(int, PacketBatch* batch) {
+void FlowManager::push_batch(int, PacketBatch* batch) {
     FlowControlBlock* tmp_stack = fcb_stack;
     FlowTableHolder* tmp_table = fcb_table;
 //#if !HAVE_DYNAMIC_FLOW_RELEASE_FNT
@@ -592,8 +592,8 @@ void FlowClassifier::push_batch(int, PacketBatch* batch) {
 }
 
 enum {h_leaves_count, h_active_count, h_print, h_timeout_count};
-String FlowClassifier::read_handler(Element* e, void* thunk) {
-    FlowClassifier* fc = static_cast<FlowClassifier*>(e);
+String FlowManager::read_handler(Element* e, void* thunk) {
+    FlowManager* fc = static_cast<FlowManager*>(e);
 
     fcb_table = &fc->_table;
     switch ((intptr_t)thunk) {
@@ -622,13 +622,13 @@ String FlowClassifier::read_handler(Element* e, void* thunk) {
     }
 };
 
-void FlowClassifier::add_handlers() {
+void FlowManager::add_handlers() {
 
-    add_read_handler("leaves_count", FlowClassifier::read_handler, h_leaves_count);
-    add_read_handler("leaves_all_count", FlowClassifier::read_handler, h_leaves_count);
-    add_read_handler("leaves_nondefault_count", FlowClassifier::read_handler, h_active_count);
-    add_read_handler("print_tree", FlowClassifier::read_handler, h_print);
-    add_read_handler("timeout_count", FlowClassifier::read_handler, h_timeout_count);
+    add_read_handler("leaves_count", FlowManager::read_handler, h_leaves_count);
+    add_read_handler("leaves_all_count", FlowManager::read_handler, h_leaves_count);
+    add_read_handler("leaves_nondefault_count", FlowManager::read_handler, h_active_count);
+    add_read_handler("print_tree", FlowManager::read_handler, h_print);
+    add_read_handler("timeout_count", FlowManager::read_handler, h_timeout_count);
 }
 
 
@@ -749,7 +749,7 @@ bool cmp(el a, el b) {
  * This function builds the layout of the FCB by going through the graph
  */
 void
-FlowClassifier::build_fcb() {
+FlowManager::build_fcb() {
     //Find list of reachable elements
     ElementDistanceCastTracker reachables(router(),false);
     router()->visit_paths(this, true, -1, &reachables);
@@ -774,7 +774,7 @@ FlowClassifier::build_fcb() {
 
         //Counting elements that appear multiple times and their maximal distance
         for (int i = 0; i < _classifiers.size(); i++) {
-            FlowClassifier* fc = dynamic_cast<FlowClassifier*>(_classifiers[i]);
+            FlowManager* fc = dynamic_cast<FlowManager*>(_classifiers[i]);
             if (fc->_reserve > min_place)
                 min_place = fc->_reserve;
             for (int j = 0; j < _classifiers[i]->_reachable_list.size(); j++) {
@@ -841,12 +841,12 @@ FlowClassifier::build_fcb() {
                 click_chatter("Placing  %p{element} at [%d-%d]",e,my_place,my_place + e->flow_data_size() -1 );
             already_placed.insert(it->id);
             e->_flow_data_offset = my_place;
-            e->_classifier = dynamic_cast<FlowClassifier*>(_classifiers[0]);
+            e->_classifier = dynamic_cast<FlowManager*>(_classifiers[0]);
         }
 
         //Set pool data size for classifiers
         for (int i = 0; i < _classifiers.size(); i++) {
-            FlowClassifier* fc = _classifiers[i];
+            FlowManager* fc = _classifiers[i];
             fc->_pool_data_size = min_place;
             for (int j = 0; j < fc->_reachable_list.size(); j++) {
                 VirtualFlowSpaceElement* vfe = dynamic_cast<VirtualFlowSpaceElement*>(fc->_reachable_list[j].first);
@@ -860,10 +860,10 @@ FlowClassifier::build_fcb() {
 }
 
 //int FlowBufferVisitor::shared_position[NR_SHARED_FLOW] = {-1};
-int FlowClassifier::_n_classifiers = 0;
-Vector<FlowClassifier *> FlowClassifier::_classifiers;
+int FlowManager::_n_classifiers = 0;
+Vector<FlowManager *> FlowManager::_classifiers;
 
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(flow)
-EXPORT_ELEMENT(FlowClassifier)
-ELEMENT_MT_SAFE(FlowClassifier)
+EXPORT_ELEMENT(FlowManager)
+ELEMENT_MT_SAFE(FlowManager)

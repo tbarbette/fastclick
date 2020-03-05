@@ -49,8 +49,8 @@ TCPReorder::initialize(ErrorHandler *errh) {
 
 void*
 TCPReorder::cast(const char *n) {
-   if (strcmp("TCPElement", n) == 0) {
-       return static_cast<TCPElement*>(this);
+   if (strcmp("TCPHelper", n) == 0) {
+       return static_cast<TCPHelper*>(this);
    }
    return FlowSpaceElement<fcb_tcpreorder>::cast(n);
 }

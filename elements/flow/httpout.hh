@@ -3,7 +3,7 @@
 
 #include <click/element.hh>
 #include "stackelement.hh"
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 
 CLICK_DECLS
 
@@ -41,7 +41,7 @@ element must also contain an HTTPIn element
  */
 
 
-class HTTPOut : public StackSpaceElement<struct fcb_httpout>, public TCPElement
+class HTTPOut : public StackSpaceElement<struct fcb_httpout>, public TCPHelper
 {
 public:
     /** @brief Construct an HTTPOut element

@@ -2,7 +2,7 @@
 #define MIDDLEBOX_PATHMERGER_HH
 #include <click/element.hh>
 #include "stackelement.hh"
-#include "tcpelement.hh"
+#include "tcphelper.hh"
 
 CLICK_DECLS
 
@@ -42,7 +42,7 @@ struct fcb_pathmerger
     }
 };
 
-class PathMerger : public TCPElement, public StackElement
+class PathMerger : public TCPHelper, public StackElement
 {
 public:
     /** @brief Construct an PathMerger element

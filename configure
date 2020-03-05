@@ -880,6 +880,7 @@ enable_force_expensive
 enable_valgrind
 enable_schedule_debugging
 enable_intel_cpu
+enable_avx
 with_numa
 with_netmap
 with_proper
@@ -1615,6 +1616,7 @@ Optional Features:
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
                           (no/yes/extra) [yes]
   --enable-intel-cpu      enable Intel-specific machine instructions
+  --enable-avx            check whether AVX is enabled, default yes
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -11069,6 +11071,44 @@ if test $enable_intel_cpu = yes; then
 
 fi
 
+# Check whether --enable-avx was given.
+if test "${enable_avx+set}" = set; then :
+  enableval=$enable_avx; check_avx=no
+else
+  check_avx=yes
+fi
+
+
+if test "${check_avx}" = "yes"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether we can compile AVX intrinsics in C" >&5
+$as_echo_n "checking whether we can compile AVX intrinsics in C... " >&6; }
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+   #include <x86intrin.h>
+   int main(int argc, char **argv){
+   double* q;
+   __m256d a = _mm256_load_pd(q);
+   double d = _mm256_cvtsd_f64(a);
+   return 0;
+   }
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  HAVE_AVX2=no
+else
+  HAVE_AVX2=yes
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${HAVE_AVX2}" >&5
+$as_echo "${HAVE_AVX2}" >&6; }
+fi
+if test "${HAVE_AVX2}" = "yes"; then
+  $as_echo "#define HAVE_AVX2 1" >>confdefs.h
+
+fi
+
 
 
 shell_expand () {
@@ -15837,6 +15877,8 @@ Configuration Summary:
     PCAP support:                ${have_pcap}
 
     RE2 support:                 ${have_re2}
+
+    AVX2 support:                ${HAVE_AVX2}
 "
 
 echo "Now type make to build FastClick..."

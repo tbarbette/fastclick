@@ -9,7 +9,7 @@
 #include <click/multithread.hh>
 #include <click/vector.hh>
 #include <clicknet/tcp.h>
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 #include <click/flow/flowelement.hh>
 #include "tcpin.hh"
 
@@ -41,7 +41,7 @@ element (eg fine for a NAT, LB, ... packet besed fct).
 
 
 
-class SimpleTCPRetransmitter : public StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>, public TCPElement
+class SimpleTCPRetransmitter : public StackStateElement<SimpleTCPRetransmitter,fcb_transmit_buffer>, public TCPHelper
 {
 public:
     /**

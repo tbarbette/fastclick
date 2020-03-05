@@ -1373,6 +1373,32 @@ if test $enable_intel_cpu = yes; then
     AC_DEFINE(HAVE_INTEL_CPU)
 fi
 
+AC_ARG_ENABLE([avx],
+		AS_HELP_STRING([--enable-avx],
+			       [check whether AVX is enabled, default yes]),
+	      [check_avx=no],
+	      [check_avx=yes])
+
+if test "${check_avx}" = "yes"; then
+  AC_MSG_CHECKING([whether we can compile AVX intrinsics in C])
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([
+   #include <x86intrin.h>
+   int main(int argc, char **argv){
+   double* q;
+   __m256d a = _mm256_load_pd(q);
+   double d = _mm256_cvtsd_f64(a);
+   return 0;
+   }
+   ])],
+   [HAVE_AVX2=no],
+   [HAVE_AVX2=yes]
+  )
+  AC_MSG_RESULT([${HAVE_AVX2}])
+fi
+if test "${HAVE_AVX2}" = "yes"; then
+  AC_DEFINE(HAVE_AVX2)
+fi
+
 
 dnl
 dnl expand path variables
@@ -2461,6 +2487,8 @@ Configuration Summary:
     PCAP support:                ${have_pcap}
 
     RE2 support:                 ${have_re2}
+
+    AVX2 support:                ${HAVE_AVX2}
 "
 
 echo "Now type make to build FastClick..."

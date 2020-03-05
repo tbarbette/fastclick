@@ -5,7 +5,10 @@
 #include <click/router.hh>
 #include <click/flowbuffer.hh>
 #include <click/routervisitor.hh>
-#   include <immintrin.h>
+#ifdef HAVE_AVX2
+#include <immintrin.h>
+#endif
+#include <algorithm>
 #include <click/flow/flowelement.hh>
 
 CLICK_DECLS
@@ -261,7 +264,7 @@ public :
     virtual int initialize(ErrorHandler *errh) {
         StackElement::initialize(errh);
         if (_flow_data_offset == -1) {
-            return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+            return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
         }
         return 0;
     }
@@ -568,6 +571,8 @@ namespace bits {
 
 } // namespace bits
 
+// Code from https://github.com/WojciechMula/sse4-strstr/
+#ifdef HAVE_AVX2
 inline size_t avx2_strstr_anysize(const char* s, size_t n, const char* needle, size_t k) {
 
     const __m256i first = _mm256_set1_epi8(needle[0]);
@@ -597,10 +602,44 @@ inline size_t avx2_strstr_anysize(const char* s, size_t n, const char* needle, s
 
     return std::string::npos;
 }
+#else
+inline size_t sse42_strstr_anysize(const char* s, size_t n, const char* needle, size_t k) {
+    const __m128i N = _mm_loadu_si128((__m128i*)needle);
+
+    for (size_t i = 0; i < n; i += 16) {
+    
+        const int mode = _SIDD_UBYTE_OPS 
+                       | _SIDD_CMP_EQUAL_ORDERED
+                       | _SIDD_BIT_MASK;
+
+        const __m128i D   = _mm_loadu_si128((__m128i*)(s + i));
+        const __m128i res = _mm_cmpestrm(N, k, D, n - i, mode);
+        uint64_t mask = _mm_cvtsi128_si64(res);
+
+        while (mask != 0) {
+
+            const auto bitpos = bits::get_first_bit_set(mask);
+
+            // we know that at least the first character of needle matches
+            if (memcmp(s + i + bitpos + 1, needle + 1, k - 1) == 0) {
+                return i + bitpos;
+            }
+
+            mask = bits::clear_leftmost_set(mask);
+        }
+    }
+
+    return std::string::npos;
+}
+#endif
 
 //Inline functions
 inline char* StackElement::searchInContent(char *content, const StringRef &pattern, uint32_t length) {
+#ifdef HAVE_AVX2
     int pos = avx2_strstr_anysize(content, length, pattern.data(), pattern.length());
+#else
+    int pos = sse42_strstr_anysize(content, length, pattern.data(), pattern.length());
+#endif
     if (pos == std::string::npos)
         return 0;
     else return content + pos;

@@ -81,7 +81,7 @@ FlowIPRoute::configure(Vector<String> &conf, ErrorHandler *errh)
   if (maxout >= noutputs())
       return errh->error("need %d or more output ports", maxout + 1);
   if (one_upstream_classifier() == 0) {
-      return errh->error("%s : Please place a FlowClassifier element before any FlowDispatcher",name().c_str());
+      return errh->error("%s : Please place a FlowManager element before any FlowDispatcher",name().c_str());
   }
   rules[conf.size()]=FlowClassificationTable::make_drop_rule();
   return 0;

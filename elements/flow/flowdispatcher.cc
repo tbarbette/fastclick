@@ -31,7 +31,7 @@ int
 FlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 	if (one_upstream_classifier() == 0) {
-		return errh->error("%s : Please place a FlowClassifier element before any FlowDispatcher",name().c_str());
+		return errh->error("%s : Please place a FlowManager element before any FlowDispatcher",name().c_str());
 	}
 	int defaultOutput = 0;
 

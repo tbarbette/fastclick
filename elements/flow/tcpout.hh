@@ -3,7 +3,7 @@
 #include <click/element.hh>
 #include "stackelement.hh"
 #include <click/bytestreammaintainer.hh>
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 
 // Forward declaration
 class TCPIn;
@@ -30,7 +30,7 @@ to send packets back to the source (for instance to acknowledge packets).
 
 =a TCPIn */
 
-class TCPOut : public StackElement, public TCPElement
+class TCPOut : public StackElement, public TCPHelper
 {
 public:
     /**

@@ -11,7 +11,7 @@
 #include <click/tcpstate.hh>
 #include "retransmissiontiming.hh"
 #include "stackelement.hh"
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 #include "tcpout.hh"
 
 #define MODIFICATIONLISTS_POOL_SIZE 1000
@@ -139,7 +139,7 @@ Name of the TCPIn element on the other path of the connection.
 
 =a TCPOut */
 
-class TCPIn : public StackSpaceElement<fcb_tcpin>, public TCPElement
+class TCPIn : public StackSpaceElement<fcb_tcpin>, public TCPHelper
 {
 public:
     /**

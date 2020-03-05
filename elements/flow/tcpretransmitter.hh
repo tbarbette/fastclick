@@ -13,7 +13,7 @@
 #include "stackelement.hh"
 #include <click/memorypool.hh>
 #include <click/bufferpool.hh>
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 #include "tcpin.hh"
 #include <click/bufferpoolnode.hh>
 #include <click/bytestreammaintainer.hh>
@@ -58,7 +58,7 @@ Default value: 65535
 #define TCPRETRANSMITTER_GET_BUFFER_SIZE 1500
 #define MAX_TRANSMIT 65535 - 40 // Max size of the content of a packet (minus 40 bytes for the headers)
 
-class TCPRetransmitter : public StackElement, public TCPElement
+class TCPRetransmitter : public StackElement, public TCPHelper
 {
 public:
     /**

@@ -169,8 +169,8 @@ FlowBufferIter FlowBuffer::end()
     return FlowBufferIter(this, NULL);
 }
 
-FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const char* needle, const int pattern_length,
-        int *feedback) {
+FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const char* needle, const int pattern_length, int *feedback) {
+#if HAVE_AVX2
     int n = start.leftInChunk();
     //If the first chunk is small, don't bother SSE
     if (n < 32)
@@ -245,6 +245,9 @@ FlowBufferContentIter FlowBuffer::searchSSE(FlowBufferContentIter start, const c
 
     *feedback = -1;
     return contentEnd();
+#else
+    return search(start,needle,feedback);
+#endif
 }
 
 FlowBufferContentIter FlowBuffer::isearch(FlowBufferContentIter start, const char* pattern,

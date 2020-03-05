@@ -2,7 +2,7 @@
 #define MIDDLEBOX_HTTPIN_HH
 #include <click/element.hh>
 #include "stackelement.hh"
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 
 CLICK_DECLS
 
@@ -53,7 +53,7 @@ must also contain an HTTPOut element
 
 =a HTTPOut */
 
-class HTTPIn : public StackSpaceElement<fcb_httpin>, TCPElement
+class HTTPIn : public StackSpaceElement<fcb_httpin>, TCPHelper
 {
 public:
     HTTPIn() CLICK_COLD;

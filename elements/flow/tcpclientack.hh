@@ -7,7 +7,7 @@
 #include <clicknet/ip.h>
 #include <click/multithread.hh>
 #include "batchfcb.hh"
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 #include <click/flow/flowelement.hh>
 
 /**
@@ -36,7 +36,7 @@ The second port should be piped to the return side.
 TCPClientAck must be used after TCPReorder
  */
 
-class TCPClientAck : public FlowSpaceElement<fcb_clientack>, public TCPElement
+class TCPClientAck : public FlowSpaceElement<fcb_clientack>, public TCPHelper
 {
 public:
     /**

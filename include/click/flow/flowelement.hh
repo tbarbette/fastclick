@@ -13,7 +13,7 @@ CLICK_DECLS
 
 #ifdef HAVE_FLOW
 
-class FlowClassifier;
+class FlowManager;
 
 
 enum FlowType {
@@ -32,8 +32,8 @@ public:
 	~FlowElement();
 	virtual FlowNode* get_table(int iport, Vector<FlowElement*> contextStack);
 
-    FlowClassifier* _classifier;
-    FlowClassifier* one_upstream_classifier() {
+    FlowManager* _classifier;
+    FlowManager* one_upstream_classifier() {
         return _classifier;
     }
 
@@ -178,7 +178,7 @@ public:
 protected:
 	int _flow_data_offset;
 	friend class FlowBufferVisitor;
-	friend class FlowClassifier;
+	friend class FlowManager;
 
 
 };
@@ -350,7 +350,7 @@ public:
 
 		}
         /*if (v.dispatchers[i] == (FlowElement*)e) {
-            click_chatter("Classification loops are unsupported, place another FlowClassifier before reinjection of the packets.");
+            click_chatter("Classification loops are unsupported, place another FlowManager before reinjection of the packets.");
             e->router()->please_stop_driver();
             return 0;
         }*/
@@ -372,7 +372,7 @@ FlowSpaceElement<T>::FlowSpaceElement() : VirtualFlowSpaceElement() {
 template<typename T>
 int FlowSpaceElement<T>::initialize(ErrorHandler *errh) {
     if (_flow_data_offset == -1) {
-        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
     }
     return 0;
 }
@@ -406,7 +406,7 @@ FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
 template<class Derived, typename T>
 int FlowStateElement<Derived, T>::initialize(ErrorHandler *errh) {
     if (_flow_data_offset == -1) {
-        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
     }
     return 0;
 }

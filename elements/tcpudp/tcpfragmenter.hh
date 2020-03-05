@@ -2,7 +2,7 @@
 #define CLICK_TCPFRAGMENTER_HH
 #include <click/element.hh>
 #include <click/batchelement.hh>
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 CLICK_DECLS
 
 /*
@@ -33,7 +33,7 @@ fragment every packet larger than the annotation's value.
 =a IPFragmenter, TCPIPEncap
 */
 
-class TCPFragmenter : public BatchElement, public TCPElement { public:
+class TCPFragmenter : public BatchElement, public TCPHelper { public:
 
     TCPFragmenter() CLICK_COLD;
     ~TCPFragmenter() CLICK_COLD;

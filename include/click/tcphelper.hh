@@ -1,5 +1,5 @@
 /*
- * tcpelement.hh - Provides several methods that can be used by elements to manage TCP packets
+ * tcphelper.hh - Provides several methods that can be used by elements to manage TCP packets
  * Romain Gaillard
  * Tom Barbette
  */
@@ -24,15 +24,15 @@
 CLICK_DECLS
 
 /**
- * @class TCPElement
+ * @class TCPHelper
  * @brief This class provides several methods that can be used by elements that inherits
  * from it to manage TCP packets.
  */
 
-class TCPElement : public IPElement
+class TCPHelper : public IPElement
 {
 public:
-    TCPElement() CLICK_COLD;
+    TCPHelper() CLICK_COLD;
 
 
     WritablePacket* forgeRst(Packet* packet) {
@@ -285,7 +285,7 @@ public:
 };
 
 inline tcp_seq_t
-TCPElement::getNextSequenceNumber(Packet* packet) const
+TCPHelper::getNextSequenceNumber(Packet* packet) const
 {
     tcp_seq_t currentSeq = getSequenceNumber(packet);
 
@@ -299,7 +299,7 @@ TCPElement::getNextSequenceNumber(Packet* packet) const
     return nextSeq;
 }
 
-inline void TCPElement::computeTCPChecksum(WritablePacket *packet)
+inline void TCPHelper::computeTCPChecksum(WritablePacket *packet)
 {
     click_ip *iph = packet->ip_header();
     click_tcp *tcph = packet->tcp_header();
@@ -310,7 +310,7 @@ inline void TCPElement::computeTCPChecksum(WritablePacket *packet)
     tcph->th_sum = click_in_cksum_pseudohdr(csum, iph, plen);
 }
 
-inline void TCPElement::resetTCPChecksum(WritablePacket *packet)
+inline void TCPHelper::resetTCPChecksum(WritablePacket *packet)
 {
     click_ip *iph = packet->ip_header();
     click_tcp *tcph = packet->tcp_header();
@@ -337,49 +337,49 @@ inline void TCPElement::resetTCPChecksum(WritablePacket *packet)
 #endif
 }
 
-inline void TCPElement::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq) const
+inline void TCPHelper::setSequenceNumber(WritablePacket* packet, tcp_seq_t seq) const
 {
     click_tcp *tcph = packet->tcp_header();
 
     tcph->th_seq = htonl(seq);
 }
 
-inline tcp_seq_t TCPElement::getSequenceNumber(Packet* packet)
+inline tcp_seq_t TCPHelper::getSequenceNumber(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohl(tcph->th_seq);
 }
 
-inline tcp_seq_t TCPElement::getAckNumber(Packet* packet)
+inline tcp_seq_t TCPHelper::getAckNumber(Packet* packet)
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohl(tcph->th_ack);
 }
 
-inline void TCPElement::setAckNumber(WritablePacket* packet, tcp_seq_t ack) const
+inline void TCPHelper::setAckNumber(WritablePacket* packet, tcp_seq_t ack) const
 {
     click_tcp *tcph = packet->tcp_header();
 
     tcph->th_ack = htonl(ack);
 }
 
-inline uint16_t TCPElement::getWindowSize(Packet *packet) const
+inline uint16_t TCPHelper::getWindowSize(Packet *packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohs(tcph->th_win);
 }
 
-inline void TCPElement::setWindowSize(WritablePacket *packet, uint16_t winSize) const
+inline void TCPHelper::setWindowSize(WritablePacket *packet, uint16_t winSize) const
 {
     click_tcp *tcph = packet->tcp_header();
 
     tcph->th_win = htons(winSize);
 }
 
-inline unsigned TCPElement::getPayloadLength(Packet* packet)
+inline unsigned TCPHelper::getPayloadLength(Packet* packet)
 {
     const click_ip *iph = packet->ip_header();
     unsigned iph_len = iph->ip_hl << 2;
@@ -391,7 +391,7 @@ inline unsigned TCPElement::getPayloadLength(Packet* packet)
     return ip_len - iph_len - tcp_offset;
 }
 
-inline unsigned char* TCPElement::getPayload(WritablePacket* packet) const
+inline unsigned char* TCPHelper::getPayload(WritablePacket* packet) const
 {
     click_tcp *tcph = packet->tcp_header();
 
@@ -400,7 +400,7 @@ inline unsigned char* TCPElement::getPayload(WritablePacket* packet) const
     return (unsigned char*)packet->transport_header() + tcph_len;
 }
 
-inline const unsigned char* TCPElement::getPayloadConst(Packet* packet) const
+inline const unsigned char* TCPHelper::getPayloadConst(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
@@ -409,7 +409,7 @@ inline const unsigned char* TCPElement::getPayloadConst(Packet* packet) const
     return (const unsigned char*)packet->transport_header() + tcph_len;
 }
 
-inline void TCPElement::setPayload(WritablePacket* packet, const unsigned char* payload,
+inline void TCPHelper::setPayload(WritablePacket* packet, const unsigned char* payload,
     uint32_t length) const
 {
     click_tcp *tcph = packet->tcp_header();
@@ -421,7 +421,7 @@ inline void TCPElement::setPayload(WritablePacket* packet, const unsigned char* 
     memcpy(payloadPtr, payload, length);
 }
 
-inline uint16_t TCPElement::getPayloadOffset(Packet* packet) const
+inline uint16_t TCPHelper::getPayloadOffset(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
@@ -433,41 +433,41 @@ inline uint16_t TCPElement::getPayloadOffset(Packet* packet) const
 }
 
 
-inline uint16_t TCPElement::getSourcePort(Packet* packet) const
+inline uint16_t TCPHelper::getSourcePort(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohs(tcph->th_sport);
 }
 
-inline uint16_t TCPElement::getDestinationPort(Packet* packet) const
+inline uint16_t TCPHelper::getDestinationPort(Packet* packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohs(tcph->th_dport);
 }
 
-inline bool TCPElement::isSyn(Packet* packet)
+inline bool TCPHelper::isSyn(Packet* packet)
 {
     return checkFlag(packet, TH_SYN);
 }
 
-inline bool TCPElement::isFin(Packet* packet)
+inline bool TCPHelper::isFin(Packet* packet)
 {
     return checkFlag(packet, TH_FIN);
 }
 
-inline bool TCPElement::isRst(Packet* packet)
+inline bool TCPHelper::isRst(Packet* packet)
 {
     return checkFlag(packet, TH_RST);
 }
 
-inline bool TCPElement::isAck(Packet* packet)
+inline bool TCPHelper::isAck(Packet* packet)
 {
     return checkFlag(packet, TH_ACK);
 }
 
-inline bool TCPElement::checkFlag(Packet *packet, uint8_t flag)
+inline bool TCPHelper::checkFlag(Packet *packet, uint8_t flag)
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;
@@ -479,13 +479,13 @@ inline bool TCPElement::checkFlag(Packet *packet, uint8_t flag)
         return false;
 }
 
-inline uint8_t TCPElement::getFlags(Packet *packet) const
+inline uint8_t TCPHelper::getFlags(Packet *packet) const
 {
     const click_tcp *tcph = packet->tcp_header();
     return tcph->th_flags;
 }
 
-inline bool TCPElement::isJustAnAck(Packet* packet, const bool or_fin)
+inline bool TCPHelper::isJustAnAck(Packet* packet, const bool or_fin)
 {
     const click_tcp *tcph = packet->tcp_header();
     uint8_t flags = tcph->th_flags;

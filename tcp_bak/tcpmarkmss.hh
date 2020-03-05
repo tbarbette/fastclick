@@ -8,7 +8,7 @@
 #include <click/batchelement.hh>
 #include "batchfcb.hh"
 #include "fcb.hh"
-#include "tcpelement.hh"
+#include "tcphelper.hh"
 
 CLICK_DECLS
 
@@ -58,7 +58,7 @@ Offset to add to the MSS before setting the annotation (can be negative)
 
 =a TCPFragmenter */
 
-class TCPMarkMSS : public BatchElement, public TCPElement
+class TCPMarkMSS : public BatchElement, public TCPHelper
 {
 public:
     /**

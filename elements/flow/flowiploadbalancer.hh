@@ -1,7 +1,7 @@
 #ifndef CLICK_FLOWIPLOADBALANCER_HH
 #define CLICK_FLOWIPLOADBALANCER_HH
 #include <click/config.h>
-#include <click/tcpelement.hh>
+#include <click/tcphelper.hh>
 #include <click/multithread.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
@@ -94,7 +94,7 @@ typedef HashTable<LBEntry,LBEntryOut> LBHashtable;
 /**
  * Full-fledge NATing Load Balancer, with its own TCP state support (but it can be parially disabled if it's used in conjuction with other flow/context element that ensure state)
  */
-class FlowNAPTLoadBalancer : public FlowStateElement<FlowNAPTLoadBalancer,TTuple>, public TCPElement {
+class FlowNAPTLoadBalancer : public FlowStateElement<FlowNAPTLoadBalancer,TTuple>, public TCPHelper {
 
 public:
 
@@ -154,7 +154,7 @@ private:
     friend class FlowNAPTLoadBalancerReverse;
 };
 
-class FlowNAPTLoadBalancerReverse : public FlowStateElement<FlowNAPTLoadBalancerReverse, LBEntryOut>, public TCPElement  {
+class FlowNAPTLoadBalancerReverse : public FlowStateElement<FlowNAPTLoadBalancerReverse, LBEntryOut>, public TCPHelper  {
 
 public:
 

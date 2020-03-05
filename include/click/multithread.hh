@@ -1236,7 +1236,7 @@ protected:
  */
 template <typename T>
 class fast_rcu { public:
-#define N 2
+#define RCU_N 2
     fast_rcu() : _rcu_current(0), _epochs(0), _write_epoch(1) {
     }
 
@@ -1277,8 +1277,8 @@ class fast_rcu { public:
         _write_lock.acquire();
         rcu_current_local = _rcu_current;
 
-        int rcu_next = (rcu_current_local + 1) & (N - 1);
-        int bad_epoch = (_write_epoch - N) + 1;
+        int rcu_next = (rcu_current_local + 1) & (RCU_N - 1);
+        int bad_epoch = (_write_epoch - RCU_N) + 1;
 
         unsigned i = 0;
         loop:

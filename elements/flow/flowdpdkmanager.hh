@@ -1,16 +1,16 @@
 #ifndef CLICK_FLOWDPDKCLASSIFIER_HH
 #define CLICK_FLOWDPDKCLASSIFIER_HH
-#include "flowclassifier.hh"
+#include "flowmanager.hh"
 #include <click/vector.hh>
 #include <rte_flow.h>
 #include "../userlevel/fromdpdkdevice.hh"
 
-class FlowDPDKClassifier : public FlowClassifier { public:
-    FlowDPDKClassifier() CLICK_COLD;
+class FlowDPDKManager : public FlowManager { public:
+    FlowDPDKManager() CLICK_COLD;
 
-	~FlowDPDKClassifier() CLICK_COLD;
+	~FlowDPDKManager() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowDPDKClassifier"; }
+    const char *class_name() const		{ return "FlowDPDKManager"; }
     void* cast(const char *n) override;
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -27,25 +27,25 @@ protected:
     FromDPDKDevice* _dev;
 };
 
-class FlowDPDKBuilderClassifier : public FlowDPDKClassifier { public:
+class FlowDPDKBuilderManager : public FlowDPDKManager { public:
 
-    FlowDPDKBuilderClassifier() CLICK_COLD;
+    FlowDPDKBuilderManager() CLICK_COLD;
 
-	~FlowDPDKBuilderClassifier() CLICK_COLD;
+	~FlowDPDKBuilderManager() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowDPDKBuilderClassifier"; }
+    const char *class_name() const		{ return "FlowDPDKBuilderManager"; }
 
     void push_batch(int port, PacketBatch* batch) override;
 
 };
 
-class FlowDPDKCacheClassifier : public FlowDPDKClassifier { public:
+class FlowDPDKCacheManager : public FlowDPDKManager { public:
 
-    FlowDPDKCacheClassifier() CLICK_COLD;
+    FlowDPDKCacheManager() CLICK_COLD;
 
-	~FlowDPDKCacheClassifier() CLICK_COLD;
+	~FlowDPDKCacheManager() CLICK_COLD;
 
-    const char *class_name() const		{ return "FlowDPDKCacheClassifier"; }
+    const char *class_name() const		{ return "FlowDPDKCacheManager"; }
 
     void push_batch(int port, PacketBatch* batch) override;
 

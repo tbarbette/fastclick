@@ -622,7 +622,7 @@ FlowNode* FlowNode::combine(FlowNode* other, bool as_child, bool priority, bool 
     flow_assert(!other->is_dummy());
     if (this->level()->is_dynamic() && !other->level()->is_dynamic()) {
         if (priority) {
-            click_chatter("Trying to attach a non-dynamic child to a dynamic node. This generally means you need a new FlowClassifier after a dynamic node, such as TCPIn elements or flow-based one");
+            click_chatter("Trying to attach a non-dynamic child to a dynamic node. This generally means you need a new FlowManager after a dynamic node, such as TCPIn elements or flow-based one");
             this->print();
             other->print();
             abort();

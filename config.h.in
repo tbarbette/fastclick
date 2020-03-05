@@ -107,6 +107,9 @@
 /* Define if you want to use Intel-specific instructions. */
 #undef HAVE_INTEL_CPU
 
+/* Define if you want to use AVX2 instructions. */
+#undef HAVE_AVX2
+
 /* Define if 64-bit integer types are enabled. */
 #undef HAVE_INT64_TYPES
 

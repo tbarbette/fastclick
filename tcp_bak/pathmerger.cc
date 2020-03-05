@@ -3,7 +3,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include "pathmerger.hh"
-#include "tcpelement.hh"
+#include "tcphelper.hh"
 
 CLICK_DECLS
 /*
@@ -163,5 +163,5 @@ void PathMerger::addEntry(struct fcb *fcb, Packet *packet, int port)
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(PathMerger)
-ELEMENT_REQUIRES(TCPElement)
+ELEMENT_REQUIRES(TCPHelper)
 ELEMENT_MT_SAFE(PathMerger)
