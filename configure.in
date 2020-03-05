@@ -298,6 +298,7 @@ if test "x$enable_dpdk" = "xyes"; then
     if pkg-config --exists libdpdk ; then
         :
     else
+      RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
         AC_MSG_ERROR([
 =========================================
