@@ -180,7 +180,7 @@ template <typename T>
 class SimpleBatchElement : public BatchElement { public:
 
     void push(int port, Packet *p) override {
-        p = T::simple_action(p);
+        p = static_cast<T&>(*this).simple_action(p);
         if (p)
             output(port).push(p);
     }
@@ -188,13 +188,13 @@ class SimpleBatchElement : public BatchElement { public:
     Packet* pull(int port) override {
         Packet *p = input(port).pull();
         if (p)
-            p = T::simple_action(p);
+            p = static_cast<T&>(*this).simple_action(p);
         return p;
     }
 
 #if HAVE_BATCH
     void push_batch(int port, PacketBatch* head) override final {
-        head = T::simple_action_batch(head);
+        head = static_cast<T&>(*this).simple_action_batch(head);
         if (head)
             output_push_batch(port,head);
     }
@@ -202,7 +202,7 @@ class SimpleBatchElement : public BatchElement { public:
     PacketBatch* pull_batch(int port, unsigned max) override final {
         PacketBatch* head = input_pull_batch(port,max);
         if (head)
-            head = T::simple_action_batch(head);
+            head = static_cast<T&>(*this).simple_action_batch(head);
         return head;
     }
 #endif

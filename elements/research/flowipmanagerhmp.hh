@@ -9,6 +9,7 @@
 #include <click/hashtablemp.hh>
 #include <click/pair.hh>
 #include <click/ipflowid.hh>
+#include <click/flow/flowelement.hh>
 #include <click/flow/common.hh>
 #include <click/timerwheel.hh>
 
