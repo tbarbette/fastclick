@@ -5,6 +5,7 @@
 #include <click/atomic.hh>
 #include <click/sync.hh>
 #if HAVE_DPDK
+# include <click/algorithm.hh>
 # include <rte_ring.h>
 # include <rte_errno.h>
 # include <click/dpdk_glue.hh>
@@ -161,11 +162,6 @@ template <typename T>
 using DynamicRing = SPSCDynamicRing<T>;
 
 #if HAVE_DPDK
-inline uint64_t next_pow2(uint64_t x) {
-	return x == 1 ? 1 : 1<<(64-__builtin_clzl(x-1));
-}
-
-
 /**
  * Ring with size set at initialization time
  */
