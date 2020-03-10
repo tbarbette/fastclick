@@ -32,6 +32,12 @@ CxxFunction::CxxFunction(const String &name, bool in_header,
   //fprintf(stderr, "%s::%s\n", _name.c_str(), _body.c_str());
 }
 
+void CxxFunction::set_inline()
+{
+    if (_ret_type.find_left("inline"))
+        _ret_type = "inline "+_ret_type;
+}
+
 String
 compile_pattern(const String &pattern0)
 {

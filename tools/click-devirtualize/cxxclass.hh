@@ -45,6 +45,8 @@ class CxxFunction {
   bool replace_expr(const String &, const String &, bool full_symbol = true);
   bool replace_call(const String &, const String &, Vector<String>& args);
 
+  void set_inline();
+
 };
 
 class CxxClass {

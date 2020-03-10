@@ -53,11 +53,13 @@
 #define DEVIRTUALIZE_OPT	311
 #define INSTRS_OPT		312
 #define REVERSE_OPT		313
+#define INLINE_OPT	    314
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
   { "config", 'c', CONFIG_OPT, 0, Clp_Negate },
   { "devirtualize", 0, DEVIRTUALIZE_OPT, Clp_ValString, Clp_Negate },
+  { "inline", 'I', INLINE_OPT, 0},
   { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
@@ -211,6 +213,7 @@ Options:\n\
   -c, --config                 Write new configuration only.\n\
   -r, --reverse                Reverse devirtualization.\n\
   -n, --no-devirtualize CLASS  Don't devirtualize element class CLASS.\n\
+  -I, --inline                 Set all functions inline.\n\
   -i, --instructions FILE      Read devirtualization instructions from FILE.\n\
   -C, --clickpath PATH         Use PATH for CLICKPATH.\n\
       --help                   Print this message and exit.\n\
@@ -241,6 +244,7 @@ main(int argc, char **argv)
   int compile_kernel = 0;
   int compile_user = 0;
   int reverse = 0;
+  int do_inline = 0;
   Vector<const char *> instruction_files;
   HashTable<String, int> specializing;
 
@@ -322,6 +326,10 @@ particular purpose.\n");
 
      case REVERSE_OPT:
       reverse = !clp->negated;
+      break;
+
+     case INLINE_OPT:
+      do_inline = !clp->negated;
       break;
 
      bad_option:
@@ -419,6 +427,8 @@ particular purpose.\n");
 
   // initialize specializer
   Specializer specializer(router, full_elementmap);
+
+  specializer.should_inline(do_inline);
   specializer.specialize(sigs, errh);
 
   // quit early if nothing was done

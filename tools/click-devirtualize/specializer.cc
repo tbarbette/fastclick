@@ -33,7 +33,7 @@ Vector<Pair<String,String>> patterns;
 Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
-    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1)
+    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false)
 {
   _etinfo.push_back(ElementTypeInfo());
 
@@ -298,6 +298,8 @@ Specializer::create_class(SpecializedClass &spc)
 	if (new_cxxc->find(old_fn.name())) // don't add again
 	  continue;
 	CxxFunction &new_fn = new_cxxc->defun(old_fn);
+    if (_do_inline)
+        new_fn.set_inline();
 	while (new_fn.replace_expr(ninputs_pat, ninputs_repl)) ;
 	while (new_fn.replace_expr(noutputs_pat, noutputs_repl)) ;
 	while (new_fn.replace_expr(push_pat, push_repl))
@@ -369,7 +371,7 @@ Specializer::do_simple_action(SpecializedClass &spc)
   }
 
   spc.cxxc->defun
-    (CxxFunction("push_batch", false, "void", "(int port, PacketBatch *batch)",
+    (CxxFunction("push_batch", false, "inline void", "(int port, PacketBatch *batch)",
 		 "\n  if (PacketBatch *nbatch = smactionbatch(batch))\n\
     output_push_batch(port, nbatch);\n", ""));
   spc.cxxc->find("output_push_batch")->unkill();

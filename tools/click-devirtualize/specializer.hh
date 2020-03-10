@@ -57,6 +57,7 @@ class Specializer { public:
     void output_new_elementmap(const ElementMap &, ElementMap &, const String &,
 			       const String &requirements) const;
 
+  void should_inline(bool do_inline) { _do_inline = do_inline; };
  private:
 
   enum { SPCE_NOT_DONE = -2, SPCE_NOT_SPECIAL = -1 };
@@ -74,6 +75,8 @@ class Specializer { public:
 
   //List of specialized class, populated by specialize()
   Vector<SpecializedClass> _specials;
+
+  bool _do_inline;
 
   CxxInfo _cxxinfo;
 
