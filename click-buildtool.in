@@ -651,6 +651,11 @@ END {
       } else
 	klass = substr(exes[j], star + 1)
       if (static_initialize[klass]) {
+          if (!class_name[klass]) {
+              print header[i], ": ", klass, "::static_initialied can only be used with a class_name method!" | "cat 1>&2"
+              ++errors
+          }
+
 	ex = ex klass "-!si ";
 	static_initialize[klass] = 0
       }
