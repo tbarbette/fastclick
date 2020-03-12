@@ -25,6 +25,7 @@
 #include <click/error.hh>
 #include <click/confparse.hh>
 #include <click/straccum.hh>
+#include <click/archive.hh>
 #include <click/driver.hh>
 #include "lexert.hh"
 #include "routert.hh"
@@ -50,6 +51,7 @@
 #define CHECK_OPT		313
 #define VERBOSE_OPT		314
 #define EXTRAS_OPT		315
+#define EMBED_OPT		316
 
 static const Clp_Option options[] = {
   { "align", 'A', ALIGN_OPT, 0, 0 },
@@ -62,6 +64,7 @@ static const Clp_Option options[] = {
   { "extras", 0, EXTRAS_OPT, 0, Clp_Negate },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
+  { "ship", 0, EMBED_OPT, 0, 0 },
   { "kernel", 'k', KERNEL_OPT, 0, 0 }, // DEPRECATED
   { "linuxmodule", 'l', KERNEL_OPT, 0, 0 },
   { "package", 'p', PACKAGE_OPT, Clp_ValString, 0 },
@@ -75,6 +78,8 @@ static int driver = -1;
 static String subpackage;
 static HashTable<String, int> initial_requirements(-1);
 static bool verbose = false;
+static bool embed_package = false;
+static String* click_compile_prog = 0;
 
 void
 short_usage()
@@ -109,6 +114,7 @@ Options:\n\
                            for the relevant driver. Default is '.'.\n\
   -E, --elements ELTS      Include element classes ELTS.\n\
       --no-extras          Don't include surplus often-useful elements.\n\
+  -s, --ship               Ship source given in package archives in the binary.\n\
   -V, --verbose            Print progress information.\n\
   -C, --clickpath PATH     Use PATH for CLICKPATH.\n\
       --help               Print this message and exit.\n\
@@ -129,7 +135,9 @@ class Mindriver { public:
     void add_router_requirements(RouterT*, ElementMap&, ErrorHandler*);
     bool add_traits(const Traits&, const ElementMap&, ErrorHandler*);
     bool resolve_requirement(const String& requirement, const ElementMap& emap, ErrorHandler* errh, bool complain = true);
-    void print_elements_conf(FILE*, String package, const ElementMap&, const String &top_srcdir);
+
+    int click_compile_file(String source, String obj, String package, ErrorHandler* errh);
+    void print_elements_conf(FILE*, String package, const ElementMap&, const String &top_srcdir, ErrorHandler* errh);
 
     HashTable<String, int> _provisions;
     HashTable<String, int> _requirements;
@@ -287,18 +295,48 @@ Mindriver::resolve_requirement(const String& requirement, const ElementMap& emap
     return false;
 }
 
+int
+Mindriver::click_compile_file(String source, String obj, String package, ErrorHandler* errh) {
+    // find compile program
+    if (!click_compile_prog)
+        click_compile_prog = new String(clickpath_find_file("click-compile", "bin", CLICK_BINDIR, errh));
+    if (!*click_compile_prog)
+        return -1;
+
+    ContextErrorHandler cerrh
+        (errh, "While compiling dependency %<%s%>:", obj.c_str());
+
+    // prepare click-compile
+    StringAccum compile_command;
+    compile_command << *click_compile_prog << " -t " << Driver::name(driver) << " -p " << package << " --objs -c " << source << " -o " << obj;
+
+    // finish compile_command
+    if (verbose)
+        errh->message("%s", compile_command.c_str());
+    int compile_retval = system(compile_command.c_str());
+    if (compile_retval == 127)
+        return cerrh.error("could not run %<%s%>", compile_command.c_str());
+    else if (compile_retval < 0)
+        return cerrh.error("could not run %<%s%>: %s", compile_command.c_str(), strerror(errno));
+    else if (compile_retval != 0)
+        return cerrh.error("%<%s%> failed", compile_command.c_str());
+    else
+        return 0;
+}
+
 void
-Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, const String &top_srcdir)
+Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, const String &top_srcdir,ErrorHandler* errh)
 {
     Vector<String> sourcevec;
     for (HashTable<String, int>::iterator iter = _source_files.begin();
 	 iter.live();
 	 iter++) {
-	iter.value() = sourcevec.size();
-	sourcevec.push_back(iter.key());
+        iter.value() = sourcevec.size();
+        sourcevec.push_back(iter.key());
     }
 
     Vector<String> headervec(sourcevec.size(), String());
+    Vector<String> compilevec(sourcevec.size(), String());
     Vector<String> classvec(sourcevec.size(), String());
     HashTable<String, int> statichash(0);
 
@@ -306,7 +344,14 @@ Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, 
     for (int i = 1; i < emap.size(); i++) {
 	const Traits &elt = emap.traits_at(i);
 	int sourcei = _source_files.get(elt.source_file);
-	if (sourcei >= 0 && emap.package(elt) == subpackage) {
+	if (sourcei >= 0) {
+        if (emap.package(elt) != subpackage) {
+            if (embed_package) {
+                compilevec[sourcei] = emap.archive(elt);
+            }
+            else
+                continue;
+        }
 	    // track ELEMENT_LIBS
 	    // ah, if only I had regular expressions
 	    if (!headervec[sourcei] && elt.libs) {
@@ -349,14 +394,29 @@ Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, 
     time_t now = time(0);
     const char *date_str = ctime(&now);
     fprintf(f, "# Generated by 'click-mkmindriver -p %s' on %s", package.c_str(), date_str);
-    for (int i = 0; i < sourcevec.size(); i++)
-	if (headervec[i]) {
-	    String classstr(classvec[i].begin() + 1, classvec[i].end());
-	    if (headervec[i][0] != '\"' && headervec[i][0] != '<')
-		fprintf(f, "%s%s\t\"%s%s\"\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), top_srcdir.c_str(), headervec[i].c_str(), classstr.c_str());
-	    else
-		fprintf(f, "%s%s\t%s\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), headervec[i].c_str(), classstr.c_str());
-	}
+    for (int i = 0; i < sourcevec.size(); i++) {
+        if (headervec[i]) {
+            String classstr(classvec[i].begin() + 1, classvec[i].end());
+            if (compilevec[i]) {
+                String source = sourcevec[i];
+                String obj = source.substring(0,source.find_right('.')) + ".o";
+
+                String s = file_string(compilevec[i], errh);
+                Vector<ArchiveElement> ar;
+                ArchiveElement::parse(s, ar);
+                ArchiveElement::extract(ar, source, source, errh);
+                String header = headervec[i];
+                ArchiveElement::extract(ar, header, header, errh);
+                click_compile_file(source,obj,package,errh);
+                fprintf(f, "%s\t\"%s\"\t%s\n", obj.c_str(), header.c_str(), classstr.c_str());
+            } else {
+                if (headervec[i][0] != '\"' && headervec[i][0] != '<')
+                fprintf(f, "%s%s\t\"%s%s\"\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), top_srcdir.c_str(), headervec[i].c_str(), classstr.c_str());
+                else
+                fprintf(f, "%s%s\t%s\t%s\n", top_srcdir.c_str(), sourcevec[i].c_str(), headervec[i].c_str(), classstr.c_str());
+            }
+        }
+    }
 }
 
 static String
@@ -478,7 +538,7 @@ particular purpose.\n");
 	    specifier = (clp->negated ? "x" : "a");
 	    break;
 
-	case CHECK_OPT:
+	  case CHECK_OPT:
 	    check = !clp->negated;
 	    break;
 
@@ -492,6 +552,10 @@ particular purpose.\n");
 
 	  case ALIGN_OPT:
 	    break;
+
+      case EMBED_OPT:
+        embed_package = !clp->negated;
+        break;
 
 	  case EXTRAS_OPT:
 	    extras = !clp->negated;
@@ -598,7 +662,7 @@ particular purpose.\n");
 	FILE *f = fopen(fn.c_str(), "w");
 	if (!f)
 	    errh->fatal("%s: %s", fn.c_str(), strerror(errno));
-	md.print_elements_conf(f, package_name, default_emap, top_srcdir);
+	md.print_elements_conf(f, package_name, default_emap, top_srcdir, errh);
 	fclose(f);
     }
 

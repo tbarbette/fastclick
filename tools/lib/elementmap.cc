@@ -276,7 +276,7 @@ parse_xml_attrs(HashTable<String, String> &attrs,
 }
 
 void
-ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandler *errh)
+ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandler *errh, String archive)
 {
     if (!errh)
 	errh = ErrorHandler::silent_handler();
@@ -330,6 +330,7 @@ ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandle
 		    g.driver_mask = Driver::driver_mask(attrs["drivers"]);
 		if (!_provided_driver_mask)
 		    _provided_driver_mask = g.driver_mask;
+        g.archive = archive;
 		_def.push_back(g);
 		in_elementmap = true;
 	    }
@@ -384,10 +385,10 @@ ElementMap::parse_xml(const String &str, const String &package_name, ErrorHandle
 }
 
 void
-ElementMap::parse(const String &str, const String &package_name, ErrorHandler *errh)
+ElementMap::parse(const String &str, const String &package_name, ErrorHandler *errh, const String archive)
 {
     if (str.length() && str[0] == '<') {
-	parse_xml(str, package_name, errh);
+	parse_xml(str, package_name, errh, archive);
 	return;
     }
 
@@ -396,6 +397,7 @@ ElementMap::parse(const String &str, const String &package_name, ErrorHandler *e
 	def_index = _def.size();
 	_def.push_back(Globals());
 	_def.back().package = package_name;
+	_def.back().archive = archive;
     }
 
     // set up default data
@@ -426,6 +428,7 @@ ElementMap::parse(const String &str, const String &package_name, ErrorHandler *e
 		_def.push_back(Globals());
 		_def.back() = _def[def_index - 1];
 		_def.back().srcdir = cp_unquote(words[1]);
+	    _def.back().archive = archive;
 	    }
 
 	} else if (words[0] == "$webdoc") {
@@ -434,6 +437,7 @@ ElementMap::parse(const String &str, const String &package_name, ErrorHandler *e
 		_def.push_back(Globals());
 		_def.back() = _def[def_index - 1];
 		_def.back().dochref = cp_unquote(words[1]);
+	_def.back().archive = archive;
 	    }
 
 	} else if (words[0] == "$provides") {
@@ -637,44 +641,45 @@ ElementMap::pick_driver(int wanted_driver, const RouterT* router, ErrorHandler* 
 bool
 ElementMap::find_and_parse_package_file(const String& package_name, const RouterT* r, const String& default_path, ErrorHandler* errh, const String& filetype, bool verbose)
 {
-    String mapname, mapname2;
+    String pnames[5] = {""};
+    int n = 0;
     if (package_name && package_name != "<archive>") {
-        mapname = "elementmap-" + package_name + ".xml";
-        mapname2 = "elementmap." + package_name;
-    } else {
-        mapname = "elementmap.xml";
-        mapname2 = "elementmap";
+        pnames[n++] = "elementmap-" + package_name + ".xml";
+        pnames[n++] = "elementmap." + package_name;
     }
+    pnames[n++] = "elementmap-devirtualize.xml";
+    pnames[n++] = "elementmap.xml";
+    pnames[n++] = "elemenetmap";
+    for (int i = 0; i < n; i++) {
+        String mapname = pnames[i];
 
-    // look for elementmap in archive
-    if (r) {
-        int aei = r->archive_index(mapname);
-        if (aei < 0)
-            aei = r->archive_index(mapname2);
-        if (aei >= 0) {
-            if (errh && verbose)
-                errh->message("parsing %s %<%s%> from configuration archive", filetype.c_str(), r->archive(aei).name.c_str());
-            parse(r->archive(aei).data, package_name);
-            return true;
+        // look for elementmap in archive
+        if (r) {
+            int aei = r->archive_index(mapname);
+            if (aei >= 0) {
+                if (errh && verbose)
+                    errh->message("parsing %s %<%s%> from configuration archive %s", filetype.c_str(), r->archive(aei).name.c_str(), r->filename().c_str());
+                parse(r->archive(aei).data, package_name, errh, r->filename());
+                return true;
+            }
+        }
+
+        // look for elementmap in file system
+        if (package_name != "<archive>") {
+            String fn = clickpath_find_file(mapname, "share", default_path);
+            if (fn) {
+                if (errh && verbose)
+                    errh->message("parsing %s %<%s%>", filetype.c_str(), fn.c_str());
+                String text = file_string(fn, errh);
+                parse(text, package_name);
+                return true;
+            }
+
         }
     }
 
-    // look for elementmap in file system
-    if (package_name != "<archive>") {
-        String fn = clickpath_find_file(mapname, "share", default_path);
-        if (!fn)
-            fn = clickpath_find_file(mapname2, "share", default_path);
-        if (fn) {
-            if (errh && verbose)
-                errh->message("parsing %s %<%s%>", filetype.c_str(), fn.c_str());
-            String text = file_string(fn, errh);
-            parse(text, package_name);
-            return true;
-        }
-
-        if (errh)
-            errh->warning("%s missing", filetype.c_str());
-    }
+    if (errh)
+        errh->warning("%s missing", filetype.c_str());
 
     return false;
 }
