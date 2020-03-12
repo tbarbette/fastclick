@@ -134,7 +134,17 @@ class CheckIPHeader : public SimpleElement<CheckIPHeader> {
                 Vector<IPAddress> &result_good_dst, Args &args
             );
         };
+    protected:
 
+        enum Reason {
+            MINISCULE_PACKET = 0,
+            BAD_VERSION,
+            BAD_HLEN,
+            BAD_IP_LEN,
+            BAD_CHECKSUM,
+            BAD_SADDR,
+            NREASONS
+        };
     private:
         unsigned _offset;
         Vector<IPAddress> _bad_src;   // array of illegal IP src addresses
@@ -151,15 +161,6 @@ class CheckIPHeader : public SimpleElement<CheckIPHeader> {
         atomic_uint64_t _drops;
         atomic_uint64_t *_reason_drops;
 
-        enum Reason {
-            MINISCULE_PACKET = 0,
-            BAD_VERSION,
-            BAD_HLEN,
-            BAD_IP_LEN,
-            BAD_CHECKSUM,
-            BAD_SADDR,
-            NREASONS
-        };
         static const char * const reason_texts[NREASONS];
 
         enum { h_count, h_drops, h_drop_details };
