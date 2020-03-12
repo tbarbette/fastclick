@@ -37,7 +37,9 @@ QueueDevice::QueueDevice() : _minqueues(0),_maxqueues(128), usable_threads(),
     thread_share(1), _this_node(0), _active(true) {
     _verbose = 1;
 }
-void QueueDevice::static_initialize() {
+
+void
+QueueDevice::static_initialize() {
 #if HAVE_NUMA
     int num_nodes = Numa::get_max_numas();
     if (num_nodes < 1)

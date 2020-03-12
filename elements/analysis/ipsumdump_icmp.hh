@@ -4,6 +4,9 @@
 CLICK_DECLS
 
 class IPSummaryDump_ICMP { public:
+
+    const char *class_name() const		{ return "IPSummaryDump_ICMP"; }
+
     static void static_initialize();
     static void static_cleanup();
 };

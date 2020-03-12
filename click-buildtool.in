@@ -601,7 +601,7 @@ $bad_files"
   ++errors
 }
 /static_initialize/ {
-  static_initialize[cur_class] = 1
+  static_initialize[cur_class] = 1;
   next
 }
 /static_cleanup/ {
