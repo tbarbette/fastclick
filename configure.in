@@ -273,8 +273,14 @@ AC_ARG_ENABLE([dpdk-packet],
 
 if test "x$enable_dpdk" = "xyes"; then
 
+    AC_MSG_CHECKING([for DPDK library])
+
     if test -z "$RTE_SDK_BIN"; then
         RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
+    fi
+
+    if test ! -d "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/build/
     fi
 
     if test -z "$RTE_LIBNAME"; then
@@ -305,10 +311,13 @@ if test "x$enable_dpdk" = "xyes"; then
 
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
-or install DPDK using meson, or he system package manager.
+or install DPDK using meson, or the system package manager.
 
 =========================================])
       fi
+
+    AC_MSG_RESULT([yes, found at $RTE_SDK_BIN])
+
       if test -e "$RTE_SRCDIR/VERSION"; then
         rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
         rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
