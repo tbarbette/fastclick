@@ -37,7 +37,7 @@ tab :: ARPTable
 
 
 /**
- * Receiver encapsulate everything to handle one port (FlowClassifier, ARP management, IP checker, ...
+ * Receiver encapsulate everything to handle one port (FlowManager, ARP management, IP checker, ...
  *
  */
 elementclass Receiver { $port, $mac, $ip, $range |
@@ -46,7 +46,7 @@ elementclass Receiver { $port, $mac, $ip, $range |
     -> etherOUT :: Null
 
     f :: FromDPDKDevice($port, VERBOSE $rxverbose, PROMISC false, RSS_AGGREGATE 1, THREADOFFSET 0, MAXTHREADS 1)
-    -> fc :: FlowClassifier(BUILDER 1, AGGCACHE false, CACHESIZE 65536, VERBOSE 1, EARLYDROP true)
+    -> fc :: FlowManager(BUILDER 1, AGGCACHE false, CACHESIZE 65536, VERBOSE 1, EARLYDROP true)
     -> arpr :: ARPDispatcher()
 
     arpr[0]

@@ -8,9 +8,9 @@ f and g result in always drop. It is not possible to have 0/10 and 0/12 on the s
 click C
 
 %file C
-Idle -> a :: FlowClassifier(VERBOSE 1, AGGCACHE false) -> FlowDispatcher(0/10 4/20) -> Discard;
+Idle -> a :: FlowManager(VERBOSE 1, AGGCACHE false) -> FlowDispatcher(0/10 4/20) -> Discard;
 
-Idle -> b :: FlowClassifier(VERBOSE 1, AGGCACHE false) -> FlowDispatcher(4/20 0/10) -> Discard;
+Idle -> b :: FlowManager(VERBOSE 1, AGGCACHE false) -> FlowDispatcher(4/20 0/10) -> Discard;
 
 
 Script(TYPE ACTIVE, stop);

@@ -10,7 +10,7 @@ Placing  r1/icmptype :: FlowDispatcher at [12-15]
 Placing  ipoutfd :: FlowDispatcher at [16-19]
 Placing  lb :: FlowIPLoadBalancer at [20-31]
 lb :: FlowIPLoadBalancer has 4 routes and 4 sources
-Table of r1/FlowClassifier@4 after optimization :
+Table of r1/FlowManager@4 after optimization :
 ---
 12/FFFF (THREECASE, 2 childs)
 |-> 1544
@@ -90,7 +90,7 @@ elementclass Receiver { $port, $mac, $ip, $range |
     -> etherOUT :: Null
 
     f::Idle
-    -> FlowClassifier(BUILDER 0, AGGCACHE 0, CACHESIZE 65536,VERBOSE 1, VERBOSE_FCB 1)
+    -> FlowManager(BUILDER 0, AGGCACHE 0, CACHESIZE 65536,VERBOSE 1, VERBOSE_FCB 1)
     -> arpr :: ARPDispatcher()
 
     arpr[0]

@@ -4,7 +4,7 @@ click CONFIG
 %file CONFIG
 FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 -> Print("IN",-1)
--> fs :: FlowClassifier(VERBOSE 0, CONTEXT NONE)
+-> fs :: FlowManager(VERBOSE 0, CONTEXT NONE)
 ~> IPIn
 -> UDPIn
 -> WordMatcher(WORD is, MODE MASK)
@@ -16,7 +16,7 @@ fs ~> Print("NON UDP") -> Discard;
 
 FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 -> Print("IN",-1)
--> FlowClassifier(VERBOSE 0, CONTEXT NONE)
+-> FlowManager(VERBOSE 0, CONTEXT NONE)
 ~> IPIn
 -> UDPIn
 -> WordMatcher(WORD is, MODE REMOVE)
@@ -26,7 +26,7 @@ FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 
 FromIPSummaryDump(IN1, STOP true, CHECKSUM true)
 -> Print("IN",-1)
--> FlowClassifier(VERBOSE 0, CONTEXT NONE)
+-> FlowManager(VERBOSE 0, CONTEXT NONE)
 ~> IPIn
 -> UDPIn
 -> WordMatcher(WORD is, MODE REPLACE)

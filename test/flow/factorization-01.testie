@@ -6,7 +6,7 @@ click CONF
 
 %file CONF
 InfiniteSource(DATA \<0123>, LIMIT 1, STOP true)
-    -> fcA :: FlowClassifier(VERBOSE 3, VERBOSE_FCB 0) -> FlowDispatcher(0/00/ff) -> FlowDispatcher(0/00/ff) -> Print(PASSED) -> Discard;
+    -> fcA :: FlowManager(VERBOSE 3, VERBOSE_FCB 0) -> FlowDispatcher(0/00/ff) -> FlowDispatcher(0/00/ff) -> Print(PASSED) -> Discard;
 
 
 %expect stderr

@@ -2,11 +2,11 @@
 click C
 
 %file C
-InfiniteSource(DATA \<10>, LIMIT 2, STOP true) -> a :: FlowClassifier() -> Print(A1) -> FlowDispatcher(0/10) -> Print(A2) -> Discard;
+InfiniteSource(DATA \<10>, LIMIT 2, STOP true) -> a :: FlowManager() -> Print(A1) -> FlowDispatcher(0/10) -> Print(A2) -> Discard;
 
-InfiniteSource(DATA \<20>, LIMIT 2, STOP true) -> b :: FlowClassifier() -> Print(B1) -> FlowDispatcher(0/10) -> Print(B2) -> Discard;
+InfiniteSource(DATA \<20>, LIMIT 2, STOP true) -> b :: FlowManager() -> Print(B1) -> FlowDispatcher(0/10) -> Print(B2) -> Discard;
 
-InfiniteSource(DATA \<10>, LIMIT 2, STOP true) -> c :: FlowClassifier() -> Print(C1) -> FlowDispatcher(0/10 0, 0/20 1) 
+InfiniteSource(DATA \<10>, LIMIT 2, STOP true) -> c :: FlowManager() -> Print(C1) -> FlowDispatcher(0/10 0, 0/20 1) 
     [0-1]=>{ [0] -> Print(CO1) -> Discard; [1] -> Print(CO2) -> Discard; };
 
 InfiniteSource(DATA \<20>, LIMIT 2, STOP true) -> c;

@@ -5,7 +5,7 @@ Simple session factorization
 click CONF
 
 %file CONF
-    fcA :: FlowClassifier(VERBOSE 3, VERBOSE_FCB 0)
+    fcA :: FlowManager(VERBOSE 3, VERBOSE_FCB 0)
     -> FlowDispatcher(0/08)
     -> FlowDispatcher(0/08)
     -> Print(PASSED) -> Discard;

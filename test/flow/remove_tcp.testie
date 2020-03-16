@@ -4,7 +4,7 @@ click CONFIG --simtime
 %file CONFIG
 FromIPSummaryDump(RX, STOP true, CHECKSUM true, TIMING true)
 -> Print("IN",-1)
--> FlowClassifier(VERBOSE 2, CONTEXT NONE)
+-> FlowManager(VERBOSE 2, CONTEXT NONE)
 ~> IPIn
 -> IPPrint(RX)
 -> tcpin_rx2 :: TCPIn(RETURNNAME tcpin_tx2, VERBOSE 1)
@@ -23,7 +23,7 @@ to_rx[1] -> out_rx;
 tee[1] 
 -> FlowStack(RELEASE false)
 -> TCPReflector(STRIP_PAYLOAD true, RAND_SEQ false)
--> FlowClassifier(VERBOSE 0, CONTEXT NONE)
+-> FlowManager(VERBOSE 0, CONTEXT NONE)
 -> Print("TX",-1)
 ~> IPIn
 -> IPPrint(TX)

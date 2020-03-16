@@ -52,7 +52,7 @@ elementclass Receiver { $port, $mac, $ip, $range |
     -> etherOUT :: Null
     
     input[1]
-    -> fc :: FlowClassifier(BUILDER 1, AGGCACHE 1, CACHESIZE 65536, VERBOSE 1, EARLYDROP false)
+    -> fc :: FlowManager(BUILDER 1, AGGCACHE 1, CACHESIZE 65536, VERBOSE 1, EARLYDROP false)
     -> arpr :: ARPDispatcher()
 
     arpr[0]

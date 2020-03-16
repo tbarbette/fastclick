@@ -4,7 +4,7 @@ click C2
 click C3
 
 %file C1
-fc1 :: FlowClassifier(VERBOSE 1)
+fc1 :: FlowManager(VERBOSE 1)
 -> fcd :: FlowContextDispatcher(- 0, - 1, -);
 
 fcd[0] -> Print(M0) ->  fd0 :: FlowDispatcher(0/00/ff) -> Print(0) -> Discard;
@@ -17,7 +17,7 @@ InfiniteSource(\<05>, LIMIT 1, STOP true) -> fc1;
 DriverManager(pause, pause, stop);
 
 %file C2
-fc2 :: FlowClassifier(VERBOSE 1)
+fc2 :: FlowManager(VERBOSE 1)
 -> fcd2 :: FlowContextDispatcher(- 0, - 1);
 
 fcd2[0] -> Print(M0) -> FlowDispatcher(0/02 1/00/ff) -> Print(0) -> Discard;
@@ -29,7 +29,7 @@ InfiniteSource(\<0005>, LIMIT 1, STOP true) -> fc2;
 InfiniteSource(\<0003>, LIMIT 1, STOP true) -> fc2;
 
 %file C3
-fc3 :: FlowClassifier(VERBOSE 1)
+fc3 :: FlowManager(VERBOSE 1)
 -> fcd3 :: FlowContextDispatcher(- 0, - 1);
 
 fcd3[0] ->  FlowDispatcher(0/02 1/00/ff) -> Print(0) -> Discard;

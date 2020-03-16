@@ -2,12 +2,12 @@
 click C
 
 %file C
-Idle -> a :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10) -> Discard; //Accept  0/10, else drop
-Idle -> b :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10,-) -> Discard; //Accept 0/10, else drop
-Idle -> c :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10,-)[0-1] => {[0] -> Discard; [1] -> Discard;}
+Idle -> a :: FlowManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10) -> Discard; //Accept  0/10, else drop
+Idle -> b :: FlowManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10,-) -> Discard; //Accept 0/10, else drop
+Idle -> c :: FlowManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10,-)[0-1] => {[0] -> Discard; [1] -> Discard;}
 
-Idle -> d1 :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10 0, 0/20 0, -) -> Discard;
-Idle -> d2 :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10 0, 0/20 0, - drop) -> Discard;
+Idle -> d1 :: FlowManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10 0, 0/20 0, -) -> Discard;
+Idle -> d2 :: FlowManager(VERBOSE 1, VERBOSE_FCB 1, AGGCACHE false) -> FlowDispatcher(0/10 0, 0/20 0, - drop) -> Discard;
 
 Script(TYPE ACTIVE, stop);
 

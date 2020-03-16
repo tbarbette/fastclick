@@ -6,13 +6,13 @@ Test against stupid merges
 click C
 
 %file C
-Idle -> a :: FlowClassifier(VERBOSE 1) -> b0 :: FlowDispatcher(0/10, 0/12, 0/14) -> Discard;
+Idle -> a :: FlowManager(VERBOSE 1) -> b0 :: FlowDispatcher(0/10, 0/12, 0/14) -> Discard;
 
-Idle -> b :: FlowClassifier(VERBOSE 1) -> b1 :: FlowDispatcher(0/10, 0/12, 0/14, 2/20, 2/22, 2/44) -> Discard;
+Idle -> b :: FlowManager(VERBOSE 1) -> b1 :: FlowDispatcher(0/10, 0/12, 0/14, 2/20, 2/22, 2/44) -> Discard;
 
-Idle -> c :: FlowClassifier(VERBOSE 1) -> c1 :: FlowDispatcher(0/10 0, 0/12 0, 0/14 0, 2/20 1, 2/22 1, 2/44 1) -> Discard;
+Idle -> c :: FlowManager(VERBOSE 1) -> c1 :: FlowDispatcher(0/10 0, 0/12 0, 0/14 0, 2/20 1, 2/22 1, 2/44 1) -> Discard;
 
-Idle -> d :: FlowClassifier(VERBOSE 1, VERBOSE_FCB 1) -> d1 :: FlowDispatcher(0/10 0, 0/12 0, 0/14 0, 2/20 1, 2/22 1, 2/44 1) [0-1] => {
+Idle -> d :: FlowManager(VERBOSE 1, VERBOSE_FCB 1) -> d1 :: FlowDispatcher(0/10 0, 0/12 0, 0/14 0, 2/20 1, 2/22 1, 2/44 1) [0-1] => {
     [0] -> d01 :: FlowDispatcher(18/32) -> Discard;
     [1] -> d02 :: FlowDispatcher(18/32) -> Discard;}
 

@@ -6,7 +6,7 @@ click CONFIG2
 arpq :: ARPQuerier(IP 1.1.1.1, ETH 1:1:1:1:1:1)
 -> td :: Discard; //Fake ToDevice
 
-fc :: FlowClassifier(VERBOSE 1)
+fc :: FlowManager(VERBOSE 1)
 -> fd :: Null
 
 fd ~> Print(Q) -> [1]arpq;
@@ -22,7 +22,7 @@ DriverManager(wait,wait,wait,stop)
 arpq :: ARPQuerier(IP 1.1.1.1, ETH 1:1:1:1:1:1)
 -> td :: Discard; //Fake ToDevice
 
-fc :: FlowClassifier(VERBOSE 1)
+fc :: FlowManager(VERBOSE 1)
 -> fd :: FlowDispatcher(12/0806 20/0002, 12/0806 20/0001, -)
 fd[0] -> Print(Q) -> [1]arpq;
 fd[1] -> Print(R) -> [0]ARPResponder -> td;
