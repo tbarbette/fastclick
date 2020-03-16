@@ -76,7 +76,7 @@ struct ArchiveElement {
 		FILE *f = fopen(dest.c_str(), "wb");
 		if (!f) {
 		  if (errh)
-			errh->error("%s: %s", name, strerror(errno));
+			errh->error("%s: %s", name.c_str(), strerror(errno));
 		  return -1;
 		}
         int r = fwrite(ae->data.c_str(), 1, ae->data.length(), f);
