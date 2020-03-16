@@ -29,7 +29,7 @@ ar x package.uo config
 ```
   Note the clickdvXX.cc and .hh file will be kept in userlevel, it contains the code from
   click-devirtualized with all specialized elements and the beetlemonkey to generate our
-  limited set of elements. You may recompile it with `g++ -fPIC -flto -std=c++11 -g -O3 -I${RTE_SDK}/x86_64-native-linuxapp-gcc/include -include ${RTE_SDK}/x86_64-native-linuxapp-gcc/include/rte_config.h -Wno-pmf-conversions -faligned-new -c -o   clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.o clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.cc -fno-access-control` but that was already done for you by click-mkmindriver
+  limited set of elements. You may recompile it with `g++ -fPIC -flto -std=c++11 -g -O3 -I${RTE_SDK}/x86_64-native-linuxapp-gcc/include -include ${RTE_SDK}/x86_64-native-linuxapp-gcc/include/rte_config.h -Wno-pmf-conversions -faligned-new -c -o   clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.o clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.cc -fno-access-control` but that was already done for you by click-mkmindriver. Use make MINDRIVER=embed V=1 to see the few lines to type to compile a new embedclick manually.
 
 
  * Now simply use embedclick with the configuration file "config", eg:
