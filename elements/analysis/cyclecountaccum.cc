@@ -45,6 +45,31 @@ CycleCountAccum::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
+inline PacketBatch*
+CycleCountAccum::simple_action_batch(PacketBatch *batch)
+{
+	state &s = *_state;
+    click_cycles_t accum = 0;
+    unsigned count = 0;
+    unsigned zero_count = 0;
+    FOR_EACH_PACKET(batch, p) {
+        if (PERFCTR_ANNO(p)) {
+            accum += click_get_cycles() - PERFCTR_ANNO(p);
+            count++;
+        } else {
+            zero_count++;
+            if ( s.zero_count == 0 && zero_count == 1)
+                click_chatter("%s: packet with zero cycle counter annotation!", declaration().c_str());
+        }
+    }
+    s.count += count;
+    s.zero_count += zero_count;
+    s.accum += accum / count;
+    return batch;
+}
+#endif
+
 String
 CycleCountAccum::read_handler(Element *e, void *thunk)
 {

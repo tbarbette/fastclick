@@ -4,6 +4,9 @@ endif
 ifeq ($(RTE_TARGET),)
 $(error "Please define RTE_TARGET environment variable")
 endif
+ifeq ($(RTE_SDK_BIN),)
+$(error "Please define RTE_SDK_BIN environment variable")
+endif
 
 # This file more or less copies rte.app.sdk, but we cannot use directly DPDK's one because its heavy modifications on the compile variables would break Click build process
 
