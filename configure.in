@@ -2326,6 +2326,9 @@ fi
 dnl add 'dpdk' if compiled with --enable-dpdk
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
+    if test "$rte_ver_year" -ge 19; then
+        provisions="$provisions dpdk19"
+    fi
 fi
 
 dnl add 'flow' if compiled with --enable-flow
