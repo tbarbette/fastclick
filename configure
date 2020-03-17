@@ -14365,6 +14365,9 @@ fi
 
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
+    if test "$rte_ver_year" -ge 19; then
+        provisions="$provisions dpdk19"
+    fi
 fi
 
 if test "x$enable_flow" = xyes; then
