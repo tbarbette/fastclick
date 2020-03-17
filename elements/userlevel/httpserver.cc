@@ -68,7 +68,7 @@ int HTTPServer::configure(Vector<String> &conf, ErrorHandler *errh) {
     for (String a : alias_map) {
         int s = a.find_left(':');
         if (s == -1)
-            return errh->error("Cannot find ':' in alias %s",a);
+            return errh->error("Cannot find ':' in alias %s",a.c_str());
         String path = a.substring(0,s);
         if (path[0] == '/')
             path = path.substring(1);
