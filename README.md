@@ -6,9 +6,9 @@ MiddleClick
 
 Compile MiddleClick with:
 ```
-./configure --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-g -O3" CXXFLAGS="-g -std=gnu++11 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --disable-dpdk-pool --disable-dpdk-packet --enable-flow --enable-ctx --enable-user-level-timestamp
+./configure --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-g -O3" CXXFLAGS="-g -std=gnu++11 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --disable-dpdk-pool --disable-dpdk-packet --enable-user-timestamp --enable-flow --enable-ctx
 ```
-Only the last two options are specific to MiddleClick, to enable the flow subsystem and the context subsystem. As MiddleClick use some timers, the --enable-user-level-timestamp option is a good idea too.
+Only the last 2 options are specific to MiddleClick, to enable the flow subsystem and the context subsystem. As MiddleClick use some timers, the --enable-user-timestamp option is a good idea too.
 
 ## Sample configurations
 
