@@ -37,23 +37,68 @@ class DPDKDevice;
 
 class RuleTiming {
     public:
-        RuleTiming(portid_t pt_id) : port_id(pt_id) {
-        }
-
-        ~RuleTiming() {
-        }
-
         portid_t port_id;       // The NIC to measure
         uint32_t rules_nb;      // Log the number of rules being installed/deleted
         float latency_ms;       // Measure rule installation/deletion latency (ms)
         float rules_per_sec;    // Measure rule installation/deletion rate (rules/sec)
         Timestamp start, end;
 
+        RuleTiming(portid_t pt_id) : port_id(pt_id) {
+        }
+
+        ~RuleTiming() {
+        }
+
         void update(const uint32_t &rules_nb) {
             this->rules_nb = rules_nb;
             this->latency_ms = (float) (end - start).usecval() / (float) 1000;
             this->rules_per_sec = (rules_nb > 0) ? (float) (rules_nb * 1000) / this->latency_ms : 0;
         }
+};
+
+class NicTableStats {
+    public:
+        NicTableStats(portid_t port_id)
+            : NicTableStats(port_id, UNKNOWN_CAPACITY, 0, 0, 0) {
+        }
+
+        NicTableStats(portid_t port_id, int32_t capacity, uint32_t rules_nb,
+            uint64_t pkts_looked_up, uint64_t pkts_matched) {
+            assert(port_id >= 0);
+            assert(pkts_looked_up >= pkts_matched);
+            // When no rules present, no hits present
+            if (rules_nb == 0) {
+                assert((pkts_looked_up == 0) && (pkts_matched == 0));
+            }
+            _port_id = port_id;
+            _capacity = capacity;
+            _rules_nb = rules_nb;
+            _pkts_looked_up = pkts_looked_up;
+            _pkts_matched = pkts_matched;
+        }
+
+        ~NicTableStats() {
+        }
+
+        inline void set_capacity(int32_t capacity) { _capacity = capacity; }
+        inline void set_rules_nb(uint32_t rules_nb) { _rules_nb = rules_nb; }
+        inline void set_pkts_looked_up(uint64_t pkts_looked_up) { _pkts_looked_up = pkts_looked_up; }
+        inline void set_pkts_matched(uint64_t pkts_matched) { _pkts_matched = pkts_matched; }
+
+        portid_t port_id() { return _port_id; }
+        int32_t  capacity() { return _capacity; }
+        uint32_t rules_nb() { return _rules_nb; }
+        uint64_t pkts_looked_up() { return _pkts_looked_up; }
+        uint64_t pkts_matched() { return _pkts_matched; }
+
+        static const int32_t UNKNOWN_CAPACITY = -1;
+
+    private:
+        portid_t _port_id;        // The NIC which owns this table
+        int32_t  _capacity;       // The capacity of the table (negative indicates unknown)
+        uint32_t _rules_nb;       // The number of rules being installed
+        uint64_t _pkts_looked_up; // The number of packets being looked up
+        uint64_t _pkts_matched;   // The number of packets being matched
 };
 
 class FlowCache {
@@ -290,6 +335,9 @@ class FlowDispatcher {
 
         // Query flow rule statistics
         String flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, int64_t &matched_bytes);
+
+        // Query flow table statistics
+        void flow_rule_table_stats(NicTableStats &table_stats);
 
         // Query aggregate flow rule statistics
         String flow_rule_aggregate_stats();

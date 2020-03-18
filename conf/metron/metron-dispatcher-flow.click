@@ -94,7 +94,7 @@ DriverManager(
 	print $(fd1.rules_aggr_stats),
 	print "",
 	print "Flushing rules...",
-	write metron.flush_nics,
+	write metron.rules_flush,
 	print "    Done!",
 	print "",
 	print "Minimum rule installation rate: "$(metron.rule_installation_rate_min fd0)" rules/sec",
