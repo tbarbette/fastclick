@@ -19,10 +19,17 @@ class TXQueueDevice;
 class QueueDevice : public BatchElement {
 
 public:
-
     QueueDevice() CLICK_COLD;
 
     static void static_initialize();
+
+    inline bool is_active() {
+        return _active;
+    }
+
+    inline void set_active(const bool &active) {
+        _active = active;
+    }
 
 private :
     /* Those two are only used during configurations. On runtime, the final
@@ -31,10 +38,9 @@ private :
     int _maxqueues;
     friend RXQueueDevice;
     friend TXQueueDevice;
+
 protected:
-
 	int _burst; //Max size of burst
-
 
     #define NO_LOCK 2
     /**

@@ -91,18 +91,18 @@ Integer. The maximum transfer unit of the device.
 =item MODE
 
 String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
-vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 17.05, flow_dir is also
+vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 17.05, flow is also
 supported.
 
 =item FLOW_RULES_FILE
 
-String. For DPDK version >= 17.05, if MODE is set to flow_dir, a path to
-a file with Flow Director rules can be supplied to the device.
-These rules are installed in the NIC using DPDK's flow API.
+String. For DPDK version >= 17.05, if MODE is set to flow, a path to
+a file with flow rules can be supplied to the device.
+These rules are installed in the NIC using DPDK's Flow API.
 
 =item FLOW_ISOLATE
 
-Boolean. Requires MODE flow_disp. Isolated mode guarantees that all ingress
+Boolean. Requires MODE flow. Isolated mode guarantees that all ingress
 traffic comes from defined flow rules only (current and future).
 If ingress traffic does not match any of the defined rules, it will be
 discarded by the NIC. Defaults to false.
