@@ -2077,6 +2077,48 @@ FlowDispatcher::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pk
 }
 
 /**
+ * Reports NIC's table statistics.
+ *
+ * @args table_stats: NIC's table statistics object to be filled
+ */
+void
+FlowDispatcher::flow_rule_table_stats(NicTableStats &table_stats)
+{
+    // Only active instances might have statistics
+    if (!active()) {
+        return;
+    }
+
+    struct rte_port *port = get_port(_port_id);
+    if (!port->flow_list || (flow_rules_count() == 0)) {
+        return;
+    }
+
+    uint32_t count = 0;
+    uint64_t tot_matched_pkts = 0;
+
+    // Traverse the list of installed flow rules
+    for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
+        uint32_t id = pf->id;
+
+        // Get currest state of the pacet and byte counters from the device
+        int64_t matched_pkts = 0;
+        int64_t matched_bytes = 0;
+        flow_rule_query(id, matched_pkts, matched_bytes);
+        tot_matched_pkts += (uint64_t) matched_pkts;
+
+        count++;
+    }
+
+    table_stats.set_rules_nb(count);
+    table_stats.set_pkts_looked_up(tot_matched_pkts);          // Not provided by DPDK
+    table_stats.set_pkts_matched(tot_matched_pkts);
+    table_stats.set_capacity(NicTableStats::UNKNOWN_CAPACITY); // Not provided by DPDK
+
+    return;
+}
+
+/**
  * Reports NIC's aggregate flow rule statistics.
  *
  * @return NIC's aggregate flow rule statistics as a string

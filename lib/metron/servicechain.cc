@@ -534,57 +534,25 @@ ClickSCManager::run_load_timer()
             int stat_idx = (j * _sc->get_nics_nb()) + i;
 
             String name = _sc->generate_configuration_slave_fd_name(i, cpu_id);
-//                long long useless = atoll(simple_call_read(name + ".useless").c_str());
-//                long long useful = atoll(simple_call_read(name + ".useful").c_str());
             long long count = atoll(simple_call_read(name + ".count").c_str());
-//                long long useless_diff = useless - sc->nic_stats[stat_idx].useless;
-//                long long useful_diff = useful - sc->nic_stats[stat_idx].useful;
-            long long count_diff = count - _sc->_nic_stats[stat_idx].count;
-//                sc->nic_stats[stat_idx].useless = useless;
-//                sc->nic_stats[stat_idx].useful = useful;
-            _sc->_nic_stats[stat_idx].count = count;
-//                long long count = atoll(simple_call_write(name + ".reset_load").c_str());
-//                if (useful_diff + useless_diff == 0) {
-//                    sc->nic_stats[stat_idx].load = 0;
-                // click_chatter(
-                //      "[SC %d] Load NIC %d CPU %d - %f: No data yet",
-                //      sn, i, j, sc->nic_stats[stat_idx].load
-                //  );
-//                    continue;
-//                }
-/*                double load = (double)useful_diff / (double)(useful_diff + useless_diff);
-            double alpha;
-            if (load > sc->nic_stats[stat_idx].load) {
-                alpha = alpha_up;
-            } else {
-                alpha = alpha_down;
-            }
-            sc->nic_stats[stat_idx].load = (sc->nic_stats[stat_idx].load * (1-alpha)) + ((alpha) * load);
-*/
-            //sc->nic_stats[stat_idx].load = simple_call_read(
-            // click_chatter(
-            //      "[SC %d] Load NIC %d CPU %d - %f %f - diff usefull %lld useless %lld",
-            //      sn, i, j, load, sc->nic_stats[stat_idx].load, useful_diff, useless_diff
-            //  );
+            long long count_diff = count - _sc->_nic_stats[stat_idx].get_count();
+            _sc->_nic_stats[stat_idx].set_count(count);
 
-           /* if (sc->nic_stats[stat_idx].load > cpu_load) {
-                cpu_load = sc->nic_stats[stat_idx].load;
-            }*/
             throughput += atoll(simple_call_read("monitoring_th_" + is + "_" + js + ".link_rate").c_str());
-            assert(_sc->get_cpu_info(j).assigned());
+            assert(_sc->get_cpu_info(j).is_assigned());
             float ncpuqueue = (float)atoi(simple_call_read(name + ".queue_count "+String(nic->phys_cpu_to_queue(_sc->get_cpu_phys_id(j)))).c_str()) / (float)(atoi(nic->call_tx_read("nb_rx_desc").c_str()));
             if (ncpuqueue > cpu_queue) {
                 cpu_queue = ncpuqueue;
             }
         }
         cpu_load = atof(load[j].c_str());
-        _sc->_cpus[j].load = cpu_load;
-        _sc->_cpus[j].max_nic_queue = cpu_queue;
+        _sc->_cpus[j].set_load(cpu_load);
+        _sc->_cpus[j].set_max_nic_queue(cpu_queue);
         if (metron()->_monitoring_mode) {
-            _sc->_cpus[j].latency.avg_throughput = throughput;
-            _sc->_cpus[j].latency.min_latency = atoll(min[j].c_str());
-            _sc->_cpus[j].latency.max_latency = atoll(max[j].c_str());
-            _sc->_cpus[j].latency.average_latency = atoll(avg[j].c_str());
+            _sc->_cpus[j].get_latency().set_avg_throughput(throughput);
+            _sc->_cpus[j].get_latency().set_min_latency(atoll(min[j].c_str()));
+            _sc->_cpus[j].get_latency().set_avg_latency(atoll(avg[j].c_str()));
+            _sc->_cpus[j].get_latency().set_max_latency(atoll(max[j].c_str()));
         }
         total_cpu_load += cpu_load;
         if (cpu_load > max_cpu_load) {
@@ -645,7 +613,6 @@ StandaloneSCManager::fix_rule(NIC *nic, String rule)
         rule = "flow create " + String(nic->get_port_id()) + " transfer " + rule;
         int pos = rule.find_left("queue index ");
         String qid = rule.substring(pos + 12);
-        //click_chatter("qid %s", qid.c_str());
         int queue = atoi(qid.substring(0, qid.find_left(' ')).c_str());
 #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         char porthex[6];
@@ -737,7 +704,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
     Bitvector cpu;
     cpu.resize(click_max_cpu_ids());
     for (unsigned j = 0; j < sc->get_max_cpu_nb(); j++) {
-        assert(sc->get_cpu_info(j).assigned());
+        assert(sc->get_cpu_info(j).is_assigned());
         cpu[sc->get_cpu_phys_id(j)] = true;
     }
 
@@ -808,13 +775,13 @@ StandaloneSCManager::run_load_timer()
             String is = String(i);
             NIC *nic = _sc->get_nic_by_index(i);
             assert(nic);
-            assert(_sc->get_cpu_info(j).assigned());
+            assert(_sc->get_cpu_info(j).is_assigned());
         }
 
         cpu_load = load[cpu_id];
         // click_chatter("Load %d %f", cpu_id, cpu_load);
 
-        _sc->_cpus[j].load = cpu_load;
+        _sc->_cpus[j].set_load(cpu_load);
         if (cpu_load > max_cpu_load) {
            max_cpu_load = cpu_load;
            max_cpu_load_index = j;

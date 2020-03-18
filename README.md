@@ -32,7 +32,7 @@ The [Metron controller][metron-ctrl] is released as an ONOS application.
 Metron Protocol
 ----
 Metron agents are managed by the Metron controller via a REST-based protocol.
-The management operations include resource advertisement, monitoring, service chain deployment, service chain reconfiguration (i.e., for load balancing), service chain removal, as well as NIC rule management operations (i.e., NIC rule installation, reporting, and deletion).
+The management operations include system resource advertisement & monitoring (i.e., CPUs, CPU caches, main memory, and NICs), service chain deployment, service chain reconfiguration (i.e., for load balancing), service chain removal, as well as NIC management operations (i.e., NIC rule installation/reporting/deletion, NIC port and queue management, etc).
 The protocol that prescribes this communication between the Metron controller and Metron agents is detailed in [this][metron-tutorial] tutorial.
 
 
