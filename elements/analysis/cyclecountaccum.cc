@@ -45,6 +45,7 @@ CycleCountAccum::simple_action(Packet *p)
     return p;
 }
 
+#if HAVE_BATCH
 inline PacketBatch*
 CycleCountAccum::simple_action_batch(PacketBatch *batch)
 {
@@ -67,6 +68,7 @@ CycleCountAccum::simple_action_batch(PacketBatch *batch)
     s.accum += accum / count;
     return batch;
 }
+#endif
 
 String
 CycleCountAccum::read_handler(Element *e, void *thunk)
