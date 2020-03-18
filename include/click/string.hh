@@ -39,6 +39,8 @@ class String { public:
     typedef intmax_t int_large_t;
     typedef uintmax_t uint_large_t;
 
+    static const int npos = -1;
+
     inline String();
     inline String(const String& x);
 #if HAVE_CXX_RVALUE_REFERENCES
@@ -107,6 +109,9 @@ class String { public:
     String trim_space_left() const;
     String replace(char from, char to) const;
     String replace(String from, String to) const;
+    String &erase(int start = 0, int len = npos);
+    inline void pop_back();
+    inline void clear();
 
     inline bool equals(const String &x) const;
     inline bool equals(const char *s, int len) const;
@@ -128,15 +133,23 @@ class String { public:
     // bool operator>(const String &, const String &);
     // bool operator>=(const String &, const String &);
     Vector<String> split(char c) const;
+    Vector<String> split(const String &delim) const;
 
     int find_left(char c, int start = 0) const;
     int find_left(const String &x, int start = 0) const;
-    int find_right(char c, int start = 0x7FFFFFFF) const;
+    int find_right(char c, int start = npos) const;
+    int find_first_of(const char *delim, int pos = 0) const;
+    int find_first_of(const String &delim, int pos = 0) const;
+    int find_first_not_of(const char *delim, int pos = 0) const;
+    int find_first_not_of(const String &delim, int pos = 0) const;
+    int find_last_of(const char delim, int pos = npos) const;
+    int find_last_not_of(const char *delim, int pos = npos) const;
 
     const char* search(String pattern);
 
     String lower() const;
     String upper() const;
+    String camel() const;
     String printable() const;
     String quoted_hex() const;
     String encode_json() const;
@@ -762,6 +775,18 @@ inline char *String::append_garbage(int len) {
     return append_uninitialized(len);
 }
 /** @endcond never */
+
+/** @brief Pop the last character of this string. */
+inline void String::pop_back() {
+    erase(length() - 1, 1);
+    return;
+}
+
+/** @brief Erases the contents of the string, which becomes an empty string. */
+inline void String::clear() {
+    erase();
+    return;
+}
 
 /** @brief Append @a x to this string.
     @return *this */
