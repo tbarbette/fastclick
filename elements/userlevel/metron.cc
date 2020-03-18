@@ -431,18 +431,19 @@ CPUStats::print()
 /**
  * CPU constructor.
  */
-CPU::CPU(int phy_id, int log_id, int socket,
-        String vendor, long frequency) : _stats()
+CPU::CPU(CpuVendor vendor, int phy_id, int log_id,
+         int socket, long frequency) : _stats()
 {
+    assert(vendor != UNKNOWN_VENDOR);
     assert(phy_id >= 0);
     assert(log_id >= 0);
     assert(socket >= 0);
-    assert((vendor) && (!vendor.empty()));
     assert(frequency > 0);
+
+    _vendor = vendor;
     _physical_id = phy_id;
     _logical_id = log_id;
     _socket = socket;
-    _vendor = vendor;
     _frequency = frequency;
 }
 
@@ -459,10 +460,10 @@ void
 CPU::print()
 {
     click_chatter("\n");
+    click_chatter("         CPU  Vendor: %s", cpu_vendor_enum_to_str(get_vendor()).c_str());
     click_chatter("Physical CPU core ID: %d", _physical_id);
     click_chatter(" Logical CPU core ID: %d", _logical_id);
     click_chatter("       CPU Socket ID: %d", _socket);
-    click_chatter("       CPU    Vendor: %s", _vendor.c_str());
     click_chatter("       CPU Frequency: %ld MHz", _frequency);
 
     _stats.print();
@@ -479,7 +480,7 @@ CPU::to_json()
     cpu.set("physicalId", get_physical_id());
     cpu.set("logicalId", get_logical_id());
     cpu.set("socket", get_socket());
-    cpu.set("vendor", get_vendor());
+    cpu.set("vendor", cpu_vendor_enum_to_str(get_vendor()));
     cpu.set("frequency", get_frequency());
 
     return cpu;
@@ -1459,21 +1460,21 @@ NIC::call_rx_write(String h, const String input)
  * CPULayout constructor.
  */
 CPULayout::CPULayout(int sockets_nb, int cores_nb, int active_cores_nb,
-                    String vendor, long frequency, String numa_nodes) :
+                    String vendor_str, long frequency, String numa_nodes) :
     _lcore_to_phy_core(), _lcore_to_socket()
 {
     assert(sockets_nb >= 0);
     assert(cores_nb >= 0);
     assert(cores_nb % sockets_nb == 0);
     assert((active_cores_nb >= 0) && (active_cores_nb <= cores_nb));
-    assert((vendor) && (!vendor.empty()));
+    assert((vendor_str) && (!vendor_str.empty()));
     assert(frequency > 0);
     assert((numa_nodes) && (!numa_nodes.empty()));
     _sockets_nb = sockets_nb;
     _cores_nb = cores_nb;
     _cores_per_socket = _cores_nb / _sockets_nb;
     _active_cores_nb = active_cores_nb;
-    _vendor = vendor;
+    _vendor = cpu_vendor_str_to_enum(vendor_str);
     _frequency = frequency;
     _numa_nodes = numa_nodes;
     _cpus.resize(cores_nb, 0);
@@ -1528,7 +1529,7 @@ CPULayout::compose()
 
     for (int i = 0; i < _cores_nb; i++) {
         _cpus[i] = new CPU(
-            get_phy_core_by_lcore(i), i, get_socket_by_lcore(i), _vendor, _frequency
+            _vendor, get_phy_core_by_lcore(i), i, get_socket_by_lcore(i), _frequency
         );
     }
 }
@@ -1577,6 +1578,12 @@ SystemResources::SystemResources(
  */
 SystemResources::~SystemResources()
 {}
+
+String
+SystemResources::get_cpu_vendor()
+{
+    return cpu_vendor_enum_to_str(_cpu_layout.get_cpu_core(0)->get_vendor());
+}
 
 /**
  * Print the system's resources.
@@ -1706,9 +1713,9 @@ Metron::collect_system_resources()
         }
     }
 
-    // if (_verbose) {
+    if (_verbose) {
         _sys_res->print();
-    // }
+    }
 }
 
 /**

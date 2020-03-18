@@ -120,7 +120,7 @@ StringTest::initialize(ErrorHandler *errh)
     CHECK(String("HELLO;YOU").erase(9, 1) == "HELLO;YOU");
     CHECK(String("HELLO;YOU").erase(String::npos, 3) == "HELLO;YOU");
     CHECK(String("HELLO;YOU").erase() == empty);               // Defaults to the whole string
-    String s("HELLO;YOU");
+    s = "HELLO;YOU";
     String s1("I;AM;FINE;DUDE");
     s = s.erase();
     CHECK(s == empty);

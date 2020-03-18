@@ -599,13 +599,13 @@ class CPUStats {
 
 class CPU {
     public:
-        CPU(int phy_id, int log_id, int socket, String vendor, long frequency);
+        CPU(CpuVendor vendor, int phy_id, int log_id, int socket, long frequency);
         ~CPU();
 
+        inline CpuVendor get_vendor() { return _vendor; };
         inline int get_physical_id() { return _physical_id; };
         inline int get_logical_id() {return _logical_id; };
         inline int get_socket() { return _socket; };
-        inline String get_vendor() { return _vendor; };
         inline long get_frequency() { return _frequency; };
         inline CPUStats &get_stats() { return _stats; };
 
@@ -618,10 +618,10 @@ class CPU {
         static const int MAX_CPU_CORE_NB = 512;
 
     private:
+        CpuVendor _vendor;       // CPU vendor
         int _physical_id;        // Physical core ID
         int _logical_id;         // Logical core ID
         int _socket;             // CPU socket ID
-        String _vendor;          // CPU vendor
         long _frequency;         // Clock frequency in MHz
         CPUStats _stats;         // Run-time CPU statistics
 };
@@ -875,7 +875,7 @@ class CPULayout {
         int _cores_nb;
         int _cores_per_socket;
         int _active_cores_nb;
-        String _vendor;
+        CpuVendor _vendor;
         long _frequency;
         String _numa_nodes;
 
@@ -903,7 +903,7 @@ class SystemResources {
 
         // Relay methods
         inline int get_cpu_sockets() { return _cpu_layout.get_sockets_nb(); };
-        inline String get_cpu_vendor() { return _cpu_layout.get_cpu_core(0)->get_vendor(); };
+        String get_cpu_vendor();
         inline String get_hw_info() { return _plat_info.get_hw_info(); };
         inline String get_sw_info() { return _plat_info.get_sw_info(); };
         inline String get_serial_number() { return _plat_info.get_serial_number(); };
