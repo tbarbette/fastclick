@@ -484,7 +484,7 @@ else
 endif
 
 ############################################################
-## Flow director library available at or after DPDK v17.05
+## Flow API library available at or after DPDK v17.05
 ############################################################
 ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -ge 17 ] && [ $(RTE_VER_MONTH) -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && [ -n $(HAVE_FLOW_API) ] && echo true),true)
 
