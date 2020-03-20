@@ -7,7 +7,12 @@ About
 ----
 Metron's [control plane][metron-ctrl] is based on the [ONOS SDN controller][onos], which we extended with [southbound drivers][metron-driver] that allow Metron to monitor and configure important resources (i.e., CPU cores and network cards) on commodity servers.
 
-Metron's data plane is based on a multi-threaded agent which conforms to the master-slave model.
+Metron's data plane is based on a multi-threaded agent which conforms to the master-slave model, as shown in the figure below.
+
+<p align="center"> 
+    <img src="img/metron-agent-arch.png" alt="metron agent's architecture">
+</p>
+
 The master (main thread) implements a REST-based protocol that allows the data plane to communicate its resources to the Metron controller. Apart from monitoring, the controller may also instruct the agent to perform service chain deployment operations. Such operations are realized as slave processes associated with NIC Rx/Tx queues and designated CPU cores.
 The Metron data plane uses two features available in modern network interface cards (NICs) to achieve accurate dispatching of input traffic to the desired CPU core(s), thus eliminating inter-core communication.
 Specifically, the Metron data plane uses either:
