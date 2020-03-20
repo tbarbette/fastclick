@@ -170,7 +170,7 @@ template <typename T> class MPMCDynamicRing {
     rte_ring* _ring;
     public:
     MPMCDynamicRing() : _ring(0) {
-        static_assert(std::is_pointer<T>());
+        static_assert(std::is_pointer<T>(), "MPMCDynamicRing can only be used with pointers");
     }
 
     inline void initialize(int size, const char* name, int flags = 0) {
