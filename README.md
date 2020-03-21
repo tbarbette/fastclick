@@ -9,7 +9,7 @@ Metron's [control plane][metron-ctrl] is based on the [ONOS SDN controller][onos
 
 Metron's data plane is based on a multi-threaded agent which conforms to the master-slave model, as shown in the figure below.
 
-<p align="center"> 
+<p align="center">
     <img src="img/metron-agent-arch.png" alt="metron agent's architecture">
 </p>
 
@@ -120,7 +120,7 @@ The FastClick README is available [here][fastclick-readme], while the original C
 [metron-paper]: https://www.usenix.org/system/files/conference/nsdi18/nsdi18-katsikas.pdf
 [metron-nsdi-page]: https://www.usenix.org/conference/nsdi18/presentation/katsikas
 [onos]: https://onosproject.org/
-[metron-ctrl]: https://github.com/gkatsikas/onos/tree/metron-ctrl-1.15.0
+[metron-ctrl]: https://github.com/gkatsikas/onos/tree/metron-ctrl/apps/metron
 [metron-driver]: https://github.com/opennetworkinglab/onos/tree/master/drivers/server
 [metron-tutorial]: https://wiki.onosproject.org/display/ONOS/Server+Device+Driver+Tutorial
 [fastclick]: https://github.com/tbarbette/fastclick
