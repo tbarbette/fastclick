@@ -220,6 +220,7 @@ int FlowDPDKManager::initialize(ErrorHandler *errh) {
 
     if (_initialize_timers(errh) != 0)
         return -1;
+    return 0;
 }
 
 void FlowDPDKManager::push_batch(int port, PacketBatch* batch) {

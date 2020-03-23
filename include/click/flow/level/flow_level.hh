@@ -220,7 +220,7 @@ public:
     inline FlowNodeData get_data_dummy(Packet* packet) {
 /*        click_chatter("FlowLevelDummy should be stripped !");
         abort();*/
-        //Return garbage on purpose
+        return FlowNodeData();
     }
 
     String print() {

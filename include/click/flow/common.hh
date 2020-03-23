@@ -198,7 +198,7 @@ private:
 			return use_count;
 		}
 
-        inline int reset_count(int n) {
+        inline void reset_count(int n) {
 			use_count = n;
 		}
 #else
