@@ -1,9 +1,12 @@
+//Ports
 define($MAC1 98:03:9b:33:fe:e2)
 define($MAC2 98:03:9b:33:fe:db)
 define($NET1 10.220.0.0/16)
 define($NET2 10.221.0.0/16)
 define($IP1 10.220.0.1)
 define($IP2 10.221.0.1)
+define($PORT1 0)
+define($PORT2 1)
 
 //Parameters
 define($rxverbose 99)
@@ -82,8 +85,8 @@ elementclass Receiver { $port, $mac, $ip, $range |
     -> t :: ToDPDKDevice($port,BLOCKING true,BURST $bout, ALLOC true, VERBOSE $txverbose, TCO true)
 }
 
-r1 :: Receiver(0000:03:00.0,$MAC1,$IP1,$IP1);
-r2 :: Receiver(0000:82:00.1,$MAC2,$IP2,$IP2);
+r1 :: Receiver($PORT1,$MAC1,$IP1,$IP1);
+r2 :: Receiver($PORT2,$MAC2,$IP2,$IP2);
 //Idle -> host :: Null;
 
 r1
