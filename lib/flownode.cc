@@ -708,8 +708,8 @@ FlowNodeHash<capacity_n>::~FlowNodeHash() {
                 childs[i].node = 0;
             }
         }
-        static_assert(capacity() < INT_MAX / 2);
-        static_assert(step() < capacity() / 2);
+        static_assert(capacity() < INT_MAX / 2, "Capacity must be smaller than INT_MAX/2");
+        static_assert(step() < capacity() / 2, "The hash steps must be smaller than the capacity/2 ");
 }
 
 
