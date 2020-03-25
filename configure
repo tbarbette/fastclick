@@ -867,6 +867,7 @@ enable_dynamic_linking
 enable_stats
 enable_stride
 enable_task_heap
+enable_cpu_load
 enable_task_stats
 enable_dmalloc
 enable_hash_iterator_epochs
@@ -1590,6 +1591,8 @@ Optional Features:
   --enable-stats[=LEVEL]  enable statistics collection
   --disable-stride        disable stride scheduler
   --enable-task-heap      use heap for task list
+  --enable-cpu-load       Keep track of CPU usage using an approximation.
+                          Useful when using polling keeping the CPU at 100%
   --enable-task-stats     Keep track of task statistics, used for automatic
                           balancing of tasks among threads
   --enable-dmalloc        enable debugging malloc
@@ -11072,6 +11075,18 @@ Ignoring --enable-task-heap, which is incompatible with --disable-stride.
 =========================================" >&2;}
 fi
 
+
+# Check whether --enable-cpu-load was given.
+if test "${enable_cpu_load+set}" = set; then :
+  enableval=$enable_cpu_load; :
+else
+  enable_cpu_load=no
+fi
+
+if test "x$enable_cpu_load" = xyes; then
+    $as_echo "#define HAVE_CLICK_LOAD 1" >>confdefs.h
+
+fi
 
 # Check whether --enable-task-stats was given.
 if test "${enable_task_stats+set}" = set; then :
