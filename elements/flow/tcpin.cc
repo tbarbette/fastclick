@@ -886,7 +886,7 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
         outElement->sendClosingPacket(fcb_in->common->maintainers[getFlowDirection()],
                 saddr, daddr, sport, dport, graceful);
     } else {
-        //Send FIN or RST to other side
+        //Send RST to other side
 
         // Get the information needed to ack the given packet
         uint32_t saddr = getDestinationAddress(packet);
@@ -894,10 +894,12 @@ void TCPIn::closeConnection(Packet *packet, bool graceful)
         uint16_t sport = getDestinationPort(packet);
         uint16_t dport = getSourcePort(packet);
 
-        // Craft and send the ack
-        outElement->sendClosingPacket(fcb_in->common->maintainers[getOppositeFlowDirection()],
+        // Craft and send the RST
+        outElement->sendClosingPacket(fcb_in->common->maintainers[getFlowDirection()],
+                daddr, saddr, dport, sport, graceful);
+        // Craft and send the RST
+        returnElement->outElement->sendClosingPacket(fcb_in->common->maintainers[getOppositeFlowDirection()],
                 saddr, daddr, sport, dport, graceful);
-
         click_chatter("Ungracefull close, releasing FCB state");
         releaseFCBState();
     }
