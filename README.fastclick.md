@@ -1,114 +1,39 @@
 FastClick
 =========
 This is an extended version of the Click Modular Router featuring an
-improved Netmap support and a new DPDK support. It is the result of
-our ANCS paper available at http://hdl.handle.net/2268/181954 .
+improved Netmap support and a new DPDK support. It was the result of
+our ANCS paper available at http://hdl.handle.net/2268/181954, but received
+multiple contributions and improvements since then.
 
-Partial DPDK support is now reverted into vanilla Click (without support for 
-batching, auto-thread assignment, thread vector, ...).
+The [Wiki](https://github.com/tbarbette/fastclick/wiki) provides documentation about the elements and how to use some FastClick features
+such as batching.
 
-Netmap
-------
-Be sure to install Netmap on your system then configure with :
-```bash
-./configure --with-netmap --enable-netmap-pool --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=gnu++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-zerocopy --enable-batch
+Quick start for DPDK
+--------------------
+
+ * Install DPDK's dependencies (sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev)
+ * Install DPDK (http://core.dpdk.org/doc/quick-start/), but add O=x86_64-native-linuxapp-gcc at the end of "make config T=x86_64-native-linuxapp-gcc" to allow DPDK to be linked against external apps. This is not needed if you used the DPDK menu, or meson. Do not forget to set up a few hugepages, and mount them, as explained in the guide.
+ * Export RTE\_SDK (path to your checked-out DPDK) and RTE\_TARGET (probably x86_64-native-linuxapp-gcc if you followed the tutorial)
+ * Build FastClick, with support for DPDK using the following command:
+
 ```
-to get the better performances.
-
-An example configuration is :
-```
-FromNetmapDevice(netmap:eth0) -> CheckIPHeader() -> ToNetmapDevice(netmap:eth1)
-```
-
-To run click, do :
-```bash
-sudo bin/click -j 4 -a /path/to/config/file.click
-```
-Where 4 is the number of threads to use. The FromNetmapDevice will share the assigned cores themselves, do not pin the thread.
-
-We noted that Netmap performs better without MQ, or at least with a minimal amount of queues :
-ethtool -L eth% combined 1
-will set the number of Netmap queues to 1. No need to pin the IRQ of the queues as our FastClick implementation will
-take care of it. Just kill irqbalance.
-
-Also, be sure to read the sections of our paper about full push to make the faster configuration.
-
-The `--enable-netmap-pool` option allows to use Netmap buffers instead of Click malloc'ed buffers. This enhance performance as there is only one kind of buffer floating into Click. However with this option you need to place at least one From/ToNetmapDevice in your configuration and allocate enough Netmap buffers using NetmapInfo.
-
-DPDK
-----
-Setup your DPDK environment (version 1.6 to 17.05 are supported), then configure with :
-```bash
-./configure --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CFLAGS="-g -O3" CXXFLAGS="-g -std=gnu++11 -O3" --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-dpdk --enable-batch --with-netmap=no --enable-zerocopy --enable-dpdk-pool --disable-dpdk-packet
-```
-to get the better performances.
-
-An example configuration is :
-```
-FromDPDKDevice(0) -> CheckIPHeader(OFFSET 14) -> ToDPDKDevice(1)
+./configure --enable-dpdk --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
 ```
 
-To run click with DPDK, you can add the usual EAL parameters :
-```bash
-sudo bin/click --dpdk -c 0xf -n 4 -- /path/to/config/file.click
-```
-where 4 is the number of memory channel and 0xf the core mask.
+Contribution
+------------
+FastClick also aims at keeping a more up-to-date fork and welcomes
+contributions from anyone.
 
-DPDK only supports full push mode.
-
-As for Netmap `--enable-dpdk-pool` option allows to use only DPDK buffers instead of Click malloc'ed buffers.
-The `--enable-dpdk-packet` option allows to use DPDK packet handling mechanism instead of of Click's Packet object. All Packet function will be changed by wrappers around DPDK's rte\_pktmbuf functions. However this feature while reducing memory footprint do not enhance the performances as Packets objects are recyced in LIFO and stays in cache while every new access to metadata inside the rte\_mbuf produce a cache miss.
+Regular contributors will be given direct access to the repository.
+The general rule of thumb to accept a pull request is to involve
+two different entities. I.e. someone for company A make a PR and
+someone from another company/research unit merges it.
 
 Examples
 --------
 See conf/fastclick/README.md
-
-How to make an element batch-compatible
----------------------------------------
-FastClick is backward compatible with all vanilla element, and it should work 
-out of the box with your own library. However Click may un-batch and re-batch
-packets along the path. This is not an issue for most slow path elements such 
-as ICMP erros elements, where the development cost is not worth it. However, 
-you probably want to have only batch-compatible elements in your fast path as 
-this will be really faster.
-
-Batch-compatible element should extend the BatchElement instead of the Element 
-class. They also have to implement 
-a version of push receiving a PacketBatch\* argument instead of Packet\* called 
-push\_batch. 
-
-The reason why batch element must provide a good old push fonction is that
-it may be not worth it to rebuild a batch before your element, and then 
-unbatch-it because your element is betweem two vanilla elements. In this case
-the push version of your element will be used.
-
-To let click compile with `--disable-batch`, always enclose push\_batch prototype
-and implementation around #if HAVE\_BATCH .. #endif
-
-If your element must use batching, if only push\_batch is implemented or 
-your element always produces batches no matter the input, you
-will want to set batch\_mode=BATCH\_MODE\_YES in the constructor, to let know 
-the backward-compatibility manager that subsequent elements will receive 
-batches, and previous element must send batch or let the backward compatibility 
-manager rebuild a batch before passing it to your element. The default is 
-BATCH\_MODE\_IFPOSSIBLE, telling that it should run in batch mode if it can, and 
-vanilla element are fixed to BATCH\_MODE\_NO.
-
-If you provide `--enable-auto-batch`, the vanilla Elements will be set in mode 
-BATCH\_MODE\_IFPOSSIBLE, with a special push\_batch function which will simply
-call push() for each packets. However the push ports of the elements will
-rebuild batches instead of letting them go through.
-
-Without auto-batch, the batches will be un-batched before a vanilla Element and
-re-batched when hitting the next BatchElement. It is referenced as the "jump"
-mode as the batch "jump over" the vanilla Element. This is the behaviour
-described in the ANCS paper and still the default mode.
-
-Continuous integration and `make check`
----------------------------------------
-To ensure people not familiar with batching get warned about bad configuration including non-batch compatible element, some messages are printed to inform a potential slower configuration. However testies (used by `make check`) does not cope well with those message to stdout. To disable them and allow make check to run, you must pass `--disable-verbose-batch` to configure.
-
-This repository uses Travis CI for CI tests which run make check under various configure options combinations. We also have a Gitlab CI for internal tests.
+The wiki provides more information about the [I/O frameworks you should use for high speed](https://github.com/tbarbette/fastclick/wiki/High-speed-I-O), such as DPDK and Netmap, and how to configure them.
 
 Differences with the ANCS paper
 -------------------------------
@@ -136,7 +61,7 @@ force us to fetch a new cacheline.
 Getting help
 ------------
 Use the github issue tracker (https://github.com/tbarbette/fastclick/issues) or
-contact tom.barbette at ulg.ac.be if you encounter any problem.
+contact barbette at kth.se if you encounter any problem.
 
 Please do not ask FastClick-related problems on the vanilla Click mailing list.
 If you are sure that your problem is Click related, post it on vanilla Click's
