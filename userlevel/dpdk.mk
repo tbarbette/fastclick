@@ -497,7 +497,8 @@ ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -eq 17 ] ) ) && ec
 	sed -i '122i uint8_t txring_numa[RTE_MAX_ETHPORTS];' $(PARSE_PATH)/testpmd.c
 endif
 # Between DPDK 18.08 and 19.08 these structs need to be declared as external in testpmd.h. DPDK 19.11 solves this issue :)
-ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -eq 08 ] ) || ( [ $(RTE_VER_YEAR) -eq 19 ] && [ $(RTE_VER_MONTH) -le 08 ] ) ) && echo true),true)
+ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -ge 08 ] ) || ( [ $(RTE_VER_YEAR) -eq 19 ] && [ $(RTE_VER_MONTH) -le 08 ] ) ) && echo true),true)
+	$(info "needed")
 	sed -i 's/struct\snvgre_encap_conf\snvgre_encap_conf;/extern struct nvgre_encap_conf nvgre_encap_conf;/g' $(PARSE_PATH)/testpmd.h
 	sed -i 's/struct\svxlan_encap_conf\svxlan_encap_conf;/extern struct vxlan_encap_conf vxlan_encap_conf;/g' $(PARSE_PATH)/testpmd.h
 endif
