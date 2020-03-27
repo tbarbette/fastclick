@@ -4,8 +4,11 @@
  * We have no load balancer in this configuration (though that is supported) so client must query
  * the address of the server on the 10.221/16 network. If the gateway of the clients is set correctly
  * (eg ip route add 10.221.0.0/16 via 10.220.0.1), the ARP resolution will lead to the packets being sent to
- * the LB. Perhaps the easisest to understand is to look in mininet/topology.py, and check the Mininet
+ * MiddleClick. Perhaps the easisest to understand is to look in mininet/topology.py, and check the Mininet
  * network.
+ *
+ * Performance advices : If suported, allow hardware offloading of the traffic
+ * classes by uncomenting line 87 (FlowDPDKManager)
  **/
 define($MAC1 98:03:9b:33:fe:e2) //Mac address of the port facing clients
 define($MAC2 98:03:9b:33:fe:db) //Mac address of the port facing servers
@@ -43,9 +46,9 @@ define($ignore 0)
 //Debug parameters
 define($rxverbose 99)
 define($txverbose 99)
+define($classverbose 1)
 define($printarp 0)
 define($printunknown 0)
-
 
 
 //TSCClock allows fast user-level timing
@@ -83,7 +86,8 @@ elementclass Receiver { $port, $mac, $ip, $range |
     -> etherOUT :: Null
 
     f :: FromDPDKDevice($port, VERBOSE $rxverbose, PROMISC false, RSS_AGGREGATE 1, THREADOFFSET 0, MAXTHREADS 1)
-    -> fc :: FlowManager(BUILDER 1, AGGCACHE false, CACHESIZE 65536, VERBOSE 1, EARLYDROP true)
+//  -> fc :: FlowManager(BUILDER 1, AGGCACHE false, CACHESIZE 65536, VERBOSE $classverbose, EARLYDROP true)
+    -> fc :: FlowDPDKBuilderManager(BUILDER 1, AGGCACHE false, CACHESIZE 65536, VERBOSE $classverbose, EARLYDROP true, DEVICE f)
     -> arpr :: ARPDispatcher()
 
     arpr[0]

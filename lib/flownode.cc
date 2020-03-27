@@ -906,6 +906,8 @@ rte_flow_item* find_layer(Vector<rte_flow_item> &pattern, enum rte_flow_item_typ
     return 0;
 }
 int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_layer, int last_offset, rte_flow_item_type &next_layer, int &next_layer_offset, Vector<rte_flow_item> &pattern, bool is_default) {
+        bool endian = 1;
+        bool implicit_type = 1;
         rte_flow_item pat;
                         pat.spec = 0;
                         pat.mask = 0;
@@ -924,16 +926,21 @@ int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_lay
                     pat.mask = 0;
                     click_chatter("Default ethertype");
                 } else {
-                    eth->type = data.data_16;
+
+                    eth->type = htons(data.data_16);
                     mask->type = -1;
                     click_chatter("Ether Type %d", data.data_16);
                     pat.spec = eth;
                     pat.mask = mask;
                     pat.last = 0;
-                    if (eth->type == 0x0008) {
+                    if (data.data_16 == 0x0008) {
+                        if (implicit_type) {
+                            pat.mask = 0;
+                            pat.spec = 0;
+                        }
                         next_layer = RTE_FLOW_ITEM_TYPE_IPV4;
                         next_layer_offset = 14;
-                    } else if (eth->type == 0x0608) {
+                    } else if (data.data_16 == 0x0608) {
                         next_layer = RTE_FLOW_ITEM_TYPE_ARP_ETH_IPV4;
                         next_layer_offset = 14;
                     } else {
@@ -986,6 +993,10 @@ int FlowLevelOffset::to_dpdk_flow(FlowNodeData data, rte_flow_item_type last_lay
                         next_layer_offset = -1;
                     }
                     if (addm) {
+                        if (implicit_type) {
+                            pat.mask = 0;
+                            pat.spec = 0;
+                        }
                         rte_flow_item patd;
                         patd.type = next_layer;
                         patd.spec = 0;

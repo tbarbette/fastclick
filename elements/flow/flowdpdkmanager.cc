@@ -43,6 +43,7 @@ FlowDPDKManager::cast(const char *n)
 	return Element::cast(n);
 }
 
+#define RSS_HASH_KEY_LENGTH 64
 
 
 void FlowDPDKManager::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
@@ -51,6 +52,7 @@ void FlowDPDKManager::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
         return;
     }
     _matches.push_back(ptr);
+    bool support_queue = 0;
 
     int port_id = _dev->port_id();
 
@@ -71,6 +73,7 @@ void FlowDPDKManager::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
     struct rte_flow_action action[3];
     struct rte_flow_action_mark mark;
     struct rte_flow_action_rss rss;
+    struct rte_flow_action_queue queue;
 
     memset(action, 0, sizeof(action));
     memset(&rss, 0, sizeof(rss));
@@ -83,31 +86,30 @@ void FlowDPDKManager::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
         mark.id = _matches.size();
         action[0].conf = &mark;
 
-        if (!is_ip) {
-            struct rte_flow_action_queue queue;
+        if (!is_ip && support_queue) {
             action[1].type = RTE_FLOW_ACTION_TYPE_QUEUE;
             queue.index = 0;
             action[1].conf = &queue;
         } else {
             action[1].type = RTE_FLOW_ACTION_TYPE_RSS;
-            uint16_t queue[RTE_MAX_QUEUES_PER_PORT];
+            uint16_t rss_queue[RTE_MAX_QUEUES_PER_PORT];
             auto threads = get_passing_threads();
             int id = 0;
             for (int i = 0; i < threads.size(); i++) {
                 if (!threads[i])
                     continue;
-                queue[id++] = id;
+                rss_queue[id++] = id;
             }
-            uint8_t rss_key[40];
+            uint8_t rss_key[RSS_HASH_KEY_LENGTH];
             struct rte_eth_rss_conf rss_conf;
             rss_conf.rss_key = rss_key;
-            rss_conf.rss_key_len = 40;
+            rss_conf.rss_key_len = RSS_HASH_KEY_LENGTH;
             rte_eth_dev_rss_hash_conf_get(port_id, &rss_conf);
             rss.types = rss_conf.rss_hf;
             rss.key_len = rss_conf.rss_key_len;
             rss.queue_num = id;
             rss.key = rss_key;
-            rss.queue = queue;
+            rss.queue = rss_queue;
             rss.level = 0;
             rss.func = RTE_ETH_HASH_FUNCTION_DEFAULT;
             action[1].conf = &rss;
@@ -124,7 +126,7 @@ void FlowDPDKManager::add_rule(Vector<rte_flow_item> pattern, FlowNodePtr ptr) {
     struct rte_flow_error error;
     int res;
     res = rte_flow_validate(port_id, &attr, pattern.data(), action, &error);
-    const char* actiont = action[0].type == RTE_FLOW_ACTION_TYPE_DROP? "drop":(is_ip?"rss":"queue");
+    const char* actiont = action[0].type == RTE_FLOW_ACTION_TYPE_DROP? "drop":(is_ip || !support_queue ?"rss":"queue");
     if (!res) {
         struct rte_flow *flow = rte_flow_create(port_id, &attr, pattern.data(), action, &error);
         if (flow) {
