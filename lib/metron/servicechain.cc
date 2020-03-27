@@ -76,7 +76,7 @@ ClickSCManager::run_service_chain(ErrorHandler *errh)
 {
     ServiceChain *sc = _sc;
 
-    for (unsigned i = 0; i < sc->get_nics_nb(); i++) {
+    for (unsigned i = 0; i < (unsigned) sc->get_nics_nb(); i++) {
         if (sc->rx_filter->apply(sc->get_nic_by_index(i), errh) != 0) {
             return errh->error("Could not apply Rx filter");
         }
@@ -105,8 +105,7 @@ ClickSCManager::run_service_chain(ErrorHandler *errh)
         Vector<String> argv = build_cmd_line(ctl_socket[1]);
 
         char *argv_char[argv.size() + 1];
-        for (unsigned i = 0; i < argv.size(); i++) {
-            // click_chatter("Cmd line arg: %s", argv[i].c_str());
+        for (unsigned i = 0; i < (unsigned) argv.size(); i++) {
             argv_char[i] = strdup(argv[i].c_str());
         }
         argv_char[argv.size()] = 0;
@@ -120,16 +119,9 @@ ClickSCManager::run_service_chain(ErrorHandler *errh)
         close(config_pipe[0]);
         close(ctl_socket[1]);
         int flags = 1;
-        /*int fd = ctl_socket[0];
-        if (ioctl(fd, FIONBIO, &flags) != 0) {
-            flags = fcntl(fd, F_GETFL);
-            if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
-                return errh->error("%s", strerror(errno));
-        }
-        */
-        String conf = sc->generate_configuration(add_extra);
 
-        click_chatter("Writing configuration %s", conf.c_str());
+        String conf = sc->generate_configuration(add_extra);
+        click_chatter("Writing configuration: %s", conf.c_str());
 
         int pos = 0;
         while (pos != conf.length()) {

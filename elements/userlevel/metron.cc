@@ -1878,16 +1878,6 @@ ServiceChain::RxFilter::to_json()
 }
 
 /**
- * Returns a name for the FromDPDKDevice element of a Metron slave process.
- */
-String
-ServiceChain::generate_configuration_slave_fd_name(
-    const int &nic_index, const int &cpu_index, const String &type)
-{
-    return "slave" + type + String(nic_index) + "C" + String(cpu_index);
-}
-
-/**
  * Applies an Rx filter configuration to a NIC
  * by allocating space for tags and then populating
  * the desired tag values.
@@ -2688,6 +2678,16 @@ ServiceChain::do_autoscale(int n_cpu_change)
 }
 
 /**
+ * Returns a name for the FromDPDKDevice element of a Metron slave process.
+ */
+String
+ServiceChain::generate_configuration_slave_fd_name(
+    const int &nic_index, const int &cpu_index, const String &type)
+{
+    return "slave" + type + String(nic_index) + "C" + String(cpu_index);
+}
+
+/**
  * Generates the software configuration for a given service chain
  * as received by the controller.
  */
@@ -2731,7 +2731,7 @@ ServiceChain::generate_configuration(bool add_extra)
 
     // NICs require an additional parameter if in Flow Director mode
     if (get_rx_mode() == FLOW) {
-        rx_conf += "MODE flow_dir, ";
+        rx_conf += "MODE flow, ";
     }
 
     for (unsigned i = 0; i < get_nics_nb(); i++) {

@@ -6,22 +6,22 @@
 
 /**
  * Deploy as follows:
- * sudo ../../bin/click --dpdk -l 0-7 -v -- conf/metron/dispatcher-flow-static.click
+ * sudo ../../bin/click --dpdk -l 0-4 -w 0000:03:00.0 -v -- dispatcher-flow-static.click queues=5
  */
 
 define(
-	$iface      0000:03:00.0,
+	$ifacePCI0  0000:03:00.0,
 	$queues     5,
 	$threads    $queues,
 	$numa       false,
 	$mode       flow,          // DPDK's Flow API dispatcher
 	$verbose    99,
-	$rules      conf/metron/test_nic_rules
+	$rules      test_nic_rules
 );
 
 // NIC in Flow Director mode
 fd0 :: FromDPDKDevice(
-	PORT $iface, MODE $mode,
+	PORT $ifacePCI0, MODE $mode,
 	N_QUEUES $queues, NUMA $numa,
 	THREADOFFSET 0, MAXTHREADS $threads,
 	FLOW_RULES_FILE $rules,
