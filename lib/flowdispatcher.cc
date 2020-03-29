@@ -2309,7 +2309,7 @@ FlowDispatcher::flow_rules_list(const bool only_matching_rules)
     StringAccum rules_list;
 
     // Traverse and print the sorted list of installed flow rules
-    for (struct port_flow *pf = sorted_rules; pf != NULL; pf = pf->next) {
+    for (struct port_flow *pf = sorted_rules; pf != NULL; pf = pf->tmp) {
         uint32_t id = pf->id;
     #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         const struct rte_flow_item *item = pf->rule.pattern;
@@ -2320,8 +2320,8 @@ FlowDispatcher::flow_rules_list(const bool only_matching_rules)
     #endif
 
         // Get currest state of the packet and byte counters from the device
-        int64_t matched_pkts = -1;
-        int64_t matched_bytes = -1;
+        int64_t matched_pkts = 0;
+        int64_t matched_bytes = 0;
         flow_rule_query(id, matched_pkts, matched_bytes);
 
         // Skip rule without match, if requested by the user
