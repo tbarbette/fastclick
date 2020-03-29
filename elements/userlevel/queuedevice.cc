@@ -246,9 +246,11 @@ int TXQueueDevice::initialize_tx(ErrorHandler * errh) {
     n_initialized++;
     if (_verbose > 1) {
         if (input_is_push(0))
-            click_chatter("%s : %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,n_queues,queue_per_threads,thread_share);
+            click_chatter("%s: %d threads can end up in this output devices. %d queues will be used, so %d queues for %d thread",
+                name().c_str(), n_threads, n_queues, queue_per_threads, thread_share);
         else
-            click_chatter("%s : %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",name().c_str(),n_threads,n_queues,queue_per_threads,thread_share);
+            click_chatter("%s: %d threads will be used to pull packets upstream. %d queues will be used, so %d queues for %d thread",
+                name().c_str(), n_threads, n_queues, queue_per_threads, thread_share);
     }
     return 0;
 }
@@ -272,9 +274,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
         queue_per_threads = n_queues / n_threads;
         lastqueue = firstqueue + n_queues - 1;
 
-        click_chatter(
-                "%s : remove StaticThreadSched to use FastClick's "
-                "auto-thread assignment", class_name());
+        click_chatter("%s: remove StaticThreadSched to use FastClick's auto-thread assignment", class_name());
         goto end;
     };
 
@@ -304,11 +304,14 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
            v.resize(usable_threads.size());
        if (v.weight() == usable_threads.weight()) {
            if (_verbose > 0)
-               click_chatter("Warning : input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",name().c_str());
+               click_chatter(
+                "Warning: input thread assignment will assign threads already assigned by yourself, as you didn't left any cores for %s",
+                name().c_str());
        } else
            usable_threads &= (~v);
        if (_threadoffset != -1 && !usable_threads[_threadoffset]) {
-           click_chatter("WARNING : The THREADOFFSET parameter will be ignored because that thread is not usable / assigned to another element.");
+           click_chatter(
+            "WARNING: The THREADOFFSET parameter will be ignored because that thread is not usable / assigned to another element");
        }
     }
 
@@ -343,7 +346,9 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
     if (n_threads == 0) {
        n_threads = 1;
        if (cores_in_node == 0) {
-           click_chatter("%s : No cores available on the same NUMA node, I'll use a core from another NUMA node, this will reduce performances.",name().c_str());
+           click_chatter(
+            "%s: No cores available on the same NUMA node, a core from another NUMA node will be used and this will reduce the performance",
+            name().c_str());
            usable_threads[0] = 1;
            cores_in_node = 1;
            if (use_nodes > 1)
@@ -375,7 +380,7 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 
     if (thread_share > 1) {
        if (_threadoffset != -1) {
-           errh->warning("Thread offset %d will be ignored because the numa node has not enough cores.",_threadoffset);
+           errh->warning("Thread offset %d will be ignored because the numa node has not enough cores", _threadoffset);
        }
        if (!_scale_parallel) {
            assert(thread_share > 0);
@@ -417,9 +422,13 @@ int RXQueueDevice::initialize_rx(ErrorHandler *errh) {
 
     if (_verbose > 1) {
         if (n_threads >= n_queues)
-           click_chatter("%s : %d threads will be used to push packets downstream. %d queues will be used meaning that each queue will be shared by %d threads.",name().c_str(),n_threads,n_queues,queue_share);
+           click_chatter(
+            "%s: %d threads will be used to push packets downstream. %d queues will be used meaning that each queue will be shared by %d threads",
+            name().c_str(), n_threads, n_queues, queue_share);
         else
-           click_chatter("%s : %d threads will be used to push packets downstream. %d queues will be used meaning that each thread will handle up to %d queues",name().c_str(),n_threads,n_queues,queue_per_threads);
+           click_chatter(
+            "%s: %d threads will be used to push packets downstream. %d queues will be used meaning that each thread will handle up to %d queues",
+            name().c_str(), n_threads, n_queues, queue_per_threads);
         }
 
     end:
