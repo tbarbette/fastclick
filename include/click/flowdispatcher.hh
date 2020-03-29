@@ -177,6 +177,7 @@ class FlowDispatcher {
         static String FLOW_RULE_LIST;
         static String FLOW_RULE_LIST_WITH_HITS;
         static String FLOW_RULE_COUNT;
+        static String FLOW_RULE_COUNT_WITH_HITS;
         static String FLOW_RULE_ISOLATE;
         static String FLOW_RULE_FLUSH;
 
@@ -293,7 +294,10 @@ class FlowDispatcher {
         // Query aggregate flow rule statistics
         String flow_rule_aggregate_stats();
 
-        // Counts the number of rules in a NIC (localy)
+        // Counts the number of rules with hits in a NIC
+        uint32_t flow_rules_with_hits_count();
+
+        // Counts the number of rules in a NIC (using the cache)
         uint32_t flow_rules_count();
 
         // Counts the number of rules in a NIC (in hardware)

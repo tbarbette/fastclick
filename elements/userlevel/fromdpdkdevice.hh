@@ -471,7 +471,8 @@ private:
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
         h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
-        h_rules_count, h_rule_packet_hits, h_rule_byte_count, h_rules_aggr_stats
+        h_rules_count, h_rules_count_with_hits, h_rule_packet_hits, h_rule_byte_count,
+        h_rules_aggr_stats
     #endif
     };
 

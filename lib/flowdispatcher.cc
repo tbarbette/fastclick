@@ -1056,18 +1056,19 @@ FlowCache::flush_rule_counters()
 String FlowDispatcher::DISPATCHING_MODE = "flow";
 
 // Supported Flow Dispatcher handlers (called from FromDPDKDevice)
-String FlowDispatcher::FLOW_RULE_ADD            = "rule_add";
-String FlowDispatcher::FLOW_RULE_DEL            = "rules_del";
-String FlowDispatcher::FLOW_RULE_IDS_GLB        = "rules_ids_global";
-String FlowDispatcher::FLOW_RULE_IDS_INT        = "rules_ids_internal";
-String FlowDispatcher::FLOW_RULE_PACKET_HITS    = "rule_packet_hits";
-String FlowDispatcher::FLOW_RULE_BYTE_COUNT     = "rule_byte_count";
-String FlowDispatcher::FLOW_RULE_AGGR_STATS     = "rules_aggr_stats";
-String FlowDispatcher::FLOW_RULE_LIST           = "rules_list";
-String FlowDispatcher::FLOW_RULE_LIST_WITH_HITS = "rules_list_with_hits";
-String FlowDispatcher::FLOW_RULE_COUNT          = "rules_count";
-String FlowDispatcher::FLOW_RULE_ISOLATE        = "rules_isolate";
-String FlowDispatcher::FLOW_RULE_FLUSH          = "rules_flush";
+String FlowDispatcher::FLOW_RULE_ADD             = "rule_add";
+String FlowDispatcher::FLOW_RULE_DEL             = "rules_del";
+String FlowDispatcher::FLOW_RULE_IDS_GLB         = "rules_ids_global";
+String FlowDispatcher::FLOW_RULE_IDS_INT         = "rules_ids_internal";
+String FlowDispatcher::FLOW_RULE_PACKET_HITS     = "rule_packet_hits";
+String FlowDispatcher::FLOW_RULE_BYTE_COUNT      = "rule_byte_count";
+String FlowDispatcher::FLOW_RULE_AGGR_STATS      = "rules_aggr_stats";
+String FlowDispatcher::FLOW_RULE_LIST            = "rules_list";
+String FlowDispatcher::FLOW_RULE_LIST_WITH_HITS  = "rules_list_with_hits";
+String FlowDispatcher::FLOW_RULE_COUNT           = "rules_count";
+String FlowDispatcher::FLOW_RULE_COUNT_WITH_HITS = "rules_count_with_hits";
+String FlowDispatcher::FLOW_RULE_ISOLATE         = "rules_isolate";
+String FlowDispatcher::FLOW_RULE_FLUSH           = "rules_flush";
 
 // Set of flow rule items supported by the Flow API
 HashMap<int, String> FlowDispatcher::flow_item;
@@ -2128,7 +2129,7 @@ FlowDispatcher::flow_rule_aggregate_stats()
             bytes_in_queue[(uint16_t) queue] = 0;
         }
 
-        // Get currest state of the pacet and byte counters from the device
+        // Get currest state of the packet and byte counters from the device
         int64_t matched_pkts = 0;
         int64_t matched_bytes = 0;
         flow_rule_query(id, matched_pkts, matched_bytes);
@@ -2189,13 +2190,53 @@ FlowDispatcher::flow_rule_aggregate_stats()
  * @return the number of flow rules being installed
  */
 uint32_t
+FlowDispatcher::flow_rules_with_hits_count()
+{
+    // Only active instances might have statistics
+    if (!active()) {
+        return 0;
+    }
+
+    struct rte_port *port = get_port(_port_id);
+    if (!port->flow_list || (flow_rules_count() == 0)) {
+        _errh->warning("Flow Dispatcher (port %u): No counter for flow rules with hits due to no traffic", _port_id);
+        return 0;
+    }
+
+    uint32_t rules_with_hits = 0;
+
+    // Traverse the list of installed flow rules
+    for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
+        uint32_t id = pf->id;
+
+        // Get currest state of the packet and byte counters from the device
+        int64_t matched_pkts = 0;
+        int64_t matched_bytes = 0;
+        flow_rule_query(id, matched_pkts, matched_bytes);
+
+        // This rule has hits
+        if (matched_pkts > 0) {
+            rules_with_hits++;
+        }
+    }
+
+    return rules_with_hits;
+}
+
+/**
+ * Return the flow rule counter for a particular NIC
+ * by looking at the flow rule cache.
+ *
+ * @return the number of flow rules being installed
+ */
+uint32_t
 FlowDispatcher::flow_rules_count()
 {
     return _flow_cache->get_rule_counter();
 }
 
 /**
- * Counts all of the flow rules installed in a NIC
+ * Return the flow rule counter for a particular NIC
  * by traversing the list of flow rules.
  *
  * @return the number of flow rules being installed
@@ -2278,7 +2319,7 @@ FlowDispatcher::flow_rules_list(const bool only_matching_rules)
         const struct rte_flow_action *action = pf->actions;
     #endif
 
-        // Get currest state of the pacet and byte counters from the device
+        // Get currest state of the packet and byte counters from the device
         int64_t matched_pkts = -1;
         int64_t matched_bytes = -1;
         flow_rule_query(id, matched_pkts, matched_bytes);

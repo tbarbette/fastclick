@@ -585,6 +585,10 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             portid_t port_id = fd->get_device()->get_port_id();
             return String(FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_count_explicit());
         }
+        case h_rules_count_with_hits: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return String(FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_with_hits_count());
+        }
         case h_rules_isolate: {
             portid_t port_id = fd->get_device()->get_port_id();
             return String(FlowDispatcher::isolated(port_id) ? "1" : "0");
@@ -930,12 +934,13 @@ void FromDPDKDevice::add_handlers()
     add_write_handler(FlowDispatcher::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
     add_write_handler(FlowDispatcher::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);
     add_write_handler(FlowDispatcher::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
-    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_GLB,        statistics_handler, h_rules_ids_global);
-    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_INT,        statistics_handler, h_rules_ids_internal);
-    add_read_handler (FlowDispatcher::FLOW_RULE_LIST,           statistics_handler, h_rules_list);
-    add_read_handler (FlowDispatcher::FLOW_RULE_LIST_WITH_HITS, statistics_handler, h_rules_list_with_hits);
-    add_read_handler (FlowDispatcher::FLOW_RULE_COUNT,          statistics_handler, h_rules_count);
-    add_read_handler (FlowDispatcher::FLOW_RULE_ISOLATE,        statistics_handler, h_rules_isolate);
+    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_GLB,         statistics_handler, h_rules_ids_global);
+    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_INT,         statistics_handler, h_rules_ids_internal);
+    add_read_handler (FlowDispatcher::FLOW_RULE_LIST,            statistics_handler, h_rules_list);
+    add_read_handler (FlowDispatcher::FLOW_RULE_LIST_WITH_HITS,  statistics_handler, h_rules_list_with_hits);
+    add_read_handler (FlowDispatcher::FLOW_RULE_COUNT,           statistics_handler, h_rules_count);
+    add_read_handler (FlowDispatcher::FLOW_RULE_COUNT_WITH_HITS, statistics_handler, h_rules_count_with_hits);
+    add_read_handler (FlowDispatcher::FLOW_RULE_ISOLATE,         statistics_handler, h_rules_isolate);
 #endif
 
     add_read_handler("mtu",read_handler, h_mtu);
