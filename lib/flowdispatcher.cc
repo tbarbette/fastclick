@@ -2268,7 +2268,7 @@ FlowDispatcher::flow_rules_list(const bool only_matching_rules)
     StringAccum rules_list;
 
     // Traverse and print the sorted list of installed flow rules
-    for (struct port_flow *pf = sorted_rules; pf != NULL; pf = pf->tmp) {
+    for (struct port_flow *pf = sorted_rules; pf != NULL; pf = pf->next) {
         uint32_t id = pf->id;
     #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         const struct rte_flow_item *item = pf->rule.pattern;
