@@ -2314,9 +2314,11 @@ FlowDispatcher::flow_rules_list(const bool only_matching_rules)
     #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
         const struct rte_flow_item *item = pf->rule.pattern;
         const struct rte_flow_action *action = pf->rule.actions;
+        const struct rte_flow_attr *attr = pf->rule.attr;
     #else
         const struct rte_flow_item *item = pf->pattern;
         const struct rte_flow_action *action = pf->actions;
+        const struct rte_flow_attr *attr = (const rte_flow_attr *) &pf->attr;
     #endif
 
         // Get currest state of the packet and byte counters from the device
@@ -2330,19 +2332,12 @@ FlowDispatcher::flow_rules_list(const bool only_matching_rules)
         }
 
         rules_list << "Flow rule #" << id << ": [";
-    #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
-        rules_list << "Group: " << pf->rule.attr->group << ", Prio: " << pf->rule.attr->priority << ", ";
-        rules_list << "Scope: " << (pf->rule.attr->ingress == 1 ? "ingress" : "-");
-        rules_list << "/" << (pf->rule.attr->egress == 1 ? "egress" : "-");
-    #else
-        rules_list << "Group: " << pf->attr.group << ", Prio: " << pf->attr.priority << ", ";
-        rules_list << "Scope: " << (pf->attr.ingress == 1 ? "ingress" : "-");
-        rules_list << "/" << (pf->attr.egress == 1 ? "egress" : "-");
-    #endif
-    #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,11,0,0)
-        rules_list << "/" << (pf->attr.transfer == 1 ? "transfer" : "-");
-    #elif RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
-        rules_list << "/" << (pf->rule.attr->transfer == 1 ? "transfer" : "-");
+        rules_list << "Group: " << attr->group << ", Prio: " << attr->priority << ", ";
+        rules_list << "Scope: " << (attr->ingress == 1 ? "ingress" : "-");
+        rules_list << "/" << (attr->egress == 1 ? "egress" : "-");
+
+    #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
+        rules_list << "/" << (attr->transfer == 1 ? "transfer" : "-");
     #endif
         rules_list << ", ";
         rules_list << "Matches:";
@@ -2528,26 +2523,25 @@ FlowDispatcher::flow_rules_sort(struct rte_port *port, struct port_flow **sorted
 
     for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
         struct port_flow **tmp;
-
-        tmp = sorted_rules;
     #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
-        while (*tmp &&
-            (pf->rule.attr->group > (*tmp)->rule.attr->group ||
-            (pf->rule.attr->group == (*tmp)->rule.attr->group &&
-             pf->rule.attr->priority > (*tmp)->rule.attr->priority) ||
-            (pf->rule.attr->group == (*tmp)->rule.attr->group &&
-             pf->rule.attr->priority == (*tmp)->rule.attr->priority &&
-             pf->id > (*tmp)->id))) {
+        const struct rte_flow_attr *curr = pf->rule.attr;
     #else
-         while (*tmp &&
-            (pf->attr.group > (*tmp)->attr.group ||
-            (pf->attr.group == (*tmp)->attr.group &&
-             pf->attr.priority > (*tmp)->attr.priority) ||
-            (pf->attr.group == (*tmp)->attr.group &&
-             pf->attr.priority == (*tmp)->attr.priority &&
-             pf->id > (*tmp)->id))) {
+        const struct rte_flow_attr *curr = (const rte_flow_attr *) &pf->attr;
     #endif
-            tmp = &(*tmp)->tmp;
+
+        for (tmp = sorted_rules; *tmp; tmp = &(*tmp)->tmp) {
+        #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
+            const struct rte_flow_attr *comp = (*tmp)->rule.attr;
+        #else
+            const struct rte_flow_attr *comp = (const rte_flow_attr *) &((*tmp)->attr);
+        #endif
+
+            // Sort flows by group, priority, and ID
+            if (curr->group > comp->group ||
+               ((curr->group == comp->group) && (curr->priority > comp->priority)) ||
+               ((curr->group == comp->group) && (curr->priority == comp->priority) && (pf->id > (*tmp)->id)))
+                    continue;
+            break;
         }
         pf->tmp = *tmp;
         *tmp = pf;
