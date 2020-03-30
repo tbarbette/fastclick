@@ -25,6 +25,7 @@ sudo bin/click-devirtualize CONFIG --inline > package.uo
 ```
 ar x package.uo config
 ```
+
   **You should remove the package requirement in `config`.
 
  * Use click-mkmindriver to create an embedded click, with the new --ship option to embed the code
@@ -66,10 +67,12 @@ You can use the optimization passes in [llvm=project](https://bitbucket.org/nsla
  ```
  
  * Optimizing the IR bitcode:
+ 
+ The first pass removes module flags fromthe IR bitcode since it clang not let relinking. 
+ The second pass optimize the `class Packet` in Click.
+ 
  ```
- # Removing module flags since it does not let relinking
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-stripmoduleflags-pass/libClassStripModuleFlagsPass.so -strip-module-flags embedclick-orig.ll -o embedclick-tmp.ll
-# Optimizing the Packet class structure
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass/libClassHandpickPass.so -handpick-packet-class embedclick-tmp.ll -element-list-filename elements_embed_router.list -o embedclick.ll
  ```
  
