@@ -329,7 +329,7 @@ or install DPDK using meson, or he system package manager.
       AC_SUBST(DPDK_INCLUDES, -I${RTE_SDK_BIN}/include/)
 
       AC_MSG_CHECKING([whether DPDK has rte_eth_read_clock])
-      if readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
+      if llvm-readelf -Ws "$RTE_LIB/librte_ethdev.a" | grep rte_eth_read_clock &> /dev/null ; then
         AC_MSG_RESULT([yes])
         AC_DEFINE([HAVE_DPDK_READ_CLOCK])
       else
