@@ -70,7 +70,7 @@ You can use the optimization passes in [llvm=project](https://bitbucket.org/nsla
  
  The first pass removes module flags fromthe IR bitcode since it clang not let relinking. 
  
- ```
+```
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-stripmoduleflags-pass/libClassStripModuleFlagsPass.so -strip-module-flags embedclick-orig.ll -o embedclick-tmp.ll
 ```
 
@@ -78,7 +78,7 @@ opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-stripmodulefl
  
 ```
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass/libClassHandpickPass.so -handpick-packet-class embedclick-tmp.ll -element-list-filename elements_embed_router.list -o embedclick.ll
- ```
+```
  
  * elements_embed_router.list can be created via:
  ```
