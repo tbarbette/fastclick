@@ -77,8 +77,14 @@ opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-stripmodulefl
  The second pass optimize the `class Packet` in Click.
  
 ```
-opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass/libClassHandpickPass.so -handpick-packet-class embedclick-tmp.ll -element-list-filename elements_embed_router.list -o embedclick.ll
+opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass/libClassHandpickPass.so -handpick-packet-class embedclick-tmp.ll -element-list-filename elements_embed_router.list -o embedclick-opt.ll
 ```
+
+ The third pass inlines the function calls to the driver (e.g., `mlx5_rx_burst_vec` in the FromDPDKDevice elements).
+ 
+ ```
+opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-driverinline-pass/libClassDriverInlinePass.so -inline-driver embedclick-opt.ll -o embedclick.ll
+ ```
  
  * elements_embed_router.list can be created via:
  ```
