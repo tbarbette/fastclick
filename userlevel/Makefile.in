@@ -110,6 +110,7 @@ LDFLAGS := $(LDFLAGS) $(shell pkg-config --libs libdpdk) -Wl,-Bstatic $(shell pk
 else
 RTE_SDK = @RTE_SDK@
 RTE_TARGET = @RTE_TARGET@
+RTE_SDK_BIN = @RTE_SDK_BIN@
 RTE_VER_MAJOR = @RTE_VER_MAJOR@
 RTE_VER_MINOR = @RTE_VER_MINOR@
 RTE_VER_YEAR = @RTE_VER_YEAR@

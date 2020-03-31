@@ -1,5 +1,8 @@
 #ifndef CLICK_TIMERWHEEL_HH
 #define CLICK_TIMERWHEEL_HH 1
+
+#include <click/algorithm.hh>
+
 CLICK_DECLS
 
 template <typename T>

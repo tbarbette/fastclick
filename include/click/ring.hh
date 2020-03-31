@@ -5,6 +5,7 @@
 #include <click/atomic.hh>
 #include <click/sync.hh>
 #if HAVE_DPDK
+# include <click/algorithm.hh>
 # include <rte_ring.h>
 # include <rte_errno.h>
 # include <click/dpdk_glue.hh>
@@ -161,11 +162,6 @@ template <typename T>
 using DynamicRing = SPSCDynamicRing<T>;
 
 #if HAVE_DPDK
-inline uint64_t next_pow2(uint64_t x) {
-	return x == 1 ? 1 : 1<<(64-__builtin_clzl(x-1));
-}
-
-
 /**
  * Ring with size set at initialization time
  */
@@ -174,7 +170,7 @@ template <typename T> class MPMCDynamicRing {
     rte_ring* _ring;
     public:
     MPMCDynamicRing() : _ring(0) {
-        static_assert(std::is_pointer<T>());
+        static_assert(std::is_pointer<T>(), "MPMCDynamicRing can only be used with pointers");
     }
 
     inline void initialize(int size, const char* name, int flags = 0) {
@@ -192,7 +188,7 @@ template <typename T> class MPMCDynamicRing {
     inline T extract() {
         T o;
 
-#if RTE_VERSION >= RTE_VERSION_NUM(16,8,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1, 0) == 0)
 #else
         if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1) == 0)
@@ -227,7 +223,11 @@ template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {
 
     inline T extract() {
         T o;
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         if (rte_ring_sc_dequeue_bulk(this->_ring, (void**)&o, 1, 0) == 0)
+#else
+        if (rte_ring_sc_dequeue_bulk(this->_ring, (void**)&o, 1) == 0)
+#endif
             return 0;
         else
             return o;

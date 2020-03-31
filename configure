@@ -6559,6 +6559,17 @@ else
 =========================================" "$LINENO" 5
 fi
 
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        enable_flow=no
+        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&5
+$as_echo "$as_me: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&2;}
+    else
+        $as_echo "#define HAVE_FLOW 1" >>confdefs.h
+
+    fi
+fi
+
 # Check whether --enable-netmap-pool was given.
 if test "${enable_netmap_pool+set}" = set; then :
   enableval=$enable_netmap_pool; :
@@ -7049,8 +7060,15 @@ fi
 
 if test "x$enable_dpdk" = "xyes"; then
 
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for DPDK library" >&5
+$as_echo_n "checking for DPDK library... " >&6; }
+
     if test -z "$RTE_SDK_BIN"; then
         RTE_SDK_BIN=$RTE_SDK/$RTE_TARGET
+    fi
+
+    if test ! -d "$RTE_SDK_BIN"; then
+        RTE_SDK_BIN=$RTE_SDK/build/
     fi
 
     if test -z "$RTE_LIBNAME"; then
@@ -7081,19 +7099,28 @@ if test "x$enable_dpdk" = "xyes"; then
 
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
-or install DPDK using meson, or he system package manager.
+or install DPDK using meson, or the system package manager.
 
 =========================================" "$LINENO" 5
       fi
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes, found at $RTE_SDK_BIN" >&5
+$as_echo "yes, found at $RTE_SDK_BIN" >&6; }
+
       if test -e "$RTE_SRCDIR/VERSION"; then
         rte_ver_year=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($1)}'`
         rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
         rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
       else
-        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" &> /dev/null ; then
+            verfile=rte_version
+        else
+            verfile=rte_config
+        fi
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
 
 
@@ -7595,7 +7622,6 @@ fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_flow" = xNO -o "x$enable_flow" = x \) && enable_flow=yes
 if test "x$enable_flow" = xyes; then
     :
-    $as_echo "#define HAVE_FLOW 1" >>confdefs.h
 
 fi
 # Check whether --enable-grid was given.
@@ -14365,6 +14391,9 @@ fi
 
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
+    if test "$rte_ver_year" -ge 19; then
+        provisions="$provisions dpdk19"
+    fi
 fi
 
 if test "x$enable_flow" = xyes; then
