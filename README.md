@@ -3,7 +3,7 @@
 
  * Compile Click with:
 ```
- ./configure RTE_SDK=/home/alireza/llvm-rack13/dpdk-nslab RTE_TARGET=x86_64-native-linux-clangflto --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CC="clang -flto" CXX="clang++ -flto" LDFLAGS="-flto -Wl,-plugin-opt=save-temps" RANLIB="/bin/true" AR="llvm-ar" --disable-dynamic-linking --enable-poll --enable-dpdk --disable-dpdk-pool --disable-dpdk-packet 
+ ./configure RTE_SDK=/home/alireza/llvm-rack13/dpdk-nslab RTE_TARGET=x86_64-native-linux-clangflto --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CC="clang -flto" CXX="clang++ -flto" LDFLAGS="-flto -Wl,-plugin-opt=save-temps" RANLIB="/bin/true" READELF="llvm-readelf" AR="llvm-ar" --disable-dynamic-linking --enable-poll --enable-dpdk --disable-dpdk-pool --disable-dpdk-packet
 ```
 
  * For dependency reasons, FastClick must be installed system-wide:
