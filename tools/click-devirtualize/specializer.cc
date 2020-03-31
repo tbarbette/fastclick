@@ -298,8 +298,9 @@ Specializer::create_class(SpecializedClass &spc)
 	if (new_cxxc->find(old_fn.name())) // don't add again
 	  continue;
 	CxxFunction &new_fn = new_cxxc->defun(old_fn);
-    if (_do_inline)
+    if (_do_inline) {
         new_fn.set_inline();
+    }
 	while (new_fn.replace_expr(ninputs_pat, ninputs_repl)) ;
 	while (new_fn.replace_expr(noutputs_pat, noutputs_repl)) ;
 	while (new_fn.replace_expr(push_pat, push_repl))
