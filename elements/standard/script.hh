@@ -356,9 +356,9 @@ Returns the negative of its numeric parameter.
 
 Returns the absolute value of its numeric parameter.
 
-=h ceil "read with parameters"
+=h floor/round/ceil "read with parameters"
 
-Returns the ceiling integer value of its numeric parameter.
+Returns the flooring/rounded/ceiling integer value of its numeric parameter.
 
 
 =h eq, ne, lt, gt, le, ge "read with parameters"

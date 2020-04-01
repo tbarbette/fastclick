@@ -1003,6 +1003,10 @@ Script::negabs_handler(int, String &str, Element *, const Handler *h, ErrorHandl
             str = String(-dx);
         else if (what == ar_abs)
             str = String(fabs(dx));
+        else if (what == ar_round)
+            str = String(round(dx));
+        else if (what == ar_floor)
+            str = String(floor(dx));
         else
             str = String(ceil(dx));
         return 0;
@@ -1010,7 +1014,7 @@ Script::negabs_handler(int, String &str, Element *, const Handler *h, ErrorHandl
         return normal_error(error_one_number, errh);
 #endif
     } else {
-        if (what == ar_ceil)
+        if (what == ar_ceil || what == ar_round || what == ar_floor)
             str = String(x);
         else
             str = String(what == ar_neg || x < 0 ? -x : x);
@@ -1376,6 +1380,9 @@ Script::add_handlers()
     set_handler("neg", Handler::f_read | Handler::f_read_param, negabs_handler, ar_neg, 0);
     set_handler("abs", Handler::f_read | Handler::f_read_param, negabs_handler, ar_abs, 0);
     set_handler("ceil", Handler::f_read | Handler::f_read_param, negabs_handler, ar_ceil, 0);
+
+    set_handler("floor", Handler::f_read | Handler::f_read_param, negabs_handler, ar_floor, 0);
+    set_handler("round", Handler::f_read | Handler::f_read_param, negabs_handler, ar_round, 0);
     set_handler("eq", Handler::f_read | Handler::f_read_param, compare_handler, AR_EQ, 0);
     set_handler("ne", Handler::f_read | Handler::f_read_param, compare_handler, AR_NE, 0);
     set_handler("gt", Handler::f_read | Handler::f_read_param, compare_handler, AR_GT, 0);
