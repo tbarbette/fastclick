@@ -534,7 +534,7 @@ class Script : public Element { public:
         ar_add = 0, ar_sub, ar_min, ar_max, ar_avg, ar_count,
         ar_popcount, ar_gt_vec,
         ar_mul, ar_div, ar_idiv, ar_mod, ar_rem,
-        ar_neg, ar_abs,
+        ar_neg, ar_abs, ar_floor, ar_round, ar_ceil,
         AR_LT, AR_EQ, AR_GT, AR_GE, AR_NE, AR_LE, // order is important
         AR_FIRST, AR_NOT, AR_SPRINTF, ar_random, ar_cat, ar_catq,
         ar_and, ar_or, ar_nand, ar_nor, ar_now, ar_now_steady, ar_if, ar_in,
