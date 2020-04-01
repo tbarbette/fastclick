@@ -17,7 +17,7 @@ make
 * For dependency reasons, FastClick must be installed system-wide:
 
 ```bash
- sudo make install
+sudo make install
 ```
   
   **If you installed Click system-wide before, you must do `sudo make uninstall` first because make install will not overwite all changed file!**
@@ -40,19 +40,19 @@ ar x package.uo config
 * Use click-mkmindriver to create an embedded click, with the new --ship option to embed the code
 
 ```bash
-  cd userlevel
-  ../bin/click-mkmindriver -V -C .. -p embed --ship -u ../package.uo
-  make MINDRIVER=embed
-  cd ..
+cd userlevel
+../bin/click-mkmindriver -V -C .. -p embed --ship -u ../package.uo
+make MINDRIVER=embed
+cd ..
 ```
 
   **Note the clickdvXX.cc and .hh file will be kept in userlevel, it contains the code from
   click-devirtualized with all specialized elements and the beetlemonkey to generate our
   limited set of elements. You may recompile it with the following command (the command should be revised when using clang). However, this was already done for you by `click-mkmindriver`. Use make `MINDRIVER=embed V=1` to see the few lines to type to compile a new embedclick manually.**
 
-  ```bash
-  g++ -fPIC -flto -std=c++11 -g -O3 -I${RTE_SDK}/x86_64-native-linuxapp-gcc/include -include ${RTE_SDK}/x86_64-native-linuxapp-gcc/include/rte_config.h -Wno-pmf-conversions -faligned-new -c -o   clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.o clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.cc -fno-access-control
-  ```
+```bash
+g++ -fPIC -flto -std=c++11 -g -O3 -I${RTE_SDK}/x86_64-native-linuxapp-gcc/include -include ${RTE_SDK}/x86_64-native-linuxapp-gcc/include/rte_config.h -Wno-pmf-conversions -faligned-new -c -o   clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.o clickdv_Q3Ysjsm0iWjr6UUA6pNNyd.u.cc -fno-access-control
+```
 
 * Following the previous steps will generate IR bitcode for `click` and `embedclick` in the `userlevel` directory. Check for `*.bc` files (e.g., `click.0.5.precodegen.bc` and `embedclick.0.5.precodegen.bc`).
 
@@ -68,10 +68,10 @@ You can use the optimization passes in [llvm-project/FastClick-Pass](https://bit
 
 * Creating human-reabale format for IR bitcode:
 
- ```bash
- cd userlevel/
- llvm-dis embedclick.0.5.precodegen.bc -o embedclick-orig.ll
- ```
+```bash
+cd userlevel/
+llvm-dis embedclick.0.5.precodegen.bc -o embedclick-orig.ll
+```
 
 ### Optimizing the IR bitcode
 
@@ -95,24 +95,24 @@ opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass
 
 3. The third pass inlines the function calls to the driver (e.g., `mlx5_rx_burst_vec` in the FromDPDKDevice elements). It does not work when compiling DPDK with default configuration.
 
- ```bash
+```bash
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-driverinline-pass/libClassDriverInlinePass.so -inline-driver embedclick-opt.ll -o embedclick.ll
- ```
+```
 
 * Creating the final binary:
 
- ```bash
- cd userlevel/
- make embedclick-opt
- ```
+```bash
+cd userlevel/
+make embedclick-opt
+```
 
  **Note that the Makefile rule requires `embedclick.ll`. Therefore, if you are skipping any of the above passes, you have to rename the final output.**
 
  This command generates a new binary called `embedclick-opt`, which can be used similar to `embedclick`.
 
- ```bash
+```bash
 sudo bin/embedclick-opt --dpdk -l 0-3 -- config
- ```
+```
 
  **The same optimization can be done for the `click`. You can create the binary with `make click-opt`.**
 
