@@ -7132,10 +7132,15 @@ $as_echo "yes, found at $RTE_SDK_BIN" >&6; }
         rte_ver_month=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($2)}'`
         rte_ver_minor=`cat $RTE_SRCDIR/VERSION | sed -e 's/-rc/.-rc./' -e 's/$/..99/' | awk -F '.' '{print int($3)}'`
       else
-        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
-        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/rte_version.h" | head -n 1 | awk '{print $3}'`
+        if grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/rte_version.h" &> /dev/null ; then
+            verfile=rte_version
+        else
+            verfile=rte_config
+        fi
+        rte_ver_major=`grep "#define RTE_VER_MAJOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_minor=`grep "#define RTE_VER_MINOR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_year=`grep "#define RTE_VER_YEAR" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
+        rte_ver_month=`grep "#define RTE_VER_MONTH" "$RTE_SDK_BIN/include/$verfile.h" | head -n 1 | awk '{print $3}'`
       fi
 
 

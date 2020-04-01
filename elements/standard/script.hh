@@ -344,6 +344,11 @@ Returns the negative of its numeric parameter.
 
 Returns the absolute value of its numeric parameter.
 
+=h ceil "read with parameters"
+
+Returns the ceiling integer value of its numeric parameter.
+
+
 =h eq, ne, lt, gt, le, ge "read with parameters"
 
 Compares two parameters and returns the result.  For example, 'C<eq 10 0xA>'
@@ -515,7 +520,7 @@ class Script : public Element { public:
     enum {
         ST_STEP = 0, ST_RUN, ST_GOTO,
         ar_add = 0, ar_sub, ar_min, ar_max, ar_mul, ar_div, ar_idiv, ar_mod, ar_rem,
-        ar_neg, ar_abs,
+        ar_neg, ar_abs, ar_ceil,
         AR_LT, AR_EQ, AR_GT, AR_GE, AR_NE, AR_LE, // order is important
         AR_FIRST, AR_NOT, AR_SPRINTF, ar_random, ar_cat, ar_catq,
         ar_and, ar_or, ar_nand, ar_nor, ar_now, ar_now_steady, ar_if, ar_in,
