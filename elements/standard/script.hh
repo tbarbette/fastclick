@@ -321,6 +321,18 @@ numbers; for example, 'C<sub 10 5 2>' returns
 Finds the minimum or maximum of a space-separated list of
 numbers; for example, 'C<max 5 10 2>' returns "C<10>".
 
+=h avg "read with parameters"
+
+Finds the average of a space-separated list of
+numbers; for example, 'C<avg 5 10 2>' returns "C<6>".
+
+=h count, popcount "read with parameters"
+
+Finds the number of items, or the numver of items different than zero
+of a space-separated list of
+numbers; for example, 'C<count 5 0 2>' returns "C<3>" and
+'C<popcount 5 0 2>' returns "C<2>".
+
 =h mul, div, idiv "read with parameters"
 
 Multiplies or divides a space-separated list of numbers and returns the
@@ -519,8 +531,10 @@ class Script : public Element { public:
 
     enum {
         ST_STEP = 0, ST_RUN, ST_GOTO,
-        ar_add = 0, ar_sub, ar_min, ar_max, ar_mul, ar_div, ar_idiv, ar_mod, ar_rem,
-        ar_neg, ar_abs, ar_ceil,
+        ar_add = 0, ar_sub, ar_min, ar_max, ar_avg, ar_count,
+        ar_popcount, ar_gt_vec,
+        ar_mul, ar_div, ar_idiv, ar_mod, ar_rem,
+        ar_neg, ar_abs,
         AR_LT, AR_EQ, AR_GT, AR_GE, AR_NE, AR_LE, // order is important
         AR_FIRST, AR_NOT, AR_SPRINTF, ar_random, ar_cat, ar_catq,
         ar_and, ar_or, ar_nand, ar_nor, ar_now, ar_now_steady, ar_if, ar_in,
