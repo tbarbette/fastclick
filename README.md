@@ -5,7 +5,7 @@ This repo contains some tools optimizing the FastClick. You need to install `Cla
 * Configure FastClick with:
 
 ```bash
-./configure RTE_SDK=/home/alireza/llvm-rack13/dpdk-nslab RTE_TARGET=x86_64-native-linux-clangflto --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CC="clang -flto" CFLAGS="-std=gnu11 -O3" CXX="clang++ -flto" CXXFLAGS="-std=gnu++14 -O3" LDFLAGS="-flto -Wl,-plugin-opt=save-temps" RANLIB="/bin/true" READELF="llvm-readelf" AR="llvm-ar" --disable-dynamic-linking --enable-poll --enable-dpdk --disable-dpdk-pool --disable-dpdk-packet
+./configure RTE_SDK=/home/alireza/llvm-rack13/dpdk-nslab RTE_TARGET=x86_64-native-linux-clanglto --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CC="clang -flto" CFLAGS="-std=gnu11 -O3" CXX="clang++ -flto" CXXFLAGS="-std=gnu++14 -O3" LDFLAGS="-flto -fuse-ld=lld -Wl,-plugin-opt=save-temps" RANLIB="/bin/true" LD="ld.lld" READELF="llvm-readelf" AR="llvm-ar" --disable-dynamic-linking --enable-poll --enable-dpdk --disable-dpdk-pool --disable-dpdk-packet
 ```
 
 * Build FastClick
@@ -93,7 +93,7 @@ grep case elements_embed.cc | awk -F"new" '{print $2}' | awk '{print $1}' | awk 
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass/libClassHandpickPass.so -handpick-packet-class embedclick-tmp.ll -element-list-filename elements_embed_router.list -o embedclick-opt.ll
 ```
 
-3. The third pass inlines the function calls to the driver (e.g., `mlx5_rx_burst_vec` in the FromDPDKDevice elements). It does not work when compiling DPDK with default configuration.
+3. The third pass replaces the driver virtual calls (e.g., `mlx5_rx_burst_vec` in the FromDPDKDevice elements). It can also inline the calls, but it does not work when compiling DPDK with default configuration.
 
 ```bash
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-driverinline-pass/libClassDriverInlinePass.so -inline-driver embedclick-opt.ll -o embedclick.ll

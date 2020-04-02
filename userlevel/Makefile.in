@@ -139,7 +139,7 @@ endif
 endif
 
 #Changing --whole-archive to --no-whole-archive to avoid getting duplicate symbol error
-DPDK_LIBS_IR=$(shell echo $(DPDK_LIBS) | sed -e 's/--whole-archive/--no-whole-archive/g')
+DPDK_LIBS_IR=$(subst --whole-archive,--no-whole-archive,$(DPDK_LIBS))
 
 
 all: $(INSTALLPROGS) $(INSTALLLIBS)
