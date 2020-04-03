@@ -56,6 +56,9 @@ FlowManager::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("ORDERED", _ordered) //Enforce FCB order of access
             .read("NOCUT", _nocut)
             .read("OPTIMIZE", _optimize)
+#if HAVE_FLOW_DYNAMIC
+            .read_or_set("RELEASE", _do_release, true)
+#endif
             .complete() < 0)
         return -1;
 
@@ -366,9 +369,12 @@ int FlowManager::_replace_leafs(ErrorHandler *errh) {
 int FlowManager::_initialize_timers(ErrorHandler *errh) {
     if (_do_release) {
 #if HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT
+        auto pushing = get_pushing_threads();
         for (unsigned i = 0; i < click_max_cpu_ids(); i++) {
-            IdleTask* idletask = new IdleTask(this);
-            idletask->initialize(this, i, 100);
+            if (pushing[i]) {
+                IdleTask* idletask = new IdleTask(this);
+                idletask->initialize(this, i, 100);
+            }
         }
         _timer.initialize(this);
         if (_clean_timer > 0)

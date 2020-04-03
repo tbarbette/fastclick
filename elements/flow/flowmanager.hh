@@ -46,7 +46,7 @@ protected:
     bool _optimize;
     FlowType _context;
 #if HAVE_FLOW_DYNAMIC
-    static constexpr bool _do_release = true;
+    bool _do_release;
 #else
     static constexpr bool _do_release = false;
 #endif
