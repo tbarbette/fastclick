@@ -76,7 +76,14 @@ bool QueueDevice::get_spawning_threads(Bitvector& bmk, bool, int port)
         //if (_active) { TODO
             for (int i = firstqueue; i < firstqueue + n_queues; i++) {
                 for (int j = 0; j < queue_share; j++) {
-                    bmk[thread_for_queue(i) - j] = 1;
+                    int t = thread_for_queue(i) - j;
+                    if (t < 0)
+                        continue;
+                    if (t < 0 || t >= bmk.size()) {
+                        click_chatter("Thread %d, to serve queue %d out of range!", t, i);
+                        assert(false);
+                    }
+                    bmk[t] = 1;
                 }
             }
         // }
