@@ -376,12 +376,15 @@ typedef struct device net_device;
 
 
 // PROCESSOR IDENTITIES
+#if CLICK_USERLEVEL && HAVE_MULTITHREAD && HAVE___THREAD_STORAGE_CLASS
+extern __thread int click_current_thread_id;
+#endif
 
 #if CLICK_LINUXMODULE
 typedef uint32_t click_processor_t;
 #  define CLICK_CPU_MAX NR_CPUS
 #elif CLICK_USERLEVEL && HAVE_MULTITHREAD
-typedef pthread_t click_processor_t;
+typedef unsigned click_processor_t;
 #  define CLICK_CPU_MAX 256
 #else
 typedef int8_t click_processor_t;
@@ -391,6 +394,7 @@ typedef int8_t click_processor_t;
 #    define CLICK_CPU_MAX 1
 #  endif
 #endif
+
 
 inline click_processor_t
 click_get_processor()
@@ -402,7 +406,11 @@ click_get_processor()
     return current->processor;
 # endif
 #elif CLICK_USERLEVEL && HAVE_MULTITHREAD
-    return pthread_self();
+#  if HAVE___THREAD_STORAGE_CLASS
+    return click_current_thread_id & 0xffff;
+#  else
+    return sched_getcpu();
+#  endif
 #else
     return 0;
 #endif
@@ -422,10 +430,6 @@ click_put_processor()
 #endif
 }
 
-#if CLICK_USERLEVEL && HAVE_MULTITHREAD && HAVE___THREAD_STORAGE_CLASS
-extern __thread int click_current_thread_id;
-#endif
-
 #if CLICK_USERLEVEL
 extern int click_nthreads;
 #endif
@@ -440,7 +444,11 @@ click_current_processor()
     return current->processor;
 # endif
 #elif CLICK_USERLEVEL && HAVE_MULTITHREAD
-    return pthread_self();
+#  if HAVE___THREAD_STORAGE_CLASS
+    return click_current_thread_id & 0xffff;
+#  else
+    return sched_getcpu();
+#  endif
 #else
     return 0;
 #endif
@@ -484,7 +492,7 @@ click_invalid_processor()
 #if CLICK_LINUXMODULE
     return -1;
 #elif CLICK_USERLEVEL && HAVE_MULTITHREAD
-    return 0;
+    return -1;
 #else
     return -1;
 #endif
@@ -752,15 +760,16 @@ click_get_cycles()
 
 inline click_cycles_t cycles_hz() {
 #if HAVE_DPDK && !CLICK_TOOL
-    if (dpdk_enabled) {
-        return rte_get_timer_hz();
+    if (likely(dpdk_enabled)) {
+        return rte_get_tsc_hz();
     }
-    return 0;
-#else
+    else
+#endif
+    {
     click_cycles_t tsc_freq = click_get_cycles();
     sleep(1);
     return click_get_cycles() - tsc_freq;
-#endif
+    }
 }
 
 // Host to network order
