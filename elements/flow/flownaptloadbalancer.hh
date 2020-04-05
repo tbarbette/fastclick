@@ -1,5 +1,5 @@
-#ifndef CLICK_FLOWIPLOADBALANCER_HH
-#define CLICK_FLOWIPLOADBALANCER_HH
+#ifndef CLICK_FLOWNAPTLOADBALANCER_HH
+#define CLICK_FLOWNAPTLOADBALANCER_HH
 #include <click/config.h>
 #include <click/tcphelper.hh>
 #include <click/multithread.hh>
