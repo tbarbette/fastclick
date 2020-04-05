@@ -111,10 +111,13 @@ field of each packet. Defaults to False.
 
 Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
 
-=item ACTIVE
+=item NUMA_NODE
 
-Boolean. If False, the device is only initialized. Use this when you want
-to read packet using secondary DPDK applications.
+Integer. Specify the NUMA node to undertake packet processing.
+
+=item TIMESTAMP
+
+Boolean. Enables hardware timestamping. Defaults to false.
 
 =item TCO
 
@@ -130,6 +133,33 @@ individually as per DPDK documentation. Defaults to False.
 
 Booelan. If True, enables IP checksum offload alone (not L4 as TCO).
 Defaults to False.
+
+=item VLAN_FILTER
+
+Boolean. Per queue ability to filter received VLAN packets by the hardware. Defaults to false.
+
+=item VLAN_STRIP
+
+Boolean. Per queue ability to strip VLAN header by the hardware in received VLAN packets. Defaults to false.
+
+=item VLAN_EXTEND
+
+Boolean. Per queue ability to extend VLAN tagged packets via QinQ. Defaults to false.
+
+=item LRO
+
+Boolean. Enables hardware-based Large Receive Offloading (LRO).
+When set to true, the NIC coalesces consecutive frames of the same flow into larger frames.
+Defaults to false.
+
+=item JUMBO
+
+Boolean. Enables the reception of Jumbo frames by the hardware. Defaults to false.
+
+=item ACTIVE
+
+Boolean. If False, the device is only initialized. Use this when you want
+to read packet using secondary DPDK applications.
 
 =item VERBOSE
 
