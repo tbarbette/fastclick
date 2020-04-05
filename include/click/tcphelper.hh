@@ -248,7 +248,8 @@ inline void TCPHelper::printPacket(Packet* p) {
     }
     if (isRst(p))
         flags += "R";
-    click_chatter("%u+%u [%s] %s %s", ntohl(p->tcp_header()->th_seq), getPayloadLength(p), flags.c_str(), IPFlowID(p).unparse().c_str(), sup.c_str());
+
+    click_chatter("%s: %u+%u [%s] %s %s", p->timestamp_anno().unparse().c_str(), ntohl(p->tcp_header()->th_seq), getPayloadLength(p), flags.c_str(), IPFlowID(p).unparse().c_str(), sup.c_str());
 }
 
 inline tcp_seq_t
