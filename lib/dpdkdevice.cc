@@ -565,20 +565,36 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
     dev_conf.rxmode.offloads = rx_conf.offloads;
 #endif
 
+#if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+    unsigned int min_rx_pktlen = (unsigned int) RTE_ETHER_MIN_LEN;
+#else
+    unsigned int min_rx_pktlen = (unsigned int) ETHER_MIN_LEN;
+#endif
+
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
     if (info.lro) {
         if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_LRO)) {
             return errh->error("Large Receive Offload (LRO) is not supported by this device!");
         } else {
-            uint32_t new_mtu = (info.init_mtu > RTE_ETHER_MAX_LEN) ? (uint32_t) info.init_mtu : (uint32_t) info.LRO_MTU;
-            dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TCP_LRO;
-            dev_conf.rxmode.max_rx_pkt_len = new_mtu;
-            dev_conf.rxmode.max_lro_pkt_size = new_mtu;
+            dev_conf.rxmode.max_rx_pkt_len = info.lro_max_pkt_size;
+            if ((dev_conf.rxmode.max_rx_pkt_len > dev_info.max_rx_pktlen) ||
+                (dev_conf.rxmode.max_rx_pkt_len < min_rx_pktlen)) {
+                // Mellanox defines MLX5_MAX_LRO_SIZE which is 65280 < 65536 (dev_info.max_rx_pktlen)
+                return errh->error(
+                    "Cannot perform LRO offloading on port_id=%u: Maximum LRO packet size must be in [%u, %u], found %" PRIu32 "\n",
+                    port_id, min_rx_pktlen, dev_info.max_rx_pktlen, info.lro_max_pkt_size);
+            }
 
-            set_init_mtu((uint16_t) new_mtu);
-            errh->message("Auto-setting MTU to %" PRIu32 " bytes due to LRO", new_mtu);
+            dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TCP_LRO;
+            dev_conf.rxmode.max_lro_pkt_size = info.lro_max_pkt_size;
+
+            if (info.lro_max_pkt_size <= RTE_ETHER_MAX_LEN) {
+                errh->warning("Increase your MTU to reap the benefits of LRO");
+            }
         }
-        errh->message("Large Receive Offload (LRO): %s", (dev_conf.rxmode.offloads & DEV_RX_OFFLOAD_TCP_LRO) ? "enabled" : "disabled");
+        errh->message("Large Receive Offload (LRO) is %s with max_lro_pkt_size %" PRIu32 " bytes in [%u, %u]\n",
+            (dev_conf.rxmode.offloads & DEV_RX_OFFLOAD_TCP_LRO) ? "enabled" : "disabled", info.lro_max_pkt_size,
+            min_rx_pktlen, dev_info.max_rx_pktlen);
     } else {
         dev_conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_TCP_LRO;
     }
@@ -586,22 +602,20 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0)
     if (info.jumbo) {
-    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
-        unsigned int min_rx_pktlen = (unsigned int) RTE_ETHER_MIN_LEN;
-    #else
-        unsigned int min_rx_pktlen = (unsigned int) ETHER_MIN_LEN;
-    #endif
         if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_JUMBO_FRAME)) {
             return errh->error("Rx jumbo frame offload is not supported by this device!");
         } else {
-            if (dev_conf.rxmode.max_rx_pkt_len > dev_info.max_rx_pktlen) {
-                return errh->error("Cannot perorm Rx jumbo frames offloading on port_id=%u: max_rx_pkt_len %u > max valid value %u\n", port_id, dev_conf.rxmode.max_rx_pkt_len, dev_info.max_rx_pktlen);
-            } else if (dev_conf.rxmode.max_rx_pkt_len < min_rx_pktlen) {
-                return errh->error("Cannot perorm Rx jumbo frames offloading on port_id=%u: max_rx_pkt_len %u < min valid value %u\n", port_id, dev_conf.rxmode.max_rx_pkt_len, min_rx_pktlen);
+            dev_conf.rxmode.max_rx_pkt_len = info.jumbo_max_rx_pkt_size;
+            if ((dev_conf.rxmode.max_rx_pkt_len > dev_info.max_rx_pktlen) ||
+                (dev_conf.rxmode.max_rx_pkt_len < min_rx_pktlen)) {
+                return errh->error(
+                    "Cannot perform Rx jumbo frames offloading on port_id=%u: Jumbo frame size must be in [%u, %u], found %" PRIu32 "\n",
+                    port_id, min_rx_pktlen, dev_info.max_rx_pktlen, info.jumbo_max_rx_pkt_size);
             }
             dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
         }
-        errh->message("Rx jumbo frames offloading enabled on port_id=%u with max_rx_pkt_len %u in [%u, %u]\n", port_id, dev_conf.rxmode.max_rx_pkt_len, min_rx_pktlen, dev_info.max_rx_pktlen);
+        errh->message("Rx jumbo frames offloading enabled on port_id=%u with max_rx_pkt_len %u bytes in [%u, %u]\n",
+            port_id, dev_conf.rxmode.max_rx_pkt_len, min_rx_pktlen, dev_info.max_rx_pktlen);
     } else {
         dev_conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
     }
@@ -663,6 +677,26 @@ void DPDKDevice::set_init_rss_max(int rss_max) {
 void DPDKDevice::set_init_fc_mode(FlowControlMode fc) {
     assert(!_is_initialized);
     info.init_fc_mode = fc;
+}
+
+void DPDKDevice::set_lro(int lro) {
+    assert(!_is_initialized);
+    info.lro = lro > 0;
+    if (info.lro && lro == 1) {
+        info.lro_max_pkt_size = info.DEF_LARGE_MTU;
+    } else if (info.lro && lro > 1) {
+        info.lro_max_pkt_size = lro;
+    }
+}
+
+void DPDKDevice::set_jumbo(int jumbo) {
+    assert(!_is_initialized);
+    info.jumbo = jumbo > 0;
+    if (info.jumbo && jumbo == 1) {
+        info.jumbo_max_rx_pkt_size = info.DEF_LARGE_MTU;
+    } else if (info.jumbo && jumbo > 1) {
+        info.jumbo_max_rx_pkt_size = jumbo;
+    }
 }
 
 void DPDKDevice::set_rx_offload(uint64_t offload) {

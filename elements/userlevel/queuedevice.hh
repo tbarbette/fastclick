@@ -227,8 +227,8 @@ protected:
     bool _vlan_filter;
     bool _vlan_strip;
     bool _vlan_extend;
-    bool _lro;
-    bool _jumbo;
+    int _lro;
+    int _jumbo;
     bool _set_rss_aggregate;
     bool _set_paint_anno;
     int _threadoffset;
