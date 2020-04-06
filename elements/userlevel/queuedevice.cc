@@ -114,8 +114,8 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     _vlan_filter = false;
     _vlan_strip = false;
     _vlan_extend = false;
-    _lro = false;
-    _jumbo = false;
+    _lro = 0;
+    _jumbo = 0;
 
     if (Args(this, errh).bind(conf)
            .read_p("PROMISC", _promisc)

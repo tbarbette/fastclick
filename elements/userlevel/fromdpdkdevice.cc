@@ -118,6 +118,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     if (fc_mode != FC_UNSET)
         _dev->set_init_fc_mode(fc_mode);
 
+    _dev->set_lro(_lro);
+    _dev->set_jumbo(_jumbo);
+
     if (set_timestamp) {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
         _dev->set_rx_offload(DEV_RX_OFFLOAD_TIMESTAMP);
@@ -171,7 +174,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     if (ret != 0) return ret;
 
     for (unsigned i = (unsigned)firstqueue; i <= (unsigned)lastqueue; i++) {
-        ret = _dev->add_rx_queue(i , _promisc, _vlan_filter, _vlan_strip, _vlan_extend, _lro, _jumbo, ndesc, errh);
+        ret = _dev->add_rx_queue(i , _promisc, _vlan_filter, _vlan_strip, _vlan_extend, _lro > 0, _jumbo > 0, ndesc, errh);
         if (ret != 0) return ret;
     }
 
