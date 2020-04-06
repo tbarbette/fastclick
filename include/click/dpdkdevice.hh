@@ -132,6 +132,8 @@ public:
         FlowControlMode init_fc_mode;
         uint64_t rx_offload;
         uint64_t tx_offload;
+
+        const uint16_t LRO_MTU = 9000;
     };
 
     int add_rx_queue(

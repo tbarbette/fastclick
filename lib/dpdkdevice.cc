@@ -52,9 +52,7 @@ const char *DPDKDevice::get_device_driver()
     return info.driver;
 }
 
-
-
-#define RETA_CONF_SIZE     (ETH_RSS_RETA_SIZE_512 / RTE_RETA_GROUP_SIZE)
+#define RETA_CONF_SIZE (ETH_RSS_RETA_SIZE_512 / RTE_RETA_GROUP_SIZE)
 
 int DPDKDevice::set_rss_max(int max)
 {
@@ -289,7 +287,7 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0) && RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
     if (strcmp(dev_info.driver_name, "net_mlx5") == 0) {
-        errh->warning("WARNING : DPDK 17.11 to 18.02 included have broken support for secondary process with mlx5. Use 18.05 with mlx5 cards if you use secondary process.");
+        errh->warning("WARNING: DPDK 17.11 to 18.02 included have broken support for secondary process with mlx5. Use 18.05 with mlx5 cards if you use secondary process.");
     }
 #endif
 
@@ -486,34 +484,11 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
                 "Cannot initialize TX queue %u of port %u on node %u",
                 i, port_id, numa_node);
 
-    if (info.init_mtu != 0) {
-        if (dev_conf.rxmode.max_rx_pkt_len < info.init_mtu) {
-            dev_conf.rxmode.max_rx_pkt_len = info.init_mtu;
-        }
-        if (rte_eth_dev_set_mtu(port_id, info.init_mtu) != 0) {
-            return errh->error("Could not set MTU %d",info.init_mtu);
-        }
-    } else {
-    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
-        dev_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
-    #else
-        dev_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
-    #endif
-    }
-
     if (info.init_rss > 0) {
         if (set_rss_max(info.init_rss) != 0) {
             return errh->error("Could not set RSS to %d queues",info.init_rss);
         }
     }
-
-    int err = rte_eth_dev_start(port_id);
-    if (err < 0)
-        return errh->error(
-            "Cannot start DPDK port %u: error %d", port_id, err);
-
-    if (info.promisc)
-        rte_eth_promiscuous_enable(port_id);
 
     if (info.init_mac != EtherAddress()) {
         struct rte_ether_addr addr;
@@ -595,7 +570,13 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         if (!(dev_info.rx_offload_capa & DEV_RX_OFFLOAD_TCP_LRO)) {
             return errh->error("Large Receive Offload (LRO) is not supported by this device!");
         } else {
+            uint32_t new_mtu = (info.init_mtu > RTE_ETHER_MAX_LEN) ? (uint32_t) info.init_mtu : (uint32_t) info.LRO_MTU;
             dev_conf.rxmode.offloads |= DEV_RX_OFFLOAD_TCP_LRO;
+            dev_conf.rxmode.max_rx_pkt_len = new_mtu;
+            dev_conf.rxmode.max_lro_pkt_size = new_mtu;
+
+            set_init_mtu((uint16_t) new_mtu);
+            errh->message("Auto-setting MTU to %" PRIu32 " bytes due to LRO", new_mtu);
         }
         errh->message("Large Receive Offload (LRO): %s", (dev_conf.rxmode.offloads & DEV_RX_OFFLOAD_TCP_LRO) ? "enabled" : "disabled");
     } else {
@@ -625,6 +606,41 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         dev_conf.rxmode.offloads &= ~DEV_RX_OFFLOAD_JUMBO_FRAME;
     }
 #endif
+
+    if (info.init_mtu != 0) {
+        if (dev_conf.rxmode.max_rx_pkt_len < info.init_mtu) {
+            dev_conf.rxmode.max_rx_pkt_len = info.init_mtu;
+        }
+        if (rte_eth_dev_set_mtu(port_id, info.init_mtu) != 0) {
+            return errh->error("Could not set MTU of %d bytes. Please change the value and retry.", info.init_mtu);
+        } else {
+            errh->message("MTU: %" PRIu16 " bytes", info.init_mtu);
+        }
+    } else {
+    #if RTE_VERSION >= RTE_VERSION_NUM(19,8,0,0)
+        dev_conf.rxmode.max_rx_pkt_len = RTE_ETHER_MAX_LEN;
+    #else
+        dev_conf.rxmode.max_rx_pkt_len = ETHER_MAX_LEN;
+    #endif
+    }
+
+    // Apply the offloading configuration before starting the port
+    if ((ret = rte_eth_dev_configure(
+            port_id, info.rx_queues.size(),
+            info.tx_queues.size(), &dev_conf)) < 0)
+        return errh->error(
+            "Cannot initialize DPDK port %u with %u RX and %u TX queues\nError %d : %s",
+            port_id, info.rx_queues.size(), info.tx_queues.size(),
+            ret, strerror(ret));
+
+    // Now start the port
+    int err = rte_eth_dev_start(port_id);
+    if (err < 0)
+        return errh->error(
+            "Cannot start DPDK port %u: error %d", port_id, err);
+
+    if (info.promisc)
+        rte_eth_promiscuous_enable(port_id);
 
     return 0;
 }
