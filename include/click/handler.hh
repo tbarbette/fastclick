@@ -43,7 +43,7 @@ class Handler { public:
 	f_checkbox = 0x4000,	///< @brief Read/write handler is boolean and
 				///  should be rendered as a checkbox.
 	f_driver0 = 1U << 26,
-        f_driver1 = 1U << 27,   ///< @brief Uninterpreted handler flags
+    f_driver1 = 1U << 27,   ///< @brief Uninterpreted handler flags
 				///  available for drivers.
 	f_user_shift = 28,
 	f_user0 = 1U << f_user_shift,

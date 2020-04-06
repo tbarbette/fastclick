@@ -1,5 +1,5 @@
 /*
- * flowiploadbalancer.{cc,hh} -- TCP & UDP load-balancer
+ * FlowL2LoadBalancer.{cc,hh} -- TCP & UDP load-balancer
  * Tom Barbette
  *
  * Copyright (c) 2019-2020 KTH Royal Institute of Technology
@@ -18,32 +18,30 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
-#include <clicknet/ip.h>
-#include <clicknet/tcp.h>
+#include <clicknet/ether.h>
 #include <click/flow/flow.hh>
 
-#include "flowiploadbalancer.hh"
+#include "flowl2loadbalancer.hh"
 
 
 CLICK_DECLS
 
 //TODO : disable timer if own_state is false
 
-FlowIPLoadBalancer::FlowIPLoadBalancer() : _own_state(true), _accept_nonsyn(true)
+FlowL2LoadBalancer::FlowL2LoadBalancer() : _own_state(true), _accept_nonsyn(true)
 {
 }
 
-FlowIPLoadBalancer::~FlowIPLoadBalancer()
+FlowL2LoadBalancer::~FlowL2LoadBalancer()
 {
 }
 
 int
-FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
+FlowL2LoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String mode= "rr";
     if (Args(conf, this, errh)
-       .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
-       .read_mp("VIP", _vip)
+       .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<EtherAddress>>(),_dsts)
        .read("STATE", _own_state)
        .read("MODE", mode)
        .complete() < 0)
@@ -55,13 +53,13 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int FlowIPLoadBalancer::initialize(ErrorHandler *errh)
+int FlowL2LoadBalancer::initialize(ErrorHandler *errh)
 {
     return 0;
 }
 
 
-bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
+bool FlowL2LoadBalancer::new_flow(L2LBEntry* flowdata, Packet* p)
 {
     if (!isSyn(p)) {
         nat_info_chatter("Non syn establishment!");
@@ -78,17 +76,16 @@ bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
 }
 
 
-void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch)
+void FlowL2LoadBalancer::push_batch(int, L2LBEntry* flowdata, PacketBatch* batch)
 {
     auto fnt = [this,flowdata](Packet*&p) -> bool {
         WritablePacket* q =p->uniqueify();
         p = q;
 
         nat_debug_chatter("Packet for flow %d", flowdata->chosen_server);
-        IPAddress srv = _dsts[flowdata->chosen_server];
+        EtherAddress srv = _dsts[flowdata->chosen_server];
 
-        q->ip_header()->ip_dst = srv;
-        p->set_dst_ip_anno(srv);
+        memcpy(&q->ether_header()->ether_dhost, srv.data(), sizeof(EtherAddress));
         return true;
     };
     EXECUTE_FOR_EACH_PACKET_UNTIL_DROP(fnt, batch);
@@ -98,51 +95,7 @@ void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch
 }
 
 
-FlowIPLoadBalancerReverse::FlowIPLoadBalancerReverse() : _lb(0)
-{
-}
-
-FlowIPLoadBalancerReverse::~FlowIPLoadBalancerReverse()
-{
-}
-
-int
-FlowIPLoadBalancerReverse::configure(Vector<String> &conf, ErrorHandler *errh)
-{
-    Element* e;
-    if (Args(conf, this, errh)
-       .read_mp("LB",e)
-       .complete() < 0)
-        return -1;
-
-    _lb = reinterpret_cast<FlowIPLoadBalancer*>(e);
-    _lb->add_remote_element(this);
-    return 0;
-}
-
-
-int FlowIPLoadBalancerReverse::initialize(ErrorHandler *errh)
-{
-    return 0;
-}
-
-void FlowIPLoadBalancerReverse::push_batch(int, PacketBatch* batch)
-{
-    auto fnt = [this](Packet* &p) -> bool {
-        WritablePacket* q =p->uniqueify();
-        p = q;
-        q->ip_header()->ip_src = _lb->_vip;
-        return true;
-    };
-
-    EXECUTE_FOR_EACH_PACKET_UNTIL_DROP(fnt, batch);
-
-    if (batch)
-        checked_output_push_batch(0, batch);
-}
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(FlowIPLoadBalancerReverse)
-ELEMENT_MT_SAFE(FlowIPLoadBalancerReverse)
-EXPORT_ELEMENT(FlowIPLoadBalancer)
-ELEMENT_MT_SAFE(FlowIPLoadBalancer)
+EXPORT_ELEMENT(FlowL2LoadBalancer)
+ELEMENT_MT_SAFE(FlowL2LoadBalancer)

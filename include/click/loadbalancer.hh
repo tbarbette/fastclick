@@ -5,6 +5,7 @@
 #include <click/hashtable.hh>
 #include <click/ipflowid.hh>
 
+template <typename T>
 class LoadBalancer { public:
 
     LoadBalancer() : _current(0), _mode_case(weight_round_robin) {
@@ -22,7 +23,7 @@ class LoadBalancer { public:
     HashTable<String, LBMode> modetrans;
     per_thread<int> _current;
     String _lb_mode;
-    Vector <IPAddress> _dsts;
+    Vector <T> _dsts;
     Vector <int> _weights;
     LBMode _mode_case;
 
