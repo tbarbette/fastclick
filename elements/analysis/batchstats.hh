@@ -4,6 +4,7 @@
 #include <click/batchelement.hh>
 #include <click/multithread.hh>
 #include <click/vector.hh>
+#include <click/statvector.hh>
 CLICK_DECLS
 
 /*
@@ -15,15 +16,22 @@ BatchStats
 
 keep statistics about batching
 
+handlers
+
+* average : Average batch size
+* median : Median batch size
+* dump : Print the number of batches for each size seen
+
  */
 
-class BatchStats : public BatchElement { public:
+class BatchStats : public BatchElement, StatVector<int> { public:
 
     BatchStats() CLICK_COLD;
     ~BatchStats() CLICK_COLD;
 
     const char *class_name() const	{ return "BatchStats"; }
     const char *port_count() const	{ return PORTS_1_1; }
+    void * cast(const char *name);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
@@ -35,11 +43,7 @@ class BatchStats : public BatchElement { public:
 #endif
 
     void add_handlers();
-private:
 
-    per_thread_omem<Vector<int>> stats;
-    enum{H_MEDIAN,H_AVERAGE,H_DUMP};
-    static String read_handler(Element *e, void *thunk);
 };
 
 CLICK_ENDDECLS
