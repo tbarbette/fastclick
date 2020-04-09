@@ -22,7 +22,7 @@
 #include <click/hashmap.hh>
 #include <click/hashtable.hh>
 #include <click/dpdkdevice.hh>
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     #include <click/flowdispatcherparser.hh>
 #endif
 
@@ -31,7 +31,7 @@ CLICK_DECLS
 /**
  * DPDK's Flow API.
  */
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 
 class DPDKDevice;
 

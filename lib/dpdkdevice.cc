@@ -26,7 +26,7 @@
 #include <click/userutils.hh>
 #include <rte_errno.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     #include <click/flowdispatcher.hh>
 extern "C" {
     #include <rte_pmd_ixgbe.h>
@@ -39,7 +39,7 @@ DPDKDevice::DPDKDevice() : port_id(-1), info() {
 }
 
 DPDKDevice::DPDKDevice(portid_t port_id) : port_id(port_id) {
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
         if (port_id >= 0)
             initialize_flow_dispatcher(port_id, ErrorHandler::default_handler());
     #endif
@@ -94,7 +94,7 @@ int DPDKDevice::set_rss_max(int max)
     return status;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 /**
  * Called by the constructor of DPDKDevice.
  * Flow Dispatcher must be strictly invoked once for each port.
@@ -104,13 +104,13 @@ int DPDKDevice::set_rss_max(int max)
  */
 void DPDKDevice::initialize_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh)
 {
-    FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
-    if (!flow_dir) {
+    FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+    if (!flow_disp) {
         return;
     }
 
     // Verify
-    const portid_t p_id = flow_dir->get_port_id();
+    const portid_t p_id = flow_disp->get_port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
@@ -313,7 +313,7 @@ static String keep_token_left(String str, char delimiter)
 }
 
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 int DPDKDevice::set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
         const String &flow_rules_filename, ErrorHandler *errh)
@@ -329,7 +329,7 @@ int DPDKDevice::set_mode(
 
     if (mode == "none") {
         m = ETH_MQ_RX_NONE;
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     } else if ((mode == "rss") || (mode == FlowDispatcher::DISPATCHING_MODE) || (mode == "")) {
 #else
     } else if ((mode == "rss") || (mode == "")) {
@@ -378,15 +378,15 @@ int DPDKDevice::set_mode(
 
     }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     if (mode == FlowDispatcher::DISPATCHING_MODE) {
-        FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
-        flow_dir->set_active(true);
-        flow_dir->set_rules_filename(flow_rules_filename);
+        FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+        flow_disp->set_active(true);
+        flow_disp->set_rules_filename(flow_rules_filename);
         errh->message(
             "Flow Dispatcher (port %u): State %s - Isolation Mode %s - Source file '%s'",
             port_id,
-            flow_dir->active() ? "active" : "inactive",
+            flow_disp->active() ? "active" : "inactive",
             FlowDispatcher::isolated(port_id) ? "active" : "inactive",
             flow_rules_filename.empty() ? "None" : flow_rules_filename.c_str()
         );
@@ -694,7 +694,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         }
     }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     if (info.flow_isolate) {
         FlowDispatcher::set_isolation_mode(port_id, true);
     } else {
@@ -1054,7 +1054,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     _is_initialized = true;
 
     // Configure Flow Dispatcher
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     for (HashTable<portid_t, FlowDispatcher *>::iterator
             it = FlowDispatcher::dev_flow_disp.begin();
             it != FlowDispatcher::dev_flow_disp.end(); ++it) {
@@ -1078,24 +1078,24 @@ int DPDKDevice::initialize(ErrorHandler *errh)
     return 0;
 }
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 int DPDKDevice::configure_nic(const portid_t &port_id)
 {
     if (!_is_initialized) {
         return -1;
     }
 
-    FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id);
-    assert(flow_dir);
+    FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id);
+    assert(flow_disp);
 
     // Invoke Flow Dispatcher only if active
-    if (flow_dir->active()) {
+    if (flow_disp->active()) {
         // Retrieve the file that contains the rules (if any)
-        String rules_file = flow_dir->rules_filename();
+        String rules_file = flow_disp->rules_filename();
 
         // There is a file with (user-defined) rules
         if (!rules_file.empty()) {
-            if (flow_dir->add_rules_from_file(rules_file) >= 0)
+            if (flow_disp->add_rules_from_file(rules_file) >= 0)
                 return 0;
             else
                 return -1;
@@ -1113,7 +1113,7 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     HashTable<portid_t, FlowDispatcher *> map = FlowDispatcher::flow_dispatcher_map();
 
     for (HashTable<portid_t, FlowDispatcher *>::const_iterator
@@ -1123,13 +1123,13 @@ void DPDKDevice::cleanup(ErrorHandler *errh)
         }
 
         portid_t port_id = it.key();
-        FlowDispatcher *flow_dir = it.value();
+        FlowDispatcher *flow_disp = it.value();
 
         // Flush
-        uint32_t rules_flushed = flow_dir->flow_rules_flush();
+        uint32_t rules_flushed = flow_disp->flow_rules_flush();
 
         // Delete this instance
-        delete flow_dir;
+        delete flow_disp;
 
         // Report
         if (rules_flushed > 0) {

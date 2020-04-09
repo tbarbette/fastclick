@@ -23,7 +23,7 @@
 
 CLICK_DECLS
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 
 #include <rte_flow.h>
 
@@ -2782,6 +2782,6 @@ FlowDispatcher::nic_consistency_check(const int32_t &target_number_of_rules)
     nic_and_cache_counts_agree();
 }
 
-#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0) */
 
 CLICK_ENDDECLS

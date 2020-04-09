@@ -26,7 +26,7 @@ extern "C" {
 
 #include <rte_version.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 
 #include <rte_malloc.h>
 #include <rte_ethdev.h>
@@ -120,7 +120,7 @@ int cmdline_parse(
     const char *buf
 );
 
-#endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+#endif // /* RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0) */
 
 #ifdef __cplusplus
 }

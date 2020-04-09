@@ -22,7 +22,7 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     #include <click/flowdispatcherglue.hh>
 #endif
 
@@ -148,7 +148,7 @@ public:
         bool jumbo;
     };
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     void initialize_flow_dispatcher(
         const portid_t &port_id,
         ErrorHandler   *errh
@@ -197,7 +197,7 @@ public:
 
     static int get_port_numa_node(portid_t port_id);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     int set_mode(
         String mode, int num_pools, Vector<int> vf_vlan,
         const String &flow_rules_filename, ErrorHandler *errh
@@ -243,7 +243,7 @@ public:
 
     static unsigned int get_nb_txdesc(const portid_t &port_id);
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     static int configure_nic(const portid_t &port_id);
 #endif
 

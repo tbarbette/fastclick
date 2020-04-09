@@ -453,7 +453,11 @@ CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
 
 include $(RTE_SDK)/mk/internal/rte.build-pre.mk
 
-override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIBS)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 16 ] && [ "$(RTE_VER_MONTH)" -ge 07 ] ) || [ $(RTE_VER_YEAR) -ge 17 ] ) && echo true),true)
+	override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIBS)
+else
+	override LDFLAGS := $(DPDK_OLD_LDFLAGS)
+endif
 
 ############################################################
 ## Flow director library available at or after DPDK v20.02
@@ -514,4 +518,4 @@ else
 
 $(debug LIBRTE_PARSE=NO)
 
-endif # RTE_VERSION >= 17.05
+endif # RTE_VERSION >= 20.02

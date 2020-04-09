@@ -21,7 +21,7 @@
 
 CLICK_DECLS
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 
 /**
  * DPDK's flow parsing implementation.
@@ -108,6 +108,6 @@ flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
     return tot_line_len;
 }
 
-#endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+#endif // /* RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0) */
 
 CLICK_ENDDECLS

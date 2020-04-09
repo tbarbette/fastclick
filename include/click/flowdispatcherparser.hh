@@ -23,7 +23,7 @@
 #include <click/error.hh>
 #include <click/flowdispatcherglue.hh>
 
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 
 #define FLOWDISP_ERROR   ((int)-1)
 #define FLOWDISP_SUCCESS ((int) 0)
@@ -98,6 +98,6 @@ int flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *e
 
 CLICK_ENDDECLS
 
-#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0) */
 
 #endif /* CLICK_FLOWDISPATCHERPARSER_HH */

@@ -91,18 +91,18 @@ Integer. The maximum transfer unit of the device.
 =item MODE
 
 String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
-vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 17.05, flow_dir is also
+vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 20.02, flow_disp is also
 supported.
 
 =item FLOW_RULES_FILE
 
-String. For DPDK version >= 17.05, if MODE is set to flow_dir, a path to
-a file with Flow Director rules can be supplied to the device.
+String. For DPDK version >= 20.02, if MODE is set to flow_disp, a path to
+a file with Flow Dispatcher rules can be supplied to the device.
 These rules are installed in the NIC using DPDK's flow API.
 
 =item FLOW_ISOLATE
 
-Boolean. Requires MODE flow_dir. Isolated mode guarantees that all ingress
+Boolean. Requires MODE flow_disp. Isolated mode guarantees that all ingress
 traffic comes from defined flow rules only (current and future).
 If ingress traffic does not match any of the defined rules, it will be
 discarded by the NIC. Defaults to false.
@@ -367,7 +367,7 @@ Upon success, the number of deleted flow rules is returned, otherwise an error i
 
 =h rules_isolate write-only
 
-Enables/Disables Flow Director's isolation mode.
+Enables/Disables Flow Dispatcher's isolation mode.
 Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future).
 Usage:
     'rules_isolate 0' disables isolation.
@@ -425,12 +425,11 @@ public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
-    void clear_buffers();
     bool run_task(Task *);
     void run_timer(Timer* t);
+#if HAVE_DPDK_INTERRUPT
     void selected(int fd, int mask);
-
-    ToDPDKDevice *find_output_element();
+#endif
 
     inline DPDKDevice *get_device() {
         return _dev;
@@ -448,7 +447,7 @@ private:
     static int write_handler(
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
-#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     static int flow_handler (
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
@@ -468,7 +467,7 @@ private:
         h_mac, h_add_mac, h_remove_mac, h_vf_mac,
         h_mtu,
         h_device,
-    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
         h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
         h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
         h_rules_count, h_rules_count_with_hits, h_rule_packet_hits, h_rule_byte_count,

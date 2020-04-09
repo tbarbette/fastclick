@@ -6991,83 +6991,6 @@ else
     have_json=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcher.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcher.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowdispatcher.hh... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowdispatcher.hh"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_h=yes
-else
-  ac_have_flow_disp_h=no
-fi
-
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcherparser.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcherparser.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowdispatcherparser.hh... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowdispatcherparser.hh"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_p_h=yes
-else
-  ac_have_flow_disp_p_h=no
-fi
-
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcherglue.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcherglue.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowdispatcherglue.hh... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowdispatcherglue.hh"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_g_h=yes
-else
-  ac_have_flow_disp_g_h=no
-fi
-
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h" = "xyesyesyes"; then
-    have_flow_api=yes
-    $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
-
-else
-    have_flow_api=no
-fi
-
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
   enableval=$enable_select; :
@@ -11043,6 +10966,83 @@ fi
 if test "x$enable_cpu_load" = xyes; then
     $as_echo "#define HAVE_CLICK_LOAD 1" >>confdefs.h
 
+fi
+
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcher.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcher.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowdispatcher.hh... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$srcdir/include/click/flowdispatcher.hh"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  ac_have_flow_disp_h=yes
+else
+  ac_have_flow_disp_h=no
+fi
+
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcherparser.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcherparser.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowdispatcherparser.hh... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$srcdir/include/click/flowdispatcherparser.hh"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  ac_have_flow_disp_p_h=yes
+else
+  ac_have_flow_disp_p_h=no
+fi
+
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcherglue.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcherglue.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowdispatcherglue.hh... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$srcdir/include/click/flowdispatcherglue.hh"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  ac_have_flow_disp_g_h=yes
+else
+  ac_have_flow_disp_g_h=no
+fi
+
+if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR" = "xyesyesyes20"; then
+    have_flow_api=yes
+    $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
+
+else
+    have_flow_api=no
 fi
 
 
@@ -15931,6 +15931,12 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 
+if test "$have_flow_api" = yes; then
+    feedback="no"
+else
+    feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
+fi
+
 echo "
 
 Configuration Summary:
@@ -15950,4 +15956,10 @@ Configuration Summary:
     JSON   support:              ${have_json}
 "
 
-echo "Now type make to build FastClick..."
+if test "$feedback" != no; then
+    echo ""
+    echo $feedback
+    echo ""
+else
+    echo "Now type make to build FastClick..."
+fi
