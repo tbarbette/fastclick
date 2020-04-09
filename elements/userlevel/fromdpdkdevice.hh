@@ -41,44 +41,44 @@ Arguments:
 
 =item PORT
 
-Integer or PCI address.  Port identifier of the device, or a PCI address in the
+Integer or PCI address. Port identifier of the device or a PCI address in the
 format fffff:ff:ff.f
 
 =item QUEUE
 
-Integer.  A specific hardware queue to use. Default is 0.
+Integer. A specific hardware queue to use. Default is 0.
 
 =item N_QUEUES
 
-Integer.  Number of hardware queues to use. -1 or default is to use as many queues
+Integer. Number of hardware queues to use. -1 or default is to use as many queues
 as threads assigned to this element.
 
 =item PROMISC
 
-Boolean.  FromDPDKDevice puts the device in promiscuous mode if PROMISC is
+Boolean. FromDPDKDevice puts the device in promiscuous mode if PROMISC is
 true. The default is false.
 
 =item BURST
 
-Integer.  Maximal number of packets that will be processed before rescheduling.
+Integer. Maximal number of packets that will be processed before rescheduling.
 The default is 32.
 
 =item MAXTHREADS
 
-Maximal number of threads that this element will take to read packets from
+Integer. Maximal number of threads that this element will take to read packets from
 the input queue. If unset (or negative) all threads not pinned with a
 ThreadScheduler element will be shared among FromDPDKDevice elements and
 other input elements supporting multiqueue (extending QueueDevice)
 
 =item THREADOFFSET
 
-Specify which Click thread will handle this element. If multiple
+Integer. Specify which Click thread will handle this element. If multiple
 j threads are used, threads with id THREADOFFSET+j will be used. Default is
 to share the threads available on the device's NUMA node equally.
 
 =item NDESC
 
-Integer.  Number of descriptors per ring. The default is 256.
+Integer. Number of descriptors per ring. The default is 256.
 
 =item MAC
 
@@ -87,6 +87,34 @@ Colon-separated string. The device's MAC address.
 =item MTU
 
 Integer. The maximum transfer unit of the device.
+
+=item MODE
+
+String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
+vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 17.05, flow_dir is also
+supported.
+
+=item FLOW_RULES_FILE
+
+String. For DPDK version >= 17.05, if MODE is set to flow_dir, a path to
+a file with Flow Director rules can be supplied to the device.
+These rules are installed in the NIC using DPDK's flow API.
+
+=item FLOW_ISOLATE
+
+Boolean. Requires MODE flow_dir. Isolated mode guarantees that all ingress
+traffic comes from defined flow rules only (current and future).
+If ingress traffic does not match any of the defined rules, it will be
+discarded by the NIC. Defaults to false.
+
+=item VF_POOLS
+
+Integer. The number of virtual function pools to be used by VMDq.
+
+=item VF_VLAN
+
+Vector of Integers. Contains the VLAN tags to be used for dispatching input
+traffic using VLAN-based VMDq.
 
 =item PAUSE
 
@@ -111,25 +139,50 @@ field of each packet. Defaults to False.
 
 Boolean. If True, allocates CPU cores in a NUMA-aware fashion.
 
+=item NUMA_NODE
+
+Integer. Specify the NUMA node to undertake packet processing.
+
+=item RX_INTR
+
+Integer. Enables Rx interrupts if non-negative value is given.
+Defaults to -1 (no interrupts).
+
+=item SCALE
+
+String. Defines the scaling policy. Can be parallel or share.
+Scaling is disabled by default.
+
+=item TIMESTAMP
+
+Boolean. Enables hardware timestamping. Defaults to false.
+
+=item VLAN_FILTER
+
+Boolean. Per queue ability to filter received VLAN packets by the hardware. Defaults to false.
+
+=item VLAN_STRIP
+
+Boolean. Per queue ability to strip VLAN header by the hardware in received VLAN packets. Defaults to false.
+
+=item VLAN_EXTEND
+
+Boolean. Per queue ability to extend VLAN tagged packets via QinQ. Defaults to false.
+
+=item LRO
+
+Boolean. Enables hardware-based Large Receive Offloading (LRO).
+When set to true, the NIC coalesces consecutive frames of the same flow into larger frames.
+Defaults to false.
+
+=item JUMBO
+
+Boolean. Enables the reception of Jumbo frames by the hardware. Defaults to false.
+
 =item ACTIVE
 
 Boolean. If False, the device is only initialized. Use this when you want
 to read packet using secondary DPDK applications.
-
-=item TCO
-
-Boolean. If True, enables TCP Checksum Offload. Packets must be set with the
-checksum flag, eg with ResetTCPChecksum. Defaults to False.
-
-=item TSO
-
-Boolean. If True, enables TCP Segmentation Offload. Packets must be configured
-individually as per DPDK documentation. Defaults to False.
-
-=item IPCO
-
-Booelan. If True, enables IP checksum offload alone (not L4 as TCO).
-Defaults to False.
 
 =item VERBOSE
 
@@ -145,13 +198,208 @@ support.
 
   FromDPDKDevice(3, QUEUE 1) -> ...
 
+=h device read-only
+
+Returns the device number.
+
+=h duplex read-only
+
+Returns whether link is duplex (1) or not (0) for an active link (status is up).
+
+=h autoneg read-only
+
+Returns whether device supports auto negotiation.
+
+=h speed read-only
+
+Returns the device's link speed in Mbps.
+
+=h carrier read-only
+
+Returns the device's link status (1 for link up, otherwise 0).
+
+=h type read-only
+
+Returns the device's link type (only fiber is currently supported).
+
+=h xstats read-only
+
+Returns a device's detailed packet and byte counters.
+
+=h queue_count read-only
+
+Returns the number of used descriptors of a specific Rx queue.
+If no queue is specified, all queues' used descriptors are returned.
+
+=h queue_packets read-only
+
+Returns the number of packets of a specific Rx queue.
+If no queue is specified, all queues' packets are returned.
+
+=h queue_bytes read-only
+
+Returns the number of bytes of a specific Rx queue.
+If no queue is specified, all queues' bytes are returned.
+
+=h rule_packet_hits read-only
+
+Returns the number of packets matched by a specific rule.
+If no rule number is specified, an error is returned (aggregate statistics not supported).
+
+=h rule_byte_count read-only
+
+Returns the number of bytes matched by a specific rule.
+If no rule number is specified, an error is returned (aggregate statistics not supported).
+
+=h rules_aggr_stats read-only
+
+Returns aggregate rule statistics.
+
+=h active read-only
+
+Returns the status of the device (1 for active, otherwise 0).
+
+=h active/safe_active write-only
+
+Sets the status of the device (1 for active, otherwise 0).
+
 =h count read-only
 
 Returns the number of packets read by the device.
 
-=h reset_count write-only
+=h useful read-only
+
+Returns the number of useful runs of this device.
+This number corresponds to the number of times that the element is successfully scheduled to receive input packets.
+
+=h useless read-only
+
+Returns the number of useless runs of this device.
+This number corresponds to the number of times that the element is scheduled to receive input packets,
+but no packets are being received (idle CPU spinning).
+
+=h reset_counts write-only
 
 Resets "count" to zero.
+
+=h reset_load write-only
+
+Resets load counters to zero.
+
+=h nb_rx_queues read-only
+
+Returns the number of Rx queues of this device.
+
+=h nb_tx_queues read-only
+
+Returns the number of Tx queues of this device.
+
+=h nb_vf_pools read-only
+
+Returns the number of Virtual Function pools of this device.
+
+=h nb_rx_desc read-only
+
+Returns the number of Rx descriptors of this device.
+
+=h mac read-only
+
+Returns the Ethernet address of this device.
+
+=h vendor read-only
+
+Returns the vendor of this device.
+
+=h driver read-only
+
+Returns the driver of this device.
+
+=h add_mac write-only
+
+Sets the Ethernet address of this device.
+
+=h remove_mac write-only
+
+Removes the Ethernet address of this device.
+
+=h vf_mac_addr read-only
+
+Returns the Ethernet addresses of the Virtual Functions of this device.
+If JSON is supported, the return format is JSON, otherwise a string is returned.
+
+=h max_rss write-only
+
+Reconfigures the size of the RSS table.
+
+=h hw_count read-only
+
+Returns the number of packets received by this device, as computed by the hardware.
+
+=h hw_bytes read-only
+
+Returns the number of bytes received by this device, as computed by the hardware.
+
+=h hw_dropped read-only
+
+Returns the number of packets dropped by this device, as computed by the hardware.
+
+=h hw_errors read-only
+
+Returns the number of errors of this device, as computed by the hardware.
+
+=h nombufs read-only
+
+Returns the number of mbufs allocated for this devce.
+
+=h rule_add write-only
+
+Inserts a new rule into this device's rule table.
+The format of the rule must comply with testpmd. If so, the rule is translated into DPDK's Flow API format.
+For example: rule_add ingress pattern eth / ipv4 src is 192.168.100.7 dst is 192.168.1.7 / udp src is 53 / end actions queue index 3 / count / end
+A rule could be optionally prepended with the pattern 'flow create X' (where X is the correct port number), otherwise this pattern will be automatically prepended.
+Upon success, the ID of the added rule is returned, otherwise an error is returned.
+
+=h rules_del write-only
+
+Deletes a (set of) rule(s) from this device's rule table.
+Rule numbers to be deleted are specified as a space-separated list (e.g., rules_del 0 1 2).
+Upon success, the number of deleted flow rules is returned, otherwise an error is returned.
+
+=h rules_isolate write-only
+
+Enables/Disables Flow Director's isolation mode.
+Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future).
+Usage:
+    'rules_isolate 0' disables isolation.
+    'rules_isolate 1' enables isolation.
+
+=h rules_flush write-only
+
+Deletes all of the rules from this device's rule table.
+Upon success, the number of deleted flow rules is returned.
+
+=h rules_ids_global read-only
+
+Returns a string of space-separated global rule IDs that correspond to the rules being installed.
+
+=h rules_ids_internal read-only
+
+Returns a string of space-separated internal rule IDs that correspond to the rules being installed.
+
+=h rules_list read-only
+
+Returns the list of flow rules being installed along with statistics per rule.
+
+=h rules_list_with_hits read-only
+
+Returns the list of flow rules being installed that exhibit at least one hit.
+This list is a subset of the list returned by rules_list handler.
+
+=h rules_count read-only
+
+Returns the number of flow rules being installed.
+
+=h
 
 =a DPDKInfo, ToDPDKDevice */
 
@@ -177,23 +425,67 @@ public:
     int initialize(ErrorHandler *) CLICK_COLD;
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
+    void clear_buffers();
     bool run_task(Task *);
+    void run_timer(Timer* t);
+    void selected(int fd, int mask);
+
+    ToDPDKDevice *find_output_element();
+
+    inline DPDKDevice *get_device() {
+        return _dev;
+    }
+
 #if HAVE_DPDK_READ_CLOCK
     static uint64_t read_clock(void* thunk);
 #endif
 
 private:
-
+    static int reset_load_handler(
+        const String &, Element *, void *, ErrorHandler *
+    ) CLICK_COLD;
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(
         const String &, Element *, void *, ErrorHandler *
     ) CLICK_COLD;
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    static int flow_handler (
+        const String &, Element *, void *, ErrorHandler *
+    ) CLICK_COLD;
+#endif
     static String status_handler(Element *e, void *thunk) CLICK_COLD;
     static String statistics_handler(Element *e, void *thunk) CLICK_COLD;
     static int xstats_handler(int operation, String &input, Element *e,
                               const Handler *handler, ErrorHandler *errh);
+    enum {
+        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
+        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
+        h_stats_packets, h_stats_bytes,
+        h_active, h_safe_active,
+        h_xstats, h_queue_count,
+        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
+        h_rss,
+        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
+        h_mtu,
+        h_device,
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        h_rule_add, h_rules_del, h_rules_isolate, h_rules_flush,
+        h_rules_list, h_rules_list_with_hits, h_rules_ids_global, h_rules_ids_internal,
+        h_rules_count, h_rules_count_with_hits, h_rule_packet_hits, h_rule_byte_count,
+        h_rules_aggr_stats
+    #endif
+    };
 
     DPDKDevice* _dev;
+
+    int _rx_intr;
+    class FDState { public:
+        FDState() : timer(), mustresched(0), useful(0) {};
+        Timer* timer;
+        int mustresched;
+        int useful;
+    };
+    per_thread<FDState> _fdstate;
     bool _set_timestamp;
 };
 

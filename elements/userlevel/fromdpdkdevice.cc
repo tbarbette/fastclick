@@ -1,7 +1,7 @@
 // -*- c-basic-offset: 4; related-file-name: "fromdpdkdevice.hh" -*-
 /*
  * fromdpdkdevice.{cc,hh} -- element reads packets live from network via
- * the DPDK.
+ * the DPDK. Configures DPDK-based NICs via DPDK's Flow API.
  *
  * Copyright (c) 2014-2015 Cyril Soldani, University of Liège
  * Copyright (c) 2016-2017 Tom Barbette, University of Liège
@@ -25,13 +25,24 @@
 #include <click/standard/scheduleinfo.hh>
 #include <click/etheraddress.hh>
 #include <click/straccum.hh>
+
 #include "fromdpdkdevice.hh"
 #include "tscclock.hh"
+#include "todpdkdevice.hh"
+#if HAVE_JSON
+#include "../json/json.hh"
+#endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    #include <click/flowdispatcher.hh>
+#endif
 
 CLICK_DECLS
 
+#define LOAD_UNIT 10
+
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0)
+    _dev(0), _rx_intr(-1)
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -56,7 +67,15 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     bool has_mtu = false;
     bool set_timestamp = false;
     FlowControlMode fc_mode(FC_UNSET);
-
+    String mode = "";
+    int num_pools = 0;
+    Vector<int> vf_vlan;
+    int max_rss = 0;
+    bool has_rss = false;
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    String flow_rules_filename;
+    bool flow_isolate = false;
+#endif
     if (Args(this, errh).bind(conf)
         .read_mp("PORT", dev)
         .consume() < 0)
@@ -69,7 +88,16 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("NDESC", ndesc)
         .read("MAC", mac).read_status(has_mac)
         .read("MTU", mtu).read_status(has_mtu)
-        .read("MAXQUEUES", maxqueues)
+        .read("MODE", mode)
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        .read("FLOW_RULES_FILE", flow_rules_filename)
+        .read("FLOW_ISOLATE", flow_isolate)
+    #endif
+        .read("VF_POOLS", num_pools)
+        .read_all("VF_VLAN", vf_vlan)
+        .read("MAXQUEUES",maxqueues)
+        .read("RX_INTR", _rx_intr)
+        .read("MAX_RSS", max_rss).read_status(has_rss)
         .read("TIMESTAMP", set_timestamp)
         .read("PAUSE", fc_mode)
         .complete() < 0)
@@ -90,14 +118,14 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
 
     int r;
     if (n_queues == -1) {
-    if (firstqueue == -1) {
-        firstqueue = 0;
-        // With DPDK we'll take as many queues as available threads
-        r = configure_rx(numa_node, 1, maxqueues, errh);
-    } else {
-        // If a queue number is set, user probably wants only one queue
-        r = configure_rx(numa_node, 1, 1, errh);
-    }
+        if (firstqueue == -1) {
+            firstqueue = 0;
+            // With DPDK we'll take as many queues as available threads
+            r = configure_rx(numa_node, 1, maxqueues, errh);
+        } else {
+            // If a queue number is set, user probably wants only one queue
+            r = configure_rx(numa_node, 1, 1, errh);
+        }
     } else {
         if (firstqueue == -1)
             firstqueue = 0;
@@ -126,7 +154,26 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _set_timestamp = false;
     }
 
-    return 0;
+    if (has_rss)
+        _dev->set_init_rss_max(max_rss);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    if ((mode == FlowDispatcher::DISPATCHING_MODE) && (flow_rules_filename.empty())) {
+        errh->warning(
+            "Flow Dispatcher (port %s): FLOW_RULES_FILE is not set, "
+            "hence this NIC can only be configured by the handlers",
+            dev.c_str()
+        );
+    }
+
+    r = _dev->set_mode(mode, num_pools, vf_vlan, flow_rules_filename, errh);
+
+    _dev->set_flow_isolate(flow_isolate);
+#else
+    r = _dev->set_mode(mode, num_pools, vf_vlan, errh);
+#endif
+
+    return r;
 }
 
 #if HAVE_DPDK_READ_CLOCK
@@ -154,7 +201,6 @@ void* FromDPDKDevice::cast(const char* name) {
 #endif
     return RXQueueDevice::cast(name);
 }
-
 
 
 int FromDPDKDevice::initialize(ErrorHandler *errh)
@@ -201,12 +247,59 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
 #endif
     }
 
+    if (_rx_intr >= 0) {
+        for (int i = firstqueue; i <= lastqueue; i++) {
+            uint64_t data = _dev->port_id << CHAR_BIT | i;
+            ret = rte_eth_dev_rx_intr_ctl_q(_dev->port_id, i,
+                                            RTE_EPOLL_PER_THREAD,
+                                            RTE_INTR_EVENT_ADD,
+                                            (void *)((uintptr_t)data));
+            if (ret != 0) {
+                return errh->error(
+                    "Cannot initialize RX interrupt on this device"
+                );
+            }
+        }
+    }
+
+    for (int q = firstqueue; q <= lastqueue; q++) {
+        int i = thread_for_queue(q);
+        if (_fdstate.get_value(i).timer != 0)
+            continue;
+        _fdstate.get_value(i).timer = new Timer(this);
+        _fdstate.get_value(i).timer->initialize(this);
+        _fdstate.get_value(i).timer->move_thread(_fdstate.get_mapping(i));
+        if (_active)
+            _fdstate.get_value(i).timer->schedule_after_msec(1);
+    }
+
     return ret;
 }
 
 void FromDPDKDevice::cleanup(CleanupStage)
 {
+    DPDKDevice::cleanup(ErrorHandler::default_handler());
     cleanup_tasks();
+}
+
+void FromDPDKDevice::clear_buffers() {
+    rte_mbuf* pkts[32];
+    for (int q = firstqueue; q <= lastqueue; q++) {
+        unsigned n;
+        int tot = 0;
+        do {
+            n = rte_eth_rx_burst(_dev->port_id, q, pkts, 32);
+            tot += n;
+            for (int i = 0; i < n; i ++) {
+                 rte_pktmbuf_free(pkts[i]);
+            }
+            if (tot > _dev->get_nb_rxdesc()) {
+                click_chatter("WARNING : Called clear_buffers while receiving packets !");
+                break;
+            }
+        } while (n > 0);
+        click_chatter("Cleared %d buffers for queue %d",tot,q);
+    }
 }
 
 bool FromDPDKDevice::run_task(Task *t)
@@ -279,23 +372,81 @@ bool FromDPDKDevice::run_task(Task *t)
         }
     }
 
-    /*We reschedule directly, as we cannot know if there is actually packet
-     * available and dpdk has no select mechanism*/
-    t->fast_reschedule();
-    return (ret);
+    if (ret == 0) {
+        if (_rx_intr >= 0) {
+           for (int iqueue = queue_for_thisthread_begin();
+                iqueue<=queue_for_thisthread_end(); iqueue++) {
+               if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
+                   click_chatter("Could not enable interrupts");
+                   t->fast_reschedule();
+                   return 0;
+               }
+           }
+           struct rte_epoll_event event[queue_per_threads];
+           int n, i;
+           uint8_t port_id, queue_id;
+           void *data;
+           n = rte_epoll_wait(RTE_EPOLL_PER_THREAD, event, queue_per_threads, -1);
+           for (i = 0; i < n; i++) {
+                   data = event[i].epdata.data;
+                   port_id = ((uintptr_t)data) >> CHAR_BIT;
+                   assert(port_id == _dev->port_id);
+           }
+           this->selected(0, SELECT_READ);
+       }
+/*
+        if (_fdstate->useful > 0)
+            t->fast_reschedule();
+        else
+            _fdstate->mustresched = 1;*/
+        t->fast_reschedule();
+       return (ret);
+    } else {
+        _fdstate->useful++;
+        t->fast_reschedule();
+        return (ret);
+    }
 }
 
-enum {
-        h_vendor, h_driver, h_carrier, h_duplex, h_autoneg, h_speed, h_type,
-        h_ipackets, h_ibytes, h_imissed, h_ierrors, h_nombufs,
-        h_active,
-        h_xstats, h_queue_count, h_stats_packets, h_stats_bytes,
-        h_nb_rx_queues, h_nb_tx_queues, h_nb_vf_pools,
-        h_mac, h_add_mac, h_remove_mac, h_vf_mac,
-        h_mtu,
-        h_device,
-};
+void FromDPDKDevice::run_timer(Timer* t) {
 
+    int u = _fdstate->useful;
+    if (u > LOAD_UNIT)
+        u = LOAD_UNIT;
+
+    _thread_state->_useful += u;
+    _thread_state->_useless += LOAD_UNIT - u;
+    _fdstate->useful = 0;
+
+    if (_fdstate->mustresched == 1) {
+        _fdstate->mustresched = 0;
+        task_for_thread()->reschedule();
+    }
+
+    _fdstate->timer->reschedule_after_msec(1);
+}
+
+void FromDPDKDevice::selected(int fd, int mask) {
+    for (int iqueue = queue_for_thisthread_begin();
+            iqueue<=queue_for_thisthread_end(); iqueue++) {
+        if (rte_eth_dev_rx_intr_disable(_dev->port_id, iqueue) != 0) {
+            click_chatter("Could not disable interrupts");
+            return;
+        }
+    }
+    task_for_thread()->reschedule();
+}
+
+ToDPDKDevice *
+FromDPDKDevice::find_output_element() {
+    for (auto e : router()->elements()) {
+        ToDPDKDevice *td = dynamic_cast<ToDPDKDevice *>(e);
+        if (td != 0 && (td->_dev->port_id == _dev->port_id)) {
+            return td;
+        }
+    }
+    return 0;
+}
 
 String FromDPDKDevice::read_handler(Element *e, void * thunk)
 {
@@ -313,9 +464,11 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
               else
                   return String((int) fd->_dev->port_id);
         case h_nb_rx_queues:
-            return String(fd->_dev->nbRXQueues());
+            return String(fd->_dev->nb_rx_queues());
         case h_nb_tx_queues:
-            return String(fd->_dev->nbTXQueues());
+            return String(fd->_dev->nb_tx_queues());
+        case h_nb_vf_pools:
+            return String(fd->_dev->nb_vf_pools());
         case h_mtu: {
             uint16_t mtu;
             if (rte_eth_dev_get_mtu(fd->_dev->port_id, &mtu) != 0)
@@ -328,6 +481,28 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
             struct rte_ether_addr mac_addr;
             rte_eth_macaddr_get(fd->_dev->port_id, &mac_addr);
             return EtherAddress((unsigned char*)&mac_addr).unparse_colon();
+        }
+        case h_vf_mac: {
+#if HAVE_JSON
+            Json jaddr = Json::make_array();
+            for (int i = 0; i < fd->_dev->nb_vf_pools(); i++) {
+                struct rte_ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
+                jaddr.push_back(
+                    EtherAddress(
+                        reinterpret_cast<unsigned char *>(&mac)
+                    ).unparse_colon());
+            }
+            return jaddr.unparse();
+#else
+            String s = "";
+            for (int i = 0; i < fd->_dev->nb_vf_pools(); i++) {
+                struct rte_ether_addr mac = fd->_dev->gen_mac(fd->_dev->port_id, i);
+                s += EtherAddress(
+                        reinterpret_cast<unsigned char *>(&mac)
+                    ).unparse_colon() + ";";
+            }
+            return s;
+#endif
         }
         case h_vendor:
             return fd->_dev->get_device_vendor_name();
@@ -362,6 +537,9 @@ String FromDPDKDevice::status_handler(Element *e, void * thunk)
 #endif
       case h_speed:
           return String(link.link_speed);
+      case h_type:
+          //TODO
+          return String("fiber");
     }
     return 0;
 }
@@ -386,6 +564,36 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
             return String(stats.imissed);
         case h_ierrors:
             return String(stats.ierrors);
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        case h_rules_list: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_list();
+        }
+        case h_rules_list_with_hits: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_list(true);
+        }
+        case h_rules_ids_global: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rule_ids_global();
+        }
+        case h_rules_ids_internal: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rule_ids_internal();
+        }
+        case h_rules_count: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return String(FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_count_explicit());
+        }
+        case h_rules_count_with_hits: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return String(FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_with_hits_count());
+        }
+        case h_rules_isolate: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            return String(FlowDispatcher::isolated(port_id) ? "1" : "0");
+        }
+    #endif
         case h_nombufs:
             return String(stats.rx_nombuf);
         default:
@@ -418,30 +626,135 @@ int FromDPDKDevice::write_handler(
             }
             return 0;
         }
+        case h_safe_active:
         case h_active: {
             bool active;
             if (!BoolArg::parse(input,active))
                 return errh->error("Not a valid boolean");
             if (fd->_active != active) {
                 fd->_active = active;
-                if (fd->_active) {
-                    for (int i = 0; i < fd->_thread_state.weight(); i++) {
-                        if (fd->_thread_state.get_value(i).task)
-                            fd->_thread_state.get_value(i).task->reschedule();
-                    }
-                } else {
-                    for (int i = 0; i < fd->_thread_state.weight(); i++) {
-                        if (fd->_thread_state.get_value(i).task)
-                            fd->_thread_state.get_value(i).task->unschedule();
-                    }
+                Bitvector b(fd->router()->master()->nthreads());
+                fd->get_spawning_threads(b, true, -1);
+                if (fd->_active) { // Activating
+                    fd->trigger_thread_reconfiguration(true,[fd,thunk](){
+                        for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                            if (fd->_thread_state.get_value(i).task)
+                                fd->_thread_state.get_value(i).task->reschedule();
+                        }
+                        for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
+                            int i = fd->thread_for_queue(q);
+                            if (!fd->_fdstate.get_value(i).timer->scheduled())
+                                fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
+                        }
+                    }, b);
+                } else { // Deactivating
+                    fd->trigger_thread_reconfiguration(false,[fd](){
+                        for (int i = 0; i < fd->_thread_state.weight(); i++) {
+                            if (fd->_thread_state.get_value(i).task)
+                                fd->_thread_state.get_value(i).task->unschedule();
+                        }
+
+                        for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
+                            int i = fd->thread_for_queue(q);
+                            if (fd->_fdstate.get_value(i).timer->scheduled())
+                                fd->_fdstate.get_value(i).timer->unschedule();
+                        }
+                    }, b);
                 }
             }
             return 0;
+        }
+        case h_rss: {
+            int max;
+            if (!IntArg().parse<int>(input,max))
+                return errh->error("Not a valid integer");
+            return fd->_dev->set_rss_max(max);
         }
     }
     return -1;
 }
 
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+int FromDPDKDevice::flow_handler(
+        const String &input, Element *e, void *thunk, ErrorHandler *errh)
+{
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    if (!fd->get_device()) {
+        return -1;
+    }
+
+    portid_t port_id = fd->get_device()->get_port_id();
+    FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+    assert(flow_dir);
+
+    switch((uintptr_t) thunk) {
+        case h_rule_add: {
+            // Trim spaces left and right
+            String rule = input.trim_space().trim_space_left();
+
+            // A '\n' must be appended at the end of this rule, if not there
+            int eor_pos = rule.find_right('\n');
+            if ((eor_pos < 0) || (eor_pos != rule.length() - 1)) {
+                rule += "\n";
+            }
+
+            // Detect and remove unwanted components
+            if (!FlowDispatcher::filter_rule(rule)) {
+                return errh->error("Flow Dispatcher (port %u): Invalid rule '%s'", port_id, rule.c_str());
+            }
+
+            rule = "flow create " + String(port_id) + " " + rule;
+
+            // Parse the queue index to infer the CPU core
+            String queue_index_str = FlowDispatcher::fetch_token_after_keyword((char *) rule.c_str(), "queue index");
+            int core_id = atoi(queue_index_str.c_str());
+
+            const uint32_t int_rule_id = flow_dir->get_flow_cache()->next_internal_rule_id();
+            if (flow_dir->flow_rule_install(int_rule_id, (long) int_rule_id, core_id, rule) != 0) {
+                return -1;
+            }
+
+            return static_cast<int>(int_rule_id);
+        }
+        case h_rules_del: {
+            // Trim spaces left and right
+            String rule_ids_str = input.trim_space().trim_space_left();
+
+            // Split space-separated rule IDs
+            Vector<String> rules_vec = rule_ids_str.split(' ');
+            const uint32_t rules_nb = rules_vec.size();
+            if (rules_nb == 0) {
+                return -1;
+            }
+
+            // Store these rules IDs in an array
+            uint32_t rule_ids[rules_nb];
+            uint32_t i = 0;
+            auto it = rules_vec.begin();
+            while (it != rules_vec.end()) {
+                rule_ids[i++] = (uint32_t) atoi(it->c_str());
+                it++;
+            }
+
+            // Batch deletion
+            return flow_dir->flow_rules_delete((uint32_t *) rule_ids, rules_nb);
+        }
+        case h_rules_isolate: {
+            if (input.empty()) {
+                return errh->error("Flow Dispatcher (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", port_id);
+            }
+            bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
+            FlowDispatcher::set_isolation_mode(port_id, status);
+            return 0;
+        }
+        case h_rules_flush: {
+            return flow_dir->flow_rules_flush();
+        }
+    }
+
+    return -1;
+}
+#endif
 
 int FromDPDKDevice::xstats_handler(
         int operation, String &input, Element *e,
@@ -492,37 +805,77 @@ int FromDPDKDevice::xstats_handler(
         case h_queue_count:
             if (input == "") {
                 StringAccum acc;
-                for (uint16_t i = 0; i < fd->_dev->nbRXQueues(); i++) {
-                    int v = rte_eth_rx_queue_count(fd->_dev->port_id, i);
-                    acc << i << " = " << v << "\n";
+                for (uint16_t i = 0; i < fd->_dev->nb_rx_queues(); i++) {
+                    int v = rte_eth_rx_queue_count(fd->_dev->get_port_id(), i);
+                    acc << "Queue " << i << ": " << v << "\n";
                 }
                 input = acc.take_string();
             } else {
-                int v = rte_eth_rx_queue_count(fd->_dev->port_id, atoi(input.c_str()));
+                int v = rte_eth_rx_queue_count(fd->_dev->get_port_id(), atoi(input.c_str()));
                 input = String(v);
             }
             return 0;
-        case h_stats_packets:
-        case h_stats_bytes:
-            {
-                struct rte_eth_stats stats;
-                if (rte_eth_stats_get(fd->_dev->port_id, &stats))
-                    return -1;
-
-                int id = atoi(input.c_str());
-                if (id < 0 || id > RTE_ETHDEV_QUEUE_STAT_CNTRS)
-                    return -EINVAL;
-                uint64_t v;
-                if (op == h_stats_packets)
-                     v = stats.q_ipackets[id];
-                else
-                     v = stats.q_opackets[id];
-                input = String(v);
+    #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        case h_rule_byte_count:
+        case h_rule_packet_hits: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+            assert(flow_dir);
+            if (input == "") {
+                return errh->error("Aggregate flow rule counters are not supported. Please specify a rule number to query");
+            } else {
+                const uint32_t rule_id = atoi(input.c_str());
+                int64_t matched_pkts = -1;
+                int64_t matched_bytes = -1;
+                flow_dir->flow_rule_query(rule_id, matched_pkts, matched_bytes);
+                if (op == (int) h_rule_packet_hits) {
+                    input = String(matched_pkts);
+                } else {
+                    input = String(matched_bytes);
+                }
                 return 0;
             }
+        }
+        case h_rules_aggr_stats: {
+            portid_t port_id = fd->get_device()->get_port_id();
+            FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+            assert(flow_dir);
+            input = flow_dir->flow_rule_aggregate_stats();
+            return 0;
+        }
+    #endif
+        case h_stats_packets:
+        case h_stats_bytes: {
+            struct rte_eth_stats stats;
+            if (rte_eth_stats_get(fd->_dev->port_id, &stats))
+                return -1;
+
+            int id = atoi(input.c_str());
+            if (id < 0 || id > RTE_ETHDEV_QUEUE_STAT_CNTRS)
+                return -EINVAL;
+            uint64_t v;
+            if (op == (int) h_stats_packets)
+                 v = stats.q_ipackets[id];
+            else
+                 v = stats.q_ibytes[id];
+            input = String(v);
+            return 0;
+        }
         default:
             return -1;
     }
+}
+
+int FromDPDKDevice::reset_load_handler(
+        const String &input, Element *e, void *thunk, ErrorHandler *errh)
+{
+
+    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
+    for (unsigned int i = 0; i < fd->_thread_state.weight(); i ++) {
+        fd->_thread_state.get_value(i)._useless = 0;
+        fd->_thread_state.get_value(i)._useful = 0;
+    }
+    return 0;
 }
 
 void FromDPDKDevice::add_handlers()
@@ -541,26 +894,54 @@ void FromDPDKDevice::add_handlers()
     set_handler("queue_count", Handler::f_read | Handler::f_read_param, xstats_handler, h_queue_count);
     set_handler("queue_packets", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_packets);
     set_handler("queue_bytes", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_bytes);
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    set_handler(FlowDispatcher::FLOW_RULE_PACKET_HITS, Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_packet_hits);
+    set_handler(FlowDispatcher::FLOW_RULE_BYTE_COUNT,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_byte_count);
+    set_handler(FlowDispatcher::FLOW_RULE_AGGR_STATS,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
+#endif
 
     add_read_handler("active", read_handler, h_active);
     add_write_handler("active", write_handler, h_active);
+    add_write_handler("safe_active", write_handler, h_safe_active);
     add_read_handler("count", count_handler, h_count);
+    add_read_handler("useful", count_handler, h_useful);
+    add_read_handler("useless", count_handler, h_useless);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
+    add_write_handler("reset_load", reset_load_handler, 0, Handler::BUTTON);
 
     add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);
     add_read_handler("nb_tx_queues",read_handler, h_nb_tx_queues);
+    add_read_handler("nb_vf_pools",read_handler, h_nb_vf_pools);
+    add_data_handlers("nb_rx_desc", Handler::h_read, &ndesc);
 
     add_read_handler("mac",read_handler, h_mac);
     add_read_handler("vendor", read_handler, h_vendor);
     add_read_handler("driver", read_handler, h_driver);
     add_write_handler("add_mac",write_handler, h_add_mac, 0);
     add_write_handler("remove_mac",write_handler, h_remove_mac, 0);
+    add_read_handler("vf_mac_addr",read_handler, h_vf_mac);
+
+    add_write_handler("max_rss", write_handler, h_rss, 0);
 
     add_read_handler("hw_count",statistics_handler, h_ipackets);
     add_read_handler("hw_bytes",statistics_handler, h_ibytes);
     add_read_handler("hw_dropped",statistics_handler, h_imissed);
     add_read_handler("hw_errors",statistics_handler, h_ierrors);
     add_read_handler("nombufs",statistics_handler, h_nombufs);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+    add_write_handler(FlowDispatcher::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
+    add_write_handler(FlowDispatcher::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
+    add_write_handler(FlowDispatcher::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);
+    add_write_handler(FlowDispatcher::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
+    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_GLB,         statistics_handler, h_rules_ids_global);
+    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_INT,         statistics_handler, h_rules_ids_internal);
+    add_read_handler (FlowDispatcher::FLOW_RULE_LIST,            statistics_handler, h_rules_list);
+    add_read_handler (FlowDispatcher::FLOW_RULE_LIST_WITH_HITS,  statistics_handler, h_rules_list_with_hits);
+    add_read_handler (FlowDispatcher::FLOW_RULE_COUNT,           statistics_handler, h_rules_count);
+    add_read_handler (FlowDispatcher::FLOW_RULE_COUNT_WITH_HITS, statistics_handler, h_rules_count_with_hits);
+    add_read_handler (FlowDispatcher::FLOW_RULE_ISOLATE,         statistics_handler, h_rules_isolate);
+#endif
 
     add_read_handler("mtu",read_handler, h_mtu);
     add_data_handlers("burst", Handler::h_read | Handler::h_write, &_burst);

@@ -8,6 +8,8 @@
 #include <click/packetbatch.hh>
 #include <click/handler.hh>
 #include <click/sync.hh>
+#include <functional>
+
 CLICK_DECLS
 class Router;
 class Master;
@@ -114,6 +116,8 @@ class Element { public:
         CLEANUP_CONFIGURED,
         CLEANUP_INITIALIZE_FAILED,
         CLEANUP_INITIALIZED,
+        CLEANUP_THREAD_INITIALZE_FAILED,
+        CLEANUP_THREAD_INITIALIZED,
         CLEANUP_ROUTER_INITIALIZED,
         CLEANUP_MANUAL
     };
@@ -171,10 +175,23 @@ class Element { public:
     Bitvector get_passing_threads(Element* origin, int level = 0);
     Bitvector get_passing_threads();
 
+    Bitvector get_spawning_threads();
+
     int home_thread_id() const;
     virtual bool is_mt_safe();
     virtual bool do_mt_safe_check(ErrorHandler*);
     void add_remote_element(Element* e);
+
+    enum ThreadReconfigurationStage {
+        THREAD_INITIALIZE,
+        THREAD_RECONFIGURE_UP_PRE,
+        THREAD_RECONFIGURE_UP_POST,
+        THREAD_RECONFIGURE_DOWN_PRE,
+        THREAD_RECONFIGURE_DOWN_POST,
+    };
+
+    virtual int thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads);
+    void trigger_thread_reconfiguration(bool is_up, std::function<void()> ready, Bitvector threads);
 
     //Deprecated name, implement get_spawning_threads
     virtual bool get_runnable_threads(Bitvector&) final = delete;
