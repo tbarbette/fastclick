@@ -6,6 +6,7 @@ cache:
     - dpdk-18.08
     - dpdk-19.08
     - dpdk-19.11
+    - dpdk-20.02
     - tcpdump-4.9.3
     - netmap-11.1
 
@@ -35,6 +36,7 @@ env:
     - FRAMEWORK=dpdk VERSION=18.08 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=19.08 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=dpdk VERSION=19.11 CONFIG="--enable-batch --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=20.02 CONFIG="--enable-batch --disable-verbose-batch"
     - FRAMEWORK=vanilla CONFIG="--disable-batch"
     - FRAMEWORK=umultithread CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"
