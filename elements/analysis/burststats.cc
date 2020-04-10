@@ -1,9 +1,9 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * BurstStats.{cc,hh} -- batch statistics counter
+ * burststats.{cc,hh} -- burst statistics counter
  * Tom Barbette
  *
- * Copyright (c) 2016 University of Liege
+ * Copyright (c) 2020 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
