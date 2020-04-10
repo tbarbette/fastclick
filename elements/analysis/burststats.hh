@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
-#ifndef CLICK_BurstStats_HH
-#define CLICK_BurstStats_HH
+#ifndef CLICK_BURSTSTATS_HH
+#define CLICK_BURSTSTATS_HH
 #include <click/batchelement.hh>
 #include <click/multithread.hh>
 #include <click/vector.hh>
