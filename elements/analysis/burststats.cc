@@ -1,9 +1,9 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * batchstats.{cc,hh} -- batch statistics counter
+ * burststats.{cc,hh} -- burst statistics counter
  * Tom Barbette
  *
- * Copyright (c) 2016 University of Liege
+ * Copyright (c) 2020 KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -17,22 +17,22 @@
  */
 
 #include <click/config.h>
-#include "batchstats.hh"
+#include "burststats.hh"
 #include <click/string.hh>
 #include <click/straccum.hh>
 #include <click/args.hh>
 
 CLICK_DECLS
 
-BatchStats::BatchStats() : StatVector(Vector<int>(MAX_BATCH_SIZE,0))
+BurstStats::BurstStats() : StatVector(Vector<int>(1024,0))
 {
 }
 
-BatchStats::~BatchStats()
+BurstStats::~BurstStats()
 {
 }
 int
-BatchStats::configure(Vector<String> &conf, ErrorHandler *errh)
+BurstStats::configure(Vector<String> &conf, ErrorHandler *errh)
 {
 
     if (Args(conf, this, errh)
@@ -43,7 +43,7 @@ BatchStats::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 void *
-BatchStats::cast(const char *name)
+BurstStats::cast(const char *name)
 {
     if (strcmp(name, "StatVector") == 0)
 	return (StatVector*)this;
@@ -53,44 +53,41 @@ BatchStats::cast(const char *name)
 
 
 int
-BatchStats::initialize(ErrorHandler *errh)
+BurstStats::initialize(ErrorHandler *errh)
 {
     return 0;
 }
 
 void
-BatchStats::cleanup(CleanupStage)
+BurstStats::cleanup(CleanupStage)
 {
 
 }
 
 Packet*
-BatchStats::simple_action(Packet* p)
+BurstStats::simple_action(Packet* p)
 {
-    (*stats)[1]++;
+    if (AGGREGATE_ANNO(p) != s->last_anno) {
+        if (s->burstlen >= 1024)
+            s->burstlen = 1023;
+        (*stats)[s->burstlen]++;
+        s->burstlen = 1;
+        s->last_anno = AGGREGATE_ANNO(p);
+    } else {
+       s->burstlen++;
+    }
+
     return p;
 }
 
-#if HAVE_BATCH
-PacketBatch*
-BatchStats::simple_action_batch(PacketBatch* b)
-{
-    (*stats)[b->count()]++;
-    return b;
-}
-#endif
-
-
-
 void
-BatchStats::add_handlers()
+BurstStats::add_handlers()
 {
     add_stat_handler(this);
 }
 
-
 CLICK_ENDDECLS
 
 ELEMENT_REQUIRES(batch)
-EXPORT_ELEMENT(BatchStats)
-ELEMENT_MT_SAFE(BatchStats)
+EXPORT_ELEMENT(BurstStats)
+ELEMENT_MT_SAFE(BurstStats)
