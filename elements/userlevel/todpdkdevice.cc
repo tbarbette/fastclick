@@ -27,7 +27,7 @@ CLICK_DECLS
 ToDPDKDevice::ToDPDKDevice() :
     _iqueues(), _dev(0),
     _timeout(0), _congestion_warning_printed(false), _create(true),
-    _tso(0), _ipco(false)
+    _tso(0), _tco(false), _ipco(false)
 {
      _blocking = false;
      _burst = -1;

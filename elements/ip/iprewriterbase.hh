@@ -80,6 +80,12 @@ class IPRewriterHeap { public:
 
 };
 
+/**
+ * Base for Rewriter elements
+ *
+ * Flows are kept in a Map, implemented by y a hashtable. That is for efficient flow lookup.
+ * For expiration, flows are kept in a heap.
+ */
 class IPRewriterBase : public BatchElement { public:
 
     typedef HashContainer<IPRewriterEntry> Map;

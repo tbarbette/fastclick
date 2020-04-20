@@ -3,7 +3,10 @@
  * (checksums, lengths)
  * Eddie Kohler
  *
+ * Counter & handler updates by Georgios Katsikas
+ *
  * Copyright (c) 1999-2000 Massachusetts Institute of Technology
+ * Copyright (c) 2020 UBITECH and KTH Royal Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,18 +30,20 @@
 CLICK_DECLS
 
 const char *CheckUDPHeader::reason_texts[NREASONS] = {
-  "not UDP", "bad packet length", "bad UDP checksum"
+    "not UDP", "bad packet length", "bad UDP checksum"
 };
 
-CheckUDPHeader::CheckUDPHeader()
-  : _reason_drops(0)
+CheckUDPHeader::CheckUDPHeader() : _reason_drops(0), _checksum(true)
 {
-  _drops = 0;
+    _count = 0;
+    _drops = 0;
 }
 
 CheckUDPHeader::~CheckUDPHeader()
 {
-  delete[] _reason_drops;
+    if (_reason_drops) {
+        delete _reason_drops;
+    }
 }
 
 int
@@ -46,103 +51,114 @@ CheckUDPHeader::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool verbose = false;
     bool details = false;
+    bool checksum = true;
 
     if (Args(conf, this, errh)
-	.read("VERBOSE", verbose)
-	.read("DETAILS", details)
-	.complete() < 0)
-	return -1;
+        .read("VERBOSE", verbose)
+        .read("DETAILS", details)
+        .read("CHECKSUM", checksum)
+        .complete() < 0)
+        return -1;
 
-  _verbose = verbose;
-  if (details) {
-    _reason_drops = new atomic_uint32_t[NREASONS];
-    for (int i = 0; i < NREASONS; ++i)
-      _reason_drops[i] = 0;
-  }
+    _verbose = verbose;
+    _checksum = checksum;
+    if (details) {
+        _reason_drops = new atomic_uint64_t[NREASONS];
+        memset(_reason_drops, 0, NREASONS * sizeof(atomic_uint64_t));
+    }
 
-  return 0;
+    return 0;
 }
 
 Packet *
 CheckUDPHeader::drop(Reason reason, Packet *p)
 {
-  if (_drops == 0 || _verbose)
-    click_chatter("UDP header check failed: %s", reason_texts[reason]);
-  _drops++;
+    if (_drops == 0 || _verbose) {
+        click_chatter("UDP header check failed: %s", reason_texts[reason]);
+    }
+    _drops++;
 
-  if (_reason_drops)
-    _reason_drops[reason]++;
+    if (_reason_drops) {
+        _reason_drops[reason]++;
+    }
 
-  if (noutputs() == 2)
-    output(1).push(p);
-  else
-    p->kill();
+    if (noutputs() == 2) {
+        output(1).push(p);
+    } else {
+        p->kill();
+    }
 
-  return 0;
+    return 0;
 }
 
 Packet *
 CheckUDPHeader::simple_action(Packet *p)
 {
-  const click_ip *iph = p->ip_header();
-  const click_udp *udph = p->udp_header();
-  unsigned len, iph_len;
+    const click_ip *iph = p->ip_header();
 
-  if (!p->has_network_header() || iph->ip_p != IP_PROTO_UDP)
-    return drop(NOT_UDP, p);
+    if (!p->has_network_header() || iph->ip_p != IP_PROTO_UDP) {
+        return drop(NOT_UDP, p);
+    }
 
-  iph_len = iph->ip_hl << 2;
-  len = ntohs(udph->uh_ulen);
-  if (len < sizeof(click_udp)
-      || p->length() < len + iph_len + p->network_header_offset())
-    return drop(BAD_LENGTH, p);
+    const click_udp *udph = p->udp_header();
+    unsigned iph_len = iph->ip_hl << 2;
+    unsigned len = ntohs(udph->uh_ulen);
+    if (len < sizeof(click_udp) ||
+        p->length() < len + iph_len + p->network_header_offset()) {
+        return drop(BAD_LENGTH, p);
+    }
 
-  if (udph->uh_sum != 0) {
-    unsigned csum = click_in_cksum((unsigned char *)udph, len);
-    if (click_in_cksum_pseudohdr(csum, iph, len) != 0)
-      return drop(BAD_CHECKSUM, p);
-  }
+    if (udph->uh_sum != 0) {
+        if (_checksum) {
+            unsigned csum = click_in_cksum((unsigned char *)udph, len);
+            if (click_in_cksum_pseudohdr(csum, iph, len) != 0) {
+                return drop(BAD_CHECKSUM, p);
+            }
+        }
+    }
 
-  return p;
+    _count++;
+
+    return p;
 }
-
-#if HAVE_BATCH
-PacketBatch*
-CheckUDPHeader::simple_action_batch(PacketBatch * batch) {
-	EXECUTE_FOR_EACH_PACKET_DROPPABLE(CheckUDPHeader::simple_action,batch,[](Packet*){});
-	return batch;
-}
-#endif
 
 String
 CheckUDPHeader::read_handler(Element *e, void *thunk)
 {
-  CheckUDPHeader *c = reinterpret_cast<CheckUDPHeader *>(e);
-  switch ((intptr_t)thunk) {
+    CheckUDPHeader *c = reinterpret_cast<CheckUDPHeader *>(e);
 
-   case 0:			// drops
-    return String(c->_drops);
-
-   case 1: {			// drop_details
-     StringAccum sa;
-     for (int i = 0; i < NREASONS; i++)
-       sa << c->_reason_drops[i] << '\t' << reason_texts[i] << '\n';
-     return sa.take_string();
-   }
-
-   default:
-    return String("<error>");
-
-  }
+    switch ((intptr_t)thunk) {
+        case h_count: {
+            return String(c->_count);
+        }
+        case h_drops: {
+            return String(c->_drops);
+        }
+        case h_drop_details: {
+            StringAccum sa;
+            for (unsigned i = 0; i < NREASONS; i++) {
+                sa.snprintf(15, "%15" PRIu64, c->_reason_drops[i].value());
+                sa << " packets due to: ";
+                sa.snprintf(24, "%24s", reason_texts[i]);
+                sa << "\n";
+            }
+            return sa.take_string();
+        }
+        default: {
+            return String("<error>");
+        }
+    }
 }
 
 void
 CheckUDPHeader::add_handlers()
 {
-  add_read_handler("drops", read_handler, 0);
-  if (_reason_drops)
-    add_read_handler("drop_details", read_handler, 1);
+    add_read_handler("count", read_handler, h_count);
+    add_read_handler("drops", read_handler, h_drops);
+    if (_reason_drops)
+        add_read_handler("drop_details", read_handler, h_drop_details);
 }
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CheckUDPHeader)
+ELEMENT_MT_SAFE(CheckUDPHeader)

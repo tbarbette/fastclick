@@ -41,9 +41,10 @@ Resets C<count>, C<cycles>, and C<zero_count> counters to zero when written.
 
 =a SetCycleCount, RoundTripCycleCount, SetPerfCount, PerfCountAccum */
 
-#include <click/element.hh>
+#include <click/batchelement.hh>
+#include <click/sync.hh>
 
-class CycleCountAccum : public Element { public:
+class CycleCountAccum : public SimpleBatchElement<CycleCountAccum> { public:
 
     CycleCountAccum() CLICK_COLD;
     ~CycleCountAccum() CLICK_COLD;
@@ -51,17 +52,24 @@ class CycleCountAccum : public Element { public:
     const char *class_name() const	{ return "CycleCountAccum"; }
     const char *port_count() const	{ return PORTS_1_1; }
 
-    void add_handlers() CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
 
-    inline void rmaction(Packet *);
-    void push(int, Packet *p);
-    Packet *pull(int);
+    inline Packet* simple_action(Packet *);
+#if HAVE_BATCH
+    inline PacketBatch* simple_action_batch(PacketBatch *batch);
+#endif
 
   private:
 
-    uint64_t _accum;
-    uint64_t _count;
-    uint64_t _zero_count;
+    struct state {
+	state() : accum(0), count(0), zero_count(0) {
+
+	}
+	uint64_t accum;
+	uint64_t count;
+	uint64_t zero_count;
+    };
+    per_thread<state> _state;
 
     static String read_handler(Element *, void *) CLICK_COLD;
     static int reset_handler(const String &, Element*, void*, ErrorHandler*);

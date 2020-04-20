@@ -51,7 +51,7 @@ CLICK_DECLS
 #define MAX_MTU 9000
 
 FromDump::FromDump()
-    : _packet(0), _end_h(0), _count(0), _timer(this), _task(this), _preload_head(0), _force_len(DISABLED)
+    : _packet(0), _preload(0), _preload_head(0), _force_len(DISABLED), _end_h(0), _count(0),  _timer(this), _task(this)
 {
 }
 

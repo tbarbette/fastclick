@@ -68,6 +68,9 @@ static unsigned long greedy_schedule_jiffies;
 
 RouterThread::RouterThread(Master *master, int id)
     : _stop_flag(false), _master(master), _id(id), _driver_entered(false)
+#if HAVE_CLICK_LOAD
+    , _load_state()
+#endif
 {
     _pending_head.x = 0;
     _pending_tail = &_pending_head;
@@ -126,6 +129,9 @@ RouterThread::RouterThread(Master *master, int id)
 # endif
 #endif
 
+#if HAVE_CLICK_LOAD
+    UPDATE_TIME = cycles_hz() / 10;
+#endif
     static_assert(THREAD_QUIESCENT == (int) ThreadSched::THREAD_QUIESCENT
                   && THREAD_UNKNOWN == (int) ThreadSched::THREAD_UNKNOWN,
                   "Thread constants screwup.");
@@ -369,6 +375,11 @@ RouterThread::run_tasks(int ntasks)
 #endif
     bool work_done;
 
+#if HAVE_CLICK_LOAD
+    click_cycles_t useful = 0;
+    click_cycles_t useless = 0;
+#endif
+
     for (; ntasks >= 0; --ntasks) {
         t = task_begin();
         if (t == task_end() || _stop_flag)
@@ -382,7 +393,12 @@ RouterThread::run_tasks(int ntasks)
             continue;
         }
 
-#if HAVE_MULTITHREAD
+#if HAVE_TASK_STATS && HAVE_CLICK_LOAD
+        runs = t->cycle_runs();
+        cycles = click_get_cycles();
+#elif HAVE_CLICK_LOAD
+        cycles = click_get_cycles();
+#elif HAVE_TASK_STATS
         runs = t->cycle_runs();
         if (runs > PROFILE_ELEMENT)
             cycles = click_get_cycles();
@@ -391,7 +407,15 @@ RouterThread::run_tasks(int ntasks)
         t->_status.is_scheduled = false;
         work_done = t->fire();
 
-#if HAVE_MULTITHREAD
+#if HAVE_CLICK_LOAD
+        if (work_done) {
+            useful += click_get_cycles() - cycles;
+        } else {
+            useless += click_get_cycles() - cycles;
+        }
+#endif
+
+#if HAVE_TASK_STATS
         if (runs > PROFILE_ELEMENT) {
             unsigned delta = click_get_cycles() - cycles;
             t->update_cycles(delta/32 + (t->cycles()*31)/32);
@@ -448,9 +472,28 @@ RouterThread::run_tasks(int ntasks)
                 n->_prev = t;
             }
 #endif
-        } else
+        } else {
             t->remove_from_scheduled_list();
+        }
     }
+
+#if HAVE_CLICK_LOAD
+    if (useless > 0 || useful > 0) {
+	LoadState &ls = _load_state.write_begin();
+	ls.useless += useless;
+        ls.useful += useful;
+
+        if (cycles - ls.last_update > UPDATE_TIME) {
+            //click_chatter("[%d] %lu %lu %lu, %lu %lu",thread_id(), _useful, _useless, (_useful << 10) / (_useless + _useful), cycles - _last_update, UPDATE_TIME);
+            ls.load.update((ls.useful << 10) / (ls.useless + ls.useful));
+            ls.last_update = cycles;
+            ls.all_useful_kcycles += (ls.useful / 1000);
+            ls.useless = 0;
+            ls.useful = 0;
+        }
+        _load_state.write_commit();
+    }
+#endif
 
 #if CLICK_BSDMODULE && !BSD_NETISRSCHED
     splx(bsd_spl);
@@ -459,6 +502,32 @@ RouterThread::run_tasks(int ntasks)
     client_update_pass(C_CLICK, t_before);
 #endif
 }
+
+
+#if HAVE_CLICK_LOAD
+float
+RouterThread::load() {
+  return (float) _load_state.read().load.unscaled_average() / 1024;
+}
+
+unsigned long long
+RouterThread::load_cycles() {
+  const LoadState &ls = _load_state.read_begin();
+  uint64_t time = click_get_cycles() - ls.last_update;
+  double r = (double)ls.useful * ((double)UPDATE_TIME * 10 / (double)time) ;
+  _load_state.read_end();
+  return r;
+}
+
+unsigned long long
+RouterThread::useful_kcycles() {
+	const LoadState &ls = _load_state.read_begin();
+    unsigned long long uk = ls.all_useful_kcycles;
+    uk += ls.useful / 1000;
+    _load_state.read_end();
+    return uk;
+}
+#endif
 
 inline void
 RouterThread::run_os()
@@ -565,6 +634,13 @@ RouterThread::driver()
     click_current_thread_id = _id | 0x40000000;
 #  endif
 # endif
+#endif
+
+#if HAVE_CLICK_LOAD
+    //Initialize the load update time
+    LoadState &ls = _load_state.write_begin();
+    ls.last_update = click_get_cycles();
+    _load_state.write_commit();
 #endif
 
 #if CLICK_NS

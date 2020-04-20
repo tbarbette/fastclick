@@ -1,6 +1,6 @@
 #ifndef RTCYCLES_HH
 #define RTCYCLES_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 
 /*
  * =c
@@ -27,7 +27,7 @@
  * =a SetCycleCount, CycleCountAccum, SetPerfCount, PerfCountAccum
  */
 
-class RTCycles : public Element { public:
+class RTCycles : public BatchElement { public:
 
   RTCycles() CLICK_COLD;
   ~RTCycles() CLICK_COLD;
@@ -37,10 +37,24 @@ class RTCycles : public Element { public:
 
   void push(int, Packet *p);
   Packet *pull(int);
+#if HAVE_BATCH
+  void push_batch(int, PacketBatch *b) override;
+  PacketBatch *pull_batch(int,unsigned) override;
+#endif
   void add_handlers() CLICK_COLD;
 
-    click_cycles_t _accum;
-    click_cycles_t _npackets;
+  struct state {
+	  state() : accum(0), npackets(0) {
+
+	  }
+    click_cycles_t accum;
+    click_cycles_t npackets;
+  };
+  per_thread<state> _state;
+
+
+  static String read_handler(Element *, void *) CLICK_COLD;
+  static int reset_handler(const String &, Element*, void*, ErrorHandler*);
 
 };
 

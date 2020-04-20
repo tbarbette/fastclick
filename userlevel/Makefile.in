@@ -67,7 +67,7 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 	ipaddress.o ipflowid.o etheraddress.o \
 	packet.o packetbatch.o \
 	error.o timestamp.o glue.o task.o timer.o atomic.o fromfile.o gaprate.o \
-	element.o batchelement.o \
+	element.o batchelement.o tcphelper.o flowelement.o flow.o \
 	allocator.o \
 	confparse.o args.o variableenv.o lexer.o elemfilter.o routervisitor.o \
 	routerthread.o router.o master.o timerset.o selectset.o handlercall.o notifier.o \
@@ -117,6 +117,9 @@ RTE_VER_MONTH = @RTE_VER_MONTH@
 include dpdk.mk
 endif
 EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
+	ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
+		EXTRA_DRIVER_OBJS := flowdispatcher.o flowdispatcherparser.o $(EXTRA_DRIVER_OBJS)
+	endif
 endif
 
 USE_XDP = @USE_XDP@
@@ -155,9 +158,22 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
 endif
 
+# At of after DPDK 20.02, compile against an additional library librte_parse (flow dispatcher)
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
+ddeps: Makefile librte_parse.a libclick.a $(OBJS)
+
+$(DRIVER): ${PARSE_PATH}.sentinel ddeps
+	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a librte_parse.a $(LIBS),LINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+else ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 17 ] && [ "$(RTE_VER_MONTH)" -ge 5 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
+$(DRIVER): Makefile libclick.a $(OBJS)
+	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS),LINK)
+	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+else
 $(DRIVER): Makefile libclick.a $(OBJS)
 	$(call cxxlink,$(DL_LDFLAGS) $(OBJS) libclick.a $(LIBS) $(DPDK_LIBS),LINK)
 	@-mkdir -p ../bin; rm -f ../bin/$@; ln -s ../userlevel/$@ ../bin/$@
+endif
 
 libclick.a: Makefile $(LIBOBJS)
 	$(call verbose_cmd,$(AR_CREATE) libclick.a $(LIBOBJS),AR libclick.a)
@@ -199,6 +215,9 @@ uninstall:
 
 clean:
 	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
+	rm -rf test-pmd/ ../lib/librte_parse_* librte_parse.*
+endif
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
 	cd bpf && $(MAKE) clean
 clean-lib:

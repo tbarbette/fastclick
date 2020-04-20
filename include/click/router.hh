@@ -5,9 +5,14 @@
 #include <click/timer.hh>
 #include <click/sync.hh>
 #include <click/task.hh>
+#include <click/vector.hh>
+#include <click/pair.hh>
 #include <click/standard/threadsched.hh>
 #if CLICK_NS
 # include <click/simclick.h>
+#endif
+#if CLICK_USERLEVEL
+#include <functional>
 #endif
 CLICK_DECLS
 class Master;
@@ -57,7 +62,12 @@ class Router { public:
     Element* find(const String& name, String context, ErrorHandler* errh = 0) const;
     Element* find(const String& name, const Element* context, ErrorHandler* errh = 0) const;
 
-    int visit(Element *e, bool isoutput, int port, RouterVisitor *visitor) const;
+    bool element_can_reach(Element* a, Element* b);
+    int visit(Element *e, bool isoutput, int port, RouterVisitor *visitor, bool all_paths = false) const;
+    int visit_ports(Element *e, bool isoutput, int port, RouterVisitor *visitor) const;
+    int visit_paths(Element *e, bool isoutput, int port, RouterVisitor *visitor) const {
+        return visit(e, isoutput, port, visitor, true);
+    }
     int visit_downstream(Element *e, int port, RouterVisitor *visitor) const;
     int visit_upstream(Element *e, int port, RouterVisitor *visitor) const;
 
@@ -74,6 +84,7 @@ class Router { public:
     static void add_write_handler(const Element *e, const String &hname, WriteHandlerCallback callback, void *user_data, uint32_t flags = 0);
     static void set_handler(const Element *e, const String &hname, uint32_t flags, HandlerCallback callback, void *read_user_data = 0, void *write_user_data = 0);
     static int set_handler_flags(const Element *e, const String &hname, uint32_t set_flags, uint32_t clear_flags = 0);
+    static int router_handler(int operation, String &data, Element *e, const Handler *handler, ErrorHandler *errh);
 
     enum { FIRST_GLOBAL_HANDLER = 0x40000000 };
     static int hindex(const Element *e, const String &hname);
@@ -133,6 +144,38 @@ class Router { public:
     inline Router* hotswap_router() const;
     void set_hotswap_router(Router* router);
 
+#if CLICK_USERLEVEL
+    /**
+     * Node of a dependency graph
+     *
+     * The node has multiple children. It should resolve all children (default action of solve_initialize)
+     * then return.
+     *
+     * post() allows to post a new children.
+     *
+     * postOnce() allows to post a child, but does nothing if it's already in the list.
+     *
+     * Used to solve dependencies in router initialization.
+     */
+    class InitFuture { public:
+        InitFuture();
+        ~InitFuture();
+
+        virtual int solve_initialize(ErrorHandler* errh);
+
+        void postOnce(InitFuture* future);
+
+        void post(std::function<int(void)>);
+        virtual void post(InitFuture* future);
+    protected:
+        Vector<InitFuture*> _children;
+    };
+    InitFuture _root_init_future;
+
+    InitFuture* get_root_init_future() {
+        return &_root_init_future;
+    }
+#endif
     int initialize(ErrorHandler* errh);
     void activate(bool foreground, ErrorHandler* errh);
     inline void activate(ErrorHandler* errh);

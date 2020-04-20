@@ -8,7 +8,7 @@ CLICK_DECLS
   @brief Click's vector container template. */
 
 /** @cond never */
-template <typename AM> class vector_memory { public:
+template <typename AM,size_t ALIGNMENTM> class vector_memory { public:
     typedef int size_type;
     typedef typename AM::type type;
     typedef type *iterator;
@@ -22,7 +22,7 @@ template <typename AM> class vector_memory { public:
     }
     ~vector_memory();
 
-    void assign(const vector_memory<AM> &x);
+    void assign(const vector_memory<AM,ALIGNMENTM> &x);
     void assign(size_type n, const type *vp);
     void resize(size_type n, const type *vp);
     iterator begin() {
@@ -63,7 +63,7 @@ template <typename AM> class vector_memory { public:
 	n_ = 0;
     }
     bool reserve_and_push_back(size_type n, const type *vp);
-    void swap(vector_memory<AM> &x);
+    void swap(vector_memory<AM,ALIGNMENTM> &x);
 
     type *l_;
     size_type n_;
@@ -107,11 +107,11 @@ template <typename AM> class vector_memory { public:
   printf("%d\n", v[0]);             // prints "2"
   @endcode
 */
-template <typename T>
+template <typename T, size_t ALIGNMENT=CLICK_DEFAULT_ALIGNMENT>
 class Vector {
 
     typedef typename array_memory<T>::type array_memory_type;
-    mutable vector_memory<array_memory_type> vm_;
+    mutable vector_memory<array_memory_type,ALIGNMENT> vm_;
 
   public:
 
@@ -136,16 +136,16 @@ class Vector {
 
     explicit inline Vector();
     explicit inline Vector(size_type n, value_argument_type v);
-    inline Vector(const Vector<T> &x);
+    inline Vector(const Vector<T,ALIGNMENT> &x);
 #if HAVE_CXX_RVALUE_REFERENCES
-    inline Vector(Vector<T> &&x);
+    inline Vector(Vector<T,ALIGNMENT> &&x);
 #endif
 
-    inline Vector<T> &operator=(const Vector<T> &x);
+    inline Vector<T,ALIGNMENT> &operator=(const Vector<T,ALIGNMENT> &x);
 #if HAVE_CXX_RVALUE_REFERENCES
-    inline Vector<T> &operator=(Vector<T> &&x);
+    inline Vector<T,ALIGNMENT> &operator=(Vector<T,ALIGNMENT> &&x);
 #endif
-    inline Vector<T> &assign(size_type n, value_argument_type v = T());
+    inline Vector<T,ALIGNMENT> &assign(size_type n, value_argument_type v = T());
 
     inline iterator begin();
     inline iterator end();
@@ -193,46 +193,46 @@ class Vector {
 
     inline void clear();
 
-    inline void swap(Vector<T> &x);
+    inline void swap(Vector<T,ALIGNMENT> &x);
 
     inline void shuffle(int n);
 
 };
 
 /** @brief Construct an empty vector. */
-template <typename T>
-inline Vector<T>::Vector() {
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT>::Vector() {
 }
 
 /** @brief Construct a vector containing @a n copies of @a v. */
-template <typename T>
-inline Vector<T>::Vector(size_type n, value_argument_type v) {
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT>::Vector(size_type n, value_argument_type v) {
     vm_.resize(n, array_memory_type::cast(&v));
 }
 
 /** @brief Construct a vector as a copy of @a x. */
-template <typename T>
-inline Vector<T>::Vector(const Vector<T> &x) {
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT>::Vector(const Vector<T,ALIGNMENT> &x) {
     vm_.assign(x.vm_);
 }
 
 #if HAVE_CXX_RVALUE_REFERENCES
 /** @overload */
-template <typename T>
-inline Vector<T>::Vector(Vector<T> &&x) {
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT>::Vector(Vector<T,ALIGNMENT> &&x) {
     vm_.swap(x.vm_);
 }
 #endif
 
 /** @brief Return the number of elements. */
-template <typename T>
-inline typename Vector<T>::size_type Vector<T>::size() const {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::size_type Vector<T,ALIGNMENT>::size() const {
     return vm_.n_;
 }
 
 /** @brief Test if the vector is empty (size() == 0). */
-template <typename T>
-inline bool Vector<T>::empty() const {
+template <typename T, size_t ALIGNMENT>
+inline bool Vector<T,ALIGNMENT>::empty() const {
     return vm_.n_ == 0;
 }
 
@@ -241,60 +241,60 @@ inline bool Vector<T>::empty() const {
     The capacity is greater than or equal to the size(). Functions such as
     resize(n) will not allocate new memory for the vector if n <=
     capacity(). */
-template <typename T>
-inline typename Vector<T>::size_type Vector<T>::capacity() const {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::size_type Vector<T,ALIGNMENT>::capacity() const {
     return vm_.capacity_;
 }
 
 /** @brief Return an iterator for the first element in the vector. */
-template <typename T>
-inline typename Vector<T>::iterator Vector<T>::begin() {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::iterator Vector<T,ALIGNMENT>::begin() {
     return (iterator) vm_.l_;
 }
 
 /** @overload */
-template <typename T>
-inline typename Vector<T>::const_iterator Vector<T>::begin() const {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::const_iterator Vector<T,ALIGNMENT>::begin() const {
     return (const_iterator) vm_.l_;
 }
 
 /** @brief Return an iterator for the end of the vector.
     @invariant end() == begin() + size() */
-template <typename T>
-inline typename Vector<T>::iterator Vector<T>::end() {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::iterator Vector<T,ALIGNMENT>::end() {
     return (iterator) vm_.l_ + vm_.n_;
 }
 
 /** @overload */
-template <typename T>
-inline typename Vector<T>::const_iterator Vector<T>::end() const {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::const_iterator Vector<T,ALIGNMENT>::end() const {
     return (const_iterator) vm_.l_ + vm_.n_;
 }
 
 /** @brief Return a const_iterator for the beginning of the vector. */
-template <typename T>
-inline typename Vector<T>::const_iterator Vector<T>::cbegin() const {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::const_iterator Vector<T,ALIGNMENT>::cbegin() const {
     return (const_iterator) vm_.l_;
 }
 
 /** @brief Return a const_iterator for the end of the vector.
     @invariant cend() == cbegin() + size() */
-template <typename T>
-inline typename Vector<T>::const_iterator Vector<T>::cend() const {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::const_iterator Vector<T,ALIGNMENT>::cend() const {
     return (iterator) vm_.l_ + vm_.n_;
 }
 
 /** @brief Return a reference to the <em>i</em>th element.
     @pre 0 <= @a i < size() */
-template <typename T>
-inline T &Vector<T>::operator[](size_type i) {
+template <typename T, size_t ALIGNMENT>
+inline T &Vector<T,ALIGNMENT>::operator[](size_type i) {
     assert((unsigned) i < (unsigned) vm_.n_);
     return *(T *)&vm_.l_[i];
 }
 
 /** @overload */
-template <typename T>
-inline const T &Vector<T>::operator[](size_type i) const {
+template <typename T, size_t ALIGNMENT>
+inline const T &Vector<T,ALIGNMENT>::operator[](size_type i) const {
     assert((unsigned) i < (unsigned) vm_.n_);
     return *(T *)&vm_.l_[i];
 }
@@ -302,40 +302,40 @@ inline const T &Vector<T>::operator[](size_type i) const {
 /** @brief Return a reference to the <em>i</em>th element.
     @pre 0 <= @a i < size()
     @sa operator[]() */
-template <typename T>
-inline T &Vector<T>::at(size_type i) {
+template <typename T, size_t ALIGNMENT>
+inline T &Vector<T,ALIGNMENT>::at(size_type i) {
     return operator[](i);
 }
 
 /** @overload */
-template <typename T>
-inline const T &Vector<T>::at(size_type i) const {
+template <typename T, size_t ALIGNMENT>
+inline const T &Vector<T,ALIGNMENT>::at(size_type i) const {
     return operator[](i);
 }
 
 /** @brief Return a reference to the first element.
     @pre !empty() */
-template <typename T>
-inline T &Vector<T>::front() {
+template <typename T, size_t ALIGNMENT>
+inline T &Vector<T,ALIGNMENT>::front() {
     return operator[](0);
 }
 
 /** @overload */
-template <typename T>
-inline const T &Vector<T>::front() const {
+template <typename T, size_t ALIGNMENT>
+inline const T &Vector<T,ALIGNMENT>::front() const {
     return operator[](0);
 }
 
 /** @brief Return a reference to the last element (number size()-1).
     @pre !empty() */
-template <typename T>
-inline T &Vector<T>::back() {
+template <typename T, size_t ALIGNMENT>
+inline T &Vector<T,ALIGNMENT>::back() {
     return operator[](vm_.n_ - 1);
 }
 
 /** @overload */
-template <typename T>
-inline const T &Vector<T>::back() const {
+template <typename T, size_t ALIGNMENT>
+inline const T &Vector<T,ALIGNMENT>::back() const {
     return operator[](vm_.n_ - 1);
 }
 
@@ -344,25 +344,25 @@ inline const T &Vector<T>::back() const {
 
     Unlike operator[]() and at(), this function does not check bounds,
     even if assertions are enabled. Use with caution. */
-template <typename T>
-inline T &Vector<T>::unchecked_at(size_type i) {
+template <typename T, size_t ALIGNMENT>
+inline T &Vector<T,ALIGNMENT>::unchecked_at(size_type i) {
     return *(T *)&vm_.l_[i];
 }
 
 /** @overload */
-template <typename T>
-inline const T &Vector<T>::unchecked_at(size_type i) const {
+template <typename T, size_t ALIGNMENT>
+inline const T &Vector<T,ALIGNMENT>::unchecked_at(size_type i) const {
     return *(T *)&vm_.l_[i];
 }
 
 /** @cond never */
-template <typename T>
-inline T &Vector<T>::at_u(size_type i) {
+template <typename T, size_t ALIGNMENT>
+inline T &Vector<T,ALIGNMENT>::at_u(size_type i) {
     return unchecked_at(i);
 }
 
-template <typename T>
-inline const T &Vector<T>::at_u(size_type i) const {
+template <typename T, size_t ALIGNMENT>
+inline const T &Vector<T,ALIGNMENT>::at_u(size_type i) const {
     return unchecked_at(i);
 }
 /** @endcond never */
@@ -370,22 +370,22 @@ inline const T &Vector<T>::at_u(size_type i) const {
 /** @brief Return a pointer to the vector's data.
 
     May be null if empty(). */
-template <typename T>
-inline T *Vector<T>::data() {
+template <typename T, size_t ALIGNMENT>
+inline T *Vector<T,ALIGNMENT>::data() {
     return (T *) vm_.l_;
 }
 
 /** @overload */
-template <typename T>
-inline const T *Vector<T>::data() const {
+template <typename T, size_t ALIGNMENT>
+inline const T *Vector<T,ALIGNMENT>::data() const {
     return (const T *) vm_.l_;
 }
 
 /** @brief Resize the vector to contain @a n elements.
     @param n new size
     @param v value used to fill new elements */
-template <typename T>
-inline void Vector<T>::resize(size_type n, value_argument_type v) {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::resize(size_type n, value_argument_type v) {
     vm_.resize(n, array_memory_type::cast(&v));
 }
 
@@ -393,15 +393,15 @@ inline void Vector<T>::resize(size_type n, value_argument_type v) {
 
     A copy of @a v is inserted at position size(). Takes amortized O(1)
     time. */
-template <typename T>
-inline void Vector<T>::push_back(value_argument_type v) {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::push_back(value_argument_type v) {
     vm_.push_back(array_memory_type::cast(&v));
 }
 
 #if HAVE_CXX_RVALUE_REFERENCES
 /** @overload */
-template <typename T> template <typename A>
-inline typename A::enable_rvalue_reference Vector<T>::push_back(T&& v)
+template <typename T, size_t ALIGNMENT> template <typename A>
+inline typename A::enable_rvalue_reference Vector<T,ALIGNMENT>::push_back(T&& v)
 {
     vm_.move_construct_back(array_memory_type::cast(&v));
 }
@@ -410,8 +410,8 @@ inline typename A::enable_rvalue_reference Vector<T>::push_back(T&& v)
 /** @brief Remove the last element.
 
     Takes O(1) time. */
-template <typename T>
-inline void Vector<T>::pop_back() {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::pop_back() {
     vm_.pop_back();
 }
 
@@ -419,8 +419,8 @@ inline void Vector<T>::pop_back() {
 
     A copy of @a v is added to position 0. Other elements are shifted one
     position forward. Takes O(size()) time. */
-template <typename T>
-inline void Vector<T>::push_front(value_argument_type v) {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::push_front(value_argument_type v) {
     vm_.insert(vm_.l_, array_memory_type::cast(&v));
 }
 
@@ -428,50 +428,50 @@ inline void Vector<T>::push_front(value_argument_type v) {
 
     Other elements are shifted one position backward. Takes O(size())
     time. */
-template <typename T>
-inline void Vector<T>::pop_front() {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::pop_front() {
     vm_.erase(vm_.l_, vm_.l_ + 1);
 }
 
 /** @brief Insert @a v before position @a it.
     @return An iterator pointing at the new element. */
-template <typename T>
-inline typename Vector<T>::iterator
-Vector<T>::insert(iterator it, value_argument_type v) {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::iterator
+Vector<T,ALIGNMENT>::insert(iterator it, value_argument_type v) {
     return (iterator) vm_.insert(array_memory_type::cast(it),
 				 array_memory_type::cast(&v));
 }
 
 /** @brief Remove the element at position @a it.
     @return An iterator pointing at the element following @a it. */
-template <typename T>
-inline typename Vector<T>::iterator
-Vector<T>::erase(iterator it) {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::iterator
+Vector<T,ALIGNMENT>::erase(iterator it) {
     return (it < end() ? erase(it, it + 1) : it);
 }
 
 /** @brief Remove the elements in [@a a, @a b).
     @return An iterator corresponding to @a b. */
-template <typename T>
-inline typename Vector<T>::iterator
-Vector<T>::erase(iterator a, iterator b) {
+template <typename T, size_t ALIGNMENT>
+inline typename Vector<T,ALIGNMENT>::iterator
+Vector<T,ALIGNMENT>::erase(iterator a, iterator b) {
     return (iterator) vm_.erase(array_memory_type::cast(a),
 				array_memory_type::cast(b));
 }
 
-template <typename T>
+template <typename T, size_t ALIGNMENT>
 inline void
-Vector<T>::fill(T value) {
-	Vector<T>::iterator __first = begin();
-	Vector<T>::iterator __last = end();
+Vector<T,ALIGNMENT>::fill(T value) {
+	Vector<T,ALIGNMENT>::iterator __first = begin();
+	Vector<T,ALIGNMENT>::iterator __last = end();
 	for (; __first != __last; ++__first)
 		*__first = value;
 }
 
 /** @brief Remove all elements.
     @post size() == 0 */
-template <typename T>
-inline void Vector<T>::clear() {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::clear() {
     vm_.clear();
 }
 
@@ -481,27 +481,27 @@ inline void Vector<T>::clear() {
     This function changes the vector's capacity(), not its size(). If
     reserve(@a n) succeeds, then any succeeding call to resize(@a m) with @a
     m < @a n will succeed without allocating vector memory. */
-template <typename T>
-inline bool Vector<T>::reserve(size_type n) {
+template <typename T, size_t ALIGNMENT>
+inline bool Vector<T,ALIGNMENT>::reserve(size_type n) {
     return vm_.reserve_and_push_back(n, 0);
 }
 
 /** @brief Swap the contents of this vector and @a x. */
-template <typename T>
-inline void Vector<T>::swap(Vector<T> &x) {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::swap(Vector<T,ALIGNMENT> &x) {
     vm_.swap(x.vm_);
 }
 
 /** @brief Replace this vector's contents with a copy of @a x. */
-template <typename T>
-inline Vector<T> &Vector<T>::operator=(const Vector<T> &x) {
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT> &Vector<T,ALIGNMENT>::operator=(const Vector<T,ALIGNMENT> &x) {
     vm_.assign(x.vm_);
     return *this;
 }
 
 #if HAVE_CXX_RVALUE_REFERENCES
-template <typename T>
-inline Vector<T> &Vector<T>::operator=(Vector<T> &&x) {
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT> &Vector<T,ALIGNMENT>::operator=(Vector<T,ALIGNMENT> &&x) {
     vm_.swap(x.vm_);
     return *this;
 }
@@ -509,28 +509,28 @@ inline Vector<T> &Vector<T>::operator=(Vector<T> &&x) {
 
 /** @brief Replace this vector's contents with @a n copies of @a v.
     @post size() == @a n */
-template <typename T>
-inline Vector<T> &Vector<T>::assign(size_type n, value_argument_type v) {
+template <typename T, size_t ALIGNMENT>
+inline Vector<T,ALIGNMENT> &Vector<T,ALIGNMENT>::assign(size_type n, value_argument_type v) {
     vm_.assign(n, array_memory_type::cast(&v));
     return *this;
 }
 
-template <typename T>
-inline void click_swap(Vector<T> &a, Vector<T> &b) {
+template <typename T, size_t ALIGNMENT>
+inline void click_swap(Vector<T,ALIGNMENT> &a, Vector<T,ALIGNMENT> &b) {
     a.swap(b);
 }
 
-template <typename T>
-inline void assign_consume(Vector<T> &a, Vector<T> &b) {
+template <typename T, size_t ALIGNMENT>
+inline void assign_consume(Vector<T,ALIGNMENT> &a, Vector<T,ALIGNMENT> &b) {
     a.swap(b);
 }
 
-template <typename T>
-inline void Vector<T>::shuffle(int n) {
+template <typename T, size_t ALIGNMENT>
+inline void Vector<T,ALIGNMENT>::shuffle(int n) {
 	if (size() > 1)
 	{
 		size_t i;
-		for (i = 0; i < n; i++)
+		for (i = 0; i < (unsigned)n; i++)
 		{
 			int n_i = i % size();
 			size_t j = click_random(0, size() -1);

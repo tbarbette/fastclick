@@ -23,7 +23,9 @@ class ResetIPChecksum : public BatchElement { public:
 
     const char *class_name() const		{ return "ResetIPChecksum"; }
     const char *port_count() const		{ return PORTS_1_1; }
-    void add_handlers() CLICK_COLD;
+    void add_handlers() override CLICK_COLD;
+
+    int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
 
     Packet *simple_action(Packet *p);
 #if HAVE_BATCH
@@ -31,7 +33,7 @@ class ResetIPChecksum : public BatchElement { public:
 #endif
 
   private:
-
+    bool _l4;
     unsigned _drops;
 
 };

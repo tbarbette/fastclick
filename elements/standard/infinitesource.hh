@@ -139,7 +139,7 @@ class InfiniteSource : public BatchElement, public ActiveNotifier { public:
     void setup_packet();
 
     Packet *_packet;
-    int _burstsize;
+    unsigned _burstsize;
     counter_t _limit;
     ucounter_t _count;
     int _datasize;

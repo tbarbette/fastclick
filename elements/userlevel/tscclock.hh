@@ -55,7 +55,7 @@ class TSCClock : public BatchElement { public:
   TSCClock() CLICK_COLD;
 
   const char *class_name() const        { return "TSCClock"; }
-  const char *port_count() const        { return PORTS_1_1; }
+  const char *port_count() const        { return "0-1/="; }
   const char *processing() const        { return PUSH; }
 
   int configure_phase() const {

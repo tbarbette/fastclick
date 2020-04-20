@@ -118,5 +118,12 @@ struct less {
  */
 #define is_pow2(n) (((n) & ((n) - 1)) == 0)
 
+/**
+ * Gives the next power of 2
+ */
+inline uint64_t next_pow2(uint64_t x) {
+	return x == 1 ? 1 : 1<<(64-__builtin_clzl(x-1));
+}
+
 CLICK_ENDDECLS
 #endif

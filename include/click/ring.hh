@@ -4,6 +4,13 @@
 
 #include <click/atomic.hh>
 #include <click/sync.hh>
+#if HAVE_DPDK
+# include <click/algorithm.hh>
+# include <rte_ring.h>
+# include <rte_errno.h>
+# include <click/dpdk_glue.hh>
+#endif
+#include <type_traits>
 
 CLICK_DECLS
 
@@ -68,8 +75,10 @@ CLICK_DECLS
 
 /**
  * Ring with size set at initialization time
+ *
+ * NOT MT-Safe
  */
-template <typename T> class DynamicRing {
+template <typename T> class SPSCDynamicRing {
 
 protected:
     uint32_t _size;
@@ -91,12 +100,12 @@ protected:
 
     T* ring;
 public:
-    DynamicRing() : _size(0),ring(0) {
+    SPSCDynamicRing() : _size(0),ring(0) {
         head = 0;
         tail = 0;
     }
 
-    ~DynamicRing() {
+    ~SPSCDynamicRing() {
     	if (_size)
     		delete[] ring;
     }
@@ -143,11 +152,121 @@ public:
         return _size > 0;
     }
 
-    inline void initialize(int size) {
+    inline void initialize(int size, const char* = 0) {
         _size = size;
         ring = new T[size];
     }
 };
+
+template <typename T>
+using DynamicRing = SPSCDynamicRing<T>;
+
+#if HAVE_DPDK
+/**
+ * Ring with size set at initialization time
+ */
+template <typename T> class MPMCDynamicRing {
+    protected:
+    rte_ring* _ring;
+    public:
+    MPMCDynamicRing() : _ring(0) {
+        static_assert(std::is_pointer<T>(), "MPMCDynamicRing can only be used with pointers");
+    }
+
+    inline void initialize(int size, const char* name, int flags = 0) {
+        assert(!_ring);
+        _ring = rte_ring_create(name, next_pow2(size), SOCKET_ID_ANY, flags);
+        if (unlikely(_ring == 0)) {
+            click_chatter("Could not create DPDK ring error %d: %s",rte_errno,rte_strerror(rte_errno));
+        }
+    }
+
+    inline bool insert(T o) {
+        return rte_ring_mp_enqueue(_ring, (void*)o) == 0;
+    }
+
+    inline T extract() {
+        T o;
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1, 0) == 0)
+#else
+        if (rte_ring_mc_dequeue_bulk(_ring, (void**)&o, 1) == 0)
+#endif
+            return 0;
+        else
+            return o;
+    }
+
+
+    inline bool is_empty() {
+        return rte_ring_empty(_ring);
+    }
+
+    inline bool is_full() {
+        return rte_ring_full(_ring);
+    }
+
+
+    ~MPMCDynamicRing() {
+        rte_ring_free(_ring);
+    }
+};
+
+
+template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {
+    public:
+
+    inline void initialize(int size, const char* name) {
+        MPMCDynamicRing<T>::initialize(size, name, RING_F_SC_DEQ);
+    }
+
+    inline T extract() {
+        T o;
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
+        if (rte_ring_sc_dequeue_bulk(this->_ring, (void**)&o, 1, 0) == 0)
+#else
+        if (rte_ring_sc_dequeue_bulk(this->_ring, (void**)&o, 1) == 0)
+#endif
+            return 0;
+        else
+            return o;
+    }
+};
+#else
+/**
+ * Ring with size set at initialization time
+ *
+ * NOT MT-Safe
+ */
+template <typename T> class MPMCDynamicRing : public SPSCDynamicRing<T> {
+	Spinlock _lock;
+
+public:
+
+	MPMCDynamicRing() : _lock() {
+
+	}
+
+    inline T extract() {
+        _lock.acquire();
+        T v= SPSCDynamicRing<T> :: extract();
+        _lock.release();
+        return v;
+    }
+
+    inline bool insert(T v) {
+	_lock.acquire();
+	bool r = SPSCDynamicRing<T> :: insert(v);
+	_lock.release();
+	return r;
+    }
+
+};
+template <typename T> class MPSCDynamicRing : public MPMCDynamicRing<T> {};
+
+#endif
+
 
 template <typename T, size_t RING_SIZE> class Ring : public BaseRing<T,RING_SIZE> {};
 
@@ -201,21 +320,24 @@ public:
 #define SPSCRing Ring
 
 template <typename T, size_t MAX_SIZE> class MPMCLIFO {
+private:
     SimpleSpinlock _lock;
+
 protected:
 
-inline bool has_space() {
-    return _count < MAX_SIZE;
-}
+	inline bool has_space() {
+		return _count < MAX_SIZE;
+	}
 
-inline bool is_empty() {
-   return _first == 0;
-}
+	inline bool is_empty() {
+	   return _first == 0;
+	}
 
 public:
-int id;
-T _first;
-unsigned int _count;
+	int id;
+	T _first;
+	unsigned int _count;
+
     MPMCLIFO() : _lock(), id(0),_first(0),_count(0) {
 
     }

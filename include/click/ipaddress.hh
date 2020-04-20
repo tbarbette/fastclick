@@ -4,13 +4,14 @@
 #include <click/string.hh>
 #include <click/glue.hh>
 #include <click/type_traits.hh>
+#include <click/hashcode.hh>
 #include <clicknet/ip.h>
 CLICK_DECLS
 class StringAccum;
 class ArgContext;
 extern const ArgContext blank_args;
 class IPAddressArg;
-template <typename T> class Vector;
+template <typename T, size_t ALIGNMENT> class Vector;
 
 class IPAddress { public:
 
@@ -414,6 +415,55 @@ class IPPortArg { public:
 	       const ArgContext &args = blank_args) const;
     int ip_p;
 };
+
+
+class IPPair {
+  public:
+
+    IPAddress src;
+    IPAddress dst;
+    IPPair() {
+        src = 0;
+        dst = 0;
+    }
+    IPPair(IPAddress a, IPAddress b) {
+        src = a;
+        dst = b;
+    }
+
+    bool contains(IPAddress foo) const {
+        return (foo == src) || (foo == dst);
+    }
+
+    bool other(IPAddress foo) const {
+        return (src == foo) ? dst : src;
+    }
+
+    inline hashcode_t hashcode() const {
+        return CLICK_NAME(hashcode)(src) + CLICK_NAME(hashcode)(dst);
+   }
+
+   inline bool operator==(IPPair other) const {
+        return (other.src == src && other.dst == dst);
+   }
+};
+
+class IPPort {
+public:
+    IPAddress ip;
+    uint16_t port;
+    IPPort(IPAddress addr, uint16_t port) : ip(addr), port(port) {
+
+    }
+    inline hashcode_t hashcode() const {
+       return CLICK_NAME(hashcode)(ip) + CLICK_NAME(hashcode)(port);
+   }
+
+   inline bool operator==(IPPort other) const {
+       return (other.ip == ip && other.port == port);
+   }
+};
+
 
 CLICK_ENDDECLS
 #endif

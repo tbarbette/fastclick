@@ -1,13 +1,13 @@
 #ifndef CLICK_IP6PRINT_HH
 #define CLICK_IP6PRINT_HH
-#include <click/element.hh>
+#include <click/batchelement.hh>
 #include <click/string.hh>
 CLICK_DECLS
 
 /*
 =c
 
-IP6Print([TAG, NBYTES, CONTENTS])
+IP6Print([LABEL, NBYTES, CONTENTS, ACTIVE])
 
 =s ip6
 
@@ -16,32 +16,58 @@ pretty-prints IP6 packets
 =d
 
 dumps simple information about ip6 packet.
-may someday be as good as IPPrint. TAG
-specifies the label at the head of each
+LABEL specifies the label at the head of each
 line. NBYTES specify how many bytes to print
 and CONTENTS specify if the content should
 be printed, in hex. NBYTES and CONTENTS
 are keywords.
 
-=a IPPrint, CheckIPHeader */
+Keyword arguments are:
 
-class IP6Print : public Element { public:
+=over 4
 
-  IP6Print();
-  ~IP6Print();
+=item LABEL
 
-  const char *class_name() const		{ return "IP6Print"; }
-  const char *port_count() const		{ return PORTS_1_1; }
+String. A label to print before each packet. Default is an empty label.
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+=item NBYTES
 
-  Packet *simple_action(Packet *);
+Integer. Determines how many bytes to print. Default is 1500 bytes.
 
- private:
+=item CONTENTS
 
-  String _label;
-  unsigned _bytes;
-  bool _contents;
+Boolean. Determines whether the packet data is printed (in hex). Default is false.
+
+=item ACTIVE
+
+Boolean. If false, then don't print messages. Default is true.
+
+=back
+
+=h active read-write
+
+Sets/Gets the active flag of this element.
+
+=a CheckIP6Header, IPPrint */
+
+class IP6Print : public SimpleElement<IP6Print> {
+    public:
+        IP6Print();
+        ~IP6Print();
+
+        const char *class_name() const { return "IP6Print"; }
+        const char *port_count() const { return PORTS_1_1; }
+
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
+
+        Packet *simple_action(Packet *);
+
+    private:
+        String _label;
+        unsigned _bytes;
+        bool _contents;
+        bool _active;
 };
 
 CLICK_ENDDECLS

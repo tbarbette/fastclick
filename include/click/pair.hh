@@ -20,6 +20,10 @@ struct Pair {
 	: first(), second() {
     }
 
+    inline Pair(typename fast_argument<T>::type t, const uninitialized_type &unused)
+    : first(t), second(U(unused)) {
+    }
+
     inline Pair(typename fast_argument<T>::type t,
 		typename fast_argument<U>::type u)
 	: first(t), second(u) {

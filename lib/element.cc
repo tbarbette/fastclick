@@ -1684,6 +1684,14 @@ Element::home_thread_id() const
     return router()->home_thread_id(this);
 }
 
+
+Bitvector Element::get_spawning_threads() {
+    Bitvector b(master()->nthreads());
+    get_spawning_threads(b, true,-1);
+    get_spawning_threads(b, false,-1);
+    return b;
+}
+
 class InputThreadVisitor: public RouterVisitor {
 public:
      Bitvector& bitmask;
@@ -1815,6 +1823,54 @@ bool Element::do_mt_safe_check(ErrorHandler* errh) {
 
 void Element::add_remote_element(Element* e) {
 	_remote_elements.push_back(e);
+}
+
+int Element::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
+    return 0;
+}
+
+class ThreadReconfigureVisitor : public RouterVisitor {
+public:
+    Element::ThreadReconfigurationStage _stage;
+    ErrorHandler* _errh;
+    Bitvector _threads;
+
+    ThreadReconfigureVisitor(Element::ThreadReconfigurationStage stage,
+            ErrorHandler* errh, Bitvector threads) : _stage(stage),
+         _errh(errh), _threads(threads) {
+    }
+
+    bool visit(Element *e, bool isoutput, int port,
+                   Element *from_e, int from_port, int distance) {
+        e->thread_configure(_stage, _errh, _threads);
+        return true;
+    }
+};
+
+/**
+ * Propagate a message to tell that some threads will start pushing or stop pushing
+ *  packets. This allows further element to prepare for thread migration.
+ *
+ *  In practice, it will call thread_reconfigure with UP_PRE or DOWN_PRE on
+ *      downstream elements, execute the ready function, then call UP_POST or
+ *      DOWN_POST
+ *
+ *
+ *
+ *  @param is_up True if the threads are being activated, false if deactivated.
+ */
+void Element::trigger_thread_reconfiguration(bool is_up, std::function<void()> ready, Bitvector threads) {
+
+    ThreadReconfigurationStage stage = is_up? THREAD_RECONFIGURE_UP_PRE : THREAD_RECONFIGURE_DOWN_PRE;
+    ThreadReconfigureVisitor trpre(stage,ErrorHandler::default_handler(), threads);
+    router()->visit(this, true, -1, &trpre);
+    router()->visit(this, false, -1, &trpre);
+    ready();
+
+    stage = is_up? THREAD_RECONFIGURE_UP_POST : THREAD_RECONFIGURE_DOWN_POST;
+    ThreadReconfigureVisitor trpost(stage,ErrorHandler::default_handler(), threads);
+    router()->visit(this, true, -1, &trpost);
+    router()->visit(this, false, -1, &trpost);
 }
 
 // SELECT

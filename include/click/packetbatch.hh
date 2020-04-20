@@ -12,7 +12,7 @@ CLICK_DECLS
 #define FOR_EACH_PACKET(batch,p) for(Packet* p = batch;p != 0;p=p->next())
 
 /**
- * Iterate over all packets of a batch. The current packet can be modified
+ * Iterate over a simply linked packet a batch. The current packet can be modified
  *  during iteration as the "next" pointer is read before going in the core of
  *  the loop.
  */
@@ -42,6 +42,46 @@ CLICK_DECLS
                     }\
                     last = q;\
                 }
+
+/**
+ * Execute a function on each packets of a batch. The function may return
+ * another packet to replace the current one. This version will stop when
+ * a packet is dropped.
+ */
+#define EXECUTE_FOR_EACH_PACKET_UNTIL_DO(fnt,batch,on_stop) \
+                Packet* efep_next = ((batch != 0)? batch->next() : 0 );\
+                Packet* p = batch;\
+                Packet* last = 0;\
+                int count = batch->count();\
+                for (;p != 0;p=efep_next,efep_next=(p==0?0:p->next())) {\
+                    Packet* q = p;\
+                    bool drop = !fnt(q);\
+                    if (q != p) {\
+                        if (last) {\
+                            last->set_next(q);\
+                        } else {\
+                            batch = static_cast<PacketBatch*>(q);\
+                            batch->set_count(count);\
+                        }\
+                        q->set_next(efep_next);\
+                    }\
+                    if (unlikely(drop)) {\
+                        on_stop(batch, q, efep_next);\
+                        break;\
+                    }\
+                    last = q;\
+                }
+
+//Variant that will drop the whole batch when fnt return false
+#define EXECUTE_FOR_EACH_PACKET_UNTIL(fnt,batch) \
+    EXECUTE_FOR_EACH_PACKET_UNTIL_DO(fnt, batch, [](PacketBatch*& batch, Packet*, Packet*){batch->kill();batch = 0;})
+
+/*
+ * Variant that will drop the remaining packets, but return the batch up to the drop (the packet for which fnt returned true is included.
+ * A usage example is a NAT, that translate all packets up to when the state is destroyed. But sometimes there could be unordered packets still coming after the last ACK, or duplicate FIN.
+ */
+#define EXECUTE_FOR_EACH_PACKET_UNTIL_DROP(fnt,batch) \
+    EXECUTE_FOR_EACH_PACKET_UNTIL_DO(fnt, batch, [](PacketBatch*& batch, Packet* dropped, Packet* next){ if (!next) return; PacketBatch* remain = PacketBatch::make_from_simple_list(next);batch->set_count(batch->count() - remain->count()); batch->set_tail(dropped); dropped->set_next(0); remain->kill(); })
 
 /**
  * Execute a function on each packet of a batch. The function may return
@@ -77,6 +117,7 @@ CLICK_DECLS
                 if (batch) {\
                     batch->set_count(count);\
                     batch->set_tail(last);\
+                    last->set_next(0);\
                 }\
             }\
 
@@ -171,7 +212,7 @@ CLICK_DECLS
         int passed = 0;\
         for (;p != 0;p=cep_next,cep_next=(p==0?0:static_cast<PacketBatch*>(p->next()))) {\
             int o = (fnt(p));\
-            if (o < 0 || o>=(nbatches)) o = (nbatches - 1);\
+            if (o < 0 || o>=(int)(nbatches)) o = (nbatches - 1);\
             if (o == last_o) {\
                 passed ++;\
             } else {\
@@ -201,8 +242,8 @@ CLICK_DECLS
             out[last_o]->set_count(out[last_o]->count() + passed);\
         }\
 \
-        int i = 0;\
-        for (; i < (nbatches); i++) {\
+        unsigned i = 0;\
+        for (; i < (unsigned)(nbatches); i++) {\
             if (out[i]) {\
                 out[i]->tail()->set_next(0);\
                 (on_finish(i,out[i]));\
@@ -320,21 +361,51 @@ class PacketBatch : public WritablePacket {
 #define MAX_BATCH_SIZE 8192
 
 public :
+    /*
+     * Return the first packet of the batch
+     */
+    inline Packet* first() {
+        return this;
+    }
 
+    /*
+     * Set the tail of the batch
+     */
     inline void set_tail(Packet* p) {
         set_prev(p);
     }
 
+    /*
+     * Return the tail of the batch
+     */
     inline Packet* tail() {
         return prev();
     }
+    
+    /*
+     * Append a simply-linked list of packet to the batch.
+     * One must therefore pass the tail and the number of packets to do it in constant time. Chances are you
+     * just created that list and can track taht.
+     */
+    inline void append_simple_list(Packet* lhead, Packet* ltail, int lcount) {
+        tail()->set_next(lhead);
+        set_tail(ltail);
+        ltail->set_next(0);
+        set_count(count() + lcount);
+    }
 
+    /*
+     * Append a proper PacketBatch to this batch.
+     */
     inline void append_batch(PacketBatch* head) {
         tail()->set_next(head);
         set_tail(head->tail());
         set_count(count() + head->count());
     }
 
+    /*
+     * Append a packet to the list.
+     */
     inline void append_packet(Packet* p) {
         tail()->set_next(p);
         set_tail(p);
@@ -427,14 +498,28 @@ public :
     }
 
     /**
-     * Build a batch from a linked list of packet
+     * Remove the first packet
+     * @return the new batch without front. Do not use "this" afterwards!
+     */
+    PacketBatch* pop_front() {
+        if (count() == 1)
+            return 0;
+        PacketBatch* poped = PacketBatch::start_head(next());
+        poped->set_count(count() -1 );
+        poped->set_tail(tail());
+        return poped;
+    }
+
+    /**
+     * Build a batch from a linked list of packet for which head->prev is the tail and tail->next is already 0
      *
      * @param head The first packet of the batch
      * @param size Number of packets in the linkedlist
      *
-     * The "prev" annotation of the first packet must point to the last packet of the linked list
+     * @pre The "prev" annotation of the first packet must point to the last packet of the linked list
+     * @pre The tail->next() packet must be zero
      */
-    inline static PacketBatch* make_from_list(Packet* head, unsigned int size) {
+    inline static PacketBatch* make_from_tailed_list(Packet* head, unsigned int size) {
         PacketBatch* b = static_cast<PacketBatch*>(head);
         b->set_count(size);
         return b;
@@ -448,11 +533,32 @@ public :
      * @param size Number of packets in the linkedlist
      */
     inline static PacketBatch* make_from_simple_list(Packet* head, Packet* tail, unsigned int size) {
-        PacketBatch* b = make_from_list(head,size);
+        PacketBatch* b = make_from_tailed_list(head,size);
         b->set_tail(tail);
         tail->set_next(0);
         return b;
     }
+
+    /**
+     * Build a batch from a linked list of packet ending by a next==0 pointer. O(n).
+     *
+     * @param head The first packet of the batch
+     */
+    inline static PacketBatch* make_from_simple_list(Packet* head) {
+        int size = 1;
+        Packet* next = head->next();
+        Packet* tail = head;
+        while (next != 0) {
+            size++;
+            tail = next;
+            next = tail->next();
+        }
+        PacketBatch* b = make_from_tailed_list(head,size);
+        b->set_tail(tail);
+        return b;
+    }
+
+
 
     /**
      * Make a batch composed of a single packet

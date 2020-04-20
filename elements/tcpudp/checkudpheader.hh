@@ -37,7 +37,15 @@ Boolean. If it is true, then CheckUDPHeader will maintain detailed counts of
 how many packets were dropped for each possible reason, accessible through the
 C<drop_details> handler. False by default.
 
+=item CHECKSUM
+
+Boolean. If it is true, the UDP checksum is validated. True by default.
+
 =back
+
+=h count read-only
+
+Returns the number of correct packets CheckUDPHeader has seen.
 
 =h drops read-only
 
@@ -51,40 +59,39 @@ true.
 
 =a CheckIPHeader, CheckTCPHeader, CheckICMPHeader, MarkIPHeader */
 
-class CheckUDPHeader : public BatchElement { public:
+class CheckUDPHeader : public SimpleElement<CheckUDPHeader> {
+    public:
+        CheckUDPHeader() CLICK_COLD;
+        ~CheckUDPHeader() CLICK_COLD;
 
-  CheckUDPHeader() CLICK_COLD;
-  ~CheckUDPHeader() CLICK_COLD;
+        const char *class_name() const    { return "CheckUDPHeader"; }
+        const char *port_count() const    { return PORTS_1_1X2; }
+        const char *processing() const    { return PROCESSING_A_AH; }
 
-  const char *class_name() const		{ return "CheckUDPHeader"; }
-  const char *port_count() const		{ return PORTS_1_1X2; }
-  const char *processing() const		{ return PROCESSING_A_AH; }
+        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+        void add_handlers() CLICK_COLD;
 
-  int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-  void add_handlers() CLICK_COLD;
+        Packet *simple_action(Packet *p);
 
-  Packet *simple_action(Packet *);
-#if HAVE_BATCH
-  PacketBatch *simple_action_batch(PacketBatch *);
-#endif
+    private:
+        bool _verbose : 1;
+        bool _checksum : 1;
+        atomic_uint64_t _count;
+        atomic_uint64_t _drops;
+        atomic_uint64_t *_reason_drops;
 
- private:
+        enum Reason {
+            NOT_UDP,
+            BAD_LENGTH,
+            BAD_CHECKSUM,
+            NREASONS
+        };
+        static const char *reason_texts[NREASONS];
 
-  bool _verbose : 1;
-  atomic_uint32_t _drops;
-  atomic_uint32_t *_reason_drops;
+        enum { h_count, h_drops, h_drop_details };
 
-  enum Reason {
-    NOT_UDP,
-    BAD_LENGTH,
-    BAD_CHECKSUM,
-    NREASONS
-  };
-  static const char *reason_texts[NREASONS];
-
-  Packet *drop(Reason, Packet *);
-  static String read_handler(Element *, void *) CLICK_COLD;
-
+        Packet *drop(Reason reason, Packet *p);
+        static String read_handler(Element *e, void *thunk) CLICK_COLD;
 };
 
 CLICK_ENDDECLS

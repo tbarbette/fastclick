@@ -339,7 +339,7 @@ Script::initialize(ErrorHandler *errh)
             _vars[_args[i] + 1] = cp_unquote(cp_expand(_args3[i], expander));
 
     int insn = _insns[_insn_pos];
-    assert(insn == INSN_INITIAL || insn == INSN_WAIT_STEP || INSN_WAIT_TIME);
+    assert(insn == INSN_INITIAL || insn == INSN_WAIT_STEP || insn == INSN_WAIT_TIME);
     if (_type == type_signal || _type == type_passive || _type == type_push
         || _type == type_proxy)
         /* passive, do nothing */;
@@ -431,9 +431,9 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
             String word = cp_shift_spacevec(_args3[ipos]);
             String file = (_args3[ipos] ? _args3[ipos] : "-");
             _args3[ipos] = (&">>"[insn == insn_save]) + file + " " + word;
-            /* FALLTHRU */
         }
 #endif
+        /* fallthru */
         case INSN_PRINT:
         case INSN_PRINTQ:
         case INSN_PRINTN:
@@ -552,8 +552,8 @@ Script::step(int nsteps, int step_type, int njumps, ErrorHandler *errh)
                 msg = cp_unquote(msg);
             if (msg)
                 errh->error("%.*s", msg.length(), msg.data());
-            /* fallthru */
         }
+        /* fallthru */
         case insn_end:
         case insn_exit:
         insn_finish:
@@ -960,13 +960,21 @@ Script::negabs_handler(int, String &str, Element *, const Handler *h, ErrorHandl
         double dx;
         if (!DoubleArg().parse(str, dx))
             return normal_error(error_one_number, errh);
-        str = String(what == ar_neg ? -dx : fabs(dx));
+        if (what == ar_neg)
+            str = String(-dx);
+        else if (what == ar_abs)
+            str = String(fabs(dx));
+        else
+            str = String(ceil(dx));
         return 0;
 #else
         return normal_error(error_one_number, errh);
 #endif
     } else {
-        str = String(what == ar_neg || x < 0 ? -x : x);
+        if (what == ar_ceil)
+            str = String(x);
+        else
+            str = String(what == ar_neg || x < 0 ? -x : x);
         return 0;
     }
 }
@@ -1324,6 +1332,7 @@ Script::add_handlers()
     set_handler("rem", Handler::f_read | Handler::f_read_param, modrem_handler, ar_rem, 0);
     set_handler("neg", Handler::f_read | Handler::f_read_param, negabs_handler, ar_neg, 0);
     set_handler("abs", Handler::f_read | Handler::f_read_param, negabs_handler, ar_abs, 0);
+    set_handler("ceil", Handler::f_read | Handler::f_read_param, negabs_handler, ar_ceil, 0);
     set_handler("eq", Handler::f_read | Handler::f_read_param, compare_handler, AR_EQ, 0);
     set_handler("ne", Handler::f_read | Handler::f_read_param, compare_handler, AR_NE, 0);
     set_handler("gt", Handler::f_read | Handler::f_read_param, compare_handler, AR_GT, 0);

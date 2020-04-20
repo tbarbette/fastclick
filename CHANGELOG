@@ -1,0 +1,14 @@
+v19.11 (27/11/2019):
+
+This version has seen the introduction of the tagging scheme. It is therefore a bit hard to list exactly all changes since the release of FastClick. Tom Barbette and Gerogios Katsikas have made a lot of elements thread-safe, and natively batch-compatible. A few things from mind though:
+
+ - FromDPDKDevice has now a SCALE parameter. If set to PARALLEL, all FromDPDKDevice for device on the same NUMA nodes will use the same cores to read packets, which is the more traditional approach.
+ - HTTPServer element, made as part of Metron, to access handlers by HTTP. Very convenient.
+ - All the Replay/ReplayUnqueue + TimestampDiff ecosystem, in collaboration with Cyril Soldani, that allows to replay packets from memory, and compute timestamp statistics when they are received. It allows to build a very efficient packet generator.
+ - Checksum offloads, TCP segmentation offload, VLAN filtering, writing the RSS indirection table, read MTU and MAC from device, add MAC ...
+ - TSCClock & cie : Use a in-application timestamp clock to avoid filtering
+ - ERSPAN support for decapsulation and a few things
+ - GTP encapsulation, GTP Table, etc and other stuffs done as part of SuperFluidity H2020 project. To implement a GTP Mobile Edge Computing (MEC) "dirverter" that can "divert" some traffic for applicitions before even going into the packet gateway. Look at the SF deliverables for more.
+ - A lot of Counter variants for research purpose as part of Tom Barbette's thesis, in the research package. Similarly there is the WorkPackage and FlowWorkPackage.
+ - DPDK support from 1.8 to 19.11.
+ - A lot of bug fixes and performance improvements.

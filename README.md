@@ -8,6 +8,18 @@ multiple contributions and improvements since then.
 The [Wiki](https://github.com/tbarbette/fastclick/wiki) provides documentation about the elements and how to use some FastClick features
 such as batching.
 
+Quick start for DPDK
+--------------------
+
+ * Install DPDK's dependencies (sudo apt install libelf-dev build-essential pkg-config zlib1g-dev libnuma-dev)
+ * Install DPDK (http://core.dpdk.org/doc/quick-start/), but add O=x86_64-native-linuxapp-gcc at the end of "make config T=x86_64-native-linuxapp-gcc" to allow DPDK to be linked against external apps. This is not needed if you used the DPDK menu, or meson. Do not forget to set up a few hugepages, and mount them, as explained in the guide.
+ * Export RTE\_SDK (path to your checked-out DPDK) and RTE\_TARGET (probably x86_64-native-linuxapp-gcc if you followed the tutorial)
+ * Build FastClick, with support for DPDK using the following command:
+
+```
+./configure --enable-dpdk --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose --enable-select=poll CFLAGS="-O3" CXXFLAGS="-std=c++11 -O3"  --disable-dynamic-linking --enable-poll --enable-bound-port-transfer --enable-local --enable-flow --disable-task-stats --disable-cpu-load
+```
+
 Contribution
 ------------
 FastClick also aims at keeping a more up-to-date fork and welcomes

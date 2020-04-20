@@ -32,7 +32,7 @@
 CLICK_DECLS
 
 ARPQuerier::ARPQuerier()
-    : _arpt(0), _my_arpt(false), _zero_warned(false)
+    : _arpt(0), _my_arpt(false), _zero_warned(false), _cache()
 {
 }
 
@@ -57,7 +57,7 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     uint32_t capacity, entry_capacity, entry_packet_capacity, capacity_slim_factor;
     Timestamp timeout, poll_timeout(60);
     bool have_capacity, have_entry_capacity, have_entry_packet_capacity, have_capacity_slim_factor, have_timeout, have_broadcast,
-	broadcast_poll = false;
+	broadcast_poll = false, have_cache = false;
     _arpt = 0;
     if (Args(this, errh).bind(conf)
 	.read("CAPACITY", capacity).read_status(have_capacity)
@@ -69,6 +69,7 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
 	.read("TABLE", ElementCastArg("ARPTable"), _arpt)
 	.read("POLL_TIMEOUT", poll_timeout)
 	.read("BROADCAST_POLL", broadcast_poll)
+	.read("CACHE", have_cache)
 	.consume() < 0)
 	return -1;
 
@@ -109,7 +110,9 @@ ARPQuerier::configure(Vector<String> &conf, ErrorHandler *errh)
     if ((uint32_t) poll_timeout.sec() >= (uint32_t) 0xFFFFFFFFU / CLICK_HZ)
 	_poll_timeout_j = 0;
     else
-	_poll_timeout_j = poll_timeout.jiffies();
+	    _poll_timeout_j = poll_timeout.jiffies();
+
+    _have_cache = have_cache;
 
     return 0;
 }
@@ -180,11 +183,20 @@ ARPQuerier::live_reconfigure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-ARPQuerier::initialize(ErrorHandler *)
+ARPQuerier::initialize(ErrorHandler * errh)
 {
     _arp_queries = 0;
     _drops = 0;
     _arp_responses = 0;
+    if (_have_cache) {
+        if (_poll_timeout_j == 0) {
+            errh->warning("CACHE will be ineffective with a timeout of 0...");
+            return 0;
+        }
+        for (unsigned i = 0; i < _cache.weight(); i++) {
+            _cache.get_value(i).set_timeout(_poll_timeout_j);
+        }
+    }
     return 0;
 }
 
@@ -270,29 +282,37 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 {
     // delete packet if we are not configured
     if (!_my_ip) {
-	p->kill();
-	++_drops;
-	return 0;
+        p->kill();
+        ++_drops;
+        return 0;
     }
 
     // make room for Ethernet header
     WritablePacket *q;
     if (response) {
-	assert(!p->shared());
-	q = p->uniqueify();
+        assert(!p->shared());
+        q = p->uniqueify();
     } else if (!(q = p->push_mac_header(sizeof(click_ether)))) {
-	++_drops;
-	return 0;
+        ++_drops;
+        return 0;
     } else
 	q->ether_header()->ether_type = htons(ETHERTYPE_IP);
 
     IPAddress dst_ip = q->dst_ip_anno();
     EtherAddress *dst_eth = reinterpret_cast<EtherAddress *>(q->ether_header()->ether_dhost);
+    click_jiffies_t now = click_jiffies();
     int r;
 
+	if (_have_cache) {
+		if (_cache->find(dst_ip, now, *dst_eth, false)) {
+			goto found;
+		}
+	}
     // Easy case: requires only read lock
   retry_read_lock:
-    r = _arpt->lookup(dst_ip, dst_eth, _poll_timeout_j);
+
+
+	r = _arpt->lookup(dst_ip, dst_eth, _poll_timeout_j);
     if (r >= 0) {
 	assert(!dst_eth->is_broadcast());
 	if (r > 0)
@@ -302,15 +322,15 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 	memset(dst_eth, 0xff, 6);
 	// ... and send packet below.
     } else if (dst_ip.is_multicast()) {
-	uint8_t *dst_addr = q->ether_header()->ether_dhost;
-	dst_addr[0] = 0x01;
-	dst_addr[1] = 0x00;
-	dst_addr[2] = 0x5E;
-	uint32_t addr = ntohl(dst_ip.addr());
-	dst_addr[3] = (addr >> 16) & 0x7F;
-	dst_addr[4] = addr >> 8;
-	dst_addr[5] = addr;
-	// ... and send packet below.
+        uint8_t *dst_addr = q->ether_header()->ether_dhost;
+        dst_addr[0] = 0x01;
+        dst_addr[1] = 0x00;
+        dst_addr[2] = 0x5E;
+        uint32_t addr = ntohl(dst_ip.addr());
+        dst_addr[3] = (addr >> 16) & 0x7F;
+        dst_addr[4] = addr >> 8;
+        dst_addr[5] = addr;
+        // ... and send packet below.
     } else {
 	// Zero or unknown address: do not send the packet.
 	if (!dst_ip) {
@@ -333,6 +353,10 @@ ARPQuerier::handle_ip(Packet *p, bool response)
 	return 0;
     }
 
+    if (_have_cache)
+	    _cache->insert(dst_ip, now, *dst_eth);
+
+    found:
     // It's time to emit the packet with our Ethernet address as source.  (Set
     // the source address immediately before send in case the user changes the
     // source address while packets are enqueued.)

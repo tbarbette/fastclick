@@ -136,6 +136,19 @@ Task::master() const
     return _thread->master();
 }
 
+void
+Task::reschedule_notify(Element* e) {
+    Bitvector b(_thread->master()->nthreads());
+    b[_thread->thread_id()] = true;
+    e->trigger_thread_reconfiguration(true,[this](){this->reschedule();}, b);
+}
+
+void
+Task::unschedule_notify(Element* e) {
+    Bitvector b(_thread->master()->nthreads());
+    b[_thread->thread_id()] = true;
+    e->trigger_thread_reconfiguration(false,[this](){unschedule();}, b);
+}
 
 void
 Task::complete_schedule(RouterThread* process_pending_thread)

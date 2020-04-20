@@ -29,9 +29,10 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
             "There can be only one instance of DPDKInfo!");
     }
     instance = this;
+    bool has_socket_mbuf, has_mbuf = false;
     if (Args(conf, this, errh)
-        .read_p("NB_MBUF", DPDKDevice::DEFAULT_NB_MBUF)
-        .read_all("NB_SOCKET_MBUF", DPDKDevice::NB_MBUF)
+        .read_p("NB_MBUF", DPDKDevice::DEFAULT_NB_MBUF).read_status(has_mbuf)
+        .read_all("NB_SOCKET_MBUF", DPDKDevice::NB_MBUF).read_status(has_socket_mbuf)
         .read("MBUF_SIZE", DPDKDevice::MBUF_DATA_SIZE)
         .read("MBUF_CACHE_SIZE", DPDKDevice::MBUF_CACHE_SIZE)
         .read("RX_PTHRESH", DPDKDevice::RX_PTHRESH)
@@ -49,13 +50,29 @@ int DPDKInfo::configure(Vector<String> &conf, ErrorHandler *errh) {
         .complete() < 0)
         return -1;
 
+    if (has_mbuf) {
+            if (!is_pow2(DPDKDevice::DEFAULT_NB_MBUF + 1)) {
+                errh->warning("The number of MBUFs is not a power of 2 minus one. This will decrease performances.");
+            }
+    }
+
+    if (has_socket_mbuf) {
+        for (int i = 0; i < DPDKDevice::NB_MBUF.size(); i++) {
+            if (!is_pow2(DPDKDevice::NB_MBUF[i] + 1)) {
+                errh->warning("The number of MBUFs is not a power of 2 minus one. This will decrease performances.");
+            }
+        }
+    }
+
+    if (DPDKDevice::MBUF_CACHE_SIZE > RTE_MEMPOOL_CACHE_MAX_SIZE) {
+        return errh->error("The number of MBUF must be lower than %d", RTE_MEMPOOL_CACHE_MAX_SIZE);
+    }
+
     return 0;
 }
 
 String DPDKInfo::read_handler(Element *e, void * thunk)
 {
-    DPDKInfo *fd = static_cast<DPDKInfo *>(e);
-
     StringAccum acc;
     switch((uintptr_t) thunk) {
         case h_pool_count:

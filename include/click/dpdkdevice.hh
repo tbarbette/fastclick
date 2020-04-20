@@ -22,6 +22,10 @@
 #include <rte_pci.h>
 #include <rte_version.h>
 
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    #include <click/flowdispatcherglue.hh>
+#endif
+
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0) && RTE_VERSION < RTE_VERSION_NUM(19,2,0,0)
     #include <rte_bus_pci.h>
 #endif
@@ -33,6 +37,11 @@
 #include <click/args.hh>
 #include <click/etheraddress.hh>
 #include <click/timer.hh>
+
+#if RTE_VERSION < RTE_VERSION_NUM(19,8,0,0)
+#define rte_ipv4_hdr ipv4_hdr
+#define rte_ether_addr ether_addr
+#endif
 
 /**
  * Unified type for DPDK port IDs.
@@ -71,51 +80,86 @@ public:
     struct DevInfo {
         inline DevInfo() :
             vendor_id(PCI_ANY_ID), vendor_name(), device_id(PCI_ANY_ID), driver(0),
-            rx_queues(0,false), tx_queues(0,false),
-            promisc(false),
-            vlan_filter(false), vlan_strip(false),
-            n_rx_descs(0), n_tx_descs(0),
-            init_mac(), init_mtu(0), init_fc_mode(FC_UNSET), rx_offload(0), tx_offload(0) {
+            init_mac(), init_mtu(0), init_rss(-1), init_fc_mode(FC_UNSET),
+            rx_queues(0, false), tx_queues(0, false), n_rx_descs(0), n_tx_descs(0),
+            num_pools(0), mq_mode((enum rte_eth_rx_mq_mode)-1), mq_mode_str(""),
+            promisc(false), flow_isolate(false), rx_offload(0), tx_offload(0),
+            vlan_filter(false), vlan_strip(false), vlan_extend(false), vf_vlan(),
+            lro(false), jumbo(false)
+        {
             rx_queues.reserve(128);
             tx_queues.reserve(128);
         }
 
         void print_device_info() {
-            click_chatter("   Vendor   ID: %d", vendor_id);
-            click_chatter("   Vendor Name: %s", vendor_name.c_str());
-            click_chatter("   Device   ID: %d", device_id);
-            click_chatter("   Driver Name: %s", driver);
-            click_chatter("Promisc   Mode: %s", promisc? "true":"false");
-            click_chatter("Vlan Filtering: %s", vlan_filter? "true":"false");
-            click_chatter("Vlan Stripping: %s", vlan_strip? "true":"false");
-            click_chatter("   MAC Address: %s", init_mac.unparse().c_str());
-            click_chatter("# of Rx Queues: %d", rx_queues.size());
-            click_chatter("# of Tx Queues: %d", tx_queues.size());
-            click_chatter("# of Rx  Descs: %d", n_rx_descs);
-            click_chatter("# of Tx  Descs: %d", n_tx_descs);
+            if (device_id == PCI_ANY_ID) {
+                return;
+            }
+            click_chatter("                Vendor   ID: %d", vendor_id);
+            click_chatter("                Vendor Name: %s", vendor_name.c_str());
+            click_chatter("                Device   ID: %d", device_id);
+            click_chatter("                Driver Name: %s", driver);
+            click_chatter("                MAC Address: %s", init_mac.unparse().c_str());
+            click_chatter("      Maximum Transfer Unit: %u", init_mtu);
+            click_chatter("Receive Side Scaling queues: %d", init_rss);
+            click_chatter("          Flow Control Mode: %d", init_fc_mode);
+            click_chatter("             # of Rx Queues: %d", rx_queues.size());
+            click_chatter("             # of Tx Queues: %d", tx_queues.size());
+            click_chatter("             # of Rx  Descs: %d", n_rx_descs);
+            click_chatter("             # of Tx  Descs: %d", n_tx_descs);
+            click_chatter("          # of memory pools: %d", num_pools);
+            click_chatter("             Reception Mode: %s", mq_mode_str.c_str());
+            click_chatter("           Promiscuous Mode: %s", promisc? "true":"false");
+            click_chatter("         Flow API Isolation: %s", flow_isolate? "true":"false");
+            click_chatter("           Rx Offloads flag: %" PRIu64, rx_offload);
+            click_chatter("           Tx Offloads flag: %" PRIu64, tx_offload);
+            click_chatter("          VLAN    Filtering: %s", vlan_filter? "true":"false");
+            click_chatter("          VLAN    Stripping: %s", vlan_strip? "true":"false");
+            click_chatter("          VLAN QinQ(extend): %s", vlan_extend? "true":"false");
+            click_chatter("      Virtual Function VLAN: %d", vf_vlan.size());
+            click_chatter("Large Receive Offload (LRO): %s", lro ? "true":"false");
+            click_chatter("    Rx Jumbo Frames Offload: %s", jumbo ? "true":"false");
         }
 
         uint16_t vendor_id;
         String vendor_name;
         uint16_t device_id;
         const char *driver;
-        Vector<bool> rx_queues;
-        Vector<bool> tx_queues;
-        bool promisc;
-        bool vlan_filter;
-        bool vlan_strip;
-        unsigned n_rx_descs;
-        unsigned n_tx_descs;
         EtherAddress init_mac;
         uint16_t init_mtu;
+        int init_rss;
         FlowControlMode init_fc_mode;
+        Vector<bool> rx_queues;
+        Vector<bool> tx_queues;
+        unsigned n_rx_descs;
+        unsigned n_tx_descs;
+        int num_pools;
+        bool promisc;
+        enum rte_eth_rx_mq_mode mq_mode;
+        String mq_mode_str;
         uint64_t rx_offload;
         uint64_t tx_offload;
+        bool flow_isolate;
+        bool vlan_filter;
+        bool vlan_strip;
+        bool vlan_extend;
+        Vector<int> vf_vlan;
+        bool lro;
+        bool jumbo;
     };
 
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    void initialize_flow_dispatcher(
+        const portid_t &port_id,
+        ErrorHandler   *errh
+    );
+#endif
+
+    portid_t get_port_id() { return port_id; }
+
     int add_rx_queue(
-        unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
-        unsigned n_desc, ErrorHandler *errh
+        unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip, bool vlan_extend,
+        bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh
     ) CLICK_COLD;
 
     int add_tx_queue(
@@ -126,16 +170,20 @@ public:
     EtherAddress get_mac();
     void set_init_mac(EtherAddress mac);
     void set_init_mtu(uint16_t mtu);
+    void set_init_rss_max(int rss_max);
     void set_init_fc_mode(FlowControlMode fc);
     void set_rx_offload(uint64_t offload);
     void set_tx_offload(uint64_t offload);
+    void set_flow_isolate(const bool &flow_isolate);
 
+    unsigned int get_nb_rxdesc();
     unsigned int get_nb_txdesc();
 
     uint16_t get_device_vendor_id();
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
+    int set_rss_max(int max);
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)
@@ -148,6 +196,20 @@ public:
     static struct rte_mempool *get_mpool(unsigned int);
 
     static int get_port_numa_node(portid_t port_id);
+
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    int set_mode(
+        String mode, int num_pools, Vector<int> vf_vlan,
+        const String &flow_rules_filename, ErrorHandler *errh
+    );
+#else
+    int set_mode(
+        String mode, int num_pools, Vector<int> vf_vlan,
+        ErrorHandler *errh
+    );
+#endif
+    rte_eth_rx_mq_mode get_mode();
+    String get_mode_str();
 
     static int initialize(ErrorHandler *errh);
 
@@ -181,6 +243,12 @@ public:
 
     static unsigned int get_nb_txdesc(const portid_t &port_id);
 
+#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+    static int configure_nic(const portid_t &port_id);
+#endif
+
+    static void cleanup(ErrorHandler *errh);
+
     static Vector<int> NB_MBUF;
     static int DEFAULT_NB_MBUF;
     static int MBUF_DATA_SIZE;
@@ -207,8 +275,12 @@ public:
 
     static struct rte_mempool** _pktmbuf_pools;
 
-    inline int nbRXQueues();
-    inline int nbTXQueues();
+    inline struct DevInfo get_info() { return info; };
+    inline int nb_rx_queues();
+    inline int nb_tx_queues();
+    inline int nb_vf_pools();
+
+    struct rte_ether_addr gen_mac(int a, int b);
 
     /*
     * TXInternalQueue is a ring of DPDK buffers pointers (rte_mbuf *) awaiting
@@ -234,6 +306,9 @@ public:
             Timer timeout;
     } __attribute__((aligned(64)));
 
+    static bool initialized() {
+        return _is_initialized;
+    }
 
 private:
 
@@ -249,13 +324,18 @@ private:
     static bool no_more_buffer_msg_printed;
 
     int initialize_device(ErrorHandler *errh) CLICK_COLD;
-    int add_queue(Dir dir, unsigned &queue_id, bool promisc, bool vlan_filter, bool vlan_strip,
-                   unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
+    int add_queue(Dir dir, unsigned &queue_id,
+                    bool promisc, bool vlan_filter, bool vlan_strip, bool vlan_extend,
+                    bool lro, bool jumbo, unsigned n_desc, ErrorHandler *errh) CLICK_COLD;
 
     static int alloc_pktmbufs(ErrorHandler* errh) CLICK_COLD;
 
-    static DPDKDevice* get_device(const portid_t &port_id) {
+    static DPDKDevice *ensure_device(const portid_t &port_id) {
         return &(_devs.find_insert(port_id, DPDKDevice(port_id)).value());
+    }
+
+    static DPDKDevice *get_device(const portid_t &port_id) {
+        return &(_devs.find(port_id).value());
     }
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
@@ -293,13 +373,13 @@ class DPDKRing { public:
     String _PROC_1;
     String _PROC_2;
 
-    unsigned     _ndesc;
-    unsigned     _burst_size;
-    short        _numa_zone;
+    unsigned _ndesc;
+    unsigned _burst_size;
+    short _numa_zone;
     int _flags;
 
-    struct rte_ring    *_ring;
-    counter_t    _count;
+    struct rte_ring *_ring;
+    counter_t _count;
 
     bool _force_create;
     bool _force_lookup;
@@ -387,12 +467,16 @@ inline rte_mbuf* DPDKDevice::get_pkt() {
     return get_pkt(rte_socket_id());
 }
 
-int DPDKDevice::nbRXQueues() {
+int DPDKDevice::nb_rx_queues() {
     return info.rx_queues.size();
 };
 
-int DPDKDevice::nbTXQueues() {
+int DPDKDevice::nb_tx_queues() {
     return info.tx_queues.size();
+};
+
+int DPDKDevice::nb_vf_pools() {
+    return info.num_pools;
 };
 
 CLICK_ENDDECLS

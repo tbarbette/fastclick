@@ -46,6 +46,7 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("%p{element} is not a counter !",e);
     if (_standalone)
         ScheduleInfo::initialize_task(this, &_task, errh);
+#if defined(__GNUC__) && !defined(__clang__)
     void (CounterBase::*aaddfnt)(CounterBase::stats) = &CounterBase::atomic_add;
     void (CounterBase::*addfnt)(CounterBase::stats) = &CounterBase::add;
     CounterBase::stats (CounterBase::*areadfnt)() = &CounterBase::atomic_read;
@@ -57,6 +58,7 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
         _add_fnt=(void (*)(CounterBase*,CounterBase::stats))(_counter->*addfnt);
         _read_fnt=(CounterBase::stats(*)(CounterBase*))(_counter->*readfnt);
     }
+#endif
     if (_pass < 1)
         return errh->error("PASS must be >= 1");
     return 0;
@@ -64,14 +66,19 @@ CounterTest::configure(Vector<String> &conf, ErrorHandler *errh)
 
 #if HAVE_BATCH
 void
-CounterTest::push_batch(int, PacketBatch* batch) {
+CounterTest::push_batch(int, PacketBatch* batch)
+{
     if (++_cur_pass == _pass) {
         _cur_pass.set(0);
         for (int i = 0; i < _rate; i++) {
             if (!router()->running())
                 break;
             if (_atomic) {
-                _read_fnt(_counter);
+#if defined(__GNUC__) && !defined(__clang__)
+            _read_fnt(_counter);
+#else
+            _counter->atomic_read();
+#endif
             } else {
                 _counter->count();
             }
@@ -82,16 +89,22 @@ CounterTest::push_batch(int, PacketBatch* batch) {
 #endif
 
 void
-CounterTest::push(int, Packet* p) {
+CounterTest::push(int, Packet* p)
+{
     for (int i = 0; i < _rate; i++) {
         if (master()->paused())
             break;
+#if defined(__GNUC__) && !defined(__clang__)
         _read_fnt(_counter);
+#else
+        if (_atomic)
+            _counter->atomic_read();
+        else
+            _counter->read();
+#endif
     }
     output_push(0, p);
 }
-
-
 
 bool
 CounterTest::run_task(Task* t)
@@ -99,21 +112,35 @@ CounterTest::run_task(Task* t)
     for (int i = 0; i < _rate; i++) {
         if (master()->paused())
             break;
+#if defined(__GNUC__) && !defined(__clang__)
         _read_fnt(_counter);
+#else
+        if (_atomic)
+            _counter->atomic_read();
+        else
+            _counter->read();
+#endif
         _read++;
     }
-
+#if defined(__GNUC__) && !defined(__clang__)
     _add_fnt(_counter,{1,1});
+#else
+    if (_atomic)
+        _counter->atomic_add({1,1});
+    else
+        _counter->add({1,1});
+#endif
     _write++;
     t->fast_reschedule();
+    return true;
 }
 
 void
-CounterTest::add_handlers() {
+CounterTest::add_handlers()
+{
     add_data_handlers("read", Handler::f_read, &_read);
     add_data_handlers("write", Handler::f_read, &_write);
 }
-
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(CounterTest)
