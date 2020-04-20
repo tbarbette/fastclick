@@ -1,3 +1,9 @@
+fastclick (0.1.5-0) stable; urgency=medium
+
+  * Update fastclick from upstream
+
+ -- Michael Elkins <elkins@isi.edu>  Mon, 20 Apr 2020 15:35:08 -0700
+
 fastclick (0.1.4-0) stable; urgency=medium
 
   * Initial package release
