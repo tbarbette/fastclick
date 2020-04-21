@@ -24,6 +24,7 @@
 #include <click/straccum.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
+
 CLICK_DECLS
 
 /** @file string.hh
@@ -1061,6 +1062,37 @@ String::glob_match(const String& pattern) const
     return true;
 }
 
+/** @brief Split a string using an input character as a delimiter.
+ * The outcome of the split is a vector of tokens.
+ * @param c character to use as a delimiter
+ *
+ * Return a vector of tokens or an empty vector if no such delimiter exists. */
+Vector<String>
+String::split(char c) const
+{
+    Vector<String> res;
+    if (empty()) {
+        return res;
+    }
+
+    int pos = 0;
+    const char *x = _r.data;
+    while (pos < _r.length) {
+        x = (const char *)
+            memchr(_r.data + pos, c, _r.length - pos);
+        if (x) {
+            int len = (x - _r.data) - pos;
+            res.push_back(String(_r.data + pos, len, _r.memo));
+            pos += len + 1;
+        } else {
+            break;
+        }
+    }
+    res.push_back(String(_r.data + pos, _r.length - pos, _r.memo));
+
+    return res;
+}
+
 /** @brief Return a pointer to the next character in UTF-8 encoding.
     @pre @a first @< @a last
 
@@ -1095,5 +1127,36 @@ String::skip_utf8_char(const unsigned char *first, const unsigned char *last)
     }
     return first;
 }
+
+const char* String::searchLegacy(const char* pattern, const int pattern_length)
+{
+    const char* start = data();
+    const char* content_end = end();
+    const char* pattern_end = pattern + pattern_length;
+
+    // Search until we reach the end of the buffer
+    while(start != content_end)
+    {
+	const char* current_pattern = pattern;
+        const char* current_content = start;
+
+        // Check if the characters in the buffer and in the pattern match (case insensitive)
+        while(current_content != content_end
+            && (*current_content == *current_pattern))
+        {
+            ++current_pattern;
+            ++current_content;
+		if (current_pattern == pattern_end)
+			return start;
+        }
+
+        ++start;
+    }
+
+    return 0;
+}
+
+
+
 
 CLICK_ENDDECLS
