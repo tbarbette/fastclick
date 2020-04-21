@@ -798,7 +798,7 @@ number_to_binary_str(const uint64_t &number, const unsigned &bits_nb)
 {
     StringAccum sa;
     if (bits_nb <= 64)
-    	for (unsigned i = 1 << bits_nb-1; i > 0; i = i / 2)
+	for (unsigned i = 1 << (bits_nb-1); i > 0; i = i / 2)
         	(number & i)? sa << "1" : sa << "0";
     return sa.take_string();
 }
