@@ -11,6 +11,8 @@ dnl The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
 dnl notice is a summary of the Click LICENSE file; the license in that file is
 dnl legally binding.
 
+m4_include([m4/click.m4])
+
 AC_INIT([click], [2.1])
 AC_PREREQ(2.60)
 AC_CONFIG_HEADERS([include/click/config.h:config.h.in], [echo > stamp-h])
@@ -1126,6 +1128,13 @@ if test "$value" != 0; then
     AC_DEFINE_UNQUOTED([CLICK_DEBUG_SCHEDULING], [$value], [Define to enable debugging support for Click scheduling.])
 fi
 
+
+dnl Compile for the native architecture
+AC_ARG_ENABLE(portable-binary, [AS_HELP_STRING([--enable-portable-binary], [disable compiler optimizations that would produce unportable binaries])],
+	acx_maxopt_portable=$enableval, acx_maxopt_portable=no)
+if test $acx_maxopt_portable = no; then
+    AX_CHECK_COMPILE_FLAG([-march=native], [CXXFLAGS="-march=native $CXXFLAGS";CFLAGS="-march=native $CFLAGS"])
+fi
 
 dnl use Intel-specific machine instructions
 

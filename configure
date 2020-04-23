@@ -855,6 +855,7 @@ enable_task_heap
 enable_dmalloc
 enable_valgrind
 enable_schedule_debugging
+enable_portable_binary
 enable_intel_cpu
 enable_avx2
 with_netmap
@@ -1559,6 +1560,9 @@ Optional Features:
   --enable-valgrind       extra support for debugging with valgrind
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
                           (no/yes/extra) [yes]
+  --enable-portable-binary
+                          disable compiler optimizations that would produce
+                          unportable binaries
   --enable-intel-cpu      enable Intel-specific machine instructions
   --enable-avx2           check whether AVX2 is enabled, default yes
 
@@ -10352,6 +10356,51 @@ _ACEOF
 
 fi
 
+
+# Check whether --enable-portable-binary was given.
+if test "${enable_portable_binary+set}" = set; then :
+  enableval=$enable_portable_binary; acx_maxopt_portable=$enableval
+else
+  acx_maxopt_portable=no
+fi
+
+if test $acx_maxopt_portable = no; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -march=native" >&5
+$as_echo_n "checking whether C++ compiler accepts -march=native... " >&6; }
+if ${ax_cv_check_cxxflags___march_native+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -march=native"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___march_native=yes
+else
+  ax_cv_check_cxxflags___march_native=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___march_native" >&5
+$as_echo "$ax_cv_check_cxxflags___march_native" >&6; }
+if test "x$ax_cv_check_cxxflags___march_native" = xyes; then :
+  CXXFLAGS="-march=native $CXXFLAGS";CFLAGS="-march=native $CFLAGS"
+else
+  :
+fi
+
+fi
 
 
 # Check whether --enable-intel-cpu was given.
