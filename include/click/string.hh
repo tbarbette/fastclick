@@ -12,6 +12,9 @@
 #else
 # include <string.h>
 #endif
+#if HAVE_AVX2
+#include <immintrin.h>
+#endif
 #define CLICK_CONSTANT_CSTR(cstr) ((cstr) && __builtin_constant_p(strlen((cstr))))
 CLICK_DECLS
 class StringAccum;
@@ -128,6 +131,8 @@ class String { public:
     int find_left(char c, int start = 0) const;
     int find_left(const String &x, int start = 0) const;
     int find_right(char c, int start = 0x7FFFFFFF) const;
+
+    const char* search(String pattern);
 
     String lower() const;
     String upper() const;
@@ -254,6 +259,11 @@ class String { public:
     }
 
     static void one_profile_report(StringAccum &sa, int i, int examples);
+#endif
+
+    const char* searchLegacy(const char* pattern, const int pattern_length);
+#if HAVE_AVX2 && !defined(CLICK_TOOL)
+    inline const char* searchAVX2(const char* pattern, const int pattern_length);
 #endif
 
     inline void assign_memo(const char *data, int length, memo_t *memo) const {
@@ -1009,6 +1019,74 @@ inline const char *rfind(const char *first, const char *last, char c) {
 
 inline const char *find(const String &s, char c) {
     return find(s.begin(), s.end(), c);
+}
+
+
+#if HAVE_AVX2 && !defined(CLICK_TOOL)
+//Inspired from https://github.com/WojciechMula/sse4-strstr/
+
+/**
+ * @pre pattern_length > 0
+ * @pre length() > 0
+ */
+inline const char* String::searchAVX2(const char* pattern, const int pattern_length) {
+	    //assert(k > 0);
+	    //assert(n > 0);
+		const char* s = data();
+		const unsigned n = length();
+
+		const __m256i first = _mm256_set1_epi8(pattern[0]);
+
+		if (unlikely(pattern_length == 1)) {
+			for (size_t i = 0; i < n; i += 32) {
+				const __m256i block_first = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
+				auto mask = _mm256_movemask_epi8(_mm256_cmpeq_epi8(first, block_first));
+				if (mask != 0) {
+					const auto bitpos = __builtin_ctzl(mask);
+					return s + i + bitpos;
+				}
+			}
+		}
+
+	    const __m256i last  = _mm256_set1_epi8(pattern[pattern_length - 1]);
+
+	    for (size_t i = 0; i < n; i += 32) {
+
+	        const __m256i block_first = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
+	        const __m256i block_last  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + pattern_length - 1));
+
+	        const __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);
+	        const __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);
+
+	        uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));
+
+	        while (mask != 0) {
+
+	            const auto bitpos = __builtin_ctzl(mask);
+
+	            if (memcmp(s + i + bitpos + 1, pattern + 1, pattern_length - 2) == 0) {
+	                return s + i + bitpos;
+	            }
+
+	            mask = mask & (mask - 1);
+	        }
+	    }
+
+	    return 0;
+}
+#endif
+
+/**
+ * Search for the non-empty pattern in this string
+ */
+inline const char* String::search(String pattern) {
+	if (unlikely(length() == 0))
+		return 0;
+#if HAVE_AVX2 && !defined(CLICK_TOOL)
+	return searchAVX2(pattern.data(), pattern.length());
+#else
+	return searchLegacy(pattern.data(), pattern.length());
+#endif
 }
 
 // sort methods
