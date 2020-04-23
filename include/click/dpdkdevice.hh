@@ -183,7 +183,12 @@ public:
     String get_device_vendor_name();
     uint16_t get_device_id();
     const char *get_device_driver();
-    int set_rss_max(int max);
+
+    int dpdk_set_rss_max(int max);
+    int dpdk_set_rss_reta(unsigned* reta, unsigned reta_sz);
+    int dpdk_get_rss_reta_size() const;
+    Vector<unsigned>  dpdk_get_rss_reta() const;
+
 
     static unsigned int dev_count() {
 #if RTE_VERSION >= RTE_VERSION_NUM(18,05,0,0)

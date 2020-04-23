@@ -111,6 +111,7 @@ class SimpleQueue : public BatchElement, public Storage { public:
     volatile int _drops;
     int _highwater_length;
     bool _nouseless;
+    bool _blocking;
 
     friend class MixedQueue;
     friend class TokenQueue;

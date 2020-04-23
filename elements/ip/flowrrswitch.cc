@@ -27,7 +27,7 @@
 
 CLICK_DECLS
 
-FlowRRSwitch::FlowRRSwitch() : _max(0), _current_port(0), _map(), _mask()
+FlowRRSwitch::FlowRRSwitch() : _max(0), _current_port(0), _map(), _mask(), _load_aware(false)
 {
 }
 
@@ -41,8 +41,13 @@ FlowRRSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
     _max = noutputs();
     if (Args(conf, this, errh)
         .read("MAX", _max)
+        .read_or_set("LOAD", _load_aware, false)
         .complete() < 0)
     return -1;
+
+    if (_load_aware) {
+        _load.resize(_max,0);
+    }
 
     _mask = IPFlowID(0xffffffff, 0xffff, 0xffffffff, 0xffff);
 
@@ -55,10 +60,25 @@ FlowRRSwitch::cleanup(CleanupStage)
     _map.clear();
 }
 
-void
+unsigned
 FlowRRSwitch::round_robin()
 {
-    _current_port = ((++_current_port) % _max);
+    if (_load_aware) {
+        unsigned min = INT_MAX;
+        int min_i = -1;
+        for (int i = 0; i < _max; i++) {
+            unsigned l = _load.unchecked_at((i + _current_port) % _max);
+            if (l < min) {
+                min_i = i;
+                min = l;
+            }
+        }
+            _current_port = (min_i + _current_port) % _max;
+            _load[_current_port]++;
+            return _current_port;
+    } else {
+        return _current_port = ((++_current_port) % _max);
+    }
 }
 
 int
@@ -78,13 +98,12 @@ FlowRRSwitch::process(int port, Packet *p)
     // New flow
     if (!found) {
         // This is where the flow will be emitted
-        new_flow.set_output_port(_current_port);
+        new_flow.set_output_port(round_robin());
 
         // Insert this new flow into the flow map
         _map.find_insert(new_flow);
 
         // Set the destiny of the next flow
-        round_robin();
 
         return new_flow.output_port();
     }
@@ -106,7 +125,7 @@ void
 FlowRRSwitch::push_batch(int port, PacketBatch *batch)
 {
     auto fnt = [this, port](Packet *p) { return process(port, p); };
-    CLASSIFY_EACH_PACKET(_max, fnt, batch, checked_output_push_batch);
+    CLASSIFY_EACH_PACKET(_max, fnt, batch, output_push_batch);
 }
 #endif
 

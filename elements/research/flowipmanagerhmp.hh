@@ -13,7 +13,7 @@
 #include <click/flow/common.hh>
 #include <click/timerwheel.hh>
 
-#include "../flow/flowipmanager.hh"
+#include "../flow/flowipmanagermp.hh"
 
 CLICK_DECLS
 
