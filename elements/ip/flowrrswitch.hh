@@ -132,12 +132,15 @@ class FlowRRSwitch : public BatchElement {
          */
         IPFlowID _mask;
 
+        bool _load_aware;
+        Vector<unsigned> _load;
+
         /**
          * Element's logic:
          * Assign a new flow to an output
          * port in a round-robin fashion.
          */
-        void round_robin();
+        unsigned round_robin() CLICK_WARN_UNUSED_RESULT;
 
         /**
          * Read handlers.

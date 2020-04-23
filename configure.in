@@ -193,11 +193,22 @@ else
     LIBS="$save_libs"
 fi
 
+AC_SEARCH_LIBS([bpf_prog_load_xattr], [bpf], [ac_have_libbpf=yes], [ac_have_libbpf=no])
+AC_CHECK_HEADERS([bpf/bpf.h], [ac_have_libbpf_h=yes], [ac_have_libbpf_h=no])
+if test "x$ac_have_libbpf$ac_have_libbpf_h" = "xyesyes"; then
+    AC_DEFINE([HAVE_BPF])
+    have_libbpf=yes
+else
+    have_libbpf=no
+fi
+
 AC_SEARCH_LIBS([curl_global_init], [curl], [ac_have_curl=yes], [ac_have_curl=no])
 AC_CHECK_HEADERS([curl/curl.h], [ac_have_curl_h=yes], [ac_have_curl_h=no])
 if test "$ac_have_curl$ac_have_curl_h" = yesyes; then
     AC_DEFINE([HAVE_CURL])
 fi
+
+AC_SEARCH_LIBS([elf_version], [elf], [ac_have_elf=yes], [ac_have_elf=no])
 
 AC_SEARCH_LIBS([MHD_start_daemon], [microhttpd], [ac_have_libmicrohttpd=yes], [ac_have_libmicrohttpd=no])
 AC_CHECK_HEADERS([microhttpd.h], [ac_have_microhttpd_h=yes], [ac_have_microhttpd_h=no])
@@ -218,15 +229,6 @@ else
     have_re2=no
 fi
 
-AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
-AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
-if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
-    AC_DEFINE([HAVE_PAPI])
-    have_papi=yes
-else
-    have_papi=no
-fi
-
 AC_CHECK_LIB([hs], [hs_compile_multi], [ac_have_hyperscan=yes], [ac_have_hyperscan=no])
 AC_CHECK_HEADERS([hs/hs.h], [ac_have_hyperscan_h=yes], [ac_have_hyperscan_h=no])
 if test "x$ac_have_hyperscan$ac_have_hyperscan_h" = "xyesyes"; then
@@ -237,6 +239,14 @@ else
     have_hyperscan=no
 fi
 
+AC_SEARCH_LIBS([PAPI_start_counters], [papi], [ac_have_papi=yes], [ac_have_papi=no])
+AC_CHECK_HEADERS([papi.h], [ac_have_papi_h=yes], [ac_have_papi_h=no])
+if test "x$ac_have_papi_h$ac_have_papi" = "xyesyes"; then
+    AC_DEFINE([HAVE_PAPI])
+    have_papi=yes
+else
+    have_papi=no
+fi
 
 AC_ARG_ENABLE([json],
     [AS_HELP_STRING([  --enable-json], [enable JSON support])],
@@ -247,6 +257,7 @@ if test "x$enable_json" = "xyes"; then
 else
     have_json=no
 fi
+
 
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
@@ -1310,20 +1321,20 @@ Ignoring --enable-task-heap, which is incompatible with --disable-stride.
 fi
 
 
-dnl click load
-AC_ARG_ENABLE([cpu-load],
-    [AS_HELP_STRING([--enable-cpu-load], [Keep track of CPU usage using an approximation. Useful when using polling keeping the CPU at 100%])],
-    [:], [enable_cpu_load=no])
-if test "x$enable_cpu_load" = xyes; then
-    AC_DEFINE(HAVE_CLICK_LOAD)
-fi
-
 dnl task statistics
 AC_ARG_ENABLE([task-stats],
     [AS_HELP_STRING([--enable-task-stats], [Keep track of task statistics, used for automatic balancing of tasks among threads])],
     [:], [enable_task_stats=no])
 if test "x$enable_task_stats" = xyes; then
     AC_DEFINE(HAVE_TASK_STATS)
+fi
+
+dnl click load
+AC_ARG_ENABLE([cpu-load],
+    [AS_HELP_STRING([--enable-cpu-load], [Keep track of CPU usage using an approximation. Useful when using polling keeping the CPU at 100%])],
+    [:], [enable_cpu_load=no])
+if test "x$enable_cpu_load" = xyes; then
+    AC_DEFINE(HAVE_CLICK_LOAD)
 fi
 
 dnl debugging malloc
@@ -2328,6 +2339,11 @@ if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 fi
 
+dnl add 'bpf' if libbpf support is available
+if test "$ac_have_libbpf$ac_have_libbpf_h" = yesyes; then
+    provisions="$provisions bpf"
+fi
+
 dnl add 'dpdk' if compiled with --enable-dpdk
 if test "x$enable_dpdk" = xyes; then
     provisions="$provisions dpdk"
@@ -2343,6 +2359,11 @@ if test "x$enable_gtp" = xyes; then
     provisions="$provisions gtp"
 fi
 
+dnl add 'hs' if HyperScan lib is available
+if test "x$have_hyperscan" = xyes; then
+    provisions="$provisions hs"
+fi
+
 dnl add 'int64' if 64-bit integers are available
 if test "x$have_int64_types" = xyes; then
     provisions="$provisions int64"
@@ -2351,6 +2372,11 @@ fi
 dnl add 'ip6' if ip6 elements are available
 if test "x$enable_ip6" = xyes; then
     provisions="$provisions ip6"
+fi
+
+dnl add 'load' if compiling with cpu-load
+if test "x$enable_cpu_load" = xyes; then
+    provisions="$provisions load"
 fi
 
 dnl add 'linux' if compiling under linux
@@ -2392,6 +2418,11 @@ fi
 dnl add 'numa' if numa support is available
 if test "x$HAVE_NUMA" = xyes; then
     provisions="$provisions numa"
+fi
+
+dnl add 'papi' if libpapi support is available
+if test "x$have_papi" = xyes; then
+    provisions="$provisions papi"
 fi
 
 dnl add 'pcap' if libpcap is available
@@ -2487,10 +2518,18 @@ Configuration Summary:
     PCAP   support:              ${have_pcap}
 
     Metron support:              ${have_metron}
+    RSS++  support:              ${enable_cpu_load}
 
     PAPI   support:              ${have_papi}
     RE2    support:              ${have_re2}
+    BPF    support:              ${have_libbpf}
 "
+
+if test "x$enable_cpu_load" != "xyes"; then
+    echo ""
+    echo "You need to enable --enable-cpu-load to have RSS++"
+    echo ""
+fi
 
 if test "$feedback" != no; then
     echo ""

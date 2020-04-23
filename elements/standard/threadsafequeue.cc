@@ -61,7 +61,7 @@ void
 ThreadSafeQueue::push(int, Packet *p)
 {
     // Code taken from SimpleQueue::push().
-
+tagain:
     // Reserve a slot by incrementing _xtail
     Storage::index_type t, nt;
     do {
@@ -75,6 +75,10 @@ ThreadSafeQueue::push(int, Packet *p)
 	push_success(h, t, nt, p);
     else {
 	_xtail = t;
+    if (unlikely(_blocking)) {
+        click_relax_fence();
+        goto tagain;
+    }
 	push_failure(p);
     }
 }

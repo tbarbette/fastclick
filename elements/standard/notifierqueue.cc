@@ -47,6 +47,7 @@ NotifierQueue::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 NotifierQueue::push(int, Packet *p)
 {
+tagain:
     // Code taken from SimpleQueue::push().
     int h = head(), t = tail(), nt = next_i(t);
 
@@ -62,9 +63,11 @@ NotifierQueue::push(int, Packet *p)
 
     } else {
 	if (_drops == 0 && _capacity > 0)
-	    click_chatter("%p{element}: overflow", this);
+	        click_chatter("%p{element}: overflow", this);
 	_drops++;
-	checked_output_push(1, p);
+        if (_blocking)
+            goto tagain;
+	    checked_output_push(1, p);
     }
 }
 

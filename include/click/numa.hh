@@ -114,6 +114,10 @@ public:
 		return numa_num_configured_nodes();
 	}
 
+	static int get_numa_node_of_cpu(int cpuid) {
+		return numa_node_of_cpu(cpuid);
+	}
+
 	static int get_device_node(const char* device) {
 
 		char path[100];

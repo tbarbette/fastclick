@@ -36,10 +36,10 @@ int
 FlowIPNAT::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-       .read_mp("SIP",_sip)
-       .read("ACCEPT_NONSYN", _accept_nonsyn)
-       .read("STATE", _own_state)
-       .complete() < 0)
+               .read_mp("SIP",_sip)
+               .read("ACCEPT_NONSYN", _accept_nonsyn)
+               .read("STATE", _own_state)
+               .complete() < 0)
         return -1;
 
     return 0;

@@ -26,9 +26,10 @@ CLICK_DECLS
 
 std::random_device rd;
 
+
 #define FRAND_MAX _gens->max()
 
-WorkPackage::WorkPackage() : _w(1)
+WorkPackage::WorkPackage() : _w(1), _analysis(false)
 {
 }
 
@@ -42,6 +43,7 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_mp("R", _r) //Percentage of access that are packet read (vs Array access) between 0 and 100
         .read_mp("PAYLOAD", _payload) //Access payload or only header
         .read("W",_w) //Amount of call to random, purely CPU intensive fct
+        .read("ANALYSIS", _analysis)
         .complete() < 0)
         return -1;
     _array.resize(s * 1024 * 1024 / sizeof(uint32_t));
@@ -57,6 +59,10 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 WorkPackage::rmaction(Packet* p, int &n_data)
 {
+	click_cycles_t start;
+	if (_analysis) {
+		 start = click_get_cycles();
+	}
     uint32_t sum = 0;
     unsigned r = 0;
     for (int i = 0; i < _w; i ++) {
@@ -73,6 +79,11 @@ WorkPackage::rmaction(Packet* p, int &n_data)
             data = _array[pos];
         }
         r = data ^ (r << 24 ^ r << 16  ^ r << 8 ^ r >> 16);
+    }
+    if (_analysis) {
+	WPStat &s = *_stats;
+	s.cycles_count += click_get_cycles() - start;
+	s.cycles_n += _w;
     }
 }
 
@@ -94,6 +105,40 @@ WorkPackage::push(int port, Packet* p)
     rmaction(p,n_data);
     output_push(port, p);
 }
+
+
+
+enum { H_CYCLES, H_CYCLES_PER_WORK, H_CYCLES_WORK };
+
+String
+WorkPackage::read_handler(Element *e, void *thunk)
+{
+	WorkPackage *c = (WorkPackage *)e;
+
+	PER_THREAD_MEMBER_SUM(uint64_t,cycles,c->_stats,cycles_count);
+	PER_THREAD_MEMBER_SUM(uint64_t,cyclesn,c->_stats,cycles_n);
+    switch ((intptr_t)thunk) {
+    case H_CYCLES:
+        return String(cycles);
+    case H_CYCLES_PER_WORK:
+        return String((double)cycles / (double)cyclesn);
+    case H_CYCLES_WORK:
+        return String(cyclesn);
+    default:
+        return "<error>";
+    }
+}
+
+
+
+void
+WorkPackage::add_handlers()
+{
+    add_read_handler("cycles", WorkPackage::read_handler, H_CYCLES);
+    add_read_handler("cycles_per_work", WorkPackage::read_handler, H_CYCLES_PER_WORK);
+    add_read_handler("cycles_work", WorkPackage::read_handler, H_CYCLES_WORK);
+}
+
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(WorkPackage)

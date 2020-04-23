@@ -1959,7 +1959,7 @@ ServiceChain::initialize_cpus(int initial_cpu_nb, int max_cpu_nb)
     _initial_cpus_nb = initial_cpu_nb;
     _max_cpus_nb = max_cpu_nb;
     _autoscale = false;
-    _cpus.resize(max_cpu_nb,CpuInfo());
+    _cpus.resize(max_cpu_nb,MetronCpuInfo());
     for (unsigned i = 0; i < max_cpu_nb; i++) {
         _cpus[i].cpu_phys_id = -1;
     }
@@ -1972,7 +1972,7 @@ Json
 ServiceChain::get_cpu_stats(int j)
 {
     ServiceChain *sc = this;
-    CpuInfo &cpu = sc->get_cpu_info(j);
+    MetronCpuInfo &cpu = sc->get_cpu_info(j);
     int cpu_id = sc->get_cpu_phys_id(j);
     Json jcpu = Json::make_object();
     jcpu.set("id", cpu_id);

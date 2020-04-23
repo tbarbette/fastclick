@@ -101,10 +101,10 @@ FromIPSummaryDump::configure(Vector<String> &conf, ErrorHandler *errh)
     .complete() < 0)
     return -1;
     if (_sampling_prob > (1 << SAMPLING_SHIFT)) {
-    errh->warning("SAMPLE probability reduced to 1");
-    _sampling_prob = (1 << SAMPLING_SHIFT);
+		errh->warning("SAMPLE probability reduced to 1");
+		_sampling_prob = (1 << SAMPLING_SHIFT);
     } else if (_sampling_prob == 0)
-    errh->warning("SAMPLE probability is 0; emitting no packets");
+	errh->warning("SAMPLE probability is 0; emitting no packets");
 
     _default_proto = default_proto;
     _stop = stop;

@@ -18,7 +18,9 @@ CLICK_DECLS
  *
  * Note that the packet's annotations are not changed.  Thus, the packet's transport
  * header annotation continues to point at the transport header, even though the transport
- * header's data is now out of range.
+ * header's data is now out of range.  To correctly handle an IP-in-IP packet,
+ * you will probably need to follow StripTransportHeader with a CheckIPHeader or
+ * MarkIPHeader element, thus marking the packet's inner header.
  *
  * =a CheckIPHeader, CheckIPHeader2, MarkIPHeader, UnStripTransportHeader, Strip
  */

@@ -1826,6 +1826,9 @@ void Element::add_remote_element(Element* e) {
 }
 
 int Element::thread_configure(ThreadReconfigurationStage stage, ErrorHandler* errh, Bitvector threads) {
+    (void)stage;
+    (void)errh;
+    (void)threads;
     return 0;
 }
 
@@ -1842,6 +1845,11 @@ public:
 
     bool visit(Element *e, bool isoutput, int port,
                    Element *from_e, int from_port, int distance) {
+        (void)isoutput;
+        (void)port;
+        (void)from_e;
+        (void)from_port;
+        (void)distance;
         e->thread_configure(_stage, _errh, _threads);
         return true;
     }

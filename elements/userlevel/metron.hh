@@ -416,9 +416,9 @@ struct LatencyInfo {
     uint64_t max_latency;
 };
 
-class CpuInfo {
+class MetronCpuInfo {
     public:
-        CpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0),
+        MetronCpuInfo() : cpu_phys_id(-1), load(0), max_nic_queue(0),
                     latency(), _active(false) {
             _active_time = Timestamp::now_steady();
         }
@@ -558,7 +558,7 @@ class ServiceChain {
             return _max_cpus_nb;
         }
 
-        inline CpuInfo &get_cpu_info(int cpu_id) {
+        inline MetronCpuInfo &get_cpu_info(int cpu_id) {
             return _cpus[cpu_id];
         }
 
@@ -622,7 +622,7 @@ class ServiceChain {
         Metron *_metron;
         ServiceChainManager *_manager;
         Vector<NIC *> _nics;
-        Vector<CpuInfo> _cpus;
+        Vector<MetronCpuInfo> _cpus;
         Vector<NicStat> _nic_stats;
         int _initial_cpus_nb;
         int _max_cpus_nb;
