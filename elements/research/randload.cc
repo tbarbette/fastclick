@@ -1,4 +1,4 @@
-/ -*- c-basic-offset: 4 -*-
+// -*- c-basic-offset: 4 -*-
 /* randload.{cc,hh} --
  * Tom Barbette
  *
