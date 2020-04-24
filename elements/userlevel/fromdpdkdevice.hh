@@ -331,6 +331,14 @@ If JSON is supported, the return format is JSON, otherwise a string is returned.
 
 Reconfigures the size of the RSS table.
 
+=h rss_reta read-only
+
+Returns the RSS RETA table
+
+=h rss_reta_size read-only
+
+Returns the RSS RETA table size
+
 =h hw_count read-only
 
 Returns the number of packets received by this device, as computed by the hardware.

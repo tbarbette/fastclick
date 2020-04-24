@@ -528,7 +528,7 @@ String FromDPDKDevice::read_handler(Element *e, void * thunk)
         case h_driver:
             return String(fd->_dev->get_device_driver());
         case h_rss_reta_size:
-		    return String(fd->_dev->dpdk_get_rss_reta_size());
+            return String(fd->_dev->dpdk_get_rss_reta_size());
         case h_rss_reta:
             StringAccum acc;
             Vector<unsigned> list = fd->_dev->dpdk_get_rss_reta();
