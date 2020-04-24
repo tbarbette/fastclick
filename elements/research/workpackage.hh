@@ -10,13 +10,64 @@ CLICK_DECLS
 /*
 =c
 
-WorkPackage(W, N)
+WorkPackage(S, N, R, PAYLOAD, [W, ANALYSIS])
 
-=s test
+=s research
+
+Artificially create CPU/Memory load
+
+=d
 
 Compute a random number for a certain amount of W time, and makes N accesses to
 an array of size S (MB)
 
+Keyword arguments are:
+
+=over 8
+
+=item S
+
+Integer. Size of the memory array, per-CPU
+
+=item N
+
+Integer. Number of random access to the array per packet
+
+=item R
+
+Integer. Percentage of accesses made to the packet content instead of the array.
+
+=item PAYLOAD
+
+Boolean. If true, access the full payload of the packet, if false, access only its header. If R=0 this value is meaningless.
+
+=item W
+
+Integer. Number of times a pseudo-random number is generated per-packet before doing any access. This is to generate a constant amount of CPU load per packet.
+
+=item ANALYSIS
+
+Boolean. If true, track statistics about cycles, readable through handlers.
+
+=back
+
+Only available in user-level processes.
+
+=n
+
+=h cycles read-only
+
+If ANALYSIS is true, gives the total number of cycles spent generating CPU load
+
+=h cycles_per_work read-only
+
+If ANALYSIS is true, gives the total number of cycles per W
+
+=h cycles_work read-only
+
+If ANALYSIS is true, gives the total number of W rounds
+
+=a RandLoad
 */
 
 class WorkPackage : public BatchElement { public:
@@ -35,6 +86,7 @@ class WorkPackage : public BatchElement { public:
 #endif
 
     void add_handlers() override CLICK_COLD;
+
 private:
     int _r;
     int _n;
@@ -44,17 +96,13 @@ private:
     per_thread<std::mt19937> _gens;
     bool _analysis;
     struct WPStat {
-	WPStat() : cycles_count(0), cycles_n(0) {
+        WPStat() : cycles_count(0), cycles_n(0) {
+        };
 
-	};
-
-	uint64_t cycles_count;
-	uint64_t cycles_n;
+        uint64_t cycles_count;
+        uint64_t cycles_n;
     };
     per_thread<WPStat> _stats;
-
-
-
 
     static String read_handler(Element *, void *) CLICK_COLD;
 };

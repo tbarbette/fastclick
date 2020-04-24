@@ -69,70 +69,84 @@ const char *DPDKDevice::get_device_driver()
 
 #define RETA_CONF_SIZE     (ETH_RSS_RETA_SIZE_512 / RTE_RETA_GROUP_SIZE)
 
+/**
+ * Reconfigure the RSS RETA table using between 0 and max queues
+ * @return 0 on success
+ */
 int DPDKDevice::dpdk_set_rss_max(int max)
 {
-	struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
+    struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
     struct rte_eth_dev_info dev_info;
 
     uint16_t reta_size = dpdk_get_rss_reta_size();
-	uint32_t i;
-	int status;
-	/* RETA setting */
-	memset(reta_conf, 0, sizeof(reta_conf));
+    uint32_t i;
+    int status;
+    /* RETA setting */
+    memset(reta_conf, 0, sizeof(reta_conf));
     for (i = 0; i < reta_size; i++) {
-			reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
+        reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
     }
-	for (i = 0; i < reta_size; i++) {
-			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
-			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
-			uint32_t core_id = i % max;
-			reta_conf[reta_id].reta[reta_pos] = core_id;
-	}
-	/* RETA update */
-	status = rte_eth_dev_rss_reta_update(port_id,
-			reta_conf,
-			reta_size);
-	return status;
+    for (i = 0; i < reta_size; i++) {
+        uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
+        uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
+        uint32_t core_id = i % max;
+        reta_conf[reta_id].reta[reta_pos] = core_id;
+    }
+    /* RETA update */
+    status = rte_eth_dev_rss_reta_update(port_id, reta_conf, reta_size);
+    return status;
 }
 
+/**
+ * Write the RSS reta table
+ * @param reta Pointer to the table
+ * @param reta_sz Size of the table
+ * @return 0 on success
+ */
 int DPDKDevice::dpdk_set_rss_reta(unsigned* reta, unsigned reta_sz)
 {
-	struct rte_eth_rss_reta_entry64 reta_conf[reta_sz / RTE_RETA_GROUP_SIZE];
+    struct rte_eth_rss_reta_entry64 reta_conf[reta_sz / RTE_RETA_GROUP_SIZE];
     struct rte_eth_dev_info dev_info;
 
-	uint32_t i;
-	int status;
-	/* RETA setting */
-	memset(reta_conf, 0, sizeof(reta_conf));
+    uint32_t i;
+    int status;
+    /* RETA setting */
+    memset(reta_conf, 0, sizeof(reta_conf));
     for (i = 0; i < reta_sz; i++) {
-			reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
+            reta_conf[i / RTE_RETA_GROUP_SIZE].mask = UINT64_MAX;
     }
-	for (i = 0; i < reta_sz; i++) {
-			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
-			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
-			reta_conf[reta_id].reta[reta_pos] = reta[i];
-	}
-	/* RETA update */
-	status = rte_eth_dev_rss_reta_update(port_id,
-			reta_conf,
-			reta_sz);
-	return status;
+    for (i = 0; i < reta_sz; i++) {
+            uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
+            uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
+            reta_conf[reta_id].reta[reta_pos] = reta[i];
+    }
+    /* RETA update */
+    status = rte_eth_dev_rss_reta_update(port_id,
+            reta_conf,
+            reta_sz);
+    return status;
 }
 
 
+/**
+ * Returns the current RSS RETA table size
+ */
 int DPDKDevice::dpdk_get_rss_reta_size() const {
-	struct rte_eth_dev_info dev_info;
+    struct rte_eth_dev_info dev_info;
 
-	rte_eth_dev_info_get(port_id, &dev_info);
-	int reta_size = dev_info.reta_size;
-	return reta_size;
+    rte_eth_dev_info_get(port_id, &dev_info);
+    int reta_size = dev_info.reta_size;
+    return reta_size;
 }
 
+/**
+ * Returns the RSS RETA table
+ */
 Vector<unsigned>
 DPDKDevice::dpdk_get_rss_reta() const
 {
-	struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
-	memset(reta_conf, 0xff, RETA_CONF_SIZE * sizeof(struct rte_eth_rss_reta_entry64));
+    struct rte_eth_rss_reta_entry64 reta_conf[RETA_CONF_SIZE];
+    memset(reta_conf, 0xff, RETA_CONF_SIZE * sizeof(struct rte_eth_rss_reta_entry64));
     uint16_t reta_size = dpdk_get_rss_reta_size();
 
     assert(reta_size > 0);
@@ -142,19 +156,19 @@ DPDKDevice::dpdk_get_rss_reta() const
 
     int status = rte_eth_dev_rss_reta_query(port_id, reta_conf, reta_size);
     if (status != 0) {
-	click_chatter("Could not query RETA for port %d (size %d) ! Error %d",port_id, reta_size, status);
-	return list;
+    click_chatter("Could not query RETA for port %d (size %d) ! Error %d",port_id, reta_size, status);
+    return list;
     }
 
-	for (int i = 0; i < reta_size; i++) {
-			uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
-			uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
+    for (int i = 0; i < reta_size; i++) {
+            uint32_t reta_id = i / RTE_RETA_GROUP_SIZE;
+            uint32_t reta_pos = i % RTE_RETA_GROUP_SIZE;
 
-			int core_id = reta_conf[reta_id].reta[reta_pos];
-			list.push_back(core_id);
-	}
+            int core_id = reta_conf[reta_id].reta[reta_pos];
+            list.push_back(core_id);
+    }
 
-	return list;
+    return list;
 }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
@@ -276,16 +290,16 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
     }
 
 #if HAVE_DPDK_PACKET_POOL
-	int total = 0;
-	for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
-		total += get_nb_mbuf(i);
-	}
+    int total = 0;
+    for (unsigned i = 0; i < _nr_pktmbuf_pools; i++) {
+        total += get_nb_mbuf(i);
+    }
 
-	if (Packet::max_data_pool_size() > 0) {
-		if (Packet::max_data_pool_size() + 8192 > total) {
-			return errh->error("--enable-dpdk-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more than %d DPDK buffers or compile without --enable-dpdk-pool", Packet::max_data_pool_size() + 8192);
-		}
-	}
+    if (Packet::max_data_pool_size() > 0) {
+        if (Packet::max_data_pool_size() + 8192 > total) {
+            return errh->error("--enable-dpdk-pool requires more DPDK buffers than the amount of packet that can stay in the queue. Please use DPDKInfo to allocate more than %d DPDK buffers or compile without --enable-dpdk-pool", Packet::max_data_pool_size() + 8192);
+        }
+    }
 #endif
 
     if (rte_eal_process_type() == RTE_PROC_PRIMARY) {
@@ -989,17 +1003,17 @@ int DPDKDevice::add_queue(DPDKDevice::Dir dir, unsigned &queue_id,
                 " be in promiscuous mode", port_id);
         info.promisc |= promisc;
 
-		if (info.rx_queues.size() > 0 && vlan_filter != info.vlan_filter)
-			return errh->error(
-					"Some elements disagree on whether or not device %u should"
-							" filter VLAN tagged packets", port_id);
-		info.vlan_filter |= vlan_filter;
+        if (info.rx_queues.size() > 0 && vlan_filter != info.vlan_filter)
+            return errh->error(
+                    "Some elements disagree on whether or not device %u should"
+                            " filter VLAN tagged packets", port_id);
+        info.vlan_filter |= vlan_filter;
 
-		if (info.rx_queues.size() > 0 && vlan_strip != info.vlan_strip)
-			return errh->error(
-					"Some elements disagree on whether or not device %u should"
-							" strip VLAN tagged packets", port_id);
-		info.vlan_strip |= vlan_strip;
+        if (info.rx_queues.size() > 0 && vlan_strip != info.vlan_strip)
+            return errh->error(
+                    "Some elements disagree on whether or not device %u should"
+                            " strip VLAN tagged packets", port_id);
+        info.vlan_strip |= vlan_strip;
 
         if (info.rx_queues.size() > 0 && vlan_extend != info.vlan_extend)
             return errh->error(

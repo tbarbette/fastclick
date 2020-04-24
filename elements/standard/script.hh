@@ -333,6 +333,11 @@ of a space-separated list of
 numbers; for example, 'C<count 5 0 2>' returns "C<3>" and
 'C<popcount 5 0 2>' returns "C<2>".
 
+=h gt_vec "read with parameters"
+
+Finds the number of items, or the numver of items higher than a given value;
+for example, 'C<gt_vec 5 0 2 7>' returns "C<1>".
+
 =h mul, div, idiv "read with parameters"
 
 Multiplies or divides a space-separated list of numbers and returns the

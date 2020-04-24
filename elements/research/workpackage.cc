@@ -59,10 +59,10 @@ WorkPackage::configure(Vector<String> &conf, ErrorHandler *errh)
 void
 WorkPackage::rmaction(Packet* p, int &n_data)
 {
-	click_cycles_t start;
-	if (_analysis) {
-		 start = click_get_cycles();
-	}
+    click_cycles_t start;
+    if (_analysis) {
+         start = click_get_cycles();
+    }
     uint32_t sum = 0;
     unsigned r = 0;
     for (int i = 0; i < _w; i ++) {
@@ -81,9 +81,9 @@ WorkPackage::rmaction(Packet* p, int &n_data)
         r = data ^ (r << 24 ^ r << 16  ^ r << 8 ^ r >> 16);
     }
     if (_analysis) {
-	WPStat &s = *_stats;
-	s.cycles_count += click_get_cycles() - start;
-	s.cycles_n += _w;
+        WPStat &s = *_stats;
+        s.cycles_count += click_get_cycles() - start;
+        s.cycles_n += _w;
     }
 }
 
@@ -113,10 +113,10 @@ enum { H_CYCLES, H_CYCLES_PER_WORK, H_CYCLES_WORK };
 String
 WorkPackage::read_handler(Element *e, void *thunk)
 {
-	WorkPackage *c = (WorkPackage *)e;
+    WorkPackage *c = (WorkPackage *)e;
 
-	PER_THREAD_MEMBER_SUM(uint64_t,cycles,c->_stats,cycles_count);
-	PER_THREAD_MEMBER_SUM(uint64_t,cyclesn,c->_stats,cycles_n);
+    PER_THREAD_MEMBER_SUM(uint64_t,cycles,c->_stats,cycles_count);
+    PER_THREAD_MEMBER_SUM(uint64_t,cyclesn,c->_stats,cycles_n);
     switch ((intptr_t)thunk) {
     case H_CYCLES:
         return String(cycles);

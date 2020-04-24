@@ -95,10 +95,10 @@ FromDevice::static_cleanup()
 {
 #if HAVE_CLICK_KERNEL
     if (registered_readers)
-	unregister_net_in(&packet_notifier);
+    unregister_net_in(&packet_notifier);
 #elif CLICK_FROMDEVICE_USE_BRIDGE
     if (br_handle_frame_hook == click_br_handle_frame_hook)
-	br_handle_frame_hook = real_br_handle_frame_hook;
+    br_handle_frame_hook = real_br_handle_frame_hook;
     unregister_netdevice_notifier(&device_notifier_early);
 #endif
     unregister_netdevice_notifier(&device_notifier);
@@ -118,11 +118,11 @@ void *
 FromDevice::cast(const char *n)
 {
     if (strcmp(n, "Storage") == 0)
-	return (Storage *)this;
+    return (Storage *)this;
     else if (strcmp(n, "FromDevice") == 0)
-	return (Element *)this;
+    return (Element *)this;
     else
-	return 0;
+    return 0;
 }
 
 int
@@ -132,13 +132,13 @@ FromDevice::configure(Vector<String> &conf, ErrorHandler *errh)
     _active = true;
     String alignment;
     if (AnyDevice::configure_keywords(conf, errh, true) < 0
-	|| (Args(conf, this, errh)
-	    .read_mp("DEVNAME", _devname)
-	    .read_p("BURST", _burst)
-	    .read("ACTIVE", _active)
-	    .read("ALIGNMENT", AnyArg(), alignment)
-	    .complete() < 0))
-	return -1;
+    || (Args(conf, this, errh)
+        .read_mp("DEVNAME", _devname)
+        .read_p("BURST", _burst)
+        .read("ACTIVE", _active)
+        .read("ALIGNMENT", AnyArg(), alignment)
+        .complete() < 0))
+    return -1;
 
     // make queue look full so packets sent to us are ignored
     set_head(0);
@@ -158,27 +158,27 @@ int
 FromDevice::initialize(ErrorHandler *errh)
 {
     if (AnyDevice::initialize_keywords(errh) < 0)
-	return -1;
+    return -1;
 
     // check for duplicate readers
     if (ifindex() >= 0) {
-	void *&used = router()->force_attachment("device_reader_" + String(ifindex()));
-	if (used)
-	    return errh->error("device %<%s%> has duplicate reader", _devname.c_str());
-	used = this;
+    void *&used = router()->force_attachment("device_reader_" + String(ifindex()));
+    if (used)
+        return errh->error("device %<%s%> has duplicate reader", _devname.c_str());
+    used = this;
     }
 
     if (registered_readers == 0) {
 #if HAVE_CLICK_KERNEL
-	packet_notifier.next = 0;
-	register_net_in(&packet_notifier);
+    packet_notifier.next = 0;
+    register_net_in(&packet_notifier);
 #elif CLICK_FROMDEVICE_USE_BRIDGE
-	real_br_handle_frame_hook = br_handle_frame_hook;
-	br_handle_frame_hook = click_br_handle_frame_hook;
+    real_br_handle_frame_hook = br_handle_frame_hook;
+    br_handle_frame_hook = click_br_handle_frame_hook;
 #elif HAVE_LINUX_NETDEV_RX_HANDLER_REGISTER
-	/* OK */
+    /* OK */
 #else
-	errh->warning("can't get packets: not compiled for a Click kernel");
+    errh->warning("can't get packets: not compiled for a Click kernel");
 #endif
     }
     ++registered_readers;
@@ -206,21 +206,21 @@ void
 FromDevice::cleanup(CleanupStage stage)
 {
     if (stage >= CLEANUP_INITIALIZED) {
-	--registered_readers;
-	if (registered_readers == 0) {
+    --registered_readers;
+    if (registered_readers == 0) {
 #if HAVE_CLICK_KERNEL
-	    unregister_net_in(&packet_notifier);
+        unregister_net_in(&packet_notifier);
 #elif CLICK_FROMDEVICE_USE_BRIDGE
-	    br_handle_frame_hook = real_br_handle_frame_hook;
+        br_handle_frame_hook = real_br_handle_frame_hook;
 #endif
-	}
+    }
     }
 
     clear_device(&from_device_map, anydev_from_device);
 
     if (stage >= CLEANUP_INITIALIZED)
-	for (Storage::index_type i = head(); i != tail(); i = next_i(i))
-	    _queue[i]->kill();
+    for (Storage::index_type i = head(); i != tail(); i = next_i(i))
+        _queue[i]->kill();
     set_head(0);
     set_tail(0);
 }
@@ -229,29 +229,29 @@ void
 FromDevice::take_state(Element *e, ErrorHandler *errh)
 {
     if (FromDevice *fd = (FromDevice *)e->cast("FromDevice")) {
-	SpinlockIRQ::flags_t flags;
-	local_irq_save(flags);
+    SpinlockIRQ::flags_t flags;
+    local_irq_save(flags);
 
-	Storage::index_type fd_i = fd->head();
-	while (fd_i != fd->tail()) {
-	    Storage::index_type t = fd->tail(), nt = next_i(t);
-	    if (nt == fd->head())
-		break;
-	    _queue[t] = fd->_queue[fd_i];
-	    fd_i = fd->next_i(fd_i);
-	    set_tail(nt);
-	}
-	for (; fd_i != fd->tail(); fd_i = fd->next_i(fd_i))
-	    fd->_queue[fd_i]->kill();
-	if (head() != tail())
-	    _task.reschedule();
+    Storage::index_type fd_i = fd->head();
+    while (fd_i != fd->tail()) {
+        Storage::index_type t = fd->tail(), nt = next_i(t);
+        if (nt == fd->head())
+        break;
+        _queue[t] = fd->_queue[fd_i];
+        fd_i = fd->next_i(fd_i);
+        set_tail(nt);
+    }
+    for (; fd_i != fd->tail(); fd_i = fd->next_i(fd_i))
+        fd->_queue[fd_i]->kill();
+    if (head() != tail())
+        _task.reschedule();
 
-	fd->set_head(0);
+    fd->set_head(0);
         fd->set_tail(0);
         fd->_capacity = 0;
-	_highwater_length = size();
+    _highwater_length = size();
 
-	local_irq_restore(flags);
+    local_irq_restore(flags);
     }
 }
 
@@ -270,7 +270,7 @@ packet_notifier_hook(struct notifier_block *nb, unsigned long backlog_len, void 
     unsigned long lock_flags;
     from_device_map.lock(false, lock_flags);
     while (stolen == 0 && (fd = (FromDevice *)from_device_map.lookup(skb->dev, fd)))
-	stolen = fd->got_skb(skb);
+    stolen = fd->got_skb(skb);
     from_device_map.unlock(false, lock_flags);
     return (stolen ? NOTIFY_STOP_MASK : 0);
 }
@@ -281,8 +281,8 @@ click_br_handle_frame_hook(struct net_bridge_port *p, struct sk_buff *skb)
 {
 # if CLICK_DEVICE_UNRECEIVABLE_SK_BUFF
     if (CLICK_DEVICE_UNRECEIVABLE_SK_BUFF_READ() == skb)
-	// This packet is being passed to Linux by ToHost.
-	return skb;
+    // This packet is being passed to Linux by ToHost.
+    return skb;
 # endif
 
     int stolen = 0;
@@ -291,14 +291,14 @@ click_br_handle_frame_hook(struct net_bridge_port *p, struct sk_buff *skb)
 
     from_device_map.lock(false, lock_flags);
     while (stolen == 0 && (fd = (FromDevice *)from_device_map.lookup(skb->dev, fd)))
-	stolen = fd->got_skb(skb);
+    stolen = fd->got_skb(skb);
     from_device_map.unlock(false, lock_flags);
     if (stolen)
-	return 0;
+    return 0;
     else if (real_br_handle_frame_hook)
-	return real_br_handle_frame_hook(p, skb);
+    return real_br_handle_frame_hook(p, skb);
     else
-	return skb;
+    return skb;
 }
 
 #elif HAVE_LINUX_NETDEV_RX_HANDLER_REGISTER
@@ -317,8 +317,8 @@ click_fromdevice_rx_handler(struct sk_buff *skb)
 # endif
 # if CLICK_DEVICE_UNRECEIVABLE_SK_BUFF
     if (CLICK_DEVICE_UNRECEIVABLE_SK_BUFF_READ() == skb)
-	// This packet is being passed to Linux by ToHost.
-	return RX_HANDLER_PASS;
+    // This packet is being passed to Linux by ToHost.
+    return RX_HANDLER_PASS;
 # endif
 
     int stolen = 0;
@@ -327,12 +327,12 @@ click_fromdevice_rx_handler(struct sk_buff *skb)
 
     from_device_map.lock(false, lock_flags);
     while (stolen == 0 && (fd = (FromDevice *)from_device_map.lookup(skb->dev, fd)))
-	stolen = fd->got_skb(skb);
+    stolen = fd->got_skb(skb);
     from_device_map.unlock(false, lock_flags);
     if (stolen)
-	return RX_HANDLER_CONSUMED;
+    return RX_HANDLER_CONSUMED;
     else
-	return RX_HANDLER_PASS;
+    return RX_HANDLER_PASS;
 }
 #endif
 
@@ -347,15 +347,16 @@ device_notifier_hook_early(struct notifier_block *nb, unsigned long flags, void 
 
 #ifdef NETDEV_GOING_DOWN
     if (flags == NETDEV_GOING_DOWN)
-	flags = NETDEV_DOWN;
+        flags = NETDEV_DOWN;
 #endif
     if (flags == NETDEV_DOWN || flags == NETDEV_UP || flags == NETDEV_CHANGE) {
-	bool exists = (flags != NETDEV_UP);
-	from_device_map.lock(true, lock_flags);
-	nes = from_device_map.lookup_all(dev, exists, es, 8);
-	for (i = 0; i < nes; i++)
-	    ((FromDevice*)(es[i]))->alter_from_device(-1);
-	from_device_map.unlock(true, lock_flags);
+        bool exists = (flags != NETDEV_UP);
+        from_device_map.lock(true, lock_flags);
+        nes = from_device_map.lookup_all(dev, exists, es, 8);
+        for (i = 0; i < nes; i++) {
+            ((FromDevice*)(es[i]))->alter_from_device(-1);
+        }
+        from_device_map.unlock(true, lock_flags);
     }
 
     return 0;
@@ -367,18 +368,18 @@ device_notifier_hook(struct notifier_block *nb, unsigned long flags, void *v)
 {
 #ifdef NETDEV_GOING_DOWN
     if (flags == NETDEV_GOING_DOWN)
-	flags = NETDEV_DOWN;
+    flags = NETDEV_DOWN;
 #endif
     if (flags == NETDEV_DOWN || flags == NETDEV_UP || flags == NETDEV_CHANGE) {
-	bool exists = (flags != NETDEV_UP);
-	net_device* dev = (net_device*)v;
-	unsigned long lock_flags;
-	from_device_map.lock(true, lock_flags);
-	AnyDevice *es[8];
-	int nes = from_device_map.lookup_all(dev, exists, es, 8);
-	for (int i = 0; i < nes; i++)
-	    ((FromDevice*)(es[i]))->set_device(flags == NETDEV_DOWN ? 0 : dev, &from_device_map, AnyDevice::anydev_change | AnyDevice::anydev_from_device);
-	from_device_map.unlock(true, lock_flags);
+    bool exists = (flags != NETDEV_UP);
+    net_device* dev = (net_device*)v;
+    unsigned long lock_flags;
+    from_device_map.lock(true, lock_flags);
+    AnyDevice *es[8];
+    int nes = from_device_map.lookup_all(dev, exists, es, 8);
+    for (int i = 0; i < nes; i++)
+        ((FromDevice*)(es[i]))->set_device(flags == NETDEV_DOWN ? 0 : dev, &from_device_map, AnyDevice::anydev_change | AnyDevice::anydev_from_device);
+    from_device_map.unlock(true, lock_flags);
     }
     return 0;
 }
@@ -392,7 +393,7 @@ int
 FromDevice::got_skb(struct sk_buff *skb)
 {
     if (!_active)
-	return 0;		// 0 means not handled
+    return 0;        // 0 means not handled
 
     skb = skb_share_check(skb, GFP_ATOMIC);
     if (!skb)
@@ -401,43 +402,40 @@ FromDevice::got_skb(struct sk_buff *skb)
     unsigned t = reserve_tail_atomic();
     if (t != invalid_index) { /* ours */
 
-	/* Retrieve the MAC header. */
+    /* Retrieve the MAC header. */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24)
-	skb_push(skb, skb->data - skb_mac_header(skb));
+    skb_push(skb, skb->data - skb_mac_header(skb));
 #else
-	skb_push(skb, skb->data - skb->mac.raw);
+    skb_push(skb, skb->data - skb->mac.raw);
 #endif
 
-	Packet *p = Packet::make(skb);
-	_queue[t] = p; /* hand it to run_task */
+    Packet *p = Packet::make(skb);
+    _queue[t] = p; /* hand it to run_task */
 
 #if CLICK_DEBUG_SCHEDULING
-	_schinfo[t].enq_time.assign_now();
-	RouterThread *rt = _task.thread();
-	_schinfo[t].enq_state = rt->thread_state();
-	int enq_process_asleep = rt->sleeper() && rt->sleeper()->state != TASK_RUNNING;
-	_schinfo[t].enq_task_scheduled = _task.scheduled();
-	_schinfo[t].enq_epoch = rt->driver_epoch();
-	_schinfo[t].enq_task_epoch = rt->driver_task_epoch();
+    _schinfo[t].enq_time.assign_now();
+    RouterThread *rt = _task.thread();
+    _schinfo[t].enq_state = rt->thread_state();
+    int enq_process_asleep = rt->sleeper() && rt->sleeper()->state != TASK_RUNNING;
+    _schinfo[t].enq_task_scheduled = _task.scheduled();
+    _schinfo[t].enq_epoch = rt->driver_epoch();
+    _schinfo[t].enq_task_epoch = rt->driver_task_epoch();
 #endif
-
-	_task.reschedule();
+    _task.reschedule();
 
 #if CLICK_DEBUG_SCHEDULING
-	_schinfo[t].enq_woke_process = enq_process_asleep && rt->sleeper()->state == TASK_RUNNING;
+    _schinfo[t].enq_woke_process = enq_process_asleep && rt->sleeper()->state == TASK_RUNNING;
 #endif
 
-	unsigned s = size(head(), tail());
-	if (s > _highwater_length)
-	    _highwater_length = s;
-
+    unsigned s = size(head(), tail());
+    if (s > _highwater_length)
+        _highwater_length = s;
     } else if (_capacity > 0) {
-	/* queue full, drop */
-	kfree_skb(skb);
-	_drops++;
-
+        /* queue full, drop */
+        kfree_skb(skb);
+        _drops++;
     } else // not yet initialized
-	return 0;
+        return 0;
 
     return 1;
 }
@@ -451,17 +449,17 @@ FromDevice::emission_report(int idx)
     StringAccum sa;
     sa << "dt " << (now - _schinfo[idx].enq_time);
     if (_schinfo[idx].enq_state != RouterThread::S_RUNNING) {
-	Timestamp etime = rt->task_epoch_time(_schinfo[idx].enq_task_epoch + 1);
-	if (etime)
-	    sa << " dt_thread " << (etime - _schinfo[idx].enq_time);
+        Timestamp etime = rt->task_epoch_time(_schinfo[idx].enq_task_epoch + 1);
+        if (etime)
+            sa << " dt_thread " << (etime - _schinfo[idx].enq_time);
     }
     sa << " arrst " << RouterThread::thread_state_name(_schinfo[idx].enq_state)
        << " depoch " << (rt->driver_epoch() - _schinfo[idx].enq_epoch)
        << " dtepoch " << (rt->driver_task_epoch() - _schinfo[idx].enq_task_epoch);
     if (_schinfo[idx].enq_woke_process)
-	sa << " woke";
+        sa << " woke";
     if (_schinfo[idx].enq_task_scheduled)
-	sa << " tasksched";
+        sa << " tasksched";
 
     click_chatter("%s packet: %s", name().c_str(), sa.c_str());
 }
@@ -474,22 +472,23 @@ FromDevice::run_task(Task *)
     int npq = 0;
     Storage::index_type h;
     while (npq < _burst && (h = head()) != tail()) {
-	Packet *p = _queue[h];
-	if (p == NULL) {
-	    _task.fast_reschedule();
-	    return npq > 0;
-	}
-	_queue[h] = 0;
+        Packet *p = _queue[h];
+        if (p == NULL) {
+            _task.fast_reschedule();
+            return npq > 0;
+        }
+        _queue[h] = 0;
 #if CLICK_DEBUG_SCHEDULING
-	emission_report(h);
+        emission_report(h);
 #endif
-	set_head(next_i(h));
-	output(0).push(p);
-	npq++;
-	_count++;
+        set_head(next_i(h));
+        output(0).push(p);
+        npq++;
+        _count++;
     }
-    if (npq == 0)
-	_empty_runs++;
+    if (npq == 0) {
+        _empty_runs++;
+    }
     // 9/18/06: Frederic Van Quickenborne reports (1/24/05) that ticket
     // adjustments in FromDevice+ToDevice cause odd behavior.  The ticket
     // adjustments actually don't feel necessary to me in From/ToDevice any
@@ -498,7 +497,7 @@ FromDevice::run_task(Task *)
     // scheduled".  So commenting this out.
     // adjust_tickets(npq);
     if (npq > 0)
-	_task.fast_reschedule();
+        _task.fast_reschedule();
     return npq > 0;
 }
 
@@ -508,17 +507,17 @@ String FromDevice::read_handler(Element *e, void *thunk)
     StringAccum sa;
     switch (reinterpret_cast<intptr_t>(thunk)) {
     case h_active:
-	sa << (fd->_dev && fd->_active);
-	break;
+    sa << (fd->_dev && fd->_active);
+    break;
     case h_length:
-	sa << fd->size();
-	break;
+    sa << fd->size();
+    break;
     case h_calls:
-	sa << "calls to run_task(): " << fd->_runs << "\n"
-	   << "calls to push():     " << fd->_count << "\n"
-	   << "empty runs:          " << fd->_empty_runs << "\n"
-	   << "drops:               " << fd->_drops << "\n";
-	break;
+    sa << "calls to run_task(): " << fd->_runs << "\n"
+       << "calls to push():     " << fd->_count << "\n"
+       << "empty runs:          " << fd->_empty_runs << "\n"
+       << "drops:               " << fd->_drops << "\n";
+    break;
     }
     return sa.take_string();
 }
@@ -527,15 +526,15 @@ int FromDevice::write_handler(const String &str, Element *e, void *thunk, ErrorH
 {
     FromDevice *fd = static_cast<FromDevice *>(e);
     switch (reinterpret_cast<intptr_t>(thunk)) {
-    case h_active:
-	if (!BoolArg().parse(str, fd->_active))
-	    return errh->error("active parameter must be boolean");
-	return 0;
-    case h_reset_counts:
-	fd->reset_counts();
-	return 0;
-    default:
-	return 0;
+        case h_active:
+            if (!BoolArg().parse(str, fd->_active)) {
+                return errh->error("active parameter must be boolean");
+            } return 0;
+        case h_reset_counts:
+            fd->reset_counts();
+            return 0;
+        default:
+            return 0;
     }
 }
 

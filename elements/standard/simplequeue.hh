@@ -9,7 +9,7 @@ CLICK_DECLS
 =c
 
 SimpleQueue
-SimpleQueue(CAPACITY)
+SimpleQueue(CAPACITY [, BLOCKING])
 
 =s storage
 
@@ -20,6 +20,11 @@ stores packets in a FIFO queue
 Stores incoming packets in a first-in-first-out queue.
 Drops incoming packets if the queue already holds CAPACITY packets.
 The default for CAPACITY is 1000.
+
+If BLOCKING is true, the pushing thread will spinloop until there is some space
+in the queue instead of dropping packets. This should not be used if the same
+thread may push packets and pull packets, as it could lead to a deadlock.
+Defaults to false.
 
 B<Multithreaded Click note:> SimpleQueue is designed to be used in an
 environment with at most one concurrent pusher and at most one concurrent

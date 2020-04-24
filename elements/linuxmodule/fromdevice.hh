@@ -140,9 +140,9 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
     static void static_initialize();
     static void static_cleanup();
 
-    const char *class_name() const	{ return "FromDevice"; }
-    const char *port_count() const	{ return PORTS_0_1; }
-    const char *processing() const	{ return PUSH; }
+    const char *class_name() const    { return "FromDevice"; }
+    const char *port_count() const    { return PORTS_0_1; }
+    const char *processing() const    { return PUSH; }
     void *cast(const char *);
 
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -156,8 +156,8 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
 
     bool run_task(Task *);
     void reset_counts() {
-		_runs = _empty_runs = _count = _drops = 0;
-		_highwater_length = Storage::size();
+        _runs = _empty_runs = _count = _drops = 0;
+        _highwater_length = Storage::size();
     }
 
   private:
@@ -174,13 +174,13 @@ class FromDevice : public AnyTaskDevice, public Storage { public:
     enum { QSIZE = 511 };
     Packet * volatile _queue[QSIZE+1];
 #if CLICK_DEBUG_SCHEDULING
-    struct Schinfo {
-	Timestamp enq_time;
-	char enq_state;
-	char enq_woke_process;
-	char enq_task_scheduled;
-	uint32_t enq_epoch;
-	uint32_t enq_task_epoch;
+        struct Schinfo {
+        Timestamp enq_time;
+        char enq_state;
+        char enq_woke_process;
+        char enq_task_scheduled;
+        uint32_t enq_epoch;
+        uint32_t enq_task_epoch;
     };
     Schinfo _schinfo[QSIZE+1];
     void emission_report(int);
