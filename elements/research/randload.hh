@@ -43,9 +43,5 @@ private:
     per_thread<std::mt19937> _gens;
 };
 
-
-
-
-
 CLICK_ENDDECLS
 #endif

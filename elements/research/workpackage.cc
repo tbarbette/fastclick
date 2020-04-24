@@ -1,6 +1,5 @@
 // -*- c-basic-offset: 4 -*-
-/*
- * WorkPackage.{cc,hh} --
+/* workpackage.{cc,hh} --
  * Tom Barbette
  *
  * Copyright (c) 2017 University of Liege
