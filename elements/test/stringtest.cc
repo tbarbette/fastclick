@@ -44,6 +44,13 @@ StringTest::initialize(ErrorHandler *errh)
     CHECK(String("HELLO;YOU").split(';')[0] == "HELLO");
     CHECK(String("HELLO;YOU").split(';')[1] == "YOU");
 
+    String s = String("HELLO YOU !");
+    CHECK(s.search("HELLO") == s.data());
+    CHECK(s.search("YOU") == s.data() + 6);
+    CHECK(s.search("ME") == 0);
+    CHECK(s.search("!") == s.data() + s.length() - 1);
+    CHECK(String("").search("!") == 0);
+
     if (!errh->nerrors()) {
     	errh->message("All tests pass!");
 		return 0;
