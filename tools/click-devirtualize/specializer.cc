@@ -780,7 +780,7 @@ Specializer::output_package(const String &package_name, const String &suffix, St
 	if (_specials[i].special())
 	    elem2package <<  "-\t\"" << package_name << suffix << ".hh\"\t" << _specials[i].cxx_name << '-' << _specials[i].click_name << '\n';
     String click_buildtool_prog = clickpath_find_file("click-buildtool", "bin", CLICK_BINDIR, errh);
-    cmd_sa << click_buildtool_prog << " elem2packagellvm " << package_name;
+    cmd_sa << click_buildtool_prog << " elem2packagestatic " << package_name;
     out << shell_command_output_string(cmd_sa.take_string(), elem2package.take_string(), errh);
 }
 

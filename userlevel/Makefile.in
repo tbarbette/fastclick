@@ -131,7 +131,7 @@ else
 DRIVER = $(MINDRIVER)click
 ELEMENTSCONF = elements_$(MINDRIVER)
 ifeq ($(MINDRIVER),embed)
-ELEM2EXPORT = elem2exportllvm
+ELEM2EXPORT = elem2exportstatic
 else 
 ELEM2EXPORT = elem2export
 endif
