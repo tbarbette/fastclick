@@ -124,11 +124,17 @@ ifndef MINDRIVER
 DRIVER = click
 ELEMENTSCONF = elements
 INSTALLLIBS = libclick.a
-FINDELEMFLAGS = @FINDELEMFLAGS@ --checksum elements.csmk
+FINDELEMFLAGS =  --checksum elements.csmk
 -include elements.csmk
+ELEM2EXPORT = elem2export
 else
 DRIVER = $(MINDRIVER)click
 ELEMENTSCONF = elements_$(MINDRIVER)
+ifeq ($(MINDRIVER),embed)
+ELEM2EXPORT = elem2exportllvm
+else 
+ELEM2EXPORT = elem2export
+endif
 endif
 INSTALLPROGS = $(DRIVER)
 
@@ -175,7 +181,7 @@ elements.conf: $(top_builddir)/config.status $(CLICK_BUILDTOOL)
 $(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2make -x "$(STD_ELEMENT_OBJS)" < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).mk)
 $(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
-	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2export < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
+	$(call verbose_cmd,$(CLICK_BUILDTOOL) $(ELEM2EXPORT) < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
 	@rm -f $(ELEMENTSCONF).d
 
 DEPFILES := $(wildcard *.d)

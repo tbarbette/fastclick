@@ -432,8 +432,10 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 	sa << "if (i == " << r1 << ") ";
       else
 	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
-      sa << "return ((" << input_class[r1] << " *)input(i).element())->"
-	 << input_class[r1] << "::pull(" << input_port[r1] << ");";
+  //     sa << "return ((" << input_class[r1] << " *)input(i).element())->"
+	//  << input_class[r1] << "::pull(" << input_port[r1] << ");";
+          sa << "return obj_" << input_class[r1] << ".pull(" << input_port[r1]
+	    << ");";
     }
     if (_ninputs[eindex])
 	sa << "\n  return input(i).pull();\n";
@@ -463,8 +465,10 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 	sa << "if (i == " << r1 << ") ";
       else
 	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
-      sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
-	 << output_class[r1] << "::push(" << output_port[r1]
+  //     sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
+	//  << output_class[r1] << "::push(" << output_port[r1]
+	//  << ", p); return; }";
+         sa << "{ obj_" << output_class[r1] << ".push(" << output_port[r1]
 	 << ", p); return; }";
     }
     if (_noutputs[eindex])
@@ -504,8 +508,10 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 	sa << "if (i == " << r1 << ") ";
       else
 	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
-      sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
-	 << output_class[r1] << "::push_batch(" << output_port[r1]
+  //     sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
+	//  << output_class[r1] << "::push_batch(" << output_port[r1]
+	//  << ", p); return; }";
+            sa << "{ obj_" << output_class[r1] << ".push_batch(" << output_port[r1]
 	 << ", p); return; }";
     }
     if (_noutputs[eindex])
@@ -774,7 +780,7 @@ Specializer::output_package(const String &package_name, const String &suffix, St
 	if (_specials[i].special())
 	    elem2package <<  "-\t\"" << package_name << suffix << ".hh\"\t" << _specials[i].cxx_name << '-' << _specials[i].click_name << '\n';
     String click_buildtool_prog = clickpath_find_file("click-buildtool", "bin", CLICK_BINDIR, errh);
-    cmd_sa << click_buildtool_prog << " elem2package " << package_name;
+    cmd_sa << click_buildtool_prog << " elem2packagellvm " << package_name;
     out << shell_command_output_string(cmd_sa.take_string(), elem2package.take_string(), errh);
 }
 
