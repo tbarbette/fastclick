@@ -1333,10 +1333,12 @@ if test "x$enable_cpu_load" = xyes; then
     AC_DEFINE(HAVE_CLICK_LOAD)
 fi
 
+
+AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([--enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02 ])], :, enable_flow_api=no)
 AC_CHECK_FILE($srcdir/include/click/flowdispatcher.hh, [ac_have_flow_disp_h=yes], [ac_have_flow_disp_h=no])
 AC_CHECK_FILE($srcdir/include/click/flowdispatcherparser.hh, [ac_have_flow_disp_p_h=yes], [ac_have_flow_disp_p_h=no])
 AC_CHECK_FILE($srcdir/include/click/flowdispatcherglue.hh, [ac_have_flow_disp_g_h=yes], [ac_have_flow_disp_g_h=no])
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR" = "xyesyesyes20"; then
+if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
     AC_DEFINE([HAVE_FLOW_API])
 else
@@ -2534,9 +2536,9 @@ done
 
 AC_OUTPUT
 
-if test "$have_flow_api" = yes; then
-    feedback="no"
-else
+feedback="no"
+
+if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
 fi
 
@@ -2547,8 +2549,8 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
-              Flow:              ${enable_flow}
-          Flow API:              ${have_flow_api}
+    Flow Subsystem:              ${enable_flow}
+       HW Flow API:              ${have_flow_api}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}

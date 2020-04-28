@@ -869,6 +869,7 @@ enable_stride
 enable_task_heap
 enable_task_stats
 enable_cpu_load
+enable_flow_api
 enable_dmalloc
 enable_hash_iterator_epochs
 enable_force_expensive
@@ -1597,6 +1598,8 @@ Optional Features:
                           balancing of tasks among threads
   --enable-cpu-load       Keep track of CPU usage using an approximation.
                           Useful when using polling keeping the CPU at 100%
+  --enable-flow-api       Support for the HW flow classification API. Also
+                          needs DPDK>=20.02
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
                           hash iterator epochs
@@ -10974,6 +10977,14 @@ if test "x$enable_cpu_load" = xyes; then
 
 fi
 
+
+# Check whether --enable-flow-api was given.
+if test "${enable_flow_api+set}" = set; then :
+  enableval=$enable_flow_api; :
+else
+  enable_flow_api=no
+fi
+
 as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcher.hh" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcher.hh" >&5
 $as_echo_n "checking for $srcdir/include/click/flowdispatcher.hh... " >&6; }
@@ -11043,7 +11054,7 @@ else
   ac_have_flow_disp_g_h=no
 fi
 
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR" = "xyesyesyes20"; then
+if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
@@ -16090,9 +16101,9 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 
-if test "$have_flow_api" = yes; then
-    feedback="no"
-else
+feedback="no"
+
+if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
 fi
 
@@ -16103,8 +16114,8 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
-              Flow:              ${enable_flow}
-          Flow API:              ${have_flow_api}
+    Flow Subsystem:              ${enable_flow}
+       HW Flow API:              ${have_flow_api}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
