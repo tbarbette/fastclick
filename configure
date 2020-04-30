@@ -7000,6 +7000,67 @@ else
     have_json=no
 fi
 
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lpci" >&5
+$as_echo_n "checking for main in -lpci... " >&6; }
+if ${ac_cv_lib_pci_main+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpci  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_pci_main=yes
+else
+  ac_cv_lib_pci_main=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pci_main" >&5
+$as_echo "$ac_cv_lib_pci_main" >&6; }
+if test "x$ac_cv_lib_pci_main" = xyes; then :
+  ac_have_pci=yes
+else
+  ac_have_pci=no
+fi
+
+for ac_header in pci/pci.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "pci/pci.h" "ac_cv_header_pci_pci_h" "$ac_includes_default"
+if test "x$ac_cv_header_pci_pci_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PCI_PCI_H 1
+_ACEOF
+ ac_have_pci_h=yes
+else
+  ac_have_pci_h=no
+fi
+
+done
+
+if test "x$ac_have_pci$ac_have_pci_h" = "xyesyes"; then
+    have_pci=yes
+    LIBS="$LIBS -lpci"
+    $as_echo "#define HAVE_PCI 1" >>confdefs.h
+
+else
+    have_pci=no
+fi
+
+
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
   enableval=$enable_select; :
@@ -14734,6 +14795,10 @@ if test "x$enable_wifi" = xyes; then
     provisions="$provisions wifi"
 fi
 
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 
 
 
@@ -16124,6 +16189,7 @@ Configuration Summary:
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
     JSON   support:              ${have_json}
+    libpci support:              ${have_pci}
 "
 
 if test "$feedback" != no; then

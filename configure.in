@@ -241,6 +241,18 @@ else
     have_json=no
 fi
 
+
+AC_CHECK_LIB([pci], [main], [ac_have_pci=yes], [ac_have_pci=no])
+AC_CHECK_HEADERS([pci/pci.h], [ac_have_pci_h=yes], [ac_have_pci_h=no])
+if test "x$ac_have_pci$ac_have_pci_h" = "xyesyes"; then
+    have_pci=yes
+    LIBS="$LIBS -lpci"
+    AC_DEFINE([HAVE_PCI])
+else
+    have_pci=no
+fi
+
+
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
 AS_HELP_STRING([  --disable-select], [do not use select()])],
@@ -2504,6 +2516,11 @@ if test "x$enable_wifi" = xyes; then
     provisions="$provisions wifi"
 fi
 
+dnl add 'pci' if libpci support is available
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 AC_SUBST(provisions)
 
 dnl
@@ -2559,6 +2576,7 @@ Configuration Summary:
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
     JSON   support:              ${have_json}
+    libpci support:              ${have_pci}
 "
 
 if test "$feedback" != no; then
