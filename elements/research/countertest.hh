@@ -43,8 +43,10 @@ class CounterTest : public BatchElement {
         Task _task;
         int _pass;
         per_thread<int> _cur_pass;
+#if defined(__GNUC__) && !defined(__clang__)
         void(*_add_fnt)(CounterBase*,CounterBase::stats);
         CounterBase::stats(*_read_fnt)(CounterBase*);
+#endif
 };
 
 CLICK_ENDDECLS

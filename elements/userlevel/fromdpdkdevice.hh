@@ -102,7 +102,7 @@ These rules are installed in the NIC using DPDK's flow API.
 
 =item FLOW_ISOLATE
 
-Boolean. Requires MODE flow_dir. Isolated mode guarantees that all ingress
+Boolean. Requires MODE flow_disp. Isolated mode guarantees that all ingress
 traffic comes from defined flow rules only (current and future).
 If ingress traffic does not match any of the defined rules, it will be
 discarded by the NIC. Defaults to false.
@@ -118,7 +118,9 @@ traffic using VLAN-based VMDq.
 
 =item PAUSE
 
-String. Set the device pause mode. "full" to enable pause frame for both RX and TX, "rx" or "tx" to set one of them, and "none" to disable pause frames. Do not set or choose "unset" to keep device current state/default.
+String. Set the device pause mode. "full" to enable pause frame for both
+RX and TX, "rx" or "tx" to set one of them, and "none" to disable pause frames.
+Do not set or choose "unset" to keep device current state/default.
 
 =item ALLOW_NONEXISTENT
 
@@ -375,7 +377,7 @@ Upon success, the number of deleted flow rules is returned, otherwise an error i
 
 =h rules_isolate write-only
 
-Enables/Disables Flow Director's isolation mode.
+Enables/Disables Flow Dispatcher's isolation mode.
 Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future).
 Usage:
     'rules_isolate 0' disables isolation.
@@ -436,7 +438,9 @@ public:
     void clear_buffers();
     bool run_task(Task *);
     void run_timer(Timer* t);
+#if HAVE_DPDK_INTERRUPT
     void selected(int fd, int mask);
+#endif
 
     ToDPDKDevice *find_output_element();
 

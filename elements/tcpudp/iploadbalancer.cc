@@ -79,18 +79,18 @@ void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
 #endif
 
 void IPLoadBalancer::push(int, Packet* p) {
-        WritablePacket* q =p->uniqueify();
+    WritablePacket* q =p->uniqueify();
 
-        if (!q)
-            return;
+    if (!q)
+        return;
 
-        unsigned hash = pick_server(p);
-        IPAddress srv = _dsts.unchecked_at(hash);
+    unsigned hash = pick_server(p);
+    IPAddress srv = _dsts.unchecked_at(hash);
 
 	q->ip_header()->ip_dst = srv;
-        q->set_dst_ip_anno(srv);
+    q->set_dst_ip_anno(srv);
 
-        output_push(0, q);
+    output_push(0, q);
 }
 
 IPLoadBalancerReverse::IPLoadBalancerReverse() {

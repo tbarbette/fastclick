@@ -462,7 +462,7 @@ endif
 ############################################################
 ## Flow director library available at or after DPDK v17.05
 ############################################################
-ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -ge 17 ] && [ $(RTE_VER_MONTH) -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && echo true),true)
+ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -ge 17 ] && [ $(RTE_VER_MONTH) -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 18 ] ) && [ -n $(HAVE_FLOW_API) ] && echo true),true)
 
 $(debug LIBRTE_PARSE=YES)
 

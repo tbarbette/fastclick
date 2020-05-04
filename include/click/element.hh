@@ -182,6 +182,7 @@ class Element { public:
     virtual bool do_mt_safe_check(ErrorHandler*);
     void add_remote_element(Element* e);
 
+    // This feature should be re-designed. I'm not sure a new stage is a good idea. The beginning of future/promise patterns is more interesting.
     enum ThreadReconfigurationStage {
         THREAD_INITIALIZE,
         THREAD_RECONFIGURE_UP_PRE,

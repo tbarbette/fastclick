@@ -49,6 +49,13 @@ StringTest::initialize(ErrorHandler *errh)
     String s;
     CHECK(s.length() == 0);
 
+    s = String("HELLO YOU !");
+    CHECK(s.search("HELLO") == s.data());
+    CHECK(s.search("YOU") == s.data() + 6);
+    CHECK(s.search("ME") == 0);
+    CHECK(s.search("!") == s.data() + s.length() - 1);
+    CHECK(String("").search("!") == 0);
+
     s = "a simple string";
     Vector<String> v = s.split(' ');
     CHECK(v.size() == 3);
@@ -60,8 +67,11 @@ StringTest::initialize(ErrorHandler *errh)
     CHECK(s.replace("simple", "complex") == "a complex string");
     CHECK(String("").replace("a", "b") == "");
 
-    errh->message("All tests pass!");
-    return 0;
+    if (!errh->nerrors()) {
+    	errh->message("All tests pass!");
+		return 0;
+    } else
+    	return -1;
 }
 
 EXPORT_ELEMENT(StringTest)

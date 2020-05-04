@@ -44,7 +44,9 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
         .read_or_set("RESERVE",_reserve, 0)
         .read_or_set("TIMEOUT", _timeout, 60)
+#if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
         .read_or_set("LF", lf, false)
+#endif
         .complete() < 0)
         return -1;
 
@@ -58,10 +60,12 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
         click_chatter("Real capacity will be %d",_table_size);
     }
 
+#if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
     if (lf) {
         _flags &= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY;
         _flags |= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF;
     }
+#endif
     return 0;
 }
 
@@ -218,6 +222,6 @@ void FlowIPManager::add_handlers()
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(dpdk)
+ELEMENT_REQUIRES(dpdk dpdk19)
 EXPORT_ELEMENT(FlowIPManager)
 ELEMENT_MT_SAFE(FlowIPManager)

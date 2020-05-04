@@ -127,6 +127,7 @@ static const StaticNameDB::Entry annotation_entries[] = {
     { "MISC_IP", MKAI(MISC_IP) },
     { "PACKET_NUMBER", MKAI(PACKET_NUMBER) },
     { "PAINT", MKAI(PAINT) },
+    { "PAINT2", MKAI(PAINT2) },
 #if HAVE_INT64_TYPES
     { "PERFCTR", MKAI(PERFCTR) },
 #endif

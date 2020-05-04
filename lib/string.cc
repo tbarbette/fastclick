@@ -24,6 +24,7 @@
 #include <click/straccum.hh>
 #include <click/glue.hh>
 #include <click/vector.hh>
+
 CLICK_DECLS
 
 /** @file string.hh
@@ -1165,5 +1166,36 @@ String::skip_utf8_char(const unsigned char *first, const unsigned char *last)
     }
     return first;
 }
+
+const char* String::searchLegacy(const char* pattern, const int pattern_length)
+{
+    const char* start = data();
+    const char* content_end = end();
+    const char* pattern_end = pattern + pattern_length;
+
+    // Search until we reach the end of the buffer
+    while(start != content_end)
+    {
+	const char* current_pattern = pattern;
+        const char* current_content = start;
+
+        // Check if the characters in the buffer and in the pattern match (case insensitive)
+        while(current_content != content_end
+            && (*current_content == *current_pattern))
+        {
+            ++current_pattern;
+            ++current_content;
+		if (current_pattern == pattern_end)
+			return start;
+        }
+
+        ++start;
+    }
+
+    return 0;
+}
+
+
+
 
 CLICK_ENDDECLS
