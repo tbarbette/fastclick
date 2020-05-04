@@ -248,6 +248,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
     }
 
     if (_rx_intr >= 0) {
+    #if HAVE_DPDK_INTERRUPT
         for (int i = firstqueue; i <= lastqueue; i++) {
             uint64_t data = _dev->port_id << CHAR_BIT | i;
             ret = rte_eth_dev_rx_intr_ctl_q(_dev->port_id, i,
@@ -260,6 +261,7 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
                 );
             }
         }
+    #endif
     }
 
     for (int q = firstqueue; q <= lastqueue; q++) {
@@ -374,6 +376,7 @@ bool FromDPDKDevice::run_task(Task *t)
 
     if (ret == 0) {
         if (_rx_intr >= 0) {
+        #if HAVE_DPDK_INTERRUPT
            for (int iqueue = queue_for_thisthread_begin();
                 iqueue<=queue_for_thisthread_end(); iqueue++) {
                if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
@@ -393,6 +396,7 @@ bool FromDPDKDevice::run_task(Task *t)
                    assert(port_id == _dev->port_id);
            }
            this->selected(0, SELECT_READ);
+        #endif
        }
 /*
         if (_fdstate->useful > 0)
@@ -426,6 +430,7 @@ void FromDPDKDevice::run_timer(Timer* t) {
     _fdstate->timer->reschedule_after_msec(1);
 }
 
+#if HAVE_DPDK_INTERRUPT
 void FromDPDKDevice::selected(int fd, int mask) {
     for (int iqueue = queue_for_thisthread_begin();
             iqueue<=queue_for_thisthread_end(); iqueue++) {
@@ -436,6 +441,7 @@ void FromDPDKDevice::selected(int fd, int mask) {
     }
     task_for_thread()->reschedule();
 }
+#endif
 
 ToDPDKDevice *
 FromDPDKDevice::find_output_element() {
@@ -712,8 +718,8 @@ int FromDPDKDevice::flow_handler(
     }
 
     portid_t port_id = fd->get_device()->get_port_id();
-    FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
-    assert(flow_dir);
+    FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+    assert(flow_disp);
 
     switch((uintptr_t) thunk) {
         case h_rule_add: {
@@ -737,8 +743,8 @@ int FromDPDKDevice::flow_handler(
             String queue_index_str = FlowDispatcher::fetch_token_after_keyword((char *) rule.c_str(), "queue index");
             int core_id = atoi(queue_index_str.c_str());
 
-            const uint32_t int_rule_id = flow_dir->get_flow_cache()->next_internal_rule_id();
-            if (flow_dir->flow_rule_install(int_rule_id, (long) int_rule_id, core_id, rule) != 0) {
+            const uint32_t int_rule_id = flow_disp->get_flow_cache()->next_internal_rule_id();
+            if (flow_disp->flow_rule_install(int_rule_id, (long) int_rule_id, core_id, rule) != 0) {
                 return -1;
             }
 
@@ -765,7 +771,7 @@ int FromDPDKDevice::flow_handler(
             }
 
             // Batch deletion
-            return flow_dir->flow_rules_delete((uint32_t *) rule_ids, rules_nb);
+            return flow_disp->flow_rules_delete((uint32_t *) rule_ids, rules_nb);
         }
         case h_rules_isolate: {
             if (input.empty()) {
@@ -776,7 +782,7 @@ int FromDPDKDevice::flow_handler(
             return 0;
         }
         case h_rules_flush: {
-            return flow_dir->flow_rules_flush();
+            return flow_disp->flow_rules_flush();
         }
     }
 
@@ -847,15 +853,15 @@ int FromDPDKDevice::xstats_handler(
         case h_rule_byte_count:
         case h_rule_packet_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
-            FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
-            assert(flow_dir);
+            FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+            assert(flow_disp);
             if (input == "") {
                 return errh->error("Aggregate flow rule counters are not supported. Please specify a rule number to query");
             } else {
                 const uint32_t rule_id = atoi(input.c_str());
                 int64_t matched_pkts = -1;
                 int64_t matched_bytes = -1;
-                flow_dir->flow_rule_query(rule_id, matched_pkts, matched_bytes);
+                flow_disp->flow_rule_query(rule_id, matched_pkts, matched_bytes);
                 if (op == (int) h_rule_packet_hits) {
                     input = String(matched_pkts);
                 } else {
@@ -866,9 +872,9 @@ int FromDPDKDevice::xstats_handler(
         }
         case h_rules_aggr_stats: {
             portid_t port_id = fd->get_device()->get_port_id();
-            FlowDispatcher *flow_dir = FlowDispatcher::get_flow_dispatcher(port_id, errh);
-            assert(flow_dir);
-            input = flow_dir->flow_rule_aggregate_stats();
+            FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+            assert(flow_disp);
+            input = flow_disp->flow_rule_aggregate_stats();
             return 0;
         }
     #endif

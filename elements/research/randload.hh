@@ -25,7 +25,6 @@ CLICK_DECLS
 class RandLoad : public BatchElement {
 
 public:
-
     RandLoad() CLICK_COLD;
     ~RandLoad() CLICK_COLD;
 
@@ -36,7 +35,11 @@ public:
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;
 
+    void push(int, Packet *);
+#if HAVE_BATCH
     void push_batch(int, PacketBatch *) override;
+#endif
+
 private:
     int _min;
     int _max;

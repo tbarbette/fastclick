@@ -1326,9 +1326,10 @@ sub process_comment ($$$) {
     # close output file & make links if appropriate
     if ($filename_func) {
         close OUT;
-
-        if ($gzip ? open(INX, "-|", "gzcat", $main_outname) : open(INX, "<", $main_outname)) {
-            $gzip ? open(OUTX, "-|", "gzcat", $main_outname . "~") : open(OUTX, "<", $main_outname . "~");
+        use File::Which;
+        $zcat = which("gzcat") ? "gzcat" : "zcat";
+        if ($gzip ? open(INX, "-|", $zcat, $main_outname) : open(INX, "<", $main_outname)) {
+            $gzip ? open(OUTX, "-|", $zcat, $main_outname . "~") : open(OUTX, "<", $main_outname . "~");
             local($/) = undef;
             my($in) = <INX>;
             my($out) = <OUTX>;

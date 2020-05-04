@@ -278,6 +278,7 @@ void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* 
 
 CLICK_ENDDECLS
 
+ELEMENT_REQUIRES(flow)
 EXPORT_ELEMENT(FlowIPNATReverse)
 ELEMENT_MT_SAFE(FlowIPNATReverse)
 EXPORT_ELEMENT(FlowIPNAT)

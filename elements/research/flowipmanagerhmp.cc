@@ -129,6 +129,6 @@ void FlowIPManagerHMP::push_batch(int, PacketBatch* batch)
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(dpdk flow)
+ELEMENT_REQUIRES(flow)
 EXPORT_ELEMENT(FlowIPManagerHMP)
 ELEMENT_MT_SAFE(FlowIPManagerHMP)

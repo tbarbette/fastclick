@@ -17,6 +17,8 @@
 
 CLICK_DECLS
 
+class DPDKDevice;
+
 /**
  * FlowIPManager based on the HashtableMP (hierarchical locked hashtable)
  *
