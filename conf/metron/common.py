@@ -44,6 +44,11 @@ STRATEGY_RAND = "random"
 
 CANNOT_SPECIFY_RULES_NB = -1
 
+DESIRED_RULE_SRC_SUBNET = "10.0.0.0"
+DESIRED_RULE_SRC_MASK = "255.255.0.0"
+DESIRED_RULE_DST_SUBNET = "192.168.0.0"
+DESIRED_RULE_DST_MASK = "255.255.0.0"
+
 ######################################################################################################
 
 def get_substring_until_delimiter(string, delimiter):
@@ -234,6 +239,18 @@ def ip_proto_str_to_int(proto_str):
 def get_random_port():
 	return randint(0, 65535)
 
+def get_desired_src_ipv4_address():
+	return DESIRED_RULE_SRC_SUBNET
+
+def get_desired_src_ipv4_mask():
+	return DESIRED_RULE_SRC_MASK
+
+def get_desired_dst_ipv4_address():
+	return DESIRED_RULE_DST_SUBNET
+
+def get_desired_dst_ipv4_mask():
+	return DESIRED_RULE_DST_MASK
+
 def get_random_rule(rule_nb, proto):
 	proto_str = get_ip_proto_str(proto)
 
@@ -247,6 +264,19 @@ def get_random_rule(rule_nb, proto):
 		rule_map[proto_str] = {}
 		rule_map[proto_str][SRC_EXACT] = str(get_random_port())
 		rule_map[proto_str][DST_EXACT] = str(get_random_port())
+	rule_map[OUTPUT_PORT_ELEMENT] = 0
+	rule_map[PRIORITY_ELEMENT] = rule_nb
+	rule_map[ACTION_ELEMENT] = ALLOW
+
+	return rule_map
+
+def get_desired_rule(rule_nb):
+	rule_map = {}
+	rule_map[IPVF] = {}
+	rule_map[IPVF][SRC_SPEC] = get_desired_src_ipv4_address()
+	rule_map[IPVF][SRC_MASK] = get_desired_src_ipv4_mask()
+	rule_map[IPVF][DST_SPEC] = get_desired_dst_ipv4_address()
+	rule_map[IPVF][DST_MASK] = get_desired_dst_ipv4_mask()
 	rule_map[OUTPUT_PORT_ELEMENT] = 0
 	rule_map[PRIORITY_ELEMENT] = rule_nb
 	rule_map[ACTION_ELEMENT] = ALLOW

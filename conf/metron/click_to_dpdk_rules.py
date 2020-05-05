@@ -25,6 +25,7 @@ ACTION_JUMP = "jump"
 NIC_INDEPENDENT = -1
 DEF_QUEUES_NB = 4
 DEF_GROUP_NB = -1
+DEF_RULE_POS = -1
 
 def generate_jump_rule(target_nic, target_group_nb, rule_count_instr):
 	"""
@@ -151,17 +152,25 @@ def rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, t
 		# Dump them to a file
 		rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb, target_group_nb, rule_count_instr)
 
-def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb, target_group_nb, protocol, rule_count_instr=False):
+def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb, target_group_nb, protocol, rule_pos, rule_count_instr=False):
 	rule_list = []
 
 	rules_nb = target_rules_nb
 
 	# If group > 0, we will generate an extra jump rule
+	start_pos = 0
 	if target_group_nb > 0:
-		rules_nb -= 1
+		start_pos = 1
+		rule_pos += 1
 
-	for i in xrange(rules_nb):
-		rule = get_random_rule(i, protocol)
+	if (rule_pos >= rules_nb):
+		rule_pos -= 1
+
+	for i in xrange(start_pos, rules_nb):
+		if (i == rule_pos):
+			rule = get_desired_rule(i)
+		else:
+			rule = get_random_rule(i, protocol)
 		rule_list.append(rule)
 
 	# Dump them to a file
@@ -178,6 +187,8 @@ def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb,
 ### |-> NIC dependent (i.e., NIC 0) with TCP as transport protocol
 ###     python click_to_dpdk_rules.py --strategy random --target-nic 0 --target-rules-nb 65536 --target-queues-nb 1 --target-group-nb 1 --rule-count --protocol TCP
 ###
+### ### To generate random rules with a desired rule somewhere in the rule-set:
+###     python click_to_dpdk_rules.py --strategy random --target-rules-nb 55000 --target-queues-nb 1 --target-group-nb 1 --rule-count --with-rule-at 27500
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser("Click IPFilter/IPLookup rules to DPDK Flow rule configurations")
@@ -190,6 +201,7 @@ if __name__ == "__main__":
 	parser.add_argument("--target-group-nb", type=int, default=DEF_GROUP_NB, help="The flow table (i.e., group) number to store the rules")
 	parser.add_argument("--protocol", type=str, default=PROTO_RANDOM, help="Set IP protocol for random rule generation. Can be [TCP, UDP, RANDOM]")
 	parser.add_argument("--rule-count", action="store_true", help="Adds rule counter instructions to rules")
+	parser.add_argument("--with-rule-at", type=int, default=DEF_RULE_POS, help="Adds a desired rule at a designated position in the rule set")
 	parser.add_argument("--iterative", action="store_true", help="Executes this script for 1 to target-queues-nb")
 
 	args = parser.parse_args()
@@ -228,6 +240,9 @@ if __name__ == "__main__":
 		raise RuntimeError("Specify a protocol type from this list: {}".format(allowed_protos))
 
 	rule_count_instr = args.rule_count
+	rule_pos = args.with_rule_at
+	if rule_pos > 0:
+		rule_pos -= 1
 
 	iterative = args.iterative
 	start_queues_nb = 1 if iterative else target_queues_nb
@@ -235,4 +250,4 @@ if __name__ == "__main__":
 	if strategy == STRATEGY_FILE:
 		rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, target_queues_nb, target_group_nb, rule_count_instr)
 	else:
-		rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb, target_group_nb, protocol, rule_count_instr)
+		rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb, target_queues_nb, target_group_nb, protocol, rule_pos, rule_count_instr)
