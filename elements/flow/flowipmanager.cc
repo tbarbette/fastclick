@@ -66,6 +66,9 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
         _flags |= ~RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY_LF;
     }
 #endif
+
+    _reserve += sizeof(uint32_t);
+
     return 0;
 }
 

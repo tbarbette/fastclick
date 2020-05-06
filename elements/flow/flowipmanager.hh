@@ -60,7 +60,6 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
         rte_hash* hash;
         FlowControlBlock *fcbs;
 
-        int _reserve;
         int _table_size;
         int _flow_state_size_full;
         int _verbose;
