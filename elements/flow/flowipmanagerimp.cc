@@ -41,12 +41,13 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
     find_children(_verbose);
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+
     _fcb_builded_init_future.post(this);
 
     return 0;
 }
 
-int FlowIPManagerIMP::initialize(ErrorHandler *errh)
+int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 {
     struct rte_hash_parameters hash_params = {0};
     char buf[32];

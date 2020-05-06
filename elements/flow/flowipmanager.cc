@@ -47,6 +47,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
         .read_or_set("LF", lf, false)
 #endif
+        .read_or_set("VERBOSE", _verbose, 1)
         .complete() < 0)
         return -1;
 
@@ -72,7 +73,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int FlowIPManager::initialize(ErrorHandler *errh)
+int FlowIPManager::solve_initialize(ErrorHandler *errh)
 {
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
@@ -85,12 +86,15 @@ int FlowIPManager::initialize(ErrorHandler *errh)
 
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
+    if (_verbose)
+     errh->message("Per-flow size is %d", _reserve);
     sprintf(buf, "%s", name().c_str());
     hash = rte_hash_create(&hash_params);
     if (!hash)
         return errh->error("Could not init flow table !");
 
     fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
+    bzero(fcbs,_flow_state_size_full * _table_size);
     CLICK_ASSERT_ALIGNED(fcbs);
     if (!fcbs)
         return errh->error("Could not init data table !");
@@ -119,7 +123,8 @@ bool FlowIPManager::run_task(Task* t)
         FlowControlBlock* next = *((FlowControlBlock**)&prev->data_32[2]);
         int old = (recent - prev->lastseen).sec();
         if (old > _timeout) {
-            //click_chatter("Release %p as it is expired since %d", prev, old);
+            if (unlikely(_verbose > 1))
+                click_chatter("Release %p as it is expired since %d", prev, old);
         //expire
             rte_hash_free_key_with_position(hash, prev->data_32[0]);
         } else {
@@ -161,6 +166,8 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
             p->kill();
             return;
         }
+        if (unlikely(_verbose > 1))
+            click_chatter("New flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
         fcb->data_32[0] = ret;
         if (_timeout) {
@@ -171,6 +178,8 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
             }
         }
     } else {
+        if (unlikely(_verbose > 1))
+            click_chatter("Existing flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
     }
 
