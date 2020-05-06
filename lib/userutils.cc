@@ -361,6 +361,43 @@ file_string(String filename, ErrorHandler *errh)
   return s;
 }
 
+void
+file_read_lines(FILE *f, Vector<String> &lines)
+{
+    char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    while ((read = getline(&line, &len, f)) != -1) {
+        lines.push_back(String(line,read));
+    }
+
+    if (line)
+        free(line);
+}
+
+int
+file_read_lines(String filename, Vector<String> &lines, ErrorHandler *errh)
+{
+  FILE *f;
+  if (filename && filename != "-") {
+    f = fopen(filename.c_str(), "rb");
+    if (!f) {
+      if (errh)
+	errh->error("%s: %s", filename.c_str(), strerror(errno));
+      return -1;
+    }
+  } else {
+    f = stdin;
+    filename = "<stdin>";
+  }
+
+  file_read_lines(f, lines);
+
+  if (f != stdin)
+    fclose(f);
+  return 0;
+}
 
 String
 unique_tmpnam(const String &pattern, ErrorHandler *errh)
