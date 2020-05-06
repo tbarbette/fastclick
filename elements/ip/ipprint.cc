@@ -57,84 +57,85 @@ IPPrint::~IPPrint()
 int
 IPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-  _bytes = 1500;
-  String contents = "no";
-  String payload = "no";
-  _label = "";
-  _swap = true;
-  _payload = false;
-  _active = true;
-  bool print_ether = false;
-  bool print_id = false;
-  bool print_time = true;
-  bool print_paint = false;
-  bool print_tos = false;
-  bool print_ttl = false;
-  bool print_len = false;
-  bool print_aggregate = false;
-  bool bcontents;
-  String channel;
+    _bytes = 1500;
+    String contents = "no";
+    String payload = "no";
+    _label = "";
+    _swap = true;
+    _payload = false;
+    _active = true;
+    bool print_ether = false;
+    bool print_id = false;
+    bool print_time = true;
+    bool print_paint = false;
+    bool print_tos = false;
+    bool print_ttl = false;
+    bool print_len = false;
+    bool print_aggregate = false;
+    bool bcontents;
+    String channel;
 
     if (Args(conf, this, errh)
-	.read_p("LABEL", _label)
-	.read("CONTENTS", WordArg(), contents)
-	.read("PAYLOAD", WordArg(), payload)
-	.read("MAXLENGTH", _bytes)
-	.read("NBYTES", _bytes) // deprecated
-    .read("ETHER", print_ether)
-	.read("ID", print_id)
-	.read("TIMESTAMP", print_time)
-	.read("PAINT", print_paint)
-	.read("TOS", print_tos)
-	.read("TTL", print_ttl)
-	.read("SWAP", _swap)
-	.read("LENGTH", print_len)
-	.read("AGGREGATE", print_aggregate)
-	.read("ACTIVE", _active)
-#if CLICK_USERLEVEL
-	.read("OUTFILE", FilenameArg(), _outfilename)
-#endif
-	.read("CHANNEL", WordArg(), channel)
-	.complete() < 0)
-	return -1;
+        .read_p("LABEL", _label)
+        .read("CONTENTS", WordArg(), contents)
+        .read("PAYLOAD", WordArg(), payload)
+        .read("MAXLENGTH", _bytes)
+        .read("NBYTES", _bytes) // deprecated
+        .read("ETHER", print_ether)
+        .read("ID", print_id)
+        .read("TIMESTAMP", print_time)
+        .read("PAINT", print_paint)
+        .read("TOS", print_tos)
+        .read("TTL", print_ttl)
+        .read("SWAP", _swap)
+        .read("LENGTH", print_len)
+        .read("AGGREGATE", print_aggregate)
+        .read("ACTIVE", _active)
+    #if CLICK_USERLEVEL
+        .read("OUTFILE", FilenameArg(), _outfilename)
+    #endif
+        .read("CHANNEL", WordArg(), channel)
+        .complete() < 0)
+        return -1;
 
     if (BoolArg().parse(contents, bcontents))
-      _contents = bcontents;
-  else if ((contents = contents.upper()), contents == "NONE")
-      _contents = 0;
-  else if (contents == "HEX")
-      _contents = 1;
-  else if (contents == "ASCII")
-      _contents = 2;
-  else
-      return errh->error("bad contents value '%s'; should be 'NONE', 'HEX', or 'ASCII'", contents.c_str());
+        _contents = bcontents;
+    else if ((contents = contents.upper()), contents == "NONE")
+        _contents = 0;
+    else if (contents == "HEX")
+        _contents = 1;
+    else if (contents == "ASCII")
+        _contents = 2;
+    else
+        return errh->error("bad contents value '%s'; should be 'NONE', 'HEX', or 'ASCII'", contents.c_str());
 
-  int payloadv;
-  payload = payload.upper();
-  if (payload == "NO" || payload == "FALSE")
-    payloadv = 0;
-  else if (payload == "YES" || payload == "TRUE" || payload == "HEX")
-    payloadv = 1;
-  else if (payload == "ASCII")
-    payloadv = 2;
-  else
-    return errh->error("bad payload value '%s'; should be 'false', 'hex', or 'ascii'", contents.c_str());
+    int payloadv;
+    payload = payload.upper();
+    if (payload == "NO" || payload == "FALSE")
+        payloadv = 0;
+    else if (payload == "YES" || payload == "TRUE" || payload == "HEX")
+        payloadv = 1;
+    else if (payload == "ASCII")
+        payloadv = 2;
+    else
+        return errh->error("bad payload value '%s'; should be 'false', 'hex', or 'ascii'", contents.c_str());
 
-  if (payloadv > 0 && _contents > 0)
-    return errh->error("specify at most one of PAYLOAD and CONTENTS");
-  else if (payloadv > 0)
-    _contents = payloadv, _payload = true;
+    if (payloadv > 0 && _contents > 0)
+        return errh->error("specify at most one of PAYLOAD and CONTENTS");
+    else if (payloadv > 0)
+        _contents = payloadv, _payload = true;
 
-  _print_ether = print_ether;
-  _print_id = print_id;
-  _print_timestamp = print_time;
-  _print_paint = print_paint;
-  _print_tos = print_tos;
-  _print_ttl = print_ttl;
-  _print_len = print_len;
-  _print_aggregate = print_aggregate;
-  _errh = router()->chatter_channel(channel);
-  return 0;
+    _print_ether = print_ether;
+    _print_id = print_id;
+    _print_timestamp = print_time;
+    _print_paint = print_paint;
+    _print_tos = print_tos;
+    _print_ttl = print_ttl;
+    _print_len = print_len;
+    _print_aggregate = print_aggregate;
+    _errh = router()->chatter_channel(channel);
+
+    return 0;
 }
 
 int
@@ -352,7 +353,7 @@ IPPrint::simple_action(Packet *p)
     if (_print_paint)
         sa << (_print_aggregate ? "." : "paint ") << (int)PAINT_ANNO(p);
     if (_print_aggregate || _print_paint)
-	sa << ": ";
+        sa << ": ";
     if (_print_ether) {
         const unsigned char *x = p->mac_header();
         if (x && ((x + 14 <= p->network_header()) && (x + 14 <= p->end_data()))) {
@@ -454,7 +455,8 @@ IPPrint::simple_action(Packet *p)
         ignore_result(fwrite(sa.data(), 1, sa.length(), _outfile));
     } else
 #endif
-        _errh->message("%s", sa.c_str());
+
+    _errh->message("%s", sa.c_str());
 
     return p;
 }
