@@ -76,6 +76,11 @@ Boolean. Determines whether to print each packet's timestamp in seconds since
 Boolean. Determines whether to print each packet's aggregate annotation.
 Default is false.
 
+=item VLAN
+
+Boolean. Determines whether to print each packet's VLAN ID.
+Default is false.
+
 =item PAINT
 
 Boolean. Determines whether to print each packet's paint annotation. Default is false.
