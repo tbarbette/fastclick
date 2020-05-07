@@ -10,7 +10,9 @@
 #include <click/flow/flowelement.hh>
 #include <click/batchbuilder.hh>
 #include <click/timerwheel.hh>
+
 CLICK_DECLS
+
 class DPDKDevice;
 struct rte_hash;
 
@@ -43,9 +45,9 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         const char *processing() const { return PUSH; }
         int configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 1; }
 
-        int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
-        int initialize(ErrorHandler *errh) CLICK_COLD;
-        void cleanup(CleanupStage stage) CLICK_COLD;
+        int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
+        int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
+        void cleanup(CleanupStage stage) override CLICK_COLD;
 
         void push_batch(int, PacketBatch* batch) override;
         void run_timer(Timer*) override;
@@ -57,15 +59,14 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         volatile int owner;
         Packet* queue;
 
-    struct gtable {
-	gtable() : hash(0), fcbs(0) {
+        struct gtable {
+            gtable() : hash(0), fcbs(0) {
+            }
+            rte_hash* hash;
+            FlowControlBlock *fcbs;
+        } CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);
 
-	}
-	rte_hash* hash;
-	FlowControlBlock *fcbs;
-    } CLICK_ALIGNED(CLICK_CACHE_LINE_SIZE);
-
-	gtable* _tables;
+        gtable* _tables;
 
         int _reserve;
         int _table_size;

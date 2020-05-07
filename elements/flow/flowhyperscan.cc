@@ -48,11 +48,12 @@
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/flow/flow.hh>
+#include <click/userutils.hh>
 #include "flowhyperscan.hh"
 
 CLICK_DECLS
 
-FlowHyperScan::FlowHyperScan()
+FlowHyperScan::FlowHyperScan() : db_streaming(0)
 {
     _scratch = 0;
 };
@@ -69,19 +70,15 @@ static hs_database_t *buildDatabase(const Vector<const char *> &expressions,
     hs_database_t *db;
     hs_compile_error_t *compileErr;
     hs_error_t err;
-    for (int i =0; i < expressions.size() ; i++) {
-        click_chatter("Pattern '%s'", expressions[i]);
-    }
 
     err = hs_compile_multi(expressions.data(), flags.data(), ids.data(),
                            expressions.size(), mode, nullptr, &db, &compileErr);
-
     if (err != HS_SUCCESS) {
         if (compileErr->expression < 0) {
             // The error does not refer to a particular expression.
-            click_chatter("ERROR: %s", compileErr->message);
+            click_chatter("ERROR %d: %s",err, compileErr->message);
         } else {
-            click_chatter("ERROR: Pattern '%s' failed compilation with error: %s", expressions[compileErr->expression], compileErr->message);
+            click_chatter("ERROR %d: Pattern %d '%s' failed compilation with error: %s", err, compileErr->expression, expressions[compileErr->expression], compileErr->message);
 
         }
         // As the compileErr pointer points to dynamically allocated memory, if
@@ -149,16 +146,19 @@ bool
 FlowHyperScan::is_valid_patterns(Vector<String> &patterns, ErrorHandler *errh)
 {
     Vector<const char*> test_set;
-    Vector<String> test_set_memory;
     Vector<unsigned> flags;
     Vector<unsigned> ids;
     bool valid = true;
+    int id = 0;
     for (int i=0; i < patterns.size(); ++i) {
         String pattern = cp_unquote(patterns[i]);
-        test_set_memory.push_back(pattern);
-        test_set.push_back(pattern.c_str());
+        if (!pattern)
+            continue;
+        char * p = new char[pattern.length() + 1];
+        memcpy(p, pattern.c_str(), pattern.length() + 1);
+        test_set.push_back(p);
         flags.push_back(_flags);
-        ids.push_back(i);
+        ids.push_back(id++);
     }
     if (valid) {
         // Try to compile
@@ -174,10 +174,12 @@ FlowHyperScan::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     bool payload_only;
     String flags_s;
+    String file = "";
     if (Args(this, errh).bind(conf)
       .read("PAYLOAD_ONLY", payload_only)
       .read("VERBOSE", _verbose)
       .read("FLAGS", flags_s)
+      .read("FILE", file)
       .consume() < 0)
       return -1;
 
@@ -209,6 +211,10 @@ FlowHyperScan::configure(Vector<String> &conf, ErrorHandler *errh)
     _payload_only = payload_only;
 
 
+    if (file) {
+        file_read_lines(file,conf);
+    }
+
     if (!is_valid_patterns(conf, errh)) {
         return -1;
     }
@@ -234,6 +240,11 @@ int FlowHyperScan::initialize(ErrorHandler *errh)
     }
 
     return 0;
+}
+
+void FlowHyperScan::cleanup(CleanupStage) {
+    if (db_streaming)
+        hs_free_database(db_streaming);
 }
 
 // Match event handler: called every time Hyperscan finds a match.
