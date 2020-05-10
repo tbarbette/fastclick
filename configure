@@ -6569,17 +6569,6 @@ else
 =========================================" "$LINENO" 5
 fi
 
-if test "x$enable_flow" = xyes; then
-    if test "x$enable_batch" != xyes; then
-        enable_flow=no
-        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&5
-$as_echo "$as_me: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&2;}
-    else
-        $as_echo "#define HAVE_FLOW 1" >>confdefs.h
-
-    fi
-fi
-
 # Check whether --enable-netmap-pool was given.
 if test "${enable_netmap_pool+set}" = set; then :
   enableval=$enable_netmap_pool; :
@@ -9765,6 +9754,17 @@ fi
 if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
+
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        as_fn_error $? "--enable-flow needs --enable-batch! Flow subsystem will be disabled." "$LINENO" 5
+    else
+        $as_echo "#define HAVE_FLOW 1" >>confdefs.h
+
+    fi
+fi
+
+
 
 
 # Check whether --enable-tools was given.

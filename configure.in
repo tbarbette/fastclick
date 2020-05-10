@@ -150,15 +150,6 @@ else
 =========================================])
 fi
 
-if test "x$enable_flow" = xyes; then
-    if test "x$enable_batch" != xyes; then
-        enable_flow=no
-        AC_MSG_WARN([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
-    else
-        AC_DEFINE(HAVE_FLOW)
-    fi
-fi
-
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [use netmap buffers instead of standard Click buffers])],
     [:], [enable_netmap_pool=no])
@@ -941,6 +932,16 @@ AX_CHECK_COMPILE_FLAG([-faligned-new], [have_aligned_new=yes], [have_aligned_new
 if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
+
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        AC_MSG_ERROR([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
+    else
+        AC_DEFINE(HAVE_FLOW)
+    fi
+fi
+
+
 
 dnl
 dnl check whether tools should be built for host or build
