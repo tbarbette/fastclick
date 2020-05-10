@@ -24,7 +24,7 @@ ACTION_JUMP = "jump"
 
 NIC_INDEPENDENT = -1
 DEF_QUEUES_NB = 4
-DEF_GROUP_NB = -1
+DEF_GROUP_NB = 0
 DEF_RULE_POS = -1
 
 def generate_jump_rule(target_nic, target_group_nb, rule_count_instr):
@@ -147,7 +147,7 @@ def rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queue
 def rule_gen_file(input_file_list, output_folder, target_nic, start_queues_nb, target_queues_nb, target_group_nb, rule_count_instr=False):
 	for in_file in input_file_list:
 		# Build the rules
-		rule_list = parse_ipfilter(in_file)
+		rule_list = parse_ipfilter(in_file, priority=-1, target="dpdk")
 
 		# Dump them to a file
 		rule_list_to_file(rule_list, in_file, output_folder, target_nic, start_queues_nb, target_queues_nb, target_group_nb, rule_count_instr)
@@ -168,9 +168,9 @@ def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb,
 
 	for i in xrange(start_pos, rules_nb):
 		if (i == rule_pos):
-			rule = get_desired_rule(i)
+			rule = get_desired_dpdk_rule(i)
 		else:
-			rule = get_random_rule(i, protocol)
+			rule = get_random_dpdk_rule(i, protocol)
 		rule_list.append(rule)
 
 	# Dump them to a file
@@ -216,7 +216,7 @@ if __name__ == "__main__":
 	target_rules_nb = args.target_rules_nb
 	if (target_rules_nb <= 0) and (strategy == STRATEGY_RAND):
 		raise RuntimeError("Strategy random requires to pass the number of rules to generate. Use --target-rules-nb")
-	print("Rule generation strategy is set to {}".format(strategy))
+	print("Rule generation strategy is set to {}\n".format(strategy))
 
 	output_folder = args.output_folder
 	if not os.path.isdir(output_folder):

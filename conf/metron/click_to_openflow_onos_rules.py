@@ -232,10 +232,10 @@ def rule_gen_random(output_folder, target_rules_nb, protocol, sw_dpid, sw_inport
 
 ###
 ### To translate rules from file:
-### python click_to_onos_of_rules.py --strategy file --input-files test_click_rules --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3
+### python click_to_openflow_onos_rules.py --strategy file --input-files test_click_rules --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3
 ###
 ### To generate random rules:
-### python click_to_onos_of_rules.py --strategy random --target-rules-nb 4093 --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3 --protocol TCP
+### python click_to_openflow_onos_rules.py --strategy random --target-rules-nb 4093 --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3 --protocol TCP
 ###
 
 if __name__ == "__main__":
@@ -257,7 +257,7 @@ if __name__ == "__main__":
 
 	input_file_list = args.input_files
 	if (not input_file_list) and (strategy == STRATEGY_FILE):
-		raise RuntimeError("Specify a list of comma-separated input files with IPFilter/IPLookup) configuration")
+		raise RuntimeError("Specify a list of comma-separated input files with IPFilter/IPLookup configuration")
 
 	target_rules_nb = args.target_rules_nb
 	if (target_rules_nb <= 0) and (strategy == STRATEGY_RAND):
