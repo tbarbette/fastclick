@@ -218,7 +218,7 @@ Pipeliner::run_task(Task* t)
         PacketBatch* out = NULL;
 #endif
         int n = 0;
-        while (!s.is_empty() && n++ < _burst) {
+        while (!s.is_empty() && n < _burst) {
 #if HAVE_BATCH
             PacketBatch* b = static_cast<PacketBatch*>(s.extract());
             if (unlikely(!receives_batch)) {
@@ -229,7 +229,9 @@ Pipeliner::run_task(Task* t)
                 } else {
                     out->append_packet(b);
                 }
+                n+=1;
             } else {
+                n+=b->length();
                 if (out == NULL) {
                     out = b;
                 } else {
