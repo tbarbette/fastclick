@@ -176,7 +176,7 @@ protected:
 };
 
 class CounterInitFuture : public Router::InitFuture { public:
-    CounterInitFuture(String name, std::function<void(void)> on_reached) : _name(name), _n(0), _on_reached(on_reached) {
+    CounterInitFuture(String name, std::function<void(void)> on_reached) : _n(0), _name(name), _on_reached(on_reached) {
 
 
     }

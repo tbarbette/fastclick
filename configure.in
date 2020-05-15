@@ -149,15 +149,6 @@ else
 =========================================])
 fi
 
-if test "x$enable_flow" = xyes; then
-    if test "x$enable_batch" != xyes; then
-        enable_flow=no
-        AC_MSG_WARN([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
-    else
-        AC_DEFINE(HAVE_FLOW)
-    fi
-fi
-
 AC_ARG_ENABLE([netmap-pool],
     [AS_HELP_STRING([  --enable-netmap-pool], [use netmap buffers instead of standard Click buffers])],
     [:], [enable_netmap_pool=no])
@@ -240,6 +231,18 @@ if test "x$enable_json" = "xyes"; then
 else
     have_json=no
 fi
+
+
+AC_CHECK_LIB([pci], [main], [ac_have_pci=yes], [ac_have_pci=no])
+AC_CHECK_HEADERS([pci/pci.h], [ac_have_pci_h=yes], [ac_have_pci_h=no])
+if test "x$ac_have_pci$ac_have_pci_h" = "xyesyes"; then
+    have_pci=yes
+    LIBS="$LIBS -lpci"
+    AC_DEFINE([HAVE_PCI])
+else
+    have_pci=no
+fi
+
 
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
@@ -912,6 +915,16 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        AC_MSG_ERROR([--enable-flow needs --enable-batch! Flow subsystem will be disabled.])
+    else
+        AC_DEFINE(HAVE_FLOW)
+    fi
+fi
+
+
+
 dnl
 dnl check whether tools should be built for host or build
 dnl
@@ -1342,10 +1355,12 @@ if test "x$enable_cpu_load" = xyes; then
     AC_DEFINE(HAVE_CLICK_LOAD)
 fi
 
+
+AC_ARG_ENABLE([flow-api], [AS_HELP_STRING([--enable-flow-api], [Support for the HW flow classification API. Also needs DPDK>=20.02 ])], :, enable_flow_api=no)
 AC_CHECK_FILE($srcdir/include/click/flowdispatcher.hh, [ac_have_flow_disp_h=yes], [ac_have_flow_disp_h=no])
 AC_CHECK_FILE($srcdir/include/click/flowdispatcherparser.hh, [ac_have_flow_disp_p_h=yes], [ac_have_flow_disp_p_h=no])
 AC_CHECK_FILE($srcdir/include/click/flowdispatcherglue.hh, [ac_have_flow_disp_g_h=yes], [ac_have_flow_disp_g_h=no])
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR" = "xyesyesyes20"; then
+if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
     AC_DEFINE([HAVE_FLOW_API])
 else
@@ -1410,6 +1425,13 @@ if test "$value" != 0; then
 fi
 
 
+dnl Compile for the native architecture
+AC_ARG_ENABLE(portable-binary, [AS_HELP_STRING([--enable-portable-binary], [disable compiler optimizations that would produce unportable binaries])],
+	acx_maxopt_portable=$enableval, acx_maxopt_portable=no)
+if test $acx_maxopt_portable = no; then
+    AX_CHECK_COMPILE_FLAG([-march=native], [CXXFLAGS="-march=native $CXXFLAGS";CFLAGS="-march=native $CFLAGS"])
+fi
+
 dnl use Intel-specific machine instructions
 
 AC_ARG_ENABLE([intel-cpu], [AS_HELP_STRING([--enable-intel-cpu], [enable Intel-specific machine instructions])], :, enable_intel_cpu=no)
@@ -1417,6 +1439,35 @@ if test $enable_intel_cpu = yes; then
     AC_DEFINE(HAVE_INTEL_CPU)
 fi
 
+dnl Support AVX2 instructions
+
+AC_ARG_ENABLE([avx2],
+        AS_HELP_STRING([--enable-avx2],
+                   [check whether AVX2 is enabled, default yes]),
+          [check_avx2=no],
+          [check_avx2=yes])
+
+if test "${check_avx2}" = "yes"; then
+  AX_CHECK_COMPILE_FLAG([-mavx], [CXXFLAGS="-mavx $CXXFLAGS";CFLAGS="-mavx $CFLAGS"])
+  AX_CHECK_COMPILE_FLAG([-mavx2], [CXXFLAGS="-mavx2 $CXXFLAGS";CFLAGS="-mavx2 $CFLAGS"])
+  AC_MSG_CHECKING([whether we can compile AVX2 intrinsics in C])
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([
+   #include <x86intrin.h>
+   int main(int argc, char **argv){
+   double* q;
+   __m256d a = _mm256_load_pd(q);
+   double d = _mm256_cvtsd_f64(a);
+   return 0;
+   }
+   ])],
+   [HAVE_AVX2=yes],
+   [HAVE_AVX2=no]
+  )
+  AC_MSG_RESULT([${HAVE_AVX2}])
+fi
+if test "${HAVE_AVX2}" = "yes"; then
+  AC_DEFINE(HAVE_AVX2)
+fi
 
 dnl
 dnl expand path variables
@@ -2475,6 +2526,11 @@ if test "x$enable_wifi" = xyes; then
     provisions="$provisions wifi"
 fi
 
+dnl add 'pci' if libpci support is available
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 AC_SUBST(provisions)
 
 dnl
@@ -2508,9 +2564,9 @@ done
 
 AC_OUTPUT
 
-if test "$have_flow_api" = yes; then
-    feedback="no"
-else
+feedback="no"
+
+if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
 fi
 
@@ -2521,8 +2577,8 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
-              Flow:              ${enable_flow}
-          Flow API:              ${have_flow_api}
+    Flow Subsystem:              ${enable_flow}
+       HW Flow API:              ${have_flow_api}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
@@ -2531,6 +2587,7 @@ Configuration Summary:
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
     JSON   support:              ${have_json}
+    libpci support:              ${have_pci}
 "
 
 if test "$feedback" != no; then

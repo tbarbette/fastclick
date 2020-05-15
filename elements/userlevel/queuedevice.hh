@@ -84,7 +84,7 @@ protected:
      */
     class ThreadState {
         public:
-        ThreadState() : _count(0), _useful(0), _useless(0), _dropped(0), first_queue_id(-1) {};
+        ThreadState() : _count(0), _useful(0), _useless(0), _dropped(0), task(0), first_queue_id(-1) {};
         long long unsigned _count;
         long long unsigned _useful;
         long long unsigned _useless;

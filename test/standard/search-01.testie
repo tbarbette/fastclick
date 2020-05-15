@@ -1,0 +1,12 @@
+%info
+Tests String class with the StringTest element.
+
+%require
+click-buildtool provides StringTest
+
+%script
+click -e 'InfiniteSource("HELLO WORLD !", STOP 1, LIMIT 1) -> s :: Search("LO ") -> Print(FOUND) -> UnstripAnno() -> Print(FOUNDFULL) -> Discard; s[1] -> Print(NOTFOUND)-> Discard;'
+
+%expect stderr
+FOUND:    7 | 574f524c 442021
+FOUNDFULL:   13 | 48454c4c 4f20574f 524c4420 21

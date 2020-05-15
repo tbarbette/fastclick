@@ -92,13 +92,14 @@ Integer. The maximum transfer unit of the device.
 
 String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
 vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 20.02, flow_disp is also
-supported.
+supported if FastClick was built with --enable-flow-api.
 
 =item FLOW_RULES_FILE
 
-String. For DPDK version >= 20.02, if MODE is set to flow_disp, a path to
-a file with Flow Dispatcher rules can be supplied to the device.
-These rules are installed in the NIC using DPDK's flow API.
+String. For DPDK version >= 20.02, FastClick was built with --enable-flow-api,
+and if MODE is set to flow_disp, a path to a file with Flow Dispatcher rules
+can be supplied to the device. These rules are installed in the NIC using
+DPDK's flow API.
 
 =item FLOW_ISOLATE
 
@@ -118,7 +119,9 @@ traffic using VLAN-based VMDq.
 
 =item PAUSE
 
-String. Set the device pause mode. "full" to enable pause frame for both RX and TX, "rx" or "tx" to set one of them, and "none" to disable pause frames. Do not set or choose "unset" to keep device current state/default.
+String. Set the device pause mode. "full" to enable pause frame for both
+RX and TX, "rx" or "tx" to set one of them, and "none" to disable pause frames.
+Do not set or choose "unset" to keep device current state/default.
 
 =item ALLOW_NONEXISTENT
 

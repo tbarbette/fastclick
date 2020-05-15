@@ -52,6 +52,10 @@ const char *filename_landmark(const char *, bool file_is_expr = false);
 String file_string(FILE *, ErrorHandler * = 0);
 String file_string(String, ErrorHandler * = 0);
 
+
+void file_read_lines(FILE*, Vector<String>&);
+int file_read_lines(String, Vector<String>&, ErrorHandler * = 0);
+
 String unique_tmpnam(const String &, ErrorHandler * = 0);
 void remove_file_on_exit(const String &);
 bool path_allows_default_path(String path);

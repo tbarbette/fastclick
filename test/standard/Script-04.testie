@@ -4,6 +4,10 @@ click CONFIG
 %file CONFIG
 s0 :: Script(
    print $(add 1 2 3),
+   print $(avg 1 2 3),
+   print $(count 1 0 3),
+   print $(popcount 1 0 3),
+   print $(popcount .01 0.32 0),
    print $(sub 10 2 2),
    print $(min 10 6 20),
    print $(max -1 6 3),
@@ -16,10 +20,20 @@ s0 :: Script(
    print $(shift foovar),
    print $(shift foovar),
    print $(get foovar),
+   print $(gt_vec 0 0.01 0.32 0),
+   print $(gt_vec 0.02 0.01 0.32 0),
+   print $(ceil 17.35),
+   print $(floor 17.33),
+   print $(round 17.33),
+   print $(round 17.51),
    stop)
 
 %expect stdout
 6
+2
+3
+2
+2
 6
 6
 6
@@ -31,5 +45,11 @@ s0 :: Script(
 foo
 bar
 baz
+2
+1
+18
+17
+17
+18
 
 %expect stderr

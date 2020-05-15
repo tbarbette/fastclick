@@ -871,12 +871,15 @@ enable_stride
 enable_task_heap
 enable_task_stats
 enable_cpu_load
+enable_flow_api
 enable_dmalloc
 enable_hash_iterator_epochs
 enable_force_expensive
 enable_valgrind
 enable_schedule_debugging
+enable_portable_binary
 enable_intel_cpu
+enable_avx2
 with_numa
 with_netmap
 with_proper
@@ -1598,6 +1601,8 @@ Optional Features:
                           balancing of tasks among threads
   --enable-cpu-load       Keep track of CPU usage using an approximation.
                           Useful when using polling keeping the CPU at 100%
+  --enable-flow-api       Support for the HW flow classification API. Also
+                          needs DPDK>=20.02
   --enable-dmalloc        enable debugging malloc
   --enable-hash-iterator-epochs
                           hash iterator epochs
@@ -1606,7 +1611,11 @@ Optional Features:
   --enable-valgrind       extra support for debugging with valgrind
   --enable-schedule-debugging[=WHAT] enable Click scheduler debugging
                           (no/yes/extra) [yes]
+  --enable-portable-binary
+                          disable compiler optimizations that would produce
+                          unportable binaries
   --enable-intel-cpu      enable Intel-specific machine instructions
+  --enable-avx2           check whether AVX2 is enabled, default yes
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -6562,17 +6571,6 @@ else
 =========================================" "$LINENO" 5
 fi
 
-if test "x$enable_flow" = xyes; then
-    if test "x$enable_batch" != xyes; then
-        enable_flow=no
-        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&5
-$as_echo "$as_me: WARNING: --enable-flow needs --enable-batch! Flow subsystem will be disabled." >&2;}
-    else
-        $as_echo "#define HAVE_FLOW 1" >>confdefs.h
-
-    fi
-fi
-
 # Check whether --enable-netmap-pool was given.
 if test "${enable_netmap_pool+set}" = set; then :
   enableval=$enable_netmap_pool; :
@@ -6993,6 +6991,67 @@ if test "x$enable_json" = "xyes"; then
 else
     have_json=no
 fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lpci" >&5
+$as_echo_n "checking for main in -lpci... " >&6; }
+if ${ac_cv_lib_pci_main+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lpci  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+
+int
+main ()
+{
+return main ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_pci_main=yes
+else
+  ac_cv_lib_pci_main=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pci_main" >&5
+$as_echo "$ac_cv_lib_pci_main" >&6; }
+if test "x$ac_cv_lib_pci_main" = xyes; then :
+  ac_have_pci=yes
+else
+  ac_have_pci=no
+fi
+
+for ac_header in pci/pci.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "pci/pci.h" "ac_cv_header_pci_pci_h" "$ac_includes_default"
+if test "x$ac_cv_header_pci_pci_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_PCI_PCI_H 1
+_ACEOF
+ ac_have_pci_h=yes
+else
+  ac_have_pci_h=no
+fi
+
+done
+
+if test "x$ac_have_pci$ac_have_pci_h" = "xyesyes"; then
+    have_pci=yes
+    LIBS="$LIBS -lpci"
+    $as_echo "#define HAVE_PCI 1" >>confdefs.h
+
+else
+    have_pci=no
+fi
+
 
 # Check whether --enable-select was given.
 if test "${enable_select+set}" = set; then :
@@ -9416,6 +9475,17 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
+if test "x$enable_flow" = xyes; then
+    if test "x$enable_batch" != xyes; then
+        as_fn_error $? "--enable-flow needs --enable-batch! Flow subsystem will be disabled." "$LINENO" 5
+    else
+        $as_echo "#define HAVE_FLOW 1" >>confdefs.h
+
+    fi
+fi
+
+
+
 
 # Check whether --enable-tools was given.
 if test "${enable_tools+set}" = set; then :
@@ -10985,6 +11055,14 @@ if test "x$enable_cpu_load" = xyes; then
 
 fi
 
+
+# Check whether --enable-flow-api was given.
+if test "${enable_flow_api+set}" = set; then :
+  enableval=$enable_flow_api; :
+else
+  enable_flow_api=no
+fi
+
 as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcher.hh" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcher.hh" >&5
 $as_echo_n "checking for $srcdir/include/click/flowdispatcher.hh... " >&6; }
@@ -11054,7 +11132,7 @@ else
   ac_have_flow_disp_g_h=no
 fi
 
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR" = "xyesyesyes20"; then
+if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
@@ -11168,6 +11246,51 @@ _ACEOF
 fi
 
 
+# Check whether --enable-portable-binary was given.
+if test "${enable_portable_binary+set}" = set; then :
+  enableval=$enable_portable_binary; acx_maxopt_portable=$enableval
+else
+  acx_maxopt_portable=no
+fi
+
+if test $acx_maxopt_portable = no; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -march=native" >&5
+$as_echo_n "checking whether C++ compiler accepts -march=native... " >&6; }
+if ${ax_cv_check_cxxflags___march_native+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -march=native"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___march_native=yes
+else
+  ax_cv_check_cxxflags___march_native=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___march_native" >&5
+$as_echo "$ax_cv_check_cxxflags___march_native" >&6; }
+if test "x$ax_cv_check_cxxflags___march_native" = xyes; then :
+  CXXFLAGS="-march=native $CXXFLAGS";CFLAGS="-march=native $CFLAGS"
+else
+  :
+fi
+
+fi
+
 
 # Check whether --enable-intel-cpu was given.
 if test "${enable_intel_cpu+set}" = set; then :
@@ -11181,6 +11304,114 @@ if test $enable_intel_cpu = yes; then
 
 fi
 
+
+# Check whether --enable-avx2 was given.
+if test "${enable_avx2+set}" = set; then :
+  enableval=$enable_avx2; check_avx2=no
+else
+  check_avx2=yes
+fi
+
+
+if test "${check_avx2}" = "yes"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -mavx" >&5
+$as_echo_n "checking whether C++ compiler accepts -mavx... " >&6; }
+if ${ax_cv_check_cxxflags___mavx+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -mavx"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___mavx=yes
+else
+  ax_cv_check_cxxflags___mavx=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___mavx" >&5
+$as_echo "$ax_cv_check_cxxflags___mavx" >&6; }
+if test "x$ax_cv_check_cxxflags___mavx" = xyes; then :
+  CXXFLAGS="-mavx $CXXFLAGS";CFLAGS="-mavx $CFLAGS"
+else
+  :
+fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -mavx2" >&5
+$as_echo_n "checking whether C++ compiler accepts -mavx2... " >&6; }
+if ${ax_cv_check_cxxflags___mavx2+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -mavx2"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___mavx2=yes
+else
+  ax_cv_check_cxxflags___mavx2=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___mavx2" >&5
+$as_echo "$ax_cv_check_cxxflags___mavx2" >&6; }
+if test "x$ax_cv_check_cxxflags___mavx2" = xyes; then :
+  CXXFLAGS="-mavx2 $CXXFLAGS";CFLAGS="-mavx2 $CFLAGS"
+else
+  :
+fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether we can compile AVX2 intrinsics in C" >&5
+$as_echo_n "checking whether we can compile AVX2 intrinsics in C... " >&6; }
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+   #include <x86intrin.h>
+   int main(int argc, char **argv){
+   double* q;
+   __m256d a = _mm256_load_pd(q);
+   double d = _mm256_cvtsd_f64(a);
+   return 0;
+   }
+
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  HAVE_AVX2=yes
+else
+  HAVE_AVX2=no
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${HAVE_AVX2}" >&5
+$as_echo "${HAVE_AVX2}" >&6; }
+fi
+if test "${HAVE_AVX2}" = "yes"; then
+  $as_echo "#define HAVE_AVX2 1" >>confdefs.h
+
+fi
 
 
 shell_expand () {
@@ -14581,6 +14812,10 @@ if test "x$enable_wifi" = xyes; then
     provisions="$provisions wifi"
 fi
 
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 
 
 
@@ -15951,9 +16186,9 @@ $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
 
-if test "$have_flow_api" = yes; then
-    feedback="no"
-else
+feedback="no"
+
+if test "$enable_flow_api$have_flow_api" = "yesno"; then
     feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
 fi
 
@@ -15964,8 +16199,8 @@ Configuration Summary:
     C++   Compiler:              ${CXX}
 
           Batching:              ${enable_batch}
-              Flow:              ${enable_flow}
-          Flow API:              ${have_flow_api}
+    Flow Subsystem:              ${enable_flow}
+       HW Flow API:              ${have_flow_api}
 
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
@@ -15974,6 +16209,7 @@ Configuration Summary:
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}
     JSON   support:              ${have_json}
+    libpci support:              ${have_pci}
 "
 
 if test "$feedback" != no; then
