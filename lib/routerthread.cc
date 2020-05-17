@@ -750,6 +750,8 @@ RouterThread::driver()
                     }
                 }
             }
+        } else {
+            _idle_dorun = -1;
         }
 
 #if CLICK_NS || BSD_NETISRSCHED
