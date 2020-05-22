@@ -112,6 +112,11 @@ protected:
     StatVector(Vector<T> v) : stats(v) {
 
     }
+
+    void resize_stats(unsigned max, T def) {
+        stats.reinitialize(Vector<T> (max,def));
+    }
+
     void add_stat_handler(Element* e) {
         //Value the most seen (gives the value)
         e->add_read_handler("most_seen", read_handler, H_MAX_OBS, Handler::f_expensive);

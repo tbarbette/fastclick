@@ -2325,6 +2325,8 @@ Element::add_default_handlers(bool allow_write_config)
   add_read_handler("home_thread", read_threads_handler, 2, Handler::f_calm);
   add_read_handler("mt_safe", read_threads_handler, 3, Handler::f_calm);
   add_read_handler("is_fullpush", read_threads_handler, 4, Handler::f_calm);
+  add_data_handlers("batch_mode", Handler::f_read, (int*)&in_batch_mode);
+
 #if CLICK_STATS >= 1
   add_read_handler("icounts", read_icounts_handler, 0);
   add_read_handler("ocounts", read_ocounts_handler, 0);

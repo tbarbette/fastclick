@@ -96,6 +96,10 @@ public:
         initialize(max_cpu_id,v);
     }
 
+    void reinitialize(T v) {
+        resize(click_max_cpu_ids(), v);
+    }
+
     ~per_thread() {
         if (_size) {
             CLICK_ALIGNED_DELETE(storage,AT,_size);
