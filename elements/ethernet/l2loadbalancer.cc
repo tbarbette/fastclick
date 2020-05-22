@@ -41,6 +41,7 @@ L2LoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<EtherAddress>>(),_dsts)
                .consume() < 0)
 		return -1;
+    click_chatter("%p{element} has %d routes",this,_dsts.size());
 
     if (parseLb(conf, this, errh) < 0)
             return -1;
@@ -48,7 +49,7 @@ L2LoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(this, errh).bind(conf).complete() < 0)
             return -1;
 
-    click_chatter("%p{element} has %d routes",this,_dsts.size());
+
     return 0;
 }
 

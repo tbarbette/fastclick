@@ -39,16 +39,20 @@ int
 FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String mode= "rr";
-    if (Args(conf, this, errh)
-       .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
-       .read_mp("VIP", _vip)
-       .read("MODE", mode)
-       .complete() < 0)
+    if (Args(this, errh).bind(conf)
+               .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
+               .read_mp("VIP", _vip)
+               .consume() < 0)
         return -1;
+
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
-    set_mode(mode);
-    click_chatter("MODE set to %s", mode.c_str());
+    if (parseLb(conf, this, errh) < 0)
+            return -1;
+
+    if (Args(this, errh).bind(conf).complete() < 0)
+            return -1;
+
     return 0;
 }
 
