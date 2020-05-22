@@ -11046,15 +11046,15 @@ else
   enable_flow_api=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcher.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcher.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowdispatcher.hh... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparser.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowparser.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowparser.hh... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowdispatcher.hh"; then
+if test -r "$srcdir/include/click/flowparser.hh"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -11069,38 +11069,15 @@ else
   ac_have_flow_disp_h=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcherparser.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcherparser.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowdispatcherparser.hh... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparserglue.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowparserglue.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowparserglue.hh... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowdispatcherparser.hh"; then
-  eval "$as_ac_File=yes"
-else
-  eval "$as_ac_File=no"
-fi
-fi
-eval ac_res=\$$as_ac_File
-	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
-$as_echo "$ac_res" >&6; }
-if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_p_h=yes
-else
-  ac_have_flow_disp_p_h=no
-fi
-
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowdispatcherglue.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowdispatcherglue.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowdispatcherglue.hh... " >&6; }
-if eval \${$as_ac_File+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  test "$cross_compiling" = yes &&
-  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowdispatcherglue.hh"; then
+if test -r "$srcdir/include/click/flowparserglue.hh"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"

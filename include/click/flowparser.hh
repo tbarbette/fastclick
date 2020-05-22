@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowdispatcher.hh -- DPDK's Flow API in Click
+ * flowparser.hh -- DPDK's Flow API in Click
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS & KTH Royal Institute of Technology
  *
@@ -15,15 +15,15 @@
  * legally binding.
  */
 
-#ifndef CLICK_FLOWDISPATCHER_H
-#define CLICK_FLOWDISPATCHER_H
+#ifndef CLICK_FLOWPARSER_H
+#define CLICK_FLOWPARSER_H
 
 #include <click/error.hh>
 #include <click/hashmap.hh>
 #include <click/hashtable.hh>
 #include <click/dpdkdevice.hh>
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    #include <click/flowdispatcherparser.hh>
+    #include <click/flowparser.hh>
 #endif
 
 CLICK_DECLS
@@ -157,11 +157,11 @@ class FlowCache {
         bool verify_transactions(const Vector<uint32_t> &int_vec, const Vector<uint32_t> &glb_vec);
 };
 
-class FlowDispatcher {
+class FlowParser {
     public:
-        FlowDispatcher();
-        FlowDispatcher(portid_t port_id, ErrorHandler *errh);
-        ~FlowDispatcher();
+        FlowParser();
+        FlowParser(portid_t port_id, ErrorHandler *errh);
+        ~FlowParser();
 
         // DPDKDevice mode is Flow Dispatcher
         static String DISPATCHING_MODE;
@@ -192,16 +192,16 @@ class FlowDispatcher {
         static HashMap<int, String> flow_action;
 
         // Global table of DPDK ports mapped to their Flow Dispatcher objects
-        static HashTable<portid_t, FlowDispatcher *> dev_flow_disp;
+        static HashTable<portid_t, FlowParser *> dev_flow_disp;
 
         // Map of ports to Flow Dispatcher instances
-        static HashTable<portid_t, FlowDispatcher *> flow_dispatcher_map();
+        static HashTable<portid_t, FlowParser *> flow_dispatcher_map();
 
         // Cleans the mappings between ports and Flow Dispatcher instances
         static void clean_flow_dispatcher_map();
 
         // Acquires a Flow Dispatcher instance on a port
-        static FlowDispatcher *get_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh = NULL);
+        static FlowParser *get_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh = NULL);
 
         // Parser initialization
         static struct cmdline *parser(ErrorHandler *errh);
@@ -401,4 +401,4 @@ class FlowDispatcher {
 
 CLICK_ENDDECLS
 
-#endif /* CLICK_FLOWDISPATCHER_H */
+#endif /* CLICK_FLOWPARSER_H */

@@ -1,6 +1,6 @@
-// -*- c-basic-offset: 4; related-file-name: "flowdispatcherparser.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "flowparserparser.hh" -*-
 /*
- * flowdispatcherparser.cc -- element that relays flow rule instructions
+ * flowparserparser.cc -- element that relays flow rule instructions
  * to DPDK's flow parsing library.
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS
@@ -17,7 +17,9 @@
  * legally binding.
  */
 
-#include <click/flowdispatcherparser.hh>
+#include <click/config.h>
+#include <click/error.hh>
+#include <click/flowparserglue.hh>
 
 CLICK_DECLS
 
@@ -87,7 +89,7 @@ flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
 {
     if (!cl) {
         errh->error("Flow parser is not initialized");
-        return FLOWDISP_ERROR;
+        return FLOWPARSER_ERROR;
     }
 
     char buff[512];
@@ -99,7 +101,7 @@ flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
         int line_len;
         if ((line_len = cmdline_parse(cl, buff)) < 0) {
             errh->error("Flow parser failed to parse input line: %s\n", buff);
-            return FLOWDISP_ERROR;
+            return FLOWPARSER_ERROR;
         }
         tot_line_len += line_len;
     }

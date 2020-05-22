@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowdispatcherglue.hh -- element that glues Click and DPDK for
+ * flowparserglue.hh -- element that glues Click and DPDK for
  * flow parsing and installation on DPDK-based NICs.
  *
  * Copyright (c) 2018 Tom Barbette, University of Liège
@@ -17,8 +17,12 @@
  * legally binding.
  */
 
-#ifndef CLICK_FLOWDISPATCHER_GLUE_H
-#define CLICK_FLOWDISPATCHER_GLUE_H
+#ifndef CLICK_FLOWPARSER_GLUE_H
+#define CLICK_FLOWPARSER_GLUE_H
+
+CLICK_DECLS
+
+class ErrorHandler;
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,6 +128,77 @@ int cmdline_parse(
 
 #ifdef __cplusplus
 }
+
+#define FLOWPARSER_ERROR   ((int)-1)
+#define FLOWPARSER_SUCCESS ((int) 0)
+
+/**
+ * DPDK's Flow parsing API.
+ */
+
+/**
+ * Allocates memory for storing port information.
+ * Copied from RTE_SDK/app/test-pmd/testpmd.c.
+ */
+static void
+init_port(void)
+{
+	/* Configuration of Ethernet ports. */
+	ports = (struct rte_port *) rte_zmalloc("fastclick: ports",
+			    sizeof(struct rte_port) * RTE_MAX_ETHPORTS,
+			    RTE_CACHE_LINE_SIZE);
+	if (ports == NULL) {
+		rte_exit(EXIT_FAILURE, "rte_zmalloc(%d struct rte_port) failed\n", RTE_MAX_ETHPORTS);
+	}
+}
+
+/**
+ * Obtains an instance of the Flow Dispatcher parser.
+ *
+ * @args errh: an instance of the error handler
+ * @return a parser object
+ */
+struct cmdline *flow_parser_init(
+	ErrorHandler *errh
+);
+
+/**
+ * Creates an instance of the Flow Dispatcher parser
+ * on a given context of instructions, obtained
+ * from DPDK.
+ *
+ * @args prompt: a user prompt message
+ * @args errh: an instance of the error handler
+ * @return a command line object
+ */
+struct cmdline *flow_parser_alloc(
+	const char *prompt,
+	ErrorHandler *errh
+);
+
+/**
+ * Parses a new line.
+ *
+ * @args line: a buffer to store the newly-parsed line
+ * @args n: the length of the line buffer
+ * @args input_cmd: the input command to parse
+ * @return the number of characters read
+ */
+char *flow_parser_parse_new_line(char *line, int n, const char **input_cmd);
+
+/**
+ * Splits a given command into multiple newline-separated tokens
+ * and parses each token at a time.
+ *
+ * @args cl: a flow parser instance
+ * @args input_cmd: the input command to parse
+ * @args errh: an instance of the error handler
+ * @return the number of characters read in total
+ */
+int flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh);
+
 #endif
 
-#endif /* CLICK_FLOWDISPATCHER_GLUE_H */
+CLICK_ENDDECLS
+
+#endif /* CLICK_FLOWPARSER_GLUE_H */
