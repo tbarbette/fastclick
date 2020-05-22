@@ -405,7 +405,7 @@ protected:
             awrr_timer->schedule_after(Timestamp::make_msec(_awrr_interval));
         }
 
-        if (nserver == 0) {
+        if (nserver <= 0) {
             if (_autoscale) {
                 nserver=1;
             } else {
