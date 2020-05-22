@@ -39,7 +39,9 @@ class SetIPAddress : public BatchElement {
 
     Packet *simple_action(Packet *);
 
-    BATCH_ELEMENT_DEFINE_SIMPLE_ACTION_BATCH(SetIPAddress);
+#if HAVE_BATCH
+    PacketBatch *simple_action_batch(PacketBatch *);
+#endif
 
 };
 
