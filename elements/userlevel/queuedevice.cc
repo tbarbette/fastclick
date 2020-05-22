@@ -491,22 +491,6 @@ unsigned long long QueueDevice::n_count() {
     return total;
 }
 
-unsigned long long QueueDevice::n_useful() {
-    unsigned long long total = 0;
-    for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
-        total += _thread_state.get_value(i)._useful;
-    }
-    return total;
-}
-
-unsigned long long QueueDevice::n_useless() {
-    unsigned long long total = 0;
-    for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
-        total += _thread_state.get_value(i)._useless;
-    }
-    return total;
-}
-
 unsigned long long QueueDevice::n_dropped() {
     unsigned long long total = 0;
     for (unsigned int i = 0; i < _thread_state.weight(); i ++) {
@@ -529,10 +513,6 @@ String QueueDevice::count_handler(Element *e, void *user_data)
     switch (what) {
         case h_count:
             return String(tdd->n_count());
-        case h_useless:
-            return String(tdd->n_useless());
-        case h_useful:
-            return String(tdd->n_useful());
         default:
             return "<undefined>";
     }

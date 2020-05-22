@@ -42,7 +42,10 @@ CLICK_DECLS
 #define LOAD_UNIT 10
 
 FromDPDKDevice::FromDPDKDevice() :
-    _dev(0), _rx_intr(-1)
+    _dev(0)
+#if HAVE_DPDK_INTERRUPT
+    ,_rx_intr(-1)
+#endif
 {
 #if HAVE_BATCH
     in_batch_mode = BATCH_MODE_YES;
@@ -96,7 +99,9 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("VF_POOLS", num_pools)
         .read_all("VF_VLAN", vf_vlan)
         .read("MAXQUEUES",maxqueues)
+#if HAVE_DPDK_INTERRUPT
         .read("RX_INTR", _rx_intr)
+#endif
         .read("MAX_RSS", max_rss).read_status(has_rss)
         .read("TIMESTAMP", set_timestamp)
         .read("PAUSE", fc_mode)
@@ -247,8 +252,8 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
 #endif
     }
 
+#if HAVE_DPDK_INTERRUPT
     if (_rx_intr >= 0) {
-    #if HAVE_DPDK_INTERRUPT
         for (int i = firstqueue; i <= lastqueue; i++) {
             uint64_t data = _dev->port_id << CHAR_BIT | i;
             ret = rte_eth_dev_rx_intr_ctl_q(_dev->port_id, i,
@@ -261,19 +266,8 @@ int FromDPDKDevice::initialize(ErrorHandler *errh)
                 );
             }
         }
-    #endif
     }
-
-    for (int q = firstqueue; q <= lastqueue; q++) {
-        int i = thread_for_queue(q);
-        if (_fdstate.get_value(i).timer != 0)
-            continue;
-        _fdstate.get_value(i).timer = new Timer(this);
-        _fdstate.get_value(i).timer->initialize(this);
-        _fdstate.get_value(i).timer->move_thread(_fdstate.get_mapping(i));
-        if (_active)
-            _fdstate.get_value(i).timer->schedule_after_msec(1);
-    }
+#endif
 
     return ret;
 }
@@ -354,9 +348,8 @@ bool FromDPDKDevice::run_task(Task *t)
         }
     }
 
-    if (ret == 0) {
-        if (_rx_intr >= 0) {
-        #if HAVE_DPDK_INTERRUPT
+#if HAVE_DPDK_INTERRUPT
+     if (ret == 0 && _rx_intr >= 0) {
            for (int iqueue = queue_for_thisthread_begin();
                 iqueue<=queue_for_thisthread_end(); iqueue++) {
                if (rte_eth_dev_rx_intr_enable(_dev->port_id, iqueue) != 0) {
@@ -376,38 +369,11 @@ bool FromDPDKDevice::run_task(Task *t)
                    assert(port_id == _dev->port_id);
            }
            this->selected(0, SELECT_READ);
-        #endif
-       }
-/*
-        if (_fdstate->useful > 0)
-            t->fast_reschedule();
-        else
-            _fdstate->mustresched = 1;*/
-        t->fast_reschedule();
-       return (ret);
-    } else {
-        _fdstate->useful++;
-        t->fast_reschedule();
-        return (ret);
     }
-}
+#endif
 
-void FromDPDKDevice::run_timer(Timer* t) {
-
-    int u = _fdstate->useful;
-    if (u > LOAD_UNIT)
-        u = LOAD_UNIT;
-
-    _thread_state->_useful += u;
-    _thread_state->_useless += LOAD_UNIT - u;
-    _fdstate->useful = 0;
-
-    if (_fdstate->mustresched == 1) {
-        _fdstate->mustresched = 0;
-        task_for_thread()->reschedule();
-    }
-
-    _fdstate->timer->reschedule_after_msec(1);
+    t->fast_reschedule();
+    return ret;
 }
 
 #if HAVE_DPDK_INTERRUPT
@@ -618,8 +584,6 @@ int FromDPDKDevice::write_handler(
                         }
                         for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
                             int i = fd->thread_for_queue(q);
-                            if (!fd->_fdstate.get_value(i).timer->scheduled())
-                                fd->_fdstate.get_value(i).timer->schedule_after_msec(1);
                         }
                     }, b);
                 } else { // Deactivating
@@ -631,8 +595,6 @@ int FromDPDKDevice::write_handler(
 
                         for (int q = fd->firstqueue; q <= fd->lastqueue; q++) {
                             int i = fd->thread_for_queue(q);
-                            if (fd->_fdstate.get_value(i).timer->scheduled())
-                                fd->_fdstate.get_value(i).timer->unschedule();
                         }
                     }, b);
                 }
@@ -841,18 +803,6 @@ int FromDPDKDevice::xstats_handler(
     }
 }
 
-int FromDPDKDevice::reset_load_handler(
-        const String &input, Element *e, void *thunk, ErrorHandler *errh)
-{
-
-    FromDPDKDevice *fd = static_cast<FromDPDKDevice *>(e);
-    for (unsigned int i = 0; i < fd->_thread_state.weight(); i ++) {
-        fd->_thread_state.get_value(i)._useless = 0;
-        fd->_thread_state.get_value(i)._useful = 0;
-    }
-    return 0;
-}
-
 void FromDPDKDevice::add_handlers()
 {
     add_read_handler("device",read_handler, h_device);
@@ -879,10 +829,7 @@ void FromDPDKDevice::add_handlers()
     add_write_handler("active", write_handler, h_active);
     add_write_handler("safe_active", write_handler, h_safe_active);
     add_read_handler("count", count_handler, h_count);
-    add_read_handler("useful", count_handler, h_useful);
-    add_read_handler("useless", count_handler, h_useless);
     add_write_handler("reset_counts", reset_count_handler, 0, Handler::BUTTON);
-    add_write_handler("reset_load", reset_load_handler, 0, Handler::BUTTON);
 
     add_read_handler("nb_rx_queues",read_handler, h_nb_rx_queues);
     add_read_handler("nb_tx_queues",read_handler, h_nb_tx_queues);

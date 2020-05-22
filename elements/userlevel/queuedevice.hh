@@ -84,10 +84,8 @@ protected:
      */
     class ThreadState {
         public:
-        ThreadState() : _count(0), _useful(0), _useless(0), _dropped(0), task(0), first_queue_id(-1) {};
+        ThreadState() : _count(0), _dropped(0), task(0), first_queue_id(-1) {};
         long long unsigned _count;
-        long long unsigned _useful;
-        long long unsigned _useless;
         long long unsigned _dropped;
         Task*       task;
         unsigned    first_queue_id;
@@ -138,8 +136,6 @@ protected:
     enum {h_count,h_useful,h_useless};
 
     unsigned long long n_count();
-    unsigned long long n_useful();
-    unsigned long long n_useless();
     unsigned long long n_dropped();
     void reset_count();
     static String count_handler(Element *e, void *user_data);
