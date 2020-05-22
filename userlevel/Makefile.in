@@ -118,7 +118,7 @@ include dpdk.mk
 endif
 EXTRA_DRIVER_OBJS := dpdkdevice.o $(EXTRA_DRIVER_OBJS)
 	ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
-		EXTRA_DRIVER_OBJS := flowdispatcher.o flowdispatcherparser.o $(EXTRA_DRIVER_OBJS)
+		EXTRA_DRIVER_OBJS := flowparser.o flowparserglue.o $(EXTRA_DRIVER_OBJS)
 	endif
 endif
 

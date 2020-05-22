@@ -34,7 +34,7 @@
 #endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    #include <click/flowdispatcher.hh>
+    #include <click/flowparser.hh>
 #endif
 
 CLICK_DECLS
@@ -165,7 +165,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh)
         _dev->set_init_rss_max(max_rss);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    if ((mode == FlowDispatcher::DISPATCHING_MODE) && (flow_rules_filename.empty())) {
+    if ((mode == FlowParser::DISPATCHING_MODE) && (flow_rules_filename.empty())) {
         errh->warning(
             "Flow Dispatcher (port %s): FLOW_RULES_FILE is not set, "
             "hence this NIC can only be configured by the handlers",
@@ -510,31 +510,31 @@ String FromDPDKDevice::statistics_handler(Element *e, void *thunk)
     #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
         case h_rules_list: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_list();
+            return FlowParser::get_flow_dispatcher(port_id)->flow_rules_list();
         }
         case h_rules_list_with_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_list(true);
+            return FlowParser::get_flow_dispatcher(port_id)->flow_rules_list(true);
         }
         case h_rules_ids_global: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rule_ids_global();
+            return FlowParser::get_flow_dispatcher(port_id)->flow_rule_ids_global();
         }
         case h_rules_ids_internal: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return FlowDispatcher::get_flow_dispatcher(port_id)->flow_rule_ids_internal();
+            return FlowParser::get_flow_dispatcher(port_id)->flow_rule_ids_internal();
         }
         case h_rules_count: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return String(FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_count_explicit());
+            return String(FlowParser::get_flow_dispatcher(port_id)->flow_rules_count_explicit());
         }
         case h_rules_count_with_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return String(FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_with_hits_count());
+            return String(FlowParser::get_flow_dispatcher(port_id)->flow_rules_with_hits_count());
         }
         case h_rules_isolate: {
             portid_t port_id = fd->get_device()->get_port_id();
-            return String(FlowDispatcher::isolated(port_id) ? "1" : "0");
+            return String(FlowParser::isolated(port_id) ? "1" : "0");
         }
     #endif
         case h_nombufs:
@@ -623,7 +623,7 @@ int FromDPDKDevice::flow_handler(
     }
 
     portid_t port_id = fd->get_device()->get_port_id();
-    FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+    FlowParser *flow_disp = FlowParser::get_flow_dispatcher(port_id, errh);
     assert(flow_disp);
 
     switch((uintptr_t) thunk) {
@@ -638,14 +638,14 @@ int FromDPDKDevice::flow_handler(
             }
 
             // Detect and remove unwanted components
-            if (!FlowDispatcher::filter_rule(rule)) {
+            if (!FlowParser::filter_rule(rule)) {
                 return errh->error("Flow Dispatcher (port %u): Invalid rule '%s'", port_id, rule.c_str());
             }
 
             rule = "flow create " + String(port_id) + " " + rule;
 
             // Parse the queue index to infer the CPU core
-            String queue_index_str = FlowDispatcher::fetch_token_after_keyword((char *) rule.c_str(), "queue index");
+            String queue_index_str = FlowParser::fetch_token_after_keyword((char *) rule.c_str(), "queue index");
             int core_id = atoi(queue_index_str.c_str());
 
             const uint32_t int_rule_id = flow_disp->get_flow_cache()->next_internal_rule_id();
@@ -683,7 +683,7 @@ int FromDPDKDevice::flow_handler(
                 return errh->error("Flow Dispatcher (port %u): Specify isolation mode (true/1 -> isolation, otherwise no isolation)", port_id);
             }
             bool status = (input.lower() == "true") || (input.lower() == "1") ? true : false;
-            FlowDispatcher::set_isolation_mode(port_id, status);
+            FlowParser::set_isolation_mode(port_id, status);
             return 0;
         }
         case h_rules_flush: {
@@ -758,7 +758,7 @@ int FromDPDKDevice::xstats_handler(
         case h_rule_byte_count:
         case h_rule_packet_hits: {
             portid_t port_id = fd->get_device()->get_port_id();
-            FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+            FlowParser *flow_disp = FlowParser::get_flow_dispatcher(port_id, errh);
             assert(flow_disp);
             if (input == "") {
                 return errh->error("Aggregate flow rule counters are not supported. Please specify a rule number to query");
@@ -777,7 +777,7 @@ int FromDPDKDevice::xstats_handler(
         }
         case h_rules_aggr_stats: {
             portid_t port_id = fd->get_device()->get_port_id();
-            FlowDispatcher *flow_disp = FlowDispatcher::get_flow_dispatcher(port_id, errh);
+            FlowParser *flow_disp = FlowParser::get_flow_dispatcher(port_id, errh);
             assert(flow_disp);
             input = flow_disp->flow_rule_aggregate_stats();
             return 0;
@@ -822,9 +822,9 @@ void FromDPDKDevice::add_handlers()
     set_handler("queue_packets", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_packets);
     set_handler("queue_bytes", Handler::f_read | Handler::f_read_param, xstats_handler, h_stats_bytes);
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    set_handler(FlowDispatcher::FLOW_RULE_PACKET_HITS, Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_packet_hits);
-    set_handler(FlowDispatcher::FLOW_RULE_BYTE_COUNT,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_byte_count);
-    set_handler(FlowDispatcher::FLOW_RULE_AGGR_STATS,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
+    set_handler(FlowParser::FLOW_RULE_PACKET_HITS, Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_packet_hits);
+    set_handler(FlowParser::FLOW_RULE_BYTE_COUNT,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rule_byte_count);
+    set_handler(FlowParser::FLOW_RULE_AGGR_STATS,  Handler::f_read | Handler::f_read_param, xstats_handler, h_rules_aggr_stats);
 #endif
 
     add_read_handler("active", read_handler, h_active);
@@ -854,17 +854,17 @@ void FromDPDKDevice::add_handlers()
     add_read_handler("nombufs",statistics_handler, h_nombufs);
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    add_write_handler(FlowDispatcher::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
-    add_write_handler(FlowDispatcher::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
-    add_write_handler(FlowDispatcher::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);
-    add_write_handler(FlowDispatcher::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
-    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_GLB,         statistics_handler, h_rules_ids_global);
-    add_read_handler (FlowDispatcher::FLOW_RULE_IDS_INT,         statistics_handler, h_rules_ids_internal);
-    add_read_handler (FlowDispatcher::FLOW_RULE_LIST,            statistics_handler, h_rules_list);
-    add_read_handler (FlowDispatcher::FLOW_RULE_LIST_WITH_HITS,  statistics_handler, h_rules_list_with_hits);
-    add_read_handler (FlowDispatcher::FLOW_RULE_COUNT,           statistics_handler, h_rules_count);
-    add_read_handler (FlowDispatcher::FLOW_RULE_COUNT_WITH_HITS, statistics_handler, h_rules_count_with_hits);
-    add_read_handler (FlowDispatcher::FLOW_RULE_ISOLATE,         statistics_handler, h_rules_isolate);
+    add_write_handler(FlowParser::FLOW_RULE_ADD,     flow_handler, h_rule_add,    0);
+    add_write_handler(FlowParser::FLOW_RULE_DEL,     flow_handler, h_rules_del,   0);
+    add_write_handler(FlowParser::FLOW_RULE_ISOLATE, flow_handler, h_rules_isolate, 0);
+    add_write_handler(FlowParser::FLOW_RULE_FLUSH,   flow_handler, h_rules_flush, 0);
+    add_read_handler (FlowParser::FLOW_RULE_IDS_GLB,         statistics_handler, h_rules_ids_global);
+    add_read_handler (FlowParser::FLOW_RULE_IDS_INT,         statistics_handler, h_rules_ids_internal);
+    add_read_handler (FlowParser::FLOW_RULE_LIST,            statistics_handler, h_rules_list);
+    add_read_handler (FlowParser::FLOW_RULE_LIST_WITH_HITS,  statistics_handler, h_rules_list_with_hits);
+    add_read_handler (FlowParser::FLOW_RULE_COUNT,           statistics_handler, h_rules_count);
+    add_read_handler (FlowParser::FLOW_RULE_COUNT_WITH_HITS, statistics_handler, h_rules_count_with_hits);
+    add_read_handler (FlowParser::FLOW_RULE_ISOLATE,         statistics_handler, h_rules_isolate);
 #endif
 
     add_read_handler("mtu",read_handler, h_mtu);
