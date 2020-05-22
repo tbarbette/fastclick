@@ -121,14 +121,14 @@ protected:
         //Value the most seen (gives the value)
         e->add_read_handler("most_seen", read_handler, H_MAX_OBS, Handler::f_expensive);
         //Value the most seen (gives the frequency of the value)
-        e->add_read_handler("most_seen_val", read_handler, H_MAX_OBS_VAL, Handler::f_expensive);
+        e->add_read_handler("most_seen_freq", read_handler, H_MAX_OBS_VAL, Handler::f_expensive);
         //Maximum value seen
         e->add_read_handler("max", read_handler, H_MAX, Handler::f_expensive);
         //Number of observations
         e->add_read_handler("count", read_handler, H_N_OBS, Handler::f_expensive);
         //Number of values that had at least one observations
         e->add_read_handler("nval", read_handler, H_NZ, Handler::f_expensive);
-        //Value of the median frequency
+        //Value for the median number of observations
         e->add_read_handler("median", read_handler, H_MEDIAN, Handler::f_expensive);
         //Average of value*frequency
         e->add_read_handler("average", read_handler, H_AVERAGE, Handler::f_expensive);

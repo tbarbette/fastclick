@@ -16,6 +16,10 @@ BatchStats
 
 keep statistics about batching
 
+=d
+
+Remembers the size of every batch passing by, and displays various statistics about the batch sizes
+
 handlers
 
 * average : Average batch size

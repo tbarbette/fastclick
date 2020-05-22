@@ -1,0 +1,12 @@
+%info
+Tests String class with the StringTest element.
+
+%require
+click-buildtool provides StringTest
+
+%script
+click -qe StringTest
+
+%expect stderr
+config:1:{{.*}}
+  All tests pass!

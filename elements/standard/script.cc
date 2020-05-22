@@ -28,6 +28,8 @@
 #include <click/straccum.hh>
 #include <click/handlercall.hh>
 #include <click/nameinfo.hh>
+#include <float.h>
+#include <math.h>
 #if CLICK_USERLEVEL
 # include <signal.h>
 # include <click/master.hh>
@@ -819,11 +821,14 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
 {
     int what = (uintptr_t) h->read_user_data();
 
-    click_intmax_t accum = (what == ar_add || what == ar_sub ? 0 : 1), arg;
+    click_intmax_t accum = (what == ar_add || what == ar_sub || what == ar_count || what == ar_popcount || what == ar_gt_vec ? 0 : 1), arg;
     bool first = true;
+    int ifirst;
 #if CLICK_USERLEVEL
-    double daccum = (what == ar_add || what == ar_sub ? 0 : 1), darg;
+    double daccum = (what == ar_add || what == ar_sub || what == ar_count || what == ar_popcount || what == ar_gt_vec ? 0 : 1), darg;
+    double dfirst;
     bool use_daccum = (what == ar_div || what == ar_idiv);
+    int naccum = 0;
 #endif
     while (1) {
         String word = cp_shift_spacevec(str);
@@ -834,13 +839,24 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
             use_daccum = true;
             daccum = accum;
         }
+        naccum ++;
         if (use_daccum && !DoubleArg().parse(word, darg))
             return errh->error("expected list of numbers");
         if (use_daccum) {
-            if (first)
+            if (first && what == ar_gt_vec)
+                dfirst = darg;
+            else if (first && what != ar_popcount && what != ar_count)
                 daccum = darg;
             else if (what == ar_add)
                 daccum += darg;
+            else if (what == ar_avg)
+                daccum += darg;
+            else if (what == ar_count)
+                daccum += 1;
+            else if (what == ar_popcount)
+                daccum += (abs(darg) > 0.00001f ? 1 : 0);
+            else if (what == ar_gt_vec)
+                daccum += (abs(darg) > dfirst ? 1 : 0);
             else if (what == ar_sub)
                 daccum -= darg;
             else if (what == ar_min)
@@ -857,10 +873,20 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
         if (!IntArg().parse(word, arg))
             return errh->error("expected list of numbers");
 #endif
-        if (first)
+        if (first && what == ar_gt_vec)
+            ifirst = arg;
+        else if (first && what != ar_popcount && what != ar_count)
             accum = arg;
         else if (what == ar_add)
             accum += arg;
+        else if (what == ar_avg)
+            accum += arg;
+        else if (what == ar_count)
+            accum += 1;
+        else if (what == ar_popcount)
+            accum += (arg != 0 ? 1 : 0);
+        else if (what == ar_gt_vec)
+            accum += (arg > ifirst ? 1 : 0);
         else if (what == ar_sub)
             accum -= arg;
         else if (what == ar_min)
@@ -895,7 +921,20 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
         first = false;
     }
 #if CLICK_USERLEVEL
-    if (what == ar_idiv) {
+    if (what == ar_avg) {
+        if (naccum == 0) {
+            if (use_daccum)
+                daccum = NAN;
+            else
+                accum = INT_MAX;
+        } else {
+            if (use_daccum)
+                daccum /= naccum;
+            else
+                accum /= naccum;
+        }
+
+    } else if (what == ar_idiv) {
         use_daccum = false;
         accum = (click_intmax_t) daccum;
     }
@@ -964,6 +1003,10 @@ Script::negabs_handler(int, String &str, Element *, const Handler *h, ErrorHandl
             str = String(-dx);
         else if (what == ar_abs)
             str = String(fabs(dx));
+        else if (what == ar_round)
+            str = String(round(dx));
+        else if (what == ar_floor)
+            str = String(floor(dx));
         else
             str = String(ceil(dx));
         return 0;
@@ -971,7 +1014,7 @@ Script::negabs_handler(int, String &str, Element *, const Handler *h, ErrorHandl
         return normal_error(error_one_number, errh);
 #endif
     } else {
-        if (what == ar_ceil)
+        if (what == ar_ceil || what == ar_round || what == ar_floor)
             str = String(x);
         else
             str = String(what == ar_neg || x < 0 ? -x : x);
@@ -1325,6 +1368,10 @@ Script::add_handlers()
     set_handler("sub", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_sub, 0);
     set_handler("min", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_min, 0);
     set_handler("max", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_max, 0);
+    set_handler("avg", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_avg, 0);
+    set_handler("count", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_count, 0);
+    set_handler("popcount", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_popcount, 0);
+    set_handler("gt_vec", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_gt_vec, 0);
     set_handler("mul", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_mul, 0);
     set_handler("div", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_div, 0);
     set_handler("idiv", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_idiv, 0);
@@ -1333,6 +1380,9 @@ Script::add_handlers()
     set_handler("neg", Handler::f_read | Handler::f_read_param, negabs_handler, ar_neg, 0);
     set_handler("abs", Handler::f_read | Handler::f_read_param, negabs_handler, ar_abs, 0);
     set_handler("ceil", Handler::f_read | Handler::f_read_param, negabs_handler, ar_ceil, 0);
+
+    set_handler("floor", Handler::f_read | Handler::f_read_param, negabs_handler, ar_floor, 0);
+    set_handler("round", Handler::f_read | Handler::f_read_param, negabs_handler, ar_round, 0);
     set_handler("eq", Handler::f_read | Handler::f_read_param, compare_handler, AR_EQ, 0);
     set_handler("ne", Handler::f_read | Handler::f_read_param, compare_handler, AR_NE, 0);
     set_handler("gt", Handler::f_read | Handler::f_read_param, compare_handler, AR_GT, 0);

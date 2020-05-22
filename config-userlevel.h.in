@@ -50,17 +50,17 @@
 /* Define if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
-/* Define if you have the <nuda.h> header file. */
-#undef HAVE_NUMA
-
 /* Define if dynamic linking is possible. */
 #undef HAVE_DYNAMIC_LINKING
 
 /* Define if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
-/* Define if you have the flow function. */
+/* Define if you have the flow subsystem. */
 #undef HAVE_FLOW
+
+/* Define if you have the HW Flow API. */
+#undef HAVE_FLOW_API
 
 /* Define if you have the ffs function. */
 #undef HAVE_FFS
@@ -136,6 +136,9 @@
 
 /* Define if <new> exists and works. */
 #undef HAVE_NEW_HDR
+
+/* Define if you have the <numa.h> header file. */
+#undef HAVE_NUMA
 
 /* Define if you have -lpcap and pcap.h. */
 #undef HAVE_PCAP

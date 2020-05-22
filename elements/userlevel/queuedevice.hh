@@ -84,7 +84,7 @@ protected:
      */
     class ThreadState {
         public:
-        ThreadState() : _count(0), _dropped(0), first_queue_id(-1), task(0) {};
+        ThreadState() : _count(0), _dropped(0), task(0), first_queue_id(-1) {};
         long long unsigned _count;
         long long unsigned _dropped;
         Task*       task;
@@ -92,9 +92,9 @@ protected:
     };
     per_thread<ThreadState> _thread_state;
 
-    int _this_node; //Numa node index
+    int _this_node; // Numa node index
 
-    bool _active; //Is this element active
+    bool _active; // Is this element active
 
     /**
      * Attempt to take the per-queue lock

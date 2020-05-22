@@ -30,17 +30,23 @@
 #define MIDDLEBOX_INIT_ACK_OFFSET    19
 #define MIDDLEBOX_INIT_ACK_SIZE      4
 
-// byte 16
-#define PAINT_ANNO_OFFSET		16
-#define PAINT_ANNO_SIZE			1
-#define PAINT_ANNO(p)			((p)->anno_u8(PAINT_ANNO_OFFSET))
-#define SET_PAINT_ANNO(p, v)		((p)->set_anno_u8(PAINT_ANNO_OFFSET, (v)))
+// byte 16-17
+#define PAINT2_ANNO_OFFSET		16
+#define PAINT2_ANNO_SIZE			2
+#define PAINT2_ANNO(p)			((p)->anno_u16(PAINT2_ANNO_OFFSET))
+#define SET_PAINT2_ANNO(p, v)		((p)->set_anno_u16(PAINT2_ANNO_OFFSET, (v)))
 
-// byte 17
-#define ICMP_PARAMPROB_ANNO_OFFSET	17
+// byte 16
+#define ICMP_PARAMPROB_ANNO_OFFSET	16
 #define ICMP_PARAMPROB_ANNO_SIZE	1
 #define ICMP_PARAMPROB_ANNO(p)		((p)->anno_u8(ICMP_PARAMPROB_ANNO_OFFSET))
 #define SET_ICMP_PARAMPROB_ANNO(p, v)	((p)->set_anno_u8(ICMP_PARAMPROB_ANNO_OFFSET, (v)))
+
+// byte 17 (lower byte of PAINT2)
+#define PAINT_ANNO_OFFSET		17
+#define PAINT_ANNO_SIZE			1
+#define PAINT_ANNO(p)			((p)->anno_u8(PAINT_ANNO_OFFSET))
+#define SET_PAINT_ANNO(p, v)		((p)->set_anno_u8(PAINT_ANNO_OFFSET, (v)))
 
 // byte 19
 #define FIX_IP_SRC_ANNO_OFFSET		19

@@ -84,7 +84,6 @@ class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>
 
     private:
         IPAddress _vip;
-        bool _own_state;
         bool _accept_nonsyn;
 
         friend class FlowIPLoadBalancerReverse;

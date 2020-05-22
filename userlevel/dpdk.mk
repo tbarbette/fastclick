@@ -4,9 +4,6 @@ endif
 ifeq ($(RTE_TARGET),)
 $(error "Please define RTE_TARGET environment variable")
 endif
-ifeq ($(RTE_SDK_BIN),)
-$(error "Please define RTE_SDK_BIN environment variable")
-endif
 
 # This file more or less copies rte.app.sdk, but we cannot use directly DPDK's one because its heavy modifications on the compile variables would break Click build process
 
@@ -430,6 +427,10 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)              += -lrte_bus_fslmc
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DPAA2_PMD)              += -lrte_mempool_dpaa2
 endif # CONFIG_RTE_LIBRTE_DPAA2_PMD
 
+ifeq ($(CONFIG_RTE_LIBRTE_COMMON_DPAAX),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_COMMON_DPAAX)   += -lrte_common_dpaax
+endif # CONFIG_RTE_LIBRTE_COMMON_DPAAX
+
 endif # ! $(CONFIG_RTE_BUILD_SHARED_LIB)
 
 endif # ! CONFIG_RTE_BUILD_COMBINE_LIBS
@@ -452,5 +453,69 @@ CXXFLAGS := $(CXXFLAGS) $(CFLAGS) $(EXTRA_CFLAGS)
 
 include $(RTE_SDK)/mk/internal/rte.build-pre.mk
 
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 16 ] && [ "$(RTE_VER_MONTH)" -ge 07 ] ) || [ $(RTE_VER_YEAR) -ge 17 ] ) && echo true),true)
+	override LDFLAGS := $(DPDK_OLD_LDFLAGS) $(DPDK_LIBS)
+else
+	override LDFLAGS := $(DPDK_OLD_LDFLAGS)
+endif
 
-override LDFLAGS := $(DPDK_OLD_LDFLAGS)
+############################################################
+## Flow director library available at or after DPDK v20.02
+############################################################
+ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && [ $(RTE_VER_YEAR) -ge 20 ] && [ -n $(HAVE_FLOW_API) ] && echo true),true)
+
+$(debug LIBRTE_PARSE=YES)
+
+RTE_VERSION=$(RTE_VER_YEAR).$(RTE_VER_MONTH).$(RTE_VER_MINOR)
+PARSE_PATH=../lib/librte_parse_$(RTE_VERSION)/
+
+${PARSE_PATH}.sentinel:
+	# Create the necessary folders for librte_parse
+	mkdir -p $(PARSE_PATH)
+	mkdir -p test-pmd
+	# Copy testpmd.c of the target DPDK version
+	cp -u $(RTE_SDK)/app/test-pmd/testpmd.c $(PARSE_PATH)
+	cp -u $(RTE_SDK)/app/test-pmd/testpmd.h $(PARSE_PATH)
+	cp -u $(RTE_SDK)/app/test-pmd/config.c $(PARSE_PATH)
+	# Strip the main function off to prevent complilation errors, while linking with Click
+	sed -i '/main(int/Q' $(PARSE_PATH)/testpmd.c
+	head -n -1 $(PARSE_PATH)/testpmd.c > $(PARSE_PATH)/testpmd_t.c;
+	mv $(PARSE_PATH)/testpmd_t.c $(PARSE_PATH)/testpmd.c
+	# Strip off testpmd report messages as our library prints its own report messages
+	sed -i '/printf("Flow rule #\%u created\\n", pf->id);/d' $(PARSE_PATH)/config.c
+	sed -i '/printf("Flow rule #\%u destroyed\\n", pf->id);/d' $(PARSE_PATH)/config.c
+
+	touch $(PARSE_PATH)/.sentinel
+
+test-pmd/%.o: ${PARSE_PATH}.sentinel
+	cp -u $(RTE_SDK)/app/test-pmd/$*.c $(PARSE_PATH)
+	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
+
+# Object files present across all DPDK versions
+PARSE_OBJS = \
+	test-pmd/cmdline_flow.o \
+	test-pmd/macfwd.o test-pmd/cmdline.o test-pmd/txonly.o test-pmd/csumonly.o test-pmd/flowgen.o \
+	test-pmd/icmpecho.o test-pmd/ieee1588fwd.o test-pmd/iofwd.o test-pmd/macswap.o \
+	test-pmd/rxonly.o \
+
+# Additional object files
+PARSE_OBJS += test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
+PARSE_OBJS += test-pmd/bpf_cmd.o
+PARSE_OBJS += test-pmd/parameters.o test-pmd/softnicfwd.o
+PARSE_OBJS += test-pmd/noisy_vnf.o test-pmd/util.o
+
+CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
+CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
+
+${PARSE_PATH}/%.o: ${PARSE_PATH}.sentinel
+	$(CC) -o $@ -O3 -c $(PARSE_PATH)/$*.c $(CFLAGS) -I$(RTE_SDK)/app/test-pmd/
+
+librte_parse.a: $(PARSE_OBJS) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o
+	$(call verbose_cmd,$(AR_CREATE) librte_parse.a $(PARSE_OBJS) $(PARSE_PATH)/testpmd.o $(PARSE_PATH)/config.o,AR librte_parse.a)
+	$(call verbose_cmd,$(RANLIB),RANLIB,librte_parse.a)
+
+else
+
+$(debug LIBRTE_PARSE=NO)
+
+endif # RTE_VERSION >= 20.02

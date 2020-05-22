@@ -29,7 +29,9 @@
 #include <click/packet_anno.hh>
 #include <click/router.hh>
 #include <click/nameinfo.hh>
+#include <click/etheraddress.hh>
 
+#include <clicknet/ether.h>
 #include <clicknet/ip.h>
 #include <clicknet/icmp.h>
 #include <clicknet/tcp.h>
@@ -62,6 +64,7 @@ IPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
     _swap = true;
     _payload = false;
     _active = true;
+    bool print_ether = false;
     bool print_id = false;
     bool print_time = true;
     bool print_paint = false;
@@ -79,6 +82,7 @@ IPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
         .read("PAYLOAD", WordArg(), payload)
         .read("MAXLENGTH", _bytes)
         .read("NBYTES", _bytes) // deprecated
+        .read("ETHER", print_ether)
         .read("ID", print_id)
         .read("TIMESTAMP", print_time)
         .read("PAINT", print_paint)
@@ -123,6 +127,7 @@ IPPrint::configure(Vector<String> &conf, ErrorHandler *errh)
     else if (payloadv > 0)
         _contents = payloadv, _payload = true;
 
+    _print_ether = print_ether;
     _print_id = print_id;
     _print_timestamp = print_time;
     _print_paint = print_paint;
@@ -352,6 +357,14 @@ IPPrint::simple_action(Packet *p)
         sa << (_print_aggregate ? "." : "paint ") << (int)PAINT_ANNO(p);
     if (_print_aggregate || _print_paint)
         sa << ": ";
+    if (_print_ether) {
+        const unsigned char *x = p->mac_header();
+        if (x && ((x + 14 <= p->network_header()) && (x + 14 <= p->end_data()))) {
+            const click_ether *ethh = reinterpret_cast<const click_ether *>(x);
+            sa << EtherAddress(ethh->ether_shost) << " > "
+               << EtherAddress(ethh->ether_dhost) << ": ";
+        }
+    }
 
     if (p->network_length() < (int) sizeof(click_ip))
         sa << "truncated-ip";
@@ -445,7 +458,8 @@ IPPrint::simple_action(Packet *p)
         ignore_result(fwrite(sa.data(), 1, sa.length(), _outfile));
     } else
 #endif
-        _errh->message("%s", sa.c_str());
+
+    _errh->message("%s", sa.c_str());
 
     return p;
 }
