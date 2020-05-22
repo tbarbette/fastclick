@@ -34,8 +34,9 @@ BurstStats::~BurstStats()
 int
 BurstStats::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-
     if (Args(conf, this, errh)
+            .read_or_set("BYTES", _bytes, false)
+            .read_or_set("MAX", _max, 1024)
 	.complete() < 0)
 	return -1;
 
@@ -55,6 +56,7 @@ BurstStats::cast(const char *name)
 int
 BurstStats::initialize(ErrorHandler *errh)
 {
+    resize_stats(_max,0);
     return 0;
 }
 
@@ -68,14 +70,14 @@ Packet*
 BurstStats::simple_action(Packet* p)
 {
     if (AGGREGATE_ANNO(p) != s->last_anno) {
-        if (s->burstlen >= 1024)
-            s->burstlen = 1023;
-        (*stats)[s->burstlen]++;
-        s->burstlen = 1;
+        if (s->burstlen >= _max)
+            s->burstlen = _max - 1;
+        (*stats)[s->burstlen] ++;
+        s->burstlen = 0;
         s->last_anno = AGGREGATE_ANNO(p);
-    } else {
-       s->burstlen++;
     }
+
+    s->burstlen += _bytes? p->length() : 1;
 
     return p;
 }

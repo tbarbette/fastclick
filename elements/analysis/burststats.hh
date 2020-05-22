@@ -43,6 +43,11 @@ class BurstStats : public SimpleElement<BurstStats>, public StatVector<int> { pu
 
     void add_handlers();
 
+private:
+
+    bool _bytes;
+    unsigned _max;
+
     struct BurstStatsState {
         BurstStatsState() : burstlen(0) {
 
