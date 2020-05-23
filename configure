@@ -14771,6 +14771,10 @@ else
     have_pcap=no
 fi
 
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
 fi
@@ -14793,10 +14797,6 @@ fi
 
 if test "x$enable_wifi" = xyes; then
     provisions="$provisions wifi"
-fi
-
-if test "x$have_pci" = xyes; then
-    provisions="$provisions pci"
 fi
 
 
