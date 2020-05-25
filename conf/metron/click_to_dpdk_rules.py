@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
 	input_file_list = args.input_files
 	if (not input_file_list) and (strategy == STRATEGY_FILE):
-		raise RuntimeError("Specify a list of comma-separated input files with IPFilter/IPLookup) configuration")
+		raise RuntimeError("Specify a list of comma-separated input files with IPFilter/IPLookup configuration")
 
 	target_rules_nb = args.target_rules_nb
 	if (target_rules_nb <= 0) and (strategy == STRATEGY_RAND):

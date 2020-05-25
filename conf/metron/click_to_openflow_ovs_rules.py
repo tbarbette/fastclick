@@ -26,7 +26,7 @@ ACTION_MOD_NW_DST = "mod_nw_dst"
 ACTION_OUT_PORT = "output"
 ACTION_JUMP = "goto_table"
 
-DEF_BRIDGE = "ovsdpdkbr0"
+DEF_BRIDGE = "ovsbr0"
 DEF_TABLE = 0
 DEF_RULE_POS = -1
 
