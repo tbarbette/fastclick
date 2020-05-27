@@ -2487,6 +2487,11 @@ else
     have_pcap=no
 fi
 
+dnl add 'pci' if libpci support is available
+if test "x$have_pci" = xyes; then
+    provisions="$provisions pci"
+fi
+
 dnl add 're2' if re2 is available
 if test "x$have_re2" = xyes; then
     provisions="$provisions re2"
@@ -2515,11 +2520,6 @@ fi
 dnl add 'wifi' if wifi elements are available
 if test "x$enable_wifi" = xyes; then
     provisions="$provisions wifi"
-fi
-
-dnl add 'pci' if libpci support is available
-if test "x$have_pci" = xyes; then
-    provisions="$provisions pci"
 fi
 
 AC_SUBST(provisions)
