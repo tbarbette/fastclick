@@ -43,6 +43,8 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
 
         const char *processing() const { return PUSH; }
         int configure_phase() const { return CONFIGURE_PHASE_PRIVILEGED + 1; }
+        bool stopClassifier() { return true; };
+
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
