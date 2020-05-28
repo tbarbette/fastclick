@@ -25,18 +25,18 @@ matrix:
 
 env:
   global:
-    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule --enable-tunnel --enable-research --enable-flow"
+    - FLAGS="--enable-ip6 --enable-json --disable-linuxmodule --enable-tunnel --enable-research"
     - CXXFLAGS="-std=gnu++11"
   matrix:
-    - FRAMEWORK=vanilla CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=umultithread CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=18.08 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=19.08 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=19.11 CONFIG="--enable-batch --disable-verbose-batch"
-    - FRAMEWORK=dpdk VERSION=20.02 CONFIG="--enable-batch --disable-verbose-batch"
+    - FRAMEWORK=vanilla CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=umultithread CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=netmap VERSION=11.1 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=16.04 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=17.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=18.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=19.08 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=19.11 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
+    - FRAMEWORK=dpdk VERSION=20.02 CONFIG="--enable-batch --enable-flow --disable-verbose-batch"
     - FRAMEWORK=vanilla CONFIG="--disable-batch"
     - FRAMEWORK=umultithread CONFIG="--disable-batch"
     - FRAMEWORK=netmap VERSION=11.1 CONFIG="--disable-batch"

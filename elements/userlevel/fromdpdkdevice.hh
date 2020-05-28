@@ -270,17 +270,6 @@ Sets the status of the device (1 for active, otherwise 0).
 
 Returns the number of packets read by the device.
 
-=h useful read-only
-
-Returns the number of useful runs of this device.
-This number corresponds to the number of times that the element is successfully scheduled to receive input packets.
-
-=h useless read-only
-
-Returns the number of useless runs of this device.
-This number corresponds to the number of times that the element is scheduled to receive input packets,
-but no packets are being received (idle CPU spinning).
-
 =h reset_counts write-only
 
 Resets "count" to zero.
@@ -429,7 +418,6 @@ public:
     void add_handlers() CLICK_COLD;
     void cleanup(CleanupStage) CLICK_COLD;
     bool run_task(Task *);
-    void run_timer(Timer* t);
 #if HAVE_DPDK_INTERRUPT
     void selected(int fd, int mask);
 #endif
@@ -480,14 +468,14 @@ private:
 
     DPDKDevice* _dev;
 
+#if HAVE_DPDK_INTERRUPT
     int _rx_intr;
     class FDState { public:
-        FDState() : timer(), mustresched(0), useful(0) {};
-        Timer* timer;
+        FDState() : mustresched(0) {};
         int mustresched;
-        int useful;
     };
     per_thread<FDState> _fdstate;
+#endif
     bool _set_timestamp;
 };
 
