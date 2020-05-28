@@ -738,7 +738,7 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
         }
         ret = rte_eth_dev_flow_ctrl_set(port_id, &conf);
         if (ret != 0)
-             return errh->error("Could not set flow control status!");
+             errh->warning("Could not set flow control status!");
     }
 
     if (info.mq_mode & ETH_MQ_RX_VMDQ_FLAG) {
