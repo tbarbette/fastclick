@@ -803,6 +803,7 @@ enable_option_checking
 enable_userlevel
 enable_user_multithread
 enable_fullpush_nonatomic
+enable_flow
 enable_batch
 enable_verbose_batch
 enable_auto_batch
@@ -838,7 +839,6 @@ enable_app
 enable_aqm
 enable_ethernet
 enable_etherswitch
-enable_flow
 enable_grid
 enable_icmp
 enable_ip
@@ -1527,6 +1527,7 @@ Optional Features:
     --disable-fullpush-nonatomic
                           disable nonatomic access to packet when
                           single-threaded fullpush context is detected
+    --enable-flow         enable flow subsystem
     --disable-batch       disable batching support
     --disable-verbose-batch
                           disable warnings and information about batching
@@ -6499,6 +6500,13 @@ if test "x$enable_fullpush_nonatomic" = "xyes"; then
 
 fi
 
+# Check whether --enable-flow was given.
+if test "${enable_flow+set}" = set; then :
+  enableval=$enable_flow; :
+else
+  enable_flow=no
+fi
+
 
 # Check whether --enable-batch was given.
 if test "${enable_batch+set}" = set; then :
@@ -6509,7 +6517,6 @@ fi
 
 
 if test "x$enable_batch" = "xyes"; then
-    enable_flow=yes
     if test "x$enable_userlevel" != "xyes"; then
         as_fn_error $? "
 =========================================
@@ -6522,6 +6529,12 @@ if test "x$enable_batch" = "xyes"; then
 
     HAVE_BATCH=yes
 
+else
+    if test "x$enable_flow" = xyes; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Flow subsystem cannot be enabled because batching has been disabled" >&5
+$as_echo "$as_me: WARNING: Flow subsystem cannot be enabled because batching has been disabled" >&2;}
+    fi
+    enable_flow=no
 fi
 
 # Check whether --enable-verbose-batch was given.
@@ -9755,7 +9768,7 @@ if test "x$have_aligned_new" = xyes; then
     CXXFLAGS="$CXXFLAGS -faligned-new"
 fi
 
-if test "x$enable_flow" = xyes; then
+if test "x$enable_flow" = "xyes"; then
     if test "x$enable_batch" != xyes; then
         as_fn_error $? "--enable-flow needs --enable-batch! Flow subsystem will be disabled." "$LINENO" 5
     else
@@ -14993,7 +15006,13 @@ fi
 if test "x$enable_batch" = xyes; then
     provisions="$provisions batch"
 else
-    enable_batch="no"
+    enable_batch=no
+fi
+
+if test "x$enable_flow" = xyes; then
+    provisions="$provisions flow"
+else
+    enable_flow=no
 fi
 
 if test "$ac_have_libbpf$ac_have_libbpf_h" = yesyes; then
@@ -15005,12 +15024,6 @@ if test "x$enable_dpdk" = xyes; then
     if test "$rte_ver_year" -ge 19; then
         provisions="$provisions dpdk19"
     fi
-fi
-
-if test "x$enable_flow" = xyes; then
-    provisions="$provisions flow"
-else
-    enable_flow="no"
 fi
 
 if test "x$enable_experimental" = xyes; then
