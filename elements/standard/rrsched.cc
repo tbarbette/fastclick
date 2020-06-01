@@ -27,8 +27,6 @@ RRSched::RRSched()
 {
 }
 
-
-
 int RRSched::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     _max = ninputs();
@@ -44,9 +42,10 @@ int
 RRSched::initialize(ErrorHandler *errh)
 {
     if (!(_signals = new NotifierSignal[ninputs()]))
-	return errh->error("out of memory!");
-    for (int i = 0; i < ninputs(); i++)
-	_signals[i] = Notifier::upstream_empty_signal(this, i);
+        return errh->error("out of memory!");
+    for (int i = 0; i < ninputs(); i++) {
+        _signals[i] = Notifier::upstream_empty_signal(this, i);
+    }
     return 0;
 }
 
@@ -61,17 +60,29 @@ RRSched::pull(int)
 {
     int i = _next;
     for (int j = 0; j < _max; j++) {
-	Packet *p = (_signals[i] ? input(i).pull() : 0);
-	i++;
-	if (i >= _max)
-	    i = 0;
-	if (p) {
-	    _next = i;
-	    return p;
-	}
+        Packet *p = (_signals[i] ? input(i).pull() : 0);
+
+        i++;
+        if (i >= _max) {
+            i = 0;
+        }
+        if (p) {
+            _next = i;
+            return p;
+        }
     }
     return 0;
 }
+
+
+#if HAVE_BATCH
+PacketBatch *
+RRSched::pull_batch(int port, unsigned max) {
+    PacketBatch *batch;
+    MAKE_BATCH(RRSched::pull(port), batch, max);
+    return batch;
+}
+#endif
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(RRSched)
