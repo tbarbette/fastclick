@@ -11092,7 +11092,7 @@ else
   ac_have_flow_disp_g_h=no
 fi
 
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_p_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
+if test "x$ac_have_flow_disp_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyes20yes"; then
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
@@ -16146,7 +16146,7 @@ fi
 feedback="no"
 
 if test "$enable_flow_api$have_flow_api" = "yesno"; then
-    feedback="To enable DPDK's Flow Dispatcher (rte_flow API), use a DPDK version >= 20.02."
+    feedback="To enable DPDK's Flow Parser (rte_flow API), use a DPDK version >= 20.02."
 fi
 
 echo "
