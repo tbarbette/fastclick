@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4; related-file-name: "generateipflowdispatcher.hh" -*-
 /*
- * GenerateIPFlowDispatcher.{cc,hh} -- element generates Flow Dispatcher patterns
+ * generateipflowdispatcher.{cc,hh} -- element generates flow rule patterns
  * out of input traffic, following DPDK's flow API syntax.
  * Georgios Katsikas, Tom Barbette
  *
@@ -33,14 +33,10 @@ CLICK_DECLS
 static const uint16_t DEF_NB_QUEUES = 16;
 
 /**
- * Flow Dispatcher rules' generator out of incoming traffic.
+ * DPDK Flow rules' generator out of incoming traffic.
  */
 GenerateIPFlowDispatcher::GenerateIPFlowDispatcher() :
-        _port(0), _nb_queues(DEF_NB_QUEUES),
-        _queue_load_map(),
-        _queue_alloc_policy(LOAD_AWARE),
-        _queue_load_imbalance(),
-        _avg_total_load_imbalance_ratio(NO_LOAD),
+        _port(0), _queues_nb(DEF_NB_QUEUES),
         GenerateIPFilter(FLOW_DISPATCHER)
 {
     _keep_dport = false;
@@ -48,58 +44,52 @@ GenerateIPFlowDispatcher::GenerateIPFlowDispatcher() :
 
 GenerateIPFlowDispatcher::~GenerateIPFlowDispatcher()
 {
-    if (!_queue_load_map.empty()) {
-        _queue_load_map.clear();
-    }
-
-    if (!_queue_load_imbalance.empty()) {
-        _queue_load_imbalance.clear();
-    }
-}
-
-void
-GenerateIPFlowDispatcher::init_queue_load_map(uint16_t queues_nb)
-{
-    for (uint16_t i = 0; i < queues_nb; i++) {
-        _queue_load_map.insert(i, 0);
-        _queue_load_imbalance.insert(i, NO_LOAD);
-    }
 }
 
 int
 GenerateIPFlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String policy = "LOAD_AWARE";
+    QueueAllocPolicy queue_alloc_policy = LOAD_AWARE;
 
     if (Args(conf, this, errh)
             .read_mp("PORT", _port)
-            .read_p("NB_QUEUES", _nb_queues)
+            .read_p("NB_QUEUES", _queues_nb)
             .read("POLICY", policy)
             .consume() < 0)
         return -1;
+
+    if (GenerateIPFilter::configure(conf, errh) < 0) {
+        return -1;
+    }
 
     int status = build_mask(_mask, _keep_saddr, _keep_daddr, _keep_sport, _keep_dport, _prefix);
     if (status != 0) {
         return errh->error("Cannot continue with empty mask");
     }
 
-    if (_nb_queues == 0) {
+    if (_queues_nb == 0) {
         errh->error("NB_QUEUES must be a positive integer");
         return -1;
     }
-    // Initialize the load per NIC queue
-    init_queue_load_map(_nb_queues);
 
     if ((policy.upper() == "ROUND_ROBIN") || (policy.upper() == "ROUND-ROBIN")) {
-        _queue_alloc_policy = ROUND_ROBIN;
+        queue_alloc_policy = ROUND_ROBIN;
     } else if ((policy.upper() == "LOAD_AWARE") || (policy.upper() == "LOAD-AWARE")) {
-        _queue_alloc_policy = LOAD_AWARE;
+        queue_alloc_policy = LOAD_AWARE;
     } else {
         errh->error("Invalid POLICY. Select in [ROUND_ROBIN, LOAD_AWARE]");
         return -1;
     }
 
-    return GenerateIPFilter::configure(conf, errh);
+    errh->message("Queue allocation policy is set to: %s", policy.upper().c_str());
+
+    // Create the supported DPDK flow rule formatter
+    _rule_formatter_map.insert(
+        static_cast<uint8_t>(RULE_DPDK),
+        new DPDKFlowRuleFormatter(_port, _queues_nb, queue_alloc_policy, _keep_sport, _keep_dport));
+
+    return 0;
 }
 
 int
@@ -111,6 +101,24 @@ GenerateIPFlowDispatcher::initialize(ErrorHandler *errh)
 void
 GenerateIPFlowDispatcher::cleanup(CleanupStage)
 {
+}
+
+IPFlowID
+GenerateIPFlowDispatcher::get_mask(int prefix)
+{
+    IPFlowID fid = IPFlowID(IPAddress::make_prefix(prefix), _mask.sport(), IPAddress::make_prefix(prefix), _mask.dport());
+    return fid;
+}
+
+bool
+GenerateIPFlowDispatcher::is_wildcard(const IPFlow &flow)
+{
+    if ((flow.flowid().saddr().s() == "0.0.0.0") ||
+        (flow.flowid().daddr().s() == "0.0.0.0")) {
+        return true;
+    }
+
+    return false;
 }
 
 /**
@@ -151,86 +159,79 @@ print_queue_load_map(const HashMap<uint16_t, uint64_t> &queue_load_map)
 }
 
 String
-GenerateIPFlowDispatcher::policy_based_rule_generation(const uint8_t aggregation_prefix)
+DPDKFlowRuleFormatter::policy_based_rule_generation(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
-    StringAccum acc;
-
-    uint32_t i = 0;
-    for (auto flow : _map) {
-        // Wildcards are intentionally excluded
-        if ((flow.flowid().saddr().s() == "0.0.0.0") &&
-            (flow.flowid().daddr().s() == "0.0.0.0")) {
-            continue;
-        }
-
-        acc << "ingress pattern eth /";
-
-        bool with_ipv4 = false;
-        if (flow.flowid().saddr().s() != "0.0.0.0") {
-            acc << " ipv4 src spec ";
-            acc << flow.flowid().saddr().unparse();
-            acc << " src mask ";
-            acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse();
-            with_ipv4 = true;
-        }
-
-        if (flow.flowid().daddr().s() != "0.0.0.0") {
-            if (!with_ipv4)
-                acc << " ipv4";
-            acc << " dst spec ";
-            acc << flow.flowid().daddr().unparse();
-            acc << " dst mask ";
-            acc << IPAddress::make_prefix(32 - aggregation_prefix).unparse();
-        }
-        acc << " /";
-
-        // Incorporate transport layer ports if asked
-        if (flow.flow_proto() != 0) {
-            String proto_str = flow.flow_proto() == 6 ? "tcp" : "udp";
-
-            if (_keep_sport) {
-                acc << " " << proto_str << " src is ";
-                acc << flow.flowid().sport();
-            }
-            if (_keep_dport) {
-                acc << " " << proto_str << " dst is ";
-                acc << flow.flowid().dport();
-            }
-            if ((_keep_sport) || (_keep_dport))
-                acc << " / ";
-        }
-
-
-        // Select a NIC queue according to the input policy
-        uint16_t chosen_queue = -1;
-        switch (_queue_alloc_policy) {
-            case ROUND_ROBIN:
-               chosen_queue = round_robin(i, _nb_queues);
-               break;
-            case LOAD_AWARE:
-               chosen_queue = find_less_loaded_queue(_queue_load_map);
-               break;
-            default:
-                return "";
-        }
-        assert((chosen_queue >= 0) && (chosen_queue < _nb_queues));
-        acc << " end actions queue index ";
-        acc << chosen_queue;
-        acc << " / count / end\n";
-
-        // Update the queue load map
-        uint64_t current_load = _queue_load_map[chosen_queue];
-        uint64_t additional_load = flow.flow_size();
-        _queue_load_map.insert(chosen_queue, current_load + additional_load);
-
-        i++;
+    // Wildcards are intentionally excluded
+    if ((flow.flowid().saddr().s() == "0.0.0.0") &&
+        (flow.flowid().daddr().s() == "0.0.0.0")) {
+        return "";
     }
+
+    StringAccum acc;
+    acc << "ingress pattern eth /";
+
+    bool with_ipv4 = false;
+    if (flow.flowid().saddr().s() != "0.0.0.0") {
+        acc << " ipv4 src spec ";
+        acc << flow.flowid().saddr().unparse();
+        acc << " src mask ";
+        acc << IPAddress::make_prefix(prefix).unparse();
+        with_ipv4 = true;
+    }
+
+    if (flow.flowid().daddr().s() != "0.0.0.0") {
+        if (!with_ipv4)
+            acc << " ipv4";
+        acc << " dst spec ";
+        acc << flow.flowid().daddr().unparse();
+        acc << " dst mask ";
+        acc << IPAddress::make_prefix(prefix).unparse();
+    }
+    acc << " /";
+
+    // Incorporate transport layer ports if asked
+    if (flow.flow_proto() != 0) {
+        String proto_str = flow.flow_proto() == 6 ? "tcp" : "udp";
+
+        if (_with_tp_s_port) {
+            acc << " " << proto_str << " src is ";
+            acc << flow.flowid().sport_host_order();
+        }
+        if (_with_tp_d_port) {
+            acc << " " << proto_str << " dst is ";
+            acc << flow.flowid().dport_host_order();
+        }
+        if ((_with_tp_s_port) || (_with_tp_d_port))
+            acc << " / ";
+    }
+
+    // Select a NIC queue according to the input policy
+    uint16_t chosen_queue = -1;
+    switch (_queue_load->_queue_alloc_policy) {
+        case ROUND_ROBIN:
+           chosen_queue = round_robin(flow_nb, _queues_nb);
+           break;
+        case LOAD_AWARE:
+           chosen_queue = find_less_loaded_queue(_queue_load->_queue_load_map);
+           break;
+        default:
+            return "";
+    }
+    assert((chosen_queue >= 0) && (chosen_queue < _queues_nb));
+    acc << " end actions queue index ";
+    acc << chosen_queue;
+    acc << " / count / end\n";
+
+    // Update the queue load map
+    uint64_t current_load = _queue_load->_queue_load_map[chosen_queue];
+    uint64_t additional_load = flow.flow_size();
+    _queue_load->_queue_load_map.insert(chosen_queue, current_load + additional_load);
 
     return acc.take_string();
 }
 
 String
-GenerateIPFlowDispatcher::dump_stats()
+QueueLoad::dump_stats()
 {
     uint64_t total_load = 0;
     for (uint16_t i = 0; i < _queue_load_map.size(); i++) {
@@ -238,7 +239,7 @@ GenerateIPFlowDispatcher::dump_stats()
     }
 
     StringAccum acc;
-    double balance_point_per_queue = (double) total_load / (double) _nb_queues;
+    double balance_point_per_queue = (double) total_load / (double) _queues_nb;
     double avg_total_load_imbalance_ratio = 0;
 
     if (balance_point_per_queue == 0) {
@@ -277,7 +278,7 @@ GenerateIPFlowDispatcher::dump_stats()
     }
 
     // Average imbalance ratio
-    avg_total_load_imbalance_ratio /= _nb_queues;
+    avg_total_load_imbalance_ratio /= _queues_nb;
     assert(avg_total_load_imbalance_ratio >= 0);
     _avg_total_load_imbalance_ratio = avg_total_load_imbalance_ratio;
 
@@ -289,7 +290,7 @@ GenerateIPFlowDispatcher::dump_stats()
 }
 
 String
-GenerateIPFlowDispatcher::dump_load()
+QueueLoad::dump_load()
 {
     StringAccum acc;
 
@@ -301,69 +302,7 @@ GenerateIPFlowDispatcher::dump_load()
         acc << " bytes\n";
     }
 
-    acc << "\n";
-    acc << "Total number of flows: " << _map.size() << "\n";
-
     return acc.take_string();
-}
-
-String
-GenerateIPFlowDispatcher::dump_rules(bool verbose)
-{
-    assert(_pattern_type == FLOW_DISPATCHER);
-
-    Timestamp before = Timestamp::now();
-
-    uint8_t n = 32 - _prefix;
-    while (_map.size() > _nrules) {
-        if (verbose) {
-            click_chatter("%8d rules with prefix /%02d, continuing with /%02d", _map.size(), 32-n, 32-n-1);
-        }
-
-        HashTable<IPFlow> new_map;
-        ++n;
-        _mask = IPFlowID(IPAddress::make_prefix(32 - n), _mask.sport(), IPAddress::make_prefix(32 - n), _mask.dport());
-
-        uint64_t i = 0;
-        for (auto flow : _map) {
-            // Check if we already have such a flow
-            flow.set_mask(_mask);
-            IPFlow *found = new_map.find(flow.flowid()).get();
-
-            // New flow
-            if (!found) {
-                // Insert this new flow into the flow map
-                new_map.find_insert(flow);
-            } else {
-                // Aggregate
-                found->update_flow_size(flow.flow_size());
-            }
-
-            i++;
-        }
-
-        _map = new_map;
-        if (n == 32) {
-            return "Impossible to reduce the number of rules below: " + String(_map.size());
-        }
-    }
-
-    if (verbose) {
-        click_chatter("%8d rules with prefix /%02d", _map.size(), 32-n);
-    }
-
-    Timestamp after = Timestamp::now();
-    uint32_t elapsed_sec = (after - before).sec();
-
-    if (verbose) {
-        click_chatter("\n");
-        click_chatter(
-            "Time to create the flow map: %" PRIu32 " seconds (%.4f minutes)",
-            elapsed_sec, (float) elapsed_sec / (float) 60
-        );
-    }
-
-    return policy_based_rule_generation(n);
 }
 
 String
@@ -373,35 +312,62 @@ GenerateIPFlowDispatcher::read_handler(Element *e, void *user_data)
     if (!g) {
         return "GenerateIPFlowDispatcher element not found";
     }
+    assert(g->_pattern_type == FLOW_DISPATCHER);
+
+    DPDKFlowRuleFormatter *rule_f = static_cast<DPDKFlowRuleFormatter *>(
+        _rule_formatter_map[static_cast<uint8_t>(RULE_DPDK)]);
+    assert(rule_f);
+
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
 
     switch (what) {
-        case h_dump: {
-            return g->dump_rules(true);
-        }
-        case h_load: {
-            return g->dump_load();
-        }
-        case h_stats: {
-            return g->dump_stats();
+        case h_flows_nb: {
+            return String(g->_flows_nb);
         }
         case h_rules_nb: {
-            if (g->_map.size() == 0) {
-                g->dump_rules();
-            }
-            return String(g->_map.size());
+            return String(g->count_rules());
+        }
+        case h_dump: {
+            return g->dump_rules(RULE_DPDK, true);
+        }
+        case h_load: {
+            return rule_f->get_queue_load()->dump_load();
+        }
+        case h_stats: {
+            return rule_f->get_queue_load()->dump_stats();
         }
         case h_avg_imbalance_ratio: {
-            if (g->_avg_total_load_imbalance_ratio == -1) {
-                g->dump_stats();
+            if (rule_f->get_queue_load()->imbalance_not_computed()) {
+                rule_f->get_queue_load()->dump_stats();
             }
-            return String(g->_avg_total_load_imbalance_ratio);
+            return String(rule_f->get_queue_load()->get_avg_load_imbalance());
         }
         default: {
             click_chatter("Unknown read handler: %d", what);
             return "";
         }
     }
+}
+
+String
+GenerateIPFlowDispatcher::to_file_handler(Element *e, void *user_data)
+{
+    GenerateIPFlowDispatcher *g = static_cast<GenerateIPFlowDispatcher *>(e);
+    if (!g) {
+        return "GenerateIPFlowDispatcher element not found";
+    }
+
+    String rules = g->dump_rules(RULE_DPDK, true);
+    if (rules.empty()) {
+        click_chatter("No rules to write to file: %s", g->_out_file.c_str());
+        return "";
+    }
+
+    if (g->dump_rules_to_file(rules) != 0) {
+        return "";
+    }
+
+    return "";
 }
 
 int
@@ -413,6 +379,10 @@ GenerateIPFlowDispatcher::param_handler(
         return errh->error("GenerateIPFlowDispatcher element not found");
     }
 
+    DPDKFlowRuleFormatter *rule_f = static_cast<DPDKFlowRuleFormatter *>(
+        _rule_formatter_map[static_cast<uint8_t>(RULE_DPDK)]);
+    assert(rule_f);
+
     switch ((intptr_t)handler->read_user_data()) {
         case h_queue_imbalance_ratio: {
             if (input == "") {
@@ -420,16 +390,12 @@ GenerateIPFlowDispatcher::param_handler(
             }
 
             // Force to compute the ratios if not already computed
-            if (g->_avg_total_load_imbalance_ratio == -1) {
-                g->dump_stats();
+            if (rule_f->get_queue_load()->imbalance_not_computed()) {
+                rule_f->get_queue_load()->dump_stats();
             }
 
             const uint16_t queue_id = atoi(input.c_str());
-            if (queue_id < g->_queue_load_imbalance.size()) {
-                input = String(g->_queue_load_imbalance[queue_id]);
-            } else {
-                input = "0";
-            }
+            input = String(rule_f->get_queue_load()->get_load_imbalance_of_queue(queue_id));
 
             return 0;
         }
@@ -443,13 +409,28 @@ GenerateIPFlowDispatcher::param_handler(
 void
 GenerateIPFlowDispatcher::add_handlers()
 {
+    add_read_handler("flows_nb", read_handler, h_flows_nb);
+    add_read_handler("rules_nb", read_handler, h_rules_nb);
     add_read_handler("dump",  read_handler, h_dump);
+    add_read_handler("dump_to_file", to_file_handler, h_dump_to_file);
     add_read_handler("load",  read_handler, h_load);
     add_read_handler("stats", read_handler, h_stats);
-    add_read_handler("rules_nb", read_handler, h_rules_nb);
     add_read_handler("avg_imbalance_ratio", read_handler, h_avg_imbalance_ratio);
 
     set_handler("queue_imbalance_ratio", Handler::f_read | Handler::f_read_param, param_handler, h_queue_imbalance_ratio);
+}
+
+String
+DPDKFlowRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+{
+    assert((prefix > 0) && (prefix <= 32));
+
+    String rule = policy_based_rule_generation(flow, flow_nb, prefix);
+    if (rule.empty()) {
+        return "";
+    }
+
+    return rule;
 }
 
 CLICK_ENDDECLS

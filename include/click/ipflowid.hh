@@ -15,7 +15,7 @@ class IPFlowID { public:
      *
      * The empty flow ID has zero-valued addresses and ports. */
     IPFlowID()
-	: _saddr(), _daddr(), _sport(0), _dport(0) {
+    : _saddr(), _daddr(), _sport(0), _dport(0) {
     }
 
     /** @brief Construct a flow ID with the given parts.
@@ -24,7 +24,7 @@ class IPFlowID { public:
      * @param daddr destination address
      * @param dport destination port, in network order */
     IPFlowID(IPAddress saddr, uint16_t sport, IPAddress daddr, uint16_t dport)
-	: _saddr(saddr), _daddr(daddr), _sport(sport), _dport(dport) {
+    : _saddr(saddr), _daddr(daddr), _sport(sport), _dport(dport) {
     }
 
     /** @brief Construct a flow ID from @a p's ip_header() and udp_header().
@@ -48,51 +48,60 @@ class IPFlowID { public:
 
     /** @brief Construct an uninitialized flow ID. */
     inline IPFlowID(const uninitialized_type &unused) {
-	(void) unused;
+        (void) unused;
     }
 
+    inline IPFlowID& operator=(const IPFlowID &);
 
     typedef IPAddress (IPFlowID::*unspecified_bool_type)() const;
     /** @brief Return true iff the addresses of this flow ID are zero. */
     operator unspecified_bool_type() const {
-	return _saddr || _daddr ? &IPFlowID::saddr : 0;
+        return _saddr || _daddr ? &IPFlowID::saddr : 0;
     }
 
 
     /** @brief Return this flow's source address. */
     IPAddress saddr() const {
-	return _saddr;
+        return _saddr;
     }
     /** @brief Return this flow's source port, in network order. */
     uint16_t sport() const {
-	return _sport;
+        return _sport;
+    }
+    /** @brief Return this flow's source port, in host order. */
+    uint16_t sport_host_order() const {
+        return ntohs(_sport);
     }
     /** @brief Return this flow's destination address. */
     IPAddress daddr() const {
-	return _daddr;
+        return _daddr;
     }
     /** @brief Return this flow's destination port, in network order. */
     uint16_t dport() const {
-	return _dport;
+        return _dport;
+    }
+    /** @brief Return this flow's destination port, in host order. */
+    uint16_t dport_host_order() const {
+        return ntohs(_dport);
     }
 
     /** @brief Set this flow's source address to @a a. */
     void set_saddr(IPAddress a) {
-	_saddr = a;
+        _saddr = a;
     }
     /** @brief Set this flow's source port to @a p.
      * @note @a p should be in network order. */
     void set_sport(uint16_t p) {
-	_sport = p;
+        _sport = p;
     }
     /** @brief Set this flow's destination address to @a a. */
     void set_daddr(IPAddress a) {
-	_daddr = a;
+        _daddr = a;
     }
     /** @brief Set this flow's destination port to @a p.
      * @note @a p should be in network order. */
     void set_dport(uint16_t p) {
-	_dport = p;
+        _dport = p;
     }
 
     /** @brief Set this flow to the given value.
@@ -101,17 +110,17 @@ class IPFlowID { public:
      * @param daddr destination address
      * @param dport destination port, in network order */
     void assign(IPAddress saddr, uint16_t sport, IPAddress daddr, uint16_t dport) {
-	_saddr = saddr;
-	_daddr = daddr;
-	_sport = sport;
-	_dport = dport;
+        _saddr = saddr;
+        _daddr = daddr;
+        _sport = sport;
+        _dport = dport;
     }
 
 
     /** @brief Return this flow's reverse, which swaps sources and destinations.
      * @return IPFlowID(daddr(), dport(), saddr(), sport()) */
     IPFlowID reverse() const {
-	return IPFlowID(_daddr, _dport, _saddr, _sport);
+        return IPFlowID(_daddr, _dport, _saddr, _sport);
     }
     inline IPFlowID rev() const CLICK_DEPRECATED;
 
@@ -134,8 +143,8 @@ class IPFlowID { public:
     // note: several functions depend on this field order!
     IPAddress _saddr;
     IPAddress _daddr;
-    uint16_t _sport;			// network byte order
-    uint16_t _dport;			// network byte order
+    uint16_t _sport;            // network byte order
+    uint16_t _dport;            // network byte order
 
     int unparse(char *s) const;
     friend StringAccum &operator<<(StringAccum &sa, const IPFlowID &flow_id);
@@ -159,21 +168,31 @@ inline hashcode_t IPFlowID::hashcode() const
     hashcode_t sx = CLICK_NAME(hashcode)(saddr());
     hashcode_t dx = CLICK_NAME(hashcode)(daddr());
     return (ROT(sx, (s % 16) + 1) ^ ROT(dx, 31 - (d % 16)))
-	^ ((d << 16) | s);
+    ^ ((d << 16) | s);
 }
 
 #undef ROT
 
+inline IPFlowID &IPFlowID::operator=(const IPFlowID &other)
+{
+    this->set_saddr(IPAddress(other.saddr().s()));
+    this->set_daddr(IPAddress(other.daddr().s()));
+    this->set_sport(other.sport());
+    this->set_dport(other.dport());
+
+    return *this;
+}
+
 inline bool operator==(const IPFlowID &a, const IPFlowID &b)
 {
     return a.sport() == b.sport() && a.dport() == b.dport()
-	&& a.saddr() == b.saddr() && a.daddr() == b.daddr();
+    && a.saddr() == b.saddr() && a.daddr() == b.daddr();
 }
 
 inline bool operator!=(const IPFlowID &a, const IPFlowID &b)
 {
     return a.sport() != b.sport() || a.dport() != b.dport()
-	|| a.saddr() != b.saddr() || a.daddr() != b.daddr();
+    || a.saddr() != b.saddr() || a.daddr() != b.daddr();
 }
 
 
@@ -205,11 +224,11 @@ class IPFlow5ID : public IPFlowID { public:
     explicit IPFlow5ID(const Packet *p, bool reverse = false);
 
     uint8_t proto() const {
-	return _proto;
+        return _proto;
     }
 
 protected:
-	uint8_t _proto;
+    uint8_t _proto;
 };
 
 CLICK_ENDDECLS

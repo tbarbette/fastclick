@@ -135,6 +135,7 @@ class IPAddress { public:
     // IPAddress operator^(IPAddress, IPAddress);
     // IPAddress operator~(IPAddress);
 
+    inline IPAddress& operator=(const IPAddress &);
     inline IPAddress& operator&=(IPAddress);
     inline IPAddress& operator|=(IPAddress);
     inline IPAddress& operator^=(IPAddress);
@@ -153,7 +154,6 @@ class IPAddress { public:
     uint32_t _addr;
 
 };
-
 
 /** @relates IPAddress
     @brief Compare two IPAddress objects for equality. */
@@ -191,6 +191,15 @@ inline bool
 operator!=(IPAddress a, uint32_t b)
 {
     return a.addr() != b;
+}
+
+/** @relates IPAddress
+    @brief Assigns an IP address object to another. */
+inline IPAddress &
+IPAddress::operator=(const IPAddress &other)
+{
+    this->_addr = other.addr();
+    return *this;
 }
 
 /** @brief Return a pointer to the address data.
