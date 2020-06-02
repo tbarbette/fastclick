@@ -40,7 +40,7 @@ d :: DPDKInfo(NB_SOCKET_MBUF 16777215, NB_SOCKET_MBUF 8191);
 
 fdIN :: FromDump($trace, STOP true, TIMING false);
 
-ruleGen :: GenerateIPFlowDispatcher(
+ruleGen :: GenerateIPDPDKFlowRules(
 	PORT $inPort, NB_QUEUES $queuesNb, NB_RULES $rulesNb,
 	POLICY $policy,
 	KEEP_SADDR $withSrcIp, KEEP_DADDR $withDstIp,
@@ -77,7 +77,7 @@ DriverManager(
 	print "",
 	print "Average load imbalance ratio: "$(ruleGen.avg_imbalance_ratio),
 	print "",
-	print "Load imbalance ratio on queue 2: "$(ruleGen.queue_imbalance_ratio 16),
+	print "Load imbalance ratio on queue 0: "$(ruleGen.queue_imbalance_ratio 0),
 
 	stop
 );

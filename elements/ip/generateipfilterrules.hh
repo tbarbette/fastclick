@@ -10,11 +10,11 @@ CLICK_DECLS
 /*
 =c
 
-GenerateIPFilter(NB_RULES [, KEEP_SADDR, KEEP_DADDR, KEEP_SPORT, KEEP_DPORT, PREFIX, PATTERN_TYPE, OUT_FILE])
+GenerateIPFilterRules(NB_RULES [, KEEP_SADDR, KEEP_DADDR, KEEP_SPORT, KEEP_DPORT, PREFIX, PATTERN_TYPE, OUT_FILE])
 
 =s ip
 
-generates IPFilter patterns out of input traffic
+generates IPFilter/IPClassifier rule patterns out of input traffic
 
 =d
 
@@ -23,9 +23,9 @@ CheckIPHeader or equivalent element.
 
 This element supports rules for the IPFilter and IPClassifier Click elements.
 However, it also acts as a parent class for other similar elements, such as:
- * GenerateIPLookup (for IPLookup Click elements)
- * GenerateIPFlowDispatcher (for rules following DPDK's Flow API)
- * GenerateOpenFlow (for OpenFlow rules targeting OVS or ONOS's northbound API)
+ * GenerateIPLookupRules (for IPLookup Click elements)
+ * GenerateIPDPDKFlowRules (for rules following DPDK's Flow API)
+ * GenerateIPOpenFlowRules (for OpenFlow rules targeting OVS or ONOS's northbound API)
 
 Keyword arguments are:
 
@@ -88,7 +88,7 @@ Outputs the rules to a designated file.
 
 =back
 
-=a IPFilter, GenerateIPLookup, GenerateIPFlowDispatcher, GenerateOpenFlow */
+=a IPFilter, GenerateIPLookupRules, GenerateIPDPDKFlowRules, GenerateIPOpenFlowRules */
 
 enum RuleFormat {
     RULE_DPDK = 0,
@@ -102,13 +102,13 @@ enum RuleFormat {
 /**
  * Abstract, base class that offers IPFlow representation & storage.
  */
-class GenerateIPPacket : public BatchElement {
+class GenerateIPPacketRules : public BatchElement {
 
     public:
-        GenerateIPPacket() CLICK_COLD;
-        ~GenerateIPPacket() CLICK_COLD;
+        GenerateIPPacketRules() CLICK_COLD;
+        ~GenerateIPPacketRules() CLICK_COLD;
 
-        const char *class_name() const { return "GenerateIPPacket"; }
+        const char *class_name() const { return "GenerateIPPacketRules"; }
         const char *port_count() const { return PORTS_1_1; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -207,26 +207,26 @@ class RuleFormatter;
 /**
  * Uses the base class to generate IPFilter patterns out of the traffic.
  */
-class GenerateIPFilter : public GenerateIPPacket {
+class GenerateIPFilterRules : public GenerateIPPacketRules {
 
     public:
         /**
          * Rule pattern type.
          */
         enum RulePattern {
+            DPDK_FLOW_API,
             IPFILTER,
             IPCLASSIFIER,
             IPLOOKUP,
-            FLOW_DISPATCHER,
             OPENFLOW,
             NONE
         };
 
-        GenerateIPFilter() CLICK_COLD;
-        GenerateIPFilter(RulePattern pattern_type) CLICK_COLD;
-        ~GenerateIPFilter() CLICK_COLD;
+        GenerateIPFilterRules() CLICK_COLD;
+        GenerateIPFilterRules(RulePattern pattern_type) CLICK_COLD;
+        ~GenerateIPFilterRules() CLICK_COLD;
 
-        const char *class_name() const { return "GenerateIPFilter"; }
+        const char *class_name() const { return "GenerateIPFilterRules"; }
         const char *port_count() const { return PORTS_1_1; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -287,7 +287,7 @@ class RuleFormatter {
         RuleFormatter(bool s_port, bool d_port) : _with_tp_s_port(s_port), _with_tp_d_port(d_port) {};
         ~RuleFormatter() {};
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) = 0;
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) = 0;
 
     protected:
         /**
@@ -305,7 +305,7 @@ class IPClassifierRuleFormatter : public RuleFormatter {
         IPClassifierRuleFormatter(bool s_port, bool d_port) : RuleFormatter(s_port, d_port) {};
         ~IPClassifierRuleFormatter() {};
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
 };
 
 /**
@@ -316,7 +316,7 @@ class IPFilterRuleFormatter : public IPClassifierRuleFormatter {
         IPFilterRuleFormatter(bool s_port, bool d_port) : IPClassifierRuleFormatter(s_port, d_port) {};
         ~IPFilterRuleFormatter() {};
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
 };
 
 CLICK_ENDDECLS

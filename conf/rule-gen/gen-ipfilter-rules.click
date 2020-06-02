@@ -38,7 +38,7 @@ d :: DPDKInfo(NB_SOCKET_MBUF 16777215, NB_SOCKET_MBUF 8191);
 
 fdIN :: FromDump($trace, STOP true, TIMING false);
 
-ruleGen :: GenerateIPFilter(
+ruleGen :: GenerateIPFilterRules(
 	NB_RULES $rulesNb,
 	PATTERN_TYPE $pattern,
 	KEEP_SADDR $withSrcIp, KEEP_DADDR $withDstIp,

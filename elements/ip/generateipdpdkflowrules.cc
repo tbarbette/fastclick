@@ -1,7 +1,7 @@
-// -*- c-basic-offset: 4; related-file-name: "generateipflowdispatcher.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "generateipdpdkflowrules.hh" -*-
 /*
- * generateipflowdispatcher.{cc,hh} -- element generates flow rule patterns
- * out of input traffic, following DPDK's flow API syntax.
+ * generateipdpdkflowrules.{cc,hh} -- element generates flow rule patterns
+ * out of input traffic, following DPDK's Flow API syntax.
  * Georgios Katsikas, Tom Barbette
  *
  * Copyright (c) 2017 Georgios Katsikas, RISE SICS
@@ -26,7 +26,7 @@
 #include <click/error.hh>
 #include <click/straccum.hh>
 
-#include "generateipflowdispatcher.hh"
+#include "generateipdpdkflowrules.hh"
 
 CLICK_DECLS
 
@@ -35,19 +35,19 @@ static const uint16_t DEF_NB_QUEUES = 16;
 /**
  * DPDK Flow rules' generator out of incoming traffic.
  */
-GenerateIPFlowDispatcher::GenerateIPFlowDispatcher() :
+GenerateIPDPDKFlowRules::GenerateIPDPDKFlowRules() :
         _port(0), _queues_nb(DEF_NB_QUEUES),
-        GenerateIPFilter(FLOW_DISPATCHER)
+        GenerateIPFilterRules(DPDK_FLOW_API)
 {
     _keep_dport = false;
 }
 
-GenerateIPFlowDispatcher::~GenerateIPFlowDispatcher()
+GenerateIPDPDKFlowRules::~GenerateIPDPDKFlowRules()
 {
 }
 
 int
-GenerateIPFlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
+GenerateIPDPDKFlowRules::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String policy = "LOAD_AWARE";
     QueueAllocPolicy queue_alloc_policy = LOAD_AWARE;
@@ -59,7 +59,7 @@ GenerateIPFlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
             .consume() < 0)
         return -1;
 
-    if (GenerateIPFilter::configure(conf, errh) < 0) {
+    if (GenerateIPFilterRules::configure(conf, errh) < 0) {
         return -1;
     }
 
@@ -93,25 +93,25 @@ GenerateIPFlowDispatcher::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-GenerateIPFlowDispatcher::initialize(ErrorHandler *errh)
+GenerateIPDPDKFlowRules::initialize(ErrorHandler *errh)
 {
-    return GenerateIPFilter::initialize(errh);
+    return GenerateIPFilterRules::initialize(errh);
 }
 
 void
-GenerateIPFlowDispatcher::cleanup(CleanupStage)
+GenerateIPDPDKFlowRules::cleanup(CleanupStage)
 {
 }
 
 IPFlowID
-GenerateIPFlowDispatcher::get_mask(int prefix)
+GenerateIPDPDKFlowRules::get_mask(int prefix)
 {
     IPFlowID fid = IPFlowID(IPAddress::make_prefix(prefix), _mask.sport(), IPAddress::make_prefix(prefix), _mask.dport());
     return fid;
 }
 
 bool
-GenerateIPFlowDispatcher::is_wildcard(const IPFlow &flow)
+GenerateIPDPDKFlowRules::is_wildcard(const IPFlow &flow)
 {
     if ((flow.flowid().saddr().s() == "0.0.0.0") ||
         (flow.flowid().daddr().s() == "0.0.0.0")) {
@@ -159,7 +159,7 @@ print_queue_load_map(const HashMap<uint16_t, uint64_t> &queue_load_map)
 }
 
 String
-DPDKFlowRuleFormatter::policy_based_rule_generation(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+DPDKFlowRuleFormatter::policy_based_rule_generation(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
     // Wildcards are intentionally excluded
     if ((flow.flowid().saddr().s() == "0.0.0.0") &&
@@ -306,13 +306,13 @@ QueueLoad::dump_load()
 }
 
 String
-GenerateIPFlowDispatcher::read_handler(Element *e, void *user_data)
+GenerateIPDPDKFlowRules::read_handler(Element *e, void *user_data)
 {
-    GenerateIPFlowDispatcher *g = static_cast<GenerateIPFlowDispatcher *>(e);
+    GenerateIPDPDKFlowRules *g = static_cast<GenerateIPDPDKFlowRules *>(e);
     if (!g) {
-        return "GenerateIPFlowDispatcher element not found";
+        return "GenerateIPDPDKFlowRules element not found";
     }
-    assert(g->_pattern_type == FLOW_DISPATCHER);
+    assert(g->_pattern_type == DPDK_FLOW_API);
 
     DPDKFlowRuleFormatter *rule_f = static_cast<DPDKFlowRuleFormatter *>(
         _rule_formatter_map[static_cast<uint8_t>(RULE_DPDK)]);
@@ -350,11 +350,11 @@ GenerateIPFlowDispatcher::read_handler(Element *e, void *user_data)
 }
 
 String
-GenerateIPFlowDispatcher::to_file_handler(Element *e, void *user_data)
+GenerateIPDPDKFlowRules::to_file_handler(Element *e, void *user_data)
 {
-    GenerateIPFlowDispatcher *g = static_cast<GenerateIPFlowDispatcher *>(e);
+    GenerateIPDPDKFlowRules *g = static_cast<GenerateIPDPDKFlowRules *>(e);
     if (!g) {
-        return "GenerateIPFlowDispatcher element not found";
+        return "GenerateIPDPDKFlowRules element not found";
     }
 
     String rules = g->dump_rules(RULE_DPDK, true);
@@ -371,12 +371,12 @@ GenerateIPFlowDispatcher::to_file_handler(Element *e, void *user_data)
 }
 
 int
-GenerateIPFlowDispatcher::param_handler(
+GenerateIPDPDKFlowRules::param_handler(
         int operation, String &input, Element *e,
         const Handler *handler, ErrorHandler *errh) {
-    GenerateIPFlowDispatcher *g = static_cast<GenerateIPFlowDispatcher *>(e);
+    GenerateIPDPDKFlowRules *g = static_cast<GenerateIPDPDKFlowRules *>(e);
     if (!g) {
-        return errh->error("GenerateIPFlowDispatcher element not found");
+        return errh->error("GenerateIPDPDKFlowRules element not found");
     }
 
     DPDKFlowRuleFormatter *rule_f = static_cast<DPDKFlowRuleFormatter *>(
@@ -407,7 +407,7 @@ GenerateIPFlowDispatcher::param_handler(
 }
 
 void
-GenerateIPFlowDispatcher::add_handlers()
+GenerateIPDPDKFlowRules::add_handlers()
 {
     add_read_handler("flows_nb", read_handler, h_flows_nb);
     add_read_handler("rules_nb", read_handler, h_rules_nb);
@@ -421,7 +421,7 @@ GenerateIPFlowDispatcher::add_handlers()
 }
 
 String
-DPDKFlowRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+DPDKFlowRuleFormatter::flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
     assert((prefix > 0) && (prefix <= 32));
 
@@ -434,5 +434,5 @@ DPDKFlowRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel GenerateIPFilter)
-EXPORT_ELEMENT(GenerateIPFlowDispatcher)
+ELEMENT_REQUIRES(userlevel GenerateIPFilterRules)
+EXPORT_ELEMENT(GenerateIPDPDKFlowRules)
