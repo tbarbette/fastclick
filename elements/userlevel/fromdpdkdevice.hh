@@ -91,19 +91,19 @@ Integer. The maximum transfer unit of the device.
 =item MODE
 
 String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
-vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 20.02, flow_disp is also
-supported if FastClick was built with --enable-flow-api.
+vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 20.02, 'flow' is also
+supported (DPDK's Flow API) if FastClick was built with --enable-flow-api.
 
 =item FLOW_RULES_FILE
 
 String. For DPDK version >= 20.02, FastClick was built with --enable-flow-api,
-and if MODE is set to flow_disp, a path to a file with Flow Dispatcher rules
+and if MODE is set to flow, a path to a file with Flow Parser rules
 can be supplied to the device. These rules are installed in the NIC using
 DPDK's flow API.
 
 =item FLOW_ISOLATE
 
-Boolean. Requires MODE flow_disp. Isolated mode guarantees that all ingress
+Boolean. Requires MODE flow. Isolated mode guarantees that all ingress
 traffic comes from defined flow rules only (current and future).
 If ingress traffic does not match any of the defined rules, it will be
 discarded by the NIC. Defaults to false.
@@ -359,7 +359,7 @@ Upon success, the number of deleted flow rules is returned, otherwise an error i
 
 =h rules_isolate write-only
 
-Enables/Disables Flow Dispatcher's isolation mode.
+Enables/Disables Flow Parser's isolation mode.
 Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future).
 Usage:
     'rules_isolate 0' disables isolation.

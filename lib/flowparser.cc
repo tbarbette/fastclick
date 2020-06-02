@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4; related-file-name: "flowparser.hh" -*-
 /*
- * flowparser.cc -- library for integrating DPDK's Flow API in Click
+ * flowparser.cc -- library for integrating DPDK's Flow API (rte_flow) into Click
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS & KTH Royal Institute of Technology
  *
@@ -1051,12 +1051,12 @@ FlowCache::flush_rule_counters()
 }
 
 /**
- * Flow Dispatcher implementation.
+ * DPDK Flow Parser implementation.
  */
-// DPDKDevice mode is Flow Dispatcher
+// DPDKDevice mode for the Flow Parser
 String FlowParser::DISPATCHING_MODE = "flow";
 
-// Supported Flow Dispatcher handlers (called from FromDPDKDevice)
+// Supported Flow Parser handlers (called from FromDPDKDevice)
 String FlowParser::FLOW_RULE_ADD             = "rule_add";
 String FlowParser::FLOW_RULE_DEL             = "rules_del";
 String FlowParser::FLOW_RULE_IDS_GLB         = "rules_ids_global";
@@ -1081,8 +1081,8 @@ HashMap<int, String> FlowParser::flow_action;
 bool FlowParser::DEF_VERBOSITY = false;
 bool FlowParser::DEF_DEBUG_MODE = false;
 
-// Global table of DPDK ports mapped to their Flow Dispatcher objects
-HashTable<portid_t, FlowParser *> FlowParser::dev_flow_disp;
+// Global table of DPDK ports mapped to their Flow Parser objects
+HashTable<portid_t, FlowParser *> FlowParser::dev_flow_parser;
 
 // Map of ports to their flow rule installation/deletion statistics
 HashMap<portid_t, Vector<RuleTiming>> FlowParser::_rule_inst_stats_map;
@@ -1110,7 +1110,7 @@ FlowParser::FlowParser(portid_t port_id, ErrorHandler *errh) :
     populate_supported_flow_items_and_actions();
 
     if (verbose()) {
-        _errh->message("Flow Dispatcher (port %u): Created (state %s)", _port_id, _active ? "active" : "inactive");
+        _errh->message("DPDK Flow Parser (port %u): Created (state %s)", _port_id, _active ? "active" : "inactive");
     }
 }
 
@@ -1122,7 +1122,7 @@ FlowParser::~FlowParser()
         delete _parser;
         _parser = NULL;
         if (verbose()) {
-            _errh->message("Flow Dispatcher (port %u): Parser deleted", _port_id);
+            _errh->message("DPDK Flow Parser (port %u): Parser deleted", _port_id);
         }
     }
 
@@ -1138,7 +1138,7 @@ FlowParser::~FlowParser()
     flow_action.clear();
 
     if (verbose()) {
-        _errh->message("Flow Dispatcher (port %u): Destroyed", _port_id);
+        _errh->message("DPDK Flow Parser (port %u): Destroyed", _port_id);
     }
 
     if (_rule_inst_stats_map.size() > 0) {
@@ -1232,10 +1232,10 @@ FlowParser::populate_supported_flow_items_and_actions()
 }
 
 /**
- * Obtains an instance of the Flow Dispatcher parser.
+ * Obtains an instance of the Flow Parser parser.
  *
  * @args errh: an instance of the error handler
- * @return a Flow Dispatcher parser object
+ * @return Flow Parser's parser object
  */
 struct cmdline *
 FlowParser::parser(ErrorHandler *errh)
@@ -1248,7 +1248,7 @@ FlowParser::parser(ErrorHandler *errh)
 }
 
 /**
- * Obtains the flow cache associated with this Flow Dispatcher.
+ * Obtains the flow cache associated with this Flow Parser.
  *
  * @return a Flow Cache object
  */
@@ -1260,37 +1260,37 @@ FlowParser::get_flow_cache()
 
 /**
  * Returns the global map of DPDK ports to
- * their Flow Dispatcher instances.
+ * their Flow Parser instances.
  *
- * @return a Flow Dispatcher instance map
+ * @return a Flow Parser instance map
  */
 HashTable<portid_t, FlowParser *>
-FlowParser::flow_dispatcher_map()
+FlowParser::flow_parser_map()
 {
-    return dev_flow_disp;
+    return dev_flow_parser;
 }
 
 /**
  * Cleans the global map of DPDK ports to
- * their Flow Dispatcher instances.
+ * their Flow Parser instances.
  */
 void
-FlowParser::clean_flow_dispatcher_map()
+FlowParser::clean_flow_parser_map()
 {
-    if (!dev_flow_disp.empty()) {
-        dev_flow_disp.clear();
+    if (!dev_flow_parser.empty()) {
+        dev_flow_parser.clear();
     }
 }
 
 /**
- * Manages the Flow Dispatcher instances.
+ * Manages the Flow Parser instances.
  *
  * @args port_id: the ID of the NIC
  * @args errh: an instance of the error handler
- * @return a Flow Dispatcher object for this NIC
+ * @return a Flow Parser object for this NIC
  */
 FlowParser *
-FlowParser::get_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh)
+FlowParser::get_flow_parser(const portid_t &port_id, ErrorHandler *errh)
 {
     if (!errh) {
         errh = ErrorHandler::default_handler();
@@ -1298,25 +1298,25 @@ FlowParser::get_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh)
 
     // Invalid port ID
     if (port_id >= DPDKDevice::dev_count()) {
-        errh->error("Flow Dispatcher (port %u): Denied to create instance for invalid port", port_id);
+        errh->error("DPDK Flow Parser (port %u): Denied to create instance for invalid port", port_id);
         return NULL;
     }
 
-    // Get the Flow Dispatcher of the desired port
-    FlowParser *flow_disp = dev_flow_disp.get(port_id);
+    // Get the Flow Parser of the desired port
+    FlowParser *flow_parser = dev_flow_parser.get(port_id);
 
     // Not there, let's created it
-    if (!flow_disp) {
-        flow_disp = new FlowParser(port_id, errh);
-        assert(flow_disp);
-        dev_flow_disp[port_id] = flow_disp;
+    if (!flow_parser) {
+        flow_parser = new FlowParser(port_id, errh);
+        assert(flow_parser);
+        dev_flow_parser[port_id] = flow_parser;
     }
 
-    // Create a Flow Dispatcher parser
+    // Create Flow Parser's parser
     _parser = parser(errh);
 
     // Ship it back
-    return flow_disp;
+    return flow_parser;
 }
 
 /**
@@ -1434,17 +1434,17 @@ FlowParser::load_rules_from_file_to_string(const String &filename)
     String rules_str = "";
 
     if (filename.empty()) {
-        _errh->warning("Flow Dispatcher (port %u): No file provided", _port_id);
+        _errh->warning("DPDK Flow Parser (port %u): No file provided", _port_id);
         return rules_str;
     }
 
     FILE *fp = NULL;
     fp = fopen(filename.c_str(), "r");
     if (fp == NULL) {
-        _errh->error("Flow Dispatcher (port %u): Failed to open file '%s'", _port_id, filename.c_str());
+        _errh->error("DPDK Flow Parser (port %u): Failed to open file '%s'", _port_id, filename.c_str());
         return rules_str;
     }
-    _errh->message("Flow Dispatcher (port %u): Opened file '%s'", _port_id, filename.c_str());
+    _errh->message("DPDK Flow Parser (port %u): Opened file '%s'", _port_id, filename.c_str());
 
     uint32_t rules_nb = 0;
     uint32_t loaded_rules_nb = 0;
@@ -1455,19 +1455,18 @@ FlowParser::load_rules_from_file_to_string(const String &filename)
 
     // Read file line-by-line (or rule-by-rule)
     while ((getline(&line, &len, fp)) != -1) {
-        rules_nb++;
-
         // Skip empty lines or lines with only spaces/tabs
         if (!line || (strlen(line) == 0) ||
             (strchr(ignore_chars, line[0]))) {
-            _errh->warning("Flow Dispatcher (port %u): Invalid rule #%" PRIu32, _port_id, rules_nb);
             continue;
         }
+
+        rules_nb++;
 
         // Detect and remove unwanted components
         String rule = String(line);
         if (!filter_rule(rule)) {
-            _errh->error("Flow Dispatcher (port %u): Invalid rule '%s'", _port_id, line);
+            _errh->error("DPDK Flow Parser (port %u): Invalid rule '%s'", _port_id, line);
             continue;
         }
 
@@ -1483,7 +1482,7 @@ FlowParser::load_rules_from_file_to_string(const String &filename)
     // Close the file
     fclose(fp);
 
-    _errh->message("Flow Dispatcher (port %u): Loaded %" PRIu32 "/%" PRIu32 " rules", _port_id, loaded_rules_nb, rules_nb);
+    _errh->message("DPDK Flow Parser (port %u): Loaded %" PRIu32 "/%" PRIu32 " rules", _port_id, loaded_rules_nb, rules_nb);
 
     return rules_str;
 }
@@ -1500,7 +1499,7 @@ FlowParser::update_rules(const HashMap<uint32_t, String> &rules_map, bool by_con
 {
     uint32_t rules_to_install = rules_map.size();
     if (rules_to_install == 0) {
-        return (int32_t) _errh->error("Flow Dispatcher (port %u): Failed to add rules due to empty input map", _port_id);
+        return (int32_t) _errh->error("DPDK Flow Parser (port %u): Failed to add rules due to empty input map", _port_id);
     }
 
     // Current capacity
@@ -1515,7 +1514,7 @@ FlowParser::update_rules(const HashMap<uint32_t, String> &rules_map, bool by_con
     // Initialize the counters for the new internal rule ID
     uint32_t *int_rule_ids = (uint32_t *) malloc(rules_to_install * sizeof(uint32_t));
     if (!int_rule_ids) {
-        return (int32_t) _errh->error("Flow Dispatcher (port %u): Failed to allocate space to store %" PRIu32 " rule IDs", _port_id, rules_to_install);
+        return (int32_t) _errh->error("DPDK Flow Parser (port %u): Failed to allocate space to store %" PRIu32 " rule IDs", _port_id, rules_to_install);
     }
 
     Vector<uint32_t> glb_rule_ids_vec;
@@ -1551,7 +1550,7 @@ FlowParser::update_rules(const HashMap<uint32_t, String> &rules_map, bool by_con
 
         if (_verbose) {
             _errh->message(
-                "Flow Dispatcher (port %u): About to install rule with global ID %" PRIu32 " and internal ID %" PRIu32 " on core %d: %s",
+                "DPDK Flow Parser (port %u): About to install rule with global ID %" PRIu32 " and internal ID %" PRIu32 " on core %d: %s",
                 _port_id, rule_id, int_rule_id, core_id, rule.c_str()
             );
         }
@@ -1627,7 +1626,7 @@ FlowParser::update_rules(const HashMap<uint32_t, String> &rules_map, bool by_con
     }
 
     _errh->message(
-        "Flow Dispatcher (port %u): Successfully installed %" PRIu32 "/%" PRIu32 " rules in %.2f ms at the rate of %.3f rules/sec",
+        "DPDK Flow Parser (port %u): Successfully installed %" PRIu32 "/%" PRIu32 " rules in %.2f ms at the rate of %.3f rules/sec",
         _port_id, installed_rules_nb, rules_to_install, rits.latency_ms, rits.rules_per_sec
     );
 
@@ -1649,7 +1648,7 @@ FlowParser::add_rules_from_file(const String &filename)
     const String rules_str = (const String) load_rules_from_file_to_string(filename);
 
     if (rules_str.empty()) {
-        return (int32_t) _errh->error("Flow Dispatcher (port %u): Failed to add rules due to empty input from file", _port_id);
+        return (int32_t) _errh->error("DPDK Flow Parser (port %u): Failed to add rules due to empty input from file", _port_id);
     }
 
     // Tokenize them to facilitate the insertion in the flow cache
@@ -1680,7 +1679,7 @@ FlowParser::flow_rules_install(const String &rules, const uint32_t &rules_nb)
 {
     // Only active instances can configure a NIC
     if (!active()) {
-        _errh->error("Flow Dispatcher (port %u): Inactive instance cannot install rules", _port_id);
+        _errh->error("DPDK Flow Parser (port %u): Inactive instance cannot install rules", _port_id);
         return FLOWPARSER_ERROR;
     }
 
@@ -1694,10 +1693,10 @@ FlowParser::flow_rules_install(const String &rules, const uint32_t &rules_nb)
     if (res >= 0) {
         // Workaround DPDK's deficiency to report rule installation issues
         if ((rules_before + rules_nb) != rules_after) {
-            _errh->message("Flow Dispatcher (port %u): Flow installation failed - Has %" PRIu32 ", but expected %" PRIu32 " rules", _port_id, rules_after, rules_before + rules_nb);
+            _errh->message("DPDK Flow Parser (port %u): Flow installation failed - Has %" PRIu32 ", but expected %" PRIu32 " rules", _port_id, rules_after, rules_before + rules_nb);
             return FLOWPARSER_ERROR;
         } else {
-            _errh->message("Flow Dispatcher (port %u): Parsed and installed a batch of %" PRIu32 " rules", _port_id, rules_nb);
+            _errh->message("DPDK Flow Parser (port %u): Parsed and installed a batch of %" PRIu32 " rules", _port_id, rules_nb);
             return FLOWPARSER_SUCCESS;
         }
     }
@@ -1720,9 +1719,9 @@ FlowParser::flow_rules_install(const String &rules, const uint32_t &rules_nb)
     }
 
     if ((rules_before + rules_nb) != rules_after) {
-        _errh->error("Flow Dispatcher (port %u): Partially installed %" PRIu32 "/%" PRIu32 " rules", _port_id, (rules_after - rules_before), rules_nb);
+        _errh->error("DPDK Flow Parser (port %u): Partially installed %" PRIu32 "/%" PRIu32 " rules", _port_id, (rules_after - rules_before), rules_nb);
     }
-    _errh->error("Flow Dispatcher (port %u): Failed to parse rules due to %s", _port_id, error.c_str());
+    _errh->error("DPDK Flow Parser (port %u): Failed to parse rules due to %s", _port_id, error.c_str());
 
     return FLOWPARSER_ERROR;
 }
@@ -1796,7 +1795,7 @@ FlowParser::flow_rules_verify_presence(const Vector<uint32_t> &int_rule_ids_vec)
     for (auto int_id : int_rule_ids_vec) {
         if (!flow_rule_get(int_id)) {
             verified = false;
-            String message = "Flow Dispatcher (port " + String(_port_id) + "): Rule " + String(int_id) + " is not in the NIC";
+            String message = "DPDK Flow Parser (port " + String(_port_id) + "): Rule " + String(int_id) + " is not in the NIC";
             if (_verbose) {
                 String rule = _flow_cache->get_rule_by_internal_id(int_id);
                 assert(!rule.empty());
@@ -1828,7 +1827,7 @@ FlowParser::flow_rules_verify_absence(const Vector<uint32_t> &old_int_rule_ids_v
     for (auto int_id : old_int_rule_ids_vec) {
         if (flow_rule_get(int_id)) {
             verified = false;
-            String message = "Flow Dispatcher (port " + String(_port_id) + "): Rule " + String(int_id) + " is still in the NIC";
+            String message = "DPDK Flow Parser (port " + String(_port_id) + "): Rule " + String(int_id) + " is still in the NIC";
             if (_verbose) {
                 String rule = _flow_cache->get_rule_by_internal_id(int_id);
                 assert(!rule.empty());
@@ -1909,12 +1908,12 @@ FlowParser::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, 
 {
     // Only active instances can configure a NIC
     if (!active()) {
-        return _errh->error("Flow Dispatcher (port %u): Inactive instance cannot remove rules", _port_id);
+        return _errh->error("DPDK Flow Parser (port %u): Inactive instance cannot remove rules", _port_id);
     }
 
     // Inputs' sanity check
     if ((!int_rule_ids) || (rules_nb == 0)) {
-        return _errh->error("Flow Dispatcher (port %u): No rules to remove", _port_id);
+        return _errh->error("DPDK Flow Parser (port %u): No rules to remove", _port_id);
     }
 
     RuleTiming rdts(_port_id);
@@ -1925,7 +1924,7 @@ FlowParser::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, 
     //       DPDK must act upon these issues.
     if (port_flow_destroy(_port_id, (uint32_t) rules_nb, (const uint32_t *) int_rule_ids) != FLOWPARSER_SUCCESS) {
         return _errh->error(
-            "Flow Dispatcher (port %u): Failed to remove a batch of %" PRIu32 " rules",
+            "DPDK Flow Parser (port %u): Failed to remove a batch of %" PRIu32 " rules",
             _port_id, rules_nb
         );
     }
@@ -1947,7 +1946,7 @@ FlowParser::flow_rules_delete(uint32_t *int_rule_ids, const uint32_t &rules_nb, 
     }
 
     _errh->message(
-        "Flow Dispatcher (port %u): Successfully deleted %" PRIu32 " rules in %.2f ms at the rate of %.3f rules/sec",
+        "DPDK Flow Parser (port %u): Successfully deleted %" PRIu32 " rules in %.2f ms at the rate of %.3f rules/sec",
         _port_id, rules_nb, rdts.latency_ms, rdts.rules_per_sec
     );
 
@@ -1970,7 +1969,7 @@ FlowParser::flow_rules_isolate(const portid_t &port_id, const int &set)
     if (port_flow_isolate(port_id, set) != FLOWPARSER_SUCCESS) {
         ErrorHandler *errh = ErrorHandler::default_handler();
         return errh->error(
-            "Flow Dispatcher (port %u): Failed to restrict ingress traffic to the defined flow rules", port_id
+            "DPDK Flow Parser (port %u): Failed to restrict ingress traffic to the defined flow rules", port_id
         );
     }
 
@@ -1978,7 +1977,7 @@ FlowParser::flow_rules_isolate(const portid_t &port_id, const int &set)
 #else
     ErrorHandler *errh = ErrorHandler::default_handler();
     return errh->error(
-        "Flow Dispatcher (port %u): Flow isolation is supported since DPDK 17.08", port_id
+        "DPDK Flow Parser (port %u): Flow isolation is supported since DPDK 17.08", port_id
     );
 #endif
 }
@@ -1998,7 +1997,7 @@ FlowParser::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, 
     // Only active instances can query a NIC
     if (!active()) {
         _errh->error(
-            "Flow Dispatcher (port %u): Inactive instance cannot query flow rule #%" PRIu32, _port_id, int_rule_id);
+            "DPDK Flow Parser (port %u): Inactive instance cannot query flow rule #%" PRIu32, _port_id, int_rule_id);
         return "";
     }
 
@@ -2010,7 +2009,7 @@ FlowParser::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, 
 
     port = get_port(_port_id);
     if (!port->flow_list || (flow_rules_count() == 0)) {
-        _errh->message("Flow Dispatcher (port %u): No flow rules to query", _port_id);
+        _errh->message("DPDK Flow Parser (port %u): No flow rules to query", _port_id);
         return "";
     }
 
@@ -2027,7 +2026,7 @@ FlowParser::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, 
     }
     if (!pf || !action) {
         _errh->message(
-            "Flow Dispatcher (port %u): No stats for invalid flow rule with ID %" PRIu32, _port_id, int_rule_id);
+            "DPDK Flow Parser (port %u): No stats for invalid flow rule with ID %" PRIu32, _port_id, int_rule_id);
         return "";
     }
 
@@ -2040,7 +2039,7 @@ FlowParser::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, 
     }
     if (action->type != RTE_FLOW_ACTION_TYPE_COUNT) {
         _errh->message(
-            "Flow Dispatcher (port %u): No count instruction for flow rule with ID %" PRIu32, _port_id, int_rule_id);
+            "DPDK Flow Parser (port %u): No count instruction for flow rule with ID %" PRIu32, _port_id, int_rule_id);
         return "";
     }
 
@@ -2054,7 +2053,7 @@ FlowParser::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pkts, 
     if (rte_flow_query(_port_id, pf->flow, action->type, &query, &error) < 0) {
 #endif
         _errh->message(
-            "Flow Dispatcher (port %u): Failed to query stats for flow rule with ID %" PRIu32, _port_id, int_rule_id);
+            "DPDK Flow Parser (port %u): Failed to query stats for flow rule with ID %" PRIu32, _port_id, int_rule_id);
         return "";
     }
 
@@ -2092,7 +2091,7 @@ FlowParser::flow_rule_aggregate_stats()
 
     struct rte_port *port = get_port(_port_id);
     if (!port->flow_list || (flow_rules_count() == 0)) {
-        _errh->warning("Flow Dispatcher (port %u): No aggregate statistics due to no traffic", _port_id);
+        _errh->warning("DPDK Flow Parser (port %u): No aggregate statistics due to no traffic", _port_id);
         return "";
     }
 
@@ -2144,7 +2143,7 @@ FlowParser::flow_rule_aggregate_stats()
 
     uint16_t queues_nb = pkts_in_queue.size();
     if (queues_nb == 0) {
-        _errh->warning("Flow Dispatcher (port %u): No queues to produce aggregate statistics", _port_id);
+        _errh->warning("DPDK Flow Parser (port %u): No queues to produce aggregate statistics", _port_id);
         return "";
     }
 
@@ -2200,7 +2199,7 @@ FlowParser::flow_rules_with_hits_count()
 
     struct rte_port *port = get_port(_port_id);
     if (!port->flow_list || (flow_rules_count() == 0)) {
-        _errh->warning("Flow Dispatcher (port %u): No counter for flow rules with hits due to no traffic", _port_id);
+        _errh->warning("DPDK Flow Parser (port %u): No counter for flow rules with hits due to no traffic", _port_id);
         return 0;
     }
 
@@ -2255,7 +2254,7 @@ FlowParser::flow_rules_count_explicit()
     struct rte_port *port = get_port(_port_id);
     if (!port->flow_list) {
         if (verbose()) {
-            _errh->message("Flow Dispatcher (port %u): No flow rules", _port_id);
+            _errh->message("DPDK Flow Parser (port %u): No flow rules", _port_id);
         }
         return rules_nb;
     }
@@ -2294,12 +2293,12 @@ String
 FlowParser::flow_rules_list(const bool only_matching_rules)
 {
     if (!active()) {
-        return "Flow Dispatcher is inactive";
+        return "DPDK Flow Parser is inactive";
     }
 
     struct rte_port *port = get_port(_port_id);
     if (!port->flow_list || (flow_rules_count() == 0)) {
-        _errh->error("Flow Dispatcher (port %u): No flow rules to list", _port_id);
+        _errh->error("DPDK Flow Parser (port %u): No flow rules to list", _port_id);
         return "No flow rules";
     }
 
@@ -2394,7 +2393,7 @@ String
 FlowParser::flow_rule_ids_internal(const bool from_nic)
 {
     if (!active()) {
-        return "Flow Dispatcher is inactive";
+        return "DPDK Flow Parser is inactive";
     }
 
     if (from_nic) {
@@ -2413,7 +2412,7 @@ FlowParser::flow_rule_ids_internal_nic()
 {
     struct rte_port *port = get_port(_port_id);
     if (!port->flow_list || (flow_rules_count() == 0)) {
-        _errh->error("Flow Dispatcher (port %u): No flow rule IDs to list", _port_id);
+        _errh->error("DPDK Flow Parser (port %u): No flow rule IDs to list", _port_id);
         return "";
     }
 
@@ -2447,7 +2446,7 @@ String
 FlowParser::flow_rule_ids_internal_cache()
 {
     if (!active()) {
-        return "Flow Dispatcher is inactive";
+        return "DPDK Flow Parser is inactive";
     }
 
     Vector<uint32_t> rule_ids = _flow_cache->internal_rule_ids();
@@ -2473,7 +2472,7 @@ String
 FlowParser::flow_rule_ids_internal_counters()
 {
     if (!active()) {
-        return "Flow Dispatcher is inactive";
+        return "DPDK Flow Parser is inactive";
     }
 
     Vector<uint32_t> rule_ids = _flow_cache->internal_rule_ids_counters();
@@ -2495,7 +2494,7 @@ String
 FlowParser::flow_rule_ids_global()
 {
     if (!active()) {
-        return "Flow Dispatcher is inactive";
+        return "DPDK Flow Parser is inactive";
     }
 
     Vector<uint32_t> rule_ids = _flow_cache->global_rule_ids();
@@ -2518,7 +2517,7 @@ void
 FlowParser::flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rules)
 {
     if (!port || !port->flow_list) {
-        _errh->error("Flow Dispatcher (port %u): Cannot sort empty flow rules' list", _port_id);
+        _errh->error("DPDK Flow Parser (port %u): Cannot sort empty flow rules' list", _port_id);
         return;
     }
 
@@ -2550,7 +2549,7 @@ FlowParser::flow_rules_sort(struct rte_port *port, struct port_flow **sorted_rul
 }
 
 /**
- * Flushes all of the flow rules from a NIC associated with this Flow Dispatcher instance.
+ * Flushes all of the flow rules from a NIC associated with this Flow Parser instance.
  *
  * @return the number of flow rules being flushed
  */
@@ -2559,7 +2558,7 @@ FlowParser::flow_rules_flush()
 {
     // Only active instances can configure a NIC
     if (!active()) {
-        _errh->message("Flow Dispatcher (port %u): Nothing to flush", _port_id);
+        _errh->message("DPDK Flow Parser (port %u): Nothing to flush", _port_id);
         return 0;
     }
 
@@ -2574,7 +2573,7 @@ FlowParser::flow_rules_flush()
     // Successful flush means zero rules left
     if (port_flow_flush(_port_id) != FLOWPARSER_SUCCESS) {
         uint32_t rules_after_flush = flow_rules_count_explicit();
-        _errh->warning("Flow Dispatcher (port %u): Flushed only %" PRIu32 " rules", _port_id, (rules_before_flush - rules_after_flush));
+        _errh->warning("DPDK Flow Parser (port %u): Flushed only %" PRIu32 " rules", _port_id, (rules_before_flush - rules_after_flush));
         return (rules_before_flush - rules_after_flush);
     }
 
@@ -2588,7 +2587,7 @@ FlowParser::flow_rules_flush()
 
     if (_verbose) {
         _errh->message(
-            "Flow Dispatcher (port %u): Successfully flushed %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
+            "DPDK Flow Parser (port %u): Successfully flushed %" PRIu32 " rules in %.0f ms at the rate of %.3f rules/sec",
             _port_id, rules_before_flush, rdts.latency_ms, rdts.rules_per_sec
         );
     }
@@ -2681,7 +2680,7 @@ FlowParser::min_avg_max(float &min, float &mean, float &max, const bool install,
     }
 
     if (!rule_stats_vec) {
-        _errh->warning("Flow Dispatcher (port %u): No rule statistics available", _port_id);
+        _errh->warning("DPDK Flow Parser (port %u): No rule statistics available", _port_id);
         return;
     }
 
@@ -2729,7 +2728,7 @@ FlowParser::rule_consistency_check(const int32_t &target_number_of_rules)
 {
     if (target_number_of_rules < 0) {
         _errh->error(
-            "Flow Dispatcher (port %u): Cannot verify consistency with a negative number of target rules",
+            "DPDK Flow Parser (port %u): Cannot verify consistency with a negative number of target rules",
             get_port_id(), target_number_of_rules
         );
         return;

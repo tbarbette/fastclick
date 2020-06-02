@@ -149,7 +149,7 @@ public:
     };
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    void initialize_flow_dispatcher(
+    void initialize_flow_parser(
         const portid_t &port_id,
         ErrorHandler   *errh
     );
