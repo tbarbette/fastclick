@@ -1,5 +1,5 @@
 /*
- * exactcpuswitch.{cc,hh} -- Element select per-cpu path
+ * exactcpuswitch.{cc,hh} -- Element selects per-cpu path
  *
  * Tom Barbette
  *
@@ -35,7 +35,7 @@ ExactCPUSwitch::update_map() {
     Bitvector b = get_pushing_threads();
     map.resize(b.size());
     int j = 0;
-    for (int i = 0; i < b.size(); i++) {
+    for (unsigned i = 0; i < b.size(); i++) {
         if (b[i] == false) {
             map[i] = -1;
             continue;
