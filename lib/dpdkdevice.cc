@@ -41,7 +41,7 @@ DPDKDevice::DPDKDevice() : port_id(-1), info() {
 DPDKDevice::DPDKDevice(portid_t port_id) : port_id(port_id) {
     #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
         if (port_id >= 0)
-            initialize_flow_dispatcher(port_id, ErrorHandler::default_handler());
+            initialize_flow_parser(port_id, ErrorHandler::default_handler());
     #endif
 };
 
@@ -97,20 +97,20 @@ int DPDKDevice::set_rss_max(int max)
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 /**
  * Called by the constructor of DPDKDevice.
- * Flow Dispatcher must be strictly invoked once for each port.
+ * Flow Parser must be strictly invoked once for each port.
  *
- * @param port_id the ID of the device where Flow Dispatcher is invoked
+ * @param port_id the ID of the device where Flow Parser is invoked
  * @param errh an error handler instance
  */
-void DPDKDevice::initialize_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh)
+void DPDKDevice::initialize_flow_parser(const portid_t &port_id, ErrorHandler *errh)
 {
-    FlowParser *flow_disp = FlowParser::get_flow_dispatcher(port_id, errh);
-    if (!flow_disp) {
+    FlowParser *flow_parser = FlowParser::get_flow_parser(port_id, errh);
+    if (!flow_parser) {
         return;
     }
 
     // Verify
-    const portid_t p_id = flow_disp->get_port_id();
+    const portid_t p_id = flow_parser->get_port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
@@ -380,13 +380,13 @@ int DPDKDevice::set_mode(
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     if (mode == FlowParser::DISPATCHING_MODE) {
-        FlowParser *flow_disp = FlowParser::get_flow_dispatcher(port_id, errh);
-        flow_disp->set_active(true);
-        flow_disp->set_rules_filename(flow_rules_filename);
+        FlowParser *flow_parser = FlowParser::get_flow_parser(port_id, errh);
+        flow_parser->set_active(true);
+        flow_parser->set_rules_filename(flow_rules_filename);
         errh->message(
-            "Flow Dispatcher (port %u): State %s - Isolation Mode %s - Source file '%s'",
+            "DPDK Flow Parser (port %u): State %s - Isolation Mode %s - Source file '%s'",
             port_id,
-            flow_disp->active() ? "active" : "inactive",
+            flow_parser->active() ? "active" : "inactive",
             FlowParser::isolated(port_id) ? "active" : "inactive",
             flow_rules_filename.empty() ? "None" : flow_rules_filename.c_str()
         );
@@ -1053,11 +1053,11 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
     _is_initialized = true;
 
-    // Configure Flow Dispatcher
+    // Configure Flow Parser
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     for (HashTable<portid_t, FlowParser *>::iterator
-            it = FlowParser::dev_flow_disp.begin();
-            it != FlowParser::dev_flow_disp.end(); ++it) {
+            it = FlowParser::dev_flow_parser.begin();
+            it != FlowParser::dev_flow_parser.end(); ++it) {
         const portid_t port_id = it.key();
 
         DPDKDevice *dev = get_device(port_id);
@@ -1085,17 +1085,17 @@ int DPDKDevice::configure_nic(const portid_t &port_id)
         return -1;
     }
 
-    FlowParser *flow_disp = FlowParser::get_flow_dispatcher(port_id);
-    assert(flow_disp);
+    FlowParser *flow_parser = FlowParser::get_flow_parser(port_id);
+    assert(flow_parser);
 
-    // Invoke Flow Dispatcher only if active
-    if (flow_disp->active()) {
+    // Invoke Flow Parser only if active
+    if (flow_parser->active()) {
         // Retrieve the file that contains the rules (if any)
-        String rules_file = flow_disp->rules_filename();
+        String rules_file = flow_parser->rules_filename();
 
         // There is a file with (user-defined) rules
         if (!rules_file.empty()) {
-            if (flow_disp->add_rules_from_file(rules_file) >= 0)
+            if (flow_parser->add_rules_from_file(rules_file) >= 0)
                 return 0;
             else
                 return -1;
@@ -1114,7 +1114,7 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    HashTable<portid_t, FlowParser *> map = FlowParser::flow_dispatcher_map();
+    HashTable<portid_t, FlowParser *> map = FlowParser::flow_parser_map();
 
     for (HashTable<portid_t, FlowParser *>::const_iterator
             it = map.begin(); it != map.end(); ++it) {
@@ -1123,25 +1123,25 @@ void DPDKDevice::cleanup(ErrorHandler *errh)
         }
 
         portid_t port_id = it.key();
-        FlowParser *flow_disp = it.value();
+        FlowParser *flow_parser = it.value();
 
         // Flush
-        uint32_t rules_flushed = flow_disp->flow_rules_flush();
+        uint32_t rules_flushed = flow_parser->flow_rules_flush();
 
         // Delete this instance
-        delete flow_disp;
+        delete flow_parser;
 
         // Report
         if (rules_flushed > 0) {
             errh->message(
-                "Flow Dispatcher (port %u): Flushed %d rules from the NIC",
+                "DPDK Flow Parser (port %u): Flushed %d rules from the NIC",
                 port_id, rules_flushed
             );
         }
     }
 
     // Clean up the table
-    FlowParser::clean_flow_dispatcher_map();
+    FlowParser::clean_flow_parser_map();
 #endif
 }
 

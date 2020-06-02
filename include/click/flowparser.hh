@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowparser.hh -- DPDK's Flow API in Click
+ * flowparser.hh -- DPDK's Flow API (rte_flow) in Click
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS & KTH Royal Institute of Technology
  *
@@ -163,10 +163,10 @@ class FlowParser {
         FlowParser(portid_t port_id, ErrorHandler *errh);
         ~FlowParser();
 
-        // DPDKDevice mode is Flow Dispatcher
+        // DPDKDevice mode for the Flow Parser
         static String DISPATCHING_MODE;
 
-        // Supported Flow Dispatcher handlers (called from FromDPDKDevice)
+        // Supported Flow Parser handlers (called from FromDPDKDevice)
         static String FLOW_RULE_ADD;
         static String FLOW_RULE_DEL;
         static String FLOW_RULE_IDS_GLB;
@@ -191,22 +191,22 @@ class FlowParser {
         // Set of flow rule actions supported by the Flow API
         static HashMap<int, String> flow_action;
 
-        // Global table of DPDK ports mapped to their Flow Dispatcher objects
-        static HashTable<portid_t, FlowParser *> dev_flow_disp;
+        // Global table of DPDK ports mapped to their Flow Parser objects
+        static HashTable<portid_t, FlowParser *> dev_flow_parser;
 
-        // Map of ports to Flow Dispatcher instances
-        static HashTable<portid_t, FlowParser *> flow_dispatcher_map();
+        // Map of ports to Flow Parser instances
+        static HashTable<portid_t, FlowParser *> flow_parser_map();
 
-        // Cleans the mappings between ports and Flow Dispatcher instances
-        static void clean_flow_dispatcher_map();
+        // Cleans the mappings between ports and Flow Parser instances
+        static void clean_flow_parser_map();
 
-        // Acquires a Flow Dispatcher instance on a port
-        static FlowParser *get_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh = NULL);
+        // Acquires a Flow Parser instance on a port
+        static FlowParser *get_flow_parser(const portid_t &port_id, ErrorHandler *errh = NULL);
 
         // Parser initialization
         static struct cmdline *parser(ErrorHandler *errh);
 
-        // Get the flow cache associated with a Flow Dispatcher
+        // Get the flow cache associated with a Flow Parser
         FlowCache *get_flow_cache();
 
         // Deletes the error handler of this element
@@ -357,7 +357,7 @@ class FlowParser {
         // Device ID
         portid_t _port_id;
 
-        // Indicates whether Flow Dispatcher is active for a given device
+        // Indicates whether Flow Parser is active for a given device
         bool _active;
 
         // Set stdout verbosity
@@ -370,7 +370,7 @@ class FlowParser {
         // A dedicated error handler
         ErrorVeneer *_errh;
 
-        // A low rule cache associated with the port of this Flow Dispatcher
+        // A flow rule cache associated with the port of this Flow Parser
         FlowCache *_flow_cache;
 
         // Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future)
@@ -397,7 +397,7 @@ class FlowParser {
 
 };
 
-#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0) */
 
 CLICK_ENDDECLS
 

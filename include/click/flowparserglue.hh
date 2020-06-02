@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowparserglue.hh -- element that glues Click and DPDK for
+ * flowparserglue.hh -- glues Click and DPDK for
  * flow parsing and installation on DPDK-based NICs.
  *
  * Copyright (c) 2018 Tom Barbette, University of Liège
@@ -69,7 +69,7 @@ static struct rte_port *get_ports() {
 static struct rte_port *get_port(const portid_t &port_id) {
     if (!ports) {
         printf(
-            "Flow Dispatcher (port %u): Unallocated DPDK ports\n",
+            "Flow Parser (port %u): Unallocated DPDK ports\n",
             port_id
         );
         return NULL;
@@ -77,7 +77,7 @@ static struct rte_port *get_port(const portid_t &port_id) {
 
     if (port_id < 0) {
         printf(
-            "Flow Dispatcher (port %u): Invalid port identifier\n",
+            "Flow Parser (port %u): Invalid port identifier\n",
             port_id
         );
         return NULL;
@@ -153,7 +153,7 @@ init_port(void)
 }
 
 /**
- * Obtains an instance of the Flow Dispatcher parser.
+ * Obtains an instance of the Flow Parser's parser.
  *
  * @args errh: an instance of the error handler
  * @return a parser object
@@ -163,7 +163,7 @@ struct cmdline *flow_parser_init(
 );
 
 /**
- * Creates an instance of the Flow Dispatcher parser
+ * Creates an instance of the Flow Parser's parser
  * on a given context of instructions, obtained
  * from DPDK.
  *

@@ -11064,9 +11064,9 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_h=yes
+  ac_have_flow_parser_h=yes
 else
-  ac_have_flow_disp_h=no
+  ac_have_flow_parser_h=no
 fi
 
 as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparserglue.hh" | $as_tr_sh`
@@ -11087,12 +11087,12 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_disp_g_h=yes
+  ac_have_flow_parser_g_h=yes
 else
-  ac_have_flow_disp_g_h=no
+  ac_have_flow_parser_g_h=no
 fi
 
-if test "x$ac_have_flow_disp_h$ac_have_flow_disp_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyes20yes"; then
+if test "x$ac_have_flow_parser_h$ac_have_flow_parser_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyes20yes"; then
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 

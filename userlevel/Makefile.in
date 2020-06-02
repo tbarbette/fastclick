@@ -147,7 +147,7 @@ ifneq ($(MAKECMDGOALS),clean)
 -include $(ELEMENTSCONF).mk
 endif
 
-# At of after DPDK 20.02, compile against an additional library librte_parse (flow dispatcher)
+# At of after DPDK 20.02, compile against an additional library librte_parse (flow parser)
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
 ddeps: Makefile librte_parse.a libclick.a $(OBJS)
 
