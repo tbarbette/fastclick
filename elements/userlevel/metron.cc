@@ -736,7 +736,6 @@ CpuCacheHierarchy::add_cache(CpuCache *cache)
 void
 CpuCacheHierarchy::query()
 {
-    int max_level = 0;
     String cache_folders = shell_command_output_string(
         "find /sys/devices/system/cpu/cpu0/cache/ -maxdepth 1 -type d | grep index | sort -u", "", 0);
     Vector<String> cache_tokens = cache_folders.split('\n');
@@ -746,16 +745,12 @@ CpuCacheHierarchy::query()
             continue;
         }
 
-        int level_int;
+        int level_int = atoi(file_string(cache_file + "/level").c_str());
         bool is_shared = false;
-        String cpu_list = file_string(cache_file + "/shared_cpu_list").c_str();
-        Vector<String> cpu_tokens = cpu_list.split(',');
-        if (cpu_tokens.size() > 1) {
-            level_int = max_level + 1;
+        // String cpu_list = file_string(cache_file + "/shared_cpu_list").c_str();   // This might be false in case of HT
+        // Vector<String> cpu_tokens = cpu_list.split(",-");
+        if (level_int > 2) {
             is_shared = true;
-        } else {
-            level_int = atoi(file_string(cache_file + "/level").c_str());
-            max_level = level_int;
         }
         String type_str = file_string(cache_file + "/type").trim_space().c_str();
         int sets = atoi(file_string(cache_file + "/number_of_sets").trim_space().c_str());
@@ -790,6 +785,7 @@ CpuCacheHierarchy::compute_total_capacity()
     assert(_cores_nb > 0);
     assert(_per_core_capacity > 0);
     assert(_llc_capacity > 0);
+    assert(_llc_capacity > _per_core_capacity);
     _total_capacity = (_sockets_nb * _llc_capacity) + (_cores_nb * _per_core_capacity);
     assert(
         (_total_capacity > 0) &&
@@ -1211,6 +1207,9 @@ MemoryHierarchy::fill_missing()
         }
         if (module->get_speed() < 0) {
             module->set_speed(get_module_speed());
+        }
+        if (module->get_serial_number().empty()) {
+            module->set_serial_nb("Not Specified");
         }
     }
 }
@@ -1713,9 +1712,7 @@ Metron::collect_system_resources()
         }
     }
 
-    if (_verbose) {
-        _sys_res->print();
-    }
+    _sys_res->print();
 }
 
 /**
