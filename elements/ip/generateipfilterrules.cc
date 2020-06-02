@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4; related-file-name: "generateipfilter.hh" -*-
 /*
- * generateipfilter.{cc,hh} -- element generates IPFilter patterns out of input traffic
+ * generateipfilterrules.{cc,hh} -- element generates IPFilter rule patterns out of input traffic
  * Tom Barbette, (extended by) Georgios Katsikas
  *
  * Copyright (c) 2017 Tom Barbette, University of Liège
@@ -23,26 +23,26 @@
 #include <click/error.hh>
 #include <click/straccum.hh>
 
-#include "generateipfilter.hh"
+#include "generateipfilterrules.hh"
 
 CLICK_DECLS
 
-const int GenerateIPPacket::DEF_NB_RULES = 1000;
-const uint16_t GenerateIPPacket::INCLUDE_TP_PORT = 0xffff;
+const int GenerateIPPacketRules::DEF_NB_RULES = 1000;
+const uint16_t GenerateIPPacketRules::INCLUDE_TP_PORT = 0xffff;
 
 /**
  * Base class for pattern generation out of incoming traffic.
  */
-GenerateIPPacket::GenerateIPPacket() : _nrules(DEF_NB_RULES), _flows_nb(0), _inst_rules(0), _prefix(32)
+GenerateIPPacketRules::GenerateIPPacketRules() : _nrules(DEF_NB_RULES), _flows_nb(0), _inst_rules(0), _prefix(32)
 {
 }
 
-GenerateIPPacket::~GenerateIPPacket()
+GenerateIPPacketRules::~GenerateIPPacketRules()
 {
 }
 
 int
-GenerateIPPacket::configure(Vector<String> &conf, ErrorHandler *errh)
+GenerateIPPacketRules::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
             .read_p("NB_RULES", _nrules)
@@ -53,13 +53,13 @@ GenerateIPPacket::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-GenerateIPPacket::initialize(ErrorHandler *errh)
+GenerateIPPacketRules::initialize(ErrorHandler *errh)
 {
     return 0;
 }
 
 int
-GenerateIPPacket::build_mask(IPFlowID &mask, bool keep_saddr, bool keep_daddr, bool keep_sport, bool keep_dport, int prefix)
+GenerateIPPacketRules::build_mask(IPFlowID &mask, bool keep_saddr, bool keep_daddr, bool keep_sport, bool keep_dport, int prefix)
 {
     if (!keep_saddr && !keep_daddr && !keep_sport && !keep_dport) {
         return -1;
@@ -76,32 +76,32 @@ GenerateIPPacket::build_mask(IPFlowID &mask, bool keep_saddr, bool keep_daddr, b
 }
 
 void
-GenerateIPPacket::cleanup(CleanupStage)
+GenerateIPPacketRules::cleanup(CleanupStage)
 {
     return;
 }
 
-HashMap<uint8_t, RuleFormatter *> GenerateIPFilter::_rule_formatter_map;
+HashMap<uint8_t, RuleFormatter *> GenerateIPFilterRules::_rule_formatter_map;
 
 /**
  * IP FIlter rules' generator out of incoming traffic.
  */
-GenerateIPFilter::GenerateIPFilter() :
-    GenerateIPPacket(), _keep_saddr(true), _keep_daddr(true), _keep_sport(false), _keep_dport(true),
+GenerateIPFilterRules::GenerateIPFilterRules() :
+    GenerateIPPacketRules(), _keep_saddr(true), _keep_daddr(true), _keep_sport(false), _keep_dport(true),
     _map_reduced(false), _pref_reduced(-1), _pattern_type(NONE), _out_file("rules")
 {
 }
 
 
 
-GenerateIPFilter::GenerateIPFilter(RulePattern pattern_type) :
-    GenerateIPPacket(), _keep_saddr(true), _keep_daddr(true), _keep_sport(false), _keep_dport(true),
+GenerateIPFilterRules::GenerateIPFilterRules(RulePattern pattern_type) :
+    GenerateIPPacketRules(), _keep_saddr(true), _keep_daddr(true), _keep_sport(false), _keep_dport(true),
     _map_reduced(false), _pref_reduced(-1), _out_file("rules")
 {
     _pattern_type = pattern_type;
 }
 
-GenerateIPFilter::~GenerateIPFilter()
+GenerateIPFilterRules::~GenerateIPFilterRules()
 {
     auto it = _rule_formatter_map.begin();
     while (it != _rule_formatter_map.end()) {
@@ -112,7 +112,7 @@ GenerateIPFilter::~GenerateIPFilter()
 }
 
 int
-GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
+GenerateIPFilterRules::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String pattern_type = "IPFILTER";
 
@@ -133,7 +133,7 @@ GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
         } else if (pattern_type.upper() == "IPCLASSIFIER") {
             _pattern_type = IPCLASSIFIER;
         } else {
-            errh->error("Invalid PATTERN_TYPE for GenerateIPFilter. Select in [IPFILTER, IPCLASSIFIER]");
+            errh->error("Invalid PATTERN_TYPE for GenerateIPFilterRules. Select in [IPFILTER, IPCLASSIFIER]");
             return -1;
         }
     }
@@ -154,22 +154,22 @@ GenerateIPFilter::configure(Vector<String> &conf, ErrorHandler *errh)
             new IPClassifierRuleFormatter(_keep_sport, _keep_dport));
     }
 
-    return GenerateIPPacket::configure(conf, errh);
+    return GenerateIPPacketRules::configure(conf, errh);
 }
 
 int
-GenerateIPFilter::initialize(ErrorHandler *errh)
+GenerateIPFilterRules::initialize(ErrorHandler *errh)
 {
-    return GenerateIPPacket::initialize(errh);
+    return GenerateIPPacketRules::initialize(errh);
 }
 
 void
-GenerateIPFilter::cleanup(CleanupStage)
+GenerateIPFilterRules::cleanup(CleanupStage)
 {
 }
 
 Packet *
-GenerateIPFilter::simple_action(Packet *p)
+GenerateIPFilterRules::simple_action(Packet *p)
 {
     // Create a flow signature for this packet
     IPFlowID flowid(p);
@@ -177,7 +177,7 @@ GenerateIPFilter::simple_action(Packet *p)
     new_flow.initialize(flowid & _mask);
 
     // Check if we already have such a flow
-    IPFlow *found = _map.find(flowid).get();
+    IPFlow *found = _map.find(flowid & _mask).get();
 
     // New flow
     if (!found) {
@@ -187,6 +187,7 @@ GenerateIPFilter::simple_action(Packet *p)
         // Keep the protocol type
         new_flow.set_proto(p->ip_header()->ip_p);
 
+        // Visualize this flow
         // new_flow.print_flow_info();
 
         // Insert this new flow into the flow map
@@ -203,22 +204,22 @@ GenerateIPFilter::simple_action(Packet *p)
 
 #if HAVE_BATCH
 PacketBatch*
-GenerateIPFilter::simple_action_batch(PacketBatch *batch)
+GenerateIPFilterRules::simple_action_batch(PacketBatch *batch)
 {
-    EXECUTE_FOR_EACH_PACKET(GenerateIPFilter::simple_action, batch);
+    EXECUTE_FOR_EACH_PACKET(GenerateIPFilterRules::simple_action, batch);
     return batch;
 }
 #endif
 
 IPFlowID
-GenerateIPFilter::get_mask(int prefix)
+GenerateIPFilterRules::get_mask(int prefix)
 {
     IPFlowID fid = IPFlowID(IPAddress::make_prefix(prefix), _mask.sport(), IPAddress::make_prefix(prefix), _mask.dport());
     return fid;
 }
 
 bool
-GenerateIPFilter::is_wildcard(const IPFlow &flow)
+GenerateIPFilterRules::is_wildcard(const IPFlow &flow)
 {
     if ((flow.flowid().saddr().s() == "0.0.0.0") ||
         (flow.flowid().daddr().s() == "0.0.0.0")) {
@@ -229,7 +230,7 @@ GenerateIPFilter::is_wildcard(const IPFlow &flow)
 }
 
 int
-GenerateIPFilter::prepare_rules(bool verbose)
+GenerateIPFilterRules::prepare_rules(bool verbose)
 {
     // This method must be called only once
     if (_map_reduced) {
@@ -310,7 +311,7 @@ GenerateIPFilter::prepare_rules(bool verbose)
 }
 
 int
-GenerateIPFilter::count_rules()
+GenerateIPFilterRules::count_rules()
 {
     // Create the map of flows if not already there
     if (_pref_reduced < 0) {
@@ -323,7 +324,7 @@ GenerateIPFilter::count_rules()
 }
 
 String
-GenerateIPFilter::dump_rules(const RuleFormat& rf, bool verbose)
+GenerateIPFilterRules::dump_rules(const RuleFormat& rf, bool verbose)
 {
     // Create the map of flows if not already there
     int n = _pref_reduced;
@@ -348,11 +349,11 @@ GenerateIPFilter::dump_rules(const RuleFormat& rf, bool verbose)
 }
 
 String
-GenerateIPFilter::read_handler(Element *e, void *user_data)
+GenerateIPFilterRules::read_handler(Element *e, void *user_data)
 {
-    GenerateIPFilter *g = static_cast<GenerateIPFilter *>(e);
+    GenerateIPFilterRules *g = static_cast<GenerateIPFilterRules *>(e);
     if (!g) {
-        return "GenerateIPFilter element not found";
+        return "GenerateIPFilterRules element not found";
     }
 
     assert(g->_pattern_type == IPFILTER || g->_pattern_type == IPCLASSIFIER);
@@ -381,7 +382,7 @@ GenerateIPFilter::read_handler(Element *e, void *user_data)
 }
 
 int
-GenerateIPFilter::dump_rules_to_file(const String &content)
+GenerateIPFilterRules::dump_rules_to_file(const String &content)
 {
     FILE *fp = NULL;
 
@@ -400,11 +401,11 @@ GenerateIPFilter::dump_rules_to_file(const String &content)
 }
 
 String
-GenerateIPFilter::to_file_handler(Element *e, void *user_data)
+GenerateIPFilterRules::to_file_handler(Element *e, void *user_data)
 {
-    GenerateIPFilter *g = static_cast<GenerateIPFilter *>(e);
+    GenerateIPFilterRules *g = static_cast<GenerateIPFilterRules *>(e);
     if (!g) {
-        return "GenerateIPFilter element not found";
+        return "GenerateIPFilterRules element not found";
     }
     RuleFormat rf = RULE_IPFILTER;
     if (g->_pattern_type == IPCLASSIFIER) {
@@ -427,7 +428,7 @@ GenerateIPFilter::to_file_handler(Element *e, void *user_data)
 }
 
 String
-IPClassifierRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+IPClassifierRuleFormatter::flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
     assert((prefix > 0) && (prefix <= 32));
     StringAccum acc;
@@ -445,7 +446,7 @@ IPClassifierRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const 
 }
 
 String
-IPFilterRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+IPFilterRuleFormatter::flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
     String rule = IPClassifierRuleFormatter::flow_to_string(flow, flow_nb, prefix);
     if (rule.empty()) {
@@ -456,7 +457,7 @@ IPFilterRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint
 }
 
 void
-GenerateIPFilter::add_handlers()
+GenerateIPFilterRules::add_handlers()
 {
     add_read_handler("flows_nb", read_handler, h_flows_nb);
     add_read_handler("rules_nb", read_handler, h_rules_nb);
@@ -465,4 +466,4 @@ GenerateIPFilter::add_handlers()
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(GenerateIPFilter)
+EXPORT_ELEMENT(GenerateIPFilterRules)

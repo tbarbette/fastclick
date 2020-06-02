@@ -1,17 +1,17 @@
 #ifndef CLICK_GENERATEIPLOOKUP_HH
 #define CLICK_GENERATEIPLOOKUP_HH
-#include "generateipfilter.hh"
+#include "generateipfilterrules.hh"
 
 CLICK_DECLS
 
 /*
 =c
 
-GenerateIPLookup(NB_RULES, OUT_PORT, [, PREFIX, OUT_FILE])
+GenerateIPLookupRules(NB_RULES, OUT_PORT, [, PREFIX, OUT_FILE])
 
 =s ip
 
-generates IPRouteTable patterns out of input traffic
+generates IPRouteTable rule patterns out of input traffic
 
 =d
 
@@ -80,23 +80,23 @@ Outputs the rules to a designated file.
 
 =back
 
-=a IPRouteTable, LookupIPRouteMP, GenerateIPFilter */
+=a IPRouteTable, LookupIPRouteMP, GenerateIPFilterRules */
 
 /**
  * Abstract, base class that offers IPFlow representation & storage.
  */
-class GenerateIPFilter;
+class GenerateIPFilterRules;
 
 /**
  * Uses the base class to generate IPRouteTable patterns out of the traffic.
  */
-class GenerateIPLookup : public GenerateIPFilter {
+class GenerateIPLookupRules : public GenerateIPFilterRules {
 
     public:
-        GenerateIPLookup() CLICK_COLD;
-        ~GenerateIPLookup() CLICK_COLD;
+        GenerateIPLookupRules() CLICK_COLD;
+        ~GenerateIPLookupRules() CLICK_COLD;
 
-        const char *class_name() const { return "GenerateIPLookup"; }
+        const char *class_name() const { return "GenerateIPLookupRules"; }
         const char *port_count() const { return PORTS_1_1; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -127,7 +127,7 @@ class IPLookupRuleFormatter : public RuleFormatter {
             RuleFormatter(s_port, d_port), _out_port(out_p) {};
         ~IPLookupRuleFormatter() {};
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix);
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix);
 
     protected:
         /**

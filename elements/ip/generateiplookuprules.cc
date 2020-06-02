@@ -1,6 +1,6 @@
-// -*- c-basic-offset: 4; related-file-name: "generateiplookup.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "generateiplookuprules.hh" -*-
 /*
- * generateiplookup.{cc,hh} -- element generates IPRouteTable rule patterns out of input traffic
+ * generateiplookuprules.{cc,hh} -- element generates IPRouteTable rule patterns out of input traffic
  * Tom Barbette, Georgios Katsikas
  *
  * Copyright (c) 2017 Tom Barbette, University of Liège
@@ -23,7 +23,7 @@
 #include <click/error.hh>
 #include <click/straccum.hh>
 
-#include "generateiplookup.hh"
+#include "generateiplookuprules.hh"
 
 CLICK_DECLS
 
@@ -32,20 +32,20 @@ static const uint8_t DEF_OUT_PORT = 1;
 /**
  * IPRouteTable rules' generator out of incoming traffic.
  */
-GenerateIPLookup::GenerateIPLookup() :
-        _out_port(DEF_OUT_PORT), GenerateIPFilter(IPLOOKUP)
+GenerateIPLookupRules::GenerateIPLookupRules() :
+        _out_port(DEF_OUT_PORT), GenerateIPFilterRules(IPLOOKUP)
 {
     _keep_saddr = false;
     _keep_sport = false;
     _keep_dport = false;
 }
 
-GenerateIPLookup::~GenerateIPLookup()
+GenerateIPLookupRules::~GenerateIPLookupRules()
 {
 }
 
 int
-GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
+GenerateIPLookupRules::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
             .read_mp("OUT_PORT", _out_port)
@@ -57,7 +57,7 @@ GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
         return -1;
     }
 
-    if (GenerateIPFilter::configure(conf, errh) < 0) {
+    if (GenerateIPFilterRules::configure(conf, errh) < 0) {
         return -1;
     }
 
@@ -89,25 +89,25 @@ GenerateIPLookup::configure(Vector<String> &conf, ErrorHandler *errh)
 }
 
 int
-GenerateIPLookup::initialize(ErrorHandler *errh)
+GenerateIPLookupRules::initialize(ErrorHandler *errh)
 {
-    return GenerateIPPacket::initialize(errh);
+    return GenerateIPPacketRules::initialize(errh);
 }
 
 void
-GenerateIPLookup::cleanup(CleanupStage)
+GenerateIPLookupRules::cleanup(CleanupStage)
 {
 }
 
 IPFlowID
-GenerateIPLookup::get_mask(int prefix)
+GenerateIPLookupRules::get_mask(int prefix)
 {
     IPFlowID fid = IPFlowID(0, 0, IPAddress::make_prefix(prefix), 0);
     return fid;
 }
 
 bool
-GenerateIPLookup::is_wildcard(const IPFlow &flow)
+GenerateIPLookupRules::is_wildcard(const IPFlow &flow)
 {
     if (flow.flowid().daddr().s() == "0.0.0.0") {
         return true;
@@ -117,11 +117,11 @@ GenerateIPLookup::is_wildcard(const IPFlow &flow)
 }
 
 String
-GenerateIPLookup::read_handler(Element *e, void *user_data)
+GenerateIPLookupRules::read_handler(Element *e, void *user_data)
 {
-    GenerateIPLookup *g = static_cast<GenerateIPLookup *>(e);
+    GenerateIPLookupRules *g = static_cast<GenerateIPLookupRules *>(e);
     if (!g) {
-        return "GenerateIPLookup element not found";
+        return "GenerateIPLookupRules element not found";
     }
 
     assert(g->_pattern_type == IPLOOKUP);
@@ -146,11 +146,11 @@ GenerateIPLookup::read_handler(Element *e, void *user_data)
 }
 
 String
-GenerateIPLookup::to_file_handler(Element *e, void *user_data)
+GenerateIPLookupRules::to_file_handler(Element *e, void *user_data)
 {
-    GenerateIPLookup *g = static_cast<GenerateIPLookup *>(e);
+    GenerateIPLookupRules *g = static_cast<GenerateIPLookupRules *>(e);
     if (!g) {
-        return "GenerateIPLookup element not found";
+        return "GenerateIPLookupRules element not found";
     }
 
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
@@ -169,7 +169,7 @@ GenerateIPLookup::to_file_handler(Element *e, void *user_data)
 }
 
 String
-IPLookupRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+IPLookupRuleFormatter::flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
     assert((prefix > 0) && (prefix <= 32));
 
@@ -181,7 +181,7 @@ IPLookupRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint
 }
 
 void
-GenerateIPLookup::add_handlers()
+GenerateIPLookupRules::add_handlers()
 {
     add_read_handler("flows_nb", read_handler, h_flows_nb);
     add_read_handler("rules_nb", read_handler, h_rules_nb);
@@ -190,5 +190,5 @@ GenerateIPLookup::add_handlers()
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(GenerateIPFilter)
-EXPORT_ELEMENT(GenerateIPLookup)
+ELEMENT_REQUIRES(GenerateIPFilterRules)
+EXPORT_ELEMENT(GenerateIPLookupRules)

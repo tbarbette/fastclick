@@ -1,17 +1,17 @@
-#ifndef CLICK_GENERATEIPFLOWDISPATCHER_HH
-#define CLICK_GENERATEIPFLOWDISPATCHER_HH
+#ifndef CLICK_GENERATEIPDPDKFLOWRULES_HH
+#define CLICK_GENERATEIPDPDKFLOWRULES_HH
 
 #include <click/hashmap.hh>
 #include <click/timestamp.hh>
 
-#include "generateipfilter.hh"
+#include "generateipfilterrules.hh"
 
 CLICK_DECLS
 
 /*
 =c
 
-GenerateIPFlowDispatcher(PORT, NB_QUEUES, NB_RULES [, POLICY, KEEP_SADDR, KEEP_DADDR, KEEP_SPORT, KEEP_DPORT, PREFIX, OUT_FILE])
+GenerateIPDPDKFlowRules(PORT, NB_QUEUES, NB_RULES [, POLICY, KEEP_SADDR, KEEP_DADDR, KEEP_SPORT, KEEP_DPORT, PREFIX, OUT_FILE])
 
 =s ip
 
@@ -107,19 +107,19 @@ Outputs the load imbalance ratio of a certain queue.
 
 =back
 
-=a DPDKDevice, FlowDispatcher, GenerateIPFilter */
+=a DPDKDevice, FlowDispatcher, GenerateIPFilterRules */
 
 /**
  * Uses the base class to generate DPDK flow rule patterns out of the traffic.
  */
-class GenerateIPFlowDispatcher : public GenerateIPFilter {
+class GenerateIPDPDKFlowRules : public GenerateIPFilterRules {
 
     public:
 
-        GenerateIPFlowDispatcher() CLICK_COLD;
-        virtual ~GenerateIPFlowDispatcher() CLICK_COLD;
+        GenerateIPDPDKFlowRules() CLICK_COLD;
+        virtual ~GenerateIPDPDKFlowRules() CLICK_COLD;
 
-        const char *class_name() const { return "GenerateIPFlowDispatcher"; }
+        const char *class_name() const { return "GenerateIPDPDKFlowRules"; }
         const char *port_count() const { return PORTS_1_1; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
@@ -286,7 +286,7 @@ class DPDKFlowRuleFormatter : public RuleFormatter {
 
         inline QueueLoad *get_queue_load() { return _queue_load; };
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix);
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix);
 
     protected:
         /**
@@ -308,7 +308,7 @@ class DPDKFlowRuleFormatter : public RuleFormatter {
         /**
          * Assign a NIC queue to a rule according to a policy.
          */
-        String policy_based_rule_generation(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix);
+        String policy_based_rule_generation(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix);
 };
 
 CLICK_ENDDECLS

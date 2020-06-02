@@ -1,6 +1,6 @@
 #ifndef CLICK_GENERATEIPOPENFLOWRULES_HH
 #define CLICK_GENERATEIPOPENFLOWRULES_HH
-#include "generateipfilter.hh"
+#include "generateipfilterrules.hh"
 
 CLICK_DECLS
 
@@ -124,12 +124,12 @@ Outputs the rules following the ONOS format to a designated file.
 
 =back
 
-=a GenerateIPFilter */
+=a GenerateIPFilterRules */
 
 /**
  * Abstract, base class that offers IPFlow representation & storage.
  */
-class GenerateIPFilter;
+class GenerateIPFilterRules;
 class RuleFormatter;
 
 enum OpenFlowProtoVersion {
@@ -144,7 +144,7 @@ enum OpenFlowProtoVersion {
 /**
  * Uses the base class to generate OpenFlow rules out of the traffic.
  */
-class GenerateIPOpenFlowRules : public GenerateIPFilter {
+class GenerateIPOpenFlowRules : public GenerateIPFilterRules {
 
     public:
         GenerateIPOpenFlowRules() CLICK_COLD;
@@ -191,7 +191,7 @@ class OpenFlowRuleFormatter : public RuleFormatter {
             _in_port(in_p), _out_port(out_p) {};
         ~OpenFlowRuleFormatter() {};
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) = 0;
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) = 0;
 
     protected:
         /**
@@ -231,7 +231,7 @@ class OVSOpenFlowRuleFormatter : public OpenFlowRuleFormatter {
             OpenFlowRuleFormatter(of_p_ver, of_br, of_t, in_p, out_p, s_port, d_port) {};
         ~OVSOpenFlowRuleFormatter() {};
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
 };
 
 /**
@@ -245,7 +245,7 @@ class ONOSOpenFlowRuleFormatter : public OpenFlowRuleFormatter {
             OpenFlowRuleFormatter(of_p_ver, of_br, of_t, in_p, out_p, s_port, d_port) {};
         ~ONOSOpenFlowRuleFormatter() {};
 
-        virtual String flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
+        virtual String flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix) override;
 };
 
 CLICK_ENDDECLS

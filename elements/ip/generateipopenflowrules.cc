@@ -35,7 +35,7 @@ static const uint8_t MAX_OF_VER = 5;
 /**
  * OpenFlow rules' generator out of incoming traffic.
  */
-GenerateIPOpenFlowRules::GenerateIPOpenFlowRules() : GenerateIPFilter(OPENFLOW)
+GenerateIPOpenFlowRules::GenerateIPOpenFlowRules() : GenerateIPFilterRules(OPENFLOW)
 {
 }
 
@@ -81,7 +81,7 @@ GenerateIPOpenFlowRules::configure(Vector<String> &conf, ErrorHandler *errh)
         return errh->error("Invalid OUT_PORT. Input a non-negative integer.");
     }
 
-    if (GenerateIPFilter::configure(conf, errh) < 0) {
+    if (GenerateIPFilterRules::configure(conf, errh) < 0) {
         return -1;
     }
 
@@ -106,7 +106,7 @@ GenerateIPOpenFlowRules::configure(Vector<String> &conf, ErrorHandler *errh)
 int
 GenerateIPOpenFlowRules::initialize(ErrorHandler *errh)
 {
-    return GenerateIPPacket::initialize(errh);
+    return GenerateIPPacketRules::initialize(errh);
 }
 
 void
@@ -231,7 +231,7 @@ GenerateIPOpenFlowRules::add_handlers()
 }
 
 String
-OVSOpenFlowRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+OVSOpenFlowRuleFormatter::flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
     StringAccum acc;
     acc << "ovs-ofctl -O OpenFlow1" << _of_proto_ver << " ";
@@ -301,7 +301,7 @@ OVSOpenFlowRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const u
 }
 
 String
-ONOSOpenFlowRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
+ONOSOpenFlowRuleFormatter::flow_to_string(GenerateIPPacketRules::IPFlow &flow, const uint32_t flow_nb, const uint8_t prefix)
 {
     StringAccum acc;
 
@@ -311,5 +311,5 @@ ONOSOpenFlowRuleFormatter::flow_to_string(GenerateIPPacket::IPFlow &flow, const 
 }
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(GenerateIPFilter)
+ELEMENT_REQUIRES(GenerateIPFilterRules)
 EXPORT_ELEMENT(GenerateIPOpenFlowRules)
