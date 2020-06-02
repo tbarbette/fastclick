@@ -27,7 +27,7 @@
 #include <rte_errno.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    #include <click/flowparser.hh>
+    #include <click/flowrulemanager.hh>
 extern "C" {
     #include <rte_pmd_ixgbe.h>
 }
@@ -41,7 +41,7 @@ DPDKDevice::DPDKDevice() : port_id(-1), info() {
 DPDKDevice::DPDKDevice(portid_t port_id) : port_id(port_id) {
     #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
         if (port_id >= 0)
-            initialize_flow_parser(port_id, ErrorHandler::default_handler());
+            initialize_flow_rule_manager(port_id, ErrorHandler::default_handler());
     #endif
 };
 
@@ -97,20 +97,20 @@ int DPDKDevice::set_rss_max(int max)
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
 /**
  * Called by the constructor of DPDKDevice.
- * Flow Parser must be strictly invoked once for each port.
+ * Flow Rule Manager must be strictly invoked once for each port.
  *
- * @param port_id the ID of the device where Flow Parser is invoked
+ * @param port_id the ID of the device where Flow Rule Manager is invoked
  * @param errh an error handler instance
  */
-void DPDKDevice::initialize_flow_parser(const portid_t &port_id, ErrorHandler *errh)
+void DPDKDevice::initialize_flow_rule_manager(const portid_t &port_id, ErrorHandler *errh)
 {
-    FlowParser *flow_parser = FlowParser::get_flow_parser(port_id, errh);
-    if (!flow_parser) {
+    FlowRuleManager *flow_rule_mgr = FlowRuleManager::get_flow_rule_mgr(port_id, errh);
+    if (!flow_rule_mgr) {
         return;
     }
 
     // Verify
-    const portid_t p_id = flow_parser->get_port_id();
+    const portid_t p_id = flow_rule_mgr->get_port_id();
     assert((p_id >= 0) && (p_id == port_id));
 }
 #endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
@@ -330,7 +330,7 @@ int DPDKDevice::set_mode(
     if (mode == "none") {
         m = ETH_MQ_RX_NONE;
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    } else if ((mode == "rss") || (mode == FlowParser::DISPATCHING_MODE) || (mode == "")) {
+    } else if ((mode == "rss") || (mode == FlowRuleManager::DISPATCHING_MODE) || (mode == "")) {
 #else
     } else if ((mode == "rss") || (mode == "")) {
 #endif
@@ -379,15 +379,15 @@ int DPDKDevice::set_mode(
     }
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    if (mode == FlowParser::DISPATCHING_MODE) {
-        FlowParser *flow_parser = FlowParser::get_flow_parser(port_id, errh);
-        flow_parser->set_active(true);
-        flow_parser->set_rules_filename(flow_rules_filename);
+    if (mode == FlowRuleManager::DISPATCHING_MODE) {
+        FlowRuleManager *flow_rule_mgr = FlowRuleManager::get_flow_rule_mgr(port_id, errh);
+        flow_rule_mgr->set_active(true);
+        flow_rule_mgr->set_rules_filename(flow_rules_filename);
         errh->message(
-            "DPDK Flow Parser (port %u): State %s - Isolation Mode %s - Source file '%s'",
+            "DPDK Flow Rule Manager (port %u): State %s - Isolation Mode %s - Source file '%s'",
             port_id,
-            flow_parser->active() ? "active" : "inactive",
-            FlowParser::isolated(port_id) ? "active" : "inactive",
+            flow_rule_mgr->active() ? "active" : "inactive",
+            FlowRuleManager::isolated(port_id) ? "active" : "inactive",
             flow_rules_filename.empty() ? "None" : flow_rules_filename.c_str()
         );
     }
@@ -696,9 +696,9 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
     if (info.flow_isolate) {
-        FlowParser::set_isolation_mode(port_id, true);
+        FlowRuleManager::set_isolation_mode(port_id, true);
     } else {
-        FlowParser::set_isolation_mode(port_id, false);
+        FlowRuleManager::set_isolation_mode(port_id, false);
     }
 #endif
 
@@ -1053,11 +1053,11 @@ int DPDKDevice::initialize(ErrorHandler *errh)
 
     _is_initialized = true;
 
-    // Configure Flow Parser
+    // Configure Flow Rule Manager
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    for (HashTable<portid_t, FlowParser *>::iterator
-            it = FlowParser::dev_flow_parser.begin();
-            it != FlowParser::dev_flow_parser.end(); ++it) {
+    for (HashTable<portid_t, FlowRuleManager *>::iterator
+            it = FlowRuleManager::dev_flow_rule_mgr.begin();
+            it != FlowRuleManager::dev_flow_rule_mgr.end(); ++it) {
         const portid_t port_id = it.key();
 
         DPDKDevice *dev = get_device(port_id);
@@ -1066,7 +1066,7 @@ int DPDKDevice::initialize(ErrorHandler *errh)
         }
 
         // Only if the device is registered and has the correct mode
-        if (dev->get_mode_str() == FlowParser::DISPATCHING_MODE) {
+        if (dev->get_mode_str() == FlowRuleManager::DISPATCHING_MODE) {
             int err = DPDKDevice::configure_nic(port_id);
             if (err != 0) {
                 return errh->error("Could not configure all rules for device %d", port_id);
@@ -1085,17 +1085,17 @@ int DPDKDevice::configure_nic(const portid_t &port_id)
         return -1;
     }
 
-    FlowParser *flow_parser = FlowParser::get_flow_parser(port_id);
-    assert(flow_parser);
+    FlowRuleManager *flow_rule_mgr = FlowRuleManager::get_flow_rule_mgr(port_id);
+    assert(flow_rule_mgr);
 
-    // Invoke Flow Parser only if active
-    if (flow_parser->active()) {
+    // Invoke Flow Rule Manager only if active
+    if (flow_rule_mgr->active()) {
         // Retrieve the file that contains the rules (if any)
-        String rules_file = flow_parser->rules_filename();
+        String rules_file = flow_rule_mgr->rules_filename();
 
         // There is a file with (user-defined) rules
         if (!rules_file.empty()) {
-            if (flow_parser->add_rules_from_file(rules_file) >= 0)
+            if (flow_rule_mgr->flow_rules_add_from_file(rules_file) >= 0)
                 return 0;
             else
                 return -1;
@@ -1114,34 +1114,34 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
 void DPDKDevice::cleanup(ErrorHandler *errh)
 {
 #if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
-    HashTable<portid_t, FlowParser *> map = FlowParser::flow_parser_map();
+    HashTable<portid_t, FlowRuleManager *> map = FlowRuleManager::flow_rule_manager_map();
 
-    for (HashTable<portid_t, FlowParser *>::const_iterator
+    for (HashTable<portid_t, FlowRuleManager *>::const_iterator
             it = map.begin(); it != map.end(); ++it) {
         if (it == NULL) {
             continue;
         }
 
         portid_t port_id = it.key();
-        FlowParser *flow_parser = it.value();
+        FlowRuleManager *flow_rule_mgr = it.value();
 
         // Flush
-        uint32_t rules_flushed = flow_parser->flow_rules_flush();
+        uint32_t rules_flushed = flow_rule_mgr->flow_rules_flush();
 
         // Delete this instance
-        delete flow_parser;
+        delete flow_rule_mgr;
 
         // Report
         if (rules_flushed > 0) {
             errh->message(
-                "DPDK Flow Parser (port %u): Flushed %d rules from the NIC",
+                "DPDK Flow Rule Manager (port %u): Flushed %d rules from the NIC",
                 port_id, rules_flushed
             );
         }
     }
 
     // Clean up the table
-    FlowParser::clean_flow_parser_map();
+    FlowRuleManager::clean_flow_rule_manager_map();
 #endif
 }
 

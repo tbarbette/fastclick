@@ -97,7 +97,7 @@ supported (DPDK's Flow API) if FastClick was built with --enable-flow-api.
 =item FLOW_RULES_FILE
 
 String. For DPDK version >= 20.02, FastClick was built with --enable-flow-api,
-and if MODE is set to flow, a path to a file with Flow Parser rules
+and if MODE is set to flow, a path to a file with Flow Rule Manager rules
 can be supplied to the device. These rules are installed in the NIC using
 DPDK's flow API.
 
@@ -359,7 +359,7 @@ Upon success, the number of deleted flow rules is returned, otherwise an error i
 
 =h rules_isolate write-only
 
-Enables/Disables Flow Parser's isolation mode.
+Enables/Disables Flow Rule Manager's isolation mode.
 Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future).
 Usage:
     'rules_isolate 0' disables isolation.
