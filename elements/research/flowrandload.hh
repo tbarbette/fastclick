@@ -12,14 +12,14 @@ CLICK_DECLS
 
 struct RandLoadState {
 	RandLoadState() : w(0) {
-
 	}
+
 	int w;
 };
 
 /*
  * =c
- * FlowRandLoad()
+ * FlowRandLoad([MIN, MAX])
  *
  * =s research
  * 
@@ -31,6 +31,18 @@ struct RandLoadState {
  * a random number between MIN and MAX, that designates how many
  * PRNG should be done per-packet. Hence, some flow will appear heavy,
  * and some light. One PRNG is around 8 CPU cycles.
+ *
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item MIN
+ *
+ * Integer. Minimal number of PRNG to run for each packets. Default is 1.
+ *
+ * =item MAX
+ *
+ * Integer. Maximal number of PRNG to run for each packets. Default is 100.
  *
  * =e
  *  FlowIPManager->FlowRandLoad(MIN 1, MAX 100).

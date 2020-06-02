@@ -55,10 +55,10 @@ int FlowRandLoad::initialize(ErrorHandler *errh) {
 }
 
 void FlowRandLoad::push_batch(int port, RandLoadState* flowdata, PacketBatch* batch) {
-	if (flowdata->w == 0) {
-		flowdata->w =  _min + ((*_gens)() / (UINT_MAX / (_max - _min) ));  //click_random(_min, _max);
-	}
-	int r;
+    if (flowdata->w == 0) {
+        flowdata->w =  _min + ((*_gens)() / (UINT_MAX / (_max - _min) ));  //click_random(_min, _max);
+    }
+    int r;
     auto fnt = [this,flowdata,&r](Packet* p) {
         for (int i = 0; i < flowdata->w; i ++) {
             r = (*_gens)();

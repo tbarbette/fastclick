@@ -23,7 +23,8 @@ CLICK_DECLS
  * an imbalance. 
  *
  * ExactCPUSwitch will use the known list of possible threads to balance
- * evenly one input thread per output port.
+ * evenly one input thread per output port, using a static mapping computed
+ * at initialization time.
  *
  * =a
  * CPUSwitch

@@ -1,6 +1,6 @@
-// -*- c-basic-offset: 4; related-file-name: "flowrrswitch.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "flowminloadswitch.hh" -*-
 /*
- * flowrrswitch.{cc,hh} -- element splits input flows across its ports
+ * flowminloadswitch.{cc,hh} -- element splits input flows across its ports
  * using a round-robin scheme.
  * Georgios Katsikas
  *
@@ -23,20 +23,20 @@
 #include <click/error.hh>
 #include <click/straccum.hh>
 
-#include "flowrrswitch.hh"
+#include "flowminloadswitch.hh"
 
 CLICK_DECLS
 
-FlowRRSwitch::FlowRRSwitch() : _max_nb_port(0), _current_port(0), _map(), _mask()
+FlowMinLoadSwitch::FlowMinLoadSwitch() : _max_nb_port(0), _current_port(0), _map(), _mask()
 {
 }
 
-FlowRRSwitch::~FlowRRSwitch()
+FlowMinLoadSwitch::~FlowMinLoadSwitch()
 {
 }
 
 int
-FlowRRSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
+FlowMinLoadSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     _max_nb_port = noutputs();
     if (Args(conf, this, errh)
@@ -44,33 +44,48 @@ FlowRRSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
         .complete() < 0)
     return -1;
 
+    _load.resize(_max_nb_port,0);
+
     _mask = IPFlowID(0xffffffff, 0xffff, 0xffffffff, 0xffff);
 
     return 0;
 }
 
 void
-FlowRRSwitch::cleanup(CleanupStage)
+FlowMinLoadSwitch::cleanup(CleanupStage)
 {
     _map.clear();
 }
 
 unsigned
-FlowRRSwitch::round_robin()
+FlowMinLoadSwitch::round_robin()
 {
-    return _current_port = ((++_current_port) % _max_nb_port);
+    unsigned min = _max_nb_port;
+    int min_i = -1;
+    for (int i = 0; i < _max_nb_port; i++) {
+        unsigned l = _load.unchecked_at((i + _current_port) % _max_nb_port);
+        if (l < min) {
+            min_i = i;
+            min = l;
+        }
+    }
+    _current_port = (min_i + _current_port) % _max_nb_port;
+    _load[_current_port]++;
+    return _current_port;
 }
 
 int
-FlowRRSwitch::process(int port, Packet *p)
+FlowMinLoadSwitch::process(int port, Packet *p)
 {
     // Create a flow signature for this packet
     IPFlowID id(p);
-    IPFlowPort new_flow = IPFlowPort();
+    IPFlowSize new_flow = IPFlowSize(
+        p->length()             // and packet length
+    );
     new_flow.initialize(id & _mask);
 
     // Check if we already have such a flow
-    IPFlowPort *found = _map.find(id).get();
+    IPFlowSize *found = _map.find(id).get();
 
     // New flow
     if (!found) {
@@ -84,18 +99,21 @@ FlowRRSwitch::process(int port, Packet *p)
         return new_flow.output_port();
     }
 
+    // Update this existing flow
+    found->update_size(p->length());
+
     return found->output_port();
 }
 
 void
-FlowRRSwitch::push(int port, Packet *p)
+FlowMinLoadSwitch::push(int port, Packet *p)
 {
     output(process(port, p)).push(p);
 }
 
 #if HAVE_BATCH
 void
-FlowRRSwitch::push_batch(int port, PacketBatch *batch)
+FlowMinLoadSwitch::push_batch(int port, PacketBatch *batch)
 {
     auto fnt = [this, port](Packet *p) { return process(port, p); };
     CLASSIFY_EACH_PACKET(_max_nb_port, fnt, batch, output_push_batch);
@@ -103,11 +121,11 @@ FlowRRSwitch::push_batch(int port, PacketBatch *batch)
 #endif
 
 String
-FlowRRSwitch::read_handler(Element *e, void *user_data)
+FlowMinLoadSwitch::read_handler(Element *e, void *user_data)
 {
-    FlowRRSwitch *r = static_cast<FlowRRSwitch *>(e);
+    FlowMinLoadSwitch *r = static_cast<FlowMinLoadSwitch *>(e);
     if (!r) {
-        return "FlowRRSwitch element not found";
+        return "FlowMinLoadSwitch element not found";
     }
     intptr_t what = reinterpret_cast<intptr_t>(user_data);
 
@@ -123,10 +141,10 @@ FlowRRSwitch::read_handler(Element *e, void *user_data)
 }
 
 void
-FlowRRSwitch::add_handlers()
+FlowMinLoadSwitch::add_handlers()
 {
     add_read_handler("flow_count", read_handler, h_flow_count);
 }
 
 CLICK_ENDDECLS
-EXPORT_ELEMENT(FlowRRSwitch)
+EXPORT_ELEMENT(FlowMinLoadSwitch)
