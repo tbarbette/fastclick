@@ -1,0 +1,3 @@
+ingress pattern eth / ipv4 src is 192.168.1.7 dst is 192.168.2.7 / udp src is 53 / end actions queue index 0 / count / end
+ingress pattern eth / ipv4 src is 192.168.10.7 dst is 192.168.20.7 / tcp dst is 80 / end actions queue index 1 / count / end
+ingress pattern eth / ipv4 src spec 192.168.100.0 src mask 255.255.255.0 dst is 192.168.200.7 / end actions queue index 2 / count / end
