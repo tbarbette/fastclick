@@ -1,6 +1,6 @@
-// -*- c-basic-offset: 4; related-file-name: "flowparserglue.hh" -*-
+// -*- c-basic-offset: 4; related-file-name: "flowruleparser.hh" -*-
 /*
- * flowparserglue.cc -- relays flow rule instructions
+ * flowruleparser.cc -- relays flow rule instructions
  * to DPDK's flow parsing library.
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS
@@ -19,7 +19,7 @@
 
 #include <click/config.h>
 #include <click/error.hh>
-#include <click/flowparserglue.hh>
+#include <click/flowruleparser.hh>
 
 CLICK_DECLS
 
@@ -29,15 +29,15 @@ CLICK_DECLS
  * DPDK's flow parsing implementation.
  */
 struct cmdline *
-flow_parser_init(ErrorHandler *errh)
+flow_rule_parser_init(ErrorHandler *errh)
 {
     errh->message("Initializing DPDK Flow Parser...");
     init_port();
-    return flow_parser_alloc("", errh);
+    return flow_rule_parser_alloc("", errh);
 }
 
 struct cmdline *
-flow_parser_alloc(const char *prompt, ErrorHandler *errh)
+flow_rule_parser_alloc(const char *prompt, ErrorHandler *errh)
 {
     if (!prompt) {
         errh->error("DPDK Flow Parser prompt not provided");
@@ -54,7 +54,7 @@ flow_parser_alloc(const char *prompt, ErrorHandler *errh)
 }
 
 char *
-flow_parser_parse_new_line(char *line, int n, const char **input_cmd)
+flow_rule_parser_parse_new_line(char *line, int n, const char **input_cmd)
 {
     // End of input
     if(**input_cmd == '\0') {
@@ -84,11 +84,11 @@ flow_parser_parse_new_line(char *line, int n, const char **input_cmd)
 }
 
 int
-flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
+flow_rule_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
 {
     if (!cl) {
         errh->error("DPDK Flow Parser is not initialized");
-        return FLOWPARSER_ERROR;
+        return FLOWRULEPARSER_ERROR;
     }
 
     char buff[512];
@@ -96,11 +96,11 @@ flow_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh)
     int tot_line_len = 0;
 
     // Split the input command in lines
-    while (flow_parser_parse_new_line(buff, sizeof(buff), p) != NULL) {
+    while (flow_rule_parser_parse_new_line(buff, sizeof(buff), p) != NULL) {
         int line_len;
         if ((line_len = cmdline_parse(cl, buff)) < 0) {
             errh->error("DPDK Flow Parser failed to parse input line: %s\n", buff);
-            return FLOWPARSER_ERROR;
+            return FLOWRULEPARSER_ERROR;
         }
         tot_line_len += line_len;
     }

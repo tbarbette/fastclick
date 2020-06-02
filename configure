@@ -11046,15 +11046,15 @@ else
   enable_flow_api=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparser.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowparser.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowparser.hh... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowruleparser.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowruleparser.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowruleparser.hh... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowparser.hh"; then
+if test -r "$srcdir/include/click/flowruleparser.hh"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -11064,20 +11064,20 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_parser_h=yes
+  ac_have_flow_rule_parser_h=yes
 else
-  ac_have_flow_parser_h=no
+  ac_have_flow_rule_parser_h=no
 fi
 
-as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowparserglue.hh" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowparserglue.hh" >&5
-$as_echo_n "checking for $srcdir/include/click/flowparserglue.hh... " >&6; }
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowrulecache.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowrulecache.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowrulecache.hh... " >&6; }
 if eval \${$as_ac_File+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   test "$cross_compiling" = yes &&
   as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
-if test -r "$srcdir/include/click/flowparserglue.hh"; then
+if test -r "$srcdir/include/click/flowrulecache.hh"; then
   eval "$as_ac_File=yes"
 else
   eval "$as_ac_File=no"
@@ -11087,12 +11087,35 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  ac_have_flow_parser_g_h=yes
+  ac_have_flow_rule_cache_h=yes
 else
-  ac_have_flow_parser_g_h=no
+  ac_have_flow_rule_cache_h=no
 fi
 
-if test "x$ac_have_flow_parser_h$ac_have_flow_parser_g_h$RTE_VER_YEAR$enable_flow_api" = "xyesyes20yes"; then
+as_ac_File=`$as_echo "ac_cv_file_$srcdir/include/click/flowrulemanager.hh" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $srcdir/include/click/flowrulemanager.hh" >&5
+$as_echo_n "checking for $srcdir/include/click/flowrulemanager.hh... " >&6; }
+if eval \${$as_ac_File+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  test "$cross_compiling" = yes &&
+  as_fn_error $? "cannot check for file existence when cross compiling" "$LINENO" 5
+if test -r "$srcdir/include/click/flowrulemanager.hh"; then
+  eval "$as_ac_File=yes"
+else
+  eval "$as_ac_File=no"
+fi
+fi
+eval ac_res=\$$as_ac_File
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
+  ac_have_flow_rule_man_h=yes
+else
+  ac_have_flow_rule_man_h=no
+fi
+
+if test "x$ac_have_flow_rule_parser_h$ac_have_flow_rule_cache_h$ac_have_flow_rule_man_h$RTE_VER_YEAR$enable_flow_api" = "xyesyesyes20yes"; then
     have_flow_api=yes
     $as_echo "#define HAVE_FLOW_API 1" >>confdefs.h
 
@@ -16146,7 +16169,7 @@ fi
 feedback="no"
 
 if test "$enable_flow_api$have_flow_api" = "yesno"; then
-    feedback="To enable DPDK's Flow Parser (rte_flow API), use a DPDK version >= 20.02."
+    feedback="To enable DPDK's Flow Rule Manager (rte_flow API), use a DPDK version >= 20.02."
 fi
 
 echo "

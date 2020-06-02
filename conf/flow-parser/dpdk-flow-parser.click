@@ -14,12 +14,12 @@ define(
 	$queues     5,
 	$threads    $queues,
 	$numa       false,
-	$mode       flow,          // Rx mode required by the DPDK Flow Parser
+	$mode       flow,    // Rx mode required by the DPDK Flow Rule Manager
 	$verbose    99,
 	$rules      test_dpdk_nic_rules        // Better provide absolute path
 );
 
-// NIC in Flow Parser's mode
+// NIC in Flow Rule Manager's mode
 fd0 :: FromDPDKDevice(
 	PORT $ifacePCI0, MODE $mode,
 	N_QUEUES $queues, NUMA $numa,
