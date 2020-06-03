@@ -1024,6 +1024,7 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
     }
 
     const char *name;
+#if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
     int ret = rte_flow_conv(RTE_FLOW_CONV_OP_ACTION_NAME_PTR,
                 &name, sizeof(name), (void *)(uintptr_t)action->type, &error);
     if (ret < 0) {
@@ -1031,6 +1032,7 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
             "DPDK Flow Rule Manager (port %u): Failed to convert action for flow rule with ID %" PRIu32, _port_id, int_rule_id);
         return "";
     }
+
     switch (action->type) {
         case RTE_FLOW_ACTION_TYPE_COUNT:
             break;
@@ -1038,6 +1040,9 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
             _errh->message("DPDK Flow Rule Manager (port %u): Cannot query action type %d (%s)\n", _port_id, action->type, name);
             return "";
     }
+#else
+    name = "unknown";
+#endif
 
     // Poisoning to make sure PMDs update it in case of error
     memset(&error, 0x55, sizeof(error));
