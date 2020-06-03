@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 # sudo pip2 install ipy
@@ -181,14 +181,14 @@ def rule_gen_random(output_folder, target_bridge, target_rules_nb, target_table,
 
 """
 To translate rules from file:
-    python click_to_openflow_ovs_rules.py --strategy file --input-files test_click_rules
+    python3 click_to_openflow_ovs_rules.py --strategy file --input-files test_click_rules
 To generate random rules:
-    python click_to_openflow_ovs_rules.py --strategy random --target-bridge ovsdpdkbr0 \
+    python3 click_to_openflow_ovs_rules.py --strategy random --target-bridge ovsdpdkbr0 \
         --target-rules-nb 10 --target-table 0 --input-port 1 \
         --ether-src b8:83:03:6f:43:38 --ether-dst b8:83:03:6f:43:40 \
         --protocol random --output-port 1
 To generate random rules with a desired rule somewhere in the rule-set:
-    python click_to_openflow_ovs_rules.py --strategy random --target-bridge ovsdpdkbr0 \
+    python3 click_to_openflow_ovs_rules.py --strategy random --target-bridge ovsdpdkbr0 \
         --target-rules-nb 15 --target-table 1 --input-port 1 \
         --ether-src b8:83:03:6f:43:38 --ether-dst b8:83:03:6f:43:40 \
         --protocol random --output-port 1 --with-rule-at 7

@@ -1,8 +1,7 @@
 // -*- c-basic-offset: 4; related-file-name: "metron.hh" -*-
 /*
- * metron.{cc,hh} -- element that deploys, monitors, and
- * (re)configures NFV service chains driven by a remote
- * controller
+ * metron.{cc,hh} -- element that deploys, monitors, and (re)configures
+ * high-performance NFV service chains driven by a remote controller
  *
  * Copyright (c) 2017 Tom Barbette, University of Liège and KTH Royal Institute of Technology
  * Copyright (c) 2017 Georgios Katsikas, KTH Royal Institute of Technology and RISE
@@ -35,7 +34,7 @@
 #include <metron/servicechain.hh>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdispatcher.hh>
+    #include <click/flowrulemanager.hh>
 #endif
 
 #if HAVE_CURL
@@ -1317,21 +1316,21 @@ NIC::cast()
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 /**
- * Returns a FlowDispatcher object associated with this NIC.
+ * Returns a FlowRuleManager object associated with this NIC.
  */
-FlowDispatcher *
-NIC::get_flow_dispatcher(int sriov)
+FlowRuleManager *
+NIC::get_flow_rule_mgr(int sriov)
 {
-    return FlowDispatcher::get_flow_dispatcher(get_port_id() + sriov);
+    return FlowRuleManager::get_flow_rule_mgr(get_port_id() + sriov);
 }
 
 /**
- * Returns a FlowCache object associated with this NIC.
+ * Returns a FlowRuleCache object associated with this NIC.
  */
-FlowCache *
-NIC::get_flow_cache(int sriov)
+FlowRuleCache *
+NIC::get_flow_rule_cache(int sriov)
 {
-    return get_flow_dispatcher(sriov)->get_flow_cache();
+    return get_flow_rule_mgr(sriov)->flow_rule_cache();
 }
 #endif
 
@@ -1874,7 +1873,7 @@ Metron::confirm_nic_mode(ErrorHandler *errh)
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         // TODO: What if none of the NICs is in Metron mode?
-        if ((_rx_mode == FLOW) && (fd_mode != FlowDispatcher::DISPATCHING_MODE)) {
+        if ((_rx_mode == FLOW) && (fd_mode != FlowRuleManager::DISPATCHING_MODE)) {
             errh->warning(
                 "[NIC %s] Configured in MODE %s, which is incompatible with Metron's accurate dispatching",
                 nic.value().get_name().c_str(), fd_mode.c_str()
@@ -2549,7 +2548,7 @@ Metron::flush_nics()
     while (it != _nics.end()) {
         NIC *nic = &it.value();
 
-        FlowDispatcher::get_flow_dispatcher(nic->get_port_id())->flow_rules_flush();
+        FlowRuleManager::get_flow_rule_mgr(nic->get_port_id())->flow_rules_flush();
 
         it++;
     }
@@ -2719,7 +2718,7 @@ Metron::nics_table_stats_to_json()
         Json jnic = Json::make_object();
         jnic.set("id", nic->get_index());
 
-        FlowDispatcher *fd = FlowDispatcher::get_flow_dispatcher(nic->get_port_id());
+        FlowRuleManager *fd = FlowRuleManager::get_flow_rule_mgr(nic->get_port_id());
         NicTableStats rule_stats(nic->get_port_id());
         fd->flow_rule_table_stats(rule_stats);
 
@@ -3007,7 +3006,7 @@ Metron::write_handler(
             int delim = data.find_left(' ');
             // Only one argument was given
             if (delim < 0) {
-                return errh->error("Handler add_rules_from_file requires 2 arguments <nic> <file-with-rules>");
+                return errh->error("Handler rules_add_from_file requires 2 arguments <nic> <file-with-rules>");
             }
 
             // Parse and verify the first argument
@@ -3026,7 +3025,7 @@ Metron::write_handler(
             // NIC is valid, now parse the second argument
             String filename = data.substring(delim + 1).trim_space_left();
 
-            int32_t installed_rules = FlowDispatcher::get_flow_dispatcher(port_id)->add_rules_from_file(filename);
+            int32_t installed_rules = FlowRuleManager::get_flow_rule_mgr(port_id)->flow_rules_add_from_file(filename);
             if (installed_rules < 0) {
                 return errh->error("Failed to insert NIC flow rules from file %s", filename.c_str());
             }
@@ -3069,7 +3068,7 @@ Metron::write_handler(
             String sec_arg = data.substring(delim + 1).trim_space_left();
             if (sec_arg.empty()) {
                 // User did not specify the number of rules, infer it automatically
-                rules_present = FlowDispatcher::get_flow_dispatcher(port_id)->flow_rules_count_explicit();
+                rules_present = FlowRuleManager::get_flow_rule_mgr(port_id)->flow_rules_count_explicit();
             } else {
                 // User want to enforce the desired number of rules (assuming that he/she knows..)
                 rules_present = atoi(sec_arg.c_str());
@@ -3080,7 +3079,7 @@ Metron::write_handler(
                 nic_name.c_str(), port_id, rules_present
             );
 
-            FlowDispatcher::get_flow_dispatcher(port_id)->rule_consistency_check(rules_present);
+            FlowRuleManager::get_flow_rule_mgr(port_id)->flow_rule_consistency_check(rules_present);
             return SUCCESS;
         }
         case h_rules_flush: {
@@ -3351,7 +3350,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_inst_lat_min:
         case h_rule_inst_lat_avg:
         case h_rule_inst_lat_max: {
-            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, true, true);
+            FlowRuleManager::get_flow_rule_mgr(port_id)->min_avg_max(min, avg, max, true, true);
             if ((intptr_t) what == h_rule_inst_lat_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_inst_lat_avg) {
@@ -3364,7 +3363,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_inst_rate_min:
         case h_rule_inst_rate_avg:
         case h_rule_inst_rate_max: {
-            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, true, false);
+            FlowRuleManager::get_flow_rule_mgr(port_id)->min_avg_max(min, avg, max, true, false);
             if ((intptr_t) what == h_rule_inst_rate_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_inst_rate_avg) {
@@ -3377,7 +3376,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_del_lat_min:
         case h_rule_del_lat_avg:
         case h_rule_del_lat_max: {
-            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, false, true);
+            FlowRuleManager::get_flow_rule_mgr(port_id)->min_avg_max(min, avg, max, false, true);
             if ((intptr_t) what == h_rule_del_lat_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_del_lat_avg) {
@@ -3390,7 +3389,7 @@ Metron::rule_stats_handler(int operation, String &param, Element *e, const Handl
         case h_rule_del_rate_min:
         case h_rule_del_rate_avg:
         case h_rule_del_rate_max: {
-            FlowDispatcher::get_flow_dispatcher(port_id)->min_avg_max(min, avg, max, false, false);
+            FlowRuleManager::get_flow_rule_mgr(port_id)->min_avg_max(min, avg, max, false, false);
             if ((intptr_t) what == h_rule_del_rate_min) {
                 param = String(min);
             } else if ((intptr_t) what == h_rule_del_rate_avg) {
@@ -4052,7 +4051,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             click_chatter("Adding %4d rules for CPU %2d with physical ID %2d", rules_map.size(), core_id, phys_core_id);
 
             // Update a batch of rules associated with this CPU core ID
-            int32_t status = nic->get_flow_dispatcher()->update_rules(rules_map, true, phys_core_id);
+            int32_t status = nic->get_flow_rule_mgr()->flow_rules_update(rules_map, true, phys_core_id);
             if (status >= 0) {
                 inserted_rules_nb += status;
             }
@@ -4084,7 +4083,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
 
                 click_chatter("Adding %" PRIu32 " MIRROR rules for CPU %d with physical ID %d", mirror_rules_map.size(), core_id, phys_core_id);
 
-                status = nic->mirror->get_flow_dispatcher()->update_rules(mirror_rules_map, true, phys_core_id);
+                status = nic->mirror->get_flow_rule_mgr()->flow_rules_update(mirror_rules_map, true, phys_core_id);
                 if (status >= 0) {
                     inserted_rules_nb += status;
                 }
@@ -4154,7 +4153,7 @@ ServiceChain::rules_to_json()
         // One NIC can dispatch to multiple CPU cores
         for (unsigned j = 0; j < get_max_cpu_nb(); j++) {
             // Fetch the rules for this NIC and this CPU core
-            HashMap<uint32_t, String> *rules_map = nic->get_flow_cache()->rules_map_by_core_id(j);
+            HashMap<uint32_t, String> *rules_map = nic->get_flow_rule_cache()->rules_map_by_core_id(j);
             if (!rules_map || rules_map->empty()) {
                 continue;
             }
@@ -4212,18 +4211,18 @@ ServiceChain::delete_rule(const uint32_t &rule_id, Metron *m, ErrorHandler *errh
     while (it != m->_nics.end()) {
         NIC *nic = &it.value();
 
-        if (!nic->get_flow_cache()->has_rules()) {
+        if (!nic->get_flow_rule_cache()->has_rules()) {
             it++;
             continue;
         }
 
         // Get the internal rule ID from the flow cache
-        int32_t int_rule_id = nic->get_flow_cache()->internal_from_global_rule_id(rule_id);
+        int32_t int_rule_id = nic->get_flow_rule_cache()->internal_from_global_rule_id(rule_id);
 
         // This internal rule ID exists, we can proceed with the deletion
         if (int_rule_id >= 0) {
             uint32_t rule_ids[1] = {(uint32_t) int_rule_id};
-            return (nic->get_flow_dispatcher()->flow_rules_delete(rule_ids, 1) == 1)? SUCCESS : ERROR;
+            return (nic->get_flow_rule_mgr()->flow_rules_delete(rule_ids, 1) == 1)? SUCCESS : ERROR;
         }
 
         it++;
@@ -4258,7 +4257,7 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
     while (it != m->_nics.end()) {
         NIC *nic = &it.value();
 
-        if (!nic->get_flow_cache()->has_rules()) {
+        if (!nic->get_flow_rule_cache()->has_rules()) {
             it++;
             continue;
         }
@@ -4266,7 +4265,7 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
         bool nic_found = false;
         for (uint32_t i = 0; i < rules_vec.size(); i++) {
             uint32_t rule_id = atol(rules_vec[i].c_str());
-            int32_t int_rule_id = nic->get_flow_cache()->internal_from_global_rule_id(rule_id);
+            int32_t int_rule_id = nic->get_flow_rule_cache()->internal_from_global_rule_id(rule_id);
 
             // Mapping not found
             if (int_rule_id < 0) {
@@ -4292,7 +4291,7 @@ ServiceChain::delete_rules(const Vector<String> &rules_vec, Metron *m, ErrorHand
     }
 
     // Delete the flow rules
-    return n.get_flow_dispatcher()->flow_rules_delete(rule_ids, rules_nb);
+    return n.get_flow_rule_mgr()->flow_rules_delete(rule_ids, rules_nb);
 }
 
 /**

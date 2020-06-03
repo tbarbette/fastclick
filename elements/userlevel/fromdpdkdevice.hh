@@ -92,7 +92,7 @@ Integer. The maximum transfer unit of the device.
 
 String. The device's Rx mode. Can be none, rss, vmdq, vmdq_rss,
 vmdq_dcb, vmdq_dcb_rss. For DPDK version >= 17.05, flow is also
-supported.
+supported (DPDK's Flow API).
 
 =item FLOW_RULES_FILE
 
@@ -366,7 +366,7 @@ Upon success, the number of deleted flow rules is returned, otherwise an error i
 
 =h rules_isolate write-only
 
-Enables/Disables Flow Dispatcher's isolation mode.
+Enables/Disables Flow Rule Manager's isolation mode.
 Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future).
 Usage:
     'rules_isolate 0' disables isolation.

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -142,18 +142,18 @@ def get_click_traffic_class(rule, classifier_type, output_format):
 
 	return rule
 
-def get_flowdir_traffic_class(rule, output_format):
+def get_dpdk_flow_traffic_class(rule, output_format):
 	if IPVF in rule:
-		return get_flowdir_ipv4_traffic_class(rule, output_format)
+		return get_dpdk_flow_ipv4_traffic_class(rule, output_format)
 	elif IPVS in rule:
-		return get_flowdir_ipv6_traffic_class(rule, output_format)
+		return get_dpdk_flow_ipv6_traffic_class(rule, output_format)
 	else:
 		return ""
 
-def get_flowdir_ipv4_traffic_class(rule, output_format):
+def get_dpdk_flow_ipv4_traffic_class(rule, output_format):
 	tc = ""
 
-	# Flow Director does not support deny rules
+	# DPDK Flow API does not support deny rules
 	if DENY in rule:
 		return ""
 
@@ -191,7 +191,7 @@ def get_flowdir_ipv4_traffic_class(rule, output_format):
 
 	return tc.strip()
 
-def get_flowdir_ipv6_traffic_class(rule, output_format):
+def get_dpdk_flow_ipv6_traffic_class(rule, output_format):
 	# TODO: Add support for IPv6
 	return ""
 
@@ -228,7 +228,7 @@ def to_json(input_file, output_format=RULE_FORMAT_IP_FILTER):
 					line = "dst net " + line
 
 			tc = get_click_traffic_class(line, classifier_type, output_format) if classifier_type in [IPFILTER, IPLOOKUP] \
-			                                                  else get_flowdir_traffic_class(line, output_format)
+			                                                  else get_dpdk_flow_traffic_class(line, output_format)
 			if not tc:
 				print("Skipping invalid rule: {}".format(line))
 				continue
@@ -263,8 +263,8 @@ def to_json(input_file, output_format=RULE_FORMAT_IP_FILTER):
 		return json_data
 
 ### Execution examples
-###     python rules_to_json.py --input-files test_click_rules --output-format ipfilter
-###     python rules_to_json.py --input-files test_click_rules --output-format iplookup
+###     python3 rules_to_json.py --input-files test_click_rules --output-format ipfilter
+###     python3 rules_to_json.py --input-files test_click_rules --output-format iplookup
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser("Click IPFilter/IPLookup/FlowDirector to JSON configuration")

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 # sudo pip2 install ipy
@@ -179,16 +179,16 @@ def rule_gen_random(output_folder, target_nic, target_rules_nb, start_queues_nb,
 
 ###
 ### To translate rules from file:
-###   python click_to_dpdk_rules.py --strategy file --input-files test_click_rules --target-queues-nb 16
+###   python3 click_to_dpdk_rules.py --strategy file --input-files test_click_rules --target-queues-nb 16
 ###
 ### To generate random rules:
 ### |-> NIC independent rule set with random transport protocol:
-###     python click_to_dpdk_rules.py --strategy random --target-rules-nb 48000 --target-queues-nb 1 --target-group-nb 0 --rule-count
+###     python3 click_to_dpdk_rules.py --strategy random --target-rules-nb 48000 --target-queues-nb 1 --target-group-nb 0 --rule-count
 ### |-> NIC dependent (i.e., NIC 0) with TCP as transport protocol
-###     python click_to_dpdk_rules.py --strategy random --target-nic 0 --target-rules-nb 65536 --target-queues-nb 1 --target-group-nb 1 --rule-count --protocol TCP
+###     python3 click_to_dpdk_rules.py --strategy random --target-nic 0 --target-rules-nb 65536 --target-queues-nb 1 --target-group-nb 1 --rule-count --protocol TCP
 ###
 ### ### To generate random rules with a desired rule somewhere in the rule-set:
-###     python click_to_dpdk_rules.py --strategy random --target-rules-nb 55000 --target-queues-nb 1 --target-group-nb 1 --rule-count --with-rule-at 27500
+###     python3 click_to_dpdk_rules.py --strategy random --target-rules-nb 55000 --target-queues-nb 1 --target-group-nb 1 --rule-count --with-rule-at 27500
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser("Click IPFilter/IPLookup rules to DPDK Flow rule configurations")

@@ -15,7 +15,7 @@
 #include "../json/json.hh"
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
- #include <click/flowdispatcher.hh>
+ #include <click/flowrulemanager.hh>
 #endif
 
 class ServiceChainManager;
@@ -443,7 +443,7 @@ Returns a JSON object with table statistics from the Metron agent's NICs.
 
 =h rules_verify write-only
 
-Verifies the consistency between the rules in the FlowCache (software) and the rules
+Verifies the consistency between the rules in the FlowRuleCache (software) and the rules
 installed into the NIC (hardware). The user must know the correct number of rules in
 the NIC.
 Usage example (assuming that NIC fd0 has 150 rules): rules_verify fd0 150
@@ -834,8 +834,8 @@ class NIC {
         FromDPDKDevice *cast();
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-        FlowDispatcher *get_flow_dispatcher(int sriov = 0);
-        FlowCache *get_flow_cache(int sriov = 0);
+        FlowRuleManager *get_flow_rule_mgr(int sriov = 0);
+        FlowRuleCache *get_flow_rule_cache(int sriov = 0);
     #endif
 
         int queue_per_pool();

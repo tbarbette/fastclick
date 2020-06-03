@@ -1,5 +1,5 @@
 /*
- * randload.{cc,hh} -- Element artificially creates CPU burden
+ * flowrandload.{cc,hh} -- Element artificially creates CPU burden per flow
  *
  * Tom Barbette
  *
@@ -14,28 +14,31 @@
  * The Software is provided WITHOUT ANY WARRANTY, EXPRESS OR IMPLIED. This
  * notice is a summary of the Click LICENSE file; the license in that file is
  * legally binding.
+
+
  */
 
-#include "randload.hh"
+#include "flowrandload.hh"
 
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
+#include <clicknet/ip.h>
+#include <clicknet/tcp.h>
+#include <click/flow/flow.hh>
 
 CLICK_DECLS
 
-RandLoad::RandLoad()
-{
+FlowRandLoad::FlowRandLoad() {
 
 };
 
-RandLoad::~RandLoad()
-{
+FlowRandLoad::~FlowRandLoad() {
 
 }
 
 int
-RandLoad::configure(Vector<String> &conf, ErrorHandler *errh)
+FlowRandLoad::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
                .read_or_set("MIN", _min, 1)
@@ -46,17 +49,18 @@ RandLoad::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int RandLoad::initialize(ErrorHandler *errh)
-{
+
+int FlowRandLoad::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-void RandLoad::push_batch(int port, PacketBatch* batch)
-{
+void FlowRandLoad::push_batch(int port, RandLoadState* flowdata, PacketBatch* batch) {
+    if (flowdata->w == 0) {
+        flowdata->w =  _min + ((*_gens)() / (UINT_MAX / (_max - _min) ));  //click_random(_min, _max);
+    }
     int r;
-    auto fnt = [this,&r](Packet* p)  {
-        int w =  _min + ((*_gens)() / (UINT_MAX / (_max - _min) ));
-        for (int i = 0; i < w - 1; i ++) {
+    auto fnt = [this,flowdata,&r](Packet* p) {
+        for (int i = 0; i < flowdata->w; i ++) {
             r = (*_gens)();
         }
         return p;
@@ -69,6 +73,6 @@ void RandLoad::push_batch(int port, PacketBatch* batch)
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(batch)
-EXPORT_ELEMENT(RandLoad)
-ELEMENT_MT_SAFE(RandLoad)
+ELEMENT_REQUIRES(flow)
+EXPORT_ELEMENT(FlowRandLoad)
+ELEMENT_MT_SAFE(FlowRandLoad)

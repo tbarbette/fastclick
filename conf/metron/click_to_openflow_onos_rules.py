@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 # sudo pip2 install ipy
@@ -232,10 +232,10 @@ def rule_gen_random(output_folder, target_rules_nb, protocol, sw_dpid, sw_inport
 
 ###
 ### To translate rules from file:
-### python click_to_openflow_onos_rules.py --strategy file --input-files test_click_rules --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3
+### python3 click_to_openflow_onos_rules.py --strategy file --input-files test_click_rules --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3
 ###
 ### To generate random rules:
-### python click_to_openflow_onos_rules.py --strategy random --target-rules-nb 4093 --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3 --protocol TCP
+### python3 click_to_openflow_onos_rules.py --strategy random --target-rules-nb 4093 --sw-dpid of:000000223d4b0182 --sw-inport 1 --sw-outport 3 --protocol TCP
 ###
 
 if __name__ == "__main__":

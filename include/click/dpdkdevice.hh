@@ -23,7 +23,7 @@
 #include <rte_version.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdispatcherglue.hh>
+    #include <click/flowruleparser.hh>
 #endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,11,0,0) && RTE_VERSION < RTE_VERSION_NUM(19,2,0,0)
@@ -149,7 +149,7 @@ public:
     };
 
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    void initialize_flow_dispatcher(
+    void initialize_flow_rule_manager(
         const portid_t &port_id,
         ErrorHandler   *errh
     );

@@ -1,4 +1,8 @@
 /*
+ * exactcpuswitch.{cc,hh} -- Element selects per-cpu path
+ *
+ * Tom Barbette
+ *
  * Copyright (c) 2018 KTH Institute of Technology
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -31,7 +35,7 @@ ExactCPUSwitch::update_map() {
     Bitvector b = get_pushing_threads();
     map.resize(b.size());
     int j = 0;
-    for (int i = 0; i < b.size(); i++) {
+    for (unsigned i = 0; i < b.size(); i++) {
         if (b[i] == false) {
             map[i] = -1;
             continue;

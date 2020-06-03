@@ -1,5 +1,5 @@
-#ifndef CLICK_RandLoad_HH
-#define CLICK_RandLoad_HH
+#ifndef CLICK_RANDLOAD_HH
+#define CLICK_RANDLOAD_HH
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/vector.hh>
@@ -7,24 +7,42 @@
 #include <random>
 
 CLICK_DECLS
-
-/**
- * RandLoad(MIN, MAX)
+/*
+ * =c
+ * RandLoad([MIN, MAX])
  *
  * =s research
  *
- * Generates a constrained random amount of CPU load
+ * Random artificial CPU load for each packet
  *
  * =d
  *
- * For each packet, this element will generate between MIN+1 and MAX+1 number
- * of pseudo-random numbers to induce some CPU load.
+ * For each packet this element will select a random number between MIN and
+ * MAX, that designates how many PRNG should be done.
+ * One PRNG is around 8 CPU cycles.
  *
- * =a WorkPackage, FlowRandLoad
+ * Keyword arguments are:
+ *
+ * =over 8
+ *
+ * =item MIN
+ *
+ * Integer. Minimal number of PRNG to run for each packets. Default is 1.
+ *
+ * =item MAX
+ *
+ * Integer. Maximal number of PRNG to run for each packets. Default is 100.
+ *
+ * =e
+ *  RandLoad(MIN 1, MAX 100).
+ *
+ * =a
+ * FlowRandLoad, WorkPackage
  */
 class RandLoad : public BatchElement {
 
 public:
+
     RandLoad() CLICK_COLD;
     ~RandLoad() CLICK_COLD;
 
@@ -32,18 +50,16 @@ public:
     const char *port_count() const		{ return "1/1"; }
     const char *processing() const		{ return PUSH; }
 
-    int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
-    int initialize(ErrorHandler *errh) override CLICK_COLD;
+    int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
+    int initialize(ErrorHandler *errh);
 
-    void push(int, Packet *);
-#if HAVE_BATCH
-    void push_batch(int, PacketBatch *) override;
-#endif
+    void push_batch(int, PacketBatch *);
 
 private:
     int _min;
     int _max;
     per_thread<std::mt19937> _gens;
+
 };
 
 CLICK_ENDDECLS

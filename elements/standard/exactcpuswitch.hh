@@ -7,11 +7,25 @@ CLICK_DECLS
 /*
  * =c
  * ExactCPUSwitch()
+ *
  * =s threads
+ *
  * classifies packets by cpu
+ *
  * =d
+ *
  * Can have any number of outputs.
- * Chooses the output on which to emit each packet based on the thread's cpu. Contrary to CPUSwitch, the output is choosed using the thread-vector mapping. It means that the outputs will be evenly shared among threads. Eg, if threads 1, 7 and 8 push packets to a CPUSwitch with 3 outputs, the 1 and 7 will push to output 1, and 8 to output 2. Leading to an imbalance. ExactCPUSwitch will use the nown list of possible threads to balance evenly.
+ * Chooses the output on which to emit each packet based on the thread's cpu.
+ * Contrary to CPUSwitch, the output is choosed using the thread-vector
+ * mapping. It means that the outputs will be evenly shared among threads.
+ * Eg, with CPUSwitch if threads 1, 7 and 8 push packets to a CPUSwitch with
+ * 3 outputs, the 1 and 7 will push to output 1, and 8 to output 2. Leading to
+ * an imbalance.
+ *
+ * ExactCPUSwitch will use the known list of possible threads to balance
+ * evenly one input thread per output port, using a static mapping computed
+ * at initialization time.
+ *
  * =a
  * CPUSwitch
  */

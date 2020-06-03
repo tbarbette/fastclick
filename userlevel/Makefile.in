@@ -116,7 +116,7 @@ RTE_VER_YEAR = @RTE_VER_YEAR@
 RTE_VER_MONTH = @RTE_VER_MONTH@
 include dpdk.mk
 endif
-EXTRA_DRIVER_OBJS := dpdkdevice.o flowdispatcher.o flowdispatcherparser.o servicechain.o $(EXTRA_DRIVER_OBJS)
+EXTRA_DRIVER_OBJS := dpdkdevice.o flowrulemanager.o flowrulecache.o flowruleparser.o servicechain.o $(EXTRA_DRIVER_OBJS)
 endif
 
 ifndef MINDRIVER

@@ -1,25 +1,25 @@
 /**
- * A static Metron-like NIC offloading example.
+ * A NIC offloading example using DPDK's Flow API.
  * Three NIC rules are offloaded, each dispatching matched packets
  * to one of the first 3 NIC queues. Another 2 queues are used by RSS.
  */
 
 /**
  * Deploy as follows:
- * sudo ../../bin/click --dpdk -l 0-4 -w 0000:03:00.0 -v -- dispatcher-flow-static.click queues=5
+ * sudo ../../bin/click --dpdk -l 0-4 -w 0000:11:00.0 -v -- dpdk-flow-parser.click
  */
 
 define(
-	$ifacePCI0  0000:03:00.0,
+	$ifacePCI0  0000:11:00.0,
 	$queues     5,
 	$threads    $queues,
 	$numa       false,
-	$mode       flow,          // DPDK's Flow API dispatcher
+	$mode       flow,    // Rx mode required by the DPDK Flow Rule Manager
 	$verbose    99,
-	$rules      test_nic_rules
+	$rules      test_dpdk_nic_rules        // Better provide absolute path
 );
 
-// NIC in Flow Director mode
+// NIC in Flow Rule Manager's mode
 fd0 :: FromDPDKDevice(
 	PORT $ifacePCI0, MODE $mode,
 	N_QUEUES $queues, NUMA $numa,
@@ -32,7 +32,7 @@ fd0
 	-> classifier :: Classifier(12/0800, -)
 	-> Strip(14)
 	-> check :: CheckIPHeader(VERBOSE true)
-	-> IPPrint(LENGTH true)
+	-> IPPrint(ETHER true, LENGTH true)
 	-> Unstrip(14)
 	-> legit :: AverageCounterMP()
 	-> Discard;

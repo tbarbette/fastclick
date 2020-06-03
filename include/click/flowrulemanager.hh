@@ -1,6 +1,6 @@
 // -*- c-basic-offset: 4 -*-
 /*
- * flowdispatcher.hh -- DPDK's Flow API in Click
+ * flowrulemanager.hh -- Flow rule manager API for DPDK-based NICs, based on DPDK's Flow API
  *
  * Copyright (c) 2018 Georgios Katsikas, RISE SICS & KTH Royal Institute of Technology
  *
@@ -15,21 +15,22 @@
  * legally binding.
  */
 
-#ifndef CLICK_FLOWDISPATCHER_H
-#define CLICK_FLOWDISPATCHER_H
+#ifndef CLICK_FLOWRULEMANAGER_H
+#define CLICK_FLOWRULEMANAGER_H
 
 #include <click/error.hh>
 #include <click/hashmap.hh>
 #include <click/hashtable.hh>
 #include <click/dpdkdevice.hh>
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
-    #include <click/flowdispatcherparser.hh>
+    #include <click/flowrulecache.hh>
+    #include <click/flowruleparser.hh>
 #endif
 
 CLICK_DECLS
 
 /**
- * DPDK's Flow API.
+ * DPDK Flow Rule Manager API.
  */
 #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
@@ -101,117 +102,16 @@ class NicTableStats {
         uint64_t _pkts_matched;   // The number of packets being matched
 };
 
-class FlowCache {
+class FlowRuleManager {
     public:
-        FlowCache(portid_t port_id, bool verbose, bool debug_mode, ErrorHandler *errh)
-            : _port_id(port_id), _rules_nb(0), _next_rule_id(0),
-              _rules(), _internal_rule_map(), _matched_pkts(), _matched_bytes() {
-            assert(_port_id >= 0);
-            _errh = new ErrorVeneer(errh);
-            assert(_errh);
-            _verbose = verbose;
-            _debug_mode = debug_mode;
-        }
+        FlowRuleManager();
+        FlowRuleManager(portid_t port_id, ErrorHandler *errh);
+        ~FlowRuleManager();
 
-        ~FlowCache() {
-            flush_rules_from_cache();
-        }
-
-        // Device methods
-        portid_t get_port_id();
-        String get_device_address();
-
-        // Search methods
-        bool has_rules();
-        bool global_rule_id_exists(const uint32_t &rule_id);
-        bool internal_rule_id_exists(const uint32_t &int_rule_id);
-        uint32_t global_from_internal_rule_id(const uint32_t &int_rule_id);
-        int32_t internal_from_global_rule_id(const uint32_t &rule_id);
-        template<typename T> void sort_rule_ids_inc(Vector<T> &rule_ids_vec);
-        template<typename T> void sort_rule_ids_dec(Vector<T> &rule_ids_vec);
-        Vector<uint32_t> global_rule_ids(const bool increasing = true);
-        Vector<uint32_t> internal_rule_ids(const bool increasing = true);
-        Vector<uint32_t> internal_rule_ids_counters(const bool increasing = true);
-        HashMap<uint32_t, String> *rules_map_by_core_id(const int &core_id);
-        Vector<String> rules_list_by_core_id(const int &core_id);
-        Vector<int> cores_with_rules();
-        String get_rule_by_global_id(const uint32_t &rule_id);
-        String get_rule_by_internal_id(const uint32_t &int_rule_id);
-
-        // Flow Cache methods
-        int32_t currently_max_internal_rule_id();
-        uint32_t next_internal_rule_id();
-        void set_next_internal_rule_id(uint32_t next_id);
-        int insert_rule_in_flow_cache(
-            const int &core_id, const uint32_t &rule_id,
-            const uint32_t &int_rule_id, const String rule
-        );
-        bool update_rule_in_flow_cache(
-            const int &core_id, const uint32_t &rule_id,
-            const uint32_t &int_rule_id, String rule
-        );
-        int32_t delete_rule_by_global_id(const uint32_t &rule_id);
-        String delete_rules_by_internal_id(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
-        String delete_rules_by_internal_id(const Vector<String> &rules_vec);
-        int32_t flush_rules_from_cache();
-
-        // Flow Cache monitoring methods
-        void set_matched_packets(const uint32_t &int_rule_id, uint64_t value);
-        uint64_t get_matched_packets(const uint32_t &int_rule_id);
-        void set_matched_bytes(const uint32_t &int_rule_id, uint64_t value);
-        uint64_t get_matched_bytes(const uint32_t &int_rule_id);
-        inline uint32_t get_rule_counter() { return _rules_nb; };
-        void initialize_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
-        void delete_rule_counters(uint32_t *int_rule_ids, const uint32_t &rules_nb);
-        void cache_consistency_check(const int32_t &target_number_of_rules);
-        void correlate_candidate_id_with_cache(int32_t &candidate);
-        void flush_rule_counters();
-
-    private:
-        // NIC's port ID associated with this flow cache
-        portid_t _port_id;
-
-        // Flow rules' counter
-        uint32_t _rules_nb;
-
-        // Next available rule ID
-        uint32_t _next_rule_id;
-
-        // Maps CPU cores to a map of global rule IDs -> rules
-        HashMap<int, HashMap<uint32_t, String> *> _rules;
-
-        // Maps global rule IDs to internal NIC rule IDs
-        HashMap<uint32_t, uint32_t> _internal_rule_map;
-
-        // Matched packets and bytes per rule ID
-        HashMap<uint32_t, uint64_t> _matched_pkts;
-        HashMap<uint32_t, uint64_t> _matched_bytes;
-
-        // An error handler
-        ErrorVeneer *_errh;
-
-        // Set stdout verbosity
-        bool _verbose;
-        bool _debug_mode;
-
-        // Methods to facilitate the mapping between ONOS and NIC rule IDs
-        bool store_rule_id_mapping(const uint32_t &rule_id, const uint32_t &int_rule_id);
-        bool delete_rule_id_mapping(const uint32_t &rule_id);
-
-        // Methods to verify cache consistency
-        bool verify_transactions(const Vector<uint32_t> &int_vec, const Vector<uint32_t> &glb_vec);
-};
-
-class FlowDispatcher {
-    public:
-        FlowDispatcher();
-        FlowDispatcher(portid_t port_id, ErrorHandler *errh);
-        ~FlowDispatcher();
-
-        // DPDKDevice mode is Flow Dispatcher
+        // DPDKDevice mode for the Flow Rule Manager
         static String DISPATCHING_MODE;
 
-        // Supported Flow Dispatcher handlers (called from FromDPDKDevice)
+        // Supported Flow Rule Manager handlers (called from FromDPDKDevice)
         static String FLOW_RULE_ADD;
         static String FLOW_RULE_DEL;
         static String FLOW_RULE_IDS_GLB;
@@ -236,23 +136,23 @@ class FlowDispatcher {
         // Set of flow rule actions supported by the Flow API
         static HashMap<int, String> flow_action;
 
-        // Global table of DPDK ports mapped to their Flow Dispatcher objects
-        static HashTable<portid_t, FlowDispatcher *> dev_flow_disp;
+        // Global table of DPDK ports mapped to their Flow Rule Manager objects
+        static HashTable<portid_t, FlowRuleManager *> dev_flow_rule_mgr;
 
-        // Map of ports to Flow Dispatcher instances
-        static HashTable<portid_t, FlowDispatcher *> flow_dispatcher_map();
+        // Map of ports to Flow Rule Manager instances
+        static HashTable<portid_t, FlowRuleManager *> flow_rule_manager_map();
 
-        // Cleans the mappings between ports and Flow Dispatcher instances
-        static void clean_flow_dispatcher_map();
+        // Cleans the mappings between ports and Flow Rule Manager instances
+        static void clean_flow_rule_manager_map();
 
-        // Acquires a Flow Dispatcher instance on a port
-        static FlowDispatcher *get_flow_dispatcher(const portid_t &port_id, ErrorHandler *errh = NULL);
+        // Acquires a Flow Rule Manager instance on a port
+        static FlowRuleManager *get_flow_rule_mgr(const portid_t &port_id, ErrorHandler *errh = NULL);
 
         // Parser initialization
-        static struct cmdline *parser(ErrorHandler *errh);
+        static struct cmdline *flow_rule_parser(ErrorHandler *errh);
 
-        // Get the flow cache associated with a Flow Dispatcher
-        FlowCache *get_flow_cache();
+        // Get a flow rule cache associated with a Flow Rule Manager
+        FlowRuleCache *flow_rule_cache();
 
         // Deletes the error handler of this element
         inline void delete_error_handler() { if (_errh) delete _errh; };
@@ -298,20 +198,17 @@ class FlowDispatcher {
         static inline bool isolated(const portid_t &port_id) { return _isolated[port_id]; };
 
         // Calibrates flow rule cache before inserting new rules
-        void calibrate_cache(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
-        void calibrate_cache(const HashMap<uint32_t, String> &rules_map);
-
-        // Updates the internal ID for the next rule to be allocated
-        void update_internal_rule_id();
+        void flow_rule_cache_calibrate(const uint32_t *int_rule_ids, const uint32_t &rules_nb);
+        void flow_rule_cache_calibrate(const HashMap<uint32_t, String> &rules_map);
 
         // Install NIC flow rules from a file
-        int32_t add_rules_from_file(const String &filename);
+        int32_t flow_rules_add_from_file(const String &filename);
 
         // Update NIC flow rules
-        int32_t update_rules(const HashMap<uint32_t, String> &rules_map, bool by_controller = true, int core_id = -1);
+        int32_t flow_rules_update(const HashMap<uint32_t, String> &rules_map, bool by_controller = true, int core_id = -1);
 
         // Loads a set of rules from a file to memory
-        String load_rules_from_file_to_string(const String &filename);
+        String flow_rules_from_file_to_string(const String &filename);
 
         // Install flow rule(s) in a NIC
         int flow_rules_install(const String &rules, const uint32_t &rules_nb);
@@ -368,10 +265,10 @@ class FlowDispatcher {
         uint32_t flow_rules_flush();
 
         // Verify the consistency of the NIC and Flow Cache upon a rule update
-        void rule_consistency_check(const int32_t &target_number_of_rules);
+        void flow_rule_consistency_check(const int32_t &target_number_of_rules);
 
         // Filters unwanted components from rule
-        static bool filter_rule(String &rule);
+        static bool flow_rule_filter(String &rule);
 
         // Returns a rule token after an input keyword
         static String fetch_token_after_keyword(char *rule, const String &keyword);
@@ -405,7 +302,7 @@ class FlowDispatcher {
         // Device ID
         portid_t _port_id;
 
-        // Indicates whether Flow Dispatcher is active for a given device
+        // Indicates whether Flow Rule Manager is active for a given device
         bool _active;
 
         // Set stdout verbosity
@@ -418,8 +315,8 @@ class FlowDispatcher {
         // A dedicated error handler
         ErrorVeneer *_errh;
 
-        // A low rule cache associated with the port of this Flow Dispatcher
-        FlowCache *_flow_cache;
+        // A flow rule cache associated with the port of this Flow Rule Manager
+        FlowRuleCache *_flow_rule_cache;
 
         // Isolated mode guarantees that all ingress traffic comes from defined flow rules only (current and future)
         static HashMap<portid_t, bool> _isolated;
@@ -449,4 +346,4 @@ class FlowDispatcher {
 
 CLICK_ENDDECLS
 
-#endif /* CLICK_FLOWDISPATCHER_H */
+#endif /* CLICK_FLOWRULEMANAGER_H */

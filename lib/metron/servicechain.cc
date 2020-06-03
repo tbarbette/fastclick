@@ -690,7 +690,7 @@ StandaloneSCManager::run_service_chain(ErrorHandler *errh)
                 rules_map.insert(2093323 + i * 128 * 128 + pindex * 128 + cpid, rule);
                 //click_chatter("Install %s", rule);
             }
-            int status = nic->get_flow_dispatcher(_sriov)->update_rules(rules_map, false);
+            int status = nic->get_flow_rule_mgr(_sriov)->flow_rules_update(rules_map, false);
             /*TODO : avoid duplicate rule installation for collocated SC (scale = false)
             */
             if (status < 0) {
