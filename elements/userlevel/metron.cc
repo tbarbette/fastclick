@@ -3293,6 +3293,7 @@ Metron::param_handler(
                     // Parse rules from JSON
                     int32_t installed_rules = sc->rules_from_json(jsc.second, m, errh);
                     if (installed_rules < 0) {
+                        delete sc;  // Wrong rules result in a wrong service chain
                         return errh->error(
                             "Cannot install NIC rules for service chain %s: Parse error",
                             sc_id.c_str()
@@ -3966,8 +3967,8 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     }
     jsc.set("cpus", jcpus);
 
-    // The controller supports memory statistics specific to a service chain
-    // jsc.set("memory", _metron->get_system_resources()->get_memory().get_memory_stats().to_json());
+    // TODO: send memory statistics specific to a service chain (hard)
+    jsc.set("memory", _metron->get_system_resources()->get_memory().get_memory_stats().to_json());
 
     assert(_manager);
     jsc.set("nics", _manager->nic_stats_to_json());
