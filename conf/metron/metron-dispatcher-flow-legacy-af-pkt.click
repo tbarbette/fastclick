@@ -60,6 +60,7 @@ define(
 	$discoverUser   onos,
 	$discoverPass   rocks,
 
+	$mirrorMode     false,
 	$monitoringMode false
 );
 
@@ -80,6 +81,7 @@ metron :: Metron(
 	SLAVE_DPDK_ARGS   "-w$ifacePCI0",      // Arguments passed to secondary DPDK processes
 	SLAVE_DPDK_ARGS   "-w$ifacePCI1",
 	SLAVE_DPDK_ARGS   "--log-level=eal,8",
+	MIRROR            $mirrorMode,         // Install NIC rules both on the forward and backward path of a server
 	MONITORING        $monitoringMode,     // Defines the monitoring behaviour of the agent
 	VERBOSE           $agentVerbosity      // Defines the verbosity level of the agent
 );
