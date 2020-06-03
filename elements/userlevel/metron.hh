@@ -954,6 +954,7 @@ class ServiceChain {
 
                 static RxFilter *from_json(const Json &j, ServiceChain *sc, ErrorHandler *errh);
                 Json to_json();
+                void print();
 
                 inline int phys_cpu_to_queue(NIC *nic, const int &phys_cpu_id) {
                     return nic->phys_cpu_to_queue(phys_cpu_id);
@@ -998,6 +999,7 @@ class ServiceChain {
         Json get_cpu_stats(int j);
         Json to_json();
         Json stats_to_json(bool monitoring_mode = false);
+        void print();
 
     #if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
         Json rules_to_json();

@@ -50,6 +50,8 @@ ServiceChainManager::~ServiceChainManager()
 String
 ServiceChainManager::fix_rule(NIC *nic, String rule)
 {
+    assert(nic);
+
     // Compose rule for the right NIC
     rule = "flow create " + String(nic->get_port_id()) + " " + rule;
 

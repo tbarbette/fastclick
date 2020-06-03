@@ -368,7 +368,7 @@ LatencyStats::print()
  * CPUStats constructor.
  */
 CPUStats::CPUStats() : _physical_id(-1), _load(0.0f), _max_nic_queue(0),
-                                   _latency(), _active(false), _active_time()
+                       _latency(), _active(false), _active_time()
 {}
 
 /**
@@ -2364,8 +2364,10 @@ Metron::delete_service_chain(ServiceChain *sc, ErrorHandler *errh)
 int
 Metron::connect(const Json &j)
 {
-    if (!_discover_timer.scheduled())
+    if (!_discover_timer.scheduled()) {
+        _discover_timer.initialize(this);
         _discover_timer.schedule_now();
+    }
     _discovered = true;
 
     return SUCCESS;
@@ -2654,6 +2656,7 @@ Metron::system_stats_to_json()
     assert(jcpus.size() == get_cpus_nb());
     assert(assigned_cpus == get_assigned_cpus_nb());
 
+    // CPU statistics
     jroot.set("cpus", jcpus);
 
     // Main memory statistics
@@ -3681,6 +3684,27 @@ ServiceChain::RxFilter::to_json()
 }
 
 /**
+ * Prints information about an Rx filter.
+ */
+void
+ServiceChain::RxFilter::print()
+{
+    if (!sc) {
+        return;
+    }
+
+    click_chatter("================ Rx Filter ================");
+    click_chatter("Service chain ID: %s", sc->get_id().c_str());
+    click_chatter("Rx filter mode: %s", rx_filter_type_enum_to_str(method).c_str());
+    for (unsigned n = 0; n < values.size(); n++) {
+        for (unsigned c = 0; c < values[n].size(); c++) {
+            click_chatter("Tag %2d: NIC %2d --> CPU %2d", (n+1)*c, n, values[n][c]);
+        }
+    }
+    click_chatter("===========================================");
+}
+
+/**
  * Applies an Rx filter configuration to a NIC
  * by allocating space for tags and then populating
  * the desired tag values.
@@ -3696,7 +3720,7 @@ ServiceChain::RxFilter::apply(NIC *nic, ErrorHandler *errh)
     allocate_nic_space_for_tags(sc->get_nics_nb());
     allocate_tag_space_for_nic(inic, sc->get_max_cpu_nb());
 
-    String method_str = rx_filter_type_enum_to_str(method).c_str();
+    String method_str = rx_filter_type_enum_to_str(method);
     click_chatter("Rx filters in mode: %s", method_str.upper().c_str());
 
     if (method == MAC) {
@@ -3834,7 +3858,7 @@ ServiceChain::from_json(const Json &j, Metron *m, ErrorHandler *errh)
     int max_cpu_nb = j.get_i("maxCpus");
 
     if (initial_cpu_nb > max_cpu_nb) {
-        errh->error("Max number of CPUs must be greater than the number of used CPUs");
+        errh->error("Max number of CPUs must be greater or equal than the number of used CPUs");
         delete sc;
         return NULL;
     }
@@ -3858,7 +3882,7 @@ ServiceChain::from_json(const Json &j, Metron *m, ErrorHandler *errh)
     Json jnics = j.get("nics");
     if (!jnics.is_array()) {
         if (jnics.is_string()) {
-            errh->warning("NICs should be a JSON array. Assuming you passed one NIC named %s...", jnics.c_str());
+            errh->warning("NICs should be placed into a JSON array. Assuming you passed one NIC named %s...", jnics.c_str());
             Json ar = Json::make_array();
             ar.push_back(jnics);
             jnics = ar;
@@ -3878,11 +3902,16 @@ ServiceChain::from_json(const Json &j, Metron *m, ErrorHandler *errh)
         sc->_nics.push_back(nic);
     }
 
-    if (m->_mirror) {
-        for (unsigned i = 0; i < sc->_nics.size(); i+=2) {
+    // Either in mirror mode or a stateful configuration is requested
+    if (m->_mirror || (sc->config.find_left("Rewriter(p") > 0)) {
+        for (unsigned i = 0; i < sc->_nics.size(); i += 2) {
             if (i + 1 < sc->_nics.size()) {
                 sc->_nics[i]->mirror = sc->_nics[i + 1];
+            } else {
+                sc->_nics[i]->mirror = sc->_nics[i];
             }
+            errh->message("NIC %s with mirror NIC %s",
+                sc->_nics[i]->get_name().c_str(), sc->_nics[i]->mirror->get_name().c_str());
         }
     }
 
@@ -3938,6 +3967,9 @@ ServiceChain::stats_to_json(bool monitoring_mode)
     }
     jsc.set("cpus", jcpus);
 
+    // The controller supports memory statistics specific to a service chain
+    // jsc.set("memory", _metron->get_system_resources()->get_memory().get_memory_stats().to_json());
+
     assert(_manager);
     jsc.set("nics", _manager->nic_stats_to_json());
 
@@ -3980,7 +4012,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
     Json jnics = j.get("nics");
     int inic = 0;
     for (auto jnic : jnics) {
-        String nic_name = jnic.second.get_s("nicName");
+        String nic_name = jnic.second.get_s("name");
 
         // Get the correct NIC
         NIC *nic = this->get_nic_by_name(nic_name);
@@ -4017,7 +4049,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
             }
 
             int phys_core_id = get_cpu_phys_id(core_id);
-            click_chatter("Adding %4d rules for CPU %d with physical ID %d", rules_map.size(), core_id, phys_core_id);
+            click_chatter("Adding %4d rules for CPU %2d with physical ID %2d", rules_map.size(), core_id, phys_core_id);
 
             // Update a batch of rules associated with this CPU core ID
             int32_t status = nic->get_flow_dispatcher()->update_rules(rules_map, true, phys_core_id);
@@ -4115,7 +4147,7 @@ ServiceChain::rules_to_json()
 
         Json jnic = Json::make_object();
 
-        jnic.set("nicName", nic->get_name());
+        jnic.set("name", nic->get_name());
 
         Json jcpus_array = Json::make_array();
 
@@ -4613,6 +4645,28 @@ ServiceChain::assigned_phys_cpus()
         }
     }
     return b;
+}
+
+void
+ServiceChain::print()
+{
+    click_chatter("======================== Service chain ========================");
+    click_chatter(" Service chain ID: %s", id.c_str());
+    click_chatter("      Config type: %s", sc_type_enum_to_str(config_type).c_str());
+    click_chatter("           Config: \n%s\n", config.c_str());
+    click_chatter("  Expanded Config: \n%s\n", generate_configuration(true).c_str());
+    rx_filter->print();
+    click_chatter("\n");
+    for (unsigned j = 0; j < get_max_cpu_nb(); j++) {
+        int cpu_id = get_cpu_phys_id(j);
+        CPUStats &cpu = get_cpu_info(j);
+        click_chatter("CPU ID: %d", cpu_id);
+        click_chatter(" Queue: %d", cpu.get_max_nic_queue());
+        click_chatter("  Load: %f", cpu.get_load());
+        click_chatter("Active: %s", cpu.is_active() ? "true" : "false");
+        click_chatter("  Busy since: %d", cpu.active_since());
+    }
+    click_chatter("===============================================================");
 }
 
 CLICK_ENDDECLS
