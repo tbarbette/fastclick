@@ -2005,7 +2005,9 @@ FlowDispatcher::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pk
     struct rte_port *port;
     struct port_flow *pf;
     struct rte_flow_action *action = 0;
-    struct rte_flow_query_count query;
+    union {
+        struct rte_flow_query_count count;
+    } query;
 
     port = get_port(_port_id);
     if (!port->flow_list || (flow_rules_count() == 0)) {
@@ -2043,6 +2045,22 @@ FlowDispatcher::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pk
         return "";
     }
 
+    const char *name;
+    int ret = rte_flow_conv(RTE_FLOW_CONV_OP_ACTION_NAME_PTR,
+                &name, sizeof(name), (void *)(uintptr_t)action->type, &error);
+    if (ret < 0) {
+        _errh->message(
+            "Flow Dispatcher (port %u): Failed to convert action for flow rule with ID %" PRIu32, _port_id, int_rule_id);
+        return "";
+    }
+    switch (action->type) {
+        case RTE_FLOW_ACTION_TYPE_COUNT:
+            break;
+        default:
+            _errh->message("Flow Dispatcher (port %u): Cannot query action type %d (%s)\n", _port_id, action->type, name);
+            return "";
+    }
+
     // Poisoning to make sure PMDs update it in case of error
     memset(&error, 0x55, sizeof(error));
     memset(&query, 0, sizeof(query));
@@ -2057,21 +2075,29 @@ FlowDispatcher::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_pk
         return "";
     }
 
-    if (query.hits_set == 1) {
-        _flow_cache->set_matched_packets(int_rule_id, query.hits);
-        matched_pkts = query.hits;
+    switch (action->type) {
+        case RTE_FLOW_ACTION_TYPE_COUNT:
+            break;
+        default:
+            _errh->message("Flow Dispatcher (port %u): Cannot display result for action type %d (%s)\n", _port_id, action->type, name);
+            return "";
     }
-    if (query.bytes_set == 1) {
-        _flow_cache->set_matched_bytes(int_rule_id, query.bytes);
-        matched_bytes = query.bytes;
+
+    if (query.count.hits_set == 1) {
+        _flow_cache->set_matched_packets(int_rule_id, query.count.hits);
+        matched_pkts = query.count.hits;
+    }
+    if (query.count.bytes_set == 1) {
+        _flow_cache->set_matched_bytes(int_rule_id, query.count.bytes);
+        matched_bytes = query.count.bytes;
     }
 
     StringAccum stats;
 
-    stats << "hits_set: " << query.hits_set << ", "
-          << "bytes_set: " << query.bytes_set << ", "
-          << "hits: " << query.hits << ", "
-          << "bytes: " << query.bytes;
+    stats << "hits_set: " << query.count.hits_set << ", "
+          << "bytes_set: " << query.count.bytes_set << ", "
+          << "hits: " << query.count.hits << ", "
+          << "bytes: " << query.count.bytes;
 
     return stats.take_string();
 }
@@ -2101,7 +2127,7 @@ FlowDispatcher::flow_rule_table_stats(NicTableStats &table_stats)
     for (struct port_flow *pf = port->flow_list; pf != NULL; pf = pf->next) {
         uint32_t id = pf->id;
 
-        // Get currest state of the pacet and byte counters from the device
+        // Get currest state of the packet and byte counters from the device
         int64_t matched_pkts = 0;
         int64_t matched_bytes = 0;
         flow_rule_query(id, matched_pkts, matched_bytes);
