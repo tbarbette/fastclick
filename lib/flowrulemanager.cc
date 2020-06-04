@@ -1052,7 +1052,7 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
 #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
     if (rte_flow_query(_port_id, pf->flow, &q_action[0], &query, &error) < 0) {
 #else
-    if (rte_flow_query(_port_id, pf->flow, &(q_action[0].type), &query, &error) < 0) {
+    if (rte_flow_query(_port_id, pf->flow, q_action[0].type, &query, &error) < 0) {
 #endif
         _errh->message(
             "DPDK Flow Rule Manager (port %u): Failed to query stats for flow rule with ID %" PRIu32, _port_id, int_rule_id);
