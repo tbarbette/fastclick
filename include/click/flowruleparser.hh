@@ -124,10 +124,9 @@ int cmdline_parse(
     const char *buf
 );
 
-#endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
-
 #ifdef __cplusplus
 }
+#endif
 
 #define FLOWRULEPARSER_ERROR   ((int)-1)
 #define FLOWRULEPARSER_SUCCESS ((int) 0)
@@ -197,7 +196,7 @@ char *flow_rule_parser_parse_new_line(char *line, int n, const char **input_cmd)
  */
 int flow_rule_parser_parse(struct cmdline *cl, const char *input_cmd, ErrorHandler *errh);
 
-#endif
+#endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
 CLICK_ENDDECLS
 

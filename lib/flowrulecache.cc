@@ -20,7 +20,7 @@
 
 CLICK_DECLS
 
-#if RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0)
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
 /**
  * Flow Rule Cache implementation.
@@ -1004,6 +1004,6 @@ FlowRuleCache::flush_rule_counters()
     _matched_bytes.clear();
 }
 
-#endif /* RTE_VERSION >= RTE_VERSION_NUM(20,2,0,0) */
+#endif /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
 CLICK_ENDDECLS
