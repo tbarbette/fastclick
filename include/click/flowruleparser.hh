@@ -124,6 +124,35 @@ int cmdline_parse(
     const char *buf
 );
 
+/**
+ * Sample actions: "actions count / end"
+ * for flow rule query operations.
+ */
+static struct rte_flow_query_count query_count = {
+    .reset = 1,
+    .hits_set = 1,
+    .bytes_set = 1,
+    .reserved = 0,
+    .hits = 0,
+    .bytes = 0
+};
+static struct rte_flow_action count_action = { RTE_FLOW_ACTION_TYPE_COUNT, &query_count};
+static struct rte_flow_action end_action = { RTE_FLOW_ACTION_TYPE_END, 0};
+/**
+ * This structure is used by rte_flow_conv() in flow_rule_query().
+ */
+static struct rte_flow_action query_actions[2];
+
+/**
+ * Statically compose a sample action for conducting flow rule queries.
+ */
+static void
+flow_query_actions_init()
+{
+    query_actions[0] = count_action;
+    query_actions[1] = end_action;
+}
+
 #endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
 
 #ifdef __cplusplus
@@ -161,9 +190,7 @@ init_port(void)
  * @args errh: an instance of the error handler
  * @return a parser object
  */
-struct cmdline *flow_rule_parser_init(
-	ErrorHandler *errh
-);
+struct cmdline *flow_rule_parser_init(ErrorHandler *errh);
 
 /**
  * Creates an instance of the Flow Parser's parser
@@ -174,10 +201,7 @@ struct cmdline *flow_rule_parser_init(
  * @args errh: an instance of the error handler
  * @return a command line object
  */
-struct cmdline *flow_rule_parser_alloc(
-	const char *prompt,
-	ErrorHandler *errh
-);
+struct cmdline *flow_rule_parser_alloc(const char *prompt, ErrorHandler *errh);
 
 /**
  * Parses a new line.

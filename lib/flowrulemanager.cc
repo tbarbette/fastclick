@@ -219,6 +219,7 @@ struct cmdline *
 FlowRuleManager::flow_rule_parser(ErrorHandler *errh)
 {
     if (!_parser) {
+        flow_query_actions_init();
         return flow_rule_parser_init(errh);
     }
 
@@ -960,7 +961,6 @@ FlowRuleManager::flow_rules_isolate(const portid_t &port_id, const int &set)
 #endif
 }
 
-
 /**
  * Queries the statistics of a NIC flow rule.
  *
@@ -983,6 +983,7 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
     struct rte_port *port;
     struct port_flow *pf;
     struct rte_flow_action *action = 0;
+    struct rte_flow_action *q_action = &query_actions[0];
     union {
         struct rte_flow_query_count count;
     } query;
@@ -1010,7 +1011,7 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
         return "";
     }
 
-    // Move the action pointer at the right offset
+    // Verify that there is a count action within this rule's set of actions and move the action pointer there
     while (action->type != RTE_FLOW_ACTION_TYPE_END) {
         if (action->type == RTE_FLOW_ACTION_TYPE_COUNT) {
             break;
@@ -1026,7 +1027,7 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
     const char *name;
 #if RTE_VERSION >= RTE_VERSION_NUM(18,11,0,0)
     int ret = rte_flow_conv(RTE_FLOW_CONV_OP_ACTION_NAME_PTR,
-                &name, sizeof(name), (void *)(uintptr_t)action->type, &error);
+                &name, sizeof(name), (void *)(uintptr_t)q_action[0].type, &error);
     if (ret < 0) {
         _errh->message(
             "DPDK Flow Rule Manager (port %u): Failed to convert action for flow rule with ID %" PRIu32, _port_id, int_rule_id);
@@ -1049,9 +1050,9 @@ FlowRuleManager::flow_rule_query(const uint32_t &int_rule_id, int64_t &matched_p
     memset(&query, 0, sizeof(query));
 
 #if RTE_VERSION >= RTE_VERSION_NUM(18,5,0,0)
-    if (rte_flow_query(_port_id, pf->flow, action, &query, &error) < 0) {
+    if (rte_flow_query(_port_id, pf->flow, &q_action[0], &query, &error) < 0) {
 #else
-    if (rte_flow_query(_port_id, pf->flow, action->type, &query, &error) < 0) {
+    if (rte_flow_query(_port_id, pf->flow, &(q_action[0].type), &query, &error) < 0) {
 #endif
         _errh->message(
             "DPDK Flow Rule Manager (port %u): Failed to query stats for flow rule with ID %" PRIu32, _port_id, int_rule_id);
