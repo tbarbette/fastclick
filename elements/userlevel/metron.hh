@@ -826,6 +826,7 @@ class NIC {
         inline portid_t get_port_id() { return is_ghost() ? -1 : cast()->get_device()->get_port_id(); };
         inline String get_name() { return is_ghost() ? "" : _element->name(); };
         inline String get_device_address() { return String(get_port_id()); };
+        inline bool has_mirror() { return mirror && (this->_index != mirror->_index); };
 
         void set_element(Element *el);
         void set_index(const int &index);

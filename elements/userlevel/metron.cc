@@ -3698,7 +3698,7 @@ ServiceChain::RxFilter::print()
     click_chatter("Rx filter mode: %s", rx_filter_type_enum_to_str(method).c_str());
     for (unsigned n = 0; n < values.size(); n++) {
         for (unsigned c = 0; c < values[n].size(); c++) {
-            click_chatter("Tag %2d: NIC %2d --> CPU %2d", (n+1)*c, n, values[n][c]);
+            click_chatter("Tag %2d: NIC %2d --> CPU %s", (n+1)*c, n, values[n][c].c_str());
         }
     }
     click_chatter("===========================================");
@@ -4057,7 +4057,7 @@ ServiceChain::rules_from_json(Json j, Metron *m, ErrorHandler *errh)
                 inserted_rules_nb += status;
             }
 
-            if (nic->mirror) {
+            if (nic->has_mirror()) {
                 click_chatter("Device %s has mirror NIC", nic_name.c_str());
                 HashMap<uint32_t, String> mirror_rules_map;
 

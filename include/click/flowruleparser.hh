@@ -124,12 +124,16 @@ int cmdline_parse(
     const char *buf
 );
 
+#endif // /* RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0) */
+
 #ifdef __cplusplus
 }
 #endif
 
 #define FLOWRULEPARSER_ERROR   ((int)-1)
 #define FLOWRULEPARSER_SUCCESS ((int) 0)
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17,5,0,0)
 
 /**
  * DPDK's Flow parsing API.
