@@ -124,16 +124,16 @@ ifndef MINDRIVER
 DRIVER = click
 ELEMENTSCONF = elements
 INSTALLLIBS = libclick.a
-FINDELEMFLAGS =  --checksum elements.csmk
+FINDELEMFLAGS = @FINDELEMFLAGS@ --checksum elements.csmk
 -include elements.csmk
 ELEM2EXPORT = elem2export
 else
 DRIVER = $(MINDRIVER)click
 ELEMENTSCONF = elements_$(MINDRIVER)
-ifeq ($(MINDRIVER),embed)
-ELEM2EXPORT = elem2exportstatic
-else 
+ifeq ($(shell grep -c "elem2packagestatic" clickdv*.cc),0)
 ELEM2EXPORT = elem2export
+else 
+ELEM2EXPORT = elem2exportstatic
 endif
 endif
 INSTALLPROGS = $(DRIVER)

@@ -33,7 +33,7 @@ Vector<Pair<String,String>> patterns;
 Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
-    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false)
+    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false), _do_static(false)
 {
   _etinfo.push_back(ElementTypeInfo());
 
@@ -432,10 +432,13 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 	sa << "if (i == " << r1 << ") ";
       else
 	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
-  //     sa << "return ((" << input_class[r1] << " *)input(i).element())->"
-	//  << input_class[r1] << "::pull(" << input_port[r1] << ");";
-          sa << "return obj_" << input_class[r1] << ".pull(" << input_port[r1]
-	    << ");";
+      if(!_do_static) {
+        sa << "return ((" << input_class[r1] << " *)input(i).element())->" 
+        << input_class[r1] << "::pull(" << input_port[r1] << ");";
+      } else {
+        sa << "return obj_" << input_class[r1] << ".pull(" << input_port[r1]
+        << ");";
+      }
     }
     if (_ninputs[eindex])
 	sa << "\n  return input(i).pull();\n";
@@ -465,11 +468,14 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 	sa << "if (i == " << r1 << ") ";
       else
 	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
-  //     sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
-	//  << output_class[r1] << "::push(" << output_port[r1]
-	//  << ", p); return; }";
-         sa << "{ obj_" << output_class[r1] << ".push(" << output_port[r1]
-	 << ", p); return; }";
+  if(!_do_static) {
+    sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
+    << output_class[r1] << "::push(" << output_port[r1]
+    << ", p); return; }";
+  } else {
+    sa << "{ obj_" << output_class[r1] << ".push(" << output_port[r1]
+    << ", p); return; }";
+  }
     }
     if (_noutputs[eindex])
 	sa << "\n  output(i).push(p);\n";
@@ -508,11 +514,14 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 	sa << "if (i == " << r1 << ") ";
       else
 	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
-  //     sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
-	//  << output_class[r1] << "::push_batch(" << output_port[r1]
-	//  << ", p); return; }";
-            sa << "{ obj_" << output_class[r1] << ".push_batch(" << output_port[r1]
-	 << ", p); return; }";
+  if(!_do_static) {
+    sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
+    << output_class[r1] << "::push_batch(" << output_port[r1]
+    << ", p); return; }";
+  } else {
+    sa << "{ obj_" << output_class[r1] << ".push_batch(" << output_port[r1]
+    << ", p); return; }";
+  }
     }
     if (_noutputs[eindex])
 	sa << "\n  output(i).push_batch(p);\n";
@@ -780,7 +789,11 @@ Specializer::output_package(const String &package_name, const String &suffix, St
 	if (_specials[i].special())
 	    elem2package <<  "-\t\"" << package_name << suffix << ".hh\"\t" << _specials[i].cxx_name << '-' << _specials[i].click_name << '\n';
     String click_buildtool_prog = clickpath_find_file("click-buildtool", "bin", CLICK_BINDIR, errh);
-    cmd_sa << click_buildtool_prog << " elem2packagestatic " << package_name;
+    if (!_do_static) {
+      cmd_sa << click_buildtool_prog << " elem2package " << package_name;
+    } else {
+      cmd_sa << click_buildtool_prog << " elem2packagestatic " << package_name;
+    }
     out << shell_command_output_string(cmd_sa.take_string(), elem2package.take_string(), errh);
 }
 

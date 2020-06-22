@@ -58,6 +58,7 @@ class Specializer { public:
 			       const String &requirements) const;
 
   void should_inline(bool do_inline) { _do_inline = do_inline; };
+  void make_static(bool do_static) { _do_static = do_static; };
  private:
 
   enum { SPCE_NOT_DONE = -2, SPCE_NOT_SPECIAL = -1 };
@@ -77,6 +78,7 @@ class Specializer { public:
   Vector<SpecializedClass> _specials;
 
   bool _do_inline;
+  bool _do_static;
 
   CxxInfo _cxxinfo;
 

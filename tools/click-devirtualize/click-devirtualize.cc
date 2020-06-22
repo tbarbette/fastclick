@@ -54,12 +54,14 @@
 #define INSTRS_OPT		312
 #define REVERSE_OPT		313
 #define INLINE_OPT	    314
+#define STATIC_OPT      315
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
   { "config", 'c', CONFIG_OPT, 0, Clp_Negate },
   { "devirtualize", 0, DEVIRTUALIZE_OPT, Clp_ValString, Clp_Negate },
   { "inline", 'I', INLINE_OPT, 0},
+  { "static", 'S', STATIC_OPT, 0},
   { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
@@ -245,6 +247,7 @@ main(int argc, char **argv)
   int compile_user = 0;
   int reverse = 0;
   int do_inline = 0;
+  int do_static = 0;
   Vector<const char *> instruction_files;
   HashTable<String, int> specializing;
 
@@ -330,6 +333,10 @@ particular purpose.\n");
 
      case INLINE_OPT:
       do_inline = !clp->negated;
+      break;
+
+     case STATIC_OPT:
+      do_static = !clp->negated;
       break;
 
      bad_option:
@@ -429,6 +436,7 @@ particular purpose.\n");
   Specializer specializer(router, full_elementmap);
 
   specializer.should_inline(do_inline);
+  specializer.make_static(do_static);
   specializer.specialize(sigs, errh);
 
   // quit early if nothing was done
