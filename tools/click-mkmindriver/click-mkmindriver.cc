@@ -374,8 +374,16 @@ Mindriver::print_elements_conf(FILE *f, String package, const ElementMap &emap, 
 	    // remember header file
 	    headervec[sourcei] = elt.header_file;
 	    // remember name
-	    if (elt.name && !elt.noexport)
-		classvec[sourcei] += " " + elt.cxx + "-" + elt.name;
+	    if (elt.name && !elt.noexport) {
+            // Avoid adding duplicate elements
+            String tmp_elem = " " + elt.cxx + "-" + elt.name;
+            int found = classvec[sourcei].find_left(tmp_elem,0);
+            if(found >= 0) {
+                printf("Found duplicate element! %s at %d\n", tmp_elem.c_str(), found);
+                continue;
+            }
+            classvec[sourcei] += tmp_elem;  
+        }
 	    // remember static methods
 	    if (elt.methods && !statichash[elt.cxx]) {
 		statichash[elt.cxx] = 1;
