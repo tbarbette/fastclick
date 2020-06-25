@@ -66,10 +66,10 @@ install-man: testie.1 $(ELEMENTMAP) Makefile
 uninstall: uninstall-man
 	/bin/rm -f $(DESTDIR)$(bindir)/click-elem2man
 uninstall-man: $(ELEMENTMAP)
-	cd $(DESTDIR)$(mandir)/man1; /bin/rm -f click.1 click-align.1 click-combine.1 click-devirtualize.1 click-fastclassifier.1 click-flatten.1 click-install.1 click-mkmindriver.1 click-pretty.1 click-uncombine.1 click-undead.1 click-uninstall.1 click-xform.1 testie.1
-	cd $(DESTDIR)$(mandir)/man5; /bin/rm -f click.5
-	cd $(DESTDIR)$(mandir)/man7; /bin/rm -f elementdoc.7
-	cd $(DESTDIR)$(mandir)/man8; /bin/rm -f click.o.8
+	cd $(DESTDIR)$(mandir)/man1 && /bin/rm -f click.1 click-align.1 click-combine.1 click-devirtualize.1 click-fastclassifier.1 click-flatten.1 click-install.1 click-mkmindriver.1 click-pretty.1 click-uncombine.1 click-undead.1 click-uninstall.1 click-xform.1 testie.1
+	cd $(DESTDIR)$(mandir)/man5 && /bin/rm -f click.5
+	cd $(DESTDIR)$(mandir)/man7 && /bin/rm -f elementdoc.7
+	cd $(DESTDIR)$(mandir)/man8 && /bin/rm -f click.o.8
 	$(PERL) $(srcdir)/click-elem2man -l -m $(DESTDIR)$(mandir) -P DEFAULT -p $(top_srcdir) -u $(ELEMENTMAP)
 
 testie.1: $(top_srcdir)/test/testie
