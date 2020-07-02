@@ -778,7 +778,9 @@ class __rwlock : public RWLock { public:
 };
 
 /**
- * Read XOR Write lock. Allow either multiple reader or multiple
+ * Read XOR Write lock, "prefer read" variant
+ *
+ * Allow either multiple reader or multiple
  * writer. When a reader arrives, writers stop taking the usecount. The reader
  * has access once all writer finish.
  *
@@ -862,13 +864,15 @@ private:
 } CLICK_CACHE_ALIGN;
 
 /**
- * Read XOR Write lock. Allow either multiple reader or multiple
+ * Read XOR Write lock, "prefer write" variant
+ *
+ * Allow either multiple reader or multiple
  * writer. When a reader arrives, writers stop taking the usecount. The reader
  * has access once all writer finish.
  *
  * To stop writer from locking, the reader will CAS a very low value.
  *
- * If max_writer is 1, this becomes rwlock, but with a priority on the reads
+ * If max_writer is 1, this becomes rwlock, but with a priority on the write
  */
 
 class rXwlockPW { public:
@@ -1369,7 +1373,7 @@ protected:
  */
 template <typename T>
 class fast_rcu { public:
-#define N 2
+#define RCU_N 2
     fast_rcu() : _rcu_current(0), _epochs(0), _write_epoch(1) {
     }
 
@@ -1411,7 +1415,7 @@ class fast_rcu { public:
         rcu_current_local = _rcu_current;
 
         int rcu_next = (rcu_current_local + 1) & 1;
-        int bad_epoch = (_write_epoch - N) + 1;
+        int bad_epoch = (_write_epoch - RCU_N) + 1;
 
         unsigned i = 0;
         loop:
@@ -1421,7 +1425,7 @@ class fast_rcu { public:
                 click_relax_fence();
                 goto loop;
             }
-            //TODO : if allow N > 2, compute a min_epoch at the same time so next writer can avoid looping
+            //TODO : if allow RCU_N > 2, compute a min_epoch at the same time so next writer can avoid looping
         }
 
         //All epochs are 0 (no accessed, or at least not to the current ptr)
