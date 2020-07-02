@@ -48,7 +48,7 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
     set_mode(mode);
-    click_chatter("MODE setted to %s", mode.c_str());
+    click_chatter("MODE set to %s", mode.c_str());
     return 0;
 }
 
