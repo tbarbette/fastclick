@@ -71,6 +71,16 @@ class FlowSwitch : public FlowStateElement<FlowSwitch,FlowSwitchEntry>,
 
         void push_batch(int, FlowSwitchEntry*, PacketBatch *);
 
+	void add_handlers() override;
+
+private:
+	static int handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh);
+        static String read_handler(Element *handler, void *user_data);
+        static int write_handler(
+            const String &, Element *, void *, ErrorHandler *
+            ) CLICK_COLD;
+
+	friend class LoadBalancer;
 };
 
 CLICK_ENDDECLS
