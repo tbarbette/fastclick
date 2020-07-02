@@ -41,11 +41,18 @@ IPLoadBalancer::~IPLoadBalancer() {
 int
 IPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    if (Args(conf, this, errh)
+    if (Args(this, errh).bind(conf)
                .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
                .read_mp("VIP", _vip)
-               .complete() < 0)
-        return -1;
+               .consume() < 0)
+		return -1;
+
+    if (parseLb(conf, this, errh) < 0)
+            return -1;
+
+    if (Args(this, errh).bind(conf).complete() < 0)
+            return -1;
+
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
     return 0;
@@ -62,12 +69,12 @@ void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
 
     auto fnt = [this](Packet*&p) {
         WritablePacket* q =p->uniqueify();
-        p = q;
 
-        unsigned hash = pick_server(p);
+        unsigned hash = pick_server(q);
         IPAddress srv = _dsts.unchecked_at(hash);
+	track_load(q, hash);
 
-	    q->ip_header()->ip_dst = srv;
+	q->ip_header()->ip_dst = srv;
         q->set_dst_ip_anno(srv);
         return q;
     };
@@ -81,16 +88,44 @@ void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
 void IPLoadBalancer::push(int, Packet* p) {
         WritablePacket* q =p->uniqueify();
 
-        if (!q)
+        if (unlikely(!q)) {
             return;
+        }
 
-        unsigned hash = pick_server(p);
+        unsigned hash = pick_server(q);
         IPAddress srv = _dsts.unchecked_at(hash);
+	track_load(q, hash);
 
 	q->ip_header()->ip_dst = srv;
         q->set_dst_ip_anno(srv);
 
         output_push(0, q);
+}
+
+int
+IPLoadBalancer::handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh) {
+    IPLoadBalancer *cs = static_cast<IPLoadBalancer *>(e);
+    return cs->lb_handler(op, s, h->read_user_data(), h->write_user_data(), errh);
+}
+
+int
+IPLoadBalancer::write_handler(
+        const String &input, Element *e, void *thunk, ErrorHandler *errh) {
+	IPLoadBalancer *cs = static_cast<IPLoadBalancer *>(e);
+
+    return cs->lb_write_handler(input,thunk,errh);
+}
+
+String
+IPLoadBalancer::read_handler(Element *e, void *thunk) {
+	IPLoadBalancer *cs = static_cast<IPLoadBalancer *>(e);
+    return cs->lb_read_handler(thunk);
+
+}
+
+void
+IPLoadBalancer::add_handlers(){
+    add_lb_handlers<IPLoadBalancer>(this);
 }
 
 IPLoadBalancerReverse::IPLoadBalancerReverse() {
@@ -139,8 +174,9 @@ void IPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
 
 void IPLoadBalancerReverse::push(int, Packet* p) {
         WritablePacket* q =p->uniqueify();
-        if (!q)
+        if (unlikely(!q)) {
             return;
+        }
 	    q->ip_header()->ip_src = _lb->_vip;
 
         output_push(0, q);

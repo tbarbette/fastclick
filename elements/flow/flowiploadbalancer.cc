@@ -38,17 +38,20 @@ FlowIPLoadBalancer::~FlowIPLoadBalancer()
 int
 FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
 {
-    String mode= "rr";
-    if (Args(conf, this, errh)
-       .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
-       .read_mp("VIP", _vip)
-       .read("MODE", mode)
-       .complete() < 0)
-        return -1;
+    if (Args(this, errh).bind(conf)
+               .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
+               .read_mp("VIP", _vip)
+               .consume() < 0)
+		return -1;
+
+    if (parseLb(conf, this, errh) < 0)
+            return -1;
+
+    if (Args(this, errh).bind(conf).complete() < 0)
+            return -1;
+
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
-    set_mode(mode);
-    click_chatter("MODE set to %s", mode.c_str());
     return 0;
 }
 
@@ -81,11 +84,17 @@ void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch
         WritablePacket* q =p->uniqueify();
         p = q;
 
+	unsigned b = flowdata->chosen_server;
+
         nat_debug_chatter("Packet for flow %d", flowdata->chosen_server);
-        IPAddress srv = _dsts[flowdata->chosen_server];
+        IPAddress srv = _dsts[b];
 
         q->ip_header()->ip_dst = srv;
         p->set_dst_ip_anno(srv);
+        track_load(p, b);
+
+
+
         return true;
     };
     EXECUTE_FOR_EACH_PACKET_UNTIL_DROP(fnt, batch);
@@ -94,6 +103,31 @@ void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch
         checked_output_push_batch(0, batch);
 }
 
+int
+FlowIPLoadBalancer::handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh) {
+    FlowIPLoadBalancer *cs = static_cast<FlowIPLoadBalancer *>(e);
+    return cs->lb_handler(op, s, h->read_user_data(), h->write_user_data(), errh);
+}
+
+int
+FlowIPLoadBalancer::write_handler(
+        const String &input, Element *e, void *thunk, ErrorHandler *errh) {
+	FlowIPLoadBalancer *cs = static_cast<FlowIPLoadBalancer *>(e);
+
+    return cs->lb_write_handler(input,thunk,errh);
+}
+
+String
+FlowIPLoadBalancer::read_handler(Element *e, void *thunk) {
+	FlowIPLoadBalancer *cs = static_cast<FlowIPLoadBalancer *>(e);
+    return cs->lb_read_handler(thunk);
+}
+
+void
+FlowIPLoadBalancer::add_handlers()
+{
+    add_lb_handlers<FlowIPLoadBalancer>(this);
+}
 
 FlowIPLoadBalancerReverse::FlowIPLoadBalancerReverse() : _lb(0)
 {
