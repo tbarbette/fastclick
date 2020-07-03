@@ -29,7 +29,6 @@ CLICK_DECLS
 
 FlowSwitch::FlowSwitch()
 {
-    alpha = 1;
 }
 
 FlowSwitch::~FlowSwitch()
@@ -40,13 +39,11 @@ int
 FlowSwitch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     String mode= "rr";
-    double alphad;
     if (Args(conf, this, errh)
        .read("MODE", mode)
-       .read_or_set("ALPHA", alphad, 1)
        .complete() < 0)
         return -1;
-    alpha = alphad;
+
     _dsts.resize(noutputs());
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
