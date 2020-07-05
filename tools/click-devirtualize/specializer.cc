@@ -33,7 +33,7 @@ Vector<Pair<String,String>> patterns;
 Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
-    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false), _do_static(false)
+    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false), _do_static(false), _do_unroll(false), _unroll_val(0)
 {
   _etinfo.push_back(ElementTypeInfo());
 
@@ -381,6 +381,50 @@ Specializer::do_simple_action(SpecializedClass &spc)
   spc.cxxc->find("input_pull")->unkill();
 }
 
+void 
+Specializer::unroll_run_task(SpecializedClass &spc) {
+  CxxFunction *run_task = spc.cxxc->find("run_task");
+  assert(run_task);
+
+  StringAccum sa;
+  int unrolling_factor = (_unroll_val == 0) ? 32 : _unroll_val;
+
+  /* Find the before/after the rte_eth_rx_burst for loop */
+  String before_for = run_task->body().substring(
+      0, run_task->body().find_left(
+             "for", run_task->body().find_left("rte_eth_rx_burst")));
+  String after_for = run_task->body().substring(
+      run_task->body().find_left(
+          "for", run_task->body().find_left("rte_eth_rx_burst")),
+      run_task->body().length());
+
+  /* Change 'n' with '_burst' */
+  // TODO: if(n) and head->make_tail(last, n) is not replaced!
+  bool found = false;
+  if (run_task->replace_expr("n", "_burst", true)) {
+    found = true;
+  }
+
+  if (found) {
+    String after_for_replaced = run_task->body().substring(
+        run_task->body().find_left(
+            "for", run_task->body().find_left("rte_eth_rx_burst")),
+        run_task->body().length());
+    sa << before_for << "\n"
+       << "if (likely(n == _burst)) { \n"
+       << "#pragma GCC unroll " << unrolling_factor
+       << "\n"
+       //<< "#pragma clang loop unroll(enable)" << "\n"
+       << "#pragma clang loop unroll_count(" << unrolling_factor << ")\n"
+       << after_for_replaced << "\n"
+       << "} else { \n"
+       << after_for << "}\n";
+
+    /* Change the body of the function */
+    run_task->set_body(sa.c_str());
+  }
+}
+
 inline const String &
 Specializer::enew_cxx_type(int i) const
 {
@@ -586,6 +630,16 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
   // actually do the work
   for (int s = 0; s < _specials.size(); s++) {
     if (create_class(_specials[s])) {
+
+  /* Unroll the for loop after rte_eth_rx_burst in FromDPDKDevice */
+  if(_do_unroll) {
+   if (_specials[s].cxxc->find("run_task")) {
+                    if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
+                      unroll_run_task(_specials[s]);
+                    }
+                  }
+  }
+
 	CxxClass* original = _specials[s].cxxc->parent(0);
 	/*for (int j = 0; j < original->nfunctions(); j++) {
 		click_chatter("CLass %s fnt %s",original->name().c_str(), original->function(j).name().c_str());

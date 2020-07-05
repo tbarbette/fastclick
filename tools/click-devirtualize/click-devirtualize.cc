@@ -55,6 +55,7 @@
 #define REVERSE_OPT		313
 #define INLINE_OPT	    314
 #define STATIC_OPT      315
+#define UNROLL_OPT      316
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
@@ -62,6 +63,7 @@ static const Clp_Option options[] = {
   { "devirtualize", 0, DEVIRTUALIZE_OPT, Clp_ValString, Clp_Negate },
   { "inline", 'I', INLINE_OPT, 0},
   { "static", 'S', STATIC_OPT, 0},
+  { "unroll", 'U', UNROLL_OPT, Clp_ValInt, Clp_Mandatory },
   { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
@@ -248,6 +250,8 @@ main(int argc, char **argv)
   int reverse = 0;
   int do_inline = 0;
   int do_static = 0;
+  int do_unroll = 0;
+  int unroll_val = 0;
   Vector<const char *> instruction_files;
   HashTable<String, int> specializing;
 
@@ -337,6 +341,11 @@ particular purpose.\n");
 
      case STATIC_OPT:
       do_static = !clp->negated;
+      break;
+
+     case UNROLL_OPT:
+      do_unroll = !clp->negated;
+      unroll_val = ( (clp->have_val != 0) ? clp->val.i : 0 );
       break;
 
      bad_option:
@@ -437,6 +446,7 @@ particular purpose.\n");
 
   specializer.should_inline(do_inline);
   specializer.make_static(do_static);
+  specializer.should_unroll(do_unroll, unroll_val);
   specializer.specialize(sigs, errh);
 
   // quit early if nothing was done
