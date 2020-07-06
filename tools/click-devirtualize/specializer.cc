@@ -385,8 +385,8 @@ void
 Specializer::unroll_run_task(SpecializedClass &spc) {
   CxxFunction *run_task = spc.cxxc->find("run_task");
   assert(run_task);
+  run_task->kill();
 
-  StringAccum sa;
   int unrolling_factor = (_unroll_val == 0) ? 32 : _unroll_val;
 
   /* Find the before/after the rte_eth_rx_burst for loop */
@@ -406,11 +406,12 @@ Specializer::unroll_run_task(SpecializedClass &spc) {
   }
 
   if (found) {
+    StringAccum new_body;
     String after_for_replaced = run_task->body().substring(
         run_task->body().find_left(
             "for", run_task->body().find_left("rte_eth_rx_burst")),
         run_task->body().length());
-    sa << before_for << "\n"
+    new_body << before_for << "\n"
        << "if (likely(n == _burst)) { \n"
        << "#pragma GCC unroll " << unrolling_factor
        << "\n"
@@ -421,7 +422,9 @@ Specializer::unroll_run_task(SpecializedClass &spc) {
        << after_for << "}\n";
 
     /* Change the body of the function */
-    run_task->set_body(sa.c_str());
+    spc.cxxc->defun(CxxFunction(run_task->name(), false, run_task->ret_type(), run_task->args(), new_body.take_string(), " "));
+  } else {
+    click_chatter("Could not unroll the for loop in run_task!\n");
   }
 }
 
