@@ -439,7 +439,7 @@ particular purpose.\n");
   }
 
   // analyze signatures to determine specialization
-  sigs.analyze(full_elementmap);
+  sigs.analyze(full_elementmap, do_static);
 
   // initialize specializer
   Specializer specializer(router, full_elementmap);

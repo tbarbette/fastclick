@@ -1129,6 +1129,7 @@ END {
   print "#ifdef CLICK_LINUXMODULE\n#define click_add_element_type_stable(n, f, t) click_add_element_type_stable((n), (f), (t), 0)\n#endif";
   print "void\nclick_export_elements()\n{\n", B, "  CLICK_DMALLOC_REG(\"nXXX\");\n}\n";
   print "void\nclick_unexport_elements()\n{\n", C, "}";
+  print "void\nclick_delete_element(Element* e)\n{\n;}";
 }
 '
     else
@@ -1168,6 +1169,7 @@ END {
   print "#ifdef CLICK_LINUXMODULE\n#define click_add_element_type_stable(n, f, t) click_add_element_type_stable((n), (f), (t), 0)\n#endif";
   print "void\nclick_export_elements()\n{\n", B, "  CLICK_DMALLOC_REG(\"nXXX\");\n}\n";
   print "void\nclick_unexport_elements()\n{\n", C, "}";
+  print "void\nclick_delete_element(Element* e)\n{\ndelete e;}";
 }
 '
     fi
