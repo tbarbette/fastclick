@@ -57,6 +57,7 @@ class Specializer { public:
     void output_new_elementmap(const ElementMap &, ElementMap &, const String &,
 			       const String &requirements) const;
 
+  void should_replace(bool do_replace) { _do_replace = do_replace; };
   void should_inline(bool do_inline) { _do_inline = do_inline; };
   void make_static(bool do_static) { _do_static = do_static; };
   void should_unroll(bool do_unroll, int unroll_val) { _do_unroll = do_unroll; _unroll_val = unroll_val; };
@@ -78,6 +79,7 @@ class Specializer { public:
   //List of specialized class, populated by specialize()
   Vector<SpecializedClass> _specials;
 
+  bool _do_replace;
   bool _do_inline;
   bool _do_static;
   bool _do_unroll;

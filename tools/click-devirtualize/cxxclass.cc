@@ -98,6 +98,8 @@ compile_pattern(const String &pattern0)
  * @args pattern A symbol to search for
  * @args pos1 Start position of the pattern if found
  * @arfs pos2 End position of the pattern if found
+ * @args full_symbol Only match if pattern is the full symbol, eg "n" will not
+ *       be a match in "_n"
  *
  */
 bool
@@ -169,8 +171,8 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
       // namely '.', '::', or '->'
       int p = tpos1 - 1;
       while (p >= 0 && isspace((unsigned char) ts[p]))
-	p--;
-      if (full_symbol && isalnum(ts[p]))
+         p--;
+      if (full_symbol && (isalnum(ts[p]) || (ts[p] == '_')))
 	  continue;
       if (allow_call || p < 0
 	  || (ts[p] != '.'

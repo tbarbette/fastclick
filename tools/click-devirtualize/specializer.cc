@@ -42,8 +42,9 @@ Specializer::Specializer(RouterT *router, const ElementMap &em)
     _ninputs[x->eindex()] = x->ninputs();
   }
 
-  patterns.push_back(Pair<String,String>("read_or_set(#0,#1,#2)","validate(#0,#1,!TEMPVAL!)"));
-  patterns.push_back(Pair<String,String>("read_or_set_p(#0,#1,#2)","validate_p(#0,#1,!TEMPVAL!)"));
+  patterns.push_back(Pair<String,String>("read(#0,#1)","validate(#0!TEMPVAL!)"));
+  patterns.push_back(Pair<String,String>("read_or_set(#0,#1,#2)","validate(#0!TEMPVAL!)"));
+  patterns.push_back(Pair<String,String>("read_or_set_p(#0,#1,#2)","validate_p(#0!TEMPVAL!)"));
 
   // prepare from element map
   for (ElementMap::TraitsIterator x = em.begin_elements(); x; x++) {
@@ -597,7 +598,7 @@ bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to) {
   //click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
   if (fnt.replace_expr(from, to, true)) {
 	  found = true;
-	  click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
+	  //click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
   }
   if (found)
 	 cxxc->defun(fnt);
@@ -617,6 +618,17 @@ trim_quotes(String s) {
 	return s.substring(b, e);
 }
 
+bool
+is_primitive(String str) {
+    str = str.trim().lower();
+    if (str == "true" || str == "false")
+        return true;
+    for (int i = 0; i < str.length(); i++) {
+        if (!isalpha(str[i]))
+            return false;
+    }
+    return true;
+}
 
 void
 Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
@@ -648,7 +660,7 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 		click_chatter("CLass %s fnt %s",original->name().c_str(), original->function(j).name().c_str());
 	}*/
 	CxxFunction* configure = original->find("configure");
-	if (configure) {
+	if (configure && _do_replace) {
 		Vector<String> args;
 		//click_chatter("Configure found  %s!",configure->body().c_str());
 		String configline = sigs.router()->element(_specials[s].eindex)->config();
@@ -656,8 +668,11 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 				while (configure->replace_call(patterns[p].first, patterns[p].second,args)) {
 					  String value;
 					  String param =  trim_quotes(args[0].trim());
+                      bool has_value = true;
 					  int pos = configline.find_left(param);
                       click_chatter("Param is %s", param.c_str());
+
+                      click_chatter("Config is %s, found at %d", configline.c_str(), pos);
 					  if (pos >= 0) {
 						  pos += param.length();
 						  while (configline[pos] == ' ')
@@ -669,18 +684,28 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 						  value = configline.substring(pos,end+1 - pos);
 						  click_chatter("Config value is %s",value.c_str());
 					  } else {
-						  if (args.size() > 2) {
+						  if (args.size() > 2 && args[2].trim()) {
 							  value=args[2].trim();
+						      click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
 						  } else {
-							  click_chatter("Unknown value for %s", param.c_str());
-							  continue;
+							  click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
+                              has_value = false;
 						  }
 
-						  click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
 					  }
-					  configure->replace_expr("!TEMPVAL!", value);
+                      if (has_value) {
+                          configure->replace_expr("!TEMPVAL!", ", "+args[1].trim()+", \""+value+"\"");
+                      } else {
+                          click_chatter("No value given");
+					      configure->replace_expr("!TEMPVAL!", "");
+                      }
 
+                      if (!has_value || !is_primitive(value)) {
+                          args.clear();
+                          continue;
+                      }
 
+                    click_chatter("Replacing occurences of %s", args[1].trim().c_str());
 					  //Replace in specialized code
 					  for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
 						  CxxFunction &fnt = _specials[s].cxxc->function(f);

@@ -56,6 +56,7 @@
 #define INLINE_OPT	    314
 #define STATIC_OPT      315
 #define UNROLL_OPT      316
+#define REPLACE_OPT	    317
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
@@ -63,6 +64,7 @@ static const Clp_Option options[] = {
   { "devirtualize", 0, DEVIRTUALIZE_OPT, Clp_ValString, Clp_Negate },
   { "inline", 'I', INLINE_OPT, 0},
   { "static", 'S', STATIC_OPT, 0},
+  { "replace", 'R', REPLACE_OPT, 0},
   { "unroll", 'U', UNROLL_OPT, Clp_ValInt, Clp_Mandatory },
   { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
@@ -218,6 +220,7 @@ Options:\n\
   -r, --reverse                Reverse devirtualization.\n\
   -n, --no-devirtualize CLASS  Don't devirtualize element class CLASS.\n\
   -I, --inline                 Set all functions inline.\n\
+  -R, --replace                Replace configuration values into code.\n\
   -i, --instructions FILE      Read devirtualization instructions from FILE.\n\
   -C, --clickpath PATH         Use PATH for CLICKPATH.\n\
       --help                   Print this message and exit.\n\
@@ -248,6 +251,7 @@ main(int argc, char **argv)
   int compile_kernel = 0;
   int compile_user = 0;
   int reverse = 0;
+  int do_replace = 0;
   int do_inline = 0;
   int do_static = 0;
   int do_unroll = 0;
@@ -333,6 +337,10 @@ particular purpose.\n");
 
      case REVERSE_OPT:
       reverse = !clp->negated;
+      break;
+
+     case REPLACE_OPT:
+      do_replace = !clp->negated;
       break;
 
      case INLINE_OPT:
@@ -444,6 +452,7 @@ particular purpose.\n");
   // initialize specializer
   Specializer specializer(router, full_elementmap);
 
+  specializer.should_replace(do_replace);
   specializer.should_inline(do_inline);
   specializer.make_static(do_static);
   specializer.should_unroll(do_unroll, unroll_val);
