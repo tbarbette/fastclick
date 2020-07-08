@@ -80,7 +80,7 @@ EXTRA_DRIVER_OBJS = @EXTRA_DRIVER_OBJS@
 LIBOBJS = $(GENERIC_OBJS) $(STD_ELEMENT_OBJS) clp.o exportstub.o
 STD_ELEMENT_OBJS = addressinfo.o alignmentinfo.o \
 	errorelement.o portinfo.o scheduleinfo.o
-OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF).o click.o
+OBJS = $(ELEMENT_OBJS) $(ELEMENTSCONF)$(ELEMENTSSUFFIX).o click.o
 
 CPPFLAGS = @CPPFLAGS@ -DCLICK_USERLEVEL
 CFLAGS = @CFLAGS@
@@ -130,10 +130,12 @@ ELEM2EXPORT = elem2export
 else
 DRIVER = $(MINDRIVER)click
 ELEMENTSCONF = elements_$(MINDRIVER)
-ifeq ($(shell grep -c "elem2packagestatic" clickdv*.cc),0)
-ELEM2EXPORT = elem2export
-else 
+ifeq ($(STATIC),1)
 ELEM2EXPORT = elem2exportstatic
+ELEMENTSSUFFIX = .static
+else
+ELEM2EXPORT = elem2export
+ELEMENTSSUFFIX =
 endif
 endif
 INSTALLPROGS = $(DRIVER)
@@ -180,8 +182,8 @@ elements.conf: $(top_builddir)/config.status $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,echo "userlevel @element_groups@" | $(CLICK_BUILDTOOL) findelem -r userlevel -p $(top_srcdir) -X $(srcdir)/elements.exclude $(FINDELEMFLAGS) >,FINDELEMENTS,elements.conf)
 $(ELEMENTSCONF).mk: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
 	$(call verbose_cmd,$(CLICK_BUILDTOOL) elem2make -x "$(STD_ELEMENT_OBJS)" < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).mk)
-$(ELEMENTSCONF).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
-	$(call verbose_cmd,$(CLICK_BUILDTOOL) $(ELEM2EXPORT) < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF).cc)
+$(ELEMENTSCONF)$(ELEMENTSSUFFIX).cc: $(ELEMENTSCONF).conf $(CLICK_BUILDTOOL)
+	$(call verbose_cmd,$(CLICK_BUILDTOOL) $(ELEM2EXPORT) < $(ELEMENTSCONF).conf >,CREATE,$(ELEMENTSCONF)$(ELEMENTSSUFFIX).cc)
 	@rm -f $(ELEMENTSCONF).d
 
 DEPFILES := $(wildcard *.d)
@@ -204,7 +206,7 @@ uninstall:
 	for i in $(INSTALLPROGS); do rm -f $(DESTDIR)$(bindir)/$$i; done
 
 clean:
-	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc elements.conf elements.csmk libclick.a
+	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(ELEMENTSCONF).static.cc elements.conf elements.csmk libclick.a
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
