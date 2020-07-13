@@ -72,6 +72,10 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_PDUMP)          += -lrte_pdump
 _LDLIBS-$(CONFIG_RTE_LIBRTE_DISTRIBUTOR)    += -lrte_distributor
 _LDLIBS-$(CONFIG_RTE_LIBRTE_IP_FRAG)        += -lrte_ip_frag
 _LDLIBS-$(CONFIG_RTE_LIBRTE_METER)          += -lrte_meter
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 20 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 21 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_FIB)            += -lrte_fib
+_LDLIBS-$(CONFIG_RTE_LIBRTE_RIB)            += -lrte_rib
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LPM)            += -lrte_lpm
 _LDLIBS-$(CONFIG_RTE_LIBRTE_ACL)            += -lrte_acl
 _LDLIBS-$(CONFIG_RTE_LIBRTE_TELEMETRY)      += -lrte_telemetry -ljansson
@@ -106,6 +110,9 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_SCHED)          += -lrt
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 20 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 21 ] ) && echo true),true)
 	_LDLIBS-$(CONFIG_RTE_LIBRTE_GRAPH)          += -lrte_graph
 	_LDLIBS-$(CONFIG_RTE_LIBRTE_NODE)           += -lrte_node
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ "$(RTE_VER_MONTH)" -ge 05 ] ) || [ $(RTE_VER_YEAR) -ge 20 ] ) && echo true),true)
+	_LDLIBS-$(CONFIG_RTE_LIBRTE_RCU)            += -lrte_rcu
 endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MEMBER)         += -lm
 _LDLIBS-$(CONFIG_RTE_LIBRTE_METER)          += -lm
@@ -155,6 +162,9 @@ ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 19 ] && [ 
 	endif
 endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_COMPRESSDEV)    += -lrte_compressdev
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 20 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 21 ] ) && echo true),true)
+	_LDLIBS-$(CONFIG_RTE_LIBRTE_REGEXDEV)       += -lrte_regexdev
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EVENTDEV)       += -lrte_eventdev
 _LDLIBS-$(CONFIG_RTE_LIBRTE_RAWDEV)         += -lrte_rawdev
 ifeq ($(CONFIG_RTE_LIBRTE_RAWDEV),y)
@@ -284,6 +294,9 @@ endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lrte_pmd_mlx5
 ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
 _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_VDPA_PMD)  += -lrte_pmd_mlx5_vdpa
+endif
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 20 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 21 ] ) && echo true),true)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_REGEX_PMD)  += -lrte_pmd_mlx5_regex
 endif
 ifeq ($(CONFIG_RTE_IBVERBS_LINK_DLOPEN),y)
 	ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && [ "$(RTE_VER_YEAR)" -ge 20 ] && echo true),true)
@@ -525,8 +538,14 @@ PARSE_OBJS = \
 # Additional object files
 PARSE_OBJS += test-pmd/cmdline_mtr.o test-pmd/cmdline_tm.o
 PARSE_OBJS += test-pmd/bpf_cmd.o
-PARSE_OBJS += test-pmd/parameters.o test-pmd/softnicfwd.o
+PARSE_OBJS += test-pmd/parameters.o
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ "$(RTE_VER_YEAR)" -eq 20 ] && [ "$(RTE_VER_MONTH)" -le 05 ] ) && echo true),true)
+	PARSE_OBJS += test-pmd/softnicfwd.o
+endif
 PARSE_OBJS += test-pmd/noisy_vnf.o test-pmd/util.o
+ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( ( [ "$(RTE_VER_YEAR)" -ge 20 ] && [ "$(RTE_VER_MONTH)" -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 21 ] ) && echo true),true)
+	PARSE_OBJS += test-pmd/5tswap.o
+endif
 
 CFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
 CXXFLAGS += -I../lib/librte_parse_$(RTE_VERSION)
