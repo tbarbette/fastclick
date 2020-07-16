@@ -388,7 +388,7 @@ Specializer::unroll_run_task(SpecializedClass &spc) {
   assert(run_task);
   run_task->kill();
 
-  int unrolling_factor = (_unroll_val == 0) ? 32 : _unroll_val;
+  int unrolling_factor = (_unroll_val == 0) ? -1 : _unroll_val;
 
   /* Find the before/after the rte_eth_rx_burst for loop */
   String before_for = run_task->body().substring(
@@ -413,12 +413,14 @@ Specializer::unroll_run_task(SpecializedClass &spc) {
             "for", run_task->body().find_left("rte_eth_rx_burst")),
         run_task->body().length());
     new_body << before_for << "\n"
-       << "if (likely(n == _burst)) { \n"
-       << "#pragma GCC unroll " << unrolling_factor
+       << "if (likely(n == _burst)) { \n";
+       if(unrolling_factor>0) {
+       new_body << "#pragma GCC unroll " << unrolling_factor
        << "\n"
        //<< "#pragma clang loop unroll(enable)" << "\n"
-       << "#pragma clang loop unroll_count(" << unrolling_factor << ")\n"
-       << after_for_replaced << "\n"
+       << "#pragma clang loop unroll_count(" << unrolling_factor << ")\n";
+       }
+       new_body << after_for_replaced << "\n"
        << "} else { \n"
        << after_for << "}\n";
 
