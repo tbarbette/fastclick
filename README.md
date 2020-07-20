@@ -8,6 +8,12 @@ This repo contains some tools optimizing the FastClick. You need to install `Cla
 ./configure RTE_SDK=/home/alireza/llvm-rack13/dpdk-nslab RTE_TARGET=x86_64-native-linux-clanglto --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CC="clang -flto" CFLAGS="-std=gnu11 -O3" CXX="clang++ -flto" CXXFLAGS="-std=gnu++14 -O3" LDFLAGS="-flto -fuse-ld=lld -Wl,-plugin-opt=save-temps" RANLIB="/bin/true" LD="ld.lld" READELF="llvm-readelf" AR="llvm-ar" --disable-dynamic-linking --enable-poll --enable-dpdk --disable-dpdk-pool --disable-dpdk-packet
 ```
 
+If you want to optimize binary sections during linking time, you should use `-ffunction-sections`, `-fdata-sections`, and `-Wl,--gc-sections -Wl,--print-gc-sections`. 
+
+```bash
+./configure RTE_SDK=/home/alireza/llvm-rack13/dpdk-nslab RTE_TARGET=x86_64-native-linux-clanglto --enable-multithread --disable-linuxmodule --enable-intel-cpu --enable-user-multithread --verbose CC="clang -flto" CFLAGS="-std=gnu11 -O3 -ffunction-sections -fdata-sections" CXX="clang++ -flto" CXXFLAGS="-std=gnu++14 -O3 -ffunction-sections -fdata-sections" LDFLAGS="-flto -fuse-ld=lld -Wl,-plugin-opt=save-temps -Wl,--gc-sections -Wl,--print-gc-sections" RANLIB="/bin/true" LD="ld.lld" READELF="llvm-readelf" AR="llvm-ar" --disable-dynamic-linking --enable-poll --enable-dpdk --disable-dpdk-pool --disable-dpdk-packet
+```
+
 * Build FastClick
 
 ```bash
@@ -88,6 +94,12 @@ grep case elements_embed.cc | awk -F"new" '{print $2}' | awk '{print $1}' | awk 
 ```
 
 * Applying the pass:
+
+```bash
+opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass/libClassHandpickPass.so -handpick-packet-class embedclick-tmp.ll -o embedclick-opt.ll
+```
+
+Note that if you want to optimize the Packet class for a subset of elements, you should run the following command:
 
 ```bash
 opt -S -load ~/llvm-rack13/llvm-project/FastClick-Pass/build/class-handpick-pass/libClassHandpickPass.so -handpick-packet-class embedclick-tmp.ll -element-list-filename elements_embed_router.list -o embedclick-opt.ll
