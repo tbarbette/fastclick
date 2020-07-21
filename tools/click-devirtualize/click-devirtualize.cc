@@ -57,6 +57,8 @@
 #define STATIC_OPT      315
 #define UNROLL_OPT      316
 #define REPLACE_OPT	    317
+#define SWTICH_OPT      318
+#define JMPS_OPT        319
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
@@ -66,6 +68,8 @@ static const Clp_Option options[] = {
   { "static", 'S', STATIC_OPT, 0},
   { "replace", 'R', REPLACE_OPT, 0},
   { "unroll", 'U', UNROLL_OPT, Clp_ValInt, Clp_Mandatory },
+  { "switch", 'W', SWTICH_OPT, Clp_ValInt, Clp_Mandatory },
+  { "jmps", 'J', JMPS_OPT, Clp_ValInt, Clp_Mandatory },
   { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
@@ -256,6 +260,10 @@ main(int argc, char **argv)
   int do_static = 0;
   int do_unroll = 0;
   int unroll_val = 0;
+  int do_switch = 0;
+  int switch_burst = 0;
+  int do_jmps = 0;
+  int jmp_burst = 0;
   Vector<const char *> instruction_files;
   HashTable<String, int> specializing;
 
@@ -354,6 +362,16 @@ particular purpose.\n");
      case UNROLL_OPT:
       do_unroll = !clp->negated;
       unroll_val = ( (clp->have_val != 0) ? clp->val.i : 0 );
+      break;
+
+     case SWTICH_OPT:
+      do_switch = !clp->negated;
+      switch_burst = ( (clp->have_val != 0) ? clp->val.i : 0 );
+      break;
+
+     case JMPS_OPT:
+      do_jmps = !clp->negated;
+      jmp_burst = ( (clp->have_val != 0) ? clp->val.i : 0 );
       break;
 
      bad_option:
@@ -456,6 +474,8 @@ particular purpose.\n");
   specializer.should_inline(do_inline);
   specializer.make_static(do_static);
   specializer.should_unroll(do_unroll, unroll_val);
+  specializer.should_switch(do_switch, switch_burst);
+  specializer.should_jmps(do_jmps, jmp_burst);
   specializer.specialize(sigs, errh);
 
   // quit early if nothing was done

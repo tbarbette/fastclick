@@ -33,7 +33,9 @@ Vector<Pair<String,String>> patterns;
 Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
-    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false), _do_static(false), _do_unroll(false), _unroll_val(0)
+    _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false), 
+    _do_static(false), _do_unroll(false), _unroll_val(0), _do_switch(false), _switch_burst(0),
+    _do_jmps(false), _jmp_burst(0)
 {
   _etinfo.push_back(ElementTypeInfo());
 
@@ -431,6 +433,106 @@ Specializer::unroll_run_task(SpecializedClass &spc) {
   }
 }
 
+void 
+Specializer::switch_run_task(SpecializedClass &spc) {
+  CxxFunction *run_task = spc.cxxc->find("run_task");
+  assert(run_task);
+  run_task->kill();
+
+  int n_switch_cases = _switch_burst;
+  if(n_switch_cases == 0) {
+     n_switch_cases = 32;
+     click_chatter("switch pass changed the input burst to 32!\n");
+  }
+
+  /* Find the before/after the rte_eth_rx_burst for loop */
+
+  int for_pos = run_task->body().find_left(
+             "for", run_task->body().find_left("rte_eth_rx_burst"));
+  int ret_pos = run_task->body().find_left(
+             "return (ret)", run_task->body().find_left("rte_eth_rx_burst"));
+  String before_for = run_task->body().substring(
+      0, for_pos);
+  String lambda_body = run_task->body().substring(
+      for_pos, ret_pos - for_pos);
+
+  String ret_clause = run_task->body().substring(
+    ret_pos, run_task->body().length() );
+  
+    /* Define the lambda */
+    StringAccum new_body;
+    new_body << before_for << "\n"
+      << "auto process_func = [&](unsigned n) { \n"
+      << lambda_body << "};\n";
+
+    /* Define the switch + cases */
+     new_body << "switch (n) { \n";
+      for(int i =n_switch_cases; i>=0;i--) {
+        new_body << "case " << i << ":\n"
+        << "process_func(" << i << ");\n"
+        << ret_clause << "\n";
+      }
+      new_body << "}\n";
+
+
+    /* Change the body of the function */
+    spc.cxxc->defun(CxxFunction(run_task->name(), false, run_task->ret_type(), run_task->args(), new_body.take_string(), " ")); 
+}
+
+void 
+Specializer::computed_jmps_run_task(SpecializedClass &spc) {
+  CxxFunction *run_task = spc.cxxc->find("run_task");
+  assert(run_task);
+  run_task->kill();
+
+  int n_jmps_cases = _jmp_burst;
+  if(n_jmps_cases == 0) {
+     n_jmps_cases = 32;
+     click_chatter("Computed jump pass changed the input burst to 32!\n");
+  }
+
+  /* Find the before/after the rte_eth_rx_burst for loop */
+
+  int for_pos = run_task->body().find_left(
+             "for", run_task->body().find_left("rte_eth_rx_burst"));
+  int ret_pos = run_task->body().find_left(
+             "return (ret)", run_task->body().find_left("rte_eth_rx_burst"));
+  String before_for = run_task->body().substring(
+      0, for_pos);
+  String lambda_body = run_task->body().substring(
+      for_pos, ret_pos - for_pos);
+
+  String ret_clause = run_task->body().substring(
+    ret_pos, run_task->body().length() );
+  
+
+    StringAccum new_body;
+    new_body << before_for << "\n";
+
+    /* Define the jump table */
+    new_body << "static void* dispatch_table[] = {\n";
+      for(int i =n_jmps_cases; i>=0;i--) {
+        new_body << "&&burst_"<< i << ((i==0) ? "}" : " ,");
+      }
+      new_body << ";\n";
+
+    /* Define the lambda function */
+    new_body  << "auto process_func = [&](unsigned n) { \n"
+      << lambda_body << "};\n"
+      << "goto *dispatch_table["<<n_jmps_cases<<"-n];\n";
+
+    /* Define the labels */
+      for(int i =n_jmps_cases; i>=0;i--) {
+        new_body << "burst_" << i << ":\n"
+        << "process_func(" << i << ");\n"
+        << ret_clause << "\n";
+      }
+
+
+    /* Change the body of the function */
+    spc.cxxc->defun(CxxFunction(run_task->name(), false, run_task->ret_type(), run_task->args(), new_body.take_string(), " ")); 
+}
+
 inline const String &
 Specializer::enew_cxx_type(int i) const
 {
@@ -653,6 +755,20 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
    if (_specials[s].cxxc->find("run_task")) {
                     if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
                       unroll_run_task(_specials[s]);
+                    }
+                  }
+  } else if (_do_switch) {
+    /* Duplicate the loop for different switch-cases */
+   if (_specials[s].cxxc->find("run_task")) {
+                    if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
+                      switch_run_task(_specials[s]);
+                    }
+                  }
+  } else if (_do_jmps) {
+    /* Duplicate the loop for different computed jmp labels */
+   if (_specials[s].cxxc->find("run_task")) {
+                    if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
+                      computed_jmps_run_task(_specials[s]);
                     }
                   }
   }

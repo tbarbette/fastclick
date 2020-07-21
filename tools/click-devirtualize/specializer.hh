@@ -61,6 +61,8 @@ class Specializer { public:
   void should_inline(bool do_inline) { _do_inline = do_inline; };
   void make_static(bool do_static) { _do_static = do_static; };
   void should_unroll(bool do_unroll, int unroll_val) { _do_unroll = do_unroll; _unroll_val = unroll_val; };
+  void should_switch(bool do_switch, int switch_burst) { _do_switch = do_switch; _switch_burst = switch_burst; };
+  void should_jmps(bool do_jmps, int jmp_burst) { _do_jmps = do_jmps; _jmp_burst = jmp_burst; };
  private:
 
   enum { SPCE_NOT_DONE = -2, SPCE_NOT_SPECIAL = -1 };
@@ -83,7 +85,11 @@ class Specializer { public:
   bool _do_inline;
   bool _do_static;
   bool _do_unroll;
+  bool _do_switch;
   int _unroll_val;
+  int _switch_burst;
+  int _do_jmps;
+  int _jmp_burst;
 
   CxxInfo _cxxinfo;
 
@@ -95,6 +101,8 @@ class Specializer { public:
   bool create_class(SpecializedClass &);
   void do_simple_action(SpecializedClass &);
   void unroll_run_task(SpecializedClass &);
+  void switch_run_task(SpecializedClass &);
+  void computed_jmps_run_task(SpecializedClass &);
   void create_connector_methods(SpecializedClass &);
 
   void output_includes(ElementTypeInfo &, StringAccum &);
