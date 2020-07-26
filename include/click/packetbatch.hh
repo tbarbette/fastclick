@@ -575,7 +575,7 @@ public :
 #if !CLICK_LINUXMODULE
     static PacketBatch *make_batch(unsigned char *data, uint16_t count, uint16_t *length,
                     buffer_destructor_type destructor,
-                                    void* argument = (void*) 0) CLICK_WARN_UNUSED_RESULT;
+                                    void* argument = (void*) 0, bool clean = true) CLICK_WARN_UNUSED_RESULT;
 #endif
 
     /**

@@ -244,6 +244,17 @@ Packet::~Packet()
 #endif
 }
 
+/*
+struct PacketStack {
+    Packet* stack[PACKET_STACK_SIZE];
+
+}
+__thread PacketStack packet_stack;
+void thread_init_stack() {
+    packet_stack_size
+}
+*/
+
 #if !CLICK_LINUXMODULE && !CLICK_PACKET_USE_DPDK
 
 # if HAVE_CLICK_PACKET_POOL
@@ -274,8 +285,13 @@ Packet::~Packet()
 #  if HAVE_MULTITHREAD
 static __thread PacketPool *thread_packet_pool;
 
+#if HAVE_VECTOR_PACKET_POOL
+typedef MPMCRing<WritablePacket**,CLICK_GLOBAL_PACKET_POOL_COUNT> BatchPRing;
+typedef MPMCRing<WritablePacket**,CLICK_GLOBAL_PACKET_DATA_POOL_COUNT> BatchPDRing;
+#else
 typedef MPMCRing<WritablePacket*,CLICK_GLOBAL_PACKET_POOL_COUNT> BatchPRing;
 typedef MPMCRing<WritablePacket*,CLICK_GLOBAL_PACKET_DATA_POOL_COUNT> BatchPDRing;
+#endif
 
 struct GlobalPacketPool {
     BatchPRing pbatch;     // batches of free packets, linked by p->prev()
@@ -292,7 +308,7 @@ static PacketPool global_packet_pool = {0,0,0,0};
 #  endif
 
 /** @brief Return the local packet pool for this thread.
-    @pre make_local_packet_pool() has succeeded on this thread. */
+    @pre initialize_local_packet_pool() has succeeded on this thread. */
 static inline PacketPool& local_packet_pool() {
 #  if HAVE_MULTITHREAD
     return *thread_packet_pool;
@@ -303,24 +319,22 @@ static inline PacketPool& local_packet_pool() {
 }
 
 /** @brief Create and return a local packet pool for this thread. */
-PacketPool* WritablePacket::make_local_packet_pool() {
+void WritablePacket::initialize_local_packet_pool() {
 #  if HAVE_MULTITHREAD
     PacketPool *pp = thread_packet_pool;
-    if (unlikely(!pp && (pp = new PacketPool))) {
-	memset(pp, 0, sizeof(PacketPool));
-	while (atomic_uint32_t::swap(global_packet_pool.lock, 1) == 1)
-	    /* do nothing */;
-	pp->thread_pool_next = global_packet_pool.thread_pools;
-	global_packet_pool.thread_pools = pp;
-	thread_packet_pool = pp;
-	click_compiler_fence();
-	global_packet_pool.lock = 0;
+    if (!pp) {
+        pp = new PacketPool();
+        while (atomic_uint32_t::swap(global_packet_pool.lock, 1) == 1)
+            /* do nothing */;
+        pp->thread_pool_next = global_packet_pool.thread_pools;
+        global_packet_pool.thread_pools = pp;
+        thread_packet_pool = pp;
+        click_compiler_fence();
+        global_packet_pool.lock = 0;
     }
-    return pp;
-#  else
-    return &global_packet_pool;
 #  endif
 }
+
 
 /**
  * Allocate a batch of packets without buffer
@@ -329,8 +343,11 @@ PacketPool* WritablePacket::make_local_packet_pool() {
 WritablePacket *
 WritablePacket::pool_batch_allocate(uint16_t count)
 {
-        PacketPool& packet_pool = *make_local_packet_pool();
-
+        PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+        assert(false);
+        return 0;
+#else
         WritablePacket *p = 0;
         WritablePacket *head = 0;
         int taken_from_pool = 0;
@@ -355,13 +372,49 @@ WritablePacket::pool_batch_allocate(uint16_t count)
         p->set_next(0);
 
         return head;
+#endif
+}
+
+/**
+ * Allocate a batch of packets with buffer
+ */
+WritablePacket *
+WritablePacket::pool_prepare_data_burst(uint16_t count)
+{
+        PacketPool& packet_pool = local_packet_pool();
+        while (unlikely(packet_pool.pdcount < count)) {
+            //TODO : check from global pool
+            WritablePacket* p = new WritablePacket;
+            p->alloc_data(0,CLICK_PACKET_POOL_BUFSIZ,0);
+#if HAVE_DPDK_PACKET_POOL
+           buffer_destructor_type type = p->_destructor;
+#endif
+            p->initialize(false);
+#if HAVE_DPDK_PACKET_POOL
+            p->_destructor = type;
+#endif
+            p->set_next(packet_pool.pd);
+            packet_pool.pd = p;
+            packet_pool.pdcount++;
+        }
+
+        return packet_pool.pd;
+}
+
+void
+WritablePacket::pool_consumed_data_burst(uint16_t n, WritablePacket* tail) {
+        PacketPool& packet_pool = local_packet_pool();
+        packet_pool.pdcount -= n;
+        packet_pool.pd = tail;
 }
 
 inline WritablePacket *
 WritablePacket::pool_allocate()
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+        assert(false);
+#else
 #  if HAVE_MULTITHREAD
     if (!packet_pool.p) {
         WritablePacket *pp = global_packet_pool.pbatch.extract();
@@ -381,8 +434,10 @@ WritablePacket::pool_allocate()
         p = new WritablePacket;
         }
         return p;
+#endif
 
 }
+
 
 /**
  * Allocate a packet with a buffer
@@ -390,8 +445,10 @@ WritablePacket::pool_allocate()
 WritablePacket *
 WritablePacket::pool_data_allocate()
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+        assert(false);
+#else
 #  if HAVE_MULTITHREAD
     if (unlikely(!packet_pool.pd)) {
         WritablePacket *pd = global_packet_pool.pdbatch.extract();
@@ -411,7 +468,7 @@ WritablePacket::pool_data_allocate()
         pd->alloc_data(0,CLICK_PACKET_POOL_BUFSIZ,0);
     }
     return pd;
-
+#endif
 }
 
 /**
@@ -419,7 +476,7 @@ WritablePacket::pool_data_allocate()
  */
 inline  WritablePacket *
 WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
-			      uint32_t tailroom)
+			      uint32_t tailroom, bool clear)
 {
     uint32_t n = headroom + length + tailroom;
 
@@ -432,23 +489,48 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
 #if HAVE_DPDK_PACKET_POOL
        buffer_destructor_type type = p->_destructor;
 #endif
-        p->initialize();
+        p->initialize(clear);
 #if HAVE_DPDK_PACKET_POOL
         p->_destructor = type;
 #endif
     } else {
         p = pool_allocate();
         p->alloc_data(headroom,length,tailroom);
-        p->initialize();
+        p->initialize(clear);
     }
 
 	return p;
 }
 
+#if HAVE_VECTOR_PACKET_POOL
+/**
+ * @pre n <= CLICK_PACKET_POOL_SIZE / 2
+ */
 inline void
-WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
+WritablePacket::check_packet_pool_size(PacketPool &packet_pool, unsigned n) {
+    if (unlikely(packet_pool.p.count() + n >= CLICK_PACKET_POOL_SIZE)) {
+        WritablePacket** ps = new WritablePacket*[CLICK_PACKET_POOL_SIZE / 2];
+        memcpy(ps, packet_pool.p.extract_burst(CLICK_PACKET_POOL_SIZE / 2), sizeof(WritablePacket*) * CLICK_PACKET_POOL_SIZE / 2);
+        global_packet_pool.pbatch.insert(ps);
+    }
+}
+
+/**
+ * @pre n <= CLICK_PACKET_POOL_SIZE / 2
+ */
+inline void
+WritablePacket::check_data_pool_size(PacketPool &packet_pool, unsigned n) {
+    if (unlikely(packet_pool.pd.count() + n >= CLICK_PACKET_DATA_POOL_SIZE)) {
+        WritablePacket** ps = new WritablePacket*[CLICK_PACKET_POOL_SIZE / 2];
+        memcpy(ps, packet_pool.pd.extract_burst(CLICK_PACKET_POOL_SIZE / 2), sizeof(WritablePacket*) * CLICK_PACKET_POOL_SIZE / 2);
+        global_packet_pool.pdbatch.insert(ps);
+    }
+}
+#else
+inline void
+WritablePacket::check_packet_pool_size(PacketPool &packet_pool, unsigned n) {
 #  if HAVE_MULTITHREAD
-    if (unlikely(packet_pool.p && packet_pool.pcount >= CLICK_PACKET_POOL_SIZE)) {
+    if (unlikely(packet_pool.p && packet_pool.pcount + n > CLICK_PACKET_POOL_SIZE)) {
         packet_pool.p->set_anno_u32(0, packet_pool.pcount);
         if (!global_packet_pool.pbatch.insert(packet_pool.p)) { //Si le nombre de batch est au max -> delete
             while (WritablePacket *p = packet_pool.p) { //On supprime le batch
@@ -470,9 +552,9 @@ WritablePacket::check_packet_pool_size(PacketPool &packet_pool) {
 }
 
 inline void
-WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
+WritablePacket::check_data_pool_size(PacketPool &packet_pool, unsigned n) {
 #  if HAVE_MULTITHREAD
-    if (unlikely(packet_pool.pd && packet_pool.pdcount >= CLICK_PACKET_DATA_POOL_SIZE)) {
+    if (unlikely(packet_pool.pd && packet_pool.pdcount + n > CLICK_PACKET_DATA_POOL_SIZE)) {
         packet_pool.pd->set_anno_u32(0, packet_pool.pdcount);
         if (!global_packet_pool.pdbatch.insert(packet_pool.pd)) {
             while (WritablePacket *pd = packet_pool.pd) {
@@ -505,6 +587,7 @@ WritablePacket::check_data_pool_size(PacketPool &packet_pool) {
     }
 #  endif /* HAVE_MULTITHREAD */
 }
+#endif
 
 inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 #if HAVE_DPDK_PACKET_POOL
@@ -533,26 +616,33 @@ inline bool WritablePacket::is_from_data_pool(WritablePacket *p) {
 void
 WritablePacket::recycle(WritablePacket *p)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
+    PacketPool& packet_pool = local_packet_pool();
     bool data = is_from_data_pool(p);
 
     if (likely(data)) {
-        check_data_pool_size(packet_pool);
+        check_data_pool_size(packet_pool, 1);
+#if HAVE_VECTOR_PACKET_POOL
+        packet_pool.pd.insert(p);
+#else
         ++packet_pool.pdcount;
         p->set_next(packet_pool.pd);
         packet_pool.pd = p;
-#if !HAVE_BATCH_RECYCLE
+# if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pdcount <= CLICK_PACKET_DATA_POOL_SIZE);
+# endif
 #endif
     } else {
-
         p->~WritablePacket();
-        check_packet_pool_size(packet_pool);
+        check_packet_pool_size(packet_pool, 1);
+#if HAVE_VECTOR_PACKET_POOL
+        packet_pool.p.insert(p);
+#else
         ++packet_pool.pcount;
         p->set_next(packet_pool.p);
         packet_pool.p = p;
-#if !HAVE_BATCH_RECYCLE
+# if !HAVE_BATCH_RECYCLE
         assert(packet_pool.pcount <= CLICK_PACKET_POOL_SIZE);
+# endif
 #endif
     }
 
@@ -564,17 +654,20 @@ WritablePacket::recycle(WritablePacket *p)
 void
 WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+    assert(false);
+#else
     Packet* next = ((head != 0)? head->next() : 0 );
     Packet* p = head;
     for (;p != 0;p=next,next=(p==0?0:p->next())) {
         ((WritablePacket*)p)->~WritablePacket();
     }
-    check_packet_pool_size(packet_pool);
+    check_packet_pool_size(packet_pool, count);
     packet_pool.pcount += count;
     tail->set_next(packet_pool.p);
     packet_pool.p = head;
+#endif
 }
 
 /**
@@ -583,11 +676,15 @@ WritablePacket::recycle_packet_batch(WritablePacket *head, Packet* tail, unsigne
 void
 WritablePacket::recycle_data_batch(WritablePacket *head, Packet* tail, unsigned count)
 {
-    PacketPool& packet_pool = *make_local_packet_pool();
-    check_data_pool_size(packet_pool);
+    PacketPool& packet_pool = local_packet_pool();
+#if HAVE_VECTOR_PACKET_POOL
+    assert(false);
+#else
+    check_data_pool_size(packet_pool, count);
     packet_pool.pdcount += count;
     tail->set_next(packet_pool.pd);
     packet_pool.pd = head;
+#endif
 }
 
 # endif /* HAVE_CLICK_PACKET_POOL */
@@ -696,7 +793,7 @@ void WritablePacket::pool_transfer(int from, int to) {
  * null. */
 WritablePacket *
 Packet::make(uint32_t headroom, const void *data,
-	     uint32_t length, uint32_t tailroom)
+	     uint32_t length, uint32_t tailroom, bool clear)
 {
 
 	#if CLICK_LINUXMODULE
@@ -713,6 +810,7 @@ Packet::make(uint32_t headroom, const void *data,
 			skb->pkt_type = HOST;
 		# endif
 		WritablePacket *q = reinterpret_cast<WritablePacket *>(skb);
+        if (clear)
 		q->clear_annotations();
 		return q;
 		} else
@@ -733,18 +831,18 @@ Packet::make(uint32_t headroom, const void *data,
 #else
 
 		# if HAVE_CLICK_PACKET_POOL
-			WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom);
+			WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom, clear);
 			if (!p)
 			return 0;
 		# else
 			WritablePacket *p = new WritablePacket;
 			if (!p)
 			return 0;
-			p->initialize();
+			p->initialize(clear);
 			if (!p->alloc_data(headroom, length, tailroom)) {
 			p->_head = 0;
 			delete p;
-			return 0;
+			    return 0;
 			}
 		# endif
 			if (data)
@@ -776,7 +874,7 @@ Packet::make(uint32_t headroom, const void *data,
  * null. */
 WritablePacket *
 Packet::make(unsigned char *data, uint32_t length,
-	     buffer_destructor_type destructor, void* argument, int headroom, int tailroom)
+	     buffer_destructor_type destructor, void* argument, int headroom, int tailroom, bool clear)
 {
 #if CLICK_PACKET_USE_DPDK
 assert(false); //TODO
@@ -787,7 +885,7 @@ assert(false); //TODO
     WritablePacket *p = new WritablePacket;
 # endif
     if (p) {
-	p->initialize();
+	p->initialize(clear);
 	p->_head = data - headroom;
 	p->_data = data;
 	p->_tail = data + length;
@@ -1262,6 +1360,8 @@ Packet::shift_data(int offset, bool free_on_failure)
 static void
 cleanup_pool(PacketPool *pp, int global)
 {
+#if HAVE_VECTOR_PACKET_POOL
+#else
     unsigned pcount = 0, pdcount = 0;
     while (WritablePacket *p = pp->p) {
 	++pcount;
@@ -1271,25 +1371,26 @@ cleanup_pool(PacketPool *pp, int global)
     while (WritablePacket *pd = pp->pd) {
     ++pdcount;
     pp->pd = static_cast<WritablePacket *>(pd->next());
-#if HAVE_DPDK_PACKET_POOL
+# if HAVE_DPDK_PACKET_POOL
     rte_pktmbuf_free((struct rte_mbuf*)pd->destructor_argument());
-#elif HAVE_NETMAP_PACKET_POOL
+# elif HAVE_NETMAP_PACKET_POOL
     NetmapBufQ::local_pool()->insert_p(pd->buffer());
-#else
-# if HAVE_DPDK
+# else
+#  if HAVE_DPDK
     if (dpdk_enabled)
         rte_free(reinterpret_cast<unsigned char *>(pd->buffer()));
     else
-# endif
+#  endif
         delete[] reinterpret_cast<unsigned char *>(pd->buffer());
-#endif
+# endif
     ::operator delete((void *) pd);
     }
-#if !HAVE_BATCH_RECYCLE
+# if !HAVE_BATCH_RECYCLE
     assert(pcount <= CLICK_PACKET_POOL_SIZE);
     assert(pdcount <= CLICK_PACKET_DATA_POOL_SIZE);
-#endif
+# endif
     assert(global || (pcount == pp->pcount && pdcount == pp->pdcount));
+#endif
 }
 #endif
 
@@ -1313,7 +1414,8 @@ Packet::static_cleanup()
 		cleanup_pool(pp, 0);
 		delete pp;
 		}
-
+    #  if HAVE_VECTOR_PACKET_POOL
+    #  else
 		PacketPool fake_pool;
 		do {
 			fake_pool.p = global_packet_pool.pbatch.extract();
@@ -1321,9 +1423,12 @@ Packet::static_cleanup()
 			if (!fake_pool.p && !fake_pool.pd) break;
 			cleanup_pool(&fake_pool, 1);
 		} while(true);
+
+    #  endif
 	# else
 		cleanup_pool(&global_packet_pool, 0);
 	# endif
+
 #endif
 }
 

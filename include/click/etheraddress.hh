@@ -84,11 +84,14 @@ class EtherAddress { public:
 	return reinterpret_cast<const unsigned char *>(_data);
     }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Waddress-of-packed-member"
     /** @brief Return a pointer to the address data, as an array of
      * uint16_ts. */
     inline const uint16_t *sdata() const {
-	return _data;
+	return const_cast<const uint16_t*>(_data);
     }
+#pragma GCC diagnostic pop
 
     /** @brief Hash function. */
     inline size_t hashcode() const {

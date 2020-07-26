@@ -193,6 +193,7 @@ private:
     static int xstats_handler(int operation, String &input, Element *e,
                               const Handler *handler, ErrorHandler *errh);
 
+protected:
     DPDKDevice* _dev;
     bool _set_timestamp;
 };

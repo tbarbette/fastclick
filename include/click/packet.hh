@@ -25,6 +25,7 @@
 #ifndef CLICK_PACKET_DEPRECATED_ENUM
 # define CLICK_PACKET_DEPRECATED_ENUM CLICK_DEPRECATED_ENUM
 #endif
+#include <click/stack.hh>
 struct click_ether;
 struct click_ip;
 struct click_icmp;
@@ -32,6 +33,8 @@ struct click_ip6;
 struct click_tcp;
 struct click_udp;
 CLICK_DECLS
+
+//#define HAVE_VECTOR_PACKET_POOL 1
 
 #if HAVE_BATCH && HAVE_CLICK_PACKET_POOL
 #define HAVE_BATCH_RECYCLE 1
@@ -62,7 +65,7 @@ class Packet { public:
     };
 
     static WritablePacket *make(uint32_t headroom, const void *data,
-				uint32_t length, uint32_t tailroom) CLICK_WARN_UNUSED_RESULT;
+				uint32_t length, uint32_t tailroom, bool clear = true) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(const void *data, uint32_t length) CLICK_WARN_UNUSED_RESULT;
     static inline WritablePacket *make(uint32_t length) CLICK_WARN_UNUSED_RESULT;
 #if CLICK_LINUXMODULE
@@ -87,7 +90,7 @@ class Packet { public:
 
     static WritablePacket* make(unsigned char* data, uint32_t length,
 				buffer_destructor_type buffer_destructor,
-                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0) CLICK_WARN_UNUSED_RESULT;
+                                void* argument = (void*) 0, int headroom = 0, int tailroom = 0, bool clear = true) CLICK_WARN_UNUSED_RESULT;
 #endif //CLICK_USERLEVEL || CLICK_MINIOS
 
 
@@ -155,15 +158,22 @@ class Packet { public:
     void set_buffer_destructor(buffer_destructor_type destructor) {
     	_destructor = destructor;
     }
+
     buffer_destructor_type buffer_destructor() const {
 	return _destructor;
     }
+
     void* destructor_argument() const {
     	return _destructor_argument;
     }
+
     void reset_buffer() {
-	_head = _data = _tail = _end = 0;
+	    _head = _data = _tail = _end = 0;
 	_destructor = 0;
+    }
+
+    void set_destructor_argument(void* arg) {
+        _destructor_argument = arg;
     }
 #endif
 
@@ -886,10 +896,24 @@ private:
 
 #if HAVE_CLICK_PACKET_POOL
     struct PacketPool {
+
+        PacketPool() :
+#if HAVE_VECTOR_PACKET_POOL
+            p(), pd()
+#else
+            p(0), pcount(0), pd(0), pdcount(0)
+#endif
+        {
+        }
+#if HAVE_VECTOR_PACKET_POOL
+        Stack<Packet*> p;
+        Stack<Packet*> pd;
+#else
         WritablePacket* p;          // free packets, linked by p->next()
         unsigned pcount;            // # packets in `p` list
         WritablePacket* pd;             // free data buffers, linked by pd->next
         unsigned pdcount;           // # buffers in `pd` list
+#endif
     #  if HAVE_MULTITHREAD
         PacketPool* thread_pool_next; // link to next per-thread pool
     #  endif
@@ -918,22 +942,27 @@ class WritablePacket : public Packet { public:
     inline void rewrite_ip(IPAddress ip, const int shift, bool is_tcp = true);
 
 #if !CLICK_LINUXMODULE
-    inline void set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
+    inline void init_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length);
+    inline void set_buffer(unsigned char *buffer, uint32_t buffer_length);
+    inline void set_data(unsigned char *data);
+    inline void set_data_length(uint32_t length);
 #endif
 
 # if HAVE_CLICK_PACKET_POOL
-    static PacketPool* make_local_packet_pool();
+    static void initialize_local_packet_pool();
 # endif
 
     static void pool_transfer(int from, int to);
+    static WritablePacket * pool_prepare_data_burst(uint16_t count);
+    static void pool_consumed_data_burst(uint16_t n, WritablePacket* tail);
 
 #if !CLICK_LINUXMODULE
-    inline void set_buffer(unsigned char *data, uint32_t length) {
-    	set_buffer(data,length,length);
+    inline void init_buffer(unsigned char *data, uint32_t length) {
+	init_buffer(data,length,length);
     }
 
-    inline void set_buffer(unsigned char *data) {
-       	set_buffer(data,buffer_length());
+    inline void init_buffer(unsigned char *data) {
+	init_buffer(data,buffer_length());
     }
 #endif
 
@@ -956,7 +985,7 @@ class WritablePacket : public Packet { public:
     }
 
     #if !CLICK_LINUXMODULE || CLICK_PACKET_USE_DPDK
-        inline void initialize();
+        inline void initialize(bool clear);
         inline void initialize_data();
     #endif
         WritablePacket(const Packet &x);
@@ -973,10 +1002,10 @@ class WritablePacket : public Packet { public:
     static WritablePacket *pool_allocate();
     static WritablePacket *pool_data_allocate();
     static WritablePacket *pool_allocate(uint32_t headroom, uint32_t length,
-					 uint32_t tailroom);
+					 uint32_t tailroom, bool clear =true);
 
-    static void check_data_pool_size(PacketPool &packet_pool);
-    static void check_packet_pool_size(PacketPool &packet_pool);
+    static void check_data_pool_size(PacketPool &packet_pool, unsigned n);
+    static void check_packet_pool_size(PacketPool &packet_pool, unsigned n);
     static bool is_from_data_pool(WritablePacket *p);
     static void recycle(WritablePacket *p);
     static WritablePacket *pool_batch_allocate(uint16_t count);
@@ -1047,7 +1076,7 @@ Packet::copy_annotations(const Packet *p, bool)
 
 #if !CLICK_LINUXMODULE
 inline void
-WritablePacket::initialize()
+WritablePacket::initialize(bool clear)
 {
 #if CLICK_PACKET_USE_DPDK
     click_chatter("UNIMPLEMENTED");
@@ -1061,7 +1090,8 @@ WritablePacket::initialize()
     _m = 0;
 # endif
 #endif
-    clear_annotations();
+    if (clear)
+        clear_annotations();
 }
 inline void
 WritablePacket::initialize_data()
@@ -2881,13 +2911,38 @@ WritablePacket::buffer_data() const
 
 #if !CLICK_LINUXMODULE
 inline void
-WritablePacket::set_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length) {
+WritablePacket::init_buffer(unsigned char *data, uint32_t buffer_length, uint32_t data_length) {
 # if CLICK_PACKET_USE_DPDK
     rte_panic("Not allowed with DPDK");
 # else
 	_head = _data = data;
 	_tail = data + data_length;
 	_end = data + buffer_length;
+# endif
+}
+inline void
+WritablePacket::set_buffer(unsigned char* buffer, uint32_t buffer_length) {
+# if CLICK_PACKET_USE_DPDK
+    rte_panic("Not allowed with DPDK");
+# else
+	_head = buffer;
+    _end = buffer +buffer_length;
+# endif
+}
+inline void
+WritablePacket::set_data(unsigned char* data) {
+# if CLICK_PACKET_USE_DPDK
+    rte_panic("Not allowed with DPDK");
+# else
+	_data = data;
+# endif
+}
+inline void
+WritablePacket::set_data_length(uint32_t data_length) {
+# if CLICK_PACKET_USE_DPDK
+    rte_panic("Not allowed with DPDK");
+# else
+	_tail = _data + data_length;
 # endif
 }
 #endif

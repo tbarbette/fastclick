@@ -336,6 +336,8 @@ int DPDKDevice::initialize_device(ErrorHandler *errh)
             dev_conf.txmode.offloads |= DEV_TX_OFFLOAD_TCP_TSO;
         }
     }
+    //Click does not use multi-segs
+    dev_conf.txmode.offloads &= ~DEV_TX_OFFLOAD_MULTI_SEGS;
 #endif
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,05,0,0)
@@ -457,16 +459,23 @@ also                ETH_TXQ_FLAGS_NOMULTMEMP
 
 #if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0) && RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
-#else
+#endif
+
+#if RTE_VERSION < RTE_VERSION_NUM(18,8,0,0)
     tx_conf.tx_thresh.pthresh = TX_PTHRESH;
     tx_conf.tx_thresh.hthresh = TX_HTHRESH;
     tx_conf.tx_thresh.wthresh = TX_WTHRESH;
 #endif
-#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,i0)
+
+#if RTE_VERSION >= RTE_VERSION_NUM(18,02,0,0)
     tx_conf.offloads = dev_conf.txmode.offloads;
 #endif
+
 #if RTE_VERSION <= RTE_VERSION_NUM(18,05,0,0)
-    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS | ETH_TXQ_FLAGS_NOOFFLOADS;
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOOFFLOADS;
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS;
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOVLANOFFL;
+    tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOXSUMSCTP;
 #endif
 
     int numa_node = DPDKDevice::get_port_numa_node(port_id);
