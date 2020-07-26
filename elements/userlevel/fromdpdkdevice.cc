@@ -223,7 +223,7 @@ bool FromDPDKDevice::run_task(Task *t) {
 #elif HAVE_ZEROCOPY
     WritablePacket *p = Packet::make(
         data, rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt, pkts[i],
-        rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]));
+        rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]), false);
 #else
     WritablePacket *p =
         Packet::make(data, (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));
