@@ -299,7 +299,7 @@ void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int o
     }
 
     void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
-        for (unsigned i = 0; i < n; i++)
+       // for (unsigned i = 0; i < n; i++)
             //printf("SENTV %p\n", ((struct rte_mbuf**)xchg)[i]);
         rte_memcpy((void *)elts, (void*) xchg, n * sizeof(struct rte_mbuf*));
     }
