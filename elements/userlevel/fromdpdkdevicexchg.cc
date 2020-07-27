@@ -36,6 +36,105 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
 
     __thread  WritablePacket* last;
 #ifndef NOXCHG
+
+/**
+ * Free the mbufs from the linear array of pointers.
+ *
+ * @param pkts
+ *   Pointer to array of packets to be free.
+ * @param pkts_n
+ *   Number of packets to be freed.
+ * @param olx
+ *   Configured Tx offloads mask. It is fully defined at
+ *   compile time and may be used for optimization.
+ */
+static __rte_always_inline void
+mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
+		  unsigned int pkts_n,
+		  unsigned int olx __rte_unused)
+{
+	struct rte_mempool *pool = NULL;
+	struct rte_mbuf **p_free = NULL;
+	struct rte_mbuf *mbuf;
+	unsigned int n_free = 0;
+
+	/*
+	 * The implemented algorithm eliminates
+	 * copying pointers to temporary array
+	 * for rte_mempool_put_bulk() calls.
+	 */
+	for (;;) {
+		for (;;) {
+			/*
+			 * Decrement mbuf reference counter, detach
+			 * indirect and external buffers if needed.
+			 */
+			mbuf = rte_pktmbuf_prefree_seg(*pkts);
+			if (likely(mbuf != NULL)) {
+				if (likely(n_free != 0)) {
+					if (unlikely(pool != mbuf->pool))
+						/* From different pool. */
+						break;
+				} else {
+					/* Start new scan array. */
+					pool = mbuf->pool;
+					p_free = pkts;
+				}
+				++n_free;
+				++pkts;
+				--pkts_n;
+				if (unlikely(pkts_n == 0)) {
+					mbuf = NULL;
+					break;
+				}
+			} else {
+				/*
+				 * This happens if mbuf is still referenced.
+				 * We can't put it back to the pool, skip.
+				 */
+				++pkts;
+				--pkts_n;
+				if (unlikely(n_free != 0))
+					/* There is some array to free.*/
+					break;
+				if (unlikely(pkts_n == 0))
+					/* Last mbuf, nothing to free. */
+					return;
+			}
+		}
+		for (;;) {
+			/*
+			 * This loop is implemented to avoid multiple
+			 * inlining of rte_mempool_put_bulk().
+			 */
+			/*
+			 * Free the array of pre-freed mbufs
+			 * belonging to the same memory pool.
+			 */
+			rte_mempool_put_bulk(pool, (void * const*)p_free, n_free);
+			if (unlikely(mbuf != NULL)) {
+				/* There is the request to start new scan. */
+				pool = mbuf->pool;
+				p_free = pkts++;
+				n_free = 1;
+				--pkts_n;
+				if (likely(pkts_n != 0))
+					break;
+				/*
+				 * This is the last mbuf to be freed.
+				 * Do one more loop iteration to complete.
+				 * This is rare case of the last unique mbuf.
+				 */
+				mbuf = NULL;
+				continue;
+			}
+			if (likely(pkts_n == 0))
+				return;
+			n_free = 0;
+			break;
+		}
+	}
+}
     inline struct WritablePacket* get_buf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
@@ -136,6 +235,75 @@ FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
     void* xchg_buffer_from_elt(struct rte_mbuf* buf) {
         return ((unsigned char*)buf) + sizeof(rte_mbuf) + RTE_PKTMBUF_HEADROOM;
     }   
+
+
+//TX SWAP ONLY
+    inline struct rte_mbuf* get_tx_buf(struct xchg* x) {
+        return (struct rte_mbuf*)x;
+    }
+
+    uint16_t xchg_get_data_len(struct xchg* xchg) {
+        return rte_pktmbuf_data_len(get_tx_buf(xchg));
+    }
+
+void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
+        mlx5_tx_free_mbuf(elts, part, olx);
+    }
+
+    struct xchg* xchg_tx_next(struct xchg** xchgs) {
+        struct rte_mbuf** pkts = (struct rte_mbuf**)xchgs;
+        struct rte_mbuf* pkt = *(pkts);
+        rte_prefetch0(pkt);
+        return (struct xchg*)pkt;
+    }
+
+    int xchg_nb_segs(struct xchg* xchg) {
+        struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
+        return 1; //NB_SEGS(pkt);
+    }
+
+    struct xchg* xchg_tx_advance(struct xchg*** xchgs_p) {
+        struct rte_mbuf** pkts = (struct rte_mbuf**)(*xchgs_p);
+        //printf("Advance : %p -> %p = %p\n", pkts, pkts+1, *(pkts+1));
+        pkts += 1;
+        *xchgs_p = (struct xchg**)pkts;
+        struct rte_mbuf* pkt = *(pkts);
+        return (struct xchg*)pkt;
+
+    }
+
+    void* xchg_get_buffer_addr(struct xchg* xchg) {
+        struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
+        return pkt->buf_addr;
+    }
+
+    void* xchg_get_buffer(struct xchg* xchg) {
+        struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
+        return rte_pktmbuf_mtod(pkt, void *);
+    }
+
+    struct rte_mbuf* xchg_get_mbuf(struct xchg* xchg) {
+        return get_tx_buf(xchg);
+    }
+
+    void xchg_tx_sent_inline(struct xchg* xchg) {
+        struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
+
+        //printf("INLINED %p\n", xchg);
+        rte_pktmbuf_free_seg(pkt);
+    }
+
+    void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchg) {
+        //printf("SENT %p\n", *xchg);
+        *elts= (struct rte_mbuf*)*xchg;
+    }
+
+    void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
+        for (unsigned i = 0; i < n; i++)
+            //printf("SENTV %p\n", ((struct rte_mbuf**)xchg)[i]);
+        rte_memcpy((void *)elts, (void*) xchg, n * sizeof(struct rte_mbuf*));
+    }
+
 
 #endif
     /*    void* xchg_fill_elts() {
