@@ -205,6 +205,12 @@ int FromDPDKDevice::initialize(ErrorHandler *errh) {
 
 void FromDPDKDevice::cleanup(CleanupStage) { cleanup_tasks(); }
 
+#ifdef DPDK_USE_XCHG
+extern "C" {
+#include <mlx5_xchg.h>
+}
+#endif
+
 bool FromDPDKDevice::run_task(Task *t) {
   struct rte_mbuf *pkts[_burst];
   int ret = 0;
@@ -214,7 +220,14 @@ bool FromDPDKDevice::run_task(Task *t) {
   PacketBatch *head = 0;
   WritablePacket *last;
 #endif
-  unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
+
+#ifdef DPDK_USE_XCHG
+ unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)pkts, _burst);
+#else
+ unsigned n = rte_eth_rx_burst(_dev->port_id, iqueue, pkts, _burst);
+#endif
+ // unsigned n = rte_mlx5_rx_burst_stripped(_dev->port_id, iqueue, pkts, _burst);
+
   for (unsigned i = 0; i < n; ++i) {
     unsigned char *data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
     rte_prefetch0(data);

@@ -208,6 +208,12 @@ void ToDPDKDevice::run_timer(Timer *)
     flush_internal_tx_queue(_iqueues.get());
 }
 
+#ifdef DPDK_USE_XCHG
+extern "C" {
+#include <mlx5_xchg.h>
+}
+#endif
+
 /* Flush as much as possible packets from a given internal queue to the DPDK
  * device. */
 void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) {
@@ -230,8 +236,15 @@ void ToDPDKDevice::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &iqueue) 
             // The sub_burst wraps around the ring
             sub_burst = _internal_tx_queue_size - iqueue.index;
         //Todo : if there is multiple queue assigned to this thread, send on all of them
+
+
+#ifdef DPDK_USE_XCHG
+        r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) &iqueue.pkts[iqueue.index], sub_burst);
+#else
         r = rte_eth_tx_burst(_dev->port_id, queue_for_thisthread_begin(), &iqueue.pkts[iqueue.index],
-                             sub_burst);
+                            sub_burst);
+#endif
+
         iqueue.nr_pending -= r;
         iqueue.index += r;
 
