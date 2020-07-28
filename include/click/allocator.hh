@@ -23,6 +23,7 @@ public:
         }
 private:
         static bool _dying;
+protected:
         static int _n_msg;
 };
 
