@@ -1,19 +1,19 @@
-#ifndef CLICK_TODPDKDEVICE_USERLEVEL_HH
-#define CLICK_TODPDKDEVICE_USERLEVEL_HH
+#ifndef CLICK_TODPDKDEVICEXCHG_USERLEVEL_HH
+#define CLICK_TODPDKDEVICEXCHG_USERLEVEL_HH
 
 #include <click/batchelement.hh>
 #include <click/sync.hh>
 #include <click/dpdkdevice.hh>
-#include "queuedevice.hh"
+#include "todpdkdevice.hh"
 
 CLICK_DECLS
 
 /*
-=title ToDPDKDevice
+=title ToDPDKDeviceXCHG
 
 =c
 
-ToDPDKDevice(PORT [, QUEUE, N_QUEUES, I<keywords> IQUEUE, BLOCKING, etc.])
+ToDPDKDeviceXCHG(PORT [, QUEUE, N_QUEUES, I<keywords> IQUEUE, BLOCKING, etc.])
 
 =s netdevices
 
@@ -97,7 +97,7 @@ This element is only available at user level, when compiled with DPDK support.
 
 =e
 
-  ... -> ToDPDKDevice(2, QUEUE 0, BLOCKING true)
+  ... -> ToDPDKDeviceXCHG(2, QUEUE 0, BLOCKING true)
 
 =h count read-only
 
@@ -113,32 +113,18 @@ Resets n_send and n_dropped counts to zero.
 
 =a DPDKInfo, FromDPDKDevice */
 
-class ToDPDKDevice : public TXQueueDevice {
+class ToDPDKDeviceXCHG : public ToDPDKDevice {
 public:
 
-    ToDPDKDevice() CLICK_COLD;
-    ~ToDPDKDevice() CLICK_COLD;
+    ToDPDKDeviceXCHG() CLICK_COLD;
+    ~ToDPDKDeviceXCHG() CLICK_COLD;
 
-    const char *class_name() const { return "ToDPDKDevice"; }
+    const char *class_name() const { return "ToDPDKDeviceXCHG"; }
     const char *port_count() const { return PORTS_1_0; }
     const char *processing() const { return PUSH; }
 
-    int configure_phase() const {
-        return CONFIGURE_PHASE_PRIVILEGED;
-    }
-    bool can_live_reconfigure() const { return false; }
-
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *) override CLICK_COLD;
-
-    void cleanup(CleanupStage stage) override CLICK_COLD;
-
-    static String statistics_handler(Element *e, void * thunk) CLICK_COLD;
-    void add_handlers() CLICK_COLD;
-
-    enum {
-        h_opackets,h_obytes,h_oerrors
-    };
 
     void run_timer(Timer *);
 #if HAVE_BATCH
@@ -146,26 +132,16 @@ public:
 #endif
     void push(int port, Packet *p);
 
-protected:
+private:
 
+    inline void congestioned();
 
-    inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, const Packet* p);
+    inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, WritablePacket* p);
 
     inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
     void flush_internal_tx_queue(DPDKDevice::TXInternalQueue &);
 
-    per_thread<DPDKDevice::TXInternalQueue> _iqueues;
 
-    DPDKDevice* _dev;
-    int _timeout;
-    bool _congestion_warning_printed;
-    bool _create;
-    bool _vlan;
-    uint32_t _tso;
-    bool _tco;
-    bool _ipco;
-
-    friend class FromDPDKDevice;
 };
 
 CLICK_ENDDECLS
