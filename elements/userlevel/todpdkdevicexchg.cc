@@ -571,6 +571,6 @@ send:
 #endif
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(ToDPDKDevice userlevel dpdk)
+ELEMENT_REQUIRES(ToDPDKDevice userlevel dpdk !dpdk-packet)
 EXPORT_ELEMENT(ToDPDKDeviceXCHG)
 ELEMENT_MT_SAFE(ToDPDKDeviceXCHG)

@@ -2346,6 +2346,18 @@ if test "x$enable_dpdk" = xyes; then
     fi
 fi
 
+dnl add 'dpdk-packet' if compiled with --enable-dpdk-packet
+if test "x$enable_dpdk_packet" = xyes; then
+    provisions="$provisions dpdk-packet"
+    packet_mode="DPDK rte_mbuf"
+else
+    if "x$enable_dpdk_pool" = xyes; then
+        packet_mode="Click's Packet object with DPDK buffers in the pool"
+    else
+        packet_mode="Click's Packet object with any buffers"
+    fi
+fi
+
 dnl add 'flow' if compiled with --enable-flow
 if test "x$enable_flow" = xyes; then
     provisions="$provisions flow"
@@ -2501,6 +2513,8 @@ Configuration Summary:
     DPDK   support:              ${enable_dpdk}
     Netmap support:              ${HAVE_NETMAP}
     PCAP   support:              ${have_pcap}
+
+       Packet mode:              ${packet_mode}
 
     RE2    support:              ${have_re2}
     HTTPD  support:              ${have_httpd}

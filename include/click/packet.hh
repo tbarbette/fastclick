@@ -10,6 +10,7 @@
 #elif CLICK_PACKET_USE_DPDK
 # include <rte_debug.h>
 # include <rte_mbuf.h>
+# include <click/dpdk_glue.hh>
 #else
 # include <click/atomic.hh>
 #endif
@@ -1522,7 +1523,7 @@ Packet::timestamp_anno() const
     return *reinterpret_cast<const Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
-    return all_anno()->timestamp;
+    return *(Timestamp*)&(mb()->timestamp);
 #else
     return *reinterpret_cast<const Timestamp*>(&_aa.timestamp);
 #endif
@@ -1538,7 +1539,7 @@ Packet::timestamp_anno()
     return *reinterpret_cast<Timestamp*>(&skb()->tstamp);
 # endif
 #elif CLICK_PACKET_USE_DPDK
-    return all_anno()->timestamp;
+    return *(Timestamp*)&(mb()->timestamp);
 #else
     return *reinterpret_cast<Timestamp*>(&_aa.timestamp);
 #endif

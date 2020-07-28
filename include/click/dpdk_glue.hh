@@ -28,4 +28,8 @@ static inline int rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table,
 }
 #endif
 
+#ifndef RTE_MBUF_INDIRECT
+#define RTE_MBUF_INDIRECT(m) RTE_MBUF_CLONED(m)
+#endif
+
 #endif
