@@ -516,8 +516,13 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
     p = head;
     rte_mbuf** pkts = pkts_s;
 send:
-    unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) pkts, count);
 
+#ifdef DPDK_USE_XCHG
+    unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) pkts, count);
+#else
+    unsigned r = 0;
+    assert(false);
+#endif
     //click_chatter("SENT %d/%d", r, count);
     for (int i = 0; i < r; i++) {
         if (pkts[i] == 0) 
@@ -541,8 +546,12 @@ send:
     Packet* sent = head->first();
 send:
     //click_chatter("SEND %d, %p", count, sent);
+#ifdef DPDK_USE_XCHG
     unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)&sent, count);
-    
+#else
+    unsigned r = 0;
+    assert(false);
+#endif
     //click_chatter("SENT %d, %p", r, sent);
     if (r != count) {
         congestioned();
@@ -557,8 +566,6 @@ send:
 # endif
    head->recycle_batch(true);
 #endif
-
-
 
 }
 #endif
