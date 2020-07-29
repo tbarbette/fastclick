@@ -494,6 +494,12 @@ $bad_files" | sort | uniq -u`
   split($2, deps, / +/);
   for (j in deps) {
     i = deps[j]
+    if (deps[j] ~ /^!/) {
+        if (dep[i] > 0) {
+            print $1;
+            break;
+        }
+    } else {
     if (dep[i] <= 0) {
       bad = 1;
       split(i, or_deps, /\|+/);
@@ -506,6 +512,7 @@ $bad_files" | sort | uniq -u`
 	break;
       }
     }
+}
   }
 }' | sort | uniq`
 	if test -n "$verbose"; then
