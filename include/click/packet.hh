@@ -170,7 +170,7 @@ class Packet { public:
 
     void reset_buffer() {
 	    _head = _data = _tail = _end = 0;
-	_destructor = 0;
+	    _destructor = 0;
     }
 
     void set_destructor_argument(void* arg) {
