@@ -495,7 +495,7 @@ $bad_files" | sort | uniq -u`
   for (j in deps) {
     i = deps[j]
     if (deps[j] ~ /^!/) {
-        if (dep[i] > 0) {
+        if (dep[i] >= 0) {
             print $1;
             break;
         }
