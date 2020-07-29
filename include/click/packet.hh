@@ -72,7 +72,7 @@ class Packet { public:
 #if CLICK_LINUXMODULE
     static Packet *make(struct sk_buff *skb) CLICK_WARN_UNUSED_RESULT;
 #elif CLICK_PACKET_USE_DPDK
-    static Packet *make(struct rte_mbuf *mb) CLICK_WARN_UNUSED_RESULT;
+    static Packet *make(struct rte_mbuf *mb, bool clear = true) CLICK_WARN_UNUSED_RESULT;
 #endif
 #if CLICK_BSDMODULE
     // Packet::make(mbuf *) wraps a Packet around an existing mbuf.
@@ -405,9 +405,11 @@ class Packet { public:
     const Anno *xanno() const		{ return (const Anno *)skb()->cb; }
     Anno *xanno()			{ return (Anno *)skb()->cb; }
 #elif CLICK_PACKET_USE_DPDK
-# define ANNO_OFFSET sizeof(struct rte_mbuf)
-    const Anno *xanno() const           { return (const Anno *) ((unsigned char*)this) + ANNO_OFFSET; }
-    Anno *xanno()			{ return (Anno *) ((unsigned char*)this) + ANNO_OFFSET; }
+    # define ANNO_OFFSET sizeof(struct rte_mbuf)
+    const Anno *xanno() const           {
+        return (const Anno *) (((unsigned char*)this) + ANNO_OFFSET); }
+    Anno *xanno()			{
+        return (Anno *) (((unsigned char*)this) + ANNO_OFFSET); }
 
 #else
     inline const Anno *xanno() const		{ return &_aa.cb; }
@@ -1699,7 +1701,7 @@ Packet::make(struct sk_buff *skb)
  * The returned packet's annotations and header pointers <em>are not
  * set</em>. */
 inline Packet *
-Packet::make(struct rte_mbuf *mb)
+Packet::make(struct rte_mbuf *mb, bool clear)
 {
   /*  if (unlikely(mb->type != RTE_MBUF_PKT)) {
         click_chatter("cannot convert ctrlmbuf to Packet");
@@ -1714,7 +1716,8 @@ Packet::make(struct rte_mbuf *mb)
         return 0;
     }*/
     Packet *p = reinterpret_cast<Packet *>(mb);
-    p->clear_annotations();
+    if (clear)
+        p->clear_annotations();
     return p;
 }
 #endif

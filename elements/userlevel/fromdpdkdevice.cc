@@ -69,6 +69,7 @@ int FromDPDKDevice::configure(Vector<String> &conf, ErrorHandler *errh) {
           .read_or_set("RSS_AGGREGATE", _set_rss_aggregate, false)
           .read_or_set("PAINT_QUEUE", _set_paint_anno, false)
           .read_or_set("BURST", _burst, 32)
+          .read_or_set("CLEAR", _clear, false)
           .read("PAUSE", fc_mode)
           .complete() < 0)
     return -1;
@@ -232,11 +233,11 @@ bool FromDPDKDevice::run_task(Task *t) {
     unsigned char *data = rte_pktmbuf_mtod(pkts[i], unsigned char *);
     rte_prefetch0(data);
 #if CLICK_PACKET_USE_DPDK
-    WritablePacket *p = static_cast<WritablePacket *>(Packet::make(pkts[i]));
+    WritablePacket *p = static_cast<WritablePacket *>(Packet::make(pkts[i], _clear));
 #elif HAVE_ZEROCOPY
     WritablePacket *p = Packet::make(
         data, rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt, pkts[i],
-        rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]), false);
+        rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]), _clear);
 #else
     WritablePacket *p =
         Packet::make(data, (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));

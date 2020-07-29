@@ -196,6 +196,7 @@ private:
 protected:
     DPDKDevice* _dev;
     bool _set_timestamp;
+    bool _clear;
 };
 
 CLICK_ENDDECLS
