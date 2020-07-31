@@ -26,6 +26,12 @@
 
 CLICK_DECLS
 
+#if CLICK_USE_DPDK_PACKET
+#define DPDK_ANNO_SIZE sizeof(AllAnno)
+#else
+#define DPDK_ANNO_SIZE 0
+#endif
+
 DPDKDevice::DPDKDevice() : port_id(-1), info() {
 }
 
@@ -201,7 +207,7 @@ int DPDKDevice::alloc_pktmbufs(ErrorHandler* errh)
                         _pktmbuf_pools[i] =
 #if RTE_VERSION >= RTE_VERSION_NUM(2,2,0,0)
                         rte_pktmbuf_pool_create(name, get_nb_mbuf(i),
-                                                MBUF_CACHE_SIZE, 0, MBUF_DATA_SIZE, i);
+                                                MBUF_CACHE_SIZE, DPDK_ANNO_SIZE, MBUF_DATA_SIZE, i);
 #else
                         rte_mempool_create(
                                         name, get_nb_mbuf(i), MBUF_SIZE, MBUF_CACHE_SIZE,
@@ -1036,9 +1042,9 @@ int DPDKDevice::DEFAULT_NB_MBUF = 65536 - 1;
 #endif
 Vector<int> DPDKDevice::NB_MBUF;
 #ifdef RTE_MBUF_DEFAULT_BUF_SIZE
-int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE;
+int DPDKDevice::MBUF_DATA_SIZE = RTE_MBUF_DEFAULT_BUF_SIZE + DPDK_ANNO_SIZE;
 #else
-int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM;
+int DPDKDevice::MBUF_DATA_SIZE = 2048 + RTE_PKTMBUF_HEADROOM + DPDK_ANNO_SIZE;
 #endif
 int DPDKDevice::MBUF_SIZE = MBUF_DATA_SIZE
                           + sizeof (struct rte_mbuf);

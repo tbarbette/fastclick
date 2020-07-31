@@ -356,15 +356,16 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
             p = next;
         }
 
-        if (p != 0) {
+        if (unlikely(p != 0)) {
             congestioned = true;
-            if (!_congestion_warning_printed) {
-                if (!_blocking)
-                    click_chatter("%s: packet dropped", name().c_str());
-                else
-                    click_chatter("%s: congestion warning", name().c_str());
-                _congestion_warning_printed = true;
+            warn_congestion();
+#if CLICK_PACKET_USE_DPDK
+            while (p) {
+                next = p->next();
+                p->kill();
+                p = next;
             }
+#endif
         }
 
         //Flush the queue if we have pending packets

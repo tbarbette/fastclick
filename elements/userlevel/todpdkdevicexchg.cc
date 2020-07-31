@@ -419,16 +419,6 @@ ToDPDKDeviceXCHG::enqueue(rte_mbuf* &q, rte_mbuf* mbuf, WritablePacket* p) {
     q = mbuf;
 }
 
-inline void ToDPDKDeviceXCHG::congestioned() {
-            if (!_congestion_warning_printed) {
-                if (!_blocking)
-                    click_chatter("%s: packet dropped", name().c_str());
-                else
-                    click_chatter("%s: congestion warning", name().c_str());
-                _congestion_warning_printed = true;
-            }
-}
-
 /**
  * push_batch seems more complex than in tonetmapdevice, but it's only because
  *  we have to place pointers in an array, and we don't want to keep a linked
@@ -470,9 +460,9 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
             p = next;
         }
 
-        if (p != 0) {
+        if (unlikely(p) != 0) {
             congestioned = true;
-            congestioned();    
+            warn_congestion();
         }
 
         //Flush the queue if we have pending packets
@@ -531,8 +521,8 @@ send:
         p = p->next();
         //click_chatter("Queue [%d] -> %p", i, pkts[i]);
     }
-    if (r != count) {
-        congestioned(); 
+    if (unlikely(r != count)) {
+        warn_congestion();
         if (_blocking) {
             count -= r;
             pkts += r;
@@ -553,8 +543,8 @@ send:
     assert(false);
 #endif
     //click_chatter("SENT %d, %p", r, sent);
-    if (r != count) {
-        congestioned();
+    if (unlikely(r != count)) {
+        warn_congestion();
         if (_blocking) {
             count -= r;
             goto send;

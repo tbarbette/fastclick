@@ -134,8 +134,6 @@ public:
 
 private:
 
-    inline void congestioned();
-
     inline void enqueue(rte_mbuf* &q, rte_mbuf* mbuf, WritablePacket* p);
 
     inline void set_flush_timer(DPDKDevice::TXInternalQueue &iqueue);
