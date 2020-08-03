@@ -79,6 +79,8 @@ clean-ns:
 	@cd ns && $(MAKE) clean
 clean-userlevel:
 	@cd userlevel && $(MAKE) clean
+clean-embed:
+	@cd userlevel && $(MAKE) clean-embed 
 clean-minios:
 	@cd minios && $(MAKE) clean
 clean-tools:

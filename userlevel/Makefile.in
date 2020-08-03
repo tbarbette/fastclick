@@ -208,6 +208,10 @@ uninstall:
 clean:
 	rm -f *.d *.o $(INSTALLPROGS) $(ELEMENTSCONF).mk $(ELEMENTSCONF).cc $(ELEMENTSCONF).static.cc elements.conf elements.csmk libclick.a
 	@-for i in $(INSTALLPROGS); do rm -f ../bin/$$i; done
+
+clean-embed:
+	rm -f clickdv* elements_embed* embedclick* package.uo
+
 clean-lib:
 	rm -f $(LIBOBJS) libclick.a
 distclean: clean
