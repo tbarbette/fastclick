@@ -507,12 +507,12 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
     rte_mbuf** pkts = pkts_s;
 send:
 
-#ifdef DPDK_USE_XCHG
+#  ifdef DPDK_USE_XCHG
     unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) pkts, count);
-#else
+#  else
     unsigned r = 0;
     assert(false);
-#endif
+#  endif
     //click_chatter("SENT %d/%d", r, count);
     for (int i = 0; i < r; i++) {
         if (pkts[i] == 0) 
@@ -531,11 +531,11 @@ send:
             //Nothing to do : packets are still in the batch, others have been swapped!
         }
     }
-# else
+# else //No SWAPONLY
     unsigned count = head->count();
     Packet* sent = head->first();
 send:
-    //click_chatter("SEND %d, %p", count, sent);
+    //click_chatter("SEND %d, %p, buffer %p", count, sent, sent->buffer());
 #ifdef DPDK_USE_XCHG
     unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)&sent, count);
 #else
