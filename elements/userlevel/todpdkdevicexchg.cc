@@ -180,6 +180,7 @@ extern "C" {
         //mlx5_tx_free_mbuf(elts, part, olx);
     }
 
+    bool xchg_do_tx_free = false;
     struct xchg* xchg_tx_next(struct xchg** xchgs) {
         WritablePacket** p = (WritablePacket**)xchgs;
         WritablePacket* pkt = *p;
@@ -192,16 +193,13 @@ extern "C" {
         return 1; //NB_SEGS(pkt);
     }
 
-    struct xchg* xchg_tx_advance(struct xchg*** xchgs_p) {
+    /* Advance in the list of packets, that is now permanently moved by one.
+     * Returns the packet that was on top.*/
+    void xchg_tx_advance(struct xchg*** xchgs_p) {
         struct WritablePacket** pkts = (WritablePacket**)(*xchgs_p);
         //printf("Advance : %p -> %p\n", *pkts, (*pkts)->next());
-        
-        struct WritablePacket* pkt = *(pkts);
-        *pkts = (WritablePacket*)pkt->next();
+        *pkts = (WritablePacket*)(*pkts)->next();
 
-        //struct rte_mbuf* mbuf = DPDKDevice::get_mbuf(pkt, false, -1, false);
-        //assert(mbuf);
-        return (struct xchg*)*pkts;
 
     }
 
@@ -246,6 +244,10 @@ extern "C" {
     void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
     }
 #elif !defined(NOXCHG)
+/*
+ * This is just an intermediate testing mode, where we keep mbuf but we do the
+ * exchange of buffers to avoid going through the pool.
+ */
     inline struct rte_mbuf* get_tx_buf(struct xchg* x) {
         return (struct rte_mbuf*)x;
     }
@@ -257,6 +259,8 @@ extern "C" {
     void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
         //mlx5_tx_free_mbuf(elts, part, olx);
     }
+
+    bool xchg_do_tx_free = false;
 
     struct xchg* xchg_tx_next(struct xchg** xchgs) {
         struct rte_mbuf** pkts = (struct rte_mbuf**)xchgs;
@@ -559,7 +563,6 @@ send:
 
 }
 #endif
-
 CLICK_ENDDECLS
 ELEMENT_REQUIRES(ToDPDKDevice userlevel dpdk !dpdk-packet)
 EXPORT_ELEMENT(ToDPDKDeviceXCHG)
