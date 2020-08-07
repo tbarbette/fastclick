@@ -135,6 +135,109 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
 		}
 	}
 }
+
+# if XCHG_RX_SWAPONLY
+
+    inline struct rte_mbuf* get_buf(struct xchg* x) {
+        return (struct rte_mbuf*)x;
+    }
+
+    void xchg_set_buffer(struct xchg* xchg, void* buf) {
+        (void)xchg;
+        (void)buf;
+    }
+
+    void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
+        get_buf(xchg)->packet_type = ptype;
+    }
+
+    void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
+        get_buf(xchg)->hash.rss = rss;
+    }
+
+    void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
+        get_buf(xchg)->timestamp = t;
+    }
+
+    void xchg_set_flag(struct xchg* xchg, uint64_t f) {
+        get_buf(xchg)->ol_flags |= f;
+    }
+
+    uint64_t xchg_get_flags(struct xchg* xchg) {
+        return get_buf(xchg)->ol_flags;
+    }
+
+    uint16_t xchg_get_outer_l2_len(struct xchg* xchg) {
+        return get_buf(xchg)->outer_l2_len;
+    }
+
+    uint16_t xchg_get_outer_l3_len(struct xchg* xchg) {
+        return get_buf(xchg)->outer_l3_len;
+    }
+
+// int xchg_has_flag(struct xchg* xchg, uint64_t f) {
+//       return get_buf(xchg)->ol_flags & f;
+//    }
+
+    void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
+        get_buf(xchg)->ol_flags &= f;
+    }
+
+    void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
+        get_buf(xchg)->hash.fdir.hi = mark;
+    }
+
+    void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
+        get_buf(xchg)->vlan_tci = vlan;
+    }
+
+    uint32_t xchg_get_vlan(struct xchg* xchg) {
+        return get_buf(xchg)->vlan_tci;
+    }
+
+
+    void xchg_set_len(struct xchg* xchg, uint16_t len) {
+        rte_pktmbuf_pkt_len(get_buf(xchg)) = len;
+    }
+    void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
+       rte_pktmbuf_data_len(get_buf(xchg)) = len;
+
+    }
+
+    uint16_t xchg_get_len(struct xchg* xchg) {
+        return rte_pktmbuf_pkt_len(get_buf(xchg));
+    }
+
+    void xchg_finish_packet(struct xchg* xchg) {
+        (void)xchg;
+    }
+
+    /**
+     * Take a packet from the ring and replace it by a new one
+     */
+    struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
+        (void) xchgs; //Mbuf is set on advance
+        struct rte_mbuf* xchg = *pkt; //Buffer in the ring
+		rte_prefetch0(xchg);
+        *pkt = rte_mbuf_raw_alloc(mp); //Allocate packet to put back in the ring
+        return (struct xchg*)xchg;
+    }
+
+    void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
+        (void)xchg;
+        rte_mbuf_raw_free(pkt);
+    }
+
+    void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+        struct xchg** xchgs = *xchgs_p;
+        *(xchgs++) = xchg; //Set in the user pointer the buffer from the ring
+        *xchgs_p = xchgs;
+    }
+    void* xchg_buffer_from_elt(struct rte_mbuf* elt) {
+        return rte_pktmbuf_mtod(elt, void*);
+    }
+# else
+
     inline struct WritablePacket* get_buf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
@@ -236,6 +339,7 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
         return ((unsigned char*)buf) + sizeof(rte_mbuf) + RTE_PKTMBUF_HEADROOM;
     }   
 
+# endif
 
 
 #endif
