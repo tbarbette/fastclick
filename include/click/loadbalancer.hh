@@ -11,6 +11,7 @@
 #include <click/ipflowid.hh>
 #include <click/tcphelper.hh>
 #include <click/straccum.hh>
+#include <click/args.hh>
 
 class LoadBalancer { public:
 
@@ -440,12 +441,14 @@ protected:
                 }
                 return b;
             }
+#if HAVE_DPDK
             case direct_hash_crc: {
                 IPFlow5ID srv = IPFlow5ID(p);
                 unsigned server_val = ipv4_hash_crc(&srv, sizeof(srv), 0);
                 server_val = ((server_val >> 16) ^ (server_val & 65535)) % _selector.size();
                 return _selector.unchecked_at(server_val);
             }
+#endif
             case direct_hash_agg: {
                 unsigned server_val = AGGREGATE_ANNO(p);
                 server_val = ((server_val >> 16) ^ (server_val & 65535)) % _selector.size();
