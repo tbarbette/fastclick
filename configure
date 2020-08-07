@@ -815,6 +815,7 @@ enable_kqueue
 enable_dpdk
 enable_dpdk_pool
 enable_dpdk_packet
+enable_dpdk_xchg
 enable_zerocopy
 enable_linuxmodule
 enable_fixincludes
@@ -1540,6 +1541,7 @@ Optional Features:
     --enable-dpdk         use DPDK
     --enable-dpdk-pool    use DPDK buffer instead of standard Click buffer
     --enable-dpdk-packet  Click packets are DPDK packet
+    --enable-dpdk-xchg    use DPDK XCHG API
     --disable-zerocopy    disable Zero Copy
   --disable-linuxmodule   disable Linux kernel driver
     --disable-fixincludes do not patch Linux kernel headers for C++
@@ -7151,6 +7153,14 @@ else
 fi
 
 
+# Check whether --enable-dpdk-xchg was given.
+if test "${enable_dpdk_xchg+set}" = set; then :
+  enableval=$enable_dpdk_xchg; :
+else
+  enable_dpdk_xchg=no
+fi
+
+
 if test "x$enable_dpdk" = "xyes"; then
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for DPDK library" >&5
@@ -7259,6 +7269,19 @@ if test "x$enable_dpdk_pool" = "xyes"; then
 =========================================" "$LINENO" 5
     fi
     $as_echo "#define HAVE_DPDK_PACKET_POOL 1" >>confdefs.h
+
+fi
+
+if test "x$enable_dpdk_xchg" = "xyes"; then
+    if test "x$enable_dpdk" != "xyes"; then
+        as_fn_error $? "
+=========================================
+
+--enable-dpdk-xchg requires --enable-dpdk which was not provided.
+
+=========================================" "$LINENO" 5
+    fi
+    $as_echo "#define HAVE_DPDK_XCHG 1" >>confdefs.h
 
 fi
 
@@ -14498,6 +14521,10 @@ else
     else
         packet_mode="Click's Packet object with any buffers"
     fi
+fi
+
+if test "x$enable_dpdk_xchg" = xyes; then
+    provisions="$provisions dpdk-xchg"
 fi
 
 if test "x$enable_flow" = xyes; then

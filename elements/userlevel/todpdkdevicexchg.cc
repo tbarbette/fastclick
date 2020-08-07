@@ -161,11 +161,9 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
     flush_internal_tx_queue(_iqueues.get());
 }
 
-#ifdef DPDK_USE_XCHG
 extern "C" {
 #include <mlx5_xchg.h>
 }
-#endif
 
 #if !defined(NOXCHG) && !defined(XCHG_TX_SWAPONLY)
     inline struct WritablePacket* get_tx_buf(struct xchg* x) {
@@ -442,11 +440,7 @@ void ToDPDKDeviceXCHG::flush_internal_tx_queue(DPDKDevice::TXInternalQueue &ique
         //Todo : if there is multiple queue assigned to this thread, send on all of them
 
 
-#ifdef DPDK_USE_XCHG
         r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) &iqueue.pkts[iqueue.index], sub_burst);
-#else
-        assert(false);
-#endif
 
         iqueue.nr_pending -= r;
         iqueue.index += r;
@@ -609,12 +603,7 @@ void ToDPDKDeviceXCHG::push_batch(int, PacketBatch *head)
     rte_mbuf** pkts = pkts_s;
 send:
 
-#  ifdef DPDK_USE_XCHG
     unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**) pkts, count);
-#  else
-    unsigned r = 0;
-    assert(false);
-#  endif
     //click_chatter("SENT %d/%d", r, count);
     for (int i = 0; i < r; i++) {
         if (pkts[i] == 0) 
@@ -638,12 +627,7 @@ send:
     Packet* sent = head->first();
 send:
     //click_chatter("SEND %d, %p, buffer %p", count, sent, sent->buffer());
-#ifdef DPDK_USE_XCHG
     unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)&sent, count);
-#else
-    unsigned r = 0;
-    assert(false);
-#endif
     //click_chatter("SENT %d, %p", r, sent);
     if (unlikely(r != count)) {
         warn_congestion();
@@ -662,6 +646,6 @@ send:
 }
 #endif
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(ToDPDKDevice userlevel dpdk !dpdk-packet)
+ELEMENT_REQUIRES(ToDPDKDevice userlevel dpdk !dpdk-packet dpdk-xchg)
 EXPORT_ELEMENT(ToDPDKDeviceXCHG)
 ELEMENT_MT_SAFE(ToDPDKDeviceXCHG)

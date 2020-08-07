@@ -21,11 +21,9 @@
 #include <click/config.h>
 
 #include "fromdpdkdevicexchg.hh"
-#ifdef DPDK_USE_XCHG
 extern "C" {
 #include <mlx5_xchg.h>
 }
-#endif
 
 CLICK_DECLS
 
@@ -374,12 +372,7 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
 #else
   WritablePacket* head = WritablePacket::pool_prepare_data_burst(_burst);
   WritablePacket* tail = head;
-#ifdef DPDK_USE_XCHG
   unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)&tail, _burst);
-#else
-  unsigned n = 0;
-  assert(false);
-#endif
   if (n) {
     WritablePacket::pool_consumed_data_burst(n,tail);
     add_count(n);
@@ -398,6 +391,6 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
 
 CLICK_ENDDECLS
 
-ELEMENT_REQUIRES(FromDPDKDevice !dpdk-packet)
+ELEMENT_REQUIRES(FromDPDKDevice !dpdk-packet dpdk-xchg)
 EXPORT_ELEMENT(FromDPDKDeviceXCHG)
 ELEMENT_MT_SAFE(FromDPDKDeviceXCHG)

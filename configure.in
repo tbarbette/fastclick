@@ -281,6 +281,10 @@ AC_ARG_ENABLE([dpdk-packet],
                     [Click packets are DPDK packet])],
     [:], [enable_dpdk_packet=no])
 
+AC_ARG_ENABLE([dpdk-xchg],
+    [AS_HELP_STRING([  --enable-dpdk-xchg], [use DPDK XCHG API])],
+    [:], [enable_dpdk_xchg=no])
+
 if test "x$enable_dpdk" = "xyes"; then
 
     AC_MSG_CHECKING([for DPDK library])
@@ -376,6 +380,19 @@ if test "x$enable_dpdk_pool" = "xyes"; then
 =========================================])
     fi
     AC_DEFINE([HAVE_DPDK_PACKET_POOL])
+fi
+
+if test "x$enable_dpdk_xchg" = "xyes"; then
+    if test "x$enable_dpdk" != "xyes"; then
+        AC_MSG_ERROR([
+=========================================
+
+--enable-dpdk-xchg requires --enable-dpdk which was not provided.
+
+=========================================])
+    fi
+    AC_DEFINE([HAVE_DPDK_XCHG])
+    LIBS="$LIBS -lmlx5_xchg"
 fi
 
 if test "x$enable_dpdk_packet" = "xyes"; then
@@ -2356,6 +2373,11 @@ else
     else
         packet_mode="Click's Packet object with any buffers"
     fi
+fi
+
+dnl add 'dpdk' if compiled with --enable-dpdk
+if test "x$enable_dpdk_xchg" = xyes; then
+    provisions="$provisions dpdk-xchg"
 fi
 
 dnl add 'flow' if compiled with --enable-flow
