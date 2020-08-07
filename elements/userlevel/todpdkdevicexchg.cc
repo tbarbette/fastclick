@@ -373,14 +373,13 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
         return 1; //NB_SEGS(pkt);
     }
 
-    struct xchg* xchg_tx_advance(struct xchg*** xchgs_p) {
+    void xchg_tx_advance(struct xchg*** xchgs_p) {
         struct rte_mbuf** pkts = (struct rte_mbuf**)(*xchgs_p);
-        //printf("Advance : %p -> %p = %p\n", pkts, pkts+1, *(pkts+1));
+//        printf("Advance : %p -> %p = %p\n", pkts, pkts+1, *(pkts+1));
+//        assert(*pkts == (struct rte_mbuf*)0x87);
         pkts += 1;
         *xchgs_p = (struct xchg**)pkts;
-        struct rte_mbuf* pkt = *(pkts);
-        return (struct xchg*)pkt;
-
+       // struct rte_mbuf* pkt = *(pkts);
     }
 
     void* xchg_get_buffer_addr(struct xchg* xchg) {
