@@ -268,30 +268,47 @@ Mindriver::resolve_requirement(const String& requirement, const ElementMap& emap
     LandmarkErrorHandler lerrh(errh, "resolving " + requirement);
 
     if (_provisions.get(requirement) > 0)
-	return true;
+	    return true;
 
     int try_name_emapi = emap.traits_index(requirement);
+
     if (try_name_emapi > 0) {
 	add_traits(emap.traits_at(try_name_emapi), emap, &lerrh);
 	return true;
     }
 
-    for (int i = 1; i < emap.size(); i++)
-	if (emap.traits_at(i).provides(requirement)) {
-	    add_traits(emap.traits_at(i), emap, &lerrh);
-	    return true;
-	}
+    if (requirement.starts_with("!")) {
+        String nr = requirement.substring(1);
+        for (int i = 1; i < emap.size(); i++) {
+            if (emap.traits_at(i).provides(nr)) {
+                if (complain)
+                    errh->error("cannot requirement %<%s%> as it is providen", requirement.c_str());
+                return false;
+
+            }
+        }
+        return true;
+    }
+
+    for (int i = 1; i < emap.size(); i++) {
+        if (emap.traits_at(i).provides(requirement)) {
+            add_traits(emap.traits_at(i), emap, &lerrh);
+            return true;
+        }
+    }
+
 
     // check for '|' requirements
     const char *begin = requirement.begin(), *bar;
     while ((bar = find(begin, requirement.end(), '|')) < requirement.end()) {
 	if (resolve_requirement(requirement.substring(begin, bar), emap, errh, false))
-	    return true;
+	        return true;
 	begin = bar + 1;
     }
-
+do_complain:
     if (complain)
 	errh->error("cannot satisfy requirement %<%s%>", requirement.c_str());
+
     return false;
 }
 
