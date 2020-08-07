@@ -70,7 +70,7 @@ void IPLoadBalancer::push_batch(int, PacketBatch* batch) {
         unsigned hash = pick_server(p);
         IPAddress srv = _dsts.unchecked_at(hash);
 
-	q->ip_header()->ip_dst = srv;
+        q->ip_header()->ip_dst = srv;
         q->set_dst_ip_anno(srv);
         return q;
     };
