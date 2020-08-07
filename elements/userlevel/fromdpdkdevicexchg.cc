@@ -22,7 +22,7 @@
 
 #include "fromdpdkdevicexchg.hh"
 extern "C" {
-#include <mlx5_xchg.h>
+#include <rte_xchg.h>
 }
 
 CLICK_DECLS

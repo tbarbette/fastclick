@@ -22,6 +22,13 @@
 
 #include "todpdkdevicexchg.hh"
 
+
+extern "C" {
+#include <rte_xchg.h>
+}
+
+
+
 CLICK_DECLS
 
 ToDPDKDeviceXCHG::ToDPDKDeviceXCHG()
@@ -159,10 +166,6 @@ inline void ToDPDKDeviceXCHG::set_flush_timer(DPDKDevice::TXInternalQueue &iqueu
 void ToDPDKDeviceXCHG::run_timer(Timer *)
 {
     flush_internal_tx_queue(_iqueues.get());
-}
-
-extern "C" {
-#include <mlx5_xchg.h>
 }
 
 #if !defined(NOXCHG) && !defined(XCHG_TX_SWAPONLY)

@@ -705,6 +705,7 @@ minios_dir
 xen_dir
 INCLUDE_KSYMS
 LINUXMODULE_FIXINCLUDES
+HAVE_DPDK_XCHG
 USE_DPDK
 DPDK_INCLUDES
 RTE_VER_MONTH
@@ -7282,6 +7283,8 @@ if test "x$enable_dpdk_xchg" = "xyes"; then
 =========================================" "$LINENO" 5
     fi
     $as_echo "#define HAVE_DPDK_XCHG 1" >>confdefs.h
+
+    HAVE_DPDK_XCHG=y
 
 fi
 

@@ -83,6 +83,9 @@ _LDLIBS-$(CONFIG_RTE_LIBRTE_METRICS)        += -lrte_metrics
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BITRATE)        += -lrte_bitratestats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_LATENCY_STATS)  += -lrte_latencystats
 _LDLIBS-$(CONFIG_RTE_LIBRTE_POWER)          += -lrte_power
+ifneq ($(HAVE_DPDK_XCHG),y)
+_LDLIBS-$(CONFIG_RTE_LIBRTE_XCHG_MBUF)          += -lrte_xchg_mbuf
+endif
 _LDLIBS-$(CONFIG_RTE_LIBRTE_EFD)            += -lrte_efd
 _LDLIBS-$(CONFIG_RTE_LIBRTE_BPF)            += -lrte_bpf
 ifeq ($(CONFIG_RTE_LIBRTE_BPF_ELF),y)
