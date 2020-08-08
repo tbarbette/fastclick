@@ -27,9 +27,7 @@
 
 CLICK_DECLS
 
-//TODO : disable timer if own_state is false
-
-FlowIPLoadBalancer::FlowIPLoadBalancer() : _own_state(true), _accept_nonsyn(true)
+FlowIPLoadBalancer::FlowIPLoadBalancer() : _accept_nonsyn(true)
 {
 }
 
@@ -44,14 +42,13 @@ FlowIPLoadBalancer::configure(Vector<String> &conf, ErrorHandler *errh)
     if (Args(conf, this, errh)
        .read_all("DST",Args::mandatory | Args::positional,DefaultArg<Vector<IPAddress>>(),_dsts)
        .read_mp("VIP", _vip)
-       .read("STATE", _own_state)
        .read("MODE", mode)
        .complete() < 0)
         return -1;
     click_chatter("%p{element} has %d routes",this,_dsts.size());
 
     set_mode(mode);
-    click_chatter("MODE setted to %s", mode.c_str());
+    click_chatter("MODE set to %s", mode.c_str());
     return 0;
 }
 
@@ -63,9 +60,9 @@ int FlowIPLoadBalancer::initialize(ErrorHandler *errh)
 
 bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
 {
-    if (!isSyn(p)) {
+    if (isTCP(p) && !isSyn(p)) {
         nat_info_chatter("Non syn establishment!");
-        if (!_accept_nonsyn || _own_state)
+        if (!_accept_nonsyn)
             return false;
     }
     int server = pick_server(p);

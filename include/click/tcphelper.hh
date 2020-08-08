@@ -86,14 +86,14 @@ public:
      * @param packet The packet
      * @return The sequence number of the packet
      */
-    static inline tcp_seq_t getSequenceNumber(Packet* packet);
+    inline static tcp_seq_t getSequenceNumber(Packet* packet);
 
     /**
      * @brief Return the ack number of a packet
      * @param packet The packet
      * @return The ack number of the packet
      */
-    static inline tcp_seq_t getAckNumber(Packet* packet);
+    inline static tcp_seq_t getAckNumber(Packet* packet);
 
     /**
      * @brief Return the sequence number of the packet that will be received after the given one
@@ -118,32 +118,39 @@ public:
     void setWindowSize(WritablePacket *packet, uint16_t winSize) const;
 
     /**
+     * @brief Indicate whether a packet is a TCP packet
+     * @param packet The packet
+     * @return A boolean indicating whether the packet is a TCP packet
+     */
+    inline static bool isTCP(Packet* packet);
+
+    /**
      * @brief Indicate whether a packet is a SYN packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is a SYN packet
      */
-    static bool isSyn(Packet* packet);
+    inline static bool isSyn(Packet* packet);
 
     /**
      * @brief Indicate whether a packet is a FIN packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is a FIN packet
      */
-    static bool isFin(Packet* packet);
+    inline static bool isFin(Packet* packet);
 
     /**
      * @brief Indicate whether a packet is a RST packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is a RST packet
      */
-    static bool isRst(Packet* packet);
+    inline static bool isRst(Packet* packet);
 
     /**
      * @brief Indicate whether a packet is an ACK packet
      * @param packet The packet
      * @return A boolean indicating whether the packet is an ACK packet
      */
-    static bool isAck(Packet* packet);
+    inline static bool isAck(Packet* packet);
 
     /**
      * @brief Check if a given flag is set in a packet
@@ -151,14 +158,14 @@ public:
      * @param flag The offset of the flag
      * @return A boolean indicating whether the flag is set in the packet
      */
-    static bool checkFlag(Packet *packet, uint8_t flag);
+    inline static bool checkFlag(Packet *packet, uint8_t flag);
 
     /**
      * @brief Return the length of the TCP payload of a packet
      * @param packet The packet
      * @return The length of the TCP payload of the packet
      */
-    static unsigned getPayloadLength(Packet* packet);
+    inline static unsigned getPayloadLength(Packet* packet);
 
     /**
      * @brief Return the payload of a TCP packet
@@ -396,6 +403,11 @@ inline uint16_t TCPHelper::getDestinationPort(Packet* packet) const
     const click_tcp *tcph = packet->tcp_header();
 
     return ntohs(tcph->th_dport);
+}
+
+inline bool TCPHelper::isTCP(Packet* packet)
+{
+    return packet->ip_header()->ip_p == IP_PROTO_TCP;
 }
 
 inline bool TCPHelper::isSyn(Packet* packet)

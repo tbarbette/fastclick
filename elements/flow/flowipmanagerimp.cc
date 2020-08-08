@@ -41,12 +41,13 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
     find_children(_verbose);
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
+
     _fcb_builded_init_future.post(this);
 
     return 0;
 }
 
-int FlowIPManagerIMP::initialize(ErrorHandler *errh)
+int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 {
     struct rte_hash_parameters hash_params = {0};
     char buf[32];
@@ -129,15 +130,17 @@ void FlowIPManagerIMP::run_timer(Timer* t)
 void FlowIPManagerIMP::cleanup(CleanupStage stage)
 {
     click_chatter("Cleanup the table");
-    for(int i =0; i<click_max_cpu_ids(); i++) {
-       if (_tables[i].hash)
-           rte_hash_free(_tables[i].hash);
+    if (_tables) {
+        for(int i =0; i<click_max_cpu_ids(); i++) {
+           if (_tables[i].hash)
+               rte_hash_free(_tables[i].hash);
 
-       if (_tables[i].fcbs)
-            delete _tables[i].fcbs;
+           if (_tables[i].fcbs)
+                delete _tables[i].fcbs;
+        }
+
+        delete _tables;
     }
-
-    delete _tables;
 }
 
 void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
