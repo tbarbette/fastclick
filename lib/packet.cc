@@ -244,17 +244,6 @@ Packet::~Packet()
 #endif
 }
 
-/*
-struct PacketStack {
-    Packet* stack[PACKET_STACK_SIZE];
-
-}
-__thread PacketStack packet_stack;
-void thread_init_stack() {
-    packet_stack_size
-}
-*/
-
 #if !CLICK_LINUXMODULE && !CLICK_PACKET_USE_DPDK
 
 # if HAVE_CLICK_PACKET_POOL

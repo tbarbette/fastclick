@@ -170,8 +170,6 @@ void click_lfree(volatile void *p, size_t size);
 
 CLICK_DECLS
 
-#define assume(cond) do { if (!(cond)) __builtin_unreachable(); } while (0)
-
 #if HAVE_DPDK
 extern bool dpdk_enabled;
 #endif

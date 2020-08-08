@@ -37,7 +37,7 @@ class LoadBalancer { public:
             case round_robin: {
                 //click_chatter("Robin robin mode");
                 int b = (*_current) ++;
-                if (*_current == _dsts.size()) {
+                if (b == _dsts.size()) {
                     *_current = 0;
                     b = 0;
                 }

@@ -47,6 +47,7 @@ class FlowHyperScan : public FlowSpaceElement<FlowHyperScanState> {
 
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         int initialize(ErrorHandler *errh) override CLICK_COLD;
+        void cleanup(CleanupStage) CLICK_COLD;
 
         void push_batch(int, FlowHyperScanState*, PacketBatch *);
 

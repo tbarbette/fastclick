@@ -193,13 +193,13 @@ class SimpleBatchElement : public BatchElement { public:
     }
 
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch* head) override {
+    void push_batch(int port, PacketBatch* head) override final {
         head = static_cast<T&>(*this).simple_action_batch(head);
         if (head)
             output_push_batch(port,head);
     }
 
-    PacketBatch* pull_batch(int port, unsigned max) override {
+    PacketBatch* pull_batch(int port, unsigned max) override final {
         PacketBatch* head = input_pull_batch(port,max);
         if (head)
             head = static_cast<T&>(*this).simple_action_batch(head);
@@ -228,13 +228,13 @@ class SimpleBatchElement : public BatchElement { public:
 template <typename T>
 class SimpleElement : public BatchElement { public:
 
-    void push(int port, Packet *p) override {
+    void push(int port, Packet *p) override final {
         p = static_cast<T&>(*this).simple_action(p);
         if (p)
             output(port).push(p);
     }
 
-    Packet* pull(int port) override {
+    Packet* pull(int port) override final {
         Packet *p = input(port).pull();
         if (p)
             p = static_cast<T&>(*this).simple_action(p);
@@ -242,13 +242,13 @@ class SimpleElement : public BatchElement { public:
     }
 
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch* head) override {
+    void push_batch(int port, PacketBatch* head) override final {
         head = _sm_action_batch(head);
         if (head)
             output(port).push_batch(head);
     }
 
-    PacketBatch* pull_batch(int port, unsigned max) override {
+    PacketBatch* pull_batch(int port, unsigned max) override final {
         PacketBatch* head = input_pull_batch(port,max);
         if (head)
             head = _sm_action_batch(head);
