@@ -130,15 +130,17 @@ void FlowIPManagerIMP::run_timer(Timer* t)
 void FlowIPManagerIMP::cleanup(CleanupStage stage)
 {
     click_chatter("Cleanup the table");
-    for(int i =0; i<click_max_cpu_ids(); i++) {
-       if (_tables[i].hash)
-           rte_hash_free(_tables[i].hash);
+    if (_tables) {
+        for(int i =0; i<click_max_cpu_ids(); i++) {
+           if (_tables[i].hash)
+               rte_hash_free(_tables[i].hash);
 
-       if (_tables[i].fcbs)
-            delete _tables[i].fcbs;
+           if (_tables[i].fcbs)
+                delete _tables[i].fcbs;
+        }
+
+        delete _tables;
     }
-
-    delete _tables;
 }
 
 void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
