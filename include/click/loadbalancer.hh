@@ -12,6 +12,7 @@
 #include <click/tcphelper.hh>
 #include <click/straccum.hh>
 #include <click/args.hh>
+#include <click/timer.hh>
 
 class LoadBalancer { public:
 
@@ -43,7 +44,7 @@ class LoadBalancer { public:
         direct_hash,
         direct_hash_crc,
         direct_hash_agg,
-	direct_hash_ip,
+    direct_hash_ip,
         least_load
     };
 
@@ -115,10 +116,10 @@ protected:
     }
 
     inline void track_load(Packet*p, int b) {
-	if (_track_load) {
-	    if (TCPHelper::isSyn(p))
+    if (_track_load) {
+        if (TCPHelper::isSyn(p))
                  _loads[b].connection_load++;
-	    else if (TCPHelper::isFin(p) || TCPHelper::isRst(p))
+        else if (TCPHelper::isFin(p) || TCPHelper::isRst(p))
                  _loads[b].connection_load--;
 
             _loads[b].packets_load++;
@@ -218,7 +219,7 @@ protected:
         bool has_cst_buckets;
         int cst_buckets;
         int nserver;
-	bool force_track_load;
+    bool force_track_load;
         int ret = Args(lb, errh).bind(conf)
             .read_or_set("LB_MODE", lb_mode,"rr")
             .read_or_set("LST_MODE",lst_mode,"conn")
@@ -232,7 +233,7 @@ protected:
             return -1;
 
         _alpha = alpha;
-	_force_track_load = force_track_load;
+    _force_track_load = force_track_load;
         if (has_cst_buckets) {
             _cst_hash.resize(cst_buckets, -1);
         }
@@ -249,57 +250,59 @@ protected:
 
     int lb_handler(int op, String &data, void *r_thunk, void* w_thunk, ErrorHandler *errh) {
 
-    LoadBalancer *cs = this;
-    if (op == Handler::f_read) {
-        switch((uintptr_t) r_thunk) {
-           case h_load: {
-                StringAccum acc;
-		if (data) {
-		    int i = atoi(data.c_str());
-                    if (cs->_loads.size() <= i) {
-		        acc << "unknown";
-		    } else {
-		        acc << cs->_loads[i].cpu_load ;
-		    }
-		} else {
-		    for (int i = 0; i < cs->_dsts.size(); i ++) {
-			if (cs->_loads.size() <= i) {
-			    acc << "unknown";
-			} else {
-			    acc << cs->_loads[i].cpu_load ;
-			}
-			acc << (i == cs->_dsts.size() -1?"":" ");
-		    }
-		}
-                data = acc.take_string();
-		return 0;
-            }
-	}
-    } else {
-       switch((uintptr_t)w_thunk) {
-            case h_load: {
-                String s(data);
-                //click_chatter("Input %s", s.c_str());
-                while (s.length() > 0) {
-                    int ntoken = s.find_left(',');
-                    if (ntoken < 0)
-                        ntoken = s.length() - 1;
-                    int pos = s.find_left(':');
-                    int server_id = atoi(s.substring(0,pos).c_str());
-                    int server_load = atoi(s.substring(pos + 1, ntoken).c_str());
-                    //click_chatter("%d is %d",server_id, server_load);
-                    if (cs->_loads.size() <= server_id) {
-                        click_chatter("Invalid server id %d", server_id);
-                        return 1;
+        LoadBalancer *cs = this;
+        if (op == Handler::f_read) {
+            switch((uintptr_t) r_thunk) {
+               case h_load: {
+                    StringAccum acc;
+                    if (data) {
+                        int i = atoi(data.c_str());
+                                if (cs->_loads.size() <= i) {
+                            acc << "unknown";
+                        } else {
+                            acc << cs->_loads[i].cpu_load ;
+                        }
+                    } else {
+                        for (int i = 0; i < cs->_dsts.size(); i ++) {
+                        if (cs->_loads.size() <= i) {
+                            acc << "unknown";
+                        } else {
+                            acc << cs->_loads[i].cpu_load ;
+                        }
+                        acc << (i == cs->_dsts.size() -1?"":" ");
+                        }
                     }
-                    cs->_loads[server_id].cpu_load = server_load;
-                    s = s.substring(ntoken + 1);
+                            data = acc.take_string();
+                    return 0;
                 }
-
-                return 0;
             }
-	}
-      }
+        } else {
+           switch((uintptr_t)w_thunk) {
+               case h_load:
+               {
+                    String s(data);
+                    //click_chatter("Input %s", s.c_str());
+                    while (s.length() > 0) {
+                        int ntoken = s.find_left(',');
+                        if (ntoken < 0)
+                            ntoken = s.length() - 1;
+                        int pos = s.find_left(':');
+                        int server_id = atoi(s.substring(0,pos).c_str());
+                        int server_load = atoi(s.substring(pos + 1, ntoken).c_str());
+                        //click_chatter("%d is %d",server_id, server_load);
+                        if (cs->_loads.size() <= server_id) {
+                            click_chatter("Invalid server id %d", server_id);
+                            return 1;
+                        }
+                        cs->_loads[server_id].cpu_load = server_load;
+                        s = s.substring(ntoken + 1);
+                    }
+
+                    return 0;
+                }
+            }
+        }
+        return -1;
     }
 
 
@@ -356,15 +359,15 @@ protected:
 
     template <class T>
     void add_lb_handlers(Element* _e) {
-	T* e = (T*)_e;
-	e->set_handler("load", Handler::f_read | Handler::f_read_param | Handler::f_write, e->handler, h_load, h_load);
-	e->add_read_handler("nb_active_servers", e->read_handler, h_nb_active_servers);
-	e->add_read_handler("nb_total_servers", e->read_handler, h_nb_total_servers);
-	e->add_read_handler("load_conn", e->read_handler, h_load_conn);
-	e->add_read_handler("load_bytes", e->read_handler, h_load_bytes);
-	e->add_read_handler("load_packets", e->read_handler, h_load_packets);
-	//e->add_write_handler("remove_server", e->write_handler, h_remove_server);
-	//e->add_write_handler("add_server", e->write_handler, h_add_server);
+    T* e = (T*)_e;
+    e->set_handler("load", Handler::f_read | Handler::f_read_param | Handler::f_write, e->handler, h_load, h_load);
+    e->add_read_handler("nb_active_servers", e->read_handler, h_nb_active_servers);
+    e->add_read_handler("nb_total_servers", e->read_handler, h_nb_total_servers);
+    e->add_read_handler("load_conn", e->read_handler, h_load_conn);
+    e->add_read_handler("load_bytes", e->read_handler, h_load_bytes);
+    e->add_read_handler("load_packets", e->read_handler, h_load_packets);
+    //e->add_write_handler("remove_server", e->write_handler, h_remove_server);
+    //e->add_write_handler("add_server", e->write_handler, h_add_server);
     }
 
     void set_mode(String mode, String metric="cpu", Element* owner=0,int awrr_timer_interval = -1, int nserver = 0) {
@@ -456,7 +459,7 @@ protected:
             }
             case direct_hash_ip: {
                 unsigned server_val = hash_ip(p);
-		return _selector.unchecked_at(server_val);
+                return _selector.unchecked_at(server_val);
             }
             case direct_hash: {
                 unsigned server_val = IPFlowID(p, false).hashcode();
