@@ -88,6 +88,7 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
 
     if (_verbose)
         errh->message("Per-flow size is %d", _reserve);
+
     sprintf(buf, "%s", name().c_str());
     hash = rte_hash_create(&hash_params);
     if (!hash)

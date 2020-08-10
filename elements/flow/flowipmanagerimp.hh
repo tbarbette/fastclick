@@ -69,7 +69,6 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
 
         gtable* _tables;
 
-        int _reserve;
         int _table_size;
         int _flow_state_size_full;
         int _verbose;
