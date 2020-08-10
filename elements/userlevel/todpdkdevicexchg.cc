@@ -185,9 +185,27 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
     struct xchg* xchg_tx_next(struct xchg** xchgs) {
         WritablePacket** p = (WritablePacket**)xchgs;
         WritablePacket* pkt = *p;
-        rte_prefetch0(pkt);
+#if !HAVE_DPDK_PACKET_POOL
+        if (!DPDKDevice::is_dpdk_buffer(pkt)) {
+            struct rte_mbuf* mbuf = DPDKDevice::get_pkt();
+            if (mbuf == 0) {
+                return NULL;
+            }
+            uint16_t l = pkt->length();
+            memcpy(rte_pktmbuf_mtod(mbuf, void *),pkt->data(),l);
+            pkt->delete_buffer(pkt->buffer(), pkt->end_buffer());
+            pkt->set_buffer((unsigned char*)mbuf->buf_addr, DPDKDevice::MBUF_DATA_SIZE);
+            pkt->change_headroom_and_length(RTE_PKTMBUF_HEADROOM,l);
+            pkt->set_buffer_destructor(DPDKDevice::free_pkt);
+        }
+#else
+
+           rte_prefetch0(pkt);
+#endif
         return (struct xchg*)pkt;
     }
+
+
 
     int xchg_nb_segs(struct xchg* xchg) {
         //struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
@@ -207,7 +225,8 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
     void* xchg_get_buffer_addr(struct xchg* xchg) {
         //assert(DPDKDevice::is_dpdk_buffer(get_tx_buf(xchg)));
         //click_chatter("ADDR is %p", get_tx_buf(xchg)->buffer());
-        return get_tx_buf(xchg)->buffer();
+        WritablePacket* p = get_tx_buf(xchg);
+        return p->buffer();
     }
 
     void* xchg_get_buffer(struct xchg* xchg) {

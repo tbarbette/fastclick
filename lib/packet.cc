@@ -221,25 +221,7 @@ Packet::~Packet()
 #elif CLICK_PACKET_USE_DPDK
     rte_panic("Packet destructor");
 #else
-    if (_data_packet)
-	_data_packet->kill();
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_head && _destructor) {
-        if (_destructor != empty_destructor)
-            _destructor(_head, _end - _head, _destructor_argument);
-    } else
-#  if HAVE_NETMAP_PACKET_POOL
-    if (_head && NetmapBufQ::is_valid_netmap_packet(this)) {
-        NetmapBufQ::local_pool()->insert_p(_head);
-    } else
-#  endif
-    if (_head) {
-            delete[] _head;
-    }
-# elif CLICK_BSDMODULE
-    if (_m)
-	m_freem(_m);
-# endif
+    delete_buffer(_head, _data);
     _head = _data = 0;
 #endif
 }
@@ -483,6 +465,9 @@ WritablePacket::pool_allocate(uint32_t headroom, uint32_t length,
         p->_destructor = type;
 #endif
     } else {
+#if HAVE_DPDK_PACKET_POOL
+        click_chatter("Allocating huge (and therefore non-DPDK) packets is inefficient in dpdk-pool mode");
+#endif
         p = pool_allocate();
         p->alloc_data(headroom,length,tailroom);
         p->initialize(clear);
@@ -688,13 +673,13 @@ Packet::alloc_data(uint32_t headroom, uint32_t length, uint32_t tailroom)
     }
 # if CLICK_USERLEVEL || CLICK_MINIOS
     unsigned char *d = 0;
-    if (n <= CLICK_PACKET_DATA_POOL_SIZE) {
+    if (n <= CLICK_PACKET_POOL_BUFSIZ) {
 #  if HAVE_DPDK_PACKET_POOL
         struct rte_mbuf *mb = DPDKDevice::get_pkt();
         if (likely(mb)) {
-          d = (unsigned char*)mb->buf_addr;
-          _destructor = DPDKDevice::free_pkt;
-          _destructor_argument = mb;
+            d = (unsigned char*)mb->buf_addr;
+            _destructor = DPDKDevice::free_pkt;
+            _destructor_argument = mb;
         } else {
             return 0;
         }
@@ -1128,32 +1113,12 @@ Packet::expensive_uniqueify(int32_t extra_headroom, int32_t extra_tailroom,
     unsigned char *end_copy = old_end + (extra_tailroom >= 0 ? 0 : extra_tailroom);
     memcpy(p->_head + (extra_headroom >= 0 ? extra_headroom : 0), start_copy, end_copy - start_copy);
 
-    // free old data
-    if (_data_packet) {
-      _data_packet->kill();
-    }
-# if CLICK_USERLEVEL || CLICK_MINIOS
-    else if (_destructor) {
-      _destructor(old_head, old_end - old_head, _destructor_argument);
-    } else {
-#  if HAVE_NETMAP_PACKET_POOL
-      if (NetmapBufQ::is_valid_netmap_buffer(old_head)) {
-        NetmapBufQ::local_pool()->insert_p(old_head);
-      } else
-#  endif
-      {
-        delete[] old_head;
-      }
-    }
+    delete_buffer(old_head, old_end);
 # if HAVE_DPDK_PACKET_POOL
     p->_destructor = desc;
     p->_destructor_argument = arg;
-#  else
+# else
     _destructor = 0;
-# endif
-
-# elif CLICK_BSDMODULE
-    m_freem(old_m); // alloc_data() created a new mbuf, so free the old one
 # endif
 
     p->_use_count = 1;
