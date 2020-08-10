@@ -223,12 +223,13 @@ protected:
 
 };
 
-template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
+template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement, Router::InitFuture {
 
 public :
 
 	FlowSpaceElement() CLICK_COLD;
 	virtual int initialize(ErrorHandler *errh) override CLICK_COLD;
+	virtual int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
     void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
 
 	virtual const size_t flow_data_size()  const override { return sizeof(T); }
@@ -267,7 +268,7 @@ public :
  *
  * close_flow() can be called to release the flow now, remove timer etc It will not call your release_flow(); automatically, do it before. A packet coming for the same flow after close_flow() is called will be considered from a new flow (seen flag is reset).
  */
-template<class Derived, typename T> class FlowStateElement : public VirtualFlowSpaceElement {
+template<class Derived, typename T> class FlowStateElement : public VirtualFlowSpaceElement, Router::InitFuture {
     struct AT : public FlowReleaseChain {
         T v;
         bool seen;
@@ -278,6 +279,7 @@ public :
 
     FlowStateElement() CLICK_COLD;
     virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+	virtual int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
     virtual const size_t flow_data_size()  const { return sizeof(AT); }
 
     /**
@@ -359,10 +361,22 @@ template<typename T>
 int
 FlowSpaceElement<T>::initialize(ErrorHandler *errh) {
     if (_flow_data_offset == -1) {
-        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
+        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
+    }
+
+    router()->get_root_init_future()->postOnce(this);
+    return 0;
+}
+
+template<typename T>
+int
+FlowSpaceElement<T>::solve_initialize(ErrorHandler *errh) {
+    if (_flow_data_offset == -1) {
+        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
     }
     return 0;
 }
+
 
 
 template<class Derived, typename T>
@@ -372,12 +386,17 @@ FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
 
 template<class Derived, typename T>
 int FlowStateElement<Derived, T>::initialize(ErrorHandler *errh) {
-    if (_flow_data_offset == -1) {
-        return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
-    }
+    router()->get_root_init_future()->postOnce(this);
     return 0;
 }
 
+template<class Derived, typename T>
+int FlowStateElement<Derived, T>::solve_initialize(ErrorHandler *errh) {
+    if (_flow_data_offset == -1) {
+        return errh->error("No FlowManager() element sets the flow context for %s !",name().c_str());
+    }
+    return 0;
+}
 #endif
 
 CLICK_ENDDECLS
