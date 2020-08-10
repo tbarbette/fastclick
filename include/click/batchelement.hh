@@ -228,13 +228,13 @@ class SimpleBatchElement : public BatchElement { public:
 template <typename T>
 class SimpleElement : public BatchElement { public:
 
-    void push(int port, Packet *p) override final {
+    void push(int port, Packet *p) override {
         p = static_cast<T&>(*this).simple_action(p);
         if (p)
             output(port).push(p);
     }
 
-    Packet* pull(int port) override final {
+    Packet* pull(int port) override  {
         Packet *p = input(port).pull();
         if (p)
             p = static_cast<T&>(*this).simple_action(p);
@@ -242,7 +242,7 @@ class SimpleElement : public BatchElement { public:
     }
 
 #if HAVE_BATCH
-    void push_batch(int port, PacketBatch* head) override final {
+    void push_batch(int port, PacketBatch* head) override  {
         head = _sm_action_batch(head);
         if (head)
             output(port).push_batch(head);
