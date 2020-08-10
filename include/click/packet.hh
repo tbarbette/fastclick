@@ -142,6 +142,7 @@ class Packet { public:
         assert(false);
         return NULL;
     }
+
     void set_buffer_destructor(buffer_destructor_type) {
         click_chatter("ILLEGAL CALL TO set_buffer_destructor");
         assert(false);
@@ -176,6 +177,8 @@ class Packet { public:
     void set_destructor_argument(void* arg) {
         _destructor_argument = arg;
     }
+
+    void delete_buffer(unsigned char* head, unsigned char* end);
 #endif
 
 
@@ -3069,6 +3072,30 @@ WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
     else
         click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
+
+inline void
+Packet::delete_buffer(unsigned char* head, unsigned char* end) {
+    if (_data_packet)
+	_data_packet->kill();
+# if CLICK_USERLEVEL || CLICK_MINIOS
+    else if (_head && _destructor) {
+        if (_destructor != empty_destructor)
+            _destructor(head, end - head, _destructor_argument);
+    } else
+#  if HAVE_NETMAP_PACKET_POOL
+    if (_head && NetmapBufQ::is_valid_netmap_buffer(head)) {
+        NetmapBufQ::local_pool()->insert_p(head);
+    } else
+#  endif
+    if (head) {
+            delete[] head;
+    }
+# elif CLICK_BSDMODULE
+    if (_m)
+	m_freem(_m);
+# endif
+}
+
 
 typedef Packet::PacketType PacketType;
 
