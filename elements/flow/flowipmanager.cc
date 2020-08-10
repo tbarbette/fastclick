@@ -42,7 +42,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
 
     if (Args(conf, this, errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
-        .read_or_set("RESERVE",_reserve, 0)
+        .read_or_set("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, 60)
 #if RTE_VERSION > RTE_VERSION_NUM(18,8,0,0)
         .read_or_set("LF", lf, false)
@@ -87,7 +87,7 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
     if (_verbose)
-     errh->message("Per-flow size is %d", _reserve);
+        errh->message("Per-flow size is %d", _reserve);
     sprintf(buf, "%s", name().c_str());
     hash = rte_hash_create(&hash_params);
     if (!hash)
