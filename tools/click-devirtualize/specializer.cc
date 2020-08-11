@@ -349,6 +349,11 @@ Specializer::create_class(SpecializedClass &spc)
       new_cxxc->find("input_pull")->kill();
     }
 
+
+  if (!new_cxxc->find("push_batch", 3)) {
+    CxxFunction *f = old_cxxc->find("push_batch", 3)
+  }
+
   return true;
 }
 
