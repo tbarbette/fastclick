@@ -42,7 +42,7 @@ class CxxFunction {
   void unkill()				{ _alive = true; }
 
   bool find_expr(const String &) const;
-  bool replace_expr(const String &, const String &, bool full_symbol = true);
+  bool replace_expr(const String &, const String &, bool full_symbol = true, bool all = false);
   bool replace_call(const String &, const String &, Vector<String>& args);
 
   void set_inline();
@@ -83,6 +83,7 @@ class CxxClass {
   void header_text(StringAccum &) const;
   void source_text(StringAccum &) const;
 
+  void print_function_list();
 };
 
 class CxxInfo { public:

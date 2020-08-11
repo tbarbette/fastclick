@@ -148,11 +148,12 @@ Specializer::read_source(ElementTypeInfo &etinfo, ErrorHandler *errh)
 
   // now, read source for the element class's parents
   CxxClass *cxxc = _cxxinfo.find_class(etinfo.cxx_name);
+  cxxc->print_function_list();
   if (cxxc)
     for (int i = 0; i < cxxc->nparents(); i++) {
       const String &p = cxxc->parent(i)->name();
       if (p != "Element")
-	read_source(type_info(p), errh);
+		read_source(type_info(p), errh);
     }
 }
 
@@ -160,6 +161,7 @@ void
 Specializer::check_specialize(int eindex, ErrorHandler *errh)
 {
   int sp = _specialize[eindex];
+    click_chatter("SP state %d",_specials[sp].eindex);
   if (_specials[sp].eindex > SPCE_NOT_DONE)
     return;
   _specials[sp].eindex = SPCE_NOT_SPECIAL;
@@ -186,7 +188,7 @@ Specializer::check_specialize(int eindex, ErrorHandler *errh)
   SpecializedClass &spc = _specials[sp];
   spc.old_click_name = old_eti.click_name;
   spc.eindex = eindex;
-  if (!old_cxxc->find_should_rewrite()) {
+  if (!old_cxxc->find_should_rewrite() && !_do_replace) {
     spc.click_name = spc.old_click_name;
     spc.cxx_name = old_eti.cxx_name;
   } else {
@@ -204,6 +206,7 @@ Specializer::create_class(SpecializedClass &spc)
   if (spc.click_name == spc.old_click_name)
     return false;
 
+  click_chatter("Specializing %s",spc.click_name.c_str());
   // create new C++ class
   const ElementTypeInfo &old_eti = etype_info(eindex);
   CxxClass *old_cxxc = _cxxinfo.find_class(old_eti.cxx_name);
@@ -297,13 +300,13 @@ Specializer::create_class(SpecializedClass &spc)
     bool any_checked_push = false, any_push = false, any_pull = false;
     for (int i = 0; i < old_cxxc->nfunctions(); i++)
       if (old_cxxc->should_rewrite(i)) {
-	const CxxFunction &old_fn = old_cxxc->function(i);
-	if (new_cxxc->find(old_fn.name())) // don't add again
-	  continue;
-	CxxFunction &new_fn = new_cxxc->defun(old_fn);
-    if (_do_inline) {
-        new_fn.set_inline();
-    }
+        const CxxFunction &old_fn = old_cxxc->function(i);
+        if (new_cxxc->find(old_fn.name())) // don't add again
+          continue;
+        CxxFunction &new_fn = new_cxxc->defun(old_fn);
+        if (_do_inline) {
+            new_fn.set_inline();
+        }
 	while (new_fn.replace_expr(ninputs_pat, ninputs_repl)) ;
 	while (new_fn.replace_expr(noutputs_pat, noutputs_repl)) ;
 	while (new_fn.replace_expr(push_pat, push_repl))
@@ -700,7 +703,7 @@ bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to) {
 	  return false;
   bool found = false;
   //click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
-  if (fnt.replace_expr(from, to, true)) {
+  if (fnt.replace_expr(from, to, true, true)) {
 	  found = true;
 	  //click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
   }
@@ -723,13 +726,14 @@ trim_quotes(String s) {
 }
 
 bool
-is_primitive(String str) {
+is_primitive_val(String str) {
     str = str.trim().lower();
     if (str == "true" || str == "false")
         return true;
     for (int i = 0; i < str.length(); i++) {
-        if (!isalpha(str[i]))
+        if (!isdigit(str[i])) {
             return false;
+        }
     }
     return true;
 }
@@ -743,8 +747,11 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
   spc.eindex = SPCE_NOT_DONE;
   _specials.assign(sigs.nsignatures(), spc);
   _specials[0].eindex = SPCE_NOT_SPECIAL;
-  for (int i = 0; i < _nelements; i++)
+  for (int i = 0; i < _nelements; i++) {
+
+    click_chatter("Element %s",_router->element(i)->name().c_str());
     check_specialize(i, errh);
+  }
 
   // actually do the work
   for (int s = 0; s < _specials.size(); s++) {
@@ -752,6 +759,7 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 
   /* Unroll the for loop after rte_eth_rx_burst in FromDPDKDevice */
   if(_do_unroll) {
+      _specials[s].cxxc->print_function_list();
    if (_specials[s].cxxc->find("run_task")) {
                     if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
                       unroll_run_task(_specials[s]);
@@ -786,11 +794,11 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 				while (configure->replace_call(patterns[p].first, patterns[p].second,args)) {
 					  String value;
 					  String param =  trim_quotes(args[0].trim());
-                      bool has_value = true;
+                      bool has_value;
 					  int pos = configline.find_left(param);
                       click_chatter("Param is %s", param.c_str());
 
-                      click_chatter("Config is %s, found at %d", configline.c_str(), pos);
+//                      click_chatter("Config is %s, found at %d", configline.c_str(), pos);
 					  if (pos >= 0) {
 						  pos += param.length();
 						  while (configline[pos] == ' ')
@@ -801,6 +809,7 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 						  while (configline[end] == ' ') end--;
 						  value = configline.substring(pos,end+1 - pos);
 						  click_chatter("Config value is %s",value.c_str());
+                          has_value = true;
 					  } else {
 						  if (args.size() > 2 && args[2].trim()) {
 							  value=args[2].trim();
@@ -812,13 +821,15 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
 
 					  }
                       if (has_value) {
-                          configure->replace_expr("!TEMPVAL!", ", "+args[1].trim()+", \""+value+"\"");
+
+                          click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
+                          configure->replace_expr("!TEMPVAL!", ", "+args[1].trim()+", "+ (is_primitive_val(value)?value:"\""+value+"\""), true, true);
                       } else {
                           click_chatter("No value given");
 					      configure->replace_expr("!TEMPVAL!", "");
                       }
 
-                      if (!has_value || !is_primitive(value)) {
+                      if (!has_value || !is_primitive_val(value)) {
                           args.clear();
                           continue;
                       }

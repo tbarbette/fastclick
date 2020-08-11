@@ -32,7 +32,6 @@ FromDPDKDeviceXCHG::FromDPDKDeviceXCHG() {
 
 FromDPDKDeviceXCHG::~FromDPDKDeviceXCHG() {}
 
-    __thread  WritablePacket* last;
 #ifndef NOXCHG
 
 /**
@@ -231,9 +230,11 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
         *(xchgs++) = xchg; //Set in the user pointer the buffer from the ring
         *xchgs_p = xchgs;
     }
+
     void* xchg_buffer_from_elt(struct rte_mbuf* elt) {
         return rte_pktmbuf_mtod(elt, void*);
     }
+
 # else
 
     inline struct WritablePacket* get_buf(struct xchg* x) {
@@ -299,7 +300,6 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
           SET_PAINT_ANNO(p, iqueue);
         }*/
 
-        last = p;
     }
 
     /**
@@ -330,6 +330,7 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
         WritablePacket* first = (WritablePacket*)xchg;
 	    WritablePacket* next = (WritablePacket*)first->next();
     	*xchgs = next;
+        *(xchgs - 1) = first;
         first->set_data(first->buffer() + RTE_PKTMBUF_HEADROOM);
     }
     
@@ -371,13 +372,13 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
   output_push_batch(0, vect);
 #else
   WritablePacket* head = WritablePacket::pool_prepare_data_burst(_burst);
-  WritablePacket* tail = head;
-  unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)&tail, _burst);
+  WritablePacket* tail[2] = {0,head};
+  unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, (struct xchg**)&(tail[1]), _burst);
   if (n) {
-    WritablePacket::pool_consumed_data_burst(n,tail);
+    WritablePacket::pool_consumed_data_burst(n,tail[1]);
     add_count(n);
     ret = 1;
-    PacketBatch* batch = PacketBatch::make_from_simple_list(head,last,n);
+    PacketBatch* batch = PacketBatch::make_from_simple_list(head,tail[0],n);
     output_push_batch(0, batch);
   }
 #endif

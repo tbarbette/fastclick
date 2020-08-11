@@ -112,11 +112,6 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     return 0;
 }
 
-const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
-{
-    *((FlowControlBlock**)&prev->data_32[2]) = next;
-};
-
 bool FlowIPManager::run_task(Task* t)
 {
     Timestamp recent = Timestamp::recent_steady();
@@ -131,7 +126,7 @@ bool FlowIPManager::run_task(Task* t)
         } else {
             //click_chatter("Cascade %p", prev);
             //No need for lock as we'll be the only one to enqueue there
-            _timer_wheel.schedule_after(prev, _timeout - (recent - prev->lastseen).sec(),setter);
+            _timer_wheel.schedule_after(prev, _timeout - (recent - prev->lastseen).sec(),fim_setter);
         }
         return next;
     });
@@ -173,9 +168,9 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         fcb->data_32[0] = ret;
         if (_timeout) {
             if (_flags) {
-                _timer_wheel.schedule_after_mp(fcb, _timeout, setter);
+                _timer_wheel.schedule_after_mp(fcb, _timeout, fim_setter);
             } else {
-                _timer_wheel.schedule_after(fcb, _timeout, setter);
+                _timer_wheel.schedule_after(fcb, _timeout, fim_setter);
             }
         }
     } else {

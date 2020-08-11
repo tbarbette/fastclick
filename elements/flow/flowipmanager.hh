@@ -14,6 +14,10 @@ CLICK_DECLS
 class DPDKDevice;
 struct rte_hash;
 
+const auto fim_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+{
+    *((FlowControlBlock**)&prev->data_32[2]) = next;
+};
 
 /**
  * FlowIPManager(CAPACITY [, RESERVE])

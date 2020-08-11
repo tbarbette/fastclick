@@ -26,8 +26,8 @@ int
 FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-        .read_or_set_p("CAPACITY", _table_size, 65536)
-        .read_or_set("RESERVE", _reserve, 0)
+        .CLICK_NEVER_REPLACE(read_or_set_p)("CAPACITY", _table_size, 65536)
+        .CLICK_NEVER_REPLACE(read_or_set)("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, -1)
         .complete() < 0)
         return -1;
@@ -96,11 +96,6 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 }
 
 
-const auto setter = [](FlowControlBlock* prev, FlowControlBlock* next)
-{
-        *((FlowControlBlock**)&prev->data_32[2]) = next;
-};
-
 bool FlowIPManagerIMP::run_task(Task* t)
 {
     /*
@@ -168,9 +163,9 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         fcb->data_32[0] = ret;
         if (_timeout > 0) {
             if (_flags) {
-                _timer_wheel.schedule_after_mp(fcb, _timeout, setter);
+                _timer_wheel.schedule_after_mp(fcb, _timeout, fim_setter);
             } else {
-                _timer_wheel.schedule_after(fcb, _timeout, setter);
+                _timer_wheel.schedule_after(fcb, _timeout, fim_setter);
             }
         }
     } else {

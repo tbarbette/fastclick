@@ -118,6 +118,7 @@ Signatures::next_phase(int phase, int eid, Vector<int> &new_sigid,
 		       const ProcessingT &pt, bool do_static)
 {
   ElementT *e = const_cast<ElementT *>(_router->element(eid));
+  click_chatter("Analyzing %s", e->name().c_str());
   int old_sigid = _sigid[eid];
   if (old_sigid == SIG_NOT_SPECIAL
       || (!do_static && _sigs[old_sigid]._connections.size() == 0)) {
@@ -163,6 +164,8 @@ Signatures::next_phase(int phase, int eid, Vector<int> &new_sigid,
     trav = _sigs[trav]._next;
   }
 
+
+  click_chatter("Append %s", e->name().c_str());
   // if not found, append
   _sigs.push_back(SignatureNode(eid));
   SignatureNode &new_node = _sigs.back();

@@ -199,12 +199,14 @@ CxxFunction::find_expr(const String &pattern) const
 }
 
 bool
-CxxFunction::replace_expr(const String &pattern, const String &replacement, bool full_symbol)
+CxxFunction::replace_expr(const String &pattern, const String &replacement, bool full_symbol, bool all)
 {
   int pos1, pos2, match_pos[10], match_len[10];
+  bool done = false;
+again:
   if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, false, full_symbol))
-    return false;
-
+    return done;
+  done = true;
   //fprintf(stderr, ":::::: %s\n", _body.c_str());
 
   StringAccum sa, clean_sa;
@@ -232,6 +234,8 @@ CxxFunction::replace_expr(const String &pattern, const String &replacement, bool
   _body = new_body;
   _clean_body = new_clean_body;
 
+  if (all)
+      goto again;
   //fprintf(stderr, ">>>>>> %s\n", _body.c_str());
   return true;
 }
@@ -398,17 +402,21 @@ CxxClass::find_should_rewrite()
     return false;
 
   static String push_pattern = compile_pattern("output(#0).push(#1)");
+  static String o_push_pattern = compile_pattern("output_push(#0,#1)");
   static String pull_pattern = compile_pattern("input(#0).pull()");
   static String checked_push_pattern = compile_pattern("checked_output_push(#0,#1)");
 
 #if HAVE_BATCH
   static String push_batch_pattern = compile_pattern("output(#0).push_batch(#1)");
+  static String o_push_batch_pattern = compile_pattern("output_push_batch(#0,#1)");
   static String checked_push_batch_pattern = compile_pattern("checked_output_push_batch(#0,#1)");
 #endif
   for (int i = 0; i < nfunctions(); i++) {
     if (_functions[i].find_expr(push_pattern)
+    || _functions[i].find_expr(o_push_pattern)
 #if HAVE_BATCH
     || _functions[i].find_expr(push_batch_pattern)
+    || _functions[i].find_expr(o_push_batch_pattern)
     || _functions[i].find_expr(checked_push_batch_pattern)
 #endif
 	|| _functions[i].find_expr(checked_push_pattern))
@@ -446,6 +454,8 @@ CxxClass::find_should_rewrite()
     }
   }
 
+  if (!any)
+      click_chatter("Shouldn't rewrite %s", name().c_str());
   return any;
 }
 
@@ -660,6 +670,9 @@ skip_balanced_parens(const String &text, int p)
   return p;
 }
 
+/*
+ * Parse functions but ignores declarations
+ */
 int
 CxxInfo::parse_function_definition(const String &text, int fn_start_p,
 				   int paren_p, const String &original,
@@ -704,6 +717,7 @@ CxxInfo::parse_function_definition(const String &text, int fn_start_p,
     if (p > fn_start_p && s[p] == ':') // nested class fns uninteresting
       return close_brace_p;
     class_name = original.substring(p + 1, end_class_name_p - (p + 1));
+    click_chatter("Class name %s", class_name.c_str());
   }
 
   // find return type; skip access control declarations, cut space from end
@@ -754,6 +768,22 @@ CxxInfo::parse_function_definition(const String &text, int fn_start_p,
   return close_brace_p;
 }
 
+int parse_reentrant(String s, int p, char b, char e, int len) {
+    int n = 0;
+    while(1) {
+        p++;
+        if (p == len) {
+            return p;
+        }
+        if (s[p] == b)
+            n++;
+        if (s[p] == e) {
+            n--;
+            if (n == 0) return p +1;
+        }
+    }
+
+}
 int
 CxxInfo::parse_class_definition(const String &text, int p,
 				const String &original)
@@ -778,13 +808,26 @@ CxxInfo::parse_class_definition(const String &text, int p,
       p++;
     if (p > p1 && (p != p1 + 6 || strncmp(s+p1, "public", 6) != 0)) {
       // XXX private or protected inheritance?
+     click_chatter("Parent %s", original.substring(p1, p - p1).c_str());
       CxxClass *parent = make_class(original.substring(p1, p - p1));
       cxxc->add_parent(parent);
+    //Parse template parameters
+    click_chatter("Next char %c/%c", original[p], s[p]);
+      if (s[p] == '<') {
+          int e = parse_reentrant(s, p -1 , '<','>', len);
+          if (e >= len)
+              click_chatter("Malformed template parameters!?");
+
+          click_chatter("Template params %s", original.substring(p + 1, e - p - 2 ).c_str());
+          p = e + 1;
+      }
     }
   }
 
   // parse class body
-  return parse_class(text, p + 1, original, cxxc);
+  int c = parse_class(text, p + 1, original, cxxc);
+  cxxc->print_function_list();
+  return c;
 }
 
 int
@@ -794,7 +837,7 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
   // parse clean_text
   const char *s = text.data();
   int len = text.length();
-
+    click_chatter("Parsing class at %d [%c]",p,text[p]);
   while (1) {
 
     // find first batch
@@ -806,25 +849,31 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
       p++;
 
     //fprintf(stderr, "   %d %c\n", p, s[p]);
-    if (p >= len)
+    if (p >= len) {
+        click_chatter("End");
       return len;
+    }
     else if (s[p] == ';') {
       // uninteresting
       p++;
       continue;
     } else if (s[p] == '}') {
-      //fprintf(stderr, "!!!!!!/\n");
+      fprintf(stderr, " end of class at %d !!!!!!/\n",p+1);
       return p + 1;
     } else if (s[p] == '{') {
       if (p > p1 + 6 && !cxx_class
 	  && (strncmp(s+p1, "class", 5) == 0
 	      || strncmp(s+p1, "struct", 6) == 0)) {
-	// parse class definition
-	p = parse_class_definition(text, p1 + 6, original);
+		// parse class definition
+            click_chatter("Parsing definition at %d", p1 + 6);
+		p = parse_class_definition(text, p1 + 6, original);
+            //      click_chatter("Subclass %s", text.substring(p1+6,p-p1-6).c_str() );
       } else
 	p = skip_balanced_braces(text, p);
-    } else if (s[p] == '(')
+    } else if (s[p] == '(') {
+        click_chatter("Parse fun %s",text.substring(p1,p-p1).c_str());
       p = parse_function_definition(text, p1, p, original, cxx_class);
+    }
 
   }
 }
@@ -904,3 +953,16 @@ CxxInfo::parse_file(const String &original_text, bool header,
     *store_includes = original_text.substring(0, p);
   }
 }
+
+void CxxClass::print_function_list() {
+      click_chatter("Function list:");
+      auto begin = _fn_map.begin();
+      auto end = _fn_map.end();
+      while (begin != end) {
+          click_chatter("FN[%s] %s", (*begin).first.c_str(), _functions[(*begin).second].name().c_str());
+          begin++;
+      }
+      for (int i = 0; i < _functions.size(); i++) {
+          click_chatter("FN[%d] %s", i, _functions[i].name().c_str());
+      }
+  }
