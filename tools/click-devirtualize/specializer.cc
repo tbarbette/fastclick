@@ -260,7 +260,7 @@ Specializer::create_class(SpecializedClass &spc)
 #if HAVE_BATCH
   new_cxxc->defun
     (CxxFunction("output_push_batch", false, "inline void",
-		 (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBacth *p) const"),
+		 (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBatch *p) const"),
 		 "", ""));
 #endif
   new_cxxc->defun
@@ -297,12 +297,18 @@ Specializer::create_class(SpecializedClass &spc)
 #endif
     String pull_pat = compile_pattern("input(#0).pull()");
     String pull_repl = "input_pull(#0)";
-    bool any_checked_push = false, any_push = false, any_pull = false;
+    bool any_checked_push = false, any_push = true, any_pull = false;
+
+    click_chatter("Checking fnts");
     for (int i = 0; i < old_cxxc->nfunctions(); i++)
       if (old_cxxc->should_rewrite(i)) {
         const CxxFunction &old_fn = old_cxxc->function(i);
-        if (new_cxxc->find(old_fn.name())) // don't add again
+
+        click_chatter("Should rewrite %s",old_fn.name().c_str());
+        if (new_cxxc->find(old_fn.name())) { // don't add again
+            click_chatter("Already there");
           continue;
+        }
         CxxFunction &new_fn = new_cxxc->defun(old_fn);
         if (_do_inline) {
             new_fn.set_inline();
@@ -310,25 +316,28 @@ Specializer::create_class(SpecializedClass &spc)
 	while (new_fn.replace_expr(ninputs_pat, ninputs_repl)) ;
 	while (new_fn.replace_expr(noutputs_pat, noutputs_repl)) ;
 	while (new_fn.replace_expr(push_pat, push_repl))
+	      any_push = true;
+        #if HAVE_BATCH
+        while (new_fn.replace_expr(push_batch_pat, push_batch_repl)) {
+                click_chatter("Have push batch");
 	  any_push = true;
-#if HAVE_BATCH
-	while (new_fn.replace_expr(push_batch_pat, push_batch_repl))
-	  any_push = true;
-#endif
+        }
+        #endif
 	while (new_fn.replace_expr(checked_push_pat, checked_push_repl))
 	  any_checked_push = true;
-#if HAVE_BATCH
+        #if HAVE_BATCH
 	while (new_fn.replace_expr(checked_push_batch_pat, checked_push_batch_repl))
 	  any_checked_push = true;
-#endif
+        #endif
 	while (new_fn.replace_expr(pull_pat, pull_repl))
 	  any_pull = true;
-      }
+    }
     if (!any_push && !any_checked_push) {
-      new_cxxc->find("output_push")->kill();
-#if HAVE_BATCH
-      new_cxxc->find("output_push_batch")->kill();
-#endif
+        click_chatter("Killing output push :(");
+        new_cxxc->find("output_push")->kill();
+    #if HAVE_BATCH
+        new_cxxc->find("output_push_batch")->kill();
+    #endif
     }
     if (!any_checked_push) {
       new_cxxc->find("output_push_checked")->kill();
@@ -338,7 +347,7 @@ Specializer::create_class(SpecializedClass &spc)
     }
     if (!any_pull)
       new_cxxc->find("input_pull")->kill();
-  }
+    }
 
   return true;
 }
@@ -649,6 +658,7 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 
 #if HAVE_BATCH
   // create output_push_batch
+  click_chatter("Creating output_push_batch for %s",cxxc->name().c_str());
   if (cxxc->find("output_push_batch")->alive()) {
     StringAccum sa;
     Vector<int> range1, range2;
@@ -691,6 +701,8 @@ Specializer::create_connector_methods(SpecializedClass &spc)
     else
 	sa << "\n  p->kill();\n";
     cxxc->find("output_push_batch_checked")->set_body(sa.take_string());
+  } else {
+      click_chatter("Push batch not alive");
   }
 #endif
 }
