@@ -72,9 +72,10 @@ class CxxClass {
 
   int nfunctions() const		{ return _functions.size(); }
   CxxFunction *find(const String &);
+  CxxFunction *find_in_parent(const String &);
   CxxFunction &function(int i)		{ return _functions[i]; }
 
-  CxxFunction &defun(const CxxFunction &);
+  CxxFunction &defun(const CxxFunction &, const bool &rewrite = false);
   void add_parent(CxxClass *);
 
   bool find_should_rewrite();

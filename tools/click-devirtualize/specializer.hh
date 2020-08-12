@@ -56,7 +56,7 @@ class Specializer { public:
     void output_package(const String &package_name, const String &suffix, StringAccum &, ErrorHandler*);
     void output_new_elementmap(const ElementMap &, ElementMap &, const String &,
 			       const String &requirements) const;
-
+  void do_config_replacement();
   void should_replace(bool do_replace) { _do_replace = do_replace; };
   void should_inline(bool do_inline) { _do_inline = do_inline; };
   void make_static(bool do_static) { _do_static = do_static; };

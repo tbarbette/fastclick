@@ -69,7 +69,7 @@ Specializer::etype_info(int eindex) const
 
 void
 Specializer::add_type_info(const String &click_name, const String &cxx_name,
-			   const String &header_file, const String &source_dir)
+               const String &header_file, const String &source_dir)
 {
   ElementTypeInfo eti;
   eti.click_name = click_name;
@@ -84,7 +84,7 @@ Specializer::add_type_info(const String &click_name, const String &cxx_name,
   if (header_file) {
     int slash = header_file.find_right('/');
     _header_file_map.set(header_file.substring(slash < 0 ? 0 : slash + 1),
-			 i);
+             i);
   }
 }
 
@@ -105,7 +105,7 @@ ElementTypeInfo::locate_header_file(RouterT *for_archive, ErrorHandler *errh)
 
 void
 Specializer::parse_source_file(ElementTypeInfo &etinfo,
-			       bool do_header, String *includes)
+                   bool do_header, String *includes)
 {
   String fn = etinfo.header_file;
   if (!do_header && fn.substring(-3) == ".hh")
@@ -117,11 +117,11 @@ Specializer::parse_source_file(ElementTypeInfo &etinfo,
     if (!etinfo.source_directory && _router->archive_index(fn) >= 0) {
       text = _router->archive(fn).data;
       if (do_header)
-	etinfo.found_header_file = fn;
+    etinfo.found_header_file = fn;
     } else if (String found = clickpath_find_file(fn, 0, etinfo.source_directory)) {
       text = file_string(found);
       if (do_header)
-	etinfo.found_header_file = found;
+    etinfo.found_header_file = found;
     }
 
     _cxxinfo.parse_file(text, do_header, includes);
@@ -153,7 +153,7 @@ Specializer::read_source(ElementTypeInfo &etinfo, ErrorHandler *errh)
     for (int i = 0; i < cxxc->nparents(); i++) {
       const String &p = cxxc->parent(i)->name();
       if (p != "Element")
-		read_source(type_info(p), errh);
+        read_source(type_info(p), errh);
     }
 }
 
@@ -170,7 +170,7 @@ Specializer::check_specialize(int eindex, ErrorHandler *errh)
   ElementTypeInfo &old_eti = etype_info(eindex);
   if (!old_eti.click_name) {
     errh->warning("no information about element class %<%s%>",
-		  _router->etype_name(eindex).c_str());
+          _router->etype_name(eindex).c_str());
     return;
   }
 
@@ -180,7 +180,7 @@ Specializer::check_specialize(int eindex, ErrorHandler *errh)
   CxxClass *old_cxxc = _cxxinfo.find_class(old_eti.cxx_name);
   if (!old_cxxc) {
     errh->warning("C++ class %<%s%> not found for element class %<%s%>",
-		  old_eti.cxx_name.c_str(), old_eti.click_name.c_str());
+          old_eti.cxx_name.c_str(), old_eti.click_name.c_str());
     return;
   }
 
@@ -240,41 +240,54 @@ Specializer::create_class(SpecializedClass &spc)
 
   new_cxxc->defun
     (CxxFunction("class_name", true, "const char *", "() const",
-		 String(" return \"") + spc.click_name + "\"; ", ""));
+         String(" return \"") + spc.click_name + "\"; ", ""));
   new_cxxc->defun
     (CxxFunction("cast", false, "void *", "(const char *n)",
-		 "\n  if (void *v = " + parent_cxx_name + "::cast(n))\n\
+         "\n  if (void *v = " + parent_cxx_name + "::cast(n))\n\
     return v;\n  else if (strcmp(n, \"" + spc.click_name + "\") == 0\n\
-	  || strcmp(n, \"" + old_eti.click_name + "\") == 0)\n\
+      || strcmp(n, \"" + old_eti.click_name + "\") == 0)\n\
     return (Element *)this;\n  else\n    return 0;\n", ""));
 
   // placeholders for input_pull and output_push
   new_cxxc->defun
     (CxxFunction("input_pull", false, "inline Packet *",
-		 (_ninputs[eindex] ? "(int i) const" : "(int) const"),
-		 "", ""));
+         (_ninputs[eindex] ? "(int i) const" : "(int) const"),
+         "", ""));
   new_cxxc->defun
     (CxxFunction("output_push", false, "inline void",
-		 (_noutputs[eindex] ? "(int i, Packet *p) const" : "(int, Packet *p) const"),
-		 "", ""));
+         (_noutputs[eindex] ? "(int i, Packet *p) const" : "(int, Packet *p) const"),
+         "", ""));
 #if HAVE_BATCH
   new_cxxc->defun
     (CxxFunction("output_push_batch", false, "inline void",
-		 (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBatch *p) const"),
-		 "", ""));
+         (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBatch *p) const"),
+         "", ""));
 #endif
   new_cxxc->defun
     (CxxFunction("output_push_checked", false, "inline void",
-		 (_noutputs[eindex] ? "(int i, Packet *p) const" : "(int, Packet *p) const"),
-		 "", ""));
+         (_noutputs[eindex] ? "(int i, Packet *p) const" : "(int, Packet *p) const"),
+         "", ""));
 #if HAVE_BATCH
   new_cxxc->defun
     (CxxFunction("output_push_batch_checked", false, "inline void",
-		 (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBatch *p) const"),
-		 "", ""));
+         (_noutputs[eindex] ? "(int i, PacketBatch *p) const" : "(int, PacketBatch *p) const"),
+         "", ""));
 #endif
   new_cxxc->defun
     (CxxFunction("never_devirtualize", true, "void", "()", "", ""));
+
+
+      //IF IMPROVED
+//      CxxClass* new_cxxc = _specials[s].cxxc;
+      if (!new_cxxc->find("push_batch")) {
+        click_chatter("Class has no push_batch?");
+        CxxFunction* f = new_cxxc->find_in_parent("push_batch");
+
+        if (f)
+            old_cxxc->defun(*f, true);
+        else
+            click_chatter("No parent has push_batch");
+      }
 
   // transfer reachable rewritable functions to new C++ class
   // with pattern replacements
@@ -294,6 +307,9 @@ Specializer::create_class(SpecializedClass &spc)
 #if HAVE_BATCH
     String checked_push_batch_pat = compile_pattern("checked_output_push_batch(#0, #1)");
     String checked_push_batch_repl = compile_pattern("output_push_batch_checked(#0, #1)");
+
+    String sym_checked_push_batch_pat = compile_pattern("checked_output_push_batch");
+    String sym_checked_push_batch_repl = compile_pattern("output_push_batch_checked");
 #endif
     String pull_pat = compile_pattern("input(#0).pull()");
     String pull_repl = "input_pull(#0)";
@@ -313,24 +329,26 @@ Specializer::create_class(SpecializedClass &spc)
         if (_do_inline) {
             new_fn.set_inline();
         }
-	while (new_fn.replace_expr(ninputs_pat, ninputs_repl)) ;
-	while (new_fn.replace_expr(noutputs_pat, noutputs_repl)) ;
-	while (new_fn.replace_expr(push_pat, push_repl))
-	      any_push = true;
+    while (new_fn.replace_expr(ninputs_pat, ninputs_repl)) ;
+    while (new_fn.replace_expr(noutputs_pat, noutputs_repl)) ;
+    while (new_fn.replace_expr(push_pat, push_repl))
+          any_push = true;
         #if HAVE_BATCH
         while (new_fn.replace_expr(push_batch_pat, push_batch_repl)) {
                 click_chatter("Have push batch");
-	  any_push = true;
+      any_push = true;
         }
         #endif
-	while (new_fn.replace_expr(checked_push_pat, checked_push_repl))
-	  any_checked_push = true;
+    while (new_fn.replace_expr(checked_push_pat, checked_push_repl))
+      any_checked_push = true;
         #if HAVE_BATCH
-	while (new_fn.replace_expr(checked_push_batch_pat, checked_push_batch_repl))
-	  any_checked_push = true;
+    while (new_fn.replace_expr(checked_push_batch_pat, checked_push_batch_repl))
+      any_checked_push = true;
+    while (new_fn.replace_expr(sym_checked_push_batch_pat, sym_checked_push_batch_repl,true))
+      any_checked_push = true;
         #endif
-	while (new_fn.replace_expr(pull_pat, pull_repl))
-	  any_pull = true;
+    while (new_fn.replace_expr(pull_pat, pull_repl))
+      any_pull = true;
     }
     if (!any_push && !any_checked_push) {
         click_chatter("Killing output push :(");
@@ -349,14 +367,6 @@ Specializer::create_class(SpecializedClass &spc)
       new_cxxc->find("input_pull")->kill();
     }
 
-/*
-  if (!new_cxxc->find("push_batch", 3)) {
-    CxxFunction f = old_cxxc->find("push_batch", 3);
-    if (!f)
-        //TODO search parents
-    new_cxx->defun(f);
-  }
-*/
   return true;
 }
 
@@ -370,14 +380,14 @@ Specializer::do_simple_action(SpecializedClass &spc)
 
   spc.cxxc->defun
     (CxxFunction("smaction", false, "inline Packet *", simple_action->args(),
-		 simple_action->body(), simple_action->clean_body()));
+         simple_action->body(), simple_action->clean_body()));
   spc.cxxc->defun
     (CxxFunction("push", false, "void", "(int port, Packet *p)",
-		 "\n  if (Packet *q = smaction(p))\n\
+         "\n  if (Packet *q = smaction(p))\n\
     output_push(port, q);\n", ""));
   spc.cxxc->defun
     (CxxFunction("pull", false, "Packet *", "(int port)",
-		 "\n  Packet *p = input_pull(port);\n\
+         "\n  Packet *p = input_pull(port);\n\
   return (p ? smaction(p) : 0);\n", ""));
 
 #if HAVE_BATCH
@@ -385,18 +395,18 @@ Specializer::do_simple_action(SpecializedClass &spc)
   if (!simple_action_batch) {
      click_chatter("Auto-generating simple_action_batch for class %s", spc.old_click_name.c_str());
      spc.cxxc->defun
-	   (CxxFunction("smactionbatch", false, "inline PacketBatch *", "(PacketBatch *batch)",
-		 "EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet*){});return batch;", ""));
+       (CxxFunction("smactionbatch", false, "inline PacketBatch *", "(PacketBatch *batch)",
+         "EXECUTE_FOR_EACH_PACKET_DROPPABLE(smaction, batch, [](Packet*){});return batch;", ""));
   } else {
-	  simple_action_batch->kill();
-	  spc.cxxc->defun
-	    (CxxFunction("smactionbatch", false, "inline PacketBatch *", simple_action_batch->args(),
-		 simple_action_batch->body(), simple_action_batch->clean_body()));
+      simple_action_batch->kill();
+      spc.cxxc->defun
+        (CxxFunction("smactionbatch", false, "inline PacketBatch *", simple_action_batch->args(),
+         simple_action_batch->body(), simple_action_batch->clean_body()));
   }
 
   spc.cxxc->defun
     (CxxFunction("push_batch", false, "inline void", "(int port, PacketBatch *batch)",
-		 "\n  if (PacketBatch *nbatch = smactionbatch(batch))\n\
+         "\n  if (PacketBatch *nbatch = smactionbatch(batch))\n\
     output_push_batch(port, nbatch);\n", ""));
   spc.cxxc->find("output_push_batch")->unkill();
 #endif
@@ -589,21 +599,21 @@ Specializer::create_connector_methods(SpecializedClass &spc)
     Vector<int> range1, range2;
     for (int i = 0; i < _ninputs[eindex]; i++)
       if (i > 0 && input_class[i] == input_class[i-1]
-	  && input_port[i] == input_port[i-1])
-	range2.back() = i;
+      && input_port[i] == input_port[i-1])
+    range2.back() = i;
       else {
-	range1.push_back(i);
-	range2.push_back(i);
+    range1.push_back(i);
+    range2.push_back(i);
       }
     for (int i = 0; i < range1.size(); i++) {
       int r1 = range1[i], r2 = range2[i];
       if (!input_class[r1])
-	continue;
+    continue;
       sa << "\n  ";
       if (r1 == r2)
-	sa << "if (i == " << r1 << ") ";
+    sa << "if (i == " << r1 << ") ";
       else
-	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
+    sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
       if(!_do_static) {
         sa << "return ((" << input_class[r1] << " *)input(i).element())->" 
         << input_class[r1] << "::pull(" << input_port[r1] << ");";
@@ -613,9 +623,9 @@ Specializer::create_connector_methods(SpecializedClass &spc)
       }
     }
     if (_ninputs[eindex])
-	sa << "\n  return input(i).pull();\n";
+    sa << "\n  return input(i).pull();\n";
     else
-	sa << "\n  assert(0);\n  return 0;\n";
+    sa << "\n  assert(0);\n  return 0;\n";
     cxxc->find("input_pull")->set_body(sa.take_string());
   }
 
@@ -625,21 +635,21 @@ Specializer::create_connector_methods(SpecializedClass &spc)
     Vector<int> range1, range2;
     for (int i = 0; i < _noutputs[eindex]; i++)
       if (i > 0 && output_class[i] == output_class[i-1]
-	  && output_port[i] == output_port[i-1])
-	range2.back() = i;
+      && output_port[i] == output_port[i-1])
+    range2.back() = i;
       else {
-	range1.push_back(i);
-	range2.push_back(i);
+    range1.push_back(i);
+    range2.push_back(i);
       }
     for (int i = 0; i < range1.size(); i++) {
       int r1 = range1[i], r2 = range2[i];
       if (!output_class[r1])
-	continue;
+    continue;
       sa << "\n  ";
       if (r1 == r2)
-	sa << "if (i == " << r1 << ") ";
+    sa << "if (i == " << r1 << ") ";
       else
-	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
+    sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
   if(!_do_static) {
     sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
     << output_class[r1] << "::push(" << output_port[r1]
@@ -650,17 +660,17 @@ Specializer::create_connector_methods(SpecializedClass &spc)
   }
     }
     if (_noutputs[eindex])
-	sa << "\n  output(i).push(p);\n";
+    sa << "\n  output(i).push(p);\n";
     else
-	sa << "\n  assert(0);\n";
+    sa << "\n  assert(0);\n";
     cxxc->find("output_push")->set_body(sa.take_string());
 
     sa.clear();
     if (_noutputs[eindex])
-	sa << "\n  if (i < " << _noutputs[eindex] << ")\n"
-	   << "    output_push(i, p);\n  else\n    p->kill();\n";
+    sa << "\n  if (i < " << _noutputs[eindex] << ")\n"
+       << "    output_push(i, p);\n  else\n    p->kill();\n";
     else
-	sa << "\n  p->kill();\n";
+    sa << "\n  p->kill();\n";
     cxxc->find("output_push_checked")->set_body(sa.take_string());
   }
 
@@ -672,21 +682,21 @@ Specializer::create_connector_methods(SpecializedClass &spc)
     Vector<int> range1, range2;
     for (int i = 0; i < _noutputs[eindex]; i++)
       if (i > 0 && output_class[i] == output_class[i-1]
-	  && output_port[i] == output_port[i-1])
-	range2.back() = i;
+      && output_port[i] == output_port[i-1])
+    range2.back() = i;
       else {
-	range1.push_back(i);
-	range2.push_back(i);
+    range1.push_back(i);
+    range2.push_back(i);
       }
     for (int i = 0; i < range1.size(); i++) {
       int r1 = range1[i], r2 = range2[i];
       if (!output_class[r1])
-	continue;
+    continue;
       sa << "\n  ";
       if (r1 == r2)
-	sa << "if (i == " << r1 << ") ";
+    sa << "if (i == " << r1 << ") ";
       else
-	sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
+    sa << "if (i >= " << r1 << " && i <= " << r2 << ") ";
   if(!_do_static) {
     sa << "{ ((" << output_class[r1] << " *)output(i).element())->"
     << output_class[r1] << "::push_batch(" << output_port[r1]
@@ -697,17 +707,17 @@ Specializer::create_connector_methods(SpecializedClass &spc)
   }
     }
     if (_noutputs[eindex])
-	sa << "\n  output(i).push_batch(p);\n";
+    sa << "\n  output(i).push_batch(p);\n";
     else
-	sa << "\n  assert(0);\n";
+    sa << "\n  assert(0);\n";
     cxxc->find("output_push_batch")->set_body(sa.take_string());
 
     sa.clear();
     if (_noutputs[eindex])
-	sa << "\n  if (i < " << _noutputs[eindex] << ")\n"
-	   << "    output_push_batch(i, p);\n  else\n    p->kill();\n";
+    sa << "\n  if (i < " << _noutputs[eindex] << ")\n"
+       << "    output_push_batch(i, p);\n  else\n    p->kill();\n";
     else
-	sa << "\n  p->kill();\n";
+    sa << "\n  p->kill();\n";
     cxxc->find("output_push_batch_checked")->set_body(sa.take_string());
   } else {
       click_chatter("Push batch not alive");
@@ -718,31 +728,31 @@ Specializer::create_connector_methods(SpecializedClass &spc)
 static
 bool do_replacement(CxxFunction &fnt, CxxClass *cxxc, String from, String to) {
   if (!fnt.alive())
-	  return false;
+      return false;
   if (fnt.name() == "add_handlers" ||fnt.name() == "configure")
-	  return false;
+      return false;
   bool found = false;
   //click_chatter("Replacing '%s' per '%s' in fnt %s",from.c_str(),to.c_str(), fnt.name().c_str());
   if (fnt.replace_expr(from, to, true, true)) {
-	  found = true;
-	  //click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
+      found = true;
+      //click_chatter("CONST REPLACEMENT FOUND ! %s", fnt.body().c_str());
   }
   if (found)
-	 cxxc->defun(fnt);
+     cxxc->defun(fnt);
   return found;
 }
 
 static String
 trim_quotes(String s) {
-	int b = 0;
-	int e = s.length() - 1;
-	while (b <= e && s[b] == '"') {
-		b++;
-	}
-	while (e >=b && s[e] == '"') {
-		e--;
-	}
-	return s.substring(b, e);
+    int b = 0;
+    int e = s.length() - 1;
+    while (b <= e && s[b] == '"') {
+        b++;
+    }
+    while (e >=b && s[e] == '"') {
+        e--;
+    }
+    return s.substring(b, e);
 }
 
 bool
@@ -768,7 +778,6 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
   _specials.assign(sigs.nsignatures(), spc);
   _specials[0].eindex = SPCE_NOT_SPECIAL;
   for (int i = 0; i < _nelements; i++) {
-
     click_chatter("Element %s",_router->element(i)->name().c_str());
     check_specialize(i, errh);
   }
@@ -777,76 +786,97 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
   for (int s = 0; s < _specials.size(); s++) {
     if (create_class(_specials[s])) {
 
-  /* Unroll the for loop after rte_eth_rx_burst in FromDPDKDevice */
-  if(_do_unroll) {
-      _specials[s].cxxc->print_function_list();
-   if (_specials[s].cxxc->find("run_task")) {
-                    if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
-                      unroll_run_task(_specials[s]);
-                    }
-                  }
-  } else if (_do_switch) {
-    /* Duplicate the loop for different switch-cases */
-   if (_specials[s].cxxc->find("run_task")) {
-                    if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
-                      switch_run_task(_specials[s]);
-                    }
-                  }
-  } else if (_do_jmps) {
-    /* Duplicate the loop for different computed jmp labels */
-   if (_specials[s].cxxc->find("run_task")) {
-                    if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
-                      computed_jmps_run_task(_specials[s]);
-                    }
-                  }
+      /* Unroll the for loop after rte_eth_rx_burst in FromDPDKDevice */
+      if(_do_unroll) {
+          _specials[s].cxxc->print_function_list();
+       if (_specials[s].cxxc->find("run_task")) {
+                        if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
+                          unroll_run_task(_specials[s]);
+                        }
+                      }
+      } else if (_do_switch) {
+        /* Duplicate the loop for different switch-cases */
+       if (_specials[s].cxxc->find("run_task")) {
+                        if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
+                          switch_run_task(_specials[s]);
+                        }
+                      }
+      } else if (_do_jmps) {
+        /* Duplicate the loop for different computed jmp labels */
+       if (_specials[s].cxxc->find("run_task")) {
+                        if(_specials[s].cxxc->name().find_left("FromDPDKDevice")>=0) {
+                          computed_jmps_run_task(_specials[s]);
+                        }
+                      }
+      }
+      if (_specials[s].cxxc->find("simple_action") || _specials[s].cxxc->find("simple_action_batch"))
+        do_simple_action(_specials[s]);
+
+    }
   }
 
-	CxxClass* original = _specials[s].cxxc->parent(0);
-	/*for (int j = 0; j < original->nfunctions(); j++) {
-		click_chatter("CLass %s fnt %s",original->name().c_str(), original->function(j).name().c_str());
-	}*/
-	CxxFunction* configure = original->find("configure");
-	if (configure && _do_replace) {
-		Vector<String> args;
-		//click_chatter("Configure found  %s!",configure->body().c_str());
-		String configline = sigs.router()->element(_specials[s].eindex)->config();
-		for (int p =0; p < patterns.size(); p++) {
-				while (configure->replace_call(patterns[p].first, patterns[p].second,args)) {
-					  String value;
-					  String param =  trim_quotes(args[0].trim());
+  for (int s = 0; s < _specials.size(); s++)
+    if (_specials[s].special())
+      create_connector_methods(_specials[s]);
+
+
+  do_config_replacement();
+}
+
+void
+Specializer::do_config_replacement() {
+
+  for (int s = 0; s < _specials.size(); s++) {
+
+    if (!_specials[s].special())
+        continue;
+    CxxClass* original = _specials[s].cxxc->parent(0);
+    /*for (int j = 0; j < original->nfunctions(); j++) {
+        click_chatter("CLass %s fnt %s",original->name().c_str(), original->function(j).name().c_str());
+    }*/
+    click_chatter("Replacing in %s", _specials[s].cxxc->name().c_str());
+    CxxFunction* configure = original->find("configure");
+    if (configure && _do_replace) {
+        Vector<String> args;
+        //click_chatter("Configure found  %s!",configure->body().c_str());
+        String configline = _router->element(_specials[s].eindex)->config();
+        for (int p =0; p < patterns.size(); p++) {
+                while (configure->replace_call(patterns[p].first, patterns[p].second,args)) {
+                      String value;
+                      String param =  trim_quotes(args[0].trim());
                       bool has_value;
-					  int pos = configline.find_left(param);
+                      int pos = configline.find_left(param);
                       click_chatter("Param is %s", param.c_str());
 
 //                      click_chatter("Config is %s, found at %d", configline.c_str(), pos);
-					  if (pos >= 0) {
-						  pos += param.length();
-						  while (configline[pos] == ' ')
-							  pos++;
-						  int end = pos + 1;
-						  while (configline[end] != ',' && configline[end] != ')') end++;
-						  end -= 1;
-						  while (configline[end] == ' ') end--;
-						  value = configline.substring(pos,end+1 - pos);
-						  click_chatter("Config value is %s",value.c_str());
+                      if (pos >= 0) {
+                          pos += param.length();
+                          while (configline[pos] == ' ')
+                              pos++;
+                          int end = pos + 1;
+                          while (configline[end] != ',' && configline[end] != ')') end++;
+                          end -= 1;
+                          while (configline[end] == ' ') end--;
+                          value = configline.substring(pos,end+1 - pos);
+                          click_chatter("Config value is %s",value.c_str());
                           has_value = true;
-					  } else {
-						  if (args.size() > 2 && args[2].trim()) {
-							  value=args[2].trim();
-						      click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
-						  } else {
-							  click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
+                      } else {
+                          if (args.size() > 2 && args[2].trim()) {
+                              value=args[2].trim();
+                              click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
+                          } else {
+                              click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
                               has_value = false;
-						  }
+                          }
 
-					  }
+                      }
                       if (has_value) {
 
                           click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
                           configure->replace_expr("!TEMPVAL!", ", "+args[1].trim()+", "+ (is_primitive_val(value)?value:"\""+value+"\""), true, true);
                       } else {
                           click_chatter("No value given");
-					      configure->replace_expr("!TEMPVAL!", "");
+                          configure->replace_expr("!TEMPVAL!", "");
                       }
 
                       if (!has_value || !is_primitive_val(value)) {
@@ -855,36 +885,29 @@ Specializer::specialize(const Signatures &sigs, ErrorHandler *errh)
                       }
 
                     click_chatter("Replacing occurences of %s", args[1].trim().c_str());
-					  //Replace in specialized code
-					  for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
-						  CxxFunction &fnt = _specials[s].cxxc->function(f);
-						  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
-					  }
+                      //Replace in specialized code
+                      for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
+                          CxxFunction &fnt = _specials[s].cxxc->function(f);
+                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
+                      }
 
-					  //Replace in original class code
-					  for (int f = 0; f < original->nfunctions(); f++) {
-						  CxxFunction &fnt = original->function(f);
-						  if (&fnt == configure)
-							  continue;
-						  CxxFunction *overriden = 0;
-						  if ((overriden = _specials[s].cxxc->find(fnt.name())))
-							  fnt = *overriden;
-						  do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
-					  }
-					  args.clear();
-				}
-				_specials[s].cxxc->defun(*configure);
-				//click_chatter("Configure changed  %s!",configure->body().c_str());
-		}
-	}
-	if (_specials[s].cxxc->find("simple_action"))
-		do_simple_action(_specials[s]);
+                      //Replace in original class code
+                      for (int f = 0; f < original->nfunctions(); f++) {
+                          CxxFunction &fnt = original->function(f);
+                          if (&fnt == configure)
+                              continue;
+                          CxxFunction *overriden = 0;
+                          if ((overriden = _specials[s].cxxc->find(fnt.name())))
+                              fnt = *overriden;
+                          do_replacement(fnt, _specials[s].cxxc, args[1].trim(), value);
+                      }
+                      args.clear();
+                }
+                _specials[s].cxxc->defun(*configure);
+                //click_chatter("Configure changed  %s!",configure->body().c_str());
+        }
     }
   }
-
-  for (int s = 0; s < _specials.size(); s++)
-    if (_specials[s].special())
-      create_connector_methods(_specials[s]);
 }
 
 void
@@ -923,7 +946,7 @@ Specializer::output_includes(ElementTypeInfo &eti, StringAccum &out)
       /* nada */;
     if (next + 8 < len && strncmp(s + next + 1, "#define", 7) == 0) {
       for (p = next + 8; p < len && s[p] != '\n'; p++)
-	/* nada */;
+    /* nada */;
     }
   }
 
@@ -941,40 +964,40 @@ Specializer::output_includes(ElementTypeInfo &eti, StringAccum &out)
 
       // skip space after '#'
       for (p++; p < p2 && isspace((unsigned char) s[p]); p++)
-	/* nada */;
+    /* nada */;
 
       // check for '#include'
       if (p + 7 < p2 && strncmp(s+p, "include", 7) == 0) {
 
-	// find what is "#include"d
-	for (p += 7; p < p2 && isspace((unsigned char) s[p]); p++)
-	  /* nada */;
+    // find what is "#include"d
+    for (p += 7; p < p2 && isspace((unsigned char) s[p]); p++)
+      /* nada */;
 
-	// interested in "user includes", not <system includes>
-	if (p < p2 && s[p] == '\"') {
-	  int left = p + 1;
-	  for (p++; p < p2 && s[p] != '\"'; p++)
-	    /* nada */;
-	  String include = includes.substring(left, p - left);
-	  int include_index = _header_file_map.get(include);
-	  if (include_index >= 0) {
-	    if (!_etinfo[include_index].found_header_file)
-	      _etinfo[include_index].locate_header_file(_router, ErrorHandler::default_handler());
-	    out << "#include \"" << _etinfo[include_index].found_header_file << "\"\n";
-	    p = p2 + 1;
-	    continue;		// don't use previous #include text
-	  } else if (left + 1 < p && s[left] != '/' && eti.found_header_file) {
-	      const char *fhf_begin = eti.found_header_file.begin();
-	      const char *fhf_end = eti.found_header_file.end();
-	      while (fhf_begin < fhf_end && fhf_end[-1] != '/')
-		  fhf_end--;
-	      if (fhf_begin < fhf_end) {
-		  out << "#include \"" << eti.found_header_file.substring(fhf_begin, fhf_end) << include << "\"\n";
-		  p = p2 + 1;
-		  continue;	// don't use previous #include text
-	      }
-	  }
-	}
+    // interested in "user includes", not <system includes>
+    if (p < p2 && s[p] == '\"') {
+      int left = p + 1;
+      for (p++; p < p2 && s[p] != '\"'; p++)
+        /* nada */;
+      String include = includes.substring(left, p - left);
+      int include_index = _header_file_map.get(include);
+      if (include_index >= 0) {
+        if (!_etinfo[include_index].found_header_file)
+          _etinfo[include_index].locate_header_file(_router, ErrorHandler::default_handler());
+        out << "#include \"" << _etinfo[include_index].found_header_file << "\"\n";
+        p = p2 + 1;
+        continue;        // don't use previous #include text
+      } else if (left + 1 < p && s[left] != '/' && eti.found_header_file) {
+          const char *fhf_begin = eti.found_header_file.begin();
+          const char *fhf_end = eti.found_header_file.end();
+          while (fhf_begin < fhf_end && fhf_end[-1] != '/')
+          fhf_end--;
+          if (fhf_begin < fhf_end) {
+          out << "#include \"" << eti.found_header_file.substring(fhf_begin, fhf_end) << include << "\"\n";
+          p = p2 + 1;
+          continue;    // don't use previous #include text
+          }
+      }
+    }
       }
 
     }
@@ -995,9 +1018,9 @@ Specializer::output(StringAccum& out_header, StringAccum& out)
     if (spc.eindex >= 0) {
       ElementTypeInfo &eti = etype_info(spc.eindex);
       if (eti.found_header_file)
-	out_header << "#include \"" << eti.found_header_file << "\"\n";
+    out_header << "#include \"" << eti.found_header_file << "\"\n";
       if (spc.special())
-	spc.cxxc->header_text(out_header);
+    spc.cxxc->header_text(out_header);
     }
   }
 
@@ -1017,8 +1040,8 @@ Specializer::output_package(const String &package_name, const String &suffix, St
 {
     StringAccum elem2package, cmd_sa;
     for (int i = 0; i < _specials.size(); i++)
-	if (_specials[i].special())
-	    elem2package <<  "-\t\"" << package_name << suffix << ".hh\"\t" << _specials[i].cxx_name << '-' << _specials[i].click_name << '\n';
+    if (_specials[i].special())
+        elem2package <<  "-\t\"" << package_name << suffix << ".hh\"\t" << _specials[i].cxx_name << '-' << _specials[i].click_name << '\n';
     String click_buildtool_prog = clickpath_find_file("click-buildtool", "bin", CLICK_BINDIR, errh);
     if (!_do_static) {
       cmd_sa << click_buildtool_prog << " elem2package " << package_name;
@@ -1030,17 +1053,17 @@ Specializer::output_package(const String &package_name, const String &suffix, St
 
 void
 Specializer::output_new_elementmap(const ElementMap &full_em, ElementMap &em,
-				   const String &filename, const String &requirements) const
+                   const String &filename, const String &requirements) const
 {
     for (int i = 0; i < _specials.size(); i++)
-	if (_specials[i].special()) {
-	    Traits e = full_em.traits(_specials[i].old_click_name);
-	    e.name = _specials[i].click_name;
-	    e.cxx = _specials[i].cxx_name;
-	    e.header_file = filename + ".hh";
-	    e.source_file = filename + ".cc";
-	    e.requirements = requirements + _specials[i].old_click_name;
-	    e.provisions = String();
-	    em.add(e);
-	}
+    if (_specials[i].special()) {
+        Traits e = full_em.traits(_specials[i].old_click_name);
+        e.name = _specials[i].click_name;
+        e.cxx = _specials[i].cxx_name;
+        e.header_file = filename + ".hh";
+        e.source_file = filename + ".cc";
+        e.requirements = requirements + _specials[i].old_click_name;
+        e.provisions = String();
+        em.add(e);
+    }
 }

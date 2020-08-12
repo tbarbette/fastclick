@@ -303,11 +303,13 @@ CxxClass::add_parent(CxxClass *cxx)
 }
 
 CxxFunction &
-CxxClass::defun(const CxxFunction &fn)
+CxxClass::defun(const CxxFunction &fn, const bool &rewrite)
 {
 	for (int i = 0; i < _functions.size(); i++) {
 		if (_functions[i].name() == fn.name()) {
 			_functions[i] = fn;
+              if (rewrite)
+               _should_rewrite[i] = true;
 			return _functions[i];
 		}
 	}
@@ -315,6 +317,8 @@ CxxClass::defun(const CxxFunction &fn)
   _functions.push_back(fn);
   _fn_map.set(fn.name(), which);
   _functions.back().unkill();
+  if (rewrite)
+      _should_rewrite[which] = true;
   return _functions.back();
 }
 
@@ -965,4 +969,18 @@ void CxxClass::print_function_list() {
       for (int i = 0; i < _functions.size(); i++) {
           click_chatter("FN[%d] %s", i, _functions[i].name().c_str());
       }
-  }
+}
+
+CxxFunction*
+CxxClass::find_in_parent(const String& name) {
+     for (int i = 0; i < nparents(); i++) {
+         click_chatter("Searching in %s", parent(i)->name().c_str());
+         parent(i)->print_function_list();
+        CxxFunction* f = parent(i)->find(name);
+        if (!f)
+            f = parent(i)->find_in_parent(name);
+        if (f)
+            return f;
+     }
+     return 0;
+}
