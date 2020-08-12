@@ -164,7 +164,7 @@ public:
 
 
 
-    virtual PacketBatch* pull_batch(int port, unsigned max) override final {
+    virtual PacketBatch* pull_batch(int port, unsigned max) override {
         click_chatter("ERROR : Flow Elements do not support pull");
         return 0;
     }
@@ -250,7 +250,7 @@ public :
         return fcb_data_for(fcb_stack);
     }
 
-	void push_batch(int port,PacketBatch* head) final {
+	void push_batch(int port, PacketBatch* head) {
 			push_flow(port, fcb_data(), head);
 	};
 	virtual void push_flow(int port, T* flowdata, PacketBatch* head) = 0;
@@ -314,7 +314,7 @@ public :
             my_fcb->previous_fnt(fcb, my_fcb->previous_thunk);
     }
 
-    void push_batch(int port,PacketBatch* head) final {
+    void push_batch(int port,PacketBatch* head) {
          auto my_fcb = my_fcb_data();
          if (!my_fcb->seen) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {

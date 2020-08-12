@@ -97,7 +97,8 @@ compile_pattern(const String &pattern0)
  * Find an expression in the function
  * @args pattern A symbol to search for
  * @args pos1 Start position of the pattern if found
- * @arfs pos2 End position of the pattern if found
+ * @args pos2 End position of the pattern if found
+ * @args allow_call Allow calls to functions
  * @args full_symbol Only match if pattern is the full symbol, eg "n" will not
  *       be a match in "_n"
  *
@@ -112,7 +113,6 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
   const char *ts = _clean_body.data();
   int tpos = 0;
   int tlen = _clean_body.length();
-
   while (tpos < tlen) {
 
     // fast loop: look for occurrences of first character in pattern
@@ -206,6 +206,10 @@ CxxFunction::replace_expr(const String &pattern, const String &replacement, bool
 again:
   if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, false, full_symbol))
     return done;
+  //XXX horrible bugfix
+  if (pos2 -pos1 == 1 && pattern.length() == 1)
+     if (_clean_body[pos1] != pattern[0])
+         return done;
   done = true;
   //fprintf(stderr, ":::::: %s\n", _body.c_str());
 
@@ -297,9 +301,12 @@ CxxClass::CxxClass(const String &name)
 }
 
 void
-CxxClass::add_parent(CxxClass *cxx)
+CxxClass::add_parent(CxxClass *cxx,const String str)
 {
-  _parents.push_back(cxx);
+    ParentalLink l;
+    l.parent = cxx;
+    l.template_params = str;
+  _parents.push_back(l);
 }
 
 CxxFunction &
@@ -317,6 +324,8 @@ CxxClass::defun(const CxxFunction &fn, const bool &rewrite)
   _functions.push_back(fn);
   _fn_map.set(fn.name(), which);
   _functions.back().unkill();
+  if (_should_rewrite.size() < which+1)
+    _should_rewrite.resize(which + 1);
   if (rewrite)
       _should_rewrite[which] = true;
   return _functions.back();
@@ -471,7 +480,7 @@ CxxClass::header_text(StringAccum &sa) const
     sa << " : ";
     for (int i = 0; i < _parents.size(); i++) {
       if (i) sa << ", ";
-      sa << "public " << _parents[i]->name();
+      sa << "public " << _parents[i].parent->name();
     }
   }
   sa << " {\n public:\n";
@@ -694,8 +703,15 @@ CxxInfo::parse_function_definition(const String &text, int fn_start_p,
   }
   // if open brace is not there, a function declaration or something similar;
   // return
-  if (p >= len || s[p] != '{')
-    return p;
+  if ( p < len + 5 && strncmp(s+p, "final", 5) == 0) {
+      p+= 5;
+     while (p < len && isspace((unsigned char) s[p]))
+        p++;
+  }
+  if (p >= len || s[p] != '{') {
+      click_chatter("No body :(");
+      return p;
+  }
 
   // save boundaries of function body
   int open_brace_p = p;
@@ -766,7 +782,8 @@ CxxInfo::parse_function_definition(const String &text, int fn_start_p,
       (CxxFunction(fn_name, !class_name, ret_type, args,
 		   original.substring(body_pos, body_len),
 		   text.substring(body_pos, body_len)));
-  }
+  } else
+      click_chatter("Not relevant:(");
 
   // done
   return close_brace_p;
@@ -790,7 +807,7 @@ int parse_reentrant(String s, int p, char b, char e, int len) {
 }
 int
 CxxInfo::parse_class_definition(const String &text, int p,
-				const String &original)
+				const String &original, CxxClass * &cxxc)
 {
   // find class name
   const char *s = text.data();
@@ -801,7 +818,7 @@ CxxInfo::parse_class_definition(const String &text, int p,
   while (p < len && (isalnum((unsigned char) s[p]) || s[p] == '_'))
     p++;
   String class_name = original.substring(name_start_p, p - name_start_p);
-  CxxClass *cxxc = make_class(class_name);
+  cxxc = make_class(class_name);
 
   // parse superclasses
   while (p < len && s[p] != '{') {
@@ -814,17 +831,19 @@ CxxInfo::parse_class_definition(const String &text, int p,
       // XXX private or protected inheritance?
      click_chatter("Parent %s", original.substring(p1, p - p1).c_str());
       CxxClass *parent = make_class(original.substring(p1, p - p1));
-      cxxc->add_parent(parent);
     //Parse template parameters
-    click_chatter("Next char %c/%c", original[p], s[p]);
+      String params = "";
       if (s[p] == '<') {
           int e = parse_reentrant(s, p -1 , '<','>', len);
           if (e >= len)
               click_chatter("Malformed template parameters!?");
 
-          click_chatter("Template params %s", original.substring(p + 1, e - p - 2 ).c_str());
+          params = original.substring(p + 1, e - p - 2 );
+          click_chatter("Template params '%s'", params.c_str());
           p = e + 1;
       }
+
+      cxxc->add_parent(parent, params);
     }
   }
 
@@ -865,21 +884,33 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
       fprintf(stderr, " end of class at %d !!!!!!/\n",p+1);
       return p + 1;
     } else if (s[p] == '{') {
+
+        CxxClass* child_cxx = 0;
       if (p > p1 + 6 && !cxx_class
 	  && (strncmp(s+p1, "class", 5) == 0
 	      || strncmp(s+p1, "struct", 6) == 0)) {
 		// parse class definition
             click_chatter("Parsing definition at %d of %s", p1 + 6, text.substring(p1+6, 20).c_str());
-		p = parse_class_definition(text, p1 + 6, original);
+		p = parse_class_definition(text, p1 + 6, original, child_cxx);
             //      click_chatter("Subclass %s", text.substring(p1+6,p-p1-6).c_str() );
       } else if (p > p1 + 8 && !cxx_class
 	  && (strncmp(s+p1, "template", 8) == 0)) {
 
-        click_chatter("Parsing template definition at %d of %s", p1, text.substring(p1, 30).c_str());
-        p1 = parse_reentrant(s, p1+7 , '<','>', len);
-        while (p1 < len && isspace((unsigned char) s[p1]))
-         p1++;
-		p = parse_class_definition(s, p1 + 6, original);
+        click_chatter("Parsing template definition at %d of %s", p1, text.substring(p1, text.substring(p1).find_left('\n')).c_str());
+        int p2 = p1+8;
+
+        while (p2 < len && isspace((unsigned char) s[p2])) p2++;
+        p1 = p2;
+        p2 = parse_reentrant(s, p2 - 1 , '<','>', len);
+        String tmpl =  text.substring(p1 + 1, p2 - p1 -2);
+        p1 = p2;
+        while (p1 < len && isspace((unsigned char) s[p1])) p1++;
+		p = parse_class_definition(s, p1 + 6, original, child_cxx);
+        if (child_cxx) {
+            click_chatter("Class %s had tmpl param %s", child_cxx->name().c_str(), tmpl.c_str());
+            child_cxx->set_template(tmpl);;
+        }
+
             //      click_chatter("Subclass %s", text.substring(p1+6,p-p1-6).c_str() );
       } else
 
@@ -982,15 +1013,44 @@ void CxxClass::print_function_list() {
 }
 
 CxxFunction*
-CxxClass::find_in_parent(const String& name) {
-     for (int i = 0; i < nparents(); i++) {
-         click_chatter("Searching in %s", parent(i)->name().c_str());
-         parent(i)->print_function_list();
+CxxClass::find_in_parent(const String& name, const String& outer_class) {
+    for (int i = 0; i < nparents(); i++) {
+        click_chatter("Searching %s in %s", name.c_str(), parent(i)->name().c_str());
+        parent(i)->print_function_list();
         CxxFunction* f = parent(i)->find(name);
         if (!f)
-            f = parent(i)->find_in_parent(name);
-        if (f)
+            f = parent(i)->find_in_parent(name, outer_class);
+        if (f) {
+            if (parent(i)->_template) {
+                String s = parent_tmpl(i);
+                if (!s) {
+                    click_chatter("Template parent without template parameters...");
+                    return 0;
+                }
+
+                Vector<String> args = parent(i)->_template.split(',');
+                Vector<String> vals = s.split(',');
+
+                CxxFunction* c = new CxxFunction(*f);
+                for (int i = 0; i < args.size(); i++) {
+                    String arg = args[i].trim();
+                    arg = arg.substring(arg.find_left(' ') + 1);
+                    String val = vals[i].trim();
+                    if (val == this->name()) {
+                        click_chatter("CRTP detected, replacing with uttermost");
+                        val = outer_class;
+                    }
+                    click_chatter("Replacing %s with %s",arg.c_str(),val.c_str());
+                    c->replace_expr(arg,val,true,true);
+                }
+                return c;
+            }
+
             return f;
-     }
-     return 0;
+        } else {
+
+                click_chatter("Parent has no push batch");
+        }
+    }
+    return 0;
 }

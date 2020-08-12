@@ -49,10 +49,19 @@ class CxxFunction {
 
 };
 
+class CxxClass;
+struct ParentalLink {
+    ParentalLink() : parent(0), template_params() {
+    }
+    CxxClass *  parent;
+    String      template_params;
+};
+
 class CxxClass {
 
   String _name;
-  Vector<CxxClass *> _parents;
+  Vector<ParentalLink> _parents;
+  String _template;
 
   HashTable<String, int> _fn_map;
   Vector<CxxFunction> _functions;
@@ -68,15 +77,19 @@ class CxxClass {
 
   const String &name() const		{ return _name; }
   int nparents() const			{ return _parents.size(); }
-  CxxClass *parent(int i) const		{ return _parents[i]; }
-
+  CxxClass *parent(int i) const		{ return _parents[i].parent; }
+  String parent_tmpl(int i) const		{ return _parents[i].template_params; }
   int nfunctions() const		{ return _functions.size(); }
   CxxFunction *find(const String &);
-  CxxFunction *find_in_parent(const String &);
+  CxxFunction *find_in_parent(const String &, const String &);
   CxxFunction &function(int i)		{ return _functions[i]; }
 
   CxxFunction &defun(const CxxFunction &, const bool &rewrite = false);
-  void add_parent(CxxClass *);
+  void add_parent(CxxClass *, const String str = "");
+
+  void set_template(String tmpl) {
+    _template = tmpl;
+  }
 
   bool find_should_rewrite();
   bool should_rewrite(int i) const	{ return _should_rewrite[i]; }
@@ -108,7 +121,7 @@ class CxxInfo { public:
   int parse_function_definition(const String &text, int fn_start_p,
 				int paren_p, const String &original,
 				CxxClass *cxx_class);
-  int parse_class_definition(const String &, int, const String &);
+  int parse_class_definition(const String &, int, const String &, CxxClass* &);
   int parse_class(const String &text, int p, const String &original,
 		  CxxClass *cxx_class);
 

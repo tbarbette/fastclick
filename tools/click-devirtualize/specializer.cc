@@ -298,7 +298,7 @@ Specializer::create_class(SpecializedClass &spc)
 //      CxxClass* new_cxxc = _specials[s].cxxc;
       if (!new_cxxc->find("push_batch")) {
         click_chatter("Class has no push_batch?");
-        CxxFunction* f = new_cxxc->find_in_parent("push_batch");
+        CxxFunction* f = new_cxxc->find_in_parent("push_batch", new_cxxc->name());
 
         if (f)
             old_cxxc->defun(*f, true);
