@@ -69,7 +69,7 @@ class FlowSwitch : public FlowStateElement<FlowSwitch,FlowSwitchEntry>,
         bool new_flow(FlowSwitchEntry*, Packet*);
         void release_flow(FlowSwitchEntry*) {};
 
-        void push_batch(int, FlowSwitchEntry*, PacketBatch *);
+        void push_flow(int, FlowSwitchEntry*, PacketBatch *);
 
 };
 
