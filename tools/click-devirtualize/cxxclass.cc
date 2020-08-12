@@ -869,10 +869,20 @@ CxxInfo::parse_class(const String &text, int p, const String &original,
 	  && (strncmp(s+p1, "class", 5) == 0
 	      || strncmp(s+p1, "struct", 6) == 0)) {
 		// parse class definition
-            click_chatter("Parsing definition at %d", p1 + 6);
+            click_chatter("Parsing definition at %d of %s", p1 + 6, text.substring(p1+6, 20).c_str());
 		p = parse_class_definition(text, p1 + 6, original);
             //      click_chatter("Subclass %s", text.substring(p1+6,p-p1-6).c_str() );
+      } else if (p > p1 + 8 && !cxx_class
+	  && (strncmp(s+p1, "template", 8) == 0)) {
+
+        click_chatter("Parsing template definition at %d of %s", p1, text.substring(p1, 30).c_str());
+        p1 = parse_reentrant(s, p1+7 , '<','>', len);
+        while (p1 < len && isspace((unsigned char) s[p1]))
+         p1++;
+		p = parse_class_definition(s, p1 + 6, original);
+            //      click_chatter("Subclass %s", text.substring(p1+6,p-p1-6).c_str() );
       } else
+
 	p = skip_balanced_braces(text, p);
     } else if (s[p] == '(') {
         click_chatter("Parse fun %s",text.substring(p1,p-p1).c_str());

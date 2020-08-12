@@ -51,8 +51,14 @@ Specializer::Specializer(RouterT *router, const ElementMap &em)
   // prepare from element map
   for (ElementMap::TraitsIterator x = em.begin_elements(); x; x++) {
     const Traits &e = x.value();
+    //click_chatter("%s %s", e.header_file.c_str(), em.source_directory(e).c_str());
     add_type_info(e.name, e.cxx, e.header_file, em.source_directory(e));
   }
+
+
+  add_type_info("FlowSpaceElement", "FlowSpaceElement", "flowelement.hh", "/usr/local/include/click/flow/");
+  add_type_info("FlowStateElement", "FlowStateElement", "flowelement.hh", "/usr/local/include/click/flow/");
+
 }
 
 inline ElementTypeInfo &
@@ -132,8 +138,11 @@ Specializer::parse_source_file(ElementTypeInfo &etinfo,
 void
 Specializer::read_source(ElementTypeInfo &etinfo, ErrorHandler *errh)
 {
-  if (!etinfo.click_name || etinfo.read_source)
+  if (!etinfo.click_name || etinfo.read_source) {
+      click_chatter("Not reading source - %d %d",!etinfo.click_name, etinfo.read_source);
     return;
+  }
+
   etinfo.read_source = true;
   if (!etinfo.header_file) {
     errh->warning("element class %<%s%> has no source file", etinfo.click_name.c_str());
@@ -152,8 +161,13 @@ Specializer::read_source(ElementTypeInfo &etinfo, ErrorHandler *errh)
   if (cxxc)
     for (int i = 0; i < cxxc->nparents(); i++) {
       const String &p = cxxc->parent(i)->name();
+        click_chatter("%s - %s", type_info(p).click_name.c_str(), p.c_str());
       if (p != "Element")
         read_source(type_info(p), errh);
+      if (p == "FlowStateElement")  {
+        click_chatter("FSE functions : ");
+          cxxc->parent(i)->print_function_list();
+      }
     }
 }
 
@@ -175,8 +189,11 @@ Specializer::check_specialize(int eindex, ErrorHandler *errh)
   }
 
   // read source code
-  if (!old_eti.read_source)
+  if (!old_eti.read_source) {
+
+        click_chatter("READS %s - %s", old_eti.click_name.c_str(), old_eti.cxx_name.c_str());
     read_source(old_eti, errh);
+  }
   CxxClass *old_cxxc = _cxxinfo.find_class(old_eti.cxx_name);
   if (!old_cxxc) {
     errh->warning("C++ class %<%s%> not found for element class %<%s%>",
