@@ -40,7 +40,7 @@ public:
         _state->lengths[*fcb - 1]++;
     }
 
-    void push_batch(int port, int* fcb, PacketBatch*);
+    void push_flow(int port, int* fcb, PacketBatch*);
 
     inline bool new_flow(void*, Packet*) {
         _state->count++;

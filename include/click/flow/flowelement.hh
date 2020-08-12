@@ -251,9 +251,9 @@ public :
     }
 
 	void push_batch(int port,PacketBatch* head) final {
-			push_batch(port, fcb_data(), head);
+			push_flow(port, fcb_data(), head);
 	};
-	virtual void push_batch(int port, T* flowdata, PacketBatch* head) = 0;
+	virtual void push_flow(int port, T* flowdata, PacketBatch* head) = 0;
 
 };
 
@@ -329,7 +329,7 @@ public :
                  return;
              }
          }
-         static_cast<Derived*>(this)->push_batch(port, &my_fcb->v, head);
+         static_cast<Derived*>(this)->push_flow(port, &my_fcb->v, head);
     };
 
     void close_flow() {

@@ -349,11 +349,14 @@ Specializer::create_class(SpecializedClass &spc)
       new_cxxc->find("input_pull")->kill();
     }
 
-
+/*
   if (!new_cxxc->find("push_batch", 3)) {
-    CxxFunction *f = old_cxxc->find("push_batch", 3)
+    CxxFunction f = old_cxxc->find("push_batch", 3);
+    if (!f)
+        //TODO search parents
+    new_cxx->defun(f);
   }
-
+*/
   return true;
 }
 

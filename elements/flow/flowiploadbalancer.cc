@@ -75,7 +75,7 @@ bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
 }
 
 
-void FlowIPLoadBalancer::push_batch(int, IPLBEntry* flowdata, PacketBatch* batch)
+void FlowIPLoadBalancer::push_flow(int, IPLBEntry* flowdata, PacketBatch* batch)
 {
     auto fnt = [this,flowdata](Packet*&p) -> bool {
         WritablePacket* q =p->uniqueify();
