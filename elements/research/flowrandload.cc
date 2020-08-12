@@ -54,7 +54,7 @@ int FlowRandLoad::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-void FlowRandLoad::push_batch(int port, RandLoadState* flowdata, PacketBatch* batch) {
+void FlowRandLoad::push_flow(int port, RandLoadState* flowdata, PacketBatch* batch) {
     if (flowdata->w == 0) {
         flowdata->w =  _min + ((*_gens)() / (UINT_MAX / (_max - _min) ));  //click_random(_min, _max);
     }
