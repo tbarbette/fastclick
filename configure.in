@@ -317,6 +317,7 @@ if test "x$enable_dpdk" = "xyes"; then
 
     if pkg-config --exists libdpdk ; then
       RTE_LIB=pkg-config --variable=libdir libdpdk
+      DPDKCFLAGS=pkg-config --cflags libdpdk
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
@@ -363,7 +364,10 @@ or install DPDK using meson, or the system package manager.
       else
         AC_MSG_RESULT([no])
       fi
-    fi
+      DPDKCFLAGS=`printf 'include ${RTE_SDK}/mk/rte.vars.mk\n\$(file >dpdkcflags,${CFLAGS})' | make -f - &>/dev/null ; cat dpdkcflags`
+      rm dpdkcflags
+      DEPCFLAGS="$DEPCFLAGS $DPDKCFLAGS"
+  fi
 
     AC_DEFINE([HAVE_DPDK])
     AC_SUBST(USE_DPDK, yes)

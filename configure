@@ -7195,6 +7195,7 @@ $as_echo_n "checking for DPDK library... " >&6; }
 
     if pkg-config --exists libdpdk ; then
       RTE_LIB=pkg-config --variable=libdir libdpdk
+      DPDKCFLAGS=$(shell pkg-config --cflags libdpdk)
     else
       RTE_LIB="$RTE_SDK_BIN/lib"
       if test ! -f "$RTE_SDK_BIN/include/rte_eal.h"; then
@@ -7251,7 +7252,10 @@ $as_echo "yes" >&6; }
         { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
       fi
-    fi
+      DPDKCFLAGS=`printf 'include ${RTE_SDK}/mk/rte.vars.mk\n\$(file >dpdkcflags,${CFLAGS})' | make -f - &>/dev/null ; cat dpdkcflags`
+      rm dpdkcflags
+      DEPCFLAGS="$DEPCFLAGS $DPDKCFLAGS"
+  fi
 
     $as_echo "#define HAVE_DPDK 1" >>confdefs.h
 
