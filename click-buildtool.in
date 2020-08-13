@@ -1080,7 +1080,7 @@ END {
     } else if (ans[2] !~ /^!/) {
       B = B "  hatred_of_rebecca[" nrebecca "] = click_add_element_type(\"" ans[2] "\", beetlemonkey, " nrebecca ");\n"
       C = C "  click_remove_element_type(hatred_of_rebecca[" nrebecca "]);\n";
-      D = D "   case " nrebecca ": return &obj_" ans[1] ";\n";
+      D = D "   case " nrebecca ": obj_" ans[1]".~" ans[1]"(); new (&obj_" ans[1] ") " ans[1] "; return &obj_" ans[1] ";\n";
       E = E "extern " ans[1] " obj_"ans[1]";\n";
       anyprovides++; nrebecca++;
     }
@@ -1147,7 +1147,7 @@ elif test "$elem2" = exportstatic; then
       anyprovides++;
     } else if (ans[2] !~ /^!/) {
       B = B "  (void) click_add_element_type_stable(\"" ans[2] "\", beetlemonkey, " nrebecca ");\n";
-      D = D "   case " nrebecca ": return &obj_" ans[1] ";\n";
+      D = D "   case " nrebecca ": obj_" ans[1]".~" ans[1]"(); new (&obj_" ans[1] ") " ans[1] "; return &obj_" ans[1] ";\n";
       E = E " " ans[1] " obj_"ans[1]";\n";
       anyprovides++; nrebecca++;
     }
