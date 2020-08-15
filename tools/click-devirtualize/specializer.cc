@@ -161,13 +161,9 @@ Specializer::read_source(ElementTypeInfo &etinfo, ErrorHandler *errh)
   if (cxxc)
     for (int i = 0; i < cxxc->nparents(); i++) {
       const String &p = cxxc->parent(i)->name();
-        click_chatter("%s - %s", type_info(p).click_name.c_str(), p.c_str());
+      //click_chatter("%s - %s", type_info(p).click_name.c_str(), p.c_str());
       if (p != "Element")
         read_source(type_info(p), errh);
-      if (p == "FlowStateElement")  {
-        click_chatter("FSE functions : ");
-          cxxc->parent(i)->print_function_list();
-      }
     }
 }
 
@@ -175,7 +171,7 @@ void
 Specializer::check_specialize(int eindex, ErrorHandler *errh)
 {
   int sp = _specialize[eindex];
-    click_chatter("SP state %d",_specials[sp].eindex);
+    //click_chatter("SP state %d",_specials[sp].eindex);
   if (_specials[sp].eindex > SPCE_NOT_DONE)
     return;
   _specials[sp].eindex = SPCE_NOT_SPECIAL;
@@ -190,8 +186,6 @@ Specializer::check_specialize(int eindex, ErrorHandler *errh)
 
   // read source code
   if (!old_eti.read_source) {
-
-        click_chatter("READS %s - %s", old_eti.click_name.c_str(), old_eti.cxx_name.c_str());
     read_source(old_eti, errh);
   }
   CxxClass *old_cxxc = _cxxinfo.find_class(old_eti.cxx_name);
@@ -223,7 +217,7 @@ Specializer::create_class(SpecializedClass &spc)
   if (spc.click_name == spc.old_click_name)
     return false;
 
-  click_chatter("Specializing %s",spc.click_name.c_str());
+  //click_chatter("Specializing %s",spc.click_name.c_str());
   // create new C++ class
   const ElementTypeInfo &old_eti = etype_info(eindex);
   CxxClass *old_cxxc = _cxxinfo.find_class(old_eti.cxx_name);
@@ -297,13 +291,10 @@ Specializer::create_class(SpecializedClass &spc)
       //IF IMPROVED
 //      CxxClass* new_cxxc = _specials[s].cxxc;
       if (!new_cxxc->find("push_batch")) {
-        click_chatter("Class has no push_batch?");
         CxxFunction* f = new_cxxc->find_in_parent("push_batch", new_cxxc->name());
 
         if (f)
             old_cxxc->defun(*f, true);
-        else
-            click_chatter("No parent has push_batch");
       }
 
   // transfer reachable rewritable functions to new C++ class
@@ -332,14 +323,12 @@ Specializer::create_class(SpecializedClass &spc)
     String pull_repl = "input_pull(#0)";
     bool any_checked_push = false, any_push = true, any_pull = false;
 
-    click_chatter("Checking fnts");
     for (int i = 0; i < old_cxxc->nfunctions(); i++)
       if (old_cxxc->should_rewrite(i)) {
         const CxxFunction &old_fn = old_cxxc->function(i);
 
-        click_chatter("Should rewrite %s",old_fn.name().c_str());
+    //    click_chatter("Should rewrite %s",old_fn.name().c_str());
         if (new_cxxc->find(old_fn.name())) { // don't add again
-            click_chatter("Already there");
           continue;
         }
         CxxFunction &new_fn = new_cxxc->defun(old_fn);
@@ -352,8 +341,7 @@ Specializer::create_class(SpecializedClass &spc)
           any_push = true;
         #if HAVE_BATCH
         while (new_fn.replace_expr(push_batch_pat, push_batch_repl)) {
-                click_chatter("Have push batch");
-      any_push = true;
+            any_push = true;
         }
         #endif
     while (new_fn.replace_expr(checked_push_pat, checked_push_repl))
@@ -368,7 +356,6 @@ Specializer::create_class(SpecializedClass &spc)
       any_pull = true;
     }
     if (!any_push && !any_checked_push) {
-        click_chatter("Killing output push :(");
         new_cxxc->find("output_push")->kill();
     #if HAVE_BATCH
         new_cxxc->find("output_push_batch")->kill();
@@ -858,6 +845,7 @@ Specializer::do_config_replacement() {
     click_chatter("Replacing in %s", _specials[s].cxxc->name().c_str());
     CxxFunction* configure = original->find("configure");
     if (configure && _do_replace) {
+        bool any_replacement = false;// Replacements in configure done?
         Vector<String> args;
         //click_chatter("Configure found  %s!",configure->body().c_str());
         String configline = _router->element(_specials[s].eindex)->config();
@@ -866,6 +854,7 @@ Specializer::do_config_replacement() {
                       String value;
                       String param =  trim_quotes(args[0].trim());
                       bool has_value;
+                      any_replacement = true;
                       int pos = configline.find_left(param);
                       click_chatter("Param is %s", param.c_str());
 
@@ -905,7 +894,7 @@ Specializer::do_config_replacement() {
                           continue;
                       }
 
-                    click_chatter("Replacing occurences of %s", args[1].trim().c_str());
+                      //click_chatter("Replacing occurences of %s", args[1].trim().c_str());
                       //Replace in specialized code
                       for (int f = 0; f < _specials[s].cxxc->nfunctions(); f++) {
                           CxxFunction &fnt = _specials[s].cxxc->function(f);
@@ -924,7 +913,8 @@ Specializer::do_config_replacement() {
                       }
                       args.clear();
                 }
-                _specials[s].cxxc->defun(*configure);
+                if (any_replacement)
+                    _specials[s].cxxc->defun(*configure);
                 //click_chatter("Configure changed  %s!",configure->body().c_str());
         }
     }

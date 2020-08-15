@@ -31,8 +31,8 @@ int
 Discard::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-	.read("ACTIVE", _active)
-	.read("BURST", _burst)
+	.read_or_set("ACTIVE", _active, true)
+	.read_or_set("BURST", _burst, 1)
 	.complete() < 0)
 	return -1;
     if (!_active && input_is_push(0))
