@@ -3073,6 +3073,7 @@ WritablePacket::rewrite_ip(IPAddress ip, const int shift, bool is_tcp) {
         click_update_in_cksum(&this->udp_header()->uh_sum, t_old_hw, t_new_hw);
 }
 
+#if !CLICK_PACKET_USE_DPDK
 inline void
 Packet::delete_buffer(unsigned char* head, unsigned char* end) {
     if (_data_packet)
@@ -3095,7 +3096,7 @@ Packet::delete_buffer(unsigned char* head, unsigned char* end) {
 	m_freem(_m);
 # endif
 }
-
+#endif
 
 typedef Packet::PacketType PacketType;
 
