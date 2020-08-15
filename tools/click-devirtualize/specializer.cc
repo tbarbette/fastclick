@@ -777,9 +777,13 @@ is_primitive_val(String str) {
     str = str.trim().lower();
     if (str == "true" || str == "false")
         return true;
+    bool minus = false;
     for (int i = 0; i < str.length(); i++) {
         if (!isdigit(str[i])) {
-            return false;
+            if (str[i] == '-' && !minus)
+                minus = true;
+            else
+                return false;
         }
     }
     return true;

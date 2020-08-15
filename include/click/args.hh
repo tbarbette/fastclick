@@ -434,8 +434,8 @@ class Args : public ArgContext {
         Slot *slot_status;
         String str = find(keyword, 0, slot_status);
         if (!str) {
-            assume(x == static_value);
-		return *this;
+            x = static_value;
+		    return *this;
         } else {
 		T *s = Args_parse_helper<DefaultArg<T> >::slot(x, *this);
 		postparse(s && (str ? Args_parse_helper<DefaultArg<T> >::parse(DefaultArg<T>(), str, *s, *this) : (*s = static_value, true)), slot_status);
@@ -1118,6 +1118,10 @@ class IntArg : public NumArg { public:
         return true;
     }
 
+    template<typename V>
+    String unparse(const V &v) {
+        return String(v);
+    }
     template<typename V>
     bool parse(const String &str, V &result, const ArgContext &args = blank_args) {
         V x;

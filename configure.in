@@ -327,6 +327,9 @@ if test "x$enable_dpdk" = "xyes"; then
 Cannot find \$RTE_SDK_BIN/include/rte_eal.h for DPDK.
 Define \$RTE_SDK and \$RTE_TARGET as per DPDK documentation,
 or install DPDK using meson, or the system package manager.
+RTE_SDK is $RTE_SDK
+RTE_TARGET is $RTE_TARGET
+RTE_SDK_BIN is $RTE_SDK_BIN
 
 =========================================])
       fi
