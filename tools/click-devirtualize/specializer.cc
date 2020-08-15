@@ -199,7 +199,7 @@ Specializer::check_specialize(int eindex, ErrorHandler *errh)
   SpecializedClass &spc = _specials[sp];
   spc.old_click_name = old_eti.click_name;
   spc.eindex = eindex;
-  if (!old_cxxc->find_should_rewrite() && !_do_replace) {
+  if (!old_cxxc->find_should_rewrite() && !_do_replace && !_do_static) {
     spc.click_name = spc.old_click_name;
     spc.cxx_name = old_eti.cxx_name;
   } else {
