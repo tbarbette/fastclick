@@ -173,14 +173,14 @@ CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
       while (p >= 0 && isspace((unsigned char) ts[p]))
          p--;
       if (full_symbol && (isalnum(ts[p]) || (ts[p] == '_')))
-	  continue;
+	    continue;
       if (allow_call || p < 0
 	  || (ts[p] != '.'
 	      && (p == 0 || ts[p-1] != ':' || ts[p] != ':')
 	      && (p == 0 || ts[p-1] != '-' || ts[p] != '>'))) {
 	*pos1 = tpos1;
-	*pos2 = tpos;
-	return true;
+	    *pos2 = tpos;
+	    return true;
       }
     }
 
@@ -248,7 +248,7 @@ bool
 CxxFunction::replace_call(const String &pattern, const String &replacement, Vector<String> &args) {
 
 	  int pos1, pos2, match_pos[10], match_len[10] = {-1};
-	  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true))
+	  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true, true))
 	    return false;
 
 	  int i = 0;
@@ -257,7 +257,7 @@ CxxFunction::replace_call(const String &pattern, const String &replacement, Vect
 	      i++;
 	  }
 
-	  click_chatter("Found %s pos %d pos %d match %d %d",pattern.c_str(), pos1, pos2, match_pos[0], match_len[0]);
+	  click_chatter("Found %s pos %d pos %d match %d %d : %s",pattern.c_str(), pos1, pos2, match_pos[0], match_len[0], _body.substring(pos1, pos2 - pos1).c_str());
 	  //fprintf(stderr, ":::::: %s\n", _body.c_str());
 
 	  StringAccum sa, clean_sa;

@@ -24,7 +24,7 @@
 
 CLICK_DECLS
 
-std::random_device rd;
+std::random_device WorkPackage::rd;
 
 #define FRAND_MAX _gens->max()
 
