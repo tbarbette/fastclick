@@ -34,7 +34,7 @@ class BatchElement;
 # define CLICK_ELEMENT_DEPRECATED CLICK_DEPRECATED
 #endif
 
-class Element { public:
+class alignas(64) Element { public:
 
     Element();
     virtual ~Element();
