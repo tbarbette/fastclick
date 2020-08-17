@@ -45,8 +45,8 @@ Specializer::Specializer(RouterT *router, const ElementMap &em)
   }
 
   patterns.push_back(Pair<String,String>("read(#0,#1)","validate(#0!TEMPVAL!)"));
-  patterns.push_back(Pair<String,String>("read_p(#0,#1)","validate(#0!TEMPVAL!)"));
-  patterns.push_back(Pair<String,String>("read_mp(#0,#1)","validate(#0!TEMPVAL!)"));
+  //patterns.push_back(Pair<String,String>("read_p(#0,#1)","validate(#0!TEMPVAL!)"));
+  //patterns.push_back(Pair<String,String>("read_mp(#0,#1)","validate(#0!TEMPVAL!)"));
   patterns.push_back(Pair<String,String>("read_or_set(#0,#1,#2)","validate(#0!TEMPVAL!)"));
   patterns.push_back(Pair<String,String>("read_or_set_p(#0,#1,#2)","validate_p(#0!TEMPVAL!)"));
 
