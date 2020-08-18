@@ -810,6 +810,7 @@ enable_verbose_batch
 enable_auto_batch
 enable_netmap_pool
 enable_json
+enable_rand_align
 enable_select
 enable_poll
 enable_kqueue
@@ -1534,6 +1535,7 @@ Optional Features:
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
     --enable-json         enable JSON support
+    --enable-rand-align   enable random alignment of element
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
@@ -7085,6 +7087,18 @@ if test "x$enable_json" = "xyes"; then
 
 else
     have_json=no
+fi
+
+# Check whether --enable-rand-align was given.
+if test "${enable_rand_align+set}" = set; then :
+  enableval=$enable_rand_align; :
+else
+  enable_rand_align=no
+fi
+
+if test "x$enable_rand_align" = "xyes"; then
+    $as_echo "#define HAVE_RAND_ALIGN 1" >>confdefs.h
+
 fi
 
 # Check whether --enable-select was given.

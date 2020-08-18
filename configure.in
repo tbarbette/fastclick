@@ -242,6 +242,13 @@ else
     have_json=no
 fi
 
+AC_ARG_ENABLE([rand-align],
+    [AS_HELP_STRING([  --enable-rand-align], [enable random alignment of element])],
+    [:], [enable_rand_align=no])
+if test "x$enable_rand_align" = "xyes"; then
+    AC_DEFINE([HAVE_RAND_ALIGN])
+fi
+
 AC_ARG_ENABLE([select],
     [AS_HELP_STRING([  --enable-select=[[select|poll|kqueue]]], [set file descriptor wait mechanism])
 AS_HELP_STRING([  --disable-select], [do not use select()])],

@@ -57,6 +57,23 @@ class Element { public:
     virtual void selected(int fd);
 #endif
 
+#ifdef HAVE_RAND_ALIGN
+// Overloading CLass specific new operator
+  static void* operator new(size_t sz)
+  {
+      int of = click_random() % 8;
+    void* m = malloc(sz + of);
+    click_chatter("EALLOC %d OF %d", sz, of);
+    return ((unsigned char*)m) + of;
+  }
+  // Overloading CLass specific delete operator
+  static void operator delete(void* m)
+  {
+      if (m)
+        free(m);
+  }
+#endif
+
     inline bool is_fullpush() const;
     enum batch_mode {BATCH_MODE_NO, BATCH_MODE_IFPOSSIBLE, BATCH_MODE_NEEDED, BATCH_MODE_YES};
 
