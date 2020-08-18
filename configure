@@ -715,6 +715,7 @@ RTE_VER_MAJOR
 RTE_SDK_BIN
 RTE_TARGET
 RTE_SDK
+DO_RAND_ALIGN
 PTHREAD_LIBS
 HAVE_BATCH
 AR_CREATEFLAGS
@@ -7098,6 +7099,11 @@ fi
 
 if test "x$enable_rand_align" = "xyes"; then
     $as_echo "#define HAVE_RAND_ALIGN 1" >>confdefs.h
+
+    DO_RAND_ALIGN=1
+
+else
+    DO_RAND_ALIGN=0
 
 fi
 

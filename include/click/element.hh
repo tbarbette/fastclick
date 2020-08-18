@@ -66,11 +66,14 @@ class Element { public:
     click_chatter("EALLOC %d OF %d", sz, of);
     return ((unsigned char*)m) + of;
   }
+  static void* operator new(size_t sz, void* p)
+  {
+    return p;
+  }
   // Overloading CLass specific delete operator
   static void operator delete(void* m)
   {
-      if (m)
-        free(m);
+    //Let's leak
   }
 #endif
 

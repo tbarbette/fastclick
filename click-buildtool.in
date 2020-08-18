@@ -1149,6 +1149,9 @@ elif test "$elem2" = exportstatic; then
       B = B "  (void) click_add_element_type_stable(\"" ans[2] "\", beetlemonkey, " nrebecca ");\n";
       D = D "   case " nrebecca ": obj_" ans[1]".~" ans[1]"(); new (&obj_" ans[1] ") " ans[1] "; return &obj_" ans[1] ";\n";
       if (!(ans[1] in objs)) {
+        if (@DO_RAND_ALIGN@) {
+          E = E " uint8_t pad_"ans[1]"[" int(8 * rand()) "] ;\n";
+        }
         E = E ans[1] " obj_"ans[1]";\n";
         objs[ans[1]] = 1;
       }
