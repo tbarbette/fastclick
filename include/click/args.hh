@@ -447,11 +447,11 @@ class Args : public ArgContext {
 
 
     template <typename T, typename V>
-    Args &validate_p(const char *keyword, T &x, const V &static_value) {
+    Args &validate_f(const char *keyword, T &x, int flags, const V &static_value) {
 	//Todo : cleaner
 
         Slot *slot_status;
-        String str = find(keyword, positional, slot_status);
+        String str = find(keyword, flags, slot_status);
         if (!str) {
 		    return *this;
         } else {
@@ -460,8 +460,34 @@ class Args : public ArgContext {
 		assert(*s == static_value);
         }
         return *this;
-
     }
+
+    template <typename T, typename V>
+    Args &validate_p(const char *keyword, T &x, const V &static_value) {
+        return validate_f(keyword, x, positional, static_value);
+    }
+
+    template <typename T, typename V>
+    Args &validate_mp(const char *keyword, T &x, const V &static_value) {
+        return validate_f(keyword, x, positional | mandatory, static_value);
+    }
+
+    template <typename T>
+    Args &validate_p(const char *keyword, T &x, const char *static_value) {
+        DefaultArg<T> p = DefaultArg<T>();
+        T v;
+        p.parse(static_value, v);
+        return validate_f(keyword, x, positional, v);
+    }
+
+    template <typename T>
+    Args &validate_mp(const char *keyword, T &x, const char *static_value) {
+        DefaultArg<T> p = DefaultArg<T>();
+        T v;
+        p.parse(static_value, v);
+        return validate_f(keyword, x, positional | mandatory, v);
+    }
+
 
     /** @brief Read an argument using a specified parser.
      * @param keyword argument name

@@ -105,13 +105,13 @@ compile_pattern(const String &pattern0)
  */
 bool
 CxxFunction::find_expr(const String &pattern, int *pos1, int *pos2,
-		       int match_pos[10], int match_len[10], bool allow_call, bool full_symbol) const
+		       int match_pos[10], int match_len[10], bool allow_call, bool full_symbol, int start) const
 {
   const char *ps = pattern.data();
   int plen = pattern.length();
 
   const char *ts = _clean_body.data();
-  int tpos = 0;
+  int tpos = start;
   int tlen = _clean_body.length();
   while (tpos < tlen) {
 
@@ -198,6 +198,31 @@ CxxFunction::find_expr(const String &pattern) const
   return find_expr(pattern, &pos1, &pos2, match_pos, match_len);
 }
 
+void
+CxxFunction::replace(const int &pos1, int &pos2, const String &replacement)
+{
+
+  StringAccum sa, clean_sa;
+  const char *s = replacement.data();
+  const char *end_s = s + replacement.length();
+  while (s < end_s) {
+      sa << *s;
+      clean_sa << *s;
+      s++;
+  }
+
+  String new_body =
+    _body.substring(0, pos1) + sa.take_string() + _body.substring(pos2);
+  String new_clean_body =
+    _clean_body.substring(0, pos1) + clean_sa.take_string()
+    + _clean_body.substring(pos2);
+  _body = new_body;
+  _clean_body = new_clean_body;
+  pos2 = pos1 + replacement.length();
+}
+
+
+
 bool
 CxxFunction::replace_expr(const String &pattern, const String &replacement, bool full_symbol, bool all)
 {
@@ -242,6 +267,24 @@ again:
       goto again;
   //fprintf(stderr, ">>>>>> %s\n", _body.c_str());
   return true;
+}
+
+bool
+CxxFunction::find_call(const String &pattern,Vector<String> &args, int& pos1, int& pos2) {
+
+	  int match_pos[10], match_len[10] = {-1};
+	  if (!find_expr(pattern, &pos1, &pos2, match_pos, match_len, true, true, pos1))
+	    return false;
+
+	  int i = 0;
+	  while (match_len[i] > -1) {
+	      args.push_back(_body.substring(match_pos[i], match_len[i]));
+	      i++;
+	  }
+
+	  click_chatter("Find_call Found %s pos %d pos %d match %d %d : %s",pattern.c_str(), pos1, pos2, match_pos[0], match_len[0], _body.substring(pos1, pos2 - pos1).c_str());
+
+	  return true;
 }
 
 bool

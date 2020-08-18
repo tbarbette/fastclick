@@ -18,7 +18,7 @@ class CxxFunction {
   String _body;
   String _clean_body;
 
-  bool find_expr(const String &, int *, int *, int[10], int[10], bool allow_call = false, bool full_symbol = false) const;
+  bool find_expr(const String &, int *, int *, int[10], int[10], bool allow_call = false, bool full_symbol = false, int start = 0) const;
 
  public:
 
@@ -42,8 +42,11 @@ class CxxFunction {
   void unkill()				{ _alive = true; }
 
   bool find_expr(const String &) const;
+
+  bool find_call(const String &, Vector<String>& args, int& pos1, int& pos2);
   bool replace_expr(const String &, const String &, bool full_symbol = false, bool all = false);
   bool replace_call(const String &, const String &, Vector<String>& args);
+  void replace(const int & pos1, int & pos2, const String& str);
 
   void set_inline();
 
@@ -81,7 +84,7 @@ class CxxClass {
   String parent_tmpl(int i) const		{ return _parents[i].template_params; }
   int nfunctions() const		{ return _functions.size(); }
   CxxFunction *find(const String &);
-  CxxFunction *find_in_parent(const String &, const String &);
+  CxxFunction *find_in_parent(const String &fnt_name, const String &outer_class);
   CxxFunction &function(int i)		{ return _functions[i]; }
 
   CxxFunction &defun(const CxxFunction &, const bool &rewrite = false);

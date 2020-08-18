@@ -22,11 +22,12 @@
 #include <click/error.hh>
 #include <click/standard/scheduleinfo.hh>
 
+#define FRAND_MAX _gens->max()
+
 CLICK_DECLS
 
 std::random_device WorkPackage::rd;
 
-#define FRAND_MAX _gens->max()
 
 WorkPackage::WorkPackage() : _w(1)
 {
