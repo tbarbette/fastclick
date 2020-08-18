@@ -28,21 +28,14 @@
 #include "signature.hh"
 #include <ctype.h>
 
-
-struct ReadFnt {
-    String pat;
-    bool positional;
-    String sub;
-};
-
-Vector<ReadFnt> patterns;
+Vector<Pair<String,String>> patterns;
 
 Specializer::Specializer(RouterT *router, const ElementMap &em)
   : _router(router), _nelements(router->nelements()),
     _ninputs(router->nelements(), 0), _noutputs(router->nelements(), 0),
     _etinfo_map(0), _header_file_map(-1), _parsed_sources(-1), _do_inline(false), 
     _do_static(false), _do_unroll(false), _unroll_val(0), _do_switch(false), _switch_burst(0),
-    _do_jmps(false), _jmp_burst(0)
+    _do_jmps(false), _jmp_burst(0), _do_align(0)
 {
   _etinfo.push_back(ElementTypeInfo());
 
@@ -51,11 +44,11 @@ Specializer::Specializer(RouterT *router, const ElementMap &em)
     _ninputs[x->eindex()] = x->ninputs();
   }
 
-  patterns.push_back(ReadFnt{"read(#0,#1)",false,"validate"});
-  patterns.push_back(ReadFnt{"read_p(#0,#1)",true,"validate_p"});
-  patterns.push_back(ReadFnt{"read_mp(#0,#1)",true,"validate_mp"});
-  patterns.push_back(ReadFnt{"read_or_set(#0,#1,#2)",false,"validate"});
-  patterns.push_back(ReadFnt{"read_or_set_p(#0,#1,#2)",true,"validate_p"});
+  patterns.push_back(Pair<String,String>("read(#0,#1)","validate(#0!TEMPVAL!)"));
+  //patterns.push_back(Pair<String,String>("read_p(#0,#1)","validate(#0!TEMPVAL!)"));
+  //patterns.push_back(Pair<String,String>("read_mp(#0,#1)","validate(#0!TEMPVAL!)"));
+  patterns.push_back(Pair<String,String>("read_or_set(#0,#1,#2)","validate(#0!TEMPVAL!)"));
+  patterns.push_back(Pair<String,String>("read_or_set_p(#0,#1,#2)","validate_p(#0!TEMPVAL!)"));
 
   // prepare from element map
   for (ElementMap::TraitsIterator x = em.begin_elements(); x; x++) {
@@ -853,21 +846,13 @@ Specializer::do_config_replacement() {
     }*/
     click_chatter("Replacing in %s", _specials[s].cxxc->name().c_str());
     CxxFunction* configure = original->find("configure");
-    if (!configure)
-        configure = original->find_in_parent("configure", _specials[s].cxxc->name());
     if (configure && _do_replace) {
         bool any_replacement = false;// Replacements in configure done?
         Vector<String> args;
         //click_chatter("Configure found  %s!",configure->body().c_str());
         String configline = _router->element(_specials[s].eindex)->config();
-
         for (int p =0; p < patterns.size(); p++) {
-            //configure->find_expr(patterns[p].pat);
-        }
-        for (int p =0; p < patterns.size(); p++) {
-            int pos1 = 0;
-            int pos2 = -1;
-                while (configure->find_call(patterns[p].pat, args, pos1, pos2)) {
+                while (configure->replace_call(patterns[p].first, patterns[p].second,args)) {
                       String value;
                       String param =  trim_quotes(args[0].trim());
                       bool has_value;
@@ -875,9 +860,8 @@ Specializer::do_config_replacement() {
                       int pos = configline.find_left(param);
                       click_chatter("Param is %s", param.c_str());
 
-
 //                      click_chatter("Config is %s, found at %d", configline.c_str(), pos);
-                      if (pos >= 0 && configline[pos - 1] != '$') {
+                      if (pos >= 0) {
                           pos += param.length();
                           while (configline[pos] == ' ')
                               pos++;
@@ -885,15 +869,13 @@ Specializer::do_config_replacement() {
                           while (configline[end] != ',' && configline[end] != ')') end++;
                           end -= 1;
                           while (configline[end] == ' ') end--;
-                              value = configline.substring(pos,end+1 - pos);
+                          value = configline.substring(pos,end+1 - pos);
                           click_chatter("Config value is %s",value.c_str());
                           has_value = true;
                       } else {
-                          if (args.size() > 2 && args[2].trim() && !patterns[p].positional) {
+                          if (args.size() > 2 && args[2].trim()) {
                               value=args[2].trim();
                               click_chatter("User did not overwrite %s, replacing by default value %s", param.c_str(), value.c_str());
-
-                              has_value = true;
                           } else {
                               click_chatter("User did not overwrite %s, preventing further overwrite", param.c_str());
                               has_value = false;
@@ -903,18 +885,12 @@ Specializer::do_config_replacement() {
                       if (has_value) {
 
                           click_chatter("Value %s given, primitive : %d",value.c_str(),is_primitive_val(value));
-                          configure->replace(pos1, pos2, patterns[p].sub + "("+args[0]+", "+args[1].trim()+", "+ (is_primitive_val(value)?value:"\""+value+"\"") + ")");
+                          configure->replace_expr("!TEMPVAL!", ", "+args[1].trim()+", "+ (is_primitive_val(value)?value:"\""+value+"\""), true, true);
                       } else {
-                          if (!patterns[p].positional) {
-                              click_chatter("No value given, preventing further overwrite");
-                              configure->replace(pos1, pos2, "validate("+args[0]+")");
-                          } else {
-                              click_chatter("No value given, but positional parameter may be missed.");
-                          }
-//                          configure->replace_expr("!TEMPVAL!", "");
+                          click_chatter("No value given");
+                          configure->replace_expr("!TEMPVAL!", "");
                       }
 
-                      pos1 = pos2;
                       if (!has_value || !is_primitive_val(value)) {
                           args.clear();
                           continue;
@@ -1057,7 +1033,7 @@ Specializer::output(StringAccum& out_header, StringAccum& out)
       if (eti.found_header_file)
     out_header << "#include \"" << eti.found_header_file << "\"\n";
       if (spc.special())
-    spc.cxxc->header_text(out_header);
+    spc.cxxc->header_text(out_header, _do_align);
     }
   }
 

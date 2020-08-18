@@ -63,6 +63,7 @@ class Specializer { public:
   void should_unroll(bool do_unroll, int unroll_val) { _do_unroll = do_unroll; _unroll_val = unroll_val; };
   void should_switch(bool do_switch, int switch_burst) { _do_switch = do_switch; _switch_burst = switch_burst; };
   void should_jmps(bool do_jmps, int jmp_burst) { _do_jmps = do_jmps; _jmp_burst = jmp_burst; };
+  void should_align(int do_align) { _do_align = do_align; };
  private:
 
   enum { SPCE_NOT_DONE = -2, SPCE_NOT_SPECIAL = -1 };
@@ -90,6 +91,7 @@ class Specializer { public:
   int _switch_burst;
   int _do_jmps;
   int _jmp_burst;
+  int _do_align;
 
   CxxInfo _cxxinfo;
 

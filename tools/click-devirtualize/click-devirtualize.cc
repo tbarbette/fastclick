@@ -59,6 +59,7 @@
 #define REPLACE_OPT	    317
 #define SWTICH_OPT      318
 #define JMPS_OPT        319
+#define ALIGN_OPT       320
 
 static const Clp_Option options[] = {
   { "clickpath", 'C', CLICKPATH_OPT, Clp_ValString, 0 },
@@ -70,6 +71,7 @@ static const Clp_Option options[] = {
   { "unroll", 'U', UNROLL_OPT, Clp_ValInt, Clp_Mandatory },
   { "switch", 'W', SWTICH_OPT, Clp_ValInt, Clp_Mandatory },
   { "jmps", 'J', JMPS_OPT, Clp_ValInt, Clp_Mandatory },
+  { "alignas", 'A', ALIGN_OPT, Clp_ValInt, Clp_Mandatory },
   { "expression", 'e', EXPRESSION_OPT, Clp_ValString, 0 },
   { "file", 'f', ROUTER_OPT, Clp_ValString, 0 },
   { "help", 0, HELP_OPT, 0, 0 },
@@ -264,6 +266,7 @@ main(int argc, char **argv)
   int switch_burst = 0;
   int do_jmps = 0;
   int jmp_burst = 0;
+  int do_align = 0;
   Vector<const char *> instruction_files;
   HashTable<String, int> specializing;
 
@@ -374,6 +377,11 @@ particular purpose.\n");
       jmp_burst = ( (clp->have_val != 0) ? clp->val.i : 0 );
       break;
 
+     case ALIGN_OPT:
+      if(!clp->negated)
+        do_align = ( (clp->have_val != 0) ? clp->val.i : 0 );
+      break;
+
      bad_option:
      case Clp_BadOption:
       short_usage();
@@ -476,6 +484,7 @@ particular purpose.\n");
   specializer.should_unroll(do_unroll, unroll_val);
   specializer.should_switch(do_switch, switch_burst);
   specializer.should_jmps(do_jmps, jmp_burst);
+  specializer.should_align(do_align);
   specializer.specialize(sigs, errh);
 
   // quit early if nothing was done
