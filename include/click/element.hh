@@ -10,6 +10,7 @@
 #include <click/sync.hh>
 #include <functional>
 
+#include <csignal>
 CLICK_DECLS
 class Router;
 class Master;
@@ -33,6 +34,8 @@ class BatchElement;
 #ifndef CLICK_ELEMENT_DEPRECATED
 # define CLICK_ELEMENT_DEPRECATED CLICK_DEPRECATED
 #endif
+
+int nalloc = 0;
 
 class Element { public:
 
@@ -59,11 +62,16 @@ class Element { public:
 
 #ifdef HAVE_RAND_ALIGN
 // Overloading CLass specific new operator
-  static void* operator new(size_t sz)
+  inline static void* operator new(size_t sz)
   {
       int of = (click_random() % (HAVE_RAND_ALIGN / alignof(Element))) * alignof(Element);
     void* m = aligned_alloc(alignof(Element), sz + of);
-    click_chatter("EALLOC %d OF %d AL %d", sz, of, alignof(Element));
+    click_chatter("EALLOC %d OF %d AL %d", sz, of, alignof(Element) );
+
+    click_chatter("RESULT-EL%d %d", nalloc++, of );
+
+    // Generate an interrupt
+// std::raise(SIGINT);
     return ((unsigned char*)m) + of;
   }
   static void* operator new(size_t sz, void* p)
