@@ -35,7 +35,6 @@ class BatchElement;
 # define CLICK_ELEMENT_DEPRECATED CLICK_DEPRECATED
 #endif
 
-int nalloc = 0;
 
 class Element { public:
 
@@ -61,6 +60,8 @@ class Element { public:
 #endif
 
 #ifdef HAVE_RAND_ALIGN
+
+   static int nalloc;
 // Overloading CLass specific new operator
   inline static void* operator new(size_t sz)
   {
