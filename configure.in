@@ -243,13 +243,17 @@ else
 fi
 
 AC_ARG_ENABLE([rand-align],
-    [AS_HELP_STRING([  --enable-rand-align], [enable random alignment of element])],
+    [AS_HELP_STRING([  --enable-rand-align=randmax], [enable random alignment of element])],
     [:], [enable_rand_align=no])
+
 if test "x$enable_rand_align" = "xyes"; then
-    AC_DEFINE([HAVE_RAND_ALIGN])
-    AC_SUBST([DO_RAND_ALIGN],1)
-else
+    enable_rand_align=8
+fi
+if test "x$enable_rand_align" = "xno"; then
     AC_SUBST([DO_RAND_ALIGN],0)
+else
+    AC_DEFINE_UNQUOTED(HAVE_RAND_ALIGN,${enable_rand_align})
+    AC_SUBST([DO_RAND_ALIGN],$enable_rand_align)
 fi
 
 AC_ARG_ENABLE([select],

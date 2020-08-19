@@ -61,7 +61,7 @@ class Element { public:
 // Overloading CLass specific new operator
   static void* operator new(size_t sz)
   {
-      int of = click_random() % 8;
+      int of = click_random() % HAVE_RAND_ALIGN;
     void* m = malloc(sz + of);
     click_chatter("EALLOC %d OF %d", sz, of);
     return ((unsigned char*)m) + of;
