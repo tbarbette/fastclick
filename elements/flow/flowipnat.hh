@@ -120,7 +120,7 @@ class FlowIPNAT : public FlowStateElement<FlowIPNAT,NATEntryIN> , TCPHelper {
         bool new_flow(NATEntryIN*, Packet*);
         void release_flow(NATEntryIN*);
 
-        void push_batch(int, NATEntryIN*, PacketBatch *);
+        void push_flow(int, NATEntryIN*, PacketBatch *);
 
     private:
         struct state {
@@ -154,7 +154,7 @@ class FlowIPNATReverse : public FlowStateElement<FlowIPNATReverse,NATEntryOUT>, 
         bool new_flow(NATEntryOUT*, Packet*);
         void release_flow(NATEntryOUT*);
 
-        void push_batch(int, NATEntryOUT*, PacketBatch *);
+        void push_flow(int, NATEntryOUT*, PacketBatch *);
 
     private:
         FlowIPNAT* _in;

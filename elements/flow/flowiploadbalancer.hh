@@ -80,7 +80,7 @@ class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>
         bool new_flow(IPLBEntry*, Packet*);
         void release_flow(IPLBEntry*) {};
 
-        void push_batch(int, IPLBEntry*, PacketBatch *);
+        void push_flow(int, IPLBEntry*, PacketBatch *);
 
         void add_handlers() override CLICK_COLD;
 private:

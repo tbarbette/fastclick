@@ -36,7 +36,7 @@ class FlowLock : public FlowSpaceElement<FlowLockState> {
         int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
         int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-        void push_batch(int, FlowLockState*, PacketBatch *);
+        void push_flow(int, FlowLockState*, PacketBatch *);
 };
 
 CLICK_ENDDECLS
