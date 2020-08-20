@@ -62,7 +62,7 @@ class Element { public:
 #ifdef HAVE_RAND_ALIGN
 
    static int nalloc;
-   static std::default_random_engine generator;
+   static std::mt19937 generator;
 // Overloading CLass specific new operator
   inline static void* operator new(size_t sz)
   {
