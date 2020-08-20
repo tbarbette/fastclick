@@ -70,7 +70,7 @@ bool FlowSwitch::new_flow(FlowSwitchEntry* flowdata, Packet* p)
     return true;
 }
 
-void FlowSwitch::push_batch(int, FlowSwitchEntry* flowdata, PacketBatch* batch)
+void FlowSwitch::push_flow(int, FlowSwitchEntry* flowdata, PacketBatch* batch)
 {
     output_push_batch(flowdata->chosen_server, batch);
 }

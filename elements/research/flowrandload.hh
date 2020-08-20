@@ -64,7 +64,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
     int initialize(ErrorHandler *errh) override CLICK_COLD;
 
-    void push_batch(int, RandLoadState*, PacketBatch *);
+    void push_flow(int, RandLoadState*, PacketBatch *);
 
 private:
     int _min;

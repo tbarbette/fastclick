@@ -36,7 +36,7 @@ int TestFlowSpace::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-void TestFlowSpace::push_batch(int port, FourBytes* flowdata, PacketBatch* batch) {
+void TestFlowSpace::push_flow(int port, FourBytes* flowdata, PacketBatch* batch) {
     output_push_batch(0, batch);
 }
 
