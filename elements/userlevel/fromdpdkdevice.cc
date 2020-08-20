@@ -244,6 +244,7 @@ bool FromDPDKDevice::run_task(Task *t) {
 # if CLICK_PACKET_INSIDE_DPDK
     WritablePacket *p =(WritablePacket*)( pkts[i] + 1);
     new (p) WritablePacket();
+
     p->initialize(_clear);
     p->set_buffer((unsigned char*)(pkts[i]->buf_addr), DPDKDevice::MBUF_DATA_SIZE);
     p->set_data(data);
