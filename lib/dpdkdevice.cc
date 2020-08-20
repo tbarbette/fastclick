@@ -852,7 +852,6 @@ void DPDKDevice::free_pkt(unsigned char *, size_t, void *pktmbuf)
     rte_pktmbuf_free((struct rte_mbuf *) pktmbuf);
 }
 
-
 bool
 DPDKDeviceArg::parse(
     const String &str, DPDKDevice* &result, const ArgContext &ctx)

@@ -300,7 +300,7 @@ void ToDPDKDevice::push(int, Packet *p)
         // If we're in blocking mode, we loop until we can put p in the iqueue
     } while (unlikely(_blocking && congestioned));
 
-#if !CLICK_PACKET_USE_DPDK
+#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     if (likely(is_fullpush()))
         p->kill_nonatomic();
     else
@@ -333,7 +333,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 
     //No recycling through click if we have DPDK-backed packets
     bool congestioned;
-#if !CLICK_PACKET_USE_DPDK
+#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     BATCH_RECYCLE_START();
 #endif
     do {
@@ -350,7 +350,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
                 abort();
             }
             next = p->next();
-#if !CLICK_PACKET_USE_DPDK
+#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
             BATCH_RECYCLE_PACKET_CONTEXT(p);
 #endif
             p = next;
@@ -377,7 +377,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         // If we're in blocking mode, we loop until we can put p in the iqueue
     } while (unlikely(_blocking && congestioned));
 
-#if !CLICK_PACKET_USE_DPDK
+#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     //If non-blocking, drop all packets that could not be sent
     while (p) {
         next = p->next();
@@ -387,7 +387,7 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
     }
 #endif
 
-#if !CLICK_PACKET_USE_DPDK
+#if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     BATCH_RECYCLE_END();
 #endif
 
