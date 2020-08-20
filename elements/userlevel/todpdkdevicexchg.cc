@@ -168,7 +168,73 @@ void ToDPDKDeviceXCHG::run_timer(Timer *)
     flush_internal_tx_queue(_iqueues.get());
 }
 
-#if !defined(NOXCHG) && !defined(XCHG_TX_SWAPONLY)
+#ifdef CLICK_PACKET_INSIDE_DPDK
+    inline struct rte_mbuf* get_mbuf(struct xchg* x) {
+        return (struct rte_mbuf*)x;
+    }
+
+    inline struct WritablePacket* get_tx_pkt(struct xchg* x) {
+        return (struct WritablePacket*)(get_mbuf(x) + 1);
+    }
+
+    uint16_t xchg_get_data_len(struct xchg* xchg) {
+        return get_tx_pkt(xchg)->length();
+    }
+
+    void xchg_tx_completed(struct rte_mbuf** elts, unsigned int part, unsigned int olx) {
+        //mlx5_tx_free_mbuf(elts, part, olx);
+    }
+
+
+
+    int xchg_nb_segs(struct xchg* xchg) {
+        //struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
+        return 1; //NB_SEGS(pkt);
+    }
+
+
+    void* xchg_get_buffer_addr(struct xchg* xchg) {
+        WritablePacket* p = get_tx_pkt(xchg);
+        return p->buffer();
+    }
+
+    void* xchg_get_buffer(struct xchg* xchg) {
+        return get_tx_pkt(xchg)->data();
+    }
+
+
+    bool xchg_do_tx_free = true;
+
+
+    void xchg_tx_advance(struct xchg*** xchgs_p) {
+        struct rte_mbuf** pkts = (struct rte_mbuf**)(*xchgs_p);
+        //printf("Advance : %p -> %p = %p\n", pkts, pkts+1, *(pkts+1));
+        pkts += 1;
+        *xchgs_p = (struct xchg**)pkts;
+
+    }
+
+	void xchg_tx_sent_inline(struct xchg* xchg) {
+        struct rte_mbuf* pkt = (struct rte_mbuf*) xchg;
+
+        //printf("INLINED %p\n", xchg);
+        rte_pktmbuf_free_seg(pkt);
+    }
+
+    void xchg_tx_sent(struct rte_mbuf** elts, struct xchg** xchg) {
+        //printf("SENT %p\n", *xchg);
+        *elts= (struct rte_mbuf*)*xchg;
+    }
+
+    void xchg_tx_sent_vec(struct rte_mbuf** elts, struct xchg** xchg, unsigned n) {
+//        for (unsigned i = 0; i < n; i++)
+            //printf("SENTV %p\n", ((struct rte_mbuf**)xchg)[i]);
+        rte_memcpy((void *)elts, (void*) xchg, n * sizeof(struct rte_mbuf*));
+    }
+
+    bool xchg_elts_vec = true;
+
+#elif !defined(XCHG_TX_SWAPONLY)
     inline struct WritablePacket* get_tx_buf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
@@ -643,6 +709,27 @@ send:
         } else {
             //Nothing to do : packets are still in the batch, others have been swapped!
         }
+    }
+# elif CLICK_PACKET_INSIDE_DPDK
+    int count = head->count();
+    struct rte_mbuf* pkts[count];
+    Packet* p = batch;
+    for (int i = 0; i < count; i++) {
+        pkts[i] = ((struct rte_mbuf*)p) - 1;
+        p = p->next();
+    }
+send:
+    unsigned r = rte_mlx5_tx_burst_xchg(_dev->port_id, queue_for_thisthread_begin(),(struct xchg**)pkts, count);
+    if (unlikely(r != count)) {
+        warn_congestion();
+        if (_blocking) {
+            count -= r;
+            pkts += r;
+            goto send;
+        } else {
+            assert(false);//TODO : kill packets starting at non-sent
+        }
+
     }
 # else //No SWAPONLY
     unsigned count = head->count();

@@ -237,6 +237,101 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
 
 # else
 
+#  if CLICK_PACKET_INSIDE_DPDK
+    inline struct rte_pktmbuf* get_mbuf(struct xchg* x) {
+        return (struct WritablePacket*)x;
+    }
+
+    inline WritablePacket* get_pkt(struct xchg* x) {
+        return (struct WritablePacket*)(get_mbuf(x) + 1);
+    }
+
+    void xchg_set_packet_type(struct xchg* xchg, uint32_t ptype) {
+        //get_buf(xchg)->packet_type = ptype;
+    }
+
+    void xchg_set_rss_hash(struct xchg* xchg, uint32_t rss) {
+        SET_AGGREGATE_ANNO(get_pkt(xchg), rss);
+    }
+
+    void xchg_set_timestamp(struct xchg* xchg, uint64_t t) {
+        get_pkt(xchg)->timestamp_anno().assignlong(t);
+    }
+
+    void xchg_set_flag(struct xchg* xchg, uint64_t f) {
+//        get_buf(xchg)->ol_flags |= f;
+    }
+
+    void xchg_clear_flag(struct xchg* xchg, uint64_t f) {
+    //    get_buf(xchg)->ol_flags &= f;
+    }
+
+    void xchg_set_fdir_id(struct xchg* xchg, uint32_t mark) {
+        SET_AGGREGATE_ANNO(get_pkt(xchg), mark);
+    }
+
+    void xchg_set_vlan(struct xchg* xchg, uint32_t vlan) {
+        SET_VLAN_TCI_ANNO(get_pkt(xchg),vlan);
+    }
+
+    void xchg_set_len(struct xchg* xchg, uint16_t len) {
+        //get_buf(xchg)->set_buffer_length(len);
+    }
+
+    void xchg_set_data_len(struct xchg* xchg, uint16_t len) {
+        get_pkt(xchg)->set_data_length(len);
+    }
+
+    uint16_t xchg_get_len(struct xchg* xchg) {
+        return get_pkt(xchg)->buffer_length();
+    }
+
+
+    void xchg_finish_packet(struct xchg* xchg) {
+i//        WritablePacket* p = get_pkt(xchg);
+ck_chatter("Packet %p, head %p, data %p, tail %p, end %p", p, p->buffer(), p->data(), p->end_data(), p->end_buffer());
+//        p->set_destructor_argument(p->buffer() - RTE_PKTMBUF_HEADROOM);
+/*        if (_set_rss_aggregate)
+#if RTE_VERSION > RTE_VERSION_NUM(1, 7, 0, 0)
+          SET_AGGREGATE_ANNO(p, pkts[i]->hash.rss);
+#else
+          SET_AGGREGATE_ANNO(p, pkts[i]->pkt.hash.rss);
+#endif
+        if (_set_paint_anno) {
+          SET_PAINT_ANNO(p, iqueue);
+        }*/
+
+    }
+
+    /**
+     * Set a new buffer to replace in the ring if not canceled, and return the next descriptor
+     */
+/**
+     * Take a packet from the ring and replace it by a new one
+     */
+    struct xchg* xchg_next(struct rte_mbuf** pkt, struct xchg** xchgs, struct rte_mempool* mp) {
+        (void) xchgs; //Mbuf is set on advance
+        struct rte_mbuf* xchg = *pkt; //Buffer in the ring
+                rte_prefetch0(get_pkt(xchg));
+        *pkt = rte_mbuf_raw_alloc(mp); //Allocate packet to put back in the ring
+        return (struct xchg*)xchg;
+    }
+
+    void xchg_cancel(struct xchg* xchg, struct rte_mbuf* pkt) {
+        (void)xchg;
+        rte_mbuf_raw_free(pkt);
+    }
+
+    void xchg_advance(struct xchg* xchg, struct xchg*** xchgs_p) {
+        struct xchg** xchgs = *xchgs_p;
+        *(xchgs++) = xchg; //Set in the user pointer the buffer from the ring
+        *xchgs_p = xchgs;
+    }
+    void* xchg_buffer_from_elt(struct rte_mbuf* elt) {
+        return rte_pktmbuf_mtod(elt, void*);
+    }
+
+#  else
     inline struct WritablePacket* get_buf(struct xchg* x) {
         return (struct WritablePacket*)x;
     }
@@ -337,7 +432,7 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
     void* xchg_buffer_from_elt(struct rte_mbuf* buf) {
         return ((unsigned char*)buf) + sizeof(rte_mbuf) + RTE_PKTMBUF_HEADROOM;
     }   
-
+#  endif
 # endif
 
 
@@ -347,7 +442,6 @@ mlx5_tx_free_mbuf(struct rte_mbuf ** pkts,
     }*/
 
 bool FromDPDKDeviceXCHG::run_task(Task *t) {
-  struct rte_mbuf *pkts[_burst];
   int ret = 0;
 
   int iqueue = queue_for_thisthread_begin();
@@ -360,7 +454,32 @@ bool FromDPDKDeviceXCHG::run_task(Task *t) {
 
 //    unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, xchgs, _burst);
 //
-#if HAVE_VECTOR_PACKET_POOL
+
+# if CLICK_PACKET_INSIDE_DPDK
+
+  struct rte_mbuf *pkts[_burst];
+  unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, pkts, _burst);
+  if (n) {
+    WritablePacket::pool_consumed_data_burst(n,tail[1]);
+    add_count(n);
+    ret = 1;
+    PacketBatch* batch = (WritablePacket*)(pkts[0] + 1);
+    WritablePacket* next = batch->first();
+    WritablePacket* p;
+    for (int i =0; i < n; i++) {
+        p = next;
+        rte_prefetch0(p->data());
+        p->set_packet_type_anno(Packet::HOST);
+        p->set_mac_header(p->data());
+        next = (WritablePacket*)(pkts[i] + 1);
+        p->set_next(next);
+    }
+
+    batch->make_tail(p,n);
+    output_push_batch(0, batch);
+  }
+
+#elif HAVE_VECTOR_PACKET_POOL
   unsigned n = rte_mlx5_rx_burst_xchg(_dev->port_id, iqueue, WritablePacket::pool_prepare_data(_burst), _burst);
   if (n) {
     WritablePacket::pool_consumed_data(n);
