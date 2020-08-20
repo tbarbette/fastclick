@@ -69,8 +69,13 @@ class Element { public:
 
       int max = atoi(getenv("CLICK_ELEM_RAND_MAX"));
       max = max / alignof(Element);
-      int rand = generator() / (generator.max() / max);
-      int of = (rand) * alignof(Element);
+      int of;
+      if (max > 0) {
+          int rand = generator() / (generator.max() / max);
+          of = (rand) * alignof(Element);
+      } else {
+          of = 0;
+      }
     void* m = aligned_alloc(alignof(Element), sz + of);
     click_chatter("EALLOC %d OF %d AL %d", sz, of, alignof(Element) );
 
