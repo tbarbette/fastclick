@@ -31,10 +31,12 @@ int QueueDevice::use_nodes = 0;
 Vector<int> QueueDevice::inputs_count = Vector<int>();
 Vector<int> QueueDevice::shared_offset = Vector<int>();
 
-QueueDevice::QueueDevice() : _minqueues(0),_maxqueues(128), usable_threads(),
+QueueDevice::QueueDevice() :
+    _minqueues(0),_maxqueues(128), _burst(0),
+    _q_infos(), usable_threads(),
     queue_per_threads(1), queue_share(1), ndesc(0), allow_nonexistent(false),
     _maxthreads(-1), _minthreads(0), firstqueue(-1), lastqueue(-1), n_queues(-1),
-    thread_share(1), _this_node(0), _active(true) {
+    thread_share(1), _thread_state(), _this_node(0), _active(true) {
     _verbose = 1;
 }
 
@@ -159,6 +161,9 @@ int RXQueueDevice::parse(Vector<String> &conf, ErrorHandler *errh) {
     _use_numa = false;
 #endif
     return 0;
+}
+
+TXQueueDevice::TXQueueDevice() : _blocking(false), _internal_tx_queue_size(1024) {
 }
 
 int TXQueueDevice::parse(Vector<String> &conf, ErrorHandler* errh) {

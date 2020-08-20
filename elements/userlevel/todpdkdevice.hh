@@ -161,7 +161,6 @@ protected:
     int _timeout;
     bool _congestion_warning_printed;
     bool _create;
-    bool _vlan;
     uint32_t _tso;
     bool _tco;
     bool _ipco;
