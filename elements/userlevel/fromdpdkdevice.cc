@@ -212,6 +212,11 @@ extern "C" {
 }
 #endif
 
+ void free_inside_pkt(unsigned char *, size_t, void *pktmbuf)
+{
+    rte_pktmbuf_free((struct rte_mbuf *) pktmbuf - 1);
+}
+
 bool FromDPDKDevice::run_task(Task *t) {
   struct rte_mbuf *pkts[_burst];
   int ret = 0;
@@ -235,9 +240,21 @@ bool FromDPDKDevice::run_task(Task *t) {
 #if CLICK_PACKET_USE_DPDK
     WritablePacket *p = static_cast<WritablePacket *>(Packet::make(pkts[i], _clear));
 #elif HAVE_ZEROCOPY
+
+# if CLICK_PACKET_INSIDE_DPDK
+    WritablePacket *p =(WritablePacket*)( pkts[i] + 1);
+    new (p) WritablePacket();
+
+    p->initialize(_clear);
+    p->set_buffer((unsigned char*)(pkts[i]->buf_addr), DPDKDevice::MBUF_DATA_SIZE);
+    p->set_data(data);
+    p->set_data_length(rte_pktmbuf_data_len(pkts[i]));
+    p->set_buffer_destructor(free_inside_pkt);
+# else
     WritablePacket *p = Packet::make(
         data, rte_pktmbuf_data_len(pkts[i]), DPDKDevice::free_pkt, pkts[i],
         rte_pktmbuf_headroom(pkts[i]), rte_pktmbuf_tailroom(pkts[i]), _clear);
+# endif
 #else
     WritablePacket *p =
         Packet::make(data, (uint32_t)rte_pktmbuf_pkt_len(pkts[i]));

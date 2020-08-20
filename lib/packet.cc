@@ -803,26 +803,34 @@ Packet::make(uint32_t headroom, const void *data,
     (void) tailroom;
     return reinterpret_cast<WritablePacket *>(mb);
 #else
+        # if CLICK_PACKET_USE_DPDK
+            struct rte_mbuf *mb = DPDKDevice::get_pkt();
+            if (!mb) {
+                click_chatter("could not alloc pktmbuf");
+                return 0;
+            }
+            WritablePacket *p = (WritablePacket*)(mb + 1);
+            p->initialize(clear);
+        # elif HAVE_CLICK_PACKET_POOL
+            WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom, clear);
+            if (!p)
+                return 0;
+        # else
+            WritablePacket *p = new WritablePacket;
+            if (!p)
+                return 0;
 
-		# if HAVE_CLICK_PACKET_POOL
-			WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom, clear);
-			if (!p)
-			return 0;
-		# else
-			WritablePacket *p = new WritablePacket;
-			if (!p)
-			return 0;
-			p->initialize(clear);
-			if (!p->alloc_data(headroom, length, tailroom)) {
-			p->_head = 0;
-			delete p;
-			    return 0;
-			}
-		# endif
-			if (data)
-			memcpy(p->data(), data, length);
-			return p;
-		#endif
+            p->initialize(clear);
+            if (!p->alloc_data(headroom, length, tailroom)) {
+                p->_head = 0;
+                delete p;
+                return 0;
+            }
+        # endif
+            if (data)
+                memcpy(p->data(), data, length);
+            return p;
+        #endif
 
 }
 
