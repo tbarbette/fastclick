@@ -1536,8 +1536,7 @@ Optional Features:
                           make vanilla elements batch-compatible automatically
     --enable-netmap-pool  use netmap buffers instead of standard Click buffers
     --enable-json         enable JSON support
-    --enable-rand-align=randmax
-                          enable random alignment of element
+    --enable-rand-align   enable random alignment of element
     --enable-select=[select|poll|kqueue]
                           set file descriptor wait mechanism
     --disable-select      do not use select()
@@ -7098,19 +7097,13 @@ else
   enable_rand_align=no
 fi
 
-
 if test "x$enable_rand_align" = "xyes"; then
-    enable_rand_align=8
-fi
-if test "x$enable_rand_align" = "xno"; then
-    DO_RAND_ALIGN=0
+    $as_echo "#define HAVE_RAND_ALIGN 1" >>confdefs.h
+
+    DO_RAND_ALIGN=1
 
 else
-    cat >>confdefs.h <<_ACEOF
-#define HAVE_RAND_ALIGN ${enable_rand_align}
-_ACEOF
-
-    DO_RAND_ALIGN=$enable_rand_align
+    DO_RAND_ALIGN=0
 
 fi
 

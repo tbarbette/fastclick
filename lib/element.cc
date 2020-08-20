@@ -3274,6 +3274,7 @@ Element::run_timer(Timer *timer)
 #ifdef HAVE_RAND_ALIGN
 
 int Element::nalloc = 0;
+std::default_random_engine  Element::generator;
 #endif
 
 CLICK_ENDDECLS

@@ -1130,7 +1130,7 @@ END {
 elif test "$elem2" = exportstatic; then
 	includes="$includes"'  print "#include <click/config.h>\n#include <click/package.hh>", includefiles;'
 	awk_program='BEGIN {
-  OFS = ""; nrebecca = 0; delete objs[0];
+    OFS = ""; nrebecca = 0; delete objs[0]; srand('${CLICK_ELEM_RAND_SEED}');
 }
 /^#/ { next; }
 {
@@ -1150,7 +1150,7 @@ elif test "$elem2" = exportstatic; then
       D = D "   case " nrebecca ": obj_" ans[1]".~" ans[1]"(); new (&obj_" ans[1] ") " ans[1] "; return &obj_" ans[1] ";\n";
       if (!(ans[1] in objs)) {
         if (@DO_RAND_ALIGN@) {
-          E = E " uint8_t pad_"ans[1]"[" int(@DO_RAND_ALIGN@ * rand()) "] ;\n";
+          E = E " uint8_t pad_"ans[1]"[" int('${CLICK_ELEM_RAND_MAX}' * rand()) "] ;\n";
         }
         E = E ans[1] " obj_"ans[1]";\n";
         objs[ans[1]] = 1;

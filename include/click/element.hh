@@ -9,7 +9,7 @@
 #include <click/handler.hh>
 #include <click/sync.hh>
 #include <functional>
-
+#include <random>
 #include <csignal>
 CLICK_DECLS
 class Router;
@@ -62,10 +62,15 @@ class Element { public:
 #ifdef HAVE_RAND_ALIGN
 
    static int nalloc;
+   static std::default_random_engine generator;
 // Overloading CLass specific new operator
   inline static void* operator new(size_t sz)
   {
-      int of = (click_random() % (HAVE_RAND_ALIGN / alignof(Element))) * alignof(Element);
+
+      int max = atoi(getenv("CLICK_ELEM_RAND_MAX"));
+      max = max / alignof(Element);
+      int rand = generator() / (generator.max() / max);
+      int of = (rand) * alignof(Element);
     void* m = aligned_alloc(alignof(Element), sz + of);
     click_chatter("EALLOC %d OF %d AL %d", sz, of, alignof(Element) );
 
