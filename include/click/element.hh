@@ -66,8 +66,10 @@ class Element { public:
 // Overloading CLass specific new operator
   inline static void* operator new(size_t sz)
   {
-
-      int max = atoi(getenv("CLICK_ELEM_RAND_MAX"));
+      char * env = getenv("CLICK_ELEM_RAND_MAX");
+      int max = 0;
+      if (env)
+          max = atoi(env);
       max = max / alignof(Element);
       int of;
       if (max > 0) {
