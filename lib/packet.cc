@@ -803,7 +803,7 @@ Packet::make(uint32_t headroom, const void *data,
     (void) tailroom;
     return reinterpret_cast<WritablePacket *>(mb);
 #else
-        # if CLICK_PACKET_USE_DPDK
+        # if CLICK_PACKET_INSIDE_DPDK
             struct rte_mbuf *mb = DPDKDevice::get_pkt();
             if (!mb) {
                 click_chatter("could not alloc pktmbuf");
@@ -811,6 +811,8 @@ Packet::make(uint32_t headroom, const void *data,
             }
             WritablePacket *p = (WritablePacket*)(mb + 1);
             p->initialize(clear);
+            p->set_buffer_destructor(DPDKDevice::free_pkt);
+            p->set_destructor_argument(mb);
         # elif HAVE_CLICK_PACKET_POOL
             WritablePacket *p = WritablePacket::pool_allocate(headroom, length, tailroom, clear);
             if (!p)
