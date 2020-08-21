@@ -22,12 +22,13 @@
 #include <click/element.hh>
 #include <click/dpdkdevice.hh>
 #include <click/userutils.hh>
+#include <click/packet.hh>
 #include <rte_errno.h>
 
 CLICK_DECLS
 
 #if CLICK_PACKET_USE_DPDK
-#define DPDK_ANNO_SIZE sizeof(AllAnno)
+#define DPDK_ANNO_SIZE sizeof(Packet::AllAnno)
 #elif CLICK_PACKET_INSIDE_DPDK
 #define DPDK_ANNO_SIZE (((sizeof(Packet) - 1) / 4) +1) * 4
 #else
