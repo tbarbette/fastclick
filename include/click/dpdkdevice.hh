@@ -357,6 +357,9 @@ inline struct rte_mbuf* DPDKDevice::get_mbuf(Packet* p, bool create, int node, b
     mbuf = p->mb();
     #elif CLICK_PACKET_INSIDE_DPDK
     mbuf = ((struct rte_mbuf*)p) - 1;
+    rte_pktmbuf_pkt_len(mbuf) = p->length();
+    rte_pktmbuf_data_len(mbuf) = p->length();
+    mbuf->data_off = p->headroom();
     #else
     if (likely(DPDKDevice::is_dpdk_packet(p) && (mbuf = (struct rte_mbuf *)((unsigned char*) p->buffer() - sizeof(rte_mbuf)) ))
         || unlikely(p->data_packet() && DPDKDevice::is_dpdk_packet(p->data_packet()) && (mbuf = (struct rte_mbuf *) p->data_packet()->destructor_argument()))) {
