@@ -134,6 +134,9 @@ protected:
   atomic_uint32_t _synchronize_ok;
   Timer** _sync_timers;
 
+  int _sync;
+  int _prec;
+
   UserClock* _base;
 
   inline int64_t tick_to_subsec(int64_t delta, int64_t mult);

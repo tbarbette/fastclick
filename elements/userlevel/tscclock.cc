@@ -66,6 +66,8 @@ TSCClock::configure(Vector<String> &conf, ErrorHandler *errh)
             .read("NOWAIT", _nowait)
             .read("BASE",basee)
             .read("SOURCE", sourcee)
+            .read_or_set("PRECISION", _prec, 100)
+            .read_or_set("SYNCHRONIZE", _sync, 10)
             .read("CONVERT_STEADY", _convert_steady)
             .read("READY_CALL", HandlerCallArg(HandlerCall::writable), _ready_h)
             .complete() < 0)
@@ -167,7 +169,7 @@ TSCClock::initialize(ErrorHandler* errh) {
     last_timestamp[0] = get_real_timestamp();
     last_cycles[0] = _source.get_current_tick(_source_thunk);
 
-    max_precision = 100 * (double)Timestamp::subsec_per_sec/(double)tsc_freq;
+    max_precision = _prec * (double)Timestamp::subsec_per_sec/(double)tsc_freq;
     //Need to converge quickly enough, but have a period large enough so that the cycle is still correct
     update_period_subsec = (int64_t)Timestamp::subsec_per_sec / 10;
     update_period_msec = update_period_subsec / (Timestamp::subsec_per_sec / Timestamp::msec_per_sec);
@@ -223,8 +225,8 @@ bool TSCClock::stabilize_tick() {
     //Lower alpha if we get a good precision 10 times in a row
     if (abs(period_error_delta_timestamp) < max_precision) {
         alpha_stable++;
-        if (alpha_stable == 10) {
-            alpha /= 10;
+        if (alpha_stable == _sync) {
+            alpha /= (float)_sync;
             alpha_stable = 0;
             //Stop when alpha cannot change the hz anymore
             if (alpha * (double)tsc_freq < 1) {
