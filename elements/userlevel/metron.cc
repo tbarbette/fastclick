@@ -579,7 +579,7 @@ CpuCache::level_from_integer(const int &level)
         case 4:
             return L4;
         default:
-            assert(true);
+            assert(false);
     }
 }
 
