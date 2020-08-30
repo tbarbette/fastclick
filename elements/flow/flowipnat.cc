@@ -62,7 +62,7 @@ int FlowIPNAT::initialize(ErrorHandler *errh)
     }
 
     /**
-     * Get passing threads, that is the threads that will call push_batch
+     * Get passing threads, that is the threads that will call push_flow
      */
     Bitvector passing = get_passing_threads(); // TODO touching false
     if (passing.weight() == 0) {
@@ -161,7 +161,7 @@ void FlowIPNAT::release_flow(NATEntryIN* fcb)
 }
 
 
-void FlowIPNAT::push_batch(int port, NATEntryIN* flowdata, PacketBatch* batch)
+void FlowIPNAT::push_flow(int port, NATEntryIN* flowdata, PacketBatch* batch)
 {
     if (!_own_state && flowdata->ref && flowdata->ref->closing && isSyn(batch->first())) {
         // If the state is not handled by us, another manager could have deleted the other side while
@@ -242,7 +242,7 @@ void FlowIPNATReverse::release_flow(NATEntryOUT* fcb)
 #endif
 }
 
-void FlowIPNATReverse::push_batch(int port, NATEntryOUT* flowdata, PacketBatch* batch)
+void FlowIPNATReverse::push_flow(int port, NATEntryOUT* flowdata, PacketBatch* batch)
 {
     if (!_in->_own_state && flowdata->ref && flowdata->ref->closing && isSyn(batch->first())) {
         // If the state is not handled by us, another manager could have deleted the other side while

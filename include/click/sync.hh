@@ -948,6 +948,12 @@ ReadWriteLock::release_write()
 class nolock { public:
     nolock() {}
 
+    inline void acquire() {};
+
+    inline void release() {};
+
+    inline bool attempt() { return true; };
+
     inline void read_begin() {}
 
     inline void read_end() {}

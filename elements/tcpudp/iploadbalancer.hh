@@ -65,11 +65,17 @@ public:
 
     void push(int, Packet *) override;
 
-private:
+    void add_handlers() override CLICK_COLD;
 
+private:
+    static int handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh);
+    static String read_handler(Element *handler, void *user_data);
     IPAddress _vip;
     bool _accept_nonsyn;
-
+    static int write_handler(
+      const String &, Element *, void *, ErrorHandler *
+  ) CLICK_COLD;
+    friend class LoadBalancer;
     friend class IPLoadBalancerReverse;
 
 };

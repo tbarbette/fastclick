@@ -23,6 +23,8 @@ public:
         }
 private:
         static bool _dying;
+protected:
+        static int _n_msg;
 };
 
 /**
@@ -151,7 +153,8 @@ class pool_allocator_mt : pool_allocator_mt_base { public:
 #if CLICK_DEBUG_ALLOCATOR
                     click_chatter("Global pool is full, freeing item");
 #endif
-                    click_chatter("Extremly inefficient pool_allocator_mt for %s ! Change parameters !",typeid(T).name());
+		    if (_n_msg++ < 5)
+			click_chatter("Extremly inefficient pool_allocator_mt for %s ! Change parameters !",typeid(T).name());
                 }
                 p.count --;
             } else {

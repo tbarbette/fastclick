@@ -28,8 +28,8 @@ enum FlowType {
 
 class FlowElement : public BatchElement {
 public:
-	FlowElement();
-	~FlowElement();
+    FlowElement();
+    ~FlowElement();
 
     virtual FlowType getContext();
 
@@ -40,21 +40,21 @@ public:
 /**
  * Element that needs FCB space
  */
-class VirtualFlowSpaceElement : public FlowElement {
+class VirtualFlowSpaceElement : public FlowElement, Router::InitFuture {
 public:
-	VirtualFlowSpaceElement() :_flow_data_offset(-1) {
-	}
-	virtual const size_t flow_data_size() const = 0;
-	virtual const int flow_data_index() const {
-		return -1;
-	}
+    VirtualFlowSpaceElement() :_flow_data_offset(-1) {
+    }
+    virtual const size_t flow_data_size() const = 0;
+    virtual const int flow_data_index() const {
+        return -1;
+    }
 
-	inline void set_flow_data_offset(int offset) {_flow_data_offset = offset; }
-	inline int flow_data_offset() {return _flow_data_offset; }
+    inline void set_flow_data_offset(int offset) {_flow_data_offset = offset; }
+    inline int flow_data_offset() {return _flow_data_offset; }
 
-	int configure_phase() const		{ return CONFIGURE_PHASE_DEFAULT + 5; }
+    int configure_phase() const        { return CONFIGURE_PHASE_DEFAULT + 5; }
 
-	void *cast(const char *name) override;
+    void *cast(const char *name) override;
 #if HAVE_FLOW_DYNAMIC
     inline void fcb_acquire(int count = 1) {
         fcb_stack->acquire(count);
@@ -169,10 +169,17 @@ public:
         return 0;
     }
 
+    //TODO this should be final
+    int initialize(ErrorHandler *errh) override CLICK_COLD {
+        _fcb_offset_defined.post(this);
+	return 0;
+    }
 protected:
-	int _flow_data_offset;
-	friend class FlowBufferVisitor;
-	friend class VirtualFlowManager;
+
+    Router::InitFuture _fcb_offset_defined;
+    int _flow_data_offset;
+    friend class FlowBufferVisitor;
+    friend class VirtualFlowManager;
 };
 
 class CounterInitFuture : public Router::InitFuture { public:
@@ -227,33 +234,33 @@ template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
 
 public :
 
-	FlowSpaceElement() CLICK_COLD;
-	virtual int initialize(ErrorHandler *errh) override CLICK_COLD;
-    void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
+    FlowSpaceElement() CLICK_COLD;
+    virtual int solve_initialize(ErrorHandler *errh) override CLICK_COLD;
+        void fcb_set_init_data(FlowControlBlock* fcb, const T data) CLICK_COLD;
 
-	virtual const size_t flow_data_size()  const override { return sizeof(T); }
+    virtual const size_t flow_data_size()  const override { return sizeof(T); }
 
 
-	/**
-	 * Return the T type for a given FCB
-	 */
-	inline T* fcb_data_for(FlowControlBlock* fcb) {
-	    T* flowdata = static_cast<T*>((void*)&fcb->data[_flow_data_offset]);
-	    return flowdata;
-	}
+    /**
+     * Return the T type for a given FCB
+     */
+    inline T* fcb_data_for(FlowControlBlock* fcb) {
+        T* flowdata = static_cast<T*>((void*)&fcb->data[_flow_data_offset]);
+        return flowdata;
+    }
 
-	/**
-	 * Return the T type in the current FCB on the stack
-	 */
-	inline T* fcb_data() {
+    /**
+     * Return the T type in the current FCB on the stack
+     */
+    inline T* fcb_data() {
         return fcb_data_for(fcb_stack);
     }
 
-	void push_batch(int port,PacketBatch* head) final {
-			push_batch(port, fcb_data(), head);
-	};
-	virtual void push_batch(int port, T* flowdata, PacketBatch* head) = 0;
+    void push_batch(int port,PacketBatch* head) final {
+            push_flow(port, fcb_data(), head);
+    };
 
+    virtual void push_flow(int port, T* flowdata, PacketBatch* head) = 0;
 };
 
 /**
@@ -277,7 +284,7 @@ public :
     typedef FlowStateElement<Derived, T> derived;
 
     FlowStateElement() CLICK_COLD;
-    virtual int initialize(ErrorHandler *errh) CLICK_COLD;
+    virtual int solve_initialize(ErrorHandler *errh) CLICK_COLD;
     virtual const size_t flow_data_size()  const { return sizeof(AT); }
 
     /**
@@ -327,7 +334,7 @@ public :
                  return;
              }
          }
-         static_cast<Derived*>(this)->push_batch(port, &my_fcb->v, head);
+         static_cast<Derived*>(this)->push_flow(port, &my_fcb->v, head);
     };
 
     void close_flow() {
@@ -357,7 +364,7 @@ FlowSpaceElement<T>::FlowSpaceElement() : VirtualFlowSpaceElement() {
 
 template<typename T>
 int
-FlowSpaceElement<T>::initialize(ErrorHandler *errh) {
+FlowSpaceElement<T>::solve_initialize(ErrorHandler *errh) {
     if (_flow_data_offset == -1) {
         return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
     }
@@ -371,7 +378,7 @@ FlowStateElement<Derived, T>::FlowStateElement() : VirtualFlowSpaceElement() {
 
 
 template<class Derived, typename T>
-int FlowStateElement<Derived, T>::initialize(ErrorHandler *errh) {
+int FlowStateElement<Derived, T>::solve_initialize(ErrorHandler *errh) {
     if (_flow_data_offset == -1) {
         return errh->error("No FlowClassifier() element sets the flow context for %s !",name().c_str());
     }

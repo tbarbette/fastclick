@@ -27,7 +27,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
         .read_or_set_p("CAPACITY", _table_size, 65536)
-        .read_or_set("RESERVE",_reserve, 0)
+        .read_or_set("RESERVE", _reserve, 0)
         .read_or_set("TIMEOUT", _timeout, -1)
         .complete() < 0)
         return -1;
@@ -43,6 +43,8 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
 
     _fcb_builded_init_future.post(this);
+
+    _reserve += sizeof(uint32_t);
 
     return 0;
 }

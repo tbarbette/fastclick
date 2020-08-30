@@ -47,7 +47,7 @@ int FlowLock::initialize(ErrorHandler *errh)
     return 0;
 }
 
-void FlowLock::push_batch(int port, FlowLockState* flowdata, PacketBatch* batch)
+void FlowLock::push_flow(int port, FlowLockState* flowdata, PacketBatch* batch)
 {
     flowdata->lock.acquire();
     output_push_batch(0, batch);

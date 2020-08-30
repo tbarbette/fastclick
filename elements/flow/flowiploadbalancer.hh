@@ -80,12 +80,21 @@ class FlowIPLoadBalancer : public FlowStateElement<FlowIPLoadBalancer,IPLBEntry>
         bool new_flow(IPLBEntry*, Packet*);
         void release_flow(IPLBEntry*) {};
 
-        void push_batch(int, IPLBEntry*, PacketBatch *);
+        void push_flow(int, IPLBEntry*, PacketBatch *);
 
-    private:
+        void add_handlers() override CLICK_COLD;
+private:
+
         IPAddress _vip;
         bool _accept_nonsyn;
 
+	static int handler(int op, String& s, Element* e, const Handler* h, ErrorHandler* errh);
+        static String read_handler(Element *handler, void *user_data);
+        static int write_handler(
+            const String &, Element *, void *, ErrorHandler *
+            ) CLICK_COLD;
+
+	friend class LoadBalancer;
         friend class FlowIPLoadBalancerReverse;
 };
 
