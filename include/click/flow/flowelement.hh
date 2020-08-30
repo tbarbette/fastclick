@@ -256,7 +256,7 @@ public :
         return fcb_data_for(fcb_stack);
     }
 
-    void push_batch(int port,PacketBatch* head) final {
+    void push_batch(int port, PacketBatch* head) final {
             push_flow(port, fcb_data(), head);
     };
 
