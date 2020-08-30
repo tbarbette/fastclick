@@ -591,16 +591,15 @@ endif
 # Additional object files, present at or after DPDK v18.08
 ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -ge 08 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/parameters.o
+	# Some sources are only available for limited DPDK versions
+	ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ $(RTE_VER_YEAR) -le 19 ] ) || ( [ "$(RTE_VER_YEAR)" -eq 20 ] && [ "$(RTE_VER_MONTH)" -le 05 ] ) && echo true),true)
+		PARSE_OBJS += test-pmd/softnicfwd.o
+	endif
 endif
 
 # Additional object files, present at or after DPDK v18.11
 ifeq ($(shell [ -n $(RTE_VER_YEAR) ] && ( ( [ $(RTE_VER_YEAR) -eq 18 ] && [ $(RTE_VER_MONTH) -ge 11 ] ) || [ $(RTE_VER_YEAR) -ge 19 ] ) && echo true),true)
 PARSE_OBJS += test-pmd/noisy_vnf.o test-pmd/util.o
-endif
-
-# Some sources are only available for limited DPDK versions
-ifeq ($(shell [ -n "$(RTE_VER_YEAR)" ] && ( [ "$(RTE_VER_YEAR)" -eq 20 ] && [ "$(RTE_VER_MONTH)" -le 05 ] ) && echo true),true)
-	PARSE_OBJS += test-pmd/softnicfwd.o
 endif
 
 # Additional object files, present at or after DPDK v20.08
