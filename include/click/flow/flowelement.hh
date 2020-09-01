@@ -182,24 +182,31 @@ protected:
     friend class VirtualFlowManager;
 };
 
+/**
+ * This future will only trigger once it is called N times.
+ * N is increased by calling add(). The typical usage is a future
+ * that will only trigger when all parents have called. To do this,
+ * you call add() in the constructor of the parents.
+ */
 class CounterInitFuture : public Router::InitFuture { public:
     CounterInitFuture(String name, std::function<void(void)> on_reached) : _n(0), _name(name), _on_reached(on_reached) {
 
 
     }
 
+    void add() {
+        _n ++;
+    }
+
     virtual void post(Router::InitFuture* future) {
-        _n++;
         Router::InitFuture::post(future);
     }
 
     virtual int solve_initialize(ErrorHandler* errh) {
-        if (_children.size() == _n) {
+        if (--_n == 0) {
             _on_reached();
             return Router::InitFuture::solve_initialize(errh);
         }
-        else
-            return errh->error("%s: router is trying to initialize while all dependent elements have not called", _name.c_str());
         return 0;
     }
 
@@ -228,6 +235,7 @@ protected:
     static void _build_fcb(int verbose,  bool ordered);
     static void build_fcb();
 
+    bool stopClassifier() { return true; };
 };
 
 template<typename T> class FlowSpaceElement : public VirtualFlowSpaceElement {
