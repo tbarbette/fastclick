@@ -329,7 +329,10 @@ FlowARPQuerier::handle_ip(Packet *p, fcb_arpcache* fcb, bool response)
 	    ++_drops;
 	    q->kill();
 	} else {
+
+        SFCB_STACK(
 	    r = _arpt->append_query(dst_ip, q);
+        );
 	    if (r == -EAGAIN)
 		goto retry_read_lock;
 	    if (r < 0)
