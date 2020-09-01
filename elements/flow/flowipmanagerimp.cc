@@ -71,7 +71,7 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
     for (int i = 0; i < passing.size(); i++) {
         if (!passing[i])
             continue;
-        sprintf(buf, "flowipmanager%d", i);
+        sprintf(buf, "%s-%d",name().c_str(), i);
         _tables[i].hash = rte_hash_create(&hash_params);
         if (!_tables[i].hash)
             return errh->error("Could not init flow table %d!", i);

@@ -1,0 +1,21 @@
+%info
+
+TCPRewriter and FTPPortMapper sequence number translation, even for SACK.
+
+%require
+click-buildtool provides flow
+
+%script
+$VALGRIND click -e "
+    Idle 
+         -> FlowIPManagerHMP(RESERVE 2, VERBOSE 1)
+         -> t1 ::  TestFlowSpace
+         -> FlowIPManagerHMP(RESERVE 0, VERBOSE 1)
+         -> t2 ::  TestFlowSpace
+         -> Discard;
+         DriverManager(stop);
+"
+
+%expect stderr
+Placing  t1 :: TestFlowSpace at [2-5]
+Placing  t2 :: TestFlowSpace at [0-3]
