@@ -313,7 +313,7 @@ void VirtualFlowManager::_build_fcb(int verbose, bool _ordered) {
             click_chatter("Placing  %p{element} at [%d-%d]",e,my_place,my_place + e->flow_data_size() -1 );
         already_placed.insert(it->id);
         e->_flow_data_offset = my_place;
-//_fcb_builded_init_future.post(e);
+	_fcb_builded_init_future.post(e);
     }
 
     //Set pool data size for classifiers

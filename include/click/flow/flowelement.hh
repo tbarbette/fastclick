@@ -169,14 +169,12 @@ public:
         return 0;
     }
 
-    //TODO this should be final
     int initialize(ErrorHandler *errh) override CLICK_COLD {
-        _fcb_offset_defined.post(this);
+	//The element itself is automatically posted by build_fcb via  fcb_builded_init_future
 	return 0;
     }
 protected:
 
-    Router::InitFuture _fcb_offset_defined;
     int _flow_data_offset;
     friend class FlowBufferVisitor;
     friend class VirtualFlowManager;
