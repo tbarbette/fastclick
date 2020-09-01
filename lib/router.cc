@@ -848,7 +848,12 @@ Router::adjust_runcount(int32_t delta)
             new_value = STOP_RUNCOUNT;
         else
             new_value = old_value + delta;
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+    } while (! _runcount.compare_and_swap(old_value, new_value));
+#else
     } while (_runcount.compare_swap(old_value, new_value) != old_value);
+#endif
+
     if ((int32_t) new_value <= 0)
         _master->request_stop();
 }

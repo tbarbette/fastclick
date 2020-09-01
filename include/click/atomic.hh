@@ -28,6 +28,25 @@ CLICK_CXX_UNPROTECT
 # endif
 #endif
 
+
+#if HAVE_MULTITHREAD && HAVE_ATOMIC_BUILTINS
+//    #pragma message "atomic.hh: using builtins implementation"
+    # define CLICK_ATOMIC_BUILTINS 1
+    # define CLICK_ATOMIC_MEMORDER __ATOMIC_SEQ_CST
+    //	compare_swap methods are not atomic if using builtins. Disable them
+    # define CLICK_BUILTINS_DEPRECATED = delete
+    # define CLICK_BUILTINS_NONDEPRECATED
+    # define CLICK_ATOMIC_COMPARE_SWAP 0
+#else
+    # define CLICK_ATOMIC_BUILTINS 0
+//    #pragma message "atomic.hh: Using click own implementation"
+    // compare_swap are truly atomics if correctly implemented (e.g. x86).
+    // In this case, we maintain the original Click's deprecation flags
+    # define CLICK_BUILTINS_DEPRECATED
+    # define CLICK_BUILTINS_NONDEPRECATED CLICK_DEPRECATED
+    # define CLICK_ATOMIC_COMPARE_SWAP 1
+#endif
+
 /** @file <click/atomic.hh>
  * @brief An atomic 32-bit integer.
  */
@@ -76,15 +95,16 @@ class atomic_uint32_t { public:
     inline uint32_t fetch_and_add(uint32_t delta);
     inline bool dec_and_test();
     inline bool nonatomic_dec_and_test();
-    inline uint32_t compare_swap(uint32_t expected, uint32_t desired);
-    inline bool compare_and_swap(uint32_t expected, uint32_t desired) CLICK_DEPRECATED;
+    inline uint32_t compare_swap(uint32_t expected, uint32_t desired) CLICK_BUILTINS_DEPRECATED;
+    inline bool compare_and_swap(uint32_t expected, uint32_t desired) CLICK_BUILTINS_NONDEPRECATED;
 
     inline static uint32_t swap(volatile uint32_t &x, uint32_t desired);
     inline static void inc(volatile uint32_t &x);
     inline static bool dec_and_test(volatile uint32_t &x);
-    inline static uint32_t compare_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired);
-    inline static bool compare_and_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired) CLICK_DEPRECATED;
+    inline static uint32_t compare_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired) CLICK_BUILTINS_DEPRECATED;
+    inline static bool compare_and_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired) CLICK_BUILTINS_NONDEPRECATED;
 
+    inline static bool use_builtins(){return CLICK_ATOMIC_BUILTINS;}
   private:
 
 #if CLICK_LINUXMODULE
@@ -135,11 +155,13 @@ class atomic_uint64_t { public:
     inline void operator--();
     inline void operator--(int);
 
-    inline uint64_t compare_swap(uint64_t expected, uint64_t desired);
+    inline uint64_t compare_swap(uint64_t expected, uint64_t desired) CLICK_BUILTINS_DEPRECATED;
     inline uint64_t fetch_and_add(uint64_t delta);
 
     inline static void add(volatile uint64_t &x, uint64_t delta);
-    inline static uint64_t compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired);
+    inline static uint64_t compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired) CLICK_BUILTINS_DEPRECATED;
+
+    inline static bool use_builtins(){return CLICK_ATOMIC_BUILTINS;}
   private:
 
 #if CLICK_LINUXMODULE
@@ -195,6 +217,8 @@ atomic_uint32_t::operator+=(int32_t delta)
 {
 #if CLICK_LINUXMODULE
     atomic_add(delta, &_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_add_fetch(&CLICK_ATOMIC_VAL, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "addl %1,%0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -212,6 +236,8 @@ atomic_uint32_t::operator-=(int32_t delta)
 {
 #if CLICK_LINUXMODULE
     atomic_sub(delta, &_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_sub_fetch(&CLICK_ATOMIC_VAL, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "subl %1,%0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -229,6 +255,8 @@ atomic_uint32_t::operator|=(uint32_t mask)
 {
 #if CLICK_LINUXMODULE && HAVE_LINUX_ATOMIC_SET_MASK
     atomic_set_mask(mask, &_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_or_fetch(&CLICK_ATOMIC_VAL, mask, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "orl %1,%0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -252,6 +280,8 @@ atomic_uint32_t::operator&=(uint32_t mask)
 {
 #if CLICK_LINUXMODULE && HAVE_LINUX_ATOMIC_SET_MASK
     atomic_clear_mask(~mask, &_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_and_fetch(&CLICK_ATOMIC_VAL, mask, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "andl %1,%0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -276,6 +306,8 @@ atomic_uint32_t::inc(volatile uint32_t &x)
 #if CLICK_LINUXMODULE
     static_assert(sizeof(atomic_t) == sizeof(x), "atomic_t expected to take 32 bits.");
     atomic_inc((atomic_t *) &x);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_add_fetch(&x, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "incl %0"
 		  : "=m" (x)
@@ -299,6 +331,8 @@ atomic_uint32_t::operator++()
 {
 #if CLICK_LINUXMODULE
     atomic_inc(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_add_fetch(&_val, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "incl %0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -315,6 +349,8 @@ atomic_uint32_t::operator++(int)
 {
 #if CLICK_LINUXMODULE
     atomic_inc(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_add_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "incl %0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -331,6 +367,8 @@ atomic_uint32_t::operator--()
 {
 #if CLICK_LINUXMODULE
     atomic_dec(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_sub_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "decl %0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -354,6 +392,8 @@ atomic_uint32_t::operator--(int)
 {
 #if CLICK_LINUXMODULE
     atomic_dec(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_sub_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "decl %0"
 		  : "=m" (CLICK_ATOMIC_VAL)
@@ -377,7 +417,12 @@ atomic_uint32_t::operator--(int)
 inline uint32_t
 atomic_uint32_t::swap(volatile uint32_t &x, uint32_t desired)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+    uint32_t actual = x;
+    __atomic_exchange(&x, &desired, &actual, CLICK_ATOMIC_MEMORDER);
+    return actual;
+
+#elif CLICK_ATOMIC_X86
     asm volatile ("xchgl %0,%1"
 		  : "=r" (desired), "=m" (x)
 		  : "0" (desired), "m" (x)
@@ -427,7 +472,9 @@ atomic_uint32_t::swap(uint32_t desired)
 inline uint32_t
 atomic_uint32_t::fetch_and_add(uint32_t delta)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+    return __atomic_fetch_add(&_val, delta, CLICK_ATOMIC_MEMORDER);
+#elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "xaddl %0,%1"
 		  : "=r" (delta), "=m" (CLICK_ATOMIC_VAL)
 		  : "0" (delta), "m" (CLICK_ATOMIC_VAL)
@@ -464,6 +511,8 @@ atomic_uint32_t::dec_and_test(volatile uint32_t &x)
 #if CLICK_LINUXMODULE
     static_assert(sizeof(atomic_t) == sizeof(x), "atomic_t expected to take 32 bits.");
     return atomic_dec_and_test((atomic_t *) &x);
+#elif CLICK_ATOMIC_BUILTINS
+    return __atomic_sub_fetch(&x,1 , CLICK_ATOMIC_MEMORDER) == 0;
 #elif CLICK_ATOMIC_X86
     uint8_t result;
     asm volatile (CLICK_ATOMIC_LOCK "decl %0 ; sete %1"
@@ -492,10 +541,15 @@ atomic_uint32_t::dec_and_test(volatile uint32_t &x)
  * @endcode
  *
  * Also acts as a memory barrier. */
+#if CLICK_ATOMIC_COMPARE_SWAP
 inline uint32_t
 atomic_uint32_t::compare_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+# warning "compare_swap is not truly atomic with system builtins"
+    return __atomic_compare_exchange(&x,&expected,&desired,0,CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
+	? expected : x;
+#elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgl %2,%1"
 		  : "=a" (expected), "=m" (x)
 		  : "r" (desired), "0" (expected), "m" (x)
@@ -519,7 +573,7 @@ atomic_uint32_t::compare_swap(volatile uint32_t &x, uint32_t expected, uint32_t 
     return actual;
 #endif
 }
-
+#endif
 
 /** @brief  Perform a compare-and-swap operation.
  *  @param  x         value
@@ -541,7 +595,10 @@ atomic_uint32_t::compare_swap(volatile uint32_t &x, uint32_t expected, uint32_t 
 inline bool
 atomic_uint32_t::compare_and_swap(volatile uint32_t &x, uint32_t expected, uint32_t desired)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+    return __atomic_compare_exchange(&x,&expected,&desired,0,CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER);
+
+#elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgl %2,%0 ; sete %%al"
 		  : "=m" (x), "=a" (expected)
 		  : "r" (desired), "m" (x), "a" (expected)
@@ -579,6 +636,8 @@ atomic_uint32_t::dec_and_test()
 {
 #if CLICK_LINUXMODULE
     return atomic_dec_and_test(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    return __atomic_sub_fetch(&_val, 1, CLICK_ATOMIC_MEMORDER) == 0;
 #elif CLICK_ATOMIC_X86
     uint8_t result;
     asm volatile (CLICK_ATOMIC_LOCK "decl %0 ; sete %1"
@@ -621,10 +680,15 @@ atomic_uint32_t::nonatomic_dec_and_test()
  * @endcode
  *
  * Also acts as a memory barrier. */
+#if CLICK_ATOMIC_COMPARE_SWAP
 inline uint32_t
 atomic_uint32_t::compare_swap(uint32_t expected, uint32_t desired)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+# warning "compare_swap is not truly atomic with system builtins"
+    return __atomic_compare_exchange(&_val, &expected, &desired, 0, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
+	? expected: _val;
+#elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgl %2,%1"
 		  : "=a" (expected), "=m" (CLICK_ATOMIC_VAL)
 		  : "r" (desired), "0" (expected), "m" (CLICK_ATOMIC_VAL)
@@ -648,6 +712,7 @@ atomic_uint32_t::compare_swap(uint32_t expected, uint32_t desired)
     return actual;
 #endif
 }
+#endif
 
 /** @brief  Perform a compare-and-swap operation.
  *  @param  expected  test value
@@ -668,7 +733,9 @@ atomic_uint32_t::compare_swap(uint32_t expected, uint32_t desired)
 inline bool
 atomic_uint32_t::compare_and_swap(uint32_t expected, uint32_t desired)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+    return __atomic_compare_exchange(&_val, &expected, &desired, 0, CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER);
+#elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgl %2,%0 ; sete %%al"
 		  : "=m" (CLICK_ATOMIC_VAL), "=a" (expected)
 		  : "r" (desired), "m" (CLICK_ATOMIC_VAL), "a" (expected)
@@ -788,6 +855,8 @@ atomic_uint64_t::operator+=(int64_t delta)
 {
 #if CLICK_LINUXMODULE
     atomic64_add(delta, &_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_add_fetch(&_val, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
           : "=m" (CLICK_ATOMIC_VAL)
@@ -805,6 +874,8 @@ atomic_uint64_t::add(volatile uint64_t &x, uint64_t delta)
 {
 #if CLICK_LINUXMODULE
     atomic64_add(delta, (atomic64_t*)&x);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_add_fetch(&x, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "addq %1,%0"
           : "=m" (x)
@@ -821,6 +892,8 @@ atomic_uint64_t::operator-=(int64_t delta)
 {
 #if CLICK_LINUXMODULE
     atomic64_sub(delta, &_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_sub_fetch(&CLICK_ATOMIC_VAL, delta, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "subq %1,%0"
           : "=m" (CLICK_ATOMIC_VAL)
@@ -862,6 +935,8 @@ atomic_uint64_t::operator++(int)
 {
 #if CLICK_LINUXMODULE
     atomic64_inc(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_add_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "incq %0"
           : "=m" (CLICK_ATOMIC_VAL)
@@ -878,6 +953,8 @@ atomic_uint64_t::operator--()
 {
 #if CLICK_LINUXMODULE
     atomic64_dec(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_sub_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "decq %0"
           : "=m" (CLICK_ATOMIC_VAL)
@@ -901,6 +978,8 @@ atomic_uint64_t::operator--(int)
 {
 #if CLICK_LINUXMODULE
     atomic64_dec(&_val);
+#elif CLICK_ATOMIC_BUILTINS
+    __atomic_sub_fetch(&CLICK_ATOMIC_VAL, 1, CLICK_ATOMIC_MEMORDER);
 #elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "decq %0"
           : "=m" (CLICK_ATOMIC_VAL)
@@ -927,10 +1006,15 @@ atomic_uint64_t::operator--(int)
  * @endcode
  *
  * Also acts as a memory barrier. */
+#if CLICK_ATOMIC_COMPARE_SWAP
 inline uint64_t
 atomic_uint64_t::compare_swap(volatile uint64_t &x, uint64_t expected, uint64_t desired)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+# warning "compare_swap is not truly atomic with system builtins"
+    return __atomic_compare_exchange(&x,&expected,&desired,0,CLICK_ATOMIC_MEMORDER, CLICK_ATOMIC_MEMORDER)
+	? expected : x;
+#elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "cmpxchgq %2,%1"
 		  : "=a" (expected), "=m" (x)
 		  : "r" (desired), "0" (expected), "m" (x)
@@ -963,6 +1047,7 @@ atomic_uint64_t::compare_swap(uint64_t expected, uint64_t desired) {
     return atomic_uint64_t::compare_swap(*(volatile uint64_t*)&CLICK_ATOMIC_VAL, expected, desired);
 #endif
 }
+#endif
 
 /** @brief  Atomically add @a delta to the value, returning the old value.
  *
@@ -975,7 +1060,9 @@ atomic_uint64_t::compare_swap(uint64_t expected, uint64_t desired) {
 inline uint64_t
 atomic_uint64_t::fetch_and_add(uint64_t delta)
 {
-#if CLICK_ATOMIC_X86
+#if CLICK_ATOMIC_BUILTINS
+    return __atomic_fetch_add(&_val, delta, CLICK_ATOMIC_MEMORDER);
+#elif CLICK_ATOMIC_X86
     asm volatile (CLICK_ATOMIC_LOCK "xaddq %0,%1"
           : "=r" (delta), "=m" (CLICK_ATOMIC_VAL)
           : "0" (delta), "m" (CLICK_ATOMIC_VAL)

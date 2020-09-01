@@ -653,7 +653,11 @@ class RWLock { public:
         uint32_t current_refcnt;
         do {
             current_refcnt = _refcnt;
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+        } while ((int32_t)current_refcnt < 0 || (!_refcnt.compare_and_swap(current_refcnt,current_refcnt+1)));
+#else
         } while ((int32_t)current_refcnt < 0 || (_refcnt.compare_swap(current_refcnt,current_refcnt+1) != current_refcnt));
+#endif
     }
 
     /**
@@ -680,14 +684,22 @@ class RWLock { public:
      * This function will spin loop while readers have the lock.
      */
     inline void write_begin() {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+        while (!_refcnt.compare_and_swap(0,-1)) click_relax_fence();
+#else
         while (_refcnt.compare_swap(0,-1) != 0) click_relax_fence();
+#endif
     }
 
     /**
      * Start a write critical section only if nobody has the lock.
      */
     inline bool write_attempt() CLICK_WARN_UNUSED_RESULT {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+        return (_refcnt.compare_and_swap(0,-1));
+#else
         return (_refcnt.compare_swap(0,-1) == 0);
+#endif
     }
 
     /**
@@ -814,7 +826,11 @@ class rXwlockPR { public:
                 if ((int32_t)current_refcnt <= -65536) {
                     //Just wait for the other reader out there to win
                 } else {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+                    if (_refcnt.compare_and_swap(current_refcnt,current_refcnt - 65536)) {
+#else
                     if (_refcnt.compare_swap(current_refcnt,current_refcnt - 65536) == current_refcnt) {
+#endif
                         //We could lower the value, so wait for it to reach -65536 (0 writer but one reader waiting) and continue
                         do {
                             click_relax_fence();
@@ -825,7 +841,11 @@ class rXwlockPR { public:
                     }
                 }
             } else { // >= 0, just grab another reader (>0)
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+                if (likely(_refcnt.compare_and_swap(current_refcnt,current_refcnt+1)))
+#else
                 if (likely(_refcnt.compare_swap(current_refcnt,current_refcnt+1) == current_refcnt))
+#endif
                     break;
             }
             click_relax_fence();
@@ -846,7 +866,11 @@ class rXwlockPR { public:
         do {
             current_refcnt = _refcnt;
             if (likely((int32_t)current_refcnt <= 0 && (int32_t)current_refcnt > max_write)) {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+                if (_refcnt.compare_and_swap(current_refcnt,current_refcnt - 1))
+#else
                 if (_refcnt.compare_swap(current_refcnt,current_refcnt - 1) == current_refcnt)
+#endif
                     break;
             }
             click_relax_fence();
@@ -900,7 +924,11 @@ class rXwlockPW { public:
                 if ((int32_t)current_refcnt <= -65536) {
                     //Just wait for the other reader out there to win
                 } else {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+                    if (_refcnt.compare_and_swap(current_refcnt,current_refcnt - 65536)) {
+#else
                     if (_refcnt.compare_swap(current_refcnt,current_refcnt - 65536) == current_refcnt) {
+#endif
                         //We could lower the value, so wait for it to reach -65536 (0 writer but one reader waiting) and continue
                         do {
                             click_relax_fence();
@@ -911,7 +939,11 @@ class rXwlockPW { public:
                     }
                 }
             } else { // >= 0, just grab another reader (>0)
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+                if (likely(_refcnt.compare_and_swap(current_refcnt,current_refcnt+1)))
+#else
                 if (likely(_refcnt.compare_swap(current_refcnt,current_refcnt+1) == current_refcnt))
+#endif
                     break;
             }
             click_relax_fence();
@@ -932,7 +964,11 @@ class rXwlockPW { public:
         do {
             current_refcnt = _refcnt;
             if (likely((int32_t)current_refcnt <= 0 && (int32_t)current_refcnt > max_write)) {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+                if (_refcnt.compare_and_swap(current_refcnt,current_refcnt - 1))
+#else
                 if (_refcnt.compare_swap(current_refcnt,current_refcnt - 1) == current_refcnt)
+#endif
                     break;
             }
             click_relax_fence();
@@ -960,7 +996,11 @@ class rXwlock { public:
     inline void read_begin() {
         uint32_t current_refcnt;
         current_refcnt = _refcnt;
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+        while ((int32_t)current_refcnt < 0 || !_refcnt.compare_and_swap(current_refcnt,current_refcnt+1)) {
+#else
         while ((int32_t)current_refcnt < 0 || _refcnt.compare_swap(current_refcnt,current_refcnt+1) != current_refcnt) {
+#endif
             click_relax_fence();
             current_refcnt = _refcnt;
         }
@@ -984,7 +1024,11 @@ class rXwlock { public:
     inline void write_begin() {
         uint32_t current_refcnt;
         current_refcnt = _refcnt;
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+        while ((int32_t)current_refcnt > 0 || !_refcnt.compare_and_swap(current_refcnt,current_refcnt-1)) {
+#else
         while ((int32_t)current_refcnt > 0 || _refcnt.compare_swap(current_refcnt,current_refcnt-1) != current_refcnt) {
+#endif
             click_relax_fence();
             current_refcnt = _refcnt;
         }
@@ -1207,7 +1251,11 @@ RWLock::read_to_write() {
        click_write_fence();
 
        //All that being said, we make a first attempt in case we would be the only reader
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+       if (_refcnt.compare_and_swap(1,-1))
+#else
        if (_refcnt.compare_swap(1,-1) == 1)
+#endif
                return true;
 
        uint32_t current_refcnt;
@@ -1220,8 +1268,13 @@ RWLock::read_to_write() {
                click_relax_fence();
                return false;
            }
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+       } while (!_refcnt.compare_and_swap(current_refcnt,new_refcnt));
+       while (!_refcnt.compare_and_swap(1000001,-1)) click_relax_fence();
+#else
        } while (_refcnt.compare_swap(current_refcnt,new_refcnt) != current_refcnt);
        while (_refcnt.compare_swap(1000001,-1) != 1000001) click_relax_fence();
+#endif
        return true;
 }
 
@@ -1294,7 +1347,11 @@ class click_rcu { public:
             rcu_current_local = rcu_current;
             click_read_fence();
             current_refcnt = refcnt[rcu_current_local].value();
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+            if (current_refcnt == (uint32_t)-1 || !(refcnt[rcu_current_local].compare_and_swap(current_refcnt,current_refcnt+1))) {
+#else
             if (current_refcnt == (uint32_t)-1 || (refcnt[rcu_current_local].compare_swap(current_refcnt,current_refcnt+1) != current_refcnt)) {
+#endif
                 click_relax_fence();
             } else {
                 break;
@@ -1328,7 +1385,11 @@ class click_rcu { public:
         retry:
         do {
             rcu_next = (rcu_current + 1) & 1;
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+        } while (!refcnt[rcu_next].compare_and_swap(0,-1));
+#else
         } while (refcnt[rcu_next].compare_swap(0,-1) != 0);
+#endif
 
         /*As the other writer writes the refcnt before rcu_current, we could
          *have grabbed the new actual bucket*/
