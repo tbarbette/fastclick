@@ -303,11 +303,20 @@ inline bool NotifierSignal::set_active(bool active) {
     uint32_t expected = *_v.v1;
 #if !CLICK_USERLEVEL || HAVE_MULTITHREAD
     while (_mask) {
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+	// TODO: is it equivalent to compare_swap branch?
+	uint32_t desired = (active ? expected | _mask : expected & ~_mask);
+	if(_v.v1->compare_and_swap(expected, desired))
+	    break;
+	expected = *(_v.v1);
+
+#else
 	uint32_t desired = (active ? expected | _mask : expected & ~_mask);
 	uint32_t actual = _v.v1->compare_swap(expected, desired);
 	if (expected == actual)
 	    break;
 	expected = actual;
+#endif
     }
 #else
     *_v.v1 = (active ? expected | _mask : expected & ~_mask);

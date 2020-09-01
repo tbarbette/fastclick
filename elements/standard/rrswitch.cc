@@ -58,7 +58,11 @@ RoundRobinSwitch::next(Packet*)
     uint32_t newval = i+1;
     if (newval >= _max)
       newval = 0;
+#if ! CLICK_ATOMIC_COMPARE_SWAP
+    _next.compare_and_swap(i, newval);
+#else
     _next.compare_swap(i, newval);
+#endif
   #endif
     return i;
 }

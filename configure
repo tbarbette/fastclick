@@ -882,6 +882,7 @@ with_numa
 with_netmap
 with_proper
 with_expat
+enable_atomic_builtins
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1613,6 +1614,9 @@ Optional Features:
                           unportable binaries
   --enable-intel-cpu      enable Intel-specific machine instructions
   --enable-avx2           check whether AVX2 is enabled, default yes
+  --enable-atomic-builtins If specified, use the GCC builtins function to
+			  implement the atomic variables. It should be specified
+			  when not on a x86 platform. Requires GCC >= 4.7.0
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -6496,6 +6500,10 @@ fi
 
 if test "x$enable_fullpush_nonatomic" = "xyes"; then
     $as_echo "#define HAVE_FULLPUSH_NONATOMIC 1" >>confdefs.h
+
+fi
+if test "${enable_atomic_builtins+set}" = "set"; then
+    $as_echo "#define HAVE_ATOMIC_BUILTINS 1" >>confdefs.h
 
 fi
 
