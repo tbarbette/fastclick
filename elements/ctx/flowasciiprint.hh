@@ -33,7 +33,7 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
-    void push_batch(int port, fcb_FlowASCIIPrint* fcb, PacketBatch*) override;
+    void push_flow(int port, fcb_FlowASCIIPrint* fcb, PacketBatch*) override;
 
 private:
     bool _active;

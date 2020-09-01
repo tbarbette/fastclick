@@ -82,7 +82,7 @@ public:
     enum fill_method _fill;
 protected:
 
-    void push_batch(int port, fcb_httpin* fcb, PacketBatch* flow) override;
+    void push_flow(int port, fcb_httpin* fcb, PacketBatch* flow) override;
 
     virtual bool isLastUsefulPacket(Packet *packet);
 

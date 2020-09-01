@@ -88,7 +88,7 @@ int constexpr length(const char* str)
     return *str ? 1 + length(str + 1) : 0;
 }
 
-void HTTPIn::push_batch(int port, fcb_httpin* fcb, PacketBatch* flow)
+void HTTPIn::push_flow(int port, fcb_httpin* fcb, PacketBatch* flow)
 {
     auto fnt = [this,fcb](Packet* &p) -> bool {
         // Check that the packet contains HTTP content

@@ -66,7 +66,7 @@ public:
     bool new_flow(TCPStateEntry*, Packet*);
     void release_flow(TCPStateEntry*);
 
-    void push_batch(int, TCPStateEntry*, PacketBatch *);
+    void push_flow(int, TCPStateEntry*, PacketBatch *);
 
 
     static String read_handler(Element* e, void* thunk);

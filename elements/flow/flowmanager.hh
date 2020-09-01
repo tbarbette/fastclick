@@ -1,5 +1,5 @@
-#ifndef CLICK_FLOWCLASSIFIER_HH
-#define CLICK_FLOWCLASSIFIER_HH
+#ifndef CLICK_FLOWMANAGER_HH
+#define CLICK_FLOWMANAGER_HH
 #include <click/string.hh>
 #include <click/timer.hh>
 #include <click/multithread.hh>

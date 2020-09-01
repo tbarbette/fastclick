@@ -7,7 +7,7 @@
 #include <click/router.hh>
 #include <click/args.hh>
 #include <click/error.hh>
-#include "flowcounter.hh"
+#include "ctxcounter.hh"
 
 CLICK_DECLS
 

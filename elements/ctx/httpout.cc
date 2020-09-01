@@ -49,7 +49,7 @@ int HTTPOut::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-void HTTPOut::push_batch(int, struct fcb_httpout* fcb, PacketBatch* flow)
+void HTTPOut::push_flow(int, struct fcb_httpout* fcb, PacketBatch* flow)
 {
     Packet* lastPacket = 0;
     bool doClose = false;

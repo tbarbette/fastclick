@@ -83,7 +83,7 @@ WordMatcher::maxModificationLevel(Element* stop) {
 }
 
 
-void WordMatcher::push_batch(int port, fcb_WordMatcher* WordMatcher, PacketBatch* flow)
+void WordMatcher::push_flow(int port, fcb_WordMatcher* WordMatcher, PacketBatch* flow)
 {
     WordMatcher->flowBuffer.enqueueAll(flow);
 

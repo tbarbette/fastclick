@@ -26,7 +26,7 @@ int FlowASCIIPrint::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-void FlowASCIIPrint::push_batch(int port, fcb_FlowASCIIPrint* fcb, PacketBatch* flow)
+void FlowASCIIPrint::push_flow(int port, fcb_FlowASCIIPrint* fcb, PacketBatch* flow)
 {
     if (!_active) {
         output_push_batch(0, flow);

@@ -110,7 +110,7 @@ SimpleTCPRetransmitter::forward_packets(fcb_transmit_buffer* fcb, PacketBatch* b
 }
 
 void
-SimpleTCPRetransmitter::push_batch(int port, fcb_transmit_buffer* fcb, PacketBatch *batch)
+SimpleTCPRetransmitter::push_flow(int port, fcb_transmit_buffer* fcb, PacketBatch *batch)
 {
     //If the flow is killed, just push the batch to port 0 (let RST go through)
     if (unlikely(!_in->fcb_data()->common || _in->fcb_data()->common->state == TCPState::CLOSED)) {

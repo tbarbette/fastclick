@@ -46,7 +46,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
 
-    void push_batch(int, SMapInfo*, PacketBatch *);
+    void push_flow(int, SMapInfo*, PacketBatch *);
 private:
     struct state {
         int last;
@@ -71,7 +71,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *errh);
 
-    void push_batch(int, PacketBatch *);
+    void push_flow(int, PacketBatch *);
 private:
     IPAddress _ip;
 };

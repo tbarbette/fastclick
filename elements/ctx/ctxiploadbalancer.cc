@@ -40,7 +40,7 @@ int CTXIPLoadBalancer::initialize(ErrorHandler *errh) {
 }
 
 
-void CTXIPLoadBalancer::push_batch(int, SMapInfo* flowdata, PacketBatch* batch) {
+void CTXIPLoadBalancer::push_flow(int, SMapInfo* flowdata, PacketBatch* batch) {
 
     state &s = *_state;
     if (flowdata->srv == 0) {
@@ -89,7 +89,7 @@ int CTXIPLoadBalancerReverse::initialize(ErrorHandler *errh) {
 
 
 
-void CTXIPLoadBalancerReverse::push_batch(int, PacketBatch* batch) {
+void CTXIPLoadBalancerReverse::push_flow(int, PacketBatch* batch) {
     auto fnt = [this](Packet*p) -> Packet*{
         WritablePacket* q=p->uniqueify();
         q->rewrite_ip(_ip,0, true);

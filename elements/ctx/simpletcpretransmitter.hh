@@ -63,7 +63,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
 
-    void push_batch(int port, fcb_transmit_buffer*, PacketBatch *batch);
+    void push_flow(int port, fcb_transmit_buffer*, PacketBatch *batch);
 
     static const int timeout = 0; //Timeout will be managed by TCP
 

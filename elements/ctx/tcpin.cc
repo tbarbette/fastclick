@@ -407,7 +407,7 @@ TCPIn::processOrderedTCP(fcb_tcpin* fcb_in, Packet* p) {
     }
 }
 
-void TCPIn::push_batch(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
+void TCPIn::push_flow(int port, fcb_tcpin* fcb_in, PacketBatch* flow)
 {
     // Assign the tcp_common structure if not already done
     //click_chatter("Fcb in : %p, Common : %p, Batch : %p, State %d", fcb_in, fcb_in->common,flow,(fcb_in->common?fcb_in->common->state:-1));

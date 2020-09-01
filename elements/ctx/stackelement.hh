@@ -286,12 +286,12 @@ public :
         return fcb_data_for(fcb_stack);
     }
 
-    void push_batch(int port,PacketBatch* head) final {
+    void push_batch(int port, PacketBatch* head) final {
         //click_chatter("Pushing packet batch %p with fcb %p in %p{element}",head,fcb_data(),this);
-        push_batch(port, fcb_data(), head);
+        push_flow(port, fcb_data(), head);
     }
 
-    virtual void push_batch(int port, T* flowdata, PacketBatch* head) = 0;
+    virtual void push_flow(int port, T* flowdata, PacketBatch* head) = 0;
 
  };
 
@@ -355,7 +355,7 @@ struct BufferData {
  *
  * The child must implement :
  * bool new_flow(T*, Packet*);
- * void push_batch(int port, T*, Packet*);
+ * void push_flow(int port, T*, Packet*);
  * void release_flow(T*);
  *
  * This is the equivalent to FlowStateElement but use the last Stack element to
@@ -403,7 +403,7 @@ public :
             my_fcb->previous_fnt(fcb, my_fcb->previous_thunk);
     }
 
-    void push_batch(int port,PacketBatch* head) final {
+    void push_batch(int port, PacketBatch* head) final {
          auto my_fcb = my_fcb_data();
          if (!my_fcb->seen) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
@@ -416,7 +416,7 @@ public :
                  head->fast_kill();
              }
          }
-         static_cast<Derived*>(this)->push_batch(port, &my_fcb->v, head);
+         static_cast<Derived*>(this)->push_flow(port, &my_fcb->v, head);
     };
 
 
@@ -434,7 +434,7 @@ class StackBufferElement : public StackStateElement<Derived, BufferData<T>>
 
     const char *processing() const final    { return Element::PUSH; }
 
-    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
+    void push_flow(int port, BufferData<T>* fcb_data, PacketBatch* flow)
     {
         auto it = fcb_data->flowBuffer.enqueueAllIter(flow);
         int action = static_cast<Derived*>(this)->process_data(&fcb_data->userdata,it);
@@ -482,7 +482,7 @@ class StackChunkBufferElement : public StackStateElement<Derived, BufferData<T>>
     }
 
 
-    void push_batch(int port, BufferData<T>* fcb_data, PacketBatch* flow)
+    void push_flow(int port, BufferData<T>* fcb_data, PacketBatch* flow)
     {
         auto it = fcb_data->flowBuffer.enqueueAllChunkIter(flow);
         int action = static_cast<Derived*>(this)->process_data(&fcb_data->userdata,it);

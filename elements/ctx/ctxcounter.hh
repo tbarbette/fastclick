@@ -3,7 +3,7 @@
 #include <click/element.hh>
 #include <click/vector.hh>
 #include <click/multithread.hh>
-#include <click/flow/flowelement.hh>
+#include "stackelement.hh"
 
 CLICK_DECLS
 

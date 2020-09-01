@@ -161,7 +161,7 @@ public:
 
     FLOW_ELEMENT_DEFINE_SESSION_CONTEXT(DEFAULT_4TUPLE,FLOW_TCP);
 
-    void push_batch(int port, fcb_tcpin* fcb, PacketBatch* flow);
+    void push_flow(int port, fcb_tcpin* fcb, PacketBatch* flow);
 
     /**
      * @brief Return the TCPOut element associated

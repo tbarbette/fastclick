@@ -64,7 +64,7 @@ int TCPRetransmitter::initialize(ErrorHandler *errh) {
     return 0;
 }
 
-void TCPRetransmitter::push_batch(int port, PacketBatch *batch)
+void TCPRetransmitter::push_flow(int port, PacketBatch *batch)
 {
     unsigned int flowDirection = determineFlowDirection();
     unsigned int oppositeFlowDirection = 1 - flowDirection;

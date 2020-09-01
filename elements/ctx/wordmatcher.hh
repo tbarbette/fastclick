@@ -66,7 +66,7 @@ public:
 
     int configure(Vector<String> &, ErrorHandler *) override CLICK_COLD;
 
-    void push_batch(int port, fcb_WordMatcher* fcb, PacketBatch*) override;
+    void push_flow(int port, fcb_WordMatcher* fcb, PacketBatch*) override;
 
     static String read_handler(Element *e, void *thunk);
     void add_handlers() override;

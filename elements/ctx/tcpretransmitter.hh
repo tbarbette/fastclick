@@ -78,7 +78,7 @@ public:
     int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
     int initialize(ErrorHandler *) CLICK_COLD;
 
-    void push_batch(int port, PacketBatch *batch);
+    void push_flow(int port, PacketBatch *batch);
 
     /**
      * @brief Called when the retransmission timer fired. Will retransmit the corresponding data

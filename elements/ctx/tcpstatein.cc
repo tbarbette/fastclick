@@ -129,7 +129,7 @@ void TCPStateIN::release_flow(TCPStateEntry* fcb) {
     }
 }
 
-void TCPStateIN::push_batch(int port, TCPStateEntry* flowdata, PacketBatch* batch) {
+void TCPStateIN::push_flow(int port, TCPStateEntry* flowdata, PacketBatch* batch) {
     auto fnt = [this,flowdata](Packet* p) -> Packet*{
         if (!flowdata->common) {
             //A packet arrived without a common but which is already seen. That's probably reusing of a connection, or a lost packet from a long time ago

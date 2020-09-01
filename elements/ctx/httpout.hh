@@ -58,7 +58,7 @@ public:
 
     int initialize(ErrorHandler *) override CLICK_COLD;
 
-    void push_batch(int, struct fcb_httpout*, PacketBatch*) override;
+    void push_flow(int, struct fcb_httpout*, PacketBatch*) override;
 protected:
     /** @brief Modify the content of an HTTP header
      * @param fcb Pointer to the FCB of the flow
